@@ -94,7 +94,7 @@ def _validate_isolated(prop, value):
   if value:
     if not _HASH_CHARS.issuperset(value) or len(value) != 40:
       raise datastore_errors.BadValueError(
-          '%s must be lowercase hex, not %s' % (prop._name, value))
+          '%s must be lowercase hex of length 40, not %s' % (prop._name, value))
 
 
 def _validate_hostname(prop, value):
@@ -208,13 +208,6 @@ def _validate_tags(prop, value):
         '%s must be key:value form, not %s' % (prop._name, value))
 
 
-def _validate_args(prop, value):
-  if not (isinstance(value, list) and all(
-      isinstance(arg, unicode) for arg in value)):
-    raise datastore_errors.BadValueError(
-        '%s must be a list of unicode strings, not %r' % (prop._name, value))
-
-
 ### Models.
 
 
@@ -245,9 +238,16 @@ class TaskProperties(ndb.Model):
   This model is immutable.
 
   New-style TaskProperties supports invocation of run_isolated. When this
-  behavior is desired, .commands and .data must be omitted; instead, the members
-  .isolated, .isolatedserver, .namespace, and (optionally) .extra_args should
-  be supplied instead.
+  behavior is desired, .data must be omitted; instead, the member
+  .inputs_ref must be suppled. .extra_args can be supplied to pass extraneous
+  arguments.
+
+  TODO(maruel): Overhaul of this entity:
+  - Convert commands to command as a single list of strings.
+  - Delete data
+  Doing so will cause a new property hash on all entities, which will
+  temporarily break the task deduplication. This happens whenever an new member
+  is added anyway.
   """
   # Hashing algorithm used to hash TaskProperties to create its key.
   HASHING_ALGO = hashlib.sha1
@@ -280,9 +280,9 @@ class TaskProperties(ndb.Model):
   execution_timeout_secs = ndb.IntegerProperty(
       validator=_validate_timeout, required=True, indexed=False)
 
-  # Extra arguments to supply to the command `python run_isolated ... .`
-  extra_args = datastore_utils.DeterministicJsonProperty(
-      validator=_validate_args, json_type=list, indexed=False)
+  # Extra arguments to supply to the command `python run_isolated ...`. Can only
+  # be set if inputs_ref is set.
+  extra_args = ndb.StringProperty(repeated=True, indexed=False)
 
   # Grace period is the time between signaling the task it timed out and killing
   # the process. During this time the process should clean up itself as quickly
@@ -316,15 +316,16 @@ class TaskProperties(ndb.Model):
 
   def _pre_put_hook(self):
     super(TaskProperties, self)._pre_put_hook()
-    if not self.commands:
-      # TODO(maruel): Remove once supported.
-      raise datastore_errors.BadValueError('commands is required')
-    if len(self.commands) > 1:
+    if len(self.commands or []) > 1:
       raise datastore_errors.BadValueError('Only one command is supported')
     if bool(self.commands) == bool(self.inputs_ref):
       raise datastore_errors.BadValueError('use one of command or inputs_ref')
     if self.data and not self.commands:
-      raise datastore_errors.BadValueError('data requires command')
+      raise datastore_errors.BadValueError('data requires commands')
+    if self.extra_args and not self.inputs_ref:
+      raise datastore_errors.BadValueError('extra_args require inputs_ref')
+    if self.inputs_ref:
+      self.inputs_ref._pre_put_hook()
 
 
 class TaskRequest(ndb.Model):
@@ -336,8 +337,7 @@ class TaskRequest(ndb.Model):
 
   There is also "old style keys" which inherit from a fake root entity
   TaskRequestShard.
-
-  TODO(maruel): Remove support 2015-02-01.
+  TODO(maruel): Remove support 2015-10-01 once entities are deleted.
 
   This model is immutable.
   """

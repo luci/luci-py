@@ -196,7 +196,7 @@ class TaskRequestApiTest(TestCase):
       ],
       'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
       'env': {u'foo': u'bar', u'joe': u'2'},
-      'extra_args': None,
+      'extra_args': [],
       'execution_timeout_secs': 30,
       'grace_period_secs': 30,
       'idempotent': True,
@@ -209,7 +209,63 @@ class TaskRequestApiTest(TestCase):
       'parent_task_id': unicode(parent_id),
       'priority': 49,
       'properties': expected_properties,
-      'properties_hash': '1bfafe595dd8b17def8f4dccfc60b597fdee0f28',
+      'properties_hash': 'b45f6f868f9227c3035cd82b4a5b0360f5ce6f61',
+      'tags': [
+        u'OS:Windows-3.1.1',
+        u'hostname:localhost',
+        u'priority:49',
+        u'tag:1',
+        u'user:Jesus',
+      ],
+      'user': u'Jesus',
+    }
+    actual = request.to_dict()
+    actual.pop('created_ts')
+    actual.pop('expiration_ts')
+    self.assertEqual(expected_request, actual)
+    self.assertEqual(30, request.expiration_secs)
+
+  def test_make_request_isolated(self):
+    parent = task_request.make_request(
+        _gen_request(
+            properties={
+              'commands': None,
+              'data': None,
+              'inputs_ref': {
+                'isolated': '0123456789012345678901234567890123456789',
+                'isolatedserver': 'http://localhost:1',
+                'namespace': 'default-gzip',
+              },
+            }),
+        True)
+    # Hack: Would need to know about TaskResultSummary.
+    parent_id = task_pack.pack_request_key(parent.key) + '1'
+    request = task_request.make_request(
+        _gen_request(properties={'idempotent':True}, parent_task_id=parent_id),
+        True)
+    expected_properties = {
+      'commands': [[u'command1', u'arg1']],
+      'data': [
+        # Items were sorted.
+        [u'http://localhost/bar', u'bar.zip'],
+        [u'http://localhost/foo', u'foo.zip'],
+      ],
+      'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
+      'env': {u'foo': u'bar', u'joe': u'2'},
+      'extra_args': [],
+      'execution_timeout_secs': 30,
+      'grace_period_secs': 30,
+      'idempotent': True,
+      'inputs_ref': None,
+      'io_timeout_secs': None,
+    }
+    expected_request = {
+      'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
+      'name': u'Request name',
+      'parent_task_id': unicode(parent_id),
+      'priority': 49,
+      'properties': expected_properties,
+      'properties_hash': 'b45f6f868f9227c3035cd82b4a5b0360f5ce6f61',
       'tags': [
         u'OS:Windows-3.1.1',
         u'hostname:localhost',
@@ -246,7 +302,7 @@ class TaskRequestApiTest(TestCase):
     self.assertEqual(True, as_dict['properties']['idempotent'])
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        '1bfafe595dd8b17def8f4dccfc60b597fdee0f28', as_dict['properties_hash'])
+        'b45f6f868f9227c3035cd82b4a5b0360f5ce6f61', as_dict['properties_hash'])
 
   def test_duped(self):
     # Two TestRequest with the same properties.
@@ -387,7 +443,7 @@ class TaskRequestApiTest(TestCase):
       'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
       'env': {u'foo': u'bar', u'joe': u'2'},
       'execution_timeout_secs': 30,
-      'extra_args': None,
+      'extra_args': [],
       'grace_period_secs': 30,
       'idempotent': False,
       'inputs_ref': None,

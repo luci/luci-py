@@ -172,10 +172,13 @@ class Endpoints(object):
   def call_api(self, method, body=None, status=200):
     """Calls endpoints API method identified by its name."""
     assert hasattr(self._api_service_cls, method), method
-    return self._api_app.post_json(
-        '/_ah/spi/%s.%s' % (self._api_service_cls.__name__, method),
-        body or {},
-        status=status)
+    res = '/_ah/spi/%s.%s' % (self._api_service_cls.__name__, method)
+    try:
+      return self._api_app.post_json(res, body or {}, status=status)
+    except Exception as e:
+      # Useful for diagnosing issues in test cases.
+      logging.info('%s failed: %s', res, e)
+      raise
 
 
 class EndpointsTestCase(TestCase):

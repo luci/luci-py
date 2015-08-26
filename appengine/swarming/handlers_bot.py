@@ -354,24 +354,27 @@ class BotPollHandler(_BotBaseHandler):
       self.abort(500, 'Deadline')
 
   def _cmd_run(self, request, run_result_key, bot_id):
+    # Only one of 'command' or 'inputs_ref' can be set.
     out = {
       'cmd': 'run',
       'manifest': {
         'bot_id': bot_id,
-        'command': request.properties.commands[0],
+        'command':
+            request.properties.commands[0]
+            if request.properties.commands else None,
         'data': request.properties.data,
         'dimensions': request.properties.dimensions,
         'env': request.properties.env,
-        'extra_args': None,
+        'extra_args': request.properties.extra_args,
         'grace_period': request.properties.grace_period_secs,
         'hard_timeout': request.properties.execution_timeout_secs,
         'host': utils.get_versioned_hosturl(),
-        'inputs_ref': None,
         'io_timeout': request.properties.io_timeout_secs,
+        'inputs_ref': request.properties.inputs_ref,
         'task_id': task_pack.pack_run_result_key(run_result_key),
       },
     }
-    self.send_response(out)
+    self.send_response(utils.to_json_encodable(out))
 
   def _cmd_sleep(self, sleep_streak, quarantined):
     out = {
@@ -466,7 +469,8 @@ class BotTaskUpdateHandler(auth.ApiHandler):
   """
   ACCEPTED_KEYS = {
     u'cost_usd', u'duration', u'exit_code', u'hard_timeout',
-    u'id', u'io_timeout', u'output', u'output_chunk_start', u'task_id',
+    u'id', u'io_timeout', u'output', u'output_chunk_start', u'outputs_ref',
+    u'task_id',
   }
   REQUIRED_KEYS = {u'id', u'task_id'}
 
@@ -491,6 +495,7 @@ class BotTaskUpdateHandler(auth.ApiHandler):
     io_timeout = request.get('io_timeout')
     output = request.get('output')
     output_chunk_start = request.get('output_chunk_start')
+    outputs_ref = request.get('outputs_ref')
 
     run_result_key = task_pack.unpack_run_result_key(task_id)
     if output is not None:
@@ -508,7 +513,7 @@ class BotTaskUpdateHandler(auth.ApiHandler):
     try:
       success, completed = task_scheduler.bot_update_task(
           run_result_key, bot_id, output, output_chunk_start,
-          exit_code, duration, hard_timeout, io_timeout, cost_usd)
+          exit_code, duration, hard_timeout, io_timeout, cost_usd, outputs_ref)
       if not success:
         self.abort_with_error(500, error='Failed to update, please retry')
 

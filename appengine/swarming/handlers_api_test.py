@@ -152,7 +152,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     response = self.app.post_json(
         '/swarming/api/v1/client/request',
         headers=headers, params=params, status=400).json
-    self.assertEqual({u'error': u'commands is required'}, response)
+    self.assertEqual({u'error': u'use one of command or inputs_ref'}, response)
 
   def test_request(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -197,7 +197,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
           u'dimensions': {},
           u'env': {},
           u'execution_timeout_secs': 30,
-          u'extra_args': None,
+          u'extra_args': [],
           u'grace_period_secs': 30,
           u'idempotent': False,
           u'inputs_ref': None,
@@ -467,7 +467,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
         u'dimensions': {u'os': u'Amiga'},
         u'env': {},
         u'execution_timeout_secs': 3600,
-        u'extra_args': None,
+        u'extra_args': [],
         u'grace_period_secs': 30,
         u'idempotent': False,
         u'inputs_ref': None,
@@ -520,7 +520,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
       u'modified_ts': now_str,
       u'name': u'first',
       u'outputs_ref': None,
-      u'properties_hash': u'6123129861fcb53c979a9247ebd7cc3743d3f550',
+      u'properties_hash': u'8771754ee465a689f19c87f2d21ea0d9b8dd4f64',
       u'server_versions': [u'v1a'],
       u'started_ts': now_str,
       u'state': task_result.State.COMPLETED,

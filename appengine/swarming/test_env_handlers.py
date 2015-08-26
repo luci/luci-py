@@ -6,15 +6,21 @@
 """Base class for handlers_*_test.py"""
 
 import base64
+import json
 import os
 
 import test_env
 test_env.setup_test_env()
 
+from google.appengine.api import users
 from google.appengine.ext import ndb
 
+import endpoints
+from protorpc.remote import protojson
 import webtest
 
+import handlers_endpoints
+import swarming_rpcs
 from components import auth
 from components import auth_testing
 from components import stats_framework
@@ -171,6 +177,46 @@ class AppTestBase(test_case.TestCase):
         headers=headers,
         params=params).json
     return response['xsrf_token'].encode('ascii')
+
+  def client_create_task_isolated(self, properties=None, **kwargs):
+    """Creates a TaskRequest via the Cloud Endpoints API."""
+    params = {
+      'dimensions': [
+        {'key': 'os', 'value': 'Amiga'},
+      ],
+      'env': [],
+      'execution_timeout_secs': 3600,
+      'io_timeout_secs': 1200,
+      'inputs_ref': {
+        'isolated': '0123456789012345678901234567890123456789',
+        'isolatedserver': 'http://localhost:1',
+        'namespace': 'default-gzip',
+      },
+    }
+    params.update(properties or {})
+    props = swarming_rpcs.TaskProperties(**params)
+
+    params = {
+      'expiration_secs': 24*60*60,
+      'name': 'hi',
+      'priority': 10,
+      'tags': [],
+      'user': 'joe@localhost',
+    }
+    params.update(kwargs)
+    request = swarming_rpcs.TaskRequest(properties=props, **params)
+    api = test_case.Endpoints(handlers_endpoints.SwarmingTasksService)
+    # Poor's man authentication.
+    old_get_current_user = endpoints.get_current_user
+    endpoints.get_current_user = lambda: users.User(
+        'admin@example.com', 'localhost')
+    try:
+      response = api.call_api(
+          'new', body=json.loads(protojson.encode_message(request)))
+    finally:
+      endpoints.get_current_user = old_get_current_user
+    response = response.json
+    return response, response['task_id']
 
   def client_create_task_raw(self, properties=None, **kwargs):
     """Creates a TaskRequest via the client API."""

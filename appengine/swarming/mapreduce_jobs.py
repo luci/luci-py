@@ -32,6 +32,12 @@ MAPREDUCE_JOBS = {
       'entity_kind': 'server.task_result.TaskResultSummary',
     },
   },
+  'fix_extra_args': {
+    'name': 'fix_extra_args',
+    'mapper_parameters': {
+      'entity_kind': 'server.task_request.TaskRequest',
+    },
+  },
 }
 
 
@@ -78,3 +84,11 @@ def backfill_tags(entity):
       task_result_summary.put()
 
   ndb.transaction(fix_task_result_summary, use_cache=False, use_memcache=False)
+
+
+def fix_extra_args(entity):
+  if entity.properties.extra_args == [None]:
+    entity.properties.extra_args = []
+    logging.info('Fixed %s', entity.task_id)
+    yield operation.db.Put(entity)
+    return

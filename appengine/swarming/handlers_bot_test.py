@@ -216,7 +216,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     }
     self.assertEqual(expected, response)
 
-  def test_poll_task(self):
+  def test_poll_task_raw(self):
     # Successfully poll a task.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
@@ -238,11 +238,70 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'data': [],
         u'dimensions': {u'os': u'Amiga'},
         u'env': {},
-        u'extra_args': None,
+        u'extra_args': [],
         u'grace_period': 30,
         u'hard_timeout': 3600,
         u'host': u'http://localhost:8080',
         u'inputs_ref': None,
+        u'io_timeout': 1200,
+        u'task_id': task_id,
+      },
+    }
+    self.assertEqual(expected, response)
+    response = self.client_get_results(task_id)
+    expected = {
+      u'abandoned_ts': None,
+      u'bot_dimensions': {u'id': [u'bot1'], u'os': [u'Amiga']},
+      u'bot_id': u'bot1',
+      u'bot_version': self.bot_version,
+      u'children_task_ids': [],
+      u'completed_ts': None,
+      u'cost_usd': 0.,
+      u'durations': [],
+      u'exit_codes': [],
+      u'failure': False,
+      u'id': u'5cee488008811',
+      u'internal_failure': False,
+      u'modified_ts': str_now,
+      u'outputs_ref': None,
+      u'server_versions': [u'v1a'],
+      u'started_ts': str_now,
+      u'state': task_result.State.RUNNING,
+      u'try_number': 1,
+    }
+    self.assertEqual(expected, response)
+
+  def test_poll_task_isolated(self):
+    # Successfully poll a task.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+    str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
+    # A bot polls, gets a task, updates it, completes it.
+    token, params = self.get_bot_token()
+    # Enqueue a task.
+    _, task_id = self.client_create_task_isolated()
+    self.assertEqual('0', task_id[-1])
+    # Convert TaskResultSummary reference to TaskRunResult.
+    task_id = task_id[:-1] + '1'
+    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    expected = {
+      u'cmd': u'run',
+      u'manifest': {
+        u'bot_id': u'bot1',
+        u'command': None,
+        u'data': [],
+        u'dimensions': {u'os': u'Amiga'},
+        u'env': {},
+        u'extra_args': [],
+        u'hard_timeout': 3600,
+        u'grace_period': 30,
+        u'host': u'http://localhost:8080',
+        u'inputs_ref': {
+          u'isolated': u'0123456789012345678901234567890123456789',
+          u'isolatedserver': u'http://localhost:1',
+          u'namespace': u'default-gzip',
+        },
         u'io_timeout': 1200,
         u'task_id': task_id,
       },

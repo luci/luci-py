@@ -456,7 +456,7 @@ def bot_reap_task(dimensions, bot_id, bot_version):
 
 def bot_update_task(
     run_result_key, bot_id, output, output_chunk_start,
-    exit_code, duration, hard_timeout, io_timeout, cost_usd):
+    exit_code, duration, hard_timeout, io_timeout, cost_usd, outputs_ref):
   """Updates a TaskRunResult and TaskResultSummary, along TaskOutput.
 
   Arguments:
@@ -469,6 +469,7 @@ def bot_update_task(
   - hard_timeout: Bool set if an hard timeout occured.
   - io_timeout: Bool set if an I/O timeout occured.
   - cost_usd: Cost in $USD of this task up to now.
+  - outputs_ref: Serialized FilesRef instance or None.
 
   Invalid states, these are flat out refused:
   - A command is updated after it had an exit code assigned to.
@@ -524,8 +525,10 @@ def bot_update_task(
       run_result.durations.append(duration)
       run_result.exit_codes.append(exit_code)
 
-    task_completed = (
-        len(run_result.exit_codes) == len(request.properties.commands))
+    if outputs_ref:
+      run_result.outputs_ref = task_request.FilesRef(**outputs_ref)
+
+    task_completed = len(run_result.exit_codes) == 1
     if run_result.state in task_result.State.STATES_RUNNING:
       if hard_timeout or io_timeout:
         run_result.state = task_result.State.TIMED_OUT

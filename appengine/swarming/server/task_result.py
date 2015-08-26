@@ -242,8 +242,12 @@ class _TaskResultCommon(ndb.Model):
 
   It is not meant to be instantiated on its own.
 
-  TODO(maruel):
+  TODO(maruel): Overhaul this entity:
   - Back fill bot_dimensions with bot dimensions when possible.
+  - Convert exit_codes to exit_code, a single value.
+  - Convert durations to duration, a single value.
+  - Convert stdout_chunks to stdout_chunk, a single value.
+  - Get rid of TaskOutput as it is not needed anymore (?)
   """
   # Bot that ran this task.
   bot_id = ndb.StringProperty()
@@ -278,7 +282,6 @@ class _TaskResultCommon(ndb.Model):
   stdout_chunks = ndb.IntegerProperty(repeated=True, indexed=False)
 
   # Aggregated exit codes. Ordered by command.
-  # TODO(maruel): Replace with only one result.
   exit_codes = ndb.IntegerProperty(repeated=True, indexed=False)
 
   # Aggregated durations in seconds. Ordered by command.
