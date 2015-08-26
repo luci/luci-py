@@ -116,7 +116,7 @@ def _gen_zip(url):
   with open(os.path.join(BOT_DIR, 'bot_config.py'), 'rb') as f:
     bot_config_content = f.read()
   return bot_archive.get_swarming_bot_zip(
-      BOT_DIR, url, {'bot_config.py': bot_config_content})
+      BOT_DIR, url, '1', {'bot_config.py': bot_config_content})
 
 
 class TestCase(auto_stub.TestCase):

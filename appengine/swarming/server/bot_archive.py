@@ -1,12 +1,12 @@
-#!/usr/bin/env python
 # Copyright 2014 The Swarming Authors. All rights reserved.
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
 """Generates the swarming_bot.zip archive for the bot.
 
-Unlike the other scripts, this file can be run stand-alone to generate a
-swarming_bot.zip so it doesn't import anything from the AppEngine SDK.
+Unlike the other source files, this file can be run from ../tools/bot_archive.py
+stand-alone to generate a swarming_bot.zip for local testing so it doesn't
+import anything from the AppEngine SDK.
 
 The hash of the content of the files in the archive is used to define the
 current version of the swarming bot code.
@@ -19,11 +19,6 @@ import os
 import StringIO
 import sys
 import zipfile
-
-from components import utils
-
-
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 # List of files needed by the swarming bot.
@@ -197,7 +192,7 @@ def resolve_symlink(path):
   return os.path.normpath(os.path.sep.join(parts))
 
 
-def yield_swarming_bot_files(root_dir, host, additionals):
+def yield_swarming_bot_files(root_dir, host, version, additionals):
   """Yields all the files to map as tuple(filename, content).
 
   config.json is injected with json data about the server.
@@ -206,7 +201,7 @@ def yield_swarming_bot_files(root_dir, host, additionals):
   items.update(additionals)
   config = {
     'server': host.rstrip('/'),
-    'server_version': utils.get_app_version(),
+    'server_version': version,
   }
   items['config.json'] = json.dumps(config)
   for item, content in sorted(items.iteritems()):
@@ -217,7 +212,7 @@ def yield_swarming_bot_files(root_dir, host, additionals):
         yield item, f.read()
 
 
-def get_swarming_bot_zip(root_dir, host, additionals):
+def get_swarming_bot_zip(root_dir, host, version, additionals):
   """Returns a zipped file of all the files a bot needs to run.
 
   Arguments:
@@ -230,7 +225,8 @@ def get_swarming_bot_zip(root_dir, host, additionals):
   """
   zip_memory_file = StringIO.StringIO()
   with zipfile.ZipFile(zip_memory_file, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-    for item, content in yield_swarming_bot_files(root_dir, host, additionals):
+    for item, content in yield_swarming_bot_files(
+        root_dir, host, version, additionals):
       zip_file.writestr(item, content)
 
   data = zip_memory_file.getvalue()
@@ -239,7 +235,7 @@ def get_swarming_bot_zip(root_dir, host, additionals):
   return data
 
 
-def get_swarming_bot_version(root_dir, host, additionals):
+def get_swarming_bot_version(root_dir, host, version, additionals):
   """Returns the SHA1 hash of the bot code, representing the version.
 
   Arguments:
@@ -252,7 +248,8 @@ def get_swarming_bot_version(root_dir, host, additionals):
   result = hashlib.sha1()
   try:
     # TODO(maruel): Deduplicate from zip_package.genereate_version().
-    for item, content in yield_swarming_bot_files(root_dir, host, additionals):
+    for item, content in yield_swarming_bot_files(
+        root_dir, host, version, additionals):
       result.update(item)
       result.update('\x00')
       result.update(content)
@@ -262,32 +259,3 @@ def get_swarming_bot_version(root_dir, host, additionals):
   out = result.hexdigest()
   logging.info('get_swarming_bot_version(%s) = %s', sorted(additionals), out)
   return out
-
-
-def main():
-  if len(sys.argv) > 1:
-    print >> sys.stderr, (
-        'This script creates a swarming_bot.zip file locally in the server '
-        'directory. This script doesn\'t accept any argument.')
-    return 1
-
-  with open(os.path.join(ROOT_DIR, 'swarming_bot', 'config.json'), 'rb') as f:
-    config = json.load(f) or {}
-  expected = ['server']
-  actual = sorted(config)
-  if expected != actual:
-    print >> sys.stderr, 'Only expected keys \'%s\', got \'%s\'' % (
-    ','.join(expected), ','.join(actual))
-  swarming_bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
-
-  zip_file = os.path.join(ROOT_DIR, 'swarming_bot.zip')
-  with open(os.path.join(swarming_bot_dir, 'bot_config.py'), 'rb') as f:
-    additionals = {'bot_config.py': f.read()}
-  with open(zip_file, 'wb') as f:
-    f.write(
-        get_swarming_bot_zip(swarming_bot_dir, config['server'], additionals))
-  return 0
-
-
-if __name__ == '__main__':
-  sys.exit(main())

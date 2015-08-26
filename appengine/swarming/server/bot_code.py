@@ -16,6 +16,7 @@ from google.appengine.ext import ndb
 
 from components import auth
 from components import datastore_utils
+from components import utils
 from server import bot_archive
 
 
@@ -121,7 +122,8 @@ def get_bot_version(host):
   # Need to calculate it.
   additionals = {'bot_config.py': get_bot_config().content}
   bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
-  bot_version = bot_archive.get_swarming_bot_version(bot_dir, host, additionals)
+  bot_version = bot_archive.get_swarming_bot_version(
+      bot_dir, host, utils.get_app_version(), additionals)
   memcache.set(key, bot_version, namespace=namespace)
   return bot_version
 
@@ -142,6 +144,7 @@ def get_swarming_bot_zip(host):
   # file if the files isn't present.
   additionals = {'bot_config.py': get_bot_config().content}
   bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
-  code = bot_archive.get_swarming_bot_zip(bot_dir, host, additionals)
+  code = bot_archive.get_swarming_bot_zip(
+      bot_dir, host, utils.get_app_version(), additionals)
   memcache.set(key, code, namespace=namespace)
   return code
