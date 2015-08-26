@@ -57,14 +57,17 @@ class TestTaskRunnerBase(net_utils.TestCase):
   @staticmethod
   def get_manifest(
       script=None, hard_timeout=10., io_timeout=10., grace_period=30.,
-      data=None):
+      data=None, inputs_ref=None, extra_args=None):
     out = {
       'bot_id': 'localhost',
-      'command': [sys.executable, '-u', '-c', script],
+      'command':
+          [sys.executable, '-u', '-c', script] if not inputs_ref else None,
       'data': data or [],
       'env': {},
+      'extra_args': extra_args or [],
       'grace_period': grace_period,
       'hard_timeout': hard_timeout,
+      'inputs_ref': inputs_ref,
       'io_timeout': io_timeout,
       'task_id': 23,
     }
@@ -117,10 +120,11 @@ class TestTaskRunner(TestTaskRunnerBase):
     super(TestTaskRunner, self).setUp()
     self.mock(time, 'time', lambda: 1000000000.)
 
-  def get_check_final(self, exit_code=0, output='hi\n'):
+  def get_check_final(self, exit_code=0, output='hi\n', outputs_ref=None):
     def check_final(kwargs):
       # It makes the diffing easier.
-      kwargs['data']['output'] = base64.b64decode(kwargs['data']['output'])
+      if 'output' in kwargs['data']:
+        kwargs['data']['output'] = base64.b64decode(kwargs['data']['output'])
       expected = {
         'data': {
           'cost_usd': 10.,
@@ -135,6 +139,8 @@ class TestTaskRunner(TestTaskRunnerBase):
         },
         'headers': {'X-XSRF-Token': 'token'},
       }
+      if outputs_ref:
+        expected['data']['outputs_ref'] = outputs_ref
       self.assertEqual(expected, kwargs)
     return check_final
 
@@ -200,8 +206,10 @@ class TestTaskRunner(TestTaskRunnerBase):
         'command': ['a'],
         'data': [('https://localhost:1/f', 'foo.zip')],
         'env': {'d': 'e'},
+        'extra_args': [],
         'grace_period': 30.,
         'hard_timeout': 10,
+        'inputs_ref': None,
         'io_timeout': 11,
         'task_id': 23,
       }
@@ -218,10 +226,100 @@ class TestTaskRunner(TestTaskRunnerBase):
     with open(out_file, 'rb') as f:
       self.assertEqual(expected, json.load(f))
 
+  def test_load_and_run_isolated(self):
+    self.expected_requests([])
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
+
+    def run_command(
+        swarming_server, task_details, work_dir, cost_usd_hour, start):
+      self.assertEqual(server, swarming_server)
+      # Necessary for OSX.
+      self.assertEqual(os.path.realpath(self.work_dir), work_dir)
+      self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
+      self.assertEqual(3600., cost_usd_hour)
+      self.assertEqual(time.time(), start)
+      return {
+        u'exit_code': 0,
+        u'hard_timeout': False,
+        u'io_timeout': False,
+        u'version': 2,
+      }
+    self.mock(task_runner, 'run_command', run_command)
+
+    manifest = os.path.join(self.root_dir, 'manifest')
+    with open(manifest, 'wb') as f:
+      data = {
+        'bot_id': 'localhost',
+        'command': None,
+        'data': None,
+        'env': {'d': 'e'},
+        'extra_args': ['foo', 'bar'],
+        'grace_period': 30.,
+        'hard_timeout': 10,
+        'io_timeout': 11,
+        'inputs_ref': {
+          'isolated': '123',
+          'isolateserver': 'http://localhost:1',
+          'namespace': 'default-gzip',
+        },
+        'task_id': 23,
+      }
+      json.dump(data, f)
+
+    out_file = os.path.join(self.root_dir, 'task_runner_out.json')
+    task_runner.load_and_run(manifest, server, 3600., time.time(), out_file)
+    expected = {
+      u'exit_code': 0,
+      u'hard_timeout': False,
+      u'io_timeout': False,
+      u'version': 2,
+    }
+    with open(out_file, 'rb') as f:
+      self.assertEqual(expected, json.load(f))
+
   def test_run_command_raw(self):
     # This runs the command for real.
     self.requests(cost_usd=1, exit_code=0)
     task_details = self.get_task_details('print(\'hi\')')
+    expected = {
+      u'exit_code': 0,
+      u'hard_timeout': False,
+      u'io_timeout': False,
+      u'version': 2,
+    }
+    self.assertEqual(expected, self._run_command(task_details))
+
+  def test_run_command_isolated(self):
+    # This runs the command for real.
+    self.requests(
+        cost_usd=1, exit_code=0,
+        outputs_ref={
+          u'isolated': u'123',
+          u'isolateserver': u'http://localhost:1',
+          u'namespace': u'default-gzip',
+        })
+    task_details = self.get_task_details(inputs_ref={
+      'isolated': '123',
+      'isolateserver': 'localhost:1',
+      'namespace': 'default-gzip',
+    }, extra_args=['foo', 'bar'])
+    #out = os.path.join(self.root_dir, 'foo')
+    #self.mock(task_runner, 'mkstemp', lambda: out)
+    # Mock running run_isolated with a script.
+    SCRIPT_ISOLATED = (
+      'import json, sys;\n'
+      'if len(sys.argv) != 2:\n'
+      '  raise Exception(sys.argv);\n'
+      'with open(sys.argv[1], \'wb\') as f:\n'
+      '  json.dump({\n'
+      '    \'isolated\': \'123\',\n'
+      '    \'isolateserver\': \'http://localhost:1\',\n'
+      '    \'namespace\': \'default-gzip\',\n'
+      '  }, f)\n'
+      'sys.stdout.write(\'hi\\n\')')
+    self.mock(
+        task_runner, 'get_isolated_cmd',
+        lambda _, x: [sys.executable, '-c', SCRIPT_ISOLATED, x])
     expected = {
       u'exit_code': 0,
       u'hard_timeout': False,
@@ -264,8 +362,10 @@ class TestTaskRunner(TestTaskRunnerBase):
           ],
           'data': [],
           'env': {},
+          'extra_args': [],
           'grace_period': 30.,
           'hard_timeout': 6,
+          'inputs_ref': None,
           'io_timeout': 6,
           'task_id': 23,
         })
@@ -379,8 +479,10 @@ class TestTaskRunner(TestTaskRunnerBase):
           'command': ['large', 'executable'],
           'data': [],
           'env': {'foo': 'bar'},
+          'extra_args': [],
           'grace_period': 30.,
           'hard_timeout': 60,
+          'inputs_ref': None,
           'io_timeout': 60,
           'task_id': 23,
         })

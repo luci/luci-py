@@ -22,6 +22,7 @@ import optparse
 import os
 import subprocess
 import sys
+import tempfile
 import time
 import zipfile
 
@@ -29,6 +30,11 @@ import xsrf_client
 from utils import net
 from utils import on_error
 from utils import subprocess42
+from utils import zip_package
+
+
+# Path to this file or the zip containing this file.
+THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
 
 
 # Sends a maximum of 100kb of stdout per task_update packet.
@@ -57,15 +63,33 @@ def monotonic_time():
   return _last_now
 
 
-def download_data(root_dir, files):
-  """Downloads and expands the zip files enumerated in the test run data."""
+def download_data(work_dir, files):
+  """Downloads and expands the zip files enumerated in the test run data.
+
+  That is only for old style commands.
+  """
   for data_url, _ in files:
     logging.info('Downloading: %s', data_url)
     content = net.url_read(data_url)
     if content is None:
       raise Exception('Failed to download %s' % data_url)
     with zipfile.ZipFile(StringIO.StringIO(content)) as zip_file:
-      zip_file.extractall(root_dir)
+      zip_file.extractall(work_dir)
+
+
+def get_isolated_cmd(task_details, isolated_result):
+  """Returns the command to call run_isolated. Mocked in tests."""
+  cmd = [
+    sys.executable, THIS_FILE, 'run_isolated',
+    '--isolated', task_details.inputs_ref['isolated'].encode('utf-8'),
+    '--namespace', task_details.inputs_ref['namespace'].encode('utf-8'),
+    '-I', task_details.inputs_ref['isolatedserver'].encode('utf-8'),
+    '--json', isolated_result,
+  ]
+  if task_details.extra_args:
+    cmd.append('--')
+    cmd.extend(task_details.extra_args)
+  return cmd
 
 
 class TaskDetails(object):
@@ -81,13 +105,22 @@ class TaskDetails(object):
      - io_timeout
      - task_id
     """
+    logging.info('TaskDetails(%s)', data)
     if not isinstance(data, dict):
       raise ValueError('Expected dict, got %r' % data)
 
     # Get all the data first so it fails early if the task details is invalid.
     self.bot_id = data['bot_id']
-    self.command = data['command']
-    self.data = data['data']
+
+    # Raw command. Only self.command or self.inputs_ref can be set.
+    self.command = data['command'] or []
+    # TODO(maruel): Deprecated.
+    self.data = data['data'] or []
+
+    # Isolated command. Is a serialized version of task_request.FilesRef.
+    self.inputs_ref = data['inputs_ref']
+    self.extra_args = data['extra_args']
+
     self.env = {
       k.encode('utf-8'): v.encode('utf-8') for k, v in data['env'].iteritems()
     }
@@ -116,6 +149,7 @@ def load_and_run(in_file, swarming_server, cost_usd_hour, start, out_file):
     task_details = TaskDetails(json.load(f))
 
   # Download the script to run in the temporary directory.
+  # TODO(maruel): Remove.
   download_data(work_dir, task_details.data)
 
   task_result = run_command(
@@ -182,7 +216,7 @@ def calc_yield_wait(task_details, start, last_io, timed_out, stdout):
 
 
 def run_command(
-    swarming_server, task_details, root_dir, cost_usd_hour, task_start):
+    swarming_server, task_details, work_dir, cost_usd_hour, task_start):
   """Runs a command and sends packets to the server to stream results back.
 
   Implements both I/O and hard timeouts. Sends the packets numbered, so the
@@ -200,127 +234,149 @@ def run_command(
   }
   post_update(swarming_server, params, None, '', 0)
 
-  logging.info('Executing: %s', task_details.command)
-  # TODO(maruel): Support both channels independently and display stderr in red.
-  env = None
-  if task_details.env:
-    env = os.environ.copy()
-    env.update(task_details.env)
+  if task_details.command:
+    # Raw command.
+    cmd = task_details.command
+    isolated_result = None
+  else:
+    # Isolated task.
+    isolated_result = os.path.join(work_dir, 'isolated_result.json')
+    cmd = get_isolated_cmd(task_details, isolated_result)
+
   try:
-    proc = subprocess42.Popen(
-        task_details.command,
-        env=env,
-        cwd=root_dir,
-        detached=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        stdin=subprocess.PIPE)
-  except OSError as e:
-    stdout = 'Command "%s" failed to start.\nError: %s' % (
-        ' '.join(task_details.command), e)
+    # TODO(maruel): Support both channels independently and display stderr in
+    # red.
+    env = None
+    if task_details.env:
+      env = os.environ.copy()
+      env.update(task_details.env)
+    try:
+      proc = subprocess42.Popen(
+          cmd,
+          env=env,
+          cwd=work_dir,
+          detached=True,
+          stdout=subprocess.PIPE,
+          stderr=subprocess.STDOUT,
+          stdin=subprocess.PIPE)
+    except OSError as e:
+      stdout = 'Command "%s" failed to start.\nError: %s' % (' '.join(cmd), e)
+      now = monotonic_time()
+      params['cost_usd'] = cost_usd_hour * (now - task_start) / 60. / 60.
+      params['duration'] = now - start
+      params['io_timeout'] = False
+      params['hard_timeout'] = False
+      post_update(swarming_server, params, 1, stdout, 0)
+      return {
+        u'exit_code': 255,
+        u'hard_timeout': False,
+        u'io_timeout': False,
+        u'version': 2,
+      }
+
+    output_chunk_start = 0
+    stdout = ''
+    exit_code = None
+    had_hard_timeout = False
+    had_io_timeout = False
+    timed_out = None
+    try:
+      calc = lambda: calc_yield_wait(
+          task_details, start, last_io, timed_out, stdout)
+      maxsize = lambda: MAX_CHUNK_SIZE - len(stdout)
+      last_io = monotonic_time()
+      for _, new_data in proc.yield_any(maxsize=maxsize, soft_timeout=calc):
+        now = monotonic_time()
+        if new_data:
+          stdout += new_data
+          last_io = now
+
+        # Post update if necessary.
+        if should_post_update(stdout, now, last_packet):
+          last_packet = monotonic_time()
+          params['cost_usd'] = (
+              cost_usd_hour * (last_packet - task_start) / 60. / 60.)
+          post_update(swarming_server, params, None, stdout, output_chunk_start)
+          output_chunk_start += len(stdout)
+          stdout = ''
+
+        # Send signal on timeout if necessary. Both are failures, not
+        # internal_failures.
+        # Eventually kill but return 0 so bot_main.py doesn't cancel the task.
+        if not timed_out:
+          if now - last_io > task_details.io_timeout:
+            had_io_timeout = True
+            logging.warning('I/O timeout')
+            try:
+              proc.terminate()
+            except OSError:
+              pass
+            timed_out = monotonic_time()
+          elif now - start > task_details.hard_timeout:
+            had_hard_timeout = True
+            logging.warning('Hard timeout')
+            try:
+              proc.terminate()
+            except OSError:
+              pass
+            timed_out = monotonic_time()
+        else:
+          # During grace period.
+          if now >= timed_out + task_details.grace_period:
+            # Now kill for real. The user can distinguish between the following
+            # states:
+            # - signal but process exited within grace period,
+            #   (hard_|io_)_timed_out will be set but the process exit code will
+            #   be script provided.
+            # - processed exited late, exit code will be -9 on posix.
+            try:
+              logging.warning('proc.kill() after grace')
+              proc.kill()
+            except OSError:
+              pass
+      logging.info('Waiting for proces exit')
+      exit_code = proc.wait()
+    except (IOError, OSError):
+      # Something wrong happened, try to kill the child process.
+      had_hard_timeout = True
+      try:
+        logging.warning('proc.kill() in finally')
+        proc.kill()
+      except OSError:
+        # The process has already exited.
+        pass
+
+      # TODO(maruel): We'd wait only for X seconds.
+      logging.info('Waiting for proces exit in finally')
+      exit_code = proc.wait()
+      logging.info('Waiting for proces exit in finally - done')
+
+    # This is the very last packet for this command. It if was an isolated task,
+    # include the output reference to the archived .isolated file.
     now = monotonic_time()
     params['cost_usd'] = cost_usd_hour * (now - task_start) / 60. / 60.
     params['duration'] = now - start
-    params['io_timeout'] = False
-    params['hard_timeout'] = False
-    post_update(swarming_server, params, 1, stdout, 0)
+    params['io_timeout'] = had_io_timeout
+    params['hard_timeout'] = had_hard_timeout
+    if isolated_result:
+      try:
+        with open(isolated_result, 'rb') as f:
+          params['outputs_ref'] = json.load(f)
+      except (IOError, OSError, ValueError) as e:
+        logging.error('Swallowing error: %s' % e)
+    post_update(swarming_server, params, exit_code, stdout, output_chunk_start)
     return {
-      u'exit_code': 255,
-      u'hard_timeout': False,
-      u'io_timeout': False,
+      u'exit_code': exit_code,
+      u'hard_timeout': had_hard_timeout,
+      u'io_timeout': had_io_timeout,
       u'version': 2,
     }
-
-  output_chunk_start = 0
-  stdout = ''
-  exit_code = None
-  had_hard_timeout = False
-  had_io_timeout = False
-  timed_out = None
-  try:
-    calc = lambda: calc_yield_wait(
-        task_details, start, last_io, timed_out, stdout)
-    maxsize = lambda: MAX_CHUNK_SIZE - len(stdout)
-    last_io = monotonic_time()
-    for _, new_data in proc.yield_any(maxsize=maxsize, soft_timeout=calc):
-      now = monotonic_time()
-      if new_data:
-        stdout += new_data
-        last_io = now
-
-      # Post update if necessary.
-      if should_post_update(stdout, now, last_packet):
-        last_packet = monotonic_time()
-        params['cost_usd'] = (
-            cost_usd_hour * (last_packet - task_start) / 60. / 60.)
-        post_update(swarming_server, params, None, stdout, output_chunk_start)
-        output_chunk_start += len(stdout)
-        stdout = ''
-
-      # Send signal on timeout if necessary. Both are failures, not
-      # internal_failures.
-      # Eventually kill but return 0 so bot_main.py doesn't cancel the task.
-      if not timed_out:
-        if now - last_io > task_details.io_timeout:
-          had_io_timeout = True
-          logging.warning('I/O timeout')
-          try:
-            proc.terminate()
-          except OSError:
-            pass
-          timed_out = monotonic_time()
-        elif now - start > task_details.hard_timeout:
-          had_hard_timeout = True
-          logging.warning('Hard timeout')
-          try:
-            proc.terminate()
-          except OSError:
-            pass
-          timed_out = monotonic_time()
-      else:
-        # During grace period.
-        if now >= timed_out + task_details.grace_period:
-          # Now kill for real. The user can distinguish between the following
-          # states:
-          # - signal but process exited within grace period,
-          #   (hard_|io_)_timed_out will be set but the process exit code will
-          #   be script provided.
-          # - processed exited late, exit code will be -9 on posix.
-          try:
-            logging.warning('proc.kill() after grace')
-            proc.kill()
-          except OSError:
-            pass
-    logging.info('Waiting for proces exit')
-    exit_code = proc.wait()
-  except (IOError, OSError):
-    # Something wrong happened, try to kill the child process.
-    had_hard_timeout = True
-    try:
-      logging.warning('proc.kill() in finally')
-      proc.kill()
-    except OSError:
-      # The process has already exited.
-      pass
-
-    # TODO(maruel): We'd wait only for X seconds.
-    logging.info('Waiting for proces exit in finally')
-    exit_code = proc.wait()
-    logging.info('Waiting for proces exit in finally - done')
-
-  # This is the very last packet for this command.
-  now = monotonic_time()
-  params['cost_usd'] = cost_usd_hour * (now - task_start) / 60. / 60.
-  params['duration'] = now - start
-  params['io_timeout'] = had_io_timeout
-  params['hard_timeout'] = had_hard_timeout
-  post_update(swarming_server, params, exit_code, stdout, output_chunk_start)
-  return {
-    u'exit_code': exit_code,
-    u'hard_timeout': had_hard_timeout,
-    u'io_timeout': had_io_timeout,
-    u'version': 2,
-  }
+  finally:
+    if isolated_result:
+      try:
+        os.remove(isolated_result)
+      except OSError:
+        pass
 
 
 def main(args):
