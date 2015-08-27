@@ -5,6 +5,7 @@
 """Primary side of Primary <-> Replica protocol."""
 
 import base64
+import hashlib
 import logging
 
 from google.appengine.api import app_identity
@@ -258,8 +259,9 @@ def pack_auth_db():
   req.auth_code_version = version.__version__
   auth_db_blob = req.SerializeToString()
 
-  # Sign it using primary's private keys.
-  key_name, sig = signature.sign_blob(auth_db_blob)
+  # Sign it using primary's private keys. sign_blob is limited to 8KB only, so
+  # hash the body first and sign the digest.
+  key_name, sig = signature.sign_blob(hashlib.sha512(auth_db_blob).digest())
   sig = base64.b64encode(sig)
 
   logging.debug('AuthDB blob size is %d bytes', len(auth_db_blob))

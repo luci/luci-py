@@ -8,6 +8,7 @@ Also includes common code used by both Replica and Primary.
 """
 
 import collections
+import hashlib
 
 from google.appengine.api import app_identity
 from google.appengine.api import urlfetch
@@ -374,7 +375,9 @@ def is_signed_by_primary(blob, key_name, sig):
   # Grab the cert from primary and verify the signature.
   certs = signature.get_service_public_certificates(state.primary_url)
   x509_certificate_pem = signature.get_x509_certificate_by_name(certs, key_name)
-  return signature.check_signature(blob, x509_certificate_pem, sig)
+  # We are signing SHA512 hashes, since AuthDB blob is too large.
+  digest = hashlib.sha512(blob).digest()
+  return signature.check_signature(digest, x509_certificate_pem, sig)
 
 
 def push_auth_db(revision, auth_db):

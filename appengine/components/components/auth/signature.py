@@ -2,7 +2,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Functions to produce and verify RSA+SHA256+SHA512 signatures.
+"""Functions to produce and verify RSA+SHA256 signatures.
 
 Based on app_identity.sign_blob() and app_identity.get_public_certificates()
 functions, and thus private keys are managed by GAE.
@@ -11,10 +11,12 @@ functions, and thus private keys are managed by GAE.
 import base64
 import hashlib
 import json
+import logging
 
 from google.appengine.api import app_identity
 from google.appengine.api import memcache
 from google.appengine.api import urlfetch
+from google.appengine.runtime import apiproxy_errors
 
 from components import utils
 
@@ -32,6 +34,10 @@ __all__ = [
 
 class CertificateError(Exception):
   """Errors when working with a certificate."""
+
+  def __init__(self, msg, transient=False):
+    super(CertificateError, self).__init__(msg)
+    self.transient = transient
 
 
 @utils.cache_with_expiration(3600)
@@ -58,23 +64,49 @@ def get_service_public_certificates(service_url):
   """
   cache_key = 'pub_certs:%s' % service_url
   certs = memcache.get(cache_key)
-  if not certs:
-    protocol = 'http://' if utils.is_local_dev_server() else 'https://'
-    assert service_url.startswith(protocol)
-    result = urlfetch.fetch(
-        url='%s/auth/api/v1/server/certificates' % service_url,
-        method='GET',
-        headers={'X-URLFetch-Service-Id': utils.get_urlfetch_service_id()},
-        follow_redirects=False,
-        deadline=10,
-        validate_certificate=True)
+  if certs:
+    return certs
+
+  protocol = 'http://' if utils.is_local_dev_server() else 'https://'
+  assert service_url.startswith(protocol)
+  url = '%s/auth/api/v1/server/certificates' % service_url
+
+  # Retry code is adapted from components/net.py. net.py can't be used directly
+  # since it depends on components.auth (and dependency cycles between
+  # components are bad).
+  attempt = 0
+  result = None
+  while attempt < 10:
+    if attempt:
+      logging.info('Retrying...')
+    attempt += 1
+    logging.info('GET %s', url)
+    try:
+      result = urlfetch.fetch(
+          url=url,
+          method='GET',
+          headers={'X-URLFetch-Service-Id': utils.get_urlfetch_service_id()},
+          follow_redirects=False,
+          deadline=10,
+          validate_certificate=True)
+    except (apiproxy_errors.DeadlineExceededError, urlfetch.Error) as e:
+      # Transient network error or URL fetch service RPC deadline.
+      logging.warning('GET %s failed: %s', url, e)
+      continue
+    # It MUST return 200 on success, it can't return 403, 404 or >=500.
     if result.status_code != 200:
-      raise CertificateError(
-          'Failed to grab public certs from %s: HTTP %d' %
-          (service_url, result.status_code))
+      logging.warning(
+          'GET %s failed, HTTP %d: %r', url, result.status_code, result.content)
+      continue
+    # Success.
     certs = json.loads(result.content)
     memcache.set(cache_key, certs, time=3600)
-  return certs
+    return certs
+
+  # All attempts failed, give up.
+  msg = 'Failed to grab public certs from %s (HTTP code %s)' % (
+      service_url, result.status_code if result else '???')
+  raise CertificateError(msg, transient=True)
 
 
 def get_x509_certificate_by_name(certs, key_name):
@@ -100,18 +132,17 @@ def get_x509_certificate_by_name(certs, key_name):
 def sign_blob(blob):
   """Signs a blob using current service's private key.
 
-  Uses GAE app_identity.sign_blob function. It has a limit of 8KB on a size of
-  a blob, so |blob| is hashed first (with sha512). So final signature is
-  RSA+SHA256(sha512(blob)).
+  Just an alias for GAE app_identity.sign_blob function for symmetry with
+  'check_signature'. Note that |blob| can be at most 8KB.
 
   Returns:
-    Tuple (name of a key used, signature).
+    Tuple (name of a key used, RSA+SHA256 signature).
   """
   # app_identity.sign_blob is producing RSA+SHA256 signature. Sadly, it isn't
   # documented anywhere. But it should be relatively stable since this API is
   # used by OAuth2 libraries (and so changing signature method may break a lot
   # of stuff).
-  return app_identity.sign_blob(hashlib.sha512(blob).digest())
+  return app_identity.sign_blob(blob)
 
 
 def check_signature(blob, x509_certificate_pem, signature):
@@ -152,5 +183,4 @@ def check_signature(blob, x509_certificate_pem, signature):
   subjectPublicKeyInfo = tbsCertificate[6]
 
   verifier = PKCS1_v1_5.new(RSA.importKey(subjectPublicKeyInfo))
-  digest = hashlib.sha512(blob).digest()
-  return verifier.verify(SHA256.new(digest), signature)
+  return verifier.verify(SHA256.new(blob), signature)
