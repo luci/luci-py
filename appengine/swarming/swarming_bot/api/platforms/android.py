@@ -193,13 +193,18 @@ def get_devices():
     return None
 
   cmds = {}
-  try:
-    generator = adb.adb_commands.AdbCommands.Devices()
-  except adb.common.usb1.USBErrorOther as e:
-    # This happens if the user is not in group plugdev.
-    return cmds
+  generator = adb.adb_commands.AdbCommands.Devices()
+  while True:
+    try:
+      # Use manual iterator handling instead of "for handle in generator" to
+      # catch USB exception explicitly.
+      handle = generator.next()
+    except adb.common.usb1.USBErrorOther as e:
+      # This happens if the user is not in group plugdev.
+      continue
+    except StopIteration:
+      break
 
-  for handle in generator:
     try:
       handle.Open()
     except adb.common.usb1.USBErrorBusy:
@@ -225,8 +230,14 @@ def get_devices():
       continue
 
     try:
+      # Give 10s for the user to accept the dialog. The best design would be to
+      # do a quick check with timeout=100ms and only if the first failed, try
+      # again with a long timeout. The goal is not to hang the bots for several
+      # minutes when all the devices are unauthenticated.
+      # TODO(maruel): A better fix would be to change python-adb to continue the
+      # authentication dance from where it stopped. This is left as a follow up.
       cmd = adb.adb_commands.AdbCommands.Connect(
-            handle, banner='swarming', rsa_keys=_ADB_KEYS, auth_timeout_ms=100)
+          handle, banner='swarming', rsa_keys=_ADB_KEYS, auth_timeout_ms=10000)
     except adb.usb_exceptions.DeviceAuthError as e:
       logging.warning('AUTH FAILURE: %s: %s', handle.serial_number, e)
       cmd = None
