@@ -19,7 +19,7 @@ Set the environment variable SWARMING_LOAD_TEST=1 to disable the use of
 server-provided bot_config.py. This permits safe load testing.
 """
 
-import os_utilities
+from api import os_utilities
 
 # Unused argument 'bot' - pylint: disable=W0613
 

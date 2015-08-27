@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright 2014 The Swarming Authors. All rights reserved.
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
@@ -34,7 +33,7 @@ import tempfile
 import time
 import urllib2
 
-import platforms
+from api import platforms
 from utils import file_path
 from utils import tools
 
@@ -1125,32 +1124,3 @@ def trim_rolled_log(name):
       os.remove(item)
   except Exception as e:
     logging.exception('trim_rolled_log(%s) failed: %s', name, e)
-
-
-def main():
-  """Prints out the output of get_dimensions() and get_state()."""
-  # Pass an empty tag, so pop it up since it has no significance.
-  devices = None
-  if sys.platform == 'linux2':
-    devices = platforms.android.get_devices()
-    if devices:
-      try:
-        data = {
-          u'dimensions': get_dimensions_all_devices_android(devices),
-          u'state': get_state_all_devices_android(devices),
-        }
-      finally:
-        platforms.android.close_devices(devices)
-  if not devices:
-    data = {
-      u'dimensions': get_dimensions(),
-      u'state': get_state(),
-    }
-
-  json.dump(data, sys.stdout, indent=2, sort_keys=True, separators=(',', ': '))
-  print('')
-  return 0
-
-
-if __name__ == '__main__':
-  sys.exit(main())

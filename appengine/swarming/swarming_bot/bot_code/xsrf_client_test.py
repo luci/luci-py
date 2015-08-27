@@ -9,8 +9,8 @@ import sys
 import time
 import unittest
 
-import test_env_bot
-test_env_bot.setup_test_env()
+import test_env_bot_code
+test_env_bot_code.setup_test_env()
 
 # Creates a server mock for functions in net.py.
 import net_utils
@@ -143,4 +143,5 @@ class UrlHelperTest(net_utils.TestCase):
 
 
 if __name__ == '__main__':
+  logging.basicConfig(level=logging.ERROR)
   unittest.main()

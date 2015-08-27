@@ -29,10 +29,10 @@ import time
 import traceback
 import zipfile
 
-import bot
 import common
-import os_utilities
 import xsrf_client
+from api import bot
+from api import os_utilities
 from utils import subprocess42
 from utils import logging_utils
 from utils import net
@@ -40,14 +40,15 @@ from utils import on_error
 from utils import zip_package
 
 
-# Path to this file or the zip containing this file.
-THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
-
-# Root directory containing this file or the zip containing this file.
-ROOT_DIR = os.path.dirname(THIS_FILE)
-
-
+# Used to opportunistically set the error handler to notify the server when the
+# process exits due to an exception.
 _ERROR_HANDLER_WAS_REGISTERED = False
+
+
+# Set to the zip's name containing this file. This is set to the absolute path
+# to swarming_bot.zip when run as part of swarming_bot.zip. This value is
+# overriden in unit tests.
+THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
 
 
 ### bot_config handler part.
@@ -75,7 +76,7 @@ def get_dimensions():
         'load_test': ['1'],
       }
 
-    import bot_config
+    from config import bot_config
     out = bot_config.get_dimensions()
     if not isinstance(out, dict):
       raise ValueError('Unexpected type %s' % out.__class__)
@@ -107,7 +108,7 @@ def get_state(sleep_streak):
       state = os_utilities.get_state()
       state['dimensions'] = os_utilities.get_dimensions()
     else:
-      import bot_config
+      from config import bot_config
       state = bot_config.get_state()
       if not isinstance(state, dict):
         state = {'error': state}
@@ -128,7 +129,7 @@ def call_hook(botobj, name, *args):
     if _in_load_test_mode():
       return
 
-    import bot_config
+    from config import bot_config
     hook = getattr(bot_config, name, None)
     if hook:
       return hook(botobj, *args)
@@ -148,7 +149,7 @@ def setup_bot(skip_reboot):
 
   botobj = get_bot()
   try:
-    import bot_config
+    from config import bot_config
   except Exception as e:
     msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
     botobj.post_error('bot_config.py is bad: %s' % msg)
@@ -261,7 +262,11 @@ def get_bot():
 
   config = get_config()
   return bot.Bot(
-      remote, attributes, config['server'], config['server_version'], ROOT_DIR,
+      remote,
+      attributes,
+      config['server'],
+      config['server_version'],
+      os.path.dirname(THIS_FILE),
       on_shutdown_hook)
 
 
@@ -426,7 +431,11 @@ def run_manifest(botobj, manifest, start):
     # the one containing swarming_bot.zip.
     with open('task_runner_stdout.log', 'wb') as f:
       proc = subprocess.Popen(
-          command, cwd=ROOT_DIR, env=env, stdout=f, stderr=subprocess.STDOUT)
+          command,
+          cwd=os.path.dirname(THIS_FILE),
+          env=env,
+          stdout=f,
+          stderr=subprocess.STDOUT)
     while proc.poll() is None:
       if time.time() - start >= hard_timeout:
         proc.kill()
@@ -481,7 +490,7 @@ def update_bot(botobj, version):
   new_zip = 'swarming_bot.1.zip'
   if os.path.basename(THIS_FILE) == new_zip:
     new_zip = 'swarming_bot.2.zip'
-  new_zip = os.path.join(ROOT_DIR, new_zip)
+  new_zip = os.path.join(os.path.dirname(THIS_FILE), new_zip)
 
   # Download as a new file.
   url = botobj.remote.url + '/swarming/api/v1/bot/bot_code/%s' % version
@@ -517,7 +526,7 @@ def update_lkgbc(botobj):
       botobj.post_error('Missing file %s for LKGBC' % THIS_FILE)
       return
 
-    golden = os.path.join(ROOT_DIR, 'swarming_bot.zip')
+    golden = os.path.join(os.path.dirname(THIS_FILE), 'swarming_bot.zip')
     if os.path.isfile(golden):
       org = os.stat(golden)
       cur = os.stat(THIS_FILE)
@@ -531,22 +540,15 @@ def update_lkgbc(botobj):
 
 
 def get_config():
-  """Returns the data from config.json.
-
-  First try the config.json inside the zip. If not present or not running inside
-  swarming_bot.zip, use the one beside the file.
-  """
-  if THIS_FILE.endswith('.zip'):
-    # Can't use with statement here as it has to work with python 2.6 due to
-    # obscure reasons relating to old cygwin installs.
-    with contextlib.closing(zipfile.ZipFile(THIS_FILE, 'r')) as f:
-      return json.load(f.open('config.json', 'r'))
-
-  with open(os.path.join(ROOT_DIR, 'config.json'), 'rb') as f:
-    return json.load(f)
+  """Returns the data from config.json."""
+  with contextlib.closing(zipfile.ZipFile(THIS_FILE, 'r')) as f:
+    return json.load(f.open('config/config.json', 'r'))
 
 
 def main(args):
+  # Include 'api' to be backward compatible with older bot_config.py files.
+  sys.path.insert(0, os.path.join(THIS_FILE, 'api'))
+
   # Add SWARMING_HEADLESS into environ so subcommands know that they are running
   # in a headless (non-interactive) mode.
   os.environ['SWARMING_HEADLESS'] = '1'
@@ -575,5 +577,5 @@ def main(args):
   try:
     return run_bot(error)
   finally:
-    call_hook(bot.Bot(None, None, None, None, ROOT_DIR, None),
+    call_hook(bot.Bot(None, None, None, None, os.path.dirname(THIS_FILE), None),
               'on_bot_shutdown')

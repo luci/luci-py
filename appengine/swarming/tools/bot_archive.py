@@ -18,7 +18,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def read_config():
-  config_path = os.path.join(ROOT_DIR, 'swarming_bot', 'config.json')
+  config_path = os.path.join(ROOT_DIR, 'swarming_bot', 'config', 'config.json')
   with open(config_path, 'rb') as f:
     config = json.load(f) or {}
   expected = ['server', 'server_version']
@@ -32,7 +32,8 @@ def read_config():
 
 def get_swarming_bot_zip():
   host = read_config()['server']
-  bot_config_path = os.path.join(ROOT_DIR, 'swarming_bot', 'bot_config.py')
+  bot_config_path = os.path.join(
+      ROOT_DIR, 'swarming_bot', 'config', 'bot_config.py')
   with open(bot_config_path, 'rb') as f:
     additionals = {'config/bot_config.py': f.read()}
   from server import bot_archive

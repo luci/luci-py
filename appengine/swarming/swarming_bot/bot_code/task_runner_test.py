@@ -18,8 +18,8 @@ import time
 import unittest
 import zipfile
 
-import test_env_bot
-test_env_bot.setup_test_env()
+import test_env_bot_code
+test_env_bot_code.setup_test_env()
 
 # Creates a server mock for functions in net.py.
 import net_utils
@@ -50,7 +50,7 @@ class TestTaskRunnerBase(net_utils.TestCase):
     os.mkdir(self.work_dir)
 
   def tearDown(self):
-    os.chdir(test_env_bot.BOT_DIR)
+    os.chdir(test_env_bot_code.BOT_DIR)
     file_path.rmtree(self.root_dir)
     super(TestTaskRunnerBase, self).tearDown()
 

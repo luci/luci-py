@@ -68,7 +68,8 @@ def get_bootstrap(host_url):
   if obj and obj.content:
     return File(header + obj.content, obj.who, obj.created_ts)
   # Fallback to the one embedded in the tree.
-  with open(os.path.join(ROOT_DIR, 'swarming_bot/bootstrap.py'), 'rb') as f:
+  path = os.path.join(ROOT_DIR, 'swarming_bot', 'config', 'bootstrap.py')
+  with open(path, 'rb') as f:
     return File(header + f.read(), None, None)
 
 
@@ -88,7 +89,7 @@ def get_bot_config():
     return File(obj.content, obj.who, obj.created_ts)
 
   # Fallback to the one embedded in the tree.
-  path = os.path.join(ROOT_DIR, 'swarming_bot', 'bot_config.py')
+  path = os.path.join(ROOT_DIR, 'swarming_bot', 'config', 'bot_config.py')
   with open(path, 'rb') as f:
     return File(f.read(), None, None)
 
@@ -120,7 +121,7 @@ def get_bot_version(host):
     return bot_version
 
   # Need to calculate it.
-  additionals = {'bot_config.py': get_bot_config().content}
+  additionals = {'config/bot_config.py': get_bot_config().content}
   bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
   bot_version = bot_archive.get_swarming_bot_version(
       bot_dir, host, utils.get_app_version(), additionals)
@@ -142,7 +143,7 @@ def get_swarming_bot_zip(host):
 
   # Get the start bot script from the database, if present. Pass an empty
   # file if the files isn't present.
-  additionals = {'bot_config.py': get_bot_config().content}
+  additionals = {'config/bot_config.py': get_bot_config().content}
   bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
   code = bot_archive.get_swarming_bot_zip(
       bot_dir, host, utils.get_app_version(), additionals)

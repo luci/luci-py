@@ -353,7 +353,7 @@ class FrontendAdminTest(AppTestBase):
   def test_bootstrap_default(self):
     self.set_as_bot()
     actual = self.app.get('/bootstrap').body
-    path = os.path.join(self.APP_DIR, 'swarming_bot/bootstrap.py')
+    path = os.path.join(self.APP_DIR, 'swarming_bot', 'config', 'bootstrap.py')
     with open(path, 'rb') as f:
       expected = f.read()
     header = 'host_url = \'http://localhost\'\n'

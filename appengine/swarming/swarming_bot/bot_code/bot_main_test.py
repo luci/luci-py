@@ -14,22 +14,19 @@ import threading
 import time
 import unittest
 
-THIS_FILE = os.path.abspath(__file__)
-
-import test_env_bot
-test_env_bot.setup_test_env()
+import test_env_bot_code
+test_env_bot_code.setup_test_env()
 
 # Creates a server mock for functions in net.py.
 import net_utils
 
+import bot_main
+import xsrf_client
+from api import bot
+from api import os_utilities
 from utils import logging_utils
 from utils import net
 from utils import zip_package
-import bot
-import bot_config
-import bot_main
-import os_utilities
-import xsrf_client
 
 
 # Access to a protected member XX of a client class - pylint: disable=W0212
@@ -63,6 +60,14 @@ class TestBotMain(net_utils.TestCase):
     self.mock(self.bot, 'restart', self.fail)
     self.mock(subprocess, 'call', self.fail)
     self.mock(time, 'time', lambda: 100.)
+    config_path = os.path.join(
+        test_env_bot_code.BOT_DIR, 'config', 'config.json')
+    with open(config_path, 'rb') as f:
+      config = json.load(f)
+    self.mock(bot_main, 'get_config', lambda: config)
+    self.mock(
+        bot_main, 'THIS_FILE',
+        os.path.join(test_env_bot_code.BOT_DIR, 'swarming_bot.zip'))
 
   def tearDown(self):
     os.environ.pop('SWARMING_BOT_ID', None)
@@ -103,6 +108,7 @@ class TestBotMain(net_utils.TestCase):
     def setup_bot(_bot):
       setup_bots.append(1)
       return False
+    from config import bot_config
     self.mock(bot_config, 'setup_bot', setup_bot)
     restarts = []
     post_event = []
@@ -112,21 +118,24 @@ class TestBotMain(net_utils.TestCase):
         bot.Bot, 'post_event', lambda *a, **kw: post_event.append((a, kw)))
     self.expected_requests([])
     bot_main.setup_bot(False)
-    self.assertEqual(
-        [(('Starting new swarming bot: %s' % THIS_FILE,), {'timeout': 900})],
-        restarts)
+    expected = [
+      (('Starting new swarming bot: %s' % bot_main.THIS_FILE,),
+        {'timeout': 900}),
+    ]
+    self.assertEqual(expected, restarts)
     # It is called twice, one as part of setup_bot(False), another as part of
     # on_shutdown_hook().
     self.assertEqual([1, 1], setup_bots)
     expected = [
-      'Starting new swarming bot: %s' % THIS_FILE,
-      'Bot is stuck restarting for: Starting new swarming bot: %s' % THIS_FILE,
+      'Starting new swarming bot: %s' % bot_main.THIS_FILE,
+      'Bot is stuck restarting for: Starting new swarming bot: %s' %
+        bot_main.THIS_FILE,
     ]
     self.assertEqual(expected, [i[0][2] for i in post_event])
 
   def test_post_error_task(self):
     self.mock(time, 'time', lambda: 126.0)
-    self.mock(logging, 'error', lambda *_: None)
+    self.mock(logging, 'error', lambda *_, **_kw: None)
     self.mock(bot_main, 'get_remote', lambda: self.server)
     # get_state() return value changes over time. Hardcode its value for the
     # duration of this test.
@@ -350,7 +359,7 @@ class TestBotMain(net_utils.TestCase):
         self2._out_file = os.path.join(
             self.root_dir, 'work', 'task_runner_out.json')
         expected = [
-          sys.executable, THIS_FILE, 'task_runner',
+          sys.executable, bot_main.THIS_FILE, 'task_runner',
           '--swarming-server', url,
           '--in-file',
           os.path.join(self.root_dir, 'work', 'task_runner_in.json'),
@@ -358,7 +367,7 @@ class TestBotMain(net_utils.TestCase):
           '--cost-usd-hour', '3600.0', '--start', '100.0',
         ]
         self.assertEqual(expected, cmd)
-        self.assertEqual(bot_main.ROOT_DIR, cwd)
+        self.assertEqual(test_env_bot_code.BOT_DIR, cwd)
         self.assertEqual('24', env['SWARMING_TASK_ID'])
         self.assertTrue(stdout)
         self.assertEqual(subprocess.STDOUT, stderr)
@@ -451,7 +460,6 @@ class TestBotMain(net_utils.TestCase):
     # Under the test however forever-blocking calls finish, and post_error is
     # called.
     self.mock(self.bot, 'post_error', lambda *_: None)
-    self.mock(bot_main, 'THIS_FILE', 'swarming_bot.1.zip')
     self.mock(net, 'url_retrieve', lambda *_: True)
 
     calls = []
@@ -459,23 +467,20 @@ class TestBotMain(net_utils.TestCase):
       calls.append(args)
       return 23
     self.mock(bot_main.common, 'exec_python', exec_python)
+    self.mock(
+        bot_main, 'THIS_FILE',
+        os.path.join(test_env_bot_code.BOT_DIR, 'swarming_bot.1.zip'))
 
     with self.assertRaises(SystemExit) as e:
       bot_main.update_bot(self.bot, '123')
     self.assertEqual(23, e.exception.code)
 
     cmd = [
-      os.path.join(bot_main.ROOT_DIR, 'swarming_bot.2.zip'), 'start_slave',
+      os.path.join(test_env_bot_code.BOT_DIR, 'swarming_bot.2.zip'),
+      'start_slave',
       '--survive',
     ]
     self.assertEqual([cmd], calls)
-
-  def test_get_config(self):
-    expected = {
-      u'server': u'http://localhost:8080',
-      u'server_version': u'version1',
-    }
-    self.assertEqual(expected, bot_main.get_config())
 
   def test_main(self):
     def check(x):

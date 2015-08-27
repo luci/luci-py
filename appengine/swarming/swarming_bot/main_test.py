@@ -37,7 +37,7 @@ from depot_tools import auto_stub
 
 from server import bot_archive
 
-import bot_main
+from bot_code import bot_main
 
 
 class FakeSwarmingHandler(BaseHTTPServer.BaseHTTPRequestHandler):
@@ -113,10 +113,10 @@ class FakeSwarmingServer(object):
 
 
 def _gen_zip(url):
-  with open(os.path.join(BOT_DIR, 'bot_config.py'), 'rb') as f:
+  with open(os.path.join(BOT_DIR, 'config', 'bot_config.py'), 'rb') as f:
     bot_config_content = f.read()
   return bot_archive.get_swarming_bot_zip(
-      BOT_DIR, url, '1', {'bot_config.py': bot_config_content})
+      BOT_DIR, url, '1', {'config/bot_config.py': bot_config_content})
 
 
 class TestCase(auto_stub.TestCase):
@@ -159,9 +159,8 @@ class SimpleMainTest(TestCase):
     version = subprocess.check_output(
         [sys.executable, self._zip_file, 'version'], stderr=subprocess.PIPE)
     lines = version.strip().split()
-    self.assertEqual(2, len(lines), lines)
-    self.assertEqual('0.3', lines[0])
-    self.assertTrue(re.match(r'^[0-9a-f]{40}$', lines[1]), lines[1])
+    self.assertEqual(1, len(lines), lines)
+    self.assertTrue(re.match(r'^[0-9a-f]{40}$', lines[0]), lines[0])
 
 
 class MainTest(TestCase):

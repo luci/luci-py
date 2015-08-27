@@ -8,8 +8,6 @@ The imports are done late so if an ImportError occurs, it is localized to this
 command only.
 """
 
-__version__ = '0.3'
-
 import json
 import logging
 import os
@@ -20,7 +18,7 @@ import subprocess
 import sys
 import zipfile
 
-import common
+from bot_code import common
 
 from utils import logging_utils
 from utils import zip_package
@@ -36,7 +34,7 @@ THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
 
 def CMDattributes(_args):
   """Prints out the bot's attributes."""
-  import bot_main
+  from bot_code import bot_main
   json.dump(
       bot_main.get_attributes(), sys.stdout, indent=2, sort_keys=True,
       separators=(',', ': '))
@@ -54,7 +52,7 @@ def CMDrun_isolated(args):
 def CMDtask_runner(args):
   """Internal command to run a swarming task."""
   logging_utils.prepare_logging('task_runner.log')
-  import task_runner
+  from bot_code import task_runner
   return task_runner.main(args)
 
 
@@ -64,7 +62,7 @@ def CMDstart_bot(args):
   logging_utils.set_console_level(logging.DEBUG)
   logging.info(
       'importing bot_main: %s, %s', THIS_FILE, zip_package.generate_version())
-  import bot_main
+  from bot_code import bot_main
   result = bot_main.main(args)
   logging.info('bot_main exit code: %d', result)
   return result
@@ -82,14 +80,11 @@ def CMDstart_slave(args):
       help='Do not reboot the host even if bot_config.setup_bot() asked to')
   options, args = parser.parse_args(args)
 
-  # User provided bot_config.py
-  logging.info(
-      'importing bot_config: %s, %s', THIS_FILE, zip_package.generate_version())
   try:
-    import bot_main
+    from bot_code import bot_main
     bot_main.setup_bot(options.survive)
   except Exception:
-    logging.exception('bot_config.py is invalid.')
+    logging.exception('bot_main.py failed.')
 
   logging.info('Starting the bot: %s', THIS_FILE)
   return common.exec_python([THIS_FILE, 'start_bot'])
@@ -109,7 +104,6 @@ def CMDrestart(_args):
 def CMDversion(_args):
   """Prints the version of this file and the hash of the code."""
   logging_utils.prepare_logging(None)
-  print __version__
   print zip_package.generate_version()
   return 0
 

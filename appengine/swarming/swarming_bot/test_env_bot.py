@@ -36,6 +36,7 @@ def init_symlinks(root):
 def setup_test_env():
   """Sets up the environment for bot tests."""
   init_symlinks(BOT_DIR)
-  client_tests = os.path.join(BOT_DIR, '..', '..', '..', 'client', 'tests')
+  client_tests = os.path.normpath(
+      os.path.join(BOT_DIR, '..', '..', '..', 'client', 'tests'))
   sys.path.insert(0, client_tests)
   sys.path.insert(0, os.path.join(BOT_DIR, 'third_party'))

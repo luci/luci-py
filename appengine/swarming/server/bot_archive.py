@@ -25,15 +25,26 @@ import zipfile
 # TODO(maruel): Make the list automatically generated?
 FILES = (
     '__main__.py',
-    'bot.py',
-    'bot_main.py',
+    'api/__init__.py',
+    'api/bot.py',
+    'api/os_utilities.py',
+    'api/platforms/__init__.py',
+    'api/platforms/android.py',
+    'api/platforms/gce.py',
+    'api/platforms/linux.py',
+    'api/platforms/osx.py',
+    'api/platforms/posix.py',
+    'api/platforms/win.py',
+    'bot_code/__init__.py',
+    'bot_code/bot_main.py',
+    'bot_code/common.py',
+    'bot_code/task_runner.py',
+    'bot_code/xsrf_client.py',
     'client/auth.py',
     'client/isolated_format.py',
     'client/isolateserver.py',
     'client/run_isolated.py',
-    'common.py',
-    'os_utilities.py',
-    'task_runner.py',
+    'config/__init__.py',
     'third_party/__init__.py',
     'third_party/colorama/__init__.py',
     'third_party/colorama/ansi.py',
@@ -138,13 +149,6 @@ FILES = (
     'third_party/rsa/rsa/transform.py',
     'third_party/rsa/rsa/util.py',
     'third_party/rsa/rsa/varblock.py',
-    'platforms/__init__.py',
-    'platforms/android.py',
-    'platforms/gce.py',
-    'platforms/linux.py',
-    'platforms/osx.py',
-    'platforms/posix.py',
-    'platforms/win.py',
     'utils/__init__.py',
     'utils/cacert.pem',
     'utils/file_path.py',
@@ -157,7 +161,6 @@ FILES = (
     'utils/threading_utils.py',
     'utils/tools.py',
     'utils/zip_package.py',
-    'xsrf_client.py',
 
     # TODO(maruel): Find a way to only include these on linux platforms but it's
     # not that large so it is not a big deal.
@@ -203,7 +206,7 @@ def yield_swarming_bot_files(root_dir, host, version, additionals):
     'server': host.rstrip('/'),
     'server_version': version,
   }
-  items['config.json'] = json.dumps(config)
+  items['config/config.json'] = json.dumps(config)
   for item, content in sorted(items.iteritems()):
     if content is not None:
       yield item, content

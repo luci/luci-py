@@ -32,7 +32,7 @@ from tools import start_servers
 
 sys.path.insert(0, BOT_DIR)
 
-import os_utilities
+from api import os_utilities
 
 
 class SwarmingClient(object):
@@ -189,7 +189,7 @@ class SwarmingTestCase(unittest.TestCase):
     self._bot.start()
 
     # Replace bot_config.py.
-    with open(os.path.join(BOT_DIR, 'bot_config.py'), 'rb') as f:
+    with open(os.path.join(BOT_DIR, 'config', 'bot_config.py'), 'rb') as f:
       bot_config_content = f.read() + '\n'
     # This will restart the bot.
     res = self._servers.http_client.request(
