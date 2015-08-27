@@ -44,7 +44,7 @@ def _dumpsys(cmd, arg):
   out = cmd.Shell('dumpsys ' + arg).decode('utf-8', 'replace')
   if out.startswith('Can\'t find service: '):
     return None
-  return out.splitlines()
+  return out
 
 
 def _parcel_to_list(lines):
@@ -282,13 +282,15 @@ def get_build_prop(cmd):
 
 
 def get_temp(cmd):
-  """Returns the device's 2 temperatures."""
+  """Returns the device's 2 temperatures if available."""
   temps = []
   for i in xrange(2):
     try:
       temps.append(
           int(cmd.Shell('cat /sys/class/thermal/thermal_zone%d/temp' % i)))
     except ValueError:
+      # On other devices, the only real way to read it is via Java
+      # developer.android.com/guide/topics/sensors/sensors_environment.html
       pass
   return temps
 
@@ -299,21 +301,40 @@ def get_battery(cmd):
   out = _dumpsys(cmd, 'battery')
   if not out:
     return props
-  for line in out:
+  for line in out.splitlines():
     if line.endswith(u':'):
       continue
-    key, value = line.split(u': ', 2)
-    props[key.lstrip()] = value
+    # On Android 4.1.2, it uses "voltage:123" instead of "voltage: 123".
+    key, value = line.split(u':', 2)
+    props[key.lstrip()] = value.strip()
   out = {u'power': []}
   if props[u'AC powered'] == u'true':
     out[u'power'].append(u'AC')
   if props[u'USB powered'] == u'true':
     out[u'power'].append(u'USB')
-  if props[u'Wireless powered'] == u'true':
+  if props.get(u'Wireless powered') == u'true':
     out[u'power'].append(u'Wireless')
   for key in (u'health', u'level', u'status', u'temperature', u'voltage'):
     out[key] = int(props[key])
   return out
+
+
+def get_cpu_scale(cmd):
+  """Returns the CPU scaling factor."""
+  mapping = {
+    'cpuinfo_max_freq': u'max',
+    'cpuinfo_min_freq': u'min',
+    'scaling_cur_freq': u'cur',
+  }
+  return {
+    v: cmd.Shell('cat /sys/devices/system/cpu/cpu0/cpufreq/' + k)
+    for k, v in mapping.iteritems()
+  }
+
+
+def get_uptime(cmd):
+  """Returns the device's uptime in second."""
+  return float(cmd.Shell('cat /proc/uptime').split()[1])
 
 
 def get_disk(cmd):
@@ -322,7 +343,7 @@ def get_disk(cmd):
   out = _dumpsys(cmd, 'diskstats')
   if not out:
     return props
-  for line in out:
+  for line in out.splitlines():
     if line.endswith(u':'):
       continue
     key, value = line.split(u': ', 2)
@@ -341,15 +362,18 @@ def get_disk(cmd):
 
 def get_imei(cmd):
   """Returns the phone's IMEI."""
-  # TODO(maruel): dumpsys iphonesubinfo for < 5.0.
+  # Android <5.0.
+  out = _dumpsys(cmd, 'iphonesubinfo')
+  match = re.search('  Device ID = (.+)$', out)
+  if match:
+    return match.group(1)
+
+  # Android >= 5.0.
   lines = cmd.Shell('service call iphonesubinfo 1').splitlines()
-  if len(lines) < 4:
-    return None
-  if lines[0] != 'Result: Parcel(':
-    return None
-  # Process the UTF-16 string.
-  chars = _parcel_to_list(lines[1:])[4:-1]
-  return u''.join(map(unichr, (int(i, 16) for i in chars)))
+  if len(lines) >= 4 and lines[0] == 'Result: Parcel(':
+    # Process the UTF-16 string.
+    chars = _parcel_to_list(lines[1:])[4:-1]
+    return u''.join(map(unichr, (int(i, 16) for i in chars)))
 
 
 def get_ip(cmd):

@@ -792,6 +792,7 @@ def get_state_all_devices_android(devices):
     u'build.id',
     u'build.tags',
     u'build.type',
+    u'build.version.release',
     u'build.version.sdk',
     u'product.board',
     u'product.cpu.abi')
@@ -804,11 +805,13 @@ def get_state_all_devices_android(devices):
         device = {
           u'battery': platforms.android.get_battery(cmd),
           u'build': {key: properties[u'ro.'+key] for key in keys},
+          u'cpu_scale': platforms.android.get_cpu_scale(cmd),
           u'disk': platforms.android.get_disk(cmd),
           u'imei': platforms.android.get_imei(cmd),
           u'ip': platforms.android.get_ip(cmd),
           u'state': u'available',
           u'temp': platforms.android.get_temp(cmd),
+          u'uptime': platforms.android.get_uptime(cmd),
         }
       else:
         device = {u'state': u'unavailable'}
