@@ -756,6 +756,13 @@ def get_dimensions_all_devices_android(devices):
   nb_android = len(dimensions[u'android'])
   dimensions[u'android_devices'] = map(
       str, range(nb_android, max(0, nb_android-2), -1))
+
+  # TODO(maruel): Add back once dimensions limit is figured out and there's a
+  # need.
+  del dimensions[u'android']
+  # Trim 'os' to reduce the number of dimensions and not run tests by accident
+  # on it.
+  dimensions[u'os'] = ['Android']
   return dimensions
 
 
@@ -780,8 +787,14 @@ def get_state_all_devices_android(devices):
     state[u'machine_type'] = [machine_type]
 
   keys = (
-    u'board.platform', u'product.cpu.abi', u'build.tags', u'build.type',
-    u'build.version.sdk', 'build.fingerprint')
+    u'board.platform',
+    u'build.fingerprint',
+    u'build.id',
+    u'build.tags',
+    u'build.type',
+    u'build.version.sdk',
+    u'product.board',
+    u'product.cpu.abi')
   state['devices'] = {}
   for serial_number, cmd in devices.iteritems():
     if cmd:

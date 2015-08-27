@@ -312,7 +312,7 @@ def get_battery(cmd):
   if props[u'Wireless powered'] == u'true':
     out[u'power'].append(u'Wireless')
   for key in (u'health', u'level', u'status', u'temperature', u'voltage'):
-    out[key] = props[key]
+    out[key] = int(props[key])
   return out
 
 
