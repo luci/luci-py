@@ -777,17 +777,19 @@ def get_state_all_devices_android(devices):
 
   keys = (
     u'board.platform', u'product.cpu.abi', u'build.tags', u'build.type',
-    u'build.version.sdk')
+    u'build.version.sdk', 'build.fingerprint')
   state['devices'] = {}
   for serial_number, cmd in devices.iteritems():
     if cmd:
       properties = platforms.android.get_build_prop(cmd)
       if properties:
-        # TODO(maruel): uptime, diskstats, wifi, power, throttle, etc.
+        # TODO(maruel): uptime, throttle, etc.
         device = {
+          u'battery': platforms.android.get_battery(cmd),
           u'build': {key: properties[u'ro.'+key] for key in keys},
           u'disk': platforms.android.get_disk(cmd),
-          u'battery': platforms.android.get_battery(cmd),
+          u'imei': platforms.android.get_imei(cmd),
+          u'ip': platforms.android.get_ip(cmd),
           u'state': u'available',
           u'temp': platforms.android.get_temp(cmd),
         }

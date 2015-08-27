@@ -47,6 +47,29 @@ def _dumpsys(cmd, arg):
   return out.splitlines()
 
 
+def _parcel_to_list(lines):
+  """Parses 'service call' output."""
+  out = []
+  for line in lines:
+    match = re.match(
+        '  0x[0-9a-f]{8}\\: ([0-9a-f ]{8}) ([0-9a-f ]{8}) ([0-9a-f ]{8}) '
+        '([0-9a-f ]{8}) \'.{16}\'\\)?', line)
+    if not match:
+      break
+    for i in xrange(1, 5):
+      group = match.group(i)
+      char = group[4:8]
+      if char != '    ':
+        out.append(char)
+      char = group[0:4]
+      if char != '    ':
+        out.append(char)
+  return out
+
+
+### Public API.
+
+
 def initialize(pub_key, priv_key):
   """Initialize Android support through adb.
 
@@ -308,3 +331,23 @@ def get_disk(cmd):
     u'data': props[u'Data-Free'],
     u'system': props[u'System-Free'],
   }
+
+
+def get_imei(cmd):
+  """Returns the phone's IMEI."""
+  # TODO(maruel): dumpsys iphonesubinfo for < 5.0.
+  lines = cmd.Shell('service call iphonesubinfo 1').splitlines()
+  if len(lines) < 4:
+    return None
+  if lines[0] != 'Result: Parcel(':
+    return None
+  # Process the UTF-16 string.
+  chars = _parcel_to_list(lines[1:])[4:-1]
+  return u''.join(map(unichr, (int(i, 16) for i in chars)))
+
+
+def get_ip(cmd):
+  """Returns the IP address."""
+  # If ever needed, read wifi.interface from /system/build.prop if a device
+  # doesn't use wlan0.
+  return cmd.Shell('getprop dhcp.wlan0.ipaddress').strip()
