@@ -193,7 +193,13 @@ def get_devices():
     return None
 
   cmds = {}
-  for handle in adb.adb_commands.AdbCommands.Devices():
+  try:
+    generator = adb.adb_commands.AdbCommands.Devices()
+  except adb.common.usb1.USBErrorOther as e:
+    # This happens if the user is not in group plugdev.
+    return cmds
+
+  for handle in generator:
     try:
       handle.Open()
     except adb.common.usb1.USBErrorBusy:
