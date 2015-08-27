@@ -20,15 +20,35 @@ import sys
 import adb
 import adb.adb_commands
 
-try:
-  from M2Crypto import RSA
-except ImportError:
-  # In this case, adb support is disabled until maruel stops being dumb and
-  # figure out how to use pycrypto or rsa, both already available.
-  RSA = None
+
+# Find abs path to third_party/ dir in the bot root dir.
+import third_party
+THIRD_PARTY_DIR = os.path.dirname(os.path.abspath(third_party.__file__))
+sys.path.insert(0, os.path.join(THIRD_PARTY_DIR, 'rsa'))
+sys.path.insert(0, os.path.join(THIRD_PARTY_DIR, 'pyasn1'))
+
+import rsa
+
+from pyasn1.codec.der import decoder
+from pyasn1.type import univ
+from rsa import pkcs1
 
 
 ### Private stuff.
+
+
+# python-rsa lib hashes all messages it signs. ADB does it already, we just
+# need to slap a signature on top of already hashed message. Introduce "fake"
+# hashing algo for this.
+class _Accum(object):
+  def __init__(self):
+    self._buf = ''
+  def update(self, msg):
+    self._buf += msg
+  def digest(self):
+    return self._buf
+pkcs1.HASH_METHODS['SHA-1-PREHASHED'] = _Accum
+pkcs1.HASH_ASN1['SHA-1-PREHASHED'] = pkcs1.HASH_ASN1['SHA-1']
 
 
 # Set when ADB is initialized. It contains one or multiple key used to
@@ -80,12 +100,11 @@ def initialize(pub_key, priv_key):
   assert bool(pub_key) == bool(priv_key)
   if _ADB_KEYS is None:
     _ADB_KEYS = []
-    if not RSA:
-      logging.error('M2Crypto is missing, run: pip install --user M2Crypto')
-      return False
-
     if pub_key:
-      _ADB_KEYS.append(M2CryptoSigner(pub_key, priv_key))
+      try:
+        _ADB_KEYS.append(PythonRSASigner(pub_key, priv_key))
+      except ValueError as exc:
+        logging.warning('Ignoring adb private key: %s', exc)
 
     # Try to add local adb keys if available.
     path = os.path.expanduser('~/.android/adbkey')
@@ -94,7 +113,10 @@ def initialize(pub_key, priv_key):
         pub = f.read()
       with open(path, 'rb') as f:
         priv = f.read()
-      _ADB_KEYS.append(M2CryptoSigner(pub, priv))
+      try:
+        _ADB_KEYS.append(PythonRSASigner(pub, priv))
+      except ValueError as exc:
+        logging.warning('Ignoring adb private key %s: %s', path, exc)
 
     if not _ADB_KEYS:
       return False
@@ -104,68 +126,34 @@ def initialize(pub_key, priv_key):
   return bool(_ADB_KEYS)
 
 
-class M2CryptoSigner(object):
-  """Implements adb_protocol.AuthSigner using
-  https://github.com/martinpaljak/M2Crypto.
-  """
+class PythonRSASigner(object):
+  """Implements adb_protocol.AuthSigner using http://stuvel.eu/rsa."""
   def __init__(self, pub, priv):
-    self.priv_key = RSA.load_key_string(priv)
+    self.priv_key = load_rsa_private_key(priv)
     self.pub_key = pub
 
   def Sign(self, data):
-    return self.priv_key.sign(data, 'sha1')
+    return rsa.sign(data, self.priv_key, 'SHA-1-PREHASHED')
 
   def GetPublicKey(self):
     return self.pub_key
 
 
-# TODO(maruel): M2Crypto is not included by default on Ubuntu.
-# rsa is included in client/third_party/rsa/rsa/ and
-# pycrypto is normally installed on Ubuntu. It would be preferable to use one of
-# these 2 but my skills failed up to now, authentication consistently fails.
-# Revisit later or delete the code.
-#
-#
-#sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'rsa'))
-#import rsa
-#
-#class RSASigner(object):
-#  """Implements adb_protocol.AuthSigner using http://stuvel.eu/rsa."""
-#  def __init__(self):
-#    self.privkey = rsa.PrivateKey.load_pkcs1(PRIV_CONVERTED_KEY)
-#
-#  def Sign(self, data):
-#    return rsa.sign(data, self.privkey, 'SHA-1')
-#
-#  def GetPublicKey(self):
-#    return PUB_KEY
-#
-#
-#try:
-#  from Crypto.Hash import SHA
-#  from Crypto.PublicKey import RSA
-#  from Crypto.Signature import PKCS1_v1_5
-#  from Crypto.Signature import PKCS1_PSS
-#except ImportError:
-#  SHA = None
-#
-#
-#class CryptoSigner(object):
-#  """Implements adb_protocol.AuthSigner using
-#  https://www.dlitz.net/software/pycrypto/.
-#  """
-#  def __init__(self):
-#    self.private_key = RSA.importKey(PRIV_KEY, None)
-#    self._signer = PKCS1_v1_5.new(self.private_key)
-#    #self.private_key = RSA.importKey(PRIV_CONVERTED_KEY, None)
-#    #self._signer = PKCS1_PSS.new(self.private_key)
-#
-#  def Sign(self, data):
-#    h = SHA.new(data)
-#    return self._signer.sign(h)
-#
-#  def GetPublicKey(self):
-#    return PUB_KEY
+def load_rsa_private_key(pem):
+  """PEM encoded PKCS#8 private key -> rsa.PrivateKey."""
+  # ADB uses private RSA keys in pkcs#8 format. 'rsa' library doesn't support
+  # them natively. Do some ASN unwrapping to extract naked RSA key
+  # (in der-encoded form). See https://www.ietf.org/rfc/rfc2313.txt.
+  # Also http://superuser.com/a/606266.
+  try:
+    der = rsa.pem.load_pem(pem, 'PRIVATE KEY')
+    keyinfo, _ = decoder.decode(der)
+    if keyinfo[1][0] != univ.ObjectIdentifier('1.2.840.113549.1.1.1'):
+        raise ValueError('Not a DER-encoded OpenSSL private RSA key')
+    private_key_der = keyinfo[2].asOctets()
+  except IndexError:
+    raise ValueError('Not a DER-encoded OpenSSL private RSA key')
+  return rsa.PrivateKey.load_pkcs1(private_key_der, format='DER')
 
 
 def kill_adb():
