@@ -93,7 +93,7 @@ class UploadBotConfigHandler(auth.AuthenticatingHandler):
   def get(self):
     bot_config = bot_code.get_bot_config()
     params = {
-      'content': bot_config.content,
+      'content': bot_config.content.decode('utf-8'),
       'path': self.request.path,
       'when': bot_config.when,
       'who': bot_config.who,
@@ -108,7 +108,9 @@ class UploadBotConfigHandler(auth.AuthenticatingHandler):
     if not script:
       self.abort(400, 'No script uploaded')
 
-    bot_code.store_bot_config(script.encode('utf-8', 'replace'))
+    # Make sure the script is valid utf-8.
+    script = script.decode('utf-8', 'replace').encode('utf-8')
+    bot_code.store_bot_config(script)
     self.get()
 
 
@@ -119,7 +121,7 @@ class UploadBootstrapHandler(auth.AuthenticatingHandler):
   def get(self):
     bootstrap = bot_code.get_bootstrap(self.request.host_url)
     params = {
-      'content': bootstrap.content,
+      'content': bootstrap.content.decode('utf-8'),
       'path': self.request.path,
       'when': bootstrap.when,
       'who': bootstrap.who,
@@ -134,7 +136,9 @@ class UploadBootstrapHandler(auth.AuthenticatingHandler):
     if not script:
       self.abort(400, 'No script uploaded')
 
-    bot_code.store_bootstrap(script.encode('utf-8'))
+    # Make sure the script is valid utf-8.
+    script = script.decode('utf-8', 'replace').encode('utf-8')
+    bot_code.store_bootstrap(script)
     self.get()
 
 

@@ -360,24 +360,31 @@ class FrontendAdminTest(AppTestBase):
     self.assertEqual(header + expected, actual)
 
   def test_bootstrap_custom(self):
-    # Act under admin identity.
     self.set_as_admin()
+    xsrf_token = self.get_xsrf_token()
     self.app.get('/restricted/upload/bootstrap')
-    data = {
-      'script': 'script_body',
-      'xsrf_token': self.get_xsrf_token(),
-    }
-    r = self.app.post('/restricted/upload/bootstrap', data)
-    self.assertIn('script_body', r.body)
+    response = self.app.post(
+        '/restricted/upload/bootstrap?xsrf_token=%s' % xsrf_token,
+        status=400)
+    self.assertEqual(
+        '400 Bad Request\n\nThe server could not comply with the request since '
+        'it is either malformed or otherwise incorrect.\n\n No script uploaded'
+        '  ', response.body)
+
+    response = self.app.post(
+        '/restricted/upload/bootstrap?xsrf_token=%s' % xsrf_token,
+        upload_files=[('script', 'script', u'script_bodé'.encode('utf-8'))])
+    self.assertIn(u'script_bodé'.encode('utf-8'), response.body)
 
     actual = self.app.get('/bootstrap').body
-    expected = 'host_url = \'http://localhost\'\nscript_body'
+    expected = u'host_url = \'http://localhost\'\nscript_bodé'.encode('utf-8')
     self.assertEqual(expected, actual)
+
 
   def test_upload_bot_config(self):
     self.set_as_admin()
     xsrf_token = self.get_xsrf_token()
-    response = self.app.get('/restricted/upload/bot_config')
+    self.app.get('/restricted/upload/bot_config')
     response = self.app.post(
         '/restricted/upload/bot_config?xsrf_token=%s' % xsrf_token,
         status=400)
@@ -388,8 +395,8 @@ class FrontendAdminTest(AppTestBase):
 
     response = self.app.post(
         '/restricted/upload/bot_config?xsrf_token=%s' % xsrf_token,
-        upload_files=[('script', 'script', 'script_body')])
-    self.assertIn('script_body', response.body)
+        upload_files=[('script', 'script', u'script_bodé'.encode('utf-8'))])
+    self.assertIn(u'script_bodé'.encode('utf-8'), response.body)
     # TODO(maruel): Assert swarming_bot.zip now contains the new code.
 
   def test_config(self):
