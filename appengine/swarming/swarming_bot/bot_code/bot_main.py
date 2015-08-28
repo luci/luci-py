@@ -33,10 +33,11 @@ import common
 import xsrf_client
 from api import bot
 from api import os_utilities
-from utils import subprocess42
+from third_party.depot_tools import fix_encoding
 from utils import logging_utils
 from utils import net
 from utils import on_error
+from utils import subprocess42
 from utils import zip_package
 
 
@@ -546,8 +547,8 @@ def get_config():
 
 
 def main(args):
-  # Include 'api' to be backward compatible with older bot_config.py files.
-  sys.path.insert(0, os.path.join(THIS_FILE, 'api'))
+  # This is necessary so os.path.join() works with unicode path. No kidding.
+  fix_encoding.fix_encoding()
 
   # Add SWARMING_HEADLESS into environ so subcommands know that they are running
   # in a headless (non-interactive) mode.

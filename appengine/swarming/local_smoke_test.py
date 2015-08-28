@@ -149,6 +149,10 @@ class SwarmingTestCase(unittest.TestCase):
     self._bot = None
     self._client = None
     self._servers = None
+    # Force language to be English, otherwise the error messages differ from
+    # expectations.
+    os.environ['LANG'] = 'en_US.UTF-8'
+    os.environ['LANGUAGE'] = 'en_US.UTF-8'
 
   def tearDown(self):
     # Kill bot, kill server, print logs if failed, delete tmpdir, call super.

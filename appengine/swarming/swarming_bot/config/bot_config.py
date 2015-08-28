@@ -1,3 +1,4 @@
+# coding: utf-8
 # Copyright 2013 The Swarming Authors. All rights reserved.
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
@@ -17,6 +18,9 @@ from stdlib.
 
 Set the environment variable SWARMING_LOAD_TEST=1 to disable the use of
 server-provided bot_config.py. This permits safe load testing.
+
+This file contains unicode to confirm UTF-8 encoded file is well supported.
+Here's a pile of poo: 💩
 """
 
 from api import os_utilities
