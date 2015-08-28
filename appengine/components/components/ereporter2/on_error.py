@@ -40,10 +40,9 @@ def log(**kwargs):
 
   Returns the entity id for the report.
   """
-  try:
+  identity = None
+  if not auth.get_current_identity().is_anonymous:
     identity = auth.get_current_identity().to_bytes()
-  except auth.UninitializedError:
-    identity = None
   try:
     # Trim all the messages to 4kb to reduce spam.
     LIMIT = 4096

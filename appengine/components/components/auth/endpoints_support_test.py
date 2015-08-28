@@ -74,17 +74,16 @@ class EndpointsAuthTest(test_case.TestCase):
         'user:another_user@example.com',
         self.call('127.0.0.1', 'another_user@example.com'))
 
-  def test_get_current_identity_ip(self):
+  def test_get_peer_ip(self):
     """IP address is stored in auth context."""
     self.call('1.2.3.4', 'user@example.com')
-    self.assertEqual(
-        ipaddr.ip_from_string('1.2.3.4'), api.get_current_identity_ip())
+    self.assertEqual(ipaddr.ip_from_string('1.2.3.4'), api.get_peer_ip())
 
-  def test_get_current_identity_host(self):
+  def test_get_peer_host(self):
     """Validates caller host (from X-Host-Token) is stored in auth context."""
     tok = host_token.create_host_token('host-name.domain')
     self.call('127.0.0.1', 'user@example.com', headers={'X-Host-Token-V1': tok})
-    self.assertEqual('host-name.domain', api.get_current_identity_host())
+    self.assertEqual('host-name.domain', api.get_peer_host())
 
 
 @endpoints.api(name='testing', version='v1')

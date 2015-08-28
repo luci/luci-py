@@ -422,9 +422,9 @@ class SelfHandler(handler.ApiHandler):
   @api.public
   def get(self):
     self.send_response({
-      'host': api.get_current_identity_host(),
+      'host': api.get_peer_host(),
       'identity': api.get_current_identity().to_bytes(),
-      'ip': ipaddr.ip_to_string(api.get_current_identity_ip()),
+      'ip': ipaddr.ip_to_string(api.get_peer_ip()),
     })
 
 

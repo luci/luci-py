@@ -102,13 +102,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     # Ensure auth component is configured before executing any code.
     # Configuration may modify _auth_methods used below.
     config.ensure_configured()
-
-    # Thread local (and request local) auth state.
-    auth_context = api.get_request_cache()
-
-    # Make get_current_identity() return Anonymous until authentication is
-    # complete. It is used in authentication_error/authorization_error calls.
-    auth_context.set_current_identity(model.Anonymous)
+    auth_context = api.reinitialize_request_cache()
 
     # http://www.html5rocks.com/en/tutorials/security/content-security-policy/
     # https://www.owasp.org/index.php/Content_Security_Policy
@@ -145,6 +139,9 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     else:
       method_func = None
 
+    # If no authentication method is applicable, default to anonymous identity.
+    identity = identity or model.Anonymous
+
     # XSRF token is required only if using Cookie based or IP whitelist auth.
     # A browser doesn't send Authorization: 'Bearer ...' or any other headers
     # by itself. So XSRF check is not required if header based authentication
@@ -152,32 +149,27 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     using_headers_auth = method_func in (
         oauth_authentication, service_to_service_authentication)
 
-    # If no authentication method is applicable, default to anonymous identity.
-    identity = identity or model.Anonymous
-
-    # Successfully extracted an identity. Put it in the request state now so
-    # that authorization_error() below can report it, if needed.
-    auth_context.set_current_identity(identity)
-
     # Extract caller host name from host token header, if present and valid.
     tok = self.request.headers.get(host_token.HTTP_HEADER)
     if tok:
       validated_host = host_token.validate_host_token(tok)
       if validated_host:
-        auth_context.set_current_identity_host(validated_host)
+        auth_context.peer_host = validated_host
 
     # Verify IP is whitelisted and authenticate requests from bots.
     assert self.request.remote_addr
     ip = ipaddr.ip_from_string(self.request.remote_addr)
-    auth_context.set_current_identity_ip(ip)
+    auth_context.peer_ip = ip
     try:
+      # 'verify_ip_whitelisted' may change identity for bots, store new one.
       identity = api.verify_ip_whitelisted(identity, ip)
     except api.AuthorizationError as err:
       self.authorization_error(err)
       return
 
-    # verify_ip_whitelisted may change identity for bots, store new one.
-    auth_context.set_current_identity(identity)
+    auth_context.peer_identity = identity
+    # TODO(vadimsh): Recognize delegation tokens.
+    auth_context.current_identity = identity
 
     try:
       # Fail if XSRF token is required, but not provided.
@@ -276,8 +268,8 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       error: instance of AuthorizationError subclass.
     """
     logging.warning(
-        'Authorization error.\n%s\nIdentity: %s\nIP: %s',
-        error, api.get_current_identity().to_bytes(), self.request.remote_addr)
+        'Authorization error.\n%s\Peer: %s\nIP: %s',
+        error, api.get_peer_identity().to_bytes(), self.request.remote_addr)
     self.abort(403, detail=str(error))
 
 
@@ -295,8 +287,8 @@ class ApiHandler(AuthenticatingHandler):
 
   def authorization_error(self, error):
     logging.warning(
-        'Authorization error.\n%s\nIdentity: %s\nIP: %s',
-        error, api.get_current_identity().to_bytes(), self.request.remote_addr)
+        'Authorization error.\n%s\Peer: %s\nIP: %s',
+        error, api.get_peer_identity().to_bytes(), self.request.remote_addr)
     self.abort_with_error(403, text=str(error))
 
   def send_response(self, response, http_code=200, headers=None):

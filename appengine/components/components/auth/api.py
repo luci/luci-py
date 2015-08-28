@@ -39,8 +39,9 @@ __all__ = [
   'disable_process_cache',
   'Error',
   'get_current_identity',
-  'get_current_identity_host',
-  'get_current_identity_ip',
+  'get_peer_identity',
+  'get_peer_host',
+  'get_peer_ip',
   'get_process_cache_expiration_sec',
   'get_secret',
   'is_admin',
@@ -49,7 +50,6 @@ __all__ = [
   'public',
   'require',
   'SecretKey',
-  'UninitializedError',
   'verify_ip_whitelisted',
   'warmup',
 ]
@@ -89,10 +89,6 @@ class AuthenticationError(Error):
 
 class AuthorizationError(Error):
   """Access is denied."""
-
-
-class UninitializedError(Error):
-  """Request auth context is not initialized."""
 
 
 ################################################################################
@@ -415,36 +411,89 @@ class RequestCache(object):
   Current request is a request being processed by currently running thread.
   A thread can handle at most one request at a time (as assumed by WSGI model).
   But same thread can be reused for another request later. In that case second
-  request gets a new copy of RequestCache. See also 'get_request_cache'.
+  request gets a new copy of RequestCache.
+
+  All members can be set only once, since they are not supposed to be changing
+  during lifetime of a request.
+
+  See also:
+    * reinitialize_request_cache - to forcibly setup new RequestCache.
+    * get_request_cache - to grab current thread-local RequestCache.
   """
 
   def __init__(self):
-    self.auth_db = None
-    self.current_identity = None
-    self.current_identity_host = None
-    self.current_identity_ip = None
+    self._auth_db = None
+    self._current_identity = None
+    self._peer_host = None
+    self._peer_identity = None
+    self._peer_ip = None
 
-  def set_current_identity(self, current_identity):
-    """Called early during request processing to set identity for a request."""
-    assert current_identity is not None
-    self.current_identity = current_identity
+  @property
+  def auth_db(self):
+    """Returns request-local copy of AuthDB, fetching it if necessary."""
+    if self._auth_db is None:
+      self._auth_db = get_process_auth_db()
+    return self._auth_db
 
-  def set_current_identity_host(self, hostname):
+  @property
+  def current_identity(self):
+    return self._current_identity or model.Anonymous
+
+  @current_identity.setter
+  def current_identity(self, current_identity):
+    """Records identity to use for auth decisions.
+
+    It may be delegated identity conveyed through delegation token.
+    If delegation is not used, it is equal to peer identity.
+    """
+    assert current_identity
+    assert not self._current_identity
+    self._current_identity = current_identity
+
+  @property
+  def peer_host(self):
+    return self._peer_host
+
+  @peer_host.setter
+  def peer_host(self, peer_host):
     """Called for requests that provide valid X-Host-Token header."""
-    assert hostname is not None
-    self.current_identity_host = hostname
+    assert peer_host
+    assert not self._peer_host
+    self._peer_host = peer_host
 
-  def set_current_identity_ip(self, ip):
-    """Remembers callers ipaddr.IP address."""
-    assert isinstance(ip, ipaddr.IP)
-    self.current_identity_ip = ip
+  @property
+  def peer_identity(self):
+    return self._peer_identity or model.Anonymous
+
+  @peer_identity.setter
+  def peer_identity(self, peer_identity):
+    """Records identity of whoever is making the request.
+
+    It's an identity directly extracted from user credentials (ignoring
+    delegation tokens).
+    """
+    assert peer_identity
+    assert not self._peer_identity
+    self._peer_identity = peer_identity
+
+  @property
+  def peer_ip(self):
+    return self._peer_ip
+
+  @peer_ip.setter
+  def peer_ip(self, peer_ip):
+    """Remembers caller's ipaddr.IP address."""
+    assert isinstance(peer_ip, ipaddr.IP)
+    assert not self._peer_ip
+    self._peer_ip = peer_ip
 
   def close(self):
     """Helps GC to collect garbage faster."""
-    self.auth_db = None
-    self.current_identity = None
-    self.current_identity_host = None
-    self.current_identity_ip = None
+    self._auth_db = None
+    self._current_identity = None
+    self._peer_host = None
+    self._peer_identity = None
+    self._peer_ip = None
 
 
 def disable_process_cache():
@@ -461,25 +510,26 @@ def get_process_cache_expiration_sec():
   return _process_cache_expiration_sec
 
 
+def reinitialize_request_cache():
+  """Creates new RequestCache instance and puts it into thread local store.
+
+  RequestCached used by the thread before this call (if any) is forcibly closed.
+  """
+  prev = getattr(_thread_local, 'request_cache', None)
+  if prev:
+    prev.close()
+  request_cache = RequestCache()
+  _thread_local.request_cache = request_cache
+  return request_cache
+
+
 def get_request_cache():
   """Returns instance of RequestCache associated with the current request.
 
-  A new instance is created for each new HTTP request. We determine
-  that we're in a new request by inspecting os.environ, which is thread-local
-  and reset at the start of each request.
+  Creates a new empty one if necessary.
   """
-  # Properly close an object from previous request served by the current thread.
-  request_cache = getattr(_thread_local, 'request_cache', None)
-  if not os.getenv('__AUTH_CACHE__') and request_cache is not None:
-    request_cache.close()
-    _thread_local.request_cache = None
-    request_cache = None
-  # Make a new cache, put it in thread local state, put flag in os.environ.
-  if request_cache is None:
-    request_cache = RequestCache()
-    _thread_local.request_cache = request_cache
-    os.environ['__AUTH_CACHE__'] = '1'
-  return request_cache
+  cache = getattr(_thread_local, 'request_cache', None)
+  return cache or reinitialize_request_cache()
 
 
 def fetch_auth_db(known_version=None):
@@ -564,7 +614,6 @@ def reset_local_state():
   _auth_db_fetching_thread = None
   _lazy_bootstrap_ran = False
   _thread_local.request_cache = None
-  os.environ.pop('__AUTH_CACHE__', None)
 
 
 def get_process_auth_db():
@@ -638,6 +687,15 @@ def get_process_auth_db():
     return _auth_db
 
 
+def warmup():
+  """Can be called from /_ah/warmup handler to precache authentication DB."""
+  get_process_auth_db()
+
+
+################################################################################
+## Identity retrieval, @public and @require decorators.
+
+
 def get_request_auth_db():
   """Returns instance of AuthDB from request-local cache.
 
@@ -650,32 +708,21 @@ def get_request_auth_db():
   AuthDB (via task queue, or UrlFetch) that another request may see a different
   copy of AuthDB.
   """
-  cache = get_request_cache()
-  if cache.auth_db is None:
-    cache.auth_db = get_process_auth_db()
-  return cache.auth_db
-
-
-def warmup():
-  """Can be called from /_ah/warmup handler to precache authentication DB."""
-  get_process_auth_db()
-
-
-################################################################################
-## Identity retrieval, @public and @require decorators.
+  return get_request_cache().auth_db
 
 
 def get_current_identity():
   """Returns Identity associated with the current request.
 
-  Always returns instance of Identity (that can possibly be Anonymous,
-  but never None).
+  Takes into account delegation tokens, e.g. it can return end-user identity
+  delegated to caller via delegation token. Use get_peer_identity() to get
+  ID of a real caller, disregarding delegation.
 
-  Raises UninitializedError if current request handler is not aware of 'auth'
-  component, i.e. it's not inherited from AuthenticatingHandler. Usually it
-  shouldn't be the case (or rather handlers not aware of 'auth' should not use
-  get_current_identity()), so it's safe to let this exception to propagate to
-  top level and cause HTTP 500.
+  Always returns instance of Identity (that can be Anonymous, but never None).
+
+  Returns non-Anonymous only if authentication context is properly initialized:
+    * For webapp2, handlers must inherit from handlers.AuthenticatingHandler.
+    * For Cloud Endpoints see endpoints_support.py.
   """
   return _get_current_identity()
 
@@ -688,41 +735,29 @@ def _get_current_identity():
   both 'auth.get_current_identity' and 'auth.api.get_current_identity'. It's
   simpler to move implementation to a private mockable function.
   """
-  # |current_identity| may be None only if 'RequestCache.set_current_identity'
-  # was never called. It happens if request handler isn't inherited from
-  # AuthenticatingHandler.
-  ident = get_request_cache().current_identity
-  if ident is None:
-    raise UninitializedError()
-  return ident
+  return get_request_cache().current_identity
 
 
-def get_current_identity_host():
-  """Returns hostname extracted from X-Host-Token header or None if missing.
+def get_peer_identity():
+  """Returns Identity of whoever made the request (disregarding delegation).
 
-  To be used to authenticate machines that reuse same single service account.
+  Always returns instance of Identity (that can be Anonymous, but never None).
 
-  Raises UninitializedError if request context is not initialized, for more info
-  see get_current_identity().
+  Returns non-Anonymous only if authentication context is properly initialized:
+    * For webapp2 handlers must inherit from handlers.AuthenticatingHandler.
+    * For Cloud Endpoints see endpoints_support.py.
   """
-  cache = get_request_cache()
-  # cache.current_identity is None iff request context is uninitialized.
-  if cache.current_identity is None:
-    return UninitializedError()
-  return cache.current_identity_host
+  return get_request_cache().peer_identity
 
 
-def get_current_identity_ip():
-  """Returns ipaddr.IP address of a client that sent current request.
+def get_peer_host():
+  """Returns hostname extracted from X-Host-Token header or None if missing."""
+  return get_request_cache().peer_host
 
-  Raises UninitializedError if request context is not initialized, for more info
-  see get_current_identity().
-  """
-  cache = get_request_cache()
-  # cache.current_identity is None iff request context is uninitialized.
-  if cache.current_identity is None:
-    return UninitializedError()
-  return cache.current_identity_ip
+
+def get_peer_ip():
+  """Returns ipaddr.IP address of a peer that sent current request."""
+  return get_request_cache().peer_ip
 
 
 def is_group_member(group_name, identity=None):
@@ -730,7 +765,7 @@ def is_group_member(group_name, identity=None):
 
   Unknown groups are considered empty.
   """
-  return get_request_auth_db().is_group_member(
+  return get_request_cache().auth_db.is_group_member(
       group_name, identity or get_current_identity())
 
 
@@ -741,7 +776,7 @@ def is_admin(identity=None):
 
 def list_group(group_name, recursive=True):
   """Returns a set of all Identity in a group."""
-  return get_request_auth_db().list_group(group_name, recursive)
+  return get_request_cache().auth_db.list_group(group_name, recursive)
 
 
 def get_secret(secret_key):
@@ -753,7 +788,7 @@ def get_secret(secret_key):
 
   Creates a new secret if necessary.
   """
-  return get_request_auth_db().get_secret(secret_key)
+  return get_request_cache().auth_db.get_secret(secret_key)
 
 
 def verify_ip_whitelisted(identity, ip):
@@ -765,7 +800,7 @@ def verify_ip_whitelisted(identity, ip):
   Raises AuthorizationError if identity has an IP whitelist assigned and given
   IP address doesn't belong to it.
   """
-  return get_request_auth_db().verify_ip_whitelisted(identity, ip)
+  return get_request_cache().auth_db.verify_ip_whitelisted(identity, ip)
 
 
 def public(func):

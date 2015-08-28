@@ -39,9 +39,9 @@ class TestingServiceApi(remote.Service):
       http_method='GET')
   def who(self, _request):
     return WhoResponse(
-        host=auth.get_current_identity_host(),
+        host=auth.get_peer_host(),
         identity=auth.get_current_identity().to_bytes(),
-        ip=auth.ip_to_string(auth.get_current_identity_ip()))
+        ip=auth.ip_to_string(auth.get_peer_ip()))
 
   @auth.endpoints_method(
       message_types.VoidMessage,

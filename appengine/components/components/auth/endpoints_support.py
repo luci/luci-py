@@ -132,10 +132,17 @@ def endpoints_method(
         initialize_request_auth(
             service.request_state.remote_address, service.request_state.headers)
         return func(service, *args, **kwargs)
-      except api.AuthenticationError:
+      except api.AuthenticationError as ex:
+        logging.warning(
+            'Authentication error.\n%s\nPeer: %s\nIP: %s',
+            ex.message, api.get_peer_identity().to_bytes(),
+            service.request_state.remote_address)
         raise endpoints.UnauthorizedException()
       except api.AuthorizationError as ex:
-        logging.warning('Forbidden: %s', ex.message)
+        logging.warning(
+            'Authorization error.\n%s\nPeer: %s\nIP: %s',
+            ex.message, api.get_peer_identity().to_bytes(),
+            service.request_state.remote_address)
         raise endpoints.ForbiddenException()
     return wrapper
   return new_decorator
@@ -176,6 +183,7 @@ def initialize_request_auth(remote_address, headers):
   or AuthenticationError exceptions.
   """
   config.ensure_configured()
+  auth_context = api.reinitialize_request_cache()
 
   # Endpoints library always does authentication before invoking a method. Just
   # grab the result of that authentication: it's doesn't make any RPCs.
@@ -215,20 +223,22 @@ def initialize_request_auth(remote_address, headers):
         raise api.AuthenticationError('Unsupported authentication method')
       identity = model.Anonymous
 
-  # Thread local (and request local) auth state.
-  auth_context = api.get_request_cache()
-
   # Extract caller host name from host token header, if present and valid.
   tok = headers.get(host_token.HTTP_HEADER)
   if tok:
     validated_host = host_token.validate_host_token(tok)
     if validated_host:
-      auth_context.set_current_identity_host(validated_host)
+      auth_context.peer_host = validated_host
 
   # Verify IP is whitelisted and authenticate requests from bots. It raises
   # AuthorizationError if IP is not allowed.
   assert identity is not None
   assert remote_address
   ip = ipaddr.ip_from_string(remote_address)
-  auth_context.set_current_identity_ip(ip)
-  auth_context.set_current_identity(api.verify_ip_whitelisted(identity, ip))
+  auth_context.peer_ip = ip
+
+  # verify_ip_whitelisted may change identity for bots, store new one.
+  identity = api.verify_ip_whitelisted(identity, ip)
+  auth_context.peer_identity = identity
+  # TODO(vadimsh): Recognize delegation tokens.
+  auth_context.current_identity = identity

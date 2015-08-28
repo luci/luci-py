@@ -16,11 +16,10 @@ General idea:
   4. A host token is put into 'X-Host-Token-V1' HTTP request header.
   5. Any service linked to the auth_service can verify host token HMAC and
      extract hostname from the token.
-  6. Verified host name is available via auth.get_current_identity_host() call.
+  6. Verified host name is available via auth.get_peer_host() call.
   7. Missing or invalid host token doesn't abort the request. The host will be
-     unknown in this case (auth.get_current_identity_host() returns None) and
-     auth API users that care about host authenticity can reject the request
-     themselves.
+     unknown in this case (auth.get_peer_host() returns None) and auth API users
+     that care about host authenticity can reject the request themselves.
 
 Host token is an additional authentication mechanism. OAuth token is still the
 primary method of authentication. Host tokens are useful for distinguishing

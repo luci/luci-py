@@ -342,8 +342,7 @@ class TestAuthDBCache(test_case.TestCase):
     """Ensure get_request_cache() respects multiple threads."""
     # Runs in its own thread.
     def thread_proc():
-      # get_request_cache() returns something meaningful.
-      request_cache = api.get_request_cache()
+      request_cache = api.reinitialize_request_cache()
       self.assertTrue(request_cache)
       # Returns same object in a context of a same request thread.
       self.assertTrue(api.get_request_cache() is request_cache)
@@ -358,7 +357,7 @@ class TestAuthDBCache(test_case.TestCase):
     ]
     for t in threads:
       t.start()
-    results = [results_queue.get() for _ in xrange(len(threads))]
+    results = [results_queue.get(timeout=1) for _ in xrange(len(threads))]
 
     # Different threads use different RequestCache objects.
     self.assertTrue(results[0] is not results[1])
@@ -366,18 +365,14 @@ class TestAuthDBCache(test_case.TestCase):
   def test_get_request_cache_different_requests(self):
     """Ensure get_request_cache() returns new object for a new request."""
     # Grab request cache for 'current' request.
-    request_cache = api.get_request_cache()
+    request_cache = api.reinitialize_request_cache()
 
     # Track calls to 'close'.
     close_calls = []
     self.mock(request_cache, 'close', lambda: close_calls.append(1))
 
-    # Restart testbed, effectively emulating a new request on a same thread.
-    self.testbed.deactivate()
-    self.testbed.activate()
-
     # Should return a new instance of request cache now.
-    self.assertTrue(api.get_request_cache() is not request_cache)
+    self.assertTrue(api.reinitialize_request_cache() is not request_cache)
     # Old one should have been closed.
     self.assertEqual(1, len(close_calls))
 
@@ -502,6 +497,8 @@ class TestAuthDBCache(test_case.TestCase):
 
   def test_get_request_auth_db(self):
     """Ensure get_request_auth_db() caches AuthDB in request cache."""
+    api.reinitialize_request_cache()
+
     # 'get_request_auth_db()' returns whatever get_process_auth_db() returns
     # when called for a first time.
     self.mock(api, 'get_process_auth_db', lambda: 'fake')
@@ -522,20 +519,19 @@ class TestAuthDBCache(test_case.TestCase):
 class ApiTest(test_case.TestCase):
   """Test for publicly exported API."""
 
-  def mock_ndb_now(self, now):
-    """Makes properties with |auto_now| and |auto_now_add| use mocked time."""
-    self.mock(model.ndb.DateTimeProperty, '_now', lambda _: now)
-    self.mock(model.ndb.DateProperty, '_now', lambda _: now.date())
+  def setUp(self):
+    super(ApiTest, self).setUp()
+    api.reset_local_state()
 
   def test_get_current_identity_unitialized(self):
-    """If set_current_identity wasn't called raises an exception."""
-    with self.assertRaises(api.UninitializedError):
-      api.get_current_identity()
+    """If request cache is not initialized, returns Anonymous."""
+    self.assertEqual(api.get_current_identity(), model.Anonymous)
 
   def test_get_current_identity(self):
     """Ensure get_current_identity returns whatever was put in request cache."""
-    api.get_request_cache().set_current_identity(model.Anonymous)
-    self.assertEqual(model.Anonymous, api.get_current_identity())
+    ident = model.Identity.from_bytes('user:abc@example.com')
+    api.get_request_cache().current_identity = ident
+    self.assertEqual(ident, api.get_current_identity())
 
   def test_require_decorator_ok(self):
     """@require calls the callback and then decorated function."""

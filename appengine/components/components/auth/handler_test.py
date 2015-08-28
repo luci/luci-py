@@ -361,25 +361,25 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     self.assertEqual(1, len(routes))
     self.assertEqual(Authenticated, routes[0].handler)
 
-  def test_get_current_identity_ip(self):
+  def test_get_peer_ip(self):
     handler.configure([])
 
     class Handler(handler.AuthenticatingHandler):
       @api.public
       def get(self):
-        self.response.write(ipaddr.ip_to_string(api.get_current_identity_ip()))
+        self.response.write(ipaddr.ip_to_string(api.get_peer_ip()))
 
     app = self.make_test_app('/request', Handler)
     response = app.get('/request', extra_environ={'REMOTE_ADDR': '192.1.2.3'})
     self.assertEqual('192.1.2.3', response.body)
 
-  def test_get_current_identity_host(self):
+  def test_get_peer_host(self):
     handler.configure([])
 
     class Handler(handler.AuthenticatingHandler):
       @api.public
       def get(self):
-        self.response.write(api.get_current_identity_host() or '<none>')
+        self.response.write(api.get_peer_host() or '<none>')
 
     app = self.make_test_app('/request', Handler)
     def call(headers):
