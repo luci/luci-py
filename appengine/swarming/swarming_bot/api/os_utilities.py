@@ -748,6 +748,8 @@ def get_dimensions_all_devices_android(devices):
           for key in keys:
             dimensions[key].add(properties[u'ro.' + key])
       dimensions[u'android'].append(serial_number)
+    except platforms.android.adb.common.usb1.USBErrorNoDevice as e:
+      logging.warning('Ignoring device: %s: %s', serial_number, e)
     except ValueError as e:
       logging.exception('Ignoring device: %s: %s', serial_number, e)
   dimensions[u'android'].sort()

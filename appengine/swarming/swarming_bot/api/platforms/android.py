@@ -196,8 +196,7 @@ def get_devices():
     try:
       handle.Open()
     except adb.common.usb1.USBErrorBusy:
-      logging.warning(
-          'Got USBErrorBusy for %s. Killing adb', handle.serial_number)
+      logging.warning('Got USBErrorBusy for %s. Killing adb', handle.usb_info)
       kill_adb()
       try:
         # If it throws again, it probably means another process
@@ -207,7 +206,7 @@ def get_devices():
       except adb.common.usb1.USBErrorBusy as e:
         logging.warning(
             'USB port for %s is already open (and failed to kill ADB) '
-            'Try rebooting the host: %s', handle.serial_number, e)
+            'Try rebooting the host: %s', handle.usb_info, e)
         cmds[handle.serial_number] = None
         continue
     except adb.common.usb1.USBErrorAccess as e:
@@ -227,17 +226,21 @@ def get_devices():
       cmd = adb.adb_commands.AdbCommands.Connect(
           handle, banner='swarming', rsa_keys=_ADB_KEYS, auth_timeout_ms=10000)
     except adb.usb_exceptions.DeviceAuthError as e:
-      logging.warning('AUTH FAILURE: %s: %s', handle.serial_number, e)
+      logging.warning('AUTH FAILURE: %s: %s', handle.usb_info, e)
       cmd = None
     except adb.usb_exceptions.ReadFailedError as e:
-      logging.warning('READ FAILURE: %s: %s', handle.serial_number, e)
+      logging.warning('READ FAILURE: %s: %s', handle.usb_info, e)
       cmd = None
     except ValueError as e:
       logging.warning(
-          'Trying unpluging and pluging it back: %s: %s',
-          handle.serial_number, e)
+          'Trying unpluging and pluging it back: %s: %s', handle.usb_info, e)
       cmd = None
-    cmds[handle.serial_number] = cmd
+
+    try:
+      serial = handle.serial_number
+    except adb.common.libusb1.USBError:
+      serial = handle.usb_info
+    cmds[serial] = cmd
 
   # Remove any /system/build.prop cache so if a device is disconnect, reflashed
   # then reconnected, it will likely be refresh properly. The main concern is
