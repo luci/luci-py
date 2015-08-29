@@ -34,7 +34,6 @@ import xsrf_client
 from api import bot
 from api import os_utilities
 from third_party.depot_tools import fix_encoding
-from utils import logging_utils
 from utils import net
 from utils import on_error
 from utils import subprocess42
@@ -302,7 +301,7 @@ def run_bot(arg_error):
     # even get to the point to be able to self-update.
     botobj = get_bot()
     if arg_error:
-      botobj.post_error('Argument error: %s' % arg_error)
+      botobj.post_error('Bootstrapping error: %s' % arg_error)
 
     if quit_bit.is_set():
       return 0
@@ -554,27 +553,13 @@ def main(args):
   # in a headless (non-interactive) mode.
   os.environ['SWARMING_HEADLESS'] = '1'
 
-  # TODO(maruel): Get rid of all flags and support no option at all.
-  # https://code.google.com/p/swarming/issues/detail?id=111
-  parser = optparse.OptionParser(
-      usage='%prog [options]',
-      description=sys.modules[__name__].__doc__)
-  # TODO(maruel): Always True.
-  parser.add_option('-v', '--verbose', action='count', default=0,
-                    help='Set logging level to INFO, twice for DEBUG.')
-
+  # The only reason this is kept is to enable the unit test to use --help to
+  # quit the process.
+  parser = optparse.OptionParser(description=sys.modules[__name__].__doc__)
+  _, args = parser.parse_args(args)
   error = None
-  try:
-    # Do this late so an error is reported. It could happen when a flag is
-    # removed but the auto-update script was not upgraded properly.
-    options, args = parser.parse_args(args)
-    levels = [logging.WARNING, logging.INFO, logging.DEBUG]
-    logging_utils.set_console_level(levels[min(options.verbose, len(levels)-1)])
-    if args:
-      parser.error('Unsupported args.')
-  except Exception as e:
-    # Do not reboot here, because it would just cause a reboot loop.
-    error = str(e)
+  if len(args) != 0:
+    error = 'Unexpected arguments: %s' % args
   try:
     return run_bot(error)
   finally:
