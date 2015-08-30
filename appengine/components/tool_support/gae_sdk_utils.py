@@ -10,6 +10,7 @@ import glob
 import hashlib
 import logging
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -33,45 +34,111 @@ yaml = None
 # Directory with this file.
 TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
 
+# Name of a directory with Python GAE SDK.
+PYTHON_GAE_SDK = 'google_appengine'
+
+# Name of a directory with Go GAE SDK.
+GO_GAE_SDK = 'go_appengine'
+
+# Value of 'runtime: ...' in app.yaml -> SDK to use.
+RUNTIME_TO_SDK = {
+  'go': GO_GAE_SDK,
+  'python27': PYTHON_GAE_SDK,
+}
+
 # Path to a current SDK, set in setup_gae_sdk, accessible by gae_sdk_path.
 _GAE_SDK_PATH = None
 
 
-def find_gae_sdk(search_dir=TOOLS_DIR):
+def find_gae_sdk(sdk_name=PYTHON_GAE_SDK, search_dir=TOOLS_DIR):
   """Returns the path to GAE SDK if found, else None."""
   # First search up the directories up to root.
   while True:
-    attempt = os.path.join(search_dir, 'google_appengine')
+    attempt = os.path.join(search_dir, sdk_name)
     if os.path.isfile(os.path.join(attempt, 'dev_appserver.py')):
       return attempt
     prev_dir = search_dir
     search_dir = os.path.dirname(search_dir)
     if search_dir == prev_dir:
       break
-
   # Next search PATH.
+  markers = ['dev_appserver.py']
+  if sdk_name == GO_GAE_SDK:
+    markers.append('goroot')
   for item in os.environ['PATH'].split(os.pathsep):
     if not item:
       continue
     item = os.path.normpath(os.path.abspath(item))
-    if os.path.isfile(os.path.join(item, 'dev_appserver.py')):
+    if all(os.path.exists(os.path.join(item, m)) for m in markers):
       return item
+  return None
 
 
-def find_app_yaml(search_dir):
-  """Locates app.yaml file in |search_dir| or any of its parent directories."""
-  while True:
-    attempt = os.path.join(search_dir, 'app.yaml')
-    if os.path.isfile(attempt):
-      return attempt
-    prev_dir = search_dir
-    search_dir = os.path.dirname(search_dir)
-    if search_dir == prev_dir:
-      return None
+def find_app_runtime_and_yamls(app_dir):
+  """Searches for app.yaml and module-*.yaml in app_dir or its subdirs.
+
+  Recognizes Python and Go GAE apps.
+
+  Returns:
+    (app runtime e.g. 'python27', list of abs path to module yamls).
+
+  Raises:
+    ValueError if not a valid GAE app.
+  """
+  # Look in the root first. It's how python apps and one-module Go apps look.
+  yamls = []
+  app_yaml = os.path.join(app_dir, 'app.yaml')
+  if os.path.isfile(app_yaml):
+    yamls.append(app_yaml)
+  yamls.extend(glob.glob(os.path.join(app_dir, 'module-*.yaml')))
+  if yamls:
+    return get_app_runtime(yamls), yamls
+
+  # Look in per-module subdirectories. Only Go apps are structured that way.
+  # See https://cloud.google.com/appengine/docs/go/#Go_Organizing_Go_apps.
+  for subdir in os.listdir(app_dir):
+    subdir = os.path.join(app_dir, subdir)
+    if not os.path.isdir(subdir):
+      continue
+    app_yaml = os.path.join(subdir, 'app.yaml')
+    if os.path.isfile(app_yaml):
+      yamls.append(app_yaml)
+    yamls.extend(glob.glob(os.path.join(subdir, 'module-*.yaml')))
+  if yamls:
+    rt = get_app_runtime(yamls)
+    if rt != 'go':
+      raise ValueError(
+          'Per-module directories imply "go" runtime, got "%s" instead' % rt)
+    return rt, yamls
+
+  raise ValueError(
+      'Not a GAE application directory, no module *.yamls found: %s' % app_dir)
+
+
+def get_module_runtime(yaml_path):
+  """Finds 'runtime: ...' property in module YAML (or None if missing)."""
+  # 'yaml' module is not available yet at this point (it is loaded from SDK).
+  with open(yaml_path, 'rt') as f:
+    m = re.search(r'^runtime\:\s+(.*)$', f.read(), re.MULTILINE)
+  return m.group(1) if m else None
+
+
+def get_app_runtime(yaml_paths):
+  """Examines all app's yamls making sure they specify single runtime.
+
+  Raises:
+    ValueError if multiple (or unknown) runtimes are specified.
+  """
+  runtimes = sorted(set(get_module_runtime(p) for p in yaml_paths))
+  if len(runtimes) != 1:
+    raise ValueError('Expecting single runtime, got %s' % ', '.join(runtimes))
+  if runtimes[0] not in RUNTIME_TO_SDK:
+    raise ValueError('Unknown runtime \'%s\' in %s' % (runtimes[0], yaml_paths))
+  return runtimes[0]
 
 
 def setup_gae_sdk(sdk_path):
-  """Modifies sys.path and other global process state to be able to use GAE SDK.
+  """Modifies sys.path and to be able to use Python portion of GAE SDK.
 
   Once this is called, other functions from this module know where to find GAE
   SDK and any AppEngine included module can be imported. The change is global
@@ -107,6 +174,9 @@ class LoginRequiredError(Exception):
   """Raised by Application methods if use has to go through login flow."""
 
 
+ModuleFile = collections.namedtuple('ModuleFile', ['path', 'data'])
+
+
 class Application(object):
   """Configurable GAE application.
 
@@ -122,8 +192,6 @@ class Application(object):
     """
     if not _GAE_SDK_PATH:
       raise ValueError('Call setup_gae_sdk first')
-    if not os.path.isfile(os.path.join(app_dir, 'app.yaml')):
-      raise ValueError('Not a GAE application directory: %s' % app_dir)
 
     self._app_dir = os.path.abspath(app_dir)
     self._app_id = app_id
@@ -131,19 +199,14 @@ class Application(object):
 
     # Module ID -> (path to YAML, deserialized content of module YAML).
     self._modules = {}
-
-    ModuleFile = collections.namedtuple('ModuleFile', ['path', 'data'])
-
-    yamls = [os.path.join(self._app_dir, 'app.yaml')]
-    yamls.extend(glob.glob(os.path.join(self._app_dir, 'module-*.yaml')))
-
-    for yaml_path in yamls:
+    for yaml_path in find_app_runtime_and_yamls(self._app_dir)[1]:
       with open(yaml_path) as f:
         data = yaml.load(f)
         module_id = data.get('module', 'default')
         if module_id in self._modules:
           raise ValueError(
-              'Multiple *.yaml files define same module %s' % module_id)
+              'Multiple *.yaml files define same module %s: %s and %s' %
+              (module_id, yaml_path, self._modules[module_id].path))
         self._modules[module_id] = ModuleFile(yaml_path, data)
 
     if 'default' not in self._modules:
@@ -170,6 +233,15 @@ class Application(object):
     # app.yaml first (correspond to 'default' module), then everything else.
     yamls = self._modules.copy()
     return [yamls.pop('default').path] + [m.path for m in yamls.itervalues()]
+
+  @property
+  def default_module_dir(self):
+    """Absolute path to a directory with app.yaml of the default module.
+
+    It's different from app_dir for Go apps. dev_appserver.py searches for
+    cron.yaml, index.yaml etc in this directory.
+    """
+    return os.path.dirname(self._modules['default'].path)
 
   def login(self):
     """Runs OAuth2 login flow and returns true on success."""
@@ -247,15 +319,18 @@ class Application(object):
 
   def update_indexes(self):
     """Deploys new index.yaml."""
-    self.run_appcfg(['update_indexes', '.'])
+    if os.path.isfile(os.path.join(self.default_module_dir, 'index.yaml')):
+      self.run_appcfg(['update_indexes', self.default_module_dir])
 
   def update_queues(self):
-    """Deploys new queues.yaml."""
-    self.run_appcfg(['update_queues', '.'])
+    """Deploys new queue.yaml."""
+    if os.path.isfile(os.path.join(self.default_module_dir, 'queue.yaml')):
+      self.run_appcfg(['update_queues', self.default_module_dir])
 
   def update_cron(self):
     """Deploys new cron.yaml."""
-    self.run_appcfg(['update_cron', '.'])
+    if os.path.isfile(os.path.join(self.default_module_dir, 'cron.yaml')):
+      self.run_appcfg(['update_cron', self.default_module_dir])
 
   def spawn_dev_appserver(self, args, open_ports=False, **kwargs):
     """Launches subprocess with dev_appserver.py.
@@ -374,15 +449,20 @@ def process_sdk_options(parser, options, app_dir):
   """
   logging.basicConfig(level=logging.DEBUG if options.verbose else logging.ERROR)
 
-  sdk_path = options.sdk_path or find_gae_sdk()
+  if not app_dir and not options.app_dir:
+    parser.error('--app-dir option is required')
+  app_dir = os.path.abspath(app_dir or options.app_dir)
+
+  try:
+    runtime = find_app_runtime_and_yamls(app_dir)[0]
+  except ValueError as exc:
+    parser.error(str(exc))
+
+  sdk_path = options.sdk_path or find_gae_sdk(RUNTIME_TO_SDK[runtime], app_dir)
   if not sdk_path:
     parser.error('Failed to find the AppEngine SDK. Pass --sdk-path argument.')
 
   setup_gae_sdk(sdk_path)
-
-  if not app_dir and not options.app_dir:
-    parser.error('--app-dir option is required')
-  app_dir = os.path.abspath(app_dir or options.app_dir)
 
   try:
     return Application(app_dir, options.app_id, options.verbose)
@@ -537,8 +617,8 @@ class KeyringAuth(DefaultAuth):
 
 
 def setup_gae_env():
-  """Sets up App Engine/Django test environment."""
-  sdk_path = find_gae_sdk()
+  """Sets up App Engine Python test environment."""
+  sdk_path = find_gae_sdk(PYTHON_GAE_SDK)
   if not sdk_path:
     raise RuntimeError('Couldn\'t find GAE SDK.')
   setup_gae_sdk(sdk_path)

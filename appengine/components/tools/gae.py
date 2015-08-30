@@ -24,10 +24,12 @@ except ImportError:
 # In case gae.py was run via symlink, find the original file since it's where
 # third_party libs are. Handle a chain of symlinks too.
 SCRIPT_PATH = os.path.abspath(__file__)
+IS_SYMLINKED = False
 while True:
   try:
     SCRIPT_PATH = os.path.abspath(
         os.path.join(os.path.dirname(SCRIPT_PATH), os.readlink(SCRIPT_PATH)))
+    IS_SYMLINKED = True
   except OSError:
     break
 
@@ -376,21 +378,32 @@ class OptionParser(optparse.OptionParser):
     return app, options, args
 
 
-def main(args, app_dir=None):
-  """Main entry points.
+def find_app_yaml(search_dir):
+  """Locates app.yaml file in |search_dir| or any of its parent directories."""
+  while True:
+    attempt = os.path.join(search_dir, 'app.yaml')
+    if os.path.isfile(attempt):
+      return attempt
+    prev_dir = search_dir
+    search_dir = os.path.dirname(search_dir)
+    if search_dir == prev_dir:
+      return None
 
-  Args:
-    args: command line arguments excluding executable name.
-    app_dir: directory with app.yaml, or None to autodiscover based on __file__.
-  """
-  # Search for app.yaml in parent directory. If found, it means gae.py was
-  # symlinked to some GAE app directory. Such symlink allows to avoid typing
-  # --app-dir parameter all the time.
-  if app_dir is None:
+
+def main(args):
+  # gae.py may be symlinked into app's directory or its subdirectory (to avoid
+  # typing --app-dir all the time). If linked into subdirectory, discover root
+  # by locating app.yaml. It is used for Python GAE apps and one-module Go apps
+  # that have all YAMLs in app root dir. For multi-module Go apps (that put
+  # app.yaml into per-module dir) gae.py MUST be symlinked into app root dir.
+  app_dir = None
+  if IS_SYMLINKED:
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    app_yaml_path = gae_sdk_utils.find_app_yaml(script_dir)
+    app_yaml_path = find_app_yaml(script_dir)
     if app_yaml_path:
       app_dir = os.path.dirname(app_yaml_path)
+    else:
+      app_dir = script_dir
 
   colorama.init()
   dispatcher = subcommand.CommandDispatcher(__name__)
