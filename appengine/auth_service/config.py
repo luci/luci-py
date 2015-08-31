@@ -25,6 +25,7 @@ import logging
 import os
 import posixpath
 
+from google import protobuf
 from google.appengine.ext import ndb
 
 from components import config
@@ -34,6 +35,7 @@ from components import utils
 from components.auth import ipaddr
 from components.auth import model
 from components.config import validation
+from components.config import validation_context
 
 from proto import config_pb2
 import importer
@@ -67,6 +69,27 @@ def get_config_revision(path):
   """Returns tuple with info about last imported config revision."""
   schema = _CONFIG_SCHEMAS.get(path)
   return schema['revision_getter']() if schema else None
+
+
+@utils.cache_with_expiration(expiration_sec=60)
+def get_delegation_config():
+  """Returns imported config_pb2.DelegationConfig (or empty one if missing)."""
+  text = _get_service_config('delegation.cfg')
+  if not text:
+    return config_pb2.DelegationConfig()
+  # The config MUST be valid, since we do validation before storing it.
+  # Nevertheless, handle the unexpected.
+  try:
+    msg = config_pb2.DelegationConfig()
+    protobuf.text_format.Merge(text, msg)
+  except protobuf.text_format.ParseError as ex:
+    logging.error('Invalid delegation.cfg: %s', ex)
+    return config_pb2.DelegationConfig()
+  ctx = validation_context.Context.logging()
+  validate_delegation_config(msg, ctx)
+  if ctx.result().has_errors:
+    return config_pb2.DelegationConfig()
+  return msg
 
 
 def refetch_config(force=False):
@@ -114,8 +137,49 @@ def refetch_config(force=False):
 
 ### Integration with config validation framework.
 
-# TODO(vadimsh): Use validation context for real (e.g. emit multiple errors at
-# once instead of aborting on the first one).
+
+@validation.self_rule('delegation.cfg', config_pb2.DelegationConfig)
+def validate_delegation_config(conf, ctx):
+  # Helper to valid a required list of identifies (or '*').
+  def validate_ident_list(name, lst):
+    if not lst:
+      ctx.error('missing %s field', name)
+      return
+    for uid in lst:
+      if uid != '*':
+        try:
+          model.Identity.from_bytes(uid)
+        except ValueError as exc:
+          ctx.error('bad identity string "%s" in %s: %s', uid, name, exc)
+    if '*' in lst and len(lst) != 1:
+      ctx.warning('redundant entries in %s, it has "*"" already', name)
+
+  for idx, r in enumerate(conf.rules):
+    with ctx.prefix('rules #%d: ', idx):
+      validate_ident_list('user_id', r.user_id)
+      validate_ident_list('target_service', r.target_service)
+      if r.max_validity_duration <= 0:
+        ctx.error('max_validity_duration must be a positive integer')
+      for s in r.allowed_to_impersonate:
+        if s.startswith('group:'):
+          name = s[len('group:'):]
+          if not model.is_valid_group_name(name):
+            ctx.error('not a valid group name: %s', name)
+          continue
+        if '*' in s:
+          try:
+            model.IdentityGlob.from_bytes(s)
+          except ValueError as exc:
+            ctx.error('not a valid identity glob "%s": %s', s, exc)
+          continue
+        try:
+          model.Identity.from_bytes(s)
+        except ValueError as exc:
+          ctx.error('not a valid identity "%s": %s', s, exc)
+
+
+# TODO(vadimsh): Below use validation context for real (e.g. emit multiple
+# errors at once instead of aborting on the first one).
 
 
 @validation.self_rule('imports.cfg')
@@ -140,6 +204,50 @@ def validate_oauth_config(conf, ctx):
     _validate_oauth_config(conf)
   except ValueError as exc:
     ctx.error(str(exc))
+
+
+# Simple auth_serivce own configs stored in the datastore as plain text.
+# They are different from imports.cfg (no GUI to update them other), and from
+# ip_whitelist.cfg and oauth.cfg (not tied to AuthDB changes).
+
+
+class _AuthServiceConfig(ndb.Model):
+  """Text config file imported from luci-config.
+
+  Root entity. Key ID is config file name.
+  """
+  # The body of the config itself.
+  config = ndb.TextProperty()
+  # Last imported SHA1 revision of the config.
+  revision = ndb.StringProperty(indexed=False)
+  # URL the config was imported from.
+  url = ndb.StringProperty(indexed=False)
+
+
+def _get_service_config_rev(cfg_name):
+  """Returns last processed Revision of given config."""
+  e = _AuthServiceConfig.get_by_id(cfg_name)
+  return Revision(e.revision, e.url) if e else None
+
+
+def _get_service_config(cfg_name):
+  """Returns text of given config file or None if missing."""
+  e = _AuthServiceConfig.get_by_id(cfg_name)
+  return e.config if e else None
+
+
+@ndb.transactional
+def _update_service_config(cfg_name, rev, conf):
+  """Stores new config (and its revision).
+
+  This function is called only if config has already been validated.
+  """
+  assert isinstance(conf, basestring)
+  e = _AuthServiceConfig.get_by_id(cfg_name) or _AuthServiceConfig(id=cfg_name)
+  old = e.config
+  e.populate(config=conf, revision=rev.revision, url=rev.url)
+  e.put()
+  return old != conf
 
 
 ### Group importer config implementation details.
@@ -371,8 +479,14 @@ def _update_oauth_config(rev, conf):
 #   'use_authdb_transaction': True to call 'updater' in AuthDB transaction.
 # }
 _CONFIG_SCHEMAS = {
+  'delegation.cfg': {
+    'proto_class': None, # delegation configs are stored as text in datastore
+    'revision_getter': lambda: _get_service_config_rev('delegation.cfg'),
+    'updater': lambda rev, c: _update_service_config('delegation.cfg', rev, c),
+    'use_authdb_transaction': False,
+  },
   'imports.cfg': {
-    'proto_class': None, # importer configs as stored as text
+    'proto_class': None, # importer configs are stored as text
     'revision_getter': _get_imports_config_revision,
     'updater': _update_imports_config,
     'use_authdb_transaction': False,

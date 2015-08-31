@@ -127,7 +127,7 @@ class Context(object):
     self.msg(logging.CRITICAL, *args, **kwargs)
 
   def result(self):
-    """Returns an instace of Result with a copy of the context state."""
+    """Returns an instance of Result with a copy of the context state."""
     return Result(self.messages[:])
 
   @classmethod
@@ -135,7 +135,7 @@ class Context(object):
     """Returns a context that raises an exception on a first error message.
 
     Args:
-      exc_type (type): exception type to raise. Defauts to ValueError.
+      exc_type (type): exception type to raise. Defaults to ValueError.
     """
     exc_type = exc_type or ValueError
     def on_message(msg):
