@@ -18,6 +18,7 @@ from protorpc import util
 
 from . import api
 from . import config
+from . import delegation
 from . import host_token
 from . import ipaddr
 from . import model
@@ -106,7 +107,7 @@ def endpoints_method(
     **kwargs):
   """Same as @endpoints.method but also adds auth state initialization code.
 
-  Also forbids changing changing auth parameters on per-method basis, since it
+  Also forbids changing auth parameters on per-method basis, since it
   unnecessary complicates authentication code. All methods inherit properties
   set on the service level.
   """
@@ -224,9 +225,9 @@ def initialize_request_auth(remote_address, headers):
       identity = model.Anonymous
 
   # Extract caller host name from host token header, if present and valid.
-  tok = headers.get(host_token.HTTP_HEADER)
-  if tok:
-    validated_host = host_token.validate_host_token(tok)
+  host_tok = headers.get(host_token.HTTP_HEADER)
+  if host_tok:
+    validated_host = host_token.validate_host_token(host_tok)
     if validated_host:
       auth_context.peer_host = validated_host
 
@@ -240,5 +241,18 @@ def initialize_request_auth(remote_address, headers):
   # verify_ip_whitelisted may change identity for bots, store new one.
   identity = api.verify_ip_whitelisted(identity, ip)
   auth_context.peer_identity = identity
-  # TODO(vadimsh): Recognize delegation tokens.
-  auth_context.current_identity = identity
+
+  # Parse delegation token, if given, to deduce end-user identity.
+  delegation_tok = headers.get(delegation.HTTP_HEADER)
+  if delegation_tok:
+    try:
+      auth_context.current_identity = delegation.check_delegation_token(
+          delegation_tok, auth_context.peer_identity)
+    except delegation.BadTokenError as exc:
+      raise api.AuthorizationError('Bad delegation token: %s' % exc)
+    except delegation.TransientError as exc:
+      msg = 'Transient error while validating delegation token.\n%s' % exc
+      logging.error(msg)
+      raise endpoints.InternalServerErrorException(msg)
+  else:
+    auth_context.current_identity = auth_context.peer_identity

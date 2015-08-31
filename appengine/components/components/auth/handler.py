@@ -20,6 +20,7 @@ from components import utils
 
 from . import api
 from . import config
+from . import delegation
 from . import host_token
 from . import ipaddr
 from . import model
@@ -150,9 +151,9 @@ class AuthenticatingHandler(webapp2.RequestHandler):
         oauth_authentication, service_to_service_authentication)
 
     # Extract caller host name from host token header, if present and valid.
-    tok = self.request.headers.get(host_token.HTTP_HEADER)
-    if tok:
-      validated_host = host_token.validate_host_token(tok)
+    host_tok = self.request.headers.get(host_token.HTTP_HEADER)
+    if host_tok:
+      validated_host = host_token.validate_host_token(host_tok)
       if validated_host:
         auth_context.peer_host = validated_host
 
@@ -162,14 +163,26 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     auth_context.peer_ip = ip
     try:
       # 'verify_ip_whitelisted' may change identity for bots, store new one.
-      identity = api.verify_ip_whitelisted(identity, ip)
+      auth_context.peer_identity = api.verify_ip_whitelisted(identity, ip)
     except api.AuthorizationError as err:
       self.authorization_error(err)
       return
 
-    auth_context.peer_identity = identity
-    # TODO(vadimsh): Recognize delegation tokens.
-    auth_context.current_identity = identity
+    # Parse delegation token, if given, to deduce end-user identity.
+    delegation_tok = self.request.headers.get(delegation.HTTP_HEADER)
+    if delegation_tok:
+      try:
+        auth_context.current_identity = delegation.check_delegation_token(
+            delegation_tok, auth_context.peer_identity)
+      except delegation.BadTokenError as exc:
+        self.authorization_error(
+            api.AuthorizationError('Bad delegation token: %s' % exc))
+      except delegation.TransientError as exc:
+        msg = 'Transient error while validating delegation token.\n%s' % exc
+        logging.error(msg)
+        self.abort(500, detail=msg)
+    else:
+      auth_context.current_identity = auth_context.peer_identity
 
     try:
       # Fail if XSRF token is required, but not provided.

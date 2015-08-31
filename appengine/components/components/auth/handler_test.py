@@ -7,6 +7,7 @@
 # pylint: disable=W0612,W0613,R0201
 
 import datetime
+import json
 import os
 import sys
 import unittest
@@ -20,11 +21,14 @@ from google.appengine.api import users
 import webapp2
 import webtest
 
+from components import utils
 from components.auth import api
+from components.auth import delegation
 from components.auth import handler
 from components.auth import host_token
 from components.auth import ipaddr
 from components.auth import model
+from components.auth.proto import delegation_pb2
 from test_support import test_case
 
 
@@ -400,6 +404,57 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     token = host_token.create_host_token('HOST.domain.com', expiration_sec=60)
     self.mock_now(origin, 61)
     self.assertEqual('<none>', call({'X-Host-Token-V1': token}))
+
+  def test_delegation_token(self):
+    peer_ident = model.Identity.from_bytes('user:peer@a.com')
+    handler.configure([lambda _request: peer_ident])
+
+    class Handler(handler.AuthenticatingHandler):
+      @api.public
+      def get(self):
+        self.response.write(json.dumps({
+          'peer_id': api.get_peer_identity().to_bytes(),
+          'cur_id': api.get_current_identity().to_bytes(),
+        }))
+
+    app = self.make_test_app('/request', Handler)
+    def call(headers=None):
+      return json.loads(app.get('/request', headers=headers).body)
+
+    # No delegation.
+    self.assertEqual(
+        {u'cur_id': u'user:peer@a.com', u'peer_id': u'user:peer@a.com'}, call())
+
+    # TODO(vadimsh): Mint token via some high-level function call.
+    subtokens = delegation_pb2.SubtokenList(subtokens=[
+        delegation_pb2.Subtoken(
+            issuer_id='user:delegated@a.com',
+            creation_time=int(utils.time_time()),
+            validity_duration=3600),
+    ])
+    tok = delegation.serialize_token(delegation.seal_token(subtokens))
+
+    # With valid delegation token.
+    self.assertEqual(
+        {u'cur_id': u'user:delegated@a.com', u'peer_id': u'user:peer@a.com'},
+        call({'X-Delegation-Token-V1': tok}))
+
+    # With invalid delegation token.
+    r = app.get(
+        '/request',
+        headers={'X-Delegation-Token-V1': tok + 'blah'},
+        expect_errors=True)
+    self.assertEqual(403, r.status_int)
+
+    # Transient error.
+    def mocked_check(*_args):
+      raise delegation.TransientError('Blah')
+    self.mock(delegation, 'check_delegation_token', mocked_check)
+    r = app.get(
+        '/request',
+        headers={'X-Delegation-Token-V1': tok},
+        expect_errors=True)
+    self.assertEqual(500, r.status_int)
 
 
 class CookieAuthenticationTest(test_case.TestCase):

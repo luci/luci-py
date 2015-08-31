@@ -3,6 +3,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import logging
 import sys
 import unittest
 
@@ -13,11 +14,14 @@ import endpoints
 from protorpc import messages
 from protorpc import remote
 
+from components import utils
 from components.auth import api
+from components.auth import delegation
 from components.auth import endpoints_support
 from components.auth import host_token
 from components.auth import ipaddr
 from components.auth import model
+from components.auth.proto import delegation_pb2
 from test_support import test_case
 
 
@@ -26,7 +30,8 @@ class EndpointsAuthTest(test_case.TestCase):
 
   def setUp(self):
     super(EndpointsAuthTest, self).setUp()
-    self.mock(endpoints_support.logging, 'error', lambda *_args: None)
+    self.mock(logging, 'error', lambda *_args: None)
+    self.mock(logging, 'warning', lambda *_args: None)
 
   def call(self, remote_address, email, headers=None):
     """Mocks current user calls initialize_request_auth."""
@@ -84,6 +89,44 @@ class EndpointsAuthTest(test_case.TestCase):
     tok = host_token.create_host_token('host-name.domain')
     self.call('127.0.0.1', 'user@example.com', headers={'X-Host-Token-V1': tok})
     self.assertEqual('host-name.domain', api.get_peer_host())
+
+  def test_delegation_token(self):
+    def call(tok=None):
+      headers = {'X-Delegation-Token-V1': tok} if tok else None
+      self.call('127.0.0.1', 'peer@a.com', headers)
+      return {
+        'cur_id': api.get_current_identity().to_bytes(),
+        'peer_id': api.get_current_identity().to_bytes(),
+      }
+
+    # No delegation.
+    self.assertEqual(
+        {'cur_id': 'user:peer@a.com', 'peer_id': 'user:peer@a.com'}, call())
+
+    # TODO(vadimsh): Mint token via some high-level function call.
+    subtokens = delegation_pb2.SubtokenList(subtokens=[
+        delegation_pb2.Subtoken(
+            issuer_id='user:delegated@a.com',
+            creation_time=int(utils.time_time()),
+            validity_duration=3600),
+    ])
+    tok = delegation.serialize_token(delegation.seal_token(subtokens))
+
+    # Valid delegation token.
+    self.assertEqual(
+        {'cur_id': 'user:delegated@a.com', 'peer_id': 'user:delegated@a.com'},
+        call(tok))
+
+    # Invalid delegation token.
+    with self.assertRaises(api.AuthorizationError):
+      call(tok + 'blah')
+
+    # Transient error.
+    def mocked_check(*_args):
+      raise delegation.TransientError('Blah')
+    self.mock(delegation, 'check_delegation_token', mocked_check)
+    with self.assertRaises(endpoints.InternalServerErrorException):
+      call(tok)
 
 
 @endpoints.api(name='testing', version='v1')
