@@ -24,6 +24,7 @@ from components.auth.ui import rest_api
 from components.auth.ui import ui
 
 import config
+import delegation
 import importer
 import replication
 
@@ -244,6 +245,7 @@ def get_routes():
   # Auth service extends the basic UI and API provided by Auth component.
   routes = []
   routes.extend(rest_api.get_rest_api_routes())
+  routes.extend(delegation.get_rest_api_routes())
   routes.extend(ui.get_ui_routes())
   routes.extend([
     # UI routes.

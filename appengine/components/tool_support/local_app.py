@@ -248,6 +248,7 @@ class HttpClient(object):
   def login_as_admin(self, user='test@example.com'):
     """Performs dev_appserver login as admin, modifies cookies."""
     self.request('/_ah/login?email=%s&admin=True&action=Login' % user)
+    self._xsrf_token = None
 
   def request(self, resource, body=None, headers=None, method=None):
     """Sends HTTP request."""

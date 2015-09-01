@@ -4,6 +4,9 @@
 
 import webapp2
 
+from google.appengine.api import datastore_errors
+from google.appengine.ext import ndb
+
 from components import auth
 from components import utils
 
@@ -17,6 +20,9 @@ class WarmupHandler(webapp2.RequestHandler):
 
 assert utils.is_local_dev_server()
 auth.disable_process_cache()
+
+# See components/auth/change_log.py, is_changle_log_indexed.
+ndb.add_flow_exception(datastore_errors.NeedIndexError)
 
 # Add a fake admin for local dev server.
 if not auth.is_replica():

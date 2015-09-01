@@ -13,7 +13,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='delegation.proto',
   package='components.auth.proto.delegation',
-  serialized_pb='\n\x10\x64\x65legation.proto\x12 components.auth.proto.delegation\"x\n\x0f\x44\x65legationToken\x12 \n\x18serialized_subtoken_list\x18\x01 \x01(\x0c\x12\x11\n\tsigner_id\x18\x02 \x01(\t\x12\x16\n\x0esigning_key_id\x18\x03 \x01(\t\x12\x18\n\x10pkcs1_sha256_sig\x18\x04 \x01(\x0c\"M\n\x0cSubtokenList\x12=\n\tsubtokens\x18\x01 \x03(\x0b\x32*.components.auth.proto.delegation.Subtoken\"s\n\x08Subtoken\x12\x11\n\tissuer_id\x18\x01 \x01(\t\x12\x15\n\rcreation_time\x18\x02 \x01(\x03\x12\x19\n\x11validity_duration\x18\x03 \x01(\x05\x12\x10\n\x08\x61udience\x18\x05 \x03(\t\x12\x10\n\x08services\x18\x06 \x03(\t')
+  serialized_pb='\n\x10\x64\x65legation.proto\x12 components.auth.proto.delegation\"x\n\x0f\x44\x65legationToken\x12 \n\x18serialized_subtoken_list\x18\x01 \x01(\x0c\x12\x11\n\tsigner_id\x18\x02 \x01(\t\x12\x16\n\x0esigning_key_id\x18\x03 \x01(\t\x12\x18\n\x10pkcs1_sha256_sig\x18\x04 \x01(\x0c\"M\n\x0cSubtokenList\x12=\n\tsubtokens\x18\x01 \x03(\x0b\x32*.components.auth.proto.delegation.Subtoken\"\x8c\x01\n\x08Subtoken\x12\x11\n\tissuer_id\x18\x01 \x01(\t\x12\x15\n\rcreation_time\x18\x02 \x01(\x03\x12\x19\n\x11validity_duration\x18\x03 \x01(\x05\x12\x10\n\x08\x61udience\x18\x05 \x03(\t\x12\x10\n\x08services\x18\x06 \x03(\t\x12\x17\n\x0fimpersonator_id\x18\x07 \x01(\t')
 
 
 
@@ -137,6 +137,13 @@ _SUBTOKEN = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='impersonator_id', full_name='components.auth.proto.delegation.Subtoken.impersonator_id', index=5,
+      number=7, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -146,8 +153,8 @@ _SUBTOKEN = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=255,
-  serialized_end=370,
+  serialized_start=256,
+  serialized_end=396,
 )
 
 _SUBTOKENLIST.fields_by_name['subtokens'].message_type = _SUBTOKEN

@@ -81,4 +81,9 @@ message Subtoken {
   // identities, e.g. "service:app-id") that can accept this token.
   // "All services" if empty.
   repeated string services = 6;
+
+  // If this token was minted on some else's behalf (i.e. issuer_id field was
+  // provided externally) stores an identify of whoever initiated the minting
+  // request. Mostly for informational purposes. Optional field.
+  optional string impersonator_id = 7;
 }

@@ -99,6 +99,7 @@ __all__ = [
   'IDENTITY_BOT',
   'IDENTITY_SERVICE',
   'IDENTITY_USER',
+  'IdentityGlob',
   'IdentityProperty',
   'ip_whitelist_key',
   'is_empty_group',

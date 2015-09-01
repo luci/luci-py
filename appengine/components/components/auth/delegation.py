@@ -149,6 +149,8 @@ def deserialize_token(blob):
   Raises:
     BadTokenError if blob doesn't look like a valid DelegationToken.
   """
+  if isinstance(blob, unicode):
+    blob = blob.encode('ascii', 'ignore')
   try:
     as_bytes = tokens.base64_decode(blob)
   except ValueError as exc:

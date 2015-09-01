@@ -538,6 +538,15 @@ def is_changle_log_indexed():
   and central Auth service has necessary indexes.
 
   UI of apps without indexes hide "Change log" tab.
+
+  Note: this function spams log with warning "suspended generator
+  has_next_async(query.py:1760) raised NeedIndexError(....)". Unfortunately
+  these lines are generated in NDB guts and the only way to hide them is to
+  modify global NDB state:
+
+    ndb.add_flow_exception(datastore_errors.NeedIndexError)
+
+  Each individual app should decide whether it wants to do it or not.
   """
   try:
     q = make_change_log_query(target='bogus$bogus')

@@ -281,7 +281,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       error: instance of AuthorizationError subclass.
     """
     logging.warning(
-        'Authorization error.\n%s\Peer: %s\nIP: %s',
+        'Authorization error.\n%s\nPeer: %s\nIP: %s',
         error, api.get_peer_identity().to_bytes(), self.request.remote_addr)
     self.abort(403, detail=str(error))
 
@@ -300,7 +300,7 @@ class ApiHandler(AuthenticatingHandler):
 
   def authorization_error(self, error):
     logging.warning(
-        'Authorization error.\n%s\Peer: %s\nIP: %s',
+        'Authorization error.\n%s\nPeer: %s\nIP: %s',
         error, api.get_peer_identity().to_bytes(), self.request.remote_addr)
     self.abort_with_error(403, text=str(error))
 
