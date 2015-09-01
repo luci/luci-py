@@ -167,6 +167,9 @@ class FrontendTest(AppTestBase):
       '/swarming/api/v1/stats/dimensions/%s/minutes' % quoted,
     )
     for url in urls:
+      self.app.get(url, status=403)
+    self.set_as_user()
+    for url in urls:
       self.app.get(url, status=200)
 
   def test_task_list_empty(self):

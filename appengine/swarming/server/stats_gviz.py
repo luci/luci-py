@@ -7,7 +7,6 @@
 import datetime
 import itertools
 import json
-import webapp2
 
 import template
 from components import auth
@@ -163,7 +162,7 @@ class StatsHandlerBase(auth.AuthenticatingHandler):
 
 
 class StatsSummaryHandler(StatsHandlerBase):
-  @auth.public
+  @auth.require(acl.is_user)
   def get(self):
     self.send_response(_Summary)
 
@@ -185,7 +184,7 @@ class StatsSummaryHandler(StatsHandlerBase):
     }
 
 
-class StatsGvizHandlerBase(webapp2.RequestHandler):
+class StatsGvizHandlerBase(auth.AuthenticatingHandler):
   def send_response(self, res_type_info, resolution):
     if resolution not in stats_framework.RESOLUTIONS:
       self.abort(404)
@@ -213,6 +212,7 @@ class StatsGvizHandlerBase(webapp2.RequestHandler):
 
 
 class StatsGvizSummaryHandler(StatsGvizHandlerBase):
+  @auth.require(acl.is_user)
   def get(self, resolution):
     self.send_response(_Summary, resolution)
 
@@ -224,6 +224,7 @@ class StatsGvizSummaryHandler(StatsGvizHandlerBase):
 class StatsGvizDimensionsHandler(StatsGvizHandlerBase):
   dimensions = None
 
+  @auth.require(acl.is_user)
   def get(self, dimensions, resolution):
     # Save it for later use in self.process_data().
     self.dimensions = dimensions
