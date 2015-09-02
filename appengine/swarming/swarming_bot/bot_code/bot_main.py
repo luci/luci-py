@@ -33,7 +33,6 @@ import common
 import xsrf_client
 from api import bot
 from api import os_utilities
-from third_party.depot_tools import fix_encoding
 from utils import net
 from utils import on_error
 from utils import subprocess42
@@ -546,9 +545,6 @@ def get_config():
 
 
 def main(args):
-  # This is necessary so os.path.join() works with unicode path. No kidding.
-  fix_encoding.fix_encoding()
-
   # Add SWARMING_HEADLESS into environ so subcommands know that they are running
   # in a headless (non-interactive) mode.
   os.environ['SWARMING_HEADLESS'] = '1'

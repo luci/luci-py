@@ -20,6 +20,7 @@ import zipfile
 
 from bot_code import common
 
+from third_party.depot_tools import fix_encoding
 from utils import logging_utils
 from utils import zip_package
 
@@ -113,6 +114,12 @@ def main():
   # Always make the current working directory the directory containing this
   # file. It simplifies assumptions.
   os.chdir(os.path.dirname(THIS_FILE))
+
+  # This is necessary so os.path.join() works with unicode path. No kidding.
+  # This must be done here as each of the command take wildly different code
+  # path and this must be run in every case, as it causes really unexpected
+  # issues otherwise, especially in module os.path.
+  fix_encoding.fix_encoding()
 
   if os.path.basename(THIS_FILE) == 'swarming_bot.zip':
     # Self-replicate itself right away as swarming_bot.1.zip and restart as it.

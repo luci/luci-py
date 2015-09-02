@@ -27,7 +27,6 @@ import time
 import zipfile
 
 import xsrf_client
-from third_party.depot_tools import fix_encoding
 from utils import net
 from utils import on_error
 from utils import subprocess42
@@ -381,9 +380,6 @@ def run_command(
 
 
 def main(args):
-  # This is necessary so os.path.join() works with unicode path. No kidding.
-  fix_encoding.fix_encoding()
-
   parser = optparse.OptionParser(description=sys.modules[__name__].__doc__)
   parser.add_option('--in-file', help='Name of the request file')
   parser.add_option(
