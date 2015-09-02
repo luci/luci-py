@@ -117,6 +117,53 @@ class CatalogTest(test_case.EndpointsTestCase):
         rpc_messages.CatalogManipulationRequestError.HOSTNAME_REUSE,
     )
 
+  def test_add_batch_empty(self):
+    request = rpc_to_json(rpc_messages.CatalogMachineBatchAdditionRequest())
+    auth_testing.mock_get_current_identity(self)
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('add_machines', request).json,
+        rpc_messages.CatalogBatchManipulationResponse,
+    )
+    self.failIf(response.responses)
+
+  def test_add_batch(self):
+    request = rpc_to_json(rpc_messages.CatalogMachineBatchAdditionRequest(
+        requests=[
+            rpc_messages.CatalogMachineAdditionRequest(
+                dimensions=rpc_messages.Dimensions(
+                    hostname='fake-host-1',
+                    os_family=rpc_messages.OSFamily.LINUX,
+                ),
+            ),
+            rpc_messages.CatalogMachineAdditionRequest(
+                dimensions=rpc_messages.Dimensions(
+                    hostname='fake-host-2',
+                    os_family=rpc_messages.OSFamily.WINDOWS,
+                ),
+            ),
+            rpc_messages.CatalogMachineAdditionRequest(
+                dimensions=rpc_messages.Dimensions(
+                    hostname='fake-host-1',
+                    os_family=rpc_messages.OSFamily.OSX,
+                ),
+            ),
+        ],
+    ))
+    auth_testing.mock_get_current_identity(self)
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('add_machines', request).json,
+        rpc_messages.CatalogBatchManipulationResponse,
+    )
+    self.assertEqual(len(response.responses), 3)
+    self.failIf(response.responses[0].error)
+    self.failIf(response.responses[1].error)
+    self.assertEqual(
+        response.responses[2].error,
+        rpc_messages.CatalogManipulationRequestError.HOSTNAME_REUSE,
+    )
+
   def test_delete(self):
     request_1 = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
         dimensions=rpc_messages.Dimensions(

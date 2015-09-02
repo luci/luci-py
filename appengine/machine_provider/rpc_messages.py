@@ -6,30 +6,7 @@
 
 from protorpc import messages
 
-
-class Backend(messages.Enum):
-  """Lists valid backends."""
-  DUMMY = 0
-  GCE = 1
-
-
-class OSFamily(messages.Enum):
-  """Lists valid OS families."""
-  LINUX = 1
-  OSX = 2
-  WINDOWS = 3
-
-
-class Dimensions(messages.Message):
-  """Represents the dimensions of a machine."""
-  # The operating system family of this machine.
-  os_family = messages.EnumField(OSFamily, 1)
-  # The backend which should be used to spin up this machine. This should
-  # generally be left unspecified so the Machine Provider selects the backend
-  # on its own.
-  backend = messages.EnumField(Backend, 2)
-  # The hostname of this machine.
-  hostname = messages.StringField(3)
+from components.machine_provider.dimensions import *
 
 
 class CatalogMachineAdditionRequest(messages.Message):
@@ -40,6 +17,17 @@ class CatalogMachineAdditionRequest(messages.Message):
   """
   # Dimensions instance specifying what sort of machine this is.
   dimensions = messages.MessageField(Dimensions, 1, required=True)
+
+
+class CatalogMachineBatchAdditionRequest(messages.Message):
+  """Represents a batched set of CatalogMachineAdditionRequests.
+
+  dimensions.backend must be specified in each CatalogMachineAdditionRequest.
+  dimensions.hostname must be unique per backend.
+  """
+  # CatalogMachineAdditionRequest instances to batch together.
+  requests = messages.MessageField(
+      CatalogMachineAdditionRequest, 1, repeated=True)
 
 
 class CatalogMachineDeletionRequest(messages.Message):
@@ -71,10 +59,25 @@ class CatalogManipulationRequestError(messages.Enum):
 
 
 class CatalogManipulationResponse(messages.Message):
-  """Represents a response to a catalog manipulation response."""
+  """Represents a response to a catalog manipulation request."""
   # CatalogManipulationRequestError instance indicating an error with the
   # request, or None if there is no error.
   error = messages.EnumField(CatalogManipulationRequestError, 1)
+  # CatalogMachineAdditionRequest this response is in reference to.
+  machine_addition_request = messages.MessageField(
+      CatalogMachineAdditionRequest, 2)
+  # CatalogMachineDeletionRequest this response is in reference to.
+  machine_deletion_request = messages.MessageField(
+      CatalogMachineDeletionRequest, 3)
+  # CatalogCapacityModificationRequest this response is in reference to.
+  capacity_modification_request = messages.MessageField(
+      CatalogCapacityModificationRequest, 4)
+
+
+class CatalogBatchManipulationResponse(messages.Message):
+  """Represents a response to a batched catalog manipulation request."""
+  responses = messages.MessageField(
+      CatalogManipulationResponse, 1, repeated=True)
 
 
 class LeaseRequest(messages.Message):

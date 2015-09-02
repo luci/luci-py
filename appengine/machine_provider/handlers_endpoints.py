@@ -22,7 +22,7 @@ import pubsub
 import rpc_messages
 
 
-@auth.endpoints.api(name='catalog', version='v1')
+@auth.endpoints_api(name='catalog', version='v1')
 class CatalogEndpoints(remote.Service):
   """Implements cloud endpoints for the Machine Provider Catalog."""
 
@@ -76,8 +76,44 @@ class CatalogEndpoints(remote.Service):
     )
     error = self.check_backend(request) or self.check_hostname(request)
     if error:
-      return rpc_messages.CatalogManipulationResponse(error=error)
+      return rpc_messages.CatalogManipulationResponse(
+          error=error,
+          machine_addition_request=request,
+      )
     return self._add_machine(request)
+
+  @auth.endpoints_method(
+      rpc_messages.CatalogMachineBatchAdditionRequest,
+      rpc_messages.CatalogBatchManipulationResponse,
+  )
+  @auth.require(acl.is_backend_service_or_catalog_admin)
+  def add_machines(self, request):
+    """Handles an incoming CatalogMachineBatchAdditionRequest.
+
+    Batches are intended to save on RPCs only. The batched requests will not
+    execute transactionally.
+    """
+    user = auth.get_current_identity().to_bytes()
+    logging.info(
+        'Received CatalogMachineBatchAdditionRequest:\nUser: %s\n%s',
+        user,
+        request,
+    )
+    responses = []
+    for request in request.requests:
+      logging.info(
+          'Processing CatalogMachineAdditionRequest:\n%s',
+          request,
+      )
+      error = self.check_backend(request) or self.check_hostname(request)
+      if error:
+        responses.append(rpc_messages.CatalogManipulationResponse(
+            error=error,
+            machine_addition_request=request,
+        ))
+      else:
+        responses.append(self._add_machine(request))
+    return rpc_messages.CatalogBatchManipulationResponse(responses=responses)
 
   @ndb.transactional
   def _add_machine(self, request):
@@ -87,13 +123,16 @@ class CatalogEndpoints(remote.Service):
       # Enforces per-backend hostname uniqueness.
       logging.info('Hostname reuse:\nOriginally used for: \n%s', entry)
       return rpc_messages.CatalogManipulationResponse(
-          error=rpc_messages.CatalogManipulationRequestError.HOSTNAME_REUSE
+          error=rpc_messages.CatalogManipulationRequestError.HOSTNAME_REUSE,
+          machine_addition_request=request,
       )
     models.CatalogMachineEntry.create_and_put(
         request.dimensions,
         models.CatalogMachineEntryStates.AVAILABLE,
     )
-    return rpc_messages.CatalogManipulationResponse()
+    return rpc_messages.CatalogManipulationResponse(
+        machine_addition_request=request,
+    )
 
   @auth.endpoints_method(
       rpc_messages.CatalogMachineDeletionRequest,
@@ -110,7 +149,10 @@ class CatalogEndpoints(remote.Service):
     )
     error = self.check_backend(request) or self.check_hostname(request)
     if error:
-      return rpc_messages.CatalogManipulationResponse(error=error)
+      return rpc_messages.CatalogManipulationResponse(
+          error=error,
+          machine_deletion_request=request,
+      )
     return self._delete_machine(request)
 
   @ndb.transactional
@@ -120,10 +162,13 @@ class CatalogEndpoints(remote.Service):
     if not entry:
       logging.info('Catalog entry not found')
       return rpc_messages.CatalogManipulationResponse(
-        error=rpc_messages.CatalogManipulationRequestError.ENTRY_NOT_FOUND,
+          error=rpc_messages.CatalogManipulationRequestError.ENTRY_NOT_FOUND,
+          machine_deletion_request=request,
       )
     entry.key.delete()
-    return rpc_messages.CatalogManipulationResponse()
+    return rpc_messages.CatalogManipulationResponse(
+        machine_deletion_request=request,
+    )
 
   @auth.endpoints_method(
       rpc_messages.CatalogCapacityModificationRequest,
@@ -140,7 +185,10 @@ class CatalogEndpoints(remote.Service):
     )
     error = self.check_backend(request)
     if error:
-      return rpc_messages.CatalogManipulationResponse(error=error)
+      return rpc_messages.CatalogManipulationResponse(
+          capacity_modification_request=request,
+          error=error,
+      )
     return self._modify_capacity(request)
 
   @ndb.transactional
@@ -150,10 +198,12 @@ class CatalogEndpoints(remote.Service):
         request.dimensions,
         request.count,
     )
-    return rpc_messages.CatalogManipulationResponse()
+    return rpc_messages.CatalogManipulationResponse(
+        capacity_modification_request=request,
+    )
 
 
-@auth.endpoints.api(name='machine_provider', version='v1')
+@auth.endpoints_api(name='machine_provider', version='v1')
 class MachineProviderEndpoints(remote.Service):
   """Implements cloud endpoints for the Machine Provider."""
 

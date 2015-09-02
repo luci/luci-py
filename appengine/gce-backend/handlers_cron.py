@@ -12,6 +12,7 @@ import webapp2
 
 from components import decorators
 from components import gce
+from components import machine_provider
 
 
 # TODO(smut): Make this modifiable at runtime (keep in datastore).
@@ -41,12 +42,21 @@ def filter_templates(templates):
     # For now, enforce only one disk.
     if len(properties.get('disks', [])) == 1:
       # For now, require the template to give the OS family in its metadata.
-      os_family_count = sum(
-          1 for metadatum in properties['metadata'].get('items', [])
+      os_family_values = [
+          metadatum['value'] for metadatum in properties['metadata'].get(
+              'items', [],
+          )
           if metadatum['key'] == 'os_family'
-      )
-      if os_family_count == 1:
-        yield template_name, template
+      ]
+      if len(os_family_values) == 1:
+        if os_family_values[0] in machine_provider.OSFamily.names():
+          yield template_name, template
+        else:
+          logging.warning(
+              'Skipping %s due to invalid os_family: %s',
+              template_name,
+              os_family_values[0],
+          )
       else:
         logging.warning(
             'Skipping %s due to metadata errors:\n%s',
@@ -112,9 +122,10 @@ class InstanceProcessor(webapp2.RequestHandler):
           if metadatum['key'] == 'os_family'
       ][0]
       group_dimensions = {
-          'cpus': gce.machine_type_to_num_cpus(properties['machineType']),
-          'disk': properties['disks'][0]['initializeParams']['diskSizeGb'],
-          'memory': gce.machine_type_to_memory(properties['machineType']),
+          'backend': machine_provider.Backend.GCE.name,
+          'disk_gb': properties['disks'][0]['initializeParams']['diskSizeGb'],
+          'memory_gb': gce.machine_type_to_memory(properties['machineType']),
+          'num_cpus': gce.machine_type_to_num_cpus(properties['machineType']),
           'os_family': os_family,
       }
 
@@ -122,10 +133,11 @@ class InstanceProcessor(webapp2.RequestHandler):
       for instance_name, instance in instances.iteritems():
         logging.info('Processing instance: %s', instance_name)
         if instance['instanceStatus'] == 'RUNNING':
-          instances[instance_name] = group_dimensions
+          instances[instance_name] = group_dimensions.copy()
+          instances[instance_name]['hostname'] = instance_name
+          # TODO(smut): Static IP assignment.
 
-    # TODO(smut): Static IP assignment, then tell Machine Provider.
-    logging.info('instances:\n%s', json.dumps(instances, indent=2))
+    machine_provider.add_machines(instances.values())
 
 
 def create_cron_app():
