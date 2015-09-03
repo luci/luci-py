@@ -108,8 +108,12 @@ class UploadBotConfigHandler(auth.AuthenticatingHandler):
     if not script:
       self.abort(400, 'No script uploaded')
 
-    # Make sure the script is valid utf-8.
-    script = script.decode('utf-8', 'replace').encode('utf-8')
+    # Make sure the script is valid utf-8. For some odd reason, the script
+    # instead may or may not be an unicode instance. This depends if it is on
+    # AppEngine production or not.
+    if isinstance(script, str):
+      script = script.decode('utf-8', 'replace')
+    script = script.encode('utf-8')
     bot_code.store_bot_config(script)
     self.get()
 
@@ -136,8 +140,12 @@ class UploadBootstrapHandler(auth.AuthenticatingHandler):
     if not script:
       self.abort(400, 'No script uploaded')
 
-    # Make sure the script is valid utf-8.
-    script = script.decode('utf-8', 'replace').encode('utf-8')
+    # Make sure the script is valid utf-8. For some odd reason, the script
+    # instead may or may not be an unicode instance. This depends if it is on
+    # AppEngine production or not.
+    if isinstance(script, str):
+      script = script.decode('utf-8', 'replace')
+    script = script.encode('utf-8')
     bot_code.store_bootstrap(script)
     self.get()
 

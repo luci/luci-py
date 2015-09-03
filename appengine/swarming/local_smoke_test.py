@@ -36,25 +36,30 @@ from api import os_utilities
 
 
 class SwarmingClient(object):
-  def __init__(self, swarming_server):
+  def __init__(self, swarming_server, isolate_server):
     self._swarming_server = swarming_server
+    self._isolate_server = isolate_server
     self._tmpdir = tempfile.mkdtemp(prefix='swarming_client')
     self._index = 0
 
-  def task_trigger(self, args):
+  def task_trigger_raw(self, args):
     """Triggers a task and return the task id."""
     h, tmp = tempfile.mkstemp(prefix='swarming_smoke_test', suffix='.json')
     os.close(h)
     try:
       cmd = [
-        '--user', 'joe@localhost', '-d', 'cpu', 'x86', '--dump-json', tmp,
+        '--user', 'joe@localhost',
+        '-d', 'cpu', 'x86',
+        '--dump-json', tmp,
         '--raw-cmd',
       ]
       cmd.extend(args)
       assert not self._run('trigger', cmd), args
-      with open(tmp, 'r') as f:
+      with open(tmp, 'rb') as f:
         data = json.load(f)
-        return data['tasks'].popitem()[1]['task_id']
+        task_id = data['tasks'].popitem()[1]['task_id']
+        logging.debug('task_id = %s', task_id)
+        return task_id
     finally:
       os.remove(tmp)
 
@@ -63,10 +68,31 @@ class SwarmingClient(object):
     h, tmp = tempfile.mkstemp(prefix='swarming_smoke_test', suffix='.json')
     os.close(h)
     try:
-      # swarming.py collect will return the exit code of the task.
-      self._run('collect', ['--task-summary-json', tmp, task_id])
-      with open(tmp, 'r') as f:
-        return json.load(f)
+      tmpdir = tempfile.mkdtemp(prefix='swarming_smoke_test')
+      try:
+        # swarming.py collect will return the exit code of the task.
+        args = [
+          '--task-summary-json', tmp, task_id, '--task-output-dir', tmpdir,
+          '--timeout', '20',
+        ]
+        self._run('collect', args)
+        with open(tmp, 'rb') as f:
+          content = f.read()
+        try:
+          summary = json.loads(content)
+        except ValueError:
+          print >> sys.stderr, 'Bad json:\n%s' % content
+          raise
+        outputs = {}
+        for root, _, files in os.walk(tmpdir):
+          for i in files:
+            p = os.path.join(root, i)
+            name = p[len(tmpdir)+1:]
+            with open(p, 'rb') as f:
+              outputs[name] = f.read()
+        return summary, outputs
+      finally:
+        shutil.rmtree(tmpdir)
     finally:
       os.remove(tmp)
 
@@ -86,6 +112,11 @@ class SwarmingClient(object):
         sys.stderr.write('  %s\n' % l)
 
   def _run(self, command, args):
+    """Runs swarming.py and capture the stdout to a log file.
+
+    The log file will be printed by the test framework in case of failure or
+    verbose mode.
+    """
     name = os.path.join(self._tmpdir, 'client_%d.log' % self._index)
     self._index += 1
     cmd = [
@@ -128,185 +159,141 @@ def gen_expected(**kwargs):
   return expected
 
 
-def handle_interrupt(fn):
-  """Makes a unittest.TestCase test handle Ctrl-C properly."""
-  def hook(self):
-    try:
-      fn(self)
-    except KeyboardInterrupt:
-      self.fail('<Ctrl-C>')
-      if self._bot:
-        self._bot.kill()
-  return hook
-
-
-class SwarmingTestCase(unittest.TestCase):
-  """Test case class for Swarming integration tests."""
+class Test(unittest.TestCase):
   maxDiff = 2000
+  client = None
+  dimensions = None
+  servers = None
 
-  def setUp(self):
-    super(SwarmingTestCase, self).setUp()
-    self._bot = None
-    self._client = None
-    self._servers = None
-    # Force language to be English, otherwise the error messages differ from
-    # expectations.
-    os.environ['LANG'] = 'en_US.UTF-8'
-    os.environ['LANGUAGE'] = 'en_US.UTF-8'
+  @classmethod
+  def setUpClass(cls):
+    cls.dimensions = os_utilities.get_dimensions()
 
-  def tearDown(self):
-    # Kill bot, kill server, print logs if failed, delete tmpdir, call super.
-    try:
-      try:
-        try:
-          try:
-            if self._bot:
-              self._bot.stop()
-          finally:
-            if self._servers:
-              self._servers.stop()
-        finally:
-          if self.has_failed() or is_verbose():
-            # Print out the logs before deleting them.
-            if self._bot:
-              self._bot.dump_log()
-            if self._servers:
-              self._servers.dump_log()
-            if self._client:
-              self._client.dump_log()
-      finally:
-        if self._client:
-          self._client.cleanup()
-    finally:
-      super(SwarmingTestCase, self).tearDown()
+  def gen_expected(self, **kwargs):
+    return gen_expected(bot_dimensions=self.dimensions, **kwargs)
 
-  def finish_setup(self):
-    """Uploads bot_config.py and starts a bot.
-
-    Should be called from test_* method (not from setUp), since if setUp fails
-    tearDown is not getting called (and finish_setup can fail because it uses
-    various server endpoints).
-    """
-    self._servers = start_servers.LocalServers(False)
-    self._servers.start()
-    self._bot = start_bot.LocalBot(self._servers.swarming_server.url)
-    self._bot.start()
-
-    # Replace bot_config.py.
-    with open(os.path.join(BOT_DIR, 'config', 'bot_config.py'), 'rb') as f:
-      bot_config_content = f.read() + '\n'
-    # This will restart the bot.
-    res = self._servers.http_client.request(
-        '/restricted/upload/bot_config',
-        body=urllib.urlencode({'script': bot_config_content}))
-    if not res:
-      raise Exception('Failed to upload bot_config')
-
-  def has_failed(self):
-    # pylint: disable=E1101
-    return not self._resultForDoCleanups.wasSuccessful()
-
-  @handle_interrupt
-  def test_integration(self):
-    """Runs a few task requests and wait for results."""
-    self.finish_setup()
-    def cmd(exit_code=0):
-      return [
-        'python', '-c', 'import sys; print(\'hi\'); sys.exit(%d)' % exit_code,
-      ]
-
-    # tuple(task_request, expectation)
-    dimensions = os_utilities.get_dimensions()
+  def test_raw_bytes(self):
     # A string of a letter 'A', UTF-8 BOM then UTF-16 BOM then UTF-EDBCDIC then
     # invalid UTF-8 and the letter 'B'. It is double escaped so it can be passed
     # down the shell.
     invalid_bytes = 'A\\xEF\\xBB\\xBF\\xFE\\xFF\\xDD\\x73\\x66\\x73\\xc3\\x28B'
+    args = [
+      '-T', 'non_utf8', '--',
+      'python', '-c', 'print(\'' + invalid_bytes + '\')',
+    ]
+    summary = self.gen_expected(
+        name=u'non_utf8',
+        # The string is mostly converted to 'Replacement Character'.
+        outputs=[u'A\ufeff\ufffd\ufffd\ufffdsfs\ufffd(B\n'])
+    self.assertOneTask(args, summary, {})
+
+  def test_invalid_command(self):
+    args = ['-T', 'invalid', '--', 'unknown_invalid_command']
+    summary = self.gen_expected(
+        name=u'invalid',
+        exit_codes=[1],
+        failure=True,
+        outputs=[
+          u'Command "unknown_invalid_command" failed to start.\n'
+          u'Error: [Errno 2] No such file or directory',
+        ])
+    self.assertOneTask(args, summary, {})
+
+  def test_hard_timeout(self):
+    args = [
+      # Need to flush to ensure it will be sent to the server.
+      '-T', 'hard_timeout', '--hard-timeout', '1', '--',
+      'python', '-c',
+      'import time,sys; sys.stdout.write(\'hi\\n\'); '
+        'sys.stdout.flush(); time.sleep(120)',
+    ]
+    summary = self.gen_expected(
+        name=u'hard_timeout',
+        exit_codes=[-signal.SIGTERM],
+        failure=True,
+        state=0x40)  # task_result.State.TIMED_OUT
+    self.assertOneTask(args, summary, {})
+
+  def test_io_timeout(self):
+    args = [
+      # Need to flush to ensure it will be sent to the server.
+      '-T', 'io_timeout', '--io-timeout', '1', '--',
+      'python', '-c',
+      'import time,sys; sys.stdout.write(\'hi\\n\'); '
+        'sys.stdout.flush(); time.sleep(120)',
+    ]
+    summary = self.gen_expected(
+        name=u'io_timeout',
+        exit_codes=[-signal.SIGTERM],
+        failure=True,
+        state=0x40)  # task_result.State.TIMED_OUT
+    self.assertOneTask(args, summary, {})
+
+  def test_success_fails(self):
+    def get_hello_world(exit_code=0):
+      return [
+        'python', '-c', 'import sys; print(\'hi\'); sys.exit(%d)' % exit_code,
+      ]
+    # tuple(task_request, expectation)
     tasks = [
       (
-        ['-T', 'simple_success', '--'] + cmd(),
-        gen_expected(name=u'simple_success', bot_dimensions=dimensions),
+        ['-T', 'simple_success', '--'] + get_hello_world(),
+        (self.gen_expected(name=u'simple_success'), {}),
       ),
       (
-        ['-T', 'simple_failure', '--'] + cmd(1),
-        gen_expected(
-          name=u'simple_failure',
-          bot_dimensions=dimensions,
-          exit_codes=[1],
-          failure=True),
+        ['-T', 'simple_failure', '--'] + get_hello_world(1),
+        (
+          self.gen_expected(
+              name=u'simple_failure', exit_codes=[1], failure=True),
+          {},
+        ),
       ),
       (
-        ['-T', 'invalid', '--', 'unknown_invalid_command'],
-        gen_expected(
-            name=u'invalid',
-            bot_dimensions=dimensions,
-            exit_codes=[1],
-            failure=True,
-            outputs=[
-              u'Command "unknown_invalid_command" failed to start.\n'
-              u'Error: [Errno 2] No such file or directory',
-            ]),
-      ),
-      (
-        [
-          # Need to flush to ensure it will be sent to the server.
-          '-T', 'hard_timeout', '--hard-timeout', '1', '--',
-          'python', '-c',
-          'import time,sys; sys.stdout.write(\'hi\\n\'); '
-            'sys.stdout.flush(); time.sleep(120)',
-        ],
-        gen_expected(
-            name=u'hard_timeout',
-            bot_dimensions=dimensions,
-            exit_codes=[-signal.SIGTERM],
-            failure=True,
-            state=0x40),  # task_result.State.TIMED_OUT
-      ),
-      (
-        [
-          # Need to flush to ensure it will be sent to the server.
-          '-T', 'io_timeout', '--io-timeout', '1', '--',
-          'python', '-c',
-          'import time,sys; sys.stdout.write(\'hi\\n\'); '
-            'sys.stdout.flush(); time.sleep(120)',
-        ],
-        gen_expected(
-            name=u'io_timeout',
-            bot_dimensions=dimensions,
-            exit_codes=[-signal.SIGTERM],
-            failure=True,
-            state=0x40),  # task_result.State.TIMED_OUT
-      ),
-      (
-        [
-          '-T', 'non_utf8', '--',
-          'python', '-c', 'print(\'' + invalid_bytes + '\')',
-        ],
-        gen_expected(
-            name=u'non_utf8', bot_dimensions=dimensions,
-            # The string is mostly converted to 'Replacement Character'.
-            outputs=[u'A\ufeff\ufffd\ufffd\ufffdsfs\ufffd(B\n']),
-      ),
-      (
-        ['-T', 'ending_simple_success', '--'] + cmd(),
-        gen_expected(name=u'ending_simple_success', bot_dimensions=dimensions),
+        ['-T', 'ending_simple_success', '--'] + get_hello_world(),
+        (self.gen_expected(name=u'ending_simple_success'), {}),
       ),
     ]
 
     # tuple(task_id, expectation)
-    self._client = SwarmingClient(self._servers.swarming_server.url)
     running_tasks = [
-      (self._client.task_trigger(args), expected) for args, expected in tasks
+      (self.client.task_trigger_raw(args), expected) for args, expected in tasks
     ]
 
-    for task_id, expectation in running_tasks:
-      self.assertResults(expectation, self._client.task_collect(task_id))
+    for task_id, (summary, files) in running_tasks:
+      actual_summary, actual_files = self.client.task_collect(task_id)
+      self.assertResults(summary, actual_summary)
+      actual_files.pop('summary.json')
+      self.assertEqual(files, actual_files)
+
+  def test_update_continue(self):
+    # Run a task, force the bot to update, run another task, ensure both tasks
+    # used different bot version.
+    args = ['-T', 'simple_success', '--', 'echo', 'hi']
+    summary = self.gen_expected(name=u'simple_success')
+    bot_version1 = self.assertOneTask(args, summary, {})
+
+    # Replace bot_config.py.
+    with open(os.path.join(BOT_DIR, 'config', 'bot_config.py'), 'rb') as f:
+      bot_config_content = f.read() + '\n'
+
+    # This will restart the bot. This ensures the update mechanism works.
+    # TODO(maruel): Convert to a real API. Can only be accessed by admin-level
+    # account.
+    res = self.servers.http_client.request(
+        '/restricted/upload/bot_config',
+        body=urllib.urlencode({'script': bot_config_content}))
+    self.assertEqual(200, res.http_code, res.body)
+    bot_version2 = self.assertOneTask(args, summary, {})
+    self.assertNotEqual(bot_version1, bot_version2)
 
   def assertResults(self, expected, result):
     self.assertEqual(['shards'], result.keys())
     self.assertEqual(1, len(result['shards']))
+    self.assertTrue(result['shards'][0])
     result = result['shards'][0].copy()
     # These are not deterministic (or I'm too lazy to calculate the value).
-    self.assertTrue(result.pop('bot_version'))
+    bot_version = result.pop('bot_version')
+    self.assertTrue(bot_version)
     self.assertTrue(result.pop('costs_usd'))
     self.assertTrue(result.pop('created_ts'))
     self.assertTrue(result.pop('completed_ts'))
@@ -315,16 +302,78 @@ class SwarmingTestCase(unittest.TestCase):
     self.assertTrue(result.pop('modified_ts'))
     self.assertTrue(result.pop('started_ts'))
     self.assertEqual(expected, result)
+    return bot_version
+
+  def assertOneTask(self, args, expected_summary, expected_files):
+    """Runs a single task at a time."""
+    task_id = self.client.task_trigger_raw(args)
+    actual_summary, actual_files = self.client.task_collect(task_id)
+    bot_version = self.assertResults(expected_summary, actual_summary)
+    actual_files.pop('summary.json')
+    self.assertEqual(expected_files, actual_files)
+    return bot_version
 
 
-def is_verbose():
-  return '-v' in sys.argv
+def cleanup(bot, client, servers, print_all):
+  """Kills bot, kills server, print logs if failed, delete tmpdir."""
+  try:
+    try:
+      try:
+        if bot:
+          bot.stop()
+      finally:
+        if servers:
+          servers.stop()
+    finally:
+      if print_all:
+        if bot:
+          bot.dump_log()
+        if servers:
+          servers.dump_log()
+        if client:
+          client.dump_log()
+  finally:
+    if client:
+      client.cleanup()
 
 
-if __name__ == '__main__':
-  if is_verbose():
+def main():
+  verbose = '-v' in sys.argv
+  if verbose:
     logging.basicConfig(level=logging.INFO)
     unittest.TestCase.maxDiff = None
   else:
     logging.basicConfig(level=logging.ERROR)
-  unittest.main()
+
+  # Force language to be English, otherwise the error messages differ from
+  # expectations.
+  os.environ['LANG'] = 'en_US.UTF-8'
+  os.environ['LANGUAGE'] = 'en_US.UTF-8'
+
+  bot = None
+  client = None
+  servers = None
+  failed = True
+  try:
+    servers = start_servers.LocalServers(False)
+    servers.start()
+    bot = start_bot.LocalBot(servers.swarming_server.url)
+    bot.start()
+    client = SwarmingClient(
+        servers.swarming_server.url, servers.isolate_server.url)
+    # Test cases only interract with the client; except for test_update_continue
+    # which mutates the bot.
+    Test.client = client
+    Test.servers = servers
+    failed = not unittest.main(exit=False).result.wasSuccessful()
+  except KeyboardInterrupt:
+    print >> sys.stderr, '<Ctrl-C>'
+    if bot:
+      bot.kill()
+  finally:
+    cleanup(bot, client, servers, failed or verbose)
+  return int(failed)
+
+
+if __name__ == '__main__':
+  sys.exit(main())
