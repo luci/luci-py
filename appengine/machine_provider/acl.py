@@ -21,24 +21,30 @@ def is_logged_in():
 
 def is_catalog_admin():
   """Returns whether the current user is a catalog administrator."""
-  # TODO: Implement a permissions model that allows admins to be set.
+  if auth.is_group_member('machine-provider-catalog-administrators'):
+    logging.info('User is Catalog administrator')
+    return True
   return False
-
-
-def is_backend_service():
-  """Returns whether the current user is a recognized backend."""
-  return is_logged_in()
 
 
 def get_current_backend():
   """Returns the backend associated with the current user.
 
-  The user must be a recognized Machine Provider backend.
-
   Returns:
-    An rpc_messages.Backend instance representing the current user.
+    An rpc_messages.Backend instance representing the current user, or None if
+    the current user is not a recognized backend.
   """
-  return rpc_messages.Backend.DUMMY
+  for backend in rpc_messages.Backend:
+    backend_group = 'machine-provider-%s-backend' % backend.name.lower()
+    if auth.is_group_member(backend_group):
+      logging.info('User is %s backend', backend.name)
+      return backend
+  logging.info('User is not a recognized backend service')
+
+
+def is_backend_service():
+  """Returns whether the current user is a recognized backend."""
+  return get_current_backend() is not None
 
 
 def is_backend_service_or_catalog_admin():
