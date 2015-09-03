@@ -259,7 +259,7 @@ class TestTaskRunner(TestTaskRunnerBase):
         'io_timeout': 11,
         'inputs_ref': {
           'isolated': '123',
-          'isolateserver': 'http://localhost:1',
+          'isolatedserver': 'http://localhost:1',
           'namespace': 'default-gzip',
         },
         'task_id': 23,
@@ -295,12 +295,12 @@ class TestTaskRunner(TestTaskRunnerBase):
         cost_usd=1, exit_code=0,
         outputs_ref={
           u'isolated': u'123',
-          u'isolateserver': u'http://localhost:1',
+          u'isolatedserver': u'http://localhost:1',
           u'namespace': u'default-gzip',
         })
     task_details = self.get_task_details(inputs_ref={
       'isolated': '123',
-      'isolateserver': 'localhost:1',
+      'isolatedserver': 'localhost:1',
       'namespace': 'default-gzip',
     }, extra_args=['foo', 'bar'])
     #out = os.path.join(self.root_dir, 'foo')
@@ -313,7 +313,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       'with open(sys.argv[1], \'wb\') as f:\n'
       '  json.dump({\n'
       '    \'isolated\': \'123\',\n'
-      '    \'isolateserver\': \'http://localhost:1\',\n'
+      '    \'isolatedserver\': \'http://localhost:1\',\n'
       '    \'namespace\': \'default-gzip\',\n'
       '  }, f)\n'
       'sys.stdout.write(\'hi\\n\')')

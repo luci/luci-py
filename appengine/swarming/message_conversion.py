@@ -130,10 +130,14 @@ def task_result_to_rpc(entity):
   """"Returns a swarming_rpcs.TaskResult from a task_result.TaskResultSummary or
   task_result.TaskRunResult.
   """
+  outputs_ref = (
+      _ndb_to_rpc(swarming_rpcs.FilesRef, entity.outputs_ref)
+      if entity.outputs_ref else None)
   kwargs = {
     'bot_dimensions': _string_list_pairs_from_dict(entity.bot_dimensions or {}),
     'duration': (entity.durations or [None])[0],
     'exit_code': (entity.exit_codes or [None])[0],
+    'outputs_ref': outputs_ref,
     'state': swarming_rpcs.StateField(entity.state),
   }
   if entity.__class__ is task_result.TaskRunResult:
