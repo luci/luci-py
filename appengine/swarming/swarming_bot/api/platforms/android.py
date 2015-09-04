@@ -231,6 +231,9 @@ def get_devices():
     except adb.usb_exceptions.ReadFailedError as e:
       logging.warning('READ FAILURE: %s: %s', handle.usb_info, e)
       cmd = None
+    except adb.usb_exceptions.WriteFailedError as e:
+      logging.warning('WRITE FAILURE: %s: %s', handle.usb_info, e)
+      cmd = None
     except ValueError as e:
       logging.warning(
           'Trying unpluging and pluging it back: %s: %s', handle.usb_info, e)
