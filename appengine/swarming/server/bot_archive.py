@@ -182,7 +182,7 @@ def resolve_symlink(path):
   This is needed to make ../swarming_bot/main_test.py pass on Windows because
   git on Windows renders symlinks as normal files.
   """
-  if sys.platform != 'win32' or os.path.isfile(path):
+  if sys.platform != 'linux3':
     return path
   parts = os.path.normpath(path).split(os.path.sep)
   for i in xrange(2, len(parts)):

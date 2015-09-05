@@ -40,14 +40,15 @@ class LocalBot(object):
     urllib.urlretrieve(self._swarming_server_url + '/bot_code', bot_zip)
     cmd = [sys.executable, bot_zip, 'start_slave']
     env = os.environ.copy()
+    kwargs = {}
+    if sys.platform != 'win32':
+      kwargs['preexec_fn'] = os.setsid
     if self._redirect:
       with open(os.path.join(self._tmpdir, 'bot_config_stdout.log'), 'wb') as f:
         self._proc = subprocess.Popen(
-            cmd, cwd=self._tmpdir, preexec_fn=os.setsid, stdout=f, env=env,
-            stderr=f)
+            cmd, cwd=self._tmpdir, stdout=f, env=env, stderr=f, **kwargs)
     else:
-      self._proc = subprocess.Popen(
-          cmd, cwd=self._tmpdir, preexec_fn=os.setsid, env=env)
+      self._proc = subprocess.Popen(cmd, cwd=self._tmpdir, env=env, **kwargs)
 
   def stop(self):
     """Stops the local Swarming bot. Returns the process exit code."""
@@ -55,7 +56,7 @@ class LocalBot(object):
       return None
     if self._proc.poll() is None:
       try:
-        os.killpg(self._proc.pid, signal.SIGTERM)
+        self._proc.send_signal(signal.SIGTERM)
         # TODO(maruel): SIGKILL after N seconds.
         self._proc.wait()
       except OSError:
@@ -64,7 +65,10 @@ class LocalBot(object):
     if self._tmpdir:
       for i in sorted(glob.glob(os.path.join(self._tmpdir, '*.log'))):
         self._read_log(i)
-      shutil.rmtree(self._tmpdir)
+      try:
+        shutil.rmtree(self._tmpdir)
+      except OSError:
+        print >> sys.stderr, 'Leaking %s' % self._tmpdir
       self._tmpdir = None
     self._proc = None
     return exit_code

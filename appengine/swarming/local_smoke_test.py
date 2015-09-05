@@ -32,7 +32,15 @@ from tools import start_servers
 
 sys.path.insert(0, BOT_DIR)
 
+# This is only needed on Windows.
+import test_env_bot
+test_env_bot.init_symlinks(BOT_DIR)
+
 from api import os_utilities
+
+
+# Signal as seen by the process.
+SIGNAL_TERM = -1073741510 if sys.platform == 'win32' else -signal.SIGTERM
 
 
 class SwarmingClient(object):
@@ -179,7 +187,7 @@ class Test(unittest.TestCase):
     invalid_bytes = 'A\\xEF\\xBB\\xBF\\xFE\\xFF\\xDD\\x73\\x66\\x73\\xc3\\x28B'
     args = [
       '-T', 'non_utf8', '--',
-      'python', '-c', 'print(\'' + invalid_bytes + '\')',
+      'python', '-u', '-c', 'print(\'' + invalid_bytes + '\')',
     ]
     summary = self.gen_expected(
         name=u'non_utf8',
@@ -189,13 +197,16 @@ class Test(unittest.TestCase):
 
   def test_invalid_command(self):
     args = ['-T', 'invalid', '--', 'unknown_invalid_command']
+    err = (
+      '[Error 2] The system cannot find the file specified'
+      if sys.platform == 'win32' else '[Errno 2] No such file or directory')
     summary = self.gen_expected(
         name=u'invalid',
         exit_codes=[1],
         failure=True,
         outputs=[
           u'Command "unknown_invalid_command" failed to start.\n'
-          u'Error: [Errno 2] No such file or directory',
+          u'Error: %s' % err,
         ])
     self.assertOneTask(args, summary, {})
 
@@ -203,13 +214,13 @@ class Test(unittest.TestCase):
     args = [
       # Need to flush to ensure it will be sent to the server.
       '-T', 'hard_timeout', '--hard-timeout', '1', '--',
-      'python', '-c',
+      'python', '-u', '-c',
       'import time,sys; sys.stdout.write(\'hi\\n\'); '
         'sys.stdout.flush(); time.sleep(120)',
     ]
     summary = self.gen_expected(
         name=u'hard_timeout',
-        exit_codes=[-signal.SIGTERM],
+        exit_codes=[SIGNAL_TERM],
         failure=True,
         state=0x40)  # task_result.State.TIMED_OUT
     self.assertOneTask(args, summary, {})
@@ -218,13 +229,13 @@ class Test(unittest.TestCase):
     args = [
       # Need to flush to ensure it will be sent to the server.
       '-T', 'io_timeout', '--io-timeout', '1', '--',
-      'python', '-c',
+      'python', '-u', '-c',
       'import time,sys; sys.stdout.write(\'hi\\n\'); '
         'sys.stdout.flush(); time.sleep(120)',
     ]
     summary = self.gen_expected(
         name=u'io_timeout',
-        exit_codes=[-signal.SIGTERM],
+        exit_codes=[SIGNAL_TERM],
         failure=True,
         state=0x40)  # task_result.State.TIMED_OUT
     self.assertOneTask(args, summary, {})
@@ -232,7 +243,8 @@ class Test(unittest.TestCase):
   def test_success_fails(self):
     def get_hello_world(exit_code=0):
       return [
-        'python', '-c', 'import sys; print(\'hi\'); sys.exit(%d)' % exit_code,
+        'python', '-u', '-c',
+        'import sys; print(\'hi\'); sys.exit(%d)' % exit_code,
       ]
     # tuple(task_request, expectation)
     tasks = [
@@ -268,7 +280,7 @@ class Test(unittest.TestCase):
   def test_update_continue(self):
     # Run a task, force the bot to update, run another task, ensure both tasks
     # used different bot version.
-    args = ['-T', 'simple_success', '--', 'echo', 'hi']
+    args = ['-T', 'simple_success', '--', 'python', '-u', '-c', 'print(\'hi\')']
     summary = self.gen_expected(name=u'simple_success')
     bot_version1 = self.assertOneTask(args, summary, {})
 

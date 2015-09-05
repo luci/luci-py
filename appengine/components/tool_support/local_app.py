@@ -141,12 +141,15 @@ class LocalApplication(object):
       cmd.extend(('--host', '0.0.0.0'))
       cmd.extend(('--admin_host', '0.0.0.0'))
 
+    kwargs = {}
+    if sys.platform != 'win32':
+      kwargs['preexec_fn'] = terminate_with_parent
     with open(log_file, 'wb') as f:
       self._proc = self._app.spawn_dev_appserver(
           cmd,
           stdout=f,
           stderr=subprocess.STDOUT,
-          preexec_fn=terminate_with_parent)
+          **kwargs)
 
     # Create a client that can talk to the service.
     self._client = HttpClient(self.url)
@@ -203,7 +206,11 @@ class LocalApplication(object):
     finally:
       with open(os.path.join(self._temp_root, 'dev_appserver.log'), 'r') as f:
         self._log = f.read()
-      shutil.rmtree(self._temp_root)
+      try:
+        shutil.rmtree(self._temp_root)
+      except OSError as e:
+        # Log but ignore it to not mask other errors.
+        print >> sys.stderr, str(e)
       self._client = None
       self._port = None
       self._proc = None
@@ -220,7 +227,7 @@ class LocalApplication(object):
     print >> sys.stderr, '-' * 60
     print >> sys.stderr, 'dev_appserver.py log for %s' % self.app_id
     print >> sys.stderr, '-' * 60
-    for l in self._log.strip('\n').splitlines():
+    for l in (self._log or '').strip('\n').splitlines():
       sys.stderr.write('  %s\n' % l)
     print >> sys.stderr, '-' * 60
 

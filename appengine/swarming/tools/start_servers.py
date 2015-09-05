@@ -15,8 +15,8 @@ import tempfile
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, APP_DIR)
 
-from tool_support import gae_sdk_utils
-gae_sdk_utils.setup_gae_env()
+import test_env
+test_env.setup_test_env()
 
 from tool_support import local_app
 

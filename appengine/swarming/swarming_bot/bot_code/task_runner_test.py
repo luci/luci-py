@@ -319,7 +319,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       'sys.stdout.write(\'hi\\n\')')
     self.mock(
         task_runner, 'get_isolated_cmd',
-        lambda _, x: [sys.executable, '-c', SCRIPT_ISOLATED, x])
+        lambda _, x: [sys.executable, '-u', '-c', SCRIPT_ISOLATED, x])
     expected = {
       u'exit_code': 0,
       u'hard_timeout': False,
