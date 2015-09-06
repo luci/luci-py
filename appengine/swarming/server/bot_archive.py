@@ -195,16 +195,18 @@ def resolve_symlink(path):
   return os.path.normpath(os.path.sep.join(parts))
 
 
-def yield_swarming_bot_files(root_dir, host, version, additionals):
+def yield_swarming_bot_files(root_dir, host, host_version, additionals):
   """Yields all the files to map as tuple(filename, content).
 
   config.json is injected with json data about the server.
+
+  This function guarantees that the output is sorted by filename.
   """
   items = {i: None for i in FILES}
   items.update(additionals)
   config = {
     'server': host.rstrip('/'),
-    'server_version': version,
+    'server_version': host_version,
   }
   items['config/config.json'] = json.dumps(config)
   for item, content in sorted(items.iteritems()):
@@ -215,7 +217,7 @@ def yield_swarming_bot_files(root_dir, host, version, additionals):
         yield item, f.read()
 
 
-def get_swarming_bot_zip(root_dir, host, version, additionals):
+def get_swarming_bot_zip(root_dir, host, host_version, additionals):
   """Returns a zipped file of all the files a bot needs to run.
 
   Arguments:
@@ -224,21 +226,29 @@ def get_swarming_bot_zip(root_dir, host, version, additionals):
         file, in addition to FILES and MAPPED. In practice, it's going to be a
         custom bot_config.py.
   Returns:
-    A string representing the zipped file's contents.
+    Tuple(str being the zipped file's content, bot version (SHA-1) it
+    represents).
   """
   zip_memory_file = StringIO.StringIO()
+  h = hashlib.sha1()
   with zipfile.ZipFile(zip_memory_file, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-    for item, content in yield_swarming_bot_files(
-        root_dir, host, version, additionals):
-      zip_file.writestr(item, content)
+    for name, content in yield_swarming_bot_files(
+        root_dir, host, host_version, additionals):
+      zip_file.writestr(name, content)
+      h.update(str(len(name)))
+      h.update(name)
+      h.update(str(len(content)))
+      h.update(content)
 
   data = zip_memory_file.getvalue()
+  bot_version = h.hexdigest()
   logging.info(
-      'get_swarming_bot_zip(%s) is %d bytes', additionals.keys(), len(data))
-  return data
+      'get_swarming_bot_zip(%s) is %d bytes; %s',
+      additionals.keys(), len(data), bot_version)
+  return data, bot_version
 
 
-def get_swarming_bot_version(root_dir, host, version, additionals):
+def get_swarming_bot_version(root_dir, host, host_version, additionals):
   """Returns the SHA1 hash of the bot code, representing the version.
 
   Arguments:
@@ -248,17 +258,18 @@ def get_swarming_bot_version(root_dir, host, version, additionals):
   Returns:
     The SHA1 hash of the bot code.
   """
-  result = hashlib.sha1()
+  h = hashlib.sha1()
   try:
     # TODO(maruel): Deduplicate from zip_package.genereate_version().
-    for item, content in yield_swarming_bot_files(
-        root_dir, host, version, additionals):
-      result.update(item)
-      result.update('\x00')
-      result.update(content)
-      result.update('\x00')
+    for name, content in yield_swarming_bot_files(
+        root_dir, host, host_version, additionals):
+      h.update(str(len(name)))
+      h.update(name)
+      h.update(str(len(content)))
+      h.update(content)
   except IOError:
     logging.warning('Missing expected file. Hash will be invalid.')
-  out = result.hexdigest()
-  logging.info('get_swarming_bot_version(%s) = %s', sorted(additionals), out)
-  return out
+  bot_version = h.hexdigest()
+  logging.info(
+      'get_swarming_bot_version(%s) = %s', sorted(additionals), bot_version)
+  return bot_version

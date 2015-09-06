@@ -97,16 +97,13 @@ def get_bot_config():
 def store_bot_config(content):
   """Stores a new version of bot_config.py."""
   out = VersionedFile(content=content).store('bot_config.py')
-  # Clear the cached version value since it has now changed. This is *super*
-  # aggressive to flush all memcache but that's the only safe way to not send
-  # old code by accident.
-  while not memcache.flush_all():
-    pass
+  # Clear the cached versions value since it has now changed.
+  memcache.delete('versions', namespace='bot_code')
   return out
 
 
 def get_bot_version(host):
-  """Retrieves the bot version loaded on this server.
+  """Retrieves the bot version (SHA-1) loaded on this server.
 
   The memcache is first checked for the version, otherwise the value
   is generated and then stored in the memcache.
@@ -114,9 +111,11 @@ def get_bot_version(host):
   Returns:
     The hash of the current bot version.
   """
-  namespace = os.environ['CURRENT_VERSION_ID']
-  key = 'bot_version' + host
-  bot_version = memcache.get(key, namespace=namespace)
+  # This is invalidate everything bot_config is uploaded.
+  bot_versions = memcache.get('versions', namespace='bot_code') or {}
+  # CURRENT_VERSION_ID is unique per upload so it can be trusted.
+  app_ver = host + '-' + os.environ['CURRENT_VERSION_ID']
+  bot_version = bot_versions.get(app_ver)
   if bot_version:
     return bot_version
 
@@ -125,7 +124,11 @@ def get_bot_version(host):
   bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
   bot_version = bot_archive.get_swarming_bot_version(
       bot_dir, host, utils.get_app_version(), additionals)
-  memcache.set(key, bot_version, namespace=namespace)
+  if len(bot_versions) > 100:
+    # Lazy discard when too large.
+    bot_versions = {}
+  bot_versions[app_ver] = bot_version
+  memcache.set('versions', bot_versions, namespace='bot_code')
   return bot_version
 
 
@@ -135,17 +138,16 @@ def get_swarming_bot_zip(host):
   Returns:
     A string representing the zipped file's contents.
   """
-  namespace = os.environ['CURRENT_VERSION_ID']
-  key = 'bot_version-%s' + get_bot_version(host)
-  code = memcache.get(key, namespace=namespace)
-  if code:
-    return code
+  bot_version = get_bot_version(host)
+  content = memcache.get('code-%s' + bot_version, namespace='bot_code')
+  if content:
+    return content
 
   # Get the start bot script from the database, if present. Pass an empty
   # file if the files isn't present.
   additionals = {'config/bot_config.py': get_bot_config().content}
   bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
-  code = bot_archive.get_swarming_bot_zip(
+  content, bot_version = bot_archive.get_swarming_bot_zip(
       bot_dir, host, utils.get_app_version(), additionals)
-  memcache.set(key, code, namespace=namespace)
-  return code
+  memcache.set('code-%s' + bot_version, content, namespace='bot_code')
+  return content
