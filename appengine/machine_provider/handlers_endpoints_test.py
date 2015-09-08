@@ -15,10 +15,11 @@ from protorpc.remote import protojson
 import webtest
 
 from components import auth_testing
+from components.machine_provider import rpc_messages
 from test_support import test_case
 
+import acl
 import handlers_endpoints
-import rpc_messages
 
 
 def rpc_to_json(rpc_message):
@@ -56,14 +57,18 @@ class CatalogTest(test_case.EndpointsTestCase):
     app = handlers_endpoints.create_endpoints_app()
     self.app = webtest.TestApp(app)
 
+  def mock_get_current_backend(self, backend=rpc_messages.Backend.DUMMY):
+    self.mock(acl, 'get_current_backend', lambda *args, **kwargs: backend)
+
   def test_add(self):
     request = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
         dimensions=rpc_messages.Dimensions(
             hostname='fake-host',
             os_family=rpc_messages.OSFamily.LINUX,
         ),
+        policies=rpc_messages.Policies(),
     ))
-    auth_testing.mock_get_current_identity(self)
+    self.mock_get_current_backend()
 
     response = jsonish_dict_to_rpc(
         self.call_api('add_machine', request).json,
@@ -76,8 +81,9 @@ class CatalogTest(test_case.EndpointsTestCase):
         dimensions=rpc_messages.Dimensions(
             os_family=rpc_messages.OSFamily.LINUX,
         ),
+        policies=rpc_messages.Policies(),
     ))
-    auth_testing.mock_get_current_identity(self)
+    self.mock_get_current_backend()
 
     response = jsonish_dict_to_rpc(
         self.call_api('add_machine', request).json,
@@ -88,20 +94,86 @@ class CatalogTest(test_case.EndpointsTestCase):
       rpc_messages.CatalogManipulationRequestError.UNSPECIFIED_HOSTNAME,
     )
 
+  def test_add_invalid_topic(self):
+    request = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
+        dimensions=rpc_messages.Dimensions(
+            hostname='fake-host',
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        policies=rpc_messages.Policies(
+            pubsub_topic='../../a-different-project/topics/my-topic',
+        ),
+    ))
+    self.mock_get_current_backend()
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('add_machine', request).json,
+        rpc_messages.CatalogManipulationResponse,
+    )
+    self.assertEqual(
+      response.error,
+      rpc_messages.CatalogManipulationRequestError.INVALID_TOPIC,
+    )
+
+  def test_add_invalid_project(self):
+    request = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
+        dimensions=rpc_messages.Dimensions(
+            hostname='fake-host',
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        policies=rpc_messages.Policies(
+            pubsub_topic='my-topic',
+            pubsub_project='my-project/topics/my-other-topic',
+        ),
+    ))
+    self.mock_get_current_backend()
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('add_machine', request).json,
+        rpc_messages.CatalogManipulationResponse,
+    )
+    self.assertEqual(
+      response.error,
+      rpc_messages.CatalogManipulationRequestError.INVALID_PROJECT,
+    )
+
+  def test_add_project_without_topic(self):
+    request = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
+        dimensions=rpc_messages.Dimensions(
+            hostname='fake-host',
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        policies=rpc_messages.Policies(
+            pubsub_project='my-project',
+        ),
+    ))
+    self.mock_get_current_backend()
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('add_machine', request).json,
+        rpc_messages.CatalogManipulationResponse,
+    )
+    self.assertEqual(
+      response.error,
+      rpc_messages.CatalogManipulationRequestError.UNSPECIFIED_TOPIC,
+    )
+
   def test_add_duplicate(self):
     request_1 = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
         dimensions=rpc_messages.Dimensions(
             hostname='fake-host',
             os_family=rpc_messages.OSFamily.LINUX,
         ),
+        policies=rpc_messages.Policies(),
     ))
     request_2 = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
         dimensions=rpc_messages.Dimensions(
             hostname='fake-host',
             os_family=rpc_messages.OSFamily.LINUX,
         ),
+        policies=rpc_messages.Policies(),
     ))
-    auth_testing.mock_get_current_identity(self)
+    self.mock_get_current_backend()
 
     response_1 = jsonish_dict_to_rpc(
         self.call_api('add_machine', request_1).json,
@@ -119,7 +191,7 @@ class CatalogTest(test_case.EndpointsTestCase):
 
   def test_add_batch_empty(self):
     request = rpc_to_json(rpc_messages.CatalogMachineBatchAdditionRequest())
-    auth_testing.mock_get_current_identity(self)
+    self.mock_get_current_backend()
 
     response = jsonish_dict_to_rpc(
         self.call_api('add_machines', request).json,
@@ -135,22 +207,25 @@ class CatalogTest(test_case.EndpointsTestCase):
                     hostname='fake-host-1',
                     os_family=rpc_messages.OSFamily.LINUX,
                 ),
+                policies=rpc_messages.Policies(),
             ),
             rpc_messages.CatalogMachineAdditionRequest(
                 dimensions=rpc_messages.Dimensions(
                     hostname='fake-host-2',
                     os_family=rpc_messages.OSFamily.WINDOWS,
                 ),
+                policies=rpc_messages.Policies(),
             ),
             rpc_messages.CatalogMachineAdditionRequest(
                 dimensions=rpc_messages.Dimensions(
                     hostname='fake-host-1',
                     os_family=rpc_messages.OSFamily.OSX,
                 ),
+                policies=rpc_messages.Policies(),
             ),
         ],
     ))
-    auth_testing.mock_get_current_identity(self)
+    self.mock_get_current_backend()
 
     response = jsonish_dict_to_rpc(
         self.call_api('add_machines', request).json,
@@ -170,8 +245,9 @@ class CatalogTest(test_case.EndpointsTestCase):
             hostname='fake-host',
             os_family=rpc_messages.OSFamily.LINUX,
         ),
+        policies=rpc_messages.Policies(),
     ))
-    request_2 = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
+    request_2 = rpc_to_json(rpc_messages.CatalogMachineDeletionRequest(
         dimensions=rpc_messages.Dimensions(
             hostname='fake-host',
             os_family=rpc_messages.OSFamily.LINUX,
@@ -182,8 +258,9 @@ class CatalogTest(test_case.EndpointsTestCase):
             hostname='fake-host',
             os_family=rpc_messages.OSFamily.WINDOWS,
         ),
+        policies=rpc_messages.Policies(),
     ))
-    auth_testing.mock_get_current_identity(self)
+    self.mock_get_current_backend()
 
     response_1 = jsonish_dict_to_rpc(
         self.call_api('add_machine', request_1).json,
@@ -207,6 +284,7 @@ class CatalogTest(test_case.EndpointsTestCase):
             hostname='fake-host-1',
             os_family=rpc_messages.OSFamily.LINUX,
         ),
+        policies=rpc_messages.Policies(),
     ))
     request_2 = rpc_to_json(rpc_messages.CatalogMachineDeletionRequest(
         dimensions=rpc_messages.Dimensions(
@@ -214,13 +292,14 @@ class CatalogTest(test_case.EndpointsTestCase):
             os_family=rpc_messages.OSFamily.LINUX,
         ),
     ))
-    request_3 = rpc_to_json(rpc_messages.CatalogMachineDeletionRequest(
+    request_3 = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
         dimensions=rpc_messages.Dimensions(
             hostname='fake-host-1',
             os_family=rpc_messages.OSFamily.LINUX,
         ),
+        policies=rpc_messages.Policies(),
     ))
-    auth_testing.mock_get_current_identity(self)
+    self.mock_get_current_backend()
 
     response_1 = jsonish_dict_to_rpc(
         self.call_api('add_machine', request_1).json,
@@ -251,7 +330,7 @@ class CatalogTest(test_case.EndpointsTestCase):
             os_family=rpc_messages.OSFamily.OSX,
         ),
     ))
-    auth_testing.mock_get_current_identity(self)
+    self.mock_get_current_backend()
 
     response = jsonish_dict_to_rpc(
         self.call_api('modify_capacity', request).json,
@@ -363,6 +442,47 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
     self.assertEqual(
         lease_response.error,
         rpc_messages.LeaseRequestError.INVALID_TOPIC,
+    )
+
+  def test_invalid_project(self):
+    lease_request = rpc_to_json(rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.WINDOWS,
+        ),
+        duration=9,
+        pubsub_topic='my-topic',
+        pubsub_project='../../a-different-project/topics/my-other-topic',
+        request_id='123',
+    ))
+    auth_testing.mock_get_current_identity(self)
+
+    lease_response = jsonish_dict_to_rpc(
+        self.call_api('lease', lease_request).json,
+        rpc_messages.LeaseResponse,
+    )
+    self.assertEqual(
+        lease_response.error,
+        rpc_messages.LeaseRequestError.INVALID_PROJECT,
+    )
+
+  def test_project_without_topic(self):
+    lease_request = rpc_to_json(rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.WINDOWS,
+        ),
+        duration=9,
+        pubsub_project='my-project',
+        request_id='123',
+    ))
+    auth_testing.mock_get_current_identity(self)
+
+    lease_response = jsonish_dict_to_rpc(
+        self.call_api('lease', lease_request).json,
+        rpc_messages.LeaseResponse,
+    )
+    self.assertEqual(
+        lease_response.error,
+        rpc_messages.LeaseRequestError.UNSPECIFIED_TOPIC,
     )
 
 

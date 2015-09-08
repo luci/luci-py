@@ -17,11 +17,11 @@ import webtest
 
 from components import auth_testing
 from components import utils
+from components.machine_provider import rpc_messages
 from test_support import test_case
 
 import handlers_cron
 import models
-import rpc_messages
 
 
 class LeaseRequestProcessorTest(test_case.TestCase):

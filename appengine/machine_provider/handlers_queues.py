@@ -11,10 +11,10 @@ import webapp2
 
 from components import decorators
 from components import net
+from components.machine_provider import rpc_messages
 
 import models
 import pubsub
-import rpc_messages
 
 
 def publish(topic, message, lease_id, machine_id):
@@ -63,10 +63,14 @@ class MachineReclaimer(webapp2.RequestHandler):
     """Reclaim a machine.
 
     Params:
+      backend_topic: If specified, topic that the machine reclamation should
+        be published to for the backend.
+      backend_project: If specified, project that the machine reclamation
+        topic is contained in.
       lease_id: ID of the LeaseRequest the machine was leased for.
       machine_id: ID of the CatalogMachineEntry being reclaimed.
-      topic: If specified, topic that the machine reclamation should be
-        published to.
+      topic: If specified, topic that the machine reclamation and lease
+        expiration should be published to for the lessee.
     """
     lease_id = self.request.get('lease_id')
     machine_id = self.request.get('machine_id')

@@ -7,6 +7,7 @@
 import logging
 
 from components import net
+from components import utils
 
 
 MACHINE_PROVIDER_API_URL = 'https://machine-provider.appspot.com/_ah/api'
@@ -18,21 +19,16 @@ MACHINE_PROVIDER_SCOPES = (
 )
 
 
-def add_machines(dimensions_list):
+def add_machines(requests):
   """Add machines to the Machine Provider's Catalog.
 
   Args:
-    dimensions_list: A list of dimensions.Dimensions instances describing the
-      dimensions of the machines to add to the catalog.
+    requests: A list of rpc_messages.CatalogMachineAdditionRequest instances.
   """
   logging.info('Sending batched add_machines request')
   return net.json_request(
       '%s/add_machines' % CATALOG_BASE_URL,
       method='POST',
-      payload={
-          'requests': [
-              {'dimensions': dimensions} for dimensions in dimensions_list
-          ],
-      },
+      payload=utils.to_json_encodable({'requests': requests}),
       scopes=MACHINE_PROVIDER_SCOPES,
   )

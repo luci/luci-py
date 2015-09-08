@@ -30,6 +30,9 @@ from google.appengine.api import modules
 from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
 
+from protorpc import messages
+from protorpc.remote import protojson
+
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 DATETIME_FORMAT = u'%Y-%m-%d %H:%M:%S'
@@ -530,6 +533,10 @@ def enqueue_task(
 
 def to_json_encodable(data):
   """Converts data into json-compatible data."""
+  if isinstance(data, messages.Message):
+    # protojson.encode_message returns a string that is already encoded json.
+    # Load it back into a json-compatible representation of the data.
+    return json.loads(protojson.encode_message(data))
   if isinstance(data, unicode) or data is None:
     return data
   if isinstance(data, str):

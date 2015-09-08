@@ -13,9 +13,9 @@ import webapp2
 
 from components import decorators
 from components import utils
+from components.machine_provider import rpc_messages
 
 import models
-import rpc_messages
 
 
 class Error(Exception):
@@ -214,13 +214,33 @@ def reclaim_machine(machine_key, reclamation_ts):
   lease.machine_id = None
   machine.lease_id = None
   machine.lease_expiration_ts = None
-  # TODO(smut): Maybe wipe the machine before marking available.
-  machine.state = models.CatalogMachineEntryStates.AVAILABLE
-  ndb.put_multi([lease, machine])
+
+  policy = machine.policies.reclamation_policy
+  if policy == rpc_messages.MachineReclamationPolicy.DELETE:
+    lease.put()
+    machine.key.delete()
+  else:
+    if policy == rpc_messages.MachineReclamationPolicy.MAKE_AVAILABLE:
+      machine.state = models.CatalogMachineEntryStates.AVAILABLE
+    else:
+      if policy != rpc_messages.MachineReclamationPolicy.RECLAIM:
+        # Something is awry. Log an error, but still reclaim the machine.
+        # Fall back on the RECLAIM policy because it notifies the backend and
+        # prevents the machine from being leased out again, but keeps it in
+        # the Catalog in case we want to examine it further.
+        logging.error(
+            'Unexpected MachineReclamationPolicy: %s\nDefaulting to RECLAIM.',
+            policy,
+        )
+      machine.state = models.CatalogMachineEntryStates.RECLAIMED
+    ndb.put_multi([lease, machine])
+
   if not utils.enqueue_task(
       '/internal/queues/reclaim-machine',
       'reclaim-machine',
       params={
+          'backend_pubsub_topic': machine.policies.pubsub_topic,
+          'backend_pubsub_project': machine.policies.pubsub_project,
           'lease_id': lease.key.id(),
           'machine_id': machine.key.id(),
           'topic': lease.request.pubsub_topic,

@@ -7,8 +7,7 @@
 import logging
 
 from components import auth
-
-import rpc_messages
+from components.machine_provider import rpc_messages
 
 
 def is_logged_in():

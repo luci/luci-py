@@ -4,9 +4,12 @@
 
 """Messages for the Machine Provider API."""
 
+# pylint: disable=unused-wildcard-import, wildcard-import
+
 from protorpc import messages
 
 from components.machine_provider.dimensions import *
+from components.machine_provider.policies import *
 
 
 class CatalogMachineAdditionRequest(messages.Message):
@@ -17,6 +20,8 @@ class CatalogMachineAdditionRequest(messages.Message):
   """
   # Dimensions instance specifying what sort of machine this is.
   dimensions = messages.MessageField(Dimensions, 1, required=True)
+  # Policies instance specifying machine-specific configuration.
+  policies = messages.MessageField(Policies, 2, required=True)
 
 
 class CatalogMachineBatchAdditionRequest(messages.Message):
@@ -56,6 +61,12 @@ class CatalogManipulationRequestError(messages.Enum):
   MISMATCHED_BACKEND = 4
   # Didn't specify a hostname.
   UNSPECIFIED_HOSTNAME = 5
+  # Proposed Cloud Pub/Sub topic was invalid.
+  INVALID_TOPIC = 6
+  # Proposed Cloud Pub/Sub project was invalid.
+  INVALID_PROJECT = 7
+  # Didn't specify a Cloud Pub/Sub topic.
+  UNSPECIFIED_TOPIC = 8
 
 
 class CatalogManipulationResponse(messages.Message):
@@ -90,6 +101,8 @@ class LeaseRequest(messages.Message):
   duration = messages.IntegerField(3, required=True)
   # Cloud Pub/Sub topic name to communicate on regarding this request.
   pubsub_topic = messages.StringField(4)
+  # Cloud Pub/Sub project name to communicate on regarding this request.
+  pubsub_project = messages.StringField(5)
 
 
 class LeaseRequestError(messages.Enum):
@@ -99,6 +112,10 @@ class LeaseRequestError(messages.Enum):
   REQUEST_ID_REUSE = 1
   # Proposed Cloud Pub/Sub topic was invalid.
   INVALID_TOPIC = 2
+  # Proposed Cloud Pub/Sub project was invalid.
+  INVALID_PROJECT = 3
+  # Didn't specify a Cloud Pub/Sub topic.
+  UNSPECIFIED_TOPIC = 4
 
 
 class LeaseResponse(messages.Message):

@@ -30,6 +30,11 @@ def validate_topic(topic):
   return '/' not in topic
 
 
+def validate_project(project):
+  """Ensures the given project is valid for Cloud Pub/Sub."""
+  return validate_topic(project)
+
+
 def _publish(topic, message, **attributes):
   """Publish messages to Cloud Pub/Sub.
 

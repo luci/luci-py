@@ -107,7 +107,7 @@ class InstanceProcessor(webapp2.RequestHandler):
     logging.info('Retrieving instance group managers')
     managers = api.get_instance_group_managers(ZONE)
 
-    instances = {}
+    requests = []
 
     # For each group manager, tell the Machine Provider about its instances.
     for manager_name, manager in managers.iteritems():
@@ -117,27 +117,37 @@ class InstanceProcessor(webapp2.RequestHandler):
       # Property-related verification was done by InstanceTemplateProcessor,
       # so we can be sure all the properties we need have been supplied.
       properties = templates[template_name]['properties']
-      os_family = [
+      disk_gb = int(properties['disks'][0]['initializeParams']['diskSizeGb'])
+      memory_gb = float(gce.machine_type_to_memory(properties['machineType']))
+      num_cpus = gce.machine_type_to_num_cpus(properties['machineType'])
+      os_family = machine_provider.OSFamily.lookup_by_name([
           metadatum['value'] for metadatum in properties['metadata']['items']
           if metadatum['key'] == 'os_family'
-      ][0]
-      group_dimensions = {
-          'backend': machine_provider.Backend.GCE.name,
-          'disk_gb': properties['disks'][0]['initializeParams']['diskSizeGb'],
-          'memory_gb': gce.machine_type_to_memory(properties['machineType']),
-          'num_cpus': gce.machine_type_to_num_cpus(properties['machineType']),
-          'os_family': os_family,
-      }
+      ][0])
 
       instances = api.get_managed_instances(manager_name, ZONE)
       for instance_name, instance in instances.iteritems():
         logging.info('Processing instance: %s', instance_name)
         if instance['instanceStatus'] == 'RUNNING':
-          instances[instance_name] = group_dimensions.copy()
-          instances[instance_name]['hostname'] = instance_name
+          requests.append(
+              machine_provider.CatalogMachineAdditionRequest(
+                  dimensions=machine_provider.Dimensions(
+                      backend=machine_provider.Backend.GCE,
+                      disk_gb=disk_gb,
+                      hostname=instance_name,
+                      memory_gb=memory_gb,
+                      num_cpus=num_cpus,
+                      os_family=os_family,
+                  ),
+                  policies=machine_provider.Policies(
+                      on_reclamation=
+                          machine_provider.MachineReclamationPolicy.DELETE,
+                  ),
+              )
+          )
           # TODO(smut): Static IP assignment.
 
-    machine_provider.add_machines(instances.values())
+    machine_provider.add_machines(requests)
 
 
 def create_cron_app():

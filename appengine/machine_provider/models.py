@@ -14,8 +14,8 @@ from protorpc import protobuf
 from protorpc.remote import protojson
 
 from components import auth
+from components.machine_provider import rpc_messages
 
-import rpc_messages
 import utils
 
 

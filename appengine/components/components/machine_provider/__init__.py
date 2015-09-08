@@ -7,5 +7,5 @@
 # Pylint doesn't like relative wildcard imports.
 # pylint: disable=relative-import, wildcard-import
 
-from dimensions import *
+from rpc_messages import *
 from utils import *

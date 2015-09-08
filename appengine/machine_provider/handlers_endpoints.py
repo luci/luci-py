@@ -15,11 +15,11 @@ from protorpc import protobuf
 from protorpc import remote
 
 from components import auth
+from components.machine_provider import rpc_messages
 
 import acl
 import models
 import pubsub
-import rpc_messages
 
 
 @auth.endpoints_api(name='catalog', version='v1')
@@ -80,6 +80,33 @@ class CatalogEndpoints(remote.Service):
           error=error,
           machine_addition_request=request,
       )
+    if request.policies.pubsub_topic:
+      if not pubsub.validate_topic(request.policies.pubsub_topic):
+        logging.warning(
+            'Invalid topic for Cloud Pub/Sub: %s',
+            request.policies.pubsub_topic,
+        )
+        return rpc_messages.CatalogManipulationResponse(
+            error=rpc_messages.CatalogManipulationRequestError.INVALID_TOPIC,
+            machine_addition_request=request,
+        )
+    if request.policies.pubsub_project:
+      error = None
+      if not pubsub.validate_project(request.policies.pubsub_project):
+        logging.warning(
+            'Invalid project for Cloud Pub/Sub: %s',
+            request.policies.pubsub_project,
+        )
+        error = rpc_messages.CatalogManipulationRequestError.INVALID_PROJECT
+      elif not request.policies.pubsub_topic:
+        logging.warning(
+            'Cloud Pub/Sub project specified without specifying topic: %s',
+            request.policies.pubsub_project,
+        )
+        error = rpc_messages.CatalogManipulationRequestError.UNSPECIFIED_TOPIC
+      if error:
+        return rpc_messages.CatalogManipulationResponse(
+            error=error, machine_addition_request=request)
     return self._add_machine(request)
 
   @auth.endpoints_method(
@@ -121,7 +148,7 @@ class CatalogEndpoints(remote.Service):
     entry = models.CatalogMachineEntry.generate_key(request.dimensions).get()
     if entry:
       # Enforces per-backend hostname uniqueness.
-      logging.info('Hostname reuse:\nOriginally used for: \n%s', entry)
+      logging.warning('Hostname reuse:\nOriginally used for: \n%s', entry)
       return rpc_messages.CatalogManipulationResponse(
           error=rpc_messages.CatalogManipulationRequestError.HOSTNAME_REUSE,
           machine_addition_request=request,
@@ -229,6 +256,23 @@ class MachineProviderEndpoints(remote.Service):
         )
         return rpc_messages.LeaseResponse(
             error=rpc_messages.LeaseRequestError.INVALID_TOPIC,
+        )
+    if request.pubsub_project:
+      if not pubsub.validate_project(request.pubsub_project):
+        logging.warning(
+            'Invalid project for Cloud Pub/Sub: %s',
+            request.pubsub_topic,
+        )
+        return rpc_messages.LeaseResponse(
+            error=rpc_messages.LeaseRequestError.INVALID_PROJECT,
+        )
+      elif not request.pubsub_topic:
+        logging.warning(
+            'Cloud Pub/Sub project specified without specifying topic: %s',
+            request.pubsub_project,
+        )
+        return rpc_messages.LeaseResponse(
+            error=rpc_messages.LeaseRequestError.UNSPECIFIED_TOPIC,
         )
     duplicate = models.LeaseRequest.get_by_id(request_hash)
     deduplication_checksum = models.LeaseRequest.compute_deduplication_checksum(
