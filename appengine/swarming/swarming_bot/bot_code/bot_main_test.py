@@ -352,6 +352,11 @@ class TestBotMain(net_utils.TestCase):
     self.assertTrue(bot_main.poll_server(self.bot, bit))
 
   def _mock_popen(self, returncode=0, exit_code=0, url='https://localhost:1'):
+    result = {
+      'exit_code': exit_code,
+      'must_signal_internal_failure': None,
+      'version': 3,
+    }
     # Method should have "self" as first argument - pylint: disable=E0213
     class Popen(object):
       def __init__(self2, cmd, cwd, env, stdout, stderr):
@@ -375,9 +380,10 @@ class TestBotMain(net_utils.TestCase):
       def poll(self2):
         self2.returncode = returncode
         with open(self2._out_file, 'wb') as f:
-          json.dump({'exit_code': exit_code}, f)
+          json.dump(result, f)
         return 0
     self.mock(subprocess, 'Popen', Popen)
+    return result
 
   def test_run_manifest(self):
     self.mock(bot_main, 'post_error_task', lambda *args: self.fail(args))
@@ -388,9 +394,9 @@ class TestBotMain(net_utils.TestCase):
         self.assertEqual(False, failure)
         self.assertEqual(False, internal_failure)
         self.assertEqual({'os': 'Amiga'}, dimensions)
-        self.assertEqual({u'exit_code': 0}, summary)
+        self.assertEqual(result, summary)
     self.mock(bot_main, 'call_hook', call_hook)
-    self._mock_popen(url='https://localhost:3')
+    result = self._mock_popen(url='https://localhost:3')
 
     manifest = {
       'dimensions': {'os': 'Amiga'},
@@ -408,9 +414,9 @@ class TestBotMain(net_utils.TestCase):
         self.assertEqual(True, failure)
         self.assertEqual(False, internal_failure)
         self.assertEqual({}, dimensions)
-        self.assertEqual({u'exit_code': 1}, summary)
+        self.assertEqual(result, summary)
     self.mock(bot_main, 'call_hook', call_hook)
-    self._mock_popen(exit_code=1)
+    result = self._mock_popen(exit_code=1)
 
     manifest = {'dimensions': {}, 'hard_timeout': 60, 'task_id': '24'}
     bot_main.run_manifest(self.bot, manifest, time.time())
@@ -424,13 +430,13 @@ class TestBotMain(net_utils.TestCase):
         self.assertEqual(False, failure)
         self.assertEqual(True, internal_failure)
         self.assertEqual({}, dimensions)
-        self.assertEqual({u'exit_code': 0}, summary)
+        self.assertEqual(result, summary)
     self.mock(bot_main, 'call_hook', call_hook)
-    self._mock_popen(returncode=1)
+    result = self._mock_popen(returncode=1)
 
     manifest = {'dimensions': {}, 'hard_timeout': 60, 'task_id': '24'}
     bot_main.run_manifest(self.bot, manifest, time.time())
-    expected = [(self.bot, 'Execution failed, internal error (1).', '24')]
+    expected = [(self.bot, 'Execution failed: internal error (1).', '24')]
     self.assertEqual(expected, posted)
 
   def test_run_manifest_exception(self):

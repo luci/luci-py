@@ -182,7 +182,10 @@ def resolve_symlink(path):
   This is needed to make ../swarming_bot/main_test.py pass on Windows because
   git on Windows renders symlinks as normal files.
   """
-  if sys.platform != 'linux3':
+  if sys.platform not in ('linux3', 'win32'):
+    # For an unknown reason, AppEngine's dev server on Windows self-report as
+    # linux3. But when running unit tests, it's value is left as win32 because
+    # unit tests are not run inside the full AppEngine SDK sandbox.
     return path
   parts = os.path.normpath(path).split(os.path.sep)
   for i in xrange(2, len(parts)):

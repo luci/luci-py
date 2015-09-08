@@ -450,11 +450,15 @@ def run_manifest(botobj, manifest, start):
 
     if proc.returncode:
       logging.warning('task_runner died')
-      msg = 'Execution failed, internal error (%d).' % proc.returncode
+      msg = 'Execution failed: internal error (%d).' % proc.returncode
       internal_failure = True
     elif not task_result:
       logging.warning('task_runner failed to write metadata')
-      msg = 'Execution failed, internal error (no metadata).'
+      msg = 'Execution failed: internal error (no metadata).'
+      internal_failure = True
+    elif task_result[u'must_signal_internal_failure']:
+      msg = (
+        'Execution failed: %s' % task_result[u'must_signal_internal_failure'])
       internal_failure = True
 
     failure = bool(task_result.get('exit_code')) if task_result else False

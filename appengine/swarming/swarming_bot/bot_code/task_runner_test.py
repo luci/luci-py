@@ -28,6 +28,7 @@ from utils import file_path
 from utils import logging_utils
 from utils import subprocess42
 from utils import tools
+import fake_swarming
 import task_runner
 import xsrf_client
 
@@ -41,6 +42,25 @@ def compress_to_zip(files):
   return out.getvalue()
 
 
+def get_manifest(
+    script=None, hard_timeout=10., io_timeout=10., grace_period=30.,
+    data=None, inputs_ref=None, extra_args=None):
+  out = {
+    'bot_id': 'localhost',
+    'command':
+        [sys.executable, '-u', '-c', script] if not inputs_ref else None,
+    'data': data or [],
+    'env': {},
+    'extra_args': extra_args or [],
+    'grace_period': grace_period,
+    'hard_timeout': hard_timeout,
+    'inputs_ref': inputs_ref,
+    'io_timeout': io_timeout,
+    'task_id': 23,
+  }
+  return out
+
+
 class TestTaskRunnerBase(net_utils.TestCase):
   def setUp(self):
     super(TestTaskRunnerBase, self).setUp()
@@ -51,31 +71,16 @@ class TestTaskRunnerBase(net_utils.TestCase):
 
   def tearDown(self):
     os.chdir(test_env_bot_code.BOT_DIR)
-    file_path.rmtree(self.root_dir)
-    super(TestTaskRunnerBase, self).tearDown()
-
-  @staticmethod
-  def get_manifest(
-      script=None, hard_timeout=10., io_timeout=10., grace_period=30.,
-      data=None, inputs_ref=None, extra_args=None):
-    out = {
-      'bot_id': 'localhost',
-      'command':
-          [sys.executable, '-u', '-c', script] if not inputs_ref else None,
-      'data': data or [],
-      'env': {},
-      'extra_args': extra_args or [],
-      'grace_period': grace_period,
-      'hard_timeout': hard_timeout,
-      'inputs_ref': inputs_ref,
-      'io_timeout': io_timeout,
-      'task_id': 23,
-    }
-    return out
+    try:
+      file_path.rmtree(self.root_dir)
+    except OSError:
+      print >> sys.stderr, 'Failed to delete %s' % self.root_dir
+    finally:
+      super(TestTaskRunnerBase, self).tearDown()
 
   @classmethod
   def get_task_details(cls, *args, **kwargs):
-    return task_runner.TaskDetails(cls.get_manifest(*args, **kwargs))
+    return task_runner.TaskDetails(get_manifest(*args, **kwargs))
 
   def gen_requests(self, cost_usd=0., **kwargs):
     return [
@@ -195,7 +200,8 @@ class TestTaskRunner(TestTaskRunnerBase):
         u'exit_code': 1,
         u'hard_timeout': False,
         u'io_timeout': False,
-        u'version': 2,
+        u'must_signal_internal_failure': None,
+        u'version': task_runner.OUT_VERSION,
       }
     self.mock(task_runner, 'run_command', run_command)
 
@@ -221,7 +227,8 @@ class TestTaskRunner(TestTaskRunnerBase):
       u'exit_code': 1,
       u'hard_timeout': False,
       u'io_timeout': False,
-      u'version': 2,
+      u'must_signal_internal_failure': None,
+      u'version': task_runner.OUT_VERSION,
     }
     with open(out_file, 'rb') as f:
       self.assertEqual(expected, json.load(f))
@@ -242,7 +249,8 @@ class TestTaskRunner(TestTaskRunnerBase):
         u'exit_code': 0,
         u'hard_timeout': False,
         u'io_timeout': False,
-        u'version': 2,
+        u'must_signal_internal_failure': None,
+        u'version': task_runner.OUT_VERSION,
       }
     self.mock(task_runner, 'run_command', run_command)
 
@@ -272,7 +280,8 @@ class TestTaskRunner(TestTaskRunnerBase):
       u'exit_code': 0,
       u'hard_timeout': False,
       u'io_timeout': False,
-      u'version': 2,
+      u'must_signal_internal_failure': None,
+      u'version': task_runner.OUT_VERSION,
     }
     with open(out_file, 'rb') as f:
       self.assertEqual(expected, json.load(f))
@@ -285,7 +294,8 @@ class TestTaskRunner(TestTaskRunnerBase):
       u'exit_code': 0,
       u'hard_timeout': False,
       u'io_timeout': False,
-      u'version': 2,
+      u'must_signal_internal_failure': None,
+      u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
 
@@ -324,7 +334,8 @@ class TestTaskRunner(TestTaskRunnerBase):
       u'exit_code': 0,
       u'hard_timeout': False,
       u'io_timeout': False,
-      u'version': 2,
+      u'must_signal_internal_failure': None,
+      u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
 
@@ -337,7 +348,8 @@ class TestTaskRunner(TestTaskRunnerBase):
       u'exit_code': 1,
       u'hard_timeout': False,
       u'io_timeout': False,
-      u'version': 2,
+      u'must_signal_internal_failure': None,
+      u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
 
@@ -373,7 +385,8 @@ class TestTaskRunner(TestTaskRunnerBase):
       u'exit_code': 255,
       u'hard_timeout': False,
       u'io_timeout': False,
-      u'version': 2,
+      u'must_signal_internal_failure': None,
+      u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
 
@@ -490,7 +503,8 @@ class TestTaskRunner(TestTaskRunnerBase):
       u'exit_code': 0,
       u'hard_timeout': False,
       u'io_timeout': False,
-      u'version': 2,
+      u'must_signal_internal_failure': None,
+      u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
 
@@ -637,7 +651,8 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       u'exit_code': sig,
       u'hard_timeout': True,
       u'io_timeout': False,
-      u'version': 2,
+      u'must_signal_internal_failure': None,
+      u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
 
@@ -651,14 +666,16 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       u'exit_code': sig,
       u'hard_timeout': False,
       u'io_timeout': True,
-      u'version': 2,
+      u'must_signal_internal_failure': None,
+      u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
 
   def test_hard_signal(self):
-    sig = signal.SIGBREAK if sys.platform == 'win32' else signal.SIGTERM
     self.requests(
-        hard_timeout=True, exit_code=0, output='hi\ngot signal %d\nbye\n' % sig)
+        hard_timeout=True,
+        exit_code=0,
+        output='hi\ngot signal %d\nbye\n' % task_runner.SIG_BREAK_OR_TERM)
     task_details = self.get_task_details(
         self.SCRIPT_SIGNAL, hard_timeout=self.SHORT_TIME_OUT)
     # Returns 0 because the process cleaned up itself.
@@ -666,14 +683,15 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       u'exit_code': 0,
       u'hard_timeout': True,
       u'io_timeout': False,
-      u'version': 2,
+      u'must_signal_internal_failure': None,
+      u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
 
   def test_io_signal(self):
-    sig = signal.SIGBREAK if sys.platform == 'win32' else signal.SIGTERM
     self.requests(
-        io_timeout=True, exit_code=0, output='hi\ngot signal %d\nbye\n' % sig)
+        io_timeout=True, exit_code=0,
+        output='hi\ngot signal %d\nbye\n' % task_runner.SIG_BREAK_OR_TERM)
     task_details = self.get_task_details(
         self.SCRIPT_SIGNAL, io_timeout=self.SHORT_TIME_OUT)
     # Returns 0 because the process cleaned up itself.
@@ -681,7 +699,8 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       u'exit_code': 0,
       u'hard_timeout': False,
       u'io_timeout': True,
-      u'version': 2,
+      u'must_signal_internal_failure': None,
+      u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
 
@@ -696,7 +715,8 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       u'exit_code': sig,
       u'hard_timeout': True,
       u'io_timeout': False,
-      u'version': 2,
+      u'must_signal_internal_failure': None,
+      u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
 
@@ -711,16 +731,16 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       u'exit_code': sig,
       u'hard_timeout': False,
       u'io_timeout': True,
-      u'version': 2,
+      u'must_signal_internal_failure': None,
+      u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
 
   def test_hard_signal_no_grace(self):
     exit_code = 1 if sys.platform == 'win32' else -signal.SIGKILL
-    sig = signal.SIGBREAK if sys.platform == 'win32' else signal.SIGTERM
     self.requests(
         hard_timeout=True, exit_code=exit_code,
-        output='hi\ngot signal %d\nbye\n' % sig)
+        output='hi\ngot signal %d\nbye\n' % task_runner.SIG_BREAK_OR_TERM)
     task_details = self.get_task_details(
         self.SCRIPT_SIGNAL_HANG, hard_timeout=self.SHORT_TIME_OUT,
         grace_period=self.SHORT_TIME_OUT)
@@ -729,16 +749,16 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       u'exit_code': exit_code,
       u'hard_timeout': True,
       u'io_timeout': False,
-      u'version': 2,
+      u'must_signal_internal_failure': None,
+      u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
 
   def test_io_signal_no_grace(self):
     exit_code = 1 if sys.platform == 'win32' else -signal.SIGKILL
-    sig = signal.SIGBREAK if sys.platform == 'win32' else signal.SIGTERM
     self.requests(
         io_timeout=True, exit_code=exit_code,
-        output='hi\ngot signal %d\nbye\n' % sig)
+        output='hi\ngot signal %d\nbye\n' % task_runner.SIG_BREAK_OR_TERM)
     task_details = self.get_task_details(
         self.SCRIPT_SIGNAL_HANG, io_timeout=self.SHORT_TIME_OUT,
         grace_period=self.SHORT_TIME_OUT)
@@ -747,7 +767,8 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       u'exit_code': exit_code,
       u'hard_timeout': False,
       u'io_timeout': True,
-      u'version': 2,
+      u'must_signal_internal_failure': None,
+      u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
 
@@ -776,12 +797,13 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       ))
     self.expected_requests(requests)
 
-    manifest = self.get_manifest(parent, data=data)
+    manifest = get_manifest(parent, data=data)
     expected = {
-      u'version': 2,
       u'exit_code': 0,
-      u'io_timeout': False,
       u'hard_timeout': False,
+      u'io_timeout': False,
+      u'must_signal_internal_failure': None,
+      u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._load_and_run(manifest))
 
@@ -858,14 +880,15 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     self.expected_requests(requests)
 
     try:
-      manifest = self.get_manifest(
+      manifest = get_manifest(
           parent, hard_timeout=self.SHORT_TIME_OUT,
           grace_period=self.SHORT_TIME_OUT, data=data)
       expected = {
         u'exit_code': exit_code,
         u'hard_timeout': True,
         u'io_timeout': False,
-        u'version': 2,
+        u'must_signal_internal_failure': None,
+        u'version': task_runner.OUT_VERSION,
       }
       self.assertEqual(expected, self._load_and_run(manifest))
     finally:
@@ -877,6 +900,112 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
             os.kill(k, signal.SIGKILL)
         except OSError:
           pass
+
+
+class TaskRunnerSmoke(unittest.TestCase):
+  # Runs a real process and a real Swarming fake server.
+  def setUp(self):
+    super(TaskRunnerSmoke, self).setUp()
+    self.root_dir = tempfile.mkdtemp(prefix='task_runner')
+    self._server = fake_swarming.Server(self)
+
+  def tearDown(self):
+    try:
+      self._server.shutdown()
+    finally:
+      try:
+        file_path.rmtree(self.root_dir)
+      except OSError:
+        print >> sys.stderr, 'Failed to delete %s' % self.root_dir
+      finally:
+        super(TaskRunnerSmoke, self).tearDown()
+
+  def test_signal(self):
+    # Tests when task_runner gets a SIGTERM.
+    os.mkdir(os.path.join(self.root_dir, 'work'))
+    signal_file = os.path.join(self.root_dir, 'work', 'signal')
+    open(signal_file, 'wb').close()
+    manifest = get_manifest(
+        script='import os,time;os.remove(%r);time.sleep(60)' % signal_file,
+        hard_timeout=60., io_timeout=60.)
+    task_in_file = os.path.join(self.root_dir, 'task_runner_in.json')
+    task_result_file = os.path.join(self.root_dir, 'task_runner_out.json')
+    with open(task_in_file, 'wb') as f:
+      json.dump(manifest, f)
+    bot = os.path.join(self.root_dir, 'swarming_bot.1.zip')
+    code, _ = fake_swarming.gen_zip(self._server.url)
+    with open(bot, 'wb') as f:
+      f.write(code)
+    cmd = [
+      sys.executable, bot, 'task_runner',
+      '--swarming-server', self._server.url,
+      '--in-file', task_in_file,
+      '--out-file', task_result_file,
+      '--cost-usd-hour', '1',
+      # Include the time taken to poll the task in the cost.
+      '--start', str(time.time()),
+    ]
+    logging.info('%s', cmd)
+    proc = subprocess42.Popen(cmd, cwd=self.root_dir, detached=True)
+    # Wait for the child process to be alive.
+    while os.path.isfile(signal_file):
+      time.sleep(0.01)
+    # Send SIGTERM to task_runner itself. Ensure the right thing happen.
+    # Note that on Windows, this is actually sending a SIGBREAK since there's no
+    # such thing as SIGTERM.
+    proc.send_signal(signal.SIGTERM)
+    proc.wait()
+    with open(os.path.join(self.root_dir, 'task_runner.log'), 'rb') as f:
+      logging.info('task_runner.log:\n---\n%s---', f.read())
+    expected = {
+      u'exit_code': 0,
+      u'hard_timeout': False,
+      u'io_timeout': False,
+      u'must_signal_internal_failure': None,
+      u'version': task_runner.OUT_VERSION,
+    }
+    self.assertEqual([], self._server.get_events())
+    tasks = self._server.get_tasks()
+    for task in tasks.itervalues():
+      for event in task:
+        event.pop('cost_usd')
+        event.pop('duration', None)
+    expected = {
+      '23': [
+        {
+          u'id': u'localhost',
+          u'task_id': 23,
+        },
+        {
+          u'exit_code': 1 if sys.platform == 'win32' else -signal.SIGKILL,
+          u'hard_timeout': False,
+          u'id': u'localhost',
+          u'io_timeout': False,
+          u'task_id': 23,
+        },
+      ],
+    }
+    self.assertEqual(expected, tasks)
+    expected = {
+      'swarming_bot.1.zip',
+      '092b5bd4562f579711823f61e311de37247c853a-cacert.pem',
+      'work',
+      'task_runner.log',
+      'task_runner_in.json',
+      'task_runner_out.json',
+    }
+    self.assertEqual(expected, set(os.listdir(self.root_dir)))
+    expected = {
+      u'exit_code': 1 if sys.platform == 'win32' else -signal.SIGKILL,
+      u'hard_timeout': False,
+      u'io_timeout': False,
+      u'must_signal_internal_failure':
+          u'task_runner received signal %d' % task_runner.SIG_BREAK_OR_TERM,
+      u'version': 3,
+    }
+    with open(task_result_file, 'rb') as f:
+      self.assertEqual(expected, json.load(f))
+    self.assertEqual(0, proc.returncode)
 
 
 if __name__ == '__main__':

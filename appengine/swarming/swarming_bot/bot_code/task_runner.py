@@ -20,6 +20,7 @@ import json
 import logging
 import optparse
 import os
+import signal
 import subprocess
 import sys
 import tempfile
@@ -47,6 +48,16 @@ MAX_PACKET_INTERVAL = 30
 
 # Minimum wait between task_update packet when there's output.
 MIN_PACKET_INTERNAL = 10
+
+
+# Current task_runner_out version.
+OUT_VERSION = 3
+
+
+# On Windows, SIGTERM is actually sent as SIGBREAK since there's no real
+# SIGTERM.  SIGBREAK is not defined on posix since it's a pure Windows concept.
+SIG_BREAK_OR_TERM = (
+    signal.SIGBREAK if sys.platform == 'win32' else signal.SIGTERM)
 
 
 # Used to implement monotonic_time for a clock that never goes backward.
@@ -130,6 +141,13 @@ class TaskDetails(object):
     self.task_id = data['task_id']
 
 
+class MustExit(Exception):
+  """Raised on signal that the process must exit immediately."""
+  def __init__(self, sig):
+    super(MustExit, self).__init__()
+    self.signal = sig
+
+
 def load_and_run(in_file, swarming_server, cost_usd_hour, start, out_file):
   """Loads the task's metadata and execute it.
 
@@ -141,21 +159,44 @@ def load_and_run(in_file, swarming_server, cost_usd_hour, start, out_file):
   # bot_main.py and contains the manifest. Temporary files will be downloaded
   # there. It's bot_main.py that will delete the directory afterward. Tests are
   # not run from there.
-  work_dir = os.path.abspath('work')
-  if not os.path.isdir(work_dir):
-    raise ValueError('%s expected to exist' % work_dir)
+  task_result = None
+  def handler(sig, _):
+    logging.info('Got signal %s', sig)
+    raise MustExit(sig)
+  try:
+    old_handler = signal.signal(SIG_BREAK_OR_TERM, handler)
+    try:
+      work_dir = os.path.abspath('work')
+      if not os.path.isdir(work_dir):
+        raise ValueError('%s expected to exist' % work_dir)
 
-  with open(in_file, 'rb') as f:
-    task_details = TaskDetails(json.load(f))
+      with open(in_file, 'rb') as f:
+        task_details = TaskDetails(json.load(f))
 
-  # Download the script to run in the temporary directory.
-  # TODO(maruel): Remove.
-  download_data(work_dir, task_details.data)
+      # Download the script to run in the temporary directory.
+      # TODO(maruel): Remove.
+      download_data(work_dir, task_details.data)
 
-  task_result = run_command(
-      swarming_server, task_details, work_dir, cost_usd_hour, start)
-  with open(out_file, 'wb') as f:
-    json.dump(task_result, f)
+      task_result = run_command(
+          swarming_server, task_details, work_dir, cost_usd_hour, start)
+    except MustExit as e:
+      # This normally means run_command() didn't get the chance to run, as it
+      # itself trap MustExit and will report accordingly. In this case, we want
+      # the parent process to send the message instead.
+      if not task_result:
+        task_result = {
+          u'exit_code': None,
+          u'hard_timeout': False,
+          u'io_timeout': False,
+          u'must_signal_internal_failure':
+              u'task_runner received signal %s' % e.signal,
+          u'version': OUT_VERSION,
+        }
+    finally:
+      signal.signal(SIG_BREAK_OR_TERM, old_handler)
+  finally:
+    with open(out_file, 'wb') as f:
+      json.dump(task_result, f)
 
 
 def post_update(swarming_server, params, exit_code, stdout, output_chunk_start):
@@ -215,6 +256,20 @@ def calc_yield_wait(task_details, start, last_io, timed_out, stdout):
   return out
 
 
+def kill_and_wait(proc, reason):
+  try:
+    logging.warning('proc.kill() in finally due to %s', reason)
+    proc.kill()
+  except OSError:
+    # The process has already exited.
+    pass
+  # TODO(maruel): We'd wait only for X seconds.
+  logging.info('Waiting for proces exit in finally')
+  exit_code = proc.wait()
+  logging.info('Waiting for proces exit in finally - done')
+  return exit_code
+
+
 def run_command(
     swarming_server, task_details, work_dir, cost_usd_hour, task_start):
   """Runs a command and sends packets to the server to stream results back.
@@ -271,7 +326,8 @@ def run_command(
         u'exit_code': 255,
         u'hard_timeout': False,
         u'io_timeout': False,
-        u'version': 2,
+        u'must_signal_internal_failure': None,
+        u'version': OUT_VERSION,
       }
 
     output_chunk_start = 0
@@ -279,6 +335,7 @@ def run_command(
     exit_code = None
     had_hard_timeout = False
     had_io_timeout = False
+    must_signal_internal_failure = None
     timed_out = None
     try:
       calc = lambda: calc_yield_wait(
@@ -336,20 +393,16 @@ def run_command(
               pass
       logging.info('Waiting for proces exit')
       exit_code = proc.wait()
+    except MustExit as e:
+      # TODO(maruel): Do the send SIGTERM to child process and give it
+      # task_details.grace_period to terminate.
+      must_signal_internal_failure = (
+          u'task_runner received signal %s' % e.signal)
+      exit_code = kill_and_wait(proc, 'signal %d' % e.signal)
     except (IOError, OSError):
       # Something wrong happened, try to kill the child process.
       had_hard_timeout = True
-      try:
-        logging.warning('proc.kill() in finally')
-        proc.kill()
-      except OSError:
-        # The process has already exited.
-        pass
-
-      # TODO(maruel): We'd wait only for X seconds.
-      logging.info('Waiting for proces exit in finally')
-      exit_code = proc.wait()
-      logging.info('Waiting for proces exit in finally - done')
+      exit_code = kill_and_wait(proc, 'exception %s' % e)
 
     # This is the very last packet for this command. It if was an isolated task,
     # include the output reference to the archived .isolated file.
@@ -369,7 +422,8 @@ def run_command(
       u'exit_code': exit_code,
       u'hard_timeout': had_hard_timeout,
       u'io_timeout': had_io_timeout,
-      u'version': 2,
+      u'must_signal_internal_failure': must_signal_internal_failure,
+      u'version': OUT_VERSION,
     }
   finally:
     if isolated_result:
