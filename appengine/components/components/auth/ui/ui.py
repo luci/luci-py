@@ -231,6 +231,11 @@ class BootstrapHandler(UIHandler):
   group may not exist yet. Used to bootstrap a new service instance.
   """
 
+  @classmethod
+  def get_auth_methods(cls, conf):
+    # Using users.is_current_user_admin(). Other auth methods don't make sense.
+    return [handler.gae_cookie_authentication]
+
   @forbid_ui_on_replica
   @api.require(users.is_current_user_admin)
   def get(self):
@@ -268,6 +273,11 @@ class LinkToPrimaryHandler(UIHandler):
     except (KeyError, ValueError):
       self.abort(400)
       return
+
+  @classmethod
+  def get_auth_methods(cls, conf):
+    # Using users.is_current_user_admin(). Other auth methods don't make sense.
+    return [handler.gae_cookie_authentication]
 
   @forbid_ui_on_replica
   @api.require(users.is_current_user_admin)

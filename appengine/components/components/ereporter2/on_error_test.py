@@ -36,11 +36,6 @@ class Ereporter2OnErrorTest(test_case.TestCase):
     self.mock(logging, 'error', lambda *_, **_kwargs: None)
     self._now = datetime.datetime(2014, 6, 24, 20, 19, 42, 653775)
     self.mock_now(self._now, 0)
-    auth.configure([
-        auth.oauth_authentication,
-        auth.cookie_authentication,
-        auth.service_to_service_authentication,
-    ])
 
   def test_log(self):
     kwargs = dict((k, k) for k in on_error.VALID_ERROR_KEYS)

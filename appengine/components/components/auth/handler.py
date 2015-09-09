@@ -30,18 +30,12 @@ from . import tokens
 __all__ = [
   'ApiHandler',
   'AuthenticatingHandler',
-  'configure',
-  'cookie_authentication',
+  'gae_cookie_authentication',
   'get_authenticated_routes',
   'oauth_authentication',
   'require_xsrf_token_request',
   'service_to_service_authentication',
 ]
-
-
-# Global list of authentication functions to use to authenticate all
-# requests. Used by AuthenticatingHandler. Initialized in 'configure'.
-_auth_methods = ()
 
 
 def require_xsrf_token_request(f):
@@ -97,12 +91,13 @@ class AuthenticatingHandler(webapp2.RequestHandler):
   xsrf_token_data = None
   # If not None, sets X_Frame-Options on all replies.
   frame_options = 'DENY'
+  # A method used to authenticate this request, see get_auth_methods().
+  auth_method = None
 
   def dispatch(self):
     """Extracts and verifies Identity, sets up request auth context."""
     # Ensure auth component is configured before executing any code.
-    # Configuration may modify _auth_methods used below.
-    config.ensure_configured()
+    conf = config.ensure_configured()
     auth_context = api.reinitialize_request_cache()
 
     # http://www.html5rocks.com/en/tutorials/security/content-security-policy/
@@ -126,7 +121,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       self.response.headers['X-Frame-Options'] = self.frame_options
 
     identity = None
-    for method_func in _auth_methods:
+    for method_func in self.get_auth_methods(conf):
       try:
         identity = method_func(self.request)
         if identity:
@@ -139,6 +134,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
         return
     else:
       method_func = None
+    self.auth_method = method_func
 
     # If no authentication method is applicable, default to anonymous identity.
     identity = identity or model.Anonymous
@@ -206,6 +202,38 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       super(AuthenticatingHandler, self).dispatch()
     except api.AuthorizationError as err:
       self.authorization_error(err)
+
+  @classmethod
+  def get_auth_methods(cls, conf):  # pylint: disable=unused-argument
+    """Returns an enumerable of functions to use to authenticate request.
+
+    The handler will try to apply auth methods sequentially one by one by until
+    it finds one that works.
+
+    Each auth method is a function that accepts webapp2.Request and can finish
+    with 3 outcomes:
+
+    * Return None: authentication method is not applicable to that request
+      and next method should be tried (for example cookie-based
+      authentication is not applicable when there's no cookies).
+
+    * Returns Identity associated with the request. Means authentication method
+      is applicable and request authenticity is confirmed.
+
+    * Raises AuthenticationError: authentication method is applicable, but
+      request contains bad credentials or invalid token, etc. For example,
+      OAuth2 token is given, but it is revoked.
+
+    A chosen auth method function will be stored in request's auth_method field.
+
+    Args:
+      conf: components.auth GAE config, see config.py.
+    """
+    # TODO(vadimsh): Use 'conf' to enable\disable some methods.
+    return (
+        oauth_authentication,
+        gae_cookie_authentication,
+        service_to_service_authentication)
 
   def generate_xsrf_token(self, xsrf_token_data=None):
     """Returns new XSRF token that embeds |xsrf_token_data|.
@@ -339,39 +367,6 @@ class ApiHandler(AuthenticatingHandler):
     return self._json_body.copy()
 
 
-def configure(auth_methods):
-  """Sets a list of authentication methods to use for all requests.
-
-  It's a global configuration that will be used by all request handlers
-  inherited from AuthenticatingHandler. AuthenticatingHandler will try to apply
-  auth methods sequentially one by one by until it finds one that works.
-
-  Args:
-    auth_methods: list of authentication functions to use to authenticate
-        a request. Order is important. For example if both cookie_authentication
-        and oauth_authentication methods are specified and a request has both
-        cookies and 'Authorization' header, whatever method comes first in the
-        list is used.
-
-  Each auth method is a function that accepts webapp2 Request and can finish
-  with 3 outcomes:
-
-  * Return None: Authentication method is not applicable to that request
-    and next method should be tried (for example cookie-based
-    authentication is not applicable when there's no cookies).
-
-  * Returns Identity associated with the request.
-    Authentication method is applicable and request authenticity is confirmed.
-
-  * Raises AuthenticationError: Authentication method is applicable, but
-    request contains bad credentials or invalid token, etc. For example,
-    OAuth2 token is given, but it is revoked.
-  """
-  global _auth_methods
-  assert all(callable(func) for func in auth_methods)
-  _auth_methods = tuple(auth_methods)
-
-
 def get_authenticated_routes(app):
   """Given WSGIApplication returns list of routes that use authentication.
 
@@ -387,10 +382,10 @@ def get_authenticated_routes(app):
 
 
 ################################################################################
-## Concrete implementations of authentication methods for webapp2 handlers.
+## All supported implementations of authentication methods for webapp2 handlers.
 
 
-def cookie_authentication(_request):
+def gae_cookie_authentication(_request):
   """AppEngine cookie based authentication via users.get_current_user()."""
   user = users.get_current_user()
   try:

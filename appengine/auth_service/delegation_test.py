@@ -17,6 +17,7 @@ import webtest
 
 from components import auth
 from components.auth import delegation as auth_delegation
+from components.auth import handler
 from components.auth.proto import delegation_pb2
 from test_support import test_case
 
@@ -42,8 +43,9 @@ class HandlersTest(test_case.TestCase):
     # Simplify auth.
     def dumb_auth(req):
       return auth.Identity.from_bytes(req.headers['Mock-Peer-Id'])
-    auth.config.ensure_configured()
-    auth.configure([dumb_auth])
+    self.mock(
+        handler.AuthenticatingHandler, 'get_auth_methods',
+        classmethod(lambda *_: [dumb_auth]))
 
   def create_token(self, body, peer_id):
     return self.app.post(

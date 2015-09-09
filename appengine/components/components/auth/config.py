@@ -50,17 +50,17 @@ def ensure_configured():
   """
   global _config_called
 
+  # It is python: no need for memory barrier to do this kind of check. Having it
+  # here avoid hitting a bunch of locks (in imp guts and _config_lock) in code
+  # executed by _every_ request.
+  if _config_called:
+    return _config
+
   # Import lazily to avoid module reference cycle.
-  from . import handler
   from .ui import ui
 
   with _config_lock:
     if not _config_called:
-      handler.configure([
-        handler.oauth_authentication,
-        handler.cookie_authentication,
-        handler.service_to_service_authentication,
-      ])
       # Customize auth UI to show where it's running.
       if not _config.UI_CUSTOM_CONFIG:
         ui.configure_ui(_config.UI_APP_NAME)

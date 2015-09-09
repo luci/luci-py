@@ -67,7 +67,6 @@ class AuthenticatingHandlerTest(test_case.TestCase):
   def setUp(self):
     super(AuthenticatingHandlerTest, self).setUp()
     # Reset global config of auth library before each test.
-    handler.configure([])
     api.reset_local_state()
     # Capture error and warning log messages.
     self.logged_errors = []
@@ -87,10 +86,12 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     """If all auth methods are not applicable, identity is set to Anonymous."""
     test = self
 
-    non_applicable = lambda _request: None
-    handler.configure([non_applicable, non_applicable])
-
     class Handler(handler.AuthenticatingHandler):
+      @classmethod
+      def get_auth_methods(cls, conf):
+        non_applicable = lambda _request: None
+        return [non_applicable, non_applicable]
+
       @api.public
       def get(self):
         test.assertEqual(model.Anonymous, api.get_current_identity())
@@ -101,7 +102,6 @@ class AuthenticatingHandlerTest(test_case.TestCase):
 
   def test_ip_whitelist_bot(self):
     """Requests from client in "bots" IP whitelist are authenticated as bot."""
-    handler.configure([])
     model.bootstrap_ip_whitelist('bots', ['192.168.1.100/32'])
 
     class Handler(handler.AuthenticatingHandler):
@@ -125,7 +125,13 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     model.bootstrap_ip_whitelist('whitelist', ['192.168.1.100/32'])
     model.bootstrap_ip_whitelist_assignment(ident1, 'whitelist')
 
+    mocked_ident = [None]
+
     class Handler(handler.AuthenticatingHandler):
+      @classmethod
+      def get_auth_methods(cls, conf):
+        return [lambda _req: mocked_ident[0]]
+
       @api.public
       def get(self):
         self.response.write('OK')
@@ -133,7 +139,7 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     app = self.make_test_app('/request', Handler)
     def call(ident, ip):
       api.reset_local_state()
-      handler.configure([lambda _request: ident])
+      mocked_ident[0] = ident
       response = app.get(
           '/request', extra_environ={'REMOTE_ADDR': ip}, expect_errors=True)
       return response.status_int
@@ -162,12 +168,15 @@ class AuthenticatingHandlerTest(test_case.TestCase):
       return ident
 
     class Handler(handler.AuthenticatingHandler):
+      @classmethod
+      def get_auth_methods(cls, conf):
+        return [not_applicable, applicable]
+
       @api.public
       def get(self):
         test.assertEqual(ident, api.get_current_identity())
         self.response.write('OK')
 
-    handler.configure([not_applicable, applicable])
     app = self.make_test_app('/request', Handler)
     self.assertEqual('OK', app.get('/request').body)
 
@@ -190,6 +199,10 @@ class AuthenticatingHandlerTest(test_case.TestCase):
       self.fail('authenticate should not be called')
 
     class Handler(handler.AuthenticatingHandler):
+      @classmethod
+      def get_auth_methods(cls, conf):
+        return [failing, skipped]
+
       @api.public
       def get(self):
         test.fail('Handler code should not be called')
@@ -200,7 +213,6 @@ class AuthenticatingHandlerTest(test_case.TestCase):
         # pylint: disable=bad-super-call
         super(Handler, self).authentication_error(err)
 
-    handler.configure([failing, skipped])
     app = self.make_test_app('/request', Handler)
     response = app.get('/request', expect_errors=True)
 
@@ -366,8 +378,6 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     self.assertEqual(Authenticated, routes[0].handler)
 
   def test_get_peer_ip(self):
-    handler.configure([])
-
     class Handler(handler.AuthenticatingHandler):
       @api.public
       def get(self):
@@ -378,8 +388,6 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     self.assertEqual('192.1.2.3', response.body)
 
   def test_get_peer_host(self):
-    handler.configure([])
-
     class Handler(handler.AuthenticatingHandler):
       @api.public
       def get(self):
@@ -407,9 +415,12 @@ class AuthenticatingHandlerTest(test_case.TestCase):
 
   def test_delegation_token(self):
     peer_ident = model.Identity.from_bytes('user:peer@a.com')
-    handler.configure([lambda _request: peer_ident])
 
     class Handler(handler.AuthenticatingHandler):
+      @classmethod
+      def get_auth_methods(cls, conf):
+        return [lambda _request: peer_ident]
+
       @api.public
       def get(self):
         self.response.write(json.dumps({
@@ -457,11 +468,11 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     self.assertEqual(500, r.status_int)
 
 
-class CookieAuthenticationTest(test_case.TestCase):
-  """Tests for cookie_authentication function."""
+class GaeCookieAuthenticationTest(test_case.TestCase):
+  """Tests for gae_cookie_authentication function."""
 
   def test_non_applicable(self):
-    self.assertIsNone(handler.cookie_authentication(webapp2.Request({})))
+    self.assertIsNone(handler.gae_cookie_authentication(webapp2.Request({})))
 
   def test_applicable(self):
     os.environ.update({
@@ -472,7 +483,7 @@ class CookieAuthenticationTest(test_case.TestCase):
     # Actual request is not used by CookieAuthentication.
     self.assertEqual(
         model.Identity(model.IDENTITY_USER, 'joe@example.com'),
-        handler.cookie_authentication(webapp2.Request({})))
+        handler.gae_cookie_authentication(webapp2.Request({})))
 
 
 class ServiceToServiceAuthenticationTest(test_case.TestCase):

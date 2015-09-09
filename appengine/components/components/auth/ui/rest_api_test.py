@@ -105,9 +105,6 @@ class ApiHandlerClassTest(test_case.TestCase):
 
   def setUp(self):
     super(ApiHandlerClassTest, self).setUp()
-    # Reset global config.
-    handler.configure([])
-    # Catch errors in log.
     self.errors = []
     self.mock(handler.logging, 'error',
         lambda *args, **kwargs: self.errors.append((args, kwargs)))
@@ -118,9 +115,12 @@ class ApiHandlerClassTest(test_case.TestCase):
 
     def failing_auth(_request):
       raise api.AuthenticationError('Boom!')
-    handler.configure([failing_auth])
 
     class Handler(handler.ApiHandler):
+      @classmethod
+      def get_auth_methods(cls, conf):
+        return [failing_auth]
+
       @api.public
       def get(self):
         test.fail('Should not be called')
@@ -296,7 +296,6 @@ class RestAPITestCase(test_case.TestCase):
         webapp2.WSGIApplication(rest_api.get_rest_api_routes(), debug=True),
         extra_environ={'REMOTE_ADDR': '127.0.0.1'})
     # Reset global config and cached state.
-    handler.configure([])
     api.reset_local_state()
     self.mocked_identity = model.Anonymous
     # Mock is_group_member checks.
@@ -464,9 +463,8 @@ class SelfHandlerTest(RestAPITestCase):
     }, body)
 
   def test_non_anonymous(self):
-    # Add fake authenticator.
-    handler.configure([
-        lambda _req: model.Identity(model.IDENTITY_USER, 'joe@example.com')])
+    self.mock_current_identity(
+        model.Identity(model.IDENTITY_USER, 'joe@example.com'))
     status, body, _ = self.get(
         '/auth/api/v1/accounts/self',
         extra_environ={'REMOTE_ADDR': '1.2.3.4'})

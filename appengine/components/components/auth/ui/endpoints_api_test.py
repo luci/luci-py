@@ -40,7 +40,6 @@ class MembershipTest(test_case.EndpointsTestCase):
 
   def setUp(self):
     super(MembershipTest, self).setUp()
-    handler.configure([])
     api.reset_local_state()
     self.mock(api, 'is_admin', lambda *_: True)
     model.AuthGroup(key=model.group_key('testgroup'), members=[]).put()
