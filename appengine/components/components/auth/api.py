@@ -20,6 +20,7 @@ import logging
 import os
 import threading
 import time
+import urllib
 
 from google.appengine.api import oauth
 from google.appengine.api import users
@@ -901,7 +902,13 @@ def autologin(func):
     if not users.get_current_user():
       self.redirect(users.create_login_url(self.request.url))
       return
-    return func(self, *args, **kwargs)
+    try:
+      return func(self, *args, **kwargs)
+    except AuthorizationError:
+      if not users.is_current_user_admin() or is_admin() or model.is_replica():
+        raise
+      self.redirect(
+          '/auth/bootstrap?r=%s' % urllib.quote_plus(self.request.path_qs))
 
   # Propagate reference to original function, mark function as decorated.
   wrapper.__wrapped__ = original

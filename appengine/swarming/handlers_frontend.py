@@ -53,6 +53,7 @@ SortOptions = collections.namedtuple('SortOptions', ['key', 'name'])
 
 
 class RestrictedConfigHandler(auth.AuthenticatingHandler):
+  @auth.autologin
   @auth.require(acl.is_admin)
   def get(self):
     self.common(None)
@@ -89,6 +90,7 @@ class RestrictedConfigHandler(auth.AuthenticatingHandler):
 class UploadBotConfigHandler(auth.AuthenticatingHandler):
   """Stores a new bot_config.py script."""
 
+  @auth.autologin
   @auth.require(acl.is_admin)
   def get(self):
     bot_config = bot_code.get_bot_config()
@@ -121,6 +123,7 @@ class UploadBotConfigHandler(auth.AuthenticatingHandler):
 class UploadBootstrapHandler(auth.AuthenticatingHandler):
   """Stores a new bootstrap.py script."""
 
+  @auth.autologin
   @auth.require(acl.is_admin)
   def get(self):
     bootstrap = bot_code.get_bootstrap(self.request.host_url)
@@ -191,6 +194,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
     SortOptions(k, v) for k, v in sorted(ACCEPTABLE_BOTS_SORTS.iteritems())
   ]
 
+  @auth.autologin
   @auth.require(acl.is_privileged_user)
   def get(self):
     limit = int(self.request.get('limit', 100))
@@ -256,6 +260,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
 class BotHandler(auth.AuthenticatingHandler):
   """Returns data about the bot, including last tasks and events."""
 
+  @auth.autologin
   @auth.require(acl.is_privileged_user)
   def get(self, bot_id):
     # pagination is currently for tasks, not events.
@@ -418,6 +423,7 @@ class TasksHandler(auth.AuthenticatingHandler):
     ],
   ]
 
+  @auth.autologin
   @auth.require(acl.is_user)
   def get(self):
     """Handles both ndb.Query searches and search.Index().search() queries.
@@ -561,6 +567,7 @@ class TaskHandler(auth.AuthenticatingHandler):
   (ends with 1 or 2).
   """
 
+  @auth.autologin
   @auth.require(acl.is_user)
   def get(self, task_id):
     try:

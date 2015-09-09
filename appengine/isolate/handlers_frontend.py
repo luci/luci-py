@@ -56,6 +56,7 @@ _GVIZ_COLUMNS_ORDER = (
 
 
 class RestrictedConfigHandler(auth.AuthenticatingHandler):
+  @auth.autologin
   @auth.require(auth.is_admin)
   def get(self):
     self.common(None)

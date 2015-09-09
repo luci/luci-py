@@ -143,7 +143,11 @@ class FrontendTest(AppTestBase):
       response = getattr(self.app, method.lower())(path, expect_errors=True)
       message = ('%s handler is not protected: %s, '
                  'returned %s' % (method, path, response))
-      self.assertIn(response.status_int, (403, 405), msg=message)
+      self.assertIn(response.status_int, (302, 403, 405), msg=message)
+      if response.status_int == 302:
+        # See user_service_stub.py, _DEFAULT_LOGIN_URL.
+        login_url = 'https://www.google.com/accounts/Login?continue='
+        self.assertTrue(response.headers['Location'].startswith(login_url))
 
     self.set_as_anonymous()
     # Try to execute 'get' and 'post' and verify they fail with 403 or 405.
@@ -230,9 +234,10 @@ class FrontendTest(AppTestBase):
     self.set_as_user()
     _, task_id = self.client_create_task_raw()
 
+    # Redirect to login page.
     self.set_as_anonymous()
-    self.app.get('/user/tasks', status=403)
-    self.app.get('/user/task/%s' % task_id, status=403)
+    self.app.get('/user/tasks', status=302)
+    self.app.get('/user/task/%s' % task_id, status=302)
 
   @staticmethod
   def _sort_state_product():

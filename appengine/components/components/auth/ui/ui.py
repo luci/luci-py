@@ -242,6 +242,7 @@ class BootstrapHandler(UIHandler):
     env = {
       'page_title': 'Bootstrap',
       'admin_group': model.ADMIN_GROUP,
+      'return_url': self.request.get('r') or '',
     }
     self.reply('auth/bootstrap.html', env)
 
@@ -255,6 +256,7 @@ class BootstrapHandler(UIHandler):
       'page_title': 'Bootstrap',
       'admin_group': model.ADMIN_GROUP,
       'added': added,
+      'return_url': self.request.get('return_url') or '',
     }
     self.reply('auth/bootstrap_done.html', env)
 
