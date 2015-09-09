@@ -21,7 +21,6 @@ import logging
 import optparse
 import os
 import signal
-import subprocess
 import sys
 import tempfile
 import time
@@ -164,8 +163,7 @@ def load_and_run(in_file, swarming_server, cost_usd_hour, start, out_file):
     logging.info('Got signal %s', sig)
     raise MustExit(sig)
   try:
-    old_handler = signal.signal(SIG_BREAK_OR_TERM, handler)
-    try:
+    with subprocess42.set_signal_handler([SIG_BREAK_OR_TERM], handler):
       work_dir = os.path.abspath('work')
       if not os.path.isdir(work_dir):
         raise ValueError('%s expected to exist' % work_dir)
@@ -179,21 +177,19 @@ def load_and_run(in_file, swarming_server, cost_usd_hour, start, out_file):
 
       task_result = run_command(
           swarming_server, task_details, work_dir, cost_usd_hour, start)
-    except MustExit as e:
-      # This normally means run_command() didn't get the chance to run, as it
-      # itself trap MustExit and will report accordingly. In this case, we want
-      # the parent process to send the message instead.
-      if not task_result:
-        task_result = {
-          u'exit_code': None,
-          u'hard_timeout': False,
-          u'io_timeout': False,
-          u'must_signal_internal_failure':
-              u'task_runner received signal %s' % e.signal,
-          u'version': OUT_VERSION,
-        }
-    finally:
-      signal.signal(SIG_BREAK_OR_TERM, old_handler)
+  except MustExit as e:
+    # This normally means run_command() didn't get the chance to run, as it
+    # itself trap MustExit and will report accordingly. In this case, we want
+    # the parent process to send the message instead.
+    if not task_result:
+      task_result = {
+        u'exit_code': None,
+        u'hard_timeout': False,
+        u'io_timeout': False,
+        u'must_signal_internal_failure':
+            u'task_runner received signal %s' % e.signal,
+        u'version': OUT_VERSION,
+      }
   finally:
     with open(out_file, 'wb') as f:
       json.dump(task_result, f)
@@ -311,9 +307,9 @@ def run_command(
           env=env,
           cwd=work_dir,
           detached=True,
-          stdout=subprocess.PIPE,
-          stderr=subprocess.STDOUT,
-          stdin=subprocess.PIPE)
+          stdout=subprocess42.PIPE,
+          stderr=subprocess42.STDOUT,
+          stdin=subprocess42.PIPE)
     except OSError as e:
       stdout = 'Command "%s" failed to start.\nError: %s' % (' '.join(cmd), e)
       now = monotonic_time()

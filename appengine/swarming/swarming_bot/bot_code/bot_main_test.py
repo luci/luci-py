@@ -7,7 +7,6 @@ import json
 import logging
 import os
 import shutil
-import subprocess
 import sys
 import tempfile
 import threading
@@ -26,6 +25,7 @@ from api import bot
 from api import os_utilities
 from utils import logging_utils
 from utils import net
+from utils import subprocess42
 from utils import zip_package
 
 
@@ -58,7 +58,7 @@ class TestBotMain(net_utils.TestCase):
         self.root_dir, self.fail)
     self.mock(self.bot, 'post_error', self.fail)
     self.mock(self.bot, 'restart', self.fail)
-    self.mock(subprocess, 'call', self.fail)
+    self.mock(subprocess42, 'call', self.fail)
     self.mock(time, 'time', lambda: 100.)
     config_path = os.path.join(
         test_env_bot_code.BOT_DIR, 'config', 'config.json')
@@ -359,7 +359,7 @@ class TestBotMain(net_utils.TestCase):
     }
     # Method should have "self" as first argument - pylint: disable=E0213
     class Popen(object):
-      def __init__(self2, cmd, cwd, env, stdout, stderr):
+      def __init__(self2, cmd, detached, cwd, env, stdout, stderr):
         self2.returncode = None
         self2._out_file = os.path.join(
             self.root_dir, 'work', 'task_runner_out.json')
@@ -372,17 +372,18 @@ class TestBotMain(net_utils.TestCase):
           '--cost-usd-hour', '3600.0', '--start', '100.0',
         ]
         self.assertEqual(expected, cmd)
+        self.assertEqual(True, detached)
         self.assertEqual(test_env_bot_code.BOT_DIR, cwd)
         self.assertEqual('24', env['SWARMING_TASK_ID'])
         self.assertTrue(stdout)
-        self.assertEqual(subprocess.STDOUT, stderr)
+        self.assertEqual(subprocess42.STDOUT, stderr)
 
       def poll(self2):
         self2.returncode = returncode
         with open(self2._out_file, 'wb') as f:
           json.dump(result, f)
         return 0
-    self.mock(subprocess, 'Popen', Popen)
+    self.mock(subprocess42, 'Popen', Popen)
     return result
 
   def test_run_manifest(self):
@@ -454,7 +455,7 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, 'call_hook', call_hook)
     def raiseOSError(*_a, **_k):
       raise OSError('Dang')
-    self.mock(subprocess, 'Popen', raiseOSError)
+    self.mock(subprocess42, 'Popen', raiseOSError)
 
     manifest = {'dimensions': {}, 'hard_timeout': 60, 'task_id': '24'}
     bot_main.run_manifest(self.bot, manifest, time.time())

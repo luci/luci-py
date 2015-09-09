@@ -7,8 +7,9 @@
 import logging
 import os
 import signal
-import subprocess
 import sys
+
+from utils import subprocess42
 
 
 def exec_python(args):
@@ -26,22 +27,17 @@ def exec_python(args):
     # On Windows, we cannot sanely exec() so shell out the child process
     # instead. But we need to forward any signal received that the bot may care
     # about. This means processes accumulate, sadly.
-    # If stdin closes, it tells the child process that the parent process died.
-    proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+    # TODO(maruel): If stdin closes, it tells the child process that the parent
+    # process died.
+    proc = subprocess42.Popen(cmd, detached=True, stdin=subprocess42.PIPE)
     def handler(sig, _):
       logging.info('Got signal %s', sig)
-      # In general, sig == SIGBREAK(21) but we cannot send it, so send
-      # CTRL_BREAK_EVENT(1) instead.
-      proc.send_signal(signal.CTRL_BREAK_EVENT)
-    old_handlers = {}
-    try:
-      for s in (signal.SIGBREAK, signal.SIGTERM):
-        old_handlers[s] = signal.signal(s, handler)
+      # Always send SIGTERM, which is properly translated.
+      proc.send_signal(signal.SIGTERM)
+
+    with subprocess42.set_signal_handler([signal.SIGBREAK], handler):
       proc.wait()
       return proc.returncode
-    finally:
-      for s, h in old_handlers.iteritems():
-        signal.signal(s, h)
   except Exception as e:
     logging.exception('failed to start: %s', e)
     # Swallow the exception.

@@ -11,7 +11,6 @@ import logging
 import os
 import signal
 import shutil
-import subprocess
 import sys
 import tempfile
 import time
@@ -400,9 +399,9 @@ class TestTaskRunner(TestTaskRunnerBase):
         expected_env = os.environ.copy()
         expected_env['foo'] = 'bar'
         self.assertEqual(expected_env, env)
-        self.assertEqual(subprocess.PIPE, stdout)
-        self.assertEqual(subprocess.STDOUT, stderr)
-        self.assertEqual(subprocess.PIPE, stdin)
+        self.assertEqual(subprocess42.PIPE, stdout)
+        self.assertEqual(subprocess42.STDOUT, stderr)
+        self.assertEqual(subprocess42.PIPE, stdin)
         self.assertEqual(True, detached)
         self2._out = [
           'hi!\n',

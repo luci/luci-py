@@ -14,7 +14,6 @@ import os
 import optparse
 import shutil
 import signal
-import subprocess
 import sys
 import zipfile
 

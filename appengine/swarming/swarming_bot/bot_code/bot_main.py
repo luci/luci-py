@@ -21,7 +21,6 @@ import optparse
 import os
 import shutil
 import signal
-import subprocess
 import sys
 import tempfile
 import threading
@@ -429,12 +428,13 @@ def run_manifest(botobj, manifest, start):
     # Put the output file into the current working directory, which should be
     # the one containing swarming_bot.zip.
     with open('task_runner_stdout.log', 'wb') as f:
-      proc = subprocess.Popen(
+      proc = subprocess42.Popen(
           command,
+          detached=True,
           cwd=os.path.dirname(THIS_FILE),
           env=env,
           stdout=f,
-          stderr=subprocess.STDOUT)
+          stderr=subprocess42.STDOUT)
     while proc.poll() is None:
       if time.time() - start >= hard_timeout:
         proc.kill()
