@@ -17,7 +17,6 @@ import json
 import logging
 import os
 import StringIO
-import sys
 import zipfile
 
 
@@ -176,16 +175,20 @@ FILES = (
     'python_libusb1/usb1.py',
 )
 
+
+def is_windows():
+  """Returns True if this code is running under Windows."""
+  return os.__file__[0] != '/'
+
+
 def resolve_symlink(path):
   """Processes path containing symlink on Windows.
 
   This is needed to make ../swarming_bot/main_test.py pass on Windows because
   git on Windows renders symlinks as normal files.
   """
-  if sys.platform not in ('linux3', 'win32'):
-    # For an unknown reason, AppEngine's dev server on Windows self-report as
-    # linux3. But when running unit tests, it's value is left as win32 because
-    # unit tests are not run inside the full AppEngine SDK sandbox.
+  if not is_windows():
+    # Only does this dance on Windows.
     return path
   parts = os.path.normpath(path).split(os.path.sep)
   for i in xrange(2, len(parts)):

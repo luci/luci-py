@@ -7,7 +7,7 @@
 https://developers.google.com/appengine/docs/python/tools/appengineconfig
 """
 
-import sys
+import os
 
 
 components_auth_UI_APP_NAME = 'Isolate Server'
@@ -18,7 +18,7 @@ def hack_windows():
 
   Manually resolves symlinks in path for directory and add them to sys.path.
   """
-  import os
+  import sys
   # Disable AppEngine's sandbox.
   from google.appengine.tools.devappserver2.python import stubs
   stubs.FakeFile.is_file_accessible = staticmethod(lambda *_: True)
@@ -40,8 +40,7 @@ def hack_windows():
           os.path.join('..', 'components', 'components', 'third_party'))))
 
 
-if sys.platform == 'linux3':
+if os.__file__[0] != '/':
   # Hack for smoke tests to pass on Windows. dev_appserver hacks the python
-  # sys.platform value by setting it to 'linux3' on Windows. Since 'linux3' is
-  # not used on linux, it's fine to key against this value.
+  # sys.platform value by setting it to 'linux3' on all platforms.
   hack_windows()
