@@ -63,12 +63,6 @@ def get_result_entity(task_id):
   return get_or_raise(key)
 
 
-def _get_range(request):
-  """Get (start, end) as keys from request types that specify date ranges."""
-  end = request.end or utils.utcnow()
-  return (request.start or end - datetime.timedelta(days=1), end)
-
-
 ### API
 
 
@@ -83,7 +77,8 @@ swarming_api = auth.endpoints_api(
 @swarming_api.api_class(resource_name='server', path='server')
 class SwarmingServerService(remote.Service):
   @auth.endpoints_method(
-      message_types.VoidMessage, swarming_rpcs.ServerDetails, http_method='GET')
+      message_types.VoidMessage, swarming_rpcs.ServerDetails,
+      http_method='GET')
   @auth.require(acl.is_bot_or_user)
   def details(self, _request):
     """Returns information about the server."""
@@ -191,7 +186,9 @@ class SwarmingTasksService(remote.Service):
         request=message_conversion.task_request_to_rpc(posted_request),
         task_id=task_pack.pack_result_summary_key(result_summary.key))
 
-  @auth.endpoints_method(swarming_rpcs.TasksRequest, swarming_rpcs.TaskList)
+  @auth.endpoints_method(
+      swarming_rpcs.TasksRequest, swarming_rpcs.TaskList,
+      http_method='GET')
   @auth.require(acl.is_privileged_user)
   def list(self, request):
     """Provides a list of available tasks."""
@@ -208,7 +205,8 @@ class SwarmingTasksService(remote.Service):
 
     # get the tasks
     try:
-      start, end = _get_range(request)
+      start = message_conversion.epoch_to_datetime(request.start)
+      end = message_conversion.epoch_to_datetime(request.end)
       items, cursor_str, state = task_result.get_result_summaries(
           request.tags, request.cursor, start, end, state, request.limit)
       return swarming_rpcs.TaskList(
@@ -276,7 +274,8 @@ class SwarmingBotService(remote.Service):
     """Lists a given bot's tasks within the specified date range."""
     logging.info('%s', request)
     try:
-      start, end = _get_range(request)
+      start = message_conversion.epoch_to_datetime(request.start)
+      end = message_conversion.epoch_to_datetime(request.end)
       run_results, cursor, more = task_result.get_run_results(
           request.cursor, request.bot_id, start, end, request.limit)
     except ValueError as e:
@@ -291,7 +290,9 @@ class SwarmingBotService(remote.Service):
 @swarming_api.api_class(resource_name='bots', path='bots')
 class SwarmingBotsService(remote.Service):
   """Bots-related API."""
-  @auth.endpoints_method(swarming_rpcs.BotsRequest, swarming_rpcs.BotList)
+  @auth.endpoints_method(
+      swarming_rpcs.BotsRequest, swarming_rpcs.BotList,
+      http_method='GET')
   @auth.require(acl.is_privileged_user)
   def list(self, request):
     """Provides list of known bots.

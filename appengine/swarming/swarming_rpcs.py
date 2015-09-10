@@ -96,8 +96,13 @@ class TasksRequest(messages.Message):
   """Request to get some subset of available tasks."""
   limit = messages.IntegerField(1, default=200)
   cursor = messages.StringField(2)
-  end = message_types.DateTimeField(3)
-  start = message_types.DateTimeField(4)
+  # These should be DateTimeField but endpoints + protorpc have trouble encoding
+  # this message in a GET request, this is due to DateTimeField's special
+  # encoding in protorpc-1.0/protorpc/message_types.py that is bypassed when
+  # using endpoints-1.0/endpoints/protojson.py to add GET query parameter
+  # support.
+  end = messages.FloatField(3)
+  start = messages.FloatField(4)
   state = messages.EnumField(TaskState, 5, default='ALL')
   tags = messages.StringField(6, repeated=True)
 
@@ -183,8 +188,13 @@ class BotTasksRequest(messages.Message):
   """Request to get data about a bot's tasks."""
   limit = messages.IntegerField(1, default=200)
   cursor = messages.StringField(2)
-  end = message_types.DateTimeField(3)
-  start = message_types.DateTimeField(4)
+  # These should be DateTimeField but endpoints + protorpc have trouble encoding
+  # this message in a GET request, this is due to DateTimeField's special
+  # encoding in protorpc-1.0/protorpc/message_types.py that is bypassed when
+  # using endpoints-1.0/endpoints/protojson.py to add GET query parameter
+  # support.
+  end = messages.FloatField(3)
+  start = messages.FloatField(4)
 
 
 ### Bot-Related Responses

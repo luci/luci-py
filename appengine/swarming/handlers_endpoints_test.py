@@ -218,8 +218,12 @@ class TasksApiTest(BaseTest):
         tags=['project:yay', 'commit:pre', 'os:Win'],
         properties=dict(idempotent=True))
 
-    start = now - datetime.timedelta(days=1)
-    end = now + datetime.timedelta(days=1)
+    start = (
+        utils.datetime_to_timestamp(now - datetime.timedelta(days=1)) /
+        1000000.)
+    end = (
+        utils.datetime_to_timestamp(now + datetime.timedelta(days=1)) /
+        1000000.)
     self.set_as_privileged_user()
     request = swarming_rpcs.TasksRequest(end=end, start=start)
     response = self.call_api('list', body=message_to_dict(request))
@@ -651,8 +655,12 @@ class BotApiTest(BaseTest):
     self.bot_complete_task(
         token, exit_code=1, task_id=res['manifest']['task_id'])
 
-    start = now + datetime.timedelta(seconds=0.5)
-    end = now_1 + datetime.timedelta(seconds=0.5)
+    start = (
+        utils.datetime_to_timestamp(now + datetime.timedelta(seconds=0.5)) /
+        1000000.)
+    end = (
+        utils.datetime_to_timestamp(now_1 + datetime.timedelta(seconds=0.5)) /
+        1000000.)
     request = swarming_rpcs.BotTasksRequest(end=end, start=start)
 
     self.set_as_privileged_user()

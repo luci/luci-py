@@ -841,6 +841,9 @@ def _sort_property(sort):
 
 
 def _datetime_to_key(date):
+  """Converts a datetime.datetime to a ndb.Key to a task_request.TaskRequest."""
+  if not date:
+    return None
   assert isinstance(date, datetime.datetime), date
   return task_request.convert_to_request_key(date)
 
@@ -962,12 +965,14 @@ def get_run_results(cursor_str, bot_id, start, end, batch_size):
   """Executes a TaskRunResult query over the appropriate date range."""
   if not 0 < batch_size <= 1000:
     raise ValueError('batch_size must be between 1 and 1000')
-  start_key, end_key = map(_datetime_to_key, (start, end))
-
-  query = TaskRunResult.query(
-      TaskRunResult.bot_id == bot_id,
-      TaskRunResult.key <= start_key,
-      TaskRunResult.key >= end_key)
+  query = TaskRunResult.query(TaskRunResult.bot_id == bot_id)
+  # Inequalities are <= and >= because keys are in reverse chronological order.
+  start_key = _datetime_to_key(start)
+  if start_key:
+    query = query.filter(TaskRunResult.key <= start_key)
+  end_key = _datetime_to_key(end)
+  if end_key:
+    query = query.filter(TaskRunResult.key >= end_key)
   query = query.order(TaskRunResult.key)
   cursor = datastore_query.Cursor(urlsafe=cursor_str)
   return query.fetch_page(batch_size, start_cursor=cursor)
@@ -995,12 +1000,14 @@ def get_result_summaries(
   """
   if not 0 < batch_size <= 1000:
     raise ValueError('Inappropriate value for batch_size.')
-  start_key, end_key = map(_datetime_to_key, (start, end))
-
+  query = task_request.TaskRequest.query()
   # Inequalities are <= and >= because keys are in reverse chronological order.
-  query = task_request.TaskRequest.query(
-      task_request.TaskRequest.key <= start_key,
-      task_request.TaskRequest.key >= end_key)
+  start_key = _datetime_to_key(start)
+  if start_key:
+    query = query.filter(task_request.TaskRequest.key <= start_key)
+  end_key = _datetime_to_key(end)
+  if end_key:
+    query = query.filter(task_request.TaskRequest.key >= end_key)
   query = query.order(task_request.TaskRequest.key)
 
   # Filter by one or more tags.

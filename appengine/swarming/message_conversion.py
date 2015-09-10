@@ -28,6 +28,9 @@ from server import task_request
 from server import task_result
 
 
+### Private API.
+
+
 def _string_pairs_from_dict(dictionary):
   return [
     swarming_rpcs.StringPair(key=k, value=v)
@@ -55,6 +58,23 @@ def _rpc_to_ndb(cls, entity, **overrides):
   }
   kwargs.update(overrides)
   return cls(**{k: v for k, v in kwargs.iteritems() if v is not None})
+
+
+### Public API.
+
+
+def epoch_to_datetime(value):
+  """Converts a messages.FloatField that represents a timestamp since epoch in
+  seconds to a datetime.datetime.
+
+  Returns None when input is 0 or None.
+  """
+  if not value:
+    return None
+  try:
+    return utils.timestamp_to_datetime(value*1000000.)
+  except OverflowError as e:
+    raise ValueError(e)
 
 
 def bot_info_to_rpc(entity, now):
