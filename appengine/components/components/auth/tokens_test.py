@@ -259,7 +259,10 @@ class TestToken(test_case.TestCase):
 
   def test_works(self):
     tok = SimpleToken.generate('message', {'embedded': 'some'})
-    self.assertEqual({'embedded': 'some'}, SimpleToken.validate(tok, 'message'))
+    out = SimpleToken.validate(tok, 'message')
+    self.assertEqual({'embedded': 'some'}, out)
+    self.assertTrue(isinstance(out.keys()[0], str))
+    self.assertTrue(isinstance(out.values()[0], str))
 
   def test_depends_on_message(self):
     tok = SimpleToken.generate('message 1')
