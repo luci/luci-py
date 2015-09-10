@@ -50,18 +50,6 @@ class SwarmingClient(object):
     self._tmpdir = tempfile.mkdtemp(prefix='swarming_client')
     self._index = 0
 
-  def isolate(self, isolate_path, isolated_path):
-    cmd = [
-      sys.executable, 'isolate.py', 'archive',
-      '-I', self._isolate_server,
-      '--namespace', 'default-gzip',
-      '-i', isolate_path,
-      '-s', isolated_path,
-    ]
-    isolated_hash = subprocess.check_output(cmd, cwd=CLIENT_DIR).split()[0]
-    logging.debug('%s = %s', isolated_path, isolated_hash)
-    return isolated_hash
-
   def task_trigger_raw(self, args):
     """Triggers a task and return the task id."""
     h, tmp = tempfile.mkstemp(prefix='swarming_smoke_test', suffix='.json')
@@ -75,29 +63,6 @@ class SwarmingClient(object):
       ]
       cmd.extend(args)
       assert not self._run('trigger', cmd), args
-      with open(tmp, 'rb') as f:
-        data = json.load(f)
-        task_id = data['tasks'].popitem()[1]['task_id']
-        logging.debug('task_id = %s', task_id)
-        return task_id
-    finally:
-      os.remove(tmp)
-
-  def task_trigger_isolated(self, name, isolated_hash):
-    """Triggers a task and return the task id."""
-    h, tmp = tempfile.mkstemp(prefix='swarming_smoke_test', suffix='.json')
-    os.close(h)
-    try:
-      cmd = [
-        '--user', 'joe@localhost',
-        '-d', 'cpu', 'x86',
-        '--dump-json', tmp,
-        '--task-name', name,
-        '-I',  self._isolate_server,
-        '--namespace', 'default-gzip',
-        isolated_hash,
-      ]
-      assert not self._run('trigger', cmd)
       with open(tmp, 'rb') as f:
         data = json.load(f)
         task_id = data['tasks'].popitem()[1]['task_id']
@@ -332,62 +297,6 @@ class Test(unittest.TestCase):
     self.assertEqual(200, res.http_code, res.body)
     bot_version2 = self.assertOneTask(args, summary, {})
     self.assertNotEqual(bot_version1, bot_version2)
-
-  def test_isolated(self):
-    # Make an isolated file, archive it.
-    isolate = {
-      'variables': {
-        'command': ['python', 'hello_world.py', '${ISOLATED_OUTDIR}'],
-        'files': ['hello_world.py'],
-      },
-    }
-    hello_world = '\n'.join((
-        'import os',
-        'import sys',
-        'print(\'hi\')',
-        'with open(os.path.join(sys.argv[1], \'result.txt\'), \'wb\') as f:',
-        '  f.write(\'hey\')'))
-    expected_summary = self.gen_expected(
-        name=u'yo',
-        isolated_out={
-          u'isolated': u'f10f4c42b38ca01726610f9575ba695468c32108',
-          u'isolatedserver': u'http://localhost:10050',
-          u'namespace': u'default-gzip',
-          u'view_url':
-            u'http://localhost:10050/browse?namespace=default-gzip'
-            '&hash=f10f4c42b38ca01726610f9575ba695468c32108',
-        },
-        outputs=[
-          u'hi\n'
-          u'[run_isolated_out_hack]{"hash":"'
-          'f10f4c42b38ca01726610f9575ba695468c32108","namespace":"default-gzip"'
-          ',"storage":"http://localhost:10050"}[/run_isolated_out_hack]\n',
-        ],
-        outputs_ref={
-          u'isolated': u'f10f4c42b38ca01726610f9575ba695468c32108',
-          u'isolatedserver': u'http://localhost:10050',
-          u'namespace': u'default-gzip',
-          u'view_url':
-            u'http://localhost:10050/browse?namespace=default-gzip'
-            '&hash=f10f4c42b38ca01726610f9575ba695468c32108',
-        })
-    expected_files = {os.path.join('0', 'result.txt'): 'hey'}
-    tmpdir = tempfile.mkdtemp(prefix='swarming_smoke')
-    try:
-      isolate_path = os.path.join(tmpdir, 'i.isolate')
-      isolated_path = os.path.join(tmpdir, 'i.isolated')
-      with open(isolate_path, 'wb') as f:
-        json.dump(isolate, f)
-      with open(os.path.join(tmpdir, 'hello_world.py'), 'wb') as f:
-        f.write(hello_world)
-      isolated_hash = self.client.isolate(isolate_path, isolated_path)
-      task_id = self.client.task_trigger_isolated('yo', isolated_hash)
-      actual_summary, actual_files = self.client.task_collect(task_id)
-      self.assertResults(expected_summary, actual_summary)
-      actual_files.pop('summary.json')
-      self.assertEqual(expected_files, actual_files)
-    finally:
-      shutil.rmtree(tmpdir)
 
   def assertResults(self, expected, result):
     self.assertEqual(['shards'], result.keys())
