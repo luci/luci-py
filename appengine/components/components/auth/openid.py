@@ -362,6 +362,11 @@ class CallbackHandler(webapp2.RequestHandler):
     pic = userinfo.get('picture')
     if pic and not pic.startswith('https://'):
       pic = None
+    # Google avatars sometimes look weird if used directly. Resized version
+    # always looks fine. 's64' is documented, for example, here:
+    # https://cloud.google.com/appengine/docs/python/images
+    if pic and pic.endswith('/photo.jpg'):
+      pic = pic.rstrip('/photo.jpg') + '/s64/photo.jpg'
 
     # Refresh datastore entry for logged in user.
     sub = userinfo['sub'].encode('ascii')
@@ -447,7 +452,7 @@ def get_current_user(request):
       sub=decoded['sub'],
       email=e.email,
       name=e.name,
-      picture=e.picture.encode('ascii'))
+      picture=e.picture.encode('ascii') if e.picture else None)
 
 
 def create_login_url(request, dest_url):
