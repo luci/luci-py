@@ -123,7 +123,8 @@ exports.presentError = function(errorText) {
 
 // Double checks with user and redirects to logout url.
 exports.logout = function() {
-  if (confirm('You\'ll be signed out from ALL your google accounts.')) {
+  if (!config.using_gae_auth ||
+      confirm('You\'ll be signed out from ALL your google accounts.')) {
     window.location = config.logout_url;
   }
 };

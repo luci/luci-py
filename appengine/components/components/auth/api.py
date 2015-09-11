@@ -23,7 +23,6 @@ import time
 import urllib
 
 from google.appengine.api import oauth
-from google.appengine.api import users
 from google.appengine.ext import ndb
 from google.appengine.ext.ndb import metadata
 from google.appengine.runtime import apiproxy_errors
@@ -877,7 +876,8 @@ def autologin(func):
   This is meant to to used on handlers that require a non-anonymous user via
   @require(), so that the user is not served a 403 simply because he didn't have
   the cookie set yet. Do not use this decorator on APIs using anything else than
-  AppEngine's user authentication mechanism.
+  AppEngine's user authentication mechanism or OpenID cookies mechanism provided
+  by components.auth.
 
   Usage example:
 
@@ -899,13 +899,14 @@ def autologin(func):
 
   @functools.wraps(func)
   def wrapper(self, *args, **kwargs):
-    if not users.get_current_user():
-      self.redirect(users.create_login_url(self.request.url))
+    if not self.get_current_user():
+      self.redirect(self.create_login_url(self.request.url))
       return
     try:
       return func(self, *args, **kwargs)
     except AuthorizationError:
-      if not users.is_current_user_admin() or is_admin() or model.is_replica():
+      if (not self.is_current_user_gae_admin() or
+          is_admin() or model.is_replica()):
         raise
       self.redirect(
           '/auth/bootstrap?r=%s' % urllib.quote_plus(self.request.path_qs))

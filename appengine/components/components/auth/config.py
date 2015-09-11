@@ -40,6 +40,8 @@ _config = lib_config.register(
       'BACKEND_MODULE': 'default',
       # Name of the task queue that processes AuthDB diffs (see change_log.py).
       'PROCESS_CHANGE_TASK_QUEUE': 'default',
+      # True to use OpenID based login instead of default GAE one.
+      'USE_OPENID': False,
     })
 
 

@@ -18,8 +18,10 @@ from components import utils
 from . import acl
 from .. import api
 from .. import change_log
+from .. import config
 from .. import handler
 from .. import model
+from .. import openid
 from .. import replication
 
 
@@ -60,6 +62,9 @@ def get_ui_routes():
   """Returns a list of routes with auth UI handlers."""
   # Routes for registered navbar tabs.
   routes = [webapp2.Route(cls.navbar_tab_url, cls) for cls in _ui_navbar_tabs]
+  # Routes to OpenID login flow.
+  if config.ensure_configured().USE_OPENID:
+    routes.extend(openid.get_ui_routes())
   # Routes for everything else.
   routes.extend([
     webapp2.Route(r'/auth', MainHandler),
@@ -134,11 +139,14 @@ class UIHandler(handler.AuthenticatingHandler):
     env.setdefault('page_title', 'Untitled')
 
     # This goes to both Jinja2 env and Javascript config object.
+    user = self.get_current_user()
     common = {
+      'account_picture': user.picture() if user else None,
       'auth_service_config_locked': False, # overridden in auth_service
       'is_admin': api.is_admin(),
-      'login_url': users.create_login_url(self.request.path),
-      'logout_url': users.create_logout_url('/'),
+      'login_url': self.create_login_url(self.request.url),
+      'logout_url': self.create_logout_url('/'),
+      'using_gae_auth': self.auth_method == handler.gae_cookie_authentication,
       'xsrf_token': self.generate_xsrf_token(),
     }
     if _ui_env_callback:
@@ -199,7 +207,7 @@ class UIHandler(handler.AuthenticatingHandler):
     # Bots doesn't use UI, and users should always use real accounts.
     ident = api.get_current_identity()
     if ident.is_anonymous or ident.is_bot:
-      self.redirect(users.create_login_url(self.request.path))
+      self.redirect(self.create_login_url(self.request.url))
       return
 
     # Admin group is empty -> redirect to bootstrap procedure to create it.

@@ -356,13 +356,20 @@ class CallbackHandler(webapp2.RequestHandler):
     except ValueError as e:
       self.abort(400, detail='Bad redirect URL: %s' % e)
 
+    # Ignore non https:// URLs for pictures. We serve all pages over HTTPS and
+    # don't want to break this rule just for a pretty picture. Google userinfo
+    # endpoint always returns https:// URL anyway.
+    pic = userinfo.get('picture')
+    if pic and not pic.startswith('https://'):
+      pic = None
+
     # Refresh datastore entry for logged in user.
     sub = userinfo['sub'].encode('ascii')
     AuthOpenIDUser(
         id=sub,
         email=userinfo['email'],
         name=userinfo['name'],
-        picture=userinfo['picture']).put()
+        picture=pic).put()
 
     # Make cookie expire a bit earlier than the token itself, to avoid
     # "bad token" errors in most common case.

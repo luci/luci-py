@@ -14,7 +14,6 @@ from test_support import test_env
 test_env.setup_test_env()
 
 from google.appengine.api import logservice
-from google.appengine.api import users
 
 import webapp2
 import webtest
@@ -116,7 +115,7 @@ class Ereporter2FrontendTest(Base):
     class admin(object):
       def email(self):
         return 'admin@example.com'
-    self.mock(users, 'get_current_user', admin)
+    self.mock(auth.AuthenticatingHandler, 'get_current_user', lambda _s: admin)
 
   def test_frontend_general(self):
     self.mock_as_admin()

@@ -84,7 +84,7 @@ style="font-family:monospace;">{{auth_service_config_rev}}</a>.
             <a target="_blank" href="{{api_url}}">API</a>
           </li>
         </ul>
-        <p class="nav navbar-text navbar-right">
+        <p class="nav navbar-text navbar-right" id="account-text-nav">
           {% if not identity.is_anonymous %}
             <span>{{identity.name}}</span>
             <span> |</span>
@@ -92,7 +92,12 @@ style="font-family:monospace;">{{auth_service_config_rev}}</a>.
           {% else %}
             <a href="{{login_url}}" class="navbar-link">Login</a>
           {% endif %}
-        </ul>
+        </p>
+        {% if account_picture %}
+          <p class="nav navbar-right" id="account-picture-nav">
+            <img src="{{account_picture}}" width="30" height="30">
+          </p>
+        {% endif %}
       </div>
     </div>
 

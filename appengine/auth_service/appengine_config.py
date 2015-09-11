@@ -7,6 +7,12 @@
 https://developers.google.com/appengine/docs/python/tools/appengineconfig
 """
 
+from components import utils
+
+# OpenID requires real accounts, it's not convenient on dev server, especially
+# for smoke tests.
+components_auth_USE_OPENID = not utils.is_local_dev_server()
+
 # Auth component UI is tweaked manually, see handlers_frontend.py.
 components_auth_UI_CUSTOM_CONFIG = True
 

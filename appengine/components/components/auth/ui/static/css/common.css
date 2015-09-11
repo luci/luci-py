@@ -12,6 +12,20 @@ body {
   margin-bottom: 20px;
 }
 
+#account-picture-nav {
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+#account-picture-nav img {
+  border-radius: 6px;
+}
+
+#account-text-nav {
+  margin-left: 8px;
+  margin-right: 0px;
+}
+
 #progress-spinner.spinning {
   background: url(/auth/static/img/gear.gif) no-repeat right center;
   padding-right: 25px;
