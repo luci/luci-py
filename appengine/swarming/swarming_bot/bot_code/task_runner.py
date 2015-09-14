@@ -87,7 +87,7 @@ def download_data(work_dir, files):
       zip_file.extractall(work_dir)
 
 
-def get_isolated_cmd(task_details, isolated_result):
+def get_isolated_cmd(work_dir, task_details, isolated_result):
   """Returns the command to call run_isolated. Mocked in tests."""
   cmd = [
     sys.executable, THIS_FILE, 'run_isolated',
@@ -95,6 +95,7 @@ def get_isolated_cmd(task_details, isolated_result):
     '--namespace', task_details.inputs_ref['namespace'].encode('utf-8'),
     '-I', task_details.inputs_ref['isolatedserver'].encode('utf-8'),
     '--json', isolated_result,
+    '--log-file', os.path.join(os.path.dirname(work_dir), 'run_isolated.log'),
   ]
   if task_details.extra_args:
     cmd.append('--')
@@ -292,7 +293,7 @@ def run_command(
   else:
     # Isolated task.
     isolated_result = os.path.join(work_dir, 'isolated_result.json')
-    cmd = get_isolated_cmd(task_details, isolated_result)
+    cmd = get_isolated_cmd(work_dir, task_details, isolated_result)
 
   try:
     # TODO(maruel): Support both channels independently and display stderr in
@@ -301,6 +302,8 @@ def run_command(
     if task_details.env:
       env = os.environ.copy()
       env.update(task_details.env)
+    logging.info('cmd=%s', cmd)
+    logging.info('env=%s', env)
     try:
       proc = subprocess42.Popen(
           cmd,

@@ -95,17 +95,11 @@ def task_request_to_rpc(entity):
     inputs_ref = _ndb_to_rpc(
         swarming_rpcs.FilesRef, entity.properties.inputs_ref)
   props = entity.properties
-  # Work around bugs in the entities.
-  # TODO(maruel): Run a map reduce to remove these entities.
-  extra_args = props.extra_args or []
-  if extra_args == [None]:
-    extra_args = []
   properties = _ndb_to_rpc(
       swarming_rpcs.TaskProperties,
       props,
       command=(props.commands or [[]])[0],
       dimensions=_string_pairs_from_dict(props.dimensions),
-      extra_args=extra_args,
       env=_string_pairs_from_dict(props.env),
       inputs_ref=inputs_ref)
 
