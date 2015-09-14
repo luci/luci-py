@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import datetime
+import logging
 import sys
 import unittest
 import urlparse
@@ -12,6 +13,7 @@ from test_support import test_env
 test_env.setup_test_env()
 
 from google.appengine.api import app_identity
+from google.appengine.ext import ndb
 
 from components.auth import api
 from components.auth import openid
@@ -23,6 +25,7 @@ class OpenIDTest(test_case.TestCase):
     super(OpenIDTest, self).setUp()
     self.mock_now(datetime.datetime(2015, 1, 1, 1, 1, 1, 1))
     self.mock(api, 'get_secret', lambda _s: 'sekret')
+    self.mock(logging, 'warning', lambda *_: None)
 
   def test_get_config(self):
     self.mock(app_identity, 'get_default_version_hostname', lambda: 'localhost')
@@ -120,6 +123,77 @@ class OpenIDTest(test_case.TestCase):
     self.assertEqual(
         'http://local/auth/openid/login?r=%2Fabc%2Fdef%3Fx%3D1%26y%3D2',
         openid.create_login_url(R(), '/abc/def?x=1&y=2'))
+
+  def test_make_session(self):
+    session = openid.make_session({
+      'email': u'email',
+      'name': u'name',
+      'picture': u'picture',
+      'sub': u'user-id',
+    }, expiration_sec=3600)
+    self.assertEqual(
+        ndb.Key(openid.AuthOpenIDUser, 'user-id', openid.AuthOpenIDSession, 1),
+        session.key)
+    self.assertEqual({
+      'closed_ts': None,
+      'created_ts': datetime.datetime(2015, 1, 1, 1, 1, 1, 1),
+      'email': u'email',
+      'expiration_ts': datetime.datetime(2015, 1, 1, 2, 1, 1, 1),
+      'is_open': True,
+      'name': u'name',
+      'picture': u'picture',
+    }, session.to_dict())
+
+    session_cookie = openid.make_session_cookie(session)
+    self.assertEqual(
+      'AXsiX2kiOiIxNDIwMDc0MDYxMDAwIiwic3MiOiJcdTAwMDFcdTAwMDBcdTAwMDBcdTAwMDBc'
+      'dTAwMDBcdTAwMDBcdTAwMDBcdTAwMDAiLCJzdWIiOiJ1c2VyLWlkIn1rVeAKbNE4fNP12wu8'
+      'icMZ88LQqyP2oQ7s_Kab_SsZGQ', session_cookie)
+
+  def test_get_open_session_ok(self):
+    session = openid.make_session({
+      'email': u'email',
+      'name': u'name',
+      'picture': u'picture',
+      'sub': u'user-id',
+    }, expiration_sec=3600)
+    session_cookie = openid.make_session_cookie(session)
+    self.assertEqual(session, openid.get_open_session(session_cookie))
+
+  def test_get_open_session_bad_cookie(self):
+    session = openid.make_session({
+      'email': u'email',
+      'name': u'name',
+      'picture': u'picture',
+      'sub': u'user-id',
+    }, expiration_sec=3600)
+    session_cookie = openid.make_session_cookie(session)
+    self.assertIsNone(openid.get_open_session(session_cookie+'blah'))
+    self.assertIsNone(openid.get_open_session(None))
+    session.key.delete()
+    self.assertIsNone(openid.get_open_session(session_cookie))
+
+  def test_session_expiration(self):
+    session = openid.make_session({
+      'email': u'email',
+      'name': u'name',
+      'picture': u'picture',
+      'sub': u'user-id',
+    }, expiration_sec=3600)
+    session_cookie = openid.make_session_cookie(session)
+    self.mock_now(datetime.datetime(2015, 1, 2, 1, 1, 1, 1))
+    self.assertIsNone(openid.get_open_session(session_cookie))
+
+  def test_session_close(self):
+    session = openid.make_session({
+      'email': u'email',
+      'name': u'name',
+      'picture': u'picture',
+      'sub': u'user-id',
+    }, expiration_sec=3600)
+    session_cookie = openid.make_session_cookie(session)
+    openid.close_session(session_cookie)
+    self.assertIsNone(openid.get_open_session(session_cookie))
 
 
 if __name__ == '__main__':

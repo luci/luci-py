@@ -13,6 +13,7 @@ import collections
 import datetime
 import json
 import logging
+import struct
 import urllib
 import urlparse
 
@@ -28,6 +29,11 @@ from components import utils
 
 from . import api
 from . import tokens
+
+
+# TODO(vadimsh): Grab refresh_token, periodically check that it is valid, revoke
+# sessions that use that token if it gets revoked. That way a user can remotely
+# revoked all session by revoking the token via Google Accounts page.
 
 
 ### Low level API implementing OpenID protocol steps.
@@ -227,15 +233,15 @@ def _fetch_json(method, url, payload=None, headers=None):
 ### API (and implementation) similar (though not identical) to Users API.
 
 
-# Cookie that holds HMAC-protected id of AuthOpenIDUser for logged in user.
-COOKIE_NAME = 'oid_user_id'
+# Cookie that holds HMAC-protected key of AuthOpenIDSession of logged in user.
+COOKIE_NAME = 'oid_session'
 
 
-class AuthOpenIDUser(ndb.Model):
-  """Holds profile information of some user.
+class _AuthOpenIDUserInfo(ndb.Model):
+  """User profile info.
 
-  Root entity. ID is 'sub' string of UserInfo response (string with unique
-  account id). Created or refreshed on sign in.
+  Must not be materialized directly in the datastore, only used as a base class
+  for AuthOpenIDUser and AuthOpenIDSession.
   """
   # Latest known email.
   email = ndb.StringProperty()
@@ -243,6 +249,38 @@ class AuthOpenIDUser(ndb.Model):
   name = ndb.StringProperty(indexed=False)
   # Latest known profile picture URL.
   picture = ndb.StringProperty(indexed=False)
+
+
+class AuthOpenIDUser(_AuthOpenIDUserInfo):
+  """Holds profile information of some user.
+
+  Root entity. ID is 'sub' string of UserInfo response (string with unique
+  account id). Created or refreshed on sign in.
+  """
+  # When the user signed in the last time (went through the login flow).
+  last_session_ts = ndb.DateTimeProperty()
+
+
+class AuthOpenIDSession(_AuthOpenIDUserInfo):
+  """A session associated with a session cookie.
+
+  Parent entity is AuthOpenIDUser. ID is random string.
+
+  Includes user profile info inline to avoid additional datastore call to
+  fetch it from AuthOpenIDUser in get_current_user().
+
+  Never deleted from the datastore (to keep some sort of history of logins).
+  Marked as closed on logout.
+  """
+  # When the session was created. Must be set.
+  created_ts = ndb.DateTimeProperty(indexed=False)
+  # When the session expires. Must be set.
+  expiration_ts = ndb.DateTimeProperty(indexed=False)
+  # When the session was closed (user used logout link). If set, the session
+  # is no longer usable.
+  closed_ts = ndb.DateTimeProperty(indexed=False)
+  # Used for indexing, since querying on != None is difficult.
+  is_open = ndb.ComputedProperty(lambda self: self.closed_ts is None)
 
 
 class UserProfile(object):
@@ -265,10 +303,10 @@ class UserProfile(object):
     self.picture = picture
 
 
-class UserIdCookie(tokens.TokenKind):
-  """Used to HMAC-tag 'oid_user_id' authentication cookie."""
+class SessionCookie(tokens.TokenKind):
+  """Used to HMAC-tag 'oid_session' authentication cookie."""
   expiration_sec = 30 * 24 * 3600
-  secret_key = api.SecretKey('oid_user_profile_cookie', scope='local')
+  secret_key = api.SecretKey('oid_session_cookie', scope='local')
   version = 1
 
 
@@ -300,6 +338,7 @@ class LogoutHandler(webapp2.RequestHandler):
       dest_url = normalize_dest_url(self.request.host_url, dest_url)
     except ValueError as e:
       self.abort(400, detail='Bad redirect URL: %s' % e)
+    close_session(self.request.cookies.get(COOKIE_NAME))
     self.response.delete_cookie(COOKIE_NAME)
     nuke_gae_cookies(self.response)
     self.redirect(dest_url)
@@ -367,23 +406,18 @@ class CallbackHandler(webapp2.RequestHandler):
     # https://cloud.google.com/appengine/docs/python/images
     if pic and pic.endswith('/photo.jpg'):
       pic = pic.rstrip('/photo.jpg') + '/s64/photo.jpg'
+    userinfo['picture'] = pic
 
-    # Refresh datastore entry for logged in user.
-    sub = userinfo['sub'].encode('ascii')
-    AuthOpenIDUser(
-        id=sub,
-        email=userinfo['email'],
-        name=userinfo['name'],
-        picture=pic).put()
+    # Close previous session (if any), create a new one.
+    close_session(self.request.cookies.get(COOKIE_NAME))
+    session = make_session(userinfo, SessionCookie.expiration_sec)
 
-    # Make cookie expire a bit earlier than the token itself, to avoid
-    # "bad token" errors in most common case.
-    expires = utils.utcnow() + datetime.timedelta(
-        seconds=UserIdCookie.expiration_sec-1800)
+    # Make cookie expire a bit earlier than the the session, to avoid
+    # "bad token" due to minor clock drifts between the server and the client.
     self.response.set_cookie(
         key=COOKIE_NAME,
-        value=UserIdCookie.generate(embedded={'sub': sub}),
-        expires=expires,
+        value=make_session_cookie(session),
+        expires=session.expiration_ts - datetime.timedelta(seconds=300),
         secure=not utils.is_local_dev_server(),
         httponly=True)
 
@@ -409,6 +443,101 @@ def nuke_gae_cookies(response):
   response.delete_cookie('SACSID')
   if utils.is_local_dev_server():
     response.delete_cookie('dev_appserver_login')
+
+
+def make_session(userinfo, expiration_sec):
+  """Creates new AuthOpenIDSession (and AuthOpenIDUser if needed) entities.
+
+  Args:
+    userinfo: user profile dict as returned by handle_authorization_code.
+    expiration_sec: how long (in seconds) the session if allowed to live.
+
+  Returns:
+    AuthOpenIDSession already persisted in the datastore.
+  """
+  now = utils.utcnow()
+
+  # Refresh datastore entry for logged in user.
+  user = AuthOpenIDUser(
+      id=userinfo['sub'].encode('ascii'),
+      last_session_ts=now,
+      email=userinfo['email'],
+      name=userinfo['name'],
+      picture=userinfo['picture'])
+
+  # Create a new session that expires at the same time when cookie signature
+  # expires. ID is autogenerated by the datastore.
+  session = AuthOpenIDSession(
+      parent=user.key,
+      created_ts=now,
+      expiration_ts=now + datetime.timedelta(seconds=expiration_sec),
+      email=user.email,
+      name=user.name,
+      picture=user.picture)
+
+  ndb.transaction(lambda: ndb.put_multi([user, session]))
+  assert session.key.integer_id()
+  return session
+
+
+def make_session_cookie(session):
+  """Given AuthOpenIDSession entity returns value of 'oid_session' cookie.
+
+  The session ID is tagged by HMAC to prevent tampering.
+  """
+  return SessionCookie.generate(embedded={
+    'sub': session.key.parent().id(),
+    'ss': struct.pack('<q', session.key.integer_id()),
+  })
+
+
+def get_open_session(cookie):
+  """Returns AuthOpenIDSession if it exists and still open.
+
+  Args:
+    cookie: value of 'oid_session' cookie.
+
+  Returns:
+    AuthOpenIDSession if cookie is valid and session has not expired yet.
+  """
+  if not cookie:
+    return None
+  try:
+    decoded = SessionCookie.validate(cookie)
+  except tokens.InvalidTokenError as e:
+    logging.warning('Bad session cookie: %s', e)
+    return None
+  try:
+    session_id = struct.unpack('<q', decoded['ss'])[0]
+  except struct.error as exc:
+    logging.warning(
+        'Bad session cookie, bad \'ss\' field %r: %s', decoded['ss'], exc)
+    return None
+  # Relying on ndb in-process cache here to avoid refetches from datastore.
+  session = ndb.Key(
+      AuthOpenIDUser, decoded['sub'], AuthOpenIDSession, session_id).get()
+  if not session:
+    logging.warning('Requesting non-existing session: %r', decoded)
+    return None
+  # Already closed or expired?
+  if session.closed_ts is not None or utils.utcnow() > session.expiration_ts:
+    return None
+  return session
+
+
+def close_session(cookie):
+  """Closes AuthOpenIDSession if it is open, making it unusable.
+
+  Args:
+    cookie: value of 'oid_session' cookie.
+  """
+  # Do not care about transactionality here, a race condition when closing
+  # a session is harmless and the session entity is not otherwise updated
+  # anywhere.
+  session = get_open_session(cookie)
+  if session:
+    session.closed_ts = utils.utcnow()
+    session.put()
 
 
 def normalize_dest_url(host_url, dest_url):
@@ -437,22 +566,14 @@ def get_current_user(request):
   """
   assert not ndb.in_transaction(), (
       'Do not call get_current_user() in a transaction')
-  cookie = request.cookies.get(COOKIE_NAME)
-  if not cookie:
-    return None
-  try:
-    decoded = UserIdCookie.validate(cookie)
-  except tokens.InvalidTokenError as e:
-    return None
-  # Relying on ndb in-process cache here to avoid refetches from datastore.
-  e = AuthOpenIDUser.get_by_id(decoded['sub'])
-  if not e:
+  session = get_open_session(request.cookies.get(COOKIE_NAME))
+  if not session:
     return None
   return UserProfile(
-      sub=decoded['sub'],
-      email=e.email,
-      name=e.name,
-      picture=e.picture.encode('ascii') if e.picture else None)
+      sub=session.key.parent().id(),
+      email=session.email,
+      name=session.name,
+      picture=session.picture.encode('ascii') if session.picture else None)
 
 
 def create_login_url(request, dest_url):
