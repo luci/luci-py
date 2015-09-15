@@ -118,37 +118,6 @@ def _write(filepath, content):
     return False
 
 
-def _get_cost_hour_gce():
-  """Returns the $USD/hour of using this bot if applicable."""
-  # Machine.
-  machine_type = get_machine_type_gce()
-  if get_zone_gce().startswith('us-'):
-    machine_cost = GCE_MACHINE_COST_HOUR_US[machine_type]
-  else:
-    machine_cost = GCE_MACHINE_COST_HOUR_EUROPE_ASIA[machine_type]
-
-  # OS.
-  os_cost = 0.
-  if sys.platform == 'win32':
-    # Assume Windows Server.
-    if machine_type in ('f1-micro', 'g1-small'):
-      os_cost = 0.02
-    else:
-      os_cost = GCE_WINDOWS_COST_CORE_HOUR * get_num_processors()
-
-  # Disk.
-  # TODO(maruel): Figure out the disk type. The metadata is not useful AFAIK.
-  disk_gb_cost = 0.
-  for disk in get_disks_info().itervalues():
-    disk_gb_cost += disk['free_mb'] / 1024. * (
-        GCE_HDD_GB_COST_MONTH / 30. / 24.)
-
-  # TODO(maruel): Network. It's not a constant cost, it's per task.
-  # See https://cloud.google.com/monitoring/api/metrics
-  # compute.googleapis.com/instance/network/sent_bytes_count
-  return machine_cost + os_cost + disk_gb_cost
-
-
 def _safe_read(filepath):
   """Returns the content of the file if possible, None otherwise."""
   try:
@@ -410,27 +379,40 @@ def get_monitor_hidpi():
 @tools.cached
 def get_cost_hour():
   """Returns the cost in $USD/h as a floating point value if applicable."""
+  # Machine.
+  machine_type = get_machine_type()
   if platforms.is_gce():
-    return _get_cost_hour_gce()
+    if platforms.gce.get_zone().startswith('us-'):
+      machine_cost = GCE_MACHINE_COST_HOUR_US[machine_type]
+    else:
+      machine_cost = GCE_MACHINE_COST_HOUR_EUROPE_ASIA[machine_type]
+  else:
+    # Guess an equivalent machine_type.
+    machine_cost = GCE_MACHINE_COST_HOUR_US.get(machine_type, 0.)
 
-  # Get an approximate cost trying to emulate GCE equivalent cost.
-  cores = get_num_processors()
+  # OS.
   os_cost = 0.
   if sys.platform == 'darwin':
-      # Apple tax. It's 50% better, right?
-      os_cost = GCE_WINDOWS_COST_CORE_HOUR * 1.5 * cores
+    # Apple tax. It's 50% better, right?
+    os_cost = GCE_WINDOWS_COST_CORE_HOUR * 1.5 * get_num_processors()
   elif sys.platform == 'win32':
-      # MS tax.
-      os_cost = GCE_WINDOWS_COST_CORE_HOUR * cores
+    # MS tax.
+    if machine_type in ('f1-micro', 'g1-small'):
+      os_cost = 0.02
+    else:
+      os_cost = GCE_WINDOWS_COST_CORE_HOUR * get_num_processors()
 
-  # Guess an equivalent machine_type.
-  machine_cost = GCE_MACHINE_COST_HOUR_US.get(get_machine_type(), 0.)
-
+  # Disk.
+  # TODO(maruel): Figure out the disk type. The metadata is not useful AFAIK.
   # Assume HDD for now, it's the cheapest. That's not true, we do have SSDs.
   disk_gb_cost = 0.
   for disk in get_disks_info().itervalues():
-      disk_gb_cost += disk['free_mb'] / 1024. * (
-          GCE_HDD_GB_COST_MONTH / 30. / 24.)
+    disk_gb_cost += disk['free_mb'] / 1024. * (
+        GCE_HDD_GB_COST_MONTH / 30. / 24.)
+
+  # TODO(maruel): Network. It's not a constant cost, it's per task.
+  # See https://cloud.google.com/monitoring/api/metrics
+  # compute.googleapis.com/instance/network/sent_bytes_count
   return machine_cost + os_cost + disk_gb_cost
 
 
@@ -442,7 +424,7 @@ def get_machine_type():
   'closest' one.
   """
   if platforms.is_gce():
-    return get_machine_type_gce()
+    return platforms.gce.get_machine_type()
 
   ram_gb = get_physical_ram() / 1024.
   cores = get_num_processors()
@@ -491,103 +473,10 @@ def can_send_metric():
 
 def send_metric(name, value):
   if platforms.is_gce():
-    return send_metric_gce(name, value)
+    return platforms.gce.send_metric(name, value)
   # Ignore on other platforms for now.
 
 
-### Google Cloud Compute Engine.
-
-
-@tools.cached
-def get_zone_gce():
-  """Returns the zone containing the GCE VM."""
-  if not platforms.is_gce():
-    return None
-  # Format is projects/<id>/zones/<zone>
-  metadata = platforms.gce.get_metadata()
-  return unicode(metadata['instance']['zone'].rsplit('/', 1)[-1])
-
-
-@tools.cached
-def get_machine_type_gce():
-  """Returns the GCE machine type."""
-  if not platforms.is_gce():
-    return None
-  # Format is projects/<id>/machineTypes/<machine_type>
-  metadata = platforms.gce.get_metadata()
-  return unicode(metadata['instance']['machineType'].rsplit('/', 1)[-1])
-
-
-@tools.cached
-def get_tags_gce():
-  """Returns a list of instance tags or empty list if not GCE VM."""
-  if not platforms.is_gce():
-    return []
-  return platforms.gce.get_metadata()['instance']['tags']
-
-
-def send_metric_gce(name, value):
-  """Sets a lightweight custom metric.
-
-  In particular, the metric has no description and it is double. To make this
-  work, use "--scopes https://www.googleapis.com/auth/monitoring" when running
-  "gcloud compute instances create". You can verify if the scope is enabled from
-  within a GCE VM with:
-    curl "http://metadata.google.internal/computeMetadata/v1/instance/\
-service-accounts/default/scopes" -H "Metadata-Flavor: Google"
-
-  Ref: https://cloud.google.com/monitoring/custom-metrics/lightweight
-
-  To create a metric, use:
-  https://developers.google.com/apis-explorer/#p/cloudmonitoring/v2beta2/cloudmonitoring.metricDescriptors.create
-  It is important to set the commonLabels.
-  """
-  logging.info('send_metric_gce(%s, %s)', name, value)
-  assert isinstance(name, str), repr(name)
-  assert isinstance(value, float), repr(value)
-
-  metadata = platforms.gce.get_metadata()
-  project_id = metadata['project']['numericProjectId']
-
-  url = (
-    'https://www.googleapis.com/cloudmonitoring/v2beta2/projects/%s/'
-    'timeseries:write') % project_id
-  now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-  body = {
-    'commonLabels': {
-      'cloud.googleapis.com/service': 'compute.googleapis.com',
-      'cloud.googleapis.com/location': get_zone_gce(),
-      'compute.googleapis.com/resource_type': 'instance',
-      'compute.googleapis.com/resource_id': metadata['instance']['id'],
-    },
-    'timeseries': [
-      {
-        'timeseriesDesc': {
-          'metric': 'custom.cloudmonitoring.googleapis.com/' + name,
-          'project': project_id,
-        },
-        'point': {
-          'start': now,
-          'end': now,
-          'doubleValue': value,
-        },
-      },
-    ],
-  }
-  headers = {
-    'Authorization': 'Bearer ' + platforms.gce.oauth2_access_token(),
-    'Content-Type': 'application/json',
-  }
-  logging.info('%s', json.dumps(body, indent=2, sort_keys=True))
-  try:
-    resp = urllib2.urlopen(urllib2.Request(url, json.dumps(body), headers))
-    # Result must be valid JSON. A sample response:
-    #   {"kind": "cloudmonitoring#writeTimeseriesResponse"}
-    logging.debug(json.load(resp))
-  except urllib2.HTTPError as e:
-    logging.error('send_metric failed: %s: %s' % (e, e.read()))
-  except IOError as e:
-    logging.error('send_metric failed: %s' % e)
 
 
 ### Windows.
@@ -862,9 +751,8 @@ def get_dimensions():
   machine_type = get_machine_type()
   if machine_type:
     dimensions[u'machine_type'] = [machine_type]
-  zone = get_zone_gce()
-  if zone:
-    dimensions[u'zone'] = [zone]
+  if platforms.is_gce():
+    dimensions[u'zone'] = [platforms.gce.get_zone()]
 
   if cpu_type.startswith(u'arm') and cpu_type != u'arm':
     dimensions[u'cpu'].append(u'arm')
