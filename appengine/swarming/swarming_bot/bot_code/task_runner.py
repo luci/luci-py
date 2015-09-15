@@ -412,10 +412,26 @@ def run_command(
     params['hard_timeout'] = had_hard_timeout
     if isolated_result:
       try:
+        # See run_isolated.py for the format.
         with open(isolated_result, 'rb') as f:
-          params['outputs_ref'] = json.load(f)
+          run_isolated_result = json.load(f)
+        logging.debug('run_isolated:\n%s', run_isolated_result)
+        # TODO(maruel): Grab statistics (cache hit rate, data downloaded,
+        # mapping time, etc) from run_isolated and push them to the server.
+        params['outputs_ref'] = run_isolated_result['outputs_ref']
+        if run_isolated_result['internal_failure']:
+          must_signal_internal_failure = run_isolated_result['internal_failure']
+          logging.error('%s', must_signal_internal_failure)
+        elif exit_code:
+          # TODO(maruel): Grab stdout from run_isolated.
+          must_signal_internal_failure = (
+              'run_isolated internal failure %d' % exit_code)
+          logging.error('%s', must_signal_internal_failure)
+        exit_code = run_isolated_result['exit_code']
       except (IOError, OSError, ValueError) as e:
-        logging.error('Swallowing error: %s' % e)
+        logging.error('Swallowing error: %s', e)
+    # TODO(maruel): Send the internal failure here instead of sending it through
+    # bot_main, this causes a race condition.
     post_update(swarming_server, params, exit_code, stdout, output_chunk_start)
     return {
       u'exit_code': exit_code,
