@@ -60,7 +60,8 @@ class LeaseRequestProcessorTest(test_case.TestCase):
             hostname='fake-host',
             os_family=rpc_messages.OSFamily.LINUX,
         ),
-        state=models.CatalogMachineEntryStates.AVAILABLE,
+        rpc_messages.Policies(),
+        models.CatalogMachineEntryStates.AVAILABLE,
     )
 
     self.app.get(

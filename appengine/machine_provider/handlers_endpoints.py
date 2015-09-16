@@ -155,6 +155,7 @@ class CatalogEndpoints(remote.Service):
       )
     models.CatalogMachineEntry.create_and_put(
         request.dimensions,
+        request.policies,
         models.CatalogMachineEntryStates.AVAILABLE,
     )
     return rpc_messages.CatalogManipulationResponse(
