@@ -15,11 +15,11 @@ from protorpc import protobuf
 from protorpc import remote
 
 from components import auth
+from components import pubsub
 from components.machine_provider import rpc_messages
 
 import acl
 import models
-import pubsub
 
 
 @auth.endpoints_api(name='catalog', version='v1')

@@ -11,10 +11,10 @@ import webapp2
 
 from components import decorators
 from components import net
+from components import pubsub
 from components.machine_provider import rpc_messages
 
 import models
-import pubsub
 
 
 def publish(topic, message, lease_id, machine_id):
