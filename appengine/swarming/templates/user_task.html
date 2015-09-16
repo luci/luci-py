@@ -168,14 +168,33 @@
         <td>Idempotent</td>
         <td>{{request.properties.idempotent}}</td>
       </tr>
-      <tr title="Actual command executed by the bot.">
-        <td>Commands</td>
-        <td>
-          {% for cmd in request.properties.commands %}
-          {{cmd|join(' ')}}<br>
-          {% endfor %}
-        </td>
-      </tr>
+      {% if request.properties.inputs_ref %}
+        <tr title="Inputs files">
+          <td>Isolated inputs</td>
+          <td>
+            <a
+              href="{{request.properties.inputs_ref.isolatedserver}}/browse?namespace={{request.properties.inputs_ref.namespace}}&hash={{request.properties.inputs_ref.isolated}}">
+              {{request.properties.inputs_ref.isolated}}
+            </a>
+          </td>
+        </tr>
+        <tr title="Extra arguments if applicable">
+          <td>Extra args</td>
+          <td>
+            {{request.properties.extra_args|join(' ')}}<br>
+          </td>
+        </tr>
+      {% else %}
+        {# Raw command #}
+        <tr title="Actual command executed by the bot.">
+          <td>Commands</td>
+          <td>
+            {% for cmd in request.properties.commands %}
+            {{cmd|join(' ')}}<br>
+            {% endfor %}
+          </td>
+        </tr>
+      {% endif %}
     </tbody>
   </table>
 </div>
@@ -303,6 +322,19 @@
       <tr title="Process exit code for each commands executed on the bot.">
         <td>Exit codes</td>
         <td>{{task.exit_codes}}</td>
+      </tr>
+      <tr title="Outputs files">
+        <td>Isolated outputs</td>
+        <td>
+          {% if task.outputs_ref %}
+            <a
+              href="{{task.outputs_ref.isolatedserver}}/browse?namespace={{task.outputs_ref.namespace}}&hash={{task.outputs_ref.isolated}}">
+              {{task.outputs_ref.isolated}}
+            </a>
+          {% else %}
+            &#8209;&#8209;
+          {% endif %}
+        </td>
       </tr>
       <tr title="Children tasks that were created by this task.">
         <td>Children tasks</td>
