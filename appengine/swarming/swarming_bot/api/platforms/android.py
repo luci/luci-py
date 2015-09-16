@@ -262,6 +262,37 @@ def close_devices(devices):
       device.Close()
 
 
+class CpuScalingGovernor(object):
+  """List of valid CPU scaling governor values."""
+  ON_DEMAND = 'ondemand'
+  PERFORMANCE = 'performance'
+  CONSERVATIVE = 'conservative'
+  POWER_SAVE = 'powersave'
+  USER_DEFINED = 'userspace'
+
+  @classmethod
+  def is_valid(cls, name):
+    return name in [getattr(cls, m) for m in dir(cls) if m[0].isupper()]
+
+
+def set_cpu_scaling_governor(cmd, governor):
+  """Sets the CPU scaling governor to the one specified."""
+  assert CpuScalingGovernor.is_valid(governor), governor
+  cmd.Shell(
+      'echo "%s">/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor' %
+      governor)
+
+
+def set_cpu_scaling(cmd, speed):
+  """Enforces strict CPU speed and disable the CPU scaling governor."""
+  assert isinstance(speed, int), speed
+  assert 10000 <= speed <= 10000000, speed
+  set_cpu_scaling_governor(cmd, CpuScalingGovernor.USER_DEFINED)
+  cmd.Shell(
+      'echo "%d">/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed' %
+      speed)
+
+
 def get_build_prop(cmd):
   """Returns the system properties for a device.
 
@@ -330,6 +361,7 @@ def get_cpu_scale(cmd):
     'cpuinfo_max_freq': u'max',
     'cpuinfo_min_freq': u'min',
     'scaling_cur_freq': u'cur',
+    'scaling_governor': u'governor',
   }
   return {
     v: cmd.Shell('cat /sys/devices/system/cpu/cpu0/cpufreq/' + k)
