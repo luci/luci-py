@@ -15,3 +15,4 @@ Local Modifications:
   - Remove dependency on gflags and M2Crypto
   - Fix a bug.
   - Rename import path of libusb1 for easier packaging.
+  - Bring support for Ubuntu 12.04.

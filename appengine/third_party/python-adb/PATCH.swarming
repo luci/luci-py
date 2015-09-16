@@ -87,6 +87,23 @@
  
  import usb_exceptions
  
+@@ -134,7 +134,15 @@ class UsbHandle(object):
+ 
+   @property
+   def port_path(self):
+-    return [self._device.getBusNumber()] + self._device.getPortNumberList()
++    out = [self._device.getBusNumber()]
++    try:
++      out.extend(self._device.getPortNumberList())
++    except AttributeError:
++      # Temporary issue on Precise. Remove once we do not support 12.04
++      # anymore.
++      # https://crbug.com/532357
++      out.append(self._device.getDeviceAddress())
++    return out
+ 
+   def Close(self):
+     if self._handle is None:
 --- a/adb/filesync_protocol.py
 +++ b/adb/filesync_protocol.py
 @@ -22,7 +22,7 @@ import stat
