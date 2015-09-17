@@ -32,6 +32,7 @@ import common
 import xsrf_client
 from api import bot
 from api import os_utilities
+from utils import file_path
 from utils import net
 from utils import on_error
 from utils import subprocess42
@@ -393,13 +394,8 @@ def run_manifest(botobj, manifest, start):
   failure = False
   internal_failure = False
   msg = None
+  work_dir = os.path.join(botobj.base_dir, 'work')
   try:
-    # We currently do not clean up the 'work' directory now is it compartmented.
-    # TODO(maruel): Compartmentation should be done via tag. It is important to
-    # not be too aggressive about deletion because running a task with a warm
-    # cache has important performance benefit.
-    # https://code.google.com/p/swarming/issues/detail?id=149
-    work_dir = os.path.join(botobj.base_dir, 'work')
     if not os.path.isdir(work_dir):
       os.makedirs(work_dir)
 
@@ -476,6 +472,11 @@ def run_manifest(botobj, manifest, start):
     call_hook(
         botobj, 'on_after_task', failure, internal_failure, task_dimensions,
         task_result)
+    if os.path.isdir(work_dir):
+      try:
+        file_path.rmtree(work_dir)
+      except Exception as e:
+        botobj.post_error('Failed to delete work directory: %s' % e)
 
 
 def update_bot(botobj, version):
