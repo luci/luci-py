@@ -90,6 +90,8 @@ def download_data(work_dir, files):
 def get_isolated_cmd(work_dir, task_details, isolated_result):
   """Returns the command to call run_isolated. Mocked in tests."""
   bot_dir = os.path.dirname(work_dir)
+  if os.path.isfile(isolated_result):
+    os.remove(isolated_result)
   cmd = [
     sys.executable, THIS_FILE, 'run_isolated',
     '--isolated', task_details.inputs_ref['isolated'].encode('utf-8'),
@@ -98,6 +100,7 @@ def get_isolated_cmd(work_dir, task_details, isolated_result):
     '--json', isolated_result,
     '--log-file', os.path.join(bot_dir, 'logs', 'run_isolated.log'),
     '--cache', os.path.join(bot_dir, 'cache'),
+    '--root-dir', os.path.join(work_dir, 'isolated'),
   ]
   if task_details.extra_args:
     cmd.append('--')
@@ -432,6 +435,8 @@ def run_command(
         exit_code = run_isolated_result['exit_code']
       except (IOError, OSError, ValueError) as e:
         logging.error('Swallowing error: %s', e)
+        if not must_signal_internal_failure:
+          must_signal_internal_failure = str(e)
     # TODO(maruel): Send the internal failure here instead of sending it through
     # bot_main, this causes a race condition.
     post_update(swarming_server, params, exit_code, stdout, output_chunk_start)

@@ -396,6 +396,8 @@ def run_manifest(botobj, manifest, start):
   msg = None
   work_dir = os.path.join(botobj.base_dir, 'work')
   try:
+    if os.path.isdir(work_dir):
+      file_path.rmtree(work_dir)
     if not os.path.isdir(work_dir):
       os.makedirs(work_dir)
 
