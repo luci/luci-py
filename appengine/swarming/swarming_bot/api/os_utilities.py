@@ -766,7 +766,7 @@ def get_dimensions():
   return dimensions
 
 
-def get_state(threshold_mb=2*1024, skip=None):
+def get_state(threshold_mb=4*1024, skip=None):
   """Returns dict with a state of the bot reported to the server with each poll.
 
   Supposed to be use only for dynamic state that changes while bot is running.
@@ -814,7 +814,7 @@ def get_state(threshold_mb=2*1024, skip=None):
   return state
 
 
-def auto_quarantine_on_low_space(state, threshold_mb=2*1024, skip=None):
+def auto_quarantine_on_low_space(state, threshold_mb, skip=None):
   """Quarantines when less than threshold_mb on any partition.
 
   Modifies state in-place. Assumes state['free_disks'] is valid.
