@@ -423,7 +423,7 @@ def run_manifest(botobj, manifest, start):
     logging.debug('Running command: %s', command)
     # Put the output file into the current working directory, which should be
     # the one containing swarming_bot.zip.
-    with open('task_runner_stdout.log', 'wb') as f:
+    with open(os.path.join('logs', 'task_runner_stdout.log'), 'wb') as f:
       proc = subprocess42.Popen(
           command,
           detached=True,

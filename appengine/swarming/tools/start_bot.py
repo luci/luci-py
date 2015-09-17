@@ -44,7 +44,10 @@ class LocalBot(object):
     if sys.platform != 'win32':
       kwargs['preexec_fn'] = os.setsid
     if self._redirect:
-      with open(os.path.join(self._tmpdir, 'bot_config_stdout.log'), 'wb') as f:
+      logs = os.path.join(self._tmpdir, 'logs')
+      if not os.path.isdir(logs):
+        os.mkdir(logs)
+      with open(os.path.join(logs, 'bot_stdout.log'), 'wb') as f:
         self._proc = subprocess.Popen(
             cmd, cwd=self._tmpdir, stdout=f, env=env, stderr=f, **kwargs)
     else:
@@ -63,7 +66,7 @@ class LocalBot(object):
         pass
     exit_code = self._proc.returncode
     if self._tmpdir:
-      for i in sorted(glob.glob(os.path.join(self._tmpdir, '*.log'))):
+      for i in sorted(glob.glob(os.path.join(self._tmpdir, 'logs', '*.log'))):
         self._read_log(i)
       try:
         shutil.rmtree(self._tmpdir)

@@ -52,14 +52,14 @@ def CMDrun_isolated(args):
 
 def CMDtask_runner(args):
   """Internal command to run a swarming task."""
-  logging_utils.prepare_logging('task_runner.log')
+  logging_utils.prepare_logging(os.path.join('logs', 'task_runner.log'))
   from bot_code import task_runner
   return task_runner.main(args)
 
 
 def CMDstart_bot(args):
   """Starts the swarming bot."""
-  logging_utils.prepare_logging('swarming_bot.log')
+  logging_utils.prepare_logging(os.path.join('logs', 'swarming_bot.log'))
   logging_utils.set_console_level(logging.DEBUG)
   logging.info(
       'importing bot_main: %s, %s', THIS_FILE, zip_package.generate_version())
@@ -72,7 +72,7 @@ def CMDstart_bot(args):
 def CMDstart_slave(args):
   """Ill named command that actually sets up the bot then start it."""
   # TODO(maruel): Rename function.
-  logging_utils.prepare_logging('bot_config.log')
+  logging_utils.prepare_logging(os.path.join('logs', 'bot_config.log'))
   logging_utils.set_console_level(logging.DEBUG)
 
   parser = optparse.OptionParser()
@@ -113,6 +113,9 @@ def main():
   # Always make the current working directory the directory containing this
   # file. It simplifies assumptions.
   os.chdir(os.path.dirname(THIS_FILE))
+  # Always create the logs dir first thing, before printing anything out.
+  if not os.path.isdir('logs'):
+    os.mkdir('logs')
 
   # This is necessary so os.path.join() works with unicode path. No kidding.
   # This must be done here as each of the command take wildly different code

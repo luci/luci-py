@@ -89,13 +89,15 @@ def download_data(work_dir, files):
 
 def get_isolated_cmd(work_dir, task_details, isolated_result):
   """Returns the command to call run_isolated. Mocked in tests."""
+  bot_dir = os.path.dirname(work_dir)
   cmd = [
     sys.executable, THIS_FILE, 'run_isolated',
     '--isolated', task_details.inputs_ref['isolated'].encode('utf-8'),
     '--namespace', task_details.inputs_ref['namespace'].encode('utf-8'),
     '-I', task_details.inputs_ref['isolatedserver'].encode('utf-8'),
     '--json', isolated_result,
-    '--log-file', os.path.join(os.path.dirname(work_dir), 'run_isolated.log'),
+    '--log-file', os.path.join(bot_dir, 'logs', 'run_isolated.log'),
+    '--cache', os.path.join(bot_dir, 'cache'),
   ]
   if task_details.extra_args:
     cmd.append('--')

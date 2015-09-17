@@ -880,7 +880,8 @@ def setup_auto_startup_win(command, cwd, batch_name):
       '@echo off\r\n'
       ':: This file was generated automatically by os_platforms.py.\r\n'
       'cd /d %s\r\n'
-      '%s 1>> swarming_bot_out.log 2>&1\r\n') % (cwd, ' '.join(command))
+      'mkdir logs\n\n'
+      '%s 1>> logs\\bot_stdout.log 2>&1\r\n') % (cwd, ' '.join(command))
   success = _write(batch_path, content)
   if success and sys.platform == 'cygwin':
     # For some reason, cygwin tends to create the file with 0644.

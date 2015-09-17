@@ -46,8 +46,8 @@ def generate_launchd_plist(command, cwd, plistname):
   escaped_plist = cgi.escape(plistname)
   entries = [
     '<key>Label</key><string>%s</string>' % escaped_plist,
-    '<key>StandardOutPath</key><string>%s.log</string>' % escaped_plist,
-    '<key>StandardErrorPath</key><string>%s-err.log</string>' % escaped_plist,
+    '<key>StandardOutPath</key><string>logs/bot_stdout.log</string>',
+    '<key>StandardErrorPath</key><string>logs/bot_stderr.log</string>',
     '<key>LimitLoadToSessionType</key><array><string>Aqua</string></array>',
     '<key>RunAtLoad</key><true/>',
     '<key>Umask</key><integer>18</integer>',
