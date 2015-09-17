@@ -347,6 +347,10 @@ class _TaskResultCommon(ndb.Model):
     return self.completed_ts or self.abandoned_ts
 
   @property
+  def exit_code(self):
+    return self.exit_codes[0] if self.exit_codes else None
+
+  @property
   def is_pending(self):
     """Returns True if the task is still pending. Mostly for html view."""
     return self.state == State.PENDING
