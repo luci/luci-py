@@ -8,11 +8,14 @@ import json
 import logging
 
 from google.appengine.api import app_identity
+from google.appengine.ext import ndb
 import webapp2
 
 from components import decorators
 from components import gce
 from components import machine_provider
+
+import models
 
 
 # TODO(smut): Make this modifiable at runtime (keep in datastore).
@@ -96,6 +99,29 @@ class InstanceTemplateProcessor(webapp2.RequestHandler):
         logging.info('Instance group manager already exists: %s', template_name)
 
 
+@ndb.transactional
+def create_instance_group(name, dimensions, policies, members):
+  """Stores an InstanceGroup and Instance entities in the datastore.
+
+  Transactionally operates on model.Instance entities which share a common
+  ancestor model.InstanceGroup (which is the root entity operated on).
+
+  Args:
+    name: Name of this instance group.
+    dimensions: rpc_messages.Dimensions describing members of this instance
+      group.
+    policies: rpc_messages.Policies governing members of this instance group.
+    members: List of models.Instances representing members of this instance
+      group.
+  """
+  member_names = []
+  for instance in members:
+    member_names.append(instance.name)
+    instance.key = instance.generate_key(instance.name, name)
+  ndb.put_multi(members)
+  models.InstanceGroup.create_and_put(name, dimensions, policies, member_names)
+
+
 class InstanceProcessor(webapp2.RequestHandler):
   """Worker for processing instances."""
 
@@ -109,6 +135,7 @@ class InstanceProcessor(webapp2.RequestHandler):
 
     requests = []
 
+    # TODO(smut): Process instance group managers concurrently with a taskqueue.
     # For each group manager, tell the Machine Provider about its instances.
     for manager_name, manager in managers.iteritems():
       logging.info('Processing instance group manager: %s', manager_name)
@@ -126,8 +153,10 @@ class InstanceProcessor(webapp2.RequestHandler):
       ][0])
 
       instances = api.get_managed_instances(manager_name, ZONE)
+      members = []
       for instance_name, instance in instances.iteritems():
         logging.info('Processing instance: %s', instance_name)
+        members.append(models.Instance(name=instance_name, group=manager_name))
         if instance['instanceStatus'] == 'RUNNING':
           requests.append(
               machine_provider.CatalogMachineAdditionRequest(
@@ -145,7 +174,21 @@ class InstanceProcessor(webapp2.RequestHandler):
                   ),
               )
           )
+          members[-1].state = models.InstanceStates.CATALOGED
+        else:
+          members[-1].state = models.InstanceStates.UNCATALOGED
           # TODO(smut): Static IP assignment.
+
+      dimensions = machine_provider.Dimensions(
+          backend=machine_provider.Backend.GCE,
+          disk_gb=disk_gb,
+          memory_gb=memory_gb,
+          num_cpus=num_cpus,
+          os_family=os_family,
+      )
+      policies = machine_provider.Policies(
+          on_reclamation=machine_provider.MachineReclamationPolicy.DELETE)
+      create_instance_group(manager_name, dimensions, policies, members)
 
     machine_provider.add_machines(requests)
 
