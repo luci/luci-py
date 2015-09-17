@@ -195,8 +195,18 @@ def get_devices():
 
     try:
       handle.Open()
-    except adb.common.usb1.USBErrorBusy:
-      logging.warning('Got USBErrorBusy for %s. Killing adb', handle.usb_info)
+    except adb.common.usb1.USBErrorNoDevice as e:
+      logging.warning(
+          'Got USBErrorNoDevice for %s: %s', handle.usb_info, e)
+      # Do not kill adb, it just means the USB host is likely resetting and the
+      # device is temporarily unavailable.We can't use handle.serial_number
+      # since this communicates with the device.
+      # TODO(maruel): In practice we'd like to retry for a few seconds.
+      cmds[handle.port_path] = None
+      continue
+    except adb.common.usb1.USBErrorBusy as e:
+      logging.warning(
+          'Got USBErrorBusy for %s. Killing adb: %s', handle.usb_info, e)
       kill_adb()
       try:
         # If it throws again, it probably means another process
