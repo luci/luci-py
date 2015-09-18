@@ -313,6 +313,15 @@ def run_bot(arg_error):
     # This environment variable is accessible to the tasks executed by this bot.
     os.environ['SWARMING_BOT_ID'] = botobj.id.encode('utf-8')
 
+    # Remove the 'work' directory if present, as not removing it may cause the
+    # bot to stay quarantined and not be able to get out of this state.
+    work_dir = os.path.join(botobj.base_dir, 'work')
+    try:
+      if os.path.isdir(work_dir):
+        file_path.rmtree(work_dir)
+    except Exception as e:
+      botobj.post_error('Failed to remove work: %s' % e)
+
     # TODO(maruel): Run 'health check' on startup.
     # https://code.google.com/p/swarming/issues/detail?id=112
     consecutive_sleeps = 0
