@@ -35,7 +35,8 @@ def exec_python(args):
       # Always send SIGTERM, which is properly translated.
       proc.send_signal(signal.SIGTERM)
 
-    with subprocess42.set_signal_handler([signal.SIGBREAK], handler):
+    sig = signal.SIGBREAK if sys.platform == 'win32' else signal.SIGTERM
+    with subprocess42.set_signal_handler([sig], handler):
       proc.wait()
       return proc.returncode
   except Exception as e:
