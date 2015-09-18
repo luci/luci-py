@@ -21,6 +21,7 @@ from components import utils
 import message_conversion
 import swarming_rpcs
 from server import acl
+from server import bot_code
 from server import bot_management
 from server import config
 from server import task_pack
@@ -74,6 +75,11 @@ swarming_api = auth.endpoints_api(
         'view and cancel tasks, query tasks and bots')
 
 
+VersionRequest = endpoints.ResourceContainer(
+    message_types.VoidMessage,
+    version=messages.IntegerField(1))
+
+
 @swarming_api.api_class(resource_name='server', path='server')
 class SwarmingServerService(remote.Service):
   @auth.endpoints_method(
@@ -83,6 +89,60 @@ class SwarmingServerService(remote.Service):
   def details(self, _request):
     """Returns information about the server."""
     return swarming_rpcs.ServerDetails(server_version=utils.get_app_version())
+
+  @auth.endpoints_method(
+      VersionRequest, swarming_rpcs.FileContent,
+      http_method='GET')
+  @auth.require(acl.is_bot_or_user)
+  def get_bootstrap(self, request):
+    """Retrieves the current or a previous version of bootstrap.py."""
+    obj = bot_code.get_bootstrap('', request.version)
+    if not obj:
+      return swarming_rpcs.FileContent()
+    return swarming_rpcs.FileContent(
+        content=obj.content.decode('utf-8'),
+        who=obj.who.to_bytes() if obj.who else None,
+        when=obj.when,
+        version=obj.version)
+
+  @auth.endpoints_method(
+      VersionRequest, swarming_rpcs.FileContent,
+      http_method='GET')
+  @auth.require(acl.is_bot_or_user)
+  def get_bot_config(self, request):
+    """Retrieves the current or a previous version of bot_config.py."""
+    obj = bot_code.get_bot_config(request.version)
+    if not obj:
+      return swarming_rpcs.FileContent()
+    return swarming_rpcs.FileContent(
+        content=obj.content.decode('utf-8'),
+        who=obj.who.to_bytes() if obj.who else None,
+        when=obj.when,
+        version=obj.version)
+
+  @auth.endpoints_method(
+      swarming_rpcs.FileContentRequest, swarming_rpcs.FileContent)
+  @auth.require(acl.is_admin)
+  def put_bootstrap(self, request):
+    """Stores a new version of bootstrap.py."""
+    key = bot_code.store_bootstrap(request.content.encode('utf-8'))
+    obj = key.get()
+    return swarming_rpcs.FileContent(
+        who=obj.who.to_bytes() if obj.who else None,
+        when=obj.created_ts,
+        version=obj.version)
+
+  @auth.endpoints_method(
+      swarming_rpcs.FileContentRequest, swarming_rpcs.FileContent)
+  @auth.require(acl.is_admin)
+  def put_bot_config(self, request):
+    """Stores a new version of bot_config.py."""
+    key = bot_code.store_bot_config(request.content.encode('utf-8'))
+    obj = key.get()
+    return swarming_rpcs.FileContent(
+        who=obj.who.to_bytes() if obj.who else None,
+        when=obj.created_ts,
+        version=obj.version)
 
 
 TaskId = endpoints.ResourceContainer(

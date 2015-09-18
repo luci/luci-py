@@ -42,6 +42,27 @@ class StringListPair(messages.Message):
   value = messages.StringField(2, repeated=True)
 
 
+### Server related.
+
+
+class ServerDetails(messages.Message):
+  """Reports the server version."""
+  server_version = messages.StringField(1)
+
+
+class FileContentRequest(messages.Message):
+  """Content of a file."""
+  content = messages.StringField(1)
+
+
+class FileContent(messages.Message):
+  """Content of a file."""
+  content = messages.StringField(1)
+  version = messages.IntegerField(2)
+  who = messages.StringField(3)
+  when = message_types.DateTimeField(4)
+
+
 ### Task-Related Requests
 
 
@@ -114,11 +135,6 @@ class CancelResponse(messages.Message):
   """Result of a request to cancel a task."""
   ok = messages.BooleanField(1)
   was_running = messages.BooleanField(2)
-
-
-class ServerDetails(messages.Message):
-  """Reports the server version."""
-  server_version = messages.StringField(1)
 
 
 class TaskOutput(messages.Message):

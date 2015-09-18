@@ -71,6 +71,66 @@ class ServerApiTest(BaseTest):
     response = self.call_api('details')
     self.assertEqual({'server_version': utils.get_app_version()}, response.json)
 
+  def _test_file(self, name):
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+    path = os.path.join(self.APP_DIR, 'swarming_bot', 'config', name + '.py')
+    with open(path, 'rb') as f:
+      content = f.read().decode('utf-8')
+
+    expected = {
+      u'content': content,
+    }
+    self.assertEqual(expected, self.call_api('get_' + name).json)
+
+    expected = {
+      u'version': u'0',
+      u'when': u'2010-01-02T03:04:05',
+      u'who': u'anonymous:anonymous',
+    }
+    response = self.call_api('put_' + name, {'content': u'hi ☀!'})
+    self.assertEqual(expected, response.json)
+
+    expected = {
+      u'content': u'hi \u2600!',
+      u'version': u'0',
+      u'when': u'2010-01-02T03:04:05',
+      u'who': u'anonymous:anonymous',
+    }
+    self.assertEqual(expected, self.call_api('get_' + name).json)
+
+    self.mock_now(now, 60)
+    expected = {
+      u'version': u'1',
+      u'when': u'2010-01-02T03:05:05',
+      u'who': u'anonymous:anonymous',
+    }
+    response = self.call_api('put_' + name, {'content': u'hi ♕!'})
+    self.assertEqual(expected, response.json)
+
+    expected = {
+      u'content': u'hi ♕!',
+      u'version': u'1',
+      u'when': u'2010-01-02T03:05:05',
+      u'who': u'anonymous:anonymous',
+    }
+    self.assertEqual(expected, self.call_api('get_' + name).json)
+
+    expected = {
+      u'content': u'hi ☀!',
+      u'version': u'0',
+      u'when': u'2010-01-02T03:04:05',
+      u'who': u'anonymous:anonymous',
+    }
+    response = self.call_api('get_' + name, {'version': '0'})
+    self.assertEqual(expected, response.json)
+
+  def test_bootstrap(self):
+    self._test_file('bootstrap')
+
+  def test_bot_config(self):
+    self._test_file('bot_config')
+
 
 class TasksApiTest(BaseTest):
   api_service_cls = handlers_endpoints.SwarmingTasksService

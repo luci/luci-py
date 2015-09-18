@@ -26,15 +26,23 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ### Models.
 
 
-File = collections.namedtuple('File', ('content', 'who', 'when'))
+File = collections.namedtuple('File', ('content', 'who', 'when', 'version'))
 
 
 class VersionedFile(ndb.Model):
+  """Versionned entity.
+
+  Root is ROOT_MODEL. id is datastore_utils.HIGH_KEY_ID - version number.
+  """
   created_ts = ndb.DateTimeProperty(indexed=False, auto_now_add=True)
   who = auth.IdentityProperty(indexed=False)
   content = ndb.BlobProperty(compressed=True)
 
   ROOT_MODEL = datastore_utils.get_versioned_root_model('VersionedFileRoot')
+
+  @property
+  def version(self):
+    return datastore_utils.HIGH_KEY_ID - self.key.integer_id()
 
   @classmethod
   def fetch(cls, name):
@@ -57,45 +65,66 @@ class VersionedFile(ndb.Model):
 ### Public APIs.
 
 
-def get_bootstrap(host_url):
+def get_bootstrap(host_url, version=None):
   """Returns the mangled version of the utility script bootstrap.py.
 
   Returns:
     File instance.
   """
-  header = 'host_url = %r\n' % host_url
-  obj = VersionedFile.fetch('bootstrap.py')
+  header = 'host_url = %r\n' % host_url if host_url else ''
+  if version is not None:
+    obj = ndb.Key(
+        VersionedFile, datastore_utils.HIGH_KEY_ID - version,
+        parent=VersionedFile._gen_root_key('bootstrap.py')).get()
+    if not obj:
+      return None
+  else:
+    obj = VersionedFile.fetch('bootstrap.py')
   if obj and obj.content:
-    return File(header + obj.content, obj.who, obj.created_ts)
+    return File(
+        header + obj.content, obj.who, obj.created_ts, obj.version)
   # Fallback to the one embedded in the tree.
   path = os.path.join(ROOT_DIR, 'swarming_bot', 'config', 'bootstrap.py')
   with open(path, 'rb') as f:
-    return File(header + f.read(), None, None)
+    return File(header + f.read(), None, None, None)
 
 
 def store_bootstrap(content):
-  """Stores a new version of bootstrap.py."""
+  """Stores a new version of bootstrap.py.
+
+  Returns the ndb.Key of the new stored entity.
+  """
   return VersionedFile(content=content).store('bootstrap.py')
 
 
-def get_bot_config():
+def get_bot_config(version=None):
   """Returns the current version of bot_config.py and extra metadata.
 
   Returns:
     File instance.
   """
-  obj = VersionedFile.fetch('bot_config.py')
+  if version is not None:
+    obj = ndb.Key(
+        VersionedFile, datastore_utils.HIGH_KEY_ID - version,
+        parent=VersionedFile._gen_root_key('bot_config.py')).get()
+    if not obj:
+      return None
+  else:
+    obj = VersionedFile.fetch('bot_config.py')
   if obj:
-    return File(obj.content, obj.who, obj.created_ts)
+    return File(obj.content, obj.who, obj.created_ts, obj.version)
 
   # Fallback to the one embedded in the tree.
   path = os.path.join(ROOT_DIR, 'swarming_bot', 'config', 'bot_config.py')
   with open(path, 'rb') as f:
-    return File(f.read(), None, None)
+    return File(f.read(), None, None, None)
 
 
 def store_bot_config(content):
-  """Stores a new version of bot_config.py."""
+  """Stores a new version of bot_config.py.
+
+  Returns the ndb.Key of the new stored entity.
+  """
   out = VersionedFile(content=content).store('bot_config.py')
   # Clear the cached versions value since it has now changed.
   memcache.delete('versions', namespace='bot_code')
