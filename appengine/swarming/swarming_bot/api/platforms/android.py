@@ -202,7 +202,7 @@ def get_devices():
       # device is temporarily unavailable.We can't use handle.serial_number
       # since this communicates with the device.
       # TODO(maruel): In practice we'd like to retry for a few seconds.
-      cmds[handle.port_path] = None
+      cmds['/'.join(map(str, handle.port_path))] = None
       continue
     except adb.common.usb1.USBErrorBusy as e:
       logging.warning(
