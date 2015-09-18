@@ -197,6 +197,11 @@ def load_and_run(in_file, swarming_server, cost_usd_hour, start, out_file):
         u'version': OUT_VERSION,
       }
   finally:
+    # We've found tests to delete 'work' when quitting, causing an exception
+    # here. Try to recreate the directory if necessary.
+    work_dir = os.path.dirname(out_file)
+    if not os.path.isdir(work_dir):
+      os.mkdir(work_dir)
     with open(out_file, 'wb') as f:
       json.dump(task_result, f)
 
