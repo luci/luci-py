@@ -186,7 +186,7 @@ def seal_token(subtokens):
         'Subtoken list is too long (%d tokens, max is %d)' %
         (len(toks), MAX_SUBTOKEN_LIST_LEN))
   serialized = subtokens.SerializeToString()
-  signing_key_id, pkcs1_sha256_sig = signature.sign_blob(serialized)
+  signing_key_id, pkcs1_sha256_sig = signature.sign_blob(serialized, 0.5)
   return delegation_pb2.DelegationToken(
       serialized_subtoken_list=serialized,
       signer_id=model.get_service_self_identity().to_bytes(),

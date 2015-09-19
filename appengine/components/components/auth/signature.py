@@ -43,7 +43,7 @@ class CertificateError(Exception):
 @utils.cache_with_expiration(3600)
 def get_own_public_certificates():
   """Returns jsonish object with public certificates of current service."""
-  certs = app_identity.get_public_certificates()
+  certs = app_identity.get_public_certificates(deadline=0.5)
   return {
     'certificates': [
       {
@@ -76,7 +76,7 @@ def get_service_public_certificates(service_url):
   # components are bad).
   attempt = 0
   result = None
-  while attempt < 10:
+  while attempt < 4:
     if attempt:
       logging.info('Retrying...')
     attempt += 1
@@ -87,7 +87,7 @@ def get_service_public_certificates(service_url):
           method='GET',
           headers={'X-URLFetch-Service-Id': utils.get_urlfetch_service_id()},
           follow_redirects=False,
-          deadline=10,
+          deadline=2,
           validate_certificate=True)
     except (apiproxy_errors.DeadlineExceededError, urlfetch.Error) as e:
       # Transient network error or URL fetch service RPC deadline.
@@ -129,7 +129,7 @@ def get_x509_certificate_by_name(certs, key_name):
   raise CertificateError('Certificate \'%s\' not found' % key_name)
 
 
-def sign_blob(blob):
+def sign_blob(blob, deadline=None):
   """Signs a blob using current service's private key.
 
   Just an alias for GAE app_identity.sign_blob function for symmetry with
@@ -142,7 +142,7 @@ def sign_blob(blob):
   # documented anywhere. But it should be relatively stable since this API is
   # used by OAuth2 libraries (and so changing signature method may break a lot
   # of stuff).
-  return app_identity.sign_blob(blob)
+  return app_identity.sign_blob(blob, deadline)
 
 
 def check_signature(blob, x509_certificate_pem, signature):
