@@ -60,9 +60,14 @@ _ADB_KEYS = None
 _BUILD_PROP_ANDROID = {}
 
 
-def _dumpsys(cmd, arg):
-  out = cmd.Shell('dumpsys ' + arg).decode('utf-8', 'replace')
-  if out.startswith('Can\'t find service: '):
+def _dumpsys(device, arg):
+  """dumpsys is a native android tool that returns semi structured data.
+
+  It acts as a directory service but each service return their data without any
+  real format, and will happily return failure.
+  """
+  out, exit_code = device.shell('dumpsys ' + arg)
+  if exit_code != 0 or out.startswith('Can\'t find service: '):
     return None
   return out
 
@@ -85,6 +90,128 @@ def _parcel_to_list(lines):
       if char != '    ':
         out.append(char)
   return out
+
+
+class _Device(object):
+  """Wraps an AdbCommands to make it exception safe.
+
+  The fact that exceptions can be thrown any time makes the client code really
+  hard to write safely. Convert USBError* to None return value.
+  """
+  def __init__(self, adb_cmd, port_path):
+    if adb_cmd:
+      assert isinstance(adb_cmd, adb.adb_commands.AdbCommands), adb_cmd
+    self.adb_cmd = adb_cmd
+    # Try to get the real serial number if possible.
+    self.serial = port_path
+    if self.adb_cmd:
+      try:
+        # The serial number is attached to adb.common.UsbHandle, no
+        # adb_commands.AdbCommands.
+        self.serial = adb_cmd.handle.serial_number
+      except adb.common.libusb1.USBError:
+        pass
+
+  @property
+  def is_valid(self):
+    return bool(self.adb_cmd)
+
+  def close(self):
+    if self.adb_cmd:
+      self.adb_cmd.Close()
+      self.adb_cmd = None
+
+  def shell(self, cmd):
+    """Runs a command on an Android device while swallowing exceptions.
+
+    Traps all kinds of USB errors so callers do not have to handle this.
+
+    Returns:
+      tuple(stdout, exit_code)
+      - stdout is as unicode if it ran, None if an USB error occurred.
+      - exit_code is set if ran.
+    """
+    if not self.adb_cmd:
+      return None, None
+    try:
+      # The adb protocol doesn't return the exit code, so embed it inside the
+      # command.
+      cmd = cmd + ' ; echo $?'
+      out = self.adb_cmd.Shell(cmd).decode('utf-8', 'replace')
+    except adb.common.libusb1.USBError as e:
+      # Trap all USB exceptions.
+      logging.error('%s.shell(%s): %s', self.name, cmd, e)
+      return None, None
+    # Protect against & or other bash conditional execution that wouldn't make
+    # the 'echo $?' command to run.
+    if not out:
+      return out, None
+    assert out[-1] == '\n', out
+    # Strip the last line to extract the exit code.
+    parts = out[:-1].rsplit('\n', 1)
+    if len(parts) == 2:
+      return parts[0] + '\n', int(parts[1])
+    # The command itself generated no output.
+    return '', int(parts[0])
+
+
+def _load_device(handle):
+  """Given a adb.USBDevice, return a _Device wrapping an
+  adb_commands.AdbCommands.
+  """
+  port_path = '/'.join(map(str, handle.port_path))
+  try:
+    handle.Open()
+  except adb.common.usb1.USBErrorNoDevice as e:
+    logging.warning('Got USBErrorNoDevice for %s: %s', port_path, e)
+    # Do not kill adb, it just means the USB host is likely resetting and the
+    # device is temporarily unavailable.We can't use handle.serial_number since
+    # this communicates with the device.
+    # TODO(maruel): In practice we'd like to retry for a few seconds.
+    handle = None
+  except adb.common.usb1.USBErrorBusy as e:
+    logging.warning('Got USBErrorBusy for %s. Killing adb: %s', port_path, e)
+    kill_adb()
+    try:
+      # If it throws again, it probably means another process holds a handle to
+      # the USB ports or group acl (plugdev) hasn't been setup properly.
+      handle.Open()
+    except adb.common.usb1.USBErrorBusy as e:
+      logging.warning(
+          'USB port for %s is already open (and failed to kill ADB) '
+          'Try rebooting the host: %s', port_path, e)
+      handle = None
+  except adb.common.usb1.USBErrorAccess as e:
+    # Do not try to use serial_number, since we can't even access the port.
+    logging.warning('Try rebooting the host: %s: %s', port_path, e)
+    handle = None
+
+  cmd = None
+  if handle:
+    try:
+      # Give 10s for the user to accept the dialog. The best design would be to
+      # do a quick check with timeout=100ms and only if the first failed, try
+      # again with a long timeout. The goal is not to hang the bots for several
+      # minutes when all the devices are unauthenticated.
+      # TODO(maruel): A better fix would be to change python-adb to continue the
+      # authentication dance from where it stopped. This is left as a follow up.
+      cmd = adb.adb_commands.AdbCommands.Connect(
+          handle, banner='swarming', rsa_keys=_ADB_KEYS,
+          auth_timeout_ms=10000)
+    except adb.usb_exceptions.DeviceAuthError as e:
+      logging.warning('AUTH FAILURE: %s: %s', port_path, e)
+    except adb.usb_exceptions.ReadFailedError as e:
+      logging.warning('READ FAILURE: %s: %s', port_path, e)
+    except adb.usb_exceptions.WriteFailedError as e:
+      logging.warning('WRITE FAILURE: %s: %s', port_path, e)
+    except ValueError as e:
+      # This is generated when there's a protocol level failure, e.g. the data
+      # is garbled.
+      logging.warning(
+          'Trying unpluging and pluging it back: %s: %s', port_path, e)
+  # Always create a _Device, even if it points to nothing. It makes using the
+  # client code much easier.
+  return _Device(cmd, port_path)
 
 
 ### Public API.
@@ -170,17 +297,19 @@ def kill_adb():
 def get_devices():
   """Returns the list of devices available.
 
-  Caller MUST call close_devices(cmds) on the return value.
+  Caller MUST call close_devices(devices) on the return value.
 
   Returns one of:
-    - dict of {serial_number: adb.adb_commands.AdbCommands}. The value may be
+    - dict of {serial_number: }. The value may be
       None if there was an Auth failure.
     - None if adb is unavailable.
   """
+  # TODO(maruel): Return a list instead of a dict. It's a bit tricky as we need
+  # to update all the bot_config.py first.
   if not adb:
     return None
 
-  cmds = {}
+  devices = {}
   generator = adb.adb_commands.AdbCommands.Devices()
   while True:
     try:
@@ -188,88 +317,27 @@ def get_devices():
       # catch USB exception explicitly.
       handle = generator.next()
     except adb.common.usb1.USBErrorOther as e:
-      # This happens if the user is not in group plugdev.
+      logging.warning(
+          'Failed to open USB device, is user in group plugdev? %s', e)
       continue
     except StopIteration:
       break
+    device = _load_device(handle)
+    devices[device.serial] = device
 
-    try:
-      handle.Open()
-    except adb.common.usb1.USBErrorNoDevice as e:
-      logging.warning(
-          'Got USBErrorNoDevice for %s: %s', handle.usb_info, e)
-      # Do not kill adb, it just means the USB host is likely resetting and the
-      # device is temporarily unavailable.We can't use handle.serial_number
-      # since this communicates with the device.
-      # TODO(maruel): In practice we'd like to retry for a few seconds.
-      cmds['/'.join(map(str, handle.port_path))] = None
-      continue
-    except adb.common.usb1.USBErrorBusy as e:
-      logging.warning(
-          'Got USBErrorBusy for %s. Killing adb: %s', handle.usb_info, e)
-      kill_adb()
-      try:
-        # If it throws again, it probably means another process
-        # holds a handle to the USB ports or group acl (plugdev) hasn't been
-        # setup properly.
-        handle.Open()
-      except adb.common.usb1.USBErrorBusy as e:
-        logging.warning(
-            'USB port for %s is already open (and failed to kill ADB) '
-            'Try rebooting the host: %s', handle.usb_info, e)
-        cmds[handle.serial_number] = None
-        continue
-    except adb.common.usb1.USBErrorAccess as e:
-      # Do not try to use serial_number, since we can't even access the port.
-      logging.warning(
-          'Try rebooting the host: %s: %s', handle.port_path, e)
-      cmds['/'.join(map(str, handle.port_path))] = None
-      continue
-
-    try:
-      # Give 10s for the user to accept the dialog. The best design would be to
-      # do a quick check with timeout=100ms and only if the first failed, try
-      # again with a long timeout. The goal is not to hang the bots for several
-      # minutes when all the devices are unauthenticated.
-      # TODO(maruel): A better fix would be to change python-adb to continue the
-      # authentication dance from where it stopped. This is left as a follow up.
-      cmd = adb.adb_commands.AdbCommands.Connect(
-          handle, banner='swarming', rsa_keys=_ADB_KEYS, auth_timeout_ms=10000)
-    except adb.usb_exceptions.DeviceAuthError as e:
-      logging.warning('AUTH FAILURE: %s: %s', handle.usb_info, e)
-      cmd = None
-    except adb.usb_exceptions.ReadFailedError as e:
-      logging.warning('READ FAILURE: %s: %s', handle.usb_info, e)
-      cmd = None
-    except adb.usb_exceptions.WriteFailedError as e:
-      logging.warning('WRITE FAILURE: %s: %s', handle.usb_info, e)
-      cmd = None
-    except ValueError as e:
-      logging.warning(
-          'Trying unpluging and pluging it back: %s: %s', handle.usb_info, e)
-      cmd = None
-
-    try:
-      serial = handle.serial_number
-    except adb.common.libusb1.USBError:
-      serial = handle.usb_info
-    cmds[serial] = cmd
-
-  # Remove any /system/build.prop cache so if a device is disconnect, reflashed
-  # then reconnected, it will likely be refresh properly. The main concern is
-  # that the bot didn't have the time to loop once while this is being done.
-  # Restarting the bot works fine too.
+  # Remove any /system/build.prop cache so if a device is disconnected,
+  # reflashed then reconnected, the cache isn't invalid.
   for key in _BUILD_PROP_ANDROID.keys():
-    if key not in cmds:
+    dev = devices.get(key)
+    if not dev or not dev.is_valid:
       _BUILD_PROP_ANDROID.pop(key)
-  return cmds
+  return devices
 
 
 def close_devices(devices):
   """Closes all devices opened by get_devices()."""
-  for device in (devices or {}).itervalues():
-    if device:
-      device.Close()
+  for _, device in sorted((devices or {}).iteritems()):
+    device.close()
 
 
 class CpuScalingGovernor(object):
@@ -285,37 +353,46 @@ class CpuScalingGovernor(object):
     return name in [getattr(cls, m) for m in dir(cls) if m[0].isupper()]
 
 
-def set_cpu_scaling_governor(cmd, governor):
-  """Sets the CPU scaling governor to the one specified."""
+def set_cpu_scaling_governor(device, governor):
+  """Sets the CPU scaling governor to the one specified.
+
+  Returns:
+    True on success.
+  """
+  assert isinstance(device, _Device), device
   assert CpuScalingGovernor.is_valid(governor), governor
-  cmd.Shell(
+  _, exit_code = device.shell(
       'echo "%s">/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor' %
       governor)
+  return exit_code == 0
 
 
-def set_cpu_scaling(cmd, speed):
-  """Enforces strict CPU speed and disable the CPU scaling governor."""
+def set_cpu_scaling(device, speed):
+  """Enforces strict CPU speed and disable the CPU scaling governor.
+
+  Returns:
+    True on success.
+  """
+  assert isinstance(device, _Device), device
   assert isinstance(speed, int), speed
   assert 10000 <= speed <= 10000000, speed
-  set_cpu_scaling_governor(cmd, CpuScalingGovernor.USER_DEFINED)
-  cmd.Shell(
+  success = set_cpu_scaling_governor(device, CpuScalingGovernor.USER_DEFINED)
+  _, exit_code = device.shell(
       'echo "%d">/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed' %
       speed)
+  return success and exit_code == 0
 
 
-def get_build_prop(cmd):
+def get_build_prop(device):
   """Returns the system properties for a device.
 
   This isn't really changing through the lifetime of a bot. One corner case is
   when the device is flashed or disconnected.
   """
-  if cmd.handle.serial_number not in _BUILD_PROP_ANDROID:
+  if device.serial not in _BUILD_PROP_ANDROID:
     properties = {}
-    try:
-      out = cmd.Shell('cat /system/build.prop').decode('utf-8')
-    except adb.usb_exceptions.ReadFailedError:
-      # It's a bit annoying because it means timeout_ms was wasted. Blacklist
-      # the device until it is disconnected and reconnected.
+    out, _ = device.shell('cat /system/build.prop')
+    if not out:
       properties = None
     else:
       for line in out.splitlines():
@@ -323,28 +400,27 @@ def get_build_prop(cmd):
           continue
         key, value = line.split(u'=', 1)
         properties[key] = value
-    _BUILD_PROP_ANDROID[cmd.handle.serial_number] = properties
-  return _BUILD_PROP_ANDROID[cmd.handle.serial_number]
+    _BUILD_PROP_ANDROID[device.serial] = properties
+  return _BUILD_PROP_ANDROID[device.serial]
 
 
-def get_temp(cmd):
+def get_temp(device):
   """Returns the device's 2 temperatures if available."""
+  # Not all devices export this file. On other devices, the only real way to
+  # read it is via Java
+  # developer.android.com/guide/topics/sensors/sensors_environment.html
   temps = []
   for i in xrange(2):
-    try:
-      temps.append(
-          int(cmd.Shell('cat /sys/class/thermal/thermal_zone%d/temp' % i)))
-    except ValueError:
-      # On other devices, the only real way to read it is via Java
-      # developer.android.com/guide/topics/sensors/sensors_environment.html
-      pass
+    out, _ = device.shell('cat /sys/class/thermal/thermal_zone%d/temp' % i)
+    if out:
+      temps.append(int(out))
   return temps
 
 
-def get_battery(cmd):
+def get_battery(device):
   """Returns details about the battery's state."""
   props = {}
-  out = _dumpsys(cmd, 'battery')
+  out = _dumpsys(device, 'battery')
   if not out:
     return props
   for line in out.splitlines():
@@ -365,7 +441,7 @@ def get_battery(cmd):
   return out
 
 
-def get_cpu_scale(cmd):
+def get_cpu_scale(device):
   """Returns the CPU scaling factor."""
   mapping = {
     'cpuinfo_max_freq': u'max',
@@ -374,20 +450,23 @@ def get_cpu_scale(cmd):
     'scaling_governor': u'governor',
   }
   return {
-    v: cmd.Shell('cat /sys/devices/system/cpu/cpu0/cpufreq/' + k)
+    v: device.shell('cat /sys/devices/system/cpu/cpu0/cpufreq/' + k)[0]
     for k, v in mapping.iteritems()
   }
 
 
-def get_uptime(cmd):
+def get_uptime(device):
   """Returns the device's uptime in second."""
-  return float(cmd.Shell('cat /proc/uptime').split()[1])
+  out, _ = device.shell('cat /proc/uptime')
+  if out:
+    return float(out.split()[1])
+  return None
 
 
-def get_disk(cmd):
+def get_disk(device):
   """Returns details about the battery's state."""
   props = {}
-  out = _dumpsys(cmd, 'diskstats')
+  out = _dumpsys(device, 'diskstats')
   if not out:
     return props
   for line in out.splitlines():
@@ -407,24 +486,31 @@ def get_disk(cmd):
   }
 
 
-def get_imei(cmd):
+def get_imei(device):
   """Returns the phone's IMEI."""
   # Android <5.0.
-  out = _dumpsys(cmd, 'iphonesubinfo')
-  match = re.search('  Device ID = (.+)$', out)
-  if match:
-    return match.group(1)
+  out = _dumpsys(device, 'iphonesubinfo')
+  if out:
+    match = re.search('  Device ID = (.+)$', out)
+    if match:
+      return match.group(1)
 
   # Android >= 5.0.
-  lines = cmd.Shell('service call iphonesubinfo 1').splitlines()
-  if len(lines) >= 4 and lines[0] == 'Result: Parcel(':
-    # Process the UTF-16 string.
-    chars = _parcel_to_list(lines[1:])[4:-1]
-    return u''.join(map(unichr, (int(i, 16) for i in chars)))
+  out, _ = device.shell('service call iphonesubinfo 1')
+  if out:
+    lines = out.splitlines()
+    if len(lines) >= 4 and lines[0] == 'Result: Parcel(':
+      # Process the UTF-16 string.
+      chars = _parcel_to_list(lines[1:])[4:-1]
+      return u''.join(map(unichr, (int(i, 16) for i in chars)))
+  return None
 
 
-def get_ip(cmd):
+def get_ip(device):
   """Returns the IP address."""
   # If ever needed, read wifi.interface from /system/build.prop if a device
   # doesn't use wlan0.
-  return cmd.Shell('getprop dhcp.wlan0.ipaddress').strip()
+  ip, _ = device.shell('getprop dhcp.wlan0.ipaddress')
+  if not ip:
+    return None
+  return ip.strip()

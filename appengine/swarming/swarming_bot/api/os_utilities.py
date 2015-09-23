@@ -629,19 +629,15 @@ def get_dimensions_all_devices_android(devices):
   for key in keys:
     dimensions[key] = set()
   dimensions[u'android'] = []
-  for serial_number, cmd in devices.iteritems():
-    try:
-      if cmd:
-        properties = platforms.android.get_build_prop(cmd)
-        if properties:
-          for key in keys:
-            dimensions[key].add(properties[u'ro.' + key])
-        # Only advertize devices that can be used.
-        dimensions[u'android'].append(serial_number)
-    except platforms.android.adb.common.usb1.USBErrorNoDevice as e:
-      logging.warning('Ignoring device: %s: %s', serial_number, e)
-    except ValueError as e:
-      logging.exception('Ignoring device: %s: %s', serial_number, e)
+  for serial_number, device in sorted(devices.iteritems()):
+    properties = platforms.android.get_build_prop(device)
+    if properties:
+      for key in keys:
+        real_key = u'ro.' + key
+        if real_key in properties:
+          dimensions[key].add(properties[real_key])
+      # Only advertize devices that can be used.
+      dimensions[u'android'].append(serial_number)
   dimensions[u'android'].sort()
   for key in keys:
     if not dimensions[key]:
@@ -692,30 +688,25 @@ def get_state_all_devices_android(devices):
     u'product.board',
     u'product.cpu.abi')
   state['devices'] = {}
-  for serial_number, cmd in devices.iteritems():
-    if cmd:
-      try:
-        properties = platforms.android.get_build_prop(cmd)
-        if properties:
-          # TODO(maruel): uptime, throttle, etc.
-          device = {
-            u'battery': platforms.android.get_battery(cmd),
-            u'build': {key: properties[u'ro.'+key] for key in keys},
-            u'cpu_scale': platforms.android.get_cpu_scale(cmd),
-            u'disk': platforms.android.get_disk(cmd),
-            u'imei': platforms.android.get_imei(cmd),
-            u'ip': platforms.android.get_ip(cmd),
-            u'state': u'available',
-            u'temp': platforms.android.get_temp(cmd),
-            u'uptime': platforms.android.get_uptime(cmd),
-          }
-        else:
-          device = {u'state': u'unavailable'}
-      except platforms.android.adb.common.usb1.USBErrorNoDevice as e:
-        device = {u'state': unicode(str(e))}
-    else:
-      device = {u'state': 'unauthenticated'}
-    state[u'devices'][serial_number] = device
+  for serial_number, device in sorted(devices.iteritems()):
+    if not device.is_valid:
+      state[u'devices'][serial_number] = {u'state': 'unauthenticated'}
+      continue
+    properties = platforms.android.get_build_prop(device)
+    if not properties:
+      state[u'devices'][serial_number] = {u'state': 'unavailable'}
+      continue
+    state[u'devices'][serial_number] = {
+      u'battery': platforms.android.get_battery(device),
+      u'build': {key: properties[u'ro.'+key] for key in keys},
+      u'cpu_scale': platforms.android.get_cpu_scale(device),
+      u'disk': platforms.android.get_disk(device),
+      u'imei': platforms.android.get_imei(device),
+      u'ip': platforms.android.get_ip(device),
+      u'state': u'available',
+      u'temp': platforms.android.get_temp(device),
+      u'uptime': platforms.android.get_uptime(device),
+    }
   return state
 
 
