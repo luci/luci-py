@@ -10,6 +10,10 @@ handlers:
   login: admin
   script: main.cron_app
   secure: always
+- url: /internal/queues/.*
+  login: admin
+  script: main.queues_app
+  secure: always
 
 includes:
 - components/auth

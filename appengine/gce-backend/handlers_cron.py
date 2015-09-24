@@ -4,6 +4,7 @@
 
 """GCE Backend cron jobs."""
 
+import copy
 import json
 import logging
 
@@ -14,6 +15,8 @@ import webapp2
 from components import decorators
 from components import gce
 from components import machine_provider
+from components import net
+from components import utils
 
 import models
 
@@ -40,7 +43,7 @@ def filter_templates(templates):
     (instance template name, compute#instanceTemplate dict) pairs.
   """
   for template_name, template in templates.iteritems():
-    logging.info('Proessing instance template: %s', template_name)
+    logging.info('Processing instance template: %s', template_name)
     properties = template.get('properties', {})
     # For now, enforce only one disk.
     if len(properties.get('disks', [])) == 1:
@@ -100,26 +103,75 @@ class InstanceTemplateProcessor(webapp2.RequestHandler):
 
 
 @ndb.transactional
-def create_instance_group(name, dimensions, policies, members):
+def create_instance_group(name, dimensions, policies, instances):
   """Stores an InstanceGroup and Instance entities in the datastore.
 
-  Transactionally operates on model.Instance entities which share a common
-  ancestor model.InstanceGroup (which is the root entity operated on).
+  Also attempts to catalog each running Instance in the Machine Provider.
+
+  Operates on model.Instance entities which share a common ancestor
+  model.InstanceGroup (which is the root entity operated on).
 
   Args:
     name: Name of this instance group.
-    dimensions: rpc_messages.Dimensions describing members of this instance
+    dimensions: machine_provider.Dimensions describing members of this instance
       group.
-    policies: rpc_messages.Policies governing members of this instance group.
-    members: List of models.Instances representing members of this instance
+    policies: machine_provider.Policies governing members of this instance
       group.
+    instances: Return value of gce.get_managed_instances listing instances in
+      this instance group.
   """
-  member_names = []
-  for instance in members:
-    member_names.append(instance.name)
-    instance.key = instance.generate_key(instance.name, name)
-  ndb.put_multi(members)
-  models.InstanceGroup.create_and_put(name, dimensions, policies, member_names)
+  instance_map = {}
+  instances_to_catalog = []
+
+  for instance_name, instance in instances.iteritems():
+    logging.info('Processing instance: %s', instance_name)
+    instance_key = models.Instance.generate_key(instance_name, name)
+    instance_map[instance_name] = models.Instance(
+        key=instance_key,
+        group=name,
+        name=instance_name,
+        state=models.InstanceStates.UNCATALOGED,
+    )
+    if instance['instanceStatus'] == 'RUNNING':
+      existing_instance = instance_key.get()
+      if existing_instance:
+        if existing_instance.state == models.InstanceStates.UNCATALOGED:
+          logging.info('Attempting to catalog instance: %s', instance_name)
+          instances_to_catalog.append(instance_name)
+        else:
+          logging.info('Skipping already cataloged instance: %s', instance_name)
+          instance_map[instance_name].state = existing_instance.state
+    else:
+      logging.warning(
+          'Instance not running: %s\ncurrentAction: %s\ninstanceStatus: %s',
+          instance_name,
+          instance['currentAction'],
+          instance['instanceStatus'],
+      )
+
+  if instances_to_catalog:
+    # Above we defaulted each instance to UNCATALOGED. Here, try to enqueue a
+    # task to catalog them in the Machine Provider, setting CATALOGED if
+    # successful.
+    if utils.enqueue_task(
+        '/internal/queues/catalog-instance-group',
+        'catalog-instance-group',
+        params={
+            'dimensions': utils.encode_to_json(dimensions),
+            'instances': utils.encode_to_json(instances_to_catalog),
+            'name': name,
+            'policies': utils.encode_to_json(policies),
+        },
+        transactional=True,
+    ):
+      for instance_name in instances_to_catalog:
+        instance_map[instance_name].state = models.InstanceStates.CATALOGED
+  else:
+    logging.info('Nothing to catalog')
+
+  ndb.put_multi(instance_map.values())
+  models.InstanceGroup.create_and_put(
+      name, dimensions, policies, sorted(instance_map.keys()))
 
 
 class InstanceProcessor(webapp2.RequestHandler):
@@ -151,34 +203,6 @@ class InstanceProcessor(webapp2.RequestHandler):
           metadatum['value'] for metadatum in properties['metadata']['items']
           if metadatum['key'] == 'os_family'
       ][0])
-
-      instances = api.get_managed_instances(manager_name, ZONE)
-      members = []
-      for instance_name, instance in instances.iteritems():
-        logging.info('Processing instance: %s', instance_name)
-        members.append(models.Instance(name=instance_name, group=manager_name))
-        if instance['instanceStatus'] == 'RUNNING':
-          requests.append(
-              machine_provider.CatalogMachineAdditionRequest(
-                  dimensions=machine_provider.Dimensions(
-                      backend=machine_provider.Backend.GCE,
-                      disk_gb=disk_gb,
-                      hostname=instance_name,
-                      memory_gb=memory_gb,
-                      num_cpus=num_cpus,
-                      os_family=os_family,
-                  ),
-                  policies=machine_provider.Policies(
-                      on_reclamation=
-                          machine_provider.MachineReclamationPolicy.DELETE,
-                  ),
-              )
-          )
-          members[-1].state = models.InstanceStates.CATALOGED
-        else:
-          members[-1].state = models.InstanceStates.UNCATALOGED
-          # TODO(smut): Static IP assignment.
-
       dimensions = machine_provider.Dimensions(
           backend=machine_provider.Backend.GCE,
           disk_gb=disk_gb,
@@ -186,11 +210,11 @@ class InstanceProcessor(webapp2.RequestHandler):
           num_cpus=num_cpus,
           os_family=os_family,
       )
+      instances = api.get_managed_instances(manager_name, ZONE)
       policies = machine_provider.Policies(
           on_reclamation=machine_provider.MachineReclamationPolicy.DELETE)
-      create_instance_group(manager_name, dimensions, policies, members)
 
-    machine_provider.add_machines(requests)
+      create_instance_group(manager_name, dimensions, policies, instances)
 
 
 def create_cron_app():

@@ -1,0 +1,3 @@
+queue:
+ - name: catalog-instance-group
+   rate: 1/s
