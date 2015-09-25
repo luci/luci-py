@@ -114,7 +114,8 @@ def lease_machine(machine_key, lease):
       params={
           'lease_id': lease.key.id(),
           'machine_id': machine.key.id(),
-          'topic': lease.request.pubsub_topic,
+          'pubsub_project': lease.request.pubsub_project,
+          'pubsub_topic': lease.request.pubsub_topic,
       },
       transactional=True,
   ):
@@ -215,7 +216,7 @@ def reclaim_machine(machine_key, reclamation_ts):
   machine.lease_id = None
   machine.lease_expiration_ts = None
 
-  policy = machine.policies.reclamation_policy
+  policy = machine.policies.on_reclamation
   if policy == rpc_messages.MachineReclamationPolicy.DELETE:
     lease.put()
     machine.key.delete()
@@ -239,11 +240,12 @@ def reclaim_machine(machine_key, reclamation_ts):
       '/internal/queues/reclaim-machine',
       'reclaim-machine',
       params={
-          'backend_pubsub_topic': machine.policies.pubsub_topic,
-          'backend_pubsub_project': machine.policies.pubsub_project,
+          'backend_project': machine.policies.pubsub_project,
+          'backend_topic': machine.policies.pubsub_topic,
           'lease_id': lease.key.id(),
+          'lessee_project': lease.request.pubsub_project,
+          'lessee_topic': lease.request.pubsub_topic,
           'machine_id': machine.key.id(),
-          'topic': lease.request.pubsub_topic,
       },
       transactional=True,
   ):

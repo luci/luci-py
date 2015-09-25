@@ -9,6 +9,7 @@ import json
 import logging
 
 import endpoints
+from google.appengine.api import app_identity
 from google.appengine.ext import ndb
 
 from protorpc import protobuf
@@ -20,6 +21,9 @@ from components.machine_provider import rpc_messages
 
 import acl
 import models
+
+
+PUBSUB_DEFAULT_PROJECT = app_identity.get_application_id()
 
 
 @auth.endpoints_api(name='catalog', version='v1')
@@ -90,6 +94,12 @@ class CatalogEndpoints(remote.Service):
             error=rpc_messages.CatalogManipulationRequestError.INVALID_TOPIC,
             machine_addition_request=request,
         )
+      if not request.policies.pubsub_project:
+        logging.info(
+            'Cloud Pub/Sub project unspecified, using default: %s',
+            PUBSUB_DEFAULT_PROJECT,
+        )
+        request.policies.pubsub_project = PUBSUB_DEFAULT_PROJECT
     if request.policies.pubsub_project:
       error = None
       if not pubsub.validate_project(request.policies.pubsub_project):
@@ -258,6 +268,12 @@ class MachineProviderEndpoints(remote.Service):
         return rpc_messages.LeaseResponse(
             error=rpc_messages.LeaseRequestError.INVALID_TOPIC,
         )
+      if not request.pubsub_project:
+        logging.info(
+            'Cloud Pub/Sub project unspecified, using default: %s',
+            PUBSUB_DEFAULT_PROJECT,
+        )
+        request.pubsub_project = PUBSUB_DEFAULT_PROJECT
     if request.pubsub_project:
       if not pubsub.validate_project(request.pubsub_project):
         logging.warning(

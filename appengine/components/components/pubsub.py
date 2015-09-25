@@ -8,14 +8,10 @@ import base64
 import logging
 import re
 
-from google.appengine.api import app_identity
-
 from components import net
 
 
-PUBSUB_BASE_URL = 'https://pubsub.googleapis.com/v1/projects/%s' % (
-    app_identity.get_application_id(),
-)
+PUBSUB_BASE_URL = 'https://pubsub.googleapis.com/v1/projects'
 PUBSUB_SCOPES = (
     'https://www.googleapis.com/auth/pubsub',
 )
@@ -35,16 +31,17 @@ def validate_project(project):
   return validate_topic(project)
 
 
-def _publish(topic, message, **attributes):
+def _publish(topic, project, message, **attributes):
   """Publish messages to Cloud Pub/Sub.
 
   Args:
     topic: Name of the topic to publish to.
+    project: Name of the project the topic exists in.
     message: Content of the message to publish.
     **attributes: Any attributes to send with the message.
   """
   net.json_request(
-      '%s/topics/%s:publish' % (PUBSUB_BASE_URL, topic),
+      '%s/%s/topics/%s:publish' % (PUBSUB_BASE_URL, project, topic),
       method='POST',
       payload={
           'messages': [
@@ -58,22 +55,23 @@ def _publish(topic, message, **attributes):
   )
 
 
-def publish(topic, message, **attributes):
+def publish(topic, project, message, **attributes):
   """Publish messages to Cloud Pub/Sub. Creates the topic if it doesn't exist.
 
   Args:
     topic: Name of the topic to publish to.
+    project: Name of the project the topic should exist in.
     message: Content of the message to publish.
     **attributes: Any attributes to send with the message.
   """
   try:
-    _publish(topic, message, **attributes)
+    _publish(topic, project, message, **attributes)
   except net.Error as e:
     if e.status_code == 404:
       # Topic does not exist. Try to create it.
       try:
         net.json_request(
-            '%s/topics/%s' % (PUBSUB_BASE_URL, topic),
+            '%s/%s/topics/%s' % (PUBSUB_BASE_URL, project, topic),
             method='PUT',
             scopes=PUBSUB_SCOPES,
         )
@@ -83,7 +81,7 @@ def publish(topic, message, **attributes):
           # else created it just now). Ignore 409, but raise any other error.
           raise
       # Retransmit now that the topic is created.
-      _publish(topic, message, **attributes)
+      _publish(topic, project, message, **attributes)
     else:
       # Unknown error.
       raise

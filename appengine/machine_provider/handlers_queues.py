@@ -17,23 +17,6 @@ from components.machine_provider import rpc_messages
 import models
 
 
-def publish(topic, message, lease_id, machine_id):
-  """Publish a message about a lease and machine.
-
-  Args:
-    topic: Topic that the message should be published to.
-    message: Content of the message to publish.
-    lease_id: ID of the LeaseRequest associated with this message.
-    machine_id: ID of the CatalogMachineEntry associated with this message.
-  """
-  pubsub.publish(
-      topic,
-      message,
-      request_hash=lease_id,
-      machine_id=machine_id,
-  )
-
-
 class LeaseRequestFulfiller(webapp2.RequestHandler):
   """Worker for fulfilling lease requests."""
 
@@ -44,15 +27,24 @@ class LeaseRequestFulfiller(webapp2.RequestHandler):
     Params:
       lease_id: ID of the LeaseRequest being fulfilled.
       machine_id: ID of the CatalogMachineEntry fulfilling the LeaseRequest.
-      topic: If specified, topic that the lease fulfillment should be published
-        to.
+      pubsub_topic: If specified, topic that the lease fulfillment should be
+        published to.
+      pubsub_project: If specified, project that the lease fulfillment topic is
+        contained in. Otherwise defaults to this project.
     """
     lease_id = self.request.get('lease_id')
     machine_id = self.request.get('machine_id')
-    topic = self.request.get('topic')
+    pubsub_project = self.request.get('pubsub_project')
+    pubsub_topic = self.request.get('pubsub_topic')
 
-    if topic:
-      publish(topic, 'FULFILLED', lease_id, machine_id)
+    if pubsub_topic:
+      pubsub.publish(
+          pubsub_topic,
+          pubsub_project,
+          'FULFILLED',
+          machine_id=machine_id,
+          request_hash=lease_id,
+    )
 
 
 class MachineReclaimer(webapp2.RequestHandler):
@@ -68,16 +60,35 @@ class MachineReclaimer(webapp2.RequestHandler):
       backend_project: If specified, project that the machine reclamation
         topic is contained in.
       lease_id: ID of the LeaseRequest the machine was leased for.
-      machine_id: ID of the CatalogMachineEntry being reclaimed.
-      topic: If specified, topic that the machine reclamation and lease
+      lessee_topic: If specified, topic that the machine reclamation and lease
         expiration should be published to for the lessee.
+      lessee_project: If specified, project that the machine reclamation and
+        lease expiration topic is contained in.
+      machine_id: ID of the CatalogMachineEntry being reclaimed.
     """
+    backend_project = self.request.get('backend_project')
+    backend_topic = self.request.get('backend_topic')
     lease_id = self.request.get('lease_id')
+    lessee_project = self.request.get('lessee_project')
+    lessee_topic = self.request.get('lessee_topic')
     machine_id = self.request.get('machine_id')
-    topic = self.request.get('topic')
 
-    if topic:
-      publish(topic, 'RECLAIMED', lease_id, machine_id)
+    if lessee_topic:
+      pubsub.publish(
+          lessee_topic,
+          lessee_project,
+          'RECLAIMED',
+          machine_id=machine_id,
+          request_hash=lease_id,
+    )
+
+    if backend_topic:
+      pubsub.publish(
+          backend_topic,
+          backend_project,
+          'RECLAIMED',
+          machine_id=machine_id,
+    )
 
 
 def create_queues_app():
