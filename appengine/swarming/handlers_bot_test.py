@@ -330,7 +330,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
     }
     self.assertEqual(expected, response)
 
-  def test_bot_error(self):
+  def test_bot_ereporter2_error(self):
+    # ereporter2's //client/utils/on_error.py traps unhandled exceptions
+    # automatically.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     errors = []
     self.mock(
@@ -347,11 +349,76 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
     # The bot fails somehow.
     error_params = {
-      'id': params['dimensions']['id'][0],
-      'message': 'Something happened',
+      'v': 1,
+      'r': {
+        'args': ['a', 'b'],
+        'category': 'junk',
+        'cwd': '/root',
+        'duration': 0.1,
+        'endpoint': '/root',
+        'env': {'a': 'b'},
+        'exception_type': 'FooError',
+        'hostname': 'localhost',
+        'message': 'Something happened',
+        'method': 'GET',
+        'os': 'Amiga',
+        'params': {'a': 123},
+        'python_version': '2.7',
+        'request_id': '123',
+        'source': params['dimensions']['id'][0],
+        'source_ip': '127.0.0.1',
+        'stack': 'stack trace...',
+        'user': 'Joe',
+        'version': '12',
+      },
     }
+    ereporter2_app = webtest.TestApp(
+        webapp2.WSGIApplication(ereporter2.get_frontend_routes(), debug=True),
+        extra_environ={
+          'REMOTE_ADDR': self.source_ip,
+          'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
+        })
+    response = ereporter2_app.post_json(
+        '/ereporter2/api/v1/on_error', error_params)
+    expected = {
+      u'id': 1,
+      u'url': u'http://localhost/restricted/ereporter2/errors/1',
+    }
+    self.assertEqual(expected, response.json)
+
+    # A bot error currently does not result in permanent quarantine. It will
+    # eventually.
+    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    self.assertTrue(response.pop(u'duration'))
+    expected = {
+      u'cmd': u'sleep',
+      u'quarantined': False,
+    }
+    self.assertEqual(expected, response)
+    self.assertEqual([], errors)
+
+  def test_bot_event_error(self):
+    # Native bot error reporting.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    errors = []
+    self.mock(
+        ereporter2, 'log_request',
+        lambda *args, **kwargs: errors.append((args, kwargs)))
+    token, params = self.get_bot_token()
+    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    self.assertTrue(response.pop(u'duration'))
+    expected = {
+      u'cmd': u'sleep',
+      u'quarantined': False,
+    }
+    self.assertEqual(expected, response)
+
+    # The bot fails somehow.
+    token, params2 = self.get_bot_token()
+    params2['event'] = 'bot_error'
+    params2['message'] = 'for the worst'
     response = self.post_with_token(
-        '/swarming/api/v1/bot/error', error_params, token)
+        '/swarming/api/v1/bot/event', params2, token)
     self.assertEqual({}, response)
 
     # A bot error currently does not result in permanent quarantine. It will
@@ -363,7 +430,14 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'quarantined': False,
     }
     self.assertEqual(expected, response)
-    self.assertEqual(1, len(errors))
+    expected = [
+      {
+        'message':
+            u'Bot: https://None/restricted/bot/bot1\nBot error:\nfor the worst',
+        'source': 'bot',
+      },
+    ]
+    self.assertEqual(expected, [e[1] for e in errors])
 
   def test_bot_event(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -651,6 +725,15 @@ class BotApiTest(test_env_handlers.AppTestBase):
     }
     self.assertEqual(expected, response)
     self.assertEqual(1, len(errors))
+    expected = [
+      {
+        'message':
+          u'Bot: https://None/restricted/bot/bot1\n'
+          'Task failed: https://None/user/task/5cee488008811\nOh',
+        'source': 'bot',
+      },
+    ]
+    self.assertEqual(expected, [e[1] for e in errors])
 
   def test_bot_code(self):
     code = self.app.get('/bot_code')

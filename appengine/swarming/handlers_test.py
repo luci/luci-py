@@ -108,7 +108,6 @@ class FrontendTest(AppTestBase):
       '/_ah/warmup',
       '/auth',
       '/ereporter2/api/v1/on_error',
-      '/server_ping',
       '/stats',
       '/swarming/api/v1/client/list',
       '/swarming/api/v1/bot/server_ping',

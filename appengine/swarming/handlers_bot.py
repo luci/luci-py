@@ -400,38 +400,6 @@ class BotPollHandler(_BotBaseHandler):
     self.send_response(out)
 
 
-class BotErrorHandler(auth.ApiHandler):
-  """Specialized version of ereporter2's /ereporter2/api/v1/on_error.
-
-  TODO(maruel): To be deleted.
-  """
-
-  EXPECTED_KEYS = {u'id', u'message'}
-
-  @auth.require(acl.is_bot)
-  def post(self):
-    request = self.parse_body()
-    log_unexpected_keys(
-        self.EXPECTED_KEYS, request, self.request, 'bot', 'keys')
-    message = request.get('message', 'unknown')
-    bot_id = request.get('id')
-    if bot_id:
-      bot_management.bot_event(
-          event_type='bot_error', bot_id=bot_id,
-          external_ip=self.request.remote_addr, dimensions=None, state=None,
-          version=None, quarantined=None, task_id=None, task_name=None,
-          message=message)
-
-    # Also log inconditionally an ereporter2 event.
-    line = (
-        'Bot: https://%s/restricted/bot/%s\n'
-        'Old API error:\n'
-        '%s') % (
-        app_identity.get_default_version_hostname(), bot_id, message)
-    ereporter2.log_request(self.request, source='bot', message=line)
-    self.send_response({})
-
-
 class BotEventHandler(_BotBaseHandler):
   """On signal that a bot had an event worth logging."""
 
@@ -602,7 +570,6 @@ def get_routes():
       ('/bootstrap', BootstrapHandler),
       ('/bot_code', BotCodeHandler),
       ('/swarming/api/v1/bot/bot_code/<version:[0-9a-f]{40}>', BotCodeHandler),
-      ('/swarming/api/v1/bot/error', BotErrorHandler),
       ('/swarming/api/v1/bot/event', BotEventHandler),
       ('/swarming/api/v1/bot/handshake', BotHandshakeHandler),
       ('/swarming/api/v1/bot/poll', BotPollHandler),
@@ -613,10 +580,5 @@ def get_routes():
       ('/swarming/api/v1/bot/task_error', BotTaskErrorHandler),
       ('/swarming/api/v1/bot/task_error/<task_id:[a-f0-9]+>',
           BotTaskErrorHandler),
-
-      # TODO(maruel): Remove once all bots are updated.
-      ('/get_slave_code', BotCodeHandler),
-      ('/get_slave_code/<version:[0-9a-f]{40}>', BotCodeHandler),
-      ('/server_ping', ServerPingHandler),
   ]
   return [webapp2.Route(*i) for i in routes]
