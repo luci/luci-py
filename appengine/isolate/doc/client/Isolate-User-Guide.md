@@ -39,20 +39,20 @@ only on Windows and the command there is different:
 
   1. Things that are configuration or OS specific.
   'conditions': [
-    [or OS=="linux" or OS=="mac"', {
+    ['OS=="linux" or OS=="mac"', {
       'variables': {
         'command': [
           '<(PRODUCT_DIR)/foo_unittests<(EXECUTABLE_SUFFIX)',
-        ]('OS=="android"),
+        ],
       },
     }],
 
-    [{
+    ['OS=="android"', {
       'variables': {
         'command': [
           'setup_env.py',
           '<(PRODUCT_DIR)/foo_unittests<(EXECUTABLE_SUFFIX)',
-        ]('OS=="win"',),
+        ],
         'files': [
           'setup_env.py',
         ],
