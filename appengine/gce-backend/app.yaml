@@ -14,6 +14,9 @@ handlers:
   login: admin
   script: main.queues_app
   secure: always
+- url: /pubsub/.*
+  script: main.pubsub_app
+  secure: always
 
 includes:
 - components/auth

@@ -18,16 +18,15 @@ import models
 
 
 @ndb.transactional
-def uncatalog_instances(group_name, instances):
+def uncatalog_instances(instances):
   """Uncatalogs cataloged instances.
 
   Args:
-    group_name: Name of the instance group these instances belong to.
     instances: List of instance names to uncatalog.
   """
   put_futures = []
   get_futures = [
-      models.Instance.generate_key(instance_name, group_name).get_async()
+      models.Instance.generate_key(instance_name).get_async()
       for instance_name in instances
   ]
   while get_futures:
@@ -62,13 +61,11 @@ class InstanceGroupCataloger(webapp2.RequestHandler):
         group.
       instances: JSON-encoded list of instances in the instance group to
         catalog:
-      name: Name of the instance group the instances are members of.
       policies: JSON-encoded string representation of machine_provider.Policies
         governing the members of the instance group.
     """
     dimensions = json.loads(self.request.get('dimensions'))
     instances = json.loads(self.request.get('instances'))
-    name = self.request.get('name')
     policies = json.loads(self.request.get('policies'))
 
     requests = []
@@ -102,7 +99,7 @@ class InstanceGroupCataloger(webapp2.RequestHandler):
       else:
         logging.info('Unknown instance: %s', instance_name)
 
-    uncatalog_instances(name, instances_to_uncatalog)
+    uncatalog_instances(instances_to_uncatalog)
 
 
 def create_queues_app():

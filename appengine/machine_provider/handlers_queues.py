@@ -30,7 +30,7 @@ class LeaseRequestFulfiller(webapp2.RequestHandler):
       pubsub_topic: If specified, topic that the lease fulfillment should be
         published to.
       pubsub_project: If specified, project that the lease fulfillment topic is
-        contained in. Otherwise defaults to this project.
+        contained in.
     """
     lease_id = self.request.get('lease_id')
     machine_id = self.request.get('machine_id')
@@ -58,7 +58,7 @@ class MachineReclaimer(webapp2.RequestHandler):
       backend_topic: If specified, topic that the machine reclamation should
         be published to for the backend.
       backend_project: If specified, project that the machine reclamation
-        topic is contained in.
+        topic is contained in for the backend.
       lease_id: ID of the LeaseRequest the machine was leased for.
       lessee_topic: If specified, topic that the machine reclamation and lease
         expiration should be published to for the lessee.

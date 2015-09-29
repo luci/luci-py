@@ -108,15 +108,17 @@ def lease_machine(machine_key, lease):
   )
   machine.state = models.CatalogMachineEntryStates.LEASED
   ndb.put_multi([lease, machine])
+  params = {
+      'lease_id': lease.key.id(),
+      'machine_id': machine.key.id(),
+  }
+  if lease.request.pubsub_topic:
+    params['pubsub_project'] = lease.request.pubsub_project
+    params['pubsub_topic'] = lease.request.pubsub_topic
   if not utils.enqueue_task(
       '/internal/queues/fulfill-lease-request',
       'fulfill-lease-request',
-      params={
-          'lease_id': lease.key.id(),
-          'machine_id': machine.key.id(),
-          'pubsub_project': lease.request.pubsub_project,
-          'pubsub_topic': lease.request.pubsub_topic,
-      },
+      params=params,
       transactional=True,
   ):
     raise TaskEnqueuingError('fulfill-lease-request')
@@ -218,10 +220,12 @@ def reclaim_machine(machine_key, reclamation_ts):
 
   policy = machine.policies.on_reclamation
   if policy == rpc_messages.MachineReclamationPolicy.DELETE:
+    logging.info('Executing MachineReclamationPolicy: DELETE')
     lease.put()
     machine.key.delete()
   else:
     if policy == rpc_messages.MachineReclamationPolicy.MAKE_AVAILABLE:
+      logging.info('Executing MachineReclamationPolicy: MAKE_AVAILABLE')
       machine.state = models.CatalogMachineEntryStates.AVAILABLE
     else:
       if policy != rpc_messages.MachineReclamationPolicy.RECLAIM:
@@ -230,23 +234,28 @@ def reclaim_machine(machine_key, reclamation_ts):
         # prevents the machine from being leased out again, but keeps it in
         # the Catalog in case we want to examine it further.
         logging.error(
-            'Unexpected MachineReclamationPolicy: %s\nDefaulting to RECLAIM.',
+            'Unexpected MachineReclamationPolicy: %s\nDefaulting to RECLAIM',
             policy,
         )
+      else:
+        logging.info('Executing MachineReclamationPolicy: RECLAIM')
       machine.state = models.CatalogMachineEntryStates.RECLAIMED
     ndb.put_multi([lease, machine])
 
+  params = {
+      'lease_id': lease.key.id(),
+      'machine_id': machine.key.id(),
+  }
+  if machine.policies.pubsub_topic:
+    params['backend_project'] = machine.policies.pubsub_project
+    params['backend_topic'] = machine.policies.pubsub_topic
+  if lease.request.pubsub_topic:
+    params['lessee_project'] = lease.request.pubsub_project
+    params['lessee_topic'] = lease.request.pubsub_topic
   if not utils.enqueue_task(
       '/internal/queues/reclaim-machine',
       'reclaim-machine',
-      params={
-          'backend_project': machine.policies.pubsub_project,
-          'backend_topic': machine.policies.pubsub_topic,
-          'lease_id': lease.key.id(),
-          'lessee_project': lease.request.pubsub_project,
-          'lessee_topic': lease.request.pubsub_topic,
-          'machine_id': machine.key.id(),
-      },
+      params=params,
       transactional=True,
   ):
     raise TaskEnqueuingError('reclaim-machine')

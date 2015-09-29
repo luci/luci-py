@@ -23,8 +23,8 @@ class InstanceGroup(ndb.Model):
   """Datastore representation of a GCE instance group.
 
   Key:
+    Instance group is a root entity.
     id: Hash of the instance group name.
-    kind: InstanceGroup. This root entity does not reference any parents.
   """
   # rpc_messages.Dimensions describing members of this instance group.
   dimensions = msgprop.MessageProperty(rpc_messages.Dimensions, required=True)
@@ -75,8 +75,8 @@ class Instance(ndb.Model):
   """Datastore representation of a GCE instance.
 
   Key:
+    Instance is a root entity.
     id: Hash of the instance group name + the instance name.
-    kind: Instance. This entity's parent is the InstanceGroup it belongs to.
   """
   # Name of the instance group this instance belongs to.
   group = ndb.StringProperty(required=True)
@@ -86,18 +86,13 @@ class Instance(ndb.Model):
   state = ndb.StringProperty(choices=InstanceStates, required=True)
 
   @classmethod
-  def generate_key(cls, name, group):
-    """Generates the key for an InstanceGroup with the given name.
+  def generate_key(cls, name):
+    """Generates the key for an Instance with the given name.
 
     Args:
-      name: Name of this instance group.
-      group: Name of the instance group this instance is a member of.
+      name: Name of this instance.
 
     Returns:
       An ndb.Key instance.
     """
-    return ndb.Key(
-        cls,
-        hashlib.sha1('%s\0%s' % (name, group)).hexdigest(),
-        parent=InstanceGroup.generate_key(group),
-    )
+    return ndb.Key(cls, hashlib.sha1(name).hexdigest())

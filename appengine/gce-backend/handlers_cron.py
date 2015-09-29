@@ -16,8 +16,10 @@ from components import decorators
 from components import gce
 from components import machine_provider
 from components import net
+from components import pubsub
 from components import utils
 
+import handlers_pubsub
 import models
 
 
@@ -102,14 +104,13 @@ class InstanceTemplateProcessor(webapp2.RequestHandler):
         logging.info('Instance group manager already exists: %s', template_name)
 
 
-@ndb.transactional
+@ndb.transactional(xg=True)
 def create_instance_group(name, dimensions, policies, instances):
   """Stores an InstanceGroup and Instance entities in the datastore.
 
   Also attempts to catalog each running Instance in the Machine Provider.
 
-  Operates on model.Instance entities which share a common ancestor
-  model.InstanceGroup (which is the root entity operated on).
+  Operates on two root entities: model.Instance and model.InstanceGroup.
 
   Args:
     name: Name of this instance group.
@@ -125,7 +126,7 @@ def create_instance_group(name, dimensions, policies, instances):
 
   for instance_name, instance in instances.iteritems():
     logging.info('Processing instance: %s', instance_name)
-    instance_key = models.Instance.generate_key(instance_name, name)
+    instance_key = models.Instance.generate_key(instance_name)
     instance_map[instance_name] = models.Instance(
         key=instance_key,
         group=name,
@@ -159,7 +160,6 @@ def create_instance_group(name, dimensions, policies, instances):
         params={
             'dimensions': utils.encode_to_json(dimensions),
             'instances': utils.encode_to_json(instances_to_catalog),
-            'name': name,
             'policies': utils.encode_to_json(policies),
         },
         transactional=True,
@@ -184,6 +184,8 @@ class InstanceProcessor(webapp2.RequestHandler):
     templates = api.get_instance_templates()
     logging.info('Retrieving instance group managers')
     managers = api.get_instance_group_managers(ZONE)
+
+    handlers_pubsub.MachineProviderSubscriptionHandler.ensure_subscribed()
 
     requests = []
 
@@ -212,7 +214,11 @@ class InstanceProcessor(webapp2.RequestHandler):
       )
       instances = api.get_managed_instances(manager_name, ZONE)
       policies = machine_provider.Policies(
-          on_reclamation=machine_provider.MachineReclamationPolicy.DELETE)
+          on_reclamation=machine_provider.MachineReclamationPolicy.DELETE,
+          pubsub_project=
+              handlers_pubsub.MachineProviderSubscriptionHandler.TOPIC_PROJECT,
+          pubsub_topic=handlers_pubsub.MachineProviderSubscriptionHandler.TOPIC,
+      )
 
       create_instance_group(manager_name, dimensions, policies, instances)
 
