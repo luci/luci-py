@@ -41,7 +41,7 @@ def _string_pairs_from_dict(dictionary):
 def _string_list_pairs_from_dict(dictionary):
   return [
     swarming_rpcs.StringListPair(key=k, value=v)
-    for k, v in sorted(dictionary.iteritems())
+    for k, v in sorted((dictionary or {}).iteritems())
   ]
 
 

@@ -3,36 +3,40 @@
 {% endmacro %}
 
 {% macro render_dict(data) %}
-  {% for k, v in data.iteritems()|sort %}
-    <strong>{{k}}</strong>:
-    {% if v is string %}
-      {{v}}
-      <br>
-    {% elif v is mapping %}
-      <br>{{render_dict_idented(v, '&nbsp;&nbsp;')}}
-    {% elif v is sequence %}
-      {{v|sort|join(' | ')}}
-      <br>
-    {% else %}
-      {{v}}
-      <br>
-    {% endif %}
-  {% endfor %}
+  {% if data %}
+    {% for k, v in data.iteritems()|sort %}
+      <strong>{{k}}</strong>:
+      {% if v is string %}
+        {{v}}
+        <br>
+      {% elif v is mapping %}
+        <br>{{render_dict_idented(v, '&nbsp;&nbsp;')}}
+      {% elif v is sequence %}
+        {{v|sort|join(' | ')}}
+        <br>
+      {% else %}
+        {{v}}
+        <br>
+      {% endif %}
+    {% endfor %}
+  {% endif %}
 {% endmacro %}
 
 {% macro render_dict_idented(data, indent) %}
-  {% for k, v in data.iteritems()|sort %}
-    {{indent|safe}}<strong>{{k}}</strong>:
-    {% if v is string %}
-      {{v}}<br>
-    {% elif v is mapping %}
-    <br>{{render_dict_idented(v, indent + '&nbsp;&nbsp;')}}
-    {% elif v is sequence %}
-      {{v|sort|join(' | ')}}<br>
-    {% else %}
-      {{v}}<br>
-    {% endif %}
-  {% endfor %}
+  {% if data %}
+    {% for k, v in data.iteritems()|sort %}
+      {{indent|safe}}<strong>{{k}}</strong>:
+      {% if v is string %}
+        {{v}}<br>
+      {% elif v is mapping %}
+      <br>{{render_dict_idented(v, indent + '&nbsp;&nbsp;')}}
+      {% elif v is sequence %}
+        {{v|sort|join(' | ')}}<br>
+      {% else %}
+        {{v}}<br>
+      {% endif %}
+    {% endfor %}
+  {% endif %}
 {% endmacro %}
 
 {% macro bot_link(bot_id, is_privileged_user) %}
