@@ -59,7 +59,7 @@ class LocalServers(object):
     self.http_client.url_opener.addheaders.append(
         ('X-XSRF-Token', self._swarming_server.client.xsrf_token))
 
-  def stop(self):
+  def stop(self, leak):
     """Stops the local Swarming and Isolate servers.
 
     Returns the exit code with priority to non-zero.
@@ -67,10 +67,10 @@ class LocalServers(object):
     exit_code = None
     try:
       if self._isolate_server:
-        exit_code = exit_code or self._isolate_server.stop()
+        exit_code = exit_code or self._isolate_server.stop(leak)
     finally:
       if self._swarming_server:
-        exit_code = exit_code or self._swarming_server.stop()
+        exit_code = exit_code or self._swarming_server.stop(leak)
     return exit_code
 
   def wait(self):
@@ -101,7 +101,7 @@ def main():
   except KeyboardInterrupt:
     print >> sys.stderr, '<Ctrl-C> received; stopping servers'
   finally:
-    exit_code = servers.stop()
+    exit_code = servers.stop(False)
   return exit_code
 
 

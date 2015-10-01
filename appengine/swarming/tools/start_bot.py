@@ -53,7 +53,7 @@ class LocalBot(object):
     else:
       self._proc = subprocess.Popen(cmd, cwd=self._tmpdir, env=env, **kwargs)
 
-  def stop(self):
+  def stop(self, leak):
     """Stops the local Swarming bot. Returns the process exit code."""
     if not self._proc:
       return None
@@ -68,10 +68,11 @@ class LocalBot(object):
     if self._tmpdir:
       for i in sorted(glob.glob(os.path.join(self._tmpdir, 'logs', '*.log'))):
         self._read_log(i)
-      try:
-        shutil.rmtree(self._tmpdir)
-      except OSError:
-        print >> sys.stderr, 'Leaking %s' % self._tmpdir
+      if not leak:
+        try:
+          shutil.rmtree(self._tmpdir)
+        except OSError:
+          print >> sys.stderr, 'Leaking %s' % self._tmpdir
       self._tmpdir = None
     self._proc = None
     return exit_code
@@ -119,7 +120,7 @@ def main():
   except KeyboardInterrupt:
     print >> sys.stderr, '<Ctrl-C> received; stopping bot'
   finally:
-    exit_code = bot.stop()
+    exit_code = bot.stop(False)
   return exit_code
 
 

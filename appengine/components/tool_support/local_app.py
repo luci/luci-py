@@ -181,7 +181,7 @@ class LocalApplication(object):
     logging.info('Service %s is ready.', self.app_id)
     self._serving = True
 
-  def stop(self):
+  def stop(self, leak=False):
     """Stops dev_appserver, collects its log.
 
     Returns the process error code if applicable.
@@ -206,11 +206,12 @@ class LocalApplication(object):
     finally:
       with open(os.path.join(self._temp_root, 'dev_appserver.log'), 'r') as f:
         self._log = f.read()
-      try:
-        shutil.rmtree(self._temp_root)
-      except OSError as e:
-        # Log but ignore it to not mask other errors.
-        print >> sys.stderr, str(e)
+      if not leak:
+        try:
+          shutil.rmtree(self._temp_root)
+        except OSError as e:
+          # Log but ignore it to not mask other errors.
+          print >> sys.stderr, str(e)
       self._client = None
       self._port = None
       self._proc = None

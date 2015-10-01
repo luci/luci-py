@@ -43,6 +43,33 @@ from api import os_utilities
 SIGNAL_TERM = -1073741510 if sys.platform == 'win32' else -signal.SIGTERM
 
 
+# For the isolated tests that outputs a file named result.txt containing 'hey'.
+ISOLATE_HELLO_WORLD = {
+  'variables': {
+    'command': ['python', '-u', 'hello_world.py'],
+    'files': ['hello_world.py'],
+  },
+}
+
+RESULT_HEY_ISOLATED_OUT = {
+  u'isolated': u'f10f4c42b38ca01726610f9575ba695468c32108',
+  u'isolatedserver': u'http://localhost:10050',
+  u'namespace': u'default-gzip',
+  u'view_url':
+    u'http://localhost:10050/browse?namespace=default-gzip'
+    '&hash=f10f4c42b38ca01726610f9575ba695468c32108',
+}
+
+RESULT_HEY_OUTPUTS_REF = {
+  u'isolated': u'f10f4c42b38ca01726610f9575ba695468c32108',
+  u'isolatedserver': u'http://localhost:10050',
+  u'namespace': u'default-gzip',
+  u'view_url':
+    u'http://localhost:10050/browse?namespace=default-gzip'
+    '&hash=f10f4c42b38ca01726610f9575ba695468c32108',
+}
+
+
 class SwarmingClient(object):
   def __init__(self, swarming_server, isolate_server):
     self._swarming_server = swarming_server
@@ -337,12 +364,6 @@ class Test(unittest.TestCase):
 
   def test_isolated(self):
     # Make an isolated file, archive it.
-    isolate = {
-      'variables': {
-        'command': ['python', 'hello_world.py'],
-        'files': ['hello_world.py'],
-      },
-    }
     hello_world = '\n'.join((
         'import os',
         'import sys',
@@ -350,38 +371,97 @@ class Test(unittest.TestCase):
         'with open(os.path.join(sys.argv[1], \'result.txt\'), \'wb\') as f:',
         '  f.write(\'hey\')'))
     expected_summary = self.gen_expected(
-        name=u'yo',
-        isolated_out={
-          u'isolated': u'f10f4c42b38ca01726610f9575ba695468c32108',
-          u'isolatedserver': u'http://localhost:10050',
-          u'namespace': u'default-gzip',
-          u'view_url':
-            u'http://localhost:10050/browse?namespace=default-gzip'
-            '&hash=f10f4c42b38ca01726610f9575ba695468c32108',
-        },
-        outputs=[
-          u'hi\n'
-        ],
-        outputs_ref={
-          u'isolated': u'f10f4c42b38ca01726610f9575ba695468c32108',
-          u'isolatedserver': u'http://localhost:10050',
-          u'namespace': u'default-gzip',
-          u'view_url':
-            u'http://localhost:10050/browse?namespace=default-gzip'
-            '&hash=f10f4c42b38ca01726610f9575ba695468c32108',
-        })
+        name=u'isolated_task',
+        isolated_out=RESULT_HEY_ISOLATED_OUT,
+        outputs=[u'hi\n'],
+        outputs_ref=RESULT_HEY_OUTPUTS_REF)
     expected_files = {os.path.join('0', 'result.txt'): 'hey'}
+    self._run_isolated(
+        hello_world, 'isolated_task', ['--', '${ISOLATED_OUTDIR}'],
+        expected_summary, expected_files)
+
+  def test_isolated_hard_timeout(self):
+    # Make an isolated file, archive it, have it time out. Similar to
+    # test_hard_timeout. The script doesn't handle signal so it failed the grace
+    # period.
+    hello_world = '\n'.join((
+        'import os',
+        'import sys',
+        'import time',
+        'sys.stdout.write(\'hi\\n\')',
+        'sys.stdout.flush()',
+        'time.sleep(120)',
+        'with open(os.path.join(sys.argv[1], \'result.txt\'), \'wb\') as f:',
+        '  f.write(\'hey\')'))
+    expected_summary = self.gen_expected(
+        name=u'isolated_hard_timeout',
+        exit_codes=[SIGNAL_TERM],
+        failure=True,
+        state=0x40)  # task_result.State.TIMED_OUT
+    self._run_isolated(
+        hello_world, 'isolated_hard_timeout',
+        ['--hard-timeout', '1', '--', '${ISOLATED_OUTDIR}'],
+        expected_summary, {})
+
+  def test_isolated_hard_timeout_grace(self):
+    # Make an isolated file, archive it, have it time out. Similar to
+    # test_hard_timeout. The script handles signal so it send results back.
+    hello_world = '\n'.join((
+        'import os',
+        'import signal',
+        'import sys',
+        'import time',
+        'l = []',
+        'def handler(signum, _):',
+        '  l.append(signum)',
+        '  sys.stdout.write(\'got signal %d\\n\' % signum)',
+        '  sys.stdout.flush()',
+        'signal.signal(signal.%s, handler)' %
+            ('SIGBREAK' if sys.platform == 'win32' else 'SIGTERM'),
+        'sys.stdout.write(\'hi\\n\')',
+        'sys.stdout.flush()',
+        'while not l:',
+        '  try:',
+        '    time.sleep(0.01)',
+        '  except IOError:',
+        '    print(\'ioerror\')',
+        'with open(os.path.join(sys.argv[1], \'result.txt\'), \'wb\') as f:',
+        '  f.write(\'hey\')'))
+    expected_summary = self.gen_expected(
+        name=u'isolated_hard_timeout_grace',
+        isolated_out=RESULT_HEY_ISOLATED_OUT,
+        outputs=[u'hi\ngot signal 15\n'],
+        outputs_ref=RESULT_HEY_OUTPUTS_REF,
+        failure=True,
+        state=0x40)  # task_result.State.TIMED_OUT
+    expected_files = {os.path.join('0', 'result.txt'): 'hey'}
+    # Sadly we have to use a slow timeout here as this test can be flaky; it
+    # will not result in the expected result if run_isolated receives the signal
+    # before it had time to download the files, map them and start the child
+    # process, which then had time to setup its handler.
+    # TODO(maruel): When using run_isolated, have run_isolated enforces the hard
+    # timeout, while I/O timeout is still enforced by task_runner. This is due
+    # to run_isolated not piping stdout so it doesn't know about stdout/stderr
+    # output. Once this is fixed, the timeout can be reduced back to 1s.
+    self._run_isolated(
+        hello_world, 'isolated_hard_timeout_grace',
+        ['--hard-timeout', '3', '--', '${ISOLATED_OUTDIR}'],
+        expected_summary, expected_files)
+
+  def _run_isolated(self, hello_world, name, args, expected_summary,
+      expected_files):
+    # Shared code for all test_isolated_* test cases.
     tmpdir = tempfile.mkdtemp(prefix='swarming_smoke')
     try:
       isolate_path = os.path.join(tmpdir, 'i.isolate')
       isolated_path = os.path.join(tmpdir, 'i.isolated')
       with open(isolate_path, 'wb') as f:
-        json.dump(isolate, f)
+        json.dump(ISOLATE_HELLO_WORLD, f)
       with open(os.path.join(tmpdir, 'hello_world.py'), 'wb') as f:
         f.write(hello_world)
       isolated_hash = self.client.isolate(isolate_path, isolated_path)
       task_id = self.client.task_trigger_isolated(
-          'yo', isolated_hash, extra=['--', '${ISOLATED_OUTDIR}'])
+          name, isolated_hash, extra=args)
       actual_summary, actual_files = self.client.task_collect(task_id)
       self.assertResults(expected_summary, actual_summary)
       actual_files.pop('summary.json')
@@ -417,16 +497,16 @@ class Test(unittest.TestCase):
     return bot_version
 
 
-def cleanup(bot, client, servers, print_all):
+def cleanup(bot, client, servers, print_all, leak):
   """Kills bot, kills server, print logs if failed, delete tmpdir."""
   try:
     try:
       try:
         if bot:
-          bot.stop()
+          bot.stop(leak)
       finally:
         if servers:
-          servers.stop()
+          servers.stop(leak)
     finally:
       if print_all:
         if bot:
@@ -436,12 +516,15 @@ def cleanup(bot, client, servers, print_all):
         if client:
           client.dump_log()
   finally:
-    if client:
+    if client and not leak:
       client.cleanup()
 
 
 def main():
   verbose = '-v' in sys.argv
+  leak = bool('--leak' in sys.argv)
+  if leak:
+    sys.argv.remove('--leak')
   if verbose:
     logging.basicConfig(level=logging.INFO)
     unittest.TestCase.maxDiff = None
@@ -474,7 +557,7 @@ def main():
     if bot:
       bot.kill()
   finally:
-    cleanup(bot, client, servers, failed or verbose)
+    cleanup(bot, client, servers, failed or verbose, leak)
   return int(failed)
 
 

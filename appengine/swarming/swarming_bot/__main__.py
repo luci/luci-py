@@ -60,7 +60,6 @@ def CMDtask_runner(args):
 def CMDstart_bot(args):
   """Starts the swarming bot."""
   logging_utils.prepare_logging(os.path.join('logs', 'swarming_bot.log'))
-  logging_utils.set_console_level(logging.DEBUG)
   logging.info(
       'importing bot_main: %s, %s', THIS_FILE, zip_package.generate_version())
   from bot_code import bot_main
@@ -73,7 +72,6 @@ def CMDstart_slave(args):
   """Ill named command that actually sets up the bot then start it."""
   # TODO(maruel): Rename function.
   logging_utils.prepare_logging(os.path.join('logs', 'bot_config.log'))
-  logging_utils.set_console_level(logging.DEBUG)
 
   parser = optparse.OptionParser()
   parser.add_option(

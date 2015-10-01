@@ -345,6 +345,7 @@ def run_command(
     had_hard_timeout = False
     had_io_timeout = False
     must_signal_internal_failure = None
+    kill_sent = False
     timed_out = None
     try:
       calc = lambda: calc_yield_wait(
@@ -372,34 +373,26 @@ def run_command(
         if not timed_out:
           if now - last_io > task_details.io_timeout:
             had_io_timeout = True
-            logging.warning('I/O timeout')
-            try:
-              proc.terminate()
-            except OSError:
-              pass
+            logging.warning('I/O timeout; sending SIGTERM')
+            proc.terminate()
             timed_out = monotonic_time()
           elif now - start > task_details.hard_timeout:
             had_hard_timeout = True
-            logging.warning('Hard timeout')
-            try:
-              proc.terminate()
-            except OSError:
-              pass
+            logging.warning('Hard timeout; sending SIGTERM')
+            proc.terminate()
             timed_out = monotonic_time()
         else:
           # During grace period.
-          if now >= timed_out + task_details.grace_period:
+          if not kill_sent and now >= timed_out + task_details.grace_period:
             # Now kill for real. The user can distinguish between the following
             # states:
             # - signal but process exited within grace period,
             #   (hard_|io_)_timed_out will be set but the process exit code will
             #   be script provided.
             # - processed exited late, exit code will be -9 on posix.
-            try:
-              logging.warning('proc.kill() after grace')
-              proc.kill()
-            except OSError:
-              pass
+            logging.warning('Grace exhausted; sending SIGKILL')
+            proc.kill()
+            kill_sent = True
       logging.info('Waiting for proces exit')
       exit_code = proc.wait()
     except MustExit as e:
