@@ -138,7 +138,8 @@ class _Device(object):
       # command.
       cmd = cmd + ' ; echo $?'
       out = self.adb_cmd.Shell(cmd).decode('utf-8', 'replace')
-    except adb.common.libusb1.USBError as e:
+    except (
+        adb.usb_exceptions.CommonUsbError, adb.common.libusb1.USBError) as e:
       # Trap all USB exceptions.
       logging.error('%s.shell(%s): %s', self.name, cmd, e)
       return None, None
