@@ -398,6 +398,7 @@ class Test(unittest.TestCase):
         exit_codes=[SIGNAL_TERM],
         failure=True,
         state=0x40)  # task_result.State.TIMED_OUT
+    # Hard timeout is enforced by run_isolated, I/O timeout by task_runner.
     self._run_isolated(
         hello_world, 'isolated_hard_timeout',
         ['--hard-timeout', '1', '--', '${ISOLATED_OUTDIR}'],
@@ -435,17 +436,10 @@ class Test(unittest.TestCase):
         failure=True,
         state=0x40)  # task_result.State.TIMED_OUT
     expected_files = {os.path.join('0', 'result.txt'): 'hey'}
-    # Sadly we have to use a slow timeout here as this test can be flaky; it
-    # will not result in the expected result if run_isolated receives the signal
-    # before it had time to download the files, map them and start the child
-    # process, which then had time to setup its handler.
-    # TODO(maruel): When using run_isolated, have run_isolated enforces the hard
-    # timeout, while I/O timeout is still enforced by task_runner. This is due
-    # to run_isolated not piping stdout so it doesn't know about stdout/stderr
-    # output. Once this is fixed, the timeout can be reduced back to 1s.
+    # Hard timeout is enforced by run_isolated, I/O timeout by task_runner.
     self._run_isolated(
         hello_world, 'isolated_hard_timeout_grace',
-        ['--hard-timeout', '3', '--', '${ISOLATED_OUTDIR}'],
+        ['--hard-timeout', '1', '--', '${ISOLATED_OUTDIR}'],
         expected_summary, expected_files)
 
   def _run_isolated(self, hello_world, name, args, expected_summary,

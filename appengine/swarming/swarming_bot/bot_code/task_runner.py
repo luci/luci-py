@@ -102,6 +102,10 @@ def get_isolated_cmd(work_dir, task_details, isolated_result):
     '--cache', os.path.join(bot_dir, 'cache'),
     '--root-dir', os.path.join(work_dir, 'isolated'),
   ]
+  if task_details.hard_timeout:
+    cmd.extend(('--hard-timeout', str(task_details.hard_timeout)))
+  if task_details.grace_period:
+    cmd.extend(('--grace-period', str(task_details.grace_period)))
   if task_details.extra_args:
     cmd.append('--')
     cmd.extend(task_details.extra_args)
@@ -253,12 +257,16 @@ def calc_yield_wait(task_details, start, last_io, timed_out, stdout):
   now = monotonic_time()
   if timed_out:
     # Give a |grace_period| seconds delay.
-    return max(now - timed_out - task_details.grace_period, 0.)
+    if task_details.grace_period:
+      return max(now - timed_out - task_details.grace_period, 0.)
+    return 0.
 
-  packet_interval = MIN_PACKET_INTERNAL if stdout else MAX_PACKET_INTERVAL
-  hard_timeout = start + task_details.hard_timeout - now
-  io_timeout = last_io + task_details.io_timeout - now
-  out = max(min(min(packet_interval, hard_timeout), io_timeout), 0)
+  out = MIN_PACKET_INTERNAL if stdout else MAX_PACKET_INTERVAL
+  if task_details.hard_timeout:
+    out = min(out, start + task_details.hard_timeout - now)
+  if task_details.io_timeout:
+    out = min(out, last_io + task_details.io_timeout - now)
+  out = max(out, 0)
   logging.debug('calc_yield_wait() = %d', out)
   return out
 
@@ -304,6 +312,12 @@ def run_command(
     # Isolated task.
     isolated_result = os.path.join(work_dir, 'isolated_result.json')
     cmd = get_isolated_cmd(work_dir, task_details, isolated_result)
+    # Hard timeout enforcement is deferred to run_isolated. Grace is doubled to
+    # give one 'grace_period' slot to the child process and one slot to upload
+    # the results back.
+    task_details.hard_timeout = 0
+    if task_details.grace_period:
+      task_details.grace_period *= 2
 
   try:
     # TODO(maruel): Support both channels independently and display stderr in
@@ -371,12 +385,14 @@ def run_command(
         # internal_failures.
         # Eventually kill but return 0 so bot_main.py doesn't cancel the task.
         if not timed_out:
-          if now - last_io > task_details.io_timeout:
+          if (task_details.io_timeout and
+              now - last_io > task_details.io_timeout):
             had_io_timeout = True
             logging.warning('I/O timeout; sending SIGTERM')
             proc.terminate()
             timed_out = monotonic_time()
-          elif now - start > task_details.hard_timeout:
+          elif (task_details.hard_timeout and
+              now - start > task_details.hard_timeout):
             had_hard_timeout = True
             logging.warning('Hard timeout; sending SIGTERM')
             proc.terminate()
@@ -422,6 +438,8 @@ def run_command(
         # TODO(maruel): Grab statistics (cache hit rate, data downloaded,
         # mapping time, etc) from run_isolated and push them to the server.
         params['outputs_ref'] = run_isolated_result['outputs_ref']
+        had_hard_timeout = run_isolated_result['had_hard_timeout']
+        params['hard_timeout'] = had_hard_timeout
         if run_isolated_result['internal_failure']:
           must_signal_internal_failure = run_isolated_result['internal_failure']
           logging.error('%s', must_signal_internal_failure)

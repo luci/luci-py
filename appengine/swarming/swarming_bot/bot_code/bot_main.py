@@ -393,9 +393,14 @@ def run_manifest(botobj, manifest, start):
   # to execute the command. It is important to note that this data is extracted
   # before any I/O is done, like writting the manifest to disk.
   task_id = manifest['task_id']
-  # Sets an hard timeout of task's hard_time + 5 minutes to notify the server.
-  # TODO(maruel): Add grace period.
-  hard_timeout = manifest['hard_timeout'] + 5*60.
+  hard_timeout = manifest['hard_timeout'] or None
+  # Default the grace period to 30s here, this doesn't affect the grace period
+  # for the actual task.
+  grace_period = manifest['grace_period'] or 30
+  if manifest['hard_timeout']:
+    # One for the child process, one for run_isolated, one for task_runner.
+    hard_timeout += 3 * manifest['grace_period']
+
   url = manifest.get('host', botobj.remote.url)
   task_dimensions = manifest['dimensions']
   task_result = {}
@@ -442,14 +447,23 @@ def run_manifest(botobj, manifest, start):
           env=env,
           stdout=f,
           stderr=subprocess42.STDOUT)
-    while proc.poll() is None:
-      if time.time() - start >= hard_timeout:
-        proc.kill()
+      try:
+        proc.wait(hard_timeout)
+      except subprocess42.TimeoutExpired:
+        # That's the last ditch effort; as task_runner should have completed a
+        # while ago and had enforced the timeout itself (or run_isolated for
+        # hard_timeout for isolated task).
+        logging.error('Sending SIGTERM to task_runner')
+        proc.terminate()
         internal_failure = True
         msg = 'task_runner hung'
+        try:
+          proc.wait(grace_period)
+        except subprocess42.TimeoutExpired:
+          logging.error('Sending SIGKILL to task_runner')
+          proc.kill()
+        proc.wait()
         return False
-      # Busy loop.
-      time.sleep(0.5)
 
     if os.path.exists(task_result_file):
       with open(task_result_file, 'rb') as fd:
