@@ -111,6 +111,7 @@ class _Device(object):
         self.serial = adb_cmd.handle.serial_number
       except adb.common.libusb1.USBError:
         pass
+    self._has_reset = False
 
   @property
   def is_valid(self):
@@ -131,22 +132,50 @@ class _Device(object):
       - stdout is as unicode if it ran, None if an USB error occurred.
       - exit_code is set if ran.
     """
+    try:
+      return self.shell_raw(cmd)
+    except (
+        adb.usb_exceptions.CommonUsbError,
+        adb.common.libusb1.USBError,
+        ValueError) as e:
+      # Trap all USB exceptions.
+      # - CommonUsbError means that device I/O failed, e.g. a write or a read
+      #   call returned an error.
+      # - USBError means that a bus I/O failed, e.g. the device path is not
+      #   present anymore.
+      # - ValueError means that there was a protocol level failure. For example
+      #   the returned data is garbage.
+      # In each case, try to do a device reset, it may help. Sadly, this likely
+      # mean that the device may not be accessible anymore until the next
+      # discovery but it's better than leaving it in a bad state.
+      logging.error('%s.shell(%s): %s', self.serial, cmd, e)
+      if not self._has_reset:
+        self._has_reset = True
+        # TODO(maruel): Intentionally do not trap exceptions here, as we want to
+        # see how it (mis-)behaves in the field.
+        # http://libusb.org/static/api-1.0/group__dev.html#ga7321bd8dc28e9a20b411bf18e6d0e9aa
+        self.adb_cmd.handle.resetDevice()
+        self.close()
+      return None, None
+
+  def shell_raw(self, cmd):
+    """Runs a command on an Android device.
+
+    Returns:
+      tuple(stdout, exit_code)
+      - stdout is as unicode if it ran, None if an USB error occurred.
+      - exit_code is set if ran.
+    """
     if not self.adb_cmd:
       return None, None
-    try:
-      # The adb protocol doesn't return the exit code, so embed it inside the
-      # command.
-      cmd = cmd + ' ; echo $?'
-      out = self.adb_cmd.Shell(cmd).decode('utf-8', 'replace')
-    except (
-        adb.usb_exceptions.CommonUsbError, adb.common.libusb1.USBError) as e:
-      # Trap all USB exceptions.
-      logging.error('%s.shell(%s): %s', self.name, cmd, e)
-      return None, None
+    # The adb protocol doesn't return the exit code, so embed it inside the
+    # command.
+    out = self.adb_cmd.Shell(cmd + ' ; echo $?').decode('utf-8', 'replace')
     # Protect against & or other bash conditional execution that wouldn't make
     # the 'echo $?' command to run.
     if not out:
       return out, None
+    # TODO(maruel): Remove and handle if this is ever trapped.
     assert out[-1] == '\n', out
     # Strip the last line to extract the exit code.
     parts = out[:-1].rsplit('\n', 1)
