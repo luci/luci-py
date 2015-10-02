@@ -288,39 +288,9 @@ def get_physical_ram():
   """Returns the amount of installed RAM in Mb, rounded to the nearest number.
   """
   if sys.platform == 'win32':
-    # https://msdn.microsoft.com/library/windows/desktop/aa366589.aspx
-    class MemoryStatusEx(ctypes.Structure):
-      _fields_ = [
-        ('dwLength', ctypes.c_ulong),
-        ('dwMemoryLoad', ctypes.c_ulong),
-        ('dwTotalPhys', ctypes.c_ulonglong),
-        ('dwAvailPhys', ctypes.c_ulonglong),
-        ('dwTotalPageFile', ctypes.c_ulonglong),
-        ('dwAvailPageFile', ctypes.c_ulonglong),
-        ('dwTotalVirtual', ctypes.c_ulonglong),
-        ('dwAvailVirtual', ctypes.c_ulonglong),
-        ('dwAvailExtendedVirtual', ctypes.c_ulonglong),
-      ]
-    stat = MemoryStatusEx()
-    stat.dwLength = ctypes.sizeof(MemoryStatusEx)  # pylint: disable=W0201
-    ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
-    return int(round(stat.dwTotalPhys / 1024. / 1024.))
-
+    return platforms.win.get_physical_ram()
   if sys.platform == 'darwin':
-    CTL_HW = 6
-    HW_MEMSIZE = 24
-    result = ctypes.c_uint64(0)
-    arr = (ctypes.c_int * 2)()
-    arr[0] = CTL_HW
-    arr[1] = HW_MEMSIZE
-    size = ctypes.c_size_t(ctypes.sizeof(result))
-    ctypes.cdll.LoadLibrary("libc.dylib")
-    libc = ctypes.CDLL("libc.dylib")
-    libc.sysctl(
-        arr, 2, ctypes.byref(result), ctypes.byref(size), None,
-        ctypes.c_size_t(0))
-    return int(round(result.value / 1024. / 1024.))
-
+    return platforms.osx.get_physical_ram()
   if os.path.isfile('/proc/meminfo'):
     # linux.
     meminfo = _safe_read('/proc/meminfo') or ''
@@ -477,138 +447,7 @@ def send_metric(name, value):
   # Ignore on other platforms for now.
 
 
-
-
-### Windows.
-
-
-@tools.cached
-def get_integrity_level_win():
-  """Returns the integrity level of the current process as a string.
-
-  TODO(maruel): It'd be nice to make it work on cygwin. The problem is that
-  ctypes.windll is unaccessible and it is not known to the author how to use
-  stdcall convention through ctypes.cdll.
-  """
-  if sys.platform != 'win32':
-    return None
-  if get_os_version_number() == u'5.1':
-    # Integrity level is Vista+.
-    return None
-
-  mapping = {
-    0x0000: u'untrusted',
-    0x1000: u'low',
-    0x2000: u'medium',
-    0x2100: u'medium high',
-    0x3000: u'high',
-    0x4000: u'system',
-    0x5000: u'protected process',
-  }
-
-  # This was specifically written this way to work on cygwin except for the
-  # windll part. If someone can come up with a way to do stdcall on cygwin, that
-  # would be appreciated.
-  BOOL = ctypes.c_long
-  DWORD = ctypes.c_ulong
-  HANDLE = ctypes.c_void_p
-  class SID_AND_ATTRIBUTES(ctypes.Structure):
-    _fields_ = [
-      ('Sid', ctypes.c_void_p),
-      ('Attributes', DWORD),
-    ]
-
-  class TOKEN_MANDATORY_LABEL(ctypes.Structure):
-    _fields_ = [
-      ('Label', SID_AND_ATTRIBUTES),
-    ]
-
-  TOKEN_READ = DWORD(0x20008)
-  # Use the same casing as in the C declaration:
-  # https://msdn.microsoft.com/library/windows/desktop/aa379626.aspx
-  TokenIntegrityLevel = ctypes.c_int(25)
-  ERROR_INSUFFICIENT_BUFFER = 122
-
-  # All the functions used locally. First open the process' token, then query
-  # the SID to know its integrity level.
-  ctypes.windll.kernel32.GetLastError.argtypes = ()
-  ctypes.windll.kernel32.GetLastError.restype = DWORD
-  ctypes.windll.kernel32.GetCurrentProcess.argtypes = ()
-  ctypes.windll.kernel32.GetCurrentProcess.restype = ctypes.c_void_p
-  ctypes.windll.advapi32.OpenProcessToken.argtypes = (
-      HANDLE, DWORD, ctypes.POINTER(HANDLE))
-  ctypes.windll.advapi32.OpenProcessToken.restype = BOOL
-  ctypes.windll.advapi32.GetTokenInformation.argtypes = (
-      HANDLE, ctypes.c_long, ctypes.c_void_p, DWORD, ctypes.POINTER(DWORD))
-  ctypes.windll.advapi32.GetTokenInformation.restype = BOOL
-  ctypes.windll.advapi32.GetSidSubAuthorityCount.argtypes = [ctypes.c_void_p]
-  ctypes.windll.advapi32.GetSidSubAuthorityCount.restype = ctypes.POINTER(
-      ctypes.c_ubyte)
-  ctypes.windll.advapi32.GetSidSubAuthority.argtypes = (ctypes.c_void_p, DWORD)
-  ctypes.windll.advapi32.GetSidSubAuthority.restype = ctypes.POINTER(DWORD)
-
-  # First open the current process token, query it, then close everything.
-  token = ctypes.c_void_p()
-  proc_handle = ctypes.windll.kernel32.GetCurrentProcess()
-  if not ctypes.windll.advapi32.OpenProcessToken(
-      proc_handle,
-      TOKEN_READ,
-      ctypes.byref(token)):
-    logging.error('Failed to get process\' token')
-    return None
-  if token.value == 0:
-    logging.error('Got a NULL token')
-    return None
-  try:
-    # The size of the structure is dynamic because the TOKEN_MANDATORY_LABEL
-    # used will have the SID appened right after the TOKEN_MANDATORY_LABEL in
-    # the heap allocated memory block, with .Label.Sid pointing to it.
-    info_size = DWORD()
-    if ctypes.windll.advapi32.GetTokenInformation(
-        token,
-        TokenIntegrityLevel,
-        ctypes.c_void_p(),
-        info_size,
-        ctypes.byref(info_size)):
-      logging.error('GetTokenInformation() failed expectation')
-      return None
-    if info_size.value == 0:
-      logging.error('GetTokenInformation() returned size 0')
-      return None
-    if ctypes.windll.kernel32.GetLastError() != ERROR_INSUFFICIENT_BUFFER:
-      logging.error(
-          'GetTokenInformation(): Unknown error: %d',
-          ctypes.windll.kernel32.GetLastError())
-      return None
-    token_info = TOKEN_MANDATORY_LABEL()
-    ctypes.resize(token_info, info_size.value)
-    if not ctypes.windll.advapi32.GetTokenInformation(
-        token,
-        TokenIntegrityLevel,
-        ctypes.byref(token_info),
-        info_size,
-        ctypes.byref(info_size)):
-      logging.error(
-          'GetTokenInformation(): Unknown error with buffer size %d: %d',
-          info_size.value,
-          ctypes.windll.kernel32.GetLastError())
-      return None
-    p_sid_size = ctypes.windll.advapi32.GetSidSubAuthorityCount(
-        token_info.Label.Sid)
-    res = ctypes.windll.advapi32.GetSidSubAuthority(
-        token_info.Label.Sid, p_sid_size.contents.value - 1)
-    value = res.contents.value
-    return mapping.get(value) or u'0x%04x' % value
-  finally:
-    ctypes.windll.kernel32.CloseHandle(token)
-
-
 ### Android.
-
-
-def initialize_android(pub, priv):
-  # TODO(maruel): Remove.
-  return platforms.android.initialize(pub, priv)
 
 
 def get_dimensions_all_devices_android(devices):
@@ -791,8 +630,7 @@ def get_state(threshold_mb=4*1024, skip=None):
   if sys.platform in ('cygwin', 'win32'):
     state[u'cygwin'] = [sys.platform == 'cygwin']
   if sys.platform == 'win32':
-    # TODO(maruel): Have get_integrity_level_win() work in the first place.
-    integrity = get_integrity_level_win()
+    integrity = platform.win.get_integrity_level()
     if integrity is not None:
       state[u'integrity'] = [integrity]
 

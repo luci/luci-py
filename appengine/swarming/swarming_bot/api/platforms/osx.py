@@ -5,6 +5,7 @@
 """OSX specific utility functions."""
 
 import cgi
+import ctypes
 import os
 import platform
 import re
@@ -165,3 +166,23 @@ def get_xcode_state():
 def get_xcode_versions():
   """Returns all Xcode versions installed."""
   return sorted(xcode['version'] for xcode in get_xcode_state().itervalues())
+
+
+@tools.cached
+def get_physical_ram():
+  """Returns the amount of installed RAM in Mb, rounded to the nearest number.
+  """
+  CTL_HW = 6
+  HW_MEMSIZE = 24
+  result = ctypes.c_uint64(0)
+  arr = (ctypes.c_int * 2)()
+  arr[0] = CTL_HW
+  arr[1] = HW_MEMSIZE
+  size = ctypes.c_size_t(ctypes.sizeof(result))
+  ctypes.cdll.LoadLibrary("libc.dylib")
+  libc = ctypes.CDLL("libc.dylib")
+  libc.sysctl(
+      arr, 2, ctypes.byref(result), ctypes.byref(size), None,
+      ctypes.c_size_t(0))
+  return int(round(result.value / 1024. / 1024.))
+
