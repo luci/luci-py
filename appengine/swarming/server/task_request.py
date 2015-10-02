@@ -149,7 +149,7 @@ def _validate_data(prop, value):
 
 
 def _validate_dict_of_strings(prop, value):
-  """Validates TaskProperties.dimension and TaskProperties.env."""
+  """Validates TaskProperties.dimensions and TaskProperties.env."""
   if not all(
          isinstance(k, unicode) and isinstance(v, unicode)
          for k, v in value.iteritems()):
@@ -193,10 +193,10 @@ def _validate_task_run_id(_prop, value):
 
 def _validate_timeout(prop, value):
   """Validates timeouts in seconds in TaskProperties."""
-  if not (_MIN_TIMEOUT_SECS <= value <= _ONE_DAY_SECS):
+  if value and not (_MIN_TIMEOUT_SECS <= value <= _ONE_DAY_SECS):
     # pylint: disable=W0212
     raise datastore_errors.BadValueError(
-        '%s (%ds) must be between %ds and one day' %
+        '%s (%ds) must be 0 or between %ds and one day' %
             (prop._name, value, _MIN_TIMEOUT_SECS))
 
 
@@ -301,6 +301,21 @@ class TaskProperties(ndb.Model):
   idempotent = ndb.BooleanProperty(default=False, indexed=False)
 
   @property
+  def is_terminate(self):
+    """If True, it is a terminate request."""
+    return (
+        not self.commands and
+        not self.data and
+        self.dimensions.keys() == [u'id'] and
+        not self.inputs_ref and
+        not self.env and
+        not self.execution_timeout_secs and
+        not self.extra_args and
+        not self.grace_period_secs and
+        not self.io_timeout_secs and
+        not self.idempotent)
+
+  @property
   def properties_hash(self):
     """Calculates the hash for this entity IFF the task is idempotent.
 
@@ -316,16 +331,17 @@ class TaskProperties(ndb.Model):
 
   def _pre_put_hook(self):
     super(TaskProperties, self)._pre_put_hook()
-    if len(self.commands or []) > 1:
-      raise datastore_errors.BadValueError('Only one command is supported')
-    if bool(self.commands) == bool(self.inputs_ref):
-      raise datastore_errors.BadValueError('use one of command or inputs_ref')
-    if self.data and not self.commands:
-      raise datastore_errors.BadValueError('data requires commands')
-    if self.extra_args and not self.inputs_ref:
-      raise datastore_errors.BadValueError('extra_args require inputs_ref')
-    if self.inputs_ref:
-      self.inputs_ref._pre_put_hook()
+    if not self.is_terminate:
+      if len(self.commands or []) > 1:
+        raise datastore_errors.BadValueError('only one command is supported')
+      if bool(self.commands) == bool(self.inputs_ref):
+        raise datastore_errors.BadValueError('use one of command or inputs_ref')
+      if self.data and not self.commands:
+        raise datastore_errors.BadValueError('data requires commands')
+      if self.extra_args and not self.inputs_ref:
+        raise datastore_errors.BadValueError('extra_args require inputs_ref')
+      if self.inputs_ref:
+        self.inputs_ref._pre_put_hook()
 
 
 class TaskRequest(ndb.Model):
@@ -400,6 +416,13 @@ class TaskRequest(ndb.Model):
     """Adds automatic tags."""
     super(TaskRequest, self)._pre_put_hook()
     self.properties._pre_put_hook()
+    if self.properties.is_terminate:
+      if not self.priority == 0:
+        raise datastore_errors.BadValueError(
+            'terminate request must be priority 0')
+    elif self.priority == 0:
+      raise datastore_errors.BadValueError(
+          'priority 0 can only be used for terminate request')
     self.tags.append('priority:%s' % self.priority)
     self.tags.append('user:%s' % self.user)
     for key, value in self.properties.dimensions.iteritems():
@@ -551,7 +574,8 @@ def make_request(request, is_bot_or_admin):
     request.priority = 100
 
   request.authenticated = auth.get_current_identity()
-  if request.properties.grace_period_secs is None:
+  if (not request.properties.is_terminate and
+      request.properties.grace_period_secs is None):
     request.properties.grace_period_secs = 30
   if request.properties.idempotent is None:
     request.properties.idempotent = False
@@ -575,6 +599,8 @@ def make_request_clone(original_request):
     The newly created TaskRequest.
   """
   now = utils.utcnow()
+  if original_request.properties.is_terminate:
+    raise ValueError('cannot clone a terminate request')
   properties = TaskProperties(**original_request.properties.to_dict())
   properties.idempotent = False
   expiration_ts = (

@@ -362,6 +362,25 @@ def poll_server(botobj, quit_bit):
     quit_bit.wait(resp['duration'])
     return False
 
+  if cmd == 'terminate':
+    quit_bit.set()
+    # This is similar to post_update() in task_runner.py.
+    params = {
+      'cost_usd': 0,
+      'duration': 0,
+      'exit_code': 0,
+      'hard_timeout': False,
+      'id': botobj.id,
+      'io_timeout': False,
+      'output': '',
+      'output_chunk_start': 0,
+      'task_id': resp['task_id'],
+    }
+    # TODO(maruel): Retry on failure.
+    botobj.remote.url_read_json(
+        '/swarming/api/v1/bot/task_update/%s' % resp['task_id'], data=params)
+    return False
+
   if cmd == 'run':
     if run_manifest(botobj, resp['manifest'], start):
       # Completed a task successfully so update swarming_bot.zip if necessary.

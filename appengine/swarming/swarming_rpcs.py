@@ -238,12 +238,17 @@ class BotList(messages.Message):
   death_timeout = messages.IntegerField(4)
 
 
-class DeletedResponse(messages.Message):
-  """Indicates whether a task was deleted."""
-  deleted = messages.BooleanField(1)
-
-
 class BotTasks(messages.Message):
   cursor = messages.StringField(1)
   items = messages.MessageField(TaskResult, 2, repeated=True)
   now = message_types.DateTimeField(3)
+
+
+class DeletedResponse(messages.Message):
+  """Indicates whether a bot was deleted."""
+  deleted = messages.BooleanField(1)
+
+
+class TerminateResponse(messages.Message):
+  """Returns the pseudo taskid to wait for the bot to shut down."""
+  task_id = messages.StringField(1)

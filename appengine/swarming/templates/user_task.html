@@ -137,66 +137,80 @@
 </div>
 
 <div title="Information about what was asked to be run. This is what is used for task deduplication.">
-  <div class="spaced">
-    <h2 class="inline">Request properties</h2>
-    {% if is_privileged_user %}
-      <form method="POST" action="/user/task/{{task.task_id}}/retry" style="display:inline">
-        <input type="submit" value="Retry" style="display:inline"></input>
-        <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
-      </form>
-    {% endif %}
-  </div>
-  <table class="property_table">
-    <tbody>
-      <tr title="The request dimensions is the minimum set of properties a bot must advertise to be able to execute this task.">
-        <td>Request dims</td>
-        <td>{{bot_view.render_dict(request.properties.dimensions)}}</td>
-      </tr>
-      <tr title="The maximum number of seconds that the command may use, otherwise it is forcibly killed.">
-        <td>Exec timeout</td>
-        <td>{{request.properties.execution_timeout_secs}}</td>
-      </tr>
-      <tr title="The maximum number of seconds that the command may not output any stdout in a single shot.">
-        <td>I/O timeout</td>
-        <td>{{request.properties.io_timeout_secs}}</td>
-      </tr>
-      <tr title="Additional environment variables to the one provided by the bot.">
-        <td>Env vars</td>
-        <td>{{bot_view.render_dict(request.properties.env)}}</td>
-      </tr>
-      <tr title="If True, successful task results may be reused for subsequent requests, so the task can be deduped.">
-        <td>Idempotent</td>
-        <td>{{request.properties.idempotent}}</td>
-      </tr>
-      {% if request.properties.inputs_ref %}
-        <tr title="Inputs files">
-          <td>Isolated inputs</td>
-          <td>
-            <a
-              href="{{request.properties.inputs_ref.isolatedserver}}/browse?namespace={{request.properties.inputs_ref.namespace}}&hash={{request.properties.inputs_ref.isolated}}">
-              {{request.properties.inputs_ref.isolated}}
-            </a>
-          </td>
+  {% if request.properties.is_terminate %}
+    <div class="spaced">
+      <h2 class="inline">Bot termination request</h2>
+    </div>
+    <table class="property_table">
+      <tbody>
+        <tr title="The request dimensions is the minimum set of properties a bot must advertise to be able to execute this task.">
+          <td>Bot</td>
+          <td>{{request.properties.dimensions['id']}}</td>
         </tr>
-        <tr title="Extra arguments if applicable">
-          <td>Extra args</td>
-          <td>
-            {{request.properties.extra_args|join(' ')}}<br>
-          </td>
-        </tr>
-      {% else %}
-        {# Raw command #}
-        <tr title="Actual command executed by the bot.">
-          <td>Commands</td>
-          <td>
-            {% for cmd in request.properties.commands %}
-            {{cmd|join(' ')}}<br>
-            {% endfor %}
-          </td>
-        </tr>
+      </tbody>
+    </table>
+  {% else %}
+    <div class="spaced">
+      <h2 class="inline">Request properties</h2>
+      {% if is_privileged_user %}
+        <form method="POST" action="/user/task/{{task.task_id}}/retry" style="display:inline">
+          <input type="submit" value="Retry" style="display:inline"></input>
+          <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
+        </form>
       {% endif %}
-    </tbody>
-  </table>
+    </div>
+    <table class="property_table">
+      <tbody>
+        <tr title="The request dimensions is the minimum set of properties a bot must advertise to be able to execute this task.">
+          <td>Request dims</td>
+          <td>{{bot_view.render_dict(request.properties.dimensions)}}</td>
+        </tr>
+        <tr title="The maximum number of seconds that the command may use, otherwise it is forcibly killed.">
+          <td>Exec timeout</td>
+          <td>{{request.properties.execution_timeout_secs}}</td>
+        </tr>
+        <tr title="The maximum number of seconds that the command may not output any stdout in a single shot.">
+          <td>I/O timeout</td>
+          <td>{{request.properties.io_timeout_secs}}</td>
+        </tr>
+        <tr title="Additional environment variables to the one provided by the bot.">
+          <td>Env vars</td>
+          <td>{{bot_view.render_dict(request.properties.env)}}</td>
+        </tr>
+        <tr title="If True, successful task results may be reused for subsequent requests, so the task can be deduped.">
+          <td>Idempotent</td>
+          <td>{{request.properties.idempotent}}</td>
+        </tr>
+        {% if request.properties.inputs_ref %}
+          <tr title="Inputs files">
+            <td>Isolated inputs</td>
+            <td>
+              <a
+                href="{{request.properties.inputs_ref.isolatedserver}}/browse?namespace={{request.properties.inputs_ref.namespace}}&hash={{request.properties.inputs_ref.isolated}}">
+                {{request.properties.inputs_ref.isolated}}
+              </a>
+            </td>
+          </tr>
+          <tr title="Extra arguments if applicable">
+            <td>Extra args</td>
+            <td>
+              {{request.properties.extra_args|join(' ')}}<br>
+            </td>
+          </tr>
+        {% else %}
+          {# Raw command #}
+          <tr title="Actual command executed by the bot.">
+            <td>Commands</td>
+            <td>
+              {% for cmd in request.properties.commands %}
+              {{cmd|join(' ')}}<br>
+              {% endfor %}
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  {% endif %}
 </div>
 
 <div title="Information about the result: the task was run where (which bot), when and what is the result.">

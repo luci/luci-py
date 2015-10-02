@@ -142,6 +142,7 @@ class BotEvent(_BotCommon):
   """
   ALLOWED_EVENTS = {
     'bot_connected', 'bot_error', 'bot_rebooting', 'bot_shutdown',
+    'bot_terminate',
     'request_restart', 'request_update', 'request_sleep', 'request_task',
     'task_completed', 'task_error', 'task_update',
   }

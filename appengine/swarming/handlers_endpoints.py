@@ -317,12 +317,59 @@ class SwarmingBotService(remote.Service):
     At that point, the bot will not appears in the list of bots but it is still
     possible to get information about the bot with its bot id is known, as
     historical data is not deleted.
+
+    It is meant to remove from the DB the presence of a bot that was retired,
+    e.g. the VM was shut down already. Use 'terminate' instead of the bot is
+    still alive.
     """
     logging.info('%s', request)
     bot_key = bot_management.get_info_key(request.bot_id)
     get_or_raise(bot_key)  # raises 404 if there is no such bot
     bot_key.delete()
     return swarming_rpcs.DeletedResponse(deleted=True)
+
+  @auth.endpoints_method(
+      BotId, swarming_rpcs.TerminateResponse,
+      name='terminate',
+      path='{bot_id}/terminate')
+  @auth.require(acl.is_bot_or_admin)
+  def terminate(self, request):
+    """Asks a bot to terminate itself gracefully.
+
+    The bot will stay in the DB, use 'delete' to remove it from the DB
+    afterward. This request returns a pseudo-taskid that can be waited for to
+    wait for the bot to turn down.
+    """
+    # TODO(maruel): Disallow a terminate task when there's one currently
+    # pending or if the bot is considered 'dead', e.g. no contact since 10
+    # minutes.
+    logging.info('%s', request)
+    bot_key = bot_management.get_info_key(request.bot_id)
+    get_or_raise(bot_key)  # raises 404 if there is no such bot
+    try:
+      # Craft a special priority 0 task to tell the bot to shutdown.
+      properties = task_request.TaskProperties(
+          dimensions={u'id': request.bot_id},
+          execution_timeout_secs=0,
+          grace_period_secs=0,
+          io_timeout_secs=0)
+      now = utils.utcnow()
+      request = task_request.TaskRequest(
+          created_ts=now,
+          expiration_ts=now + datetime.timedelta(days=1),
+          name='Terminate %s' % request.bot_id,
+          priority=0,
+          properties=properties,
+          tags=['terminate:1'],
+          user=auth.get_current_identity().to_bytes())
+      assert request.properties.is_terminate
+      posted_request = task_request.make_request(request, acl.is_bot_or_admin())
+    except (datastore_errors.BadValueError, TypeError, ValueError) as e:
+      raise endpoints.BadRequestException(e.message)
+
+    result_summary = task_scheduler.schedule_request(posted_request)
+    return swarming_rpcs.TerminateResponse(
+        task_id=task_pack.pack_result_summary_key(result_summary.key))
 
   @auth.endpoints_method(
       BotTasksRequest, swarming_rpcs.BotTasks,

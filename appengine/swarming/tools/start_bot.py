@@ -9,10 +9,17 @@ import glob
 import os
 import signal
 import shutil
-import subprocess
+import socket
 import sys
 import tempfile
 import urllib
+
+
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+CLIENT_DIR = os.path.join(THIS_DIR, '..', '..', '..', 'client')
+sys.path.insert(0, CLIENT_DIR)
+from utils import subprocess42
+sys.path.pop(0)
 
 
 class LocalBot(object):
@@ -29,6 +36,11 @@ class LocalBot(object):
     self._redirect = redirect
 
   @property
+  def bot_id(self):
+    # TODO(maruel): Big assumption.
+    return socket.getfqdn().split('.')[0]
+
+  @property
   def log(self):
     """Returns the log output. Only set after calling stop()."""
     return '\n'.join(self._logs.itervalues()) if self._logs else None
@@ -39,19 +51,15 @@ class LocalBot(object):
     bot_zip = os.path.join(self._tmpdir, 'swarming_bot.zip')
     urllib.urlretrieve(self._swarming_server_url + '/bot_code', bot_zip)
     cmd = [sys.executable, bot_zip, 'start_slave']
-    env = os.environ.copy()
-    kwargs = {}
-    if sys.platform != 'win32':
-      kwargs['preexec_fn'] = os.setsid
     if self._redirect:
       logs = os.path.join(self._tmpdir, 'logs')
       if not os.path.isdir(logs):
         os.mkdir(logs)
       with open(os.path.join(logs, 'bot_stdout.log'), 'wb') as f:
-        self._proc = subprocess.Popen(
-            cmd, cwd=self._tmpdir, stdout=f, env=env, stderr=f, **kwargs)
+        self._proc = subprocess42.Popen(
+            cmd, cwd=self._tmpdir, stdout=f, stderr=f, detached=True)
     else:
-      self._proc = subprocess.Popen(cmd, cwd=self._tmpdir, env=env, **kwargs)
+      self._proc = subprocess42.Popen(cmd, cwd=self._tmpdir, detached=True)
 
   def stop(self, leak):
     """Stops the local Swarming bot. Returns the process exit code."""
@@ -77,9 +85,13 @@ class LocalBot(object):
     self._proc = None
     return exit_code
 
-  def wait(self):
+  def poll(self):
+    """Polls the process to know if it exited."""
+    self._proc.poll()
+
+  def wait(self, timeout=None):
     """Waits for the process to normally exit."""
-    self._proc.wait()
+    return self._proc.wait(timeout)
 
   def kill(self):
     """Kills the child forcibly."""

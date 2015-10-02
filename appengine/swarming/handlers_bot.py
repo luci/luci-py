@@ -334,12 +334,16 @@ class BotPollHandler(_BotBaseHandler):
         return
 
       try:
-        # This one is tricky since it intentionally runs a transaction after
+        # This part is tricky since it intentionally runs a transaction after
         # another one.
-        bot_event(
-            'request_task', task_id=run_result.task_id,
-            task_name=request.name)
-        self._cmd_run(request, run_result.key, bot_id)
+        if request.properties.is_terminate:
+          bot_event('bot_terminate', task_id=run_result.task_id)
+          self._cmd_terminate(run_result.task_id)
+        else:
+          bot_event(
+              'request_task', task_id=run_result.task_id,
+              task_name=request.name)
+          self._cmd_run(request, run_result.key, bot_id)
       except:
         logging.exception('Dang, exception after reaping')
         raise
@@ -381,6 +385,13 @@ class BotPollHandler(_BotBaseHandler):
       'cmd': 'sleep',
       'duration': task_scheduler.exponential_backoff(sleep_streak),
       'quarantined': quarantined,
+    }
+    self.send_response(out)
+
+  def _cmd_terminate(self, task_id):
+    out = {
+      'cmd': 'terminate',
+      'task_id': task_id,
     }
     self.send_response(out)
 

@@ -16,7 +16,6 @@ import os
 import shutil
 import signal
 import socket
-import subprocess
 import sys
 import tempfile
 import time
@@ -29,6 +28,10 @@ CLIENT_DIR = os.path.join(APP_DIR, '..', '..', 'client')
 
 from tools import start_bot
 from tools import start_servers
+
+sys.path.insert(0, CLIENT_DIR)
+from utils import subprocess42
+sys.path.pop(0)
 
 sys.path.insert(0, BOT_DIR)
 
@@ -85,7 +88,7 @@ class SwarmingClient(object):
       '-i', isolate_path,
       '-s', isolated_path,
     ]
-    isolated_hash = subprocess.check_output(cmd, cwd=CLIENT_DIR).split()[0]
+    isolated_hash = subprocess42.check_output(cmd, cwd=CLIENT_DIR).split()[0]
     logging.debug('%s = %s', isolated_path, isolated_hash)
     return isolated_hash
 
@@ -168,6 +171,9 @@ class SwarmingClient(object):
     finally:
       os.remove(tmp)
 
+  def terminate(self, bot_id):
+    return self._run('terminate', ['--wait', bot_id])
+
   def cleanup(self):
     if self._tmpdir:
       shutil.rmtree(self._tmpdir)
@@ -188,6 +194,9 @@ class SwarmingClient(object):
 
     The log file will be printed by the test framework in case of failure or
     verbose mode.
+
+    Returns:
+      The process exit code.
     """
     name = os.path.join(self._tmpdir, 'client_%d.log' % self._index)
     self._index += 1
@@ -198,8 +207,8 @@ class SwarmingClient(object):
     with open(name, 'wb') as f:
       f.write('\nRunning: %s\n' % ' '.join(cmd))
       f.flush()
-      p = subprocess.Popen(
-          cmd, stdout=f, stderr=subprocess.STDOUT, cwd=CLIENT_DIR)
+      p = subprocess42.Popen(
+          cmd, stdout=f, stderr=subprocess42.STDOUT, cwd=CLIENT_DIR)
       p.communicate()
       return p.returncode
 
@@ -546,10 +555,25 @@ def main():
     Test.client = client
     Test.servers = servers
     failed = not unittest.main(exit=False).result.wasSuccessful()
+
+    # Then try to terminate the bot sanely. After the terminate request
+    # completed, the bot process should have terminated. Give it a few
+    # seconds due to delay between sending the event that the process is
+    # shutting down vs the process is shut down.
+    if client.terminate(bot.bot_id) is not 0:
+      print >> sys.stderr, 'swarming.py terminate failed'
+      failed = True
+    try:
+      bot.wait(10)
+    except subprocess42.TimeoutExpired:
+      print >> sys.stderr, 'Bot is still alive after swarming.py terminate'
+      failed = True
   except KeyboardInterrupt:
     print >> sys.stderr, '<Ctrl-C>'
+    failed = True
     if bot:
       bot.kill()
+      bot.wait()
   finally:
     cleanup(bot, client, servers, failed or verbose, leak)
   return int(failed)
