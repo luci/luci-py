@@ -419,6 +419,10 @@ def run_manifest(botobj, manifest, start):
   if manifest['hard_timeout']:
     # One for the child process, one for run_isolated, one for task_runner.
     hard_timeout += 3 * manifest['grace_period']
+    # For isolated task, download time is not counted for hard timeout so add
+    # more time.
+    if not manifest['command']:
+      hard_timeout += manifest['io_timeout'] or 600
 
   url = manifest.get('host', botobj.remote.url)
   task_dimensions = manifest['dimensions']

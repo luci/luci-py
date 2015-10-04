@@ -271,15 +271,14 @@ def calc_yield_wait(task_details, start, last_io, timed_out, stdout):
   return out
 
 
-def kill_and_wait(proc, reason):
+def kill_and_wait(proc, grace_period, reason):
+  logging.warning('SIGTERM finally due to %s', reason)
+  proc.terminate()
   try:
-    logging.warning('proc.kill() in finally due to %s', reason)
+    proc.wait(grace_period)
+  except subprocess42.TimeoutError:
+    logging.warning('SIGKILL finally due to %s', reason)
     proc.kill()
-  except OSError:
-    # The process has already exited.
-    pass
-  # TODO(maruel): We'd wait only for X seconds.
-  logging.info('Waiting for proces exit in finally')
   exit_code = proc.wait()
   logging.info('Waiting for proces exit in finally - done')
   return exit_code
@@ -416,11 +415,13 @@ def run_command(
       # task_details.grace_period to terminate.
       must_signal_internal_failure = (
           u'task_runner received signal %s' % e.signal)
-      exit_code = kill_and_wait(proc, 'signal %d' % e.signal)
+      exit_code = kill_and_wait(
+          proc, task_details.grace_period, 'signal %d' % e.signal)
     except (IOError, OSError):
       # Something wrong happened, try to kill the child process.
       had_hard_timeout = True
-      exit_code = kill_and_wait(proc, 'exception %s' % e)
+      exit_code = kill_and_wait(
+          proc, task_details.grace_period, 'exception %s' % e)
 
     # This is the very last packet for this command. It if was an isolated task,
     # include the output reference to the archived .isolated file.
