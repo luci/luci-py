@@ -26,6 +26,7 @@ FILES = (
     '__main__.py',
     'api/__init__.py',
     'api/bot.py',
+    'api/parallel.py',
     'api/os_utilities.py',
     'api/platforms/__init__.py',
     'api/platforms/android.py',
