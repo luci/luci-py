@@ -8,6 +8,7 @@ The imports are done late so if an ImportError occurs, it is localized to this
 command only.
 """
 
+import code
 import json
 import logging
 import os
@@ -42,6 +43,17 @@ def CMDattributes(_args):
   return 0
 
 
+def CMDrestart(_args):
+  """Utility subcommand that hides the difference between each OS to reboot
+  the host."""
+  logging_utils.prepare_logging(None)
+  import os_utilities
+  # This function doesn't return.
+  os_utilities.restart()
+  # Should never reach here.
+  return 1
+
+
 def CMDrun_isolated(args):
   """Internal command to run an isolated command."""
   sys.path.insert(0, os.path.join(THIS_FILE, 'client'))
@@ -50,11 +62,33 @@ def CMDrun_isolated(args):
   return run_isolated.main(args)
 
 
-def CMDtask_runner(args):
-  """Internal command to run a swarming task."""
-  logging_utils.prepare_logging(os.path.join('logs', 'task_runner.log'))
-  from bot_code import task_runner
-  return task_runner.main(args)
+
+def CMDshell(args):
+  """Starts a shell with api.* in.."""
+  logging_utils.prepare_logging(None)
+  logging_utils.set_console_level(logging.DEBUG)
+
+  from bot_code import bot_main
+  from api import os_utilities
+  from api import platforms
+  local_vars = {
+    'bot_main': bot_main,
+    'json': json,
+    'os_utilities': os_utilities,
+    'platforms': platforms,
+  }
+  # Can't use: from api.platforms import *
+  local_vars.update(
+      (k, v) for k, v in platforms.__dict__.iteritems()
+      if not k.startswith('_'))
+
+  if args:
+    for arg in args:
+      exec code.compile_command(arg) in local_vars
+  else:
+    code.interact(
+        'Locals:\n  ' + '\n  '.join( sorted(local_vars)), None, local_vars)
+  return 0
 
 
 def CMDstart_bot(args):
@@ -89,15 +123,11 @@ def CMDstart_slave(args):
   return common.exec_python([THIS_FILE, 'start_bot'])
 
 
-def CMDrestart(_args):
-  """Utility subcommand that hides the difference between each OS to reboot
-  the host."""
-  logging_utils.prepare_logging(None)
-  import os_utilities
-  # This function doesn't return.
-  os_utilities.restart()
-  # Should never reach here.
-  return 1
+def CMDtask_runner(args):
+  """Internal command to run a swarming task."""
+  logging_utils.prepare_logging(os.path.join('logs', 'task_runner.log'))
+  from bot_code import task_runner
+  return task_runner.main(args)
 
 
 def CMDversion(_args):
