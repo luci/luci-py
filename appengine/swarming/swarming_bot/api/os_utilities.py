@@ -630,7 +630,7 @@ def get_state(threshold_mb=4*1024, skip=None):
   if sys.platform in ('cygwin', 'win32'):
     state[u'cygwin'] = [sys.platform == 'cygwin']
   if sys.platform == 'win32':
-    integrity = platform.win.get_integrity_level()
+    integrity = platforms.win.get_integrity_level()
     if integrity is not None:
       state[u'integrity'] = [integrity]
 
