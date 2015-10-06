@@ -24,6 +24,8 @@ import urllib2
 
 from . import gae_sdk_utils
 
+from utils import file_path
+
 
 def terminate_with_parent():
   """Sets up current process to receive SIGTERM when its parent dies.
@@ -208,7 +210,7 @@ class LocalApplication(object):
         self._log = f.read()
       if not leak:
         try:
-          shutil.rmtree(self._temp_root)
+          file_path.rmtree(self._temp_root)
         except OSError as e:
           # Log but ignore it to not mask other errors.
           print >> sys.stderr, str(e)

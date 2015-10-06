@@ -23,6 +23,8 @@ import bot_main
 import xsrf_client
 from api import bot
 from api import os_utilities
+from depot_tools import fix_encoding
+from utils import file_path
 from utils import logging_utils
 from utils import net
 from utils import subprocess42
@@ -74,7 +76,7 @@ class TestBotMain(net_utils.TestCase):
   def tearDown(self):
     os.environ.pop('SWARMING_BOT_ID', None)
     os.chdir(self.old_cwd)
-    shutil.rmtree(self.root_dir)
+    file_path.rmtree(self.root_dir)
     super(TestBotMain, self).tearDown()
 
   def test_get_dimensions(self):
@@ -529,6 +531,7 @@ class TestBotMain(net_utils.TestCase):
 
 
 if __name__ == '__main__':
+  fix_encoding.fix_encoding()
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None
   logging.basicConfig(

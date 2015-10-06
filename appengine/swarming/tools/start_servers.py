@@ -13,7 +13,12 @@ import tempfile
 
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CLIENT_DIR = os.path.join(os.path.dirname(os.path.dirname(APP_DIR)), 'client')
 sys.path.insert(0, APP_DIR)
+
+sys.path.insert(0, CLIENT_DIR)
+from third_party.depot_tools import fix_encoding
+sys.path.pop(0)
 
 import test_env
 test_env.setup_test_env()
@@ -88,6 +93,7 @@ class LocalServers(object):
 
 
 def main():
+  fix_encoding.fix_encoding()
   parser = argparse.ArgumentParser(description=sys.modules[__name__].__doc__)
   parser.add_argument('-a', '--all', action='store_true')
   args = parser.parse_args()

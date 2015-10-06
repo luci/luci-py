@@ -8,7 +8,6 @@
 import glob
 import os
 import signal
-import shutil
 import socket
 import sys
 import tempfile
@@ -18,6 +17,8 @@ import urllib
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 CLIENT_DIR = os.path.join(THIS_DIR, '..', '..', '..', 'client')
 sys.path.insert(0, CLIENT_DIR)
+from third_party.depot_tools import fix_encoding
+from utils import file_path
 from utils import subprocess42
 sys.path.pop(0)
 
@@ -78,7 +79,7 @@ class LocalBot(object):
         self._read_log(i)
       if not leak:
         try:
-          shutil.rmtree(self._tmpdir)
+          file_path.rmtree(self._tmpdir)
         except OSError:
           print >> sys.stderr, 'Leaking %s' % self._tmpdir
       self._tmpdir = None
@@ -121,6 +122,7 @@ class LocalBot(object):
 
 
 def main():
+  fix_encoding.fix_encoding()
   if len(sys.argv) != 2:
     print >> sys.stderr, 'Specify url to Swarming server'
     return 1

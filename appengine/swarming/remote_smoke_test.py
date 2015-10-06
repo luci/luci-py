@@ -10,7 +10,6 @@ import json
 import logging
 import optparse
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -21,6 +20,11 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 CHECKOUT_DIR = os.path.dirname(os.path.dirname(APP_DIR))
 CLIENT_DIR = os.path.join(CHECKOUT_DIR, 'client')
 SWARMING_SCRIPT = os.path.join(CLIENT_DIR, 'swarming.py')
+
+sys.path.insert(0, CLIENT_DIR)
+from third_party.depot_tools import fix_encoding
+from utils import file_path
+sys.path.pop(0)
 
 
 def gen_isolated(isolate, script, includes=None):
@@ -61,7 +65,7 @@ def gen_isolated(isolate, script, includes=None):
       out = subprocess.check_output(cmd)
     return out.split(' ', 1)[0]
   finally:
-    shutil.rmtree(tmp)
+    file_path.rmtree(tmp)
 
 
 def capture(cmd, **kwargs):
@@ -193,6 +197,7 @@ def run_test(results, swarming, isolate, extra_flags, name, test_case):
 
 
 def main():
+  fix_encoding.fix_encoding()
   # It's necessary for relative paths in .isolate.
   os.chdir(APP_DIR)
 

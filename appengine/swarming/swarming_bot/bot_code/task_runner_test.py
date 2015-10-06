@@ -23,6 +23,7 @@ test_env_bot_code.setup_test_env()
 # Creates a server mock for functions in net.py.
 import net_utils
 
+from depot_tools import fix_encoding
 from utils import file_path
 from utils import logging_utils
 from utils import subprocess42
@@ -1015,6 +1016,7 @@ class TaskRunnerSmoke(unittest.TestCase):
 
 
 if __name__ == '__main__':
+  fix_encoding.fix_encoding()
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None
   logging_utils.prepare_logging(None)

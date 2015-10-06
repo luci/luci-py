@@ -13,7 +13,6 @@ import json
 import glob
 import logging
 import os
-import shutil
 import signal
 import socket
 import sys
@@ -30,6 +29,8 @@ from tools import start_bot
 from tools import start_servers
 
 sys.path.insert(0, CLIENT_DIR)
+from third_party.depot_tools import fix_encoding
+from utils import file_path
 from utils import subprocess42
 sys.path.pop(0)
 
@@ -167,7 +168,7 @@ class SwarmingClient(object):
               outputs[name] = f.read()
         return summary, outputs
       finally:
-        shutil.rmtree(tmpdir)
+        file_path.rmtree(tmpdir)
     finally:
       os.remove(tmp)
 
@@ -176,7 +177,7 @@ class SwarmingClient(object):
 
   def cleanup(self):
     if self._tmpdir:
-      shutil.rmtree(self._tmpdir)
+      file_path.rmtree(self._tmpdir)
       self._tmpdir = None
 
   def dump_log(self):
@@ -470,7 +471,7 @@ class Test(unittest.TestCase):
       actual_files.pop('summary.json')
       self.assertEqual(expected_files, actual_files)
     finally:
-      shutil.rmtree(tmpdir)
+      file_path.rmtree(tmpdir)
 
   def assertResults(self, expected, result):
     self.assertEqual(['shards'], result.keys())
@@ -524,6 +525,7 @@ def cleanup(bot, client, servers, print_all, leak):
 
 
 def main():
+  fix_encoding.fix_encoding()
   verbose = '-v' in sys.argv
   leak = bool('--leak' in sys.argv)
   if leak:

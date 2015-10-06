@@ -11,13 +11,17 @@ methods.
 
 import unittest
 import os
-
-from tool_support import gae_sdk_utils
-from tool_support import local_app
-
+import sys
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_APP_DIR = os.path.join(THIS_DIR, 'test_endpoints_app')
+CLIENT_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(THIS_DIR))), 'client')
+sys.path.insert(0, CLIENT_DIR)
+
+from third_party.depot_tools import fix_encoding
+from tool_support import gae_sdk_utils
+from tool_support import local_app
 
 
 class CloudEndpointsSmokeTest(unittest.TestCase):
@@ -92,5 +96,6 @@ class CloudEndpointsSmokeTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
+  fix_encoding.fix_encoding()
   gae_sdk_utils.setup_gae_env()
   unittest.main()

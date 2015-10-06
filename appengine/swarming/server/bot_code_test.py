@@ -7,7 +7,6 @@ import StringIO
 import logging
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -22,6 +21,13 @@ from test_support import test_case
 
 from server import bot_archive
 from server import bot_code
+
+CLIENT_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(test_env.APP_DIR)), 'client')
+sys.path.insert(0, CLIENT_DIR)
+from third_party.depot_tools import fix_encoding
+from utils import file_path
+sys.path.pop(0)
 
 
 class BotManagementTest(test_case.TestCase):
@@ -73,10 +79,11 @@ class BotManagementTest(test_case.TestCase):
       out = proc.communicate()[0]
       self.assertEqual(0, proc.returncode, out)
     finally:
-      shutil.rmtree(temp_dir)
+      file_path.rmtree(temp_dir)
 
 
 if __name__ == '__main__':
+  fix_encoding.fix_encoding()
   logging.basicConfig(
       level=logging.DEBUG if '-v' in sys.argv else logging.ERROR)
   unittest.main()

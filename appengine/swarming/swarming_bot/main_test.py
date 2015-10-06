@@ -6,7 +6,6 @@
 import json
 import os
 import re
-import shutil
 import sys
 import tempfile
 import unittest
@@ -21,6 +20,8 @@ from utils import subprocess42
 import fake_swarming
 from bot_code import bot_main
 from depot_tools import auto_stub
+from depot_tools import fix_encoding
+from utils import file_path
 
 
 class TestCase(auto_stub.TestCase):
@@ -34,7 +35,7 @@ class TestCase(auto_stub.TestCase):
 
   def tearDown(self):
     try:
-      shutil.rmtree(self._tmpdir)
+      file_path.rmtree(self._tmpdir)
     finally:
       super(TestCase, self).tearDown()
 
@@ -119,6 +120,7 @@ class MainTest(TestCase):
 
 
 if __name__ == '__main__':
+  fix_encoding.fix_encoding()
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None
   unittest.main()
