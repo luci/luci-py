@@ -13,14 +13,14 @@ test_env_platforms.setup_test_env()
 import android
 
 
-class MockCmd(object):
+class MockDevice(object):
   def __init__(self, cmds):
     self._cmds = cmds[:]
 
-  def Shell(self, cmd):
+  def shell(self, cmd):
     data = self._cmds.pop(0)
     assert data[0] == cmd, (data, cmd)
-    return data[1]
+    return data[1], 0
 
 
 RAW_IMEI = """Result: Parcel(
@@ -31,8 +31,12 @@ RAW_IMEI = """Result: Parcel(
 
 class TestAndroid(unittest.TestCase):
   def test_get_imei(self):
-    cmd = MockCmd([('shell service call iphonesubinfo 1', RAW_IMEI)])
-    self.assertEqual(u'355236058685894', android.get_imei(cmd))
+    device = MockDevice(
+        [
+          ('dumpsys iphonesubinfo', ''),
+          ('service call iphonesubinfo 1', RAW_IMEI),
+        ])
+    self.assertEqual(u'355236058685894', android.get_imei(device))
 
 
 class PythonRSASignerTest(unittest.TestCase):

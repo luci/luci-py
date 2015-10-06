@@ -7,6 +7,9 @@ import logging
 import sys
 import unittest
 
+import test_env_platforms
+test_env_platforms.setup_test_env()
+
 import win
 
 

@@ -41,6 +41,8 @@ class TestBotMain(net_utils.TestCase):
     self.root_dir = tempfile.mkdtemp(prefix='bot_main')
     self.old_cwd = os.getcwd()
     os.chdir(self.root_dir)
+    # __main__ does it for us.
+    os.mkdir('logs')
     self.server = xsrf_client.XsrfRemote('https://localhost:1/')
     self.attributes = {
       'dimensions': {
@@ -378,11 +380,12 @@ class TestBotMain(net_utils.TestCase):
         self.assertTrue(stdout)
         self.assertEqual(subprocess42.STDOUT, stderr)
 
-      def poll(self2):
+      def wait(self2, timeout=None): # pylint: disable=unused-argument
         self2.returncode = returncode
         with open(self2._out_file, 'wb') as f:
           json.dump(result, f)
         return 0
+
     self.mock(subprocess42, 'Popen', Popen)
     return result
 
@@ -400,11 +403,14 @@ class TestBotMain(net_utils.TestCase):
     result = self._mock_popen(url='https://localhost:3')
 
     manifest = {
+      'command': ['echo', 'hi'],
       'dimensions': {'os': 'Amiga'},
+      'grace_period': 30,
       'hard_timeout': 60,
       'host': 'https://localhost:3',
       'task_id': '24',
     }
+    self.assertEqual(self.root_dir, self.bot.base_dir)
     bot_main.run_manifest(self.bot, manifest, time.time())
 
   def test_run_manifest_task_failure(self):
@@ -419,7 +425,14 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, 'call_hook', call_hook)
     result = self._mock_popen(exit_code=1)
 
-    manifest = {'dimensions': {}, 'hard_timeout': 60, 'task_id': '24'}
+    manifest = {
+      'command': ['echo', 'hi'],
+      'dimensions': {},
+      'grace_period': 30,
+      'hard_timeout': 60,
+      'io_timeout': 60,
+      'task_id': '24',
+    }
     bot_main.run_manifest(self.bot, manifest, time.time())
 
   def test_run_manifest_internal_failure(self):
@@ -435,7 +448,14 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, 'call_hook', call_hook)
     result = self._mock_popen(returncode=1)
 
-    manifest = {'dimensions': {}, 'hard_timeout': 60, 'task_id': '24'}
+    manifest = {
+      'command': ['echo', 'hi'],
+      'dimensions': {},
+      'grace_period': 30,
+      'hard_timeout': 60,
+      'io_timeout': 60,
+      'task_id': '24',
+    }
     bot_main.run_manifest(self.bot, manifest, time.time())
     expected = [(self.bot, 'Execution failed: internal error (1).', '24')]
     self.assertEqual(expected, posted)
@@ -457,7 +477,13 @@ class TestBotMain(net_utils.TestCase):
       raise OSError('Dang')
     self.mock(subprocess42, 'Popen', raiseOSError)
 
-    manifest = {'dimensions': {}, 'hard_timeout': 60, 'task_id': '24'}
+    manifest = {
+      'command': ['echo', 'hi'],
+      'dimensions': {},
+      'grace_period': 30,
+      'hard_timeout': 60,
+      'task_id': '24',
+    }
     bot_main.run_manifest(self.bot, manifest, time.time())
     expected = [(self.bot, 'Internal exception occured: Dang', '24')]
     self.assertEqual(expected, posted)

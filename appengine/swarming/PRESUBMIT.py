@@ -68,6 +68,9 @@ def CommonChecks(input_api, output_api):
     input_api.PresubmitLocalPath(),
     join('server'),
     join('swarming_bot'),
+    join('swarming_bot', 'api'),
+    join('swarming_bot', 'api', 'platforms'),
+    join('swarming_bot', 'bot_code'),
   ]
 
   blacklist = [

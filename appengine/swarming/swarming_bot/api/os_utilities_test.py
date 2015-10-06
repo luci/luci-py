@@ -66,12 +66,6 @@ class TestOsUtilities(auto_stub.TestCase):
     actual = os_utilities.get_gpu()
     self.assertTrue(actual is None or actual)
 
-  def test_get_integrity_level_win(self):
-    if sys.platform == 'win32':
-      self.assertIsInstance(os_utilities.get_integrity_level_win(), basestring)
-    else:
-      self.assertIs(os_utilities.get_integrity_level_win(), None)
-
   def test_get_dimensions(self):
     actual = set(os_utilities.get_dimensions())
     # Only set on GCE.

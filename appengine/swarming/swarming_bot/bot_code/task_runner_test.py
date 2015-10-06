@@ -152,7 +152,8 @@ class TestTaskRunner(TestTaskRunnerBase):
     start = time.time()
     self.mock(time, 'time', lambda: start + 10)
     server = xsrf_client.XsrfRemote('https://localhost:1/')
-    return task_runner.run_command(server, task_details, '.', 3600., start)
+    return task_runner.run_command(
+        server, task_details, self.work_dir, 3600., start)
 
   def test_download_data(self):
     requests = [
@@ -312,8 +313,6 @@ class TestTaskRunner(TestTaskRunnerBase):
       'isolatedserver': 'localhost:1',
       'namespace': 'default-gzip',
     }, extra_args=['foo', 'bar'])
-    #out = os.path.join(self.root_dir, 'foo')
-    #self.mock(task_runner, 'mkstemp', lambda: out)
     # Mock running run_isolated with a script.
     SCRIPT_ISOLATED = (
       'import json, sys;\n'
@@ -321,14 +320,20 @@ class TestTaskRunner(TestTaskRunnerBase):
       '  raise Exception(sys.argv);\n'
       'with open(sys.argv[1], \'wb\') as f:\n'
       '  json.dump({\n'
-      '    \'isolated\': \'123\',\n'
-      '    \'isolatedserver\': \'http://localhost:1\',\n'
-      '    \'namespace\': \'default-gzip\',\n'
+      '    \'exit_code\': 0,\n'
+      '    \'had_hard_timeout\': False,\n'
+      '    \'internal_failure\': None,\n'
+      '    \'outputs_ref\': {\n'
+      '      \'isolated\': \'123\',\n'
+      '      \'isolatedserver\': \'http://localhost:1\',\n'
+      '       \'namespace\': \'default-gzip\',\n'
+      '    },\n'
       '  }, f)\n'
       'sys.stdout.write(\'hi\\n\')')
     self.mock(
         task_runner, 'get_isolated_cmd',
-        lambda _, x: [sys.executable, '-u', '-c', SCRIPT_ISOLATED, x])
+        lambda _work_dir, _details, isolated_result:
+          [sys.executable, '-u', '-c', SCRIPT_ISOLATED, isolated_result])
     expected = {
       u'exit_code': 0,
       u'hard_timeout': False,
@@ -395,7 +400,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       """Mocks the process so we can control how data is returned."""
       def __init__(self2, cmd, cwd, env, stdout, stderr, stdin, detached):
         self.assertEqual(task_details.command, cmd)
-        self.assertEqual('.', cwd)
+        self.assertEqual(self.work_dir, cwd)
         expected_env = os.environ.copy()
         expected_env['foo'] = 'bar'
         self.assertEqual(expected_env, env)
@@ -638,7 +643,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     # Dot not mock time since this test class is testing timeouts.
     server = xsrf_client.XsrfRemote('https://localhost:1/')
     return task_runner.run_command(
-        server, task_details, '.', 3600., time.time())
+        server, task_details, self.work_dir, 3600., time.time())
 
   def test_hard(self):
     # Actually 0xc000013a
@@ -954,7 +959,8 @@ class TaskRunnerSmoke(unittest.TestCase):
     # such thing as SIGTERM.
     proc.send_signal(signal.SIGTERM)
     proc.wait()
-    with open(os.path.join(self.root_dir, 'task_runner.log'), 'rb') as f:
+    task_runner_log = os.path.join(self.root_dir, 'logs', 'task_runner.log')
+    with open(task_runner_log, 'rb') as f:
       logging.info('task_runner.log:\n---\n%s---', f.read())
     expected = {
       u'exit_code': 0,
@@ -976,7 +982,7 @@ class TaskRunnerSmoke(unittest.TestCase):
           u'task_id': 23,
         },
         {
-          u'exit_code': 1 if sys.platform == 'win32' else -signal.SIGKILL,
+          u'exit_code': 1 if sys.platform == 'win32' else -signal.SIGTERM,
           u'hard_timeout': False,
           u'id': u'localhost',
           u'io_timeout': False,
@@ -989,13 +995,14 @@ class TaskRunnerSmoke(unittest.TestCase):
       'swarming_bot.1.zip',
       '092b5bd4562f579711823f61e311de37247c853a-cacert.pem',
       'work',
-      'task_runner.log',
+      'logs',
+      # TODO(maruel): Move inside work.
       'task_runner_in.json',
       'task_runner_out.json',
     }
     self.assertEqual(expected, set(os.listdir(self.root_dir)))
     expected = {
-      u'exit_code': 1 if sys.platform == 'win32' else -signal.SIGKILL,
+      u'exit_code': 1 if sys.platform == 'win32' else -signal.SIGTERM,
       u'hard_timeout': False,
       u'io_timeout': False,
       u'must_signal_internal_failure':
@@ -1013,4 +1020,7 @@ if __name__ == '__main__':
   logging_utils.prepare_logging(None)
   logging_utils.set_console_level(
       logging.DEBUG if '-v' in sys.argv else logging.CRITICAL+1)
+  # Fix litteral text expectation.
+  os.environ['LANG'] = 'en_US.UTF-8'
+  os.environ['LANGUAGE'] = 'en_US.UTF-8'
   unittest.main()
