@@ -9,15 +9,38 @@ import json
 import logging
 
 from google.appengine.api import app_identity
+from google.appengine.ext import ndb
 import webapp2
 
 from components import pubsub
 from components import utils
 
+import models
+
 
 APP_BASE_URL = 'https://%s' % app_identity.get_default_version_hostname()
 APP_ID = app_identity.get_application_id()
 MACHINE_PROVIDER_ENDPOINT = '/pubsub/machine-provider'
+
+
+@ndb.transactional
+def schedule_deletion(instance_key):
+  """Marks a cataloged instance for deletion.
+
+  Args:
+    instance_key: Key for the models.Instance to mark for deletion.
+  """
+  instance = instance_key.get()
+  if instance.state == models.InstanceStates.CATALOGED:
+    # A CATALOGED Instance was just reported by the Machine Provider to have
+    # been reclaimed. Per the Policies we set on the machine, it's been removed
+    # from the Catalog and is therefore safe for us to delete.
+    logging.info('Scheduling deletion of instance: %s', instance.name)
+    instance.state = models.InstanceStates.PENDING_DELETION
+    instance.put()
+  else:
+    logging.warning(
+        'Unexpected instance state for scheduling deletion: %s', instance.state)
 
 
 class MachineProviderSubscriptionHandler(pubsub.PushSubscriptionHandler):
@@ -41,15 +64,15 @@ class MachineProviderSubscriptionHandler(pubsub.PushSubscriptionHandler):
     Returns:
       A webapp2.Response instance, or None.
     """
-    hostname = attributes['machine_id']
+    hostname = attributes.get('hostname')
     message = base64.b64decode(message)
 
-    if message == 'RECLAIMED':
+    if hostname and message == 'RECLAIMED':
       # Per the policies we set on the instance when adding it to the Machine
       # Provider, a reclaimed machine is deleted from the Catalog. Therefore
       # we are safe to manipulate it. Here we schedule it for deletion.
       # TODO(smut): Schedule for deletion.
-      pass
+      schedule_deletion(models.Instance.generate_key(hostname))
 
 
 def create_pubsub_app():

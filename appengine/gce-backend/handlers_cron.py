@@ -4,7 +4,7 @@
 
 """GCE Backend cron jobs."""
 
-import copy
+import collections
 import json
 import logging
 
@@ -32,6 +32,78 @@ MIN_INSTANCE_GROUP_SIZE = 4
 
 # TODO(smut): Support other zones.
 ZONE = 'us-central1-f'
+
+
+@ndb.transactional
+def delete_instances(instance_keys):
+  """Sets the given Instances as DELETED.
+
+  Args:
+    instance_keys: List of ndb.Keys for Instances to set as DELETED.
+  """
+  get_futures = [instance_key.get_async() for instance_key in instance_keys]
+  put_futures = []
+  while get_futures:
+    ndb.Future.wait_any(get_futures)
+    incomplete_futures = []
+    for future in get_futures:
+      if future.done():
+        instance = future.get_result()
+        if instance.state == models.InstanceStates.PENDING_DELETION:
+          logging.info('Deleting instance: %s', instance.name)
+          # TODO(smut): Remove from the datastore.
+          # The deletion operation returns success as soon as it's scheduled.
+          # We also need to list the instances to check which ones have been
+          # deleted.
+          instance.state = models.InstanceStates.DELETED
+          put_futures.append(instance.put_async())
+        else:
+          logging.warning(
+              'Instance no longer pending deletion: %s', instance.name)
+      else:
+        incomplete_futures.append(future)
+    get_futures = incomplete_futures
+  if put_futures:
+    ndb.Future.wait_all(put_futures)
+
+
+class InstanceDeletionProcessor(webapp2.RequestHandler):
+  """Worker for processing pending instance deletions."""
+
+  @decorators.require_cronjob
+  def get(self):
+    api = gce.Project(GCE_PROJECT_ID)
+
+    # Aggregate instances because the API lets us batch instance deletions
+    # for a common instance group manager.
+    instance_map = collections.defaultdict(list)
+    for instance in models.Instance.query(
+        models.Instance.state == models.InstanceStates.PENDING_DELETION
+    ):
+      instance_map[instance.group].append(instance)
+
+    # TODO(smut): Delete instances in different instance groups concurrently.
+    for group, instances in instance_map.iteritems():
+      # TODO(smut): Resize the instance group.
+      # When instances are deleted from an instance group, the instance group's
+      # size is decreased by the number of deleted instances. We need to resize
+      # the group back to its original size in order to replace those deleted
+      # instances.
+      logging.info(
+          'Deleting instances from instance group: %s\n%s',
+          group,
+          [instance.name for instance in instances],
+      )
+      # Try to delete the instances. If the operation succeeds, update the
+      # datastore. If it fails, just move on to the next set of instances
+      # and try again later.
+      try:
+        response = api.delete_instances(
+            group, ZONE, [instance.url for instance in instances])
+        if response.get('status') == 'DONE':
+          delete_instances([instance.key for instance in instances])
+      except net.Error as e:
+        logging.warning('%s', e)
 
 
 def filter_templates(templates):
@@ -132,8 +204,9 @@ def create_instance_group(name, dimensions, policies, instances):
         group=name,
         name=instance_name,
         state=models.InstanceStates.UNCATALOGED,
+        url=instance['instance'],
     )
-    if instance['instanceStatus'] == 'RUNNING':
+    if instance.get('instanceStatus') == 'RUNNING':
       existing_instance = instance_key.get()
       if existing_instance:
         if existing_instance.state == models.InstanceStates.UNCATALOGED:
@@ -147,7 +220,7 @@ def create_instance_group(name, dimensions, policies, instances):
           'Instance not running: %s\ncurrentAction: %s\ninstanceStatus: %s',
           instance_name,
           instance['currentAction'],
-          instance['instanceStatus'],
+          instance.get('instanceStatus'),
       )
 
   if instances_to_catalog:
@@ -225,6 +298,7 @@ class InstanceProcessor(webapp2.RequestHandler):
 
 def create_cron_app():
   return webapp2.WSGIApplication([
+      ('/internal/cron/delete-instances', InstanceDeletionProcessor),
       ('/internal/cron/process-instance-templates', InstanceTemplateProcessor),
       ('/internal/cron/process-instances', InstanceProcessor),
   ])

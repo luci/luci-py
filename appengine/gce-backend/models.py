@@ -68,7 +68,8 @@ class InstanceGroup(ndb.Model):
     return ndb.Key(cls, hashlib.sha1(name).hexdigest())
 
 
-InstanceStates = Enum(['CATALOGED', 'UNCATALOGED'])
+InstanceStates = Enum([
+  'CATALOGED', 'UNCATALOGED', 'PENDING_DELETION', 'DELETED'])
 
 
 class Instance(ndb.Model):
@@ -84,6 +85,8 @@ class Instance(ndb.Model):
   name = ndb.StringProperty(required=True)
   # State of this instance.
   state = ndb.StringProperty(choices=InstanceStates, required=True)
+  # URL for this instance.
+  url = ndb.StringProperty(required=True)
 
   @classmethod
   def generate_key(cls, name):

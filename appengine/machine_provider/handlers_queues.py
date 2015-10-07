@@ -59,6 +59,7 @@ class MachineReclaimer(webapp2.RequestHandler):
         be published to for the backend.
       backend_project: If specified, project that the machine reclamation
         topic is contained in for the backend.
+      hostname: Hostname being reclaimed.
       lease_id: ID of the LeaseRequest the machine was leased for.
       lessee_topic: If specified, topic that the machine reclamation and lease
         expiration should be published to for the lessee.
@@ -68,6 +69,7 @@ class MachineReclaimer(webapp2.RequestHandler):
     """
     backend_project = self.request.get('backend_project')
     backend_topic = self.request.get('backend_topic')
+    hostname = self.request.get('hostname')
     lease_id = self.request.get('lease_id')
     lessee_project = self.request.get('lessee_project')
     lessee_topic = self.request.get('lessee_topic')
@@ -87,7 +89,7 @@ class MachineReclaimer(webapp2.RequestHandler):
           backend_topic,
           backend_project,
           'RECLAIMED',
-          machine_id=machine_id,
+          hostname=hostname,
     )
 
 

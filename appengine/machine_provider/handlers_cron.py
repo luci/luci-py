@@ -243,6 +243,7 @@ def reclaim_machine(machine_key, reclamation_ts):
     ndb.put_multi([lease, machine])
 
   params = {
+      'hostname': machine.dimensions.hostname,
       'lease_id': lease.key.id(),
       'machine_id': machine.key.id(),
   }

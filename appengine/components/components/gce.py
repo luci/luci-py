@@ -4,6 +4,7 @@
 
 """Wrapper around GCE REST API."""
 
+import json
 import re
 
 from components import net
@@ -226,6 +227,33 @@ class Project(object):
             'targetSize': size,
         },
     )
+
+  def delete_instances(self, manager, zone, instance_urls):
+    """Deletes the given GCE instances from the given instance group manager.
+
+    Args:
+      manager: Name of the instance group manager.
+      zone: Zone to delete the instances in.
+      instance_urls: List of URLs of instances to delete.
+
+    Returns:
+      JSON describing the result of the operation.
+    """
+    try:
+      resp = self.call_api(
+          '/zones/%s/instanceGroupManagers/%s/deleteInstances' % (
+              zone,
+              manager,
+          ),
+          method='POST',
+          payload={'instances': instance_urls},
+      )
+    except net.Error as e:
+      if e.status_code == 400:
+        resp = json.loads(e.response)
+      else:
+        raise
+    return resp
 
   def get_instance_group_managers(self, zone):
     """Returns the GCE instance group managers associated with this project.

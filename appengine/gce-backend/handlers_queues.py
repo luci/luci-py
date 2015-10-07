@@ -31,17 +31,22 @@ def uncatalog_instances(instances):
   ]
   while get_futures:
     ndb.Future.wait_any(get_futures)
-    instances = [future.get_result() for future in get_futures if future.done()]
-    get_futures = [future for future in get_futures if not future.done()]
-    for instance in instances:
-      if instance.state == models.InstanceStates.CATALOGED:
-        # handlers_cron.py sets each Instance's state to
-        # CATALOGED before triggering InstanceGroupCataloger.
-        logging.info('Uncataloging instance: %s', instance.name)
-        instance.state = models.InstanceStates.UNCATALOGED
-        put_futures.append(instance.put_async())
+    incomplete_futures = []
+    for future in get_futures:
+      if future.done():
+        instance = future.get_result()
+        if instance.state == models.InstanceStates.CATALOGED:
+          # handlers_cron.py sets each Instance's state to
+          # CATALOGED before triggering InstanceGroupCataloger.
+          logging.info('Uncataloging instance: %s', instance.name)
+          instance.state = models.InstanceStates.UNCATALOGED
+          put_futures.append(instance.put_async())
+        else:
+          logging.info(
+              'Ignoring already uncataloged instance: %s', instance.name)
       else:
-        logging.info('Ignoring already uncataloged instance: %s', instance.name)
+        incomplete_futures.append(future)
+    get_futures = incomplete_futures
   if put_futures:
     ndb.Future.wait_all(put_futures)
   else:
@@ -53,7 +58,7 @@ class InstanceGroupCataloger(webapp2.RequestHandler):
 
   @decorators.require_taskqueue('catalog-instance-group')
   def post(self):
-    """Reclaim a machine.
+    """Catalog instances in the Machine Provider.
 
     Params:
       dimensions: JSON-encoded string representation of
