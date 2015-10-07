@@ -185,4 +185,3 @@ def get_physical_ram():
       arr, 2, ctypes.byref(result), ctypes.byref(size), None,
       ctypes.c_size_t(0))
   return int(round(result.value / 1024. / 1024.))
-

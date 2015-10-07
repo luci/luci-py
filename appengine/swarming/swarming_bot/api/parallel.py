@@ -27,7 +27,7 @@ def pmap(fn, items):
   if not items:
     return []
   if len(items) == 1:
-    return fn(items[0])
+    return [fn(items[0])]
 
   # Try to reuse the common pool. Can only be used by one mapper at a time.
   locked = _POOL_LOCK.acquire(False)

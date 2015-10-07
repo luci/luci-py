@@ -185,4 +185,3 @@ def generate_autostart_destkop(command, name):
       'cmd': ' '.join(pipes.quote(c) for c in command),
       'name': name,
     }
-
