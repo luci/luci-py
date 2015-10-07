@@ -28,7 +28,7 @@ from api import os_utilities
 # Unused argument 'bot' - pylint: disable=W0613
 
 
-def get_dimensions():
+def get_dimensions(bot):
   """Returns dict with the bot's dimensions.
 
   The dimensions are what are used to select the bot that can run each task.
@@ -38,11 +38,14 @@ def get_dimensions():
   in your bot_config.py and override the item 'id'.
 
   See https://code.google.com/p/swarming/wiki/SwarmingMagicValues.
+
+  Arguments:
+  - botobj: bot.Bot instance or None.
   """
   return os_utilities.get_dimensions()
 
 
-def get_state():
+def get_state(bot):
   """Returns dict with a state of the bot reported to the server with each poll.
 
   It is only for dynamic state that changes while bot is running for information
@@ -53,6 +56,9 @@ def get_state():
   tasks.
 
   See https://code.google.com/p/swarming/wiki/SwarmingMagicValues.
+
+  Arguments:
+  - botobj: bot.Bot instance or None.
   """
   return os_utilities.get_state()
 

@@ -80,7 +80,7 @@ class TestBotMain(net_utils.TestCase):
     super(TestBotMain, self).tearDown()
 
   def test_get_dimensions(self):
-    dimensions = set(bot_main.get_dimensions())
+    dimensions = set(bot_main.get_dimensions(None))
     dimensions.discard('hidpi')
     dimensions.discard('zone')  # Only set on GCE bots.
     expected = {'cores', 'cpu', 'gpu', 'id', 'machine_type', 'os'}
@@ -88,7 +88,7 @@ class TestBotMain(net_utils.TestCase):
 
   def test_get_dimensions_load_test(self):
     os.environ['SWARMING_LOAD_TEST'] = '1'
-    self.assertEqual(['id', 'load_test'], sorted(bot_main.get_dimensions()))
+    self.assertEqual(['id', 'load_test'], sorted(bot_main.get_dimensions(None)))
 
   def test_generate_version(self):
     self.assertEqual('123', bot_main.generate_version())
@@ -101,7 +101,7 @@ class TestBotMain(net_utils.TestCase):
     # changed.
     for disk in expected['disks'].itervalues():
       self.assertGreater(disk.pop('free_mb'), 1.)
-    actual = bot_main.get_state(12)
+    actual = bot_main.get_state(None, 12)
     for disk in actual['disks'].itervalues():
       self.assertGreater(disk.pop('free_mb'), 1.)
     self.assertEqual(expected, actual)
@@ -143,8 +143,8 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, 'get_remote', lambda: self.server)
     # get_state() return value changes over time. Hardcode its value for the
     # duration of this test.
-    self.mock(os_utilities, 'get_state', lambda: {'foo': 'bar'})
-    expected_attribs = bot_main.get_attributes()
+    self.mock(os_utilities, 'get_state', lambda : {'foo': 'bar'})
+    expected_attribs = bot_main.get_attributes(None)
     self.expected_requests(
         [
           (

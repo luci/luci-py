@@ -62,7 +62,7 @@ def _in_load_test_mode():
   return os.environ.get('SWARMING_LOAD_TEST') == '1'
 
 
-def get_dimensions():
+def get_dimensions(botobj):
   """Returns bot_config.py's get_attributes() dict."""
   # Importing this administrator provided script could have side-effects on
   # startup. That is why it is imported late.
@@ -76,7 +76,7 @@ def get_dimensions():
       }
 
     from config import bot_config
-    out = bot_config.get_dimensions()
+    out = bot_config.get_dimensions(botobj)
     if not isinstance(out, dict):
       raise ValueError('Unexpected type %s' % out.__class__)
     return out
@@ -99,7 +99,7 @@ def get_dimensions():
         }
 
 
-def get_state(sleep_streak):
+def get_state(botobj, sleep_streak):
   """Returns dict with a state of the bot reported to the server with each poll.
   """
   try:
@@ -108,7 +108,7 @@ def get_state(sleep_streak):
       state['dimensions'] = os_utilities.get_dimensions()
     else:
       from config import bot_config
-      state = bot_config.get_state()
+      state = bot_config.get_state(botobj)
       if not isinstance(state, dict):
         state = {'error': state}
   except Exception as e:
@@ -176,16 +176,19 @@ def generate_version():
     return 'Error: %s' % e
 
 
-def get_attributes():
+def get_attributes(botobj):
   """Returns the attributes sent to the server.
 
   Each called function catches all exceptions so the bot doesn't die on startup,
   which is annoying to recover. In that case, we set a special property to catch
   these and help the admin fix the swarming_bot code more quickly.
+
+  Arguments:
+  - botobj: bot.Bot instance or None
   """
   return {
-    'dimensions': get_dimensions(),
-    'state': get_state(0),
+    'dimensions': get_dimensions(botobj),
+    'state': get_state(botobj, 0),
     'version': generate_version(),
   }
 
@@ -245,12 +248,28 @@ def get_bot():
 
   Should only be called once in the process lifetime.
   """
+  # This variable is used to bootstrap the initial bot.Bot object, which then is
+  # used to get the dimensions and state.
+  attributes = {
+    'dimensions': {u'id': ['none']},
+    'state': {},
+    'version': generate_version(),
+  }
+  config = get_config()
   while True:
     try:
-      attributes = get_attributes()
-
       # Handshake to get an XSRF token even if there were errors.
       remote = get_remote()
+      remote.xsrf_request_params = attributes.copy()
+      # Create a temporary object to call the hooks.
+      botobj = bot.Bot(
+          remote,
+          attributes,
+          config['server'],
+          config['server_version'],
+          os.path.dirname(THIS_FILE),
+          on_shutdown_hook)
+      attributes = get_attributes(botobj)
       remote.xsrf_request_params = attributes.copy()
       break
     except Exception:
@@ -259,7 +278,6 @@ def get_bot():
       # the server is reachable again.
       logging.exception('Catastrophic failure')
 
-  config = get_config()
   return bot.Bot(
       remote,
       attributes,
@@ -327,8 +345,8 @@ def run_bot(arg_error):
     consecutive_sleeps = 0
     while not quit_bit.is_set():
       try:
-        botobj.update_dimensions(get_dimensions())
-        botobj.update_state(get_state(consecutive_sleeps))
+        botobj.update_dimensions(get_dimensions(botobj))
+        botobj.update_state(get_state(botobj, consecutive_sleeps))
         did_something = poll_server(botobj, quit_bit)
         if did_something:
           consecutive_sleeps = 0

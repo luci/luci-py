@@ -37,7 +37,7 @@ def CMDattributes(_args):
   """Prints out the bot's attributes."""
   from bot_code import bot_main
   json.dump(
-      bot_main.get_attributes(), sys.stdout, indent=2, sort_keys=True,
+      bot_main.get_attributes(None), sys.stdout, indent=2, sort_keys=True,
       separators=(',', ': '))
   print('')
   return 0

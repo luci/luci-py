@@ -23,7 +23,7 @@ def main():
   # Pass an empty tag, so pop it up since it has no significance.
   devices = None
   if sys.platform == 'linux2':
-    devices = platforms.android.get_devices()
+    devices = platforms.android.get_devices(None)
     if devices:
       try:
         data = {

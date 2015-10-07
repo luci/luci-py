@@ -49,7 +49,7 @@ def main():
     return 1
 
   sys.path.insert(0, ROOT_DIR)
-  content = get_swarming_bot_zip()
+  content, _ = get_swarming_bot_zip()
   with open(os.path.join(ROOT_DIR, 'swarming_bot.zip'), 'wb') as f:
     f.write(content)
   return 0
