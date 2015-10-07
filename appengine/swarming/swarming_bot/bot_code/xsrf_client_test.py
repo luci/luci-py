@@ -3,6 +3,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import datetime
 import logging
 import os
 import sys
@@ -39,7 +40,10 @@ class UrlHelperTest(net_utils.TestCase):
           (
             'http://localhost/auth/api/v1/accounts/self/xsrf_token',
             {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
-            {'xsrf_token': 'token'},
+            {
+              'expiration_sec': 100,
+              'xsrf_token': 'token',
+            },
           ),
           (
             'http://localhost/a',
@@ -58,20 +62,24 @@ class UrlHelperTest(net_utils.TestCase):
           (
             'http://localhost/auth/api/v1/accounts/self/xsrf_token',
             {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
-            {'xsrf_token': 'token'},
+            {
+              'expiration_sec': 100,
+              'xsrf_token': 'token',
+            },
           ),
           (
             'http://localhost/a',
             {'data': {'foo': 'bar'}, 'headers': {'X-XSRF-Token': 'token'}},
-            # Fake that the token went bad by returning None. XsrfRemote will
-            # automatically try to refresh the token before retrying.
-            None,
+            'bar',
             None,
           ),
           (
             'http://localhost/auth/api/v1/accounts/self/xsrf_token',
             {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
-            {'xsrf_token': 'token2'},
+            {
+              'expiration_sec': 100,
+              'xsrf_token': 'token2',
+            },
           ),
           (
             'http://localhost/a',
@@ -81,38 +89,11 @@ class UrlHelperTest(net_utils.TestCase):
           ),
         ])
 
+    now = xsrf_client._utcnow()
     remote = xsrf_client.XsrfRemote('http://localhost/')
     remote.url_read('/a', data={'foo': 'bar'})
-
-  def testXsrfRemoteRefreshForced(self):
-    self.expected_requests(
-        [
-          (
-            'http://localhost/a',
-            {
-              'data': {'foo': 'bar'},
-              'headers': {'X-XSRF-Token': 'invalid_token'},
-            },
-            # Fake that the token went bad by returning None. XsrfRemote will
-            # automatically try to refresh the token before retrying.
-            None,
-            None,
-          ),
-          (
-            'http://localhost/auth/api/v1/accounts/self/xsrf_token',
-            {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
-            {'xsrf_token': 'token2'},
-          ),
-          (
-            'http://localhost/a',
-            {'data': {'foo': 'bar'}, 'headers': {'X-XSRF-Token': 'token2'}},
-            'foo',
-            None,
-          ),
-        ])
-
-    remote = xsrf_client.XsrfRemote('http://localhost/')
-    remote.token = 'invalid_token'
+    self.mock(
+        xsrf_client, '_utcnow', lambda: now + datetime.timedelta(seconds=91))
     remote.url_read('/a', data={'foo': 'bar'})
 
   def testXsrfRemoteCustom(self):
@@ -125,7 +106,11 @@ class UrlHelperTest(net_utils.TestCase):
               'data': {'attributes': 'b'},
               'headers': {'X-XSRF-Token-Request': '1'},
             },
-            {'ignored': True, 'xsrf_token': 'token'},
+            {
+              'expiration_sec': 100,
+              'ignored': True,
+              'xsrf_token': 'token',
+            },
           ),
           (
             'http://localhost/a',

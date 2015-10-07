@@ -443,7 +443,12 @@ class XSRFHandler(handler.ApiHandler):
   @handler.require_xsrf_token_request
   @api.public
   def post(self):
-    self.send_response({'xsrf_token': self.generate_xsrf_token()})
+    token = self.generate_xsrf_token()
+    self.send_response(
+        {
+          'expiration_sec': handler.XSRFToken.expiration_sec,
+          'xsrf_token': token,
+        })
 
 
 class ChangeLogHandler(handler.ApiHandler):

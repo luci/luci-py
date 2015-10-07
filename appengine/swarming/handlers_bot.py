@@ -252,6 +252,7 @@ class BotHandshakeHandler(_BotBaseHandler):
     data = {
       # This access token will be used to validate each subsequent request.
       'bot_version': bot_code.get_bot_version(self.request.host_url),
+      'expiration_sec': auth.handler.XSRFToken.expiration_sec,
       'server_version': utils.get_app_version(),
       'xsrf_token': self.generate_xsrf_token(),
     }

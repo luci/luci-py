@@ -66,7 +66,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     response = self.app.post_json(
         '/swarming/api/v1/bot/handshake', headers=headers, params=params).json
     self.assertEqual(
-        [u'bot_version', u'server_version', u'xsrf_token'], sorted(response))
+        [u'bot_version', u'expiration_sec', u'server_version', u'xsrf_token'],
+        sorted(response))
     self.assertTrue(response['xsrf_token'])
     self.assertEqual(40, len(response['bot_version']))
     self.assertEqual(u'v1a', response['server_version'])
@@ -83,7 +84,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     response = self.app.post_json(
         '/swarming/api/v1/bot/handshake', headers=headers, params={}).json
     self.assertEqual(
-        [u'bot_version', u'server_version', u'xsrf_token'], sorted(response))
+        [u'bot_version', u'expiration_sec', u'server_version', u'xsrf_token'],
+        sorted(response))
     self.assertTrue(response['xsrf_token'])
     self.assertEqual(40, len(response['bot_version']))
     self.assertEqual(u'v1a', response['server_version'])
@@ -117,7 +119,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     response = self.app.post_json(
         '/swarming/api/v1/bot/handshake', headers=headers, params=params).json
     self.assertEqual(
-        [u'bot_version', u'server_version', u'xsrf_token'], sorted(response))
+        [u'bot_version', u'expiration_sec',u'server_version', u'xsrf_token'],
+        sorted(response))
     self.assertTrue(response['xsrf_token'])
     self.assertEqual(40, len(response['bot_version']))
     self.assertEqual(u'v1a', response['server_version'])

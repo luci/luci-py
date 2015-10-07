@@ -2,8 +2,9 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""A helper script for wrapping url calls."""
+"""Wraps URL requests with an XSRF token using components/auth based service."""
 
+import datetime
 import logging
 import os
 import sys
@@ -19,6 +20,11 @@ class Error(Exception):
   pass
 
 
+def _utcnow():
+  """So it can be mocked."""
+  return datetime.datetime.utcnow()
+
+
 class XsrfRemote(object):
   """Transparently adds XSRF token to requests."""
   TOKEN_RESOURCE = '/auth/api/v1/accounts/self/xsrf_token'
@@ -27,6 +33,7 @@ class XsrfRemote(object):
     self.url = url.rstrip('/')
     self.token = None
     self.token_resource = token_resource or self.TOKEN_RESOURCE
+    self.expiration = None
     self.xsrf_request_params = {}
 
   def url_read(self, resource, **kwargs):
@@ -35,14 +42,9 @@ class XsrfRemote(object):
       # No XSRF token for GET.
       return net.url_read(url, **kwargs)
 
-    if not self.token:
-      self.token = self.refresh_token()
-    resp = self._url_read_post(url, **kwargs)
-    if resp is None:
-      # This includes 403 because the XSRF token expired. Renew the token.
-      # TODO(maruel): It'd be great if it were transparent.
+    if self.need_refresh():
       self.refresh_token()
-      resp = self._url_read_post(url, **kwargs)
+    resp = self._url_read_post(url, **kwargs)
     if resp is None:
       raise Error('Failed to connect to %s' % url)
     return resp
@@ -53,15 +55,9 @@ class XsrfRemote(object):
       # No XSRF token required for GET.
       return net.url_read_json(url, **kwargs)
 
-    if not self.token:
-      self.token = self.refresh_token()
-    resp = self._url_read_json_post(url, **kwargs)
-    if resp is None:
-      logging.error('Forcibly refreshing; %s, %s', url, kwargs)
-      # This includes 403 because the XSRF token expired. Renew the token.
-      # TODO(maruel): It'd be great if it were transparent.
+    if self.need_refresh():
       self.refresh_token()
-      resp = self._url_read_json_post(url, **kwargs)
+    resp = self._url_read_json_post(url, **kwargs)
     if resp is None:
       raise Error('Failed to connect to %s' % url)
     return resp
@@ -77,7 +73,16 @@ class XsrfRemote(object):
     if resp is None:
       raise Error('Failed to connect to %s' % url)
     self.token = resp['xsrf_token']
+    if resp.get('expiration_sec'):
+      exp = resp['expiration_sec']
+      exp -= min(round(exp * 0.1), 600)
+      self.expiration = _utcnow() + datetime.timedelta(seconds=exp)
     return self.token
+
+  def need_refresh(self):
+    """Returns True if the XSRF token needs to be refreshed."""
+    return (
+        not self.token or (self.expiration and self.expiration <= _utcnow()))
 
   def _url_read_post(self, url, **kwargs):
     headers = (kwargs.pop('headers', None) or {}).copy()
