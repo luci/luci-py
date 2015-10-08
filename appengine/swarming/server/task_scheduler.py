@@ -483,12 +483,17 @@ def bot_update_task(
   if cost_usd is not None and cost_usd < 0.:
     raise ValueError('cost_usd must be None or greater or equal than 0')
 
+  packed = task_pack.pack_run_result_key(run_result_key)
+  logging.debug(
+      'bot_update_task(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)',
+      packed, bot_id, len(output) if output else output, output_chunk_start,
+      exit_code, duration, hard_timeout, io_timeout, cost_usd, outputs_ref)
+
   result_summary_key = task_pack.run_result_key_to_result_summary_key(
       run_result_key)
   request_key = task_pack.result_summary_key_to_request_key(result_summary_key)
   request_future = request_key.get_async()
   server_version = utils.get_app_version()
-  packed = task_pack.pack_run_result_key(run_result_key)
   request = request_future.get_result()
   now = utils.utcnow()
 
