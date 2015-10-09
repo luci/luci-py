@@ -111,8 +111,8 @@ def publish(topic, project, message, **attributes):
       raise
 
 
-class PushSubscriptionHandler(webapp2.RequestHandler):
-  """Base class for defining Pub/Sub push subscription handlers."""
+class SubscriptionHandler(webapp2.RequestHandler):
+  """Base class for defining Pub/Sub subscription handlers."""
   # TODO(smut): Keep in datastore. See components/datastore_utils.
   ENDPOINT = None
   SUBSCRIPTION = None
@@ -121,37 +121,117 @@ class PushSubscriptionHandler(webapp2.RequestHandler):
   TOPIC_PROJECT = None
 
   @classmethod
-  def _subscribe(cls):
-    """Subscribes to a Cloud Pub/Sub project."""
+  def get_subscription_url(cls):
+    return '%s/%s/subscriptions/%s' % (
+        PUBSUB_BASE_URL,
+        cls.SUBSCRIPTION_PROJECT,
+        cls.SUBSCRIPTION,
+    )
+
+  @classmethod
+  def unsubscribe(cls):
+    """Unsubscribes from a Cloud Pub/Sub project."""
     net.json_request(
-        '%s/%s/subscriptions/%s' % (
-            PUBSUB_BASE_URL,
-            cls.SUBSCRIPTION_PROJECT,
-            cls.SUBSCRIPTION,
-        ),
-        method='PUT',
-        payload={
-            'topic': 'projects/%s/topics/%s' % (cls.TOPIC_PROJECT, cls.TOPIC),
-            'pushConfig': {'pushEndpoint': cls.ENDPOINT},
-        },
+        cls.get_subscription_url(),
+        method='DELETE',
         scopes=PUBSUB_SCOPES,
     )
 
   @classmethod
-  def ensure_subscribed(cls):
-    """Ensures a Cloud Pub/Sub subscription exists."""
+  def _subscribe(cls, push=False):
+    """Subscribes to a Cloud Pub/Sub project."""
+    payload = {
+        'topic': 'projects/%s/topics/%s' % (cls.TOPIC_PROJECT, cls.TOPIC),
+    }
+    if push:
+      payload['pushConfig'] = {'pushEndpoint': cls.ENDPOINT}
+    net.json_request(
+        cls.get_subscription_url(),
+        method='PUT',
+        payload=payload,
+        scopes=PUBSUB_SCOPES,
+    )
+
+  @classmethod
+  def ensure_subscribed(cls, push=False):
+    """Ensures a Cloud Pub/Sub subscription exists.
+
+    Can also be used to change subscription type between push and pull.
+
+    Args:
+      push: Whether or not to create a push subscription. Defaults to pull.
+    """
     try:
-      cls._subscribe()
+      cls._subscribe(push=push)
     except net.NotFoundError:
       # Topic does not exist. Try to create it.
       ensure_topic_exists(cls.TOPIC, cls.TOPIC_PROJECT)
       # Retransmit now that the topic is created.
-      cls._subscribe()
+      cls._subscribe(push=push)
     except net.Error as e:
-      if e.status_code != 409:
-        # 409 is the status code when the subscription already exists.
-        # Ignore 409, but raise any other error.
+      if e.status_code == 409:
+        # Subscription already exists. When the subscription already exists,
+        # it won't change between pull and push if the create request was for
+        # a different type of subscription than what currently existed. Since
+        # we get no information about whether the existing subscription is a
+        # push or pull subscription, just blindly send a request to change the
+        # subscription type.
+        payload = None
+        if push:
+          payload = {'pushConfig': {'pushEndpoint': cls.ENDPOINT}}
+        net.json_request(
+          cls.get_subscription_url(),
+          method='POST',
+          payload=payload,
+          scopes=PUBSUB_SCOPES,
+        )
+      else:
         raise
+
+  @classmethod
+  def is_subscribed(cls):
+    """Returns whether or not a Cloud Pub/Sub subscription exists.
+
+    Returns:
+      True if the subscription exists, False otherwise.
+    """
+    try:
+      net.json_request(
+          cls.get_subscription_url(),
+          method='GET',
+          scopes=PUBSUB_SCOPES,
+      )
+      return True
+    except net.NotFoundError:
+      return False
+
+  def get(self):
+    """Queries for Pub/Sub messages."""
+    response = net.json_request(
+        '%s:pull' % self.get_subscription_url(),
+        method='POST',
+        payload={
+            'maxMessages': 1,
+            'returnImmediately': True,
+        },
+        scopes=PUBSUB_SCOPES,
+    )
+    message_ids = []
+    for received_message in response.get('receivedMessages', []):
+      attributes = received_message.get('message', {}).get('attributes', {})
+      message = received_message.get('message', {}).get('data', '')
+      logging.info(
+          'Received Pub/Sub message:\n%s\nAttributes:\n%s', message, attributes)
+      # TODO(smut): Process messages in parallel.
+      self.process_message(message, attributes)
+      message_ids.append(received_message['ackId'])
+    if message_ids:
+      net.json_request(
+          '%s:acknowledge' % self.get_subscription_url(),
+          method='POST',
+          payload={'ackIds': message_ids},
+          scopes=PUBSUB_SCOPES,
+      )
 
   def post(self):
     """Handles a Pub/Sub push message."""
@@ -172,13 +252,12 @@ class PushSubscriptionHandler(webapp2.RequestHandler):
 
     logging.info(
         'Received Pub/Sub message:\n%s\nAttributes:\n%s', message, attributes)
-    return self.process_message(subscription, message, attributes)
+    return self.process_message(message, attributes)
 
-  def process_message(self, subscription, message, attributes):
+  def process_message(self, message, attributes):
     """Process a Pub/Sub message.
 
     Args:
-      subscription: Name of the subscription this message is associated with.
       message: The message string.
       attributes: A dict of key/value pairs representing attributes associated
         with this message.

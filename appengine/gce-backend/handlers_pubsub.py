@@ -43,7 +43,7 @@ def schedule_deletion(instance_key):
         'Unexpected instance state for scheduling deletion: %s', instance.state)
 
 
-class MachineProviderSubscriptionHandler(pubsub.PushSubscriptionHandler):
+class MachineProviderSubscriptionHandler(pubsub.SubscriptionHandler):
   """Worker for receiving Pub/Sub push messages from the Machine Provider."""
   # How the Machine Provider should talk to the GCE Backend.
   ENDPOINT = '%s/%s' % (APP_BASE_URL, MACHINE_PROVIDER_ENDPOINT)
@@ -52,11 +52,10 @@ class MachineProviderSubscriptionHandler(pubsub.PushSubscriptionHandler):
   TOPIC = 'machine-provider'
   TOPIC_PROJECT = APP_ID
 
-  def process_message(self, subscription, message, attributes):
+  def process_message(self, message, attributes):
     """Process a Pub/Sub message.
 
     Args:
-      subscription: Name of the subscription this message is associated with.
       message: The message string.
       attributes: A dict of key/value pairs representing attributes associated
         with this message.

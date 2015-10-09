@@ -16,7 +16,6 @@ from components import decorators
 from components import gce
 from components import machine_provider
 from components import net
-from components import pubsub
 from components import utils
 
 import handlers_pubsub
@@ -252,13 +251,19 @@ class InstanceProcessor(webapp2.RequestHandler):
 
   @decorators.require_cronjob
   def get(self):
+    pubsub_handler = handlers_pubsub.MachineProviderSubscriptionHandler
+    if not pubsub_handler.is_subscribed():
+      logging.error(
+          'Pub/Sub subscription not created:\n%s',
+          pubsub_handler.get_subscription_url(),
+      )
+      return
+
     api = gce.Project(GCE_PROJECT_ID)
     logging.info('Retrieving instance templates')
     templates = api.get_instance_templates()
     logging.info('Retrieving instance group managers')
     managers = api.get_instance_group_managers(ZONE)
-
-    handlers_pubsub.MachineProviderSubscriptionHandler.ensure_subscribed()
 
     requests = []
 

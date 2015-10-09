@@ -347,7 +347,7 @@ class ZoneOperation(object):
 
 def is_valid_project_id(project_id):
   """True if string looks like a valid Cloud Project id."""
-  return re.match(r'^[a-z0-9\-]+$', project_id)
+  return re.match(r'^(google.com:)?[a-z0-9\-]+$', project_id)
 
 
 def is_valid_region(region):
