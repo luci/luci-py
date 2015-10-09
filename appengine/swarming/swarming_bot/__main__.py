@@ -14,7 +14,6 @@ import logging
 import os
 import optparse
 import shutil
-import signal
 import sys
 import zipfile
 
