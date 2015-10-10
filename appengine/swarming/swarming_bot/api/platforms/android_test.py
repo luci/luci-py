@@ -74,7 +74,7 @@ oShjkmSqylt4CG34EcCl+JkRTZVFsvp4f8gxC1yQasPo9xjB3DC7maanjp70uMLw
 
   def test_sign(self):
     # Does not crash => works.
-    signer = android.PythonRSASigner('pub', self.TEST_KEY)
+    signer = android._PythonRSASigner('pub', self.TEST_KEY)
     self.assertTrue(signer.Sign('data to sign'))
 
 

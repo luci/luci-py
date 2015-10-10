@@ -60,6 +60,36 @@ _ADB_KEYS = None
 _BUILD_PROP_ANDROID = {}
 
 
+class _PythonRSASigner(object):
+  """Implements adb_protocol.AuthSigner using http://stuvel.eu/rsa."""
+  def __init__(self, pub, priv):
+    self.priv_key = _load_rsa_private_key(priv)
+    self.pub_key = pub
+
+  def Sign(self, data):
+    return rsa.sign(data, self.priv_key, 'SHA-1-PREHASHED')
+
+  def GetPublicKey(self):
+    return self.pub_key
+
+
+def _load_rsa_private_key(pem):
+  """PEM encoded PKCS#8 private key -> rsa.PrivateKey."""
+  # ADB uses private RSA keys in pkcs#8 format. 'rsa' library doesn't support
+  # them natively. Do some ASN unwrapping to extract naked RSA key
+  # (in der-encoded form). See https://www.ietf.org/rfc/rfc2313.txt.
+  # Also http://superuser.com/a/606266.
+  try:
+    der = rsa.pem.load_pem(pem, 'PRIVATE KEY')
+    keyinfo, _ = decoder.decode(der)
+    if keyinfo[1][0] != univ.ObjectIdentifier('1.2.840.113549.1.1.1'):
+        raise ValueError('Not a DER-encoded OpenSSL private RSA key')
+    private_key_der = keyinfo[2].asOctets()
+  except IndexError:
+    raise ValueError('Not a DER-encoded OpenSSL private RSA key')
+  return rsa.PrivateKey.load_pkcs1(private_key_der, format='DER')
+
+
 def _dumpsys(device, arg):
   """dumpsys is a native android tool that returns semi structured data.
 
@@ -92,7 +122,69 @@ def _parcel_to_list(lines):
   return out
 
 
-class _Device(object):
+def _load_device(handle):
+  """Given a adb.USBDevice, return a Device wrapping an
+  adb_commands.AdbCommands.
+  """
+  port_path = '/'.join(map(str, handle.port_path))
+  try:
+    handle.Open()
+  except adb.common.usb1.USBErrorNoDevice as e:
+    logging.warning('Got USBErrorNoDevice for %s: %s', port_path, e)
+    # Do not kill adb, it just means the USB host is likely resetting and the
+    # device is temporarily unavailable.We can't use handle.serial_number since
+    # this communicates with the device.
+    # TODO(maruel): In practice we'd like to retry for a few seconds.
+    handle = None
+  except adb.common.usb1.USBErrorBusy as e:
+    logging.warning('Got USBErrorBusy for %s. Killing adb: %s', port_path, e)
+    kill_adb()
+    try:
+      # If it throws again, it probably means another process holds a handle to
+      # the USB ports or group acl (plugdev) hasn't been setup properly.
+      handle.Open()
+    except adb.common.usb1.USBErrorBusy as e:
+      logging.warning(
+          'USB port for %s is already open (and failed to kill ADB) '
+          'Try rebooting the host: %s', port_path, e)
+      handle = None
+  except adb.common.usb1.USBErrorAccess as e:
+    # Do not try to use serial_number, since we can't even access the port.
+    logging.warning('Try rebooting the host: %s: %s', port_path, e)
+    handle = None
+
+  cmd = None
+  if handle:
+    try:
+      # Give 10s for the user to accept the dialog. The best design would be to
+      # do a quick check with timeout=100ms and only if the first failed, try
+      # again with a long timeout. The goal is not to hang the bots for several
+      # minutes when all the devices are unauthenticated.
+      # TODO(maruel): A better fix would be to change python-adb to continue the
+      # authentication dance from where it stopped. This is left as a follow up.
+      cmd = adb.adb_commands.AdbCommands.Connect(
+          handle, banner='swarming', rsa_keys=_ADB_KEYS,
+          auth_timeout_ms=10000)
+    except adb.usb_exceptions.DeviceAuthError as e:
+      logging.warning('AUTH FAILURE: %s: %s', port_path, e)
+    except adb.usb_exceptions.ReadFailedError as e:
+      logging.warning('READ FAILURE: %s: %s', port_path, e)
+    except adb.usb_exceptions.WriteFailedError as e:
+      logging.warning('WRITE FAILURE: %s: %s', port_path, e)
+    except ValueError as e:
+      # This is generated when there's a protocol level failure, e.g. the data
+      # is garbled.
+      logging.warning(
+          'Trying unpluging and pluging it back: %s: %s', port_path, e)
+  # Always create a Device, even if it points to nothing. It makes using the
+  # client code much easier.
+  return Device(cmd, port_path)
+
+
+### Public API.
+
+
+class Device(object):
   """Wraps an AdbCommands to make it exception safe.
 
   The fact that exceptions can be thrown any time makes the client code really
@@ -185,68 +277,6 @@ class _Device(object):
     return '', int(parts[0])
 
 
-def _load_device(handle):
-  """Given a adb.USBDevice, return a _Device wrapping an
-  adb_commands.AdbCommands.
-  """
-  port_path = '/'.join(map(str, handle.port_path))
-  try:
-    handle.Open()
-  except adb.common.usb1.USBErrorNoDevice as e:
-    logging.warning('Got USBErrorNoDevice for %s: %s', port_path, e)
-    # Do not kill adb, it just means the USB host is likely resetting and the
-    # device is temporarily unavailable.We can't use handle.serial_number since
-    # this communicates with the device.
-    # TODO(maruel): In practice we'd like to retry for a few seconds.
-    handle = None
-  except adb.common.usb1.USBErrorBusy as e:
-    logging.warning('Got USBErrorBusy for %s. Killing adb: %s', port_path, e)
-    kill_adb()
-    try:
-      # If it throws again, it probably means another process holds a handle to
-      # the USB ports or group acl (plugdev) hasn't been setup properly.
-      handle.Open()
-    except adb.common.usb1.USBErrorBusy as e:
-      logging.warning(
-          'USB port for %s is already open (and failed to kill ADB) '
-          'Try rebooting the host: %s', port_path, e)
-      handle = None
-  except adb.common.usb1.USBErrorAccess as e:
-    # Do not try to use serial_number, since we can't even access the port.
-    logging.warning('Try rebooting the host: %s: %s', port_path, e)
-    handle = None
-
-  cmd = None
-  if handle:
-    try:
-      # Give 10s for the user to accept the dialog. The best design would be to
-      # do a quick check with timeout=100ms and only if the first failed, try
-      # again with a long timeout. The goal is not to hang the bots for several
-      # minutes when all the devices are unauthenticated.
-      # TODO(maruel): A better fix would be to change python-adb to continue the
-      # authentication dance from where it stopped. This is left as a follow up.
-      cmd = adb.adb_commands.AdbCommands.Connect(
-          handle, banner='swarming', rsa_keys=_ADB_KEYS,
-          auth_timeout_ms=10000)
-    except adb.usb_exceptions.DeviceAuthError as e:
-      logging.warning('AUTH FAILURE: %s: %s', port_path, e)
-    except adb.usb_exceptions.ReadFailedError as e:
-      logging.warning('READ FAILURE: %s: %s', port_path, e)
-    except adb.usb_exceptions.WriteFailedError as e:
-      logging.warning('WRITE FAILURE: %s: %s', port_path, e)
-    except ValueError as e:
-      # This is generated when there's a protocol level failure, e.g. the data
-      # is garbled.
-      logging.warning(
-          'Trying unpluging and pluging it back: %s: %s', port_path, e)
-  # Always create a _Device, even if it points to nothing. It makes using the
-  # client code much easier.
-  return _Device(cmd, port_path)
-
-
-### Public API.
-
-
 def initialize(pub_key, priv_key):
   """Initialize Android support through adb.
 
@@ -259,7 +289,7 @@ def initialize(pub_key, priv_key):
     _ADB_KEYS = []
     if pub_key:
       try:
-        _ADB_KEYS.append(PythonRSASigner(pub_key, priv_key))
+        _ADB_KEYS.append(_PythonRSASigner(pub_key, priv_key))
       except ValueError as exc:
         logging.warning('Ignoring adb private key: %s', exc)
 
@@ -271,7 +301,7 @@ def initialize(pub_key, priv_key):
       with open(path, 'rb') as f:
         priv = f.read()
       try:
-        _ADB_KEYS.append(PythonRSASigner(pub, priv))
+        _ADB_KEYS.append(_PythonRSASigner(pub, priv))
       except ValueError as exc:
         logging.warning('Ignoring adb private key %s: %s', path, exc)
 
@@ -281,36 +311,6 @@ def initialize(pub_key, priv_key):
     if pub_key:
       logging.warning('initialize() was called repeatedly: ignoring keys')
   return bool(_ADB_KEYS)
-
-
-class PythonRSASigner(object):
-  """Implements adb_protocol.AuthSigner using http://stuvel.eu/rsa."""
-  def __init__(self, pub, priv):
-    self.priv_key = load_rsa_private_key(priv)
-    self.pub_key = pub
-
-  def Sign(self, data):
-    return rsa.sign(data, self.priv_key, 'SHA-1-PREHASHED')
-
-  def GetPublicKey(self):
-    return self.pub_key
-
-
-def load_rsa_private_key(pem):
-  """PEM encoded PKCS#8 private key -> rsa.PrivateKey."""
-  # ADB uses private RSA keys in pkcs#8 format. 'rsa' library doesn't support
-  # them natively. Do some ASN unwrapping to extract naked RSA key
-  # (in der-encoded form). See https://www.ietf.org/rfc/rfc2313.txt.
-  # Also http://superuser.com/a/606266.
-  try:
-    der = rsa.pem.load_pem(pem, 'PRIVATE KEY')
-    keyinfo, _ = decoder.decode(der)
-    if keyinfo[1][0] != univ.ObjectIdentifier('1.2.840.113549.1.1.1'):
-        raise ValueError('Not a DER-encoded OpenSSL private RSA key')
-    private_key_der = keyinfo[2].asOctets()
-  except IndexError:
-    raise ValueError('Not a DER-encoded OpenSSL private RSA key')
-  return rsa.PrivateKey.load_pkcs1(private_key_der, format='DER')
 
 
 def kill_adb():
@@ -389,7 +389,7 @@ def set_cpu_scaling_governor(device, governor):
   Returns:
     True on success.
   """
-  assert isinstance(device, _Device), device
+  assert isinstance(device, Device), device
   assert CpuScalingGovernor.is_valid(governor), governor
   _, exit_code = device.shell(
       'echo "%s">/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor' %
@@ -403,7 +403,7 @@ def set_cpu_scaling(device, speed):
   Returns:
     True on success.
   """
-  assert isinstance(device, _Device), device
+  assert isinstance(device, Device), device
   assert isinstance(speed, int), speed
   assert 10000 <= speed <= 10000000, speed
   success = set_cpu_scaling_governor(device, CpuScalingGovernor.USER_DEFINED)
