@@ -130,10 +130,12 @@ class GitilesImportTestCase(test_case.TestCase):
         parents=['beefdead'],
         author=None,
         committer=None,
-        message=None)
+        message=None,
+        tree_diff=None)
     self.mock(gitiles, 'get_log', mock.Mock())
     gitiles.get_log.return_value = gitiles.Log(
         commits=[latest_commit],
+        next_cursor=None,
     )
 
   def test_import_config_set(self):

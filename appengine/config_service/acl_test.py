@@ -47,7 +47,7 @@ class AclTestCase(test_case.TestCase):
     service_cfg = service_config_pb2.Service(
         id='swarming', access=['group:swarming-app'])
     services.get_service_async.side_effect = lambda sid: future(service_cfg)
-    auth.is_group_member.side_effect = lambda g: g == 'swarming-app'
+    auth.is_group_member.side_effect = lambda g, *_: g == 'swarming-app'
 
     self.assertTrue(acl.can_read_config_set('services/swarming'))
 
@@ -62,10 +62,10 @@ class AclTestCase(test_case.TestCase):
 
     self.assertFalse(acl.can_read_config_set('projects/secret'))
 
-    auth.is_group_member.side_effect = lambda name: name == 'googlers'
+    auth.is_group_member.side_effect = lambda name, *_: name == 'googlers'
     self.assertTrue(acl.can_read_config_set('projects/secret'))
 
-    auth.is_group_member.side_effect = lambda name: name == 'project-admins'
+    auth.is_group_member.side_effect = lambda name, *_: name == 'project-admins'
     self.assertTrue(acl.can_read_config_set('projects/secret'))
 
   def test_has_project_access_identity(self):
