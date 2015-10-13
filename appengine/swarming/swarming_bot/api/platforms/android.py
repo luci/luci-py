@@ -13,6 +13,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 
 # This file must be imported from swarming_bot.zip (or with '..' in sys.path).
 # libusb1 must have been put in the path already.
@@ -314,14 +315,33 @@ def initialize(pub_key, priv_key):
 
 
 def kill_adb():
-  """adb sucks. Kill it with fire."""
+  """Stops the adb daemon.
+
+  The Swarming bot doesn't use the Android's SDK adb. It uses python-adb to
+  directly communicate with the devices. This works much better when a lot of
+  devices are connected to the host.
+
+  adb's stability is less than stellar. Kill it with fire.
+  """
   if not adb:
     return
-  try:
-    subprocess.call(['adb', 'kill-server'])
-  except OSError:
-    pass
-  subprocess.call(['killall', '--exact', 'adb'])
+  while True:
+    try:
+      subprocess.check_output(['pgrep', 'adb'])
+    except subprocess.CalledProcessError:
+      return
+    try:
+      subprocess.call(
+          ['adb', 'kill-server'],
+          stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    except OSError:
+      pass
+    subprocess.call(
+        ['killall', '--exact', 'adb'],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    # Force thread scheduling to give a chance to the OS to clean out the
+    # process.
+    time.sleep(0.001)
 
 
 def get_devices():
