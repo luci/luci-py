@@ -4,6 +4,7 @@
 
 import logging
 
+from google.appengine.api import memcache
 from protorpc import messages
 from protorpc import message_types
 from protorpc import remote
@@ -231,12 +232,7 @@ class ConfigApi(remote.Service):
     except ValueError as ex:
       raise endpoints.BadRequestException(ex.message)
 
-    def iter_project_config_sets():
-      for project in get_projects():
-        yield 'projects/%s' % project.id
-
-    return get_config_multi(
-        iter_project_config_sets(), request.path, request.hashes_only)
+    return get_config_multi('projects', request.path, request.hashes_only)
 
   ##############################################################################
   # endpoint: get_ref_configs
@@ -253,13 +249,7 @@ class ConfigApi(remote.Service):
     except ValueError as ex:
       raise endpoints.BadRequestException(ex.message)
 
-    def iter_ref_config_sets():
-      for project in get_projects():
-        for ref_name in get_ref_names(project.id):
-          yield 'projects/%s/%s' % (project.id, ref_name)
-
-    return get_config_multi(
-        iter_ref_config_sets(), request.path, request.hashes_only)
+    return get_config_multi('refs', request.path, request.hashes_only)
 
 
 @utils.memcache('projects_with_details', time=60)  # 1 min.
@@ -298,23 +288,49 @@ def get_ref_names(project_id):
   return [ref.name for ref in refs]
 
 
-def get_config_multi(config_sets, path, hashes_only):
+def get_config_sets_from_scope(scope):
+  """Returns list of config sets from 'projects' or 'refs'."""
+  assert scope in ('projects', 'refs'), scope
+  for project in get_projects():
+    if scope == 'projects':
+      yield 'projects/%s' % project.id
+    else:
+      for ref_name in get_ref_names(project.id):
+        yield 'projects/%s/%s' % (project.id, ref_name)
+
+
+def get_config_multi(scope, path, hashes_only):
   """Returns configs at |path| in all config sets.
+
+  scope can be 'projects' or 'refs'.
 
   Returns empty config list if requester does not have project access.
   """
+  assert scope in ('projects', 'refs'), scope
+  cache_key = (
+    '%s%s:%s' % (scope, ',hashes_only' if hashes_only else '', path))
+  configs = memcache.get(cache_key)
+  if configs is None:
+    configs = storage.get_latest_multi_async(
+        get_config_sets_from_scope(scope), path, hashes_only).get_result()
+    for config in configs:
+      if not hashes_only and config.get('content') is None:
+        logging.error(
+            'Blob %s referenced from %s:%s:%s was not found',
+            config['content_hash'],
+            config['config_set'],
+            config['revision'],
+            path)
+    try:
+      memcache.add(cache_key, configs, time=10*60)
+    except ValueError:
+      logging.exception('%s:%s configs are too big for memcache', scope, path)
+
   res = GetConfigMultiResponseMessage()
-  config_sets = filter(acl.can_read_config_set, config_sets)
-  configs = storage.get_latest_multi_async(
-      config_sets, path, hashes_only).get_result()
   for config in configs:
+    if not acl.can_read_config_set(config['config_set']):
+      continue
     if not hashes_only and config.get('content') is None:
-      logging.error(
-          'Blob %s referenced from %s:%s:%s was not found',
-          config['content_hash'],
-          config['config_set'],
-          config['revision'],
-          path)
       continue
     res.configs.append(res.ConfigEntry(
         config_set=config['config_set'],

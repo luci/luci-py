@@ -338,7 +338,13 @@ class ApiTest(test_case.EndpointsTestCase):
         'revision': 'beefdead',
         'content_hash': 'ccc123',
         # No content
-      }
+      },
+      {
+        'config_set': 'projects/secret',
+        'revision': 'badcoffee',
+        'content_hash': 'abcabc',
+        'content': 'abcsdjksl',
+      },
     ])
 
     req = {'path': 'cq.cfg'}
@@ -352,33 +358,9 @@ class ApiTest(test_case.EndpointsTestCase):
         'content': base64.b64encode('config text'),
       }],
     })
-    config_sets_arg = storage.get_latest_multi_async.call_args[0][0]
-    self.assertEqual(
-        list(config_sets_arg),
-        ['projects/chromium', 'projects/v8', 'projects/inconsistent'])
 
   ##############################################################################
   # get_ref_configs
-
-  def test_get_ref_configs(self):
-    self.mock_refs()
-
-    self.mock(api, 'get_config_multi', mock.Mock())
-    res = api.GetConfigMultiResponseMessage()
-    api.get_config_multi.return_value = res
-
-    req = {'path': 'cq.cfg'}
-    resp = self.call_api('get_ref_configs', req).json_body
-
-    config_sets = api.get_config_multi.call_args[0][0]
-    self.assertEqual(
-        list(config_sets),
-        [
-          'projects/chromium/refs/heads/master',
-          'projects/chromium/refs/heads/release42',
-          'projects/v8/refs/heads/master',
-          'projects/v8/refs/heads/release42',
-        ])
 
   def test_get_ref_configs_without_permission(self):
     acl.has_project_access.return_value = False
