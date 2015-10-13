@@ -387,7 +387,7 @@ class TestTaskRunner(TestTaskRunnerBase):
           'task_id': 23,
         })
     expected = {
-      u'exit_code': 255,
+      u'exit_code': -1,
       u'hard_timeout': False,
       u'io_timeout': False,
       u'must_signal_internal_failure': None,

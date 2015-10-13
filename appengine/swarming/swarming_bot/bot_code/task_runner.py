@@ -345,7 +345,7 @@ def run_command(
       params['hard_timeout'] = False
       post_update(swarming_server, params, 1, stdout, 0)
       return {
-        u'exit_code': 255,
+        u'exit_code': -1,
         u'hard_timeout': False,
         u'io_timeout': False,
         u'must_signal_internal_failure': None,
@@ -456,6 +456,8 @@ def run_command(
           must_signal_internal_failure = str(e)
     # TODO(maruel): Send the internal failure here instead of sending it through
     # bot_main, this causes a race condition.
+    if exit_code is None:
+      exit_code = -1
     post_update(swarming_server, params, exit_code, stdout, output_chunk_start)
     return {
       u'exit_code': exit_code,
