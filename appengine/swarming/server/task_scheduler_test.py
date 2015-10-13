@@ -430,7 +430,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     # A bot reaps the TaskToRun.
     reaped_ts = self.now + datetime.timedelta(seconds=60)
     self.mock_now(reaped_ts)
-    bot_dimensions = {'OS': 'Windows-3.1.1'}
+    bot_dimensions = {u'OS': u'Windows-3.1.1'}
     reaped_request, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc')
     self.assertEqual(request, reaped_request)
@@ -513,8 +513,8 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'cost_saved_usd': None,
       'created_ts': created_ts,
       'deduped_from': None,
-      'durations': [0.1, 0.2],
-      'exit_codes': [0, 0],
+      'durations': [0.1],
+      'exit_codes': [0],
       'failure': False,
       'id': '1d69b9f088008810',
       'internal_failure': False,
@@ -539,8 +539,8 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'children_task_ids': [],
         'completed_ts': done_ts,
         'cost_usd': 0.1,
-        'durations': [0.1, 0.2],
-        'exit_codes': [0, 0],
+        'durations': [0.1],
+        'exit_codes': [0],
         'failure': False,
         'id': '1d69b9f088008811',
         'internal_failure': False,
@@ -634,12 +634,12 @@ class TaskSchedulerApiTest(test_case.TestCase):
   def test_bot_update_task(self):
     run_result = _quick_reap()
     self.assertEqual(
-        (True, True),
+        (True, False),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 'hi', 0, 0, 0.1, False, False, 0.1,
+            run_result.key, 'localhost', 'hi', 0, None, None, False, False, 0.1,
             None))
     self.assertEqual(
-        (True, False),
+        (True, True),
         task_scheduler.bot_update_task(
             run_result.key, 'localhost', 'hey', 2, 0, 0.1, False, False,
             0.1, None))

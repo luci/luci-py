@@ -296,7 +296,9 @@ class BotHandler(auth.AuthenticatingHandler):
         if run_results[index].ended_ts:
           idle_time += (
               run_results[index-1].started_ts - run_results[index].ended_ts)
-          duration = run_results[index].duration
+          # We are taking the whole time the bot was doing work, not just the
+          # duration associated with the task.
+          duration = run_results[index].duration_total
           if duration:
             run_time += duration
 
@@ -492,7 +494,9 @@ class TasksHandler(auth.AuthenticatingHandler):
     total_cost_usd = sum(t.cost_usd for t in tasks)
     total_cost_saved_usd = sum(
         t.cost_saved_usd for t in tasks if t.cost_saved_usd)
-    total_saved = safe_sum(t.duration for t in tasks if t.deduped_from)
+    # Include the overhead in the total amount of time saved, since it's
+    # overhead saved.
+    total_saved = safe_sum(t.duration_total for t in tasks if t.deduped_from)
     duration_sum = safe_sum(durations)
     total_saved_percent = (
         (100. * total_saved.total_seconds() / duration_sum.total_seconds())

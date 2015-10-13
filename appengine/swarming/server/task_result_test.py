@@ -327,7 +327,8 @@ class TaskResultApiTest(TestCase):
     }
     self.assertEqual(expected, result_summary.key.get().to_dict())
     self.assertEqual(['foo'], list(result_summary.get_outputs()))
-    self.assertEqual(datetime.timedelta(seconds=2), result_summary.duration)
+    self.assertEqual(
+        datetime.timedelta(seconds=2), result_summary.duration_total)
     self.assertEqual(
         datetime.timedelta(seconds=2),
         result_summary.duration_now(utils.utcnow()))
@@ -436,7 +437,8 @@ class TaskResultApiTest(TestCase):
     run_result = task_result.TaskRunResult(
         started_ts=datetime.datetime(2010, 1, 1, 0, 0, 0),
         completed_ts=datetime.datetime(2010, 1, 1, 0, 2, 0))
-    self.assertEqual(datetime.timedelta(seconds=120), run_result.duration)
+    self.assertEqual(
+        datetime.timedelta(seconds=120), run_result.duration_total)
     self.assertEqual(
         datetime.timedelta(seconds=120),
         run_result.duration_now(utils.utcnow()))
@@ -444,7 +446,7 @@ class TaskResultApiTest(TestCase):
     run_result = task_result.TaskRunResult(
         started_ts=datetime.datetime(2010, 1, 1, 0, 0, 0),
         abandoned_ts=datetime.datetime(2010, 1, 1, 0, 1, 0))
-    self.assertEqual(None, run_result.duration)
+    self.assertEqual(None, run_result.duration_total)
     self.assertEqual(None, run_result.duration_now(utils.utcnow()))
 
   def test_run_result_timeout(self):

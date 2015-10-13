@@ -140,7 +140,7 @@ def _calculate_failure(result_common):
   # When a command times out, there may not be any exit code, it is still a user
   # process failure mode, not an infrastructure failure mode.
   return (
-      any(result_common.exit_codes or []) or
+      bool(result_common.exit_code) or
       result_common.state == State.TIMED_OUT)
 
 
@@ -323,8 +323,8 @@ class _TaskResultCommon(ndb.Model):
     return self.state == State.PENDING
 
   @property
-  def duration(self):
-    """Returns the timedelta the task spent executing.
+  def duration_total(self):
+    """Returns the timedelta the task spent executing, including overhead.
 
     Task abandoned or not yet completed are not applicable and return None.
     """
@@ -333,10 +333,11 @@ class _TaskResultCommon(ndb.Model):
     return self.completed_ts - self.started_ts
 
   def duration_now(self, now):
-    """Returns the timedelta the task spent executing as of now.
+    """Returns the timedelta the task spent executing as of now, including
+    overhead.
 
-    Similar to .duration except that its return value is not deterministic. Task
-    abandoned is not applicable and return None.
+    Similar to .duration_total except that its return value is not
+    deterministic. Task abandoned is not applicable and return None.
     """
     if not self.started_ts or self.abandoned_ts:
       return None
@@ -451,7 +452,7 @@ class _TaskResultCommon(ndb.Model):
     # assert ndb.in_transaction(), (
     #     'Saving %s outside of transaction' % self.__class__.__name__)
     if self.state == State.EXPIRED:
-      if self.failure or self.exit_codes:
+      if self.failure or self.exit_code is not None:
         raise datastore_errors.BadValueError(
             'Unexpected State, a task can\'t fail if it hasn\'t started yet')
 

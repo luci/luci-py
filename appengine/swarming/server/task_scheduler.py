@@ -142,7 +142,7 @@ def _update_stats(run_result, bot_id, request, completed):
         'run_completed', run_result.key,
         bot_id=bot_id,
         dimensions=request.properties.dimensions,
-        runtime_ms=_secs_to_ms(run_result.duration.total_seconds()),
+        runtime_ms=_secs_to_ms(run_result.duration_total.total_seconds()),
         user=request.user)
     stats.add_task_entry(
         'task_completed',
@@ -513,27 +513,35 @@ def bot_update_task(
 
     # This happens as an HTTP request is retried when the DB write succeeded but
     # it still returned HTTP 500.
-    if len(run_result.exit_codes) and exit_code is not None:
-      if run_result.exit_codes[0] != exit_code:
+    if run_result.exit_code is not None and exit_code is not None:
+      if run_result.exit_code != exit_code:
         result_summary_future.wait()
-        return None, False, 'got 2 different exit_codes; %d then %d' % (
-            run_result.exit_codes[0], exit_code)
+        return None, False, 'got 2 different exit_code; %s then %s' % (
+            run_result.exit_code, exit_code)
+
+    if run_result.durations and duration is not None:
+      if run_result.durations[0] != duration:
+        result_summary_future.wait()
+        return None, False, 'got 2 different durations; %s then %s' % (
+            run_result.durations[0], duration)
 
     if (duration is None) != (exit_code is None):
       result_summary_future.wait()
       return None, False, (
-          'had unexpected duration; expected iff a command completes; index %d'
-          % len(run_result.exit_codes))
+          'had unexpected duration; expected iff a command completes\n'
+          'duration: %s vs %s; exit: %s vs %s' % (
+            run_result.durations, duration, run_result.exit_code, exit_code))
 
-    if exit_code is not None:
-      # The command completed.
+    # If the command completed. Check if the value wasn't set already.
+    if duration is not None and not run_result.durations:
       run_result.durations.append(duration)
+    if exit_code is not None and run_result.exit_code is None:
       run_result.exit_codes.append(exit_code)
 
     if outputs_ref:
       run_result.outputs_ref = task_request.FilesRef(**outputs_ref)
 
-    task_completed = len(run_result.exit_codes) == 1
+    task_completed = run_result.exit_code is not None
     if run_result.state in task_result.State.STATES_RUNNING:
       if hard_timeout or io_timeout:
         run_result.state = task_result.State.TIMED_OUT
