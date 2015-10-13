@@ -87,47 +87,46 @@ def import_revision(
       updated_config_set.put()
     return
 
+  entites_to_put = [storage.Revision(key=rev_key)]
+  if create_config_set:
+    entites_to_put.append(updated_config_set)
+
   # Fetch archive, extract files and save them to Blobs outside ConfigSet
   # transaction.
   location = base_location._replace(treeish=revision)
   archive = location.get_archive(
       deadline=get_gitiles_config().fetch_archive_deadline)
   if not archive:
-    logging.error(
-        'Could not import %s: configuration does not exist', config_set)
-    return
+    logging.warning(
+        'Configuration %s does not exist. Probably it was deleted', config_set)
+  else:
+    logging.info('%s archive size: %d bytes' % (config_set, len(archive)))
 
-  logging.info('%s archive size: %d bytes' % (config_set, len(archive)))
+    stream = StringIO.StringIO(archive)
+    blob_futures = []
+    with tarfile.open(mode='r|gz', fileobj=stream) as tar:
+      for item in tar:
+        if not item.isreg():  # pragma: no cover
+          continue
+        with contextlib.closing(tar.extractfile(item)) as extracted:
+          content = extracted.read()
+          ctx = config.validation.Context.logging()
+          validation.validate_config(config_set, item.name, content, ctx=ctx)
+          if ctx.result().has_errors:
+            logging.error('Invalid revision %s@%s', config_set, revision)
+            return
+          content_hash = storage.compute_hash(content)
+          blob_futures.append(storage.import_blob_async(
+              content=content, content_hash=content_hash))
+          entites_to_put.append(
+              storage.File(
+                  id=item.name,
+                  parent=rev_key,
+                  content_hash=content_hash)
+          )
 
-  entites_to_put = [storage.Revision(key=rev_key)]
-  if create_config_set:
-    entites_to_put.append(updated_config_set)
-
-  stream = StringIO.StringIO(archive)
-  blob_futures = []
-  with tarfile.open(mode='r|gz', fileobj=stream) as tar:
-    for item in tar:
-      if not item.isreg():  # pragma: no cover
-        continue
-      with contextlib.closing(tar.extractfile(item)) as extracted:
-        content = extracted.read()
-        ctx = config.validation.Context.logging()
-        validation.validate_config(config_set, item.name, content, ctx=ctx)
-        if ctx.result().has_errors:
-          logging.error('Invalid revision %s@%s', config_set, revision)
-          return
-        content_hash = storage.compute_hash(content)
-        blob_futures.append(storage.import_blob_async(
-            content=content, content_hash=content_hash))
-        entites_to_put.append(
-            storage.File(
-                id=item.name,
-                parent=rev_key,
-                content_hash=content_hash)
-        )
-
-  # Wait for Blobs to be imported before proceeding.
-  ndb.Future.wait_all(blob_futures)
+    # Wait for Blobs to be imported before proceeding.
+    ndb.Future.wait_all(blob_futures)
 
   @ndb.transactional
   def do_import():
