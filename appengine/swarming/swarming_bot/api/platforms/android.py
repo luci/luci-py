@@ -52,9 +52,13 @@ pkcs1.HASH_METHODS['SHA-1-PREHASHED'] = _Accum
 pkcs1.HASH_ASN1['SHA-1-PREHASHED'] = pkcs1.HASH_ASN1['SHA-1']
 
 
-# Set when ADB is initialized. It contains one or multiple key used to
-# authenticate to Android debug protocol (adb).
+# Both following are set when ADB is initialized.
+# _ADB_KEYS is set to a list of _PythonRSASigner instances. It contains one or
+# multiple key used to authenticate to Android debug protocol (adb).
 _ADB_KEYS = None
+# _ADB_KEYS_RAW is set to a dict(pub: priv) when initialized, with the raw
+# content of each key.
+_ADB_KEYS_RAW = None
 
 
 # Cache of /system/build.prop on Android devices connected to this host.
@@ -185,6 +189,17 @@ def _load_device(handle):
 ### Public API.
 
 
+# List of known CPU scaling governor values.
+KNOWN_CPU_SCALING_GOVERNOR_VALUES = (
+  'conservative',  # Not available on Nexus 10
+  'interactive',   # Default on Nexus 10.
+  'ondemand',      # Not available on Nexus 10. Default on Nexus 4 and later.
+  'performance',
+  'powersave',     # Not available on Nexus 10.
+  'userspace',
+)
+
+
 class Device(object):
   """Wraps an AdbCommands to make it exception safe.
 
@@ -285,32 +300,29 @@ def initialize(pub_key, priv_key):
   ~/.android/adbkey.pub.
   """
   global _ADB_KEYS
+  global _ADB_KEYS_RAW
+  if _ADB_KEYS is not None:
+    assert False, 'initialize() was called repeatedly: ignoring keys'
   assert bool(pub_key) == bool(priv_key)
-  if _ADB_KEYS is None:
-    _ADB_KEYS = []
-    if pub_key:
-      try:
-        _ADB_KEYS.append(_PythonRSASigner(pub_key, priv_key))
-      except ValueError as exc:
-        logging.warning('Ignoring adb private key: %s', exc)
+  pub_key = pub_key.strip() if pub_key else pub_key
+  priv_key = priv_key.strip() if priv_key else priv_key
 
-    # Try to add local adb keys if available.
-    path = os.path.expanduser('~/.android/adbkey')
-    if os.path.isfile(path) and os.path.isfile(path+'.pub'):
-      with open(path + '.pub', 'rb') as f:
-        pub = f.read()
-      with open(path, 'rb') as f:
-        priv = f.read()
-      try:
-        _ADB_KEYS.append(_PythonRSASigner(pub, priv))
-      except ValueError as exc:
-        logging.warning('Ignoring adb private key %s: %s', path, exc)
+  _ADB_KEYS = []
+  _ADB_KEYS_RAW = {}
+  if pub_key:
+    _ADB_KEYS.append(_PythonRSASigner(pub_key, priv_key))
+    _ADB_KEYS_RAW[pub_key] = priv_key
 
-    if not _ADB_KEYS:
-      return False
-  else:
-    if pub_key:
-      logging.warning('initialize() was called repeatedly: ignoring keys')
+  # Try to add local adb keys if available.
+  path = os.path.expanduser('~/.android/adbkey')
+  if os.path.isfile(path) and os.path.isfile(path + '.pub'):
+    with open(path + '.pub', 'rb') as f:
+      pub = f.read().strip()
+    with open(path, 'rb') as f:
+      priv = f.read().strip()
+    _ADB_KEYS.append(_PythonRSASigner(pub, priv))
+    _ADB_KEYS_RAW[pub] = priv
+
   return bool(_ADB_KEYS)
 
 
@@ -390,19 +402,6 @@ def close_devices(devices):
     device.close()
 
 
-class CpuScalingGovernor(object):
-  """List of valid CPU scaling governor values."""
-  ON_DEMAND = 'ondemand'
-  PERFORMANCE = 'performance'
-  CONSERVATIVE = 'conservative'
-  POWER_SAVE = 'powersave'
-  USER_DEFINED = 'userspace'
-
-  @classmethod
-  def is_valid(cls, name):
-    return name in [getattr(cls, m) for m in dir(cls) if m[0].isupper()]
-
-
 def set_cpu_scaling_governor(device, governor):
   """Sets the CPU scaling governor to the one specified.
 
@@ -410,7 +409,7 @@ def set_cpu_scaling_governor(device, governor):
     True on success.
   """
   assert isinstance(device, Device), device
-  assert CpuScalingGovernor.is_valid(governor), governor
+  assert governor in KNOWN_CPU_SCALING_GOVERNOR_VALUES, governor
   _, exit_code = device.shell(
       'echo "%s">/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor' %
       governor)
@@ -426,7 +425,7 @@ def set_cpu_scaling(device, speed):
   assert isinstance(device, Device), device
   assert isinstance(speed, int), speed
   assert 10000 <= speed <= 10000000, speed
-  success = set_cpu_scaling_governor(device, CpuScalingGovernor.USER_DEFINED)
+  success = set_cpu_scaling_governor(device, 'userspace')
   _, exit_code = device.shell(
       'echo "%d">/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed' %
       speed)
