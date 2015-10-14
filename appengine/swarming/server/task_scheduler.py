@@ -517,6 +517,9 @@ def bot_update_task(
       return None, False, 'expected bot (%s) but had update from bot %s' % (
           run_result.bot_id, bot_id)
 
+    if not run_result.started_ts:
+      return None, False, 'TaskRunResult is broken; %s' % run_result.to_dict()
+
     # This happens as an HTTP request is retried when the DB write succeeded but
     # it still returned HTTP 500.
     if run_result.exit_code is not None and exit_code is not None:
