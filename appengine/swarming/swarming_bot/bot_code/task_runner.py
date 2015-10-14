@@ -365,7 +365,7 @@ def run_command(
           task_details, start, last_io, timed_out, stdout)
       maxsize = lambda: MAX_CHUNK_SIZE - len(stdout)
       last_io = monotonic_time()
-      for _, new_data in proc.yield_any(maxsize=maxsize, soft_timeout=calc):
+      for _, new_data in proc.yield_any(maxsize=maxsize, timeout=calc):
         now = monotonic_time()
         if new_data:
           stdout += new_data

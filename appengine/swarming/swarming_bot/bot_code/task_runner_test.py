@@ -416,9 +416,9 @@ class TestTaskRunner(TestTaskRunnerBase):
           'hi!\n',
         ]
 
-      def yield_any(self2, maxsize, soft_timeout):
+      def yield_any(self2, maxsize, timeout):
         self.assertLess(0, maxsize)
-        self.assertLess(0, soft_timeout)
+        self.assertLess(0, timeout)
         for i in self2._out:
           yield 'stdout', i
 
