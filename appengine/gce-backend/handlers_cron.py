@@ -22,17 +22,6 @@ import handlers_pubsub
 import models
 
 
-# TODO(smut): Make this modifiable at runtime (keep in datastore).
-GCE_PROJECT_ID = app_identity.get_application_id()
-
-# TODO(smut): Make this modifiable at runtime (keep in datastore).
-# Minimum number of instances to keep in each instance group.
-MIN_INSTANCE_GROUP_SIZE = 4
-
-# TODO(smut): Support other zones.
-ZONE = 'us-central1-f'
-
-
 @ndb.transactional
 def delete_instances(instance_keys):
   """Sets the given Instances as DELETED.
@@ -71,8 +60,6 @@ class InstanceDeletionProcessor(webapp2.RequestHandler):
 
   @decorators.require_cronjob
   def get(self):
-    api = gce.Project(GCE_PROJECT_ID)
-
     # Aggregate instances because the API lets us batch instance deletions
     # for a common instance group manager.
     instance_map = collections.defaultdict(list)
@@ -93,61 +80,17 @@ class InstanceDeletionProcessor(webapp2.RequestHandler):
           group,
           [instance.name for instance in instances],
       )
+      api = gce.Project(instance.project)
       # Try to delete the instances. If the operation succeeds, update the
       # datastore. If it fails, just move on to the next set of instances
       # and try again later.
       try:
         response = api.delete_instances(
-            group, ZONE, [instance.url for instance in instances])
+            group, instance.zone, [instance.url for instance in instances])
         if response.get('status') == 'DONE':
           delete_instances([instance.key for instance in instances])
       except net.Error as e:
         logging.warning('%s', e)
-
-
-def filter_templates(templates):
-  """Filters out misconfigured templates.
-
-  Args:
-    templates: A dict mapping instance template names to
-      compute#instanceTemplate dicts.
-
-  Yields:
-    (instance template name, compute#instanceTemplate dict) pairs.
-  """
-  for template_name, template in templates.iteritems():
-    logging.info('Processing instance template: %s', template_name)
-    properties = template.get('properties', {})
-    # For now, enforce only one disk.
-    if len(properties.get('disks', [])) == 1:
-      # For now, require the template to give the OS family in its metadata.
-      os_family_values = [
-          metadatum['value'] for metadatum in properties['metadata'].get(
-              'items', [],
-          )
-          if metadatum['key'] == 'os_family'
-      ]
-      if len(os_family_values) == 1:
-        if os_family_values[0] in machine_provider.OSFamily.names():
-          yield template_name, template
-        else:
-          logging.warning(
-              'Skipping %s due to invalid os_family: %s',
-              template_name,
-              os_family_values[0],
-          )
-      else:
-        logging.warning(
-            'Skipping %s due to metadata errors:\n%s',
-            template_name,
-            json.dumps(properties.get('metadata', {}), indent=2),
-        )
-    else:
-      logging.warning(
-          'Skipping %s due to unsupported number of disks:\n%s',
-          template_name,
-          json.dumps(properties.get('disks', []), indent=2),
-      )
 
 
 class InstanceTemplateProcessor(webapp2.RequestHandler):
@@ -155,28 +98,45 @@ class InstanceTemplateProcessor(webapp2.RequestHandler):
 
   @decorators.require_cronjob
   def get(self):
-    api = gce.Project(GCE_PROJECT_ID)
-    logging.info('Retrieving instance templates')
-    templates = api.get_instance_templates()
-    logging.info('Retrieving instance group managers')
-    managers = api.get_instance_group_managers(ZONE)
-
-    # For each template, ensure there exists a group manager managing it.
-    for template_name, template in filter_templates(templates):
-      if template_name not in managers:
-        logging.info(
-          'Creating instance group manager from instance template: %s',
-          template_name,
+    # For each template entry in the datastore, create a group manager.
+    for template in models.InstanceTemplate.query():
+      logging.info(
+          'Retrieving instance template %s from project %s',
+          template.template_name,
+          template.template_project,
+      )
+      api = gce.Project(template.template_project)
+      try:
+        instance_template = api.get_instance_template(template.template_name)
+      except net.NotFoundError:
+        logging.error(
+            'Instance template does not exist: %s',
+            template.template_name,
         )
+        continue
+      try:
         api.create_instance_group_manager(
-            template, MIN_INSTANCE_GROUP_SIZE, ZONE,
+            template.instance_group_name,
+            instance_template,
+            template.initial_size,
+            template.zone,
         )
-      else:
-        logging.info('Instance group manager already exists: %s', template_name)
+      except net.Error as e:
+        if e.status_code == 409:
+          logging.info(
+              'Instance group manager already exists: %s',
+              template.template_name,
+          )
+        else:
+          logging.error(
+              'Could not create instance group manager: %s\n%s',
+              template.template_name,
+              e,
+          )
 
 
 @ndb.transactional(xg=True)
-def create_instance_group(name, dimensions, policies, instances):
+def create_instance_group(name, dimensions, policies, instances, zone, project):
   """Stores an InstanceGroup and Instance entities in the datastore.
 
   Also attempts to catalog each running Instance in the Machine Provider.
@@ -191,6 +151,8 @@ def create_instance_group(name, dimensions, policies, instances):
       group.
     instances: Return value of gce.get_managed_instances listing instances in
       this instance group.
+    zone: Zone these instances exist in. e.g. us-central1-f.
+    project: Project these instances exist in.
   """
   instance_map = {}
   instances_to_catalog = []
@@ -202,8 +164,10 @@ def create_instance_group(name, dimensions, policies, instances):
         key=instance_key,
         group=name,
         name=instance_name,
+        project=project,
         state=models.InstanceStates.UNCATALOGED,
         url=instance['instance'],
+        zone=zone,
     )
     if instance.get('instanceStatus') == 'RUNNING':
       existing_instance = instance_key.get()
@@ -259,30 +223,28 @@ class InstanceProcessor(webapp2.RequestHandler):
       )
       return
 
-    api = gce.Project(GCE_PROJECT_ID)
-    logging.info('Retrieving instance templates')
-    templates = api.get_instance_templates()
-    logging.info('Retrieving instance group managers')
-    managers = api.get_instance_group_managers(ZONE)
-
-    requests = []
-
-    # TODO(smut): Process instance group managers concurrently with a taskqueue.
     # For each group manager, tell the Machine Provider about its instances.
-    for manager_name, manager in managers.iteritems():
-      logging.info('Processing instance group manager: %s', manager_name)
-      # Extract template name from a link to the template.
-      template_name = manager['instanceTemplate'].split('/')[-1]
-      # Property-related verification was done by InstanceTemplateProcessor,
-      # so we can be sure all the properties we need have been supplied.
-      properties = templates[template_name]['properties']
+    for template in models.InstanceTemplate.query():
+      logging.info(
+          'Retrieving instance template %s from project %s',
+          template.template_name,
+          template.template_project,
+      )
+      api = gce.Project(template.template_project)
+      try:
+        instance_template = api.get_instance_template(template.template_name)
+      except net.NotFoundError:
+        logging.error(
+            'Instance template does not exist: %s',
+            template.template_name,
+        )
+        continue
+      api = gce.Project(template.instance_group_project)
+      properties = instance_template['properties']
       disk_gb = int(properties['disks'][0]['initializeParams']['diskSizeGb'])
       memory_gb = float(gce.machine_type_to_memory(properties['machineType']))
       num_cpus = gce.machine_type_to_num_cpus(properties['machineType'])
-      os_family = machine_provider.OSFamily.lookup_by_name([
-          metadatum['value'] for metadatum in properties['metadata']['items']
-          if metadatum['key'] == 'os_family'
-      ][0])
+      os_family = machine_provider.OSFamily.lookup_by_name(template.os_family)
       dimensions = machine_provider.Dimensions(
           backend=machine_provider.Backend.GCE,
           disk_gb=disk_gb,
@@ -290,7 +252,8 @@ class InstanceProcessor(webapp2.RequestHandler):
           num_cpus=num_cpus,
           os_family=os_family,
       )
-      instances = api.get_managed_instances(manager_name, ZONE)
+      instances = api.get_managed_instances(
+          template.instance_group_name, template.zone)
       policies = machine_provider.Policies(
           on_reclamation=machine_provider.MachineReclamationPolicy.DELETE,
           pubsub_project=
@@ -298,7 +261,14 @@ class InstanceProcessor(webapp2.RequestHandler):
           pubsub_topic=handlers_pubsub.MachineProviderSubscriptionHandler.TOPIC,
       )
 
-      create_instance_group(manager_name, dimensions, policies, instances)
+      create_instance_group(
+          template.instance_group_name,
+          dimensions,
+          policies,
+          instances,
+          template.zone,
+          template.instance_group_project,
+      )
 
 
 def create_cron_app():

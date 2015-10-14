@@ -205,10 +205,11 @@ class Project(object):
       if not page_token:
         break
 
-  def create_instance_group_manager(self, template, size, zone):
+  def create_instance_group_manager(self, name, template, size, zone):
     """Creates an instance group manager from the given template.
 
     Args:
+     name: Name of the instance group.
      template: A dict describing a GCE instance template.
      size: Number of instances the group manager should maintain.
      zone: Zone to create the instance group in.
@@ -220,10 +221,10 @@ class Project(object):
         '/zones/%s/instanceGroupManagers' % zone,
         method='POST',
         payload={
-            'baseInstanceName': template['name'],
+            'baseInstanceName': name,
             'description': template['description'],
             'instanceTemplate': template['selfLink'],
-            'name': template['name'],
+            'name': name,
             'targetSize': size,
         },
     )
@@ -255,6 +256,17 @@ class Project(object):
         raise
     return resp
 
+  def get_instance_group_manager(self, name, zone):
+    """Returns the specified GCE instance group manager.
+
+    Returns:
+      A compute#instanceGroupManager dict.
+
+    Raises:
+      net.NotFoundError: If the instance group manager does not exist.
+    """
+    return self.call_api('/zones/%s/instanceGroupManagers/%s' % (zone, name))
+
   def get_instance_group_managers(self, zone):
     """Returns the GCE instance group managers associated with this project.
 
@@ -267,6 +279,17 @@ class Project(object):
     """
     response = self.call_api('/zones/%s/instanceGroupManagers' % zone)
     return {manager['name']: manager for manager in response.get('items', [])}
+
+  def get_instance_template(self, name):
+    """Returns the specified GCE instance template.
+
+    Returns:
+      A compute#instanceTemplate dict.
+
+    Raises:
+      net.NotFoundError: If the instance template does not exist.
+    """
+    return self.call_api('/global/instanceTemplates/%s' % name)
 
   def get_instance_templates(self):
     """Returns the GCE instance templates associated with this project.
