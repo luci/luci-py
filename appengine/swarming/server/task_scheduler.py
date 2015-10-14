@@ -138,18 +138,24 @@ def _reap_task(to_run_key, request, bot_id, bot_version, bot_dimensions):
 def _update_stats(run_result, bot_id, request, completed):
   """Updates stats after a bot task update notification."""
   if completed:
+    runtime_ms = 0
+    if run_result.duration_total:
+      runtime_ms = _secs_to_ms(run_result.duration_total.total_seconds())
+    pending_ms = 0
+    if run_result.started_ts:
+      pending_ms = _secs_to_ms(
+            (run_result.started_ts - request.created_ts).total_seconds())
     stats.add_run_entry(
         'run_completed', run_result.key,
         bot_id=bot_id,
         dimensions=request.properties.dimensions,
-        runtime_ms=_secs_to_ms(run_result.duration_total.total_seconds()),
+        runtime_ms=runtime_ms,
         user=request.user)
     stats.add_task_entry(
         'task_completed',
         task_pack.request_key_to_result_summary_key(request.key),
         dimensions=request.properties.dimensions,
-        pending_ms=_secs_to_ms(
-            (run_result.completed_ts - request.created_ts).total_seconds()),
+        pending_ms=pending_ms,
         user=request.user)
   else:
     stats.add_run_entry(
@@ -577,14 +583,15 @@ def bot_update_task(
 
   try:
     run_result, task_completed, error = datastore_utils.transaction(run)
-  except datastore_utils.CommitError:
+  except datastore_utils.CommitError as e:
+    logging.info('Got commit error: %s', e)
     # It is important that the caller correctly surface this error.
     return False, False
 
   if run_result:
     _update_stats(run_result, bot_id, request, task_completed)
   if error:
-      logging.error('Task %s %s', packed, error)
+    logging.error('Task %s %s', packed, error)
   return True, task_completed
 
 

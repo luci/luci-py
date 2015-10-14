@@ -495,6 +495,7 @@ class BotTaskUpdateHandler(auth.ApiHandler):
           run_result_key, bot_id, output, output_chunk_start,
           exit_code, duration, hard_timeout, io_timeout, cost_usd, outputs_ref)
       if not success:
+        logging.info('Failed to update, please retry')
         self.abort_with_error(500, error='Failed to update, please retry')
 
       action = 'task_completed' if completed else 'task_update'
@@ -510,6 +511,7 @@ class BotTaskUpdateHandler(auth.ApiHandler):
           message='Failed to update task: %s' % e)
       self.abort_with_error(400, error=str(e))
     except Exception as e:
+      logging.exception('Internal error: %s', e)
       self.abort_with_error(500, error=str(e))
 
     # TODO(maruel): When a task is canceled, reply with 'DIE' so that the bot
