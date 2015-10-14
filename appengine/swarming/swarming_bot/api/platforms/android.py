@@ -15,8 +15,8 @@ import subprocess
 import sys
 import time
 
-# This file must be imported from swarming_bot.zip (or with '..' in sys.path).
-# libusb1 must have been put in the path already.
+# This file must be imported from swarming_bot.zip (or with '../..' in
+# sys.path). libusb1 must have been put in the path already.
 
 import adb
 import adb.adb_commands
@@ -455,20 +455,27 @@ def get_build_prop(device):
 
 
 def get_temp(device):
-  """Returns the device's 2 temperatures if available."""
+  """Returns the device's 2 temperatures if available.
+
+  Returns None otherwise.
+  """
+  assert isinstance(device, Device), device
   # Not all devices export this file. On other devices, the only real way to
   # read it is via Java
   # developer.android.com/guide/topics/sensors/sensors_environment.html
   temps = []
-  for i in xrange(2):
-    out, _ = device.shell('cat /sys/class/thermal/thermal_zone%d/temp' % i)
-    if out:
+  try:
+    for i in xrange(2):
+      out, _ = device.shell('cat /sys/class/thermal/thermal_zone%d/temp' % i)
       temps.append(int(out))
+  except ValueError:
+    return None
   return temps
 
 
 def get_battery(device):
   """Returns details about the battery's state."""
+  assert isinstance(device, Device), device
   props = {}
   out = _dumpsys(device, 'battery')
   if not out:
@@ -477,12 +484,14 @@ def get_battery(device):
     if line.endswith(u':'):
       continue
     # On Android 4.1.2, it uses "voltage:123" instead of "voltage: 123".
-    key, value = line.split(u':', 2)
-    props[key.lstrip()] = value.strip()
+    parts = line.split(u':', 2)
+    if len(parts) == 2:
+      key, value = parts
+      props[key.lstrip()] = value.strip()
   out = {u'power': []}
-  if props[u'AC powered'] == u'true':
+  if props.get(u'AC powered') == u'true':
     out[u'power'].append(u'AC')
-  if props[u'USB powered'] == u'true':
+  if props.get(u'USB powered') == u'true':
     out[u'power'].append(u'USB')
   if props.get(u'Wireless powered') == u'true':
     out[u'power'].append(u'Wireless')
@@ -493,6 +502,7 @@ def get_battery(device):
 
 def get_cpu_scale(device):
   """Returns the CPU scaling factor."""
+  assert isinstance(device, Device), device
   mapping = {
     'cpuinfo_max_freq': u'max',
     'cpuinfo_min_freq': u'min',
@@ -507,6 +517,7 @@ def get_cpu_scale(device):
 
 def get_uptime(device):
   """Returns the device's uptime in second."""
+  assert isinstance(device, Device), device
   out, _ = device.shell('cat /proc/uptime')
   if out:
     return float(out.split()[1])
@@ -515,6 +526,7 @@ def get_uptime(device):
 
 def get_disk(device):
   """Returns details about the battery's state."""
+  assert isinstance(device, Device), device
   props = {}
   out = _dumpsys(device, 'diskstats')
   if not out:
@@ -522,13 +534,15 @@ def get_disk(device):
   for line in out.splitlines():
     if line.endswith(u':'):
       continue
-    key, value = line.split(u': ', 2)
-    match = re.match(u'^(\d+)K / (\d+)K.*', value)
-    if match:
-      props[key.lstrip()] = {
-        'free_mb': round(float(match.group(1)) / 1024., 1),
-        'size_mb': round(float(match.group(2)) / 1024., 1),
-      }
+    parts = line.split(u': ', 2)
+    if len(parts) == 2:
+      key, value = parts
+      match = re.match(u'^(\d+)K / (\d+)K.*', value)
+      if match:
+        props[key.lstrip()] = {
+          'free_mb': round(float(match.group(1)) / 1024., 1),
+          'size_mb': round(float(match.group(2)) / 1024., 1),
+        }
   return {
     u'cache': props[u'Cache-Free'],
     u'data': props[u'Data-Free'],
@@ -538,6 +552,7 @@ def get_disk(device):
 
 def get_imei(device):
   """Returns the phone's IMEI."""
+  assert isinstance(device, Device), device
   # Android <5.0.
   out = _dumpsys(device, 'iphonesubinfo')
   if out:
@@ -558,6 +573,7 @@ def get_imei(device):
 
 def get_ip(device):
   """Returns the IP address."""
+  assert isinstance(device, Device), device
   # If ever needed, read wifi.interface from /system/build.prop if a device
   # doesn't use wlan0.
   ip, _ = device.shell('getprop dhcp.wlan0.ipaddress')
