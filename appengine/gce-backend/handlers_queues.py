@@ -39,7 +39,7 @@ def uncatalog_instances(instances):
           # handlers_cron.py sets each Instance's state to
           # CATALOGED before triggering InstanceGroupCataloger.
           logging.info('Uncataloging instance: %s', instance.name)
-          instance.state = models.InstanceStates.UNCATALOGED
+          instance.state = models.InstanceStates.PENDING_CATALOG
           put_futures.append(instance.put_async())
         else:
           logging.info(

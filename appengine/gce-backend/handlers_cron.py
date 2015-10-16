@@ -166,19 +166,21 @@ def create_instance_group(name, dimensions, policies, instances, zone, project):
         group=name,
         name=instance_name,
         project=project,
-        state=models.InstanceStates.UNCATALOGED,
+        state=models.InstanceStates.NEW,
         url=instance['instance'],
         zone=zone,
     )
     if instance.get('instanceStatus') == 'RUNNING':
       existing_instance = instance_key.get()
       if existing_instance:
-        if existing_instance.state == models.InstanceStates.UNCATALOGED:
+        if existing_instance.state == models.InstanceStates.PENDING_CATALOG:
           logging.info('Attempting to catalog instance: %s', instance_name)
           instances_to_catalog.append(instance_name)
         else:
           logging.info('Skipping already cataloged instance: %s', instance_name)
           instance_map[instance_name].state = existing_instance.state
+      else:
+        logging.info('Storing new instance: %s', instance_name)
     else:
       logging.warning(
           'Instance not running: %s\ncurrentAction: %s\ninstanceStatus: %s',
@@ -188,9 +190,8 @@ def create_instance_group(name, dimensions, policies, instances, zone, project):
       )
 
   if instances_to_catalog:
-    # Above we defaulted each instance to UNCATALOGED. Here, try to enqueue a
-    # task to catalog them in the Machine Provider, setting CATALOGED if
-    # successful.
+    # If we fail to enqueue the task to add these instances to the Machine
+    # Provider, set them back to PENDING_CATALOG in order to try again later.
     if utils.enqueue_task(
         '/internal/queues/catalog-instance-group',
         'catalog-instance-group',
@@ -203,6 +204,10 @@ def create_instance_group(name, dimensions, policies, instances, zone, project):
     ):
       for instance_name in instances_to_catalog:
         instance_map[instance_name].state = models.InstanceStates.CATALOGED
+    else:
+      for instance_name in instances_to_catalog:
+        instance_map[instance_state].state = (
+            models.InstanceStates.PENDING_CATALOG)
   else:
     logging.info('Nothing to catalog')
 
@@ -211,8 +216,8 @@ def create_instance_group(name, dimensions, policies, instances, zone, project):
       name, dimensions, policies, sorted(instance_map.keys()))
 
 
-class InstanceProcessor(webapp2.RequestHandler):
-  """Worker for processing instances."""
+class InstanceGroupProcessor(webapp2.RequestHandler):
+  """Worker for processing instance group managers."""
 
   @decorators.require_cronjob
   def get(self):
@@ -279,9 +284,27 @@ class InstanceProcessor(webapp2.RequestHandler):
       )
 
 
+class InstanceProcessor(webapp2.RequestHandler):
+  """Worker for processing instances."""
+
+  @decorators.require_cronjob
+  def get(self):
+    put_futures = []
+    for instance in models.Instance.query(
+        models.Instance.state == models.InstanceStates.NEW
+    ):
+      logging.info('Processing instance: %s', instance.name)
+      # TODO(smut): Prepare instances.
+      instance.state = models.InstanceStates.PENDING_CATALOG
+      put_futures.append(instance.put_async())
+    if put_futures:
+      ndb.Future.wait_all(put_futures)
+
+
 def create_cron_app():
   return webapp2.WSGIApplication([
       ('/internal/cron/delete-instances', InstanceDeletionProcessor),
+      ('/internal/cron/process-instance-groups', InstanceGroupProcessor),
       ('/internal/cron/process-instance-templates', InstanceTemplateProcessor),
       ('/internal/cron/process-instances', InstanceProcessor),
   ])

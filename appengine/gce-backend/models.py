@@ -108,7 +108,12 @@ class InstanceGroup(ndb.Model):
 
 
 InstanceStates = Enum([
-  'CATALOGED', 'UNCATALOGED', 'PENDING_DELETION', 'DELETED'])
+  'CATALOGED',
+  'DELETED',
+  'NEW',
+  'PENDING_CATALOG',
+  'PENDING_DELETION',
+])
 
 
 class Instance(ndb.Model):
