@@ -114,6 +114,7 @@ class InstanceTemplateProcessor(webapp2.RequestHandler):
             template.template_name,
         )
         continue
+      api = gce.Project(template.instance_group_project)
       try:
         api.create_instance_group_manager(
             template.instance_group_name,
@@ -252,8 +253,15 @@ class InstanceProcessor(webapp2.RequestHandler):
           num_cpus=num_cpus,
           os_family=os_family,
       )
-      instances = api.get_managed_instances(
-          template.instance_group_name, template.zone)
+      try:
+        instances = api.get_managed_instances(
+            template.instance_group_name, template.zone)
+      except net.NotFoundError:
+        logging.warning(
+            'Instance group manager does not exist: %s',
+            template.instance_group_name,
+        )
+        continue
       policies = machine_provider.Policies(
           on_reclamation=machine_provider.MachineReclamationPolicy.DELETE,
           pubsub_project=
