@@ -146,9 +146,8 @@ class OpenIDTest(test_case.TestCase):
 
     session_cookie = openid.make_session_cookie(session)
     self.assertEqual(
-      'AXsiX2kiOiIxNDIwMDc0MDYxMDAwIiwic3MiOiJcdTAwMDFcdTAwMDBcdTAwMDBcdTAwMDBc'
-      'dTAwMDBcdTAwMDBcdTAwMDBcdTAwMDAiLCJzdWIiOiJ1c2VyLWlkIn1rVeAKbNE4fNP12wu8'
-      'icMZ88LQqyP2oQ7s_Kab_SsZGQ', session_cookie)
+      'AnsiX2kiOiIxNDIwMDc0MDYxMDAwIiwic3MiOiIxIiwic3ViIjoidXNlci1pZCJ93v490y1l'
+      'YLFkvz8f6fculiqLwhe28bKL9TxXobrQxFg', session_cookie)
 
   def test_get_open_session_ok(self):
     session = openid.make_session({
@@ -194,6 +193,13 @@ class OpenIDTest(test_case.TestCase):
     session_cookie = openid.make_session_cookie(session)
     openid.close_session(session_cookie)
     self.assertIsNone(openid.get_open_session(session_cookie))
+
+  def test_session_cookie_serialization(self):
+    for i in xrange(1, 1024):
+      session = openid.AuthOpenIDSession(
+          id=i, parent=ndb.Key(openid.AuthOpenIDUser, 'blah'))
+      cookie = openid.make_session_cookie(session)
+      openid.SessionCookie.validate(cookie)
 
 
 if __name__ == '__main__':

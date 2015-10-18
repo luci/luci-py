@@ -13,7 +13,6 @@ import collections
 import datetime
 import json
 import logging
-import struct
 import urllib
 import urlparse
 
@@ -307,7 +306,7 @@ class SessionCookie(tokens.TokenKind):
   """Used to HMAC-tag 'oid_session' authentication cookie."""
   expiration_sec = 30 * 24 * 3600
   secret_key = api.SecretKey('oid_session_cookie', scope='local')
-  version = 1
+  version = 2
 
 
 class LoginHandler(webapp2.RequestHandler):
@@ -487,7 +486,7 @@ def make_session_cookie(session):
   """
   return SessionCookie.generate(embedded={
     'sub': session.key.parent().id(),
-    'ss': struct.pack('<q', session.key.integer_id()),
+    'ss': str(session.key.integer_id()),
   })
 
 
@@ -508,8 +507,8 @@ def get_open_session(cookie):
     logging.warning('Bad session cookie: %s', e)
     return None
   try:
-    session_id = struct.unpack('<q', decoded['ss'])[0]
-  except struct.error as exc:
+    session_id = int(decoded['ss'])
+  except ValueError as exc:
     logging.warning(
         'Bad session cookie, bad \'ss\' field %r: %s', decoded['ss'], exc)
     return None
