@@ -508,9 +508,8 @@ def get_open_session(cookie):
     return None
   try:
     session_id = int(decoded['ss'])
-  except ValueError as exc:
-    logging.warning(
-        'Bad session cookie, bad \'ss\' field %r: %s', decoded['ss'], exc)
+  except (TypeError, ValueError) as exc:
+    logging.warning('Bad session cookie (%r): %s', decoded, exc)
     return None
   # Relying on ndb in-process cache here to avoid refetches from datastore.
   session = ndb.Key(
