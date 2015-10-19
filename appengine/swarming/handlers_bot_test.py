@@ -597,12 +597,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     }
     response = self.post_with_token(
         '/swarming/api/v1/bot/task_update', params, token, status=500)
-    expected = {
-      u'error':
-          u'The server has either erred or is incapable of performing the '
-          u'requested operation.',
-    }
-    self.assertEqual(expected, response)
+    self.assertEqual({u'error': u'Failed to update, please retry'}, response)
 
   def test_task_update_failure(self):
     # The error is caught in handlers_api.BotTaskUpdateHandler.post().

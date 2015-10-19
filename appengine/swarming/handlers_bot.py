@@ -9,6 +9,7 @@ import json
 import logging
 import textwrap
 
+import webob
 import webapp2
 
 from google.appengine.api import app_identity
@@ -510,6 +511,8 @@ class BotTaskUpdateHandler(auth.ApiHandler):
           category='task_failure',
           message='Failed to update task: %s' % e)
       self.abort_with_error(400, error=str(e))
+    except webob.exc.HTTPException:
+      raise
     except Exception as e:
       logging.exception('Internal error: %s', e)
       self.abort_with_error(500, error=str(e))
