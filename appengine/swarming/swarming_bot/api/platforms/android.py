@@ -8,6 +8,7 @@ This file serves as an API to bot_config.py. bot_config.py can be replaced on
 the server to allow additional server-specific functionality.
 """
 
+import collections
 import cStringIO
 import inspect
 import logging
@@ -15,11 +16,14 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import time
+
 
 # This file must be imported from swarming_bot.zip (or with '../..' in
 # sys.path). libusb1 must have been put in the path already.
 
+from api import parallel
 import adb
 import adb.adb_commands
 
@@ -63,8 +67,58 @@ _ADB_KEYS = None
 _ADB_KEYS_RAW = None
 
 
-# Cache of /system/build.prop on Android devices connected to this host.
-_BUILD_PROP_ANDROID = {}
+class _PerDeviceCache(object):
+  """Caches data per device, thread-safe."""
+  Device = collections.namedtuple(
+      'Device',
+      [
+        # Cache of /system/build.prop on the Android device.
+        'build_props',
+        # Cache of $EXTERNAL_STORAGE_PATH.
+        'external_storage_path',
+        # /system/xbin/su exists.
+        'has_su',
+        # /root is readable.
+        'is_root',
+        # All the valid CPU scaling governors.
+        'available_governors',
+        # CPU frequency limits.
+        'cpuinfo_max_freq',
+        'cpuinfo_min_freq',
+      ])
+
+  def __init__(self):
+    self._lock = threading.Lock()
+    # Keys is usb path, value is a _Cache.Device.
+    self._per_device = {}
+
+  def get(self, device):
+    assert isinstance(device, Device), device
+    with self._lock:
+      return self._per_device.get(device.port_path)
+
+  def set(self, port_path, device):
+    assert isinstance(device, self.Device), device
+    logging.info('PerDeviceCache: %s: %s', port_path, device)
+    with self._lock:
+      self._per_device[port_path] = device
+
+  def trim(self, devices):
+    """Removes any stale cache for any device that is not found anymore.
+
+    So if a device is disconnected, reflashed then reconnected, the cache isn't
+    invalid.
+    """
+    device_keys = {d.port_path: d for d in devices}
+    with self._lock:
+      for port_path in self._per_device.keys():
+        dev = device_keys.get(port_path)
+        if not dev or not dev.is_valid:
+          del self._per_device[port_path]
+
+
+# Global cache of per device cache.
+_per_device_cache = _PerDeviceCache()
 
 
 class _PythonRSASigner(object):
@@ -192,6 +246,66 @@ def _load_device(bot, handle):
   # Always create a Device, even if it points to nothing. It makes using the
   # client code much easier.
   return Device(bot, cmd, port_path)
+
+
+def _init_cache(device):
+  """Primes data known to be fetched soon right away that is static for the
+  lifetime of the device.
+
+  The data is cached in _per_device_cache() as long as the device is connected
+  and responsive.
+  """
+  if not _per_device_cache.get(device):
+    # TODO(maruel): This doesn't seem super useful since the following symlinks
+    # already exist: /sdcard/, /mnt/sdcard, /storage/sdcard0.
+    external_storage_path, exitcode = device.shell('echo -n $EXTERNAL_STORAGE')
+    if exitcode:
+      external_storage_path = None
+
+    properties = {}
+    out = device.pull_content('/system/build.prop')
+    if not out:
+      properties = None
+    else:
+      for line in out.splitlines():
+        if line.startswith(u'#') or not line:
+          continue
+        key, value = line.split(u'=', 1)
+        properties[key] = value
+
+    mode, _, _ = device.stat('/system/xbin/su')
+    has_su = bool(mode)
+
+    mode, _, _ = device.stat('/root')
+    is_root = bool(mode)
+
+    if has_su and not is_root:
+      # Opportinistically tries to switch adbd to run in root mode.
+      if device.reset_adbd_as_root():
+        mode, _, _ = device.stat('/root')
+        is_root = bool(mode)
+
+    available_governors = KNOWN_CPU_SCALING_GOVERNOR_VALUES
+    out = device.pull_content(
+        '/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors')
+    if out:
+      available_governors = sorted(i for i in out.split())
+      assert set(available_governors).issubset(
+          KNOWN_CPU_SCALING_GOVERNOR_VALUES), available_governors
+
+    cpuinfo_max_freq = device.pull_content(
+        '/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq')
+    if cpuinfo_max_freq:
+      cpuinfo_max_freq = int(cpuinfo_max_freq)
+    cpuinfo_min_freq = device.pull_content(
+        '/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq')
+    if cpuinfo_min_freq:
+      cpuinfo_min_freq = int(cpuinfo_min_freq)
+
+    c = _per_device_cache.Device(
+        properties, external_storage_path, has_su, is_root, available_governors,
+        cpuinfo_max_freq, cpuinfo_min_freq)
+    _per_device_cache.set(device.port_path, c)
 
 
 ### Public API.
@@ -599,18 +713,15 @@ def get_devices(bot=None):
       break
     handles.append(handle)
 
-  devices = []
-  for handle in handles:
+  def fn(handle):
     # Open the device and do the initial adb-connect.
     device = _load_device(bot, handle)
-    devices.append(device)
+    # Query the device, caching data upfront inside _per_device_cache.
+    _init_cache(device)
+    return device
 
-  # Remove any /system/build.prop cache so if a device is disconnected,
-  # reflashed then reconnected, the cache isn't invalid.
-  for key in _BUILD_PROP_ANDROID.keys():
-    dev = devices.get(key)
-    if not dev or not dev.is_valid:
-      _BUILD_PROP_ANDROID.pop(key)
+  devices = parallel.pmap(fn, handles)
+  _per_device_cache.trim(devices)
   return devices
 
 
@@ -628,13 +739,49 @@ def set_cpu_scaling_governor(device, governor):
   """
   assert isinstance(device, Device), device
   assert governor in KNOWN_CPU_SCALING_GOVERNOR_VALUES, governor
-  _, exit_code = device.shell(
-      'echo "%s">/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor' %
-      governor)
-  return exit_code == 0
+  cache = _per_device_cache.get(device)
+  if cache:
+    if governor not in cache.available_governors:
+      if governor == 'powersave':
+        return set_cpu_speed(device, cache.cpuinfo_min_freq)
+      if governor == 'ondemand':
+        governor = 'interactive'
+      elif governor == 'interactive':
+        governor = 'ondemand'
+      else:
+        logging.error('Can\'t switch to %s', governor)
+        return False
+  assert governor in KNOWN_CPU_SCALING_GOVERNOR_VALUES, governor
+
+  # First query the current state and only try to switch if it's different.
+  prev = device.pull_content(
+      '/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor')
+  if prev:
+    prev = prev.strip()
+    if prev == governor:
+      return True
+    if cache and prev not in cache.available_governors:
+      logging.error(
+          '%s: Read invalid scaling_governor: %s', device.port_path, prev)
+
+  if not device.push_content(
+      '/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor', governor + '\n'):
+    logging.error(
+        '%s: Writing scaling_governor %s failed; was %s',
+        device.port_path, governor, prev)
+    return False
+  # Get it back to confirm.
+  newval = device.pull_content(
+      '/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor')
+  if not (newval or '').strip() == governor:
+    logging.error(
+        '%s: Wrote scaling_governor %s; was %s; got %s',
+        device.port_path, governor, prev, newval)
+    return False
+  return True
 
 
-def set_cpu_scaling(device, speed):
+def set_cpu_speed(device, speed):
   """Enforces strict CPU speed and disable the CPU scaling governor.
 
   Returns:
@@ -644,10 +791,13 @@ def set_cpu_scaling(device, speed):
   assert isinstance(speed, int), speed
   assert 10000 <= speed <= 10000000, speed
   success = set_cpu_scaling_governor(device, 'userspace')
-  _, exit_code = device.shell(
-      'echo "%d">/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed' %
-      speed)
-  return success and exit_code == 0
+  if not device.push_content(
+      '/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed', '%d\n' % speed):
+    return False
+  # Get it back to confirm.
+  val = device.pull_content(
+      '/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed')
+  return success and (val or '').strip() == str(speed)
 
 
 def get_build_prop(device):
@@ -656,19 +806,21 @@ def get_build_prop(device):
   This isn't really changing through the lifetime of a bot. One corner case is
   when the device is flashed or disconnected.
   """
-  if device.serial not in _BUILD_PROP_ANDROID:
-    properties = {}
-    out, _ = device.shell('cat /system/build.prop')
-    if not out:
-      properties = None
-    else:
-      for line in out.splitlines():
-        if line.startswith(u'#') or not line:
-          continue
-        key, value = line.split(u'=', 1)
-        properties[key] = value
-    _BUILD_PROP_ANDROID[device.serial] = properties
-  return _BUILD_PROP_ANDROID[device.serial]
+  assert isinstance(device, Device), device
+  cache = _per_device_cache.get(device)
+  if cache:
+    return cache.build_props
+
+
+def get_external_storage_path(device):
+  """Returns the path to the SDCard (or emulated.
+
+  May look like /storage/emulated/legacy or None.
+  """
+  assert isinstance(device, Device), device
+  cache = _per_device_cache.get(device)
+  if cache:
+    return cache.external_storage_path
 
 
 def get_temp(device):
@@ -726,10 +878,21 @@ def get_cpu_scale(device):
     'scaling_cur_freq': u'cur',
     'scaling_governor': u'governor',
   }
-  return {
-    v: device.shell('cat /sys/devices/system/cpu/cpu0/cpufreq/' + k)[0]
-    for k, v in mapping.iteritems()
-  }
+
+  out = {}
+  cache = _per_device_cache.get(device)
+  if cache:
+    out = {
+      'max': cache.cpuinfo_max_freq,
+      'min': cache.cpuinfo_min_freq,
+    }
+    del mapping['cpuinfo_max_freq']
+    del mapping['cpuinfo_min_freq']
+
+  out.update(
+    (v, device.pull_content('/sys/devices/system/cpu/cpu0/cpufreq/' + k))
+    for k, v in mapping.iteritems())
+  return out
 
 
 def get_uptime(device):
