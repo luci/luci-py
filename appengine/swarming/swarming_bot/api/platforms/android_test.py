@@ -15,7 +15,7 @@ import android
 
 class MockDevice(android.Device):
   def __init__(self, cmds):
-    super(MockDevice, self).__init__(None, None)
+    super(MockDevice, self).__init__(None, None, None)
     self._cmds = cmds[:]
 
   def shell(self, cmd):

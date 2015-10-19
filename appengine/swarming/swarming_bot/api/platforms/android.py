@@ -8,6 +8,7 @@ This file serves as an API to bot_config.py. bot_config.py can be replaced on
 the server to allow additional server-specific functionality.
 """
 
+import inspect
 import logging
 import os
 import re
@@ -127,12 +128,14 @@ def _parcel_to_list(lines):
   return out
 
 
-def _load_device(handle):
-  """Given a adb.USBDevice, return a Device wrapping an
-  adb_commands.AdbCommands.
+def _load_device(bot, handle):
+  """Return a Device wrapping an adb_commands.AdbCommands.
   """
+  assert isinstance(handle, adb.common.UsbHandle), handle
   port_path = '/'.join(map(str, handle.port_path))
   try:
+    # If this succeeds, this initializes handle._handle, which is a
+    # usb1.USBDeviceHandle.
     handle.Open()
   except adb.common.usb1.USBErrorNoDevice as e:
     logging.warning('Got USBErrorNoDevice for %s: %s', port_path, e)
@@ -181,9 +184,13 @@ def _load_device(handle):
       # is garbled.
       logging.warning(
           'Trying unpluging and pluging it back: %s: %s', port_path, e)
+    finally:
+      # Do not leak the USB handle when we can't talk to the device.
+      if not cmd:
+        handle.Close()
   # Always create a Device, even if it points to nothing. It makes using the
   # client code much easier.
-  return Device(cmd, port_path)
+  return Device(bot, cmd, port_path)
 
 
 ### Public API.
@@ -205,21 +212,30 @@ class Device(object):
 
   The fact that exceptions can be thrown any time makes the client code really
   hard to write safely. Convert USBError* to None return value.
+
+  Only contains the low level commands. High level operations are built upon the
+  low level functionality provided by this class.
   """
-  def __init__(self, adb_cmd, port_path):
+  # - CommonUsbError means that device I/O failed, e.g. a write or a read call
+  #   returned an error.
+  # - USBError means that a bus I/O failed, e.g. the device path is not present
+  #   anymore.
+  # - ValueError means that there was a protocol level failure. For example the
+  #   returned data is garbage.
+  _ERRORS = (
+    adb.usb_exceptions.CommonUsbError, adb.common.libusb1.USBError, ValueError)
+
+  def __init__(self, bot, adb_cmd, port_path):
     if adb_cmd:
       assert isinstance(adb_cmd, adb.adb_commands.AdbCommands), adb_cmd
+    self._bot = bot
+    self._has_reset = False
+    self._tries = 1
     self.adb_cmd = adb_cmd
-    # Try to get the real serial number if possible.
+    self.port_path = port_path
     self.serial = port_path
     if self.adb_cmd:
-      try:
-        # The serial number is attached to adb.common.UsbHandle, no
-        # adb_commands.AdbCommands.
-        self.serial = adb_cmd.handle.serial_number
-      except adb.common.libusb1.USBError:
-        pass
-    self._has_reset = False
+      self._set_serial_number()
 
   @property
   def is_valid(self):
@@ -292,6 +308,31 @@ class Device(object):
     # The command itself generated no output.
     return '', int(parts[0])
 
+  def _set_serial_number(self):
+    """Tries to set self.serial to the serial number of the device.
+
+    This means communicating to the USB device, so it may throw.
+    """
+    for _ in xrange(self._tries):
+      try:
+        # The serial number is attached to adb.common.UsbHandle, no
+        # adb_commands.AdbCommands.
+        self.serial = self.adb_cmd.handle.serial_number
+      except self._ERRORS as e:
+        self._try_reset('(): %s', e)
+
+  def _try_reset(self, fmt, *args):
+    """When a self._ERRORS occurred, try to reset the device."""
+    items = [self.port_path, inspect.stack()[1][3]]
+    items.extend(args)
+    msg = ('%s.%s' + fmt) % tuple(items)
+    logging.error(msg)
+    if self._bot:
+      self._bot.post_error(msg)
+    if not self._has_reset:
+      self._has_reset = True
+      # TODO(maruel): Actually do the reset via ADB protocol.
+
 
 def initialize(pub_key, priv_key):
   """Initialize Android support through adb.
@@ -356,7 +397,7 @@ def kill_adb():
     time.sleep(0.001)
 
 
-def get_devices():
+def get_devices(bot=None):
   """Returns the list of devices available.
 
   Caller MUST call close_devices(devices) on the return value.
@@ -384,7 +425,7 @@ def get_devices():
       continue
     except StopIteration:
       break
-    device = _load_device(handle)
+    device = _load_device(bot, handle)
     devices[device.serial] = device
 
   # Remove any /system/build.prop cache so if a device is disconnected,
