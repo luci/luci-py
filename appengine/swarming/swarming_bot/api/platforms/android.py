@@ -403,17 +403,15 @@ def get_devices(bot=None):
   Caller MUST call close_devices(devices) on the return value.
 
   Returns one of:
-    - dict of {serial_number: }. The value may be
-      None if there was an Auth failure.
+    - list of Device instances.
     - None if adb is unavailable.
   """
-  # TODO(maruel): Return a list instead of a dict. It's a bit tricky as we need
-  # to update all the bot_config.py first.
-  if not adb:
+  if not adb or not _ADB_KEYS:
     return None
 
-  devices = {}
-  generator = adb.adb_commands.AdbCommands.Devices()
+  handles = []
+  generator = adb.common.UsbHandle.FindDevices(
+      adb.adb_commands.DeviceIsAvailable, timeout_ms=60000)
   while True:
     try:
       # Use manual iterator handling instead of "for handle in generator" to
@@ -425,8 +423,13 @@ def get_devices(bot=None):
       continue
     except StopIteration:
       break
+    handles.append(handle)
+
+  devices = []
+  for handle in handles:
+    # Open the device and do the initial adb-connect.
     device = _load_device(bot, handle)
-    devices[device.serial] = device
+    devices.append(device)
 
   # Remove any /system/build.prop cache so if a device is disconnected,
   # reflashed then reconnected, the cache isn't invalid.
@@ -439,7 +442,7 @@ def get_devices(bot=None):
 
 def close_devices(devices):
   """Closes all devices opened by get_devices()."""
-  for _, device in sorted((devices or {}).iteritems()):
+  for device in devices:
     device.close()
 
 

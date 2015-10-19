@@ -33,6 +33,7 @@ import tempfile
 import time
 import urllib2
 
+from api import parallel
 from api import platforms
 from utils import file_path
 from utils import tools
@@ -468,7 +469,7 @@ def get_dimensions_all_devices_android(devices):
   for key in keys:
     dimensions[key] = set()
   dimensions[u'android'] = []
-  for serial_number, device in sorted(devices.iteritems()):
+  for device in devices:
     properties = platforms.android.get_build_prop(device)
     if properties:
       for key in keys:
@@ -476,7 +477,7 @@ def get_dimensions_all_devices_android(devices):
         if real_key in properties:
           dimensions[key].add(properties[real_key])
       # Only advertize devices that can be used.
-      dimensions[u'android'].append(serial_number)
+      dimensions[u'android'].append(device.serial)
   dimensions[u'android'].sort()
   for key in keys:
     if not dimensions[key]:
@@ -526,26 +527,34 @@ def get_state_all_devices_android(devices):
     u'build.version.sdk',
     u'product.board',
     u'product.cpu.abi')
-  state['devices'] = {}
-  for serial_number, device in sorted(devices.iteritems()):
+
+  def fn(device):
     if not device.is_valid:
-      state[u'devices'][serial_number] = {u'state': 'unauthenticated'}
-      continue
+      return {u'state': 'unauthenticated'}
     properties = platforms.android.get_build_prop(device)
     if not properties:
-      state[u'devices'][serial_number] = {u'state': 'unavailable'}
-      continue
-    state[u'devices'][serial_number] = {
+      return {u'state': 'unavailable'}
+    return {
       u'battery': platforms.android.get_battery(device),
       u'build': {key: properties[u'ro.'+key] for key in keys},
       u'cpu_scale': platforms.android.get_cpu_scale(device),
       u'disk': platforms.android.get_disk(device),
       u'imei': platforms.android.get_imei(device),
       u'ip': platforms.android.get_ip(device),
+      u'serial': device.serial,
       u'state': u'available',
       u'temp': platforms.android.get_temp(device),
       u'uptime': platforms.android.get_uptime(device),
     }
+
+  start = time.time()
+  state[u'devices'] = {
+    device.port_path: out
+    for device, out in zip(devices, parallel.pmap(fn, devices))
+  }
+  logging.info(
+      'get_state_all_devices_android() (device part) took %gs' %
+      round(time.time() - start, 1))
   return state
 
 
