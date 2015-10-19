@@ -8,6 +8,7 @@ This file serves as an API to bot_config.py. bot_config.py can be replaced on
 the server to allow additional server-specific functionality.
 """
 
+import cStringIO
 import inspect
 import logging
 import os
@@ -246,6 +247,133 @@ class Device(object):
       self.adb_cmd.Close()
       self.adb_cmd = None
 
+  def listdir(self, destdir):
+    """List a directory on the device."""
+    assert destdir.startswith('/'), destdir
+    if self.adb_cmd:
+      for _ in xrange(self._tries):
+        try:
+          return self.adb_cmd.List(destdir)
+        except adb.usb_exceptions.AdbCommandFailureException:
+          break
+        except self._ERRORS as e:
+          self._try_reset('(%s): %s', destdir, e)
+    return None
+
+  def stat(self, dest):
+    """Stats a file/dir on the device. It's likely faster than shell().
+
+    Returns:
+      tuple(mode, size, mtime)
+    """
+    assert dest.startswith('/'), dest
+    if self.adb_cmd:
+      for _ in xrange(self._tries):
+        try:
+          return self.adb_cmd.Stat(dest)
+        except adb.usb_exceptions.AdbCommandFailureException:
+          break
+        except self._ERRORS as e:
+          self._try_reset('(%s): %s', dest, e)
+    return None, None, None
+
+  def pull(self, remotefile, dest):
+    """Retrieves a file from the device to dest on the host.
+
+    Returns True on success.
+    """
+    assert remotefile.startswith('/'), remotefile
+    if self.adb_cmd:
+      for _ in xrange(self._tries):
+        try:
+          self.adb_cmd.Pull(remotefile, dest)
+          return True
+        except adb.usb_exceptions.AdbCommandFailureException:
+          break
+        except self._ERRORS as e:
+          self._try_reset('(%s, %s): %s', remotefile, dest, e)
+    return False
+
+  def pull_content(self, remotefile):
+    """Reads a file from the device.
+
+    Returns content on success as str, None on failure.
+    """
+    assert remotefile.startswith('/'), remotefile
+    if self.adb_cmd:
+      # TODO(maruel): Distinction between file is not present and I/O error.
+      for _ in xrange(self._tries):
+        try:
+          return self.adb_cmd.Pull(remotefile, None)
+        except adb.usb_exceptions.AdbCommandFailureException:
+          break
+        except self._ERRORS as e:
+          self._try_reset('(%s): %s', remotefile, e)
+    return None
+
+  def push(self, localfile, dest, mtime='0'):
+    """Pushes a local file to dest on the device.
+
+    Returns True on success.
+    """
+    assert dest.startswith('/'), dest
+    if self.adb_cmd:
+      for _ in xrange(self._tries):
+        try:
+          self.adb_cmd.Push(localfile, dest, mtime)
+          return True
+        except adb.usb_exceptions.AdbCommandFailureException:
+          break
+        except self._ERRORS as e:
+          self._try_reset('(%s, %s): %s', localfile, dest, e)
+    return False
+
+  def push_content(self, dest, content, mtime='0'):
+    """Writes content to dest on the device.
+
+    Returns True on success.
+    """
+    assert dest.startswith('/'), dest
+    if self.adb_cmd:
+      for _ in xrange(self._tries):
+        try:
+          self.adb_cmd.Push(cStringIO.StringIO(content), dest, mtime)
+          return True
+        except adb.usb_exceptions.AdbCommandFailureException:
+          break
+        except self._ERRORS as e:
+          self._try_reset('(%s, %s): %s', dest, content, e)
+    return False
+
+  def reboot(self):
+    """Reboot the device. Doesn't wait for it to be rebooted"""
+    if self.adb_cmd:
+      for _ in xrange(self._tries):
+        try:
+          # Use 'bootloader' to switch to fastboot.
+          out = self.adb_cmd.Reboot()
+          logging.info('reboot: %s', out)
+          return True
+        except adb.usb_exceptions.AdbCommandFailureException:
+          break
+        except self._ERRORS as e:
+          self._try_reset('(): %s', e)
+    return False
+
+  def remount(self):
+    """Remount / as read-write."""
+    if self.adb_cmd:
+      for _ in xrange(self._tries):
+        try:
+          out = self.adb_cmd.Remount()
+          logging.info('remount: %s', out)
+          return True
+        except adb.usb_exceptions.AdbCommandFailureException:
+          break
+        except self._ERRORS as e:
+          self._try_reset('(): %s', e)
+    return False
+
   def shell(self, cmd):
     """Runs a command on an Android device while swallowing exceptions.
 
@@ -256,57 +384,62 @@ class Device(object):
       - stdout is as unicode if it ran, None if an USB error occurred.
       - exit_code is set if ran.
     """
-    try:
-      return self.shell_raw(cmd)
-    except (
-        adb.usb_exceptions.CommonUsbError,
-        adb.common.libusb1.USBError,
-        ValueError) as e:
-      # Trap all USB exceptions.
-      # - CommonUsbError means that device I/O failed, e.g. a write or a read
-      #   call returned an error.
-      # - USBError means that a bus I/O failed, e.g. the device path is not
-      #   present anymore.
-      # - ValueError means that there was a protocol level failure. For example
-      #   the returned data is garbage.
-      # In each case, try to do a device reset, it may help. Sadly, this likely
-      # mean that the device may not be accessible anymore until the next
-      # discovery but it's better than leaving it in a bad state.
-      logging.error('%s.shell(%s): %s', self.serial, cmd, e)
-      if not self._has_reset:
-        self._has_reset = True
-        # TODO(maruel): Intentionally do not trap exceptions here, as we want to
-        # see how it (mis-)behaves in the field.
-        # http://libusb.org/static/api-1.0/group__dev.html#ga7321bd8dc28e9a20b411bf18e6d0e9aa
-        self.adb_cmd.handle.resetDevice()
-        self.close()
-      return None, None
+    for _ in xrange(self._tries):
+      try:
+        return self.shell_raw(cmd)
+      except self._ERRORS as e:
+        self._try_reset('(%s): %s', cmd, e)
+    return None, None
 
   def shell_raw(self, cmd):
     """Runs a command on an Android device.
+
+    It is expected that the user quote cmd properly.
+
+    It may fail if cmd is >512 or output is >32768. Workaround for long cmd is
+    to push a shell script first then run this. Workaround for large output is
+    to is run_shell_wrapped().
 
     Returns:
       tuple(stdout, exit_code)
       - stdout is as unicode if it ran, None if an USB error occurred.
       - exit_code is set if ran.
     """
+    if isinstance(cmd, unicode):
+      cmd = cmd.encode('utf-8')
+    assert isinstance(cmd, str), cmd
     if not self.adb_cmd:
       return None, None
     # The adb protocol doesn't return the exit code, so embed it inside the
     # command.
-    out = self.adb_cmd.Shell(cmd + ' ; echo $?').decode('utf-8', 'replace')
+    complete_cmd = cmd + ' ;echo -e "\n$?"'
+    assert len(complete_cmd) <= 512, 'Command is too long: %s' % complete_cmd
+    out = self.adb_cmd.Shell(complete_cmd).decode('utf-8', 'replace')
     # Protect against & or other bash conditional execution that wouldn't make
     # the 'echo $?' command to run.
     if not out:
       return out, None
+    # adb shell uses CRLF EOL. Only God Knows Why.
+    out = out.replace('\r\n', '\n')
     # TODO(maruel): Remove and handle if this is ever trapped.
     assert out[-1] == '\n', out
     # Strip the last line to extract the exit code.
     parts = out[:-1].rsplit('\n', 1)
-    if len(parts) == 2:
-      return parts[0] + '\n', int(parts[1])
-    # The command itself generated no output.
-    return '', int(parts[0])
+    return parts[0], int(parts[1])
+
+  def reset_adbd_as_root(self):
+    """If the device is not root, sets it to root.
+
+    Should not be called by end users.
+    """
+    for _ in xrange(self._tries):
+      try:
+        out = self.adb_cmd.Root()
+        logging.info('reset_adbd_as_root() = %s', out)
+        return out != 'adbd cannot run as root in production builds\n'
+      except self._ERRORS as e:
+        self._try_reset('(): %s', e)
+    return False
 
   def _set_serial_number(self):
     """Tries to set self.serial to the serial number of the device.
@@ -332,6 +465,47 @@ class Device(object):
     if not self._has_reset:
       self._has_reset = True
       # TODO(maruel): Actually do the reset via ADB protocol.
+
+  def _reset(self):
+    """Resets the USB connection and reconnect to the device at the low level
+    ADB protocol layer.
+    """
+    # http://libusb.org/static/api-1.0/group__dev.html#ga7321bd8dc28e9a20b411bf18e6d0e9aa
+    if self.adb_cmd:
+      try:
+        self.adb_cmd.handle._handle.resetDevice()
+      except adb.common.usb1.USBErrorNotFound:
+        logging.info('resetDevice() failed')
+      self.close()
+      # Reopen itself.
+      # TODO(maruel): This makes no sense to do a complete enumeration, we
+      # know the exact port path.
+      context = adb.common.usb1.USBContext()
+      try:
+        for device in context.getDeviceList(skip_on_error=True):
+          port_path = [device.getBusNumber()]
+          try:
+            port_path.extend(device.getPortNumberList())
+          except AttributeError:
+            # Temporary issue on Precise. Remove once we do not support 12.04
+            # anymore.
+            # https://crbug.com/532357
+            port_path.append(device.getDeviceAddress())
+          if port_path == self.port_path:
+            device.Open()
+            self.adb_cmd = adb.adb_commands.AdbCommands.Connect(
+                device, banner='swarming', rsa_keys=_ADB_KEYS,
+                auth_timeout_ms=60000)
+          break
+        else:
+          # TODO(maruel): Maybe a race condition.
+          logging.info('failed to find device after reset')
+      finally:
+        context.exit()
+
+  def __repr__(self):
+    return '<android.Device %s %s>' % (
+        self.port_path, self.serial if self.is_valid else '(broken)')
 
 
 def initialize(pub_key, priv_key):
