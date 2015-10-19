@@ -541,6 +541,11 @@ def get_state_all_devices_android(devices):
       u'disk': platforms.android.get_disk(device),
       u'imei': platforms.android.get_imei(device),
       u'ip': platforms.android.get_ip(device),
+      u'max_uid': platforms.android.get_last_uid(device),
+      u'other_packages': [
+        p for p in platforms.android.list_packages(device) or []
+        if not p.startswith(('com.android.', 'com.google.')) and p != 'android'
+      ],
       u'serial': device.serial,
       u'state': u'available',
       u'temp': platforms.android.get_temp(device),

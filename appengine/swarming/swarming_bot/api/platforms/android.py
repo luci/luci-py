@@ -13,7 +13,11 @@ import cStringIO
 import inspect
 import logging
 import os
+import pipes
+import posixpath
+import random
 import re
+import string
 import subprocess
 import sys
 import threading
@@ -835,9 +839,9 @@ def get_temp(device):
   temps = []
   try:
     for i in xrange(2):
-      out, _ = device.shell('cat /sys/class/thermal/thermal_zone%d/temp' % i)
+      out = device.pull_content('/sys/class/thermal/thermal_zone%d/temp' % i)
       temps.append(int(out))
-  except ValueError:
+  except (TypeError, ValueError):
     return None
   return temps
 
@@ -865,7 +869,7 @@ def get_battery(device):
   if props.get(u'Wireless powered') == u'true':
     out[u'power'].append(u'Wireless')
   for key in (u'health', u'level', u'status', u'temperature', u'voltage'):
-    out[key] = int(props[key])
+    out[key] = int(props[key]) if key in props else None
   return out
 
 
@@ -898,7 +902,7 @@ def get_cpu_scale(device):
 def get_uptime(device):
   """Returns the device's uptime in second."""
   assert isinstance(device, Device), device
-  out, _ = device.shell('cat /proc/uptime')
+  out = device.pull_content('/proc/uptime')
   if out:
     return float(out.split()[1])
   return None
@@ -960,3 +964,154 @@ def get_ip(device):
   if not ip:
     return None
   return ip.strip()
+
+
+def get_last_uid(device):
+  """Returns the highest UID on the device."""
+  assert isinstance(device, Device), device
+  # pylint: disable=line-too-long
+  # Applications are set in the 10000-19999 UID space. The UID are not reused.
+  # So after installing 10000 apps, including stock apps, ignoring uninstalls,
+  # then the device becomes unusable. Oops!
+  # https://android.googlesource.com/platform/frameworks/base/+/master/api/current.txt
+  # or:
+  # curl -sSLJ \
+  #   https://android.googlesource.com/platform/frameworks/base/+/master/api/current.txt?format=TEXT \
+  #   | base64 --decode | grep APPLICATION_UID
+  out = device.pull_content('/data/system/packages.list')
+  if not out:
+    return None
+  return max(int(l.split(' ', 2)[1]) for l in out.splitlines() if len(l) > 2)
+
+
+def list_packages(device):
+  """Returns the list of packages installed."""
+  out, _ = device.shell('pm list packages')
+  if not out:
+    return None
+  return [l.split(':', 1)[1] for l in out.strip().splitlines()]
+
+
+def install_apk(device, destdir, apk):
+  """Installs apk to destdir directory."""
+  assert isinstance(device, Device), device
+  # TODO(maruel): Test.
+  # '/data/local/tmp/'
+  dest = posixpath.join(destdir, os.path.basename(apk))
+  if not device.push(apk, dest):
+    return False
+  return device.shell('pm install -r %s' % pipes.quote(dest))[1] is 0
+
+
+def uninstall_apk(device, package):
+  """Uninstalls the package."""
+  assert isinstance(device, Device), device
+  return device.shell('pm uninstall %s' % pipes.quote(package))[1] is 0
+
+
+def get_application_path(device, package):
+  assert isinstance(device, Device), device
+  # TODO(maruel): Test.
+  out, _ = device.shell('pm path %s' % pipes.quote(package))
+  return out.strip() if out else out
+
+
+def get_application_version(device, package):
+  assert isinstance(device, Device), device
+  # TODO(maruel): Test.
+  out, _ = device.shell('dumpsys package %s' % pipes.quote(package))
+  return out
+
+
+def wait_for_device(device, timeout=180):
+  """Waits for the device to be responsive."""
+  assert isinstance(device, Device), device
+  start = time.time()
+  while (time.time() - start) < timeout:
+    try:
+      if device.shell_raw('echo \'hi\'')[1] == 0:
+        return True
+    except device._ERRORS:
+      pass
+  return False
+
+
+def push_keys(device):
+  """Pushes all the keys on the file system to the device.
+
+  This is necessary when the device just got wiped but still has authorization,
+  as soon as it reboots it'd loose the authorization.
+
+  It never removes a previously trusted key, only adds new ones. Saves writing
+  to the device if unnecessary.
+  """
+  if not _ADB_KEYS_RAW:
+    # E.g. adb was never run locally and initialize(None, None) was used.
+    return False
+  keys = set(_ADB_KEYS_RAW)
+  assert all('\n' not in k for k in keys), keys
+  old_content = device.pull_content('/data/misc/adb/adb_keys')
+  if old_content:
+    old_keys = set(old_content.strip().splitlines())
+    if keys.issubset(old_keys):
+      return True
+    keys = keys | old_keys
+  assert all('\n' not in k for k in keys), keys
+  if device.shell('mkdir -p /data/misc/adb')[1] != 0:
+    return False
+  if device.shell('restorecon /data/misc/adb')[1] != 0:
+    return False
+  if not device.push_content(
+      '/data/misc/adb/adb_keys', ''.join(k + '\n' for k in sorted(keys))):
+    return False
+  if device.shell('restorecon /data/misc/adb/adb_keys')[1] != 0:
+    return False
+  return True
+
+
+def mkstemp(device, content, prefix='swarming', suffix=''):
+  """Make a new temporary files with content.
+
+  The random part of the name is guaranteed to not require quote.
+
+  Returns None in case of failure.
+  """
+  # There's a small race condition in there but it's assumed only this process
+  # is doing something on the device at this point.
+  choices = string.ascii_letters + string.digits
+  for _ in xrange(5):
+    name = '/data/local/tmp/' + prefix + ''.join(
+        random.choice(choices) for _ in xrange(5)) + suffix
+    mode, _, _ = device.stat(name)
+    if mode:
+      continue
+    if device.push_content(name, content):
+      return name
+
+
+def run_shell_wrapped(device, commands):
+  """Creates a temporary shell script, runs it then return the data.
+
+  This is needed when:
+  - the expected command is more than ~500 characters
+  - the expected output is more than 32k characters
+
+  Returns:
+    tuple(stdout and stderr merged, exit_code).
+  """
+  content = ''.join(l + '\n' for l in commands)
+  script = mkstemp(device, content, suffix='.sh')
+  if not script:
+    return False
+  try:
+    outfile = mkstemp(device, '', suffix='.txt')
+    if not outfile:
+      return False
+    try:
+      _, exit_code = device.shell('sh %s &> %s' % (script, outfile))
+      out = device.pull_content(outfile)
+      return out, exit_code
+    finally:
+      device.shell('rm %s' % outfile)
+  finally:
+    device.shell('rm %s' % script)
