@@ -243,13 +243,12 @@ def reclaim_machine(machine_key, reclamation_ts):
     ndb.put_multi([lease, machine])
 
   params = {
+      'backend_project': machine.policies.backend_project,
+      'backend_topic': machine.policies.backend_topic,
       'hostname': machine.dimensions.hostname,
       'lease_id': lease.key.id(),
       'machine_id': machine.key.id(),
   }
-  if machine.policies.pubsub_topic:
-    params['backend_project'] = machine.policies.pubsub_project
-    params['backend_topic'] = machine.policies.pubsub_topic
   if lease.request.pubsub_topic:
     params['lessee_project'] = lease.request.pubsub_project
     params['lessee_topic'] = lease.request.pubsub_topic
@@ -280,8 +279,26 @@ class MachineReclamationProcessor(webapp2.RequestHandler):
       reclaim_machine(machine, now)
 
 
+class NewMachineProcessor(webapp2.RequestHandler):
+  """Worker for processing new machines."""
+
+  @decorators.require_cronjob
+  def get(self):
+    put_futures = []
+    for machine in models.CatalogMachineEntry.query(
+        models.CatalogMachineEntry.state==models.CatalogMachineEntryStates.NEW,
+    ):
+      if machine.state == models.CatalogMachineEntryStates.NEW:
+        # TODO(smut): Create the topic, subscription, and IAM policy.
+        machine.state = models.CatalogMachineEntryStates.AVAILABLE
+        put_futures.append(machine.put_async())
+    if put_futures:
+      ndb.Future.wait_all(put_futures)
+
+
 def create_cron_app():
   return webapp2.WSGIApplication([
       ('/internal/cron/process-lease-requests', LeaseRequestProcessor),
       ('/internal/cron/process-machine-reclamations', MachineReclamationProcessor),
+      ('/internal/cron/process-new-machines', NewMachineProcessor),
   ])

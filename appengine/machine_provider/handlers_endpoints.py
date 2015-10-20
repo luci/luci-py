@@ -84,34 +84,33 @@ class CatalogEndpoints(remote.Service):
           error=error,
           machine_addition_request=request,
       )
-    if request.policies.pubsub_topic:
-      if not pubsub.validate_topic(request.policies.pubsub_topic):
-        logging.warning(
-            'Invalid topic for Cloud Pub/Sub: %s',
-            request.policies.pubsub_topic,
-        )
-        return rpc_messages.CatalogManipulationResponse(
-            error=rpc_messages.CatalogManipulationRequestError.INVALID_TOPIC,
-            machine_addition_request=request,
-        )
-      if not request.policies.pubsub_project:
-        logging.info(
-            'Cloud Pub/Sub project unspecified, using default: %s',
-            PUBSUB_DEFAULT_PROJECT,
-        )
-        request.policies.pubsub_project = PUBSUB_DEFAULT_PROJECT
-    if request.policies.pubsub_project:
+    if not pubsub.validate_topic(request.policies.backend_topic):
+      logging.warning(
+          'Invalid topic for Cloud Pub/Sub: %s',
+          request.policies.backend_topic,
+      )
+      return rpc_messages.CatalogManipulationResponse(
+          error=rpc_messages.CatalogManipulationRequestError.INVALID_TOPIC,
+          machine_addition_request=request,
+      )
+    if not request.policies.backend_project:
+      logging.info(
+          'Cloud Pub/Sub project unspecified, using default: %s',
+          PUBSUB_DEFAULT_PROJECT,
+      )
+      request.policies.backend_project = PUBSUB_DEFAULT_PROJECT
+    if request.policies.backend_project:
       error = None
-      if not pubsub.validate_project(request.policies.pubsub_project):
+      if not pubsub.validate_project(request.policies.backend_project):
         logging.warning(
             'Invalid project for Cloud Pub/Sub: %s',
-            request.policies.pubsub_project,
+            request.policies.backend_project,
         )
         error = rpc_messages.CatalogManipulationRequestError.INVALID_PROJECT
-      elif not request.policies.pubsub_topic:
+      elif not request.policies.backend_topic:
         logging.warning(
             'Cloud Pub/Sub project specified without specifying topic: %s',
-            request.policies.pubsub_project,
+            request.policies.backend_project,
         )
         error = rpc_messages.CatalogManipulationRequestError.UNSPECIFIED_TOPIC
       if error:
@@ -166,7 +165,7 @@ class CatalogEndpoints(remote.Service):
     models.CatalogMachineEntry.create_and_put(
         request.dimensions,
         request.policies,
-        models.CatalogMachineEntryStates.AVAILABLE,
+        models.CatalogMachineEntryStates.NEW,
     )
     return rpc_messages.CatalogManipulationResponse(
         machine_addition_request=request,

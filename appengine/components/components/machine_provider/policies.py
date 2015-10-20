@@ -18,15 +18,39 @@ class MachineReclamationPolicy(messages.Enum):
 
 
 class Policies(messages.Message):
-  """Represents the policies for a machine."""
-  # Cloud Pub/Sub topic name to communicate on regarding this machine.
-  pubsub_topic = messages.StringField(1)
-  # Cloud Pub/Sub project to communicate on regarding this machine.
-  pubsub_project = messages.StringField(2)
+  """Represents the policies for a machine.
+
+  There are two Pub/Sub channels of communication for each machine.
+  One is the backend-level channel which the Machine Provider will use
+  to tell the backend that the machine has been leased, or that the machine
+  needs to be reclaimed. The other is the channel between the Machine Provider
+  and the machine itself. The machine should listen for instructions from the
+  Machine Provider on this channel.
+
+  Since the machine itself is what's being leased out to untrusted users,
+  we will assign this Cloud Pub/Sub topic and give it restricted permissions
+  which only allow it to subscribe to the one topic. On the other hand, the
+  backend is trusted so we allow it to choose its own topic.
+
+  When a backend adds a machine to the Catalog, it should provide the Pub/Sub
+  topic and project to communicate on regarding the machine, as well as the
+  service account on the machine itself which will be used to authenticate
+  pull requests on the subscription created by the Machine Provider for the
+  machine.
+  """
+  # Cloud Pub/Sub topic name to communicate on with the backend regarding
+  # this machine.
+  backend_topic = messages.StringField(1, required=True)
+  # Cloud Pub/Sub project to communicate on with the backend regarding
+  # this machine.
+  backend_project = messages.StringField(2)
+  # Cloud Pub/Sub service account which the Machine Provider should authorize
+  # to consume messages on the machine pull subscription.
+  machine_service_account = messages.StringField(3)
   # Action the Machine Provider should take when reclaiming a machine
   # from a lessee.
   on_reclamation = messages.EnumField(
       MachineReclamationPolicy,
-      3,
+      4,
       default=MachineReclamationPolicy.MAKE_AVAILABLE,
   )

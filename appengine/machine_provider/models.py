@@ -165,7 +165,7 @@ class CatalogCapacityEntry(CatalogEntry):
       yield capacity
 
 
-CatalogMachineEntryStates = Enum(['AVAILABLE', 'LEASED'])
+CatalogMachineEntryStates = Enum(['AVAILABLE', 'LEASED', 'NEW'])
 
 
 class CatalogMachineEntry(CatalogEntry):
@@ -182,6 +182,8 @@ class CatalogMachineEntry(CatalogEntry):
   lease_expiration_ts = ndb.DateTimeProperty()
   # rpc_messages.Policies governing this machine.
   policies = msgprop.MessageProperty(rpc_messages.Policies)
+  # Cloud Pub/Sub topic the machine must listen to for instructions.
+  pubsub_topic = ndb.StringProperty()
   # Element of CatalogMachineEntryStates giving the state of this entry.
   state = ndb.StringProperty(
       choices=CatalogMachineEntryStates,

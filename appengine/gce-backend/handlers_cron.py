@@ -268,10 +268,11 @@ class InstanceGroupProcessor(webapp2.RequestHandler):
         )
         continue
       policies = machine_provider.Policies(
-          on_reclamation=machine_provider.MachineReclamationPolicy.DELETE,
-          pubsub_project=
+          backend_project=
               handlers_pubsub.MachineProviderSubscriptionHandler.TOPIC_PROJECT,
-          pubsub_topic=handlers_pubsub.MachineProviderSubscriptionHandler.TOPIC,
+          backend_topic=
+              handlers_pubsub.MachineProviderSubscriptionHandler.TOPIC,
+          on_reclamation=machine_provider.MachineReclamationPolicy.DELETE,
       )
 
       create_instance_group(
