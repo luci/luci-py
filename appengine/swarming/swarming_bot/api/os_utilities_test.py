@@ -80,7 +80,7 @@ class TestOsUtilities(auto_stub.TestCase):
     actual = os_utilities.get_state()
     expected = {
       u'cost_usd_hour', u'cwd', u'disks', u'gpu', u'ip', u'hostname',
-      u'nb_files_in_temp', u'ram', u'running_time', u'started_ts',
+      u'nb_files_in_temp', u'pid', u'ram', u'running_time', u'started_ts',
     }
     if sys.platform in ('cygwin', 'win32'):
       expected.add(u'cygwin')

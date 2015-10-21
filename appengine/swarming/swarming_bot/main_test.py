@@ -50,8 +50,10 @@ class SimpleMainTest(TestCase):
         [sys.executable, self._zip_file, 'attributes'],
         stderr=subprocess42.PIPE))
     expected = bot_main.get_attributes(None)
-    for key in (
-        u'cwd', u'disks', u'nb_files_in_temp', u'running_time', u'started_ts'):
+    NON_DETERMINISTIC = (
+      u'cwd', u'disks', u'nb_files_in_temp', u'pid', u'running_time',
+      u'started_ts')
+    for key in NON_DETERMINISTIC:
       del actual[u'state'][key]
       del expected[u'state'][key]
     del actual[u'version']

@@ -637,6 +637,7 @@ def get_state(threshold_mb=4*1024, skip=None):
     u'hostname': get_hostname(),
     u'ip': get_ip(),
     u'nb_files_in_temp': nb_files_in_temp,
+    u'pid': os.getpid(),
     u'ram': get_physical_ram(),
     u'running_time': int(round(time.time() - _STARTED_TS)),
     u'started_ts': int(round(_STARTED_TS)),
