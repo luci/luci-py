@@ -1,3 +1,5 @@
 queue:
  - name: catalog-instance-group
    rate: 1/s
+ - name: delete-instances
+   rate: 1/s

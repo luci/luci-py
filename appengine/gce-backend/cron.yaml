@@ -1,9 +1,7 @@
 cron:
-- url: /internal/cron/delete-instances
-  schedule: every 1 minutes
 - url: /internal/cron/process-instance-groups
   schedule: every 1 minutes
 - url: /internal/cron/process-instance-templates
   schedule: every 1 minutes
-- url: /internal/cron/process-instances
+- url: /pubsub/machine-provider
   schedule: every 1 minutes

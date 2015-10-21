@@ -58,6 +58,28 @@ class InstanceTemplate(ndb.Model):
     return ndb.Key(cls, hashlib.sha1('%s\0%s' % (name, project)).hexdigest())
 
 
+InstanceStates = Enum([
+  'CATALOGED',
+  'DELETED',
+  'NEW',
+  'PENDING_CATALOG',
+  'PENDING_DELETION',
+])
+
+
+class Instance(ndb.Model):
+  """Structured property representing a GCE instance.
+
+  Standalone Instance entities should not exist in the datastore.
+  """
+  # Name of this instance.
+  name = ndb.StringProperty(required=True)
+  # State of this instance.
+  state = ndb.StringProperty(choices=InstanceStates, required=True)
+  # URL for this instance.
+  url = ndb.StringProperty(required=True)
+
+
 class InstanceGroup(ndb.Model):
   """Datastore representation of a GCE instance group.
 
@@ -68,31 +90,15 @@ class InstanceGroup(ndb.Model):
   # rpc_messages.Dimensions describing members of this instance group.
   dimensions = msgprop.MessageProperty(rpc_messages.Dimensions, required=True)
   # Names of members of this instance group.
-  members = ndb.StringProperty(repeated=True)
+  members = ndb.LocalStructuredProperty(Instance, repeated=True)
   # Name of this instance group.
   name = ndb.StringProperty(required=True)
   # rpc_messages.Policies governing members of this instance group.
   policies = msgprop.MessageProperty(rpc_messages.Policies, required=True)
-
-  @classmethod
-  def create_and_put(cls, name, dimensions, policies, members):
-    """Creates a new InstanceGroup entity and puts it in the datastore.
-
-    Args:
-      name: Name of this instance group.
-      dimensions: rpc_messages.Dimensions describing members of this instance
-        group.
-      policies: rpc_messages.Policies governing members of this instance group.
-      members: A list of names of members of this instance group.
-    """
-    assert dimensions.backend == rpc_messages.Backend.GCE
-    cls(
-        key=cls.generate_key(name),
-        dimensions=dimensions,
-        members=members,
-        name=name,
-        policies=policies,
-    ).put()
+  # Name of the project this instance group exists in.
+  project = ndb.StringProperty(required=True)
+  # Zone the members of this instance group exist in. e.g. us-central1-f.
+  zone = ndb.StringProperty(required=True)
 
   @classmethod
   def generate_key(cls, name):
@@ -107,43 +113,59 @@ class InstanceGroup(ndb.Model):
     return ndb.Key(cls, hashlib.sha1(name).hexdigest())
 
 
-InstanceStates = Enum([
-  'CATALOGED',
-  'DELETED',
-  'NEW',
-  'PENDING_CATALOG',
-  'PENDING_DELETION',
-])
+class InstanceDeletions(ndb.Model):
+  """Datastore representation of a set of instances scheduled for deletion.
 
-
-class Instance(ndb.Model):
-  """Datastore representation of a GCE instance.
-
-  Key:
-    Instance is a root entity.
-    id: Hash of the instance group name + the instance name.
+  Only one instance of this entity should exist in the datastore.
   """
-  # Name of the instance group this instance belongs to.
-  group = ndb.StringProperty(required=True)
-  # Name of this instance.
-  name = ndb.StringProperty(required=True)
-  # Project this instance is located in.
-  project = ndb.StringProperty(required=True)
-  # State of this instance.
-  state = ndb.StringProperty(choices=InstanceStates, required=True)
-  # URL for this instance.
-  url = ndb.StringProperty(required=True)
-  # Zone this instance is located in.
-  zone = ndb.StringProperty(required=True)
+  ID = 'InstanceDeletions'
+  # Names of instances scheduled for deletion.
+  instances = ndb.StringProperty(repeated=True)
+
+  def _pre_put_hook(self):
+    super(InstanceDeletions, self)._pre_put_hook()
+    self.instances.sort()
 
   @classmethod
-  def generate_key(cls, name):
-    """Generates the key for an Instance with the given name.
+  def add_instance(cls, instance_name):
+    """Schedules an instance for deletion.
 
     Args:
-      name: Name of this instance.
+      instance_name: Name of the instance to schedule for deletion.
+    """
+    key = cls.get_key()
+    instance_deletions = key.get()
+    if not instance_deletions:
+      instance_deletions = InstanceDeletions(key=key, instances=[])
+    instances = set(instance_deletions.instances)
+    instances.add(instance_name)
+    instance_deletions.instances = instances
+    instance_deletions.put()
+
+  @classmethod
+  def discard_instances(cls, instance_names):
+    """Discards instances scheduled for deletion.
+
+    Args:
+      instance_names: Names of the instances to discard.
+    """
+    instance_deletions = cls.get_key().get()
+    instances = set(instance_deletions.instances) - set(instance_names)
+    instance_deletions.instances = instances
+    instance_deletions.put()
+
+  @classmethod
+  def get_instances(cls):
+    """Gets the instances scheduled for deletion.
 
     Returns:
-      An ndb.Key instance.
+      A set of instances scheduled for deletion.
     """
-    return ndb.Key(cls, hashlib.sha1(name).hexdigest())
+    instance_deletions = cls.get_key().get()
+    if not instance_deletions:
+      return set()
+    return set(instance_deletions.instances)
+
+  @classmethod
+  def get_key(cls):
+    return ndb.Key(cls, hashlib.sha1(cls.ID).hexdigest())

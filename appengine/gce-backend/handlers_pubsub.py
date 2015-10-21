@@ -24,23 +24,13 @@ MACHINE_PROVIDER_ENDPOINT = '/pubsub/machine-provider'
 
 
 @ndb.transactional
-def schedule_deletion(instance_key):
+def schedule_deletion(instance_name):
   """Marks a cataloged instance for deletion.
 
   Args:
-    instance_key: Key for the models.Instance to mark for deletion.
+    instance_name: Name of the instance to schedule for deletion.
   """
-  instance = instance_key.get()
-  if instance.state == models.InstanceStates.CATALOGED:
-    # A CATALOGED Instance was just reported by the Machine Provider to have
-    # been reclaimed. Per the Policies we set on the machine, it's been removed
-    # from the Catalog and is therefore safe for us to delete.
-    logging.info('Scheduling deletion of instance: %s', instance.name)
-    instance.state = models.InstanceStates.PENDING_DELETION
-    instance.put()
-  else:
-    logging.warning(
-        'Unexpected instance state for scheduling deletion: %s', instance.state)
+  models.InstanceDeletions.add_instance(instance_name)
 
 
 class MachineProviderSubscriptionHandler(pubsub.SubscriptionHandler):
@@ -70,8 +60,7 @@ class MachineProviderSubscriptionHandler(pubsub.SubscriptionHandler):
       # Per the policies we set on the instance when adding it to the Machine
       # Provider, a reclaimed machine is deleted from the Catalog. Therefore
       # we are safe to manipulate it. Here we schedule it for deletion.
-      # TODO(smut): Schedule for deletion.
-      schedule_deletion(models.Instance.generate_key(hostname))
+      schedule_deletion(hostname)
 
 
 def create_pubsub_app():

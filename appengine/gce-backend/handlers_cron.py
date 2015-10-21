@@ -22,77 +22,6 @@ import handlers_pubsub
 import models
 
 
-@ndb.transactional
-def delete_instances(instance_keys):
-  """Sets the given Instances as DELETED.
-
-  Args:
-    instance_keys: List of ndb.Keys for Instances to set as DELETED.
-  """
-  get_futures = [instance_key.get_async() for instance_key in instance_keys]
-  put_futures = []
-  while get_futures:
-    ndb.Future.wait_any(get_futures)
-    incomplete_futures = []
-    for future in get_futures:
-      if future.done():
-        instance = future.get_result()
-        if instance.state == models.InstanceStates.PENDING_DELETION:
-          logging.info('Deleting instance: %s', instance.name)
-          # TODO(smut): Remove from the datastore.
-          # The deletion operation returns success as soon as it's scheduled.
-          # We also need to list the instances to check which ones have been
-          # deleted.
-          instance.state = models.InstanceStates.DELETED
-          put_futures.append(instance.put_async())
-        else:
-          logging.warning(
-              'Instance no longer pending deletion: %s', instance.name)
-      else:
-        incomplete_futures.append(future)
-    get_futures = incomplete_futures
-  if put_futures:
-    ndb.Future.wait_all(put_futures)
-
-
-class InstanceDeletionProcessor(webapp2.RequestHandler):
-  """Worker for processing pending instance deletions."""
-
-  @decorators.require_cronjob
-  def get(self):
-    # Aggregate instances because the API lets us batch instance deletions
-    # for a common instance group manager.
-    instance_map = collections.defaultdict(list)
-    for instance in models.Instance.query(
-        models.Instance.state == models.InstanceStates.PENDING_DELETION
-    ):
-      instance_map[instance.group].append(instance)
-
-    # TODO(smut): Delete instances in different instance groups concurrently.
-    for group, instances in instance_map.iteritems():
-      # TODO(smut): Resize the instance group.
-      # When instances are deleted from an instance group, the instance group's
-      # size is decreased by the number of deleted instances. We need to resize
-      # the group back to its original size in order to replace those deleted
-      # instances.
-      logging.info(
-          'Deleting instances from instance group: %s\n%s',
-          group,
-          [instance.name for instance in instances],
-      )
-      api = gce.Project(instance.project)
-      # Try to delete the instances. If the operation succeeds, update the
-      # datastore. If it fails, just move on to the next set of instances
-      # and try again later.
-      try:
-        response = api.delete_instances(
-            group, instance.zone, [instance.url for instance in instances])
-        if response.get('status') == 'DONE':
-          delete_instances([instance.key for instance in instances])
-      except net.Error as e:
-        logging.warning('%s', e)
-
-
 class InstanceTemplateProcessor(webapp2.RequestHandler):
   """Worker for processing instance templates."""
 
@@ -137,12 +66,16 @@ class InstanceTemplateProcessor(webapp2.RequestHandler):
 
 
 @ndb.transactional(xg=True)
-def create_instance_group(name, dimensions, policies, instances, zone, project):
-  """Stores an InstanceGroup and Instance entities in the datastore.
+def process_instance_group(
+    name, dimensions, policies, instances, zone, project):
+  """Processes an InstanceGroup entity.
 
-  Also attempts to catalog each running Instance in the Machine Provider.
+  We store an InstanceGroup entity in the datastore if one doesn't already
+  exist, then we look at instances themselves which need to be processed.
 
-  Operates on two root entities: model.Instance and model.InstanceGroup.
+  Root entities operated on:
+    models.InstanceDeletions
+    models.InstanceGroup
 
   Args:
     name: Name of this instance group.
@@ -155,31 +88,53 @@ def create_instance_group(name, dimensions, policies, instances, zone, project):
     zone: Zone these instances exist in. e.g. us-central1-f.
     project: Project these instances exist in.
   """
-  instance_map = {}
+  # List of instances across all instance groups scheduled to be deleted.
+  all_instances_to_delete = models.InstanceDeletions.get_instances()
+  # List of instances to catalog.
   instances_to_catalog = []
+  # Mapping of instance names to instance URLs to delete.
+  instances_to_delete = {}
+
+  instance_group_key = models.InstanceGroup.generate_key(name)
+  instance_group = instance_group_key.get()
+
+  old_instance_map = {}
+  new_instance_map = {}
+
+  if instance_group:
+    for instance in instance_group.members:
+      old_instance_map[instance.name] = instance
 
   for instance_name, instance in instances.iteritems():
     logging.info('Processing instance: %s', instance_name)
-    instance_key = models.Instance.generate_key(instance_name)
-    instance_map[instance_name] = models.Instance(
-        key=instance_key,
-        group=name,
+    new_instance_map[instance_name] = models.Instance(
         name=instance_name,
-        project=project,
-        state=models.InstanceStates.NEW,
         url=instance['instance'],
-        zone=zone,
     )
     if instance.get('instanceStatus') == 'RUNNING':
-      existing_instance = instance_key.get()
+      existing_instance = old_instance_map.get(instance_name)
       if existing_instance:
+        new_instance_map[instance_name].state = existing_instance.state
         if existing_instance.state == models.InstanceStates.PENDING_CATALOG:
           logging.info('Attempting to catalog instance: %s', instance_name)
           instances_to_catalog.append(instance_name)
-        else:
-          logging.info('Skipping already cataloged instance: %s', instance_name)
-          instance_map[instance_name].state = existing_instance.state
+        elif existing_instance.state == models.InstanceStates.CATALOGED:
+          if instance_name in all_instances_to_delete:
+            logging.info('Scheduling instance for deletion: %s', instance_name)
+            instances_to_delete[instance_name] = instance['instance']
+          else:
+            logging.info(
+                'Skipping already cataloged instance: %s', instance_name)
+        elif existing_instance.state == models.InstanceStates.PENDING_DELETION:
+          logging.info('Scheduling instance for deletion: %s', instance_name)
+          instances_to_delete[instance_name] = instance['instance']
+        elif existing_instance.state == models.InstanceStates.NEW:
+          logging.info('Preparing new instance: %s', instance_name)
+          # TODO(smut): Prepare instance before cataloging.
+          new_instance_map[instance_name].state = (
+              models.InstanceStates.PENDING_CATALOG)
       else:
+        new_instance_map[instance_name].state = models.InstanceStates.NEW
         logging.info('Storing new instance: %s', instance_name)
     else:
       logging.warning(
@@ -198,22 +153,52 @@ def create_instance_group(name, dimensions, policies, instances, zone, project):
         params={
             'dimensions': utils.encode_to_json(dimensions),
             'instances': utils.encode_to_json(instances_to_catalog),
+            'name': name,
             'policies': utils.encode_to_json(policies),
         },
         transactional=True,
     ):
       for instance_name in instances_to_catalog:
-        instance_map[instance_name].state = models.InstanceStates.CATALOGED
+        new_instance_map[instance_name].state = models.InstanceStates.CATALOGED
     else:
       for instance_name in instances_to_catalog:
-        instance_map[instance_state].state = (
+        new_instance_map[instance_name].state = (
             models.InstanceStates.PENDING_CATALOG)
   else:
     logging.info('Nothing to catalog')
 
-  ndb.put_multi(instance_map.values())
-  models.InstanceGroup.create_and_put(
-      name, dimensions, policies, sorted(instance_map.keys()))
+  if instances_to_delete:
+    # Enqueue a task, mark as PENDING_DELETION, and remove from the scheduled
+    # deletions because we've scheduled it. If the task fails to enqueue, the
+    # instance will stay in the PENDING_DELETION state to be retried later.
+    utils.enqueue_task(
+        '/internal/queues/delete-instances',
+        'delete-instances',
+        params={
+            'group': name,
+            'instance_map': utils.encode_to_json(instances_to_delete),
+            'project': project,
+            'zone': zone,
+        },
+        transactional=True,
+    )
+    for instance_name in instances_to_delete:
+      new_instance_map[instance_name].state = (
+          models.InstanceStates.PENDING_DELETION)
+    models.InstanceDeletions.discard_instances(instances_to_delete.keys())
+  else:
+    logging.info('Nothing to delete')
+
+  models.InstanceGroup(
+      key=models.InstanceGroup.generate_key(name),
+      dimensions=dimensions,
+      members=sorted(
+          new_instance_map.values(), key=lambda instance: instance.name),
+      name=name,
+      policies=policies,
+      project=project,
+      zone=zone,
+  ).put()
 
 
 class InstanceGroupProcessor(webapp2.RequestHandler):
@@ -275,7 +260,7 @@ class InstanceGroupProcessor(webapp2.RequestHandler):
           on_reclamation=machine_provider.MachineReclamationPolicy.DELETE,
       )
 
-      create_instance_group(
+      process_instance_group(
           template.instance_group_name,
           dimensions,
           policies,
@@ -285,27 +270,8 @@ class InstanceGroupProcessor(webapp2.RequestHandler):
       )
 
 
-class InstanceProcessor(webapp2.RequestHandler):
-  """Worker for processing instances."""
-
-  @decorators.require_cronjob
-  def get(self):
-    put_futures = []
-    for instance in models.Instance.query(
-        models.Instance.state == models.InstanceStates.NEW
-    ):
-      logging.info('Processing instance: %s', instance.name)
-      # TODO(smut): Prepare instances.
-      instance.state = models.InstanceStates.PENDING_CATALOG
-      put_futures.append(instance.put_async())
-    if put_futures:
-      ndb.Future.wait_all(put_futures)
-
-
 def create_cron_app():
   return webapp2.WSGIApplication([
-      ('/internal/cron/delete-instances', InstanceDeletionProcessor),
       ('/internal/cron/process-instance-groups', InstanceGroupProcessor),
       ('/internal/cron/process-instance-templates', InstanceTemplateProcessor),
-      ('/internal/cron/process-instances', InstanceProcessor),
   ])
