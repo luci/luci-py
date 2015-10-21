@@ -73,7 +73,17 @@ def main():
     print >> sys.stderr, (
         '\nFailed to retrieve the log of last %d commits.' % nb_commits)
     return 1
-  sys.stdout.write(log.replace('@chromium.org', ''))
+  maxlen = 0
+  lines = []
+  for l in log.rstrip().splitlines():
+    parts = l.split(' ', 2)
+    parts[1] = parts[1].split('@', 1)[0]
+    maxlen = max(maxlen, len(parts[1]))
+    lines.append(parts)
+  out = '\n'.join(
+    '%s %-*s %s' % (parts[0], maxlen, parts[1], parts[2])
+    for parts in lines)
+  sys.stdout.write(out)
 
   if options.files:
     print('')
