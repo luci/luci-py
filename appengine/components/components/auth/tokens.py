@@ -8,6 +8,7 @@ import base64
 import hashlib
 import hmac
 import json
+import time
 
 from components import utils
 
@@ -360,5 +361,13 @@ def decode_token(algo, token, possible_secrets, message):
       }
       return version, public
 
+  try:
+    public = {
+      k.encode('ascii', 'replace'): v.encode('ascii', 'replace')
+      for k, v in json.loads(public).iteritems()
+    }
+  except (AttributeError, ValueError):
+    pass
   # At least one secret key should match.
-  raise InvalidTokenError('Bad token MAC')
+  raise InvalidTokenError(
+      'Bad token MAC; now=%d; data=%s' % (time.time(), public))

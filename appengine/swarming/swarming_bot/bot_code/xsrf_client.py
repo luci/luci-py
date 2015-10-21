@@ -46,7 +46,7 @@ class XsrfRemote(object):
       self.refresh_token()
     resp = self._url_read_post(url, **kwargs)
     if resp is None:
-      raise Error('Failed to connect to %s' % url)
+      raise Error('Failed to connect to %s; %s' % (url, self.expiration))
     return resp
 
   def url_read_json(self, resource, **kwargs):
@@ -59,7 +59,7 @@ class XsrfRemote(object):
       self.refresh_token()
     resp = self._url_read_json_post(url, **kwargs)
     if resp is None:
-      raise Error('Failed to connect to %s' % url)
+      raise Error('Failed to connect to %s; %s' % (url, self.expiration))
     return resp
 
   def refresh_token(self):
