@@ -35,10 +35,8 @@ from utils import subprocess42
 sys.path.pop(0)
 
 sys.path.insert(0, BOT_DIR)
-
-# This is only needed on Windows.
 import test_env_bot
-test_env_bot.init_symlinks(BOT_DIR)
+test_env_bot.setup_test_env()
 
 from api import os_utilities
 

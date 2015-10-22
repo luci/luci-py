@@ -20,8 +20,8 @@ import socket
 import threading
 import weakref
 
-from python_libusb1 import libusb1
-from python_libusb1 import usb1
+import libusb1
+import usb1
 
 import usb_exceptions
 
@@ -151,8 +151,7 @@ class UsbHandle(object):
       self._handle.releaseInterface(self._interface_number)
       self._handle.close()
     except libusb1.USBError:
-      _LOG.info('USBError while closing handle %s: ',
-                self.usb_info, exc_info=True)
+      _LOG.info('USBError while closing handle %s: ', self.usb_info)
     finally:
       self._handle = None
 
@@ -194,11 +193,12 @@ class UsbHandle(object):
           'Could not receive data from %s (timeout %sms)' % (
               self.usb_info, self.Timeout(timeout_ms)), e)
 
+  @classmethod
   def PortPathMatcher(cls, port_path):
     """Returns a device matcher for the given port path."""
     if isinstance(port_path, basestring):
       # Convert from sysfs path to port_path.
-      port_path = [int(part) for part in SYSFS_PORT_SPLIT_RE.split(port_path)]
+      port_path = [int(part) for part in port_path.split('/')]
     return lambda device: device.port_path == port_path
 
   @classmethod
@@ -278,6 +278,7 @@ class UsbHandle(object):
       handle = cls(device, setting, usb_info=usb_info, timeout_ms=timeout_ms)
       if device_matcher is None or device_matcher(handle):
         yield handle
+
 
 class TcpHandle(object):
   """TCP connection object.

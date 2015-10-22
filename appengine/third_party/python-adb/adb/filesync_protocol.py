@@ -18,30 +18,18 @@ host side.
 """
 
 import collections
+import logging
 import stat
 import struct
 import time
 
-from python_libusb1 import libusb1
+import libusb1
 
 import adb_protocol
 import usb_exceptions
 
-# Default mode for pushed files.
-DEFAULT_PUSH_MODE = stat.S_IFREG | stat.S_IRWXU | stat.S_IRWXG
-# Maximum size of a filesync DATA packet.
-MAX_PUSH_DATA = 2*1024
 
-
-class InvalidChecksumError(Exception):
-  """Checksum of data didn't match expected checksum."""
-
-
-class InterleavedDataError(Exception):
-  """We only support command sent serially."""
-
-
-class PushFailedError(Exception):
+class PushFailedError(usb_exceptions.AdbCommandFailureException):
   """Pushing a file failed for some reason."""
 
 
@@ -50,13 +38,20 @@ DeviceFile = collections.namedtuple('DeviceFile', [
 
 
 class FilesyncProtocol(object):
-  """Implements the FileSync protocol as described in sync.txt."""
+  """Implements the FileSync protocol as described in ../filesync_protocol.txt.
+
+  TODO(maruel): Make these functions async.
+  """
+  # Maximum size of a filesync DATA packet; file_sync_service.h
+  SYNC_DATA_MAX = 64*1024
+  # Default mode for pushed files.
+  DEFAULT_PUSH_MODE = stat.S_IFREG | stat.S_IRWXU | stat.S_IRWXG
 
   @staticmethod
   def Stat(connection, filename):
     cnxn = FileSyncConnection(connection, '<4I')
     cnxn.Send('STAT', filename)
-    command, (mode, size, mtime) = cnxn.Read(('STAT',), read_data=False)
+    command, (mode, size, mtime) = cnxn.ReadNoData(('STAT',))
 
     if command != 'STAT':
       raise adb_protocol.InvalidResponseError(
@@ -101,12 +96,13 @@ class FilesyncProtocol(object):
       PushFailedError: Raised on push failure.
     """
     fileinfo = '%s,%s' % (filename, st_mode)
+    assert len(filename) <= 1024, 'Name too long: %s' % filename
 
     cnxn = FileSyncConnection(connection, '<2I')
     cnxn.Send('SEND', fileinfo)
 
     while True:
-      data = datafile.read(MAX_PUSH_DATA)
+      data = datafile.read(cls.SYNC_DATA_MAX)
       if not data:
         break
       cnxn.Send('DATA', data)
@@ -114,22 +110,27 @@ class FilesyncProtocol(object):
     if mtime == 0:
       mtime = int(time.time())
     # DONE doesn't send data, but it hides the last bit of data in the size
-    # field.
+    # field. #youhadonejob
     cnxn.Send('DONE', size=mtime)
-    for cmd_id, _, data in cnxn.ReadUntil((), 'OKAY', 'FAIL'):
+    for cmd_id, _, data in cnxn.ReadUntil((), 'OKAY', 'DATA', 'FAIL'):
       if cmd_id == 'OKAY':
         return
-      raise PushFailedError(data)
+      if cmd_id == 'DATA':
+        # file_sync_client.cpp CopyDone ignores the cmd_id in this case.
+        raise PushFailedError(data)
+      if cmd_id == 'FAIL':
+        raise PushFailedError(data)
+      raise PushFailedError('Unexpected message %s: %s' % (cmd_id, data))
+
 
 
 class FileSyncConnection(object):
   """Encapsulate a FileSync service connection."""
 
-  ids = [
+  _VALID_IDS = [
       'STAT', 'LIST', 'SEND', 'RECV', 'DENT', 'DONE', 'DATA', 'OKAY',
       'FAIL', 'QUIT',
   ]
-  id_to_wire, wire_to_id = adb_protocol.MakeWireIDs(ids)
 
   def __init__(self, adb_connection, recv_header_format):
     self.adb = adb_connection
@@ -156,37 +157,35 @@ class FileSyncConnection(object):
     """
     if data:
       size = len(data)
-
-    if not self._CanAddToSendBuffer(len(data)):
-      self._Flush()
-
-    header = struct.pack('<2I', self.id_to_wire[command_id], size)
+    header = struct.pack('<2I', adb_protocol.ID2Wire(command_id), size)
     self.send_buffer += header + data
 
-  def Read(self, expected_ids, read_data=True):
+  def Read(self, expected_ids):
     """Read ADB messages and return FileSync packets."""
-    if self.send_buffer:
-      self._Flush()
+    self._Flush()
 
     # Read one filesync packet off the recv buffer.
     header_data = self._ReadBuffered(self.recv_header_len)
     header = struct.unpack(self.recv_header_format, header_data)
-    # Header is (ID, ...).
-    command_id = self.wire_to_id[header[0]]
-
-    if command_id not in expected_ids:
-      if command_id == 'FAIL':
-        raise usb_exceptions.AdbCommandFailureException('Command failed.')
-      raise adb_protocol.InvalidResponseError(
-          'Expected one of %s, got %s' % (expected_ids, command_id))
-
-    if not read_data:
-      return command_id, header[1:]
 
     # Header is (ID, ..., size).
     size = header[-1]
     data = self._ReadBuffered(size)
+    command_id = self._VerifyReplyCommand(header, expected_ids)
     return command_id, header[1:-1], data
+
+  def ReadNoData(self, expected_ids):
+    """Read ADB messages and return FileSync packets.
+
+    This is for special packets that do not return data.
+    """
+    self._Flush()
+
+    # Read one filesync packet off the recv buffer.
+    header_data = self._ReadBuffered(self.recv_header_len)
+    header = struct.unpack(self.recv_header_format, header_data)
+    command_id = self._VerifyReplyCommand(header, expected_ids)
+    return command_id, header[1:]
 
   def ReadUntil(self, expected_ids, *finish_ids):
     """Useful wrapper around Read."""
@@ -196,17 +195,15 @@ class FileSyncConnection(object):
       if cmd_id in finish_ids:
         break
 
-  def _CanAddToSendBuffer(self, data_len):
-    added_len = self.send_header_len + data_len
-    return len(self.send_buffer) + added_len < adb_protocol.MAX_ADB_DATA
-
   def _Flush(self):
-    try:
-      self.adb.Write(self.send_buffer)
-    except libusb1.USBError as e:
-      raise adb_protocol.SendFailedError(
-          'Could not send data %s' % self.send_buffer, e)
-    self.send_buffer = ''
+    while self.send_buffer:
+      chunk = self.send_buffer[:self.adb.max_packet_size]
+      try:
+        self.adb.Write(chunk)
+      except libusb1.USBError as e:
+        self.send_buffer = ''
+        raise adb_protocol.SendFailedError('Could not write %r' % chunk, e)
+      self.send_buffer = self.send_buffer[self.adb.max_packet_size:]
 
   def _ReadBuffered(self, size):
     # Ensure recv buffer has enough data.
@@ -218,3 +215,16 @@ class FileSyncConnection(object):
     self.recv_buffer = self.recv_buffer[size:]
     return result
 
+  @classmethod
+  def _VerifyReplyCommand(cls, header, expected_ids):
+    # Header is (ID, ...).
+    command_id = adb_protocol.Wire2ID(header[0])
+    if command_id not in cls._VALID_IDS:
+      raise usb_exceptions.AdbCommandFailureException(
+          'Command failed; incorrect header: %s', header)
+    if command_id not in expected_ids:
+      if command_id == 'FAIL':
+        raise usb_exceptions.AdbCommandFailureException('Command failed.')
+      raise adb_protocol.InvalidResponseError(
+          'Expected one of %s, got %s' % (expected_ids, command_id))
+    return command_id

@@ -16,3 +16,4 @@ Local Modifications:
   - Fix a bug.
   - Rename import path of libusb1 for easier packaging.
   - Bring support for Ubuntu 12.04.
+  - Reimplement adb_protocol.py to add multiplexing support and resiliency.

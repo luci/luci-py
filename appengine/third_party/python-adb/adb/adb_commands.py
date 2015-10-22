@@ -43,9 +43,6 @@ class AdbCommands(object):
 
   Some methods are more-pythonic and/or have more options.
   """
-  protocol_handler = adb_protocol.AdbMessage
-  filesync_handler = filesync_protocol.FilesyncProtocol
-
   @classmethod
   def ConnectDevice(
       cls, port_path=None, serial=None, default_timeout_ms=None, **kwargs):
@@ -67,31 +64,22 @@ class AdbCommands(object):
             timeout_ms=default_timeout_ms)
     return cls.Connect(handle, **kwargs)
 
-  def __init__(self, handle, device_state):
-    self.handle = handle
-    self._device_state = device_state
+  def __init__(self, conn):
+    self.conn = conn
+
+  @property
+  def handle(self):
+    return self.conn._usb
 
   def Close(self):
-    self.handle.Close()
+    self.conn.Close()
 
   @classmethod
-  def Connect(cls, usb, banner=None, **kwargs):
-    """Connect to the device.
-
-    Args:
-      usb: UsbHandle or TcpHandle instance to use.
-      banner: See protocol_handler.Connect.
-      **kwargs: See protocol_handler.Connect for kwargs. Includes rsa_keys,
-          and auth_timeout_ms.
-    Returns:
-      An instance of this class if the device connected successfully.
-    """
-    if not banner:
-      banner = socket.gethostname()
-    device_state = cls.protocol_handler.Connect(usb, banner=banner, **kwargs)
-    # Remove banner and colons after device state (state::banner)
-    device_state = device_state.split(':')[0]
-    return cls(usb, device_state)
+  def Connect(cls, usb, **kwargs):
+    """Connect to the device."""
+    if not kwargs.get('banner'):
+      kwargs['banner'] = socket.gethostname()
+    return cls(adb_protocol.AdbConnectionManager.Connect(usb, **kwargs))
 
   @classmethod
   def Devices(cls):
@@ -99,7 +87,7 @@ class AdbCommands(object):
     return common.UsbHandle.FindDevices(DeviceIsAvailable)
 
   def GetState(self):
-    return self._device_state
+    return self.conn.state
 
   def Install(self, apk_path, destination_dir=None, timeout_ms=None):
     """Install apk to device.
@@ -133,13 +121,12 @@ class AdbCommands(object):
       mtime: Optional, modification time to set on the file.
       timeout_ms: Expected timeout for any part of the push.
     """
-    connection = self.protocol_handler.Open(
-        self.handle, destination='sync:',
-        timeout_ms=timeout_ms)
+    connection = self.conn.Open(
+        destination='sync:', timeout_ms=timeout_ms)
     if isinstance(source_file, basestring):
       source_file = open(source_file)
-    self.filesync_handler.Push(connection, source_file, device_filename,
-                               mtime=int(mtime))
+    filesync_protocol.FilesyncProtocol.Push(
+        connection, source_file, device_filename, mtime=int(mtime))
     connection.Close()
 
   def Pull(self, device_filename, dest_file=None, timeout_ms=None):
@@ -157,10 +144,10 @@ class AdbCommands(object):
       dest_file = open(dest_file, 'w')
     elif not dest_file:
       dest_file = cStringIO.StringIO()
-    connection = self.protocol_handler.Open(
-        self.handle, destination='sync:',
-        timeout_ms=timeout_ms)
-    self.filesync_handler.Pull(connection, device_filename, dest_file)
+    connection = self.conn.Open(
+        destination='sync:', timeout_ms=timeout_ms)
+    filesync_protocol.FilesyncProtocol.Pull(
+        connection, device_filename, dest_file)
     connection.Close()
     # An empty call to cStringIO.StringIO returns an instance of
     # cStringIO.OutputType.
@@ -169,22 +156,22 @@ class AdbCommands(object):
 
   def Stat(self, device_filename):
     """Get a file's stat() information."""
-    connection = self.protocol_handler.Open(self.handle, destination='sync:')
-    mode, size, mtime = self.filesync_handler.Stat(
+    connection = self.conn.Open(destination='sync:')
+    mode, size, mtime = filesync_protocol.FilesyncProtocol.Stat(
         connection, device_filename)
     connection.Close()
     return mode, size, mtime
 
   def List(self, device_path):
     """Return a directory listing of the given path."""
-    connection = self.protocol_handler.Open(self.handle, destination='sync:')
-    listing = self.filesync_handler.List(connection, device_path)
+    connection = self.conn.Open(destination='sync:')
+    listing = filesync_protocol.FilesyncProtocol.List(connection, device_path)
     connection.Close()
     return listing
 
   def Reboot(self, destination=''):
     """Reboot device, specify 'bootloader' for fastboot."""
-    self.protocol_handler.Open(self.handle, 'reboot:%s' % destination)
+    self.conn.Open('reboot:%s' % destination)
 
   def RebootBootloader(self):
     """Reboot device into fastboot."""
@@ -192,17 +179,16 @@ class AdbCommands(object):
 
   def Remount(self):
     """Remount / as read-write."""
-    return self.protocol_handler.Command(self.handle, service='remount')
+    return self.conn.Command(service='remount')
 
   def Root(self):
     """Restart adbd as root on device."""
-    return self.protocol_handler.Command(self.handle, service='root')
+    return self.conn.Command(service='root')
 
   def Shell(self, command, timeout_ms=None):
     """Run command on the device, returning the output."""
-    return self.protocol_handler.Command(
-        self.handle, service='shell', command=command,
-        timeout_ms=timeout_ms)
+    return self.conn.Command(
+        service='shell', command=command, timeout_ms=timeout_ms)
 
   def StreamingShell(self, command, timeout_ms=None):
     """Run command on the device, yielding each line of output.
@@ -214,12 +200,10 @@ class AdbCommands(object):
     Yields:
       The responses from the shell command.
     """
-    return self.protocol_handler.StreamingCommand(
-        self.handle, service='shell', command=command,
-        timeout_ms=timeout_ms)
+    return self.conn.StreamingCommand(
+        service='shell', command=command, timeout_ms=timeout_ms)
 
   def Logcat(self, options, timeout_ms=None):
     """Run 'shell logcat' and stream the output to stdout."""
-    return self.protocol_handler.StreamingCommand(
-        self.handle, service='shell', command='logcat %s' % options,
-        timeout_ms=timeout_ms)
+    return self.conn.StreamingCommand(
+        service='shell', command='logcat %s' % options, timeout_ms=timeout_ms)

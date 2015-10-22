@@ -17,52 +17,50 @@ Implements the ADB protocol as seen in android's adb/adbd binaries, but only the
 host side.
 """
 
+import collections
+import inspect
+import logging
+import Queue
 import struct
+import threading
 import time
 
 import usb_exceptions
 
 
-# Maximum amount of data in an ADB packet.
-MAX_ADB_DATA = 4096
-# ADB protocol version.
-VERSION = 0x01000000
-
-# AUTH constants for arg0.
-AUTH_TOKEN = 1
-AUTH_SIGNATURE = 2
-AUTH_RSAPUBLICKEY = 3
+_LOG = logging.getLogger('adb.low')
+_LOG.setLevel(logging.ERROR)
 
 
-class InvalidCommandError(Exception):
+class InvalidResponseError(IOError):
   """Got an invalid command over USB."""
 
-  def __init__(self, message, response_header, response_data):
-    if response_header == 'FAIL':
-      message = 'Command failed, device said so. (%s)' % message
-    super(InvalidCommandError, self).__init__(
-        message, response_header, response_data)
+  def __init__(self, message, header):
+    super(InvalidResponseError, self).__init__(message + ': %s' % header)
+    self.header = header
 
 
-class InvalidResponseError(Exception):
-  """Got an invalid response to our command."""
+def ID2Wire(name):
+  assert len(name) == 4 and isinstance(name, str), name
+  assert all('A' <= c <= 'Z' for c in name), name
+  return sum(ord(c) << (i * 8) for i, c in enumerate(name))
 
 
-class InvalidChecksumError(Exception):
-  """Checksum of data didn't match expected checksum."""
+def Wire2ID(encoded):
+  assert isinstance(encoded, int), encoded
+  name = (
+      chr(encoded & 0xff) +
+      chr((encoded >> 8) & 0xff) +
+      chr((encoded >> 16) & 0xff) +
+      chr(encoded >> 24))
+  if not all('A' <= c <= 'Z' for c in name):
+    return 'XXXX'
+  return name
 
 
-class InterleavedDataError(Exception):
-  """We only support command sent serially."""
-
-
-def MakeWireIDs(ids):
-  id_to_wire = {
-      cmd_id: sum(ord(c) << (i * 8) for i, c in enumerate(cmd_id))
-      for cmd_id in ids
-  }
-  wire_to_id = {wire: cmd_id for cmd_id, wire in id_to_wire.items()}
-  return id_to_wire, wire_to_id
+def _CalculateChecksum(data):
+  """The checksum is just a sum of all the bytes. I swear."""
+  return sum(map(ord, data)) & 0xFFFFFFFF
 
 
 class AuthSigner(object):
@@ -77,78 +75,10 @@ class AuthSigner(object):
     raise NotImplementedError()
 
 
-class _AdbConnection(object):
-  """ADB Connection."""
-
-  def __init__(self, usb, local_id, remote_id, timeout_ms):
-    self.usb = usb
-    self.local_id = local_id
-    self.remote_id = remote_id
-    self.timeout_ms = timeout_ms
-
-  def _Send(self, command, arg0, arg1, data=''):
-    message = AdbMessage(command, arg0, arg1, data)
-    message.Send(self.usb, self.timeout_ms)
-
-  def Write(self, data):
-    """Write a packet and expect an Ack."""
-    self._Send('WRTE', arg0=self.local_id, arg1=self.remote_id, data=data)
-    # Expect an ack in response.
-    cmd, okay_data = self.ReadUntil('OKAY')
-    if cmd != 'OKAY':
-      if cmd == 'FAIL':
-        raise usb_exceptions.AdbCommandFailureException(
-            'Command failed.', okay_data)
-      raise InvalidCommandError(
-          'Expected an OKAY in response to a WRITE, got %s (%s)',
-          cmd, okay_data)
-    return len(data)
-
-  def Okay(self):
-    self._Send('OKAY', arg0=self.local_id, arg1=self.remote_id)
-
-  def ReadUntil(self, *expected_cmds):
-    """Read a packet, Ack any write packets."""
-    cmd, remote_id, local_id, data = AdbMessage.Read(
-        self.usb, expected_cmds, self.timeout_ms)
-    if local_id != 0 and self.local_id != local_id:
-      raise InterleavedDataError("We don't support multiple streams...")
-    if remote_id != 0 and self.remote_id != remote_id:
-      raise InvalidResponseError(
-          'Incorrect remote id, expected %s got %s' % (
-              self.remote_id, remote_id))
-    # Ack write packets.
-    if cmd == 'WRTE':
-      self.Okay()
-    return cmd, data
-
-  def ReadUntilClose(self):
-    """Yield packets until a Close packet is received."""
-    while True:
-      cmd, data = self.ReadUntil('CLSE', 'WRTE')
-      if cmd == 'CLSE':
-        self._Send('CLSE', arg0=self.local_id, arg1=self.remote_id)
-        break
-      if cmd != 'WRTE':
-        if cmd == 'FAIL':
-          raise usb_exceptions.AdbCommandFailureException(
-              'Command failed.', data)
-        raise InvalidCommandError('Expected a WRITE or a CLOSE, got %s (%s)',
-                                  cmd, data)
-      yield data
-
-  def Close(self):
-    self._Send('CLSE', arg0=self.local_id, arg1=self.remote_id)
-    cmd, data = self.ReadUntil('CLSE')
-    if cmd != 'CLSE':
-      if cmd == 'FAIL':
-        raise usb_exceptions.AdbCommandFailureException('Command failed.', data)
-      raise InvalidCommandError('Expected a CLSE response, got %s (%s)',
-                                cmd, data)
-
-
-class AdbMessage(object):
-  """ADB Protocol and message class.
+class _AdbMessageHeader(collections.namedtuple(
+      '_AdbMessageHeader',
+      ['command', 'arg0', 'arg1', 'data_length', 'data_checksum'])):
+  """The raw wire format for the header only.
 
   Protocol Notes
 
@@ -162,90 +92,304 @@ class AdbMessage(object):
     WRITE(0, host_id, 'data')
     CLOSE(device_id, host_id, '')
   """
+  _VALID_IDS = (
+      # The behavior depends on args0:
+      # - AUTH_TOKEN:
+      #   - Sending: Includes a key.
+      #   - Receiving: Switches connection to unauthorized, reply with
+      #     AUTH_SIGNATURE.
+      # - AUTH_SIGNATURE:
+      # Receiving:
+      # - 
+      # Sending:
+      # - Immediately puts the device into unauthenticated mode.
+      # arg0 is one of the AUTH_* value.
+      'AUTH', 'CLSE', 'CNXN', 'FAIL', 'OKAY', 'OPEN', 'SYNC', 'WRTE')
 
-  ids = ['SYNC', 'CNXN', 'AUTH', 'OPEN', 'OKAY', 'CLSE', 'WRTE']
-  commands, constants = MakeWireIDs(ids)
-  # An ADB message is 6 words in little-endian.
-  format = '<6I'
+  # ADB protocol version.
+  VERSION = 0x01000000
 
-  connections = 0
+  # AUTH constants for arg0.
+  AUTH_TOKEN = 1
+  AUTH_SIGNATURE = 2
+  AUTH_RSAPUBLICKEY = 3
 
-  def __init__(self, command=None, arg0=None, arg1=None, data=''):
-    self.command = self.commands[command]
-    self.magic = self.command ^ 0xFFFFFFFF
-    self.arg0 = arg0
-    self.arg1 = arg1
-    self.data = data
-
-  @property
-  def checksum(self):
-    return self.CalculateChecksum(self.data)
-
-  @staticmethod
-  def CalculateChecksum(data):
-    # The checksum is just a sum of all the bytes. I swear.
-    return sum(map(ord, data)) & 0xFFFFFFFF
-
-  def Pack(self):
-    """Returns this message in an over-the-wire format."""
-    return struct.pack(self.format, self.command, self.arg0, self.arg1,
-                       len(self.data), self.checksum, self.magic)
+  @classmethod
+  def Make(cls, command_name, arg0, arg1, data):
+    if command_name not in cls._VALID_IDS:
+      raise InvalidResponseError('Unknown command: %s' % command_name)
+    assert isinstance(arg0, int), arg0
+    assert isinstance(arg1, int), arg1
+    assert isinstance(data, str), repr(data)
+    return cls(
+        ID2Wire(command_name), arg0, arg1, len(data), _CalculateChecksum(data))
 
   @classmethod
   def Unpack(cls, message):
     try:
-      cmd, arg0, arg1, data_length, data_checksum, unused_magic = struct.unpack(
-          cls.format, message)
+      command, arg0, arg1, data_length, data_checksum, magic = struct.unpack(
+          '<6I', message)
     except struct.error as e:
-      raise ValueError('Unable to unpack ADB command.', cls.format, message, e)
-    return cmd, arg0, arg1, data_length, data_checksum
+      raise InvalidResponseError('Unable to unpack ADB message: %r', message)
+    hdr = cls(command, arg0, arg1, data_length, data_checksum)
+    expected_magic = command ^ 0xFFFFFFFF
+    if magic != expected_magic:
+      raise InvalidResponseError(
+          'Invalid magic %r != %r' % (magic, expected_magic), hdr)
+    if hdr.command_name == 'XXXX':
+      raise InvalidResponseError('Unknown command', hdr)
+    if hdr.data_length < 0:
+      raise InvalidResponseError('Invalid data length', hdr)
+    return hdr
 
-  def Send(self, usb, timeout_ms=None):
+  @property
+  def Packed(self):
+    """Returns this message in an over-the-wire format."""
+    magic = self.command ^ 0xFFFFFFFF
+    # An ADB message is 6 words in little-endian.
+    return struct.pack(
+        '<6I', self.command, self.arg0, self.arg1, self.data_length,
+        self.data_checksum, magic)
+
+  @property
+  def command_name(self):
+    return Wire2ID(self.command)
+
+  def str_partial(self):
+    command_name = self.command_name
+    arg0 = self.arg0
+    arg1 = self.arg1
+    if command_name == 'AUTH':
+      if arg0 == self.AUTH_TOKEN:
+        arg0 = 'TOKEN'
+      elif arg0 == self.AUTH_SIGNATURE:
+        arg0 = 'SIGNATURE'
+      elif arg0 == self.AUTH_RSAPUBLICKEY:
+        arg0 = 'RSAPUBLICKEY'
+      if arg1 != 0:
+        raise InvalidResponseError(
+            'Unexpected arg1 value (0x%x) on AUTH packet' % arg1)
+      return '%s, %s' % (command_name, arg0)
+    elif command_name == 'CNXN':
+      if arg0 == self.VERSION:
+        arg0 = 'v1'
+      arg1 = 'pktsize:%d' % arg1
+    return '%s, %s, %s' % (command_name, arg0, arg1)
+
+  def __str__(self):
+    return '%s, %d' % (self.str_partial(), self.data_length)
+
+
+class _AdbMessage(object):
+  """ADB message class including the data."""
+  def __init__(self, header, data=''):
+    self.header = header
+    self.data = data
+
+  def Write(self, usb, timeout_ms=None):
     """Send this message over USB."""
-    usb.BulkWrite(self.Pack(), timeout_ms)
-    usb.BulkWrite(self.data, timeout_ms)
+    timeout_ms = usb.Timeout(timeout_ms)
+    # We can't merge these 2 writes, the device wouldn't be able to read the
+    # packet.
+    try:
+      usb.BulkWrite(self.header.Packed, timeout_ms)
+      usb.BulkWrite(self.data, timeout_ms)
+    finally:
+      self._log_msg(usb)
 
   @classmethod
-  def Read(cls, usb, expected_cmds, timeout_ms=None, total_timeout_ms=None):
-    """Receive a response from the device."""
-    total_timeout_ms = usb.Timeout(total_timeout_ms)
-    start = time.time()
-    while True:
-      msg = usb.BulkRead(24, timeout_ms)
-      cmd, arg0, arg1, data_length, data_checksum = cls.Unpack(msg)
-      command = cls.constants.get(cmd)
-      if not command:
-        raise InvalidCommandError(
-            'Unknown command: %x' % cmd, cmd, (arg0, arg1))
-      if command in expected_cmds:
-        break
-
-      if time.time() - start > total_timeout_ms:
-        raise InvalidCommandError(
-            'Never got one of the expected responses (%s)' % expected_cmds,
-            cmd, (timeout_ms, total_timeout_ms))
-
-    if data_length > 0:
-      data = usb.BulkRead(data_length, timeout_ms)
-      actual_checksum = cls.CalculateChecksum(data)
-      if actual_checksum != data_checksum:
-        raise InvalidChecksumError(
-            'Received checksum %s != %s', (actual_checksum, data_checksum))
+  def Read(cls, usb, timeout_ms=None):
+    """Reads one _AdbMessage.
+    
+    Returns None if it failed to read the header with a ReadFailedError.
+    """
+    timeout_ms = usb.Timeout(timeout_ms)
+    packet = usb.BulkRead(24, timeout_ms)
+    hdr = _AdbMessageHeader.Unpack(packet)
+    if hdr.data_length:
+      data = usb.BulkRead(hdr.data_length, timeout_ms)
+      assert len(data) == hdr.data_length, (len(data), hdr.data_length)
+      actual_checksum = _CalculateChecksum(data)
+      if actual_checksum != hdr.data_checksum:
+        raise InvalidResponseError(
+            'Received checksum %s != %s' % (actual_checksum, hdr.data_checksum),
+            hdr)
     else:
       data = ''
-    return command, arg0, arg1, data
+    msg = cls(hdr, data)
+    msg._log_msg(usb)
+    return msg
 
   @classmethod
-  def Connect(cls, usb, banner='notadb', rsa_keys=None, auth_timeout_ms=100):
+  def Make(cls, command_name, arg0, arg1, data):
+    return cls(_AdbMessageHeader.Make(command_name, arg0, arg1, data), data)
+
+  def _log_msg(self, usb):
+    _LOG.debug(
+        '%s.%s(%s)',
+        '/'.join(str(i) for i in usb.port_path), inspect.stack()[1][3], self)
+
+  def __str__(self):
+    if self.data:
+      data = repr(self.data)
+      if len(data) > 128:
+        data = data[:128] + u'\u2026\''
+      return '%s, %s' % (self.header.str_partial(), data)
+    return self.header.str_partial()
+
+
+class _AdbConnection(object):
+  """One logical ADB connection to a service."""
+  class _MessageQueue(object):
+    def __init__(self, manager):
+      self._queue = Queue.Queue()
+      self._manager = manager
+
+    def __iter__(self):
+      return self
+
+    def next(self):
+      while True:
+        try:
+          i = self._queue.get_nowait()
+        except Queue.Empty:
+          # Will reentrantly call self._Add() via parent._OnRead()
+          if not self._manager.ReadAndDispatch():
+            # Failed to read from the device, the connection likely dropped.
+            raise StopIteration()
+          continue
+        if isinstance(i, StopIteration):
+          raise i
+        return i
+
+    def _Add(self, message):
+      self._queue.put(message.data)
+
+    def _Close(self):
+      self._queue.put(StopIteration())
+
+  def __init__(self, manager, local_id, service_name):
+    # ID as given by the remote device.
+    self.remote_id = 0
+    # Service requested on the remote device.
+    self.service_name = service_name
+    # Self assigned local ID.
+    self._local_id = local_id
+    self._yielder = self._MessageQueue(manager)
+    self._manager = manager
+
+  def __iter__(self):
+    # If self._yielder is None, it means it has already closed. Return a fake
+    # iterator with nothing in it.
+    return self._yielder or []
+
+  def Make(self, command_name, data):
+    return _AdbMessage.Make(command_name, self._local_id, self.remote_id, data)
+
+  def _Write(self, command_name, data):
+    assert len(data) <= self._manager.max_packet_size, '%d > %d' % (
+        len(data), self._manager.max_packet_size)
+    self.Make(command_name, data).Write(self._manager._usb)
+
+  def Close(self):
+    """User initiated stream close.
+    
+    It's rare that the user needs to do this.
+    """
+    try:
+      self._Write('CLSE', '')
+      for _ in self:
+        pass
+    except (usb_exceptions.ReadFailedError, usb_exceptions.WriteFailedError):
+      # May get a LIBUSB_ERROR_TIMEOUT
+      pass
+
+  @property
+  def max_packet_size(self):
+    return self._manager.max_packet_size
+
+  def _HasClosed(self):
+    """Must be called with the manager lock held."""
+    if self._yielder:
+      self._yielder._Close()
+      self._yielder = None
+      self._manager._UnregisterLocked(self._local_id)
+
+  def _OnRead(self, message):
+    """Calls from within ReadAndDispatch(), so the manager lock is held."""
+    # Can be CLSE, OKAY or WRTE. It's generally basically an ACK.
+    if message.header.arg0 != self.remote_id:
+      raise InvalidResponseError(
+          'Unexpected remote ID: expected %d; for message %s' %
+          (self.remote_id, message))
+    if message.header.arg1 != self._local_id:
+      raise InvalidResponseError(
+          'Unexpected local ID: expected %d; for message %s' %
+          (self._local_id, message))
+    cmd_name = message.header.command_name
+    if cmd_name == 'CLSE':
+      self._HasClosed()
+      return
+    if cmd_name == 'OKAY':
+      return
+    if cmd_name == 'WRTE':
+      try:
+        self._Write('OKAY', '')
+      except usb_exceptions.WriteFailedError as e:
+        _LOG.info('Failed to reply OKAY: %s', e)
+      self._yielder._Add(message)
+      return
+    if cmd_name == 'AUTH':
+      self._manager._HandleAUTH(message)
+      return
+    if cmd_name == 'CNXN':
+      self._manager.HandleCNXN(message)
+      return
+    # Unexpected message.
+    assert False, message
+
+  # Adaptors.
+
+  def Write(self, data):
+    self._Write('WRTE', data)
+
+  def ReadUntil(self, _):
+    return 'WRTE', self._yielder.next()
+
+
+class AdbConnectionManager(object):
+  """Multiplexes the multiple connections."""
+  # Maximum amount of data in an ADB packet. Value of MAX_PAYLOAD_V2 in adb.h.
+  MAX_ADB_DATA = 256*1024
+
+  def __init__(self, usb, banner, rsa_keys, auth_timeout_ms):
+    # Constants.
+    self._usb = usb
+    self._host_banner = banner
+    self._rsa_keys = rsa_keys
+    self._auth_timeout_ms = auth_timeout_ms
+
+    self._lock = threading.Lock()
+    # As defined by the device.
+    self.max_packet_size = 0
+    # Banner replied in CNXN packet.
+    self.state = None
+    # Multiplexed stream handling.
+    self._connections = {}
+    self._next_local_id = 16
+
+  @classmethod
+  def Connect(cls, usb, banner, rsa_keys, auth_timeout_ms):
     """Establish a new connection to the device.
 
     Args:
-      usb: A USBHandle with BulkRead and BulkWrite methods.
-      banner: A string to send as a host identifier.
+      usb: A USBHandle with BulkRead and BulkWrite methods. Takes ownership of
+          the handle, it will be closed by this instance.
       rsa_keys: List of AuthSigner subclass instances to be used for
           authentication. The device can either accept one of these via the Sign
           method, or we will send the result of GetPublicKey from the first one
           if the device doesn't accept any of them.
+      banner: A string to send as a host identifier.
       auth_timeout_ms: Timeout to wait for when sending a new public key. This
           is only relevant when we send a new public key. The device shows a
           dialog and this timeout is how long to wait for that dialog. If used
@@ -255,136 +399,192 @@ class AdbMessage(object):
           by default.
 
     Returns:
-      The device's reported banner. Always starts with the state (device,
-          recovery, or sideload), sometimes includes information after a : with
-          various product information.
-
-    Raises:
-      usb_exceptions.DeviceAuthError: When the device expects authentication,
-          but we weren't given any valid keys.
-      InvalidResponseError: When the device does authentication in an
-          unexpected way.
+      An AdbConnection.
     """
-    msg = cls(
-        command='CNXN', arg0=VERSION, arg1=MAX_ADB_DATA,
-        data='host::%s\0' % banner)
-    msg.Send(usb)
-    cmd, arg0, arg1, banner = cls.Read(usb, ['CNXN', 'AUTH'])
-    if cmd == 'AUTH':
-      if not rsa_keys:
-        raise usb_exceptions.DeviceAuthError(
-            'Device authentication required, no keys available.')
-      # Loop through our keys, signing the last 'banner' or token.
-      for rsa_key in rsa_keys:
-        if arg0 != AUTH_TOKEN:
-          raise InvalidResponseError(
-              'Unknown AUTH response: %s %s %s' % (arg0, arg1, banner))
+    assert isinstance(rsa_keys, (list, tuple)), rsa_keys
+    assert len(rsa_keys) <= 10, 'adb will sleep 1s after each key above 10'
+    self = cls(usb, banner, rsa_keys, auth_timeout_ms)
+    self._Connect()
+    return self
 
-        signed_token = rsa_key.Sign(banner)
-        msg = cls(
-            command='AUTH', arg0=AUTH_SIGNATURE, arg1=0, data=signed_token)
-        msg.Send(usb)
-        cmd, arg0, unused_arg1, banner = cls.Read(usb, ['CNXN', 'AUTH'])
-        if cmd == 'CNXN':
-          return banner
-      # None of the keys worked, so send a public key.
-      msg = cls(
-          command='AUTH', arg0=AUTH_RSAPUBLICKEY, arg1=0,
-          data=rsa_keys[0].GetPublicKey() + '\0')
-      msg.Send(usb)
+  def Open(self, destination, timeout_ms=None, callback=None):
+    """Opens a new connection to the device via an OPEN message.
+
+    Args:
+      destination: The service:command string.
+
+    Returns:
+      The local connection object to use.
+
+    Yields:
+      The responses from the service if used as such.
+    """
+    with self._lock:
+      next_id = self._next_local_id
+      self._next_local_id += 1
+
+    conn = _AdbConnection(self, next_id, destination)
+    conn._Write('OPEN', destination + '\0')
+    with self._lock:
+      self._connections[conn._local_id] = conn
+    # TODO(maruel): Timeout.
+    # Reads until we got the proper remote id.
+    while True:
+      msg = _AdbMessage.Read(self._usb, timeout_ms)
+      if msg.header.arg1 == conn._local_id:
+        conn.remote_id = msg.header.arg0
+      conn._OnRead(msg)
+      if msg.header.arg1 == conn._local_id:
+        return conn
+
+  def Close(self):
+    """Also closes the usb handle."""
+    with self._lock:
+      conns = self._connections.values()
+    for conn in conns:
+      conn._HasClosed()
+    with self._lock:
+      assert not self._connections, self._connections
+    self._usb.Close()
+
+  def StreamingCommand(self, service, command='', timeout_ms=None):
+    """One complete set of USB packets for a single connection for a single
+    command.
+
+    Sends service:command in a new connection, reading the data for the
+    response. All the data is held in memory, large responses will be slow and
+    can fill up memory.
+
+    Args:
+      service: The service on the device to talk to.
+      command: The command to send to the service.
+      timeout_ms: Timeout for USB packets, in milliseconds.
+    """
+    return self.Open('%s:%s' % (service, command), timeout_ms).__iter__()
+
+  def Command(self, service, command='', timeout_ms=None):
+    return ''.join(self.StreamingCommand(service, command, timeout_ms))
+
+  def ReadAndDispatch(self, timeout_ms=None):
+    """Receive a response from the device."""
+    with self._lock:
       try:
-        cmd, arg0, unused_arg1, banner = cls.Read(
-            usb, ['CNXN'], timeout_ms=auth_timeout_ms)
+        msg = _AdbMessage.Read(self._usb, timeout_ms)
+      except usb_exceptions.ReadFailedError as e:
+        # adbd could be rebooting, etc. Return None to signal that this kind of
+        # failure is expected.
+        _LOG.info('Masking read error %s', e)
+        return False
+      conn = self._connections.get(msg.header.arg1)
+      if not conn:
+        # It's likely a tored down connection from a previous ADB instance,
+        # e.g.  pkill adb.
+        # TODO(maruel): It could be a spurious CNXN. In that case we're better
+        # to cancel all the known _AdbConnection and start over.
+        _LOG.error(
+            self._fmt(': Got unexpected connection, dropping: %s', msg))
+        return False
+      conn._OnRead(msg)
+      return True
+
+  def _Connect(self):
+    """Connect to the device."""
+    # Empty the connection first.
+    with self._lock:
+      reply = None
+      start = time.time()
+      nb = 0
+      while True:
+        try:
+          msg = _AdbMessage.Read(self._usb, 20)
+        except usb_exceptions.ReadFailedError:
+          break
+        nb += 1
+        if msg.header.command_name in ('AUTH', 'CNXN'):
+          # Assert the message has the expected host.
+          reply = msg
+        else:
+          conn = self._connections.get(msg.header.arg1)
+          if conn:
+            conn._OnRead(msg)
+      _LOG.info('Flushed %d messages in %.1fs', nb, time.time() - start)
+
+      if not reply:
+        msg = _AdbMessage.Make(
+            'CNXN', _AdbMessageHeader.VERSION, self.MAX_ADB_DATA,
+            'host::%s\0' % self._host_banner)
+        msg.Write(self._usb)
+        reply = _AdbMessage.Read(self._usb)
+      if reply.header.command_name == 'AUTH':
+        self._HandleAUTH(reply)
+      else:
+        self._HandleCNXN(reply)
+
+  def _HandleAUTH(self, reply):
+    # self._lock must be held.
+    if not self._rsa_keys:
+      raise usb_exceptions.DeviceAuthError(
+          'Device authentication required, no keys available.')
+
+    # Loop through our keys, signing the last data which is the challenge.
+    for rsa_key in self._rsa_keys:
+      reply = self._HandleReplyChallenge(rsa_key, reply, self._auth_timeout_ms)
+      if reply.header.command_name == 'CNXN':
+        break
+
+    if reply.header.command_name == 'AUTH':
+      # None of the keys worked, so send a public key. This will prompt to the
+      # user.
+      msg = _AdbMessage.Make(
+          'AUTH', _AdbMessageHeader.AUTH_RSAPUBLICKEY, 0,
+          self._rsa_keys[0].GetPublicKey() + '\0')
+      msg.Write(self._usb)
+      try:
+        reply = _AdbMessage.Read(self._usb, self._auth_timeout_ms)
       except usb_exceptions.ReadFailedError as e:
         if e.usb_error.value == -7:  # Timeout.
           raise usb_exceptions.DeviceAuthError(
               'Accept auth key on device, then retry.')
         raise
-      # This didn't time-out, so we got a CNXN response.
-      return banner
-    return banner
+    self._HandleCNXN(reply)
 
-  @classmethod
-  def Open(cls, usb, destination, timeout_ms=None):
-    """Opens a new connection to the device via an OPEN message.
+  def _HandleCNXN(self, reply):
+    # self._lock must be held.
+    if reply.header.command_name != 'CNXN':
+      raise usb_exceptions.DeviceAuthError(
+          'Accept auth key on device, then retry.')
+    if reply.header.arg0 != _AdbMessageHeader.VERSION:
+      raise InvalidResponseError('Unknown CNXN response', reply)
+    self.state = reply.data
+    self.max_packet_size = reply.header.arg1
+    _LOG.debug('max packet size: %d' % self.max_packet_size)
+    for conn in self._connections.itervalues():
+      conn._HasClosed()
+    self._connections = {}
 
-    Not the same as the posix 'open' or any other google3 Open methods.
+  def _HandleReplyChallenge(self, rsa_key, reply, auth_timeout_ms):
+    # self._lock must be held.
+    if (reply.header.arg0 != _AdbMessageHeader.AUTH_TOKEN or
+        reply.header.arg1 != 0 or
+        reply.header.data_length != 20 or
+        len(reply.data) != 20):
+      raise InvalidResponseError('Unknown AUTH response', reply)
+    msg = _AdbMessage.Make(
+        'AUTH', _AdbMessageHeader.AUTH_SIGNATURE, 0, rsa_key.Sign(reply.data))
+    msg.Write(self._usb)
+    return _AdbMessage.Read(self._usb, auth_timeout_ms)
 
-    Args:
-      usb: USB device handle with BulkRead and BulkWrite methods.
-      destination: The service:command string.
-      timeout_ms: Timeout in milliseconds for USB packets.
+  def _Unregister(self, conn_id):
+    with self._lock:
+      self._UnregisterLocked(conn_id)
 
-    Raises:
-      InvalidResponseError: Wrong local_id sent to us.
-      InvalidCommandError: Didn't get a ready response.
+  def _UnregisterLocked(self, conn_id):
+    # self._lock must be held.
+    self._connections.pop(conn_id, None)
 
-    Returns:
-      The local connection id.
-    """
-    local_id = 1
-    msg = cls(
-        command='OPEN', arg0=local_id, arg1=0,
-        data=destination + '\0')
-    msg.Send(usb, timeout_ms)
-    cmd, remote_id, their_local_id, _ = cls.Read(usb, ['CLSE', 'OKAY'],
-                                                 timeout_ms=timeout_ms)
-    if local_id != their_local_id:
-      raise InvalidResponseError(
-          'Expected the local_id to be %s, got %s' % (local_id, their_local_id))
-    if cmd == 'CLSE':
-      # Device doesn't support this service.
-      return None
-    if cmd != 'OKAY':
-      raise InvalidCommandError('Expected a ready response, got %s' % cmd,
-                                cmd, (remote_id, their_local_id))
-    return _AdbConnection(usb, local_id, remote_id, timeout_ms)
-
-  @classmethod
-  def Command(cls, usb, service, command='', timeout_ms=None):
-    """One complete set of USB packets for a single command.
-
-    Sends service:command in a new connection, reading the data for the
-    response. All the data is held in memory, large responses will be slow and
-    can fill up memory.
-
-    Args:
-      usb: USB device handle with BulkRead and BulkWrite methods.
-      service: The service on the device to talk to.
-      command: The command to send to the service.
-      timeout_ms: Timeout for USB packets, in milliseconds.
-
-    Raises:
-      InterleavedDataError: Multiple streams running over usb.
-      InvalidCommandError: Got an unexpected response command.
-
-    Returns:
-      The response from the service.
-    """
-    return ''.join(cls.StreamingCommand(usb, service, command, timeout_ms))
-
-  @classmethod
-  def StreamingCommand(cls, usb, service, command='', timeout_ms=None):
-    """One complete set of USB packets for a single command.
-
-    Sends service:command in a new connection, reading the data for the
-    response. All the data is held in memory, large responses will be slow and
-    can fill up memory.
-
-    Args:
-      usb: USB device handle with BulkRead and BulkWrite methods.
-      service: The service on the device to talk to.
-      command: The command to send to the service.
-      timeout_ms: Timeout for USB packets, in milliseconds.
-
-    Raises:
-      InterleavedDataError: Multiple streams running over usb.
-      InvalidCommandError: Got an unexpected response command.
-
-    Yields:
-      The responses from the service.
-    """
-    connection = cls.Open(usb, destination='%s:%s' % (service, command),
-                          timeout_ms=timeout_ms)
-    for data in connection.ReadUntilClose():
-      yield data
+  def _fmt(self, fmt, *args):
+    items = [
+      '/'.join(str(i) for i in self._usb.port_path), inspect.stack()[1][3],
+    ]
+    items.extend(args)
+    return ('%s.%s' + fmt) % tuple(items)
