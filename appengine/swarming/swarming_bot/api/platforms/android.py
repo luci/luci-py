@@ -93,7 +93,6 @@ class _PerDeviceCache(object):
 
   def set(self, port_path, device):
     assert isinstance(device, self.Device), device
-    logging.info('PerDeviceCache: %s: %s', port_path, device)
     with self._lock:
       self._per_device[port_path] = device
 
@@ -270,14 +269,12 @@ def _init_cache(device):
     mode, _, _ = device.stat('/system/xbin/su')
     has_su = bool(mode)
 
-    mode, _, _ = device.stat('/root')
-    is_root = bool(mode)
+    is_root = device._is_root()
 
     if has_su and not is_root:
       # Opportinistically tries to switch adbd to run in root mode.
-      if device.reset_adbd_as_root():
-        mode, _, _ = device.stat('/root')
-        is_root = bool(mode)
+      if device._reset_adbd_as_root():
+        is_root = device._is_root()
 
     available_governors = KNOWN_CPU_SCALING_GOVERNOR_VALUES
     out = device.pull_content(
@@ -535,19 +532,54 @@ class Device(object):
     parts = out[:-1].rsplit('\n', 1)
     return parts[0], int(parts[1])
 
-  def reset_adbd_as_root(self):
-    """If the device is not root, sets it to root.
+  def _reset_adbd_as_root(self):
+    """If adbd on the device is not root, ask it to restart as root.
 
-    Should not be called by end users.
+    This causes the USB device to disapear momentarily, which causes a big mess,
+    as we cannot communicate with it for a moment. So try to be clever and
+    reenumerate the device until the device is back, then reinitialize the
+    communication, all synchronously.
     """
     for _ in xrange(self._tries):
       try:
         out = self.adb_cmd.Root()
-        logging.info('reset_adbd_as_root() = %s', out)
-        return out != 'adbd cannot run as root in production builds\n'
+        logging.info('_reset_adbd_as_root() = %s', out)
+        # Hardcoded strings in platform_system_core/adb/services.cpp
+        if out == 'adbd is already running as root\n':
+          return True
+        if out == 'adbd cannot run as root in production builds\n':
+          return False
+        # 'restarting adbd as root\n'
+        if not self._is_root():
+          logging.error('Failed to id after _reset_adbd_as_root()')
+          return False
+        return True
       except self._ERRORS as e:
         self._try_reset('(): %s', e)
     return False
+
+  def _reset_adbd_as_user(self):
+    """If adbd on the device is root, ask it to restart as user."""
+    for _ in xrange(self._tries):
+      try:
+        out = self.adb_cmd.conn.Command(service='unroot')
+        logging.info('_reset_adbd_as_user() = %s', out)
+        # Hardcoded strings in platform_system_core/adb/services.cpp
+        # 'adbd not running as root\n' or 'restarting adbd as non root\n'
+        if self._is_root():
+          logging.error('Failed to id after _reset_adbd_as_user()')
+          return False
+        return True
+      except self._ERRORS as e:
+        self._try_reset('(): %s', e)
+    return False
+
+  def _is_root(self):
+    """Returns True if adbd is running as root."""
+    out, exit_code = self.shell('id')
+    if exit_code != 0 or not out:
+      return False
+    return out.startswith('out=0(root)')
 
   def _set_serial_number(self):
     """Tries to set self.serial to the serial number of the device.
@@ -589,27 +621,24 @@ class Device(object):
       # TODO(maruel): This makes no sense to do a complete enumeration, we
       # know the exact port path.
       context = adb.common.usb1.USBContext()
-      try:
-        for device in context.getDeviceList(skip_on_error=True):
-          port_path = [device.getBusNumber()]
-          try:
-            port_path.extend(device.getPortNumberList())
-          except AttributeError:
-            # Temporary issue on Precise. Remove once we do not support 12.04
-            # anymore.
-            # https://crbug.com/532357
-            port_path.append(device.getDeviceAddress())
-          if port_path == self.port_path:
-            device.Open()
-            self.adb_cmd = adb.adb_commands.AdbCommands.Connect(
-                device, banner='swarming', rsa_keys=_ADB_KEYS,
-                auth_timeout_ms=60000)
-          break
-        else:
-          # TODO(maruel): Maybe a race condition.
-          logging.info('failed to find device after reset')
-      finally:
-        context.exit()
+      for device in context.getDeviceList(skip_on_error=True):
+        port_path = [device.getBusNumber()]
+        try:
+          port_path.extend(device.getPortNumberList())
+        except AttributeError:
+          # Temporary issue on Precise. Remove once we do not support 12.04
+          # anymore.
+          # https://crbug.com/532357
+          port_path.append(device.getDeviceAddress())
+        if port_path == self.port_path:
+          device.Open()
+          self.adb_cmd = adb.adb_commands.AdbCommands.Connect(
+              device, banner='swarming', rsa_keys=_ADB_KEYS,
+              auth_timeout_ms=60000)
+        break
+      else:
+        # TODO(maruel): Maybe a race condition.
+        logging.info('failed to find device after reset')
 
   def __repr__(self):
     return '<android.Device %s %s>' % (
@@ -747,9 +776,9 @@ def set_cpu_scaling_governor(device, governor):
         return False
   assert governor in KNOWN_CPU_SCALING_GOVERNOR_VALUES, governor
 
+  path = '/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor'
   # First query the current state and only try to switch if it's different.
-  prev = device.pull_content(
-      '/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor')
+  prev = device.pull_content(path)
   if prev:
     prev = prev.strip()
     if prev == governor:
@@ -758,15 +787,18 @@ def set_cpu_scaling_governor(device, governor):
       logging.error(
           '%s: Read invalid scaling_governor: %s', device.port_path, prev)
 
-  if not device.push_content(
-      '/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor', governor + '\n'):
-    logging.error(
-        '%s: Writing scaling_governor %s failed; was %s',
-        device.port_path, governor, prev)
-    return False
+  # This works on Nexus 10 but not on Nexus 5. Need to investigate more. In the
+  # meantime, simply try one after the other.
+  if not device.push_content(path, governor + '\n'):
+    # Fallback via shell.
+    _, exit_code = device.shell('echo "%s" > %s' % (governor, path))
+    if exit_code != 0:
+      logging.error(
+          '%s: Writing scaling_governor %s failed; was %s',
+          device.port_path, governor, prev)
+      return False
   # Get it back to confirm.
-  newval = device.pull_content(
-      '/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor')
+  newval = device.pull_content(path)
   if not (newval or '').strip() == governor:
     logging.error(
         '%s: Wrote scaling_governor %s; was %s; got %s',
@@ -1105,3 +1137,10 @@ def run_shell_wrapped(device, commands):
       device.shell('rm %s' % outfile)
   finally:
     device.shell('rm %s' % script)
+
+
+def get_prop(device, prop):
+  out, exit_code = device.shell('getprop %s' % pipes.quote(prop))
+  if exit_code != 0:
+    return None
+  return out.rstrip()
