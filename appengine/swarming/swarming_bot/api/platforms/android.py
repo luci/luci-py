@@ -24,25 +24,15 @@ import threading
 import time
 
 
-# This file must be imported from swarming_bot.zip (or with '../..' in
-# sys.path). libusb1 must have been put in the path already.
-
-from api import parallel
 import adb
 import adb.adb_commands
-
-
-# Find abs path to third_party/ dir in the bot root dir.
-import third_party
-THIRD_PARTY_DIR = os.path.dirname(os.path.abspath(third_party.__file__))
-sys.path.insert(0, os.path.join(THIRD_PARTY_DIR, 'rsa'))
-sys.path.insert(0, os.path.join(THIRD_PARTY_DIR, 'pyasn1'))
-
-import rsa
-
 from pyasn1.codec.der import decoder
 from pyasn1.type import univ
+import rsa
 from rsa import pkcs1
+
+
+from api import parallel
 
 
 ### Private stuff.

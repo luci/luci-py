@@ -79,7 +79,6 @@ oShjkmSqylt4CG34EcCl+JkRTZVFsvp4f8gxC1yQasPo9xjB3DC7maanjp70uMLw
     self.assertTrue(signer.Sign('data to sign'))
 
 
-
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None

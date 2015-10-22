@@ -17,6 +17,8 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def main():
   """Prints out the output of get_dimensions() and get_state()."""
   sys.path.insert(0, os.path.join(ROOT_DIR, 'swarming_bot'))
+  import test_env_bot
+  test_env_bot.setup_test_env()
   from api import os_utilities
   from api import platforms
 

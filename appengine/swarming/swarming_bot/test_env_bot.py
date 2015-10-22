@@ -39,9 +39,17 @@ def setup_test_env():
   client_tests = os.path.normpath(
       os.path.join(BOT_DIR, '..', '..', '..', 'client', 'tests'))
   sys.path.insert(0, client_tests)
+
   tp = os.path.join(BOT_DIR, 'third_party')
   if sys.platform == 'win32':
     # third_party is a symlink.
     with open(tp, 'rb') as f:
       tp = os.path.join(BOT_DIR, f.read())
   sys.path.insert(0, tp)
+
+  # libusb1 expects to be directly in sys.path.
+  sys.path.insert(0, os.path.join(BOT_DIR, 'python_libusb1'))
+
+  # For python-rsa.
+  sys.path.insert(0, os.path.join(tp, 'rsa'))
+  sys.path.insert(0, os.path.join(tp, 'pyasn1'))
