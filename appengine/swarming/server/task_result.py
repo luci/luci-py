@@ -1024,7 +1024,11 @@ def get_result_summaries(
   requests, cursor, more = query.fetch_page(
       batch_size, start_cursor=cursor, keys_only=True)
   keys = [task_pack.request_key_to_result_summary_key(k) for k in requests]
-  tasks = ndb.get_multi(keys)
+  # The TaskResultSummary may be missing for a corresponding TaskRequest. This
+  # may happen because the TaskResultSummary is added as a follow up transaction
+  # to the transaction that adds TaskRequest and the second one may fail (this
+  # should be changed). In this case, ignore the request.
+  tasks = [i for i in ndb.get_multi(keys) if i]
   cursor_str = cursor.urlsafe() if cursor and more else None
   return tasks, cursor_str, state
 
