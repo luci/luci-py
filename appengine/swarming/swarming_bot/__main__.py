@@ -47,6 +47,15 @@ def CMDattributes(_args):
   return 0
 
 
+def CMDconfig(_args):
+  """Prints the config.json embedded in this zip."""
+  logging_utils.prepare_logging(None)
+  from bot_code import bot_main
+  json.dump(bot_main.get_config(), sys.stdout, indent=2, sort_keys=True)
+  print('')
+  return 0
+
+
 def CMDrestart(_args):
   """Utility subcommand that hides the difference between each OS to reboot
   the host."""
