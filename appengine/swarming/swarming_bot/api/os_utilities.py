@@ -717,14 +717,33 @@ def setup_auto_startup_win(command, cwd, batch_name):
       if '/cygdrive/' in command[i]:
         command[i] = platforms.win.from_cygwin_path(command[i])
 
-  # TODO(maruel): Shell escape! Sadly shlex.quote() is only available starting
-  # python 3.3 and it's tricky on Windows with '^'.
   # Don't forget the CRLF, otherwise cmd.exe won't process it.
+  #
+  # Do manual roll at each system startup because on Windows, cmd.exe opens
+  # redirected file with no sharing permission at all (grrr) so log roll cannot
+  # be done from within the swarming_bot process. This manual roll means we only
+  # keep the last 10 boots instead of the last 10Mb of logs, the difference is
+  # significant but 10 boots should be good enough in general.
+  #
+  # pipes.quote() shell escape is sadly escaping with single quotes instead of
+  # double quotes, which isn't always great on Windows. Sadly shlex.quote() is
+  # only available starting python 3.3 and it's tricky on Windows with '^'. So
+  # skip this for now and hope for the best.
   content = (
       '@echo off\r\n'
       ':: This file was generated automatically by os_platforms.py.\r\n'
       'cd /d %s\r\n'
-      'mkdir logs\n\n'
+      'mkdir logs\r\n'
+      'del logs\\bot_stdout.log.9\r\n'
+      'move logs\\bot_stdout.log.8 logs\\bot_stdout.log.9\r\n'
+      'move logs\\bot_stdout.log.7 logs\\bot_stdout.log.8\r\n'
+      'move logs\\bot_stdout.log.6 logs\\bot_stdout.log.7\r\n'
+      'move logs\\bot_stdout.log.5 logs\\bot_stdout.log.6\r\n'
+      'move logs\\bot_stdout.log.4 logs\\bot_stdout.log.5\r\n'
+      'move logs\\bot_stdout.log.3 logs\\bot_stdout.log.4\r\n'
+      'move logs\\bot_stdout.log.2 logs\\bot_stdout.log.3\r\n'
+      'move logs\\bot_stdout.log.1 logs\\bot_stdout.log.2\r\n'
+      'move logs\\bot_stdout.log logs\\bot_stdout.log.1\r\n'
       '%s 1>> logs\\bot_stdout.log 2>&1\r\n') % (cwd, ' '.join(command))
   success = _write(batch_path, content)
   if success and sys.platform == 'cygwin':
