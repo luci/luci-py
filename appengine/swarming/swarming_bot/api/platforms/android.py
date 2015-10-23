@@ -24,9 +24,10 @@ import threading
 import time
 
 
-import adb
-import adb.adb_commands
-import adb.sign_pythonrsa
+from adb import adb_commands
+from adb import common
+from adb import sign_pythonrsa
+from adb import usb_exceptions
 
 
 from api import parallel
@@ -132,32 +133,32 @@ def _parcel_to_list(lines):
 def _load_device(bot, handle):
   """Return a Device wrapping an adb_commands.AdbCommands.
   """
-  assert isinstance(handle, adb.common.UsbHandle), handle
+  assert isinstance(handle, common.UsbHandle), handle
   port_path = '/'.join(map(str, handle.port_path))
   try:
     # If this succeeds, this initializes handle._handle, which is a
     # usb1.USBDeviceHandle.
     handle.Open()
-  except adb.common.usb1.USBErrorNoDevice as e:
+  except common.usb1.USBErrorNoDevice as e:
     logging.warning('Got USBErrorNoDevice for %s: %s', port_path, e)
     # Do not kill adb, it just means the USB host is likely resetting and the
     # device is temporarily unavailable.We can't use handle.serial_number since
     # this communicates with the device.
     # TODO(maruel): In practice we'd like to retry for a few seconds.
     handle = None
-  except adb.common.usb1.USBErrorBusy as e:
+  except common.usb1.USBErrorBusy as e:
     logging.warning('Got USBErrorBusy for %s. Killing adb: %s', port_path, e)
     kill_adb()
     try:
       # If it throws again, it probably means another process holds a handle to
       # the USB ports or group acl (plugdev) hasn't been setup properly.
       handle.Open()
-    except adb.common.usb1.USBErrorBusy as e:
+    except common.usb1.USBErrorBusy as e:
       logging.warning(
           'USB port for %s is already open (and failed to kill ADB) '
           'Try rebooting the host: %s', port_path, e)
       handle = None
-  except adb.common.usb1.USBErrorAccess as e:
+  except common.usb1.USBErrorAccess as e:
     # Do not try to use serial_number, since we can't even access the port.
     logging.warning('Try rebooting the host: %s: %s', port_path, e)
     handle = None
@@ -171,12 +172,12 @@ def _load_device(bot, handle):
       # minutes when all the devices are unauthenticated.
       # TODO(maruel): A better fix would be to change python-adb to continue the
       # authentication dance from where it stopped. This is left as a follow up.
-      cmd = adb.adb_commands.AdbCommands.Connect(
+      cmd = adb_commands.AdbCommands.Connect(
           handle, banner='swarming', rsa_keys=_ADB_KEYS,
           auth_timeout_ms=10000)
-    except adb.usb_exceptions.DeviceAuthError as e:
+    except usb_exceptions.DeviceAuthError as e:
       logging.warning('AUTH FAILURE: %s: %s', port_path, e)
-    except adb.usb_exceptions.LibusbWrappingError as e:
+    except usb_exceptions.LibusbWrappingError as e:
       logging.warning('WRITE FAILURE: %s: %s', port_path, e)
     finally:
       # Do not leak the USB handle when we can't talk to the device.
@@ -272,12 +273,11 @@ class Device(object):
   #   returned an error.
   # - USBError means that a bus I/O failed, e.g. the device path is not present
   #   anymore.
-  _ERRORS = (
-      adb.usb_exceptions.CommonUsbError, adb.common.libusb1.USBError)
+  _ERRORS = (usb_exceptions.CommonUsbError, common.libusb1.USBError)
 
   def __init__(self, bot, adb_cmd, port_path):
     if adb_cmd:
-      assert isinstance(adb_cmd, adb.adb_commands.AdbCommands), adb_cmd
+      assert isinstance(adb_cmd, adb_commands.AdbCommands), adb_cmd
     self._bot = bot
     self._has_reset = False
     self._tries = 1
@@ -303,7 +303,7 @@ class Device(object):
       for _ in xrange(self._tries):
         try:
           return self.adb_cmd.List(destdir)
-        except adb.usb_exceptions.AdbCommandFailureException:
+        except usb_exceptions.AdbCommandFailureException:
           break
         except self._ERRORS as e:
           self._try_reset('(%s): %s', destdir, e)
@@ -320,7 +320,7 @@ class Device(object):
       for _ in xrange(self._tries):
         try:
           return self.adb_cmd.Stat(dest)
-        except adb.usb_exceptions.AdbCommandFailureException:
+        except usb_exceptions.AdbCommandFailureException:
           break
         except self._ERRORS as e:
           self._try_reset('(%s): %s', dest, e)
@@ -337,7 +337,7 @@ class Device(object):
         try:
           self.adb_cmd.Pull(remotefile, dest)
           return True
-        except adb.usb_exceptions.AdbCommandFailureException:
+        except usb_exceptions.AdbCommandFailureException:
           break
         except self._ERRORS as e:
           self._try_reset('(%s, %s): %s', remotefile, dest, e)
@@ -354,7 +354,7 @@ class Device(object):
       for _ in xrange(self._tries):
         try:
           return self.adb_cmd.Pull(remotefile, None)
-        except adb.usb_exceptions.AdbCommandFailureException:
+        except usb_exceptions.AdbCommandFailureException:
           break
         except self._ERRORS as e:
           self._try_reset('(%s): %s', remotefile, e)
@@ -371,7 +371,7 @@ class Device(object):
         try:
           self.adb_cmd.Push(localfile, dest, mtime)
           return True
-        except adb.usb_exceptions.AdbCommandFailureException:
+        except usb_exceptions.AdbCommandFailureException:
           break
         except self._ERRORS as e:
           self._try_reset('(%s, %s): %s', localfile, dest, e)
@@ -388,7 +388,7 @@ class Device(object):
         try:
           self.adb_cmd.Push(cStringIO.StringIO(content), dest, mtime)
           return True
-        except adb.usb_exceptions.AdbCommandFailureException:
+        except usb_exceptions.AdbCommandFailureException:
           break
         except self._ERRORS as e:
           self._try_reset('(%s, %s): %s', dest, content, e)
@@ -403,7 +403,7 @@ class Device(object):
           out = self.adb_cmd.Reboot()
           logging.info('reboot: %s', out)
           return True
-        except adb.usb_exceptions.AdbCommandFailureException:
+        except usb_exceptions.AdbCommandFailureException:
           break
         except self._ERRORS as e:
           self._try_reset('(): %s', e)
@@ -417,7 +417,7 @@ class Device(object):
           out = self.adb_cmd.Remount()
           logging.info('remount: %s', out)
           return True
-        except adb.usb_exceptions.AdbCommandFailureException:
+        except usb_exceptions.AdbCommandFailureException:
           break
         except self._ERRORS as e:
           self._try_reset('(): %s', e)
@@ -535,7 +535,7 @@ class Device(object):
     """
     for _ in xrange(self._tries):
       try:
-        # The serial number is attached to adb.common.UsbHandle, no
+        # The serial number is attached to common.UsbHandle, no
         # adb_commands.AdbCommands.
         self.serial = self.adb_cmd.handle.serial_number
       except self._ERRORS as e:
@@ -561,13 +561,13 @@ class Device(object):
     if self.adb_cmd:
       try:
         self.adb_cmd.handle._handle.resetDevice()
-      except adb.common.usb1.USBErrorNotFound:
+      except common.usb1.USBErrorNotFound:
         logging.info('resetDevice() failed')
       self.close()
       # Reopen itself.
       # TODO(maruel): This makes no sense to do a complete enumeration, we
       # know the exact port path.
-      context = adb.common.usb1.USBContext()
+      context = common.usb1.USBContext()
       for device in context.getDeviceList(skip_on_error=True):
         port_path = [device.getBusNumber()]
         try:
@@ -579,7 +579,7 @@ class Device(object):
           port_path.append(device.getDeviceAddress())
         if port_path == self.port_path:
           device.Open()
-          self.adb_cmd = adb.adb_commands.AdbCommands.Connect(
+          self.adb_cmd = adb_commands.AdbCommands.Connect(
               device, banner='swarming', rsa_keys=_ADB_KEYS,
               auth_timeout_ms=60000)
         break
@@ -609,7 +609,7 @@ def initialize(pub_key, priv_key):
   _ADB_KEYS = []
   _ADB_KEYS_RAW = {}
   if pub_key:
-    _ADB_KEYS.append(adb.sign_pythonrsa.PythonRSASigner(pub_key, priv_key))
+    _ADB_KEYS.append(sign_pythonrsa.PythonRSASigner(pub_key, priv_key))
     _ADB_KEYS_RAW[pub_key] = priv_key
 
   # Try to add local adb keys if available.
@@ -619,7 +619,7 @@ def initialize(pub_key, priv_key):
       pub = f.read().strip()
     with open(path, 'rb') as f:
       priv = f.read().strip()
-    _ADB_KEYS.append(adb.sign_pythonrsa.PythonRSASigner(pub, priv))
+    _ADB_KEYS.append(sign_pythonrsa.PythonRSASigner(pub, priv))
     _ADB_KEYS_RAW[pub] = priv
 
   return bool(_ADB_KEYS)
@@ -634,7 +634,7 @@ def kill_adb():
 
   adb's stability is less than stellar. Kill it with fire.
   """
-  if not adb:
+  if not _ADB_KEYS:
     return
   while True:
     try:
@@ -664,18 +664,18 @@ def get_devices(bot=None):
     - list of Device instances.
     - None if adb is unavailable.
   """
-  if not adb or not _ADB_KEYS:
+  if not _ADB_KEYS:
     return None
 
   handles = []
-  generator = adb.common.UsbHandle.FindDevices(
-      adb.adb_commands.DeviceIsAvailable, timeout_ms=60000)
+  generator = common.UsbHandle.FindDevices(
+      adb_commands.DeviceIsAvailable, timeout_ms=60000)
   while True:
     try:
       # Use manual iterator handling instead of "for handle in generator" to
       # catch USB exception explicitly.
       handle = generator.next()
-    except adb.common.usb1.USBErrorOther as e:
+    except common.usb1.USBErrorOther as e:
       logging.warning(
           'Failed to open USB device, is user in group plugdev? %s', e)
       continue
