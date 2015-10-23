@@ -11,6 +11,7 @@ import test_env_platforms
 test_env_platforms.setup_test_env()
 
 import android
+from adb import sign_pythonrsa
 
 
 class MockDevice(android.Device):
@@ -75,7 +76,7 @@ oShjkmSqylt4CG34EcCl+JkRTZVFsvp4f8gxC1yQasPo9xjB3DC7maanjp70uMLw
 
   def test_sign(self):
     # Does not crash => works.
-    signer = android._PythonRSASigner('pub', self.TEST_KEY)
+    signer = sign_pythonrsa.PythonRSASigner('pub', self.TEST_KEY)
     self.assertTrue(signer.Sign('data to sign'))
 
 

@@ -26,10 +26,7 @@ import time
 
 import adb
 import adb.adb_commands
-from pyasn1.codec.der import decoder
-from pyasn1.type import univ
-import rsa
-from rsa import pkcs1
+import adb.sign_pythonrsa
 
 
 from api import parallel
@@ -38,23 +35,9 @@ from api import parallel
 ### Private stuff.
 
 
-# python-rsa lib hashes all messages it signs. ADB does it already, we just
-# need to slap a signature on top of already hashed message. Introduce "fake"
-# hashing algo for this.
-class _Accum(object):
-  def __init__(self):
-    self._buf = ''
-  def update(self, msg):
-    self._buf += msg
-  def digest(self):
-    return self._buf
-pkcs1.HASH_METHODS['SHA-1-PREHASHED'] = _Accum
-pkcs1.HASH_ASN1['SHA-1-PREHASHED'] = pkcs1.HASH_ASN1['SHA-1']
-
-
 # Both following are set when ADB is initialized.
-# _ADB_KEYS is set to a list of _PythonRSASigner instances. It contains one or
-# multiple key used to authenticate to Android debug protocol (adb).
+# _ADB_KEYS is set to a list of adb_protocol.AuthSigner instances. It contains
+# one or multiple key used to authenticate to Android debug protocol (adb).
 _ADB_KEYS = None
 # _ADB_KEYS_RAW is set to a dict(pub: priv) when initialized, with the raw
 # content of each key.
@@ -112,36 +95,6 @@ class _PerDeviceCache(object):
 
 # Global cache of per device cache.
 _per_device_cache = _PerDeviceCache()
-
-
-class _PythonRSASigner(object):
-  """Implements adb_protocol.AuthSigner using http://stuvel.eu/rsa."""
-  def __init__(self, pub, priv):
-    self.priv_key = _load_rsa_private_key(priv)
-    self.pub_key = pub
-
-  def Sign(self, data):
-    return rsa.sign(data, self.priv_key, 'SHA-1-PREHASHED')
-
-  def GetPublicKey(self):
-    return self.pub_key
-
-
-def _load_rsa_private_key(pem):
-  """PEM encoded PKCS#8 private key -> rsa.PrivateKey."""
-  # ADB uses private RSA keys in pkcs#8 format. 'rsa' library doesn't support
-  # them natively. Do some ASN unwrapping to extract naked RSA key
-  # (in der-encoded form). See https://www.ietf.org/rfc/rfc2313.txt.
-  # Also http://superuser.com/a/606266.
-  try:
-    der = rsa.pem.load_pem(pem, 'PRIVATE KEY')
-    keyinfo, _ = decoder.decode(der)
-    if keyinfo[1][0] != univ.ObjectIdentifier('1.2.840.113549.1.1.1'):
-        raise ValueError('Not a DER-encoded OpenSSL private RSA key')
-    private_key_der = keyinfo[2].asOctets()
-  except IndexError:
-    raise ValueError('Not a DER-encoded OpenSSL private RSA key')
-  return rsa.PrivateKey.load_pkcs1(private_key_der, format='DER')
 
 
 def _dumpsys(device, arg):
@@ -223,15 +176,8 @@ def _load_device(bot, handle):
           auth_timeout_ms=10000)
     except adb.usb_exceptions.DeviceAuthError as e:
       logging.warning('AUTH FAILURE: %s: %s', port_path, e)
-    except adb.usb_exceptions.ReadFailedError as e:
-      logging.warning('READ FAILURE: %s: %s', port_path, e)
-    except adb.usb_exceptions.WriteFailedError as e:
+    except adb.usb_exceptions.LibusbWrappingError as e:
       logging.warning('WRITE FAILURE: %s: %s', port_path, e)
-    except ValueError as e:
-      # This is generated when there's a protocol level failure, e.g. the data
-      # is garbled.
-      logging.warning(
-          'Trying unpluging and pluging it back: %s: %s', port_path, e)
     finally:
       # Do not leak the USB handle when we can't talk to the device.
       if not cmd:
@@ -326,10 +272,8 @@ class Device(object):
   #   returned an error.
   # - USBError means that a bus I/O failed, e.g. the device path is not present
   #   anymore.
-  # - ValueError means that there was a protocol level failure. For example the
-  #   returned data is garbage.
   _ERRORS = (
-    adb.usb_exceptions.CommonUsbError, adb.common.libusb1.USBError, ValueError)
+      adb.usb_exceptions.CommonUsbError, adb.common.libusb1.USBError)
 
   def __init__(self, bot, adb_cmd, port_path):
     if adb_cmd:
@@ -562,7 +506,10 @@ class Device(object):
     """If adbd on the device is root, ask it to restart as user."""
     for _ in xrange(self._tries):
       try:
-        out = self.adb_cmd.conn.Command(service='unroot')
+        # It's defined in the adb code but doesn't work on 4.4.
+        #out = self.adb_cmd.conn.Command(service='unroot')
+        out = self.cmd.Shell(
+            'setprop service.adb.root 0; setprop ctl.restart adbd')
         logging.info('_reset_adbd_as_user() = %s', out)
         # Hardcoded strings in platform_system_core/adb/services.cpp
         # 'adbd not running as root\n' or 'restarting adbd as non root\n'
@@ -662,7 +609,7 @@ def initialize(pub_key, priv_key):
   _ADB_KEYS = []
   _ADB_KEYS_RAW = {}
   if pub_key:
-    _ADB_KEYS.append(_PythonRSASigner(pub_key, priv_key))
+    _ADB_KEYS.append(adb.sign_pythonrsa.PythonRSASigner(pub_key, priv_key))
     _ADB_KEYS_RAW[pub_key] = priv_key
 
   # Try to add local adb keys if available.
@@ -672,7 +619,7 @@ def initialize(pub_key, priv_key):
       pub = f.read().strip()
     with open(path, 'rb') as f:
       priv = f.read().strip()
-    _ADB_KEYS.append(_PythonRSASigner(pub, priv))
+    _ADB_KEYS.append(adb.sign_pythonrsa.PythonRSASigner(pub, priv))
     _ADB_KEYS_RAW[pub] = priv
 
   return bool(_ADB_KEYS)
