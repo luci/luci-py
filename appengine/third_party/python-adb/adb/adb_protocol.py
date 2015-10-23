@@ -116,8 +116,7 @@ class _AdbMessageHeader(collections.namedtuple(
 
   @classmethod
   def Make(cls, command_name, arg0, arg1, data):
-    if command_name not in cls._VALID_IDS:
-      raise InvalidResponseError('Unknown command: %s' % command_name)
+    assert command_name in cls._VALID_IDS
     assert isinstance(arg0, int), arg0
     assert isinstance(arg1, int), arg1
     assert isinstance(data, str), repr(data)
@@ -168,7 +167,7 @@ class _AdbMessageHeader(collections.namedtuple(
         arg0 = 'RSAPUBLICKEY'
       if arg1 != 0:
         raise InvalidResponseError(
-            'Unexpected arg1 value (0x%x) on AUTH packet' % arg1)
+            'Unexpected arg1 value (0x%x) on AUTH packet' % arg1, self)
       return '%s, %s' % (command_name, arg0)
     elif command_name == 'CNXN':
       if arg0 == self.VERSION:
@@ -319,13 +318,13 @@ class _AdbConnection(object):
     """Calls from within ReadAndDispatch(), so the manager lock is held."""
     # Can be CLSE, OKAY or WRTE. It's generally basically an ACK.
     if message.header.arg0 != self.remote_id:
-      raise InvalidResponseError(
-          'Unexpected remote ID: expected %d; for message %s' %
-          (self.remote_id, message))
+      # We can't assert that for now. TODO(maruel): Investigate the one-off
+      # cases.
+      logging.warning(
+          'Unexpected remote ID: expected %d: %s', self.remote_id, message)
     if message.header.arg1 != self._local_id:
       raise InvalidResponseError(
-          'Unexpected local ID: expected %d; for message %s' %
-          (self._local_id, message))
+          'Unexpected local ID: expected %d' % self._local_id, message)
     cmd_name = message.header.command_name
     if cmd_name == 'CLSE':
       self._HasClosed()
