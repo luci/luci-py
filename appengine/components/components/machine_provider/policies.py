@@ -7,6 +7,12 @@
 from protorpc import messages
 
 
+class KeyValuePair(messages.Message):
+  """Represents a key-value pair."""
+  key = messages.StringField(1, required=True)
+  value = messages.StringField(2)
+
+
 class MachineReclamationPolicy(messages.Enum):
   """Lists valid machine reclamation policies."""
   # Make the machine available for lease again immediately.
@@ -54,3 +60,6 @@ class Policies(messages.Message):
       4,
       default=MachineReclamationPolicy.MAKE_AVAILABLE,
   )
+  # Cloud Pub/Sub message attributes to include when communicating with the
+  # backend regarding this machine.
+  backend_attributes = messages.MessageField(KeyValuePair, 5, repeated=True)

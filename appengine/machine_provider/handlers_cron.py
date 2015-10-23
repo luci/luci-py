@@ -249,6 +249,10 @@ def reclaim_machine(machine_key, reclamation_ts):
       'lease_id': lease.key.id(),
       'machine_id': machine.key.id(),
   }
+  backend_attributes = {}
+  for attribute in machine.policies.backend_attributes:
+    backend_attributes[attribute.key] = attribute.value
+  params['backend_attributes'] = utils.encode_to_json(backend_attributes)
   if lease.request.pubsub_topic:
     params['lessee_project'] = lease.request.pubsub_project
     params['lessee_topic'] = lease.request.pubsub_topic
@@ -277,6 +281,24 @@ class MachineReclamationProcessor(webapp2.RequestHandler):
         models.CatalogMachineEntry.lease_expiration_ts > min_ts,
     ).fetch(keys_only=True):
       reclaim_machine(machine, now)
+
+
+@ndb.transactional
+def create_subscription(machine_key):
+  """Creates a Cloud Pub/Sub subscription for machine communication.
+
+  Args:
+    machine_key: ndb.Key for the machine whose subscription should be created.
+  """
+  machine = machine_key.get()
+  logging.info('Attempting to subscribe CatalogMachineEntry:\n%s', machine)
+
+  if machine.state != models.CatalogMachineEntryStates.NEW:
+    logging.warning('CatalogMachineEntry no longer new:\n%s', machine)
+    return
+
+  if machine.subscription:
+    logging.info('CatalogMachineEntry already subscribed:\n%s', machine)
 
 
 class NewMachineProcessor(webapp2.RequestHandler):

@@ -115,6 +115,7 @@ class SubscriptionHandler(webapp2.RequestHandler):
   """Base class for defining Pub/Sub subscription handlers."""
   # TODO(smut): Keep in datastore. See components/datastore_utils.
   ENDPOINT = None
+  MAX_MESSAGES = None
   SUBSCRIPTION = None
   SUBSCRIPTION_PROJECT = None
   TOPIC = None
@@ -211,7 +212,7 @@ class SubscriptionHandler(webapp2.RequestHandler):
         '%s:pull' % self.get_subscription_url(),
         method='POST',
         payload={
-            'maxMessages': 1,
+            'maxMessages': self.MAX_MESSAGES,
             'returnImmediately': True,
         },
         scopes=PUBSUB_SCOPES,

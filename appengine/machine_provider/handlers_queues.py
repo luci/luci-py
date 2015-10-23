@@ -4,6 +4,7 @@
 
 """Task queues for fulfilling lease requests."""
 
+import json
 import logging
 
 from google.appengine.ext import ndb
@@ -55,18 +56,21 @@ class MachineReclaimer(webapp2.RequestHandler):
     """Reclaim a machine.
 
     Params:
-      backend_topic: If specified, topic that the machine reclamation should
-        be published to for the backend.
       backend_project: If specified, project that the machine reclamation
         topic is contained in for the backend.
+      backend_attributes: If specified, JSON-encoded dict of attributes to
+        include in the machine reclamation message for the backend.
+      backend_topic: If specified, topic that the machine reclamation should
+        be published to for the backend.
       hostname: Hostname being reclaimed.
       lease_id: ID of the LeaseRequest the machine was leased for.
-      lessee_topic: If specified, topic that the machine reclamation and lease
-        expiration should be published to for the lessee.
       lessee_project: If specified, project that the machine reclamation and
         lease expiration topic is contained in.
+      lessee_topic: If specified, topic that the machine reclamation and lease
+        expiration should be published to for the lessee.
       machine_id: ID of the CatalogMachineEntry being reclaimed.
     """
+    backend_attributes = json.loads(self.request.get('backend_attributes', {}))
     backend_project = self.request.get('backend_project')
     backend_topic = self.request.get('backend_topic')
     hostname = self.request.get('hostname')
@@ -85,11 +89,13 @@ class MachineReclaimer(webapp2.RequestHandler):
     )
 
     if backend_topic:
+      attributes = backend_attributes.copy()
+      attributes['hostname'] = hostname
       pubsub.publish(
           backend_topic,
           backend_project,
           'RECLAIMED',
-          hostname=hostname,
+          **attributes
     )
 
 

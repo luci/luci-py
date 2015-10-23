@@ -65,17 +65,13 @@ class InstanceTemplateProcessor(webapp2.RequestHandler):
           )
 
 
-@ndb.transactional(xg=True)
+@ndb.transactional
 def process_instance_group(
     name, dimensions, policies, instances, zone, project):
   """Processes an InstanceGroup entity.
 
   We store an InstanceGroup entity in the datastore if one doesn't already
   exist, then we look at instances themselves which need to be processed.
-
-  Root entities operated on:
-    models.InstanceDeletions
-    models.InstanceGroup
 
   Args:
     name: Name of this instance group.
@@ -88,8 +84,6 @@ def process_instance_group(
     zone: Zone these instances exist in. e.g. us-central1-f.
     project: Project these instances exist in.
   """
-  # List of instances across all instance groups scheduled to be deleted.
-  all_instances_to_delete = models.InstanceDeletions.get_instances()
   # List of instances to catalog.
   instances_to_catalog = []
   # Mapping of instance names to instance URLs to delete.
@@ -101,7 +95,7 @@ def process_instance_group(
   old_instance_map = {}
   new_instance_map = {}
 
-  if instance_group:
+  if instance_group and instance_group.members:
     for instance in instance_group.members:
       old_instance_map[instance.name] = instance
 
@@ -119,12 +113,7 @@ def process_instance_group(
           logging.info('Attempting to catalog instance: %s', instance_name)
           instances_to_catalog.append(instance_name)
         elif existing_instance.state == models.InstanceStates.CATALOGED:
-          if instance_name in all_instances_to_delete:
-            logging.info('Scheduling instance for deletion: %s', instance_name)
-            instances_to_delete[instance_name] = instance['instance']
-          else:
-            logging.info(
-                'Skipping already cataloged instance: %s', instance_name)
+          logging.info('Skipping already cataloged instance: %s', instance_name)
         elif existing_instance.state == models.InstanceStates.PENDING_DELETION:
           logging.info('Scheduling instance for deletion: %s', instance_name)
           instances_to_delete[instance_name] = instance['instance']
@@ -168,10 +157,9 @@ def process_instance_group(
     logging.info('Nothing to catalog')
 
   if instances_to_delete:
-    # Enqueue a task, mark as PENDING_DELETION, and remove from the scheduled
-    # deletions because we've scheduled it. If the task fails to enqueue, the
-    # instance will stay in the PENDING_DELETION state to be retried later.
-    utils.enqueue_task(
+    # If we fail to enqueue the task to delete these instances,
+    # set them back to PENDING_DELETION in order to try again later.
+    if utils.enqueue_task(
         '/internal/queues/delete-instances',
         'delete-instances',
         params={
@@ -181,11 +169,13 @@ def process_instance_group(
             'zone': zone,
         },
         transactional=True,
-    )
-    for instance_name in instances_to_delete:
-      new_instance_map[instance_name].state = (
-          models.InstanceStates.PENDING_DELETION)
-    models.InstanceDeletions.discard_instances(instances_to_delete.keys())
+    ):
+      for instance_name in instances_to_delete.keys():
+        new_instance_map[instance_name].state = models.InstanceStates.DELETED
+    else:
+      for instance_name in instances_to_delete.keys():
+        new_instance_map[instance_name].state = (
+            models.InstanceStates.PENDING_DELETION)
   else:
     logging.info('Nothing to delete')
 
@@ -253,6 +243,10 @@ class InstanceGroupProcessor(webapp2.RequestHandler):
         )
         continue
       policies = machine_provider.Policies(
+          backend_attributes=[
+              machine_provider.KeyValuePair(
+                  key='group', value=template.instance_group_name),
+          ],
           backend_project=
               handlers_pubsub.MachineProviderSubscriptionHandler.TOPIC_PROJECT,
           backend_topic=

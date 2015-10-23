@@ -19,13 +19,14 @@ import models
 
 
 @ndb.transactional
-def uncatalog_instances(instance_group_key, instances):
-  """Uncatalogs cataloged instances.
+def reschedule_instance_cataloging(instance_group_key, instances):
+  """Reschedules the given instances for cataloging.
 
   Args:
     instance_group_key: ndb.Key for the instance group containing the instances.
-    instances: Set of instance names to uncatalog.
+    instances: List of instance names to reschedule for cataloging.
   """
+  instances = set(instances)
   instance_group = instance_group_key.get()
   if not instance_group:
     logging.error('Instance group does not exist: %s', instance_group_key)
@@ -34,6 +35,7 @@ def uncatalog_instances(instance_group_key, instances):
   updated = False
   for instance in instance_group.members:
     if instance.name in instances:
+      instances.discard(instance.name)
       if instance.state == models.InstanceStates.CATALOGED:
         # handlers_cron.py sets each instance's state to CATALOGED
         # before triggering the InstanceGroupCataloger task queue.
@@ -43,9 +45,13 @@ def uncatalog_instances(instance_group_key, instances):
         instance.state = models.InstanceStates.PENDING_CATALOG
         updated = True
       elif instance.state == models.InstanceStates.PENDING_CATALOG:
-        logging.info('Ignoring already uncataloged instance: %s', instance.name)
+        logging.info('Ignoring already rescheduled instance: %s', instance.name)
       else:
         logging.error('Instance in unexpected state:\n%s', instance)
+
+  if instances:
+    logging.warning('Instances not found: %s', ', '.join(sorted(instances)))
+
   if updated:
     instance_group.put()
 
@@ -55,7 +61,7 @@ class InstanceGroupCataloger(webapp2.RequestHandler):
 
   @decorators.require_taskqueue('catalog-instance-group')
   def post(self):
-    """Catalog instances in the Machine Provider.
+    """Catalogs instances in the Machine Provider.
 
     Params:
       dimensions: JSON-encoded string representation of
@@ -72,17 +78,16 @@ class InstanceGroupCataloger(webapp2.RequestHandler):
     name = self.request.get('name')
     policies = json.loads(self.request.get('policies'))
 
-    requests = []
-    instances_to_uncatalog = set()
+    requests = {}
 
     for instance_name in instances:
-      instances_to_uncatalog.add(instance_name)
-      requests.append({
-          'dimensions': dimensions.copy(), 'policies': policies})
-      requests[-1]['dimensions']['hostname'] = instance_name
+      requests[instance_name] = {
+          'dimensions': dimensions.copy(), 'policies': policies}
+      requests[instance_name]['dimensions']['hostname'] = instance_name
 
     try:
-      responses = machine_provider.add_machines(requests).get('responses', {})
+      responses = machine_provider.add_machines(
+          requests.values()).get('responses', {})
     except net.Error as e:
       logging.warning(e)
       responses = {}
@@ -91,20 +96,20 @@ class InstanceGroupCataloger(webapp2.RequestHandler):
       request = response.get('machine_addition_request', {})
       error = response.get('error')
       instance_name = request.get('dimensions', {}).get('hostname')
-      if instance_name in instances:
+      if instance_name in requests.keys():
         if not error:
           logging.info('Instance added to Catalog: %s', instance_name)
-          instances_to_uncatalog.discard(instance_name)
+          requests.pop(instance_name)
         elif error == 'HOSTNAME_REUSE':
           logging.warning('Hostname reuse in Catalog: %s', instance_name)
-          instances_to_uncatalog.discard(instance_name)
+          requests.pop(instance_name)
         else:
           logging.warning('Instance not added to Catalog: %s', instance_name)
       else:
         logging.info('Unknown instance: %s', instance_name)
 
-    uncatalog_instances(
-        models.InstanceGroup.generate_key(name), instances_to_uncatalog)
+    reschedule_instance_cataloging(
+        models.InstanceGroup.generate_key(name), requests.keys())
 
 
 @ndb.transactional
@@ -113,8 +118,9 @@ def delete_instances(instance_group_key, instances):
 
   Args:
     instance_group_key: ndb.Key for the instance group containing the instances.
-    instances: Set of instance names to delete.
+    instances: List of instance names to delete.
   """
+  instances = set(instances)
   instance_group = instance_group_key.get()
   if not instance_group:
     logging.error('Instance group does not exist: %s', instance_group_key)
@@ -125,19 +131,53 @@ def delete_instances(instance_group_key, instances):
   for instance in instance_group.members:
     members.append(instance)
     if instance.name in instances:
-      if instance.state == models.InstanceStates.PENDING_DELETION:
+      instances.discard(instance.name)
+      if instance.state == models.InstanceStates.DELETED:
         logging.info('Deleting instance: %s', instance.name)
-        instances.discard(instance.name)
         members.pop()
         updated = True
       else:
         logging.error('Instance in unexpected state:\n%s', instance)
 
   if instances:
-    logging.info('Instances already deleted: %s', ', '.join(instances))
+    logging.warning('Instances not found: %s', ', '.join(sorted(instances)))
 
   if updated:
     instance_group.members = members
+    instance_group.put()
+
+
+@ndb.transactional
+def reschedule_instance_deletion(instance_group_key, instances):
+  """Reschedules the given instances for deletion.
+
+  Args:
+    instance_group_key: ndb.Key for the instance group containing the instances.
+    instances: List of instance names to reschedule for deletion.
+  """
+  instances = set(instances)
+  instance_group = instance_group_key.get()
+  if not instance_group:
+    logging.error('Instance group does not exist: %s', instance_group_key)
+    return
+
+  updated = False
+  for instance in instance_group.members:
+    if instance.name in instances:
+      instances.discard(instance.name)
+      if instance.state == models.InstanceStates.DELETED:
+        logging.info('Rescheduling deletion of instance: %s', instance.name)
+        instance.state = models.InstanceStates.PENDING_DELETION
+        updated = True
+      elif instance.state == models.InstanceStates.PENDING_DELETION:
+        logging.info('Ignoring already rescheduled instance: %s', instance.name)
+      else:
+        logging.error('Instance in unexpected state:\n%s', instance)
+
+  if instances:
+    logging.warning('Instances not found: %s', ', '.join(sorted(instances)))
+
+  if updated:
     instance_group.put()
 
 
@@ -160,10 +200,13 @@ class InstanceDeleter(webapp2.RequestHandler):
     project = self.request.get('project')
     zone = self.request.get('zone')
 
+    instance_group_key = models.InstanceGroup.generate_key(group)
+    instances = sorted(instance_map.keys())
+
     logging.info(
         'Deleting instances from instance group: %s\n%s',
         group,
-        ', '.join(instance_map.keys()),
+        ', '.join(instances),
     )
     api = gce.Project(project)
     # Try to delete the instances. If the operation succeeds, update the
@@ -177,10 +220,14 @@ class InstanceDeleter(webapp2.RequestHandler):
     try:
       response = api.delete_instances(group, zone, instance_map.values())
       if response.get('status') == 'DONE':
-        delete_instances(
-            models.InstanceGroup.generate_key(group), set(instance_map.keys()))
+        # Either they all succeed or they all fail. If they all succeeded,
+        # remove them from the datastore and return. In all other cases,
+        # set them back to PENDING_DELETION to try again later.
+        delete_instances(instance_group_key, instances)
+        return
     except net.Error as e:
       logging.warning('%s', e)
+    reschedule_instance_deletion(instance_group_key, instances)
 
 
 def create_queues_app():
