@@ -529,6 +529,14 @@ class TestBotMain(net_utils.TestCase):
       return 0
     self.mock(bot_main, 'run_bot', run_bot)
 
+    class Singleton(object):
+      # pylint: disable=no-self-argument
+      def acquire(self2):
+        return True
+      def release(self2):
+        self.fail()
+    self.mock(bot_main, 'SINGLETON', Singleton())
+
     self.assertEqual(0, bot_main.main([]))
 
 

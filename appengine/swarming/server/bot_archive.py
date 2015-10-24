@@ -38,6 +38,7 @@ FILES = (
     'bot_code/__init__.py',
     'bot_code/bot_main.py',
     'bot_code/common.py',
+    'bot_code/singleton.py',
     'bot_code/task_runner.py',
     'bot_code/xsrf_client.py',
     'client/auth.py',

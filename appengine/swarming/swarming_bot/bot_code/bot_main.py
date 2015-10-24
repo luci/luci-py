@@ -29,6 +29,7 @@ import traceback
 import zipfile
 
 import common
+import singleton
 import xsrf_client
 from api import bot
 from api import os_utilities
@@ -48,6 +49,10 @@ _ERROR_HANDLER_WAS_REGISTERED = False
 # to swarming_bot.zip when run as part of swarming_bot.zip. This value is
 # overriden in unit tests.
 THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
+
+
+# The singleton, initially unset.
+SINGLETON = singleton.Singleton(os.path.dirname(THIS_FILE))
 
 
 ### bot_config handler part.
@@ -507,12 +512,12 @@ def run_manifest(botobj, manifest, start):
         proc.wait()
         return False
 
+    logging.info('task_runner exit: %d', proc.returncode)
     if os.path.exists(task_result_file):
       with open(task_result_file, 'rb') as fd:
         task_result = json.load(fd)
 
     if proc.returncode:
-      logging.warning('task_runner died')
       msg = 'Execution failed: internal error (%d).' % proc.returncode
       internal_failure = True
     elif not task_result:
@@ -578,6 +583,8 @@ def update_bot(botobj, version):
   logging.info('Restarting to %s.', new_zip)
   sys.stdout.flush()
   sys.stderr.flush()
+  # Don't forget to release the singleton before restarting itself.
+  SINGLETON.release()
 
   # Do not call on_bot_shutdown.
   # On OSX, launchd will be unhappy if we quit so the old code bot process has
@@ -627,6 +634,17 @@ def main(args):
   # quit the process.
   parser = optparse.OptionParser(description=sys.modules[__name__].__doc__)
   _, args = parser.parse_args(args)
+
+  # Enforces that only one process with a bot in this directory can be run on
+  # this host at once.
+  #
+  # This is generally a problem with launchd which is a bit too much
+  # 'restart-happy', causing 2 bots running concurrently on the host but it was
+  # observed on linux too.
+  if not SINGLETON.acquire():
+    print >> sys.stderr, 'Found a previous bot, exiting.'
+    return 1
+
   error = None
   if len(args) != 0:
     error = 'Unexpected arguments: %s' % args

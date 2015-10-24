@@ -571,7 +571,7 @@ def main():
   except KeyboardInterrupt:
     print >> sys.stderr, '<Ctrl-C>'
     failed = True
-    if bot:
+    if bot.poll() is None:
       bot.kill()
       bot.wait()
   finally:
