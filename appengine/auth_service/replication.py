@@ -7,6 +7,7 @@
 import base64
 import hashlib
 import logging
+import zlib
 
 from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
@@ -80,11 +81,76 @@ class AuthReplicaState(ndb.Model, datastore_utils.SerializableModelMixin):
   push_error = ndb.StringProperty(indexed=False)
 
 
+class AuthDBSnapshot(ndb.Model):
+  """Contains deflated serialized AuthDB proto message for some revision.
+
+  Root entity. ID is corresponding revision number (as integer). Immutable.
+  """
+  # Deflated serialized AuthDB proto message.
+  auth_db_deflated = ndb.BlobProperty()
+  # SHA256 hex digest of auth_db (before compression).
+  auth_db_sha256 = ndb.StringProperty(indexed=False)
+  # When this revision was created.
+  created_ts = ndb.DateTimeProperty(indexed=True)
+
+
+class AuthDBSnapshotLatest(ndb.Model):
+  """Pointer to latest stored AuthDBSnapshot entity.
+
+  Exists in single instance with key ('AuthDBSnapshotLatest', 'latest').
+  """
+  # Revision number of latest stored AuthDBSnaphost. Monotonically increases.
+  auth_db_rev = ndb.IntegerProperty(indexed=False)
+  # When latest stored AuthDBSnaphost was created (and this entity updated).
+  modified_ts = ndb.DateTimeProperty(indexed=False)
+  # SHA256 hex digest of latest AuthDBSnapshot's auth_db (before compression).
+  auth_db_sha256 = ndb.StringProperty(indexed=False)
+
+
 def replicas_root_key():
   """Root key for AuthReplicaState entities. Entity itself doesn't exist."""
   # It' intentionally not under model.root_key(). It has nothing to do with core
   # auth model.
   return ndb.Key('AuthReplicaStateRoot', 'root')
+
+
+def replica_state_key(app_id):
+  """Returns key of corresponding AuthReplicaState entity."""
+  return ndb.Key(AuthReplicaState, app_id, parent=replicas_root_key())
+
+
+def auth_db_snapshot_key(auth_db_rev):
+  """Key for AuthDBSnapshot at given revision."""
+  assert isinstance(auth_db_rev, (int, long)), auth_db_rev
+  return ndb.Key(AuthDBSnapshot, int(auth_db_rev))
+
+
+def auth_db_snapshot_latest_key():
+  """Key of AuthDBSnapshotLatest singleton entity."""
+  return ndb.Key(AuthDBSnapshotLatest, 'latest')
+
+
+def get_latest_auth_db_snapshot(skip_body):
+  """Returns latest known AuthDBSnapshot or None."""
+  latest = auth_db_snapshot_latest_key().get()
+  if not latest:
+    return None
+  if skip_body:
+    return AuthDBSnapshot(
+        key=auth_db_snapshot_key(latest.auth_db_rev),
+        auth_db_sha256=latest.auth_db_sha256,
+        created_ts=latest.modified_ts)
+  return get_auth_db_snapshot(latest.auth_db_rev, skip_body)
+
+
+def get_auth_db_snapshot(rev, skip_body):
+  """Returns AuthDBSnapshot at given revision or None."""
+  s = auth_db_snapshot_key(rev).get()
+  if not s:
+    return None
+  if skip_body:
+    s.auth_db_deflated = None
+  return s
 
 
 def configure_as_primary():
@@ -96,6 +162,11 @@ def configure_as_primary():
     assert ndb.in_transaction()
     trigger_replication(auth_state.auth_db_rev, transactional=True)
   model.configure_as_primary(replication_callback)
+
+
+def is_replica(ident):
+  """True if given identity corresponds to registered replica."""
+  return ident.is_service and bool(replica_state_key(ident.name).get())
 
 
 def register_replica(app_id, replica_url):
@@ -155,6 +226,13 @@ def update_replicas_task(auth_db_rev):
         replication_state.auth_db_rev, auth_db_rev)
     return True
 
+  # Pack an entire AuthDB into a blob to be to stored in the datastore and
+  # pushed to Replicas.
+  replication_state, auth_db_blob = pack_auth_db()
+
+  # Put the blob into datastore. Also updates pointer to the latest stored blob.
+  store_auth_db_snapshot(replication_state, auth_db_blob)
+
   # Grab last known replicas state and push only to replicas that are behind.
   stale_replicas = [
     entity for entity in AuthReplicaState.query(ancestor=replicas_root_key())
@@ -164,8 +242,8 @@ def update_replicas_task(auth_db_rev):
     logging.info('All replicas are up-to-date.')
     return True
 
-  # Pack an entire AuthDB into a blob to be pushed to Replicas.
-  auth_db_blob, key_name, sig = pack_auth_db()
+  # Sign the blob, replicas check the signature.
+  key_name, sig = sign_auth_db_blob(auth_db_blob)
 
   # Push the blob to all out-of-date replicas, in parallel.
   push_started_ts = utils.utcnow()
@@ -242,10 +320,10 @@ def update_replicas_task(auth_db_rev):
 
 
 def pack_auth_db():
-  """Packs an entire AuthDB into a blob, signing it using app's private key.
+  """Packs an entire AuthDB into a blob (serialized protobuf message).
 
   Returns:
-    Tuple (blob, name of a key used to sign it, base64 encoded signature).
+    Tuple (AuthReplicationState, blob).
   """
   # Grab the snapshot.
   state, snapshot = replication.new_auth_db_snapshot()
@@ -259,13 +337,58 @@ def pack_auth_db():
   req.auth_code_version = version.__version__
   auth_db_blob = req.SerializeToString()
 
-  # Sign it using primary's private keys. sign_blob is limited to 8KB only, so
+  logging.debug('AuthDB blob size is %d bytes', len(auth_db_blob))
+  return state, auth_db_blob
+
+
+def sign_auth_db_blob(auth_db_blob):
+  """Signs AuthDB blob with app's private key.
+
+  Returns:
+    Tuple (name of a key used, base64 encoded signature).
+  """
+  # sign_blob is limited to 8KB only, so
   # hash the body first and sign the digest.
   key_name, sig = signature.sign_blob(hashlib.sha512(auth_db_blob).digest())
-  sig = base64.b64encode(sig)
+  return key_name, base64.b64encode(sig)
 
-  logging.debug('AuthDB blob size is %d bytes', len(auth_db_blob))
-  return auth_db_blob, key_name, sig
+
+def store_auth_db_snapshot(replication_state, auth_db_blob):
+  """Puts AuthDB blob (serialized proto) into datastore.
+
+  Args:
+    replication_state: AuthReplicationState that correspond to auth_db_blob.
+    auth_db_blob: serialized AuthDB proto message.
+  """
+  deflated = zlib.compress(auth_db_blob)
+  sha256 = hashlib.sha256(auth_db_blob).hexdigest()
+  key = auth_db_snapshot_key(replication_state.auth_db_rev)
+  latest_key = auth_db_snapshot_latest_key()
+
+  logging.debug('AuthDB deflated blob size is %d bytes', len(deflated))
+
+  @ndb.transactional
+  def insert():
+    if not key.get():
+      e = AuthDBSnapshot(
+        key=key,
+        auth_db_deflated=deflated,
+        auth_db_sha256=sha256,
+        created_ts=replication_state.modified_ts)
+      e.put()
+  insert()
+
+  @ndb.transactional
+  def update_latest_pointer():
+    latest = latest_key.get()
+    if not latest:
+      latest = AuthDBSnapshotLatest(key=latest_key)
+    if latest.auth_db_rev < replication_state.auth_db_rev:
+      latest.auth_db_rev = replication_state.auth_db_rev
+      latest.modified_ts = replication_state.modified_ts
+      latest.auth_db_sha256 = sha256
+      latest.put()
+  update_latest_pointer()
 
 
 @ndb.tasklet

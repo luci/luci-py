@@ -24,7 +24,11 @@ import urllib2
 
 from . import gae_sdk_utils
 
-from utils import file_path
+try:
+  from utils import file_path
+  rmtree = file_path.rmtree
+except ImportError:
+  rmtree = shutil.rmtree
 
 
 def terminate_with_parent():
@@ -210,7 +214,7 @@ class LocalApplication(object):
         self._log = f.read()
       if not leak:
         try:
-          file_path.rmtree(self._temp_root)
+          rmtree(self._temp_root)
         except OSError as e:
           # Log but ignore it to not mask other errors.
           print >> sys.stderr, str(e)

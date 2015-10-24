@@ -5,6 +5,7 @@
 """This module defines Auth Server frontend url handlers."""
 
 import os
+import base64
 
 import webapp2
 
@@ -90,6 +91,13 @@ def get_additional_ui_environment(handler):
   }
 
 
+def is_replica_or_trusted_service():
+  """Returns True if caller is a replica or in 'auth-trusted-services' group."""
+  return (
+      auth.is_group_member('auth-trusted-services') or
+      replication.is_replica(auth.get_current_identity()))
+
+
 ################################################################################
 ## API handlers.
 
@@ -99,6 +107,41 @@ class LinkTicketToken(auth.TokenKind):
   expiration_sec = 24 * 3600
   secret_key = auth.SecretKey('link_ticket_token', scope='local')
   version = 1
+
+
+class AuthDBRevisionsHandler(auth.ApiHandler):
+  """Serves deflated AuthDB proto message with snapshot of all groups.
+
+  Args:
+    rev: version of the snapshot to get ('latest' or concrete revision number).
+        Not all versions may be available (i.e. there may be gaps in revision
+        numbers).
+    skip_body: if '1' will not return actual snapshot, just its SHA256 hash,
+        revision number and timestamp.
+  """
+
+  @auth.require(lambda: is_replica_or_trusted_service() or auth.is_admin())
+  def get(self, rev):
+    skip_body = self.request.get('skip_body') == '1'
+    if rev == 'latest':
+      snapshot = replication.get_latest_auth_db_snapshot(skip_body)
+    else:
+      try:
+        rev = int(rev)
+      except ValueError:
+        self.abort_with_error(400, text='Bad revision number, not an integer')
+      snapshot = replication.get_auth_db_snapshot(rev, skip_body)
+    if not snapshot:
+      self.abort_with_error(404, text='No such snapshot: %s' % rev)
+    resp = {
+      'auth_db_rev': snapshot.key.integer_id(),
+      'created_ts': utils.datetime_to_timestamp(snapshot.created_ts),
+      'sha256': snapshot.auth_db_sha256,
+    }
+    if not skip_body:
+      assert snapshot.auth_db_deflated
+      resp['deflated_body'] = base64.b64encode(snapshot.auth_db_deflated)
+    self.send_response({'snapshot': resp})
 
 
 class ImporterConfigHandler(auth.ApiHandler):
@@ -255,6 +298,9 @@ def get_routes():
     webapp2.Route(r'/_ah/warmup', WarmupHandler),
 
     # API routes.
+    webapp2.Route(
+        r'/auth_service/api/v1/authdb/revisions/<rev:(latest|[0-9]+)>',
+        AuthDBRevisionsHandler),
     webapp2.Route(
         r'/auth_service/api/v1/importer/config',
         ImporterConfigHandler),

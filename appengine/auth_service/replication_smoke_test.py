@@ -9,11 +9,14 @@ It launches two local services (Primary and Replica) via dev_appserver and sets
 up auth db replication between them.
 """
 
+import base64
+import hashlib
 import logging
 import os
 import sys
 import time
 import unittest
+import zlib
 
 from tool_support import gae_sdk_utils
 from tool_support import local_app
@@ -57,6 +60,7 @@ class ReplicationTest(unittest.TestCase):
     self.check_oauth_config_replication()
     self.check_group_replication()
     self.check_ip_whitelist_replication()
+    self.check_snapshot_endpoint()
     self.check_host_token_usage()
     self.check_delegation_token_usage()
 
@@ -218,6 +222,23 @@ class ReplicationTest(unittest.TestCase):
   def check_ip_whitelist_replication(self):
     """Verifies changes to IP whitelist propagate to replica."""
     # TODO(vadimsh): Implement once IP whitelist is accessible via API.
+
+  def check_snapshot_endpoint(self):
+    """Verifies /auth_service/api/v1/authdb/revisions/ works."""
+    response = self.auth_service.client.json_request(
+        '/auth_service/api/v1/authdb/revisions/latest')
+    self.assertEqual(200, response.http_code)
+    latest = response.body['snapshot']
+
+    response = self.auth_service.client.json_request(
+        '/auth_service/api/v1/authdb/revisions/%d' % latest['auth_db_rev'])
+    self.assertEqual(200, response.http_code)
+    at_rev = response.body['snapshot']
+
+    self.assertEqual(latest, at_rev)
+    deflated = base64.b64decode(latest['deflated_body'])
+    self.assertEqual(
+        latest['sha256'], hashlib.sha256(zlib.decompress(deflated)).hexdigest())
 
   def check_host_token_usage(self):
     logging.info('Generating host token in primary')
