@@ -47,23 +47,6 @@ _ADB_KEYS_RAW = None
 
 class _PerDeviceCache(object):
   """Caches data per device, thread-safe."""
-  Device = collections.namedtuple(
-      'Device',
-      [
-        # Cache of /system/build.prop on the Android device.
-        'build_props',
-        # Cache of $EXTERNAL_STORAGE_PATH.
-        'external_storage_path',
-        # /system/xbin/su exists.
-        'has_su',
-        # /root is readable.
-        'is_root',
-        # All the valid CPU scaling governors.
-        'available_governors',
-        # CPU frequency limits.
-        'cpuinfo_max_freq',
-        'cpuinfo_min_freq',
-      ])
 
   def __init__(self):
     self._lock = threading.Lock()
@@ -74,10 +57,9 @@ class _PerDeviceCache(object):
     with self._lock:
       return self._per_device.get(device.port_path)
 
-  def set(self, port_path, device):
-    assert isinstance(device, self.Device), device
+  def set(self, device, cache):
     with self._lock:
-      self._per_device[port_path] = device
+      self._per_device[device.port_path] = cache
 
   def trim(self, devices):
     """Removes any stale cache for any device that is not found anymore.
@@ -182,7 +164,8 @@ def _init_cache(device):
   The data is cached in _per_device_cache() as long as the device is connected
   and responsive.
   """
-  if not _per_device_cache.get(device):
+  cache = _per_device_cache.get(device)
+  if not cache:
     # TODO(maruel): This doesn't seem super useful since the following symlinks
     # already exist: /sdcard/, /mnt/sdcard, /storage/sdcard0.
     external_storage_path, exitcode = device.shell('echo -n $EXTERNAL_STORAGE')
@@ -203,12 +186,9 @@ def _init_cache(device):
     mode, _, _ = device.stat('/system/xbin/su')
     has_su = bool(mode)
 
-    is_root = device._device._is_root()
-
-    if has_su and not is_root:
+    if has_su and not device._device._is_root():
       # Opportinistically tries to switch adbd to run in root mode.
-      if device._device._reset_adbd_as_root():
-        is_root = device._device._is_root()
+      device._device._reset_adbd_as_root()
 
     available_governors = KNOWN_CPU_SCALING_GOVERNOR_VALUES
     out = device.pull_content(
@@ -227,10 +207,13 @@ def _init_cache(device):
     if cpuinfo_min_freq:
       cpuinfo_min_freq = int(cpuinfo_min_freq)
 
-    c = _per_device_cache.Device(
-        properties, external_storage_path, has_su, is_root, available_governors,
+    cache = DeviceCache(
+        properties, external_storage_path, has_su, available_governors,
         cpuinfo_max_freq, cpuinfo_min_freq)
-    _per_device_cache.set(device.port_path, c)
+    # Only save the cache if all the calls above worked.
+    if all(i is not None for i in cache._asdict().itervalues()):
+      _per_device_cache.set(device, cache)
+  return cache
 
 
 ### Public API.
@@ -245,6 +228,25 @@ KNOWN_CPU_SCALING_GOVERNOR_VALUES = (
   'powersave',     # Not available on Nexus 10.
   'userspace',
 )
+
+
+# DeviceCache is static information about a device that it preemptively
+# initialized and that cannot change without formatting the device.
+DeviceCache = collections.namedtuple(
+    'DeviceCache',
+    [
+      # Cache of /system/build.prop on the Android device.
+      'build_props',
+      # Cache of $EXTERNAL_STORAGE_PATH.
+      'external_storage_path',
+      # /system/xbin/su exists.
+      'has_su',
+      # All the valid CPU scaling governors.
+      'available_governors',
+      # CPU frequency limits.
+      'cpuinfo_max_freq',
+      'cpuinfo_min_freq',
+    ])
 
 
 class LowDevice(object):
