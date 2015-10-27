@@ -737,43 +737,6 @@ class OAuthAccountsTest(test_case.TestCase):
     with self.assertRaises(api.AuthorizationError):
       api.extract_oauth_caller_identity()
 
-  def test_unrecognized_service_account(self):
-    self.mock_all('app-id@blah.gserviceaccount.com', 'anonymous')
-    with self.assertRaises(api.AuthorizationError) as e:
-      api.extract_oauth_caller_identity()
-    self.assertEqual(
-        'Unrecognized combination of email (app-id@blah.gserviceaccount.com) '
-        'and client_id (anonymous). Is client_id whitelisted? Is it '
-        'unrecognized service account?', str(e.exception))
-
-  def test_gae_service_account(self):
-    self.mock_all('app-id@appspot.gserviceaccount.com', 'anonymous')
-    self.assertEqual(
-        self.user('app-id@appspot.gserviceaccount.com'),
-        api.extract_oauth_caller_identity())
-
-  def test_internal_service_account(self):
-    self.mock_all('app-id@system.gserviceaccount.com', 'anonymous')
-    self.assertEqual(
-        self.user('app-id@system.gserviceaccount.com'),
-        api.extract_oauth_caller_identity())
-
-  def test_gce_service_account(self):
-    self.mock_all(
-        '123456789123@project.gserviceaccount.com',
-        '123456789123.project.googleusercontent.com')
-    self.assertEqual(
-        self.user('123456789123@project.gserviceaccount.com'),
-        api.extract_oauth_caller_identity())
-
-  def test_private_key_service_account(self):
-    self.mock_all(
-        '111111111111-abcdefghq20gfl1@developer.gserviceaccount.com',
-        '111111111111-abcdefghq20gfl1.apps.googleusercontent.com')
-    self.assertEqual(
-        self.user('111111111111-abcdefghq20gfl1@developer.gserviceaccount.com'),
-        api.extract_oauth_caller_identity())
-
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

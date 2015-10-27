@@ -367,32 +367,13 @@ def extract_oauth_caller_identity(extra_client_ids=None):
   # never fail.
   email = oauth.get_current_user(oauth_scope).email()
 
-  # Is client_id in the explicit whitelist? Used with three legged OAuth.
+  # Is client_id in the explicit whitelist? Used with three legged OAuth. Detect
+  # Google service accounts. No need to whitelist client_ids for each of them,
+  # since email address uniquely identifies credentials used.
   good = (
+      email.endswith('.gserviceaccount.com') or
       get_request_auth_db().is_allowed_oauth_client_id(client_id) or
       client_id in (extra_client_ids or []))
-
-  # Detect various sorts of service accounts. They have a property: client_id
-  # and email are related in some way. No need to whitelist client_ids for each
-  # of them, since email address uniquely identifies credentials used.
-
-  # GAE service account. Token via app_identity.get_access_token().
-  if not good and email.endswith('@appspot.gserviceaccount.com'):
-    good = True
-
-  # Internal service account.
-  if not good and email.endswith('@system.gserviceaccount.com'):
-    good = (client_id == 'anonymous')
-
-  # GCE service account. Token via GCE metadata server.
-  if not good and email.endswith('@project.gserviceaccount.com'):
-    project_id = email[:-len('@project.gserviceaccount.com')]
-    good = (client_id == '%s.project.googleusercontent.com' % project_id)
-
-  # Service account with *.p12 key. Token via SignedJwtAssertionCredentials.
-  if not good and email.endswith('@developer.gserviceaccount.com'):
-    prefix = email[:-len('@developer.gserviceaccount.com')]
-    good = (client_id == '%s.apps.googleusercontent.com' % prefix)
 
   if not good:
     raise AuthorizationError(
