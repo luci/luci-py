@@ -71,7 +71,6 @@ class _PerDeviceCache(object):
     self._per_device = {}
 
   def get(self, device):
-    assert isinstance(device, Device), device
     with self._lock:
       return self._per_device.get(device.port_path)
 
@@ -96,18 +95,6 @@ class _PerDeviceCache(object):
 
 # Global cache of per device cache.
 _per_device_cache = _PerDeviceCache()
-
-
-def _dumpsys(device, arg):
-  """dumpsys is a native android tool that returns semi structured data.
-
-  It acts as a directory service but each service return their data without any
-  real format, and will happily return failure.
-  """
-  out, exit_code = device.shell('dumpsys ' + arg)
-  if exit_code != 0 or out.startswith('Can\'t find service: '):
-    return None
-  return out
 
 
 def _parcel_to_list(lines):
@@ -185,7 +172,7 @@ def _load_device(bot, handle):
         handle.Close()
   # Always create a Device, even if it points to nothing. It makes using the
   # client code much easier.
-  return Device(bot, cmd, port_path)
+  return HighDevice(LowDevice(bot, cmd, port_path))
 
 
 def _init_cache(device):
@@ -216,12 +203,12 @@ def _init_cache(device):
     mode, _, _ = device.stat('/system/xbin/su')
     has_su = bool(mode)
 
-    is_root = device._is_root()
+    is_root = device._device._is_root()
 
     if has_su and not is_root:
       # Opportinistically tries to switch adbd to run in root mode.
-      if device._reset_adbd_as_root():
-        is_root = device._is_root()
+      if device._device._reset_adbd_as_root():
+        is_root = device._device._is_root()
 
     available_governors = KNOWN_CPU_SCALING_GOVERNOR_VALUES
     out = device.pull_content(
@@ -260,7 +247,7 @@ KNOWN_CPU_SCALING_GOVERNOR_VALUES = (
 )
 
 
-class Device(object):
+class LowDevice(object):
   """Wraps an AdbCommands to make it exception safe.
 
   The fact that exceptions can be thrown any time makes the client code really
@@ -588,7 +575,7 @@ class Device(object):
         logging.info('failed to find device after reset')
 
   def __repr__(self):
-    return '<android.Device %s %s>' % (
+    return '<Device %s %s>' % (
         self.port_path, self.serial if self.is_valid else '(broken)')
 
 
@@ -661,7 +648,7 @@ def get_devices(bot=None):
   Caller MUST call close_devices(devices) on the return value.
 
   Returns one of:
-    - list of Device instances.
+    - list of HighDevice instances.
     - None if adb is unavailable.
   """
   if not _ADB_KEYS:
@@ -701,393 +688,433 @@ def close_devices(devices):
     device.close()
 
 
-def set_cpu_scaling_governor(device, governor):
-  """Sets the CPU scaling governor to the one specified.
+class HighDevice(object):
+  """High level device representation.
 
-  Returns:
-    True on success.
+  This class contains all the methods that are effectively composite calls to
+  the low level functionality provided by LowDevice. As such there's no direct
+  access by methods of this class to self.cmd.
   """
-  assert isinstance(device, Device), device
-  assert governor in KNOWN_CPU_SCALING_GOVERNOR_VALUES, governor
-  cache = _per_device_cache.get(device)
-  if cache:
-    if governor not in cache.available_governors:
-      if governor == 'powersave':
-        return set_cpu_speed(device, cache.cpuinfo_min_freq)
-      if governor == 'ondemand':
-        governor = 'interactive'
-      elif governor == 'interactive':
-        governor = 'ondemand'
-      else:
-        logging.error('Can\'t switch to %s', governor)
-        return False
-  assert governor in KNOWN_CPU_SCALING_GOVERNOR_VALUES, governor
+  def __init__(self, device):
+    self._device = device
 
-  path = '/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor'
-  # First query the current state and only try to switch if it's different.
-  prev = device.pull_content(path)
-  if prev:
-    prev = prev.strip()
-    if prev == governor:
-      return True
-    if cache and prev not in cache.available_governors:
-      logging.error(
-          '%s: Read invalid scaling_governor: %s', device.port_path, prev)
+  # Proxy the embedded object methods.
+  @property
+  def adb_cmd(self):
+    return self._device.adb_cmd
 
-  # This works on Nexus 10 but not on Nexus 5. Need to investigate more. In the
-  # meantime, simply try one after the other.
-  if not device.push_content(path, governor + '\n'):
-    # Fallback via shell.
-    _, exit_code = device.shell('echo "%s" > %s' % (governor, path))
-    if exit_code != 0:
-      logging.error(
-          '%s: Writing scaling_governor %s failed; was %s',
-          device.port_path, governor, prev)
-      return False
-  # Get it back to confirm.
-  newval = device.pull_content(path)
-  if not (newval or '').strip() == governor:
-    logging.error(
-        '%s: Wrote scaling_governor %s; was %s; got %s',
-        device.port_path, governor, prev, newval)
-    return False
-  return True
+  @property
+  def port_path(self):
+    return self._device.port_path
 
+  @property
+  def serial(self):
+    return self._device.serial
 
-def set_cpu_speed(device, speed):
-  """Enforces strict CPU speed and disable the CPU scaling governor.
+  @property
+  def is_valid(self):
+    return bool(self.adb_cmd)
 
-  Returns:
-    True on success.
-  """
-  assert isinstance(device, Device), device
-  assert isinstance(speed, int), speed
-  assert 10000 <= speed <= 10000000, speed
-  success = set_cpu_scaling_governor(device, 'userspace')
-  if not device.push_content(
-      '/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed', '%d\n' % speed):
-    return False
-  # Get it back to confirm.
-  val = device.pull_content(
-      '/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed')
-  return success and (val or '').strip() == str(speed)
+  def close(self):
+    self._device.close()
 
+  def listdir(self, destdir):
+    return self._device.listdir(destdir)
 
-def get_build_prop(device):
-  """Returns the system properties for a device.
+  def pull(self, *args, **kwargs):
+    return self._device.pull(*args, **kwargs)
 
-  This isn't really changing through the lifetime of a bot. One corner case is
-  when the device is flashed or disconnected.
-  """
-  assert isinstance(device, Device), device
-  cache = _per_device_cache.get(device)
-  if cache:
-    return cache.build_props
+  def pull_content(self, *args, **kwargs):
+    return self._device.pull_content(*args, **kwargs)
 
+  def push(self, *args, **kwargs):
+    return self._device.push(*args, **kwargs)
 
-def get_external_storage_path(device):
-  """Returns the path to the SDCard (or emulated.
+  def push_content(self, *args, **kwargs):
+    return self._device.push_content(*args, **kwargs)
 
-  May look like /storage/emulated/legacy or None.
-  """
-  assert isinstance(device, Device), device
-  cache = _per_device_cache.get(device)
-  if cache:
-    return cache.external_storage_path
+  def reboot(self):
+    return self._device.reboot()
 
+  def remount(self):
+    return self._device.remount()
 
-def get_temp(device):
-  """Returns the device's 2 temperatures if available.
+  def shell(self, cmd):
+    return self._device.shell(cmd)
 
-  Returns None otherwise.
-  """
-  assert isinstance(device, Device), device
-  # Not all devices export this file. On other devices, the only real way to
-  # read it is via Java
-  # developer.android.com/guide/topics/sensors/sensors_environment.html
-  temps = []
-  try:
-    for i in xrange(2):
-      out = device.pull_content('/sys/class/thermal/thermal_zone%d/temp' % i)
-      temps.append(int(out))
-  except (TypeError, ValueError):
-    return None
-  return temps
+  def shell_raw(self, cmd):
+    return self._device.shell_raw(cmd)
 
+  def stat(self, dest):
+    return self._device.stat(dest)
 
-def get_battery(device):
-  """Returns details about the battery's state."""
-  assert isinstance(device, Device), device
-  props = {}
-  out = _dumpsys(device, 'battery')
-  if not out:
-    return props
-  for line in out.splitlines():
-    if line.endswith(u':'):
-      continue
-    # On Android 4.1.2, it uses "voltage:123" instead of "voltage: 123".
-    parts = line.split(u':', 2)
-    if len(parts) == 2:
-      key, value = parts
-      props[key.lstrip()] = value.strip()
-  out = {u'power': []}
-  if props.get(u'AC powered') == u'true':
-    out[u'power'].append(u'AC')
-  if props.get(u'USB powered') == u'true':
-    out[u'power'].append(u'USB')
-  if props.get(u'Wireless powered') == u'true':
-    out[u'power'].append(u'Wireless')
-  for key in (u'health', u'level', u'status', u'temperature', u'voltage'):
-    out[key] = int(props[key]) if key in props else None
-  return out
+  def __repr__(self):
+    return repr(self._device)
 
+  # High level methods.
 
-def get_cpu_scale(device):
-  """Returns the CPU scaling factor."""
-  assert isinstance(device, Device), device
-  mapping = {
-    'cpuinfo_max_freq': u'max',
-    'cpuinfo_min_freq': u'min',
-    'scaling_cur_freq': u'cur',
-    'scaling_governor': u'governor',
-  }
+  def set_cpu_scaling_governor(self, governor):
+    """Sets the CPU scaling governor to the one specified.
 
-  out = {}
-  cache = _per_device_cache.get(device)
-  if cache:
-    out = {
-      'max': cache.cpuinfo_max_freq,
-      'min': cache.cpuinfo_min_freq,
-    }
-    del mapping['cpuinfo_max_freq']
-    del mapping['cpuinfo_min_freq']
+    Returns:
+      True on success.
+    """
+    assert governor in KNOWN_CPU_SCALING_GOVERNOR_VALUES, governor
+    cache = _per_device_cache.get(self)
+    if cache:
+      if governor not in cache.available_governors:
+        if governor == 'powersave':
+          return self.set_cpu_speed(cache.cpuinfo_min_freq)
+        if governor == 'ondemand':
+          governor = 'interactive'
+        elif governor == 'interactive':
+          governor = 'ondemand'
+        else:
+          logging.error('Can\'t switch to %s', governor)
+          return False
+    assert governor in KNOWN_CPU_SCALING_GOVERNOR_VALUES, governor
 
-  out.update(
-    (v, device.pull_content('/sys/devices/system/cpu/cpu0/cpufreq/' + k))
-    for k, v in mapping.iteritems())
-  return out
-
-
-def get_uptime(device):
-  """Returns the device's uptime in second."""
-  assert isinstance(device, Device), device
-  out = device.pull_content('/proc/uptime')
-  if out:
-    return float(out.split()[1])
-  return None
-
-
-def get_disk(device):
-  """Returns details about the battery's state."""
-  assert isinstance(device, Device), device
-  props = {}
-  out = _dumpsys(device, 'diskstats')
-  if not out:
-    return props
-  for line in out.splitlines():
-    if line.endswith(u':'):
-      continue
-    parts = line.split(u': ', 2)
-    if len(parts) == 2:
-      key, value = parts
-      match = re.match(u'^(\d+)K / (\d+)K.*', value)
-      if match:
-        props[key.lstrip()] = {
-          'free_mb': round(float(match.group(1)) / 1024., 1),
-          'size_mb': round(float(match.group(2)) / 1024., 1),
-        }
-  return {
-    u'cache': props[u'Cache-Free'],
-    u'data': props[u'Data-Free'],
-    u'system': props[u'System-Free'],
-  }
-
-
-def get_imei(device):
-  """Returns the phone's IMEI."""
-  assert isinstance(device, Device), device
-  # Android <5.0.
-  out = _dumpsys(device, 'iphonesubinfo')
-  if out:
-    match = re.search('  Device ID = (.+)$', out)
-    if match:
-      return match.group(1)
-
-  # Android >= 5.0.
-  out, _ = device.shell('service call iphonesubinfo 1')
-  if out:
-    lines = out.splitlines()
-    if len(lines) >= 4 and lines[0] == 'Result: Parcel(':
-      # Process the UTF-16 string.
-      chars = _parcel_to_list(lines[1:])[4:-1]
-      return u''.join(map(unichr, (int(i, 16) for i in chars)))
-  return None
-
-
-def get_ip(device):
-  """Returns the IP address."""
-  assert isinstance(device, Device), device
-  # If ever needed, read wifi.interface from /system/build.prop if a device
-  # doesn't use wlan0.
-  ip, _ = device.shell('getprop dhcp.wlan0.ipaddress')
-  if not ip:
-    return None
-  return ip.strip()
-
-
-def get_last_uid(device):
-  """Returns the highest UID on the device."""
-  assert isinstance(device, Device), device
-  # pylint: disable=line-too-long
-  # Applications are set in the 10000-19999 UID space. The UID are not reused.
-  # So after installing 10000 apps, including stock apps, ignoring uninstalls,
-  # then the device becomes unusable. Oops!
-  # https://android.googlesource.com/platform/frameworks/base/+/master/api/current.txt
-  # or:
-  # curl -sSLJ \
-  #   https://android.googlesource.com/platform/frameworks/base/+/master/api/current.txt?format=TEXT \
-  #   | base64 --decode | grep APPLICATION_UID
-  out = device.pull_content('/data/system/packages.list')
-  if not out:
-    return None
-  return max(int(l.split(' ', 2)[1]) for l in out.splitlines() if len(l) > 2)
-
-
-def list_packages(device):
-  """Returns the list of packages installed."""
-  out, _ = device.shell('pm list packages')
-  if not out:
-    return None
-  return [l.split(':', 1)[1] for l in out.strip().splitlines()]
-
-
-def install_apk(device, destdir, apk):
-  """Installs apk to destdir directory."""
-  assert isinstance(device, Device), device
-  # TODO(maruel): Test.
-  # '/data/local/tmp/'
-  dest = posixpath.join(destdir, os.path.basename(apk))
-  if not device.push(apk, dest):
-    return False
-  return device.shell('pm install -r %s' % pipes.quote(dest))[1] is 0
-
-
-def uninstall_apk(device, package):
-  """Uninstalls the package."""
-  assert isinstance(device, Device), device
-  return device.shell('pm uninstall %s' % pipes.quote(package))[1] is 0
-
-
-def get_application_path(device, package):
-  assert isinstance(device, Device), device
-  # TODO(maruel): Test.
-  out, _ = device.shell('pm path %s' % pipes.quote(package))
-  return out.strip() if out else out
-
-
-def get_application_version(device, package):
-  assert isinstance(device, Device), device
-  # TODO(maruel): Test.
-  out, _ = device.shell('dumpsys package %s' % pipes.quote(package))
-  return out
-
-
-def wait_for_device(device, timeout=180):
-  """Waits for the device to be responsive."""
-  assert isinstance(device, Device), device
-  start = time.time()
-  while (time.time() - start) < timeout:
-    try:
-      if device.shell_raw('echo \'hi\'')[1] == 0:
+    path = '/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor'
+    # First query the current state and only try to switch if it's different.
+    prev = self.pull_content(path)
+    if prev:
+      prev = prev.strip()
+      if prev == governor:
         return True
-    except device._ERRORS:
-      pass
-  return False
+      if cache and prev not in cache.available_governors:
+        logging.error(
+            '%s: Read invalid scaling_governor: %s', self.port_path, prev)
 
+    # This works on Nexus 10 but not on Nexus 5. Need to investigate more. In
+    # the meantime, simply try one after the other.
+    if not self.push_content(path, governor + '\n'):
+      # Fallback via shell.
+      _, exit_code = self.shell('echo "%s" > %s' % (governor, path))
+      if exit_code != 0:
+        logging.error(
+            '%s: Writing scaling_governor %s failed; was %s',
+            self.port_path, governor, prev)
+        return False
+    # Get it back to confirm.
+    newval = self.pull_content(path)
+    if not (newval or '').strip() == governor:
+      logging.error(
+          '%s: Wrote scaling_governor %s; was %s; got %s',
+          self.port_path, governor, prev, newval)
+      return False
+    return True
 
-def push_keys(device):
-  """Pushes all the keys on the file system to the device.
+  def set_cpu_speed(self, speed):
+    """Enforces strict CPU speed and disable the CPU scaling governor.
 
-  This is necessary when the device just got wiped but still has authorization,
-  as soon as it reboots it'd loose the authorization.
+    Returns:
+      True on success.
+    """
+    assert isinstance(speed, int), speed
+    assert 10000 <= speed <= 10000000, speed
+    success = self.set_cpu_scaling_governor('userspace')
+    if not self.push_content(
+        '/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed', '%d\n' %
+        speed):
+      return False
+    # Get it back to confirm.
+    val = self.pull_content(
+        '/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed')
+    return success and (val or '').strip() == str(speed)
 
-  It never removes a previously trusted key, only adds new ones. Saves writing
-  to the device if unnecessary.
-  """
-  if not _ADB_KEYS_RAW:
-    # E.g. adb was never run locally and initialize(None, None) was used.
+  def get_build_prop(self):
+    """Returns the system properties for a device.
+
+    This isn't really changing through the lifetime of a bot. One corner case is
+    when the device is flashed or disconnected.
+    """
+    cache = _per_device_cache.get(self)
+    if cache:
+      return cache.build_props
+
+  def get_external_storage_path(self):
+    """Returns the path to the SDCard (or emulated).
+
+    May look like /storage/emulated/legacy or None.
+    """
+    cache = _per_device_cache.get(self)
+    if cache:
+      return cache.external_storage_path
+
+  def get_temperatures(self):
+    """Returns the device's 2 temperatures if available.
+
+    Returns None otherwise.
+    """
+    # Not all devices export this file. On other devices, the only real way to
+    # read it is via Java
+    # developer.android.com/guide/topics/sensors/sensors_environment.html
+    temps = []
+    try:
+      for i in xrange(2):
+        out = self.pull_content('/sys/class/thermal/thermal_zone%d/temp' % i)
+        temps.append(int(out))
+    except (TypeError, ValueError):
+      return None
+    return temps
+
+  def get_battery(self):
+    """Returns details about the battery's state."""
+    props = {}
+    out = self.dumpsys('battery')
+    if not out:
+      return props
+    for line in out.splitlines():
+      if line.endswith(u':'):
+        continue
+      # On Android 4.1.2, it uses "voltage:123" instead of "voltage: 123".
+      parts = line.split(u':', 2)
+      if len(parts) == 2:
+        key, value = parts
+        props[key.lstrip()] = value.strip()
+    out = {u'power': []}
+    if props.get(u'AC powered') == u'true':
+      out[u'power'].append(u'AC')
+    if props.get(u'USB powered') == u'true':
+      out[u'power'].append(u'USB')
+    if props.get(u'Wireless powered') == u'true':
+      out[u'power'].append(u'Wireless')
+    for key in (u'health', u'level', u'status', u'temperature', u'voltage'):
+      out[key] = int(props[key]) if key in props else None
+    return out
+
+  def get_cpu_scale(self):
+    """Returns the CPU scaling factor."""
+    mapping = {
+      'cpuinfo_max_freq': u'max',
+      'cpuinfo_min_freq': u'min',
+      'scaling_cur_freq': u'cur',
+      'scaling_governor': u'governor',
+    }
+
+    out = {}
+    cache = _per_device_cache.get(self)
+    if cache:
+      out = {
+        'max': cache.cpuinfo_max_freq,
+        'min': cache.cpuinfo_min_freq,
+      }
+      del mapping['cpuinfo_max_freq']
+      del mapping['cpuinfo_min_freq']
+
+    out.update(
+      (v, self.pull_content('/sys/devices/system/cpu/cpu0/cpufreq/' + k))
+      for k, v in mapping.iteritems())
+    return out
+
+  def get_uptime(self):
+    """Returns the device's uptime in second."""
+    out = self.pull_content('/proc/uptime')
+    if out:
+      return float(out.split()[1])
+    return None
+
+  def get_disk(self):
+    """Returns details about the battery's state."""
+    props = {}
+    out = self.dumpsys('diskstats')
+    if not out:
+      return props
+    for line in out.splitlines():
+      if line.endswith(u':'):
+        continue
+      parts = line.split(u': ', 2)
+      if len(parts) == 2:
+        key, value = parts
+        match = re.match(u'^(\d+)K / (\d+)K.*', value)
+        if match:
+          props[key.lstrip()] = {
+            'free_mb': round(float(match.group(1)) / 1024., 1),
+            'size_mb': round(float(match.group(2)) / 1024., 1),
+          }
+    return {
+      u'cache': props[u'Cache-Free'],
+      u'data': props[u'Data-Free'],
+      u'system': props[u'System-Free'],
+    }
+
+  def get_imei(self):
+    """Returns the phone's IMEI."""
+    # Android <5.0.
+    out = self.dumpsys('iphonesubinfo')
+    if out:
+      match = re.search('  Device ID = (.+)$', out)
+      if match:
+        return match.group(1)
+
+    # Android >= 5.0.
+    out, _ = self.shell('service call iphonesubinfo 1')
+    if out:
+      lines = out.splitlines()
+      if len(lines) >= 4 and lines[0] == 'Result: Parcel(':
+        # Process the UTF-16 string.
+        chars = _parcel_to_list(lines[1:])[4:-1]
+        return u''.join(map(unichr, (int(i, 16) for i in chars)))
+    return None
+
+  def get_ip(self):
+    """Returns the IP address."""
+    # If ever needed, read wifi.interface from /system/build.prop if a device
+    # doesn't use wlan0.
+    ip, _ = self.shell('getprop dhcp.wlan0.ipaddress')
+    if not ip:
+      return None
+    return ip.strip()
+
+  def get_last_uid(self):
+    """Returns the highest UID on the device."""
+    # pylint: disable=line-too-long
+    # Applications are set in the 10000-19999 UID space. The UID are not reused.
+    # So after installing 10000 apps, including stock apps, ignoring uninstalls,
+    # then the device becomes unusable. Oops!
+    # https://android.googlesource.com/platform/frameworks/base/+/master/api/current.txt
+    # or:
+    # curl -sSLJ \
+    #   https://android.googlesource.com/platform/frameworks/base/+/master/api/current.txt?format=TEXT \
+    #   | base64 --decode | grep APPLICATION_UID
+    out = self.pull_content('/data/system/packages.list')
+    if not out:
+      return None
+    return max(int(l.split(' ', 2)[1]) for l in out.splitlines() if len(l) > 2)
+
+  def list_packages(self):
+    """Returns the list of packages installed."""
+    out, _ = self.shell('pm list packages')
+    if not out:
+      return None
+    return [l.split(':', 1)[1] for l in out.strip().splitlines()]
+
+  def install_apk(self, destdir, apk):
+    """Installs apk to destdir directory."""
+    # TODO(maruel): Test.
+    # '/data/local/tmp/'
+    dest = posixpath.join(destdir, os.path.basename(apk))
+    if not self.push(apk, dest):
+      return False
+    return self.shell('pm install -r %s' % pipes.quote(dest))[1] is 0
+
+  def uninstall_apk(self, package):
+    """Uninstalls the package."""
+    return self.shell('pm uninstall %s' % pipes.quote(package))[1] is 0
+
+  def get_application_path(self, package):
+    # TODO(maruel): Test.
+    out, _ = self.shell('pm path %s' % pipes.quote(package))
+    return out.strip() if out else out
+
+  def get_application_version(self, package):
+    # TODO(maruel): Test.
+    out, _ = self.shell('dumpsys package %s' % pipes.quote(package))
+    return out
+
+  def wait_for_device(self, timeout=180):
+    """Waits for the device to be responsive."""
+    start = time.time()
+    while (time.time() - start) < timeout:
+      try:
+        if self.shell_raw('echo \'hi\'')[1] == 0:
+          return True
+      except self._ERRORS:
+        pass
     return False
-  keys = set(_ADB_KEYS_RAW)
-  assert all('\n' not in k for k in keys), keys
-  old_content = device.pull_content('/data/misc/adb/adb_keys')
-  if old_content:
-    old_keys = set(old_content.strip().splitlines())
-    if keys.issubset(old_keys):
-      return True
-    keys = keys | old_keys
-  assert all('\n' not in k for k in keys), keys
-  if device.shell('mkdir -p /data/misc/adb')[1] != 0:
-    return False
-  if device.shell('restorecon /data/misc/adb')[1] != 0:
-    return False
-  if not device.push_content(
-      '/data/misc/adb/adb_keys', ''.join(k + '\n' for k in sorted(keys))):
-    return False
-  if device.shell('restorecon /data/misc/adb/adb_keys')[1] != 0:
-    return False
-  return True
 
+  def push_keys(self):
+    """Pushes all the keys on the file system to the device.
 
-def mkstemp(device, content, prefix='swarming', suffix=''):
-  """Make a new temporary files with content.
+    This is necessary when the device just got wiped but still has
+    authorization, as soon as it reboots it'd lose the authorization.
 
-  The random part of the name is guaranteed to not require quote.
+    It never removes a previously trusted key, only adds new ones. Saves writing
+    to the device if unnecessary.
+    """
+    if not _ADB_KEYS_RAW:
+      # E.g. adb was never run locally and initialize(None, None) was used.
+      return False
+    keys = set(_ADB_KEYS_RAW)
+    assert all('\n' not in k for k in keys), keys
+    old_content = self.pull_content('/data/misc/adb/adb_keys')
+    if old_content:
+      old_keys = set(old_content.strip().splitlines())
+      if keys.issubset(old_keys):
+        return True
+      keys = keys | old_keys
+    assert all('\n' not in k for k in keys), keys
+    if self.shell('mkdir -p /data/misc/adb')[1] != 0:
+      return False
+    if self.shell('restorecon /data/misc/adb')[1] != 0:
+      return False
+    if not self.push_content(
+        '/data/misc/adb/adb_keys', ''.join(k + '\n' for k in sorted(keys))):
+      return False
+    if self.shell('restorecon /data/misc/adb/adb_keys')[1] != 0:
+      return False
+    return True
 
-  Returns None in case of failure.
-  """
-  # There's a small race condition in there but it's assumed only this process
-  # is doing something on the device at this point.
-  choices = string.ascii_letters + string.digits
-  for _ in xrange(5):
-    name = '/data/local/tmp/' + prefix + ''.join(
-        random.choice(choices) for _ in xrange(5)) + suffix
-    mode, _, _ = device.stat(name)
-    if mode:
-      continue
-    if device.push_content(name, content):
-      return name
+  def mkstemp(self, content, prefix='swarming', suffix=''):
+    """Make a new temporary files with content.
 
+    The random part of the name is guaranteed to not require quote.
 
-def run_shell_wrapped(device, commands):
-  """Creates a temporary shell script, runs it then return the data.
+    Returns None in case of failure.
+    """
+    # There's a small race condition in there but it's assumed only this process
+    # is doing something on the device at this point.
+    choices = string.ascii_letters + string.digits
+    for _ in xrange(5):
+      name = '/data/local/tmp/' + prefix + ''.join(
+          random.choice(choices) for _ in xrange(5)) + suffix
+      mode, _, _ = self.stat(name)
+      if mode:
+        continue
+      if self.push_content(name, content):
+        return name
 
-  This is needed when:
-  - the expected command is more than ~500 characters
-  - the expected output is more than 32k characters
+  def run_shell_wrapped(self, commands):
+    """Creates a temporary shell script, runs it then return the data.
 
-  Returns:
-    tuple(stdout and stderr merged, exit_code).
-  """
-  content = ''.join(l + '\n' for l in commands)
-  script = mkstemp(device, content, suffix='.sh')
-  if not script:
-    return False
-  try:
-    outfile = mkstemp(device, '', suffix='.txt')
-    if not outfile:
+    This is needed when:
+    - the expected command is more than ~500 characters
+    - the expected output is more than 32k characters
+
+    Returns:
+      tuple(stdout and stderr merged, exit_code).
+    """
+    content = ''.join(l + '\n' for l in commands)
+    script = self.mkstemp(content, suffix='.sh')
+    if not script:
       return False
     try:
-      _, exit_code = device.shell('sh %s &> %s' % (script, outfile))
-      out = device.pull_content(outfile)
-      return out, exit_code
+      outfile = self.mkstemp('', suffix='.txt')
+      if not outfile:
+        return False
+      try:
+        _, exit_code = self.shell('sh %s &> %s' % (script, outfile))
+        out = self.pull_content(outfile)
+        return out, exit_code
+      finally:
+        self.shell('rm %s' % outfile)
     finally:
-      device.shell('rm %s' % outfile)
-  finally:
-    device.shell('rm %s' % script)
+      self.shell('rm %s' % script)
 
+  def get_prop(self, prop):
+    out, exit_code = self.shell('getprop %s' % pipes.quote(prop))
+    if exit_code != 0:
+      return None
+    return out.rstrip()
 
-def get_prop(device, prop):
-  out, exit_code = device.shell('getprop %s' % pipes.quote(prop))
-  if exit_code != 0:
-    return None
-  return out.rstrip()
+  def dumpsys(self, arg):
+    """dumpsys is a native android tool that returns inconsistent semi
+    structured data.
+
+    It acts as a directory service but each service return their data without
+    any real format, and will happily return failure.
+    """
+    out, exit_code = self.shell('dumpsys ' + arg)
+    if exit_code != 0 or out.startswith('Can\'t find service: '):
+      return None
+    return out

@@ -14,9 +14,9 @@ import android
 from adb import sign_pythonrsa
 
 
-class MockDevice(android.Device):
+class MockDevice(object):
   def __init__(self, cmds):
-    super(MockDevice, self).__init__(None, None, None)
+    super(MockDevice, self).__init__()
     self._cmds = cmds[:]
 
   def shell(self, cmd):
@@ -38,7 +38,7 @@ class TestAndroid(unittest.TestCase):
           ('dumpsys iphonesubinfo', ''),
           ('service call iphonesubinfo 1', RAW_IMEI),
         ])
-    self.assertEqual(u'355236058685894', android.get_imei(device))
+    self.assertEqual(u'355236058685894', android.HighDevice(device).get_imei())
 
 
 class PythonRSASignerTest(unittest.TestCase):

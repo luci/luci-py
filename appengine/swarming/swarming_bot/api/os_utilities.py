@@ -470,7 +470,7 @@ def get_dimensions_all_devices_android(devices):
     dimensions[key] = set()
   dimensions[u'android'] = []
   for device in devices:
-    properties = platforms.android.get_build_prop(device)
+    properties = device.get_build_prop()
     if properties:
       for key in keys:
         real_key = u'ro.' + key
@@ -531,25 +531,25 @@ def get_state_all_devices_android(devices):
   def fn(device):
     if not device.is_valid:
       return {u'state': 'unauthenticated'}
-    properties = platforms.android.get_build_prop(device)
+    properties = device.get_build_prop()
     if not properties:
       return {u'state': 'unavailable'}
     return {
-      u'battery': platforms.android.get_battery(device),
+      u'battery': device.get_battery(),
       u'build': {key: properties[u'ro.'+key] for key in keys},
-      u'cpu_scale': platforms.android.get_cpu_scale(device),
-      u'disk': platforms.android.get_disk(device),
-      u'imei': platforms.android.get_imei(device),
-      u'ip': platforms.android.get_ip(device),
-      u'max_uid': platforms.android.get_last_uid(device),
+      u'cpu_scale': device.get_cpu_scale(),
+      u'disk': device.get_disk(),
+      u'imei': device.get_imei(),
+      u'ip': device.get_ip(),
+      u'max_uid': device.get_last_uid(),
       u'other_packages': [
-        p for p in platforms.android.list_packages(device) or []
+        p for p in device.list_packages() or []
         if not p.startswith(('com.android.', 'com.google.')) and p != 'android'
       ],
       u'serial': device.serial,
       u'state': u'available',
-      u'temp': platforms.android.get_temp(device),
-      u'uptime': platforms.android.get_uptime(device),
+      u'temp': device.get_temperatures(),
+      u'uptime': device.get_uptime(),
     }
 
   start = time.time()
