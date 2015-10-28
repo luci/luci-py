@@ -14,9 +14,6 @@ Supports three ways to generate OAuth2 tokens:
   * app_identity.get_access_token(...) to use native GAE service account.
   * OAuth flow with JWT token, for @developer.gserviceaccount.com service
     accounts (the one with a private key).
-  * Read an existing token from the datastore when running on dev server (useful
-    during local debugging with developer's own tokens obtained elsewhere, for
-    example from API Explorer).
 """
 
 import base64
@@ -29,7 +26,6 @@ import urllib
 from google.appengine.api import app_identity
 from google.appengine.api import memcache
 from google.appengine.api import urlfetch
-from google.appengine.ext import ndb
 
 from components import utils
 
@@ -67,9 +63,6 @@ def get_access_token(scopes, service_account_key=None):
   invoke app_identity.get_access_token(...) to use app's
   @appspot.gserviceaccount.com account.
 
-  On dev server (if service_account_key is not passed or empty) reads the token
-  from 'access_token' DevServerAccessToken entity.
-
   Args:
     scopes: the requested API scope string, or a list of strings.
     service_account_key: optional instance of ServiceAccountKey.
@@ -85,47 +78,12 @@ def get_access_token(scopes, service_account_key=None):
   if service_account_key:
     # Empty private_key_id probably means that the app is not configured yet.
     if not service_account_key.private_key_id:
-      # On dev server fallback to reading hardcoded token from the datastore.
-      if utils.is_local_dev_server():
-        return _get_dev_server_token()
       raise AccessTokenError('Service account secret key is not initialized')
     return _get_jwt_based_token(scopes, service_account_key)
-
-  # app_identity.get_access_token returns nonsense on dev server.
-  if utils.is_local_dev_server():
-    return _get_dev_server_token()
-
-  # Running on real GAE, and no secret key is passed -> app_identity API.
   return app_identity.get_access_token(scopes)
 
 
 ## Private stuff.
-
-
-class DevServerAccessToken(ndb.Model):
-  # The entity is supposed to be modified from dev server datastore viewer that
-  # doesn't know about memcache. So disable it.
-  _use_memcache = False
-  # Dev server datastore viewer fails to update fields that have None value, so
-  # set explicitly to '' instead.
-  access_token = ndb.StringProperty(default='')
-
-
-def _get_dev_server_token():
-  """Reads token from DevServerAccessToken entity."""
-  assert utils.is_local_dev_server()
-  token = DevServerAccessToken.get_or_insert('access_token')
-
-  # Dump token URL to log, so that it easy to find and change it.
-  edit_url = 'http://localhost:8000/datastore/edit/%s' % token.key.urlsafe()
-  logging.info('Using token from %s', edit_url)
-
-  if not token.access_token:
-    raise AccessTokenError(
-        'Dev server access token is not initialized: %s' % edit_url)
-
-  # Fake expiration time as 5 min from now.
-  return token.access_token, utils.time_time() + 300
 
 
 def _get_jwt_based_token(scopes, service_account_key):

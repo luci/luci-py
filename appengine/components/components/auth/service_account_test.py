@@ -33,9 +33,6 @@ class GetAccessTokenTest(test_case.TestCase):
       calls.append((method, args))
       return 'token', 0
     self.mock(
-        service_account, '_get_dev_server_token',
-        functools.partial(get_token, 'dev_server'))
-    self.mock(
         service_account, '_get_jwt_based_token',
         functools.partial(get_token, 'jwt_based'))
     self.mock(
@@ -69,42 +66,7 @@ class GetAccessTokenTest(test_case.TestCase):
         service_account.get_access_token('scope', FAKE_SECRET_KEY))
     self.assertEqual([('jwt_based', ('scope', FAKE_SECRET_KEY))], calls)
 
-  ## Verify what token generation method are used when running on dev server.
-
-  def test_on_dev_no_key_uses_datastore(self):
-    """On dev server uses token from datastore if secret key is not used."""
-    calls = self.mock_methods()
-    self.assertEqual(('token', 0), service_account.get_access_token('scope'))
-    self.assertEqual([('dev_server', ())], calls)
-
-  def test_on_dev_empty_key_uses_datastore(self):
-    """On dev server uses token from datastore if secret key is empty."""
-    calls = self.mock_methods()
-    self.assertEqual(
-        ('token', 0),
-        service_account.get_access_token('scope', EMPTY_SECRET_KEY))
-    self.assertEqual([('dev_server', ())], calls)
-
-  def test_on_dev_good_key_is_used(self):
-    """On dev server if good key is passed, invokes JWT based fetch."""
-    calls = self.mock_methods()
-    self.assertEqual(
-        ('token', 0),
-        service_account.get_access_token('scope', FAKE_SECRET_KEY))
-    self.assertEqual([('jwt_based', ('scope', FAKE_SECRET_KEY))], calls)
-
   ## Tests for individual token generation methods.
-
-  def test_get_dev_server_token_present(self):
-    service_account.DevServerAccessToken(
-        id='access_token', access_token='blah').put()
-    token, exp = service_account._get_dev_server_token()
-    self.assertEqual('blah', token)
-    self.assertGreaterEqual(exp, utils.time_time())
-
-  def test_get_dev_server_token_missing(self):
-    with self.assertRaises(service_account.AccessTokenError):
-      service_account._get_dev_server_token()
 
   def test_get_jwt_based_token_memcache(self):
     now = datetime.datetime(2015, 1, 2, 3)
