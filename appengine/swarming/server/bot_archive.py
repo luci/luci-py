@@ -172,6 +172,7 @@ FILES = (
     'adb/common.py',
     'adb/fastboot.py',
     'adb/filesync_protocol.py',
+    'adb/parallel.py',
     'adb/sign_pythonrsa.py',
     'adb/usb_exceptions.py',
     'python_libusb1/__init__.py',
