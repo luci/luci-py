@@ -99,64 +99,6 @@ def _parcel_to_list(lines):
   return out
 
 
-def _load_device(bot, handle):
-  """Return a Device wrapping an adb_commands.AdbCommands.
-  """
-  assert isinstance(handle, common.UsbHandle), handle
-  port_path = '/'.join(map(str, handle.port_path))
-  try:
-    # If this succeeds, this initializes handle._handle, which is a
-    # usb1.USBDeviceHandle.
-    handle.Open()
-  except common.usb1.USBErrorNoDevice as e:
-    logging.warning('Got USBErrorNoDevice for %s: %s', port_path, e)
-    # Do not kill adb, it just means the USB host is likely resetting and the
-    # device is temporarily unavailable.We can't use handle.serial_number since
-    # this communicates with the device.
-    # TODO(maruel): In practice we'd like to retry for a few seconds.
-    handle = None
-  except common.usb1.USBErrorBusy as e:
-    logging.warning('Got USBErrorBusy for %s. Killing adb: %s', port_path, e)
-    kill_adb()
-    try:
-      # If it throws again, it probably means another process holds a handle to
-      # the USB ports or group acl (plugdev) hasn't been setup properly.
-      handle.Open()
-    except common.usb1.USBErrorBusy as e:
-      logging.warning(
-          'USB port for %s is already open (and failed to kill ADB) '
-          'Try rebooting the host: %s', port_path, e)
-      handle = None
-  except common.usb1.USBErrorAccess as e:
-    # Do not try to use serial_number, since we can't even access the port.
-    logging.warning('Try rebooting the host: %s: %s', port_path, e)
-    handle = None
-
-  cmd = None
-  if handle:
-    try:
-      # Give 10s for the user to accept the dialog. The best design would be to
-      # do a quick check with timeout=100ms and only if the first failed, try
-      # again with a long timeout. The goal is not to hang the bots for several
-      # minutes when all the devices are unauthenticated.
-      # TODO(maruel): A better fix would be to change python-adb to continue the
-      # authentication dance from where it stopped. This is left as a follow up.
-      cmd = adb_commands.AdbCommands.Connect(
-          handle, banner='swarming', rsa_keys=_ADB_KEYS,
-          auth_timeout_ms=10000)
-    except usb_exceptions.DeviceAuthError as e:
-      logging.warning('AUTH FAILURE: %s: %s', port_path, e)
-    except usb_exceptions.LibusbWrappingError as e:
-      logging.warning('WRITE FAILURE: %s: %s', port_path, e)
-    finally:
-      # Do not leak the USB handle when we can't talk to the device.
-      if not cmd:
-        handle.Close()
-  # Always create a Device, even if it points to nothing. It makes using the
-  # client code much easier.
-  return HighDevice(LowDevice(bot, cmd, port_path))
-
-
 def _init_cache(device):
   """Primes data known to be fetched soon right away that is static for the
   lifetime of the device.
@@ -185,10 +127,6 @@ def _init_cache(device):
 
     mode, _, _ = device.stat('/system/xbin/su')
     has_su = bool(mode)
-
-    if has_su and not device._device._is_root():
-      # Opportinistically tries to switch adbd to run in root mode.
-      device._device._reset_adbd_as_root()
 
     available_governors = KNOWN_CPU_SCALING_GOVERNOR_VALUES
     out = device.pull_content(
@@ -264,10 +202,10 @@ class LowDevice(object):
   #   anymore.
   _ERRORS = (usb_exceptions.CommonUsbError, common.libusb1.USBError)
 
-  def __init__(self, bot, adb_cmd, port_path):
+  def __init__(self, adb_cmd, port_path, on_error):
     if adb_cmd:
       assert isinstance(adb_cmd, adb_commands.AdbCommands), adb_cmd
-    self._bot = bot
+    self._on_error = on_error
     self._has_reset = False
     self._tries = 1
     self.adb_cmd = adb_cmd
@@ -465,7 +403,7 @@ class LowDevice(object):
     parts = out[:-1].rsplit('\n', 1)
     return parts[0], int(parts[1])
 
-  def _reset_adbd_as_root(self):
+  def reset_adbd_as_root(self):
     """If adbd on the device is not root, ask it to restart as root.
 
     This causes the USB device to disapear momentarily, which causes a big mess,
@@ -476,22 +414,22 @@ class LowDevice(object):
     for _ in xrange(self._tries):
       try:
         out = self.adb_cmd.Root()
-        logging.info('_reset_adbd_as_root() = %s', out)
+        logging.info('reset_adbd_as_root() = %s', out)
         # Hardcoded strings in platform_system_core/adb/services.cpp
         if out == 'adbd is already running as root\n':
           return True
         if out == 'adbd cannot run as root in production builds\n':
           return False
         # 'restarting adbd as root\n'
-        if not self._is_root():
-          logging.error('Failed to id after _reset_adbd_as_root()')
+        if not self.is_root():
+          logging.error('Failed to id after reset_adbd_as_root()')
           return False
         return True
       except self._ERRORS as e:
         self._try_reset('(): %s', e)
     return False
 
-  def _reset_adbd_as_user(self):
+  def reset_adbd_as_user(self):
     """If adbd on the device is root, ask it to restart as user."""
     for _ in xrange(self._tries):
       try:
@@ -499,22 +437,32 @@ class LowDevice(object):
         #out = self.adb_cmd.conn.Command(service='unroot')
         out = self.cmd.Shell(
             'setprop service.adb.root 0; setprop ctl.restart adbd')
-        logging.info('_reset_adbd_as_user() = %s', out)
+        logging.info('reset_adbd_as_user() = %s', out)
         # Hardcoded strings in platform_system_core/adb/services.cpp
         # 'adbd not running as root\n' or 'restarting adbd as non root\n'
-        if self._is_root():
-          logging.error('Failed to id after _reset_adbd_as_user()')
+        if self.is_root():
+          logging.error('Failed to id after reset_adbd_as_user()')
           return False
         return True
       except self._ERRORS as e:
         self._try_reset('(): %s', e)
     return False
 
-  def _is_root(self):
-    """Returns True if adbd is running as root."""
+  def is_root(self):
+    """Returns True if adbd is running as root.
+
+    Returns None if it can't give a meaningful answer.
+
+    Technically speaking this function is "high level" but is needed because
+    reset_adbd_as_*() calls are asynchronous, so there is a race condition while
+    adbd triggers the internal restart and its socket waiting for new
+    connections; the previous (non-switched) server may accept connection while
+    it is shutting down so it is important to repeatedly query until connections
+    go to the new restarted adbd process.
+    """
     out, exit_code = self.shell('id')
     if exit_code != 0 or not out:
-      return False
+      return None
     return out.startswith('out=0(root)')
 
   def _set_serial_number(self):
@@ -536,11 +484,12 @@ class LowDevice(object):
     items.extend(args)
     msg = ('%s.%s' + fmt) % tuple(items)
     logging.error(msg)
-    if self._bot:
-      self._bot.post_error(msg)
+    if self._on_error:
+      self._on_error(msg)
     if not self._has_reset:
       self._has_reset = True
       # TODO(maruel): Actually do the reset via ADB protocol.
+    return msg
 
   def _reset(self):
     """Resets the USB connection and reconnect to the device at the low level
@@ -644,10 +593,88 @@ def kill_adb():
     time.sleep(0.001)
 
 
-def get_devices(bot=None):
+def open_device_low(handle, on_error):
+  """Return a LowDevice wrapping an adb_commands.AdbCommands.
+
+  Arguments:
+  - handle: An opened common.UsbHandle.
+  - on_error: callback to call on USB communication failure.
+
+  Returns:
+    LowDevice.
+  """
+  assert isinstance(handle, common.UsbHandle), handle
+  port_path = '/'.join(map(str, handle.port_path))
+  try:
+    # If this succeeds, this initializes handle._handle, which is a
+    # usb1.USBDeviceHandle.
+    handle.Open()
+  except common.usb1.USBErrorNoDevice as e:
+    logging.warning('Got USBErrorNoDevice for %s: %s', port_path, e)
+    # Do not kill adb, it just means the USB host is likely resetting and the
+    # device is temporarily unavailable. We can't use handle.serial_number since
+    # this communicates with the device.
+    # TODO(maruel): In practice we'd like to retry for a few seconds.
+    handle = None
+  except common.usb1.USBErrorBusy as e:
+    logging.warning('Got USBErrorBusy for %s. Killing adb: %s', port_path, e)
+    kill_adb()
+    try:
+      # If it throws again, it probably means another process holds a handle to
+      # the USB ports or group acl (plugdev) hasn't been setup properly.
+      handle.Open()
+    except common.usb1.USBErrorBusy as e:
+      logging.warning(
+          'USB port for %s is already open (and failed to kill ADB) '
+          'Try rebooting the host: %s', port_path, e)
+      handle = None
+  except common.usb1.USBErrorAccess as e:
+    # Do not try to use serial_number, since we can't even access the port.
+    logging.warning('Try rebooting the host: %s: %s', port_path, e)
+    handle = None
+
+  cmd = None
+  if handle:
+    try:
+      # Give 10s for the user to accept the dialog. The best design would be to
+      # do a quick check with timeout=100ms and only if the first failed, try
+      # again with a long timeout. The goal is not to hang the bots for several
+      # minutes when all the devices are unauthenticated.
+      # TODO(maruel): A better fix would be to change python-adb to continue the
+      # authentication dance from where it stopped. This is left as a follow up.
+      cmd = adb_commands.AdbCommands.Connect(
+          handle, banner='swarming', rsa_keys=_ADB_KEYS,
+          auth_timeout_ms=10000)
+    except usb_exceptions.DeviceAuthError as e:
+      logging.warning('AUTH FAILURE: %s: %s', port_path, e)
+    except usb_exceptions.LibusbWrappingError as e:
+      logging.warning('WRITE FAILURE: %s: %s', port_path, e)
+    finally:
+      # Do not leak the USB handle when we can't talk to the device.
+      if not cmd:
+        handle.Close()
+
+  # Always create a Device, even if it points to nothing. It makes using the
+  # client code much easier.
+  return LowDevice(cmd, port_path, on_error)
+
+
+def open_device(handle, on_error):
+  """Returns a HighDevice from a common.UsbHandle.
+
+  See open_device_low() for more details.
+  """
+  device = open_device_low(handle, on_error)
+  # Query the device, caching data upfront inside _per_device_cache so repeated
+  # calls won't reload the cached items.
+  return HighDevice(device, _init_cache(device))
+
+
+def get_devices(bot):
   """Returns the list of devices available.
 
-  Caller MUST call close_devices(devices) on the return value.
+  Caller MUST call close_devices(devices) on the return value to close the USB
+  handles.
 
   Returns one of:
     - list of HighDevice instances.
@@ -674,9 +701,12 @@ def get_devices(bot=None):
 
   def fn(handle):
     # Open the device and do the initial adb-connect.
-    device = _load_device(bot, handle)
-    # Query the device, caching data upfront inside _per_device_cache.
-    _init_cache(device)
+    device = open_device(handle, bot.post_error if bot else None)
+    # Opportinistically tries to switch adbd to run in root mode. This is
+    # necessary for things like switching the CPU scaling governor to cool off
+    # devices while idle.
+    if device.cache.has_su and not device.is_root():
+      device.reset_adbd_as_root()
     return device
 
   devices = parallel.pmap(fn, handles)
@@ -686,7 +716,7 @@ def get_devices(bot=None):
 
 def close_devices(devices):
   """Closes all devices opened by get_devices()."""
-  for device in devices:
+  for device in devices or []:
     device.close()
 
 
@@ -697,13 +727,19 @@ class HighDevice(object):
   the low level functionality provided by LowDevice. As such there's no direct
   access by methods of this class to self.cmd.
   """
-  def __init__(self, device):
+  def __init__(self, device, cache):
     self._device = device
+    self._cache = cache
 
   # Proxy the embedded object methods.
   @property
   def adb_cmd(self):
     return self._device.adb_cmd
+
+  @property
+  def cache(self):
+    """Returns an instance of DeviceCache."""
+    return self._cache
 
   @property
   def port_path(self):
@@ -715,10 +751,13 @@ class HighDevice(object):
 
   @property
   def is_valid(self):
-    return bool(self.adb_cmd)
+    return self._device.is_valid
 
   def close(self):
     self._device.close()
+
+  def is_root(self):
+    return self._device.is_root()
 
   def listdir(self, destdir):
     return self._device.listdir(destdir)
@@ -741,6 +780,12 @@ class HighDevice(object):
   def remount(self):
     return self._device.remount()
 
+  def reset_adbd_as_root(self):
+    return self._device.reset_adbd_as_root()
+
+  def reset_adbd_as_user(self):
+    return self._device.reset_adbd_as_user()
+
   def shell(self, cmd):
     return self._device.shell(cmd)
 
@@ -762,18 +807,16 @@ class HighDevice(object):
       True on success.
     """
     assert governor in KNOWN_CPU_SCALING_GOVERNOR_VALUES, governor
-    cache = _per_device_cache.get(self)
-    if cache:
-      if governor not in cache.available_governors:
-        if governor == 'powersave':
-          return self.set_cpu_speed(cache.cpuinfo_min_freq)
-        if governor == 'ondemand':
-          governor = 'interactive'
-        elif governor == 'interactive':
-          governor = 'ondemand'
-        else:
-          logging.error('Can\'t switch to %s', governor)
-          return False
+    if governor not in self.cache.available_governors:
+      if governor == 'powersave':
+        return self.set_cpu_speed(self.cache.cpuinfo_min_freq)
+      if governor == 'ondemand':
+        governor = 'interactive'
+      elif governor == 'interactive':
+        governor = 'ondemand'
+      else:
+        logging.error('Can\'t switch to %s', governor)
+        return False
     assert governor in KNOWN_CPU_SCALING_GOVERNOR_VALUES, governor
 
     path = '/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor'
@@ -783,7 +826,7 @@ class HighDevice(object):
       prev = prev.strip()
       if prev == governor:
         return True
-      if cache and prev not in cache.available_governors:
+      if prev not in self.cache.available_governors:
         logging.error(
             '%s: Read invalid scaling_governor: %s', self.port_path, prev)
 
@@ -823,25 +866,6 @@ class HighDevice(object):
     val = self.pull_content(
         '/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed')
     return success and (val or '').strip() == str(speed)
-
-  def get_build_prop(self):
-    """Returns the system properties for a device.
-
-    This isn't really changing through the lifetime of a bot. One corner case is
-    when the device is flashed or disconnected.
-    """
-    cache = _per_device_cache.get(self)
-    if cache:
-      return cache.build_props
-
-  def get_external_storage_path(self):
-    """Returns the path to the SDCard (or emulated).
-
-    May look like /storage/emulated/legacy or None.
-    """
-    cache = _per_device_cache.get(self)
-    if cache:
-      return cache.external_storage_path
 
   def get_temperatures(self):
     """Returns the device's 2 temperatures if available.
@@ -888,22 +912,13 @@ class HighDevice(object):
   def get_cpu_scale(self):
     """Returns the CPU scaling factor."""
     mapping = {
-      'cpuinfo_max_freq': u'max',
-      'cpuinfo_min_freq': u'min',
       'scaling_cur_freq': u'cur',
       'scaling_governor': u'governor',
     }
-
-    out = {}
-    cache = _per_device_cache.get(self)
-    if cache:
-      out = {
-        'max': cache.cpuinfo_max_freq,
-        'min': cache.cpuinfo_min_freq,
-      }
-      del mapping['cpuinfo_max_freq']
-      del mapping['cpuinfo_min_freq']
-
+    out = {
+      'max': self.cache.cpuinfo_max_freq,
+      'min': self.cache.cpuinfo_min_freq,
+    }
     out.update(
       (v, self.pull_content('/sys/devices/system/cpu/cpu0/cpufreq/' + k))
       for k, v in mapping.iteritems())

@@ -470,7 +470,7 @@ def get_dimensions_all_devices_android(devices):
     dimensions[key] = set()
   dimensions[u'android'] = []
   for device in devices:
-    properties = device.get_build_prop()
+    properties = device.cache.build_props
     if properties:
       for key in keys:
         real_key = u'ro.' + key
@@ -531,7 +531,7 @@ def get_state_all_devices_android(devices):
   def fn(device):
     if not device.is_valid:
       return {u'state': 'unauthenticated'}
-    properties = device.get_build_prop()
+    properties = device.cache.build_props
     if not properties:
       return {u'state': 'unavailable'}
     return {

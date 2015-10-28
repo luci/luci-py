@@ -38,7 +38,8 @@ class TestAndroid(unittest.TestCase):
           ('dumpsys iphonesubinfo', ''),
           ('service call iphonesubinfo 1', RAW_IMEI),
         ])
-    self.assertEqual(u'355236058685894', android.HighDevice(device).get_imei())
+    self.assertEqual(
+        u'355236058685894', android.HighDevice(device, None).get_imei())
 
 
 class PythonRSASignerTest(unittest.TestCase):
