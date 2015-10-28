@@ -5,6 +5,8 @@
 """Helper functions for working with Cloud Pub/Sub."""
 
 import base64
+import contextlib
+import copy
 import logging
 import re
 
@@ -14,101 +16,345 @@ import webapp2
 from components import net
 
 
-PUBSUB_BASE_URL = 'https://pubsub.googleapis.com/v1/projects'
-PUBSUB_SCOPES = (
-    'https://www.googleapis.com/auth/pubsub',
-)
+# From Pub/Sub docs: `{subscription}` must start with a letter, and contain only
+# letters (`[A-Za-z]`), numbers (`[0-9]`), dashes (`-`), underscores (`_`),
+# periods (`.`), tildes (`~`), plus (`+`) or percent signs (`%`). It must be
+# between 3 and 255 characters in length, and it must not start with `"goog"`.
+#
+# The last check is done in _validate_name to simplify the regexp.
+#
+# Same rules apply to topic names too.
+_NAME_RE = re.compile(r'^[A-Za-z][A-Za-z0-9\-_\.~\+%]{2,254}$')
 
 
-def validate_topic(topic):
-  """Ensures the given topic is valid for Cloud Pub/Sub."""
-  # Technically, there are more restrictions for topic names than we check here,
-  # but the API will reject anything that doesn't match. We only check / in case
-  # the user is trying to manipulate the topic into posting somewhere else (e.g.
-  # by setting the topic as ../../<some other project>/topics/<topic>.
-  return '/' not in topic
+class Error(Exception):
+  """Raised on fatal errors."""
+  def __init__(self, inner):
+    super(Error, self).__init__(str(inner))
+    self.inner = inner
+
+
+class TransientError(Exception):
+  """Raised on errors that can go away with retry. Results in 500 HTTP code.
+
+  Specifically not a subclass of Error, so that "except Error" block passes
+  transient errors through.
+  """
+  def __init__(self, inner):
+    super(TransientError, self).__init__(str(inner))
+    self.inner = inner
 
 
 def validate_project(project):
   """Ensures the given project is valid for Cloud Pub/Sub."""
-  return validate_topic(project)
+  # Technically, there are more restrictions for project names than we check
+  # here, but the API will reject anything that doesn't match. We only check /
+  # in case the user is trying to manipulate the topic into posting somewhere
+  # else (e.g. by setting the project as ../../<some other project>.
+  return project and '/' not in project
 
 
-def ensure_topic_exists(topic, project):
-  """Ensures the given Cloud Pub/Sub topic exists in the given project.
+def validate_topic(topic):
+  """Ensures the given topic is valid for Cloud Pub/Sub."""
+  return _validate_name(topic)
+
+
+def validate_subscription(subscription):
+  """Ensures the given subscription is valid for Cloud Pub/Sub."""
+  return _validate_name(subscription)
+
+
+def full_topic_name(project, topic):
+  """Returns full topic name in given project."""
+  assert validate_project(project), project
+  assert validate_topic(topic), topic
+  return 'projects/%s/topics/%s' % (project, topic)
+
+
+def full_subscription_name(project, subscription):
+  """Returns full subscription name in given project."""
+  assert validate_project(project), project
+  assert validate_subscription(subscription), subscription
+  return 'projects/%s/subscriptions/%s' % (project, subscription)
+
+
+def validate_full_name(name, kind):
+  """Returns True if name has form "projects/<project-id>/<kind>/<id>."""
+  chunks = name.split('/')
+  return (
+      len(chunks) == 4 and
+      chunks[0] == 'projects' and
+      validate_project(chunks[1]) and
+      chunks[2] == kind and
+      _validate_name(chunks[3]))
+
+
+def _validate_name(name):
+  """Returns True if the name matches rules for topic and subcription names."""
+  return (
+      not name.startswith('goog') and
+      bool(_NAME_RE.match(name)))
+
+
+def _call(method, endpoint, payload=None, accepted_http_statuses=None):
+  """Makes HTTP request to Pub/Sub service.
 
   Args:
-    topic: Name of the topic which should exist.
-    project: Name of the project the topic should exist in.
+    method: HTTP verb, such as 'GET' or 'PUT'.
+    endpoint: URL of the endpoint, relative to pubsub.googleapis.com/v1/.
+    payload: Body of the request to send as JSON.
+    accepted_http_statuses: List of additional status codes to treat as success.
+
+  Raises:
+    Error or TransientError.
   """
   try:
-    net.json_request(
-        '%s/%s/topics/%s' % (PUBSUB_BASE_URL, project, topic),
-        method='PUT',
-        scopes=PUBSUB_SCOPES,
-    )
+    return net.json_request(
+        url='https://pubsub.googleapis.com/v1/' + endpoint,
+        method=method,
+        payload=payload,
+        scopes=['https://www.googleapis.com/auth/pubsub'])
   except net.Error as e:
-    if e.status_code != 409:
-      # 409 is the status code when the topic already exists.
-      # Ignore 409, but raise any other error.
-      raise
+    if accepted_http_statuses and e.status_code in accepted_http_statuses:
+      return None
+    if e.status_code >= 500:
+      raise TransientError(e)
+    raise Error(e)
 
 
-def _publish(topic, project, message, **attributes):
-  """Publish messages to Cloud Pub/Sub.
+def ensure_topic_exists(topic):
+  """Ensures the given Cloud Pub/Sub topic exists.
 
   Args:
-    topic: Name of the topic to publish to.
-    project: Name of the project the topic exists in.
-    message: Content of the message to publish.
-    **attributes: Any attributes to send with the message.
+    topic: Full topic name, as returned by `full_topic_name`.
+
+  Raises:
+    Error or TransientError.
   """
-  net.json_request(
-      '%s/%s/topics/%s:publish' % (PUBSUB_BASE_URL, project, topic),
-      method='POST',
-      payload={
-          'messages': [
-              {
-                  'attributes': attributes,
-                  'data': base64.b64encode(message),
-              },
-          ],
-      },
-      scopes=PUBSUB_SCOPES,
-  )
+  assert validate_full_name(topic, 'topics'), topic
+  # 409 is the status code when the topic already exists.
+  _call('PUT', topic, accepted_http_statuses=[409])
 
 
-def publish(topic, project, message, **attributes):
+def _with_existing_topic(topic, callback):
+  """Calls callback, catches 404, creates the topic, calls callback again.
+
+  Used by 'publish' and 'ensure_subscription_exists'.
+
+  Raises:
+    Error or TransientError.
+  """
+  try:
+    callback()
+  except Error as e:
+    if e.inner.status_code != 404:
+      raise e
+    ensure_topic_exists(topic)
+    callback()
+
+
+def publish(topic, message, **attributes):
   """Publish messages to Cloud Pub/Sub. Creates the topic if it doesn't exist.
 
   Args:
-    topic: Name of the topic to publish to.
-    project: Name of the project the topic should exist in.
+    topic: Full name of the topic to publish to.
     message: Content of the message to publish.
     **attributes: Any attributes to send with the message.
+
+  Raises:
+    Error or TransientError.
   """
-  try:
-    _publish(topic, project, message, **attributes)
-  except net.Error as e:
-    if e.status_code == 404:
-      # Topic does not exist. Try to create it.
-      ensure_topic_exists(topic, project)
-      try:
-        net.json_request(
-            '%s/%s/topics/%s' % (PUBSUB_BASE_URL, project, topic),
-            method='PUT',
-            scopes=PUBSUB_SCOPES,
-        )
-      except net.Error as e:
-        if e.status_code != 409:
-          # 409 is the status code when the topic already exists (maybe someone
-          # else created it just now). Ignore 409, but raise any other error.
-          raise
-      # Retransmit now that the topic is created.
-      _publish(topic, project, message, **attributes)
-    else:
-      # Unknown error.
-      raise
+  assert validate_full_name(topic, 'topics'), topic
+
+  def call_publish():
+    _call(
+        'POST', '%s:publish' % topic,
+        payload={
+            'messages': [{
+                'attributes': attributes,
+                'data': base64.b64encode(message),
+            }],
+        },
+    )
+
+  _with_existing_topic(topic, call_publish)
+
+
+def get_subscription(subscription):
+  """Returns subscription dict or None if no such subscription.
+
+  See https://cloud.google.com/pubsub/reference/rest/v1/projects.subscriptions.
+
+  Args:
+    subscription: Full name of the subscription.
+
+  Raises:
+    Error or TransientError.
+  """
+  return _call('GET', subscription, accepted_http_statuses=[404])
+
+
+def ensure_subscription_exists(
+    subscription, topic, push_config=None, ack_deadline_seconds=None):
+  """Ensures given subscription exists.
+
+  Will register new subscription or chage push config of an existing one
+  if necessary, but won't change a topic or default ack_deadline_seconds if they
+  don't match requested values (there's no API to do that).
+
+  Will also try to create the topic if it's missing.
+
+  Args:
+    subscription: Full name of the subscription.
+    topic: Full name of the topic to subscribe to.
+    push_config: Dict with push configuration, or None to not touch it.
+    ack_deadline_seconds: How long to wait for ack.
+
+  Raises:
+    Error or TransientError.
+  """
+  assert validate_full_name(subscription, 'subscriptions'), subscription
+  assert validate_full_name(topic, 'topics'), topic
+
+  # Need to use GET to ensure the subscription is actually subscripted to
+  # the given topic and not to something else.
+  existing = _call('GET', subscription, accepted_http_statuses=[404])
+  if existing:
+    if existing['topic'] != topic:
+      raise Error('Can\'t change topic of an existing subscription')
+    if (ack_deadline_seconds is not None and
+        ack_deadline_seconds != existing['ackDeadlineSeconds']):
+      raise Error('Can\'t change ack deadline of an existing subscription')
+    if push_config is not None and push_config != existing['pushConfig']:
+      _call(
+          'POST', '%s:modifyPushConfig' % subscription,
+          payload={'pushConfig': push_config})
+    return
+
+  def create_subscription():
+    _call(
+        'PUT', subscription,
+        payload={
+            'topic': topic,
+            'pushConfig': push_config or {},
+            'ackDeadlineSeconds': ack_deadline_seconds or 60,
+        },
+    )
+
+  _with_existing_topic(topic, create_subscription)
+
+
+def ensure_subscription_deleted(subscription):
+  """Deletes a subscription if it exists.
+
+  Args:
+    subscription: Full name of the subscription.
+
+  Raises:
+    Error or TransientError.
+  """
+  assert validate_full_name(subscription, 'subscriptions'), subscription
+  _call('DELETE', subscription, accepted_http_statuses=[404])
+
+
+@contextlib.contextmanager
+def iam_policy(object_name):
+  """Changes IAM policy for an existing subscription or topic.
+
+  Reads current policy, invokes the context manager body, writes modified policy
+  back. Uses etags for concurrency control.
+
+  Usage example:
+
+  with pubsub.iam_policy(...) as policy:
+    policy.add_member('roles/viewer', 'user:mike@example.com')
+
+  Args:
+    object_name: Full subscription or topic name.
+
+  Raises:
+    Error or TransientError.
+  """
+  assert (
+      validate_full_name(object_name, 'subscriptions') or
+      validate_full_name(object_name, 'topics')), object_name
+  policy = _call('GET', '%s:getIamPolicy' % object_name)
+  copied = IAMPolicy(copy.deepcopy(policy))
+  yield copied
+  if copied.policy != policy:
+    _call(
+        'POST', '%s:setIamPolicy' % object_name,
+        payload={'policy': copied.policy})
+
+
+class IAMPolicy(object):
+  """Wrapper around IAM policy dict for simpler modification.
+
+  See https://cloud.google.com/pubsub/reference/rest/Shared.Types/Policy.
+  """
+
+  def __init__(self, policy):
+    assert isinstance(policy, dict), policy
+    self.policy = policy
+
+  def members(self, role):
+    """Returns list of members with given role, or empty list if none.
+
+    Args:
+      role: Role name, such as 'roles/viewer'.
+    """
+    for b in self.policy.get('bindings', []):
+      if b.get('role') == role:
+        return list(b.get('members', []))
+    return []
+
+  def add_member(self, role, member):
+    """Adds a member to some role.
+
+    Args:
+      role: Role name, such as 'roles/viewer'.
+      member: ID of the member to add, such as 'user:mike@example.com'.
+
+    Returns:
+      True if added, False if was already there.
+    """
+    role_dict = None
+    for b in self.policy.get('bindings', []):
+      if b.get('role') == role:
+        role_dict = b
+        break
+
+    if role_dict is None:
+      self.policy.setdefault('bindings', []).append({
+          'role': role,
+          'members': [member],
+      })
+      return True
+
+    if member in role_dict.get('members', []):
+      return False
+
+    role_dict.setdefault('members', []).append(member)
+    return True
+
+  def remove_member(self, role, member):
+    """Removes a member from some role.
+
+    Args:
+      role: Role name, such as 'roles/viewer'.
+      member: ID of the member to add, such as 'user:mike@example.com'.
+
+    Returns:
+      True if removed, False if wasn't there.
+    """
+    for b in self.policy.get('bindings', []):
+      if b.get('role') == role:
+        members = b.get('members')
+        if not members or member not in members:
+          return False
+        members.remove(member)
+        return True
+    return False
 
 
 class SubscriptionHandler(webapp2.RequestHandler):
@@ -122,36 +368,19 @@ class SubscriptionHandler(webapp2.RequestHandler):
   TOPIC_PROJECT = None
 
   @classmethod
-  def get_subscription_url(cls):
-    return '%s/%s/subscriptions/%s' % (
-        PUBSUB_BASE_URL,
-        cls.SUBSCRIPTION_PROJECT,
-        cls.SUBSCRIPTION,
-    )
+  def get_subscription_name(cls):
+    """Returns full name of the subscription."""
+    return full_subscription_name(cls.SUBSCRIPTION_PROJECT, cls.SUBSCRIPTION)
+
+  @classmethod
+  def get_topic_name(cls):
+    """Returns full name of the topic."""
+    return full_topic_name(cls.TOPIC_PROJECT, cls.TOPIC)
 
   @classmethod
   def unsubscribe(cls):
     """Unsubscribes from a Cloud Pub/Sub project."""
-    net.json_request(
-        cls.get_subscription_url(),
-        method='DELETE',
-        scopes=PUBSUB_SCOPES,
-    )
-
-  @classmethod
-  def _subscribe(cls, push=False):
-    """Subscribes to a Cloud Pub/Sub project."""
-    payload = {
-        'topic': 'projects/%s/topics/%s' % (cls.TOPIC_PROJECT, cls.TOPIC),
-    }
-    if push:
-      payload['pushConfig'] = {'pushEndpoint': cls.ENDPOINT}
-    net.json_request(
-        cls.get_subscription_url(),
-        method='PUT',
-        payload=payload,
-        scopes=PUBSUB_SCOPES,
-    )
+    ensure_subscription_deleted(cls.get_subscription_name())
 
   @classmethod
   def ensure_subscribed(cls, push=False):
@@ -162,32 +391,10 @@ class SubscriptionHandler(webapp2.RequestHandler):
     Args:
       push: Whether or not to create a push subscription. Defaults to pull.
     """
-    try:
-      cls._subscribe(push=push)
-    except net.NotFoundError:
-      # Topic does not exist. Try to create it.
-      ensure_topic_exists(cls.TOPIC, cls.TOPIC_PROJECT)
-      # Retransmit now that the topic is created.
-      cls._subscribe(push=push)
-    except net.Error as e:
-      if e.status_code == 409:
-        # Subscription already exists. When the subscription already exists,
-        # it won't change between pull and push if the create request was for
-        # a different type of subscription than what currently existed. Since
-        # we get no information about whether the existing subscription is a
-        # push or pull subscription, just blindly send a request to change the
-        # subscription type.
-        payload = None
-        if push:
-          payload = {'pushConfig': {'pushEndpoint': cls.ENDPOINT}}
-        net.json_request(
-          cls.get_subscription_url(),
-          method='POST',
-          payload=payload,
-          scopes=PUBSUB_SCOPES,
-        )
-      else:
-        raise
+    ensure_subscription_exists(
+        subscription=cls.get_subscription_name(),
+        topic=cls.get_topic_name(),
+        push_config={'pushEndpoint': cls.ENDPOINT} if push else {})
 
   @classmethod
   def is_subscribed(cls):
@@ -196,26 +403,16 @@ class SubscriptionHandler(webapp2.RequestHandler):
     Returns:
       True if the subscription exists, False otherwise.
     """
-    try:
-      net.json_request(
-          cls.get_subscription_url(),
-          method='GET',
-          scopes=PUBSUB_SCOPES,
-      )
-      return True
-    except net.NotFoundError:
-      return False
+    return bool(get_subscription(cls.get_subscription_name()))
 
   def get(self):
     """Queries for Pub/Sub messages."""
-    response = net.json_request(
-        '%s:pull' % self.get_subscription_url(),
-        method='POST',
+    response = _call(
+        'POST', '%s:pull' % self.get_subscription_name(),
         payload={
             'maxMessages': self.MAX_MESSAGES,
             'returnImmediately': True,
         },
-        scopes=PUBSUB_SCOPES,
     )
     message_ids = []
     for received_message in response.get('receivedMessages', []):
@@ -227,12 +424,9 @@ class SubscriptionHandler(webapp2.RequestHandler):
       self.process_message(message, attributes)
       message_ids.append(received_message['ackId'])
     if message_ids:
-      net.json_request(
-          '%s:acknowledge' % self.get_subscription_url(),
-          method='POST',
-          payload={'ackIds': message_ids},
-          scopes=PUBSUB_SCOPES,
-      )
+      _call(
+          'POST', '%s:acknowledge' % self.get_subscription_name(),
+          payload={'ackIds': message_ids})
 
   def post(self):
     """Handles a Pub/Sub push message."""
@@ -244,8 +438,7 @@ class SubscriptionHandler(webapp2.RequestHandler):
     message = self.request.json.get('message', {}).get('data', '')
     subscription = self.request.json.get('subscription')
 
-    if subscription != 'projects/%s/subscriptions/%s' % (
-        self.SUBSCRIPTION_PROJECT, self.SUBSCRIPTION):
+    if subscription != self.get_subscription_name():
       self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
       logging.error('Ignoring unexpected subscription: %s', subscription)
       self.abort(403, 'Unexpected subscription: %s' % subscription)

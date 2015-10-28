@@ -200,7 +200,7 @@ class InstanceGroupProcessor(webapp2.RequestHandler):
     if not pubsub_handler.is_subscribed():
       logging.error(
           'Pub/Sub subscription not created:\n%s',
-          pubsub_handler.get_subscription_url(),
+          pubsub_handler.get_subscription_name(),
       )
       return
 

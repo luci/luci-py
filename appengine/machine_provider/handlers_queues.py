@@ -40,8 +40,7 @@ class LeaseRequestFulfiller(webapp2.RequestHandler):
 
     if pubsub_topic:
       pubsub.publish(
-          pubsub_topic,
-          pubsub_project,
+          pubsub.full_topic_name(pubsub_project, pubsub_topic),
           'FULFILLED',
           machine_id=machine_id,
           request_hash=lease_id,
@@ -81,8 +80,7 @@ class MachineReclaimer(webapp2.RequestHandler):
 
     if lessee_topic:
       pubsub.publish(
-          lessee_topic,
-          lessee_project,
+          pubsub.full_topic_name(lessee_project, lessee_topic),
           'RECLAIMED',
           machine_id=machine_id,
           request_hash=lease_id,
@@ -92,8 +90,7 @@ class MachineReclaimer(webapp2.RequestHandler):
       attributes = backend_attributes.copy()
       attributes['hostname'] = hostname
       pubsub.publish(
-          backend_topic,
-          backend_project,
+          pubsub.full_topic_name(backend_project, backend_topic),
           'RECLAIMED',
           **attributes
     )
