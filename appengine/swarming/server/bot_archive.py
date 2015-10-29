@@ -168,6 +168,7 @@ FILES = (
     # not that large so it is not a big deal.
     'adb/__init__.py',
     'adb/adb_commands.py',
+    'adb/adb_commands_safe.py',
     'adb/adb_protocol.py',
     'adb/common.py',
     'adb/fastboot.py',
