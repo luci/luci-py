@@ -18,7 +18,7 @@ class MockDevice(object):
     super(MockDevice, self).__init__()
     self._cmds = cmds[:]
 
-  def shell(self, cmd):
+  def Shell(self, cmd):
     data = self._cmds.pop(0)
     assert data[0] == cmd, (data, cmd)
     return data[1], 0
