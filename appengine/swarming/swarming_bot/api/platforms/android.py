@@ -36,9 +36,9 @@ from api import parallel
 # _ADB_KEYS is set to a list of adb_protocol.AuthSigner instances. It contains
 # one or multiple key used to authenticate to Android debug protocol (adb).
 _ADB_KEYS = None
-# _ADB_KEYS_RAW is set to a dict(pub: priv) when initialized, with the raw
-# content of each key.
-_ADB_KEYS_RAW = None
+# _ADB_KEYS_PUB is the set of public keys for corresponding initialized private
+# keys.
+_ADB_KEYS_PUB = set()
 
 
 class _PerDeviceCache(object):
@@ -72,10 +72,10 @@ class _PerDeviceCache(object):
 
 
 # Global cache of per device cache.
-_per_device_cache = _PerDeviceCache()
+_PER_DEVICE_CACHE = _PerDeviceCache()
 
 
-def _parcel_to_list(lines):
+def _ParcelToList(lines):
   """Parses 'service call' output."""
   out = []
   for line in lines:
@@ -95,14 +95,14 @@ def _parcel_to_list(lines):
   return out
 
 
-def _init_cache(device):
+def _InitCache(device):
   """Primes data known to be fetched soon right away that is static for the
   lifetime of the device.
 
-  The data is cached in _per_device_cache() as long as the device is connected
+  The data is cached in _PER_DEVICE_CACHE() as long as the device is connected
   and responsive.
   """
-  cache = _per_device_cache.get(device)
+  cache = _PER_DEVICE_CACHE.get(device)
   if not cache:
     # TODO(maruel): This doesn't seem super useful since the following symlinks
     # already exist: /sdcard/, /mnt/sdcard, /storage/sdcard0.
@@ -146,7 +146,7 @@ def _init_cache(device):
         cpuinfo_max_freq, cpuinfo_min_freq)
     # Only save the cache if all the calls above worked.
     if all(i is not None for i in cache._asdict().itervalues()):
-      _per_device_cache.set(device, cache)
+      _PER_DEVICE_CACHE.set(device, cache)
   return cache
 
 
@@ -190,7 +190,6 @@ def initialize(pub_key, priv_key):
   ~/.android/adbkey.pub.
   """
   global _ADB_KEYS
-  global _ADB_KEYS_RAW
   if _ADB_KEYS is not None:
     assert False, 'initialize() was called repeatedly: ignoring keys'
   assert bool(pub_key) == bool(priv_key)
@@ -198,20 +197,19 @@ def initialize(pub_key, priv_key):
   priv_key = priv_key.strip() if priv_key else priv_key
 
   _ADB_KEYS = []
-  _ADB_KEYS_RAW = {}
   if pub_key:
     _ADB_KEYS.append(sign_pythonrsa.PythonRSASigner(pub_key, priv_key))
-    _ADB_KEYS_RAW[pub_key] = priv_key
+    _ADB_KEYS_PUB.add(pub_key)
 
   # Try to add local adb keys if available.
   path = os.path.expanduser('~/.android/adbkey')
   if os.path.isfile(path) and os.path.isfile(path + '.pub'):
     with open(path + '.pub', 'rb') as f:
-      pub = f.read().strip()
+      pub_key = f.read().strip()
     with open(path, 'rb') as f:
-      priv = f.read().strip()
-    _ADB_KEYS.append(sign_pythonrsa.PythonRSASigner(pub, priv))
-    _ADB_KEYS_RAW[pub] = priv
+      priv_key = f.read().strip()
+    _ADB_KEYS.append(sign_pythonrsa.PythonRSASigner(pub_key, priv_key))
+    _ADB_KEYS_PUB.add(pub_key)
 
   return bool(_ADB_KEYS)
 
@@ -221,9 +219,9 @@ def open_device(handle, banner, rsa_keys, on_error):
   """
   device = adb_commands_safe.AdbCommandsSafe.ConnectHandle(
       handle, banner=banner, rsa_keys=rsa_keys, on_error=on_error)
-  # Query the device, caching data upfront inside _per_device_cache so repeated
+  # Query the device, caching data upfront inside _PER_DEVICE_CACHE so repeated
   # calls won't reload the cached items.
-  return HighDevice(device, _init_cache(device))
+  return HighDevice(device, _InitCache(device), _ADB_KEYS_PUB)
 
 
 def get_devices(bot):
@@ -263,12 +261,12 @@ def get_devices(bot):
     # Opportinistically tries to switch adbd to run in root mode. This is
     # necessary for things like switching the CPU scaling governor to cool off
     # devices while idle.
-    if device.cache.has_su and not device.is_root():
-      device.reset_adbd_as_root()
+    if device.cache.has_su and not device.IsRoot():
+      device.Root()
     return device
 
   devices = parallel.pmap(fn, handles)
-  _per_device_cache.trim(devices)
+  _PER_DEVICE_CACHE.trim(devices)
   return devices
 
 
@@ -285,11 +283,18 @@ class HighDevice(object):
   the low level functionality provided by AdbCommandsSafe. As such there's no
   direct access by methods of this class to self.cmd.
   """
-  def __init__(self, device, cache):
+  def __init__(self, device, cache, rsa_keys_public):
+    # device can be one of adb_commands_safe.AdbCommandsSafe,
+    # adb_commands.AdbCommands or a fake.
+    assert isinstance(cache, DeviceCache), cache
+    assert all(isinstance(p, str) for p in rsa_keys_public), rsa_keys_public
+    assert all('\n' not in p for p in rsa_keys_public), rsa_keys_public
+    # Immutable.
     self._device = device
     self._cache = cache
+    self._rsa_keys_public = rsa_keys_public
 
-  # Proxy the embedded object methods.
+  # Proxy the embedded low level methods.
 
   @property
   def cache(self):
@@ -311,51 +316,66 @@ class HighDevice(object):
   def Close(self):
     self._device.Close()
 
-  def is_root(self):
+  def IsRoot(self):
     return self._device.IsRoot()
 
-  def listdir(self, destdir):
+  def List(self, destdir):
     return self._device.List(destdir)
 
-  def pull(self, *args, **kwargs):
+  def Pull(self, *args, **kwargs):
     return self._device.Pull(*args, **kwargs)
 
-  def pull_content(self, *args, **kwargs):
+  def PullContent(self, *args, **kwargs):
     return self._device.PullContent(*args, **kwargs)
 
-  def push(self, *args, **kwargs):
+  def Push(self, *args, **kwargs):
     return self._device.Push(*args, **kwargs)
 
-  def push_content(self, *args, **kwargs):
+  def PushContent(self, *args, **kwargs):
     return self._device.PushContent(*args, **kwargs)
 
-  def reboot(self):
+  def Reboot(self):
     return self._device.Reboot()
 
-  def remount(self):
+  def Remount(self):
     return self._device.Remount()
 
-  def reset_adbd_as_root(self):
+  def Root(self):
     return self._device.Root()
 
-  def reset_adbd_as_user(self):
-    return self._device.Unroot()
-
-  def shell(self, cmd):
+  def Shell(self, cmd):
     return self._device.Shell(cmd)
 
-  def shell_raw(self, cmd):
+  def ShellRaw(self, cmd):
     return self._device.ShellRaw(cmd)
 
-  def stat(self, dest):
+  def Stat(self, dest):
     return self._device.Stat(dest)
+
+  def Unroot(self):
+    return self._device.Unroot()
 
   def __repr__(self):
     return repr(self._device)
 
   # High level methods.
 
-  def set_cpu_scaling_governor(self, governor):
+  def GetCPUScale(self):
+    """Returns the CPU scaling factor."""
+    mapping = {
+      'scaling_cur_freq': u'cur',
+      'scaling_governor': u'governor',
+    }
+    out = {
+      'max': self.cache.cpuinfo_max_freq,
+      'min': self.cache.cpuinfo_min_freq,
+    }
+    out.update(
+      (v, self.PullContent('/sys/devices/system/cpu/cpu0/cpufreq/' + k))
+      for k, v in mapping.iteritems())
+    return out
+
+  def SetCPUScalingGovernor(self, governor):
     """Sets the CPU scaling governor to the one specified.
 
     Returns:
@@ -364,7 +384,7 @@ class HighDevice(object):
     assert governor in KNOWN_CPU_SCALING_GOVERNOR_VALUES, governor
     if governor not in self.cache.available_governors:
       if governor == 'powersave':
-        return self.set_cpu_speed(self.cache.cpuinfo_min_freq)
+        return self.SetCPUSpeed(self.cache.cpuinfo_min_freq)
       if governor == 'ondemand':
         governor = 'interactive'
       elif governor == 'interactive':
@@ -376,7 +396,7 @@ class HighDevice(object):
 
     path = '/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor'
     # First query the current state and only try to switch if it's different.
-    prev = self.pull_content(path)
+    prev = self.PullContent(path)
     if prev:
       prev = prev.strip()
       if prev == governor:
@@ -387,16 +407,16 @@ class HighDevice(object):
 
     # This works on Nexus 10 but not on Nexus 5. Need to investigate more. In
     # the meantime, simply try one after the other.
-    if not self.push_content(path, governor + '\n'):
+    if not self.PushContent(path, governor + '\n'):
       # Fallback via shell.
-      _, exit_code = self.shell('echo "%s" > %s' % (governor, path))
+      _, exit_code = self.Shell('echo "%s" > %s' % (governor, path))
       if exit_code != 0:
         logging.error(
             '%s: Writing scaling_governor %s failed; was %s',
             self.port_path, governor, prev)
         return False
     # Get it back to confirm.
-    newval = self.pull_content(path)
+    newval = self.PullContent(path)
     if not (newval or '').strip() == governor:
       logging.error(
           '%s: Wrote scaling_governor %s; was %s; got %s',
@@ -404,7 +424,7 @@ class HighDevice(object):
       return False
     return True
 
-  def set_cpu_speed(self, speed):
+  def SetCPUSpeed(self, speed):
     """Enforces strict CPU speed and disable the CPU scaling governor.
 
     Returns:
@@ -412,17 +432,17 @@ class HighDevice(object):
     """
     assert isinstance(speed, int), speed
     assert 10000 <= speed <= 10000000, speed
-    success = self.set_cpu_scaling_governor('userspace')
-    if not self.push_content(
+    success = self.SetCPUScalingGovernor('userspace')
+    if not self.PushContent(
         '/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed', '%d\n' %
         speed):
       return False
     # Get it back to confirm.
-    val = self.pull_content(
+    val = self.PullContent(
         '/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed')
     return success and (val or '').strip() == str(speed)
 
-  def get_temperatures(self):
+  def GetTemperatures(self):
     """Returns the device's 2 temperatures if available.
 
     Returns None otherwise.
@@ -433,16 +453,16 @@ class HighDevice(object):
     temps = []
     try:
       for i in xrange(2):
-        out = self.pull_content('/sys/class/thermal/thermal_zone%d/temp' % i)
+        out = self.PullContent('/sys/class/thermal/thermal_zone%d/temp' % i)
         temps.append(int(out))
     except (TypeError, ValueError):
       return None
     return temps
 
-  def get_battery(self):
+  def GetBattery(self):
     """Returns details about the battery's state."""
     props = {}
-    out = self.dumpsys('battery')
+    out = self.Dumpsys('battery')
     if not out:
       return props
     for line in out.splitlines():
@@ -464,32 +484,17 @@ class HighDevice(object):
       out[key] = int(props[key]) if key in props else None
     return out
 
-  def get_cpu_scale(self):
-    """Returns the CPU scaling factor."""
-    mapping = {
-      'scaling_cur_freq': u'cur',
-      'scaling_governor': u'governor',
-    }
-    out = {
-      'max': self.cache.cpuinfo_max_freq,
-      'min': self.cache.cpuinfo_min_freq,
-    }
-    out.update(
-      (v, self.pull_content('/sys/devices/system/cpu/cpu0/cpufreq/' + k))
-      for k, v in mapping.iteritems())
-    return out
-
-  def get_uptime(self):
+  def GetUptime(self):
     """Returns the device's uptime in second."""
-    out = self.pull_content('/proc/uptime')
+    out = self.PullContent('/proc/uptime')
     if out:
       return float(out.split()[1])
     return None
 
-  def get_disk(self):
+  def GetDisk(self):
     """Returns details about the battery's state."""
     props = {}
-    out = self.dumpsys('diskstats')
+    out = self.Dumpsys('diskstats')
     if not out:
       return props
     for line in out.splitlines():
@@ -510,35 +515,32 @@ class HighDevice(object):
       u'system': props[u'System-Free'],
     }
 
-  def get_imei(self):
+  def GetIMEI(self):
     """Returns the phone's IMEI."""
     # Android <5.0.
-    out = self.dumpsys('iphonesubinfo')
+    out = self.Dumpsys('iphonesubinfo')
     if out:
       match = re.search('  Device ID = (.+)$', out)
       if match:
         return match.group(1)
 
     # Android >= 5.0.
-    out, _ = self.shell('service call iphonesubinfo 1')
+    out, _ = self.Shell('service call iphonesubinfo 1')
     if out:
       lines = out.splitlines()
       if len(lines) >= 4 and lines[0] == 'Result: Parcel(':
         # Process the UTF-16 string.
-        chars = _parcel_to_list(lines[1:])[4:-1]
+        chars = _ParcelToList(lines[1:])[4:-1]
         return u''.join(map(unichr, (int(i, 16) for i in chars)))
     return None
 
-  def get_ip(self):
-    """Returns the IP address."""
+  def GetIP(self):
+    """Returns the IP address of the first network connection."""
     # If ever needed, read wifi.interface from /system/build.prop if a device
     # doesn't use wlan0.
-    ip, _ = self.shell('getprop dhcp.wlan0.ipaddress')
-    if not ip:
-      return None
-    return ip.strip()
+    return self.GetProp('dhcp.wlan0.ipaddress')
 
-  def get_last_uid(self):
+  def GetLastUID(self):
     """Returns the highest UID on the device."""
     # pylint: disable=line-too-long
     # Applications are set in the 10000-19999 UID space. The UID are not reused.
@@ -549,53 +551,51 @@ class HighDevice(object):
     # curl -sSLJ \
     #   https://android.googlesource.com/platform/frameworks/base/+/master/api/current.txt?format=TEXT \
     #   | base64 --decode | grep APPLICATION_UID
-    out = self.pull_content('/data/system/packages.list')
+    out = self.PullContent('/data/system/packages.list')
     if not out:
       return None
     return max(int(l.split(' ', 2)[1]) for l in out.splitlines() if len(l) > 2)
 
-  def list_packages(self):
+  def GetPackages(self):
     """Returns the list of packages installed."""
-    out, _ = self.shell('pm list packages')
+    out, _ = self.Shell('pm list packages')
     if not out:
       return None
     return [l.split(':', 1)[1] for l in out.strip().splitlines()]
 
-  def install_apk(self, destdir, apk):
+  def InstallAPK(self, destdir, apk):
     """Installs apk to destdir directory."""
     # TODO(maruel): Test.
     # '/data/local/tmp/'
     dest = posixpath.join(destdir, os.path.basename(apk))
     if not self.push(apk, dest):
       return False
-    return self.shell('pm install -r %s' % pipes.quote(dest))[1] is 0
+    return self.Shell('pm install -r %s' % pipes.quote(dest))[1] is 0
 
-  def uninstall_apk(self, package):
+  def UninstallAPK(self, package):
     """Uninstalls the package."""
-    return self.shell('pm uninstall %s' % pipes.quote(package))[1] is 0
+    return self.Shell('pm uninstall %s' % pipes.quote(package))[1] is 0
 
-  def get_application_path(self, package):
+  def GetApplicationPath(self, package):
     # TODO(maruel): Test.
-    out, _ = self.shell('pm path %s' % pipes.quote(package))
+    out, _ = self.Shell('pm path %s' % pipes.quote(package))
     return out.strip() if out else out
 
-  def get_application_version(self, package):
-    # TODO(maruel): Test.
-    out, _ = self.shell('dumpsys package %s' % pipes.quote(package))
-    return out
+  def GetApplicationVersion(self, package):
+    return self.Dumpsys('package %s' % pipes.quote(package))
 
-  def wait_for_device(self, timeout=180):
+  def WaitForDevice(self, timeout=180):
     """Waits for the device to be responsive."""
     start = time.time()
     while (time.time() - start) < timeout:
       try:
-        if self.shell_raw('echo \'hi\'')[1] == 0:
+        if self.ShellRaw('echo \'hi\'')[1] == 0:
           return True
       except self._ERRORS:
         pass
     return False
 
-  def push_keys(self):
+  def PushKeys(self):
     """Pushes all the keys on the file system to the device.
 
     This is necessary when the device just got wiped but still has
@@ -604,30 +604,26 @@ class HighDevice(object):
     It never removes a previously trusted key, only adds new ones. Saves writing
     to the device if unnecessary.
     """
-    if not _ADB_KEYS_RAW:
-      # E.g. adb was never run locally and initialize(None, None) was used.
-      return False
-    keys = set(_ADB_KEYS_RAW)
-    assert all('\n' not in k for k in keys), keys
-    old_content = self.pull_content('/data/misc/adb/adb_keys')
+    keys = set(self._rsa_keys_public)
+    old_content = self.PullContent('/data/misc/adb/adb_keys')
     if old_content:
       old_keys = set(old_content.strip().splitlines())
       if keys.issubset(old_keys):
         return True
       keys = keys | old_keys
     assert all('\n' not in k for k in keys), keys
-    if self.shell('mkdir -p /data/misc/adb')[1] != 0:
+    if self.Shell('mkdir -p /data/misc/adb')[1] != 0:
       return False
-    if self.shell('restorecon /data/misc/adb')[1] != 0:
+    if self.Shell('restorecon /data/misc/adb')[1] != 0:
       return False
-    if not self.push_content(
+    if not self.PushContent(
         '/data/misc/adb/adb_keys', ''.join(k + '\n' for k in sorted(keys))):
       return False
-    if self.shell('restorecon /data/misc/adb/adb_keys')[1] != 0:
+    if self.Shell('restorecon /data/misc/adb/adb_keys')[1] != 0:
       return False
     return True
 
-  def mkstemp(self, content, prefix='swarming', suffix=''):
+  def Mkstemp(self, content, prefix='python-adb', suffix=''):
     """Make a new temporary files with content.
 
     The random part of the name is guaranteed to not require quote.
@@ -643,10 +639,10 @@ class HighDevice(object):
       mode, _, _ = self.stat(name)
       if mode:
         continue
-      if self.push_content(name, content):
+      if self.PushContent(name, content):
         return name
 
-  def run_shell_wrapped(self, commands):
+  def WrappedShell(self, commands):
     """Creates a temporary shell script, runs it then return the data.
 
     This is needed when:
@@ -665,28 +661,28 @@ class HighDevice(object):
       if not outfile:
         return False
       try:
-        _, exit_code = self.shell('sh %s &> %s' % (script, outfile))
-        out = self.pull_content(outfile)
+        _, exit_code = self.Shell('sh %s &> %s' % (script, outfile))
+        out = self.PullContent(outfile)
         return out, exit_code
       finally:
-        self.shell('rm %s' % outfile)
+        self.Shell('rm %s' % outfile)
     finally:
-      self.shell('rm %s' % script)
+      self.Shell('rm %s' % script)
 
-  def get_prop(self, prop):
-    out, exit_code = self.shell('getprop %s' % pipes.quote(prop))
+  def GetProp(self, prop):
+    out, exit_code = self.Shell('getprop %s' % pipes.quote(prop))
     if exit_code != 0:
       return None
     return out.rstrip()
 
-  def dumpsys(self, arg):
+  def Dumpsys(self, arg):
     """dumpsys is a native android tool that returns inconsistent semi
     structured data.
 
     It acts as a directory service but each service return their data without
     any real format, and will happily return failure.
     """
-    out, exit_code = self.shell('dumpsys ' + arg)
+    out, exit_code = self.Shell('dumpsys ' + arg)
     if exit_code != 0 or out.startswith('Can\'t find service: '):
       return None
     return out

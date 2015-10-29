@@ -31,14 +31,16 @@ RAW_IMEI = """Result: Parcel(
 """
 
 class TestAndroid(unittest.TestCase):
-  def test_get_imei(self):
+  def test_GetIMEI(self):
     device = MockDevice(
         [
           ('dumpsys iphonesubinfo', ''),
           ('service call iphonesubinfo 1', RAW_IMEI),
         ])
+    cache = android.DeviceCache(None, None, None, None, None, None)
     self.assertEqual(
-        u'355236058685894', android.HighDevice(device, None).get_imei())
+        u'355236058685894',
+        android.HighDevice(device, cache, []).GetIMEI())
 
 
 if __name__ == '__main__':

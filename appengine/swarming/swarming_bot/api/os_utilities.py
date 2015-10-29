@@ -535,21 +535,21 @@ def get_state_all_devices_android(devices):
     if not properties:
       return {u'state': 'unavailable'}
     return {
-      u'battery': device.get_battery(),
+      u'battery': device.GetBattery(),
       u'build': {key: properties[u'ro.'+key] for key in keys},
-      u'cpu_scale': device.get_cpu_scale(),
-      u'disk': device.get_disk(),
-      u'imei': device.get_imei(),
-      u'ip': device.get_ip(),
-      u'max_uid': device.get_last_uid(),
+      u'cpu_scale': device.GetCPUScale(),
+      u'disk': device.GetDisk(),
+      u'imei': device.GetIMEI(),
+      u'ip': device.GetIP(),
+      u'max_uid': device.GetLastUID(),
       u'other_packages': [
-        p for p in device.list_packages() or []
+        p for p in device.GetPackages() or []
         if not p.startswith(('com.android.', 'com.google.')) and p != 'android'
       ],
       u'serial': device.serial,
       u'state': u'available',
-      u'temp': device.get_temperatures(),
-      u'uptime': device.get_uptime(),
+      u'temp': device.GetTemperatures(),
+      u'uptime': device.GetUptime(),
     }
 
   start = time.time()
