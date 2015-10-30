@@ -153,13 +153,13 @@ def _with_existing_topic(topic, callback):
     return callback()
 
 
-def publish(topic, message, **attributes):
+def publish(topic, message, attributes=None):
   """Publish messages to Cloud Pub/Sub. Creates the topic if it doesn't exist.
 
   Args:
     topic: Full name of the topic to publish to.
     message: Content of the message to publish.
-    **attributes: Any attributes to send with the message.
+    attributes: Any attributes to send with the message.
 
   Raises:
     Error or TransientError.
@@ -171,7 +171,7 @@ def publish(topic, message, **attributes):
         'POST', '%s:publish' % topic,
         payload={
             'messages': [{
-                'attributes': attributes,
+                'attributes': attributes or {},
                 'data': base64.b64encode(message),
             }],
         },

@@ -192,6 +192,17 @@ message AuthDBRevision {
 }
 
 
+// Published by Primary into 'auth-db-changed' PubSub topic. The body of the
+// message is base64 encoded serialized ChangeNotification. Additional
+// attributes are:
+//  X-AuthDB-SigKey-v1: <id of a public key>
+//  X-AuthDB-SigVal-v1: <base64 encoded RSA-SHA256(blob) signature>
+message ChangeNotification {
+  // New revision of the AuthDB.
+  optional AuthDBRevision revision = 1;
+}
+
+
 // Sent from Primary to Replica to update Replica's AuthDB.
 // Primary signs the entire serialized message with its private key and appends
 // two headers to HTTP request that carries the blob:

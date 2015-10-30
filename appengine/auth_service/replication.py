@@ -22,6 +22,8 @@ from components.auth import signature
 from components.auth import version
 from components.auth.proto import replication_pb2
 
+import pubsub
+
 
 # Possible values of push_status field of AuthReplicaState.
 PUSH_STATUS_SUCCESS = 0
@@ -232,6 +234,9 @@ def update_replicas_task(auth_db_rev):
 
   # Put the blob into datastore. Also updates pointer to the latest stored blob.
   store_auth_db_snapshot(replication_state, auth_db_blob)
+
+  # Notify PubSub subscribers that new snapshot is available.
+  pubsub.publish_authdb_change(replication_state)
 
   # Grab last known replicas state and push only to replicas that are behind.
   stale_replicas = [

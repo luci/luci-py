@@ -1,4 +1,4 @@
-application: chrome-infra-auth-dev
+application: auth-service
 module: backend
 version: 1
 runtime: python27

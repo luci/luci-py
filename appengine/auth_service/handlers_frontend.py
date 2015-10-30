@@ -114,7 +114,10 @@ class AuthDBRevisionsHandler(auth.ApiHandler):
         revision number and timestamp.
   """
 
-  @auth.require(lambda: acl.is_replica_or_trusted_service() or auth.is_admin())
+  @auth.require(lambda: (
+      auth.is_admin() or
+      acl.is_trusted_service() or
+      replication.is_replica(auth.get_current_identity())))
   def get(self, rev):
     skip_body = self.request.get('skip_body') == '1'
     if rev == 'latest':

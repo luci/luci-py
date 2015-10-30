@@ -16,12 +16,16 @@ They have 'pubsub.topics.attachSubscription' permission on the topic and can
 create subscriptions belong to Cloud Projects they own.
 """
 
+import base64
 import logging
 
 from google.appengine.api import app_identity
 
 from components import auth
 from components import pubsub
+from components import utils
+from components.auth import signature
+from components.auth.proto import replication_pb2
 
 import acl
 
@@ -80,3 +84,26 @@ def revoke_stale_authorization():
         if not acl.is_trusted_service(ident):
           logging.warning('Removing "%s" from subscribers list', iam_ident)
           p.remove_member('roles/pubsub.subscriber', iam_ident)
+
+
+def publish_authdb_change(state):
+  """Publishes AuthDB change notification to the topic.
+
+  Args:
+    state: AuthReplicationState with version info.
+  """
+  if utils.is_local_dev_server():
+    return
+
+  msg = replication_pb2.ReplicationPushRequest()
+  msg.revision.primary_id = app_identity.get_application_id()
+  msg.revision.auth_db_rev = state.auth_db_rev
+  msg.revision.modified_ts = utils.datetime_to_timestamp(state.modified_ts)
+
+  blob = msg.SerializeToString()
+  key_name, sig = signature.sign_blob(blob)
+
+  pubsub.publish(topic_name(), blob, {
+    'X-AuthDB-SigKey-v1': key_name,
+    'X-AuthDB-SigVal-v1': base64.b64encode(sig),
+  })

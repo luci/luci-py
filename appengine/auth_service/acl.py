@@ -7,8 +7,6 @@
 from components import auth
 from components.auth.ui import acl
 
-import replication
-
 
 def has_access(identity=None):
   """Returns True if current caller can access groups and other auth data."""
@@ -18,10 +16,3 @@ def has_access(identity=None):
 def is_trusted_service(identity=None):
   """Returns True if caller is in 'auth-trusted-services' group."""
   return auth.is_group_member('auth-trusted-services', identity)
-
-
-def is_replica_or_trusted_service():
-  """Returns True if caller is a replica or in 'auth-trusted-services' group."""
-  return (
-      is_trusted_service() or
-      replication.is_replica(auth.get_current_identity()))

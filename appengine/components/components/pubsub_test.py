@@ -100,7 +100,7 @@ class PubSubTest(test_case.TestCase):
         },
       },
     ])
-    pubsub.publish('projects/a/topics/def', 'msg', a=1, b=2)
+    pubsub.publish('projects/a/topics/def', 'msg', {'a': 1, 'b': 2})
 
   def test_publish_transient_error(self):
     self.mock_requests([
@@ -119,7 +119,7 @@ class PubSubTest(test_case.TestCase):
       }
     ])
     with self.assertRaises(pubsub.TransientError):
-      pubsub.publish('projects/a/topics/def', 'msg', a=1, b=2)
+      pubsub.publish('projects/a/topics/def', 'msg', {'a': 1, 'b': 2})
 
   def test_publish_fatal_error(self):
     self.mock_requests([
@@ -138,7 +138,7 @@ class PubSubTest(test_case.TestCase):
       }
     ])
     with self.assertRaises(pubsub.Error):
-      pubsub.publish('projects/a/topics/def', 'msg', a=1, b=2)
+      pubsub.publish('projects/a/topics/def', 'msg', {'a': 1, 'b': 2})
 
   def test_iam_policy_works(self):
     self.mock_requests([
