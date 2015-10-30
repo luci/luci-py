@@ -9,6 +9,11 @@ cron:
   url: /internal/cron/import_groups
   schedule: every 15 minutes
 
+- description: revoke stale pubsub authorization
+  target: backend
+  url: /internal/cron/revoke_stale_pubsub_auth
+  schedule: every 30 minutes
+
 ### ereporter2
 
 - description: ereporter2 cleanup

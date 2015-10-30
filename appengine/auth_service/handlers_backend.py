@@ -11,7 +11,14 @@ from components.auth import change_log
 
 import config
 import importer
+import pubsub
 import replication
+
+
+class InternalRevokePubSubAuthCronHandler(webapp2.RequestHandler):
+  @decorators.require_cronjob
+  def get(self):
+    pubsub.revoke_stale_authorization()
 
 
 class InternalUpdateConfigCronHandler(webapp2.RequestHandler):
@@ -39,6 +46,9 @@ def get_routes():
   routes.extend(change_log.get_backend_routes())
   # Auth service's own routes.
   routes.extend([
+    webapp2.Route(
+        r'/internal/cron/revoke_stale_pubsub_auth',
+        InternalRevokePubSubAuthCronHandler),
     webapp2.Route(
         r'/internal/cron/update_config',
         InternalUpdateConfigCronHandler),

@@ -145,12 +145,12 @@ def _with_existing_topic(topic, callback):
     Error or TransientError.
   """
   try:
-    callback()
+    return callback()
   except Error as e:
     if e.inner.status_code != 404:
       raise e
     ensure_topic_exists(topic)
-    callback()
+    return callback()
 
 
 def publish(topic, message, **attributes):
@@ -262,7 +262,8 @@ def iam_policy(object_name):
   """Changes IAM policy for an existing subscription or topic.
 
   Reads current policy, invokes the context manager body, writes modified policy
-  back. Uses etags for concurrency control.
+  back. Uses etags for concurrency control. Autocreates a topic if object_name
+  is referencing a topic that doesn't exist.
 
   Usage example:
 
@@ -275,12 +276,22 @@ def iam_policy(object_name):
   Raises:
     Error or TransientError.
   """
-  assert (
-      validate_full_name(object_name, 'subscriptions') or
-      validate_full_name(object_name, 'topics')), object_name
-  policy = _call('GET', '%s:getIamPolicy' % object_name)
+  is_sub = validate_full_name(object_name, 'subscriptions')
+  is_topic = validate_full_name(object_name, 'topics')
+  assert is_sub or is_topic, object_name
+
+  def get_policy():
+    return _call('GET', '%s:getIamPolicy' % object_name)
+
+  # We can create topics on the fly (but not subscriptions).
+  if is_topic:
+    policy = _with_existing_topic(object_name, get_policy)
+  else:
+    policy = get_policy()
+
   copied = IAMPolicy(copy.deepcopy(policy))
   yield copied
+
   if copied.policy != policy:
     _call(
         'POST', '%s:setIamPolicy' % object_name,

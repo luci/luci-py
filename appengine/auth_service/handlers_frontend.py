@@ -20,13 +20,14 @@ from components.auth import model
 from components.auth import tokens
 from components.auth import version
 from components.auth.proto import replication_pb2
-from components.auth.ui import acl
 from components.auth.ui import rest_api
 from components.auth.ui import ui
 
+import acl
 import config
 import delegation
 import importer
+import pubsub
 import replication
 
 
@@ -91,13 +92,6 @@ def get_additional_ui_environment(handler):
   }
 
 
-def is_replica_or_trusted_service():
-  """Returns True if caller is a replica or in 'auth-trusted-services' group."""
-  return (
-      auth.is_group_member('auth-trusted-services') or
-      replication.is_replica(auth.get_current_identity()))
-
-
 ################################################################################
 ## API handlers.
 
@@ -120,7 +114,7 @@ class AuthDBRevisionsHandler(auth.ApiHandler):
         revision number and timestamp.
   """
 
-  @auth.require(lambda: is_replica_or_trusted_service() or auth.is_admin())
+  @auth.require(lambda: acl.is_replica_or_trusted_service() or auth.is_admin())
   def get(self, rev):
     skip_body = self.request.get('skip_body') == '1'
     if rev == 'latest':
@@ -142,6 +136,81 @@ class AuthDBRevisionsHandler(auth.ApiHandler):
       assert snapshot.auth_db_deflated
       resp['deflated_body'] = base64.b64encode(snapshot.auth_db_deflated)
     self.send_response({'snapshot': resp})
+
+
+class AuthDBSubscriptionAuthHandler(auth.ApiHandler):
+  """Manages authorization to PubSub topic for AuthDB change notifications.
+
+  Members of 'auth-trusted-services' group may use this endpoint to make sure
+  they can attach subscriptions to AuthDB change notification stream.
+  """
+
+  def subscriber_email(self):
+    """Validates caller is using email for auth, returns it.
+
+    Raises HTTP 400 if some other kind of authentication is used. Only emails
+    are supported by PubSub.
+    """
+    caller = auth.get_current_identity()
+    if not caller.is_user:
+      self.abort_with_error(400, text='Caller must use email-based auth')
+    return caller.name
+
+  @auth.require(acl.is_trusted_service)
+  def get(self):
+    """Queries whether the caller is authorized to attach subscriptions already.
+
+    Response body:
+    {
+      'topic': <full name of PubSub topic with AuthDB change notifications>,
+      'authorized': <boolean>
+    }
+    """
+    try:
+      return self.send_response({
+        'topic': pubsub.topic_name(),
+        'authorized': pubsub.is_authorized_subscriber(self.subscriber_email()),
+      })
+    except pubsub.Error as e:
+      self.abort_with_error(409, text=str(e))
+
+  @auth.require(acl.is_trusted_service)
+  def post(self):
+    """Grants caller "pubsub.subscriber" role on change notifications topic.
+
+    Response body:
+    {
+      'topic': <full name of PubSub topic with AuthDB change notifications>,
+      'authorized': true
+    }
+    """
+    try:
+      pubsub.authorize_subscriber(self.subscriber_email())
+      return self.send_response({
+        'topic': pubsub.topic_name(),
+        'authorized': True,
+      })
+    except pubsub.Error as e:
+      self.abort_with_error(409, text=str(e))
+
+  @auth.require(acl.is_trusted_service)
+  def delete(self):
+    """Revokes authorization if it exists.
+
+    Response body:
+    {
+      'topic': <full name of PubSub topic with AuthDB change notifications>,
+      'authorized': false
+    }
+    """
+    try:
+      pubsub.deauthorize_subscriber(self.subscriber_email())
+      return self.send_response({
+        'topic': pubsub.topic_name(),
+        'authorized': False,
+      })
+    except pubsub.Error as e:
+      self.abort_with_error(409, text=str(e))
 
 
 class ImporterConfigHandler(auth.ApiHandler):
@@ -301,6 +370,9 @@ def get_routes():
     webapp2.Route(
         r'/auth_service/api/v1/authdb/revisions/<rev:(latest|[0-9]+)>',
         AuthDBRevisionsHandler),
+    webapp2.Route(
+        r'/auth_service/api/v1/authdb/subscription/authorization',
+        AuthDBSubscriptionAuthHandler),
     webapp2.Route(
         r'/auth_service/api/v1/importer/config',
         ImporterConfigHandler),
