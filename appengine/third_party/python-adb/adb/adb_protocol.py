@@ -25,7 +25,7 @@ import struct
 import threading
 import time
 
-import usb_exceptions
+from adb import usb_exceptions
 
 
 _LOG = logging.getLogger('adb.low')
@@ -128,7 +128,7 @@ class _AdbMessageHeader(collections.namedtuple(
     try:
       command, arg0, arg1, data_length, data_checksum, magic = struct.unpack(
           '<6I', message)
-    except struct.error as e:
+    except struct.error:
       raise InvalidResponseError('Unable to unpack ADB message: %r', message)
     hdr = cls(command, arg0, arg1, data_length, data_checksum)
     expected_magic = command ^ 0xFFFFFFFF
@@ -406,7 +406,7 @@ class AdbConnectionManager(object):
     self._Connect()
     return self
 
-  def Open(self, destination, timeout_ms=None, callback=None):
+  def Open(self, destination, timeout_ms=None):
     """Opens a new connection to the device via an OPEN message.
 
     Args:

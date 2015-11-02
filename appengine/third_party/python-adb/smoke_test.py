@@ -29,24 +29,13 @@ import time
 import unittest
 
 
-# TODO(maruel): Temporary hack.
-THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-THIRD_PARTY = os.path.dirname(os.path.dirname(THIS_DIR))
-sys.path.insert(0, os.path.join(THIRD_PARTY, 'python-libusb1'))
-sys.path.insert(
-    0, os.path.join(THIRD_PARTY, '..', '..', 'client', 'third_party', 'rsa'))
-sys.path.insert(
-    0, os.path.join(THIRD_PARTY, '..', '..', 'client', 'third_party', 'pyasn1'))
-# TODO(maruel): Temporary hack.
-
-
 import usb1
 
 
-import adb_commands
-import adb_protocol
-import common
-import usb_exceptions
+from adb import adb_commands
+from adb import adb_protocol
+from adb import common
+from adb import usb_exceptions
 
 
 class Filter(object):
@@ -219,10 +208,10 @@ class Test(unittest.TestCase):
       userid = self.cmd.Shell('id').split(' ', 1)[0]
       self.assertIn(userid, ('uid=2000(shell)', 'uid=0(root)'))
       return userid
-  
+
   def switch_root(self):
     """Switches adbd to run as root.
-    
+
     Asserts that adbd was not running as root.
     """
     logging.debug('switch_root()')

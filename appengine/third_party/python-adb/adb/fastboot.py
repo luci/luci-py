@@ -20,12 +20,12 @@ import logging
 import os
 import struct
 
-import common
-import usb_exceptions
+from adb import common
+from adb import usb_exceptions
 
 # The size of packets to write to usb, this is set to 4 for legacy reasons.
 # We've had success with 1MB DRASTICALLY decreasing flashing times.
-fastboot_write_chunk_size_kb = 1024,
+FASTBOOT_WRITE_CHUNK_SIZE_KB = 1024,
 
 _LOG = logging.getLogger('fastboot')
 
@@ -191,7 +191,7 @@ class FastbootProtocol(object):
       progress = self._HandleProgress(length, progress_callback)
       progress.next()
     while length:
-      tmp = data.read(fastboot_write_chunk_size_kb * 1024)
+      tmp = data.read(FASTBOOT_WRITE_CHUNK_SIZE_KB * 1024)
       length -= len(tmp)
       self.usb.BulkWrite(tmp)
 

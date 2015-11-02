@@ -18,7 +18,7 @@ from pyasn1.codec.der import decoder
 from pyasn1.type import univ
 from rsa import pkcs1
 
-import adb_protocol
+from adb import adb_protocol
 
 
 # python-rsa lib hashes all messages it signs. ADB does it already, we just

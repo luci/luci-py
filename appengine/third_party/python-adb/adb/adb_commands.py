@@ -26,9 +26,9 @@ import cStringIO
 import os
 import socket
 
-import adb_protocol
-import common
-import filesync_protocol
+from adb import adb_protocol
+from adb import common
+from adb import filesync_protocol
 
 # From adb.h
 CLASS = 0xFF

@@ -22,16 +22,16 @@ import subprocess
 import time
 
 
-import adb_commands
-import common
-import usb_exceptions
+from adb import adb_commands
+from adb import common
+from adb import usb_exceptions
 
 
 ### Public API.
 
 
 # Make adb_commands_safe a drop-in replacement for adb_commands.
-from adb_commands import DeviceIsAvailable
+from adb.adb_commands import DeviceIsAvailable
 
 
 def KillADB():

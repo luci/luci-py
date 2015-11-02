@@ -16,7 +16,7 @@ import hashlib
 
 from M2Crypto import RSA
 
-import adb_protocol
+from adb import adb_protocol
 
 
 class M2CryptoSigner(adb_protocol.AuthSigner):

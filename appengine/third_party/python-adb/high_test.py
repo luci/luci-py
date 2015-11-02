@@ -17,7 +17,8 @@ import logging
 import sys
 import unittest
 
-import high
+
+from adb import high
 
 
 class MockDevice(object):
@@ -44,10 +45,10 @@ class TestAndroid(unittest.TestCase):
           ('dumpsys iphonesubinfo', ''),
           ('service call iphonesubinfo 1', RAW_IMEI),
         ])
-    cache = android.DeviceCache(None, None, None, None, None, None)
+    cache = high.DeviceCache(None, None, None, None, None, None)
     self.assertEqual(
         u'355236058685894',
-        android.HighDevice(device, cache, []).GetIMEI())
+        high.HighDevice(device, cache, []).GetIMEI())
 
 
 if __name__ == '__main__':

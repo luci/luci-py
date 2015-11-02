@@ -25,8 +25,8 @@ import time
 
 import libusb1
 
-import adb_protocol
-import usb_exceptions
+from adb import adb_protocol
+from adb import usb_exceptions
 
 
 class PushFailedError(usb_exceptions.AdbCommandFailureException):
