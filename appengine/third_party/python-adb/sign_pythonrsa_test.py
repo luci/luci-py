@@ -62,7 +62,7 @@ oShjkmSqylt4CG34EcCl+JkRTZVFsvp4f8gxC1yQasPo9xjB3DC7maanjp70uMLw
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
-    unittest.TestCase.maxDiff = None
+    unittest.TestCase.maxDiff = None  # pragma: no cover
   logging.basicConfig(
       level=logging.DEBUG if '-v' in sys.argv else logging.CRITICAL)
   unittest.main()

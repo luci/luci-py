@@ -19,16 +19,18 @@ Common usb browsing, and usb communication.
 import logging
 import socket
 import threading
-import weakref
+import traceback
 
 import libusb1
 import usb1
 
 from adb import usb_exceptions
 
+
 DEFAULT_TIMEOUT_MS = 1000
 
-_LOG = logging.getLogger('android_usb')
+_LOG = logging.getLogger('adb.usb')
+_LOG.setLevel(logging.ERROR)
 
 
 def GetInterface(setting):
@@ -58,7 +60,7 @@ class UsbHandle(object):
     BulkWrite(bytes data)
   """
 
-  _HANDLE_CACHE = weakref.WeakValueDictionary()
+  _HANDLE_CACHE = {}
   _HANDLE_CACHE_LOCK = threading.Lock()
 
   def __init__(self, device, setting, usb_info=None, timeout_ms=None):
@@ -70,12 +72,20 @@ class UsbHandle(object):
       usb_info: String describing the usb path/serial/device, for debugging.
       timeout_ms: Timeout in milliseconds for all I/O.
     """
+    # Immutable.
     self._setting = setting
     self._device = device
-    self._handle = None
-
     self._usb_info = usb_info or ''
     self._timeout_ms = timeout_ms or DEFAULT_TIMEOUT_MS
+
+    # State.
+    self._handle = None
+    self._port_path = None
+    self._serial_number = None
+    self._read_endpoint = None
+    self._write_endpoint = None
+    self._interface_number = None
+    self._max_read_packet_len = None
 
   @property
   def usb_info(self):
@@ -90,14 +100,16 @@ class UsbHandle(object):
   def Open(self):
     """Opens the USB device for this setting, and claims the interface."""
     # Make sure we close any previous handle open to this usb device.
-    port_path = tuple(self.port_path)
-    with self._HANDLE_CACHE_LOCK:
-      old_handle = self._HANDLE_CACHE.get(port_path)
-      if old_handle is not None:
-        old_handle.Close()
+    port_path = self.port_path
+    _LOG.info('%s.Open()', self.port_path_str)
 
-    self._read_endpoint = None
-    self._write_endpoint = None
+    with self._HANDLE_CACHE_LOCK:
+      previous = self._HANDLE_CACHE.get(port_path)
+      if previous:
+        _LOG.error(
+            '%s.Open(): Found already opened port:\n%s',
+            self.port_path_str, previous[1])
+        previous[0].Close()
 
     for endpoint in self._setting.iterEndpoints():
       address = endpoint.getAddress()
@@ -117,44 +129,58 @@ class UsbHandle(object):
         handle.detachKernelDriver(iface_number)
     except libusb1.USBError as e:
       if e.value == libusb1.LIBUSB_ERROR_NOT_FOUND:
-        _LOG.warning('Kernel driver not found for interface: %s.', iface_number)
+        _LOG.warning(
+            '%s.Open(): Kernel driver not found for interface: %s.',
+            self.port_path_str, iface_number)
       else:
         raise
     handle.claimInterface(iface_number)
     self._handle = handle
     self._interface_number = iface_number
 
+    stack = ''.join(traceback.format_stack()[:-2])
     with self._HANDLE_CACHE_LOCK:
-      self._HANDLE_CACHE[port_path] = self
-    # When this object is deleted, make sure it's closed.
-    weakref.ref(self, self.Close)
+      self._HANDLE_CACHE[port_path] = (self._handle, stack)
+
+  @property
+  def is_open(self):
+    return bool(self._handle)
 
   @property
   def serial_number(self):
-    return self._device.getSerialNumber()
+    if not self._serial_number:
+      self._serial_number = self._device.getSerialNumber()
+    return self._serial_number
 
   @property
   def port_path(self):
-    out = [self._device.getBusNumber()]
-    try:
-      out.extend(self._device.getPortNumberList())
-    except AttributeError:
-      # Temporary issue on Precise. Remove once we do not support 12.04
-      # anymore.
-      # https://crbug.com/532357
-      out.append(self._device.getDeviceAddress())
-    return out
+    if not self._port_path:
+      self._port_path = (
+          self._device.getBusNumber(), self._device.getDeviceAddress())
+    return self._port_path
+
+  @property
+  def port_path_str(self):
+    return '/'.join(str(p) for p in self.port_path)
 
   def Close(self):
+    port_path = self.port_path
+    _LOG.info('%s.Close()', self.port_path_str)
+    with self._HANDLE_CACHE_LOCK:
+      self._HANDLE_CACHE.pop(port_path, None)
     if self._handle is None:
       return
     try:
       self._handle.releaseInterface(self._interface_number)
       self._handle.close()
-    except libusb1.USBError:
-      _LOG.info('USBError while closing handle %s: ', self.usb_info)
+    except libusb1.USBError as e:
+      _LOG.info('%s.Close(): USBError: %s', self.port_path_str, e)
     finally:
       self._handle = None
+      self._read_endpoint = None
+      self._write_endpoint = None
+      self._interface_number = None
+      self._max_read_packet_len = None
 
   def Timeout(self, timeout_ms):
     return timeout_ms if timeout_ms is not None else self._timeout_ms
@@ -199,7 +225,8 @@ class UsbHandle(object):
     """Returns a device matcher for the given port path."""
     if isinstance(port_path, basestring):
       # Convert from sysfs path to port_path.
-      port_path = [int(part) for part in port_path.split('/')]
+      port_path = [int(i) for i in port_path.split('/')]
+    port_path = tuple(port_path)
     return lambda device: device.port_path == port_path
 
   @classmethod
@@ -268,7 +295,7 @@ class UsbHandle(object):
       timeout_ms: Default timeout of commands in milliseconds.
 
     Yields:
-      UsbHandle instances
+      Unopened UsbHandle instances
     """
     ctx = usb1.USBContext()
     for device in ctx.getDeviceList(skip_on_error=True):
@@ -279,6 +306,25 @@ class UsbHandle(object):
       handle = cls(device, setting, usb_info=usb_info, timeout_ms=timeout_ms)
       if device_matcher is None or device_matcher(handle):
         yield handle
+
+  @classmethod
+  def FindDevicesSafe(cls, *args, **kwargs):
+    """Safe version of FindDevicesSafe.
+
+    Use manual iterator handling instead of "for handle in generator" to catch
+    USB exception explicitly.
+    """
+    generator = cls.FindDevices(*args, **kwargs)
+    while True:
+      try:
+        handle = generator.next()
+      except usb1.USBErrorOther as e:
+        logging.error(
+            'Failed to open USB device, is user in group plugdev? %s', e)
+        continue
+      except StopIteration:
+        raise
+      yield handle
 
 
 class TcpHandle(object):
@@ -306,14 +352,14 @@ class TcpHandle(object):
   def serial_number(self):
     return self._serial_number
 
-  def BulkWrite(self, data, timeout=None):
-      return self._connection.sendall(data)
+  def BulkWrite(self, data, timeout=None):  # pylint: disable=unused-argument
+    return self._connection.sendall(data)
 
-  def BulkRead(self, numbytes, timeout=None):
-      return self._connection.recv(numbytes)
+  def BulkRead(self, numbytes, timeout=None):  # pylint: disable=unused-argument
+    return self._connection.recv(numbytes)
 
   def Timeout(self, timeout_ms):
-      return timeout_ms
+    return timeout_ms
 
   def Close(self):
-      return self._connection.close()
+    return self._connection.close()
