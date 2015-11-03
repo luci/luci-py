@@ -117,7 +117,7 @@ class _AdbMessageHeader(collections.namedtuple(
       command, arg0, arg1, data_length, data_checksum, magic = struct.unpack(
           '<6I', message)
     except struct.error:
-      raise InvalidResponseError('Unable to unpack ADB message: %r', message)
+      raise InvalidResponseError('Unable to unpack ADB message', message)
     hdr = cls(command, arg0, arg1, data_length, data_checksum)
     expected_magic = command ^ 0xFFFFFFFF
     if magic != expected_magic:

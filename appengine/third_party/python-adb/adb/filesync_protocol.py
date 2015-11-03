@@ -48,6 +48,8 @@ class FilesyncProtocol(object):
 
   @staticmethod
   def Stat(connection, filename):
+    if isinstance(filename, unicode):
+      filename = filename.encode('utf-8')
     cnxn = FileSyncConnection(connection, '<4I')
     cnxn.Send('STAT', filename)
     command, (mode, size, mtime) = cnxn.ReadNoData(('STAT',))
@@ -59,6 +61,8 @@ class FilesyncProtocol(object):
 
   @classmethod
   def List(cls, connection, path):
+    if isinstance(path, unicode):
+      path = path.encode('utf-8')
     cnxn = FileSyncConnection(connection, '<5I')
     cnxn.Send('LIST', path)
     files = []
@@ -72,6 +76,8 @@ class FilesyncProtocol(object):
   @classmethod
   def Pull(cls, connection, filename, dest_file):
     """Pull a file from the device into the file-like dest_file."""
+    if isinstance(filename, unicode):
+      filename = filename.encode('utf-8')
     cnxn = FileSyncConnection(connection, '<2I')
     cnxn.Send('RECV', filename)
     for cmd_id, _, data in cnxn.ReadUntil(('DATA',), 'DONE'):
@@ -94,6 +100,8 @@ class FilesyncProtocol(object):
     Raises:
       PushFailedError: Raised on push failure.
     """
+    if isinstance(filename, unicode):
+      filename = filename.encode('utf-8')
     fileinfo = '%s,%s' % (filename, st_mode)
     assert len(filename) <= 1024, 'Name too long: %s' % filename
 
