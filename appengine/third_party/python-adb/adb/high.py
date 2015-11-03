@@ -40,6 +40,11 @@ from adb import sign_pythonrsa
 ### Private stuff.
 
 
+_LOG = logging.getLogger('adb.high')
+_LOG.setLevel(logging.ERROR)
+
+
+_ADB_KEYS_LOCK = threading.Lock()
 # Both following are set when ADB is initialized.
 # _ADB_KEYS is set to a list of adb_protocol.AuthSigner instances. It contains
 # one or multiple key used to authenticate to Android debug protocol (adb).
@@ -197,42 +202,33 @@ def Initialize(pub_key, priv_key):
   You can steal pub_key, priv_key pair from ~/.android/adbkey and
   ~/.android/adbkey.pub.
   """
-  global _ADB_KEYS
-  if _ADB_KEYS is not None:
-    assert False, 'initialize() was called repeatedly: ignoring keys'
-  assert bool(pub_key) == bool(priv_key)
-  pub_key = pub_key.strip() if pub_key else pub_key
-  priv_key = priv_key.strip() if priv_key else priv_key
+  with _ADB_KEYS_LOCK:
+    global _ADB_KEYS
+    if _ADB_KEYS is not None:
+      assert False, 'initialize() was called repeatedly: ignoring keys'
+    assert bool(pub_key) == bool(priv_key)
+    pub_key = pub_key.strip() if pub_key else pub_key
+    priv_key = priv_key.strip() if priv_key else priv_key
 
-  _ADB_KEYS = []
-  if pub_key:
-    _ADB_KEYS.append(sign_pythonrsa.PythonRSASigner(pub_key, priv_key))
-    _ADB_KEYS_PUB.add(pub_key)
+    _ADB_KEYS = []
+    if pub_key:
+      _ADB_KEYS.append(sign_pythonrsa.PythonRSASigner(pub_key, priv_key))
+      _ADB_KEYS_PUB.add(pub_key)
 
-  # Try to add local adb keys if available.
-  path = os.path.expanduser('~/.android/adbkey')
-  if os.path.isfile(path) and os.path.isfile(path + '.pub'):
-    with open(path + '.pub', 'rb') as f:
-      pub_key = f.read().strip()
-    with open(path, 'rb') as f:
-      priv_key = f.read().strip()
-    _ADB_KEYS.append(sign_pythonrsa.PythonRSASigner(pub_key, priv_key))
-    _ADB_KEYS_PUB.add(pub_key)
+    # Try to add local adb keys if available.
+    path = os.path.expanduser('~/.android/adbkey')
+    if os.path.isfile(path) and os.path.isfile(path + '.pub'):
+      with open(path + '.pub', 'rb') as f:
+        pub_key = f.read().strip()
+      with open(path, 'rb') as f:
+        priv_key = f.read().strip()
+      _ADB_KEYS.append(sign_pythonrsa.PythonRSASigner(pub_key, priv_key))
+      _ADB_KEYS_PUB.add(pub_key)
 
-  return bool(_ADB_KEYS)
-
-
-def OpenDevice(handle, banner, rsa_keys, on_error):
-  """Returns a HighDevice from an unopened common.UsbHandle.
-  """
-  device = adb_commands_safe.AdbCommandsSafe.ConnectHandle(
-      handle, banner=banner, rsa_keys=rsa_keys, on_error=on_error)
-  # Query the device, caching data upfront inside _PER_DEVICE_CACHE so repeated
-  # calls won't reload the cached items.
-  return HighDevice(device, _InitCache(device), _ADB_KEYS_PUB)
+    return _ADB_KEYS[:]
 
 
-def GetDevices(on_error=None):
+def GetDevices(banner, default_timeout_ms, auth_timeout_ms, on_error=None):
   """Returns the list of devices available.
 
   Caller MUST call CloseDevices(devices) on the return value or call .Close() on
@@ -242,36 +238,18 @@ def GetDevices(on_error=None):
     - list of HighDevice instances.
     - None if adb is unavailable.
   """
-  if not _ADB_KEYS:
-    return None
-
+  with _ADB_KEYS_LOCK:
+    if not _ADB_KEYS:
+      return []
   # List of unopened common.UsbHandle.
-  handles = []
-  generator = common.UsbHandle.FindDevices(
-      adb_commands_safe.DeviceIsAvailable, timeout_ms=60000)
-  while True:
-    try:
-      # Use manual iterator handling instead of "for handle in generator" to
-      # catch USB exception explicitly.
-      handle = generator.next()
-    except common.usb1.USBErrorOther as e:
-      logging.warning(
-          'Failed to open USB device, is user in group plugdev? %s', e)
-      continue
-    except StopIteration:
-      break
-    handles.append(handle)
+  handles = list(
+      common.UsbHandle.FindDevicesSafe(
+          adb_commands_safe.DeviceIsAvailable, timeout_ms=default_timeout_ms))
 
   def fn(handle):
-    # Open the device and do the initial adb-connect.
-    device = OpenDevice(
-        handle, 'swarming', _ADB_KEYS, on_error)
-    # Opportinistically tries to switch adbd to run in root mode. This is
-    # necessary for things like switching the CPU scaling governor to cool off
-    # devices while idle.
-    if device.cache.has_su and not device.IsRoot():
-      device.Root()
-    return device
+    return HighDevice.Connect(
+        handle, banner=banner, default_timeout_ms=default_timeout_ms,
+        auth_timeout_ms=auth_timeout_ms, on_error=on_error)
 
   devices = parallel.pmap(fn, handles)
   _PER_DEVICE_CACHE.trim(devices)
@@ -291,16 +269,26 @@ class HighDevice(object):
   the low level functionality provided by AdbCommandsSafe. As such there's no
   direct access by methods of this class to self.cmd.
   """
-  def __init__(self, device, cache, rsa_keys_public):
+  def __init__(self, device, cache):
     # device can be one of adb_commands_safe.AdbCommandsSafe,
     # adb_commands.AdbCommands or a fake.
-    assert isinstance(cache, DeviceCache), cache
-    assert all(isinstance(p, str) for p in rsa_keys_public), rsa_keys_public
-    assert all('\n' not in p for p in rsa_keys_public), rsa_keys_public
+
     # Immutable.
     self._device = device
     self._cache = cache
-    self._rsa_keys_public = rsa_keys_public
+
+  @classmethod
+  def ConnectDevice(cls, port_path, **kwargs):
+    """Opens the device and do the initial adb-connect."""
+    kwargs['port_path'] = port_path
+    return cls._Connect(
+        adb_commands_safe.AdbCommandsSafe.ConnectDevice, **kwargs)
+
+  @classmethod
+  def Connect(cls, handle, **kwargs):
+    """Opens the device and do the initial adb-connect."""
+    kwargs['handle'] = handle
+    return cls._Connect(adb_commands_safe.AdbCommandsSafe.Connect, **kwargs)
 
   # Proxy the embedded low level methods.
 
@@ -352,7 +340,11 @@ class HighDevice(object):
     return self._device.Root()
 
   def Shell(self, cmd):
-    return self._device.Shell(cmd)
+    """Automatically uses WrappedShell() when necessary."""
+    if self._device.IsShellOk(cmd):
+      return self._device.Shell(cmd)
+    else:
+      return self.WrappedShell([cmd])
 
   def ShellRaw(self, cmd):
     return self._device.ShellRaw(cmd)
@@ -381,7 +373,9 @@ class HighDevice(object):
     out.update(
       (v, self.PullContent('/sys/devices/system/cpu/cpu0/cpufreq/' + k))
       for k, v in mapping.iteritems())
-    return out
+    return {
+      k: v.strip() if isinstance(v, str) else v for k, v in out.iteritems()
+    }
 
   def SetCPUScalingGovernor(self, governor):
     """Sets the CPU scaling governor to the one specified.
@@ -389,7 +383,7 @@ class HighDevice(object):
     Returns:
       True on success.
     """
-    assert governor in KNOWN_CPU_SCALING_GOVERNOR_VALUES, governor
+    assert governor in KNOWN_CPU_SCALING_GOVERNOR_VALUES, repr(governor)
     if governor not in self.cache.available_governors:
       if governor == 'powersave':
         return self.SetCPUSpeed(self.cache.cpuinfo_min_freq)
@@ -398,7 +392,9 @@ class HighDevice(object):
       elif governor == 'interactive':
         governor = 'ondemand'
       else:
-        logging.error('Can\'t switch to %s', governor)
+        _LOG.warning(
+            '%s.SetCPUScalingGovernor(): Can\'t switch to %s',
+            self.port_path, governor)
         return False
     assert governor in KNOWN_CPU_SCALING_GOVERNOR_VALUES, governor
 
@@ -410,24 +406,25 @@ class HighDevice(object):
       if prev == governor:
         return True
       if prev not in self.cache.available_governors:
-        logging.error(
-            '%s: Read invalid scaling_governor: %s', self.port_path, prev)
+        _LOG.warning(
+            '%s.SetCPUScalingGovernor(): Read invalid scaling_governor: %s',
+            self.port_path, prev)
 
     # This works on Nexus 10 but not on Nexus 5. Need to investigate more. In
     # the meantime, simply try one after the other.
-    if not self.PushContent(path, governor + '\n'):
+    if not self.PushContent(governor + '\n', path):
       # Fallback via shell.
       _, exit_code = self.Shell('echo "%s" > %s' % (governor, path))
       if exit_code != 0:
-        logging.error(
-            '%s: Writing scaling_governor %s failed; was %s',
+        _LOG.warning(
+            '%s.SetCPUScalingGovernor(): Writing %s failed; was %s',
             self.port_path, governor, prev)
         return False
     # Get it back to confirm.
     newval = self.PullContent(path)
     if not (newval or '').strip() == governor:
-      logging.error(
-          '%s: Wrote scaling_governor %s; was %s; got %s',
+      _LOG.warning(
+          '%s.SetCPUScalingGovernor(): Wrote %s; was %s; got %s',
           self.port_path, governor, prev, newval)
       return False
     return True
@@ -442,8 +439,8 @@ class HighDevice(object):
     assert 10000 <= speed <= 10000000, speed
     success = self.SetCPUScalingGovernor('userspace')
     if not self.PushContent(
-        '/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed', '%d\n' %
-        speed):
+        '%d\n' % speed,
+        '/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed'):
       return False
     # Get it back to confirm.
     val = self.PullContent(
@@ -587,10 +584,7 @@ class HighDevice(object):
   def GetApplicationPath(self, package):
     # TODO(maruel): Test.
     out, _ = self.Shell('pm path %s' % pipes.quote(package))
-    return out.strip() if out else out
-
-  def GetApplicationVersion(self, package):
-    return self.Dumpsys('package %s' % pipes.quote(package))
+    return out.strip().split(':', 1)[1] if out else out
 
   def WaitForDevice(self, timeout=180):
     """Waits for the device to be responsive."""
@@ -612,7 +606,7 @@ class HighDevice(object):
     It never removes a previously trusted key, only adds new ones. Saves writing
     to the device if unnecessary.
     """
-    keys = set(self._rsa_keys_public)
+    keys = set(self._device.public_keys)
     old_content = self.PullContent('/data/misc/adb/adb_keys')
     if old_content:
       old_keys = set(old_content.strip().splitlines())
@@ -644,10 +638,10 @@ class HighDevice(object):
     for _ in xrange(5):
       name = '/data/local/tmp/' + prefix + ''.join(
           random.choice(choices) for _ in xrange(5)) + suffix
-      mode, _, _ = self.stat(name)
+      mode, _, _ = self.Stat(name)
       if mode:
         continue
-      if self.PushContent(name, content):
+      if self.PushContent(content, name):
         return name
 
   def WrappedShell(self, commands):
@@ -661,11 +655,11 @@ class HighDevice(object):
       tuple(stdout and stderr merged, exit_code).
     """
     content = ''.join(l + '\n' for l in commands)
-    script = self.mkstemp(content, suffix='.sh')
+    script = self.Mkstemp(content, suffix='.sh')
     if not script:
       return False
     try:
-      outfile = self.mkstemp('', suffix='.txt')
+      outfile = self.Mkstemp('', suffix='.txt')
       if not outfile:
         return False
       try:
@@ -694,3 +688,18 @@ class HighDevice(object):
     if exit_code != 0 or out.startswith('Can\'t find service: '):
       return None
     return out
+
+  @classmethod
+  def _Connect(cls, constructor, **kwargs):
+    """Called by either ConnectDevice or Connect."""
+    if not kwargs.get('rsa_keys'):
+      with _ADB_KEYS_LOCK:
+        kwargs['rsa_keys'] = _ADB_KEYS[:]
+    device = constructor(**kwargs)
+    # Opportunistically tries to switch adbd to run in root mode. This is
+    # necessary for things like switching the CPU scaling governor to cool off
+    # devices while idle.
+    cache = _InitCache(device)
+    if cache.has_su and not device.IsRoot():
+      device.Root()
+    return HighDevice(device, cache)

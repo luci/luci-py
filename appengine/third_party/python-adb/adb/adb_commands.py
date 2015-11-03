@@ -185,6 +185,24 @@ class AdbCommands(object):
     """Restart adbd as root on device."""
     return self.conn.Command(service='root')
 
+  def Unroot(self):
+    """Restart adbd as user on device."""
+    # adbd implementation of self.conn.Command(service='unroot') is defined in
+    # the adb code but doesn't work on 4.4.
+    # Until then, emulate Hardcoded strings in
+    # platform_system_core/adb/services.cpp. #closeenough
+    cmd = (
+        'if [ "$(getprop service.adb.root)" == "0" ]; then '
+          'echo "adbd not running as root"; '
+        'else '
+          'setprop service.adb.root 0 && echo "restarting adbd as non root" && '
+          'setprop ctl.restart adbd; '
+        'fi')
+    # adb shell uses CRLF EOL. Only God Knows Why. To add excitment, this is not
+    # the case when using a direct service like what Root() is doing, so do the
+    # CRLF->LF conversion manually.
+    return self.Shell(cmd).replace('\r\n', '\n')
+
   def Shell(self, command, timeout_ms=None):
     """Run command on the device, returning the output."""
     return self.conn.Command(

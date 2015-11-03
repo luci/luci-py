@@ -25,6 +25,10 @@ class MockDevice(object):
   def __init__(self, cmds):
     super(MockDevice, self).__init__()
     self._cmds = cmds[:]
+    self.port_path = (0, 0)
+
+  def IsShellOk(self, cmd):  # pylint: disable=unused-argument
+    return True
 
   def Shell(self, cmd):
     data = self._cmds.pop(0)
@@ -47,13 +51,12 @@ class TestAndroid(unittest.TestCase):
         ])
     cache = high.DeviceCache(None, None, None, None, None, None)
     self.assertEqual(
-        u'355236058685894',
-        high.HighDevice(device, cache, []).GetIMEI())
+        u'355236058685894', high.HighDevice(device, cache).GetIMEI())
 
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
-    unittest.TestCase.maxDiff = None
+    unittest.TestCase.maxDiff = None  # pragma: no cover
   logging.basicConfig(
       level=logging.DEBUG if '-v' in sys.argv else logging.CRITICAL)
   unittest.main()
