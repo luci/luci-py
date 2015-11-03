@@ -171,11 +171,11 @@ class AdbCommands(object):
 
   def Reboot(self, destination=''):
     """Reboot device, specify 'bootloader' for fastboot."""
-    self.conn.Open('reboot:%s' % destination)
+    return self.conn.Command(service='reboot', command=destination)
 
   def RebootBootloader(self):
     """Reboot device into fastboot."""
-    self.Reboot('bootloader')
+    return self.Reboot('bootloader')
 
   def Remount(self):
     """Remount / as read-write."""

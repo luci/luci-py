@@ -107,6 +107,7 @@ class Test(unittest.TestCase):
         on_error=None, default_timeout_ms=10000, auth_timeout_ms=10000,
         lost_timeout_ms=30000)
     self.assertEqual(True, self.cmd.is_valid)
+    self.assertTrue(self.cmd.GetUptime())
 
   def high(self):
     """Open the device and ensure it's running as root."""
@@ -116,6 +117,15 @@ class Test(unittest.TestCase):
         port_path=port_path, banner='python-adb', on_error=None,
         default_timeout_ms=10000, auth_timeout_ms=10000, lost_timeout_ms=10000)
     self.assertEqual(True, self.cmd.is_valid)
+    self.assertEqual(True, self.cmd.WaitForDevice())
+    if self.cmd.cache.has_su and not self.cmd.IsRoot():
+      try:
+        self.cmd.Root()
+      finally:
+        # Restarting the Android device changed the port path. Find it back by
+        # the serial number.
+        logging.info('Updating port path to %s', self.cmd.port_path)
+        self.__class__.PORT_PATH = self.cmd.port_path
 
   def test_GetDevices(self):
     devices = high.GetDevices(
@@ -247,6 +257,25 @@ class Test(unittest.TestCase):
     actual, exit_code = self.cmd.WrappedShell(['echo hi', 'echo bye'])
     self.assertEqual('hi\nbye\n', actual)
     self.assertEqual(0, exit_code)
+
+  def test_Reboot(self):
+    # Warning: this test is observed to take over 35 seconds.
+    self.high()
+    # Take uptime, reboot, ensure uptime is lower.
+    uptime = self.cmd.GetUptime()
+    logging.info('GetUptime() = %.2f seconds', uptime)
+    self.assertGreater(uptime, 20.)
+    start = time.time()
+    try:
+      actual = self.cmd.Reboot()
+      logging.info('Reboot() took %.2f seconds', time.time() - start)
+      self.assertEqual(True, actual)
+      self.assertGreater(uptime, self.cmd.GetUptime())
+    finally:
+      # Restarting the Android device changed the port path. Find it back by the
+      # serial number.
+      logging.info('Updating port path to %s', self.cmd.port_path)
+      self.__class__.PORT_PATH = self.cmd.port_path
 
   def test_cpu(self):
     """Adjust the CPU speed to power save then max speed then back to normal."""

@@ -23,7 +23,8 @@ def initialize(pub_key, priv_key):
 
 def get_devices(bot):
   return high.GetDevices(
-      'swarming', 10000, 10000, on_error=bot.post_error if bot else None)
+      'swarming', 10000, 10000, on_error=bot.post_error if bot else None,
+      as_root=True)
 
 
 def close_devices(devices):

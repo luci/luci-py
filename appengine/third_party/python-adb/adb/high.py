@@ -227,11 +227,20 @@ def Initialize(pub_key, priv_key):
     return _ADB_KEYS[:]
 
 
-def GetDevices(banner, default_timeout_ms, auth_timeout_ms, on_error=None):
+def GetDevices(
+    banner, default_timeout_ms, auth_timeout_ms, on_error=None, as_root=False):
   """Returns the list of devices available.
 
   Caller MUST call CloseDevices(devices) on the return value or call .Close() on
   each element to close the USB handles.
+
+  Arguments:
+  - banner: authentication banner associated with the RSA keys. It's better to
+        use a constant.
+  - default_timeout_ms: default I/O operation timeout.
+  - auth_timeout_ms: timeout for the user to accept the public key.
+  - on_error: callback when an internal failure occurs.
+  - as_root: if True, restarts adbd as root if possible.
 
   Returns one of:
     - list of HighDevice instances.
@@ -246,9 +255,13 @@ def GetDevices(banner, default_timeout_ms, auth_timeout_ms, on_error=None):
           adb_commands_safe.DeviceIsAvailable, timeout_ms=default_timeout_ms))
 
   def fn(handle):
-    return HighDevice.Connect(
+    device = HighDevice.Connect(
         handle, banner=banner, default_timeout_ms=default_timeout_ms,
         auth_timeout_ms=auth_timeout_ms, on_error=on_error)
+    if as_root and device.cache.has_su and not device.IsRoot():
+      # This updates the port path of the device thus clears its cache.
+      device.Root()
+    return device
 
   devices = parallel.pmap(fn, handles)
   _PER_DEVICE_CACHE.trim(devices)
@@ -311,6 +324,10 @@ class HighDevice(object):
   def Close(self):
     self._device.Close()
 
+  def GetUptime(self):
+    """Returns the device's uptime in second."""
+    return self._device.GetUptime()
+
   def IsRoot(self):
     return self._device.IsRoot()
 
@@ -330,7 +347,14 @@ class HighDevice(object):
     return self._device.PushContent(*args, **kwargs)
 
   def Reboot(self):
-    return self._device.Reboot()
+    """Reboots the phone then Waits for the device to come back.
+
+    adbd running on the phone will likely not be in Root(), so the caller should
+    call Root() right afterward if desired.
+    """
+    if not self._device.Reboot():
+      return False
+    return self.WaitUntilFullyBooted()
 
   def Remount(self):
     return self._device.Remount()
@@ -488,13 +512,6 @@ class HighDevice(object):
       out[key] = int(props[key]) if key in props else None
     return out
 
-  def GetUptime(self):
-    """Returns the device's uptime in second."""
-    out = self.PullContent('/proc/uptime')
-    if out:
-      return float(out.split()[1])
-    return None
-
   def GetDisk(self):
     """Returns details about the battery's state."""
     props = {}
@@ -539,10 +556,27 @@ class HighDevice(object):
     return None
 
   def GetIP(self):
-    """Returns the IP address of the first network connection."""
-    # If ever needed, read wifi.interface from /system/build.prop if a device
-    # doesn't use wlan0.
+    """Returns the IP address of the wifi network connection."""
     return self.GetProp('dhcp.wlan0.ipaddress')
+
+  def GetIPs(self):
+    """Returns the current IP addresses of networks that are up."""
+    # There's multiple ways to find parts of this information:
+    # - dumpsys wifi
+    # - getprop dhcp.wlan0.ipaddress
+    # - ip -o addr show
+    # - ip route
+    # - netcfg
+
+    # <NAME> <UP/DOWN> <IP/MASK> <UNKNOWN> <MAC>
+    out, exit_code = self.Shell('netcfg')
+    if exit_code:
+      return []
+    parts = (l.split() for l in out.splitlines())
+    return {
+        p[0]: p[2].split('/', 1)[0] for p in parts
+        if p[1] == 'UP' and p[2] != '0.0.0.0/0'
+    }
 
   def GetLastUID(self):
     """Returns the highest UID on the device."""
@@ -586,15 +620,50 @@ class HighDevice(object):
     return out.strip().split(':', 1)[1] if out else out
 
   def WaitForDevice(self, timeout=180):
-    """Waits for the device to be responsive."""
+    """Waits for the device to be responsive.
+
+    In practice, waits for the device to have its external storage to be
+    mounted.
+
+    Returns:
+    - uptime as float in second or None.
+    """
     start = time.time()
-    while (time.time() - start) < timeout:
-      try:
-        if self.ShellRaw('echo \'hi\'')[1] == 0:
-          return True
-      except self._device._ERRORS:
-        pass
+    while True:
+      if (time.time() - start) > timeout:
+        return False
+      if self.Stat(self.cache.external_storage_path)[0] != None:
+        return True
+      time.sleep(0.1)
     return False
+
+  def WaitUntilFullyBooted(self, timeout=300):
+    """Waits for the device to be fully started up with network connectivity.
+
+    Arguments:
+    - timeout: minimum amount of time to wait for for the device to come up
+          online. It may extend to up to lock_timeout_ms more.
+    """
+    # Wait for the device to respond at all and optionally have lower uptime.
+    start = time.time()
+    if not self.WaitForDevice(timeout):
+      return False
+
+    # Wait for the internal sys.boot_completed bit to be set. This is the place
+    # where most time is spent.
+    while True:
+      if (time.time() - start) > timeout:
+        return False
+      if self.GetProp('sys.boot_completed') == '1':
+        break
+      time.sleep(0.1)
+
+    # Wait for one network to be up and running.
+    while not self.GetIPs():
+      if (time.time() - start) > timeout:
+        return False
+      time.sleep(0.1)
+    return True
 
   def PushKeys(self):
     """Pushes all the keys on the file system to the device.
@@ -695,10 +764,4 @@ class HighDevice(object):
       with _ADB_KEYS_LOCK:
         kwargs['rsa_keys'] = _ADB_KEYS[:]
     device = constructor(**kwargs)
-    # Opportunistically tries to switch adbd to run in root mode. This is
-    # necessary for things like switching the CPU scaling governor to cool off
-    # devices while idle.
-    cache = _InitCache(device)
-    if cache.has_su and not device.IsRoot():
-      device.Root()
-    return HighDevice(device, cache)
+    return HighDevice(device, _InitCache(device))

@@ -192,6 +192,14 @@ class AdbCommandsSafe(object):
       self._handle.Close()
       self._handle = None
 
+  def GetUptime(self):
+    """Returns the device's uptime in second."""
+    # This is an high level functionality but is needed by self.Reboot().
+    out = self.PullContent('/proc/uptime')
+    if out:
+      return float(out.split()[1])
+    return None
+
   def List(self, destdir):
     """List a directory on the device."""
     assert destdir.startswith('/'), destdir
@@ -202,7 +210,8 @@ class AdbCommandsSafe(object):
         except usb_exceptions.AdbCommandFailureException:
           break
         except self._ERRORS as e:
-          self._Reset('(%s): %s', destdir, e)
+          if not self._Reset('(%s): %s', destdir, e):
+            break
     return None
 
   def Stat(self, dest):
@@ -219,7 +228,8 @@ class AdbCommandsSafe(object):
         except usb_exceptions.AdbCommandFailureException:
           break
         except self._ERRORS as e:
-          self._Reset('(%s): %s', dest, e)
+          if not self._Reset('(%s): %s', dest, e):
+            break
     return None, None, None
 
   def Pull(self, remotefile, dest):
@@ -236,7 +246,8 @@ class AdbCommandsSafe(object):
         except usb_exceptions.AdbCommandFailureException:
           break
         except self._ERRORS as e:
-          self._Reset('(%s, %s): %s', remotefile, dest, e)
+          if not self._Reset('(%s, %s): %s', remotefile, dest, e):
+            break
     return False
 
   def PullContent(self, remotefile):
@@ -253,7 +264,8 @@ class AdbCommandsSafe(object):
         except usb_exceptions.AdbCommandFailureException:
           break
         except self._ERRORS as e:
-          self._Reset('(%s): %s', remotefile, e)
+          if not self._Reset('(%s): %s', remotefile, e):
+            break
     return None
 
   def Push(self, localfile, dest, mtime='0'):
@@ -270,7 +282,8 @@ class AdbCommandsSafe(object):
         except usb_exceptions.AdbCommandFailureException:
           break
         except self._ERRORS as e:
-          self._Reset('(%s, %s): %s', localfile, dest, e)
+          if not self._Reset('(%s, %s): %s', localfile, dest, e):
+            break
     return False
 
   def PushContent(self, content, dest, mtime='0'):
@@ -287,22 +300,52 @@ class AdbCommandsSafe(object):
         except usb_exceptions.AdbCommandFailureException:
           break
         except self._ERRORS as e:
-          self._Reset('(%s, %s): %s', dest, content, e)
+          if not self._Reset('(%s, %s): %s', dest, content, e):
+            break
     return False
 
   def Reboot(self):
-    """Reboot the device. Doesn't wait for it to be rebooted"""
+    """Reboots the device. Waits for it to be rebooted but not fully
+    operational.
+
+    This causes the USB device to disapear momentarily and get a new port_path.
+    If the phone just booted up, this function will cause the caller to sleep.
+
+    The caller will likely want to call self.Root() to switch adbd to root
+    context if desired.
+
+    Returns True on success.
+    """
     if self._adb_cmd:
-      for _ in self._Loop():
-        try:
-          # Use 'bootloader' to switch to fastboot.
-          out = self._adb_cmd.Reboot()
-          _LOG.info('%s.Reboot(): %s', self.port_path, out)
+      # Get previous uptime to ensure the phone actually rebooted.
+      previous_uptime = self.GetUptime()
+      if not previous_uptime:
+        return False
+      if previous_uptime <= 30.:
+        # Wait for uptime to be high enough. Otherwise we can't know if the
+        # device rebooted or not.
+        time.sleep(31. - previous_uptime)
+        previous_uptime = self.GetUptime()
+        if not previous_uptime:
+          return False
+
+      if not self._Reboot():
+        return False
+
+      # There's no need to loop initially too fast. Restarting the phone
+      # always take several tens of seconds at best.
+      time.sleep(5.)
+
+      i = 0
+      for i in self._Loop():
+        if not self._Reconnect(True):
+          continue
+        uptime = self.GetUptime()
+        if uptime and uptime < previous_uptime:
           return True
-        except usb_exceptions.AdbCommandFailureException:
-          break
-        except self._ERRORS as e:
-          self._Reset('(): %s', e)
+        time.sleep(0.1)
+      _LOG.error(
+          '%s.Reboot(): Failed to id after %d tries', self.port_path, i+1)
     return False
 
   def Remount(self):
@@ -317,7 +360,8 @@ class AdbCommandsSafe(object):
         except usb_exceptions.AdbCommandFailureException:
           break
         except self._ERRORS as e:
-          self._Reset('(): %s', e)
+          if not self._Reset('(): %s', e):
+            break
     return False
 
   def Shell(self, cmd):
@@ -335,7 +379,8 @@ class AdbCommandsSafe(object):
         try:
           return self.ShellRaw(cmd)
         except self._ERRORS as e:
-          self._Reset('(%s): %s', cmd, e)
+          if not self._Reset('(%s): %s', cmd, e):
+            break
     return None, None
 
   def IsShellOk(self, cmd):
@@ -400,7 +445,8 @@ class AdbCommandsSafe(object):
       for i in self._Loop():
         # We need to reconnect so we can assert the connection to adbd is to the
         # right process, not the old one but the new one.
-        self._Reconnect(True)
+        if not self._Reconnect(True):
+          continue
         if self.IsRoot():
           return True
       _LOG.error('%s.Root(): Failed to id after %d tries', self.port_path, i+1)
@@ -416,7 +462,8 @@ class AdbCommandsSafe(object):
       for i in self._Loop():
         # We need to reconnect so we can assert the connection to adbd is to the
         # right process, not the old one but the new one.
-        self._Reconnect(True)
+        if not self._Reconnect(True):
+          continue
         if self.IsRoot() is False:
           return True
       _LOG.error(
@@ -440,6 +487,27 @@ class AdbCommandsSafe(object):
       return None
     return out.startswith('uid=0(root)')
 
+  # Protected methods.
+
+  def _Reboot(self):
+    """Reboots the phone."""
+    i = 0
+    for i in self._Loop():
+      try:
+        out = self._adb_cmd.Reboot()
+      except self._ERRORS as e:
+        if not self._Reset('(): %s', e, use_serial=True):
+          break
+        continue
+
+      _LOG.info('%s._Reboot(): %r', self.port_path, out)
+      if out == '':
+        # reboot doesn't reply anything.
+        return True
+      assert False, repr(out)
+    _LOG.error('%s._Reboot(): Failed after %d tries', self.port_path, i+1)
+    return False
+
   def _Root(self):
     """Upgrades adbd from shell user context (uid 2000) to root."""
     i = 0
@@ -447,7 +515,8 @@ class AdbCommandsSafe(object):
       try:
         out = self._adb_cmd.Root()
       except self._ERRORS as e:
-        self._Reset('(): %s', e, use_serial=True)
+        if not self._Reset('(): %s', e, use_serial=True):
+          break
         continue
 
       _LOG.info('%s._Root(): %r', self.port_path, out)
@@ -457,7 +526,9 @@ class AdbCommandsSafe(object):
       if out == 'adbd cannot run as root in production builds\n':
         _LOG.error('%s._Root(): %r', self.port_path, out)
         return False
-      if out == 'restarting adbd as root\n':
+      # Sadly, it's possible that adbd restarts so fast that it doesn't even
+      # wait for the output buffer to be flushed. In this case, out == ''.
+      if out in ('', 'restarting adbd as root\n'):
         return True
       assert False, repr(out)
     _LOG.error('%s._Root(): Failed after %d tries', self.port_path, i+1)
@@ -475,7 +546,8 @@ class AdbCommandsSafe(object):
       try:
         out = self._adb_cmd.Unroot()
       except self._ERRORS as e:
-        self._Reset('(): %s', e, use_serial=True)
+        if not self._Reset('(): %s', e, use_serial=True):
+          break
         continue
 
       _LOG.info('%s.Unroot(): %r', self.port_path, out)
@@ -494,8 +566,8 @@ class AdbCommandsSafe(object):
     assert not self._handle
     assert not self._adb_cmd
     # TODO(maruel): Add support for TCP/IP communication.
-    _LOG.info('%s._Find(%s) %s', self.port_path, use_serial, self._serial)
     try:
+      previous_port_path = self._port_path
       if use_serial:
         assert self._serial
         self._handle = common.UsbHandle.Find(
@@ -507,8 +579,13 @@ class AdbCommandsSafe(object):
         self._handle = common.UsbHandle.Find(
             adb_commands.DeviceIsAvailable, port_path=self.port_path,
             timeout_ms=self._default_timeout_ms)
-    except (common.usb1.USBError, usb_exceptions.DeviceNotFoundError):
-      pass
+      _LOG.info(
+          '%s._Find(%s) %s = %s',
+          previous_port_path, use_serial, self._serial,
+          self.port_path if self._handle else 'None')
+    except (common.usb1.USBError, usb_exceptions.DeviceNotFoundError) as e:
+      _LOG.info(
+          '%s._Find(%s) %s : %s', self.port_path, use_serial, self._serial, e)
 
   def _WaitUntilFound(self, use_serial):
     """Loops until the device is found on the USB bus.
@@ -566,7 +643,10 @@ class AdbCommandsSafe(object):
     return bool(self._handle)
 
   def _Connect(self, use_serial):
-    """Initializes self._adb_cmd from the opened self._handle."""
+    """Initializes self._adb_cmd from the opened self._handle.
+
+    Returns True on success.
+    """
     assert not self._adb_cmd
     _LOG.debug('%s._Connect(%s)', self.port_path, use_serial)
     if self._handle:
@@ -605,6 +685,8 @@ class AdbCommandsSafe(object):
           _LOG.warning('AUTH FAILURE: %s: %s', self.port_path, e)
         except usb_exceptions.LibusbWrappingError as e:
           _LOG.warning('I/O FAILURE: %s: %s', self.port_path, e)
+        except adb_protocol.InvalidResponseError as e:
+          _LOG.warning('SYNC FAILURE: %s: %s', self.port_path, e)
         finally:
           # Do not leak the USB handle when we can't talk to the device.
           if not self._adb_cmd:
@@ -627,7 +709,10 @@ class AdbCommandsSafe(object):
       time.sleep(self._sleep)
 
   def _Reset(self, fmt, *args, **kwargs):
-    """When a self._ERRORS occurred, try to reset the device."""
+    """When a self._ERRORS occurred, try to reset the device.
+
+    Returns True on success.
+    """
     items = [self.port_path, inspect.stack()[1][3]]
     items.extend(args)
     msg = ('%s.%s' + fmt) % tuple(items)
@@ -636,9 +721,7 @@ class AdbCommandsSafe(object):
       self._on_error(msg)
 
     # Reset the adbd and USB connections with a new connection.
-    self._Reconnect(kwargs.get('use_serial', False))
-    assert self._adb_cmd
-    return msg
+    return self._Reconnect(kwargs.get('use_serial', False))
 
   def _Reconnect(self, use_serial):
     """Disconnects and reconnect.
@@ -647,11 +730,14 @@ class AdbCommandsSafe(object):
     - use_serial: If True, search the device by the serial number instead of the
         port number. This is necessary when downgrading adbd from root to user
         context.
+
+    Returns True on success.
     """
     self.Close()
     self._WaitUntilFound(use_serial=use_serial)
-    if self._OpenHandle():
-      self._Connect(use_serial=use_serial)
+    if not self._OpenHandle():
+      return False
+    return self._Connect(use_serial=use_serial)
 
   def __repr__(self):
     return '<Device %s %s>' % (
