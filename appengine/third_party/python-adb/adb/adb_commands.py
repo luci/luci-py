@@ -57,11 +57,11 @@ class AdbCommands(object):
     used instead of a USB connection.
     """
     if serial and ':' in serial:
-        handle = common.TcpHandle(serial)
+      handle = common.TcpHandle(serial)
     else:
-        handle = common.UsbHandle.FindAndOpen(
-            DeviceIsAvailable, port_path=port_path, serial=serial,
-            timeout_ms=default_timeout_ms)
+      handle = common.UsbHandle.FindAndOpen(
+          DeviceIsAvailable, port_path=port_path, serial=serial,
+          timeout_ms=default_timeout_ms)
     return cls.Connect(handle, **kwargs)
 
   def __init__(self, conn):

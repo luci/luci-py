@@ -18,8 +18,6 @@ from pyasn1.codec.der import decoder
 from pyasn1.type import univ
 from rsa import pkcs1
 
-from adb import adb_protocol
-
 
 # python-rsa lib hashes all messages it signs. ADB does it already, we just
 # need to slap a signature on top of already hashed message. Introduce "fake"

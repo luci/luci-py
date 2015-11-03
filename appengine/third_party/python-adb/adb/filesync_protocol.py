@@ -18,7 +18,6 @@ host side.
 """
 
 import collections
-import logging
 import stat
 import struct
 import time
@@ -202,7 +201,7 @@ class FileSyncConnection(object):
         self.adb.Write(chunk)
       except libusb1.USBError as e:
         self.send_buffer = ''
-        raise adb_protocol.SendFailedError('Could not write %r' % chunk, e)
+        raise usb_exceptions.WriteFailedError('Could not write %r' % chunk, e)
       self.send_buffer = self.send_buffer[self.adb.max_packet_size:]
 
   def _ReadBuffered(self, size):

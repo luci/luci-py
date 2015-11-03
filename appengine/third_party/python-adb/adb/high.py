@@ -26,7 +26,6 @@ import posixpath
 import random
 import re
 import string
-import sys
 import threading
 import time
 
@@ -168,12 +167,12 @@ def _InitCache(device):
 
 # List of known CPU scaling governor values.
 KNOWN_CPU_SCALING_GOVERNOR_VALUES = (
-  'conservative',  # Not available on Nexus 10
-  'interactive',   # Default on Nexus 10.
-  'ondemand',      # Not available on Nexus 10. Default on Nexus 4 and later.
-  'performance',
-  'powersave',     # Not available on Nexus 10.
-  'userspace',
+    'conservative',  # Not available on Nexus 10
+    'interactive',   # Default on Nexus 10.
+    'ondemand',      # Not available on Nexus 10. Default on Nexus 4 and later.
+    'performance',
+    'powersave',     # Not available on Nexus 10.
+    'userspace',
 )
 
 
@@ -182,17 +181,17 @@ KNOWN_CPU_SCALING_GOVERNOR_VALUES = (
 DeviceCache = collections.namedtuple(
     'DeviceCache',
     [
-      # Cache of /system/build.prop on the Android device.
-      'build_props',
-      # Cache of $EXTERNAL_STORAGE_PATH.
-      'external_storage_path',
-      # /system/xbin/su exists.
-      'has_su',
-      # All the valid CPU scaling governors.
-      'available_governors',
-      # CPU frequency limits.
-      'cpuinfo_max_freq',
-      'cpuinfo_min_freq',
+        # Cache of /system/build.prop on the Android device.
+        'build_props',
+        # Cache of $EXTERNAL_STORAGE_PATH.
+        'external_storage_path',
+        # /system/xbin/su exists.
+        'has_su',
+        # All the valid CPU scaling governors.
+        'available_governors',
+        # CPU frequency limits.
+        'cpuinfo_max_freq',
+        'cpuinfo_min_freq',
     ])
 
 
@@ -363,18 +362,18 @@ class HighDevice(object):
   def GetCPUScale(self):
     """Returns the CPU scaling factor."""
     mapping = {
-      'scaling_cur_freq': u'cur',
-      'scaling_governor': u'governor',
+        'scaling_cur_freq': u'cur',
+        'scaling_governor': u'governor',
     }
     out = {
-      'max': self.cache.cpuinfo_max_freq,
-      'min': self.cache.cpuinfo_min_freq,
+        'max': self.cache.cpuinfo_max_freq,
+        'min': self.cache.cpuinfo_min_freq,
     }
     out.update(
-      (v, self.PullContent('/sys/devices/system/cpu/cpu0/cpufreq/' + k))
-      for k, v in mapping.iteritems())
+        (v, self.PullContent('/sys/devices/system/cpu/cpu0/cpufreq/' + k))
+        for k, v in mapping.iteritems())
     return {
-      k: v.strip() if isinstance(v, str) else v for k, v in out.iteritems()
+        k: v.strip() if isinstance(v, str) else v for k, v in out.iteritems()
     }
 
   def SetCPUScalingGovernor(self, governor):
@@ -508,16 +507,16 @@ class HighDevice(object):
       parts = line.split(u': ', 2)
       if len(parts) == 2:
         key, value = parts
-        match = re.match(u'^(\d+)K / (\d+)K.*', value)
+        match = re.match(ur'^(\d+)K / (\d+)K.*', value)
         if match:
           props[key.lstrip()] = {
-            'free_mb': round(float(match.group(1)) / 1024., 1),
-            'size_mb': round(float(match.group(2)) / 1024., 1),
+              'free_mb': round(float(match.group(1)) / 1024., 1),
+              'size_mb': round(float(match.group(2)) / 1024., 1),
           }
     return {
-      u'cache': props[u'Cache-Free'],
-      u'data': props[u'Data-Free'],
-      u'system': props[u'System-Free'],
+        u'cache': props[u'Cache-Free'],
+        u'data': props[u'Data-Free'],
+        u'system': props[u'System-Free'],
     }
 
   def GetIMEI(self):
@@ -536,7 +535,7 @@ class HighDevice(object):
       if len(lines) >= 4 and lines[0] == 'Result: Parcel(':
         # Process the UTF-16 string.
         chars = _ParcelToList(lines[1:])[4:-1]
-        return u''.join(map(unichr, (int(i, 16) for i in chars)))
+        return u''.join(unichr(c) for c in (int(i, 16) for i in chars))
     return None
 
   def GetIP(self):
@@ -573,7 +572,7 @@ class HighDevice(object):
     # TODO(maruel): Test.
     # '/data/local/tmp/'
     dest = posixpath.join(destdir, os.path.basename(apk))
-    if not self.push(apk, dest):
+    if not self.Push(apk, dest):
       return False
     return self.Shell('pm install -r %s' % pipes.quote(dest))[1] is 0
 
@@ -593,7 +592,7 @@ class HighDevice(object):
       try:
         if self.ShellRaw('echo \'hi\'')[1] == 0:
           return True
-      except self._ERRORS:
+      except self._device._ERRORS:
         pass
     return False
 

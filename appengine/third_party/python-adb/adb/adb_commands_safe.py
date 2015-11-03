@@ -128,7 +128,7 @@ class AdbCommandsSafe(object):
     self._adb_cmd = None
     self._serial = None
     self._handle = handle
-    self._port_path = '/'.join(map(str, port_path))
+    self._port_path = '/'.join(str(p) for p in port_path)
 
   @classmethod
   def ConnectDevice(cls, port_path, **kwargs):
@@ -139,6 +139,7 @@ class AdbCommandsSafe(object):
           device.
     - The rest are the same as __init__().
     """
+    # pylint: disable=protected-access
     obj = cls(port_path=port_path, handle=None, **kwargs)
     obj._WaitUntilFound(use_serial=False)
     if obj._OpenHandle():
@@ -156,6 +157,7 @@ class AdbCommandsSafe(object):
     Returns:
       AdbCommandsSafe.
     """
+    # pylint: disable=protected-access
     obj = cls(port_path=handle.port_path, handle=handle, **kwargs)
     if not handle.is_open:
       obj._OpenHandle()

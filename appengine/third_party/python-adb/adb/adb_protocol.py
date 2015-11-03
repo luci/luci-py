@@ -60,7 +60,7 @@ def Wire2ID(encoded):
 
 def _CalculateChecksum(data):
   """The checksum is just a sum of all the bytes. I swear."""
-  return sum(map(ord, data)) & 0xFFFFFFFF
+  return sum(ord(d) for d in data) & 0xFFFFFFFF
 
 
 class AuthSigner(object):
@@ -76,8 +76,8 @@ class AuthSigner(object):
 
 
 class _AdbMessageHeader(collections.namedtuple(
-      '_AdbMessageHeader',
-      ['command', 'arg0', 'arg1', 'data_length', 'data_checksum'])):
+    '_AdbMessageHeader',
+    ['command', 'arg0', 'arg1', 'data_length', 'data_checksum'])):
   """The raw wire format for the header only.
 
   Protocol Notes
@@ -92,21 +92,9 @@ class _AdbMessageHeader(collections.namedtuple(
     WRITE(0, host_id, 'data')
     CLOSE(device_id, host_id, '')
   """
-  _VALID_IDS = (
-      # The behavior depends on args0:
-      # - AUTH_TOKEN:
-      #   - Sending: Includes a key.
-      #   - Receiving: Switches connection to unauthorized, reply with
-      #     AUTH_SIGNATURE.
-      # - AUTH_SIGNATURE:
-      # Receiving:
-      # - 
-      # Sending:
-      # - Immediately puts the device into unauthenticated mode.
-      # arg0 is one of the AUTH_* value.
-      'AUTH', 'CLSE', 'CNXN', 'FAIL', 'OKAY', 'OPEN', 'SYNC', 'WRTE')
+  _VALID_IDS = ('AUTH', 'CLSE', 'CNXN', 'FAIL', 'OKAY', 'OPEN', 'SYNC', 'WRTE')
 
-  # ADB protocol version.
+  # CNXN constants for arg0.
   VERSION = 0x01000000
 
   # AUTH constants for arg0.
@@ -199,7 +187,7 @@ class _AdbMessage(object):
   @classmethod
   def Read(cls, usb, timeout_ms=None):
     """Reads one _AdbMessage.
-    
+
     Returns None if it failed to read the header with a ReadFailedError.
     """
     timeout_ms = usb.Timeout(timeout_ms)
@@ -277,6 +265,11 @@ class _AdbConnection(object):
     self._yielder = self._MessageQueue(manager)
     self._manager = manager
 
+  @property
+  def local_id(self):
+    """Local connection ID as sent to adbd."""
+    return self._local_id
+
   def __iter__(self):
     # If self._yielder is None, it means it has already closed. Return a fake
     # iterator with nothing in it.
@@ -286,13 +279,13 @@ class _AdbConnection(object):
     return _AdbMessage.Make(command_name, self._local_id, self.remote_id, data)
 
   def _Write(self, command_name, data):
-    assert len(data) <= self._manager.max_packet_size, '%d > %d' % (
-        len(data), self._manager.max_packet_size)
+    assert len(data) <= self.max_packet_size, '%d > %d' % (
+        len(data), self.max_packet_size)
     self.Make(command_name, data).Write(self._manager._usb)
 
   def Close(self):
     """User initiated stream close.
-    
+
     It's rare that the user needs to do this.
     """
     try:
@@ -306,6 +299,10 @@ class _AdbConnection(object):
   @property
   def max_packet_size(self):
     return self._manager.max_packet_size
+
+  @property
+  def port_path(self):
+    return self._manager.port_path
 
   def _HasClosed(self):
     """Must be called with the manager lock held."""
@@ -335,7 +332,7 @@ class _AdbConnection(object):
       try:
         self._Write('OKAY', '')
       except usb_exceptions.WriteFailedError as e:
-        _LOG.info('Failed to reply OKAY: %s', e)
+        _LOG.info('%s._OnRead(): Failed to reply OKAY: %s', self.port_path, e)
       self._yielder._Add(message)
       return
     if cmd_name == 'AUTH':
@@ -402,9 +399,14 @@ class AdbConnectionManager(object):
     """
     assert isinstance(rsa_keys, (list, tuple)), rsa_keys
     assert len(rsa_keys) <= 10, 'adb will sleep 1s after each key above 10'
+    # pylint: disable=protected-access
     self = cls(usb, banner, rsa_keys, auth_timeout_ms)
     self._Connect()
     return self
+
+  @property
+  def port_path(self):
+    return self._usb.port_path
 
   def Open(self, destination, timeout_ms=None):
     """Opens a new connection to the device via an OPEN message.
@@ -425,15 +427,15 @@ class AdbConnectionManager(object):
     conn = _AdbConnection(self, next_id, destination)
     conn._Write('OPEN', destination + '\0')
     with self._lock:
-      self._connections[conn._local_id] = conn
+      self._connections[conn.local_id] = conn
     # TODO(maruel): Timeout.
     # Reads until we got the proper remote id.
     while True:
       msg = _AdbMessage.Read(self._usb, timeout_ms)
-      if msg.header.arg1 == conn._local_id:
+      if msg.header.arg1 == conn.local_id:
         conn.remote_id = msg.header.arg0
       conn._OnRead(msg)
-      if msg.header.arg1 == conn._local_id:
+      if msg.header.arg1 == conn.local_id:
         return conn
 
   def Close(self):
@@ -472,7 +474,8 @@ class AdbConnectionManager(object):
       except usb_exceptions.ReadFailedError as e:
         # adbd could be rebooting, etc. Return None to signal that this kind of
         # failure is expected.
-        _LOG.info('Masking read error %s', e)
+        _LOG.info(
+            '%s.ReadAndDispatch(): Masking read error %s', self.port_path, e)
         return False
       conn = self._connections.get(msg.header.arg1)
       if not conn:
@@ -481,7 +484,8 @@ class AdbConnectionManager(object):
         # TODO(maruel): It could be a spurious CNXN. In that case we're better
         # to cancel all the known _AdbConnection and start over.
         _LOG.error(
-            self._fmt(': Got unexpected connection, dropping: %s', msg))
+            '%s.ReadAndDispatch(): Got unexpected connection, dropping: %s',
+            self.port_path, msg)
         return False
       conn._OnRead(msg)
       return True
@@ -506,7 +510,9 @@ class AdbConnectionManager(object):
           conn = self._connections.get(msg.header.arg1)
           if conn:
             conn._OnRead(msg)
-      _LOG.info('Flushed %d messages in %.1fs', nb, time.time() - start)
+      _LOG.info(
+          '%s._Connect(): Flushed %d messages in %.1fs',
+          self.port_path, nb, time.time() - start)
 
       if not reply:
         msg = _AdbMessage.Make(
@@ -556,7 +562,9 @@ class AdbConnectionManager(object):
       raise InvalidResponseError('Unknown CNXN response', reply)
     self.state = reply.data
     self.max_packet_size = reply.header.arg1
-    _LOG.debug('max packet size: %d' % self.max_packet_size)
+    _LOG.debug(
+        '%s._HandleCNXN(): max packet size: %d',
+        self.port_path, self.max_packet_size)
     for conn in self._connections.itervalues():
       conn._HasClosed()
     self._connections = {}
@@ -580,10 +588,3 @@ class AdbConnectionManager(object):
   def _UnregisterLocked(self, conn_id):
     # self._lock must be held.
     self._connections.pop(conn_id, None)
-
-  def _fmt(self, fmt, *args):
-    items = [
-      '/'.join(str(i) for i in self._usb.port_path), inspect.stack()[1][3],
-    ]
-    items.extend(args)
-    return ('%s.%s' + fmt) % tuple(items)
