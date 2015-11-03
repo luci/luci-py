@@ -60,7 +60,7 @@ class InstanceTemplate(ndb.Model):
 
 InstanceStates = Enum([
   'CATALOGED',
-  'DELETED',
+  'DELETING',
   'NEW',
   'PENDING_CATALOG',
   'PENDING_DELETION',

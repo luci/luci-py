@@ -132,7 +132,7 @@ def delete_instances(instance_group_key, instances):
     members.append(instance)
     if instance.name in instances:
       instances.discard(instance.name)
-      if instance.state == models.InstanceStates.DELETED:
+      if instance.state == models.InstanceStates.DELETING:
         logging.info('Deleting instance: %s', instance.name)
         members.pop()
         updated = True
@@ -165,7 +165,7 @@ def reschedule_instance_deletion(instance_group_key, instances):
   for instance in instance_group.members:
     if instance.name in instances:
       instances.discard(instance.name)
-      if instance.state == models.InstanceStates.DELETED:
+      if instance.state == models.InstanceStates.DELETING:
         logging.info('Rescheduling deletion of instance: %s', instance.name)
         instance.state = models.InstanceStates.PENDING_DELETION
         updated = True
@@ -230,8 +230,78 @@ class InstanceDeleter(webapp2.RequestHandler):
     reschedule_instance_deletion(instance_group_key, instances)
 
 
+@ndb.transactional
+def set_prepared_instance_states(instance_group_key, succeeded, failed):
+  """Sets the states of prepared instances.
+
+  Args:
+    instance_group_key: ndb.Key for the instance group containing the instances.
+    succeeded: List of instance names to schedule for cataloging.
+    failed: List of instance names to reschedule for preparation.
+  """
+  instance_group = instance_group_key.get()
+  if not instance_group:
+    logging.error('Instance group does not exist: %s', instance_group_key)
+    return
+
+  updated = False
+  for instance in instance_group.members:
+    if instance.name in succeeded:
+      succeeded.remove(instance.name)
+      if instance.state == models.InstanceStates.PREPARING:
+        logging.info('Scheduling catalog of instance: %s', instance.name)
+        instance.state = models.InstanceStates.PENDING_CATALOG
+        updated = True
+      elif instance.state == models.InstanceStates.PENDING_CATALOG:
+        logging.info('Ignoring already scheduled instance: %s', instance.name)
+      else:
+        logging.error('Instance in unexpected state:\n%s', instance)
+    elif instance.name in failed:
+      failed.remove(instance.name)
+      if instance.state == models.InstanceStates.PREPARING:
+        logging.info('Rescheduling preparation of instance: %s', instance.name)
+        instance.state = models.InstanceStates.NEW
+        updated = True
+      elif instance.state == models.InstanceStates.NEW:
+        logging.info('Ignoring already rescheduled instance: %s', instance.name)
+      else:
+        logging.error('Instance in unexpected state:\n%s', instance)
+
+  if succeeded:
+    logging.warning('Instances not found: %s', ', '.join(sorted(succeeded)))
+  if failed:
+    logging.warning('Instances not found: %s', ', '.join(sorted(failed)))
+
+  if updated:
+    instance_group.put()
+
+
+class InstancePreparer(webapp2.RequestHandler):
+  """Worker for preparing instances."""
+
+  @decorators.require_taskqueue('prepare-instances')
+  def post(self):
+    """Prepares GCE instances for use.
+
+    Params:
+      group: Name of the instance group containing the instances to prepare.
+      instances: JSON-encoded list of instances to prepare.
+      project: Name of the project the instance group exists in.
+      zone: Zone the instances exist in. e.g. us-central1-f.
+    """
+    group = self.request.get('group')
+    instances = json.loads(self.request.get('instances'))
+    project = self.request.get('project')
+    zone = self.request.get('zone')
+
+    # TODO(smut): Prepare instances.
+    set_prepared_instance_states(
+        models.InstanceGroup.generate_key(group), instances, [])
+
+
 def create_queues_app():
   return webapp2.WSGIApplication([
       ('/internal/queues/catalog-instance-group', InstanceGroupCataloger),
       ('/internal/queues/delete-instances', InstanceDeleter),
+      ('/internal/queues/prepare-instances', InstancePreparer),
   ])

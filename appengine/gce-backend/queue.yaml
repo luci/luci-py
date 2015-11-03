@@ -3,3 +3,5 @@ queue:
    rate: 1/s
  - name: delete-instances
    rate: 1/s
+ - name: prepare-instances
+   rate: 1/s

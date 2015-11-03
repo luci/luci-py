@@ -88,6 +88,8 @@ def process_instance_group(
   instances_to_catalog = []
   # Mapping of instance names to instance URLs to delete.
   instances_to_delete = {}
+  # List of instances to prepare.
+  instances_to_prepare = []
 
   instance_group_key = models.InstanceGroup.generate_key(name)
   instance_group = instance_group_key.get()
@@ -119,9 +121,7 @@ def process_instance_group(
           instances_to_delete[instance_name] = instance['instance']
         elif existing_instance.state == models.InstanceStates.NEW:
           logging.info('Preparing new instance: %s', instance_name)
-          # TODO(smut): Prepare instance before cataloging.
-          new_instance_map[instance_name].state = (
-              models.InstanceStates.PENDING_CATALOG)
+          instances_to_prepares.append(instance_name)
       else:
         new_instance_map[instance_name].state = models.InstanceStates.NEW
         logging.info('Storing new instance: %s', instance_name)
@@ -171,13 +171,35 @@ def process_instance_group(
         transactional=True,
     ):
       for instance_name in instances_to_delete.keys():
-        new_instance_map[instance_name].state = models.InstanceStates.DELETED
+        new_instance_map[instance_name].state = models.InstanceStates.DELETING
     else:
       for instance_name in instances_to_delete.keys():
         new_instance_map[instance_name].state = (
             models.InstanceStates.PENDING_DELETION)
   else:
     logging.info('Nothing to delete')
+
+  if instances_to_prepare:
+    # If we fail to enqueue the task to prepare these instances,
+    # set them back to NEW in order to try again later.
+    if utils.enqueue_task(
+        '/internal/queues/prepare-instances',
+        'prepare-instances',
+        params={
+            'group': name,
+            'instances': utils.encode_to_json(instances_to_prepare),
+            'project': project,
+            'zone': zone,
+        },
+        transactional=True,
+    ):
+      for instance_name in instances_to_prepare:
+        new_instance_map[instance_name].state = models.InstanceStates.PREPARING
+    else:
+      for instance_name in instances_to_prepare:
+        new_instance_map[instance_name].state = models.InstanceStates.NEW
+  else:
+    logging.info('Nothing to prepare')
 
   models.InstanceGroup(
       key=models.InstanceGroup.generate_key(name),
