@@ -84,8 +84,9 @@ def process_instance_group(
     zone: Zone these instances exist in. e.g. us-central1-f.
     project: Project these instances exist in.
   """
-  # List of instances to catalog.
-  instances_to_catalog = []
+  # Mapping of instance names to catalog to service accounts to use for Cloud
+  # Pub/Sub communication with the Machine Provider
+  instances_to_catalog = {}
   # Mapping of instance names to instance URLs to delete.
   instances_to_delete = {}
   # List of instances to prepare.
@@ -113,7 +114,8 @@ def process_instance_group(
         new_instance_map[instance_name].state = existing_instance.state
         if existing_instance.state == models.InstanceStates.PENDING_CATALOG:
           logging.info('Attempting to catalog instance: %s', instance_name)
-          instances_to_catalog.append(instance_name)
+          instances_to_catalog[instance_name] = (
+              existing_instance.pubsub_service_account)
         elif existing_instance.state == models.InstanceStates.CATALOGED:
           logging.info('Skipping already cataloged instance: %s', instance_name)
         elif existing_instance.state == models.InstanceStates.PENDING_DELETION:
@@ -121,7 +123,7 @@ def process_instance_group(
           instances_to_delete[instance_name] = instance['instance']
         elif existing_instance.state == models.InstanceStates.NEW:
           logging.info('Preparing new instance: %s', instance_name)
-          instances_to_prepares.append(instance_name)
+          instances_to_prepare.append(instance_name)
       else:
         new_instance_map[instance_name].state = models.InstanceStates.NEW
         logging.info('Storing new instance: %s', instance_name)
@@ -141,7 +143,7 @@ def process_instance_group(
         'catalog-instance-group',
         params={
             'dimensions': utils.encode_to_json(dimensions),
-            'instances': utils.encode_to_json(instances_to_catalog),
+            'instance_map': utils.encode_to_json(instances_to_catalog),
             'name': name,
             'policies': utils.encode_to_json(policies),
         },
@@ -170,10 +172,10 @@ def process_instance_group(
         },
         transactional=True,
     ):
-      for instance_name in instances_to_delete.keys():
+      for instance_name in instances_to_delete:
         new_instance_map[instance_name].state = models.InstanceStates.DELETING
     else:
-      for instance_name in instances_to_delete.keys():
+      for instance_name in instances_to_delete:
         new_instance_map[instance_name].state = (
             models.InstanceStates.PENDING_DELETION)
   else:

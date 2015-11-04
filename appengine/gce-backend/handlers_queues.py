@@ -67,23 +67,25 @@ class InstanceGroupCataloger(webapp2.RequestHandler):
       dimensions: JSON-encoded string representation of
         machine_provider.Dimensions describing the members of the instance
         group.
-      instances: JSON-encoded list of instances in the instance group to
-        catalog.
+      instance_map: JSON-encoded dict mapping instance names to service accounts
+        to use for Cloud Pub/Sub communication with the Machine Provider.
       name: Name of the instance group whose instances are being cataloged.
       policies: JSON-encoded string representation of machine_provider.Policies
         governing the members of the instance group.
     """
     dimensions = json.loads(self.request.get('dimensions'))
-    instances = json.loads(self.request.get('instances'))
+    instance_map = json.loads(self.request.get('instance_map'))
     name = self.request.get('name')
     policies = json.loads(self.request.get('policies'))
 
     requests = {}
 
-    for instance_name in instances:
+    for instance_name, service_account in instance_map.iteritems():
       requests[instance_name] = {
           'dimensions': dimensions.copy(), 'policies': policies}
       requests[instance_name]['dimensions']['hostname'] = instance_name
+      requests[instance_name]['policies']['machine_service_account'] = (
+          service_account)
 
     try:
       responses = machine_provider.add_machines(
@@ -236,7 +238,8 @@ def set_prepared_instance_states(instance_group_key, succeeded, failed):
 
   Args:
     instance_group_key: ndb.Key for the instance group containing the instances.
-    succeeded: List of instance names to schedule for cataloging.
+    succeeded: Dict mapping instance names to schedule for cataloging to
+      service account names.
     failed: List of instance names to reschedule for preparation.
   """
   instance_group = instance_group_key.get()
@@ -247,9 +250,10 @@ def set_prepared_instance_states(instance_group_key, succeeded, failed):
   updated = False
   for instance in instance_group.members:
     if instance.name in succeeded:
-      succeeded.remove(instance.name)
+      service_account = succeeded.pop(instance.name)
       if instance.state == models.InstanceStates.PREPARING:
         logging.info('Scheduling catalog of instance: %s', instance.name)
+        instance.pubsub_service_account = service_account
         instance.state = models.InstanceStates.PENDING_CATALOG
         updated = True
       elif instance.state == models.InstanceStates.PENDING_CATALOG:
@@ -268,7 +272,8 @@ def set_prepared_instance_states(instance_group_key, succeeded, failed):
         logging.error('Instance in unexpected state:\n%s', instance)
 
   if succeeded:
-    logging.warning('Instances not found: %s', ', '.join(sorted(succeeded)))
+    logging.warning(
+        'Instances not found: %s', ', '.join(sorted(succeeded)))
   if failed:
     logging.warning('Instances not found: %s', ', '.join(sorted(failed)))
 
@@ -294,9 +299,31 @@ class InstancePreparer(webapp2.RequestHandler):
     project = self.request.get('project')
     zone = self.request.get('zone')
 
-    # TODO(smut): Prepare instances.
+    api = gce.Project(project)
+
+    succeeded = {}
+    failed = []
+
+    # Get the default service account of each instance and set it as the
+    # instance's Cloud Pub/Sub service account. This service account will
+    # be sent to the Machine Provider to be authorized to subscribe to the
+    # machine topic to listen for instructions from Machine Provider.
+    for instance in instances:
+      try:
+        service_accounts = api.get_instance(
+            zone, instance, fields=['serviceAccounts'])
+      except net.Error:
+        service_accounts = None
+
+      if not service_accounts or not service_accounts['serviceAccounts']:
+        failed.append(instance)
+      else:
+        # Just assume the first service account is the default.
+        succeeded[instance] = service_accounts['serviceAccounts'][0]['email']
+
+    # TODO(smut): Any additional preparation.
     set_prepared_instance_states(
-        models.InstanceGroup.generate_key(group), instances, [])
+        models.InstanceGroup.generate_key(group), succeeded, failed)
 
 
 def create_queues_app():

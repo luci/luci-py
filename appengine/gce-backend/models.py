@@ -64,6 +64,7 @@ InstanceStates = Enum([
   'NEW',
   'PENDING_CATALOG',
   'PENDING_DELETION',
+  'PREPARING',
 ])
 
 
@@ -74,6 +75,12 @@ class Instance(ndb.Model):
   """
   # Name of this instance.
   name = ndb.StringProperty(required=True)
+  # Project the Cloud Pub/Sub topic exists in.
+  pubsub_project = ndb.StringProperty(indexed=False)
+  # Service account authorized to subscribe to the Cloud Pub/Sub topic.
+  pubsub_service_account = ndb.StringProperty(indexed=False)
+  # Cloud Pub/Sub topic the Machine Provider communicates with this machine on.
+  pubsub_topic = ndb.StringProperty(indexed=False)
   # State of this instance.
   state = ndb.StringProperty(choices=InstanceStates, required=True)
   # URL for this instance.
