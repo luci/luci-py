@@ -14,6 +14,7 @@
 
 """Implements parallel map (pmap)."""
 
+import logging
 import Queue
 import sys
 import threading
@@ -65,12 +66,21 @@ def _pmap(pool, queue_in, queue_out, fn, items):
   for index, item in enumerate(items):
     queue_in.put((index, fn, item))
   out = [None] * len(items)
+  e = None
   for _ in xrange(len(items)):
     index, result = queue_out.get()
     if index < 0:
       # This is an exception.
-      raise result[0], result[1], result[2]
-    out[index] = result
+      if not e:
+        e = result
+      else:
+        logging.debug(
+            'pmap(): discarding exception for item %d: %s',
+            -index - 1, result[1])
+    else:
+      out[index] = result
+  if e:
+    raise e[0], e[1], e[2]
   return out
 
 
