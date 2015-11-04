@@ -93,7 +93,7 @@ class UsbHandle(object):
       sn = self.serial_number
     except libusb1.USBError:
       sn = ''
-    if sn and sn != self._usb_info:
+    if sn and sn != self._usb_info and self._usb_info:
       return '%s %s' % (self._usb_info, sn)
     return self._usb_info
 
@@ -104,43 +104,48 @@ class UsbHandle(object):
     _LOG.info('%s.Open()', self.port_path_str)
 
     with self._HANDLE_CACHE_LOCK:
-      previous = self._HANDLE_CACHE.get(port_path)
+      # Safely recover from USB handle leaks.
+      # TODO(maruel): Eventually turn this into an hard failure.
+      previous = self._HANDLE_CACHE.pop(port_path, None)
       if previous:
         _LOG.error(
             '%s.Open(): Found already opened port:\n%s',
             self.port_path_str, previous[1])
         previous[0].Close()
 
-    for endpoint in self._setting.iterEndpoints():
-      address = endpoint.getAddress()
-      if address & libusb1.USB_ENDPOINT_DIR_MASK:
-        self._read_endpoint = address
-        self._max_read_packet_len = endpoint.getMaxPacketSize()
-      else:
-        self._write_endpoint = address
-
-    assert self._read_endpoint is not None
-    assert self._write_endpoint is not None
-
-    handle = self._device.open()
-    iface_number = self._setting.getNumber()
     try:
-      if handle.kernelDriverActive(iface_number):
-        handle.detachKernelDriver(iface_number)
-    except libusb1.USBError as e:
-      if e.value == libusb1.LIBUSB_ERROR_NOT_FOUND:
-        _LOG.warning(
-            '%s.Open(): Kernel driver not found for interface: %s.',
-            self.port_path_str, iface_number)
-      else:
-        raise
-    handle.claimInterface(iface_number)
-    self._handle = handle
-    self._interface_number = iface_number
+      for endpoint in self._setting.iterEndpoints():
+        address = endpoint.getAddress()
+        if address & libusb1.USB_ENDPOINT_DIR_MASK:
+          self._read_endpoint = address
+          self._max_read_packet_len = endpoint.getMaxPacketSize()
+        else:
+          self._write_endpoint = address
 
-    stack = ''.join(traceback.format_stack()[:-2])
-    with self._HANDLE_CACHE_LOCK:
-      self._HANDLE_CACHE[port_path] = (self._handle, stack)
+      assert self._read_endpoint is not None
+      assert self._write_endpoint is not None
+
+      self._handle = self._device.open()
+      self._interface_number = self._setting.getNumber()
+      try:
+        if self._handle.kernelDriverActive(self._interface_number):
+          self._handle.detachKernelDriver(self._interface_number)
+      except libusb1.USBError as e:
+        if e.value == libusb1.LIBUSB_ERROR_NOT_FOUND:
+          _LOG.warning(
+              '%s.Open(): Kernel driver not found for interface: %s.',
+              self.port_path_str, self._interface_number)
+          self.Close()
+        else:
+          raise
+      self._handle.claimInterface(self._interface_number)
+
+      stack = ''.join(traceback.format_stack()[:-2])
+      with self._HANDLE_CACHE_LOCK:
+        self._HANDLE_CACHE[port_path] = (self, stack)
+    except Exception as e:
+      self.Close()
+      raise
 
   @property
   def is_open(self):
@@ -171,7 +176,8 @@ class UsbHandle(object):
     if self._handle is None:
       return
     try:
-      self._handle.releaseInterface(self._interface_number)
+      if self._interface_number:
+        self._handle.releaseInterface(self._interface_number)
       self._handle.close()
     except libusb1.USBError as e:
       _LOG.info('%s.Close(): USBError: %s', self.port_path_str, e)
