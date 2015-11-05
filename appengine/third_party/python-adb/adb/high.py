@@ -700,6 +700,25 @@ class HighDevice(object):
             self.port_path)
         return False
       time.sleep(0.1)
+
+    # Then the slowest part of all.
+    while True:
+      if (time.time() - start) > timeout:
+        _LOG.warning(
+            '%s.WaitUntilFullyBooted() didn\'t get Package Manager running in '
+            'time',
+            self.port_path)
+        return False
+      out, _ = self.Shell('pm path')
+      if out == 'Error: no package specified\n':
+        # It's up!
+        break
+
+      assert (out ==
+          'Error: Could not access the Package Manager.  Is the system '
+          'running?\n'), out
+      time.sleep(0.1)
+
     return True
 
   def PushKeys(self):
