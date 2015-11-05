@@ -51,17 +51,40 @@ deterministic (including the files themselves) it is possible to use the
 `--idempotent` flag. This flag tells the server to **skip** the task if the
 exact same command was run previously and succeeded. This basically means that
 if you run the test twice and it succeeded, the second request is served the
-results from the first request. This saves a lot of time and infrastructure
-usage.
+results from the first request. _This saves a lot of time and infrastructure
+usage._
 
 For a task to be idempotent, it must depend on nothing else than the task
-description:
-   - isolated files mapped in
-   - dimensions are uniquely describe the type of bot required (exact OS
-     version, any other important detail)
+description which includes:
 
-If a task fetches anything from a remote service, it must not be marked as
+    - Isolated files mapped in.
+    - Dimensions are uniquely describe the type of bot required; exact OS
+      version, any other important detail that can affect the task output.
+
+Other things of note are:
+
+    - No access to any remote service. This include HTTP(S), DNS lookup, etc. No
+      file can be 'downloaded' or 'uploaded' by the task. They must be mapped
+      in, content addressed, up front. Results must be inside
+      `${ISOLATED_OUTDIR}``.
+      - This is also important from a performance PoV since run_isolate.py keeps
+        a local content addressed cache.
+    - No dependency on the time of the day or any other side-signal.
+
+If any of the rule above does not hold, the task must *not* be marked as
 idempotent since it is not reproducible by definition.
+
+
+### Task behavior
+
+Swarming is designed against internal Google test distribution mechanism. As
+such, it has a few assumptions baked in. A task shall:
+
+    - Open input files as read-only, never for write.
+    - Write files only to these two locations:
+      - The OS-specific temporary directory, e.g. `/tmp` or `%TEMP%` file files
+        that are irrelevant after the task execution.
+      - `${ISOLATED_OUTDIR}` for files that are the output of this task.
 
 
 ## Running a task asynchronously
