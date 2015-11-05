@@ -10,9 +10,30 @@ import os
 import platform
 import re
 import string
+import subprocess
 import sys
 
 from utils import tools
+
+
+_WIN32_CLIENT_NAMES = {
+    '5.0': '2000',
+    '5.1': 'XP',
+    '5.2': 'XP',
+    '6.0': 'Vista',
+    '6.1': '7',
+    '6.2': '8',
+    '6.3': '8.1',
+    '10.0': '10',
+}
+
+_WIN32_SERVER_NAMES = {
+    '5.2': '2003Server',
+    '6.0': '2008Server',
+    '6.1': '2008ServerR2',
+    '6.2': '2012Server',
+    '6.3': '2012ServerR2',
+}
 
 
 @tools.cached
@@ -72,28 +93,33 @@ def to_cygwin_path(path):
 def get_os_version_number():
   """Returns the normalized OS version number as a string.
 
+  Actively work around AppCompat version lie shim.
+
   Returns:
     - 5.1, 6.1, etc. There is no way to distinguish between Windows 7
       and Windows Server 2008R2 since they both report 6.1.
   """
-  if sys.platform == 'win32':
-    version_raw = platform.version()
-    version_parts = version_raw.split('.')
-  else:
-    # This handles 'CYGWIN_NT-5.1' and 'CYGWIN_NT-6.1-WOW64'.
-    version_raw = platform.system()
-    version_parts = version_raw.split('-')[1].split('.')
-  assert len(version_parts) >= 2,  (
-      'Unable to determine Windows version: %s' % version_raw)
-  if version_parts[0] < 5 or (version_parts[0] == 5 and version_parts[1] < 1):
-    assert False, 'Version before XP are unsupported: %s' % version_parts
-  return u'.'.join(version_parts[:2])
+  # Windows is lying to us until python adds to its manifest:
+  #   <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
+  # and it doesn't.
+  # So ask nicely to cmd.exe instead, which will always happily report the right
+  # version. Here's some sample output:
+  # - XP: Microsoft Windows XP [Version 5.1.2600]
+  # - Win10: Microsoft Windows [Version 10.0.10240]
+  # - Win7 or Win2K8R2: Microsoft Windows [Version 6.1.7601]
+  out = subprocess.check_output(['cmd.exe', '/c', 'ver']).strip()
+  return re.search(r'\[Version (\d+\.\d+)\.\d+\]', out).group(1)
 
 
 @tools.cached
 def get_os_version_name():
   """Returns the marketing name of the OS including the service pack."""
-  marketing_name = platform.uname()[2]
+  # Python keeps a local map in platform.py and it is updated at newer python
+  # release. Since our python release is a bit old, do not rely on it.
+  is_server = sys.getwindowsversion().product_type == 3
+  lookup = _WIN32_SERVER_NAMES if is_server else _WIN32_CLIENT_NAMES
+  version_number = get_os_version_number()
+  marketing_name = lookup.get(version_number, version_number)
   service_pack = platform.win32_ver()[2] or 'SP0'
   return '%s-%s' % (marketing_name, service_pack)
 
