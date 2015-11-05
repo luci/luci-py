@@ -314,7 +314,8 @@ class _AdbConnection(object):
   def _OnRead(self, message):
     """Calls from within ReadAndDispatch(), so the manager lock is held."""
     # Can be CLSE, OKAY or WRTE. It's generally basically an ACK.
-    if message.header.arg0 != self.remote_id:
+    cmd_name = message.header.command_name
+    if message.header.arg0 != self.remote_id and cmd_name != 'CLSE':
       # We can't assert that for now. TODO(maruel): Investigate the one-off
       # cases.
       logging.warning(
@@ -322,7 +323,6 @@ class _AdbConnection(object):
     if message.header.arg1 != self._local_id:
       raise InvalidResponseError(
           'Unexpected local ID: expected %d' % self._local_id, message)
-    cmd_name = message.header.command_name
     if cmd_name == 'CLSE':
       self._HasClosed()
       return

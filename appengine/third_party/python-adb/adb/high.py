@@ -432,10 +432,16 @@ class HighDevice(object):
         _LOG.warning(
             '%s.SetCPUScalingGovernor(): Read invalid scaling_governor: %s',
             self.port_path, prev)
+    else:
+      _LOG.warning(
+          '%s.SetCPUScalingGovernor(): Failed to read %s', self.port_path, path)
 
     # This works on Nexus 10 but not on Nexus 5. Need to investigate more. In
     # the meantime, simply try one after the other.
     if not self.PushContent(governor + '\n', path):
+      _LOG.info(
+          '%s.SetCPUScalingGovernor(): Failed to push %s in %s',
+          self.port_path, governor, path)
       # Fallback via shell.
       _, exit_code = self.Shell('echo "%s" > %s' % (governor, path))
       if exit_code != 0:
@@ -608,11 +614,21 @@ class HighDevice(object):
     dest = posixpath.join(destdir, os.path.basename(apk))
     if not self.Push(apk, dest):
       return False
-    return self.Shell('pm install -r %s' % pipes.quote(dest))[1] is 0
+    cmd = 'pm install -r %s' % pipes.quote(dest)
+    out, exit_code = self.Shell(cmd)
+    if not exit_code:
+      return True
+    _LOG.info('%s: %s', cmd, out)
+    return False
 
   def UninstallAPK(self, package):
     """Uninstalls the package."""
-    return self.Shell('pm uninstall %s' % pipes.quote(package))[1] is 0
+    cmd = 'pm uninstall %s' % pipes.quote(package)
+    out, exit_code = self.Shell(cmd)
+    if not exit_code:
+      return True
+    _LOG.info('%s: %s', cmd, out)
+    return False
 
   def GetApplicationPath(self, package):
     # TODO(maruel): Test.
@@ -628,13 +644,16 @@ class HighDevice(object):
     Returns:
     - uptime as float in second or None.
     """
+    if not self.cache.external_storage_path:
+      return False
     start = time.time()
     while True:
       if (time.time() - start) > timeout:
-        return False
+        break
       if self.Stat(self.cache.external_storage_path)[0] != None:
         return True
       time.sleep(0.1)
+    _LOG.warning('%s.WaitForDevice() failed', self.port_path)
     return False
 
   def WaitUntilFullyBooted(self, timeout=300):
@@ -653,14 +672,23 @@ class HighDevice(object):
     # where most time is spent.
     while True:
       if (time.time() - start) > timeout:
+        _LOG.warning(
+            '%s.WaitUntilFullyBooted() didn\'t get init.svc.bootanim in time: '
+            '%r',
+            self.port_path, self.GetProp('init.svc.bootanim'))
         return False
-      if self.GetProp('sys.boot_completed') == '1':
+      # sys.boot_completed can't be relyed on. It fires too early or worse can
+      # be completely missing on some kernels (e.g. Manta).
+      if self.GetProp('init.svc.bootanim') == 'stopped':
         break
       time.sleep(0.1)
 
     # Wait for one network to be up and running.
     while not self.GetIPs():
       if (time.time() - start) > timeout:
+        _LOG.warning(
+            '%s.WaitUntilFullyBooted() didn\'t get an IP in time',
+            self.port_path)
         return False
       time.sleep(0.1)
     return True
