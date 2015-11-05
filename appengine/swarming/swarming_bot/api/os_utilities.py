@@ -537,7 +537,7 @@ def get_state_all_devices_android(devices):
       u'cpu': device.GetCPUScale(),
       u'disk': device.GetDisk(),
       u'imei': device.GetIMEI(),
-      u'ip': device.GetIP(),
+      u'ip': device.GetIPs(),
       u'max_uid': device.GetLastUID(),
       u'other_packages': platforms.android.get_unknown_apps(device),
       u'serial': device.serial,

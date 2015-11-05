@@ -337,22 +337,33 @@ class Test(unittest.TestCase):
     self.assertTrue(self.cmd.serial)
     self.assertTrue(self.cmd.cache.external_storage_path.startswith('/'))
     self.assertIn(self.cmd.IsRoot(), (True, False))
+
     temps = self.cmd.GetTemperatures()
     self.assertEqual(2, len(temps))
     self.assertTrue(all(isinstance(t, int) for t in temps), temps)
     self.assertTrue(all(15 < t < 60 for t in temps))
+
     battery = self.cmd.GetBattery()
     self.assertIn(u'USB', battery['power'])
+
     self.assertGreater(self.cmd.GetUptime(), 10.)
+
     disks = self.cmd.GetDisk()
     self.assertGreater(disks['cache'], 10.)
     self.assertGreater(disks['data'], 10.)
     self.assertGreater(disks['system'], 10.)
+
     imei = self.cmd.GetIMEI()
     self.assertTrue(imei is None or len(imei) == 15, imei)
-    self.assertTrue(re.match(r'^\d+\.\d+\.\d+\.\d+$', self.cmd.GetIP()))
+
+    ips = self.cmd.GetIPs()
+    self.assertTrue(ips)
+    self.assertTrue(
+        all(re.match(r'^\d+\.\d+\.\d+\.\d+$', v) for v in ips.itervalues()), ips)
+
     last_uid = self.cmd.GetLastUID()
     self.assertTrue(2000 < last_uid < 200000)
+
     apps = self.cmd.GetPackages()
     self.assertIn('com.google.android.email', apps)
     self.assertEqual(

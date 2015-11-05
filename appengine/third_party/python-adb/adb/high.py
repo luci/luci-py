@@ -286,6 +286,10 @@ class HighDevice(object):
   This class contains all the methods that are effectively composite calls to
   the low level functionality provided by AdbCommandsSafe. As such there's no
   direct access by methods of this class to self.cmd.
+
+  Most importantly, there must be no automatic retry at this level; all
+  automatic retries must be inside AdbCommandsSafe. The only exception is
+  WaitForXXX() functions.
   """
   def __init__(self, device, cache):
     # device can be one of adb_commands_safe.AdbCommandsSafe,
@@ -577,10 +581,6 @@ class HighDevice(object):
         return u''.join(unichr(c) for c in (int(i, 16) for i in chars))
     return None
 
-  def GetIP(self):
-    """Returns the IP address of the wifi network connection."""
-    return self.GetProp('dhcp.wlan0.ipaddress')
-
   def GetIPs(self):
     """Returns the current IP addresses of networks that are up."""
     # There's multiple ways to find parts of this information:
@@ -597,7 +597,7 @@ class HighDevice(object):
     parts = (l.split() for l in out.splitlines())
     return {
         p[0]: p[2].split('/', 1)[0] for p in parts
-        if p[1] == 'UP' and p[2] != '0.0.0.0/0'
+        if p[0] != 'lo' and p[1] == 'UP' and p[2] != '0.0.0.0/0'
     }
 
   def GetLastUID(self):
@@ -697,15 +697,6 @@ class HighDevice(object):
       # be completely missing on some kernels (e.g. Manta).
       if self.GetProp('init.svc.bootanim') == 'stopped':
         break
-      time.sleep(0.1)
-
-    # Wait for one network to be up and running.
-    while not self.GetIPs():
-      if (time.time() - start) > timeout:
-        _LOG.warning(
-            '%s.WaitUntilFullyBooted() didn\'t get an IP in time',
-            self.port_path)
-        return False
       time.sleep(0.1)
 
     # Then the slowest part of all.
