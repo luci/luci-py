@@ -328,8 +328,6 @@ class UsbHandle(object):
         logging.error(
             'Failed to open USB device, is user in group plugdev? %s', e)
         continue
-      except StopIteration:
-        raise
       yield handle
 
 

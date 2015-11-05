@@ -180,13 +180,10 @@ class Test(unittest.TestCase):
     """Switches from root to user then to root again."""
     # This test is a bit intensive, adbd can take several seconds to restart
     # from user to root.
-    self.safe()
+    self.high()
     self.assertTrue(repr(self.cmd))
 
     try:
-      if not self.cmd.IsRoot():
-        self.assertEqual(True, self.cmd.Root())  # pragma: no cover
-
       self.assertEqual(True, self.cmd.IsRoot())
       self.assertEqual(True, self.cmd.Root())
       self.assertEqual(True, self.cmd.IsRoot())
@@ -194,7 +191,16 @@ class Test(unittest.TestCase):
       self.assertEqual(False, self.cmd.IsRoot())
       self.assertEqual(True, self.cmd.Unroot())
       self.assertEqual(False, self.cmd.IsRoot())
-      self.assertEqual(True, self.cmd.Root())
+    finally:
+      # Restarting adbd changed the port path. Find it back by the serial
+      # number.
+      logging.info('Updating port path to %s', self.cmd.port_path)
+      self.__class__.PORT_PATH = self.cmd.port_path
+    # Make sure the auto-root code of high() is always exercised.
+    self.cmd.Close()
+    self.cmd = None
+    self.high()
+    try:
       self.assertEqual(True, self.cmd.IsRoot())
       self.assertEqual(True, self.cmd.Root())
       self.assertEqual(True, self.cmd.IsRoot())
@@ -250,6 +256,23 @@ class Test(unittest.TestCase):
     actual, exit_code = self.cmd.Shell(cmd)
     self.assertEqual(cmd[5:] + '\n', actual)
     self.assertEqual(0, exit_code)
+
+    # This breaks the exit code parsing code.
+    out, exit_code = self.cmd.Shell('echo hi; exit 1')
+    self.assertEqual(out, 'hi\n')
+    self.assertEqual(exit_code, None)
+
+    out, exit_code = self.cmd.ShellRaw('echo hi; exit 1')
+    self.assertEqual(out, 'hi\n')
+    self.assertEqual(exit_code, None)
+
+  def test_StreamingShell(self):
+    # This test takes a good 10 seconds.
+    self.high()
+    for out in self.cmd.StreamingShell('logcat'):
+      self.assertIsInstance(out, str)
+      self.assertGreater(len(out), 0)
+      self.assertLessEqual(len(out), self.cmd.max_packet_size)
 
   def test_WrappedShell(self):
     """Works around shell length limitation due to packet size."""
@@ -336,6 +359,9 @@ class Test(unittest.TestCase):
         u'/system/app/PrebuiltEmailGoogle/PrebuiltEmailGoogle.apk',
         self.cmd.GetApplicationPath('com.google.android.email'))
 
+    self.assertGreater(len(self.cmd.List(u'/')), 5)
+    # TODO(maruel): InstallAPK, UninstallAPK, PushKeys.
+
 
 def main():
   # First, find a device to test against if none is provided.
@@ -356,6 +382,9 @@ def main():
   adb_commands_safe._LOG.setLevel(level)
   common._LOG.setLevel(level)
   high._LOG.setLevel(level)
+
+  # Excercise this function before initialization.
+  assert high.GetDevices('python-adb', 1000, 1000) == []
 
   Test.KEYS = high.Initialize(None, None)
   if not Test.KEYS:

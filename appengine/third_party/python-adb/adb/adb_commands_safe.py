@@ -170,6 +170,12 @@ class AdbCommandsSafe(object):
     return bool(self._adb_cmd)
 
   @property
+  def max_packet_size(self):
+    if not self._adb_cmd:
+      return None
+    return self._adb_cmd.conn.max_packet_size
+
+  @property
   def port_path(self):
     """Returns the USB port path as a str."""
     return self._port_path
@@ -391,7 +397,7 @@ class AdbCommandsSafe(object):
     if not self._adb_cmd:
       return True
     cmd_size = len(cmd + self._SHELL_SUFFIX)
-    pkt_size = self._adb_cmd.conn.max_packet_size - len('shell:')
+    pkt_size = self.max_packet_size - len('shell:')
     # Has to keep one byte for trailing nul byte.
     return cmd_size < pkt_size
 
@@ -427,7 +433,34 @@ class AdbCommandsSafe(object):
     assert out[-1] == '\n', out
     # Strip the last line to extract the exit code.
     parts = out[:-1].rsplit('\n', 1)
-    return parts[0], int(parts[1])
+    exit_code = None
+    if len(parts) > 1:
+      try:
+        exit_code = int(parts[1])
+      except IndexError, ValueError:
+        # The exit code wasn't output.
+        parts[0] += '\n' + parts[1]
+    else:
+      parts[0] = out
+    return parts[0], exit_code
+
+  def StreamingShell(self, cmd):
+    """Streams the output from shell.
+
+    Yields output as str. The exit code and exceptions are lost. If the device
+    context is invalid, the command is silently dropped.
+    """
+    if isinstance(cmd, unicode):
+      cmd = cmd.encode('utf-8')
+    assert isinstance(cmd, str), cmd
+    assert self.IsShellOk(cmd), 'Command is too long: %r' % cmd
+    if self._adb_cmd:
+      try:
+        for out in self._adb_cmd.StreamingShell(cmd):
+          yield out
+      except self._ERRORS as e:
+        # Do not try to reset the USB context, just exit.
+        _LOG.info('%s.StreamingShell(): %s', self.port_path, e)
 
   def Root(self):
     """If adbd on the device is not root, ask it to restart as root.

@@ -316,6 +316,10 @@ class HighDevice(object):
     return self._cache
 
   @property
+  def max_packet_size(self):
+    return self._device.max_packet_size
+
+  @property
   def port_path(self):
     return self._device.port_path
 
@@ -377,6 +381,9 @@ class HighDevice(object):
 
   def ShellRaw(self, cmd):
     return self._device.ShellRaw(cmd)
+
+  def StreamingShell(self, cmd):
+    return self._device.StreamingShell(cmd)
 
   def Stat(self, dest):
     return self._device.Stat(dest)
