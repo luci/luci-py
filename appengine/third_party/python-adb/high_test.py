@@ -49,7 +49,7 @@ class TestAndroid(unittest.TestCase):
           ('dumpsys iphonesubinfo', ''),
           ('service call iphonesubinfo 1', RAW_IMEI),
         ])
-    cache = high.DeviceCache(None, None, None, None, None, None)
+    cache = high.DeviceCache(None, None, None, None, None)
     self.assertEqual(
         u'355236058685894', high.HighDevice(device, cache).GetIMEI())
 

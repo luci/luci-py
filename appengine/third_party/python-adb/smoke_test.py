@@ -280,15 +280,29 @@ class Test(unittest.TestCase):
   def test_cpu(self):
     """Adjust the CPU speed to power save then max speed then back to normal."""
     self.high()
-    expected = {u'cur', u'governor', u'max', u'min'}
+
+    # Only one of these 2 scaling governor is supported, not both for one
+    # kernel.
+    unknown = {
+        'conservative', 'interactive'} - set(self.cmd.cache.available_governors)
+    self.assertEqual(1, len(unknown), unknown)
+    unknown = unknown.pop()
+
+    expected = {u'cur', u'governor'}
     previous = self.cmd.GetCPUScale()
     self.assertEqual(expected, set(previous))
     try:
       self.assertEqual(True, self.cmd.SetCPUScalingGovernor('powersave'))
       self.assertIn(
           self.cmd.GetCPUScale()['governor'], ('powersave', 'userspace'))
-      self.assertEqual(True, self.cmd.SetCPUSpeed(previous['max']))
+
+      self.assertEqual(
+          True, self.cmd.SetCPUSpeed(self.cmd.cache.available_frequencies[0]))
       self.assertEqual('userspace', self.cmd.GetCPUScale()['governor'])
+      with self.assertRaises(AssertionError):
+        self.cmd.SetCPUSpeed(self.cmd.cache.available_frequencies[0]-1)
+
+      self.assertEqual(False, self.cmd.SetCPUScalingGovernor(unknown))
       self.assertEqual(True, self.cmd.SetCPUScalingGovernor('ondemand'))
     finally:
       self.assertEqual(

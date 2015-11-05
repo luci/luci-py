@@ -144,18 +144,25 @@ def _InitCache(device):
       assert set(available_governors).issubset(
           KNOWN_CPU_SCALING_GOVERNOR_VALUES), available_governors
 
-    cpuinfo_max_freq = device.PullContent(
-        '/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq')
-    if cpuinfo_max_freq:
-      cpuinfo_max_freq = int(cpuinfo_max_freq)
-    cpuinfo_min_freq = device.PullContent(
-        '/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq')
-    if cpuinfo_min_freq:
-      cpuinfo_min_freq = int(cpuinfo_min_freq)
+    available_frequencies = device.PullContent(
+        '/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies')
+    if available_frequencies:
+      available_frequencies = sorted(
+          int(i) for i in available_frequencies.strip().split())
+    else:
+      # It's possibly an older kernel. In that case, query the min/max instead.
+      cpuinfo_min_freq = device.PullContent(
+          '/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq')
+      cpuinfo_max_freq = device.PullContent(
+          '/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq')
+      if cpuinfo_min_freq and cpuinfo_max_freq:
+        # In practice there's more CPU speeds than this but there's no way (?)
+        # to query this information.
+        available_frequencies = [int(cpuinfo_min_freq), int(cpuinfo_max_freq)]
 
     cache = DeviceCache(
-        properties, external_storage_path, has_su, available_governors,
-        cpuinfo_max_freq, cpuinfo_min_freq)
+        properties, external_storage_path, has_su,
+        available_frequencies, available_governors)
     # Only save the cache if all the calls above worked.
     if all(i is not None for i in cache._asdict().itervalues()):
       _PER_DEVICE_CACHE.set(device, cache)
@@ -187,11 +194,10 @@ DeviceCache = collections.namedtuple(
         'external_storage_path',
         # /system/xbin/su exists.
         'has_su',
-        # All the valid CPU scaling governors.
+        # Valid CPU frequencies.
+        'available_frequencies',
+        # Valid CPU scaling governors.
         'available_governors',
-        # CPU frequency limits.
-        'cpuinfo_max_freq',
-        'cpuinfo_min_freq',
     ])
 
 
@@ -390,12 +396,9 @@ class HighDevice(object):
         'scaling_governor': u'governor',
     }
     out = {
-        'max': self.cache.cpuinfo_max_freq,
-        'min': self.cache.cpuinfo_min_freq,
+        v: self.PullContent('/sys/devices/system/cpu/cpu0/cpufreq/' + k)
+        for k, v in mapping.iteritems()
     }
-    out.update(
-        (v, self.PullContent('/sys/devices/system/cpu/cpu0/cpufreq/' + k))
-        for k, v in mapping.iteritems())
     return {
         k: v.strip() if isinstance(v, str) else v for k, v in out.iteritems()
     }
@@ -407,9 +410,11 @@ class HighDevice(object):
       True on success.
     """
     assert governor in KNOWN_CPU_SCALING_GOVERNOR_VALUES, repr(governor)
+    if not self.cache.available_governors:
+      return False
     if governor not in self.cache.available_governors:
       if governor == 'powersave':
-        return self.SetCPUSpeed(self.cache.cpuinfo_min_freq)
+        return self.SetCPUSpeed(self.cache.available_frequencies[0])
       if governor == 'ondemand':
         governor = 'interactive'
       elif governor == 'interactive':
@@ -466,6 +471,10 @@ class HighDevice(object):
     """
     assert isinstance(speed, int), speed
     assert 10000 <= speed <= 10000000, speed
+    if not self.cache.available_frequencies:
+      return False
+    assert speed in self.cache.available_frequencies, (
+        speed, self.cache.available_frequencies)
     success = self.SetCPUScalingGovernor('userspace')
     if not self.PushContent(
         '%d\n' % speed,
