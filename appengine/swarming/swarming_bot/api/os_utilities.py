@@ -464,7 +464,7 @@ def get_dimensions_all_devices_android(devices):
   del dimensions[u'gpu']
   dimensions.pop(u'machine_type')
 
-  # Make sure all the devices use the same board.
+  # Make sure all the devices use the same board and OS.
   keys = (u'build.id', u'product.board')
   for key in keys:
     dimensions[key] = set()
@@ -521,9 +521,6 @@ def get_state_all_devices_android(devices):
     u'board.platform',
     u'build.fingerprint',
     u'build.id',
-    u'build.tags',
-    u'build.type',
-    u'build.version.release',
     u'build.version.sdk',
     u'product.board',
     u'product.cpu.abi')
@@ -537,15 +534,12 @@ def get_state_all_devices_android(devices):
     return {
       u'battery': device.GetBattery(),
       u'build': {key: properties[u'ro.'+key] for key in keys},
-      u'cpu_scale': device.GetCPUScale(),
+      u'cpu': device.GetCPUScale(),
       u'disk': device.GetDisk(),
       u'imei': device.GetIMEI(),
       u'ip': device.GetIP(),
       u'max_uid': device.GetLastUID(),
-      u'other_packages': [
-        p for p in device.GetPackages() or []
-        if not p.startswith(('com.android.', 'com.google.')) and p != 'android'
-      ],
+      u'other_packages': platforms.android.get_unknown_apps(device),
       u'serial': device.serial,
       u'state': u'available',
       u'temp': device.GetTemperatures(),

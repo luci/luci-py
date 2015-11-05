@@ -30,6 +30,31 @@ common._LOG.setLevel(LEVEL)
 high._LOG.setLevel(LEVEL)
 
 
+# This list of third party apps embedded in the base OS image varies from
+# version to version.
+KNOWN_APPS = frozenset([
+    'android',
+    'com.hp.android.printservice',
+    'com.lge.SprintHiddenMenu',
+    'com.lge.update',
+    'com.qualcomm.qcrilmsgtunnel',
+    'com.qualcomm.shutdownlistner',
+    'com.qualcomm.timeservice',
+    'com.quickoffice.android',
+    'com.redbend.vdmc',
+    'jp.co.omronsoft.iwnnime.ml',
+    'jp.co.omronsoft.iwnnime.ml.kbd.white',
+])
+
+
+def get_unknown_apps(device):
+  return [
+      p for p in device.GetPackages() or []
+      if (not p.startswith(('com.android.', 'com.google.')) and
+          p not in KNOWN_APPS)
+  ]
+
+
 def initialize(pub_key, priv_key):
   return high.Initialize(pub_key, priv_key)
 
