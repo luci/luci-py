@@ -34,16 +34,24 @@ high._LOG.setLevel(LEVEL)
 # version to version.
 KNOWN_APPS = frozenset([
     'android',
+    'android.autoinstalls.config.google.nexus',
     'com.hp.android.printservice',
+    'com.huawei.callstatisticsutils',
+    'com.huawei.entitlement',
+    'com.huawei.mmitest',
+    'com.huawei.sarcontrolservice',
     'com.lge.SprintHiddenMenu',
     'com.lge.update',
+    'com.qualcomm.cabl',
     'com.qualcomm.qcrilmsgtunnel',
     'com.qualcomm.shutdownlistner',
     'com.qualcomm.timeservice',
+    'com.quicinc.cne.CNEService',
     'com.quickoffice.android',
     'com.redbend.vdmc',
     'jp.co.omronsoft.iwnnime.ml',
     'jp.co.omronsoft.iwnnime.ml.kbd.white',
+    'org.codeaurora.ims',
 ])
 
 
