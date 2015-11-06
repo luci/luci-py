@@ -604,7 +604,7 @@ def get_dimensions():
   return dimensions
 
 
-def get_state(threshold_mb=4*1024, skip=None):
+def get_state(threshold_mb=4*1024, threshold_relative=0.15, skip=None):
   """Returns dict with a state of the bot reported to the server with each poll.
 
   Supposed to be use only for dynamic state that changes while bot is running.
@@ -648,16 +648,21 @@ def get_state(threshold_mb=4*1024, skip=None):
   # self-quarantine.
   #if nb_files_in_temp > 1024:
   #  state[u'quarantined'] = '> 1024 files in TEMP'
-  auto_quarantine_on_low_space(state, threshold_mb, skip)
+  auto_quarantine_on_low_space(state, threshold_mb, threshold_relative, skip)
   return state
 
 
-def auto_quarantine_on_low_space(state, threshold_mb, skip=None):
-  """Quarantines when less than threshold_mb on any partition.
+def auto_quarantine_on_low_space(
+    state, threshold_mb, threshold_relative, skip=None):
+  """Quarantines when there's not enough free space on any partition.
+
+  It will quarantine only if both threshold_mb, as the total free space and
+  threshold_relative, as the free space fraction versus the total partition
+  size, are both underwater.
 
   Modifies state in-place. Assumes state['free_disks'] is valid.
   """
-  if not threshold_mb or state.get(u'quarantined'):
+  if not threshold_mb or not threshold_relative or state.get(u'quarantined'):
     return
   if skip is None:
     # Do not check these mount points for low disk space.
@@ -665,8 +670,12 @@ def auto_quarantine_on_low_space(state, threshold_mb, skip=None):
 
   s = []
   for mount, infos in state[u'disks'].iteritems():
-    space_mb = infos['free_mb']
-    if mount not in skip and space_mb < threshold_mb:
+    if mount in skip:
+      continue
+    free_mb = infos['free_mb']
+    size_mb = infos['size_mb']
+    # Both checks must fail.
+    if free_mb < threshold_mb and free_mb < (size_mb * threshold_relative):
       s.append('Not enough free disk space on %s.' % mount)
   if s:
     state[u'quarantined'] = '\n'.join(s)
