@@ -130,6 +130,10 @@ def _InitCache(device):
       for line in out.splitlines():
         if line.startswith(u'#') or not line:
           continue
+        if line.startswith('import '):
+          # That's a new-style import line. For now just ignore it as we do not
+          # need it for now.
+          continue
         key, value = line.split(u'=', 1)
         properties[key] = value
 
