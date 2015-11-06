@@ -241,23 +241,31 @@ class AuthDB(object):
     entity = self.secrets[secret_key.scope][secret_key.name]
     return list(entity.values)
 
-  def verify_ip_whitelisted(self, identity, ip):
+  def verify_ip_whitelisted(self, identity, ip, headers):
     """Verifies IP is in a whitelist assigned to Identity or in bots whitelist.
 
     Returns new bot Identity if request was authenticated as coming from
     IP whitelisted bot, or |identity| otherwise.
 
     Raises AuthorizationError if identity has an IP whitelist assigned and given
-    IP address doesn't belong to it.
+    IP address doesn't belong to it or X-Whitelisted-Bot-Id is used by
+    non whitelisted bot.
     """
     assert isinstance(identity, model.Identity), identity
 
     # Check bots whitelist to authenticate anonymous request as coming from bot.
+    bot_id_header = headers.get('X-Whitelisted-Bot-Id')
     if identity.is_anonymous:
       whitelist = self.ip_whitelists.get(model.BOTS_IP_WHITELIST)
       if whitelist and whitelist.is_ip_whitelisted(ip):
-        addr_str = ipaddr.ip_to_string(ip)
-        return model.Identity(model.IDENTITY_BOT, addr_str.replace(':', '-'))
+        return model.Identity(
+            model.IDENTITY_BOT,
+            bot_id_header or ipaddr.ip_to_string(ip).replace(':', '-'))
+
+    if bot_id_header:
+      raise AuthorizationError(
+          'X-Whitelisted-Bot-Id (%s) is used by bot not in the whitelist'
+          % bot_id_header)
 
     # Find IP whitelist name in the assignment entity (if any).
     for assignment in self.ip_whitelist_assignments.assignments:
@@ -772,7 +780,7 @@ def get_secret(secret_key):
   return get_request_cache().auth_db.get_secret(secret_key)
 
 
-def verify_ip_whitelisted(identity, ip):
+def verify_ip_whitelisted(identity, ip, headers):
   """Verifies IP is in a whitelist assigned to Identity or in bots whitelist.
 
   Returns new bot Identity if request was authenticated as coming from
@@ -781,7 +789,8 @@ def verify_ip_whitelisted(identity, ip):
   Raises AuthorizationError if identity has an IP whitelist assigned and given
   IP address doesn't belong to it.
   """
-  return get_request_cache().auth_db.verify_ip_whitelisted(identity, ip)
+  return get_request_cache().auth_db.verify_ip_whitelisted(
+      identity, ip, headers)
 
 
 def public(func):

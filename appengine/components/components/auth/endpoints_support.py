@@ -239,7 +239,7 @@ def initialize_request_auth(remote_address, headers):
   auth_context.peer_ip = ip
 
   # verify_ip_whitelisted may change identity for bots, store new one.
-  identity = api.verify_ip_whitelisted(identity, ip)
+  identity = api.verify_ip_whitelisted(identity, ip, headers)
   auth_context.peer_identity = identity
 
   # Parse delegation token, if given, to deduce end-user identity.
