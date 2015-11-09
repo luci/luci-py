@@ -1,7 +1,7 @@
 Name: Python ADB + Fastboot implementation
 Short Name: python-adb
-URL: https://github.com/google/python-adb
-Revision: 05339fb17f973b7748bb57ee4da13bd22f9b2ff7
+URL: https://github.com/luci/python-adb
+Revision: d7f1ba42cc3b0469f8331618c825ae4032dd9ff0
 License: Apache License, Version 2.0
 
 Description:
@@ -10,10 +10,4 @@ protocols, using libusb1 for USB communications.
 
 
 Local Modifications:
-- rm *.py adb/*_debug.py adb/common_cli.py
-- Applied patch to:
-  - Remove dependency on gflags and M2Crypto
-  - Fix a bug.
-  - Rename import path of libusb1 for easier packaging.
-  - Bring support for Ubuntu 12.04.
-  - Reimplement adb_protocol.py to add multiplexing support and resiliency.
+None.

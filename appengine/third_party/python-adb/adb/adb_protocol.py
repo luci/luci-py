@@ -36,7 +36,7 @@ class InvalidResponseError(IOError):
   """Got an invalid command over USB."""
 
   def __init__(self, message, header):
-    super(InvalidResponseError, self).__init__(message + ': %s' % header)
+    super(InvalidResponseError, self).__init__('%s: %s' % (message, header))
     self.header = header
 
 
@@ -393,7 +393,6 @@ class AdbConnectionManager(object):
           quickly; while in interactive settings it should be high to allow
           users to accept the dialog. We default to automation here, so it's low
           by default.
-
     Returns:
       An AdbConnection.
     """
@@ -492,11 +491,11 @@ class AdbConnectionManager(object):
 
   def _Connect(self):
     """Connect to the device."""
-    # Empty the connection first.
     with self._lock:
       reply = None
       start = time.time()
       nb = 0
+      _LOG.debug('Emptying the connection first')
       while True:
         try:
           msg = _AdbMessage.Read(self._usb, 20)

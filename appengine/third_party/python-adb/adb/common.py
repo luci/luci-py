@@ -353,6 +353,10 @@ class TcpHandle(object):
     self._connection = socket.create_connection((host, port))
 
   @property
+  def port_path(self):
+    return self.serial_number
+
+  @property
   def serial_number(self):
     return self._serial_number
 

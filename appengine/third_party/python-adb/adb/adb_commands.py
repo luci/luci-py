@@ -75,10 +75,9 @@ class AdbCommands(object):
     self.conn.Close()
 
   @classmethod
-  def Connect(cls, usb, **kwargs):
+  def Connect(cls, usb, banner, **kwargs):
     """Connect to the device."""
-    if not kwargs.get('banner'):
-      kwargs['banner'] = socket.gethostname()
+    kwargs['banner'] = banner or socket.gethostname()
     return cls(adb_protocol.AdbConnectionManager.Connect(usb, **kwargs))
 
   @classmethod

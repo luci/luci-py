@@ -25,9 +25,10 @@ from adb import usb_exceptions
 
 # The size of packets to write to usb, this is set to 4 for legacy reasons.
 # We've had success with 1MB DRASTICALLY decreasing flashing times.
-FASTBOOT_WRITE_CHUNK_SIZE_KB = 1024,
+FASTBOOT_WRITE_CHUNK_SIZE_KB = 1024
 
 _LOG = logging.getLogger('fastboot')
+_LOG.setLevel(logging.ERROR)
 
 DEFAULT_MESSAGE_CALLBACK = lambda m: logging.info('Got %s from device', m)
 FastbootMessage = collections.namedtuple(  # pylint: disable=invalid-name
