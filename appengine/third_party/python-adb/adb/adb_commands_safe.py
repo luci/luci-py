@@ -607,7 +607,10 @@ class AdbCommandsSafe(object):
 
       _LOG.info('%s.Unroot(): %r', self.port_path, out)
       # Hardcoded strings in platform_system_core/adb/services.cpp
-      if out in ('adbd not running as root\n', 'restarting adbd as non root\n'):
+      # Sadly, it's possible that adbd restarts so fast that it doesn't even
+      # wait for the output buffer to be flushed. In this case, out == ''.
+      if out in (
+          '', 'adbd not running as root\n', 'restarting adbd as non root\n'):
         return True
       assert False, repr(out)
     _LOG.error('%s._Unroot(): Failed after %d tries', self.port_path, i+1)
