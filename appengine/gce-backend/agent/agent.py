@@ -5,11 +5,16 @@
 
 """Machine Provider agent for GCE instances."""
 
+import base64
 import datetime
 import httplib2
 import json
 import socket
+import subprocess
 import sys
+import tempfile
+import time
+import urlparse
 
 
 METADATA_BASE_URL = 'http://metadata/computeMetadata/v1'
@@ -106,6 +111,27 @@ class PubSub(object):
   def __init__(self, service_account='default'):
     self._http = AuthorizedHTTPRequest(service_account=service_account)
 
+  def acknowledge(self, subscription, project, ack_ids):
+    """Acknowledges the receipt of messages on a Cloud Pub/Sub subscription.
+
+    Args:
+      subscription: Name of the subscription.
+      project: Project the subscription exists in.
+      ack_ids: IDs of messages to acknowledge.
+
+    Raises:
+      NotFoundError: If the subscription and/or topic can't be found.
+    """
+    response, content = self._http.request(
+        '%s/%s/subscriptions/%s:acknowledge' % (
+            PUBSUB_BASE_URL, project, subscription),
+        body=json.dumps({'ackIds': ack_ids}),
+        method='POST',
+    )
+    if response['status'] == '404':
+      raise NotFoundError(response, json.loads(content))
+    return json.loads(content)
+
   def pull(self, subscription, project):
     """Polls for new messages on a Cloud Pub/Sub pull subscription.
 
@@ -134,12 +160,41 @@ def main():
   """Listens for Cloud Pub/Sub communication."""
   # Attributes tell us what subscription has been created for us to listen to.
   project = get_metadata('instance/attributes/pubsub_subscription_project')
+  service_account = get_metadata('instance/attributes/pubsub_service_account')
   subscription = get_metadata('instance/attributes/pubsub_subscription')
-  pubsub = PubSub()
+  pubsub = PubSub(service_account=service_account)
 
   response = pubsub.pull(subscription, project)
-  print response
-  # TODO(smut): Process messages.
+
+  while True:
+    ack_ids = []
+    start_time = time.time()
+    for message in response.get('receivedMessages', []):
+      ack_ids.append(message['ackId'])
+      attributes = message['message'].get('attributes', {})
+      message = base64.b64decode(message['message'].get('data', ''))
+
+      if message == 'CONNECT' and attributes.get('swarming_server'):
+        response, content = httplib2.Http().request(
+            urlparse.urljoin(attributes.get('swarming_server'), 'bootstrap'),
+            method='GET',
+        )
+        if response['status'] == '200':
+          bootstrap = tempfile.mkstemp('bootstrap')[1]
+          with open(bootstrap, 'w') as f:
+            f.write(content)
+          # Once the bootstrap is complete, the instance will be rebooted,
+          # and on startup it will connect to the Swarming server. Since
+          # the instance will be rebooted, acknowledge all messages now.
+          pubsub.acknowledge(subscription, project, [ack_ids])
+          ack_ids = []
+          subprocess.check_call(['python', bootstrap])
+
+    if ack_ids:
+      pubsub.acknowledge(subscription, project, ack_ids)
+    if time.time() - start_time < 1:
+      # Iterate at most once per second (chosen arbitrarily).
+      time.sleep(1)
 
 
 if __name__ == '__main__':
