@@ -324,7 +324,11 @@ def run_command(
     env = None
     if task_details.env:
       env = os.environ.copy()
-      env.update(task_details.env)
+      for key, value in task_details.env.iteritems():
+        if not value:
+          env.pop(key, None)
+        else:
+          env[key] = value
     logging.info('cmd=%s', cmd)
     logging.info('env=%s', env)
     try:
