@@ -85,12 +85,15 @@ def process_instance_group(
     project: Project these instances exist in.
   """
   # Mapping of instance names to catalog to service accounts to use for Cloud
-  # Pub/Sub communication with the Machine Provider
+  # Pub/Sub communication with the Machine Provider.
   instances_to_catalog = {}
   # Mapping of instance names to instance URLs to delete.
   instances_to_delete = {}
   # List of instances to prepare.
   instances_to_prepare = []
+  # Mapping of instances whose metadata should be updated to a dict of metadata
+  # to update.
+  instances_to_update = {}
 
   instance_group_key = models.InstanceGroup.generate_key(name)
   instance_group = instance_group_key.get()
@@ -104,14 +107,10 @@ def process_instance_group(
 
   for instance_name, instance in instances.iteritems():
     logging.info('Processing instance: %s', instance_name)
-    new_instance_map[instance_name] = models.Instance(
-        name=instance_name,
-        url=instance['instance'],
-    )
     if instance.get('instanceStatus') == 'RUNNING':
       existing_instance = old_instance_map.get(instance_name)
       if existing_instance:
-        new_instance_map[instance_name].state = existing_instance.state
+        new_instance_map[instance_name] = existing_instance
         if existing_instance.state == models.InstanceStates.PENDING_CATALOG:
           logging.info('Attempting to catalog instance: %s', instance_name)
           instances_to_catalog[instance_name] = (
@@ -124,8 +123,25 @@ def process_instance_group(
         elif existing_instance.state == models.InstanceStates.NEW:
           logging.info('Preparing new instance: %s', instance_name)
           instances_to_prepare.append(instance_name)
+        elif existing_instance.state == \
+            models.InstanceStates.PENDING_METADATA_UPDATE:
+          logging.info(
+              'Scheduling instance for metadata update: %s', instance_name)
+          instances_to_update[instance_name] = {
+              'pubsub_service_account':
+                  existing_instance.pubsub_service_account,
+              'pubsub_subscription': existing_instance.pubsub_subscription,
+              'pubsub_subscription_project':
+                  existing_instance.pubsub_subscription_project,
+              'pubsub_topic': existing_instance.pubsub_topic,
+              'pubsub_topic_project': existing_instance.pubsub_topic_project,
+          }
       else:
-        new_instance_map[instance_name].state = models.InstanceStates.NEW
+        new_instance_map[instance_name] = models.Instance(
+            name=instance_name,
+            state=models.InstanceStates.NEW,
+            url=instance['instance'],
+        )
         logging.info('Storing new instance: %s', instance_name)
     else:
       logging.warning(
@@ -202,6 +218,30 @@ def process_instance_group(
         new_instance_map[instance_name].state = models.InstanceStates.NEW
   else:
     logging.info('Nothing to prepare')
+
+  if instances_to_update:
+    # If we fail to enqueue the task to update these instances, set
+    # them back to PENDING_METADATA_UPDATE in order to try again later.
+    if utils.enqueue_task(
+        '/internal/queues/update-instance-metadata',
+        'update-instance-metadata',
+        params={
+            'group': name,
+            'instance_map': utils.encode_to_json(instances_to_update),
+            'project': project,
+            'zone': zone,
+        },
+        transactional=True,
+    ):
+      for instance_name in instances_to_update:
+        new_instance_map[instance_name].state = (
+            models.InstanceStates.UPDATING_METADATA)
+    else:
+      for instance_name in instances_to_update:
+        new_instance_map[instance_name].state = (
+            models.InstanceStates.PENDING_METADATA_UPDATE)
+  else:
+    logging.info('Nothing to update')
 
   models.InstanceGroup(
       key=models.InstanceGroup.generate_key(name),

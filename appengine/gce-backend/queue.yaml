@@ -5,3 +5,5 @@ queue:
    rate: 1/s
  - name: prepare-instances
    rate: 1/s
+ - name: update-instance-metadata
+   rate: 1/s

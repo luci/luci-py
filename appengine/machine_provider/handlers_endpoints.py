@@ -162,11 +162,14 @@ class CatalogEndpoints(remote.Service):
           error=rpc_messages.CatalogManipulationRequestError.HOSTNAME_REUSE,
           machine_addition_request=request,
       )
-    models.CatalogMachineEntry.create_and_put(
-        request.dimensions,
-        request.policies,
-        models.CatalogMachineEntryStates.NEW,
-    )
+    models.CatalogMachineEntry(
+        key=models.CatalogMachineEntry.generate_key(request.dimensions),
+        dimensions=request.dimensions,
+        pubsub_subscription_project=PUBSUB_DEFAULT_PROJECT,
+        pubsub_topic_project=PUBSUB_DEFAULT_PROJECT,
+        policies=request.policies,
+        state=models.CatalogMachineEntryStates.NEW,
+    ).put()
     return rpc_messages.CatalogManipulationResponse(
         machine_addition_request=request,
     )

@@ -350,6 +350,10 @@ class ZoneOperation(object):
     return self.done
 
   @property
+  def name(self):
+    return self._info['name']
+
+  @property
   def done(self):
     """True when operation completes (successfully or not)."""
     return self._info['status'] == 'DONE'

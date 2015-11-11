@@ -36,24 +36,74 @@ def schedule_deletion(instance_group_key, instance_name):
     logging.error('Instance group does not exist: %s', instance_group_key)
     return
 
-  found = False
   for instance in instance_group.members:
     if instance.name == instance_name:
       if instance.state == models.InstanceStates.CATALOGED:
         logging.info('Scheduling instance for deletion: %s', instance_name)
         instance.state = models.InstanceStates.PENDING_DELETION
-        found = True
+        instance_group.put()
+        return
       elif instance.state == models.InstanceStates.PENDING_DELETION:
         logging.info('Instance already pending deletion: %s', instance_name)
       else:
         logging.error('Instance in unexpected state:\n%s', instance)
       break
-
-  if found:
-    instance_group.put()
   else:
     # We may have deleted it already.
     logging.warning(
+        'Instance %s not found in instance group %s',
+        instance_name,
+        instance_group.name,
+    )
+
+
+@ndb.transactional
+def schedule_metadata_update(
+    instance_group_key,
+    instance_name,
+    subscription,
+    subscription_project,
+    topic,
+    topic_project,
+):
+  """Schedules a metadata update for a cataloged instance.
+
+  Args:
+    instance_group_key: ndb.Key for the instance group that owns the instance.
+    instance_name: Name of the instance to schedule for metadata update.
+    subscription: Name of the Cloud Pub/Sub subscription the instance should
+      listen for instructions on.
+    subscription_project: Project the Cloud Pub/Sub subscription exists in.
+    topic: Name of the Cloud Pub/Sub topic the instance has been subscribed to.
+    topic_project: Project the Cloud Pub/Sub topic exists in.
+  """
+  instance_group = instance_group_key.get()
+  if not instance_group:
+    logging.error('Instance group does not exist: %s', instance_group_key)
+    return
+
+  instances = []
+
+  for instance in instance_group.members:
+    if instance.name == instance_name:
+      if instance.state == models.InstanceStates.CATALOGED:
+        logging.info(
+            'Scheduling instance for metadata update: %s', instance_name)
+        instance.pubsub_subscription = subscription
+        instance.pubsub_subscription_project = subscription_project
+        instance.pubsub_topic = topic
+        instance.pubsub_topic_project = topic_project
+        instance.state = models.InstanceStates.PENDING_METADATA_UPDATE
+        instance_group.put()
+        return
+      elif instance.state == models.InstanceStates.PENDING_METADATA_UPDATE:
+        logging.info(
+            'Instance already pending metadata update: %s', instance_name)
+      else:
+        logging.error('Instance in unexpected state:\n%s', instance)
+      break
+  else:
+    logging.error(
         'Instance %s not found in instance group %s',
         instance_name,
         instance_group.name,
@@ -85,11 +135,28 @@ class MachineProviderSubscriptionHandler(pubsub.SubscriptionHandler):
     hostname = attributes.get('hostname')
     message = base64.b64decode(message)
 
-    if group and hostname and message == 'RECLAIMED':
-      # Per the policies we set on the instance when adding it to the Machine
-      # Provider, a reclaimed machine is deleted from the Catalog. Therefore
-      # we are safe to manipulate it. Here we schedule it for deletion.
-      schedule_deletion(models.InstanceGroup.generate_key(group), hostname)
+    if group and hostname:
+      if message == 'RECLAIMED':
+        # Per the policies we set on the instance when adding it to the Machine
+        # Provider, a reclaimed machine is deleted from the Catalog. Therefore
+        # we are safe to manipulate it. Here we schedule it for deletion.
+        schedule_deletion(models.InstanceGroup.generate_key(group), hostname)
+      elif message == 'SUBSCRIBED':
+        # The Machine Provider created the machine communication topic and
+        # subscribed the machine to it. We need to set this in the instance's
+        # metadata so it knows what subscription to query for instructions.
+        subscription = attributes.get('subscription')
+        subscription_project = attributes.get('subscription_project')
+        topic = attributes.get('topic')
+        topic_project = attributes.get('topic_project')
+        schedule_metadata_update(
+            models.InstanceGroup.generate_key(group),
+            hostname,
+            subscription,
+            subscription_project,
+            topic,
+            topic_project,
+        )
 
 
 def create_pubsub_app():

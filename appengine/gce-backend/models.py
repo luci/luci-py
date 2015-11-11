@@ -64,7 +64,10 @@ InstanceStates = Enum([
   'NEW',
   'PENDING_CATALOG',
   'PENDING_DELETION',
+  'PENDING_METADATA_OPERATION',
+  'PENDING_METADATA_UPDATE',
   'PREPARING',
+  'UPDATING_METADATA',
 ])
 
 
@@ -73,14 +76,20 @@ class Instance(ndb.Model):
 
   Standalone Instance entities should not exist in the datastore.
   """
+  # Name of any in-progress metadata operation.
+  metadata_operation = ndb.StringProperty(indexed=False)
   # Name of this instance.
   name = ndb.StringProperty(required=True)
-  # Project the Cloud Pub/Sub topic exists in.
-  pubsub_project = ndb.StringProperty(indexed=False)
   # Service account authorized to subscribe to the Cloud Pub/Sub topic.
   pubsub_service_account = ndb.StringProperty(indexed=False)
+  # Cloud Pub/Sub subscription created for the machine by the Machine Provider.
+  pubsub_subscription = ndb.StringProperty(indexed=False)
+  # Project the Cloud Pub/Sub subscription exists in.
+  pubsub_subscription_project = ndb.StringProperty(indexed=False)
   # Cloud Pub/Sub topic the Machine Provider communicates with this machine on.
   pubsub_topic = ndb.StringProperty(indexed=False)
+  # Project the Cloud Pub/Sub topic exists in.
+  pubsub_topic_project = ndb.StringProperty(indexed=False)
   # State of this instance.
   state = ndb.StringProperty(choices=InstanceStates, required=True)
   # URL for this instance.

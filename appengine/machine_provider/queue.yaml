@@ -1,5 +1,7 @@
 queue:
  - name: fulfill-lease-request
    rate: 1/s
+ - name: subscribe-machine
+   rate: 1/s
  - name: reclaim-machine
    rate: 1/s

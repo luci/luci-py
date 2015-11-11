@@ -326,9 +326,111 @@ class InstancePreparer(webapp2.RequestHandler):
         models.InstanceGroup.generate_key(group), succeeded, failed)
 
 
+@ndb.transactional
+def set_updated_instance_states(instance_group_key, succeeded, failed):
+  """Sets the states of updated instances.
+
+  Args:
+    instance_group_key: ndb.Key for the instance group containing the instances.
+    succeeded: Dict mapping instance names whose metadata is being updated to
+      operation names.
+    failed: List of instance names to reschedule for metadata update.
+  """
+  instance_group = instance_group_key.get()
+  if not instance_group:
+    logging.error('Instance group does not exist: %s', instance_group_key)
+    return
+
+  updated = False
+  for instance in instance_group.members:
+    if instance.name in succeeded:
+      operation = succeeded.pop(instance.name)
+      if instance.state == models.InstanceStates.UPDATING_METADATA:
+        logging.info('Updating metadata of instance: %s', instance.name)
+        instance.metadata_operation = operation
+        instance.state = models.InstanceStates.PENDING_METADATA_OPERATION
+        updated = True
+      elif instance.state == models.InstanceStates.PENDING_METADATA_OPERATION:
+        logging.info(
+            'Ignoring instance already pending metadata operation result: %s',
+            instance.name,
+        )
+      else:
+        logging.error('Instance in unexpected state:\n%s', instance)
+    elif instance.name in failed:
+      failed.remove(instance.name)
+      if instance.state == models.InstanceStates.UPDATING_METADATA:
+        logging.info(
+            'Rescheduling metadata update for instance: %s', instance.name)
+        instance.state = models.InstanceStates.PENDING_METADATA_UPDATE
+        updated = True
+      elif instance.state == models.InstanceStates.PENDING_METADATA_UPDATE:
+        logging.info('Ignoring already rescheduled instance: %s', instance.name)
+      else:
+        logging.error('Instance in unexpected state:\n%s', instance)
+
+  if succeeded:
+    logging.warning(
+        'Instances not found: %s', ', '.join(sorted(succeeded)))
+  if failed:
+    logging.warning('Instances not found: %s', ', '.join(sorted(failed)))
+
+  if updated:
+    instance_group.put()
+
+
+class InstanceMetadataUpdater(webapp2.RequestHandler):
+  """Worker for updating instance metadata."""
+
+  @decorators.require_taskqueue('update-instance-metadata')
+  def post(self):
+    """Updates GCE instance metadata.
+
+    Params:
+      group: Name of the instance group containing the instances to update.
+      instances: JSON-encoded dict of instances mapped to metadata to set.
+      project: Name of the project the instance group exists in.
+      zone: Zone the instances exist in. e.g. us-central1-f.
+    """
+    group = self.request.get('group')
+    instance_map = json.loads(self.request.get('instance_map'))
+    project = self.request.get('project')
+    zone = self.request.get('zone')
+
+    api = gce.Project(project)
+
+    succeeded = {}
+    failed = []
+
+    for instance in instance_map:
+      new_metadata = instance_map[instance]
+      logging.info('New metadata:\n%s', json.dumps(new_metadata, indent=2))
+      try:
+        existing_metadata = api.get_instance(
+            zone, instance, fields=['metadata'])
+      except net.Error:
+        existing_metadata = None
+
+      if not existing_metadata or not existing_metadata['metadata']:
+        failed.append(instance)
+      else:
+        fingerprint = existing_metadata['metadata']['fingerprint']
+        items = [{'key': k, 'value': v} for k, v in new_metadata.iteritems()]
+        try:
+          operation = api.set_metadata(zone, instance, fingerprint, items)
+          succeeded[instance] = operation.name
+          # TODO(smut): Check on the doneness of this operation.
+        except net.Error:
+          failed.append(instance)
+
+    set_updated_instance_states(
+        models.InstanceGroup.generate_key(group), succeeded, failed)
+
+
 def create_queues_app():
   return webapp2.WSGIApplication([
       ('/internal/queues/catalog-instance-group', InstanceGroupCataloger),
       ('/internal/queues/delete-instances', InstanceDeleter),
       ('/internal/queues/prepare-instances', InstancePreparer),
+      ('/internal/queues/update-instance-metadata', InstanceMetadataUpdater),
   ])

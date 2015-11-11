@@ -274,13 +274,13 @@ class MachineReclamationProcessor(webapp2.RequestHandler):
     min_ts = utils.timestamp_to_datetime(0)
     now = utils.utcnow()
 
-    for machine in models.CatalogMachineEntry.query(
+    for machine_key in models.CatalogMachineEntry.query(
         models.CatalogMachineEntry.lease_expiration_ts < now,
         # Also filter out unassigned machines, i.e. CatalogMachineEntries
         # where lease_expiration_ts is None. None sorts before min_ts.
         models.CatalogMachineEntry.lease_expiration_ts > min_ts,
     ).fetch(keys_only=True):
-      reclaim_machine(machine, now)
+      reclaim_machine(machine_key, now)
 
 
 @ndb.transactional
@@ -293,12 +293,46 @@ def create_subscription(machine_key):
   machine = machine_key.get()
   logging.info('Attempting to subscribe CatalogMachineEntry:\n%s', machine)
 
+  if not machine:
+    logging.warning('CatalogMachineEntry no longer exists: %s', machine_key)
+    return
+
   if machine.state != models.CatalogMachineEntryStates.NEW:
     logging.warning('CatalogMachineEntry no longer new:\n%s', machine)
     return
 
-  if machine.subscription:
+  if machine.pubsub_subscription:
     logging.info('CatalogMachineEntry already subscribed:\n%s', machine)
+    return
+
+  machine.pubsub_subscription = 'subscription-%s' % machine.key.id()
+  machine.pubsub_topic = 'topic-%s' % machine.key.id()
+
+  params = {
+      'backend_project': machine.policies.backend_project,
+      'backend_topic': machine.policies.backend_topic,
+      'hostname': machine.dimensions.hostname,
+      'machine_id': machine.key.id(),
+      'machine_service_account': machine.policies.machine_service_account,
+      'machine_subscription': machine.pubsub_subscription,
+      'machine_subscription_project': machine.pubsub_subscription_project,
+      'machine_topic': machine.pubsub_topic,
+      'machine_topic_project': machine.pubsub_topic_project,
+  }
+  backend_attributes = {}
+  for attribute in machine.policies.backend_attributes:
+    backend_attributes[attribute.key] = attribute.value
+  params['backend_attributes'] = utils.encode_to_json(backend_attributes)
+  if utils.enqueue_task(
+      '/internal/queues/subscribe-machine',
+      'subscribe-machine',
+      params=params,
+      transactional=True,
+  ):
+    machine.state = models.CatalogMachineEntryStates.SUBSCRIBING
+    machine.put()
+  else:
+    raise TaskEnqueuingError('subscribe-machine')
 
 
 class NewMachineProcessor(webapp2.RequestHandler):
@@ -306,16 +340,10 @@ class NewMachineProcessor(webapp2.RequestHandler):
 
   @decorators.require_cronjob
   def get(self):
-    put_futures = []
-    for machine in models.CatalogMachineEntry.query(
+    for machine_key in models.CatalogMachineEntry.query(
         models.CatalogMachineEntry.state==models.CatalogMachineEntryStates.NEW,
-    ):
-      if machine.state == models.CatalogMachineEntryStates.NEW:
-        # TODO(smut): Create the topic, subscription, and IAM policy.
-        machine.state = models.CatalogMachineEntryStates.AVAILABLE
-        put_futures.append(machine.put_async())
-    if put_futures:
-      ndb.Future.wait_all(put_futures)
+    ).fetch(keys_only=True):
+      create_subscription(machine_key)
 
 
 def create_cron_app():
