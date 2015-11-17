@@ -23,7 +23,6 @@ from components import auth
 from components import ereporter2
 from components import utils
 
-import handlers_api
 import handlers_bot
 import handlers_endpoints
 import swarming_rpcs
@@ -47,11 +46,8 @@ class BaseTest(test_env_handlers.AppTestBase, test_case.EndpointsTestCase):
     super(BaseTest, self).setUp()
     self.mock(auth, 'is_group_member', lambda *_args, **_kwargs: True)
     # handlers_bot is necessary to create fake tasks.
-    # TODO(maruel): Get rid of handlers_api.get_routes() here. The API should be
-    # self-sufficient.
-    routes = handlers_bot.get_routes() + handlers_api.get_routes()
     self.app = webtest.TestApp(
-        webapp2.WSGIApplication(routes, debug=True),
+        webapp2.WSGIApplication(handlers_bot.get_routes(), debug=True),
         extra_environ={
           'REMOTE_ADDR': self.source_ip,
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
@@ -86,7 +82,7 @@ class ServerApiTest(BaseTest):
     expected = {
       u'version': u'0',
       u'when': u'2010-01-02T03:04:05',
-      u'who': u'anonymous:anonymous',
+      u'who': u'user:user@example.com',
     }
     response = self.call_api('put_' + name, {'content': u'hi ☀!'})
     self.assertEqual(expected, response.json)
@@ -95,7 +91,7 @@ class ServerApiTest(BaseTest):
       u'content': u'hi \u2600!',
       u'version': u'0',
       u'when': u'2010-01-02T03:04:05',
-      u'who': u'anonymous:anonymous',
+      u'who': u'user:user@example.com',
     }
     self.assertEqual(expected, self.call_api('get_' + name).json)
 
@@ -103,7 +99,7 @@ class ServerApiTest(BaseTest):
     expected = {
       u'version': u'1',
       u'when': u'2010-01-02T03:05:05',
-      u'who': u'anonymous:anonymous',
+      u'who': u'user:user@example.com',
     }
     response = self.call_api('put_' + name, {'content': u'hi ♕!'})
     self.assertEqual(expected, response.json)
@@ -112,7 +108,7 @@ class ServerApiTest(BaseTest):
       u'content': u'hi ♕!',
       u'version': u'1',
       u'when': u'2010-01-02T03:05:05',
-      u'who': u'anonymous:anonymous',
+      u'who': u'user:user@example.com',
     }
     self.assertEqual(expected, self.call_api('get_' + name).json)
 
@@ -120,7 +116,7 @@ class ServerApiTest(BaseTest):
       u'content': u'hi ☀!',
       u'version': u'0',
       u'when': u'2010-01-02T03:04:05',
-      u'who': u'anonymous:anonymous',
+      u'who': u'user:user@example.com',
     }
     response = self.call_api('get_' + name, {'version': '0'})
     self.assertEqual(expected, response.json)
@@ -159,7 +155,7 @@ class TasksApiTest(BaseTest):
         user='joe@localhost')
     expected = {
       u'request': {
-        u'authenticated': u'anonymous:anonymous',
+        u'authenticated': u'user:user@example.com',
         u'created_ts': str_now,
         u'expiration_secs': u'30',
         u'name': u'job1',
@@ -218,7 +214,7 @@ class TasksApiTest(BaseTest):
         user='joe@localhost')
     expected = {
       u'request': {
-        u'authenticated': u'anonymous:anonymous',
+        u'authenticated': u'user:user@example.com',
         u'created_ts': str_now,
         u'expiration_secs': u'30',
         u'name': u'job1',

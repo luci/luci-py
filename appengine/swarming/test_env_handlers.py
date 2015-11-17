@@ -78,26 +78,42 @@ class AppTestBase(test_case.TestCase):
     self.testbed.setup_env(USER_EMAIL='', overwrite=True)
     auth.ip_whitelist_key(auth.BOTS_IP_WHITELIST).delete()
     auth_testing.reset_local_state()
+    auth_testing.mock_get_current_identity(self, auth.Anonymous)
 
   def set_as_super_admin(self):
     self.set_as_anonymous()
     self.testbed.setup_env(USER_EMAIL='super-admin@example.com', overwrite=True)
+    auth_testing.reset_local_state()
+    auth_testing.mock_get_current_identity(
+        self, auth.Identity.from_bytes('user:' + os.environ['USER_EMAIL']))
 
   def set_as_admin(self):
     self.set_as_anonymous()
     self.testbed.setup_env(USER_EMAIL='admin@example.com', overwrite=True)
+    auth_testing.reset_local_state()
+    auth_testing.mock_get_current_identity(
+        self, auth.Identity.from_bytes('user:' + os.environ['USER_EMAIL']))
 
   def set_as_privileged_user(self):
     self.set_as_anonymous()
     self.testbed.setup_env(USER_EMAIL='priv@example.com', overwrite=True)
+    auth_testing.reset_local_state()
+    auth_testing.mock_get_current_identity(
+        self, auth.Identity.from_bytes('user:' + os.environ['USER_EMAIL']))
 
   def set_as_user(self):
     self.set_as_anonymous()
     self.testbed.setup_env(USER_EMAIL='user@example.com', overwrite=True)
+    auth_testing.reset_local_state()
+    auth_testing.mock_get_current_identity(
+        self, auth.Identity.from_bytes('user:' + os.environ['USER_EMAIL']))
 
   def set_as_bot(self):
     self.set_as_anonymous()
     auth.bootstrap_ip_whitelist(auth.BOTS_IP_WHITELIST, [self.source_ip])
+    auth_testing.reset_local_state()
+    auth_testing.mock_get_current_identity(
+        self, auth.Identity.from_bytes('bot:' + self.source_ip))
 
   # Web or generic
 
@@ -168,18 +184,12 @@ class AppTestBase(test_case.TestCase):
 
   # Client
 
-  def get_client_token(self):
-    """Gets the XSRF token for client after handshake."""
-    headers = {'X-XSRF-Token-Request': '1'}
-    params = {}
-    response = self.app.post_json(
-        '/swarming/api/v1/client/handshake',
-        headers=headers,
-        params=params).json
-    return response['xsrf_token'].encode('ascii')
+  def endpoint_call(self, service, name, args):
+    body = json.loads(protojson.encode_message(args))
+    return test_case.Endpoints(service).call_api(name, body=body).json
 
-  def client_create_task_isolated(self, properties=None, **kwargs):
-    """Creates a TaskRequest via the Cloud Endpoints API."""
+  def _client_create_task(self, properties=None, **kwargs):
+    """Creates an isolated command TaskRequest via the Cloud Endpoints API."""
     params = {
       'dimensions': [
         {'key': 'os', 'value': 'Amiga'},
@@ -187,11 +197,6 @@ class AppTestBase(test_case.TestCase):
       'env': [],
       'execution_timeout_secs': 3600,
       'io_timeout_secs': 1200,
-      'inputs_ref': {
-        'isolated': '0123456789012345678901234567890123456789',
-        'isolatedserver': 'http://localhost:1',
-        'namespace': 'default-gzip',
-      },
     }
     params.update(properties or {})
     props = swarming_rpcs.TaskProperties(**params)
@@ -205,43 +210,25 @@ class AppTestBase(test_case.TestCase):
     }
     params.update(kwargs)
     request = swarming_rpcs.TaskRequest(properties=props, **params)
-    api = test_case.Endpoints(handlers_endpoints.SwarmingTasksService)
-    # Poor's man authentication.
-    old_get_current_user = endpoints.get_current_user
-    endpoints.get_current_user = lambda: users.User(
-        'admin@example.com', 'localhost')
-    try:
-      response = api.call_api(
-          'new', body=json.loads(protojson.encode_message(request)))
-    finally:
-      endpoints.get_current_user = old_get_current_user
-    response = response.json
+    response = self.endpoint_call(
+        handlers_endpoints.SwarmingTasksService, 'new', request)
     return response, response['task_id']
+
+  def client_create_task_isolated(self, properties=None, **kwargs):
+    properties = (properties or {}).copy()
+    properties['inputs_ref'] = {
+      'isolated': '0123456789012345678901234567890123456789',
+      'isolatedserver': 'http://localhost:1',
+      'namespace': 'default-gzip',
+    }
+    return self._client_create_task(properties, **kwargs)
 
   def client_create_task_raw(self, properties=None, **kwargs):
-    """Creates a TaskRequest via the client API."""
-    token = self.get_client_token()
-    params = {
-      'name': 'hi',
-      'priority': 10,
-      'properties': {
-        'commands': [['python', 'run_test.py']],
-        'data': [],
-        'dimensions': {'os': 'Amiga'},
-        'env': {},
-        'execution_timeout_secs': 3600,
-        'io_timeout_secs': 1200,
-      },
-      'scheduling_expiration_secs': 24*60*60,
-      'tags': [],
-      'user': 'joe@localhost',
-    }
-    params.update(kwargs)
-    params['properties'].update(properties or {})
-    response = self.post_with_token(
-        '/swarming/api/v1/client/request', params, token)
-    return response, response['task_id']
+    """Creates a raw command TaskRequest via the Cloud Endpoints API."""
+    properties = (properties or {}).copy()
+    properties['command'] = ['python', 'run_test.py']
+    return self._client_create_task(properties, **kwargs)
 
   def client_get_results(self, task_id):
-    return self.app.get(
-        '/swarming/api/v1/client/task/%s' % task_id).json
+    api = test_case.Endpoints(handlers_endpoints.SwarmingTaskService)
+    return api.call_api('result', body={'task_id': task_id}).json

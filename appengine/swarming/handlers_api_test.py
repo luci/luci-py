@@ -46,6 +46,16 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     # Client API test cases run by default as user.
     self.set_as_user()
 
+  def get_client_token(self):
+    """Gets the XSRF token for client after handshake."""
+    headers = {'X-XSRF-Token-Request': '1'}
+    params = {}
+    response = self.app.post_json(
+        '/swarming/api/v1/client/handshake',
+        headers=headers,
+        params=params).json
+    return response['xsrf_token'].encode('ascii')
+
   def test_list(self):
     self.set_as_anonymous()
     response = self.app.get('/swarming/api/v1/client/list').json

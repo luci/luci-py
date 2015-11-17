@@ -23,20 +23,21 @@ from google.appengine.ext import ndb
 import webapp2
 import webtest
 
-import handlers_api
 import handlers_bot
 from components import ereporter2
-from components import utils
 from server import bot_archive
 from server import bot_management
 from server import task_result
+
+
+DATETIME_FORMAT = u'%Y-%m-%dT%H:%M:%S'
 
 
 class BotApiTest(test_env_handlers.AppTestBase):
   def setUp(self):
     super(BotApiTest, self).setUp()
     # By default requests in tests are coming from bot with fake IP.
-    routes = handlers_bot.get_routes() + handlers_api.get_routes()
+    routes = handlers_bot.get_routes()
     app = webapp2.WSGIApplication(routes, debug=True)
     self.app = webtest.TestApp(
         app,
@@ -224,7 +225,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
-    str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
+    str_now = unicode(now.strftime(DATETIME_FORMAT))
     # A bot polls, gets a task, updates it, completes it.
     token, params = self.get_bot_token()
     # Enqueue a task.
@@ -253,24 +254,23 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, response)
     response = self.client_get_results(task_id)
     expected = {
-      u'abandoned_ts': None,
-      u'bot_dimensions': {u'id': [u'bot1'], u'os': [u'Amiga']},
+      u'bot_dimensions': [
+        {u'key': u'id', u'value': [u'bot1']},
+        {u'key': u'os', u'value': [u'Amiga']},
+      ],
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
-      u'children_task_ids': [],
-      u'completed_ts': None,
-      u'cost_usd': 0.,
-      u'durations': [],
-      u'exit_codes': [],
+      u'costs_usd': [0.],
+      u'created_ts': str_now,
       u'failure': False,
-      u'id': u'5cee488008811',
       u'internal_failure': False,
       u'modified_ts': str_now,
-      u'outputs_ref': None,
+      u'name': u'hi',
       u'server_versions': [u'v1a'],
       u'started_ts': str_now,
-      u'state': task_result.State.RUNNING,
-      u'try_number': 1,
+      u'state': u'RUNNING',
+      u'task_id': u'5cee488008811',
+      u'try_number': u'1',
     }
     self.assertEqual(expected, response)
 
@@ -279,7 +279,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
-    str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
+    str_now = unicode(now.strftime(DATETIME_FORMAT))
     # A bot polls, gets a task, updates it, completes it.
     token, params = self.get_bot_token()
     # Enqueue a task.
@@ -312,24 +312,23 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, response)
     response = self.client_get_results(task_id)
     expected = {
-      u'abandoned_ts': None,
-      u'bot_dimensions': {u'id': [u'bot1'], u'os': [u'Amiga']},
+      u'bot_dimensions': [
+        {u'key': u'id', u'value': [u'bot1']},
+        {u'key': u'os', u'value': [u'Amiga']},
+      ],
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
-      u'children_task_ids': [],
-      u'completed_ts': None,
-      u'cost_usd': 0.,
-      u'durations': [],
-      u'exit_codes': [],
+      u'costs_usd': [0.],
+      u'created_ts': str_now,
       u'failure': False,
-      u'id': u'5cee488008811',
       u'internal_failure': False,
       u'modified_ts': str_now,
-      u'outputs_ref': None,
+      u'name': u'hi',
       u'server_versions': [u'v1a'],
       u'started_ts': str_now,
-      u'state': task_result.State.RUNNING,
-      u'try_number': 1,
+      u'state': u'RUNNING',
+      u'task_id': u'5cee488008811',
+      u'try_number': u'1',
     }
     self.assertEqual(expected, response)
 
@@ -493,10 +492,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
-    str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
+    str_now = unicode(now.strftime(DATETIME_FORMAT))
     token, params = self.get_bot_token()
     self.client_create_task_raw(
-        properties=dict(commands=[['python', 'runtest.py']]))
+        properties=dict(command=['python', 'runtest.py']))
 
     def _params(**kwargs):
       out = {
@@ -513,24 +512,23 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
     def _expected(**kwargs):
       out = {
-        u'abandoned_ts': None,
-        u'bot_dimensions': {u'id': [u'bot1'], u'os': [u'Amiga']},
+        u'bot_dimensions': [
+          {u'key': u'id', u'value': [u'bot1']},
+          {u'key': u'os', u'value': [u'Amiga']},
+        ],
         u'bot_id': u'bot1',
         u'bot_version': self.bot_version,
-        u'children_task_ids': [],
-        u'completed_ts': None,
-        u'cost_usd': 0.1,
-        u'durations': [],
-        u'exit_codes': [],
+        u'costs_usd': [0.1],
+        u'created_ts': str_now,
         u'failure': False,
-        u'id': u'5cee488008811',
         u'internal_failure': False,
         u'modified_ts': str_now,
-        u'outputs_ref': None,
+        u'name': u'hi',
         u'server_versions': [u'v1a'],
         u'started_ts': str_now,
-        u'state': task_result.State.RUNNING,
-        u'try_number': 1,
+        u'state': u'RUNNING',
+        u'task_id': u'5cee488008811',
+        u'try_number': u'1',
       }
       out.update(**kwargs)
       return out
@@ -567,16 +565,16 @@ class BotApiTest(test_env_handlers.AppTestBase):
         duration=0.1, exit_code=23, output=base64.b64encode('Ahahah'))
     expected = _expected(
         completed_ts=str_now,
-        durations=[0.1],
-        exit_codes=[23],
+        duration=0.1,
+        exit_code=u'23',
         failure=True,
-        state=task_result.State.COMPLETED)
+        state=u'COMPLETED')
     _cycle(params, expected)
 
   def test_task_update_db_failure(self):
     # The error is caught in task_scheduler.bot_update_task().
     self.client_create_task_raw(
-        properties=dict(commands=[['python', 'runtest.py']]))
+        properties=dict(command=['python', 'runtest.py']))
 
     token, params = self.get_bot_token()
     response = self.post_with_token(
@@ -600,9 +598,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual({u'error': u'Failed to update, please retry'}, response)
 
   def test_task_update_failure(self):
-    # The error is caught in handlers_api.BotTaskUpdateHandler.post().
     self.client_create_task_raw(
-        properties=dict(commands=[['python', 'runtest.py']]))
+        properties=dict(command=['python', 'runtest.py']))
 
     token, params = self.get_bot_token()
     response = self.post_with_token(
@@ -632,7 +629,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
-    str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
+    str_now = unicode(now.strftime(DATETIME_FORMAT))
     token, params = self.get_bot_token()
     self.client_create_task_raw()
     response = self.post_with_token(
@@ -652,24 +649,26 @@ class BotApiTest(test_env_handlers.AppTestBase):
         '/swarming/api/v1/bot/task_update', params, token)
     response = self.client_get_results(task_id)
     expected = {
-      u'abandoned_ts': None,
-      u'bot_dimensions': {u'id': [u'bot1'], u'os': [u'Amiga']},
+      u'bot_dimensions': [
+        {u'key': u'id', u'value': [u'bot1']},
+        {u'key': u'os', u'value': [u'Amiga']},
+      ],
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
-      u'children_task_ids': [],
       u'completed_ts': str_now,
-      u'cost_usd': 0.1,
-      u'durations': [0.1],
-      u'exit_codes': [1],
+      u'costs_usd': [0.1],
+      u'created_ts': str_now,
+      u'duration': 0.1,
+      u'exit_code': u'1',
       u'failure': True,
-      u'id': u'5cee488008811',
       u'internal_failure': False,
       u'modified_ts': str_now,
-      u'outputs_ref': None,
+      u'name': u'hi',
       u'server_versions': [u'v1a'],
       u'started_ts': str_now,
-      u'state': task_result.State.COMPLETED,
-      u'try_number': 1,
+      u'state': u'COMPLETED',
+      u'task_id': u'5cee488008811',
+      u'try_number': u'1',
     }
     self.assertEqual(expected, response)
 
@@ -678,7 +677,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
-    str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
+    str_now = unicode(now.strftime(DATETIME_FORMAT))
     errors = []
     self.mock(
         ereporter2, 'log_request',
@@ -703,23 +702,23 @@ class BotApiTest(test_env_handlers.AppTestBase):
     response = self.client_get_results(task_id)
     expected = {
       u'abandoned_ts': str_now,
-      u'bot_dimensions': {u'id': [u'bot1'], u'os': [u'Amiga']},
+      u'bot_dimensions': [
+        {u'key': u'id', u'value': [u'bot1']},
+        {u'key': u'os', u'value': [u'Amiga']},
+      ],
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
-      u'children_task_ids': [],
-      u'completed_ts': None,
-      u'cost_usd': 0.,
-      u'durations': [],
-      u'exit_codes': [],
+      u'costs_usd': [0.],
+      u'created_ts': str_now,
       u'failure': False,
-      u'id': u'5cee488008811',
       u'internal_failure': True,
       u'modified_ts': str_now,
-      u'outputs_ref': None,
+      u'name': u'hi',
       u'server_versions': [u'v1a'],
       u'started_ts': str_now,
-      u'state': task_result.State.BOT_DIED,
-      u'try_number': 1,
+      u'state': u'BOT_DIED',
+      u'task_id': u'5cee488008811',
+      u'try_number': u'1',
     }
     self.assertEqual(expected, response)
     self.assertEqual(1, len(errors))
