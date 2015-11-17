@@ -56,13 +56,18 @@ class Singleton(object):
         self.release()
       return bool(self.handle)
     else:
-      self.handle = open(self.key, 'wb')
+      self.handle = open(self.key, 'a+b')
       try:
         fcntl.flock(self.handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
       except IOError:
+        # There's a small race conditon where it could report a previous pid.
+        logging.error('Singleton held by %s', self.handle.read())
         self.handle.close()
         self.handle = None
         return False
+      self.handle.seek(0, os.SEEK_SET)
+      self.handle.truncate(0)
+      self.handle.write(str(os.getpid()))
       return True
 
   def release(self):

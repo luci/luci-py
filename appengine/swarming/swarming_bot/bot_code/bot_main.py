@@ -486,11 +486,14 @@ def run_manifest(botobj, manifest, start):
     logging.debug('Running command: %s', command)
     # Put the output file into the current working directory, which should be
     # the one containing swarming_bot.zip.
-    with open(os.path.join('logs', 'task_runner_stdout.log'), 'wb+') as f:
+    log_path = os.path.join(botobj.base_dir, 'logs', 'task_runner_stdout.log')
+    os_utilities.roll_log(log_path)
+    os_utilities.trim_rolled_log(log_path)
+    with open(log_path, 'a+b') as f:
       proc = subprocess42.Popen(
           command,
           detached=True,
-          cwd=os.path.dirname(THIS_FILE),
+          cwd=botobj.base_dir,
           env=env,
           stdout=f,
           stderr=subprocess42.STDOUT)
@@ -642,8 +645,14 @@ def main(args):
   # 'restart-happy', causing 2 bots running concurrently on the host but it was
   # observed on linux too.
   if not SINGLETON.acquire():
-    print >> sys.stderr, 'Found a previous bot, exiting.'
+    print >> sys.stderr, 'Found a previous bot, %d exiting.' % os.getpid()
     return 1
+
+  for t in ('out', 'err'):
+    log_path = os.path.join(
+        os.path.dirname(THIS_FILE), 'logs', 'bot_std%s.log' % t)
+    os_utilities.roll_log(log_path)
+    os_utilities.trim_rolled_log(log_path)
 
   error = None
   if len(args) != 0:
