@@ -379,6 +379,8 @@ def poll_server(botobj, quit_bit):
   start = time.time()
   resp = botobj.remote.url_read_json(
       '/swarming/api/v1/bot/poll', data=botobj._attributes)
+  if not resp:
+    return False
   logging.debug('Server response:\n%s', resp)
 
   cmd = resp['cmd']
