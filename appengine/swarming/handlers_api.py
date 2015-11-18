@@ -256,7 +256,7 @@ class ClientApiTasksHandler(auth.ApiHandler):
           400, error='Only one of name, tag (1 or many) or state can be used')
 
     items, cursor_str, sort, state = task_result.get_tasks(
-        name, tags, cursor_str, limit, sort, state)
+        limit, cursor_str, sort, state, tags, name)
     data = {
       'cursor': cursor_str,
       'items': items,
@@ -280,7 +280,6 @@ class ClientApiTasksCountHandler(auth.ApiHandler):
   """
   EXPECTED = {'interval', 'state', 'tag'}
 
-  # See task_result.get_result_summary_query().
   VALID_STATES = {
     'all',
     'bot_died',
@@ -322,13 +321,9 @@ class ClientApiTasksCountHandler(auth.ApiHandler):
           error='Invalid state "%s", expecting on of %s' %
           (state, ', '.join(sorted(self.VALID_STATES))))
 
-    # Cutoff deadline => request key for filtering (it embeds timestamp).
     cutoff = utils.utcnow() - datetime.timedelta(seconds=interval)
-    request_id = task_request.datetime_to_request_base_id(cutoff)
-    request_key = task_request.request_id_to_key(request_id)
-
-    query = task_result.get_result_summary_query(None, state, tags)
-    query = query.filter(task_result.TaskResultSummary.key <= request_key)
+    query = task_result.get_result_summaries_query(
+        cutoff, None, 'created_ts', state, tags)
     self.send_response(utils.to_json_encodable({'count': query.count()}))
 
 

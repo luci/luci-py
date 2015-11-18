@@ -9,13 +9,13 @@ import json
 import logging
 
 from google.appengine.api import datastore_errors
-from google.appengine.datastore import datastore_query
 import endpoints
 from protorpc import messages
 from protorpc import message_types
 from protorpc import remote
 
 from components import auth
+from components import datastore_utils
 from components import utils
 
 import message_conversion
@@ -253,28 +253,24 @@ class SwarmingTasksService(remote.Service):
   def list(self, request):
     """Provides a list of available tasks."""
     logging.info('%s', request)
-    state = request.state.name.lower()
-    uses = sum([bool(request.tags), state != 'all'])
-    if state != 'all':
-      raise endpoints.BadRequestException(
-          'Querying by state is not yet supported. '
-          'Received argument state=%s.' % state)
-    if uses > 1:
-      raise endpoints.BadRequestException(
-          'Only one of tag (1 or many) or state can be used.')
-
-    # get the tasks
     try:
       start = message_conversion.epoch_to_datetime(request.start)
       end = message_conversion.epoch_to_datetime(request.end)
-      items, cursor_str, state = task_result.get_result_summaries(
-          request.tags, request.cursor, start, end, state, request.limit)
-      return swarming_rpcs.TaskList(
-          cursor=cursor_str,
-          items=[message_conversion.task_result_to_rpc(i) for i in items])
+      now = utils.utcnow()
+      query = task_result.get_result_summaries_query(
+          start, end,
+          request.sort.name.lower(),
+          request.state.name.lower(),
+          request.tags)
+      items, cursor = datastore_utils.fetch_page(
+          query, request.limit, request.cursor)
     except ValueError as e:
       raise endpoints.BadRequestException(
-          'Inappropriate limit for tasks/list: %s' % e)
+          'Inappropriate filter for tasks/list: %s' % e)
+    return swarming_rpcs.TaskList(
+        cursor=cursor,
+        items=[message_conversion.task_result_to_rpc(i) for i in items],
+        now=now)
 
 
 BotId = endpoints.ResourceContainer(
@@ -378,20 +374,33 @@ class SwarmingBotService(remote.Service):
       http_method='GET')
   @auth.require(acl.is_privileged_user)
   def tasks(self, request):
-    """Lists a given bot's tasks within the specified date range."""
+    """Lists a given bot's tasks within the specified date range.
+
+    In this case, the tasks are effectively TaskRunResult since it's individual
+    task tries sent to this specific bot.
+
+    It is impossible to search by both tags and bot id. If there's a need,
+    TaskRunResult.tags will be added (via a copy from TaskRequest.tags).
+    """
     logging.info('%s', request)
     try:
       start = message_conversion.epoch_to_datetime(request.start)
       end = message_conversion.epoch_to_datetime(request.end)
-      run_results, cursor, more = task_result.get_run_results(
-          request.cursor, request.bot_id, start, end, request.limit)
+      now = utils.utcnow()
+      query = task_result.get_run_results_query(
+          start, end,
+          request.sort.name.lower(),
+          request.state.name.lower(),
+          request.bot_id)
+      items, cursor = datastore_utils.fetch_page(
+          query, request.limit, request.cursor)
     except ValueError as e:
       raise endpoints.BadRequestException(
-          'Inappropriate limit for bots/list: %s' % e)
+          'Inappropriate filter for bot.tasks: %s' % e)
     return swarming_rpcs.BotTasks(
-        cursor=cursor.urlsafe() if cursor and more else None,
-        items=[message_conversion.task_result_to_rpc(r) for r in run_results],
-        now=utils.utcnow())
+        cursor=cursor,
+        items=[message_conversion.task_result_to_rpc(r) for r in items],
+        now=now)
 
 
 @swarming_api.api_class(resource_name='bots', path='bots')
@@ -408,11 +417,10 @@ class SwarmingBotsService(remote.Service):
     """
     logging.info('%s', request)
     now = utils.utcnow()
-    cursor = datastore_query.Cursor(urlsafe=request.cursor)
     q = bot_management.BotInfo.query().order(bot_management.BotInfo.key)
-    bots, cursor, more = q.fetch_page(request.limit, start_cursor=cursor)
+    bots, cursor = datastore_utils.fetch_page(q, request.limit, request.cursor)
     return swarming_rpcs.BotList(
-        cursor=cursor.urlsafe() if cursor and more else None,
+        cursor=cursor,
         death_timeout=config.settings().bot_death_timeout_secs,
         items=[message_conversion.bot_info_to_rpc(bot, now) for bot in bots],
         now=now)

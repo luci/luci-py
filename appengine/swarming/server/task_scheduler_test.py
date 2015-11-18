@@ -1217,15 +1217,17 @@ class TaskSchedulerApiTest(test_case.TestCase):
         task_scheduler.cron_handle_bot_died('f.local'))
 
   def test_search_by_name(self):
+    # This is awkward but it's because _search_by_name() depends on
+    # functionality saved by task_scheduler. (There's a layering issue).
     data = _gen_request(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     request = task_request.make_request(data, True)
     result_summary = task_scheduler.schedule_request(request)
 
     # Assert that search is not case-sensitive by using unexpected casing.
-    actual, _cursor = task_result.search_by_name('requEST', None, 10)
+    actual, _cursor = task_result._search_by_name('requEST', None, 10)
     self.assertEqual([result_summary], actual)
-    actual, _cursor = task_result.search_by_name('name', None, 10)
+    actual, _cursor = task_result._search_by_name('name', None, 10)
     self.assertEqual([result_summary], actual)
 
   def test_search_by_name_failures(self):
@@ -1234,10 +1236,10 @@ class TaskSchedulerApiTest(test_case.TestCase):
     request = task_request.make_request(data, True)
     result_summary = task_scheduler.schedule_request(request)
 
-    actual, _cursor = task_result.search_by_name('foo', None, 10)
+    actual, _cursor = task_result._search_by_name('foo', None, 10)
     self.assertEqual([], actual)
     # Partial match doesn't work.
-    actual, _cursor = task_result.search_by_name('nam', None, 10)
+    actual, _cursor = task_result._search_by_name('nam', None, 10)
     self.assertEqual([], actual)
 
   def test_search_by_name_broken_tasks(self):
@@ -1292,11 +1294,11 @@ class TaskSchedulerApiTest(test_case.TestCase):
 
     # Now the DB is full of half-corrupted entities.
     cursor = None
-    actual, cursor = task_result.search_by_name('Request', cursor, 31)
+    actual, cursor = task_result._search_by_name('Request', cursor, 31)
     self.assertEqual(31, len(actual))
-    actual, cursor = task_result.search_by_name('Request', cursor, 31)
+    actual, cursor = task_result._search_by_name('Request', cursor, 31)
     self.assertEqual(3, len(actual))
-    actual, cursor = task_result.search_by_name('Request', cursor, 31)
+    actual, cursor = task_result._search_by_name('Request', cursor, 31)
     self.assertEqual(0, len(actual))
 
 

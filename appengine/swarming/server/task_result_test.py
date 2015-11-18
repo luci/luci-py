@@ -67,14 +67,14 @@ def get_entities(entity_model):
 
 
 class TestCase(test_case.TestCase):
+  APP_DIR = test_env.APP_DIR
+
   def setUp(self):
     super(TestCase, self).setUp()
     auth_testing.mock_get_current_identity(self)
 
 
 class TaskResultApiTest(TestCase):
-  APP_DIR = test_env.APP_DIR
-
   def setUp(self):
     super(TaskResultApiTest, self).setUp()
     self.now = datetime.datetime(2014, 1, 2, 3, 4, 5, 6)
@@ -465,30 +465,20 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(True, run_result.failure)
     self.assertEqual(True, result_summary.failure)
 
-  def test_get_result_summary_query(self):
-    # Indirectly tested by both frontend and API.
-    pass
-
   def test_get_tasks(self):
     # Indirectly tested by both frontend and API.
     pass
 
-  def test_search_by_name(self):
-    # Tested in task_scheduler_test.
-    pass
-
-  def test_get_result_summaries(self):
+  def test_get_result_summaries_query(self):
     # Indirectly tested by API.
     pass
 
-  def test_get_run_results(self):
+  def test_get_run_results_query(self):
     # Indirectly tested by API.
     pass
 
 
 class TestOutput(TestCase):
-  APP_DIR = test_env.APP_DIR
-
   def setUp(self):
     super(TestOutput, self).setUp()
     request = task_request.make_request(_gen_request(), True)

@@ -27,6 +27,11 @@ class StateField(messages.Enum):
   COMPLETED = 0x70  # 112
 
 
+class TaskSort(messages.Enum):
+  """Flag to sort returned tasks. The natural sort is CREATED_TS."""
+  CREATED_TS, MODIFIED_TS, COMPLETED_TS, ABANDONED_TS = range(4)
+
+
 ### Pretend Associative Array
 
 
@@ -126,6 +131,7 @@ class TasksRequest(messages.Message):
   start = messages.FloatField(4)
   state = messages.EnumField(TaskState, 5, default='ALL')
   tags = messages.StringField(6, repeated=True)
+  sort = messages.EnumField(TaskSort, 7, default='CREATED_TS')
 
 
 ### Task-Related Responses
@@ -180,6 +186,7 @@ class TaskList(messages.Message):
   """Wraps a list of TaskResult, along with request information."""
   cursor = messages.StringField(1)
   items = messages.MessageField(TaskResult, 2, repeated=True)
+  now = message_types.DateTimeField(3)
 
 
 class TaskRequestMetadata(messages.Message):
@@ -211,6 +218,13 @@ class BotTasksRequest(messages.Message):
   # support.
   end = messages.FloatField(3)
   start = messages.FloatField(4)
+  state = messages.EnumField(TaskState, 5, default='ALL')
+  # It is currently not possible to query by tag on a specific bot, this
+  # information is not saved in TaskRunResult to reduce the entity size. It is
+  # fixable if a need ever come up, but normally a bot doesn't run enough task
+  # per day to have to bother with this, just enumerate all the tasks run on the
+  # bot and filter on client side.
+  sort = messages.EnumField(TaskSort, 7, default='CREATED_TS')
 
 
 ### Bot-Related Responses

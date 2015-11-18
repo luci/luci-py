@@ -30,6 +30,7 @@ import swarming_rpcs
 from server import acl
 from server import bot_management
 from server import config
+from server import task_pack
 
 
 def message_to_dict(rpc_message):
@@ -258,7 +259,7 @@ class TasksApiTest(BaseTest):
     str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
     self.mock_now(now)
     self.mock(random, 'getrandbits', lambda _: 0x66)
-    self.client_create_task_raw(
+    _, first_id = self.client_create_task_raw(
         name='first', tags=['project:yay', 'commit:post', 'os:Win'],
         properties=dict(idempotent=True))
     self.set_as_bot()
@@ -274,6 +275,79 @@ class TasksApiTest(BaseTest):
         tags=['project:yay', 'commit:pre', 'os:Win'],
         properties=dict(idempotent=True))
 
+    # Hack the datastore so MODIFIED_TS returns in backward order compared to
+    # CREATED_TS.
+    now_120 = self.mock_now(now, 120)
+    str_now_120 = unicode(now_120.strftime(self.DATETIME_NO_MICRO))
+    entity = task_pack.unpack_result_summary_key(first_id).get()
+    entity.modified_ts = now_120
+    entity.put()
+
+    second = {
+      u'bot_dimensions': [
+        {u'key': u'id', u'value': [u'bot1']},
+        {u'key': u'os', u'value': [u'Amiga']},
+      ],
+      u'bot_id': u'bot1',
+      u'bot_version': self.bot_version,
+      u'cost_saved_usd': 0.1,
+      u'created_ts': str_now_60,
+      u'completed_ts': str_now,
+      u'deduped_from': u'5cee488006611',
+      u'duration': 0.1,
+      u'exit_code': u'0',
+      u'failure': False,
+      u'internal_failure': False,
+      u'modified_ts': str_now_60,
+      u'name': u'second',
+      u'server_versions': [u'v1a'],
+      u'started_ts': str_now,
+      u'state': u'COMPLETED',
+      u'tags': [
+        u'commit:pre',
+        u'os:Amiga',
+        u'os:Win',
+        u'priority:10',
+        u'project:yay',
+        u'user:jack@localhost',
+      ],
+      u'task_id': u'5cfcee8008810',
+      u'try_number': u'0',
+      u'user': u'jack@localhost',
+    }
+    first = {
+      u'bot_dimensions': [
+        {u'key': u'id', u'value': [u'bot1']},
+        {u'key': u'os', u'value': [u'Amiga']},
+      ],
+      u'bot_id': u'bot1',
+      u'bot_version': self.bot_version,
+      u'costs_usd': [0.1],
+      u'created_ts': str_now,
+      u'completed_ts': str_now,
+      u'duration': 0.1,
+      u'exit_code': u'0',
+      u'failure': False,
+      u'internal_failure': False,
+      u'modified_ts': str_now_120,
+      u'name': u'first',
+      u'properties_hash': u'8771754ee465a689f19c87f2d21ea0d9b8dd4f64',
+      u'server_versions': [u'v1a'],
+      u'started_ts': str_now,
+      u'state': u'COMPLETED',
+      u'tags': [
+        u'commit:post',
+        u'os:Amiga',
+        u'os:Win',
+        u'priority:10',
+        u'project:yay',
+        u'user:joe@localhost',
+      ],
+      u'task_id': u'5cee488006610',
+      u'try_number': u'1',
+      u'user': u'joe@localhost'
+    }
+
     start = (
         utils.datetime_to_timestamp(now - datetime.timedelta(days=1)) /
         1000000.)
@@ -281,97 +355,53 @@ class TasksApiTest(BaseTest):
         utils.datetime_to_timestamp(now + datetime.timedelta(days=1)) /
         1000000.)
     self.set_as_privileged_user()
+
+    # Basic request.
     request = swarming_rpcs.TasksRequest(end=end, start=start)
-    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(
+        {u'now': str_now_120, u'items': [second, first]},
+        self.call_api('list', body=message_to_dict(request)).json)
 
-    # we expect [second, first]
-    task_results = [
-      {
-        u'bot_dimensions': [
-          {u'key': u'id', u'value': [u'bot1']},
-          {u'key': u'os', u'value': [u'Amiga']},
-        ],
-        u'bot_id': u'bot1',
-        u'bot_version': self.bot_version,
-        u'cost_saved_usd': 0.1,
-        u'created_ts': str_now_60,
-        u'completed_ts': str_now,
-        u'deduped_from': u'5cee488006611',
-        u'duration': 0.1,
-        u'exit_code': u'0',
-        u'failure': False,
-        u'internal_failure': False,
-        u'modified_ts': str_now_60,
-        u'name': u'second',
-        u'server_versions': [u'v1a'],
-        u'started_ts': str_now,
-        u'state': u'COMPLETED',
-        u'tags': [
-          u'commit:pre',
-          u'os:Amiga',
-          u'os:Win',
-          u'priority:10',
-          u'project:yay',
-          u'user:jack@localhost',
-        ],
-        u'task_id': u'5cfcee8008810',
-        u'try_number': u'0',
-        u'user': u'jack@localhost',
-      },
-      {
-        u'bot_dimensions': [
-          {u'key': u'id', u'value': [u'bot1']},
-          {u'key': u'os', u'value': [u'Amiga']},
-        ],
-        u'bot_id': u'bot1',
-        u'bot_version': self.bot_version,
-        u'costs_usd': [0.1],
-        u'created_ts': str_now,
-        u'completed_ts': str_now,
-        u'duration': 0.1,
-        u'exit_code': u'0',
-        u'failure': False,
-        u'internal_failure': False,
-        u'modified_ts': str_now,
-        u'name': u'first',
-        u'properties_hash': u'8771754ee465a689f19c87f2d21ea0d9b8dd4f64',
-        u'server_versions': [u'v1a'],
-        u'started_ts': str_now,
-        u'state': u'COMPLETED',
-        u'tags': [
-          u'commit:post',
-          u'os:Amiga',
-          u'os:Win',
-          u'priority:10',
-          u'project:yay',
-          u'user:joe@localhost',
-        ],
-        u'task_id': u'5cee488006610',
-        u'try_number': u'1',
-        u'user': u'joe@localhost'
-      },
-    ]
-    second, _ = task_results
-    expected = {u'items': task_results}
+    # Sort by CREATED_TS.
+    request = swarming_rpcs.TasksRequest(
+        sort=swarming_rpcs.TaskSort.CREATED_TS)
+    self.assertEqual(
+        {u'now': str_now_120, u'items': [second, first]},
+        self.call_api('list', body=message_to_dict(request)).json)
 
-    self.assertEqual(expected, response.json)
+    # Sort by MODIFIED_TS.
+    request = swarming_rpcs.TasksRequest(
+        sort=swarming_rpcs.TaskSort.MODIFIED_TS)
+    self.assertEqual(
+        {u'now': str_now_120, u'items': [first, second]},
+        self.call_api('list', body=message_to_dict(request)).json)
 
-    # try with a tag: should still only contain second
+    # With two tags.
     request = swarming_rpcs.TasksRequest(
         end=end, start=start, tags=['project:yay', 'commit:pre'])
-    response = self.call_api('list', body=message_to_dict(request))
-    self.assertEqual({u'items': [second]}, response.json)
+    self.assertEqual(
+        {u'now': str_now_120, u'items': [second]},
+        self.call_api('list', body=message_to_dict(request)).json)
 
-    # try with a spurious tag: items should be empty
+    # A spurious tag.
     request = swarming_rpcs.TasksRequest(end=end, start=start, tags=['foo:bar'])
-    expected.pop('items')
-    response = self.call_api('list', body=message_to_dict(request))
-    self.assertEqual(expected, response.json)
+    self.assertEqual(
+        {u'now': str_now_120},
+        self.call_api('list', body=message_to_dict(request)).json)
 
-    # try with multiple sort/filter options
+    # Both state and tag.
     request = swarming_rpcs.TasksRequest(
-        end=end, start=start, tags=['foo:bar'],
-        state=swarming_rpcs.TaskState.PENDING)
+        end=end, start=start, tags=['commit:pre'],
+        state=swarming_rpcs.TaskState.COMPLETED_SUCCESS)
+    self.assertEqual(
+        {u'now': str_now_120, u'items': [second]},
+        self.call_api('list', body=message_to_dict(request)).json)
+
+    # Both sort and tag.
+    request = swarming_rpcs.TasksRequest(
+        end=end, start=start, tags=['commit:pre'],
+        sort=swarming_rpcs.TaskSort.MODIFIED_TS,
+        state=swarming_rpcs.TaskState.COMPLETED_SUCCESS)
     with self.call_should_fail('400'):
       self.call_api('list', body=message_to_dict(request))
 

@@ -458,7 +458,7 @@ class TasksHandler(auth.AuthenticatingHandler):
     # This call is synchronous.
     try:
       tasks, cursor_str, sort, state = task_result.get_tasks(
-          task_name, task_tags, cursor_str, limit, sort, state)
+          limit, cursor_str, sort, state, task_tags, task_name)
 
       # Prefetch the TaskRequest all at once, so that ndb's in-process cache has
       # it instead of fetching them one at a time indirectly when using
@@ -543,14 +543,10 @@ class TasksHandler(auth.AuthenticatingHandler):
     """Returns all the counting futures in parallel."""
     counts_future = {}
     last_24h = now - datetime.timedelta(days=1)
-    request_id = task_request.datetime_to_request_base_id(last_24h)
-    request_key = task_request.request_id_to_key(request_id)
     for state_key, _, _ in itertools.chain.from_iterable(self.STATE_CHOICES):
-      query = task_result.get_result_summary_query(None, state_key, None)
-      # It is counter intuitive but the equality has to be reversed, since the
-      # value in the db is binary negated.
-      counts_future[state_key] = query.filter(
-          task_result.TaskResultSummary.key <= request_key).count_async()
+      query = task_result.get_result_summaries_query(
+          last_24h, None, 'created_ts', state_key, None)
+      counts_future[state_key] = query.count_async()
     return counts_future
 
   def _get_state_choices(self, counts_future):
