@@ -242,9 +242,15 @@ class SwarmingTasksService(remote.Service):
       raise endpoints.BadRequestException(e.message)
 
     result_summary = task_scheduler.schedule_request(posted_request)
+
+    previous_result = None
+    if result_summary.deduped_from:
+      previous_result = message_conversion.task_result_to_rpc(result_summary)
+
     return swarming_rpcs.TaskRequestMetadata(
         request=message_conversion.task_request_to_rpc(posted_request),
-        task_id=task_pack.pack_result_summary_key(result_summary.key))
+        task_id=task_pack.pack_result_summary_key(result_summary.key),
+        task_result=previous_result)
 
   @auth.endpoints_method(
       swarming_rpcs.TasksRequest, swarming_rpcs.TaskList,

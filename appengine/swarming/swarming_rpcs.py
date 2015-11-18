@@ -193,6 +193,8 @@ class TaskRequestMetadata(messages.Message):
   """Provides the ID of the requested TaskRequest."""
   request = messages.MessageField(TaskRequest, 1)
   task_id = messages.StringField(2)
+  # Set to finished task result in case task was deduplicated.
+  task_result = messages.MessageField(TaskResult, 3)
 
 
 ### Bots

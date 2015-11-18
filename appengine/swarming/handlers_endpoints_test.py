@@ -149,7 +149,7 @@ class TasksApiTest(BaseTest):
             ],
             env=[
               swarming_rpcs.StringPair(key='PATH', value='/'),
-              ],
+            ],
             execution_timeout_secs=30,
             io_timeout_secs=30),
         tags=['foo:bar'],
@@ -187,6 +187,97 @@ class TasksApiTest(BaseTest):
     response = self.call_api('new', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
 
+  def test_new_ok_deduped(self):
+    """Asserts that new returns task result for deduped."""
+    # Run a task to completion.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.mock_now(datetime.datetime(2010, 1, 2, 3, 4, 5))
+    self.client_create_task_raw(
+        name='task', tags=['project:yay', 'commit:post', 'os:Win'],
+        properties=dict(idempotent=True))
+    self.set_as_bot()
+    self.bot_run_task()
+
+    self.mock(random, 'getrandbits', lambda _: 0x66)
+    now = datetime.datetime(2010, 1, 2, 5, 5, 5)
+    self.mock_now(now)
+    str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
+    self.set_as_user()
+
+    request = swarming_rpcs.TaskRequest(
+        expiration_secs=30,
+        name='job1',
+        priority=200,
+        properties=swarming_rpcs.TaskProperties(
+            command=['python', 'run_test.py'],
+            dimensions=[
+              swarming_rpcs.StringPair(key='os', value='Amiga'),
+            ],
+            execution_timeout_secs=3600,
+            io_timeout_secs=1200,
+            idempotent=True),
+        tags=['foo:bar'],
+        user='joe@localhost')
+    expected = {
+      u'request': {
+        u'authenticated': u'user:user@example.com',
+        u'created_ts': str_now,
+        u'expiration_secs': u'30',
+        u'name': u'job1',
+        u'priority': u'200',
+        u'properties': {
+          u'command': [u'python', u'run_test.py'],
+          u'dimensions': [
+            {u'key': u'os', u'value': u'Amiga'},
+          ],
+          u'execution_timeout_secs': u'3600',
+          u'grace_period_secs': u'30',
+          u'idempotent': True,
+          u'io_timeout_secs': u'1200',
+        },
+        u'tags': [
+          u'foo:bar',
+          u'os:Amiga',
+          u'priority:200',
+          u'user:joe@localhost',
+        ],
+        u'user': u'joe@localhost',
+      },
+      u'task_id': u'63dabe8006610',
+      u'task_result': {
+        u'bot_dimensions': [
+          {u'key': u'id', u'value': [u'bot1']},
+          {u'key': u'os', u'value': [u'Amiga']},
+        ],
+        u'bot_id': u'bot1',
+        u'bot_version': u'e821e620f06f76364246db14e973cd3e23735d14',
+        u'completed_ts': u'2010-01-02T03:04:05',
+        u'cost_saved_usd': 0.1,
+        u'created_ts': u'2010-01-02T05:05:05',
+        u'deduped_from': u'5cee488008811',
+        u'duration': 0.1,
+        u'exit_code': u'0',
+        u'failure': False,
+        u'internal_failure': False,
+        u'modified_ts': u'2010-01-02T05:05:05',
+        u'name': u'job1',
+        u'server_versions': [u'v1a'],
+        u'started_ts': u'2010-01-02T03:04:05',
+        u'state': u'COMPLETED',
+        u'tags': [
+          u'foo:bar',
+          u'os:Amiga',
+          u'priority:200',
+          u'user:joe@localhost',
+        ],
+        u'task_id': u'63dabe8006610',
+        u'try_number': u'0',
+        u'user': u'joe@localhost',
+      },
+    }
+    response = self.call_api('new', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+
   def test_new_ok_isolated(self):
     """Asserts that new generates appropriate metadata."""
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -204,7 +295,7 @@ class TasksApiTest(BaseTest):
             ],
             env=[
               swarming_rpcs.StringPair(key='PATH', value='/'),
-              ],
+            ],
             execution_timeout_secs=30,
             inputs_ref=swarming_rpcs.FilesRef(
                 isolated='1'*40,
