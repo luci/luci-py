@@ -134,6 +134,19 @@ class TasksRequest(messages.Message):
   sort = messages.EnumField(TaskSort, 7, default='CREATED_TS')
 
 
+class TasksCountRequest(messages.Message):
+  """Request to count some subset of tasks."""
+  # These should be DateTimeField but endpoints + protorpc have trouble encoding
+  # this message in a GET request, this is due to DateTimeField's special
+  # encoding in protorpc-1.0/protorpc/message_types.py that is bypassed when
+  # using endpoints-1.0/endpoints/protojson.py to add GET query parameter
+  # support.
+  end = messages.FloatField(3)
+  start = messages.FloatField(4)
+  state = messages.EnumField(TaskState, 5, default='ALL')
+  tags = messages.StringField(6, repeated=True)
+
+
 ### Task-Related Responses
 
 
@@ -187,6 +200,12 @@ class TaskList(messages.Message):
   cursor = messages.StringField(1)
   items = messages.MessageField(TaskResult, 2, repeated=True)
   now = message_types.DateTimeField(3)
+
+
+class TasksCount(messages.Message):
+  """Returns the count, as requested."""
+  count = messages.IntegerField(1)
+  now = message_types.DateTimeField(2)
 
 
 class TaskRequestMetadata(messages.Message):

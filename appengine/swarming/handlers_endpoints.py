@@ -278,6 +278,31 @@ class SwarmingTasksService(remote.Service):
         items=[message_conversion.task_result_to_rpc(i) for i in items],
         now=now)
 
+  @auth.endpoints_method(
+      swarming_rpcs.TasksCountRequest, swarming_rpcs.TasksCount,
+      http_method='GET')
+  @auth.require(acl.is_privileged_user)
+  def count(self, request):
+    """Counts number of tasks in a given state."""
+    logging.info('%s', request)
+    if not request.start:
+      raise endpoints.BadRequestException('start (as epoch) is required')
+    if not request.end:
+      raise endpoints.BadRequestException('end (as epoch) is required')
+    try:
+      now = utils.utcnow()
+      query = task_result.get_result_summaries_query(
+          message_conversion.epoch_to_datetime(request.start),
+          message_conversion.epoch_to_datetime(request.end),
+          'created_ts',
+          request.state.name.lower(),
+          request.tags)
+      count = query.count()
+    except ValueError as e:
+      raise endpoints.BadRequestException(
+          'Inappropriate filter for tasks/count: %s' % e)
+    return swarming_rpcs.TasksCount(count=count, now=now)
+
 
 BotId = endpoints.ResourceContainer(
     message_types.VoidMessage,
