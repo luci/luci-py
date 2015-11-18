@@ -683,7 +683,7 @@ def cancel_task(result_summary_key):
 ### Cron job.
 
 
-def cron_abort_expired_task_to_run():
+def cron_abort_expired_task_to_run(host):
   """Aborts expired TaskToRun requests to execute a TaskRequest on a bot.
 
   Three reasons can cause this situation:
@@ -696,14 +696,18 @@ def cron_abort_expired_task_to_run():
     reconnect them.
   - Server has internal failures causing it to fail to either distribute the
     tasks or properly receive results from the bots.
+
+  Returns:
+    Packed tasks ids of aborted tasks.
   """
-  killed = 0
+  killed = []
   skipped = 0
   try:
     for to_run in task_to_run.yield_expired_task_to_run():
       request = to_run.request_key.get()
       if _expire_task(to_run.key, request):
-        killed += 1
+        # TODO(maruel): Know which try it is.
+        killed.append(request.task_id)
         stats.add_task_entry(
             'task_request_expired',
             task_pack.request_key_to_result_summary_key(request.key),
@@ -713,19 +717,24 @@ def cron_abort_expired_task_to_run():
         # It's not a big deal, the bot will continue running.
         skipped += 1
   finally:
+    if killed:
+      logging.error(
+          'EXPIRED!\n%d tasks:\n%s',
+          len(killed),
+          '\n'.join('  https://%s/user/task/%s' % (host, i) for i in killed))
     # TODO(maruel): Use stats_framework.
-    logging.info('Killed %d task, skipped %d', killed, skipped)
+    logging.info('Killed %d task, skipped %d', len(killed), skipped)
   return killed
 
 
-def cron_handle_bot_died():
+def cron_handle_bot_died(host):
   """Aborts or retry stale TaskRunResult where the bot stopped sending updates.
 
   If the task was at its first try, it'll be retried. Otherwise the task will be
   canceled.
   """
   ignored = 0
-  killed = 0
+  killed = []
   retried = 0
   try:
     for run_result_key in task_result.yield_run_result_keys_with_dead_bot():
@@ -733,10 +742,16 @@ def cron_handle_bot_died():
       if result is True:
         retried += 1
       elif result is False:
-        killed += 1
+        killed.append(task_pack.pack_run_result_key(run_result_key))
       else:
         ignored += 1
   finally:
+    if killed:
+      logging.error(
+          'BOT_DIED!\n%d tasks:\n%s',
+          len(killed),
+          '\n'.join('  https://%s/user/task/%s' % (host, i) for i in killed))
     # TODO(maruel): Use stats_framework.
-    logging.info('Killed %d; retried %d; ignored: %d', killed, retried, ignored)
+    logging.info(
+        'Killed %d; retried %d; ignored: %d', len(killed), retried, ignored)
   return killed, retried, ignored

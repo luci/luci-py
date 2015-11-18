@@ -19,7 +19,7 @@ class CronBotDiedHandler(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
     try:
-      task_scheduler.cron_handle_bot_died()
+      task_scheduler.cron_handle_bot_died(self.request.host_url)
     except db.NeedIndexError as e:
       # When a fresh new instance is deployed, it takes a few minutes for the
       # composite indexes to be created even if they are empty. Ignore the case
@@ -34,7 +34,7 @@ class CronBotDiedHandler(webapp2.RequestHandler):
 class CronAbortExpiredShardToRunHandler(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
-    task_scheduler.cron_abort_expired_task_to_run()
+    task_scheduler.cron_abort_expired_task_to_run(self.request.host_url)
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 

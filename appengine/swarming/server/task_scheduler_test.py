@@ -847,7 +847,9 @@ class TaskSchedulerApiTest(test_case.TestCase):
         True)
     result_summary = task_scheduler.schedule_request(request)
     abandoned_ts = self.mock_now(self.now, request.expiration_secs+1)
-    self.assertEqual(1, task_scheduler.cron_abort_expired_task_to_run())
+    self.assertEqual(
+        ['1d69b9f088008810'],
+        task_scheduler.cron_abort_expired_task_to_run('f.local'))
     self.assertEqual([], task_result.TaskRunResult.query().fetch())
     expected = {
       'abandoned_ts': abandoned_ts,
@@ -897,14 +899,16 @@ class TaskSchedulerApiTest(test_case.TestCase):
     _request, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc')
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
-    self.assertEqual((0, 1, 0), task_scheduler.cron_handle_bot_died())
+    self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died('f.local'))
     self.assertEqual(task_result.State.BOT_DIED, run_result.key.get().state)
     self.assertEqual(
         task_result.State.PENDING, run_result.result_summary_key.get().state)
 
     # BOT_DIED is kept instead of EXPIRED.
     abandoned_ts = self.mock_now(self.now, request.expiration_secs+1)
-    self.assertEqual(1, task_scheduler.cron_abort_expired_task_to_run())
+    self.assertEqual(
+        ['1d69b9f088008810'],
+        task_scheduler.cron_abort_expired_task_to_run('f.local'))
     self.assertEqual(1, len(task_result.TaskRunResult.query().fetch()))
     expected = {
       'abandoned_ts': abandoned_ts,
@@ -955,7 +959,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(task_result.State.RUNNING, run_result.state)
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
-    self.assertEqual((0, 1, 0), task_scheduler.cron_handle_bot_died())
+    self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died('f.local'))
 
     # Refresh and compare:
     expected = {
@@ -1069,7 +1073,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(task_result.State.RUNNING, run_result.state)
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
-    self.assertEqual((0, 1, 0), task_scheduler.cron_handle_bot_died())
+    self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died('f.local'))
 
     # Refresh and compare:
     expected = {
@@ -1150,14 +1154,16 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(task_result.State.RUNNING, run_result.state)
     self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
-    self.assertEqual((0, 1, 0), task_scheduler.cron_handle_bot_died())
+    self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died('f.local'))
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 2)
     # It must be a different bot.
     _request, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost-second', 'abc')
     now_2 = self.mock_now(self.now + 2 * task_result.BOT_PING_TOLERANCE, 3)
-    self.assertEqual((1, 0, 0), task_scheduler.cron_handle_bot_died())
-    self.assertEqual((0, 0, 0), task_scheduler.cron_handle_bot_died())
+    self.assertEqual(
+        (['1d69b9f088008812'], 0, 0),
+        task_scheduler.cron_handle_bot_died('f.local'))
+    self.assertEqual(([], 0, 0), task_scheduler.cron_handle_bot_died('f.local'))
     expected = {
       'abandoned_ts': now_2,
       'bot_dimensions': bot_dimensions,
@@ -1206,7 +1212,9 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(task_result.State.RUNNING, run_result.state)
     self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 601)
-    self.assertEqual((1, 0, 0), task_scheduler.cron_handle_bot_died())
+    self.assertEqual(
+        (['1d69b9f088008811'], 0, 0),
+        task_scheduler.cron_handle_bot_died('f.local'))
 
   def test_search_by_name(self):
     data = _gen_request(
