@@ -32,10 +32,10 @@ MAPREDUCE_JOBS = {
       'entity_kind': 'server.task_result.TaskResultSummary',
     },
   },
-  'fix_extra_args': {
-    'name': 'fix_extra_args',
+  'fix_tags': {
+    'name': 'fix_tags',
     'mapper_parameters': {
-      'entity_kind': 'server.task_request.TaskRequest',
+      'entity_kind': 'server.task_result.TaskResultSummary',
     },
   },
 }
@@ -86,9 +86,11 @@ def backfill_tags(entity):
   ndb.transaction(fix_task_result_summary, use_cache=False, use_memcache=False)
 
 
-def fix_extra_args(entity):
-  if entity.properties.extra_args == [None]:
-    entity.properties.extra_args = []
+def fix_tags(entity):
+  """Backfills missing tags and fix the ones with an invalid value."""
+  request = entity.request_key.get()
+  # Compare the two lists of tags.
+  if entity.properties.tags != request.tags:
+    entity.properties.tags = request.tags
     logging.info('Fixed %s', entity.task_id)
     yield operation.db.Put(entity)
-    return

@@ -343,7 +343,8 @@ def schedule_request(request):
       # functionality.
       # Setting task.queue_number to None removes it from the scheduling.
       task.queue_number = None
-      _copy_entity(dupe_summary, result_summary, ('created_ts', 'name', 'user'))
+      _copy_entity(
+          dupe_summary, result_summary, ('created_ts', 'name', 'user', 'tags'))
       result_summary.properties_hash = None
       result_summary.try_number = 0
       result_summary.cost_saved_usd = result_summary.cost_usd

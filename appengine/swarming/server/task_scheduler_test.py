@@ -239,7 +239,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'server_versions': [u'v1a'],
       'started_ts': now or self.now,
       'state': State.COMPLETED,
-      'tags': [u'OS:Windows-3.1.1', u'priority:50', u'tag:1', u'user:Jesus'],
+      'tags': [u'OS:Windows-3.1.1', u'priority:50', u'tag:1', u'user:Raoul'],
       'try_number': 0,
       'user': u'Raoul',
     }
