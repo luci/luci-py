@@ -90,7 +90,7 @@ def fix_tags(entity):
   """Backfills missing tags and fix the ones with an invalid value."""
   request = entity.request_key.get()
   # Compare the two lists of tags.
-  if entity.properties.tags != request.tags:
-    entity.properties.tags = request.tags
+  if entity.tags != request.tags:
+    entity.tags = request.tags
     logging.info('Fixed %s', entity.task_id)
     yield operation.db.Put(entity)
