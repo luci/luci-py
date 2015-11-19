@@ -94,12 +94,39 @@ def endpoints_api(
     allowed_client_ids = sorted(
         set(allowed_client_ids) | set([endpoints.API_EXPLORER_CLIENT_ID]))
 
-  return endpoints.api(
+  # Someone was looking for job security here:
+  # - api() returns _ApiDecorator class instance.
+  # - One of the following is done:
+  #   - _ApiDecorator.__call__() is called with the remote.Service class as
+  #     argument.
+  #   - api_class() is explicitly called which returns a function, which is then
+  #     called with the  remote.Service class as argument.
+  decorator = endpoints.api(
       name, version,
       auth_level=auth_level,
       allowed_client_ids=allowed_client_ids,
       **kwargs)
 
+  def fn(cls):
+    if not cls.all_remote_methods():
+      raise TypeError(
+          'Service %s must have at least one auth.endpoints_method method' %
+          name)
+    for method, func in cls.all_remote_methods().iteritems():
+      if func and not api.is_decorated(func.remote._RemoteMethodInfo__method):
+        raise TypeError(
+            'Method \'%s\' of \'%s\' is not protected by @require or @public '
+            'decorator' % (method, name))
+    return cls
+
+  class Hook(object):
+    def __call__(self, cls):
+      return fn(decorator.api_class()(cls))
+    def api_class(self, *args, **kwargs):
+      wrapper = decorator.api_class(*args, **kwargs)
+      return lambda cls: fn(wrapper(cls))
+
+  return Hook()
 
 def endpoints_method(
     request_message=message_types.VoidMessage,

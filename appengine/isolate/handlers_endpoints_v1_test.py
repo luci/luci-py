@@ -26,6 +26,7 @@ from components import auth_testing
 from components import utils
 from test_support import test_case
 
+import acl
 import config
 import gcs
 import handlers_backend
@@ -122,7 +123,9 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     super(IsolateServiceTest, self).setUp()
     self.testbed.init_blobstore_stub()
     self.testbed.init_urlfetch_stub()
-    auth_testing.mock_get_current_identity(self)
+    admin = auth.Identity(auth.IDENTITY_USER, 'admin@example.com')
+    auth.bootstrap_group( acl.FULL_ACCESS_GROUP, [admin])
+    auth_testing.mock_get_current_identity(self, admin)
     version = utils.get_app_version()
     self.mock(utils, 'get_task_queue_host', lambda: version)
     self.testbed.setup_env(current_version_id='testbed.version')

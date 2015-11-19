@@ -26,6 +26,7 @@ from protorpc import remote
 from components import auth
 from components import utils
 
+import acl
 import config
 import gcs
 from handlers_api import hash_content
@@ -156,6 +157,7 @@ class IsolateService(remote.Service):
   ### Endpoints Methods
 
   @auth.endpoints_method(DigestCollection, UrlCollection, http_method='POST')
+  @auth.require(acl.isolate_writable)
   def preupload(self, request):
     """Checks for entry's existence and generates upload URLs.
 
@@ -227,16 +229,19 @@ class IsolateService(remote.Service):
     return response
 
   @auth.endpoints_method(StorageRequest, PushPing)
+  @auth.require(acl.isolate_writable)
   def store_inline(self, request):
     """Stores relatively small entities in the datastore."""
     return self.storage_helper(request, False)
 
   @auth.endpoints_method(FinalizeRequest, PushPing)
+  @auth.require(acl.isolate_writable)
   def finalize_gs_upload(self, request):
     """Informs client that large entities have been uploaded to GCS."""
     return self.storage_helper(request, True)
 
   @auth.endpoints_method(RetrieveRequest, RetrievedContent)
+  @auth.require(acl.isolate_readable)
   def retrieve(self, request):
     """Retrieves content from a storage location."""
     content = None
@@ -283,6 +288,7 @@ class IsolateService(remote.Service):
         expiration=DEFAULT_LINK_EXPIRATION))
 
   @auth.endpoints_method(message_types.VoidMessage, ServerDetails)
+  @auth.require(acl.isolate_readable)
   def server_details(self, _request):
     return ServerDetails(server_version=utils.get_app_version())
 

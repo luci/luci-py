@@ -37,6 +37,7 @@ class TestingServiceApi(remote.Service):
       WhoResponse,
       name='who',
       http_method='GET')
+  @auth.public
   def who(self, _request):
     return WhoResponse(
         host=auth.get_peer_host(),
@@ -57,6 +58,7 @@ class TestingServiceApi(remote.Service):
       HostTokenRespones,
       name='create_host_token',
       http_method='POST')
+  @auth.public
   def create_host_token(self, request):
     return HostTokenRespones(host_token=auth.create_host_token(request.host))
 
