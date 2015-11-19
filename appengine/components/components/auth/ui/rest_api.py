@@ -11,6 +11,7 @@ import textwrap
 import urllib
 import webapp2
 
+from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
 from google.appengine.datastore import datastore_query
@@ -54,6 +55,7 @@ def get_rest_api_routes():
         '/auth/api/v1/ip_whitelists/<name:%s>' % ip_whitelist_re,
         IPWhitelistHandler),
     webapp2.Route('/auth/api/v1/server/certificates', CertificatesHandler),
+    webapp2.Route('/auth/api/v1/server/info', ServerInfoHandler),
     webapp2.Route('/auth/api/v1/server/oauth_config', OAuthConfigHandler),
     webapp2.Route('/auth/api/v1/server/state', ServerStateHandler),
   ]
@@ -877,6 +879,24 @@ class IPWhitelistHandler(EntityHandlerBase):
   def do_delete(cls, entity):
     # TODO(vadimsh): Verify it isn't being referenced by whitelist assigments.
     entity.key.delete()
+
+
+class ServerInfoHandler(handler.ApiHandler):
+  """Returns information about the service (app version, service account name).
+
+  May be used by other services to know what account to add to ACLs.
+  """
+
+  # In 99% cases account name is guessable from appID anyway, so its fine to
+  # have this public.
+  @api.public
+  def get(self):
+    self.send_response({
+      'app_id': app_identity.get_application_id(),
+      'app_runtime': 'python27',
+      'app_version': utils.get_app_version(),
+      'service_account_name': app_identity.get_service_account_name(),
+    })
 
 
 class CertificatesHandler(handler.ApiHandler):
