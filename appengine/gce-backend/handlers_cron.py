@@ -20,6 +20,7 @@ from components import utils
 
 import handlers_pubsub
 import models
+import state_machine
 
 
 class InstanceTemplateProcessor(webapp2.RequestHandler):
@@ -84,16 +85,7 @@ def process_instance_group(
     zone: Zone these instances exist in. e.g. us-central1-f.
     project: Project these instances exist in.
   """
-  # Mapping of instance names to catalog to service accounts to use for Cloud
-  # Pub/Sub communication with the Machine Provider.
-  instances_to_catalog = {}
-  # Mapping of instance names to instance URLs to delete.
-  instances_to_delete = {}
-  # List of instances to prepare.
-  instances_to_prepare = []
-  # Mapping of instances whose metadata should be updated to a dict of metadata
-  # to update.
-  instances_to_update = {}
+  instance_dicts = {state: {} for state in state_machine.STATE_MACHINE}
 
   instance_group_key = models.InstanceGroup.generate_key(name)
   instance_group = instance_group_key.get()
@@ -111,31 +103,11 @@ def process_instance_group(
       existing_instance = old_instance_map.get(instance_name)
       if existing_instance:
         new_instance_map[instance_name] = existing_instance
-        if existing_instance.state == models.InstanceStates.PENDING_CATALOG:
-          logging.info('Attempting to catalog instance: %s', instance_name)
-          instances_to_catalog[instance_name] = (
-              existing_instance.pubsub_service_account)
-        elif existing_instance.state == models.InstanceStates.CATALOGED:
-          logging.info('Skipping already cataloged instance: %s', instance_name)
-        elif existing_instance.state == models.InstanceStates.PENDING_DELETION:
-          logging.info('Scheduling instance for deletion: %s', instance_name)
-          instances_to_delete[instance_name] = instance['instance']
-        elif existing_instance.state == models.InstanceStates.NEW:
-          logging.info('Preparing new instance: %s', instance_name)
-          instances_to_prepare.append(instance_name)
-        elif existing_instance.state == \
-            models.InstanceStates.PENDING_METADATA_UPDATE:
-          logging.info(
-              'Scheduling instance for metadata update: %s', instance_name)
-          instances_to_update[instance_name] = {
-              'pubsub_service_account':
-                  existing_instance.pubsub_service_account,
-              'pubsub_subscription': existing_instance.pubsub_subscription,
-              'pubsub_subscription_project':
-                  existing_instance.pubsub_subscription_project,
-              'pubsub_topic': existing_instance.pubsub_topic,
-              'pubsub_topic_project': existing_instance.pubsub_topic_project,
-          }
+        if existing_instance.state in state_machine.STATE_MACHINE:
+          state = existing_instance.state
+          logging.info('Processing instance in state: %s', state)
+          instance_dicts[state][instance_name] = \
+              state_machine.STATE_MACHINE[state].accumulator(existing_instance)
       else:
         new_instance_map[instance_name] = models.Instance(
             name=instance_name,
@@ -151,97 +123,28 @@ def process_instance_group(
           instance.get('instanceStatus'),
       )
 
-  if instances_to_catalog:
-    # If we fail to enqueue the task to add these instances to the Machine
-    # Provider, set them back to PENDING_CATALOG in order to try again later.
-    if utils.enqueue_task(
-        '/internal/queues/catalog-instance-group',
-        'catalog-instance-group',
-        params={
-            'dimensions': utils.encode_to_json(dimensions),
-            'instance_map': utils.encode_to_json(instances_to_catalog),
-            'name': name,
-            'policies': utils.encode_to_json(policies),
-        },
-        transactional=True,
-    ):
-      for instance_name in instances_to_catalog:
-        new_instance_map[instance_name].state = models.InstanceStates.CATALOGED
-    else:
-      for instance_name in instances_to_catalog:
-        new_instance_map[instance_name].state = (
-            models.InstanceStates.PENDING_CATALOG)
-  else:
-    logging.info('Nothing to catalog')
-
-  if instances_to_delete:
-    # If we fail to enqueue the task to delete these instances,
-    # set them back to PENDING_DELETION in order to try again later.
-    if utils.enqueue_task(
-        '/internal/queues/delete-instances',
-        'delete-instances',
-        params={
-            'group': name,
-            'instance_map': utils.encode_to_json(instances_to_delete),
-            'project': project,
-            'zone': zone,
-        },
-        transactional=True,
-    ):
-      for instance_name in instances_to_delete:
-        new_instance_map[instance_name].state = models.InstanceStates.DELETING
-    else:
-      for instance_name in instances_to_delete:
-        new_instance_map[instance_name].state = (
-            models.InstanceStates.PENDING_DELETION)
-  else:
-    logging.info('Nothing to delete')
-
-  if instances_to_prepare:
-    # If we fail to enqueue the task to prepare these instances,
-    # set them back to NEW in order to try again later.
-    if utils.enqueue_task(
-        '/internal/queues/prepare-instances',
-        'prepare-instances',
-        params={
-            'group': name,
-            'instances': utils.encode_to_json(instances_to_prepare),
-            'project': project,
-            'zone': zone,
-        },
-        transactional=True,
-    ):
-      for instance_name in instances_to_prepare:
-        new_instance_map[instance_name].state = models.InstanceStates.PREPARING
-    else:
-      for instance_name in instances_to_prepare:
-        new_instance_map[instance_name].state = models.InstanceStates.NEW
-  else:
-    logging.info('Nothing to prepare')
-
-  if instances_to_update:
-    # If we fail to enqueue the task to update these instances, set
-    # them back to PENDING_METADATA_UPDATE in order to try again later.
-    if utils.enqueue_task(
-        '/internal/queues/update-instance-metadata',
-        'update-instance-metadata',
-        params={
-            'group': name,
-            'instance_map': utils.encode_to_json(instances_to_update),
-            'project': project,
-            'zone': zone,
-        },
-        transactional=True,
-    ):
-      for instance_name in instances_to_update:
-        new_instance_map[instance_name].state = (
-            models.InstanceStates.UPDATING_METADATA)
-    else:
-      for instance_name in instances_to_update:
-        new_instance_map[instance_name].state = (
-            models.InstanceStates.PENDING_METADATA_UPDATE)
-  else:
-    logging.info('Nothing to update')
+  for state, instance_map in instance_dicts.iteritems():
+    if instance_map:
+      if utils.enqueue_task(
+          state_machine.STATE_MACHINE[state].url,
+          state_machine.STATE_MACHINE[state].taskqueue,
+          params={
+              'dimensions': utils.encode_to_json(dimensions),
+              'group': name,
+              'instance_map': utils.encode_to_json(instance_map),
+              'policies': utils.encode_to_json(policies),
+              'project': project,
+              'zone': zone,
+          },
+          transactional=True,
+      ):
+        for instance_name in instance_map:
+          new_instance_map[instance_name].state = (
+              state_machine.STATE_MACHINE[state].success_state)
+      else:
+        for instance_name in instance_map:
+          new_instance_map[instance_name].state = (
+              state_machine.STATE_MACHINE[state].failure_state)
 
   models.InstanceGroup(
       key=models.InstanceGroup.generate_key(name),

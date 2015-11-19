@@ -67,15 +67,15 @@ class InstanceGroupCataloger(webapp2.RequestHandler):
       dimensions: JSON-encoded string representation of
         machine_provider.Dimensions describing the members of the instance
         group.
+      group: Name of the instance group whose instances are being cataloged.
       instance_map: JSON-encoded dict mapping instance names to service accounts
         to use for Cloud Pub/Sub communication with the Machine Provider.
-      name: Name of the instance group whose instances are being cataloged.
       policies: JSON-encoded string representation of machine_provider.Policies
         governing the members of the instance group.
     """
     dimensions = json.loads(self.request.get('dimensions'))
+    group = self.request.get('group')
     instance_map = json.loads(self.request.get('instance_map'))
-    name = self.request.get('name')
     policies = json.loads(self.request.get('policies'))
 
     requests = {}
@@ -111,7 +111,7 @@ class InstanceGroupCataloger(webapp2.RequestHandler):
         logging.info('Unknown instance: %s', instance_name)
 
     reschedule_instance_cataloging(
-        models.InstanceGroup.generate_key(name), requests.keys())
+        models.InstanceGroup.generate_key(group), requests.keys())
 
 
 @ndb.transactional
@@ -290,12 +290,12 @@ class InstancePreparer(webapp2.RequestHandler):
 
     Params:
       group: Name of the instance group containing the instances to prepare.
-      instances: JSON-encoded list of instances to prepare.
+      instance_map: JSON-encoded dict of instances to prepare.
       project: Name of the project the instance group exists in.
       zone: Zone the instances exist in. e.g. us-central1-f.
     """
     group = self.request.get('group')
-    instances = json.loads(self.request.get('instances'))
+    instance_map = json.loads(self.request.get('instance_map'))
     project = self.request.get('project')
     zone = self.request.get('zone')
 
@@ -308,7 +308,7 @@ class InstancePreparer(webapp2.RequestHandler):
     # instance's Cloud Pub/Sub service account. This service account will
     # be sent to the Machine Provider to be authorized to subscribe to the
     # machine topic to listen for instructions from Machine Provider.
-    for instance in instances:
+    for instance in instance_map:
       try:
         service_accounts = api.get_instance(
             zone, instance, fields=['serviceAccounts'])
@@ -388,7 +388,7 @@ class InstanceMetadataUpdater(webapp2.RequestHandler):
 
     Params:
       group: Name of the instance group containing the instances to update.
-      instances: JSON-encoded dict of instances mapped to metadata to set.
+      instance_map: JSON-encoded dict of instances mapped to metadata to set.
       project: Name of the project the instance group exists in.
       zone: Zone the instances exist in. e.g. us-central1-f.
     """
