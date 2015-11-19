@@ -120,6 +120,9 @@ def endpoints_api(
     return cls
 
   class Hook(object):
+    def new_factory(self):
+      return decorator.new_factory()
+
     def __call__(self, cls):
       return fn(decorator.api_class()(cls))
     def api_class(self, *args, **kwargs):
@@ -127,6 +130,7 @@ def endpoints_api(
       return lambda cls: fn(wrapper(cls))
 
   return Hook()
+
 
 def endpoints_method(
     request_message=message_types.VoidMessage,
