@@ -113,14 +113,12 @@ def task_request_to_rpc(entity):
 def new_task_request_from_rpc(msg, now):
   """"Returns a task_request.TaskRequest from a swarming_rpcs.NewTaskRequest."""
   assert msg.__class__ is swarming_rpcs.NewTaskRequest
-  if not msg.properties:
-    raise ValueError('properties is required')
-  inputs_ref = None
-  if msg.properties.inputs_ref:
-    inputs_ref = _rpc_to_ndb(task_request.FilesRef, msg.properties.inputs_ref)
   props = msg.properties
   if not props:
     raise ValueError('properties is required')
+  inputs_ref = None
+  if props.inputs_ref:
+    inputs_ref = _rpc_to_ndb(task_request.FilesRef, props.inputs_ref)
   properties = _rpc_to_ndb(
       task_request.TaskProperties,
       props,

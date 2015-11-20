@@ -125,7 +125,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     def pubsub_publish(**kwargs):
       calls.append(('directly', kwargs))
       if not publish_successful:
-        raise pubsub.Error('Fail')
+        raise pubsub.TransientError('Fail')
     self.mock(utils, 'enqueue_task', enqueue_task)
     self.mock(pubsub, 'publish', pubsub_publish)
     return calls

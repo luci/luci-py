@@ -280,7 +280,8 @@ def _maybe_pubsub_notify_now(result_summary, request):
   Does it only if result_summary indicates a task in some finished state and
   the request is specifying pubsub topic.
 
-  On errors logs them and returns False. Otherwise returns True.
+  Returns False to trigger the retry (on transient errors), or True if retry is
+  not needed (e.g. messages was sent successfully or fatal error happened).
   """
   assert not ndb.in_transaction()
   assert isinstance(
@@ -293,9 +294,12 @@ def _maybe_pubsub_notify_now(result_summary, request):
       _pubsub_notify(
           task_id, request.pubsub_topic,
           request.pubsub_auth_token, request.pubsub_userdata)
-    except (pubsub.Error, pubsub.TransientError):
-      logging.exception('Failed to send PubSub notification')
+    except pubsub.TransientError:
+      logging.exception('Transient error when sending PubSub notification')
       return False
+    except pubsub.Error:
+      logging.exception('Fatal error when sending PubSub notification')
+      return True # do not retry it
   return True
 
 
@@ -330,18 +334,22 @@ def _maybe_pubsub_notify_via_tq(result_summary, request):
 def _pubsub_notify(task_id, topic, auth_token, userdata):
   """Sends PubSub notification about task completion.
 
-  Raises pubsub.Error or pubsub.TransientError on errors.
+  Raises pubsub.TransientError on transient errors. Fatal errors are logged, but
+  not retried.
   """
   logging.debug(
       'Sending PubSub notify to "%s" (with userdata "%s") about '
       'completion of "%s"', topic, userdata, task_id)
-  pubsub.publish(
-      topic=topic,
-      message=utils.encode_to_json({
-        'task_id': task_id,
-        'userdata': userdata,
-      }),
-      attributes={'auth_token': auth_token})
+  msg = {'task_id': task_id}
+  if userdata:
+    msg['userdata'] = userdata
+  try:
+    pubsub.publish(
+        topic=topic,
+        message=utils.encode_to_json(msg),
+        attributes={'auth_token': auth_token} if auth_token else None)
+  except pubsub.Error:
+    logging.exception('Fatal error when sending PubSub notification')
 
 
 ### Public API.

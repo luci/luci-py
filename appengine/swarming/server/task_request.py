@@ -442,6 +442,12 @@ class TaskRequest(ndb.Model):
         not pubsub.validate_full_name(self.pubsub_topic, 'topics')):
       raise datastore_errors.BadValueError(
           'bad pubsub topic name - %s' % self.pubsub_topic)
+    if self.pubsub_auth_token and not self.pubsub_topic:
+      raise datastore_errors.BadValueError(
+          'pubsub_auth_token requires pubsub_topic')
+    if self.pubsub_userdata and not self.pubsub_topic:
+      raise datastore_errors.BadValueError(
+          'pubsub_userdata requires pubsub_topic')
 
 
 def _new_request_key():

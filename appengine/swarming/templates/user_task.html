@@ -122,6 +122,22 @@
         <td>Tags</td>
         <td>{{request.tags|join('<br>'|safe)}}</td>
       </tr>
+      {% if request.pubsub_topic %}
+        <tr title="PubSub topic notified about task completion.">
+          <td>Pubsub topic</td>
+          <td>{{request.pubsub_topic}}</td>
+        </tr>
+        <tr title="Data passed along with PubSub notification.">
+          <td>Pubsub data</td>
+          <td>
+          {% if request.pubsub_userdata %}
+            {{request.pubsub_userdata}}
+          {% else %}
+            &#8209;&#8209;
+          {% endif %}
+          </td>
+        </tr>
+      {% endif %}
       <tr title="Parent task that created this task.">
         <td>Parent task</td>
         <td>
