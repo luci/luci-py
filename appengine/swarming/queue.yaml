@@ -10,3 +10,6 @@ queue:
     task_age_limit: 2h
     min_backoff_seconds: 1
     max_backoff_seconds: 600
+
+- name: pubsub
+  rate: 500/s

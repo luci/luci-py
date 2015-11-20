@@ -210,6 +210,8 @@ class TaskRequestApiTest(TestCase):
       'priority': 49,
       'properties': expected_properties,
       'properties_hash': 'b45f6f868f9227c3035cd82b4a5b0360f5ce6f61',
+      'pubsub_topic': None,
+      'pubsub_userdata': None,
       'tags': [
         u'OS:Windows-3.1.1',
         u'hostname:localhost',
@@ -266,6 +268,8 @@ class TaskRequestApiTest(TestCase):
       'priority': 49,
       'properties': expected_properties,
       'properties_hash': 'b45f6f868f9227c3035cd82b4a5b0360f5ce6f61',
+      'pubsub_topic': None,
+      'pubsub_userdata': None,
       'tags': [
         u'OS:Windows-3.1.1',
         u'hostname:localhost',
@@ -460,6 +464,8 @@ class TaskRequestApiTest(TestCase):
       'priority': 49,
       'properties': expected_properties,
       'properties_hash': None,
+      'pubsub_topic': None,
+      'pubsub_userdata': None,
       'tags': [
         u'OS:Windows-3.1.1',
         u'hostname:localhost',

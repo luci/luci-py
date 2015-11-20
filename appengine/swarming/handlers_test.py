@@ -480,7 +480,7 @@ class BackendTest(AppTestBase):
       self.assertEqual(1, self.execute_tasks())
 
   def testTaskQueueUrls(self):
-    # Tests all the cron tasks are securely handled.
+    # Tests all the task queue tasks are securely handled.
     # TODO(maruel): Test mapreduce.
     task_queue_urls = sorted(
       r for r in self._GetRoutes() if r.startswith('/internal/taskqueue/')
@@ -488,13 +488,14 @@ class BackendTest(AppTestBase):
     )
     task_queues = [
       ('cleanup', '/internal/taskqueue/cleanup_data'),
+      ('pubsub', '/internal/taskqueue/pubsub/<task_id:[0-9a-f]+>'),
     ]
     self.assertEqual(sorted(zip(*task_queues)[1]), task_queue_urls)
 
-    for task_name, url in task_queues:
-      response = self.app.post(
-          url, headers={'X-AppEngine-QueueName': task_name}, status=200)
-      self.assertEqual('Success.', response.body)
+    for _, url in task_queues:
+      url = url.replace('<task_id:[0-9a-f]+>', 'abcabcabc')
+      self.app.post(
+          url, headers={'X-AppEngine-QueueName': 'bogus name'}, status=403)
 
 
 if __name__ == '__main__':

@@ -4,6 +4,8 @@
 
 """Main entry point for Swarming backend handlers."""
 
+import json
+
 import webapp2
 from google.appengine.api import datastore_errors
 from google.appengine.api import taskqueue
@@ -61,6 +63,17 @@ class TaskCleanupDataHandler(webapp2.RequestHandler):
     self.response.out.write('Success.')
 
 
+class TaskSendPubSubMessage(webapp2.RequestHandler):
+  """Sends PubSub notification about task completion."""
+
+  # Add task_id to the URL for better visibility in request logs.
+  @decorators.require_taskqueue('pubsub')
+  def post(self, task_id):  # pylint: disable=unused-argument
+    task_scheduler.task_handle_pubsub_task(json.loads(self.request.body))
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    self.response.out.write('Success.')
+
+
 ### Mapreduce related handlers
 
 
@@ -90,6 +103,7 @@ def get_routes():
 
     # Task queues.
     ('/internal/taskqueue/cleanup_data', TaskCleanupDataHandler),
+    (r'/internal/taskqueue/pubsub/<task_id:[0-9a-f]+>', TaskSendPubSubMessage),
 
     # Mapreduce related urls.
     (r'/internal/taskqueue/mapreduce/launch/<job_id:[^\/]+>',

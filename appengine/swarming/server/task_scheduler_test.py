@@ -23,6 +23,7 @@ import webtest
 
 from components import auth_testing
 from components import datastore_utils
+from components import pubsub
 from components import stats_framework
 from components import utils
 from test_support import test_case
@@ -116,6 +117,19 @@ class TaskSchedulerApiTest(test_case.TestCase):
     actual = stats._parse_line(line, stats._Snapshot(), {}, {}, {})
     self.assertIs(True, actual, line)
 
+  def mock_pub_sub(self, enqueue_successful=True, publish_successful=True):
+    calls = []
+    def enqueue_task(**kwargs):
+      calls.append(('via_task_queue', kwargs))
+      return enqueue_successful
+    def pubsub_publish(**kwargs):
+      calls.append(('directly', kwargs))
+      if not publish_successful:
+        raise pubsub.Error('Fail')
+    self.mock(utils, 'enqueue_task', enqueue_task)
+    self.mock(pubsub, 'publish', pubsub_publish)
+    return calls
+
   def test_all_apis_are_tested(self):
     # Ensures there's a test for each public API.
     # TODO(maruel): Remove this once coverage is asserted.
@@ -170,6 +184,24 @@ class TaskSchedulerApiTest(test_case.TestCase):
         task_scheduler.random, 'random',
         lambda: task_scheduler._PROBABILITY_OF_QUICK_COMEBACK - 0.01)
     self.assertEqual(1.0, task_scheduler.exponential_backoff(235))
+
+  def test_task_handle_pubsub_task(self):
+    calls = []
+    def publish_mock(**kwargs):
+      calls.append(kwargs)
+    self.mock(task_scheduler.pubsub, 'publish', publish_mock)
+    task_scheduler.task_handle_pubsub_task({
+      'topic': 'projects/abc/topics/def',
+      'task_id': 'abcdef123',
+      'auth_token': 'token',
+      'userdata': 'userdata',
+    })
+    self.assertEqual([
+      {
+        'attributes': {'auth_token': 'token'},
+        'message': '{"task_id":"abcdef123","userdata":"userdata"}',
+        'topic': 'projects/abc/topics/def',
+    }], calls)
 
   def _task_ran_successfully(self):
     """Runs a task successfully and returns the task_id."""
@@ -671,6 +703,38 @@ class TaskSchedulerApiTest(test_case.TestCase):
             run_result.key, 'localhost', 'hi', 0, 0, 0.1, False, False, 0.1,
             None))
 
+  def test_bot_update_pubsub_error(self):
+    data = _gen_request(
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}),
+        pubsub_topic='projects/abc/topics/def')
+    request = task_request.make_request(data, True)
+    task_scheduler.schedule_request(request)
+    bot_dimensions = {
+      u'OS': [u'Windows', u'Windows-3.1.1'],
+      u'hostname': u'localhost',
+      u'foo': u'bar',
+    }
+    _, run_result = task_scheduler.bot_reap_task(
+        bot_dimensions, 'localhost', 'abc')
+    self.assertEqual('localhost', run_result.bot_id)
+
+    # Attempt to terminate the task with success, but make PubSub call fail.
+    self.mock_pub_sub(publish_successful=False)
+    self.assertEqual(
+        (False, False),
+        task_scheduler.bot_update_task(
+            run_result.key, 'localhost', 'Foo1', 0, 0, 0.1, False, False,
+            0.1, None))
+
+    # Bot retries bot_update, now PubSub works and notification is sent.
+    pub_sub_calls = self.mock_pub_sub(publish_successful=True)
+    self.assertEqual(
+        (True, True),
+        task_scheduler.bot_update_task(
+            run_result.key, 'localhost', 'Foo1', 0, 0, 0.1, False, False,
+            0.1, None))
+    self.assertEqual(1, len(pub_sub_calls)) # notification is sent
+
   def _bot_update_timeouts(self, hard, io):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     data = _gen_request(
@@ -742,10 +806,14 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self._bot_update_timeouts(False, True)
 
   def test_bot_kill_task(self):
+    pub_sub_calls = self.mock_pub_sub()
     self.mock(random, 'getrandbits', lambda _: 0x88)
     dimensions = {u'OS': u'Windows-3.1.1'}
     request = task_request.make_request(
-        _gen_request(properties={'dimensions': dimensions}), True)
+        _gen_request(
+            properties={'dimensions': dimensions},
+            pubsub_topic='projects/abc/topics/def'),
+        True)
     result_summary = task_scheduler.schedule_request(request)
     reaped_request, run_result = task_scheduler.bot_reap_task(
         {'OS': 'Windows-3.1.1'}, 'localhost', 'abc')
@@ -801,6 +869,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'try_number': 1,
     }
     self.assertEqual(expected, run_result.key.get().to_dict())
+    self.assertEqual(1, len(pub_sub_calls)) # notification sent
 
   def test_bot_kill_task_wrong_bot(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -818,7 +887,9 @@ class TaskSchedulerApiTest(test_case.TestCase):
 
   def test_cancel_task(self):
     data = _gen_request(
-        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}),
+        pubsub_topic='projects/abc/topics/def')
+    pub_sub_calls = self.mock_pub_sub()
     request = task_request.make_request(data, True)
     result_summary = task_scheduler.schedule_request(request)
     ok, was_running = task_scheduler.cancel_task(result_summary.key)
@@ -826,10 +897,13 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(False, was_running)
     result_summary = result_summary.key.get()
     self.assertEqual(task_result.State.CANCELED, result_summary.state)
+    self.assertEqual(1, len(pub_sub_calls)) # sent completion notification
 
   def test_cancel_task_running(self):
     data = _gen_request(
-        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}),
+        pubsub_topic='projects/abc/topics/def')
+    pub_sub_calls = self.mock_pub_sub()
     request = task_request.make_request(data, True)
     result_summary = task_scheduler.schedule_request(request)
     reaped_request, run_result = task_scheduler.bot_reap_task(
@@ -839,12 +913,16 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(True, was_running)
     result_summary = result_summary.key.get()
     self.assertEqual(task_result.State.RUNNING, result_summary.state)
+    self.assertEqual(0, len(pub_sub_calls)) # no notifications
 
   def test_cron_abort_expired_task_to_run(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     request = task_request.make_request(
-        _gen_request(properties={'dimensions': {u'OS': u'Windows-3.1.1'}}),
+        _gen_request(
+            properties={'dimensions': {u'OS': u'Windows-3.1.1'}},
+            pubsub_topic='projects/abc/topics/def'),
         True)
+    pub_sub_calls = self.mock_pub_sub()
     result_summary = task_scheduler.schedule_request(request)
     abandoned_ts = self.mock_now(self.now, request.expiration_secs+1)
     self.assertEqual(
@@ -879,14 +957,17 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'user': u'Jesus',
     }
     self.assertEqual(expected, result_summary.key.get().to_dict())
+    self.assertEqual(1, len(pub_sub_calls)) # pubsub completion notification
 
   def test_cron_abort_expired_task_to_run_retry(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
+    pub_sub_calls = self.mock_pub_sub()
     now = utils.utcnow()
     data = _gen_request(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}),
         created_ts=now,
-        expiration_ts=now+datetime.timedelta(seconds=600))
+        expiration_ts=now+datetime.timedelta(seconds=600),
+        pubsub_topic='projects/abc/topics/def')
     request = task_request.make_request(data, True)
     result_summary = task_scheduler.schedule_request(request)
 
@@ -903,6 +984,8 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(task_result.State.BOT_DIED, run_result.key.get().state)
     self.assertEqual(
         task_result.State.PENDING, run_result.result_summary_key.get().state)
+    # No PubSub notifications yet.
+    self.assertEqual(0, len(pub_sub_calls))
 
     # BOT_DIED is kept instead of EXPIRED.
     abandoned_ts = self.mock_now(self.now, request.expiration_secs+1)
@@ -939,14 +1022,20 @@ class TaskSchedulerApiTest(test_case.TestCase):
     }
     self.assertEqual(expected, result_summary.key.get().to_dict())
 
+    # PubSub notification is sent.
+    self.assertEqual(1, len(pub_sub_calls))
+
   def test_cron_handle_bot_died(self):
+    pub_sub_calls = self.mock_pub_sub()
+
     # Test first retry, then success.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     now = utils.utcnow()
     data = _gen_request(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}),
         created_ts=now,
-        expiration_ts=now+datetime.timedelta(seconds=600))
+        expiration_ts=now+datetime.timedelta(seconds=600),
+        pubsub_topic='projects/abc/topics/def')
     request = task_request.make_request(data, True)
     _result_summary = task_scheduler.schedule_request(request)
     bot_dimensions = {
@@ -1012,6 +1101,9 @@ class TaskSchedulerApiTest(test_case.TestCase):
     }
     self.assertEqual(expected, run_result.result_summary_key.get().to_dict())
 
+    # No PubSub notifications yet.
+    self.assertEqual(0, len(pub_sub_calls))
+
     # Task was retried.
     now_2 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 2)
     _request, run_result = task_scheduler.bot_reap_task(
@@ -1052,6 +1144,9 @@ class TaskSchedulerApiTest(test_case.TestCase):
     }
     self.assertEqual(expected, run_result.result_summary_key.get().to_dict())
     self.assertEqual(0.1, run_result.key.get().cost_usd)
+
+    # PubSub notification is sent.
+    self.assertEqual(1, len(pub_sub_calls))
 
   def test_cron_handle_bot_died_same_bot_denied(self):
     # Test first retry, then success.

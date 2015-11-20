@@ -103,6 +103,12 @@ class NewTaskRequest(messages.Message):
   properties = messages.MessageField(TaskProperties, 5)
   tags = messages.StringField(6, repeated=True)
   user = messages.StringField(7)
+  # Full topic name to post too, e.g. "projects/<id>/topics/<id>".
+  pubsub_topic = messages.StringField(8)
+  # Secret string to put into "auth_token" attribute of PubSub message.
+  pubsub_auth_token = messages.StringField(9)
+  # Will be but into "userdata" fields of PubSub message.
+  pubsub_userdata = messages.StringField(10)
 
 
 class TaskRequest(messages.Message):
@@ -116,6 +122,8 @@ class TaskRequest(messages.Message):
   user = messages.StringField(7)
   authenticated = messages.StringField(8)
   created_ts = message_types.DateTimeField(9)
+  pubsub_topic = messages.StringField(10)
+  pubsub_userdata = messages.StringField(11)
 
 
 class TasksRequest(messages.Message):

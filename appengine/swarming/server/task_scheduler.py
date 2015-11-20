@@ -19,6 +19,7 @@ from google.appengine.ext import ndb
 from google.appengine.runtime import apiproxy_errors
 
 from components import datastore_utils
+from components import pubsub
 from components import utils
 from server import config
 from server import stats
@@ -75,7 +76,12 @@ def _expire_task(to_run_key, request):
       result_summary.state = task_result.State.EXPIRED
     result_summary.abandoned_ts = now
     result_summary.modified_ts = now
-    ndb.put_multi([to_run, result_summary])
+
+    futures = ndb.put_multi_async((to_run, result_summary))
+    _maybe_pubsub_notify_via_tq(result_summary, request)
+    for f in futures:
+      f.check_success()
+
     return True
 
   # It'll be caught by next cron job execution in case of failure.
@@ -184,7 +190,7 @@ def _handle_dead_bot(run_result_key):
   to_run_key = task_to_run.request_to_task_to_run_key(request)
 
   def run():
-    """Returns tuple(Result, bot_id)."""
+    """Returns tuple(task_is_retried or None, bot_id)."""
     # Do one GET, one PUT at the end.
     run_result, result_summary, to_run = ndb.get_multi(
         (run_result_key, result_summary_key, to_run_key))
@@ -194,6 +200,8 @@ def _handle_dead_bot(run_result_key):
 
     run_result.signal_server_version(server_version)
     run_result.modified_ts = now
+
+    notify = False
     if result_summary.try_number != run_result.try_number:
       # Not updating correct run_result, cancel it without touching
       # result_summary.
@@ -201,7 +209,7 @@ def _handle_dead_bot(run_result_key):
       run_result.state = task_result.State.BOT_DIED
       run_result.internal_failure = True
       run_result.abandoned_ts = now
-      result = False
+      task_is_retried = None
     elif result_summary.try_number == 1 and now < request.expiration_ts:
       # Retry it.
       to_put = (run_result, result_summary, to_run)
@@ -213,7 +221,7 @@ def _handle_dead_bot(run_result_key):
       # being retried.
       result_summary.reset_to_pending()
       result_summary.modified_ts = now
-      result = True
+      task_is_retried = True
     else:
       # Cancel it, there was more than one try or the task expired in the
       # meantime.
@@ -222,17 +230,24 @@ def _handle_dead_bot(run_result_key):
       run_result.internal_failure = True
       run_result.abandoned_ts = now
       result_summary.set_from_run_result(run_result, request)
-      result = False
-    ndb.put_multi(to_put)
-    return result, run_result.bot_id
+      notify = True
+      task_is_retried = False
+
+    futures = ndb.put_multi_async(to_put)
+    if notify:
+      _maybe_pubsub_notify_via_tq(result_summary, request)
+    for f in futures:
+      f.check_success()
+
+    return task_is_retried, run_result.bot_id
 
   try:
-    success, bot_id = datastore_utils.transaction(run)
+    task_is_retried, bot_id = datastore_utils.transaction(run)
   except datastore_utils.CommitError:
-    success, bot_id = None, None
-  if success is not None:
-    task_to_run.set_lookup_cache(to_run_key, success)
-    if not success:
+    task_is_retried, bot_id = None, None
+  if task_is_retried is not None:
+    task_to_run.set_lookup_cache(to_run_key, task_is_retried)
+    if not task_is_retried:
       stats.add_run_entry(
           'run_bot_died', run_result_key,
           bot_id=bot_id[0],
@@ -242,7 +257,7 @@ def _handle_dead_bot(run_result_key):
       logging.info('Retried %s', packed)
   else:
     logging.info('Ignored %s', packed)
-  return success
+  return task_is_retried
 
 
 def _copy_entity(src, dst, skip_list):
@@ -257,6 +272,76 @@ def _copy_entity(src, dst, skip_list):
     if not isinstance(v, ndb.ComputedProperty) and k not in skip_list
   }
   dst.populate(**kwargs)
+
+
+def _maybe_pubsub_notify_now(result_summary, request):
+  """Examines result_summary and sends task completion PubSub message.
+
+  Does it only if result_summary indicates a task in some finished state and
+  the request is specifying pubsub topic.
+
+  On errors logs them and returns False. Otherwise returns True.
+  """
+  assert not ndb.in_transaction()
+  assert isinstance(
+      result_summary, task_result.TaskResultSummary), result_summary
+  assert isinstance(request, task_request.TaskRequest), request
+  if (result_summary.state in task_result.State.STATES_NOT_RUNNING and
+      request.pubsub_topic):
+    task_id = task_pack.pack_result_summary_key(result_summary.key)
+    try:
+      _pubsub_notify(
+          task_id, request.pubsub_topic,
+          request.pubsub_auth_token, request.pubsub_userdata)
+    except (pubsub.Error, pubsub.TransientError):
+      logging.exception('Failed to send PubSub notification')
+      return False
+  return True
+
+
+def _maybe_pubsub_notify_via_tq(result_summary, request):
+  """Examines result_summary and enqueues a task to send PubSub message.
+
+  Must be called within a transaction.
+
+  Raises CommitError on errors (to abort the transaction).
+  """
+  assert ndb.in_transaction()
+  assert isinstance(
+      result_summary, task_result.TaskResultSummary), result_summary
+  assert isinstance(request, task_request.TaskRequest), request
+  if (result_summary.state in task_result.State.STATES_NOT_RUNNING and
+      request.pubsub_topic):
+    task_id = task_pack.pack_result_summary_key(result_summary.key)
+    ok = utils.enqueue_task(
+        url='/internal/taskqueue/pubsub/%s' % task_id,
+        queue_name='pubsub',
+        transactional=True,
+        payload=utils.encode_to_json({
+          'task_id': task_id,
+          'topic': request.pubsub_topic,
+          'auth_token': request.pubsub_auth_token,
+          'userdata': request.pubsub_userdata,
+        }))
+    if not ok:
+      raise datastore_utils.CommitError('Failed to enqueue task queue task')
+
+
+def _pubsub_notify(task_id, topic, auth_token, userdata):
+  """Sends PubSub notification about task completion.
+
+  Raises pubsub.Error or pubsub.TransientError on errors.
+  """
+  logging.debug(
+      'Sending PubSub notify to "%s" (with userdata "%s") about '
+      'completion of "%s"', topic, userdata, task_id)
+  pubsub.publish(
+      topic=topic,
+      message=utils.encode_to_json({
+        'task_id': task_id,
+        'userdata': userdata,
+      }),
+      attributes={'auth_token': auth_token})
 
 
 ### Public API.
@@ -511,33 +596,35 @@ def bot_update_task(
     run_result = run_result_future.get_result()
     if not run_result:
       result_summary_future.wait()
-      return None, False, 'is missing'
+      return None, None, False, 'is missing'
 
     if run_result.bot_id != bot_id:
       result_summary_future.wait()
-      return None, False, 'expected bot (%s) but had update from bot %s' % (
-          run_result.bot_id, bot_id)
+      return None, None, False, (
+          'expected bot (%s) but had update from bot %s' % (
+          run_result.bot_id, bot_id))
 
     if not run_result.started_ts:
-      return None, False, 'TaskRunResult is broken; %s' % run_result.to_dict()
+      return None, None, False, 'TaskRunResult is broken; %s' % (
+          run_result.to_dict())
 
     # This happens as an HTTP request is retried when the DB write succeeded but
     # it still returned HTTP 500.
     if run_result.exit_code is not None and exit_code is not None:
       if run_result.exit_code != exit_code:
         result_summary_future.wait()
-        return None, False, 'got 2 different exit_code; %s then %s' % (
+        return None, None, False, 'got 2 different exit_code; %s then %s' % (
             run_result.exit_code, exit_code)
 
     if run_result.durations and duration is not None:
       if run_result.durations[0] != duration:
         result_summary_future.wait()
-        return None, False, 'got 2 different durations; %s then %s' % (
+        return None, None, False, 'got 2 different durations; %s then %s' % (
             run_result.durations[0], duration)
 
     if (duration is None) != (exit_code is None):
       result_summary_future.wait()
-      return None, False, (
+      return None, None, False, (
           'had unexpected duration; expected iff a command completes\n'
           'duration: %s vs %s; exit: %s vs %s' % (
             run_result.durations, duration, run_result.exit_code, exit_code))
@@ -583,16 +670,20 @@ def bot_update_task(
 
     to_put.append(result_summary)
     ndb.put_multi(to_put)
-    return run_result, task_completed, None
+
+    return result_summary, run_result, task_completed, None
 
   try:
-    run_result, task_completed, error = datastore_utils.transaction(run)
+    smry, run_result, task_completed, error = datastore_utils.transaction(run)
   except datastore_utils.CommitError as e:
     logging.info('Got commit error: %s', e)
     # It is important that the caller correctly surface this error.
     return False, False
 
   if run_result:
+    # Caller must retry if PubSub enqueue fails.
+    if not _maybe_pubsub_notify_now(smry, request):
+      return False, False
     _update_stats(run_result, bot_id, request, task_completed)
   if error:
     logging.error('Task %s %s', packed, error)
@@ -607,8 +698,8 @@ def bot_kill_task(run_result_key, bot_id):
   """
   result_summary_key = task_pack.run_result_key_to_result_summary_key(
       run_result_key)
-  request_key = task_pack.result_summary_key_to_request_key(result_summary_key)
-  request_future = request_key.get_async()
+  request = task_pack.result_summary_key_to_request_key(
+      result_summary_key).get()
   server_version = utils.get_app_version()
   now = utils.utcnow()
   packed = task_pack.pack_run_result_key(run_result_key)
@@ -630,7 +721,12 @@ def bot_kill_task(run_result_key, bot_id):
     run_result.abandoned_ts = now
     run_result.modified_ts = now
     result_summary.set_from_run_result(run_result, None)
-    ndb.put_multi((run_result, result_summary))
+
+    futures = ndb.put_multi_async((run_result, result_summary))
+    _maybe_pubsub_notify_via_tq(result_summary, request)
+    for f in futures:
+      f.check_success()
+
     return run_result, None
 
   try:
@@ -640,7 +736,6 @@ def bot_kill_task(run_result_key, bot_id):
     # seconds passed on the next cron_handle_bot_died cron job.
     return 'Failed killing task %s: %s' % (packed, e)
 
-  request = request_future.get_result()
   if run_result:
     stats.add_run_entry(
         'run_bot_died', run_result.key,
@@ -652,8 +747,9 @@ def bot_kill_task(run_result_key, bot_id):
 
 def cancel_task(result_summary_key):
   """Cancels a task if possible."""
-  request_key = task_pack.result_summary_key_to_request_key(result_summary_key)
-  to_run_key = task_to_run.request_to_task_to_run_key(request_key.get())
+  request = task_pack.result_summary_key_to_request_key(
+      result_summary_key).get()
+  to_run_key = task_to_run.request_to_task_to_run_key(request)
   now = utils.utcnow()
 
   def run():
@@ -665,7 +761,12 @@ def cancel_task(result_summary_key):
     result_summary.state = task_result.State.CANCELED
     result_summary.abandoned_ts = now
     result_summary.modified_ts = now
-    ndb.put_multi((to_run, result_summary))
+
+    futures = ndb.put_multi_async((to_run, result_summary))
+    _maybe_pubsub_notify_via_tq(result_summary, request)
+    for f in futures:
+      f.check_success()
+
     return True, was_running
 
   try:
@@ -755,3 +856,15 @@ def cron_handle_bot_died(host):
     logging.info(
         'Killed %d; retried %d; ignored: %d', len(killed), retried, ignored)
   return killed, retried, ignored
+
+
+## Task queue tasks.
+
+
+def task_handle_pubsub_task(payload):
+  """Handles task enqueued by _maybe_pubsub_notify_via_tq."""
+  # Do not catch errors to trigger task queue task retry. Errors should not
+  # happen in normal case.
+  _pubsub_notify(
+      payload['task_id'], payload['topic'],
+      payload['auth_token'], payload['userdata'])

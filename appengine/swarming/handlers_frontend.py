@@ -755,6 +755,7 @@ class EmailHandler(webapp2.RequestHandler):
 
 def create_application(debug):
   template.bootstrap()
+  utils.set_task_queue_module('default')
 
   routes = [
       # Frontend pages. They return HTML.

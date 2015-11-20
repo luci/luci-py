@@ -58,6 +58,7 @@ from google.appengine.ext import ndb
 
 from components import auth
 from components import datastore_utils
+from components import pubsub
 from components import utils
 from server import task_pack
 
@@ -393,6 +394,15 @@ class TaskRequest(ndb.Model):
   # to a valid task_id pointing to a TaskRunResult or be None.
   parent_task_id = ndb.StringProperty(validator=_validate_task_run_id)
 
+  # PubSub topic to send task completion notification to.
+  pubsub_topic = ndb.StringProperty(indexed=False)
+
+  # Secret token to send as 'auth_token' attribute with PubSub messages.
+  pubsub_auth_token = ndb.StringProperty(indexed=False)
+
+  # Data to send in 'userdata' field of PubSub messages.
+  pubsub_userdata = ndb.StringProperty(indexed=False)
+
   @property
   def task_id(self):
     """Returns the TaskResultSummary packed id, not the task request key."""
@@ -406,7 +416,7 @@ class TaskRequest(ndb.Model):
 
   def to_dict(self):
     """Converts properties_hash to hex so it is json serializable."""
-    out = super(TaskRequest, self).to_dict()
+    out = super(TaskRequest, self).to_dict(exclude=['pubsub_auth_token'])
     properties_hash = self.properties.properties_hash
     out['properties_hash'] = (
         properties_hash.encode('hex') if properties_hash else None)
@@ -428,6 +438,10 @@ class TaskRequest(ndb.Model):
     for key, value in self.properties.dimensions.iteritems():
       self.tags.append('%s:%s' % (key, value))
     self.tags = sorted(set(self.tags))
+    if (self.pubsub_topic and
+        not pubsub.validate_full_name(self.pubsub_topic, 'topics')):
+      raise datastore_errors.BadValueError(
+          'bad pubsub topic name - %s' % self.pubsub_topic)
 
 
 def _new_request_key():
@@ -586,6 +600,8 @@ def make_request(request, is_bot_or_admin):
 def make_request_clone(original_request):
   """Makes a new TaskRequest from a previous one.
 
+  Used by "Retry task" UI button.
+
   Modifications:
   - Enforces idempotent=False.
   - Removes the parent_task_id if any.
@@ -618,6 +634,7 @@ def make_request_clone(original_request):
     raise ValueError('a request can only be cloned by a user, not a bot')
   username = username[len(prefix):]
   tags = set(t for t in original_request.tags if not t.startswith('user:'))
+  # Note: specifically do not inherit pubsub parameters.
   request = TaskRequest(
       authenticated=user,
       created_ts=now,

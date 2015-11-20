@@ -214,6 +214,8 @@ class ClientApiTest(test_env_handlers.AppTestBase):
           u'io_timeout_secs': 30,
         },
         u'properties_hash': None,
+        u'pubsub_topic': None,
+        u'pubsub_userdata': None,
         u'tags': [
           u'foo:bar',
           u'priority:200',
@@ -484,6 +486,8 @@ class ClientApiTest(test_env_handlers.AppTestBase):
         u'io_timeout_secs': 1200,
       },
       u'properties_hash': None,
+      u'pubsub_topic': None,
+      u'pubsub_userdata': None,
       u'tags': [u'os:Amiga', u'priority:100', u'user:joe@localhost'],
       u'user': u'joe@localhost',
     }

@@ -138,7 +138,7 @@ class TasksApiTest(BaseTest):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
-    request = swarming_rpcs.TaskRequest(
+    request = swarming_rpcs.NewTaskRequest(
         expiration_secs=30,
         name='job1',
         priority=200,
@@ -153,7 +153,10 @@ class TasksApiTest(BaseTest):
             execution_timeout_secs=30,
             io_timeout_secs=30),
         tags=['foo:bar'],
-        user='joe@localhost')
+        user='joe@localhost',
+        pubsub_topic='projects/abc/topics/def',
+        pubsub_auth_token='secret that must not be shown',
+        pubsub_userdata='userdata')
     expected = {
       u'request': {
         u'authenticated': u'user:user@example.com',
@@ -174,6 +177,8 @@ class TasksApiTest(BaseTest):
           u'idempotent': False,
           u'io_timeout_secs': u'30',
         },
+        u'pubsub_topic': u'projects/abc/topics/def',
+        u'pubsub_userdata': u'userdata',
         u'tags': [
           u'a:b',
           u'foo:bar',
@@ -204,7 +209,7 @@ class TasksApiTest(BaseTest):
     str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
     self.set_as_user()
 
-    request = swarming_rpcs.TaskRequest(
+    request = swarming_rpcs.NewTaskRequest(
         expiration_secs=30,
         name='job1',
         priority=200,
@@ -284,7 +289,7 @@ class TasksApiTest(BaseTest):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
-    request = swarming_rpcs.TaskRequest(
+    request = swarming_rpcs.NewTaskRequest(
         expiration_secs=30,
         name='job1',
         priority=200,
@@ -507,13 +512,22 @@ class TaskApiTest(BaseTest):
 
   def test_cancel_ok(self):
     """Asserts that task cancellation goes smoothly."""
+    # catch PubSub notification
+    notifies = []
+    def enqueue_task_mock(**kwargs):
+      notifies.append(kwargs)
+      return True
+    self.mock(utils, 'enqueue_task', enqueue_task_mock)
+
     # create and cancel a task
     self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
     self.set_as_admin()
-    _, task_id = self.client_create_task_raw()
+    _, task_id = self.client_create_task_raw(
+        pubsub_topic='projects/abc/topics/def',
+        pubsub_userdata='blah')
     expected = {u'ok': True, u'was_running': False}
     response = self.call_api('cancel', body={'task_id': task_id})
     self.assertEqual(expected, response.json)
@@ -533,6 +547,18 @@ class TaskApiTest(BaseTest):
     }
     response = self.call_api('result', body={'task_id': task_id})
     self.assertEqual(expected, response.json)
+
+    # notification has been sent.
+    expected = [
+      {
+        'payload': '{"auth_token":null,"task_id":"5cee488008810",'
+                   '"topic":"projects/abc/topics/def","userdata":"blah"}',
+        'queue_name': 'pubsub',
+        'transactional': True,
+        'url': '/internal/taskqueue/pubsub/5cee488008810',
+      },
+    ]
+    self.assertEqual(expected, notifies)
 
   def test_result_unknown(self):
     """Asserts that result raises 404 for unknown task IDs."""
