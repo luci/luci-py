@@ -101,7 +101,7 @@ def endpoints_api(
   #     argument.
   #   - api_class() is explicitly called which returns a function, which is then
   #     called with the  remote.Service class as argument.
-  decorator = endpoints.api(
+  api_decorator = endpoints.api(
       name, version,
       auth_level=auth_level,
       allowed_client_ids=allowed_client_ids,
@@ -119,17 +119,14 @@ def endpoints_api(
             'decorator' % (method, name))
     return cls
 
-  class Hook(object):
-    def new_factory(self):
-      return decorator.new_factory()
+  # Monkey patch api_decorator to make 'api_class' to return wrapped decorator.
+  orig = api_decorator.api_class
+  def patched_api_class(*args, **kwargs):
+    wrapper = orig(*args, **kwargs)
+    return lambda cls: fn(wrapper(cls))
+  api_decorator.api_class = patched_api_class
 
-    def __call__(self, cls):
-      return fn(decorator.api_class()(cls))
-    def api_class(self, *args, **kwargs):
-      wrapper = decorator.api_class(*args, **kwargs)
-      return lambda cls: fn(wrapper(cls))
-
-  return Hook()
+  return api_decorator
 
 
 def endpoints_method(

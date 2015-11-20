@@ -77,6 +77,7 @@ class ConfigApi(remote.Service):
       GetMappingResponseMessage,
       http_method='GET',
       path='mapping')
+  @auth.public # ACL check inside
   def get_mapping(self, request):
     """Returns config-set mapping, one or all."""
     if request.config_set and not self.can_read_config_set(request.config_set):
@@ -112,6 +113,7 @@ class ConfigApi(remote.Service):
       GetConfigResponseMessage,
       http_method='GET',
       path='config_sets/{config_set}/config/{path}')
+  @auth.public # ACL check inside
   def get_config(self, request):
     """Gets a config file."""
     try:
@@ -160,6 +162,7 @@ class ConfigApi(remote.Service):
       GetConfigByHashResponseMessage,
       http_method='GET',
       path='config/{content_hash}')
+  @auth.public
   def get_config_by_hash(self, request):
     """Gets a config file by its hash."""
     res = self.GetConfigByHashResponseMessage(
@@ -180,6 +183,7 @@ class ConfigApi(remote.Service):
       GetProjectsResponseMessage,
       http_method='GET',
       path='projects')
+  @auth.public # ACL check inside
   def get_projects(self, request):  # pylint: disable=W0613
     """Gets list of registered projects.
 
@@ -205,6 +209,7 @@ class ConfigApi(remote.Service):
       GetRefsResponseMessage,
       http_method='GET',
       path='projects/{project_id}/refs')
+  @auth.public # ACL check inside
   def get_refs(self, request):
     """Gets list of refs of a project."""
     if not acl.has_project_access(request.project_id):
@@ -225,6 +230,7 @@ class ConfigApi(remote.Service):
       GetConfigMultiResponseMessage,
       http_method='GET',
       path='configs/projects/{path}')
+  @auth.public # ACL check inside
   def get_project_configs(self, request):
     """Gets configs in all project config sets."""
     try:
@@ -242,6 +248,7 @@ class ConfigApi(remote.Service):
       GetConfigMultiResponseMessage,
       http_method='GET',
       path='configs/refs/{path}')
+  @auth.public # ACL check inside
   def get_ref_configs(self, request):
     """Gets configs in all ref config sets."""
     try:

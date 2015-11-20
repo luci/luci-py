@@ -138,6 +138,7 @@ class ConfigApi(remote.Service):
 
   @auth.endpoints_method(
       ValidateRequestMessage, ValidateResponseMessage, http_method='POST')
+  @auth.public
   def validate(self, request):
     """Validates a config.
 
