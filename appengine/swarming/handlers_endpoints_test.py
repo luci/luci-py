@@ -255,7 +255,7 @@ class TasksApiTest(BaseTest):
           {u'key': u'os', u'value': [u'Amiga']},
         ],
         u'bot_id': u'bot1',
-        u'bot_version': u'e821e620f06f76364246db14e973cd3e23735d14',
+        u'bot_version': self.bot_version,
         u'completed_ts': u'2010-01-02T03:04:05',
         u'cost_saved_usd': 0.1,
         u'created_ts': u'2010-01-02T05:05:05',
