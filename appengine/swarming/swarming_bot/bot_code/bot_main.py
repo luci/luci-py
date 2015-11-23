@@ -459,9 +459,17 @@ def run_manifest(botobj, manifest, start):
   msg = None
   work_dir = os.path.join(botobj.base_dir, 'work')
   try:
-    if os.path.isdir(work_dir):
-      file_path.rmtree(work_dir)
-    if not os.path.isdir(work_dir):
+    try:
+      if os.path.isdir(work_dir):
+        file_path.rmtree(work_dir)
+    except OSError:
+      # If a previous task created an undeleteable file/directory inside 'work',
+      # make sure that following tasks are not affected. This is done by working
+      # around the undeleteable directory by creating a temporary directory
+      # instead. This is not normal behavior. The bot will report a failure on
+      # start.
+      work_dir = tempfile.mkdtemp(dir=botobj.base_dir, prefix='work')
+    else:
       os.makedirs(work_dir)
 
     env = os.environ.copy()
