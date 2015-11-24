@@ -88,6 +88,7 @@ class ClientApiListHandler(auth.ApiHandler):
 
   @auth.public
   def get(self):
+    logging.error('Unexpected old client')
     # Hard to make it any simpler.
     prefix = '/swarming/api/v1/client/'
     data = {
@@ -120,6 +121,7 @@ class ClientHandshakeHandler(auth.ApiHandler):
   @auth.require_xsrf_token_request
   @auth.require(acl.is_bot_or_user)
   def post(self):
+    logging.error('Unexpected old client')
     request = self.parse_body()
     log_unexpected_keys(
         self.EXPECTED_KEYS, request, self.request, 'client', 'keys')
@@ -135,6 +137,7 @@ class ClientTaskResultBase(auth.ApiHandler):
   """Implements the common base code for task related query APIs."""
 
   def get_result_key(self, task_id):
+    logging.error('Unexpected old client')
     # TODO(maruel): Users can only request their own task. Privileged users can
     # request any task.
     key = None
@@ -163,6 +166,7 @@ class ClientTaskResultHandler(ClientTaskResultBase):
 
   @auth.require(acl.is_bot_or_user)
   def get(self, task_id):
+    logging.error('Unexpected old client')
     result = self.get_result_entity(task_id)
     self.send_response(utils.to_json_encodable(result))
 
@@ -172,6 +176,7 @@ class ClientTaskResultRequestHandler(ClientTaskResultBase):
 
   @auth.require(acl.is_bot_or_user)
   def get(self, task_id):
+    logging.error('Unexpected old client')
     _, summary_key = self.get_result_key(task_id)
     request_key = task_pack.result_summary_key_to_request_key(summary_key)
     self.send_response(utils.to_json_encodable(request_key.get()))
@@ -182,6 +187,7 @@ class ClientTaskResultOutputHandler(ClientTaskResultBase):
 
   @auth.require(acl.is_bot_or_user)
   def get(self, task_id, command_index):
+    logging.error('Unexpected old client')
     result = self.get_result_entity(task_id)
     output = result.get_command_output_async(int(command_index)).get_result()
     if output:
@@ -199,6 +205,7 @@ class ClientTaskResultOutputAllHandler(ClientTaskResultBase):
 
   @auth.require(acl.is_bot_or_user)
   def get(self, task_id):
+    logging.error('Unexpected old client')
     result = self.get_result_entity(task_id)
     # JSON then reencodes to ascii compatible encoded strings, which explodes
     # the size.
@@ -235,6 +242,7 @@ class ClientApiTasksHandler(auth.ApiHandler):
 
   @auth.require(acl.is_privileged_user)
   def get(self):
+    logging.error('Unexpected old client')
     extra = frozenset(self.request.GET) - self.EXPECTED
     if extra:
       self.abort_with_error(
@@ -296,6 +304,7 @@ class ClientApiTasksCountHandler(auth.ApiHandler):
 
   @auth.require(acl.is_privileged_user)
   def get(self):
+    logging.error('Unexpected old client')
     extra = frozenset(self.request.GET) - self.EXPECTED
     if extra:
       self.abort_with_error(
@@ -337,6 +346,7 @@ class ClientApiBots(auth.ApiHandler):
 
   @auth.require(acl.is_privileged_user)
   def get(self):
+    logging.error('Unexpected old client')
     now = utils.utcnow()
     limit = int(self.request.get('limit', 1000))
     filter_by = self.request.get('filter')
@@ -380,6 +390,7 @@ class ClientApiBot(auth.ApiHandler):
 
   @auth.require(acl.is_privileged_user)
   def get(self, bot_id):
+    logging.error('Unexpected old client')
     bot = bot_management.get_info_key(bot_id).get()
     if not bot:
       self.abort_with_error(404, error='Bot not found')
@@ -402,6 +413,7 @@ class ClientApiBotTask(auth.ApiHandler):
 
   @auth.require(acl.is_privileged_user)
   def get(self, bot_id):
+    logging.error('Unexpected old client')
     limit = int(self.request.get('limit', 100))
     cursor = datastore_query.Cursor(urlsafe=self.request.get('cursor'))
     run_results, cursor, more = task_result.TaskRunResult.query(
@@ -423,6 +435,7 @@ class ClientApiServer(auth.ApiHandler):
 
   @auth.require(acl.is_privileged_user)
   def get(self):
+    logging.error('Unexpected old client')
     data = {
       'bot_version': bot_code.get_bot_version(self.request.host_url),
     }
@@ -472,6 +485,7 @@ class ClientRequestHandler(auth.ApiHandler):
 
   @auth.require(acl.is_bot_or_user)
   def post(self):
+    logging.error('Unexpected old client')
     data = self.parse_body()
     msg = log_unexpected_subset_keys(
         self._EXPECTED_DATA_KEYS, self._REQUIRED_DATA_KEYS, data, self.request,
@@ -531,6 +545,7 @@ class ClientCancelHandler(auth.ApiHandler):
   # own task.
   @auth.require(acl.is_admin)
   def post(self):
+    logging.error('Unexpected old client')
     request = self.parse_body()
     task_id = request.get('task_id')
     summary_key = task_pack.unpack_result_summary_key(task_id)

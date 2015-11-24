@@ -165,6 +165,7 @@ class HandshakeHandler(ProtocolHandler):
   @auth.require(acl.isolate_readable)
   def post(self):
     """Responds with access token and server version."""
+    logging.error('Unexpected old client')
     try:
       request = json.loads(self.request.body)
       client_protocol = str(request['protocol_version'])
@@ -374,6 +375,7 @@ class PreUploadContentHandler(ProtocolHandler):
   @auth.require(acl.isolate_writable)
   def post(self, namespace):
     """Reads body with items to upload and replies with URLs to upload to."""
+    logging.error('Unexpected old client')
     if not re.match(r'^%s$' % model.NAMESPACE_RE, namespace):
       self.send_error(
           'Invalid namespace; allowed keys must pass regexp "%s"' %
@@ -423,6 +425,7 @@ class RetrieveContentHandler(ProtocolHandler):
 
   @auth.require(acl.isolate_readable)
   def get(self, namespace, hash_key):  #pylint: disable=W0221
+    logging.error('Unexpected old client')
     # Parse 'Range' header if it's present to extract initial offset.
     # Only support single continuous range from some |offset| to the end.
     offset = 0
@@ -524,6 +527,7 @@ class StoreContentHandler(ProtocolHandler):
   @auth.require(acl.isolate_writable)
   def post(self, namespace, hash_key):
     """POST is used when finalizing upload to GS."""
+    logging.error('Unexpected old client')
     return self.handle(namespace, hash_key)
 
   @auth.require(acl.isolate_writable)
