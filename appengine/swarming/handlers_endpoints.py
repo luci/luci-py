@@ -273,6 +273,14 @@ class SwarmingTasksService(remote.Service):
     except ValueError as e:
       raise endpoints.BadRequestException(
           'Inappropriate filter for tasks/list: %s' % e)
+    except datastore_errors.NeedIndexError as e:
+      logging.error('%s', e)
+      raise endpoints.BadRequestException(
+          'Requires new index, ask admin to create one.')
+    except datastore_errors.BadArgumentError as e:
+      logging.error('%s', e)
+      raise endpoints.BadRequestException(
+          'This combination is unsupported, sorry.')
     return swarming_rpcs.TaskList(
         cursor=cursor,
         items=[message_conversion.task_result_to_rpc(i) for i in items],

@@ -9,7 +9,6 @@ import json
 import webapp2
 from google.appengine.api import datastore_errors
 from google.appengine.api import taskqueue
-from google.appengine.ext import db
 
 import mapreduce_jobs
 from components import decorators
@@ -22,7 +21,7 @@ class CronBotDiedHandler(webapp2.RequestHandler):
   def get(self):
     try:
       task_scheduler.cron_handle_bot_died(self.request.host_url)
-    except db.NeedIndexError as e:
+    except datastore_errors.NeedIndexError as e:
       # When a fresh new instance is deployed, it takes a few minutes for the
       # composite indexes to be created even if they are empty. Ignore the case
       # where the index is defined but still being created by AppEngine.

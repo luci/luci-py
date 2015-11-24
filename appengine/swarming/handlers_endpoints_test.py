@@ -397,7 +397,150 @@ class TasksApiTest(BaseTest):
 
   def test_list_ok(self):
     """Asserts that list requests all TaskResultSummaries."""
+    first, second, str_now_120, start, end = self._gen_two_tasks()
+    # Basic request.
+    request = swarming_rpcs.TasksRequest(end=end, start=start)
+    self.assertEqual(
+        {u'now': str_now_120, u'items': [second, first]},
+        self.call_api('list', body=message_to_dict(request)).json)
 
+    # Sort by CREATED_TS.
+    request = swarming_rpcs.TasksRequest(
+        sort=swarming_rpcs.TaskSort.CREATED_TS)
+    self.assertEqual(
+        {u'now': str_now_120, u'items': [second, first]},
+        self.call_api('list', body=message_to_dict(request)).json)
+
+    # Sort by MODIFIED_TS.
+    request = swarming_rpcs.TasksRequest(
+        sort=swarming_rpcs.TaskSort.MODIFIED_TS)
+    self.assertEqual(
+        {u'now': str_now_120, u'items': [first, second]},
+        self.call_api('list', body=message_to_dict(request)).json)
+
+    # With two tags.
+    request = swarming_rpcs.TasksRequest(
+        end=end, start=start, tags=['project:yay', 'commit:pre'])
+    self.assertEqual(
+        {u'now': str_now_120, u'items': [second]},
+        self.call_api('list', body=message_to_dict(request)).json)
+
+    # A spurious tag.
+    request = swarming_rpcs.TasksRequest(end=end, start=start, tags=['foo:bar'])
+    self.assertEqual(
+        {u'now': str_now_120},
+        self.call_api('list', body=message_to_dict(request)).json)
+
+    # Both state and tag.
+    request = swarming_rpcs.TasksRequest(
+        end=end, start=start, tags=['commit:pre'],
+        state=swarming_rpcs.TaskState.COMPLETED_SUCCESS)
+    self.assertEqual(
+        {u'now': str_now_120, u'items': [second]},
+        self.call_api('list', body=message_to_dict(request)).json)
+
+    # Both sort and tag.
+    request = swarming_rpcs.TasksRequest(
+        end=end, start=start, tags=['commit:pre'],
+        sort=swarming_rpcs.TaskSort.MODIFIED_TS,
+        state=swarming_rpcs.TaskState.COMPLETED_SUCCESS)
+    with self.call_should_fail('400'):
+      self.call_api('list', body=message_to_dict(request))
+
+  def test_count_indexes(self):
+    # Asserts that no combination crashes.
+    _, _, str_now_120, start, end = self._gen_two_tasks()
+    for state in swarming_rpcs.TaskState:
+      for tags in ([], ['a:1'], ['a:1', 'b:2']):
+        request = swarming_rpcs.TasksCountRequest(
+            start=start, end=end, state=state, tags=tags)
+        result = self.call_api('count', body=message_to_dict(request)).json
+        # Don't check for correctness here, just assert that it doesn't throw
+        # due to missing index.
+        result.pop(u'count')
+        expected = {u'now': str_now_120}
+        self.assertEqual(expected, result)
+
+  def test_list_indexes(self):
+    # Asserts that no combination crashes unexpectedly.
+    TaskState = swarming_rpcs.TaskState
+    TaskSort = swarming_rpcs.TaskSort
+    # List of all unsupported combinations. These can be added either with a new
+    # index or by massaging the way entities are stored.
+    blacklisted = [
+        # (<Using start, end or tags>, TaskState, TaskSort)
+        (None, TaskState.BOT_DIED, TaskSort.ABANDONED_TS),
+        (None, TaskState.BOT_DIED, TaskSort.COMPLETED_TS),
+        (None, TaskState.BOT_DIED, TaskSort.MODIFIED_TS),
+        (None, TaskState.CANCELED, TaskSort.ABANDONED_TS),
+        (None, TaskState.CANCELED, TaskSort.COMPLETED_TS),
+        (None, TaskState.CANCELED, TaskSort.MODIFIED_TS),
+        (None, TaskState.COMPLETED, TaskSort.ABANDONED_TS),
+        (None, TaskState.COMPLETED, TaskSort.COMPLETED_TS),
+        (None, TaskState.COMPLETED, TaskSort.MODIFIED_TS),
+        (None, TaskState.COMPLETED_FAILURE, TaskSort.ABANDONED_TS),
+        (None, TaskState.COMPLETED_FAILURE, TaskSort.COMPLETED_TS),
+        (None, TaskState.COMPLETED_FAILURE, TaskSort.MODIFIED_TS),
+        (None, TaskState.COMPLETED_SUCCESS, TaskSort.ABANDONED_TS),
+        (None, TaskState.COMPLETED_SUCCESS, TaskSort.COMPLETED_TS),
+        (None, TaskState.COMPLETED_SUCCESS, TaskSort.MODIFIED_TS),
+        (None, TaskState.DEDUPED, TaskSort.ABANDONED_TS),
+        (None, TaskState.DEDUPED, TaskSort.COMPLETED_TS),
+        (None, TaskState.DEDUPED, TaskSort.MODIFIED_TS),
+        (None, TaskState.EXPIRED, TaskSort.ABANDONED_TS),
+        (None, TaskState.EXPIRED, TaskSort.COMPLETED_TS),
+        (None, TaskState.EXPIRED, TaskSort.MODIFIED_TS),
+        (None, TaskState.PENDING, TaskSort.ABANDONED_TS),
+        (None, TaskState.PENDING, TaskSort.COMPLETED_TS),
+        (None, TaskState.PENDING, TaskSort.MODIFIED_TS),
+        (None, TaskState.PENDING_RUNNING, TaskSort.ABANDONED_TS),
+        (None, TaskState.PENDING_RUNNING, TaskSort.COMPLETED_TS),
+        (None, TaskState.PENDING_RUNNING, TaskSort.MODIFIED_TS),
+        (None, TaskState.RUNNING, TaskSort.ABANDONED_TS),
+        (None, TaskState.RUNNING, TaskSort.COMPLETED_TS),
+        (None, TaskState.RUNNING, TaskSort.MODIFIED_TS),
+        (None, TaskState.TIMED_OUT, TaskSort.ABANDONED_TS),
+        (None, TaskState.TIMED_OUT, TaskSort.COMPLETED_TS),
+        (None, TaskState.TIMED_OUT, TaskSort.MODIFIED_TS),
+        (True, TaskState.ALL, TaskSort.ABANDONED_TS),
+        (True, TaskState.ALL, TaskSort.COMPLETED_TS),
+        (True, TaskState.ALL, TaskSort.MODIFIED_TS),
+    ]
+    _, _, str_now_120, start, end = self._gen_two_tasks()
+    for state in TaskState:
+      for tags in ([], ['a:1'], ['a:1', 'b:2']):
+        for start in (None, start):
+          for end in (None, end):
+            for sort in TaskSort:
+              request = swarming_rpcs.TasksRequest(
+                  start=start, end=end, state=state, tags=tags, sort=sort)
+              using_filter = bool(start or end or tags)
+              if ((using_filter, state, sort) in blacklisted or
+                  (None, state, sort) in blacklisted):
+                # TODO(maruel): Update as soon as new GAE SDK is released.
+                # https://code.google.com/p/googleappengine/issues/detail?id=10544
+                try:
+                  with self.assertRaises(AssertionError):
+                    self.call_api('list', body=message_to_dict(request))
+                except:  # pylint: disable=bare-except
+                  self.fail(
+                      'Is actually supported: (%s, %s, %s)' %
+                      (using_filter, state, sort))
+              else:
+                try:
+                  result = self.call_api(
+                      'list', body=message_to_dict(request)).json
+                except:  # pylint: disable=bare-except
+                  self.fail(
+                      'Is unsupported: (%s, %s, %s)' %
+                      (using_filter, state, sort))
+                # Don't check for correctness here, just assert that it doesn't
+                # throw due to missing index or invalid query.
+                result.pop(u'items', None)
+                expected = {u'now': str_now_120}
+                self.assertEqual(expected, result)
+
+  def _gen_two_tasks(self):
     # first request
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
@@ -499,55 +642,7 @@ class TasksApiTest(BaseTest):
         utils.datetime_to_timestamp(now + datetime.timedelta(days=1)) /
         1000000.)
     self.set_as_privileged_user()
-
-    # Basic request.
-    request = swarming_rpcs.TasksRequest(end=end, start=start)
-    self.assertEqual(
-        {u'now': str_now_120, u'items': [second, first]},
-        self.call_api('list', body=message_to_dict(request)).json)
-
-    # Sort by CREATED_TS.
-    request = swarming_rpcs.TasksRequest(
-        sort=swarming_rpcs.TaskSort.CREATED_TS)
-    self.assertEqual(
-        {u'now': str_now_120, u'items': [second, first]},
-        self.call_api('list', body=message_to_dict(request)).json)
-
-    # Sort by MODIFIED_TS.
-    request = swarming_rpcs.TasksRequest(
-        sort=swarming_rpcs.TaskSort.MODIFIED_TS)
-    self.assertEqual(
-        {u'now': str_now_120, u'items': [first, second]},
-        self.call_api('list', body=message_to_dict(request)).json)
-
-    # With two tags.
-    request = swarming_rpcs.TasksRequest(
-        end=end, start=start, tags=['project:yay', 'commit:pre'])
-    self.assertEqual(
-        {u'now': str_now_120, u'items': [second]},
-        self.call_api('list', body=message_to_dict(request)).json)
-
-    # A spurious tag.
-    request = swarming_rpcs.TasksRequest(end=end, start=start, tags=['foo:bar'])
-    self.assertEqual(
-        {u'now': str_now_120},
-        self.call_api('list', body=message_to_dict(request)).json)
-
-    # Both state and tag.
-    request = swarming_rpcs.TasksRequest(
-        end=end, start=start, tags=['commit:pre'],
-        state=swarming_rpcs.TaskState.COMPLETED_SUCCESS)
-    self.assertEqual(
-        {u'now': str_now_120, u'items': [second]},
-        self.call_api('list', body=message_to_dict(request)).json)
-
-    # Both sort and tag.
-    request = swarming_rpcs.TasksRequest(
-        end=end, start=start, tags=['commit:pre'],
-        sort=swarming_rpcs.TaskSort.MODIFIED_TS,
-        state=swarming_rpcs.TaskState.COMPLETED_SUCCESS)
-    with self.call_should_fail('400'):
-      self.call_api('list', body=message_to_dict(request))
+    return first, second, str_now_120, start, end
 
 
 class TaskApiTest(BaseTest):
