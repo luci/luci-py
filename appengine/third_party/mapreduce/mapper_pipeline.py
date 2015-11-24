@@ -42,6 +42,7 @@ class MapperPipeline(pipeline_base._OutputSlotsMixin,
     output_writer_spec: output writer specification as string.
     params: mapper parameters for input reader and output writer as dict.
     shards: number of shards in the job as int.
+    base_path: (optional) the path prefix under which requests to the servlet should go.
 
   Returns:
     default: the list of filenames produced by the mapper if there was any
@@ -67,7 +68,8 @@ class MapperPipeline(pipeline_base._OutputSlotsMixin,
           input_reader_spec,
           output_writer_spec=None,
           params=None,
-          shards=None):
+          shards=None,
+          base_path=None):
     """Start a mapreduce job.
 
     Args:
@@ -82,7 +84,8 @@ class MapperPipeline(pipeline_base._OutputSlotsMixin,
     """
     if shards is None:
       shards = parameters.config.SHARD_COUNT
-
+    if base_path is None:
+      base_path = parameters.config.BASE_PATH
     mapreduce_id = control.start_map(
         job_name,
         handler_spec,
@@ -92,6 +95,7 @@ class MapperPipeline(pipeline_base._OutputSlotsMixin,
             "done_callback": self.get_callback_url(),
             "done_callback_method": "GET",
             "pipeline_id": self.pipeline_id,
+            "base_path": base_path,
         },
         shard_count=shards,
         output_writer_spec=output_writer_spec,
@@ -99,7 +103,7 @@ class MapperPipeline(pipeline_base._OutputSlotsMixin,
         )
     self.fill(self.outputs.job_id, mapreduce_id)
     self.set_status(console_url="%s/detail?mapreduce_id=%s" % (
-        (parameters.config.BASE_PATH, mapreduce_id)))
+        (base_path, mapreduce_id)))
 
   def try_cancel(self):
     """Always allow mappers to be canceled and retried."""

@@ -1,7 +1,7 @@
 Name: Google AppEngine API for running MapReduce jobs
 Short Name: appengine-mapreduce
 URL: https://github.com/GoogleCloudPlatform/appengine-mapreduce
-Revision: 9f0d9a15cc3fc559a6296bbb3bf1676be942c7de
+Revision: e0d79c8ca72418dc214a71f9ea834644608024b6
 License: Apache License, Version 2.0
 
 Description:
