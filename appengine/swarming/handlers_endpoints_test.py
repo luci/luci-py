@@ -897,8 +897,105 @@ class BotApiTest(BaseTest):
       ],
       u'now': unicode(now_1.strftime(self.DATETIME_FORMAT)),
     }
-    json_version = response.json
-    self.assertEqual(expected, json_version)
+    self.assertEqual(expected, response.json)
+
+  def test_events(self):
+    # Run one task, push an event manually.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+    str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
+
+    self.set_as_bot()
+    self.client_create_task_raw()
+    token, params = self.get_bot_token()
+    res = self.bot_poll()
+    now_60 = self.mock_now(now, 60)
+    str_now_60 = unicode(now_60.strftime(self.DATETIME_NO_MICRO))
+    self.bot_complete_task(token, task_id=res['manifest']['task_id'])
+
+    params['event'] = 'bot_rebooting'
+    params['message'] = 'for the best'
+    response = self.post_with_token('/swarming/api/v1/bot/event', params, token)
+    self.assertEqual({}, response)
+
+    start = utils.datetime_to_timestamp(now) / 1000000.
+    end = utils.datetime_to_timestamp(now_60) / 1000000.
+    self.set_as_privileged_user()
+    body = message_to_dict(
+        swarming_rpcs.BotEventsRequest(start=start, end=end+1))
+    body['bot_id'] = 'bot1'
+    response = self.call_api('events', body=body)
+    dimensions = [
+      {u'key': u'id', u'value': [u'bot1']},
+      {u'key': u'os', u'value': [u'Amiga']},
+    ]
+    state = unicode(json.dumps(
+        {'running_time': 1234., 'sleep_streak': 0,
+          'started_ts': 1410990411.111},
+        sort_keys=True,
+        separators=(',',':')))
+    expected = {
+      u'items': [
+        {
+          u'dimensions': dimensions,
+          u'event_type': u'bot_rebooting',
+          u'external_ip': unicode(self.source_ip),
+          u'message': u'for the best',
+          u'quarantined': False,
+          u'state': state,
+          u'ts': str_now_60,
+          u'version': unicode(self.bot_version),
+        },
+        {
+          u'dimensions': dimensions,
+          u'event_type': u'task_completed',
+          u'external_ip': unicode(self.source_ip),
+          u'quarantined': False,
+          u'state': state,
+          u'task_id': u'5cee488008811',
+          u'ts': str_now_60,
+          u'version': unicode(self.bot_version),
+        },
+        {
+          u'dimensions': dimensions,
+          u'event_type': u'request_task',
+          u'external_ip': unicode(self.source_ip),
+          u'quarantined': False,
+          u'state': state,
+          u'task_id': u'5cee488008811',
+          u'ts': str_now,
+          u'version': unicode(self.bot_version),
+        },
+        {
+          u'dimensions': dimensions,
+          u'event_type': u'bot_connected',
+          u'external_ip': unicode(self.source_ip),
+          u'quarantined': False,
+          u'state': state,
+          u'ts': str_now,
+          u'version': u'123',
+        },
+        {
+          u'dimensions': dimensions,
+          u'event_type': u'bot_connected',
+          u'external_ip': unicode(self.source_ip),
+          u'quarantined': False,
+          u'state': state,
+          u'ts': str_now,
+          u'version': u'123',
+        },
+      ],
+        u'now': str_now_60,
+    }
+    self.assertEqual(expected, response.json)
+
+    # Now test with a subset.
+    body = message_to_dict(swarming_rpcs.BotEventsRequest(start=end, end=end+1))
+    body['bot_id'] = 'bot1'
+    response = self.call_api('events', body=body)
+    expected['items'] = expected['items'][:-3]
+    self.assertEqual(expected, response.json)
 
 
 if __name__ == '__main__':

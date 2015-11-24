@@ -309,6 +309,11 @@ BotId = endpoints.ResourceContainer(
     bot_id=messages.StringField(1, required=True))
 
 
+BotEventsRequest = endpoints.ResourceContainer(
+    swarming_rpcs.BotEventsRequest,
+    bot_id=messages.StringField(1, required=True))
+
+
 BotTasksRequest = endpoints.ResourceContainer(
     swarming_rpcs.BotTasksRequest,
     bot_id=messages.StringField(1, required=True))
@@ -354,6 +359,38 @@ class SwarmingBotService(remote.Service):
     get_or_raise(bot_key)  # raises 404 if there is no such bot
     bot_key.delete()
     return swarming_rpcs.DeletedResponse(deleted=True)
+
+  @auth.endpoints_method(
+      BotEventsRequest, swarming_rpcs.BotEvents,
+      name='events',
+      path='{bot_id}/events',
+      http_method='GET')
+  @auth.require(acl.is_privileged_user)
+  def events(self, request):
+    """Returns events that happened on a bot."""
+    logging.info('%s', request)
+    try:
+      now = utils.utcnow()
+      start = message_conversion.epoch_to_datetime(request.start)
+      end = message_conversion.epoch_to_datetime(request.end)
+      order = not (start or end)
+      query = bot_management.get_events_query(request.bot_id, order)
+      if not order:
+        query = query.order(
+            -bot_management.BotEvent.ts, bot_management.BotEvent.key)
+      if start:
+        query = query.filter(bot_management.BotEvent.ts >= start)
+      if end:
+        query = query.filter(bot_management.BotEvent.ts < end)
+      items, cursor = datastore_utils.fetch_page(
+          query, request.limit, request.cursor)
+    except ValueError as e:
+      raise endpoints.BadRequestException(
+          'Inappropriate filter for bot.events: %s' % e)
+    return swarming_rpcs.BotEvents(
+        cursor=cursor,
+        items=[message_conversion.bot_event_to_rpc(r) for r in items],
+        now=now)
 
   @auth.endpoints_method(
       BotId, swarming_rpcs.TerminateResponse,

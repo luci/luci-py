@@ -10,6 +10,12 @@ indexes:
 # automatically uploaded to the admin console when you next deploy
 # your application using appcfg.py.
 
+- kind: BotEvent
+  ancestor: yes
+  properties:
+  - name: ts
+    direction: desc
+
 - kind: TaskResultSummary
   properties:
   - name: failure

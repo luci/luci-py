@@ -271,7 +271,8 @@ class BotHandler(auth.AuthenticatingHandler):
             -task_result.TaskRunResult.started_ts).fetch_page_async(
                 limit, start_cursor=cursor)
     bot_future = bot_management.get_info_key(bot_id).get_async()
-    events_future = bot_management.get_events_query(bot_id).fetch_async(100)
+    events_future = bot_management.get_events_query(
+        bot_id, True).fetch_async(100)
 
     now = utils.utcnow()
 

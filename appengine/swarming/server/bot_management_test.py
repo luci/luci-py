@@ -77,7 +77,8 @@ class BotManagementTest(test_case.TestCase):
       },
     ]
     self.assertEqual(
-        expected, [i.to_dict() for i in bot_management.get_events_query('id1')])
+        expected,
+        [i.to_dict() for i in bot_management.get_events_query('id1', True)])
 
   def test_bot_event_poll_sleep(self):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
@@ -106,7 +107,7 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(False, bot_info.is_busy)
 
     # No BotEvent is registered for 'poll'.
-    self.assertEqual([], bot_management.get_events_query('id1').fetch())
+    self.assertEqual([], bot_management.get_events_query('id1', True).fetch())
 
   def test_bot_event_busy(self):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
@@ -148,7 +149,7 @@ class BotManagementTest(test_case.TestCase):
     ]
     self.assertEqual(
         expected,
-        [e.to_dict() for e in bot_management.get_events_query('id1')])
+        [e.to_dict() for e in bot_management.get_events_query('id1', True)])
 
   def test_should_restart_bot_not_set(self):
     state = {

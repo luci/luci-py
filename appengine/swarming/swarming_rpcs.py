@@ -236,6 +236,19 @@ class BotsRequest(messages.Message):
   cursor = messages.StringField(2)
 
 
+class BotEventsRequest(messages.Message):
+  """Request to get events for a bot."""
+  limit = messages.IntegerField(1, default=200)
+  cursor = messages.StringField(2)
+  # These should be DateTimeField but endpoints + protorpc have trouble encoding
+  # this message in a GET request, this is due to DateTimeField's special
+  # encoding in protorpc-1.0/protorpc/message_types.py that is bypassed when
+  # using endpoints-1.0/endpoints/protojson.py to add GET query parameter
+  # support.
+  end = messages.FloatField(3)
+  start = messages.FloatField(4)
+
+
 class BotTasksRequest(messages.Message):
   """Request to get data about a bot's tasks."""
   limit = messages.IntegerField(1, default=200)
@@ -279,6 +292,33 @@ class BotList(messages.Message):
   items = messages.MessageField(BotInfo, 2, repeated=True)
   now = message_types.DateTimeField(3)
   death_timeout = messages.IntegerField(4)
+
+
+class BotEvent(messages.Message):
+  # Timestamp of this event.
+  ts = message_types.DateTimeField(1)
+  # Type of event.
+  event_type = messages.StringField(2)
+  # Message included in the event.
+  message = messages.StringField(3)
+  # Bot dimensions at that moment.
+  dimensions = messages.MessageField(StringListPair, 4, repeated=True)
+  # Bot state at that moment, encoded as json.
+  state = messages.StringField(5)
+  # IP address as seen by the HTTP handler.
+  external_ip = messages.StringField(6)
+  # Version of swarming_bot.zip the bot is currently running.
+  version = messages.StringField(7)
+  # If True, the bot is not accepting task.
+  quarantined = messages.BooleanField(8)
+  # Affected by event_type == 'request_task', 'task_completed', 'task_error'.
+  task_id = messages.StringField(9)
+
+
+class BotEvents(messages.Message):
+  cursor = messages.StringField(1)
+  items = messages.MessageField(BotEvent, 2, repeated=True)
+  now = message_types.DateTimeField(3)
 
 
 class BotTasks(messages.Message):

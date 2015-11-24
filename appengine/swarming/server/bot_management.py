@@ -188,10 +188,13 @@ def get_info_key(bot_id):
   return ndb.Key(BotInfo, 'info', parent=get_root_key(bot_id))
 
 
-def get_events_query(bot_id):
+def get_events_query(bot_id, order):
   """Returns an ndb.Query for most recent events in reverse chronological order.
   """
-  return BotEvent.query(ancestor=get_root_key(bot_id)).order(BotEvent.key)
+  query = BotEvent.query(ancestor=get_root_key(bot_id))
+  if order:
+    query = query.order(BotEvent.key)
+  return query
 
 
 def get_settings_key(bot_id):

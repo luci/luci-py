@@ -13,6 +13,7 @@ ProtoRPC.
 
 import datetime
 import functools
+import json
 import logging
 import re
 
@@ -85,6 +86,16 @@ def bot_info_to_rpc(entity, now):
       dimensions=_string_list_pairs_from_dict(entity.dimensions),
       is_dead=entity.is_dead(now),
       bot_id=entity.id)
+
+
+def bot_event_to_rpc(entity):
+  """"Returns a swarming_rpcs.BotEvent from a bot.BotEvent."""
+  return _ndb_to_rpc(
+      swarming_rpcs.BotEvent,
+      entity,
+      dimensions=_string_list_pairs_from_dict(entity.dimensions),
+      state=json.dumps(entity.state, sort_keys=True, separators=(',', ':')),
+      task_id=entity.task_id if entity.task_id else None)
 
 
 def task_request_to_rpc(entity):
