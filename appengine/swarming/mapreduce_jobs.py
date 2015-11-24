@@ -19,6 +19,9 @@ from mapreduce import operation
 
 from components import utils
 
+from server import task_pack
+from server import task_result  # Needed for entity.get()
+
 
 # Task queue name to run all map reduce jobs on.
 MAPREDUCE_TASK_QUEUE = 'mapreduce-jobs'
@@ -38,6 +41,12 @@ MAPREDUCE_JOBS = {
       'entity_kind': 'server.task_result.TaskResultSummary',
     },
   },
+  'delete_old': {
+    'name': 'delete_old',
+    'mapper_parameters': {
+      'entity_kind': 'server.task_request.TaskRequest',
+    },
+  },
 }
 
 
@@ -45,7 +54,9 @@ def launch_job(job_id):
   """Launches a job given its key from MAPREDUCE_JOBS dict."""
   assert job_id in MAPREDUCE_JOBS, 'Unknown mapreduce job id %s' % job_id
   job_def = MAPREDUCE_JOBS[job_id].copy()
-  job_def.setdefault('shard_count', 256)
+  # 256 helps getting things done faster but it is very easy to burn thousands
+  # of $ within a few hours. Don't forget to update queue.yaml accordingly.
+  job_def.setdefault('shard_count', 128)
   job_def.setdefault('queue_name', MAPREDUCE_TASK_QUEUE)
   job_def.setdefault(
       'reader_spec', 'mapreduce.input_readers.DatastoreInputReader')
@@ -88,9 +99,30 @@ def backfill_tags(entity):
 
 def fix_tags(entity):
   """Backfills missing tags and fix the ones with an invalid value."""
-  request = entity.request_key.get()
+  request = entity.request_key.get(use_cache=False, use_memcache=False)
   # Compare the two lists of tags.
   if entity.tags != request.tags:
     entity.tags = request.tags
     logging.info('Fixed %s', entity.task_id)
     yield operation.db.Put(entity)
+
+
+def delete_old(entity):
+  key_to_delete = None
+  if entity.key.parent():
+    # It is a TaskRequestShard, it is very old.
+    key_to_delete = entity.key.parent()
+  elif not task_pack.request_key_to_result_summary_key(entity.key).get(
+      use_cache=False, use_memcache=False):
+    # There's a TaskRequest without TaskResultSummary, delete it.
+    key_to_delete = entity.key
+
+  if key_to_delete:
+    logging.info('Deleting %s: %s', entity.task_id, key_to_delete)
+    total = 1
+    qo = ndb.QueryOptions(keys_only=True)
+    for k in ndb.Query(default_options=qo, ancestor=key_to_delete):
+      yield operation.db.Delete(k)
+      total += 1
+    yield operation.db.Delete(key_to_delete)
+    logging.info('Deleted %d entities', total)

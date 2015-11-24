@@ -4,8 +4,10 @@ queue:
   rate: 1/m
 
 - name: mapreduce-jobs
-  bucket_size: 100
-  rate: 200/s
+  bucket_size: 500
+  rate: 500/s
+  # This limits the burn rate:
+  max_concurrent_requests: 128
   retry_parameters:
     task_age_limit: 2h
     min_backoff_seconds: 1
