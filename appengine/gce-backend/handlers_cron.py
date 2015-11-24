@@ -103,11 +103,13 @@ def process_instance_group(
       existing_instance = old_instance_map.get(instance_name)
       if existing_instance:
         new_instance_map[instance_name] = existing_instance
-        if existing_instance.state in state_machine.STATE_MACHINE:
-          state = existing_instance.state
+        state = existing_instance.state
+        if state in state_machine.STATE_MACHINE:
           logging.info('Processing instance in state: %s', state)
           instance_dicts[state][instance_name] = \
               state_machine.STATE_MACHINE[state].accumulator(existing_instance)
+        else:
+          logging.info('Not processing instance in state: %s', state)
       else:
         new_instance_map[instance_name] = models.Instance(
             name=instance_name,

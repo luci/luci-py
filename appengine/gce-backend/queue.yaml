@@ -1,6 +1,8 @@
 queue:
  - name: catalog-instance-group
    rate: 1/s
+ - name: check-metadata-operation
+   rate: 1/s
  - name: delete-instances
    rate: 1/s
  - name: prepare-instances

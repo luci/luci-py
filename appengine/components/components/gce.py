@@ -170,6 +170,19 @@ class Project(object):
         })
     return ZoneOperation(self, zone, op_info)
 
+  def check_zone_operation(self, zone, operation):
+    """Returns the result of a zone operation.
+
+    Args:
+      zone: name of a zone, e.g. 'us-central1-a'.
+      operation: name of the operation.
+
+    Returns:
+      A compute#operation dict.
+    """
+    assert is_valid_zone(zone), zone
+    return self.call_api('/zones/%s/operations/%s' % (zone, operation))
+
   def add_access_config(self, zone, instance, network_interface, external_ip):
     """Attaches external IP (given as IPv4 string) to an instance's NIC."""
     assert is_valid_zone(zone), zone

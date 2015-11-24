@@ -54,6 +54,13 @@ STATE_MACHINE = {
       models.InstanceStates.DELETING,
       models.InstanceStates.PENDING_DELETION,
   ),
+  models.InstanceStates.PENDING_METADATA_OPERATION: StateTransition(
+      lambda instance: instance.metadata_operation,
+      'check-metadata-operation',
+      '/internal/queues/check-metadata-operation',
+      models.InstanceStates.CHECKING_METADATA,
+      models.InstanceStates.PENDING_METADATA_OPERATION,
+  ),
   models.InstanceStates.PENDING_METADATA_UPDATE: StateTransition(
       lambda instance: {
           'pubsub_service_account': instance.pubsub_service_account,
