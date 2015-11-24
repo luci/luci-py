@@ -14,7 +14,8 @@ from protorpc import messages
 class TaskState(messages.Enum):
   (
     PENDING, RUNNING, PENDING_RUNNING, COMPLETED, COMPLETED_SUCCESS,
-    COMPLETED_FAILURE, EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, ALL) = range(11)
+    COMPLETED_FAILURE, EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, ALL,
+    DEDUPED) = range(12)
 
 
 class StateField(messages.Enum):

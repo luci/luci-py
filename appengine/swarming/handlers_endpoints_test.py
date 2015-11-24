@@ -283,6 +283,54 @@ class TasksApiTest(BaseTest):
     response = self.call_api('new', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
 
+    request = swarming_rpcs.TasksRequest(state=swarming_rpcs.TaskState.DEDUPED)
+    expected = {
+      u'items': [
+        {
+          u'bot_dimensions': [
+            {u'key': u'id', u'value': [u'bot1']},
+            {u'key': u'os', u'value': [u'Amiga']},
+          ],
+          u'bot_id': u'bot1',
+          u'bot_version': self.bot_version,
+          u'completed_ts': u'2010-01-02T03:04:05',
+          u'cost_saved_usd': 0.1,
+          u'created_ts': u'2010-01-02T05:05:05',
+          u'deduped_from': u'5cee488008811',
+          u'duration': 0.1,
+          u'exit_code': u'0',
+          u'failure': False,
+          u'internal_failure': False,
+          u'modified_ts': u'2010-01-02T05:05:05',
+          u'name': u'job1',
+          u'server_versions': [u'v1a'],
+          u'started_ts': u'2010-01-02T03:04:05',
+          u'state': u'COMPLETED',
+          u'tags': [
+            u'foo:bar',
+            u'os:Amiga',
+            u'priority:200',
+            u'user:joe@localhost',
+          ],
+          u'task_id': u'63dabe8006610',
+          u'try_number': u'0',
+          u'user': u'joe@localhost',
+        },
+      ],
+      u'now': str_now,
+    }
+    self.assertEqual(
+        expected,
+        self.call_api('list', body=message_to_dict(request)).json)
+
+    start = utils.datetime_to_timestamp(now) / 1000000. - 1
+    end = utils.datetime_to_timestamp(now) / 1000000. + 1
+    request = swarming_rpcs.TasksCountRequest(
+        start=start, end=end, state=swarming_rpcs.TaskState.DEDUPED)
+    self.assertEqual(
+        {u'now': str_now, u'count': u'1'},
+        self.call_api('count', body=message_to_dict(request)).json)
+
   def test_new_ok_isolated(self):
     """Asserts that new generates appropriate metadata."""
     self.mock(random, 'getrandbits', lambda _: 0x88)

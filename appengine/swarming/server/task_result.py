@@ -897,6 +897,10 @@ def _filter_query(cls, query, start, end, sort, state):
     query = query.filter(cls.state == State.COMPLETED)
     return query.filter(cls.failure == True)
 
+  if state == 'deduped':
+    query = query.filter(cls.state == State.COMPLETED)
+    return query.filter(cls.try_number == 0)
+
   if state == 'expired':
     return query.filter(cls.state == State.EXPIRED)
 
