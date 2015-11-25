@@ -98,16 +98,19 @@ def main():
   parser.add_argument('-a', '--all', action='store_true')
   args = parser.parse_args()
   servers = LocalServers(args.all)
+  dump_log = True
   try:
     servers.start()
     print('Swarming: %s' % servers.swarming_server.url)
     print('Isolate : %s' % servers.isolate_server.url)
     servers.wait()
-    servers.dump_log()
   except KeyboardInterrupt:
     print >> sys.stderr, '<Ctrl-C> received; stopping servers'
+    dump_log = False
   finally:
     exit_code = servers.stop(False)
+    if dump_log:
+      servers.dump_log()
   return exit_code
 
 

@@ -144,6 +144,9 @@ def CMDshell(parser, args):
   parser.allow_positional_args = True
   parser.add_option(
       '-H', '--host', help='Only necessary if not hosted on .appspot.com')
+  parser.add_option(
+      '--local', action='store_true',
+      help='Operates locally on an empty dev instance')
   app, options, args = parser.parse_args(args)
 
   module = 'default'
@@ -158,7 +161,7 @@ def CMDshell(parser, args):
   if module not in app.modules:
     parser.error('No such module: %s' % module)
 
-  if not options.host:
+  if not options.host and not options.local:
     prefixes = filter(None, (version, module, app.app_id))
     options.host = '%s.appspot.com' % '-dot-'.join(prefixes)
 
@@ -166,21 +169,22 @@ def CMDshell(parser, args):
   gae_sdk_utils.setup_env(
       app.app_dir, app.app_id, version, module, remote_api=True)
 
-  # Open the connection.
-  from google.appengine.ext.remote_api import remote_api_stub
-  try:
-    print('Connecting...')
-    remote_api_stub.ConfigureRemoteApi(
-        None,
-        '/_ah/remote_api',
-        gae_sdk_utils.get_authentication_function(),
-        options.host,
-        save_cookies=True,
-        secure=True)
-  except urllib2.URLError:
-    print >> sys.stderr, 'Failed to access %s' % options.host
-    return 1
-  remote_api_stub.MaybeInvokeAuthentication()
+  if options.host:
+    # Open the connection.
+    from google.appengine.ext.remote_api import remote_api_stub
+    try:
+      print('Connecting...')
+      remote_api_stub.ConfigureRemoteApi(
+          None,
+          '/_ah/remote_api',
+          gae_sdk_utils.get_authentication_function(),
+          options.host,
+          save_cookies=True,
+          secure=True)
+    except urllib2.URLError:
+      print >> sys.stderr, 'Failed to access %s' % options.host
+      return 1
+    remote_api_stub.MaybeInvokeAuthentication()
 
   def register_sys_path(*path):
     abs_path = os.path.abspath(os.path.join(*path))
