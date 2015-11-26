@@ -9,7 +9,7 @@ import logging
 import sys
 import unittest
 
-from test_support import test_env
+import test_env
 test_env.setup_test_env()
 
 from google.appengine.ext import ndb

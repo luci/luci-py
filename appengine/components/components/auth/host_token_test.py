@@ -7,7 +7,7 @@ import datetime
 import sys
 import unittest
 
-from test_support import test_env
+import test_env
 test_env.setup_test_env()
 
 from components.auth import host_token
