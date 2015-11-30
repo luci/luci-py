@@ -172,9 +172,9 @@ def load_and_run(in_file, swarming_server, cost_usd_hour, start, out_file):
   def handler(sig, _):
     logging.info('Got signal %s', sig)
     raise MustExit(sig)
+  work_dir = os.path.dirname(out_file)
   try:
     with subprocess42.set_signal_handler([SIG_BREAK_OR_TERM], handler):
-      work_dir = os.path.abspath('work')
       if not os.path.isdir(work_dir):
         raise ValueError('%s expected to exist' % work_dir)
 
@@ -203,7 +203,6 @@ def load_and_run(in_file, swarming_server, cost_usd_hour, start, out_file):
   finally:
     # We've found tests to delete 'work' when quitting, causing an exception
     # here. Try to recreate the directory if necessary.
-    work_dir = os.path.dirname(out_file)
     if not os.path.isdir(work_dir):
       os.mkdir(work_dir)
     with open(out_file, 'wb') as f:

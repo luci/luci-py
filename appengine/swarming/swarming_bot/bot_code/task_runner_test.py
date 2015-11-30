@@ -222,7 +222,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       }
       json.dump(data, f)
 
-    out_file = os.path.join(self.root_dir, 'task_runner_out.json')
+    out_file = os.path.join(self.root_dir, 'work', 'task_runner_out.json')
     task_runner.load_and_run(manifest, server, 3600., time.time(), out_file)
     expected = {
       u'exit_code': 1,
@@ -275,7 +275,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       }
       json.dump(data, f)
 
-    out_file = os.path.join(self.root_dir, 'task_runner_out.json')
+    out_file = os.path.join(self.root_dir, 'work', 'task_runner_out.json')
     task_runner.load_and_run(manifest, server, 3600., time.time(), out_file)
     expected = {
       u'exit_code': 0,

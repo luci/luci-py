@@ -561,7 +561,8 @@ def run_manifest(botobj, manifest, start):
       try:
         file_path.rmtree(work_dir)
       except Exception as e:
-        botobj.post_error('Failed to delete work directory: %s' % e)
+        botobj.post_error(
+            'Failed to delete work directory %s: %s' % (work_dir, e))
 
 
 def update_bot(botobj, version):
