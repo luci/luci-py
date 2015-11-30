@@ -53,6 +53,12 @@ def generate_launchd_plist(command, cwd, plistname):
     '<key>RunAtLoad</key><true/>',
     '<key>Umask</key><integer>18</integer>',
 
+    # https://developer.apple.com/library/mac/documentation/Darwin/Reference/ManPages/man5/launchd.plist.5.html
+    # launchd expects the process to call vproc_transaction_begin(), which we
+    # don't. Otherwise it sends SIGKILL instead of SIGTERM, which isn't nice.
+    '<key>EnableTransactions</key>',
+    '<false/>',
+
     '<key>EnvironmentVariables</key>',
     '<dict>',
     '  <key>PATH</key>',
