@@ -48,12 +48,6 @@ class NotificationsTestCase(test_case.TestCase):
     gitiles.get_log_async.return_value.set_result(
         gitiles.Log(commits=[commit], next_cursor=None))
 
-    storage.ConfigSet(
-        id='projects/x',
-        latest_revision=old_rev,
-        location=str(base)
-    ).put()
-
     self.mock(template, 'render', mock.Mock())
 
     self.mock(auth, 'list_group', mock.Mock())
@@ -61,6 +55,8 @@ class NotificationsTestCase(test_case.TestCase):
       auth.Identity('user', 'bill@x.com'),
       auth.Identity('service', 'foo'),
     ]
+
+    # Notify.
 
     notifications.notify_gitiles_rejection('projects/x', new_loc, ctx.result())
 
@@ -73,6 +69,38 @@ class NotificationsTestCase(test_case.TestCase):
     self.assertEqual(email.to, ['John <john@x.com>'])
     self.assertEqual(email.cc, {'bill@x.com'})
 
+    template.render.assert_called_with(
+        'templates/validation_notification.html',
+        {
+          'author': 'John',
+          'messages': [
+            {'severity': 'ERROR', 'text': 'err'},
+            {'severity': 'WARNING', 'text': 'warn'}
+          ],
+          'rev_link': new_loc,
+          'rev_hash': 'aaaaaaa',
+          'rev_repo': 'x',
+          'cur_rev_hash': None,
+          'cur_rev_link': None,
+        })
+
+    # Do not send second time.
+    notifications._send.reset_mock()
+    notifications.notify_gitiles_rejection('projects/x', new_loc, ctx.result())
+    self.assertFalse(notifications._send.called)
+
+    # Now with config set.
+
+    ndb.Key(notifications.Notification, str(new_loc)).delete()
+
+    storage.ConfigSet(
+      id='projects/x',
+      latest_revision=old_rev,
+      location=str(base)
+    ).put()
+
+    template.render.reset_mock()
+    notifications.notify_gitiles_rejection('projects/x', new_loc, ctx.result())
     template.render.assert_called_with(
         'templates/validation_notification.html',
         {

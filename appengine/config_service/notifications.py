@@ -83,31 +83,37 @@ def notify_gitiles_rejection(config_set, location, validation_result):
   app_id = app_identity.get_application_id()
   rev = location.treeish[:7]
 
-  cs = storage.ConfigSet.get_by_id(config_set)
-  assert cs
-
   try:
+    template_params = {
+      'author': commit.author.name or commit.author.email,
+      'messages': [
+        {
+          'severity': logging.getLevelName(msg.severity),
+          'text': msg.text
+        }
+        for msg in validation_result.messages
+        ],
+      'rev_link': location,
+      'rev_hash': rev,
+      'rev_repo': location.project,
+      'cur_rev_hash': None,
+      'cur_rev_link': None,
+    }
+
+    cs = storage.ConfigSet.get_by_id(config_set)
+    if cs:
+      template_params.update(
+          cur_rev_hash=cs.latest_revision[:7],
+          cur_rev_link=location._replace(treeish=cs.latest_revision),
+      )
     msg = mail.EmailMessage(
         sender=(
             '%s.appspot.com <%s@appspot.gserviceaccount.com>' %
             (app_id, app_id)),
         subject='Config revision %s is rejected' % rev,
         to=get_recipients(commit),
-        html=template.render('templates/validation_notification.html', {
-          'author': commit.author.name or commit.author.email,
-          'messages': [
-            {
-              'severity': logging.getLevelName(msg.severity),
-              'text': msg.text
-            }
-            for msg in validation_result.messages
-          ],
-          'rev_link': location,
-          'rev_hash': rev,
-          'rev_repo': location.project,
-          'cur_rev_hash': cs.latest_revision[:7],
-          'cur_rev_link': location._replace(treeish=cs.latest_revision),
-        }))
+        html=template.render(
+            'templates/validation_notification.html', template_params))
     cc = get_cc_recipients()
     if cc:
       msg.cc = cc
