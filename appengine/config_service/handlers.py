@@ -11,6 +11,7 @@ from components.config.proto import service_config_pb2
 
 import common
 import gitiles_import
+import notifications
 import storage
 
 
@@ -49,8 +50,9 @@ class SchemasHandler(webapp2.RequestHandler):
 
 def get_frontend_routes():  # pragma: no cover
   return [
-      webapp2.Route(r'/', MainPageHandler),
-      webapp2.Route(r'/schemas/<name:.+>', SchemasHandler),
+    webapp2.Route(r'/', MainPageHandler),
+    webapp2.Route(r'/schemas/<name:.+>', SchemasHandler),
+    webapp2.Route(r'/_ah/bounce', notifications.BounceHandler),
   ]
 
 

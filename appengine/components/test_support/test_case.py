@@ -100,6 +100,8 @@ class TestCase(auto_stub.TestCase):
     self._taskqueue_stub = self.testbed.get_stub(testbed.TASKQUEUE_SERVICE_NAME)
     self._taskqueue_stub._root_path = self.APP_DIR
 
+    self.testbed.init_user_stub()
+
   def tearDown(self):
     try:
       if not self.has_failed():

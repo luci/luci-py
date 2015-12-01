@@ -23,15 +23,14 @@ from google.appengine.api import urlfetch_errors
 from google.appengine.ext import ndb
 from google.protobuf import text_format
 
-from components import auth
 from components import config
 from components import gitiles
 from components import net
-from components.datastore_utils import txn
 from components.config.proto import service_config_pb2
 
 import admin
 import common
+import notifications
 import projects
 import storage
 import validation
@@ -87,9 +86,9 @@ def import_revision(
       updated_config_set.put()
     return
 
-  entites_to_put = [storage.Revision(key=rev_key)]
+  entities_to_put = [storage.Revision(key=rev_key)]
   if create_config_set:
-    entites_to_put.append(updated_config_set)
+    entities_to_put.append(updated_config_set)
 
   # Fetch archive, extract files and save them to Blobs outside ConfigSet
   # transaction.
@@ -105,25 +104,30 @@ def import_revision(
     stream = StringIO.StringIO(archive)
     blob_futures = []
     with tarfile.open(mode='r|gz', fileobj=stream) as tar:
+      files = {}
+      ctx = config.validation.Context()
       for item in tar:
         if not item.isreg():  # pragma: no cover
           continue
         with contextlib.closing(tar.extractfile(item)) as extracted:
           content = extracted.read()
-          ctx = config.validation.Context.logging()
+          files[item.name] = content
           validation.validate_config(config_set, item.name, content, ctx=ctx)
-          if ctx.result().has_errors:
-            logging.error('Invalid revision %s@%s', config_set, revision)
-            return
-          content_hash = storage.compute_hash(content)
-          blob_futures.append(storage.import_blob_async(
-              content=content, content_hash=content_hash))
-          entites_to_put.append(
-              storage.File(
-                  id=item.name,
-                  parent=rev_key,
-                  content_hash=content_hash)
-          )
+      if ctx.result().has_errors:
+        logging.warning('Invalid revision %s@%s', config_set, revision)
+        notifications.notify_gitiles_rejection(
+            config_set, location, ctx.result())
+        return
+      for name, content in files.iteritems():
+        content_hash = storage.compute_hash(content)
+        blob_futures.append(storage.import_blob_async(
+            content=content, content_hash=content_hash))
+        entities_to_put.append(
+            storage.File(
+                id=name,
+                parent=rev_key,
+                content_hash=content_hash)
+        )
 
     # Wait for Blobs to be imported before proceeding.
     ndb.Future.wait_all(blob_futures)
@@ -131,7 +135,7 @@ def import_revision(
   @ndb.transactional
   def do_import():
     if not rev_key.get():
-      ndb.put_multi(entites_to_put)
+      ndb.put_multi(entities_to_put)
 
   do_import()
   logging.info('Imported revision %s/%s', config_set, location.treeish)

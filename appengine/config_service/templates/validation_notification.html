@@ -1,0 +1,23 @@
+<p>Hi {{ author }},</p>
+
+<p>
+  Some configs in revision <a href="{{ rev_link }}">{{ rev_hash }}</a>
+  in {{ rev_repo }} repo have validation errors.
+  <a href="{{ hostname }}">luci-config</a> had to reject all configs in this
+  revision.
+</p>
+
+<ul>
+  {% for msg in messages %}
+    <li>{{ msg.severity }}: {{ msg.text }}</li>
+  {% endfor %}
+</ul>
+
+<p>Please correct these errors. If you have questions, ask CCed people.</p>
+
+<p>
+  Configs in revision <a href="{{ cur_rev_link }}">{{ cur_rev_hash }}</a>
+  will remain active until new valid ones are committed.
+</p>
+
+<p>-Your friendly luci-config service</p>

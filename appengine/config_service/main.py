@@ -13,10 +13,22 @@ import webapp2
 
 from components import utils
 from components import ereporter2
+from components import template
+from google.appengine.api import app_identity
 
 import admin
 import api
 import handlers
+
+
+def bootstrap_templates():
+  TEMPLATES_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), 'templates')
+  template.bootstrap(
+      {'templates': TEMPLATES_DIR},
+      global_env={
+        'hostname': app_identity.get_default_version_hostname()
+      })
 
 
 def create_html_app():  # pragma: no cover
@@ -32,6 +44,7 @@ def create_endpoints_app():  # pragma: no cover
 
 def create_backend_app():  # pragma: no cover
   """Returns WSGI app for backend."""
+  bootstrap_templates()
   return webapp2.WSGIApplication(
       handlers.get_backend_routes(), debug=utils.is_local_dev_server())
 

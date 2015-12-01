@@ -40,6 +40,9 @@ includes:
 - components/auth
 - components/ereporter2
 
+inbound_services:
+- mail_bounce
+
 skip_files:
 # Test and tools.
 - support/
