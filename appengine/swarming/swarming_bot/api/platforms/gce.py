@@ -24,10 +24,6 @@ _CACHED_OAUTH2_TOKEN_LOCK = threading.Lock()
 ## Public API.
 
 
-class SendMetricsFailure(Exception):
-  """Signals that metrics couldn't be sent successfully."""
-
-
 def is_gce():
   """Returns True if running on Google Compute Engine."""
   return bool(get_metadata())
@@ -115,68 +111,9 @@ def get_tags():
   return get_metadata()['instance']['tags']
 
 
-def send_metric(name, value):
-  """Sets a lightweight custom metric.
-
-  In particular, the metric has no description and it is double. To make this
-  work, use "--scopes https://www.googleapis.com/auth/monitoring" when running
-  "gcloud compute instances create". You can verify if the scope is enabled from
-  within a GCE VM with:
-    curl "http://metadata.google.internal/computeMetadata/v1/instance/\
-service-accounts/default/scopes" -H "Metadata-Flavor: Google"
-
-  Ref: https://cloud.google.com/monitoring/custom-metrics/lightweight
-
-  To create a metric, use:
-  https://developers.google.com/apis-explorer/#p/cloudmonitoring/v2beta2/cloudmonitoring.metricDescriptors.create
-  It is important to set the commonLabels.
-  """
-  logging.info('send_metric(%s, %s)', name, value)
-  assert isinstance(name, str), repr(name)
-  assert isinstance(value, float), repr(value)
-
-  metadata = get_metadata()
-  project_id = metadata['project']['numericProjectId']
-
-  url = (
-    'https://www.googleapis.com/cloudmonitoring/v2beta2/projects/%s/'
-    'timeseries:write') % project_id
-  now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-  body = {
-    'commonLabels': {
-      'cloud.googleapis.com/service': 'compute.googleapis.com',
-      'cloud.googleapis.com/location': get_zone(),
-      'compute.googleapis.com/resource_type': 'instance',
-      'compute.googleapis.com/resource_id': metadata['instance']['id'],
-    },
-    'timeseries': [
-      {
-        'timeseriesDesc': {
-          'metric': 'custom.cloudmonitoring.googleapis.com/' + name,
-          'project': project_id,
-        },
-        'point': {
-          'start': now,
-          'end': now,
-          'doubleValue': value,
-        },
-      },
-    ],
-  }
-  try:
-    token = oauth2_access_token()
-  except (IOError, urllib2.HTTPError) as e:
-    raise SendMetricsFailure(e)
-
-  headers = {
-    'Authorization': 'Bearer ' + token,
-    'Content-Type': 'application/json',
-  }
-  logging.info('%s', json.dumps(body, indent=2, sort_keys=True))
-  try:
-    resp = urllib2.urlopen(urllib2.Request(url, json.dumps(body), headers))
-    # Result must be valid JSON. A sample response:
-    #   {"kind": "cloudmonitoring#writeTimeseriesResponse"}
-    logging.debug(json.load(resp))
-  except (IOError, urllib2.HTTPError) as e:
-    raise SendMetricsFailure(e)
+@tools.cached
+def can_send_metric(service_account):
+  """True if 'send_metric' really does something."""
+  # Scope to use Cloud Monitoring.
+  scope = 'https://www.googleapis.com/auth/monitoring'
+  return scope in oauth2_available_scopes(account=service_account)

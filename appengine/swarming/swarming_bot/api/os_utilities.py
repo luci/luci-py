@@ -37,6 +37,8 @@ from api import parallel
 from api import platforms
 from utils import file_path
 from utils import tools
+from third_party import httplib2
+from third_party.oauth2client import client
 
 
 # For compatibility with older bot_config.py files.
@@ -98,6 +100,9 @@ GCE_SSD_GB_COST_MONTH = 0.17
 # https://cloud.google.com/compute/pricing#premiumoperatingsystems
 GCE_WINDOWS_COST_CORE_HOUR = 0.04
 
+
+MONITORING_ENDPOINT = 'https://www.googleapis.com/cloudmonitoring/v2beta2'
+MONITORING_SCOPES = ['https://www.googleapis.com/auth/monitoring']
 
 ### Private stuff.
 
@@ -432,20 +437,92 @@ def get_machine_type():
   return machine_type
 
 
+class SendMetricsFailure(Exception):
+  pass
+
+
+def send_metric(name, value, labels, project, service_account):
+  """Send a custom metric value to Cloud Monitoring.
+
+  Args:
+    name: Name of the custom metric. Must already exist.
+    value: Value to send. Must be int or float.
+    labels: Labels to include with the metric. Must be a dict.
+    project: Project the metric exists in. Must already exist.
+    service_account: Service account to use. For GCE, the name of
+      the service account, otherwise the path to the service account
+      JSON file.
+
+  Raises:
+    SendMetricsFailure
+  """
+  headers = {
+      'Content-Type': 'application/json',
+  }
+  http = httplib2.Http(ca_certs=tools.get_cacerts_bundle())
+
+  # Authorize the request. In general, we need to produce an OAuth2 bearer token
+  # using a service account JSON file. However on GCE there is a shortcut: it
+  # can fetch the current bearer token right from the instance metadata without
+  # the need for the oauth2client.client library.
+  if platforms.is_gce():
+    try:
+      gce_bearer_token = platforms.gce.oauth2_access_token(
+          account=service_account)
+    except (IOError, urllib2.HTTPError) as e:
+      raise SendMetricsFailure(e)
+    headers['Authorization'] = 'Bearer %s' % gce_bearer_token
+  else:
+    try:
+      oauth2client = get_oauth2_client(service_account, MONITORING_SCOPES)
+    except (IOError, OSError, ValueError) as e:
+      raise SendMetricsFailure(e)
+    http = oauth2client.authorize(http)
+
+  now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+  body = {
+      'commonLabels': labels,
+      'timeseries': [{
+          'point': {
+              'end': now,
+              'start': now,
+          },
+          'timeseriesDesc': {
+              'metric': 'custom.cloudmonitoring.googleapis.com/%s' % name,
+              'project': project,
+          },
+      }],
+  }
+  # Cloud Monitoring only supports int64 and double for custom metrics.
+  if isinstance(value, int):
+    body['timeseries'][0]['point']['int64Value'] = value
+  elif isinstance(value, float):
+    body['timeseries'][0]['point']['doubleValue'] = value
+  else:
+    raise SendMetricsFailure('Invalid value type: %s' % type(value))
+
+  response, content = http.request(
+      '%s/projects/%s/timeseries:write' % (MONITORING_ENDPOINT, project),
+      method='POST', body=json.dumps(body), headers=headers)
+
+  if response['status'] != '200':
+    raise SendMetricsFailure(json.loads(content))
+
+
+def get_oauth2_client(service_account_json_file, scopes=None):
+  if not scopes:
+    scopes = []
+  # Ensure scopes is a hashable type for caching.
+  return _get_oauth2_client(service_account_json_file, tuple(sorted(scopes)))
+
+
 @tools.cached
-def can_send_metric():
-  """True if 'send_metric' really does something."""
-  if platforms.is_gce():
-    # Scope to use Cloud Monitoring.
-    scope = 'https://www.googleapis.com/auth/monitoring'
-    return scope in platforms.gce.oauth2_available_scopes()
-  return False
-
-
-def send_metric(name, value):
-  if platforms.is_gce():
-    return platforms.gce.send_metric(name, value)
-  # Ignore on other platforms for now.
+def _get_oauth2_client(service_account_json_file, scopes):
+  with open(service_account_json_file) as f:
+    service_account_json = json.load(f)
+  return client.SignedJwtAssertionCredentials(
+      service_account_json['client_email'], service_account_json['private_key'],
+      scopes)
 
 
 ### Android.
