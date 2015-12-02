@@ -11,8 +11,6 @@ includes:
 - components/auth
 
 libraries:
-- name: jinja2
-  version: "2.6"
 - name: pycrypto
   version: "2.6"
 - name: webapp2

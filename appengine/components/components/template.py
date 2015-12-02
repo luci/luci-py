@@ -7,12 +7,14 @@
 import os
 import urllib
 
+from components import utils
+utils.import_jinja2()
+
 import jinja2
 
 from google.appengine.api import users
 
 from components import natsort
-from components import utils
 
 
 NON_BREAKING_HYPHEN = u'\u2011'

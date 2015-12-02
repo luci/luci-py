@@ -598,3 +598,11 @@ def fix_protobuf_package():
   protobuf_pkg = os.path.join(THIS_DIR, 'third_party', 'protobuf', 'google')
   if protobuf_pkg not in google.__path__:
     google.__path__.append(protobuf_pkg)
+
+
+def import_jinja2():
+  """Remove any existing jinja2 package and add ours."""
+  for i in sys.path[:]:
+    if os.path.basename(i) == 'jinja2':
+      sys.path.remove(i)
+  sys.path.append(os.path.join(THIS_DIR, 'third_party'))
