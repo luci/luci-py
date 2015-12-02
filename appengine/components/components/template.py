@@ -67,13 +67,6 @@ def _timedeltaformat(value):
   return '%d:%02d' % (minutes, seconds)
 
 
-def _urlquote(s):
-  # TODO(maruel): Remove once jinja is upgraded to 2.7.
-  if isinstance(s, jinja2.Markup):
-    s = s.unescape()
-  return jinja2.Markup(urllib.quote_plus(s.encode('utf8')))
-
-
 # Filters available by default.
 _DEFAULT_GLOBAL_FILTERS = {
   'datetimeformat': _datetimeformat,
@@ -82,7 +75,6 @@ _DEFAULT_GLOBAL_FILTERS = {
   'natsort': _natsorted,
   'succinctdatetimeformat': _succinctdatetimeformat,
   'timedeltaformat': _timedeltaformat,
-  'urlquote': _urlquote,
 }
 
 

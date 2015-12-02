@@ -156,6 +156,9 @@ def setup_gae_sdk(sdk_path):
 
   import dev_appserver
   dev_appserver.fix_sys_path()
+  for i in sys.path[:]:
+    if 'jinja2-2.6' in i:
+      sys.path.remove(i)
 
   # Make 'yaml' variable (defined on top of this module) point to loaded module.
   global yaml
