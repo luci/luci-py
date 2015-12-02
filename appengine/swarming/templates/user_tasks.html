@@ -104,9 +104,11 @@
   }
 
   function update_filter() {
-    // This resets the cursor and sort.
-    var state = radio_value("state");
-    var url = '/user/tasks?state=' + state + '&limit=' + get_limit();
+    // This resets the cursor, sort and task name.
+    var task_tag = document.getElementById("task_tag").value;
+    var url = '/user/tasks?state=' + encodeURIComponent(radio_value("state")) +
+        '&limit=' + encodeURIComponent(get_limit()) +
+        '&task_tag=' + encodeURIComponent(task_tag);
     document.location.href = url;
   }
 </script>
@@ -171,7 +173,7 @@
           Task tags<br>
           (whole tag only, 1 per line)
           <br>
-          <textarea name="task_tag" rows="3" cols="30">{{task_tag}}</textarea>
+          <textarea id="task_tag" name="task_tag" rows="3" cols="30">{{task_tag}}</textarea>
           <br>
           <input type="submit" value="Search">
         </div>
@@ -192,13 +194,30 @@
 </form>
 <br>
 
+
 {% macro total_pending_star() %}
   {% if has_pending %}*{% endif %}
   {% endmacro %}
 
+
 {% macro total_running_star() %}
   {% if has_running %}*{% endif %}
 {% endmacro %}
+
+
+{% macro next_page_link() %}
+{% if cursor %}
+<p>
+{% if task_tag %}
+  <a href="/user/tasks?limit={{limit}}&state={{state}}&task_tag={{task_tag|urlencode}}&cursor={{cursor|urlencode}}">Next page</a>
+{% elif task_name %}
+  <a href="/user/tasks?limit={{limit}}&state={{state}}&task_name={{task_name|urlencode}}&cursor={{cursor|urlencode}}">Next page</a>
+{% else %}
+  <a href="/user/tasks?limit={{limit}}&state={{state}}&sort={{sort}}&cursor={{cursor|urlencode}}">Next page</a>
+{% endif %}
+{% endif %}
+{% endmacro %}
+
 
 {% if tasks %}
   <table id="request-table" class="alterning_background"
@@ -276,7 +295,7 @@
     {% if show_footer %}
       <tfoot>
         <tr>
-          <td></td>
+          <td>{{ next_page_link() }}</td>
           <td></td>
           <td><strong>Median</strong></td>
           <td>
@@ -344,21 +363,12 @@
           <td></td>
         </tr>
       </tfoot>
+    {% else %}
+      {{ next_page_link() }}
     {% endif %}
   </table>
 {% else %}
   No data to show for this selection.
-{% endif %}
-
-{% if cursor %}
-<p>
-{% if task_tag %}
-  <a href="/user/tasks?task_tag={{task_tag}}&limit={{limit}}&cursor={{cursor}}">Next page</a>
-{% elif task_name %}
-  <a href="/user/tasks?task_name={{task_name}}&limit={{limit}}&cursor={{cursor}}">Next page</a>
-{% else %}
-  <a href="/user/tasks?sort={{sort}}&state={{state}}&limit={{limit}}&cursor={{cursor}}">Next page</a>
-{% endif %}
 {% endif %}
 
 {% endblock %}
