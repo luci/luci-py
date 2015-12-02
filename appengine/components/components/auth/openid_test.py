@@ -9,7 +9,7 @@ import sys
 import unittest
 import urlparse
 
-import test_env
+from test_support import test_env
 test_env.setup_test_env()
 
 from google.appengine.api import app_identity
