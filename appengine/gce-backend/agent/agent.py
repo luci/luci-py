@@ -9,16 +9,25 @@ import base64
 import datetime
 import httplib2
 import json
+import os
+import shutil
 import socket
 import subprocess
 import sys
 import tempfile
 import time
+import urllib2
 import urlparse
 
 
+THIS_DIR = os.path.dirname(__file__)
+
 METADATA_BASE_URL = 'http://metadata/computeMetadata/v1'
 PUBSUB_BASE_URL = 'https://pubsub.googleapis.com/v1/projects'
+SWARMING_BOT_DIR = '/b/swarm_slave'
+SWARMING_BOT_ZIP = os.path.join(SWARMING_BOT_DIR, 'swarming_bot.zip')
+SWARMING_UPSTART_CONFIG_DEST = '/etc/init/swarming-start-bot.conf'
+SWARMING_UPSTART_CONFIG_SRC = os.path.join(THIS_DIR, 'swarming-start-bot.conf')
 
 
 class Error(Exception):
@@ -175,20 +184,26 @@ def main():
       message = base64.b64decode(message['message'].get('data', ''))
 
       if message == 'CONNECT' and attributes.get('swarming_server'):
-        response, content = httplib2.Http().request(
-            urlparse.urljoin(attributes.get('swarming_server'), 'bootstrap'),
-            method='GET',
-        )
-        if response['status'] == '200':
-          bootstrap = tempfile.mkstemp('bootstrap')[1]
-          with open(bootstrap, 'w') as f:
-            f.write(content)
-          # Once the bootstrap is complete, the instance will be rebooted,
-          # and on startup it will connect to the Swarming server. Since
-          # the instance will be rebooted, acknowledge all messages now.
-          pubsub.acknowledge(subscription, project, [ack_ids])
-          ack_ids = []
-          subprocess.check_call(['python', bootstrap])
+        if os.path.exists(SWARMING_UPSTART_CONFIG_DEST):
+          os.remove(SWARMING_UPSTART_CONFIG_DEST)
+        shutil.copy2(SWARMING_UPSTART_CONFIG_SRC, SWARMING_UPSTART_CONFIG_DEST)
+
+        if not os.path.exists(SWARMING_BOT_DIR):
+          os.mkdir(SWARMING_BOT_DIR)
+
+        if os.path.exists(SWARMING_BOT_ZIP):
+          # Delete just the zip, not the whole directory so logs are kept.
+          os.remove(SWARMING_BOT_ZIP)
+
+        bot_code = urllib2.urlopen(urlparse.urljoin(
+            attributes.get('swarming_server'), 'bot_code'))
+        with open(SWARMING_BOT_ZIP, 'w') as fd:
+          shutil.copyfileobj(bot_code, fd)
+        # Make swarming_bot.zip readable/executable by everyone.
+        os.chmod(SWARMING_BOT_ZIP, 0755)
+
+        pubsub.acknowledge(subscription, project, ack_ids)
+        subprocess.check_call(['/sbin/shutdown', '-r', 'now'])
 
     if ack_ids:
       pubsub.acknowledge(subscription, project, ack_ids)
