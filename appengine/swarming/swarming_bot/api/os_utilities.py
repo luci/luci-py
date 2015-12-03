@@ -501,9 +501,12 @@ def send_metric(name, value, labels, project, service_account):
   else:
     raise SendMetricsFailure('Invalid value type: %s' % type(value))
 
-  response, content = http.request(
-      '%s/projects/%s/timeseries:write' % (MONITORING_ENDPOINT, project),
-      method='POST', body=json.dumps(body), headers=headers)
+  try:
+    response, content = http.request(
+        '%s/projects/%s/timeseries:write' % (MONITORING_ENDPOINT, project),
+        method='POST', body=json.dumps(body), headers=headers)
+  except IOError as e:
+    raise SendMetricsFailure(e)
 
   if response['status'] != '200':
     raise SendMetricsFailure(json.loads(content))
