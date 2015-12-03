@@ -816,7 +816,7 @@ def cron_abort_expired_task_to_run(host):
       request = to_run.request_key.get()
       if _expire_task(to_run.key, request):
         # TODO(maruel): Know which try it is.
-        killed.append(request.task_id)
+        killed.append(request)
         stats.add_task_entry(
             'task_request_expired',
             task_pack.request_key_to_result_summary_key(request.key),
@@ -830,10 +830,12 @@ def cron_abort_expired_task_to_run(host):
       logging.error(
           'EXPIRED!\n%d tasks:\n%s',
           len(killed),
-          '\n'.join('  https://%s/user/task/%s' % (host, i) for i in killed))
+          '\n'.join(
+            '  %s/user/task/%s  %s' % (host, i.task_id, i.properties.dimensions)
+            for i in killed))
     # TODO(maruel): Use stats_framework.
     logging.info('Killed %d task, skipped %d', len(killed), skipped)
-  return killed
+  return [i.task_id for i in killed]
 
 
 def cron_handle_bot_died(host):
@@ -859,7 +861,7 @@ def cron_handle_bot_died(host):
       logging.error(
           'BOT_DIED!\n%d tasks:\n%s',
           len(killed),
-          '\n'.join('  https://%s/user/task/%s' % (host, i) for i in killed))
+          '\n'.join('  %s/user/task/%s' % (host, i) for i in killed))
     # TODO(maruel): Use stats_framework.
     logging.info(
         'Killed %d; retried %d; ignored: %d', len(killed), retried, ignored)
