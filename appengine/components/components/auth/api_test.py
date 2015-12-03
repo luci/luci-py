@@ -286,14 +286,15 @@ class AuthDBTest(test_case.TestCase):
     # Should convert Anonymous to bot, 192.168.1.1 is in 'bots' whitelist.
     result = self.make_auth_db_with_ip_whitelist().verify_ip_whitelisted(
         model.Anonymous, ipaddr.ip_from_string('192.168.1.1'), {})
-    self.assertEqual(model.Identity(model.IDENTITY_BOT, '192.168.1.1'), result)
+    self.assertEqual(
+        model.Identity(model.IDENTITY_BOT, 'whitelisted-ip'), result)
 
   def test_verify_ip_whitelisted_bot_ipv6_loopback(self):
     # Should convert Anonymous as bot, 192.168.1.1 is in 'bots' whitelist.
     result = self.make_auth_db_with_ip_whitelist().verify_ip_whitelisted(
         model.Anonymous, ipaddr.ip_from_string('::1'), {})
     self.assertEqual(
-        model.Identity(model.IDENTITY_BOT, '0-0-0-0-0-0-0-1'), result)
+        model.Identity(model.IDENTITY_BOT, 'whitelisted-ip'), result)
 
   def test_verify_ip_whitelisted_bot_with_x_header(self):
     # Should convert Anonymous to bot, 192.168.1.1 is in 'bots' whitelist.

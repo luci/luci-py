@@ -258,9 +258,13 @@ class AuthDB(object):
     if identity.is_anonymous:
       whitelist = self.ip_whitelists.get(model.BOTS_IP_WHITELIST)
       if whitelist and whitelist.is_ip_whitelisted(ip):
-        return model.Identity(
-            model.IDENTITY_BOT,
-            bot_id_header or ipaddr.ip_to_string(ip).replace(':', '-'))
+        bot_id = bot_id_header
+        if not bot_id:
+          # TODO(vadimsh): It is temporary bandaid until bots start using
+          # X-Whitelisted-Bot-Id or switch to OAuth.
+          bot_id = 'whitelisted-ip'
+          # bot_id = ipaddr.ip_to_string(ip).replace(':', '-')
+        return model.Identity(model.IDENTITY_BOT, bot_id)
 
     if bot_id_header:
       raise AuthorizationError(

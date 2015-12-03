@@ -114,7 +114,7 @@ class AuthenticatingHandlerTest(test_case.TestCase):
       api.reset_local_state()
       return app.get('/request', extra_environ={'REMOTE_ADDR': ip}).body
 
-    self.assertEqual('bot:192.168.1.100', call('192.168.1.100'))
+    self.assertEqual('bot:whitelisted-ip', call('192.168.1.100'))
     self.assertEqual('anonymous:anonymous', call('127.0.0.1'))
 
   def test_ip_whitelist(self):
