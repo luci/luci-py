@@ -509,7 +509,11 @@ def send_metric(name, value, labels, project, service_account):
     raise SendMetricsFailure(e)
 
   if response['status'] != '200':
-    raise SendMetricsFailure(json.loads(content))
+    try:
+      content = json.loads(content)
+    except ValueError:
+      pass
+    raise SendMetricsFailure(content)
 
 
 def get_oauth2_client(service_account_json_file, scopes=None):
