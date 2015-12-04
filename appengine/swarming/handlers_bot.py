@@ -141,6 +141,9 @@ class _BotBaseHandler(auth.ApiHandler):
   EXPECTED_KEYS = {u'dimensions', u'state', u'version'}
   REQUIRED_STATE_KEYS = {u'running_time', u'sleep_streak'}
 
+  # TODO(vadimsh): Remove once bots use X-Whitelisted-Bot-Id or OAuth.
+  xsrf_token_enforce_on = ()
+
   def _process(self):
     """Returns True if the bot has invalid parameter and should be automatically
     quarantined.
@@ -455,6 +458,9 @@ class BotTaskUpdateHandler(auth.ApiHandler):
   }
   REQUIRED_KEYS = {u'id', u'task_id'}
 
+  # TODO(vadimsh): Remove once bots use X-Whitelisted-Bot-Id or OAuth.
+  xsrf_token_enforce_on = ()
+
   @auth.require(acl.is_bot)
   def post(self, task_id=None):
     # Unlike handshake and poll, we do not accept invalid keys here. This code
@@ -534,6 +540,9 @@ class BotTaskErrorHandler(auth.ApiHandler):
   """
 
   EXPECTED_KEYS = {u'id', u'message', u'task_id'}
+
+  # TODO(vadimsh): Remove once bots use X-Whitelisted-Bot-Id or OAuth.
+  xsrf_token_enforce_on = ()
 
   @auth.require(acl.is_bot)
   def post(self, task_id=None):

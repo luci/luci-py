@@ -328,10 +328,9 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     # POST works without a token, put PUT doesn't.
     self.assertEqual(200, app.post('/request').status_int)
     self.assertEqual(403, app.put('/request', expect_errors=True).status_int)
-    # Both fail if wrong token is provided.
+    # Only the one that requires the token fails if wrong token is provided.
     bad_token = {'xsrf_token': 'boo'}
-    self.assertEqual(
-        403, app.post('/request', bad_token, expect_errors=True).status_int)
+    self.assertEqual(200, app.post('/request', bad_token).status_int)
     self.assertEqual(
         403, app.put('/request', bad_token, expect_errors=True).status_int)
 

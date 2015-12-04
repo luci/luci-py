@@ -1148,6 +1148,7 @@ def bootstrap_loopback_ips():
   assert utils.is_local_dev_server()
   bootstrap_ip_whitelist(BOTS_IP_WHITELIST, ['127.0.0.1', '::1'], 'Local bots')
   return [
+    Identity(IDENTITY_BOT, 'whitelisted-ip'),
     Identity(IDENTITY_BOT, '127.0.0.1'),
     Identity(IDENTITY_BOT, '0-0-0-0-0-0-0-1'),
   ]

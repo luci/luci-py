@@ -197,7 +197,13 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       self.xsrf_token_data = {}
       if self.xsrf_token is not None:
         # This raises AuthorizationError if token is invalid.
-        self.xsrf_token_data = self.verify_xsrf_token()
+        try:
+          self.xsrf_token_data = self.verify_xsrf_token()
+        except api.AuthorizationError as exc:
+          if not need_xsrf_token:
+            logging.warning('XSRF token is broken, ignoring - %s', exc)
+          else:
+            raise
 
       # All other ACL checks will be performed by corresponding handlers
       # manually or via '@required' decorator. Failed ACL check raises
