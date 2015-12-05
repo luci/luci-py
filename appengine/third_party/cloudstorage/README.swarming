@@ -1,7 +1,7 @@
 Name: App Engine Client for Google Cloud Storage
 Short Name: appengine-gcs-client
-URL: https://code.google.com/p/appengine-gcs-client/
-Revision: 164
+URL: https://github.com/googlecloudplatform/appengine-gcs-client
+Revision: 0cffd5bf06058fd9523fe5949d1430e6f0551cdb
 License: Apache License, Version 2.0
 
 Description:
@@ -13,4 +13,3 @@ overall developer experience.
 
 Local Modifications:
 Kept only src/cloudstorage/. Stripped test/ and demo/.
-See also MODIFICATIONS.diff.

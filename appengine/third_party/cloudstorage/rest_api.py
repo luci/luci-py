@@ -20,7 +20,8 @@
 
 __all__ = ['add_sync_methods']
 
-import httplib
+import logging
+import os
 import random
 import time
 
@@ -28,10 +29,37 @@ from . import api_utils
 
 try:
   from google.appengine.api import app_identity
+  from google.appengine.api import lib_config
   from google.appengine.ext import ndb
 except ImportError:
   from google.appengine.api import app_identity
+  from google.appengine.api import lib_config
   from google.appengine.ext import ndb
+
+
+
+@ndb.tasklet
+def _make_token_async(scopes, service_account_id):
+  """Get a fresh authentication token.
+
+  Args:
+    scopes: A list of scopes.
+    service_account_id: Internal-use only.
+
+  Raises:
+    An ndb.Return with a tuple (token, expiration_time) where expiration_time is
+    seconds since the epoch.
+  """
+  rpc = app_identity.create_rpc()
+  app_identity.make_get_access_token_call(rpc, scopes, service_account_id)
+  token, expires_at = yield rpc
+  raise ndb.Return((token, expires_at))
+
+
+class _ConfigDefaults(object):
+  TOKEN_MAKER = _make_token_async
+
+_config = lib_config.register('cloudstorage', _ConfigDefaults.__dict__)
 
 
 def _make_sync_method(name):
@@ -84,24 +112,6 @@ class _AE_TokenStorage_(ndb.Model):
   expires = ndb.FloatProperty()
 
 
-@ndb.tasklet
-def _make_token_async(scopes, service_account_id):
-  """Get a fresh authentication token.
-
-  Args:
-    scopes: A list of scopes.
-    service_account_id: Internal-use only.
-
-  Returns:
-    An tuple (token, expiration_time) where expiration_time is
-    seconds since the epoch.
-  """
-  rpc = app_identity.create_rpc()
-  app_identity.make_get_access_token_call(rpc, scopes, service_account_id)
-  token, expires_at = yield rpc
-  raise ndb.Return((token, expires_at))
-
-
 class _RestApi(object):
   """Base class for REST-based API wrapper classes.
 
@@ -114,49 +124,38 @@ class _RestApi(object):
   and is subject to change at any release.
   """
 
-  # Upper bound here should be less than 5 min. If you have a token that expires
-  # at the moment X, and at the moment X - 5 min (or earlier) ask app engine to
-  # give you a new token, app engine still can return same old token with same
-  # expiration time X. If _TOKEN_EXPIRATION_HEADROOM happens to be > 5 min and
-  # get_token_async() is called sometime within time interval
-  # [X - _TOKEN_EXPIRATION_HEADROOM, X - 5], it would make perform RPC, but
-  # would not in fact get a new token. If get_token_async() is called frequently
-  # enough during this time frame (which happens when calling api.delete() in
-  # a loop to delete a bunch of files, for example), app engine may raise
-  # OverQuotaError.
-  _TOKEN_EXPIRATION_HEADROOM = random.randint(60, 240)
-
   def __init__(self, scopes, service_account_id=None, token_maker=None,
                retry_params=None):
     """Constructor.
 
     Args:
       scopes: A scope or a list of scopes.
+      service_account_id: Internal use only.
       token_maker: An asynchronous function of the form
         (scopes, service_account_id) -> (token, expires).
       retry_params: An instance of api_utils.RetryParams. If None, the
         default for current thread will be used.
-      service_account_id: Internal use only.
     """
 
     if isinstance(scopes, basestring):
       scopes = [scopes]
     self.scopes = scopes
     self.service_account_id = service_account_id
-    self.make_token_async = token_maker or _make_token_async
-    self.token = None
+    self.make_token_async = token_maker or _config.TOKEN_MAKER
     if not retry_params:
       retry_params = api_utils._get_default_retry_params()
     self.retry_params = retry_params
+    self.user_agent = {'User-Agent': retry_params._user_agent}
+    self.expiration_headroom = random.randint(60, 240)
 
   def __getstate__(self):
     """Store state as part of serialization/pickling."""
-    return {'token': self.token,
-            'scopes': self.scopes,
+    return {'scopes': self.scopes,
             'id': self.service_account_id,
-            'a_maker': None if self.make_token_async == _make_token_async
-            else self.make_token_async,
-            'retry_params': self.retry_params}
+            'a_maker': (None if self.make_token_async == _make_token_async
+                        else self.make_token_async),
+            'retry_params': self.retry_params,
+            'expiration_headroom': self.expiration_headroom}
 
   def __setstate__(self, state):
     """Restore state as part of deserialization/unpickling."""
@@ -164,50 +163,39 @@ class _RestApi(object):
                   service_account_id=state['id'],
                   token_maker=state['a_maker'],
                   retry_params=state['retry_params'])
-    self.token = state['token']
+    self.expiration_headroom = state['expiration_headroom']
 
   @ndb.tasklet
   def do_request_async(self, url, method='GET', headers=None, payload=None,
                        deadline=None, callback=None):
     """Issue one HTTP request.
 
-    This is an async wrapper around urlfetch(). It adds an authentication
-    header and retries on a 401 status code. Upon other retriable errors,
-    it performs blocking retries.
+    It performs async retries using tasklets.
+
+    Args:
+      url: the url to fetch.
+      method: the method in which to fetch.
+      headers: the http headers.
+      payload: the data to submit in the fetch.
+      deadline: the deadline in which to make the call.
+      callback: the call to make once completed.
+
+    Yields:
+      The async fetch of the url.
     """
-    headers = {} if headers is None else dict(headers)
-    if self.token is None:
-      self.token = yield self.get_token_async()
-    headers['authorization'] = 'OAuth ' + self.token
-
-    deadline = deadline or self.retry_params.urlfetch_timeout
-
-    retry = False
-    resp = None
-    try:
-      resp = yield self.urlfetch_async(url, payload=payload, method=method,
-                                       headers=headers, follow_redirects=False,
-                                       deadline=deadline, callback=callback)
-      if resp.status_code == httplib.UNAUTHORIZED:
-        self.token = yield self.get_token_async(refresh=True)
-        headers['authorization'] = 'OAuth ' + self.token
-        resp = yield self.urlfetch_async(
-            url, payload=payload, method=method, headers=headers,
-            follow_redirects=False, deadline=deadline, callback=callback)
-    except api_utils._RETRIABLE_EXCEPTIONS:
-      retry = True
-    else:
-      retry = api_utils._should_retry(resp)
-
-    if retry:
-      retry_resp = api_utils._retry_fetch(
-          url, retry_params=self.retry_params, payload=payload, method=method,
-          headers=headers, follow_redirects=False, deadline=deadline)
-      if retry_resp:
-        resp = retry_resp
-      elif not resp:
-        raise
-
+    retry_wrapper = api_utils._RetryWrapper(
+        self.retry_params,
+        retriable_exceptions=api_utils._RETRIABLE_EXCEPTIONS,
+        should_retry=api_utils._should_retry)
+    resp = yield retry_wrapper.run(
+        self.urlfetch_async,
+        url=url,
+        method=method,
+        headers=headers,
+        payload=payload,
+        deadline=deadline,
+        callback=callback,
+        follow_redirects=False)
     raise ndb.Return((resp.status_code, resp.headers, resp.content))
 
   @ndb.tasklet
@@ -215,21 +203,23 @@ class _RestApi(object):
     """Get an authentication token.
 
     The token is cached in memcache, keyed by the scopes argument.
+    Uses a random token expiration headroom value generated in the constructor
+    to eliminate a burst of GET_ACCESS_TOKEN API requests.
 
     Args:
       refresh: If True, ignore a cached token; default False.
 
-    Returns:
-      An authentication token.
+    Yields:
+      An authentication token. This token is guaranteed to be non-expired.
     """
-    if self.token is not None and not refresh:
-      raise ndb.Return(self.token)
     key = '%s,%s' % (self.service_account_id, ','.join(self.scopes))
     ts = yield _AE_TokenStorage_.get_by_id_async(
-        key, use_cache=True, use_memcache=True,
+        key,
+        use_cache=True,
+        use_memcache=self.retry_params.memcache_access_token,
         use_datastore=self.retry_params.save_access_token)
-    if ts is None or ts.expires < (time.time() +
-                                   self._TOKEN_EXPIRATION_HEADROOM):
+    if refresh or ts is None or ts.expires < (
+        time.time() + self.expiration_headroom):
       token, expires_at = yield self.make_token_async(
           self.scopes, self.service_account_id)
       timeout = int(expires_at - time.time())
@@ -237,20 +227,53 @@ class _RestApi(object):
       if timeout > 0:
         yield ts.put_async(memcache_timeout=timeout,
                            use_datastore=self.retry_params.save_access_token,
-                           use_cache=True, use_memcache=True)
-    self.token = ts.token
-    raise ndb.Return(self.token)
+                           use_cache=True,
+                           use_memcache=self.retry_params.memcache_access_token)
+    raise ndb.Return(ts.token)
 
-  def urlfetch_async(self, url, **kwds):
+  @ndb.tasklet
+  def urlfetch_async(self, url, method='GET', headers=None,
+                     payload=None, deadline=None, callback=None,
+                     follow_redirects=False):
     """Make an async urlfetch() call.
 
-    This just passes the url and keyword arguments to NDB's async
-    urlfetch() wrapper in the current context.
+    This is an async wrapper around urlfetch(). It adds an authentication
+    header.
 
-    This returns a Future despite not being decorated with @ndb.tasklet!
+    Args:
+      url: the url to fetch.
+      method: the method in which to fetch.
+      headers: the http headers.
+      payload: the data to submit in the fetch.
+      deadline: the deadline in which to make the call.
+      callback: the call to make once completed.
+      follow_redirects: whether or not to follow redirects.
+
+    Yields:
+      This returns a Future despite not being decorated with @ndb.tasklet!
     """
+    headers = {} if headers is None else dict(headers)
+    headers.update(self.user_agent)
+    try:
+      self.token = yield self.get_token_async()
+    except app_identity.InternalError, e:
+      if os.environ.get('DATACENTER', '').endswith('sandman'):
+        self.token = None
+        logging.warning('Could not fetch an authentication token in sandman '
+                     'based Appengine devel setup; proceeding without one.')
+      else:
+        raise e
+    if self.token:
+      headers['authorization'] = 'OAuth ' + self.token
+
+    deadline = deadline or self.retry_params.urlfetch_timeout
+
     ctx = ndb.get_context()
-    return ctx.urlfetch(url, **kwds)
+    resp = yield ctx.urlfetch(
+        url, payload=payload, method=method,
+        headers=headers, follow_redirects=follow_redirects,
+        deadline=deadline, callback=callback)
+    raise ndb.Return(resp)
 
 
 _RestApi = add_sync_methods(_RestApi)

@@ -31,23 +31,34 @@ import urllib
 
 
 try:
+  from google.appengine.api import app_identity
   from google.appengine.api import urlfetch
+  from google.appengine.api import urlfetch_errors
   from google.appengine.datastore import datastore_rpc
+  from google.appengine.ext import ndb
   from google.appengine.ext.ndb import eventloop
+  from google.appengine.ext.ndb import tasklets
   from google.appengine.ext.ndb import utils
   from google.appengine import runtime
   from google.appengine.runtime import apiproxy_errors
 except ImportError:
+  from google.appengine.api import app_identity
   from google.appengine.api import urlfetch
+  from google.appengine.api import urlfetch_errors
   from google.appengine.datastore import datastore_rpc
   from google.appengine import runtime
   from google.appengine.runtime import apiproxy_errors
+  from google.appengine.ext import ndb
   from google.appengine.ext.ndb import eventloop
+  from google.appengine.ext.ndb import tasklets
   from google.appengine.ext.ndb import utils
 
 
 _RETRIABLE_EXCEPTIONS = (urlfetch.DownloadError,
-                         apiproxy_errors.Error)
+                         urlfetch_errors.InternalTransientError,
+                         apiproxy_errors.Error,
+                         app_identity.InternalError,
+                         app_identity.BackendDeadlineExceeded)
 
 _thread_local_settings = threading.local()
 _thread_local_settings.default_retry_params = None
@@ -104,8 +115,95 @@ def _should_retry(resp):
            resp.status_code < 600))
 
 
+class _RetryWrapper(object):
+  """A wrapper that wraps retry logic around any tasklet."""
+
+  def __init__(self,
+               retry_params,
+               retriable_exceptions=_RETRIABLE_EXCEPTIONS,
+               should_retry=lambda r: False):
+    """Init.
+
+    Args:
+      retry_params: an RetryParams instance.
+      retriable_exceptions: a list of exception classes that are retriable.
+      should_retry: a function that takes a result from the tasklet and returns
+        a boolean. True if the result should be retried.
+    """
+    self.retry_params = retry_params
+    self.retriable_exceptions = retriable_exceptions
+    self.should_retry = should_retry
+
+  @ndb.tasklet
+  def run(self, tasklet, **kwds):
+    """Run a tasklet with retry.
+
+    The retry should be transparent to the caller: if no results
+    are successful, the exception or result from the last retry is returned
+    to the caller.
+
+    Args:
+      tasklet: the tasklet to run.
+      **kwds: keywords arguments to run the tasklet.
+
+    Raises:
+      The exception from running the tasklet.
+
+    Returns:
+      The result from running the tasklet.
+    """
+    start_time = time.time()
+    n = 1
+
+    while True:
+      e = None
+      result = None
+      got_result = False
+
+      try:
+        result = yield tasklet(**kwds)
+        got_result = True
+        if not self.should_retry(result):
+          raise ndb.Return(result)
+      except runtime.DeadlineExceededError:
+        logging.debug(
+            'Tasklet has exceeded request deadline after %s seconds total',
+            time.time() - start_time)
+        raise
+      except self.retriable_exceptions, e:
+        pass
+
+      if n == 1:
+        logging.debug('Tasklet is %r', tasklet)
+
+      delay = self.retry_params.delay(n, start_time)
+
+      if delay <= 0:
+        logging.debug(
+            'Tasklet failed after %s attempts and %s seconds in total',
+            n, time.time() - start_time)
+        if got_result:
+          raise ndb.Return(result)
+        elif e is not None:
+          raise e
+        else:
+          assert False, 'Should never reach here.'
+
+      if got_result:
+        logging.debug(
+            'Got result %r from tasklet.', result)
+      else:
+        logging.debug(
+            'Got exception "%r" from tasklet.', e)
+      logging.debug('Retry in %s seconds.', delay)
+      n += 1
+      yield tasklets.sleep(delay)
+
+
 class RetryParams(object):
   """Retry configuration parameters."""
+
+  _DEFAULT_USER_AGENT = 'App Engine Python GCS Client'
 
   @datastore_rpc._positional(1)
   def __init__(self,
@@ -116,7 +214,9 @@ class RetryParams(object):
                max_retries=6,
                max_retry_period=30.0,
                urlfetch_timeout=None,
-               save_access_token=False):
+               save_access_token=False,
+               _user_agent=None,
+               memcache_access_token=True):
     """Init.
 
     This object is unique per request per thread.
@@ -137,9 +237,13 @@ class RetryParams(object):
       urlfetch_timeout: timeout for urlfetch in seconds. Could be None,
         in which case the value will be chosen by urlfetch module.
       save_access_token: persist access token to datastore to avoid
-        excessive usage of GetAccessToken API. Usually the token is cached
-        in process and in memcache. In some cases, memcache isn't very
-        reliable.
+        excessive usage of GetAccessToken API. In addition to this, the token
+        will be cached in process, and may also be cached in memcache (see
+        memcache_access_token param).  However, storing in Datastore can still
+        be useful in the event that memcache is unavailable.
+      _user_agent: The user agent string that you want to use in your requests.
+      memcache_access_token: cache access token in memcache to avoid excessive
+        usage of GetAccessToken API.
     """
     self.backoff_factor = self._check('backoff_factor', backoff_factor)
     self.initial_delay = self._check('initial_delay', initial_delay)
@@ -155,6 +259,11 @@ class RetryParams(object):
       self.urlfetch_timeout = self._check('urlfetch_timeout', urlfetch_timeout)
     self.save_access_token = self._check('save_access_token', save_access_token,
                                          True, bool)
+    self.memcache_access_token = self._check('memcache_access_token',
+                                             memcache_access_token,
+                                             True,
+                                             bool)
+    self._user_agent = _user_agent or self._DEFAULT_USER_AGENT
 
     self._request_id = os.getenv('REQUEST_LOG_ID')
 
@@ -218,66 +327,6 @@ class RetryParams(object):
     return min(
         math.pow(self.backoff_factor, n-1) * self.initial_delay,
         self.max_delay)
-
-
-def _retry_fetch(url, retry_params, **kwds):
-  """A blocking fetch function similar to urlfetch.fetch.
-
-  This function should be used when a urlfetch has timed out or the response
-  shows http request timeout. This function will put current thread to
-  sleep between retry backoffs.
-
-  Args:
-    url: url to fetch.
-    retry_params: an instance of RetryParams.
-    **kwds: keyword arguments for urlfetch. If deadline is specified in kwds,
-      it precedes the one in RetryParams. If none is specified, it's up to
-      urlfetch to use its own default.
-
-  Returns:
-    A urlfetch response from the last retry. None if no retry was attempted.
-
-  Raises:
-    Whatever exception encountered during the last retry.
-  """
-  n = 1
-  start_time = time.time()
-  delay = retry_params.delay(n, start_time)
-  if delay <= 0:
-    return
-
-  logging.info('Will retry request to %s.', url)
-  while delay > 0:
-    resp = None
-    try:
-      logging.info('Retry in %s seconds.', delay)
-      time.sleep(delay)
-      resp = urlfetch.fetch(url, **kwds)
-    except runtime.DeadlineExceededError:
-      logging.info(
-          'Urlfetch retry %s will exceed request deadline '
-          'after %s seconds total', n, time.time() - start_time)
-      raise
-    except _RETRIABLE_EXCEPTIONS, e:
-      pass
-
-    n += 1
-    delay = retry_params.delay(n, start_time)
-    if resp and not _should_retry(resp):
-      break
-    elif resp:
-      logging.info(
-          'Got status %s from GCS.', resp.status_code)
-    else:
-      logging.info(
-          'Got exception "%r" while contacting GCS.', e)
-
-  if resp:
-    return resp
-
-  logging.info('Urlfetch failed after %s retries and %s seconds in total.',
-               n - 1, time.time() - start_time)
-  raise
 
 
 def _run_until_rpc():

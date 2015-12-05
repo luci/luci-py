@@ -169,6 +169,39 @@ class _StorageApi(rest_api._RestApi):
     """GET a bucket."""
     return self.do_request_async(self.api_url + path, 'GET', **kwds)
 
+  def compose_object(self, file_list, destination_file, content_type):
+    """COMPOSE multiple objects together.
+
+    Using the given list of files, calls the put object with the compose flag.
+    This call merges all the files into the destination file.
+
+    Args:
+      file_list: list of dicts with the file name.
+      destination_file: Path to the destination file.
+      content_type: Content type for the destination file.
+    """
+
+    xml_setting_list = ['<ComposeRequest>']
+
+    for meta_data in file_list:
+      xml_setting_list.append('<Component>')
+      for key, val in meta_data.iteritems():
+        xml_setting_list.append('<%s>%s</%s>' % (key, val, key))
+      xml_setting_list.append('</Component>')
+    xml_setting_list.append('</ComposeRequest>')
+    xml = ''.join(xml_setting_list)
+
+    if content_type is not None:
+      headers = {'Content-Type': content_type}
+    else:
+      headers = None
+    status, resp_headers, content = self.put_object(
+        api_utils._quote_filename(destination_file) + '?compose',
+        payload=xml,
+        headers=headers)
+    errors.check_status(status, [200], destination_file, resp_headers,
+                        body=content)
+
 
 _StorageApi = rest_api.add_sync_methods(_StorageApi)
 
@@ -183,7 +216,8 @@ class ReadBuffer(object):
                api,
                path,
                buffer_size=DEFAULT_BUFFER_SIZE,
-               max_request_size=MAX_REQUEST_SIZE):
+               max_request_size=MAX_REQUEST_SIZE,
+               offset=0):
     """Constructor.
 
     Args:
@@ -193,6 +227,8 @@ class ReadBuffer(object):
         one buffer. But there may be a pending future that contains
         a second buffer. This size must be less than max_request_size.
       max_request_size: Max bytes to request in one urlfetch.
+      offset: Number of bytes to skip at the start of the file. If None, 0 is
+        used.
     """
     self._api = api
     self._path = path
@@ -202,18 +238,25 @@ class ReadBuffer(object):
     assert buffer_size <= max_request_size
     self._buffer_size = buffer_size
     self._max_request_size = max_request_size
-    self._offset = 0
+    self._offset = offset
+
     self._buffer = _Buffer()
     self._etag = None
 
-    self._request_next_buffer()
+    get_future = self._get_segment(offset, self._buffer_size, check_response=False)
 
     status, headers, content = self._api.head_object(path)
     errors.check_status(status, [200], path, resp_headers=headers, body=content)
-    self._file_size = long(headers['content-length'])
+    self._file_size = long(common.get_stored_content_length(headers))
     self._check_etag(headers.get('etag'))
-    if self._file_size == 0:
-      self._buffer_future = None
+
+    self._buffer_future = None
+
+    if self._file_size != 0:
+      content, check_response_closure = get_future.get_result()
+      check_response_closure()
+      self._buffer.reset(content)
+      self._request_next_buffer()
 
   def __getstate__(self):
     """Store state as part of serialization/pickling.
@@ -372,11 +415,11 @@ class ReadBuffer(object):
   def _request_next_buffer(self):
     """Request next buffer.
 
-    Requires self._offset and self._buffer are in consistent state
+    Requires self._offset and self._buffer are in consistent state.
     """
     self._buffer_future = None
     next_offset = self._offset + self._buffer.remaining()
-    if not hasattr(self, '_file_size') or next_offset != self._file_size:
+    if next_offset != self._file_size:
       self._buffer_future = self._get_segment(next_offset,
                                               self._buffer_size)
 
@@ -405,11 +448,11 @@ class ReadBuffer(object):
       request_size -= self._max_request_size
       start += self._max_request_size
     if start < end:
-      futures.append(self._get_segment(start, end-start))
+      futures.append(self._get_segment(start, end - start))
     return [fut.get_result() for fut in futures]
 
   @ndb.tasklet
-  def _get_segment(self, start, request_size):
+  def _get_segment(self, start, request_size, check_response=True):
     """Get a segment of the file from Google Storage.
 
     Args:
@@ -418,9 +461,15 @@ class ReadBuffer(object):
       request_size: number of bytes to request. Have to be small enough
         for a single urlfetch request. May go over the logical range of the
         file.
+      check_response: True to check the validity of GCS response automatically
+        before the future returns. False otherwise. See Yields section.
 
     Yields:
-      a segment [start, start + request_size) of the file.
+      If check_response is True, the segment [start, start + request_size)
+      of the file.
+      Otherwise, a tuple. The first element is the unverified file segment.
+      The second element is a closure that checks response. Caller should
+      first invoke the closure before consuing the file segment.
 
     Raises:
       ValueError: if the file has changed while reading.
@@ -430,10 +479,14 @@ class ReadBuffer(object):
     headers = {'Range': 'bytes=' + content_range}
     status, resp_headers, content = yield self._api.get_object_async(
         self._path, headers=headers)
-    errors.check_status(status, [200, 206], self._path, headers, resp_headers,
-                        body=content)
-    self._check_etag(resp_headers.get('etag'))
-    raise ndb.Return(content)
+    def _checker():
+      errors.check_status(status, [200, 206], self._path, headers,
+                          resp_headers, body=content)
+      self._check_etag(resp_headers.get('etag'))
+    if check_response:
+      _checker()
+      raise ndb.Return(content)
+    raise ndb.Return(content, _checker)
 
   def _check_etag(self, etag):
     """Check if etag is the same across requests to GCS.
@@ -748,39 +801,40 @@ class StreamingBuffer(object):
     least self._blocksize, or to flush the final (incomplete) block of
     the file with finish=True.
     """
-    blocksize_or_zero = 0 if finish else self._blocksize
-
-    while self._buffered >= blocksize_or_zero:
-      buffer = []
-      buffered = 0
+    while ((finish and self._buffered >= 0) or
+           (not finish and self._buffered >= self._blocksize)):
+      tmp_buffer = []
+      tmp_buffer_len = 0
 
       excess = 0
       while self._buffer:
         buf = self._buffer.popleft()
         size = len(buf)
         self._buffered -= size
-        buffer.append(buf)
-        buffered += size
-        if buffered >= self._maxrequestsize:
-          excess = buffered - self._maxrequestsize
+        tmp_buffer.append(buf)
+        tmp_buffer_len += size
+        if tmp_buffer_len >= self._maxrequestsize:
+          excess = tmp_buffer_len - self._maxrequestsize
           break
-        if self._buffered < blocksize_or_zero and buffered >= blocksize_or_zero:
-          excess = buffered % self._blocksize
+        if not finish and (
+            tmp_buffer_len % self._blocksize + self._buffered <
+            self._blocksize):
+          excess = tmp_buffer_len % self._blocksize
           break
 
       if excess:
-        over = buffer.pop()
+        over = tmp_buffer.pop()
         size = len(over)
         assert size >= excess
-        buffered -= size
+        tmp_buffer_len -= size
         head, tail = over[:-excess], over[-excess:]
         self._buffer.appendleft(tail)
         self._buffered += len(tail)
         if head:
-          buffer.append(head)
-          buffered += len(head)
+          tmp_buffer.append(head)
+          tmp_buffer_len += len(head)
 
-      data = ''.join(buffer)
+      data = ''.join(tmp_buffer)
       file_len = '*'
       if finish and not self._buffered:
         file_len = self._written + len(data)
