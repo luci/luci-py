@@ -27,6 +27,8 @@ from server import task_result  # Needed for entity.get()
 
 
 APP_IDENTITY = app_identity.get_application_id()
+# Base path to the mapreduce pipeline.
+MAPREDUCE_PIPELINE_BASE_PATH = '/internal/mapreduce/pipeline'
 # Task queue name to run all map reduce jobs on.
 MAPREDUCE_TASK_QUEUE = 'mapreduce-jobs'
 
@@ -72,10 +74,8 @@ def launch_job(job_id):
   # 256 helps getting things done faster but it is very easy to burn thousands
   # of $ within a few hours. Don't forget to update queue.yaml accordingly.
   job_def.setdefault('shards', 128)
-  job_def.setdefault('queue_name', MAPREDUCE_TASK_QUEUE)
   job_def.setdefault(
-      'reader_spec', 'mapreduce.input_readers.DatastoreInputReader')
-  job_def.setdefault('handler_spec', 'mapreduce_jobs.' + job_id)
+      'input_reader_spec', 'mapreduce.input_readers.DatastoreInputReader')
   job_def['mapper_params'] = job_def['mapper_params'].copy()
   job_def['mapper_params'].setdefault(
       'bucket_name', app_identity.get_default_gcs_bucket_name())
@@ -88,7 +88,8 @@ def launch_job(job_id):
     job_def['params'] = job_def.pop('mapper_params')
     pipeline = mapreduce_pipeline.MapPipeline(**job_def)
 
-  pipeline.start(base_path='/internal/mapreduce')
+  pipeline.start(
+      base_path=MAPREDUCE_PIPELINE_BASE_PATH, queue_name=MAPREDUCE_TASK_QUEUE)
   logging.info('Pipeline ID: %s', pipeline.pipeline_id)
   return pipeline.pipeline_id
 
