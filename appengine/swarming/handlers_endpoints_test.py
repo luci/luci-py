@@ -31,6 +31,8 @@ from server import acl
 from server import bot_management
 from server import config
 from server import task_pack
+from server import task_request
+from server import task_result
 
 
 def message_to_dict(rpc_message):
@@ -196,7 +198,8 @@ class TasksApiTest(BaseTest):
     """Asserts that new returns task result for deduped."""
     # Run a task to completion.
     self.mock(random, 'getrandbits', lambda _: 0x88)
-    self.mock_now(datetime.datetime(2010, 1, 2, 3, 4, 5))
+    now = self.mock_now(datetime.datetime(2010, 1, 2, 3, 4, 5))
+    str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
     self.client_create_task_raw(
         name='task', tags=['project:yay', 'commit:post', 'os:Win'],
         properties=dict(idempotent=True))
@@ -204,9 +207,8 @@ class TasksApiTest(BaseTest):
     self.bot_run_task()
 
     self.mock(random, 'getrandbits', lambda _: 0x66)
-    now = datetime.datetime(2010, 1, 2, 5, 5, 5)
-    self.mock_now(now)
-    str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
+    now_30 = self.mock_now(now, 30)
+    str_now_30 = unicode(now_30.strftime(self.DATETIME_NO_MICRO))
     self.set_as_user()
 
     request = swarming_rpcs.NewTaskRequest(
@@ -226,7 +228,7 @@ class TasksApiTest(BaseTest):
     expected = {
       u'request': {
         u'authenticated': u'user:user@example.com',
-        u'created_ts': str_now,
+        u'created_ts': str_now_30,
         u'expiration_secs': u'30',
         u'name': u'job1',
         u'priority': u'200',
@@ -248,7 +250,7 @@ class TasksApiTest(BaseTest):
         ],
         u'user': u'joe@localhost',
       },
-      u'task_id': u'63dabe8006610',
+      u'task_id': u'5cf59b8006610',
       u'task_result': {
         u'bot_dimensions': [
           {u'key': u'id', u'value': [u'bot1']},
@@ -256,18 +258,18 @@ class TasksApiTest(BaseTest):
         ],
         u'bot_id': u'bot1',
         u'bot_version': self.bot_version,
-        u'completed_ts': u'2010-01-02T03:04:05',
+        u'completed_ts': str_now,
         u'cost_saved_usd': 0.1,
-        u'created_ts': u'2010-01-02T05:05:05',
+        u'created_ts': str_now_30,
         u'deduped_from': u'5cee488008811',
         u'duration': 0.1,
         u'exit_code': u'0',
         u'failure': False,
         u'internal_failure': False,
-        u'modified_ts': u'2010-01-02T05:05:05',
+        u'modified_ts': str_now_30,
         u'name': u'job1',
         u'server_versions': [u'v1a'],
-        u'started_ts': u'2010-01-02T03:04:05',
+        u'started_ts': str_now,
         u'state': u'COMPLETED',
         u'tags': [
           u'foo:bar',
@@ -275,7 +277,7 @@ class TasksApiTest(BaseTest):
           u'priority:200',
           u'user:joe@localhost',
         ],
-        u'task_id': u'63dabe8006610',
+        u'task_id': u'5cf59b8006610',
         u'try_number': u'0',
         u'user': u'joe@localhost',
       },
@@ -293,18 +295,18 @@ class TasksApiTest(BaseTest):
           ],
           u'bot_id': u'bot1',
           u'bot_version': self.bot_version,
-          u'completed_ts': u'2010-01-02T03:04:05',
+          u'completed_ts': str_now,
           u'cost_saved_usd': 0.1,
-          u'created_ts': u'2010-01-02T05:05:05',
+          u'created_ts': str_now_30,
           u'deduped_from': u'5cee488008811',
           u'duration': 0.1,
           u'exit_code': u'0',
           u'failure': False,
           u'internal_failure': False,
-          u'modified_ts': u'2010-01-02T05:05:05',
+          u'modified_ts': str_now_30,
           u'name': u'job1',
           u'server_versions': [u'v1a'],
-          u'started_ts': u'2010-01-02T03:04:05',
+          u'started_ts': str_now,
           u'state': u'COMPLETED',
           u'tags': [
             u'foo:bar',
@@ -312,24 +314,77 @@ class TasksApiTest(BaseTest):
             u'priority:200',
             u'user:joe@localhost',
           ],
-          u'task_id': u'63dabe8006610',
+          u'task_id': u'5cf59b8006610',
           u'try_number': u'0',
           u'user': u'joe@localhost',
         },
       ],
-      u'now': str_now,
+      u'now': str_now_30,
     }
     self.assertEqual(
         expected,
         self.call_api('list', body=message_to_dict(request)).json)
+    # Assert the entity presence.
+    self.assertEqual(2, task_request.TaskRequest.query().count())
+    self.assertEqual(2, task_result.TaskResultSummary.query().count())
+    self.assertEqual(1, task_result.TaskRunResult.query().count())
 
+    # Use the occasion to test 'count' and 'requests'.
     start = utils.datetime_to_timestamp(now) / 1000000. - 1
-    end = utils.datetime_to_timestamp(now) / 1000000. + 1
+    end = utils.datetime_to_timestamp(now_30) / 1000000. + 1
     request = swarming_rpcs.TasksCountRequest(
         start=start, end=end, state=swarming_rpcs.TaskState.DEDUPED)
     self.assertEqual(
-        {u'now': str_now, u'count': u'1'},
+        {u'now': str_now_30, u'count': u'1'},
         self.call_api('count', body=message_to_dict(request)).json)
+    request = swarming_rpcs.TasksRequest(start=start, end=end)
+    expected = {
+      u'items': [
+        {
+          u'authenticated': u'user:user@example.com',
+          u'created_ts': str_now_30,
+          u'expiration_secs': u'30',
+          u'name': u'job1',
+          u'priority': u'200',
+          u'properties': {
+            u'command': [u'python', u'run_test.py'],
+            u'dimensions': [{u'key': u'os', u'value': u'Amiga'}],
+            u'execution_timeout_secs': u'3600',
+            u'grace_period_secs': u'30',
+            u'idempotent': True,
+            u'io_timeout_secs': u'1200',
+          },
+          u'tags': [
+            u'foo:bar', u'os:Amiga', u'priority:200', u'user:joe@localhost',
+          ],
+          u'user': u'joe@localhost',
+        },
+        {
+          u'authenticated': u'user:user@example.com',
+          u'created_ts': str_now,
+          u'expiration_secs': u'86400',
+          u'name': u'task',
+          u'priority': u'10',
+          u'properties': {
+            u'command': [u'python', u'run_test.py'],
+            u'dimensions': [{u'key': u'os', u'value': u'Amiga'}],
+            u'execution_timeout_secs': u'3600',
+            u'grace_period_secs': u'30',
+            u'idempotent': True,
+            u'io_timeout_secs': u'1200',
+          },
+          u'tags': [
+            u'commit:post', u'os:Amiga', u'os:Win', u'priority:10',
+            u'project:yay', u'user:joe@localhost',
+          ],
+          u'user': u'joe@localhost',
+        },
+      ],
+      u'now': str_now_30,
+    }
+    self.assertEqual(
+        expected,
+        self.call_api('requests', body=message_to_dict(request)).json)
 
   def test_new_ok_isolated(self):
     """Asserts that new generates appropriate metadata."""

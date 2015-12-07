@@ -9,6 +9,7 @@ import json
 import logging
 
 from google.appengine.api import datastore_errors
+from google.appengine.ext import ndb
 import endpoints
 from protorpc import messages
 from protorpc import message_types
@@ -257,19 +258,18 @@ class SwarmingTasksService(remote.Service):
       http_method='GET')
   @auth.require(acl.is_privileged_user)
   def list(self, request):
-    """Provides a list of available tasks."""
+    """Returns tasks results based on the filters.
+
+    This endpoint is significantly slower than 'count'. Use 'count' when
+    possible.
+    """
+    # TODO(maruel): Rename 'list' to 'results'.
+    # TODO(maruel): Rename 'TaskList' to 'TaskResults'.
     logging.info('%s', request)
+    now = utils.utcnow()
     try:
-      start = message_conversion.epoch_to_datetime(request.start)
-      end = message_conversion.epoch_to_datetime(request.end)
-      now = utils.utcnow()
-      query = task_result.get_result_summaries_query(
-          start, end,
-          request.sort.name.lower(),
-          request.state.name.lower(),
-          request.tags)
       items, cursor = datastore_utils.fetch_page(
-          query, request.limit, request.cursor)
+          self._query_from_request(request), request.limit, request.cursor)
     except ValueError as e:
       raise endpoints.BadRequestException(
           'Inappropriate filter for tasks/list: %s' % e)
@@ -287,6 +287,42 @@ class SwarmingTasksService(remote.Service):
         now=now)
 
   @auth.endpoints_method(
+      swarming_rpcs.TasksRequest, swarming_rpcs.TaskRequests,
+      http_method='GET')
+  @auth.require(acl.is_privileged_user)
+  def requests(self, request):
+    """Returns tasks requests based on the filters.
+
+    This endpoint is slightly slower than 'list'. Use 'list' or 'count' when
+    possible.
+    """
+    logging.info('%s', request)
+    now = utils.utcnow()
+    try:
+      # Get the TaskResultSummary keys, then fetch the corresponding
+      # TaskRequest entities.
+      keys, cursor = datastore_utils.fetch_page(
+          self._query_from_request(request),
+          request.limit, request.cursor, keys_only=True)
+      items = ndb.get_multi(
+          task_pack.result_summary_key_to_request_key(k) for k in keys)
+    except ValueError as e:
+      raise endpoints.BadRequestException(
+          'Inappropriate filter for tasks/requests: %s' % e)
+    except datastore_errors.NeedIndexError as e:
+      logging.error('%s', e)
+      raise endpoints.BadRequestException(
+          'Requires new index, ask admin to create one.')
+    except datastore_errors.BadArgumentError as e:
+      logging.error('%s', e)
+      raise endpoints.BadRequestException(
+          'This combination is unsupported, sorry.')
+    return swarming_rpcs.TaskRequests(
+        cursor=cursor,
+        items=[message_conversion.task_request_to_rpc(i) for i in items],
+        now=now)
+
+  @auth.endpoints_method(
       swarming_rpcs.TasksCountRequest, swarming_rpcs.TasksCount,
       http_method='GET')
   @auth.require(acl.is_privileged_user)
@@ -297,19 +333,23 @@ class SwarmingTasksService(remote.Service):
       raise endpoints.BadRequestException('start (as epoch) is required')
     if not request.end:
       raise endpoints.BadRequestException('end (as epoch) is required')
+    now = utils.utcnow()
     try:
-      now = utils.utcnow()
-      query = task_result.get_result_summaries_query(
-          message_conversion.epoch_to_datetime(request.start),
-          message_conversion.epoch_to_datetime(request.end),
-          'created_ts',
-          request.state.name.lower(),
-          request.tags)
-      count = query.count()
+      count = self._query_from_request(request, 'created_ts').count()
     except ValueError as e:
       raise endpoints.BadRequestException(
           'Inappropriate filter for tasks/count: %s' % e)
     return swarming_rpcs.TasksCount(count=count, now=now)
+
+  def _query_from_request(self, request, sort=None):
+    """Returns a TaskResultSummary query."""
+    start = message_conversion.epoch_to_datetime(request.start)
+    end = message_conversion.epoch_to_datetime(request.end)
+    return task_result.get_result_summaries_query(
+        start, end,
+        sort or request.sort.name.lower(),
+        request.state.name.lower(),
+        request.tags)
 
 
 BotId = endpoints.ResourceContainer(

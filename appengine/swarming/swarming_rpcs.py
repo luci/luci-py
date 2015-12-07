@@ -205,9 +205,17 @@ class TaskResult(messages.Message):
 
 
 class TaskList(messages.Message):
-  """Wraps a list of TaskResult, along with request information."""
+  """Wraps a list of TaskResult."""
+  # TODO(maruel): Rename to TaskResults.
   cursor = messages.StringField(1)
   items = messages.MessageField(TaskResult, 2, repeated=True)
+  now = message_types.DateTimeField(3)
+
+
+class TaskRequests(messages.Message):
+  """Wraps a list of TaskRequest."""
+  cursor = messages.StringField(1)
+  items = messages.MessageField(TaskRequest, 2, repeated=True)
   now = message_types.DateTimeField(3)
 
 
@@ -288,7 +296,7 @@ class BotInfo(messages.Message):
 
 
 class BotList(messages.Message):
-  """Wraps a list of BotInfo, along with information about the request."""
+  """Wraps a list of BotInfo."""
   cursor = messages.StringField(1)
   items = messages.MessageField(BotInfo, 2, repeated=True)
   now = message_types.DateTimeField(3)
