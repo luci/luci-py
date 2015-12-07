@@ -197,6 +197,9 @@ def _handle_dead_bot(run_result_key):
     if run_result.state != task_result.State.RUNNING:
       # It was updated already or not updating last. Likely DB index was stale.
       return None, run_result.bot_id
+    if run_result.modified_ts > now - task_result.BOT_PING_TOLERANCE:
+      # The query index IS stale.
+      return None, run_result.bot_id
 
     run_result.signal_server_version(server_version)
     run_result.modified_ts = now
