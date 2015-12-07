@@ -732,7 +732,7 @@ class RootHandler(auth.AuthenticatingHandler):
     }
     if acl.is_admin():
       params['mapreduce_jobs'] = [
-        {'id': job_id, 'name': job_def['name']}
+        {'id': job_id, 'name': job_def['job_name']}
         for job_id, job_def in mapreduce_jobs.MAPREDUCE_JOBS.iteritems()
       ]
       params['xsrf_token'] = self.generate_xsrf_token()
