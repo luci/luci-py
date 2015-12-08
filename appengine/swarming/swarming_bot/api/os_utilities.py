@@ -18,6 +18,7 @@ import getpass
 import glob
 import hashlib
 import json
+import locale
 import logging
 import multiprocessing
 import os
@@ -437,6 +438,12 @@ def get_machine_type():
   return machine_type
 
 
+@tools.cached
+def get_locale():
+  """Returns the OS's UI active locale."""
+  return '.'.join(locale.getdefaultlocale())
+
+
 class SendMetricsFailure(Exception):
   pass
 
@@ -714,6 +721,7 @@ def get_state(threshold_mb=4*1024, threshold_relative=0.15, skip=None):
     u'gpu': get_gpu()[1],
     u'hostname': get_hostname(),
     u'ip': get_ip(),
+    u'locale': get_locale(),
     u'nb_files_in_temp': nb_files_in_temp,
     u'pid': os.getpid(),
     u'ram': get_physical_ram(),
