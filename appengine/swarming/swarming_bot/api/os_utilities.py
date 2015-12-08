@@ -444,6 +444,45 @@ def get_locale():
   return '.'.join(locale.getdefaultlocale())
 
 
+class AuthenticatedHttpRequestFailure(Exception):
+  pass
+
+
+def authenticated_http_request(service_account, *args, **kwargs):
+  """Sends an OAuth2-authenticated HTTP request.
+
+  Args:
+    service_account: Service account to use. For GCE, the name of the service
+      account, otherwise the path to the service account JSON file.
+
+  Raises:
+    AuthenticatedHttpRequestFailure
+  """
+  scopes = kwargs.pop('scopes', [])
+  kwargs['headers'] = kwargs.get('headers', {}).copy()
+  http = httplib2.Http(ca_certs=tools.get_cacerts_bundle())
+
+  # Authorize the request. In general, we need to produce an OAuth2 bearer token
+  # using a service account JSON file. However on GCE there is a shortcut: it
+  # can fetch the current bearer token right from the instance metadata without
+  # the need for the oauth2client.client library.
+  if platforms.is_gce():
+    try:
+      gce_bearer_token = platforms.gce.oauth2_access_token(
+          account=service_account)
+    except (IOError, urllib2.HTTPError) as e:
+      raise AuthenticatedHttpRequestFailure(e)
+    kwargs['headers']['Authorization'] = 'Bearer %s' % gce_bearer_token
+  else:
+    try:
+      oauth2client = get_oauth2_client(service_account, scopes)
+    except (IOError, OSError, ValueError) as e:
+      raise AuthenticatedHttpRequestFailure(e)
+    http = oauth2client.authorize(http)
+
+  return http.request(*args, **kwargs)
+
+
 class SendMetricsFailure(Exception):
   pass
 
@@ -466,25 +505,6 @@ def send_metric(name, value, labels, project, service_account):
   headers = {
       'Content-Type': 'application/json',
   }
-  http = httplib2.Http(ca_certs=tools.get_cacerts_bundle())
-
-  # Authorize the request. In general, we need to produce an OAuth2 bearer token
-  # using a service account JSON file. However on GCE there is a shortcut: it
-  # can fetch the current bearer token right from the instance metadata without
-  # the need for the oauth2client.client library.
-  if platforms.is_gce():
-    try:
-      gce_bearer_token = platforms.gce.oauth2_access_token(
-          account=service_account)
-    except (IOError, urllib2.HTTPError) as e:
-      raise SendMetricsFailure(e)
-    headers['Authorization'] = 'Bearer %s' % gce_bearer_token
-  else:
-    try:
-      oauth2client = get_oauth2_client(service_account, MONITORING_SCOPES)
-    except (IOError, OSError, ValueError) as e:
-      raise SendMetricsFailure(e)
-    http = oauth2client.authorize(http)
 
   now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
   body = {
@@ -509,10 +529,12 @@ def send_metric(name, value, labels, project, service_account):
     raise SendMetricsFailure('Invalid value type: %s' % type(value))
 
   try:
-    response, content = http.request(
+    response, content = authenticated_http_request(
+        service_account,
         '%s/projects/%s/timeseries:write' % (MONITORING_ENDPOINT, project),
-        method='POST', body=json.dumps(body), headers=headers)
-  except IOError as e:
+        method='POST', body=json.dumps(body), headers=headers,
+        scopes=MONITORING_SCOPES)
+  except (AuthenticatedHttpRequestFailure, IOError) as e:
     raise SendMetricsFailure(e)
 
   if response['status'] != '200':
