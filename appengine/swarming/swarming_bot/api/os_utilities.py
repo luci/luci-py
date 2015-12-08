@@ -441,7 +441,10 @@ def get_machine_type():
 @tools.cached
 def get_locale():
   """Returns the OS's UI active locale."""
-  return '.'.join(locale.getdefaultlocale())
+  locales = locale.getdefaultlocale()
+  if locales[0]:
+    return '.'.join(locales)
+  return 'Unknown'
 
 
 class AuthenticatedHttpRequestFailure(Exception):
