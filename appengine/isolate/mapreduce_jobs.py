@@ -11,12 +11,16 @@ instead.
 
 import logging
 
-from mapreduce import control
+from google.appengine.api import app_identity
+
+from mapreduce import mapreduce_pipeline
 
 import config
 import gcs
 
 
+# Base path to the mapreduce pipeline.
+MAPREDUCE_PIPELINE_BASE_PATH = '/internal/mapreduce/pipeline'
 # Task queue name to run all map reduce jobs on.
 MAPREDUCE_TASK_QUEUE = 'mapreduce-jobs'
 
@@ -24,14 +28,16 @@ MAPREDUCE_TASK_QUEUE = 'mapreduce-jobs'
 # Registered mapreduce jobs, displayed on admin page.
 MAPREDUCE_JOBS = {
   'find_missing_gs_files': {
-    'name': 'Report missing GS files',
-    'mapper_parameters': {
+    'job_name': 'Report missing GS files',
+    'mapper_spec': 'find_missing_gs_files',
+    'mapper_params': {
       'entity_kind': 'handlers.ContentEntry',
     },
   },
   'delete_broken_entries': {
-    'name': 'Delete entries that do not have corresponding GS files',
-    'mapper_parameters': {
+    'job_name': 'Delete entries that do not have corresponding GS files',
+    'mapper_spec': 'delete_broken_entries',
+    'mapper_params': {
       'entity_kind': 'handlers.ContentEntry',
     },
   },
@@ -42,12 +48,25 @@ def launch_job(job_id):
   """Launches a job given its key from MAPREDUCE_JOBS dict."""
   assert job_id in MAPREDUCE_JOBS, 'Unknown mapreduce job id %s' % job_id
   job_def = MAPREDUCE_JOBS[job_id].copy()
-  job_def.setdefault('shard_count', 64)
-  job_def.setdefault('queue_name', MAPREDUCE_TASK_QUEUE)
+  job_def.setdefault('shards', 64)
   job_def.setdefault(
-      'reader_spec', 'mapreduce.input_readers.DatastoreInputReader')
-  job_def.setdefault('handler_spec', 'mapreduce_jobs.' + job_id)
-  return control.start_map(base_path='/internal/mapreduce', **job_def)
+      'input_reader_spec', 'mapreduce.input_readers.DatastoreInputReader')
+  job_def['mapper_params'] = job_def['mapper_params'].copy()
+  job_def['mapper_params'].setdefault(
+      'bucket_name', app_identity.get_default_gcs_bucket_name())
+
+  if 'reducer_spec' in job_def:
+    logging.info('Starting mapreduce job')
+    pipeline = mapreduce_pipeline.MapreducePipeline(**job_def)
+  else:
+    logging.info('Starting mapper-only pipeline')
+    job_def['params'] = job_def.pop('mapper_params')
+    pipeline = mapreduce_pipeline.MapPipeline(**job_def)
+
+  pipeline.start(
+      base_path=MAPREDUCE_PIPELINE_BASE_PATH, queue_name=MAPREDUCE_TASK_QUEUE)
+  logging.info('Pipeline ID: %s', pipeline.pipeline_id)
+  return pipeline.pipeline_id
 
 
 def is_good_content_entry(entry):

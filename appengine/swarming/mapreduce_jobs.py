@@ -16,7 +16,6 @@ import logging
 from google.appengine.api import app_identity
 from google.appengine.ext import ndb
 
-from mapreduce import control
 from mapreduce import mapreduce_pipeline
 from mapreduce import operation
 
@@ -26,7 +25,6 @@ from server import task_pack
 from server import task_result  # Needed for entity.get()
 
 
-APP_IDENTITY = app_identity.get_application_id()
 # Base path to the mapreduce pipeline.
 MAPREDUCE_PIPELINE_BASE_PATH = '/internal/mapreduce/pipeline'
 # Task queue name to run all map reduce jobs on.
