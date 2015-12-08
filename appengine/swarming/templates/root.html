@@ -5,6 +5,11 @@
 <script src="/third_party/webcomponentsjs/webcomponents.min.js"></script>
 <link rel="import" href="/elements/stats-overview-build.html">
 <style>
+  .highlight_section {
+    background-color: #ffffee;
+    border-radius: 20px;
+    padding: 10px;
+  }
   .admin a {
     {% if not is_admin %}
       color: gray;
@@ -41,8 +46,12 @@
 <h1>Swarming Server</h1>
 <div layout horizontal>
   <div>
-    <div>Swarming Server is an open source task distribution service written in python
-    running on AppEngine.</div>
+    <div class=highlight_section>
+      Swarming Server is an open source task distribution service. It is written
+      in python and runs on <a
+        href="https://cloud.google.com/appengine/">AppEngine</a>. It is part of
+        <a href="https://github.com/luci/luci-py">LUCI</a>.
+    </div>
     <p>
 
     {% if not nickname %}
@@ -54,25 +63,26 @@
     <h3>Service Status</h3>
     <ul>
       <li class="user"><a href="/stats">Usage statistics</a></li>
-      <li class="user"><a href="/user/tasks">Tasks list and search</a></li>
-      <li class="privileged_user"><a href="/restricted/bots">Known bots</a></li>
-      <li class="admin"><a href="/restricted/ereporter2/errors">Recent ereporter2 errors</a></li>
-      <li class="admin"><a href="/restricted/ereporter2/report">Recent exceptions in server log</a></li>
+      <li class="user"><a href="/user/tasks">Tasks</a></li>
+      <li class="privileged_user"><a href="/restricted/bots">Bots</a></li>
+      <li class="admin"><a href="/restricted/ereporter2/report">Exceptions in server log</a></li>
+      <li class="admin"><a href="/restricted/ereporter2/errors">Ereporter2 errors</a></li>
+      <li class="admin"><a href="/restricted/mapreduce/status">Map reduce jobs</a></li>
     </ul>
 
     <h3>Configuration</h3>
     <ul class="admin">
-      <li><a href="/restricted/config">Global server config</a></li>
-      <li><a href="/restricted/upload/bootstrap">Upload new bootstrap.py</a></li>
-      <li><a href="/restricted/upload/bot_config">Upload new bot_config.py</a></li>
-      <li><a href="/auth/groups">Manage user groups</a></li>
+      <li><a href="/restricted/config">Server config</a></li>
+      <li><a href="/restricted/upload/bootstrap">bootstrap.py</a></li>
+      <li><a href="/restricted/upload/bot_config">bot_config.py</a></li>
+      <li><a href="/auth/groups">User groups</a></li>
     </ul>
 
     <h3>Running a bot</h3>
       To bootstrap a bot, run one of these:
       <ol>
         <li>
-          TL;DR;
+          <strong> TL;DR; </strong>
 <div class="command">python -c "import urllib; exec urllib.urlopen('{{host_url}}/bootstrap').read()"</div>
         </li>
         <li>
@@ -80,21 +90,16 @@
 <div class="command">'python -c "import urllib; exec urllib.urlopen('"'{{host_url}}/bootstrap'"').read()"'</div>
         </li>
         <li>
-          Manually. Don't forget if swarming_bot.zip was already present, curl
-          won't overwrite it so "rm swarming_bot.zip" first if necessary.
+          Manually:
 <div class="command" style="margin-bottom:0">mkdir bot; cd bot
-curl -sSLOJ {{host_url}}/bot_code
+rm swarming_bot.zip; curl -sSLOJ {{host_url}}/bot_code
 python swarming_bot.zip</div>
         </li>
       </ol>
     </li>
-    See the project's page for code and help pages:
-      <a href="https://code.google.com/p/swarming/">
-        https://code.google.com/p/swarming/</a>
 
     <h3>Map reduce jobs</h3>
     <ul class="admin">
-      <li><a href="/restricted/mapreduce/status">Map reduce jobs status</a></li>
       {% for job in mapreduce_jobs %}
         <li>
           <form action="/restricted/launch_mapreduce" method="post">

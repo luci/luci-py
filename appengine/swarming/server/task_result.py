@@ -94,6 +94,7 @@ class State(object):
   STATES = (RUNNING, PENDING, EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, COMPLETED)
   STATES_RUNNING = (RUNNING, PENDING)
   STATES_NOT_RUNNING = (EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, COMPLETED)
+  STATES_EXCEPTIONAL = (EXPIRED, TIMED_OUT, BOT_DIED, CANCELED)
   STATES_DONE = (TIMED_OUT, COMPLETED)
   STATES_ABANDONED = (EXPIRED, BOT_DIED, CANCELED)
 
@@ -350,6 +351,13 @@ class _TaskResultCommon(ndb.Model):
   @property
   def exit_code(self):
     return self.exit_codes[0] if self.exit_codes else None
+
+  @property
+  def is_exceptional(self):
+    """Returns True if the task is in an exceptional state. Mostly for html
+    view.
+    """
+    return self.state in State.STATES_EXCEPTIONAL
 
   @property
   def is_pending(self):

@@ -3,6 +3,11 @@
 
 {% block headers %}
 <style>
+  .highlight_section {
+    background-color: #ffffee;
+    border-radius: 20px;
+    padding: 10px;
+  }
   .admin a {
     {% if not is_admin %}
       color: gray;
@@ -20,9 +25,14 @@
 
 {% block body %}
 
-<h1>Welcome to an Isolate Server instance</h1>
+<h1>Isolate Server</h1>
+<div class=highlight_section>
 Isolate Server is a Content-Addressed Cache that is used by the Swarming
-project to distribute test execution accross a swarm of slaves.
+project to distribute test execution accross a swarming bots.
+It is written in python and runs on <a
+href="https://cloud.google.com/appengine/">AppEngine</a>. It is part of <a
+href="https://github.com/luci/luci-py">LUCI</a>.
+</div>
 <p>
 
 {% if not nickname %}
@@ -34,20 +44,20 @@ As a {{user_type}}, you are entitled to see these pages:
 <h3>Service Status</h3>
 <ul>
   <li><a href="/stats">Usage statistics</a></li>
-  <li class="user"><a href="/browse">Browse online</a></li>
-  <li class="admin"><a href="/restricted/ereporter2/errors">Recent ereporter2 errors</a></li>
-  <li class="admin"><a href="/restricted/ereporter2/report">Recent exceptions in server log</a></li>
+  <li class="user"><a href="/browse">Browse files online</a></li>
+  <li class="admin"><a href="/restricted/ereporter2/report">Exceptions in server log</a></li>
+  <li class="admin"><a href="/restricted/ereporter2/errors">Ereporter2 errors</a></li>
+  <li class="admin"><a href="/restricted/mapreduce/status">Map reduce jobs</a></li>
 </ul>
 
 <h3>Configuration</h3>
 <ul class="admin">
-  <li><a href="/restricted/config">Server global config</a></li>
-  <li><a href="/auth/groups">Manage user groups</a></li>
+  <li><a href="/restricted/config">Server config</a></li>
+  <li><a href="/auth/groups">User groups</a></li>
 </ul>
 
 <h3>Map reduce jobs</h3>
 <ul class="admin">
-  <li><a href="/restricted/mapreduce/status">Map reduce jobs status</a></li>
   {% for job in mapreduce_jobs %}
     <li>
       <form action="/restricted/launch_mapreduce" method="post">

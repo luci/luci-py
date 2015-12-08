@@ -235,7 +235,7 @@
     </thead>
     <tbody>
       {% for task in tasks %}
-        <tr class="request {% if task.failure or task.internal_failure %}failed_test{% endif%}">
+        <tr class="request {% if task.failure or task.internal_failure or task.is_exceptional %}failed_test{% endif%}">
           <td>
             <a href="/user/task/{{task.task_id}}">{{task.name}}</a>
           </td>
