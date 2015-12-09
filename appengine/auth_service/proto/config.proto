@@ -105,8 +105,9 @@ message DelegationConfig {
     // rule). Required.
     repeated string user_id = 1;
 
-    // A token request matches this rule if its 'services' field is subset of
-    // 'target_service' list. '*' denotes "any service". Required.
+    // A token request matches this rule if its 'services' field contains '*'
+    // or is subset of 'target_service' list.
+    // '*' denotes "any service". Required.
     repeated string target_service = 2;
 
     // Rule outputs.

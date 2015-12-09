@@ -69,12 +69,12 @@ class HandlersTest(test_case.TestCase):
     self.assertTrue(t.creation_time >= time.time() - 30)
     self.assertEqual(3600, t.validity_duration)
     self.assertFalse(t.audience)
-    self.assertFalse(t.services)
+    self.assertEqual(t.services, ['*'])
     self.assertFalse(t.HasField('impersonator_id'))
 
   def test_with_impersonation(self):
     # This function is tested separately below.
-    self.mock(delegation, 'check_can_create_token', lambda *_: None)
+    self.mock(delegation, 'check_can_create_token', lambda *_, **__: None)
 
     resp = self.create_token({
       'audience': ['user:b@a.com'],
@@ -171,18 +171,19 @@ class CheckCanCreateTokenTest(test_case.TestCase):
         target_service=['*'],
         max_validity_duration=5)
 
-    def call(user_id, services):
-      return delegation.get_delegation_rule(
-          user_id, services).max_validity_duration
-    self.assertEqual(1, call('service:a', ['service:b']))
-    self.assertEqual(2, call('service:a', ['service:x']))
-    self.assertEqual(2, call('service:a', ['service:c']))
-    self.assertEqual(3, call('service:x', ['service:c']))
-    self.assertEqual(4, call('service:x', ['service:c', 'service:d']))
-    self.assertEqual(
-        5, call('service:x', ['service:c', 'service:d', 'service:e']))
-    self.assertEqual(2, call('service:a', ['*']))
-    self.assertEqual(5, call('service:x', ['*']))
+    def test(expected_max_validity_duration, user_id, services):
+      rule = delegation.get_delegation_rule(user_id, services)
+      self.assertEqual(
+          expected_max_validity_duration, rule.max_validity_duration)
+
+    test(1, 'service:a', ['service:b'])
+    test(2, 'service:a', ['service:x'])
+    test(2, 'service:a', ['service:c'])
+    test(3, 'service:x', ['service:c'])
+    test(4, 'service:x', ['service:c', 'service:d'])
+    test(5, 'service:x', ['service:c', 'service:d', 'service:e'])
+    test(1, 'service:a', ['*'])
+    test(3, 'service:x', ['*'])
 
   def make_subtoken(self, **kwargs):
     return delegation_pb2.Subtoken(**kwargs)

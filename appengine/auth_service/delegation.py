@@ -94,6 +94,8 @@ class CreateDelegationTokenHandler(auth.ApiHandler):
     subtoken.creation_time = int(utils.time_time())
     if not subtoken.validity_duration:
       subtoken.validity_duration = DEF_VALIDITY_DURATION_SEC
+    if not subtoken.services or '*' in subtoken.services:
+      subtoken.services[:] = get_default_allowed_services(user_id)
 
     # Check ACL (raises auth.AuthorizationError on errors).
     check_can_create_token(user_id, subtoken)
@@ -194,15 +196,18 @@ def get_delegation_rule(user_id, services):
   Args:
     user_id: identity string to match against 'user_id' field.
     services: list of identities (as strings) to match against 'target_service'.
+      If contains '*', first user_id-matching rule will be returned.
 
   Returns:
     config_pb2.DelegationConfig.Rule if found, DEFAULT_RULE if not.
   """
   services_set = set(services)
   for r in config.get_delegation_config().rules:
-    if (('*' in r.user_id or user_id in r.user_id) and
-        ('*' in r.target_service or services_set.issubset(r.target_service))):
-      return r
+    if '*' in r.user_id or user_id in r.user_id:
+      if ('*' in r.target_service or
+          '*' in services or
+          services_set.issubset(r.target_service)):
+        return r
   return DEFAULT_RULE
 
 
@@ -235,14 +240,13 @@ def check_can_create_token(user_id, subtoken):
   """Checks that caller is allowed to mint a given root token.
 
   Args:
-    caller_id: identity string of a current caller.
+    user_id: identity string of a current caller.
     subtoken: instance of delegation_pb2.Subtoken describing root token.
 
   Raises:
     auth.AuthorizationError if such token is not allowed for the caller.
   """
-  # Empty subtoken.services means the token applies to all services.
-  rule = get_delegation_rule(user_id, subtoken.services or ['*'])
+  rule = get_delegation_rule(user_id, subtoken.services)
 
   if subtoken.validity_duration > rule.max_validity_duration:
     raise auth.AuthorizationError(
@@ -262,3 +266,14 @@ def check_can_create_token(user_id, subtoken):
   raise auth.AuthorizationError(
       '"%s" is not allowed to impersonate "%s" on %s' %
       (user_id, subtoken.issuer_id, subtoken.services or ['*']))
+
+
+def get_default_allowed_services(user_id):
+  """Returns the list of services defined by a first matching rule.
+
+  Args:
+    user_id: identity string of a current caller.
+  """
+  rule = get_delegation_rule(user_id, ['*'])
+  return rule.target_service
+
