@@ -7,18 +7,36 @@
 See delegation.proto for general idea behind it.
 """
 
+import collections
+import datetime
 import functools
+import hashlib
+import json
+import logging
 import threading
+import urllib
 
+from google.appengine.api import urlfetch
+from google.appengine.ext import ndb
+from google.appengine.runtime import apiproxy_errors
 from google.protobuf import message
 
 from components import utils
 
 from . import api
 from . import model
+from . import service_account
 from . import signature
 from . import tokens
 from .proto import delegation_pb2
+
+
+__all__ = [
+  'delegate',
+  'delegate_async',
+  'DelegationToken',
+  'DelegationTokenCreationError',
+]
 
 
 # TODO(vadimsh): Add a simple encryption layer, so that token's guts are not
@@ -44,6 +62,21 @@ class BadTokenError(Exception):
 
 class TransientError(Exception):
   """Raised on errors that can go away with retry. Results in 500 HTTP code."""
+
+
+class DelegationTokenCreationError(Exception):
+  """Raised on delegation token creation errors."""
+
+
+class DelegationAuthorizationError(DelegationTokenCreationError):
+  """Raised on authorization error during delegation token creation."""
+
+
+# A minted delegation token returned by delegate_async and delegate.
+DelegationToken = collections.namedtuple('DelegationToken', [
+  'token',  # urlsafe base64 encoded blob with delegation token.
+  'expiry',  # datetime.datetime of expiration.
+])
 
 
 class SignatureChecker(object):
@@ -261,6 +294,208 @@ def unseal_token(tok):
   if len(toks.subtokens) > MAX_SUBTOKEN_LIST_LEN:
     raise BadTokenError('Bad serialized_subtoken_list: too many subtokens')
   return toks
+
+
+## Token creation.
+
+
+def _urlfetch_async(**kwargs):
+  """To be mocked in tests."""
+  return ndb.get_context().urlfetch(**kwargs)
+
+
+@ndb.tasklet
+def _authenticated_request_async(url, method='GET', payload=None, params=None):
+  """Sends an authenticated JSON API request, returns deserialized response.
+
+  Raises:
+    DelegationTokenCreationError if request failed or response is malformed.
+    DelegationAuthorizationError on HTTP 401 or 403 response from auth service.
+  """
+  scope = 'https://www.googleapis.com/auth/userinfo.email'
+  access_token = service_account.get_access_token(scope)[0]
+  headers = {'Authorization': 'Bearer %s' % access_token}
+
+  if payload is not None:
+    assert method in ('CREATE', 'POST', 'PUT'), method
+    headers['Content-Type'] = 'application/json; charset=utf-8'
+    payload = utils.encode_to_json(payload)
+
+  if utils.is_local_dev_server():
+    protocols = ('http://', 'https://')
+  else:
+    protocols = ('https://',)
+  assert url.startswith(protocols) and '?' not in url, url
+  if params:
+    url += '?' + urllib.urlencode(params)
+
+  try:
+    res = yield _urlfetch_async(
+        url=url,
+        payload=payload,
+        method=method,
+        headers=headers,
+        follow_redirects=False,
+        deadline=10,
+        validate_certificate=True)
+  except (apiproxy_errors.DeadlineExceededError, urlfetch.Error) as e:
+    raise DelegationTokenCreationError(str(e))
+
+  if res.status_code in (401, 403):
+    raise api.DelegationAuthorizationError(
+      'HTTP response status code: %s' % res.status_code)
+
+  if res.status_code >= 300:
+    raise DelegationTokenCreationError(
+      'HTTP response status code: %s' % res.status_code)
+
+  try:
+    json_res = json.loads(res.content)
+  except ValueError as e:
+    raise DelegationTokenCreationError('Bad JSON response: %s' % e)
+  raise ndb.Return(json_res)
+
+
+@ndb.tasklet
+def delegate_async(
+    audience=None,
+    services=None,
+    min_validity_duration_sec=5*60,
+    max_validity_duration_sec=60*60*10,
+    impersonate=None,
+    auth_service_url=None):
+  """Creates a delegation token.
+
+  An RPC. Memcaches the token.
+
+  Does not support delegation of a delegation token.
+
+  Args:
+    audience (list of (str or Identity)): to WHOM caller's identity is
+      delegated; a list of identities or groups.
+      If None (default), the token can be used by anyone.
+      Example: ['user:def@example.com', 'group:abcdef']
+    services (list of (str or Identity)): WHERE token is accepted.
+      If None (default), the token is accepted everywhere.
+      Each list element must be an identity of 'service' kind.
+      Example: ['service:gae-app1', 'service:gae-app2']
+    min_validity_duration_sec (int): minimally acceptable lifetime of the token.
+      If there's existing token cached locally that have TTL
+      min_validity_duration_sec or more, it will be returned right away.
+      Default is 5 min.
+    max_validity_duration_sec (int): defines lifetime of a new token.
+      It will bet set as tokens' TTL if there's no existing cached tokens with
+      sufficiently long lifetime. Default is 10 hours.
+    impersonate (str or Identity): a caller can mint a delegation token on some
+      else's behalf (effectively impersonating them).
+      Only a privileged set of callers can do that.
+      If impersonation is allowed, token's issuer_id field will contain whatever
+      is in 'impersonate' field.
+      Example: 'user:abc@example.com'
+    auth_service_url (str): the URL for the authentication service that will
+      mint the token. Defaults to the URL of the primary if this is a replica.
+
+  Returns:
+    DelegationToken as ndb.Future.
+
+  Raises:
+    ValueError if args are invalid.
+    DelegationTokenCreationError if could not create a token.
+    DelegationAuthorizationError on HTTP 403 response from auth service.
+  """
+  # Validate audience.
+  audience = audience or []
+  for a in audience:
+    assert isinstance(a, (basestring, model.Identity)), a
+    if isinstance(a, basestring) and not a.startswith('group:'):
+      model.Identity.from_bytes(a)  # May raise ValueError.
+  id_to_str = lambda i: i.to_bytes() if isinstance(i, model.Identity) else i
+  audience = map(id_to_str, audience)
+
+  # Validate services.
+  services = services or []
+  for s in services:
+    if isinstance(s, basestring):
+      s = model.Identity.from_bytes(s)
+    assert isinstance(s, model.Identity), s
+    assert s.kind == model.IDENTITY_SERVICE, s
+  services = map(id_to_str, services)
+
+  # Validate validity durations.
+  assert isinstance(min_validity_duration_sec, int), min_validity_duration_sec
+  assert isinstance(max_validity_duration_sec, int), max_validity_duration_sec
+  assert min_validity_duration_sec >= 5
+  assert max_validity_duration_sec >= 5
+  assert min_validity_duration_sec <= max_validity_duration_sec
+
+  # Validate impersonate.
+  if impersonate is not None:
+    assert isinstance(impersonate, (basestring, model.Identity)), impersonate
+    impersonate = id_to_str(impersonate)
+
+  # Validate auth_service_url.
+  if auth_service_url is None:
+    repl_state = model.get_replication_state()
+    if repl_state:
+      auth_service_url = repl_state.primary_url
+    if not auth_service_url:
+      raise ValueError(
+          'auth_service_url is unspecified and this is not a replica')
+
+  # End of validation.
+
+  req = {
+    'audience': audience,
+    'services': services,
+    'validity_duration': max_validity_duration_sec,
+    'impersonate': impersonate,
+  }
+
+  # Get from cache.
+  cache_key_hash = hashlib.sha1(json.dumps(req, sort_keys=True)).hexdigest()
+  cache_key = 'delegation_token/v1/%s' % cache_key_hash
+  ctx = ndb.get_context()
+  token = yield ctx.memcache_get(cache_key)
+  min_validity_duration = datetime.timedelta(seconds=min_validity_duration_sec)
+  now = utils.utcnow()
+  if token and token.expiry - min_validity_duration > now:
+    raise ndb.Return(token)
+
+  # Request a new one.
+  logging.info(
+      'Minting a delegation token for %r',
+      {k: v for k, v in req.iteritems() if v},
+  )
+
+  res = yield _authenticated_request_async(
+      '%s/auth_service/api/v1/delegation/token/create' % auth_service_url,
+      method='POST',
+      payload=req)
+  actual_validity_duration_sec = res.get('validity_duration')
+  if not isinstance(actual_validity_duration_sec, int):
+    raise DelegationTokenCreationError(
+        'Unexpected response, validity_duration is absent '
+        'or not a number: %s' % res)
+
+  token = DelegationToken(
+      token=res.get('delegation_token'),
+      expiry=now + datetime.timedelta(seconds=actual_validity_duration_sec),
+  )
+  if not token.token:
+    raise DelegationTokenCreationError(
+      'Unexpected response, no delegation_token: %s' % res)
+
+  # Put to cache. Refresh the token 10 sec in advance.
+  if actual_validity_duration_sec > 10:
+    yield ctx.memcache_add(
+        cache_key, token, time=actual_validity_duration_sec - 10)
+
+  raise ndb.Return(token)
+
+
+def delegate(**kwargs):
+  """Blocking version of delegate_async."""
+  return delegate_async(**kwargs).get_result()
 
 
 ## Token validation.

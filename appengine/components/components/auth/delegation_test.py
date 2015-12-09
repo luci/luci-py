@@ -3,12 +3,16 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import collections
 import datetime
+import json
 import sys
 import unittest
 
 from test_support import test_env
 test_env.setup_test_env()
+
+from google.appengine.ext import ndb
 
 from components import utils
 from components.auth import api
@@ -247,6 +251,91 @@ class FullRoundtripTest(test_case.TestCase):
     make_id = model.Identity.from_bytes
     ident = delegation.check_delegation_token(blob, make_id('user:final@a.com'))
     self.assertEqual(make_id('user:initial@a.com'), ident)
+
+
+class CreateTokenTest(test_case.TestCase):
+
+  Response = collections.namedtuple('Response', ['status_code', 'content'])
+
+  def test_success(self):
+    self.mock_now(datetime.datetime(2015, 1, 1))
+
+    @ndb.tasklet
+    def urlfetch(url, payload, **_rest):
+      urlfetch.called = True
+      self.assertEqual(
+          url,
+          'https://example.com/auth_service/api/v1/delegation/token/create')
+      payload = json.loads(payload)
+      self.assertEqual(payload, urlfetch.expected_payload)
+      res = {
+        'delegation_token': 'deadbeef',
+        'validity_duration': payload['validity_duration'],
+      }
+      raise ndb.Return(self.Response(200, json.dumps(res, sort_keys=True)))
+
+    urlfetch.expected_payload = {
+      'audience': [
+        'user:a1@example.com',
+        'user:a2@example.com',
+        'group:g'
+      ],
+      'services': ['service:1', 'service:2'],
+      'validity_duration': 3000,
+      'impersonate': 'user:i@example.com',
+    }
+    urlfetch.called = False
+
+    self.mock(delegation, '_urlfetch_async', urlfetch)
+
+    model.AuthReplicationState(
+        key=model.replication_state_key(),
+        primary_url='https://example.com'
+    ).put()
+
+    args = {
+      'audience': [
+        'user:a1@example.com',
+        model.Identity('user', 'a2@example.com'),
+        'group:g',
+      ],
+      'services': [
+        'service:1',
+        model.Identity('service', '2')
+      ],
+      'max_validity_duration_sec': 3000,
+      'impersonate': model.Identity('user', 'i@example.com'),
+    }
+    result = delegation.delegate(**args)
+    self.assertTrue(urlfetch.called)
+    self.assertEqual(result.token, 'deadbeef')
+    self.assertEqual(
+        result.expiry, utils.utcnow() + datetime.timedelta(seconds=3000))
+
+    # Get from cache.
+    urlfetch.called = False
+    delegation.delegate(**args)  # must not increase urlfetch.call_count
+    self.assertFalse(urlfetch.called)
+
+    # Get from cache with larger validity duration.
+    urlfetch.called = False
+    args['min_validity_duration_sec'] = 5000
+    args['max_validity_duration_sec'] = 5000
+    urlfetch.expected_payload['validity_duration'] = 5000
+    result = delegation.delegate(**args)
+    self.assertTrue(urlfetch.called)
+    self.assertEqual(result.token, 'deadbeef')
+    self.assertEqual(
+        result.expiry, utils.utcnow() + datetime.timedelta(seconds=5000))
+    self.assertTrue(urlfetch.called)
+
+  def test_http_500(self):
+    http500_fut = ndb.Future()
+    http500_fut.set_result(self.Response(500, 'Server internal error'))
+    self.mock(delegation, '_urlfetch_async', lambda  **_k: http500_fut)
+
+    with self.assertRaises(delegation.DelegationTokenCreationError):
+      delegation.delegate(auth_service_url='https://example.com')
 
 
 if __name__ == '__main__':

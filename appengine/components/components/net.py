@@ -14,6 +14,7 @@ from google.appengine.runtime import apiproxy_errors
 
 from components import auth
 from components import utils
+from components.auth import delegation
 
 
 EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email'
@@ -53,6 +54,7 @@ def request_async(
     headers=None,
     scopes=None,
     service_account_key=None,
+    delegation_token=None,
     deadline=None,
     max_attempts=None):
   """Sends a REST API request, returns raw unparsed response.
@@ -67,6 +69,7 @@ def request_async(
     headers: additional request headers.
     scopes: OAuth2 scopes for the access token (ok skip auth if None).
     service_account_key: auth.ServiceAccountKey with credentials.
+    delegation_token: delegation token returned by auth.delegate.
     deadline: deadline for a single attempt (10 sec by default).
     max_attempts: how many times to retry on errors (4 times by default).
 
@@ -93,6 +96,12 @@ def request_async(
     access_token = auth.get_access_token(scopes, service_account_key)[0]
     headers = (headers or {}).copy()
     headers['Authorization'] = 'Bearer %s' % access_token
+
+  if delegation_token:
+    if isinstance(delegation_token, auth.DelegationToken):
+      delegation_token = delegation_token.token
+    assert isinstance(delegation_token, basestring)
+    headers[delegation.HTTP_HEADER] = delegation_token
 
   if payload is not None:
     assert isinstance(payload, str), type(payload)
@@ -165,6 +174,7 @@ def json_request_async(
     headers=None,
     scopes=None,
     service_account_key=None,
+    delegation_token=None,
     deadline=None,
     max_attempts=None):
   """Sends a JSON REST API request, returns deserialized response.
@@ -179,6 +189,7 @@ def json_request_async(
     headers: additional request headers.
     scopes: OAuth2 scopes for the access token (ok skip auth if None).
     service_account_key: auth.ServiceAccountKey with credentials.
+    delegation_token: delegation token returned by auth.delegate.
     deadline: deadline for a single attempt.
     max_attempts: how many times to retry on errors.
 
@@ -202,6 +213,7 @@ def json_request_async(
       headers=headers,
       scopes=scopes,
       service_account_key=service_account_key,
+      delegation_token=delegation_token,
       deadline=deadline,
       max_attempts=max_attempts)
   try:
