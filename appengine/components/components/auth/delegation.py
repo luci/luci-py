@@ -342,7 +342,7 @@ def _authenticated_request_async(url, method='GET', payload=None, params=None):
     raise DelegationTokenCreationError(str(e))
 
   if res.status_code in (401, 403):
-    raise api.DelegationAuthorizationError(
+    raise DelegationAuthorizationError(
       'HTTP response status code: %s' % res.status_code)
 
   if res.status_code >= 300:

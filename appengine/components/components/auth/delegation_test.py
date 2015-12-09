@@ -330,11 +330,19 @@ class CreateTokenTest(test_case.TestCase):
     self.assertTrue(urlfetch.called)
 
   def test_http_500(self):
-    http500_fut = ndb.Future()
-    http500_fut.set_result(self.Response(500, 'Server internal error'))
-    self.mock(delegation, '_urlfetch_async', lambda  **_k: http500_fut)
+    res = ndb.Future()
+    res.set_result(self.Response(500, 'Server internal error'))
+    self.mock(delegation, '_urlfetch_async', lambda  **_k: res)
 
     with self.assertRaises(delegation.DelegationTokenCreationError):
+      delegation.delegate(auth_service_url='https://example.com')
+
+  def test_http_403(self):
+    res = ndb.Future()
+    res.set_result(self.Response(403, 'Not authorized'))
+    self.mock(delegation, '_urlfetch_async', lambda  **_k: res)
+
+    with self.assertRaises(delegation.DelegationAuthorizationError):
       delegation.delegate(auth_service_url='https://example.com')
 
 
