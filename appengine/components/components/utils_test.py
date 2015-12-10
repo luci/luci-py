@@ -8,6 +8,8 @@
 
 import datetime
 import sys
+import threading
+import time
 import unittest
 
 from test_support import test_env
@@ -81,6 +83,27 @@ class UtilsTest(test_case.TestCase):
     self.assertEqual(1, get_me())
     self.assertEqual(1, len(calls))
 
+  def test_cache_with_tasklets(self):
+    @utils.cache
+    def f():
+      ndb.sleep(0).wait()  # Yield thread.
+      return 1
+
+    @ndb.tasklet
+    def g():
+      yield ()  # Make g a generator.
+      raise ndb.Return(f())
+
+    def test():
+      ndb.Future.wait_all([(g()), (g())])
+
+    t = threading.Thread(target=test)
+    t.daemon = True
+    t.start()
+    t.join(1)
+    if t.is_alive():
+      self.fail('deadlock')
+
   def test_clear_cache(self):
     calls = []
 
@@ -106,6 +129,7 @@ class FakeNdbContext(object):
     self.get_calls.append(key)
     raise ndb.Return(self.cached_value)
 
+  # pylint: disable=redefined-outer-name
   @ndb.tasklet
   def memcache_set(self, key, value, time=None):
     self.cached_value = value
