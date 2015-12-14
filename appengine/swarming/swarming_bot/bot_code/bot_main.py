@@ -651,12 +651,15 @@ def main(args):
 
   # Enforces that only one process with a bot in this directory can be run on
   # this host at once.
-  #
-  # This is generally a problem with launchd which is a bit too much
-  # 'restart-happy', causing 2 bots running concurrently on the host but it was
-  # observed on linux too.
   if not SINGLETON.acquire():
-    print >> sys.stderr, 'Found a previous bot, %d exiting.' % os.getpid()
+    if sys.platform == 'darwin':
+      msg = (
+          'Found a previous bot, %d rebooting as a workaround for '
+          'https://crbug.com/569610.') % os.getpid()
+      print >> sys.stderr, msg
+      os_utilities.restart(msg)
+    else:
+      print >> sys.stderr, 'Found a previous bot, %d exiting.' % os.getpid()
     return 1
 
   for t in ('out', 'err'):
@@ -673,3 +676,4 @@ def main(args):
   finally:
     call_hook(bot.Bot(None, None, None, None, os.path.dirname(THIS_FILE), None),
               'on_bot_shutdown')
+    logging.info('main() returning')
