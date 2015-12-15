@@ -60,7 +60,10 @@ class LeaseRequestProcessorTest(test_case.TestCase):
             hostname='fake-host',
             os_family=rpc_messages.OSFamily.LINUX,
         ),
-        rpc_messages.Policies(),
+        rpc_messages.Policies(
+            backend_project='fake-project',
+            backend_topic='fake-topic',
+        ),
         models.CatalogMachineEntryStates.AVAILABLE,
     )
 

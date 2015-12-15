@@ -66,7 +66,10 @@ class CatalogTest(test_case.EndpointsTestCase):
             hostname='fake-host',
             os_family=rpc_messages.OSFamily.LINUX,
         ),
-        policies=rpc_messages.Policies(),
+        policies=rpc_messages.Policies(
+            backend_project='fake-project',
+            backend_topic='fake-topic',
+        ),
     ))
     self.mock_get_current_backend()
 
@@ -81,7 +84,10 @@ class CatalogTest(test_case.EndpointsTestCase):
         dimensions=rpc_messages.Dimensions(
             os_family=rpc_messages.OSFamily.LINUX,
         ),
-        policies=rpc_messages.Policies(),
+        policies=rpc_messages.Policies(
+            backend_project='fake-project',
+            backend_topic='fake-topic',
+        ),
     ))
     self.mock_get_current_backend()
 
@@ -101,7 +107,8 @@ class CatalogTest(test_case.EndpointsTestCase):
             os_family=rpc_messages.OSFamily.LINUX,
         ),
         policies=rpc_messages.Policies(
-            pubsub_topic='../../a-different-project/topics/my-topic',
+            backend_project='fake-project',
+            backend_topic='../../a-different-project/topics/my-topic',
         ),
     ))
     self.mock_get_current_backend()
@@ -122,8 +129,8 @@ class CatalogTest(test_case.EndpointsTestCase):
             os_family=rpc_messages.OSFamily.LINUX,
         ),
         policies=rpc_messages.Policies(
-            pubsub_topic='my-topic',
-            pubsub_project='my-project/topics/my-other-topic',
+            backend_topic='my-topic',
+            backend_project='my-project/topics/my-other-topic',
         ),
     ))
     self.mock_get_current_backend()
@@ -137,41 +144,26 @@ class CatalogTest(test_case.EndpointsTestCase):
       rpc_messages.CatalogManipulationRequestError.INVALID_PROJECT,
     )
 
-  def test_add_project_without_topic(self):
-    request = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
-        dimensions=rpc_messages.Dimensions(
-            hostname='fake-host',
-            os_family=rpc_messages.OSFamily.LINUX,
-        ),
-        policies=rpc_messages.Policies(
-            pubsub_project='my-project',
-        ),
-    ))
-    self.mock_get_current_backend()
-
-    response = jsonish_dict_to_rpc(
-        self.call_api('add_machine', request).json,
-        rpc_messages.CatalogManipulationResponse,
-    )
-    self.assertEqual(
-      response.error,
-      rpc_messages.CatalogManipulationRequestError.UNSPECIFIED_TOPIC,
-    )
-
   def test_add_duplicate(self):
     request_1 = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
         dimensions=rpc_messages.Dimensions(
             hostname='fake-host',
             os_family=rpc_messages.OSFamily.LINUX,
         ),
-        policies=rpc_messages.Policies(),
+        policies=rpc_messages.Policies(
+            backend_project='fake-project',
+            backend_topic='fake-topic',
+        ),
     ))
     request_2 = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
         dimensions=rpc_messages.Dimensions(
             hostname='fake-host',
             os_family=rpc_messages.OSFamily.LINUX,
         ),
-        policies=rpc_messages.Policies(),
+        policies=rpc_messages.Policies(
+            backend_project='fake-project',
+            backend_topic='fake-topic',
+        ),
     ))
     self.mock_get_current_backend()
 
@@ -207,21 +199,30 @@ class CatalogTest(test_case.EndpointsTestCase):
                     hostname='fake-host-1',
                     os_family=rpc_messages.OSFamily.LINUX,
                 ),
-                policies=rpc_messages.Policies(),
+                policies=rpc_messages.Policies(
+                    backend_project='fake-project',
+                    backend_topic='fake-topic',
+                ),
             ),
             rpc_messages.CatalogMachineAdditionRequest(
                 dimensions=rpc_messages.Dimensions(
                     hostname='fake-host-2',
                     os_family=rpc_messages.OSFamily.WINDOWS,
                 ),
-                policies=rpc_messages.Policies(),
+                policies=rpc_messages.Policies(
+                    backend_project='fake-project',
+                    backend_topic='fake-topic',
+                ),
             ),
             rpc_messages.CatalogMachineAdditionRequest(
                 dimensions=rpc_messages.Dimensions(
                     hostname='fake-host-1',
                     os_family=rpc_messages.OSFamily.OSX,
                 ),
-                policies=rpc_messages.Policies(),
+                policies=rpc_messages.Policies(
+                    backend_project='fake-project',
+                    backend_topic='fake-topic',
+                ),
             ),
         ],
     ))
@@ -245,7 +246,10 @@ class CatalogTest(test_case.EndpointsTestCase):
             hostname='fake-host',
             os_family=rpc_messages.OSFamily.LINUX,
         ),
-        policies=rpc_messages.Policies(),
+        policies=rpc_messages.Policies(
+            backend_project='fake-project',
+            backend_topic='fake-topic',
+        ),
     ))
     request_2 = rpc_to_json(rpc_messages.CatalogMachineDeletionRequest(
         dimensions=rpc_messages.Dimensions(
@@ -258,7 +262,10 @@ class CatalogTest(test_case.EndpointsTestCase):
             hostname='fake-host',
             os_family=rpc_messages.OSFamily.WINDOWS,
         ),
-        policies=rpc_messages.Policies(),
+        policies=rpc_messages.Policies(
+            backend_project='fake-project',
+            backend_topic='fake-topic',
+        ),
     ))
     self.mock_get_current_backend()
 
@@ -284,7 +291,10 @@ class CatalogTest(test_case.EndpointsTestCase):
             hostname='fake-host-1',
             os_family=rpc_messages.OSFamily.LINUX,
         ),
-        policies=rpc_messages.Policies(),
+        policies=rpc_messages.Policies(
+            backend_project='fake-project',
+            backend_topic='fake-topic',
+        ),
     ))
     request_2 = rpc_to_json(rpc_messages.CatalogMachineDeletionRequest(
         dimensions=rpc_messages.Dimensions(
@@ -297,7 +307,10 @@ class CatalogTest(test_case.EndpointsTestCase):
             hostname='fake-host-1',
             os_family=rpc_messages.OSFamily.LINUX,
         ),
-        policies=rpc_messages.Policies(),
+        policies=rpc_messages.Policies(
+            backend_project='fake-project',
+            backend_topic='fake-topic',
+        ),
     ))
     self.mock_get_current_backend()
 
