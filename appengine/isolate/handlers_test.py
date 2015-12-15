@@ -155,7 +155,8 @@ class MainTest(test_case.TestCase):
   def test_browse_missing(self):
     self.set_as_reader()
     hashhex = '0123456780123456780123456789990123456789'
-    self.app_frontend.get('/browse?namespace=default&hash=%s' % hashhex)
+    self.app_frontend.get(
+        '/browse?namespace=default&hash=%s' % hashhex, status=404)
 
   def test_config(self):
     self.set_as_admin()

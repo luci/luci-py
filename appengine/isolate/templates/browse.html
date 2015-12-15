@@ -19,7 +19,10 @@
     padding: 0;
     width: 100%;
   }
-
+  .monospace {
+    font-family: monospace;
+    white-space: pre-wrap;
+  }
   iframe.use_all_space {
     height: 100%;
     margin: 0;
@@ -28,6 +31,9 @@
   }
 </style>
 
+
+{#
+TODO(maruel): Reenable once Web UI authentication is switched to OAuth2.
 <script type="text/javascript" src="third_party/pako/pako-0.2.3.min.js">
 </script>
 <script>
@@ -39,34 +45,37 @@
 
   // Fetch the content, uncompress it if necessary, then write it to the iframe.
   function update() {
-    // TODO(maruel): Add #namespace=namespace&hash=hash for copy-pastability
-    // without forcing a page reload instead of forcing a reload.
-    var hash = encodeURIComponent(document.getElementById('hash').value);
+    var digest = encodeURIComponent(document.getElementById('digest').value);
     var namespace = encodeURIComponent(
         document.getElementById('namespace').value);
-    var url = '/content-gs/retrieve/' + namespace + '/' + hash;
-    fetch(namespace, url);
-    document.getElementById('generated_link').innerHTML = (
-        '<a href="' + url + '">Link to ' + hash + '</a>');
+    var url = '/_ah/api/isolateservice/v1/retrieve';
+    fetch(url, namespace, digest);
+    // TODO(maruel): Add back once endpoint API is rewritten.
+    //document.getElementById('generated_link').innerHTML = (
+    //    '<a href="' + url + '">Link to ' + digest + '</a>');
   }
 
-  function fetch(namespace, url) {
+  function ab2str(buf) {
+    return String.fromCharCode.apply(null, new Uint8Array(buf));
+  }
+
+  function fetch(url, namespace, digest) {
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', url, true);
+    // TODO(maruel): Change back to a HTTP GET once endpoint API is rewritten.
+    xhr.open('POST', url, true);
+    xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
+    var oauthToken = gapi.auth.getToken();
+    xhr.setRequestHeader('Authorization', 'Bearer ' + oauthToken.access_token);
     xhr.responseType = 'arraybuffer';
     xhr.onload = function(e) {
       if (this.status == 200) {
         post_process_async(
             namespace, new Uint8Array(this.response), write_to_iframe);
       } else {
-        /* TODO(maruel): Handle load failure because 'No
-          'Access-Control-Allow-Origin' header is present on the requested
-          resource.' and print out tools/README-CORS.
-        */
-        alert(this.statusText);
+        alert(ab2str(this.response));
       }
     };
-    xhr.send();
+    xhr.send(JSON.stringify({namespace: {namespace:namespace}, digest: digest}));
   }
 
   function decompress_to_string_async(data, callback) {
@@ -113,6 +122,7 @@
     ifrm.close();
   }
 </script>
+#}
 {% endblock %}
 
 
@@ -120,19 +130,17 @@
 
 <h1>File browser</h1>
 
-Enter the namespace and hash of an object:<br>
+Enter the namespace and digest of an object:<br>
 <form id="form1" method="GET">
   <input id="namespace" name="namespace" value="{{namespace}}" /><br>
-  <input id="hash" name="hash" maxlength=40 size=40 value="{{hash_value}}" />
+  <input id="digest" name="digest" maxlength=40 size=40 value="{{digest}}" />
   <br>
   <input type=submit value="Load item"/><br>
 </form>
 <p>
 <div id="generated_link"> </div>
 <p>
-<div class="use_all_space">
-  <iframe id="content" class="use_all_space" sandbox="allow-same-origin">
-  </iframe>
-</div>
+<hr>
+<div class="use_all_space monospace">{{content}}{#  <iframe id="content" class="use_all_space" sandbox="allow-same-origin"></iframe>#}</div>
 
 {% endblock %}

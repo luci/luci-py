@@ -5,9 +5,11 @@
 """This module defines Isolate Server frontend url handlers."""
 
 import datetime
+import json
 
 import webapp2
 
+from google.appengine.api import memcache
 from google.appengine.api import users
 
 import acl
@@ -15,6 +17,7 @@ import config
 import gcs
 import handlers_api
 import mapreduce_jobs
+import model
 import stats
 import template
 from components import auth
@@ -133,12 +136,44 @@ class BrowseHandler(auth.AuthenticatingHandler):
   @auth.autologin
   @auth.require(acl.isolate_readable)
   def get(self):
-    namespace = self.request.get('namespace', 'default')
-    hash_value = self.request.get('hash', '')
+    namespace = self.request.get('namespace', 'default-gzip')
+    # Support 'hash' for compatibility with old links. To remove eventually.
+    digest = self.request.get('digest', '') or self.request.get('hash', '')
+    content = None
+    if digest and namespace:
+      # TODO(maruel): Refactor into a function.
+      memcache_entry = memcache.get(digest, namespace='table_%s' % namespace)
+      if memcache_entry is not None:
+        raw_data = memcache_entry
+      else:
+        try:
+          key = model.get_entry_key(namespace, digest)
+        except ValueError:
+          self.abort(400, 'Invalid key')
+        entity = key.get()
+        if entity is None:
+          self.abort(404, 'Unable to retrieve the entry')
+        raw_data = entity.content
+      if not raw_data:
+        stream = gcs.read_file(config.settings().gs_bucket, key.id())
+      else:
+        stream = [raw_data]
+      content = ''.join(model.expand_content(namespace, stream))
+      if content.startswith('{'):
+        # Try to format as JSON.
+        try:
+          content = json.dumps(
+              json.loads(content), sort_keys=True, indent=2,
+              separators=(',', ': '))
+        except ValueError:
+          pass
     params = {
-      'hash_value': hash_value,
+      'content': content,
+      'digest': digest,
       'namespace': namespace,
-      'onload': 'update()' if hash_value else '',
+      # TODO(maruel): Add back once Web UI authentication is switched to OAuth2.
+      #'onload': 'update()' if digest else '',
+      'onload': '',
     }
     self.response.write(template.render('isolate/browse.html', params))
 
