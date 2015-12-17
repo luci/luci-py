@@ -9,6 +9,8 @@ import base64
 import datetime
 import httplib2
 import json
+import logging
+import logging.handlers
 import os
 import shutil
 import socket
@@ -16,11 +18,15 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
 import urllib2
 import urlparse
 
 
 THIS_DIR = os.path.dirname(__file__)
+
+LOG_DIR = os.path.join(THIS_DIR, 'logs')
+LOG_FILE = os.path.join(LOG_DIR, '%s.log' % os.path.basename(__file__))
 
 METADATA_BASE_URL = 'http://metadata/computeMetadata/v1'
 PUBSUB_BASE_URL = 'https://pubsub.googleapis.com/v1/projects'
@@ -48,6 +54,41 @@ class NotFoundError(RequestError):
 # 409
 class ConflictError(RequestError):
   pass
+
+
+def configure_logging():
+  """Sets up the log file."""
+  class TimeFormatter(logging.Formatter):
+    def formatTime(self, record, datefmt=None):
+      datefmt = datefmt or '%Y-%m-%d %H:%M:%S'
+      return time.strftime(datefmt, time.localtime(record.created))
+
+  class SeverityFilter(logging.Filter):
+    def filter(self, record):
+      record.severity = record.levelname[0]
+      return True
+
+  if not os.path.exists(LOG_DIR):
+    os.mkdir(LOG_DIR)
+
+  logger = logging.getLogger()
+  logger.setLevel(logging.DEBUG)
+
+  log_file = logging.handlers.RotatingFileHandler(LOG_FILE, backupCount=100)
+  log_file.addFilter(SeverityFilter())
+  log_file.setFormatter(TimeFormatter('%(asctime)s %(severity)s: %(message)s'))
+  logger.addHandler(log_file)
+
+  # Log all uncaught exceptions.
+  def log_exception(exception_type, value, stack_trace):
+    logging.error(
+        ''.join(traceback.format_exception(exception_type, value, stack_trace)),
+    )
+  sys.excepthook = log_exception
+
+  # Rotate log files once on startup to get per-execution log files.
+  if os.path.exists(LOG_FILE):
+    log_file.doRollover()
 
 
 def get_metadata(key=''):
@@ -167,21 +208,28 @@ class PubSub(object):
 
 def main():
   """Listens for Cloud Pub/Sub communication."""
+  configure_logging()
+
   # Attributes tell us what subscription has been created for us to listen to.
   project = get_metadata('instance/attributes/pubsub_subscription_project')
   service_account = get_metadata('instance/attributes/pubsub_service_account')
   subscription = get_metadata('instance/attributes/pubsub_subscription')
   pubsub = PubSub(service_account=service_account)
 
-  response = pubsub.pull(subscription, project)
-
   while True:
+    logging.info('Polling for new messages')
     ack_ids = []
     start_time = time.time()
+    response = pubsub.pull(subscription, project)
     for message in response.get('receivedMessages', []):
       ack_ids.append(message['ackId'])
       attributes = message['message'].get('attributes', {})
       message = base64.b64decode(message['message'].get('data', ''))
+      logging.info(
+          'Received message: %s\nAttributes: %s',
+          message,
+          json.dumps(attributes, indent=2),
+      )
 
       if message == 'CONNECT' and attributes.get('swarming_server'):
         if os.path.exists(SWARMING_UPSTART_CONFIG_DEST):
