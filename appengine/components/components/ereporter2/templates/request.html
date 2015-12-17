@@ -41,39 +41,39 @@
   <tbody>
     <tr>
       <td>Version</td>
-      <td>{{request.version_id}}</td>
+      <td>{{request.version_id|utf8}}</td>
     </tr>
     <tr>
       <td>Host</td>
-      <td>{{request.host}}</td>
+      <td>{{request.host|utf8}}</td>
     </tr>
     <tr>
       <td>Resource</td>
-      <td>{{request.resource}}</td>
+      <td>{{request.resource|utf8}}</td>
     </tr>
     <tr>
       <td>Method</td>
-      <td>{{request.method}}</td>
+      <td>{{request.method|utf8}}</td>
     </tr>
     <tr>
       <td>User agent</td>
-      <td>{{request.user_agent}}</td>
+      <td>{{request.user_agent|utf8}}</td>
     </tr>
     <tr>
       <td>IP</td>
-      <td>{{request.ip}}</td>
+      <td>{{request.ip|utf8}}</td>
     </tr>
     <tr>
       <td>Nickname</td>
-      <td>{{request.nickname or '--'}}</td>
+      <td>{{(request.nickname or '--')|utf8}}</td>
     </tr>
     <tr>
       <td>HTTP version</td>
-      <td>{{request.http_version}}</td>
+      <td>{{request.http_version|utf8}}</td>
     </tr>
     <tr>
       <td>Referrer</td>
-      <td>{{request.referrer or '--'}}</td>
+      <td>{{(request.referrer or '--')|utf8}}</td>
     </tr>
     <tr>
       <td>HTTP Status</td>
@@ -119,15 +119,15 @@
     </tr>
     <tr>
       <td>Module</td>
-      <td>{{request.module_id}}</td>
+      <td>{{request.module_id|utf8}}</td>
     </tr>
     <tr>
       <td>Task queue name</td>
-      <td>{{request.task_queue_name or '--'}}</td>
+      <td>{{(request.task_queue_name or '--')|utf8}}</td>
     </tr>
     <tr>
       <td>Task name</td>
-      <td>{{request.task_name or '--'}}</td>
+      <td>{{(request.task_name or '--')|utf8}}</td>
     </tr>
     <tr>
       <td>Loading request</td>
@@ -135,17 +135,17 @@
     </tr>
     <tr>
       <td>Appengine version</td>
-      <td>{{request.app_engine_release}}</td>
+      <td>{{request.app_engine_release|utf8}}</td>
     </tr>
   </tbody>
 </table>
 {# app_id, combined, finished, instance_key, offset, replica_index #}
 
 <p>
-<a href=https://appengine.google.com/instances?app_id={{request.app_id}}>
+<a href=https://appengine.google.com/instances?app_id={{request.app_id|utf8}}>
   View instances</a>
 <br>
-<a href="https://appengine.google.com/logs?app_id={{request.app_id}}">
+<a href="https://appengine.google.com/logs?app_id={{request.app_id|utf8}}">
   View logs in AppEngine log viewer
 </a>
 <p>
@@ -159,7 +159,7 @@
 {% for log in request.app_logs %}
 <strong>{{level(log.level)}}</strong>:
   {{log.time|epochformat('%Y-%m-%d %H:%M:%S.%f')}}
-<pre>{{log.message}}</pre><br>
+<pre>{{log.message|utf8}}</pre><br>
 {% endfor %}
 
 {% endblock %}

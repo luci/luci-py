@@ -67,6 +67,13 @@ def _timedeltaformat(value):
   return '%d:%02d' % (minutes, seconds)
 
 
+def _utf8(s):
+  """Decodes an str to unicode."""
+  if s is None:
+    return s
+  return s.decode('utf-8')
+
+
 # Filters available by default.
 _DEFAULT_GLOBAL_FILTERS = {
   'datetimeformat': _datetimeformat,
@@ -75,6 +82,7 @@ _DEFAULT_GLOBAL_FILTERS = {
   'natsort': _natsorted,
   'succinctdatetimeformat': _succinctdatetimeformat,
   'timedeltaformat': _timedeltaformat,
+  'utf8': _utf8,
 }
 
 
