@@ -32,6 +32,12 @@ import fake_swarming
 import task_runner
 import xsrf_client
 
+CLIENT_DIR = os.path.normpath(
+    os.path.join(test_env_bot_code.BOT_DIR, '..', '..', '..', 'client'))
+
+sys.path.insert(0, os.path.join(CLIENT_DIR, 'tests'))
+import isolateserver_mock
+
 
 def compress_to_zip(files):
   # TODO(maruel): Remove once 'data' support is removed.
@@ -42,22 +48,23 @@ def compress_to_zip(files):
   return out.getvalue()
 
 
-def get_manifest(
-    script=None, hard_timeout=10., io_timeout=10., grace_period=30.,
-    data=None, inputs_ref=None, extra_args=None):
+def get_manifest(script=None, inputs_ref=None, **kwargs):
   out = {
     'bot_id': 'localhost',
     'command':
         [sys.executable, '-u', '-c', script] if not inputs_ref else None,
-    'data': data or [],
+    # TODO(maruel): Remove once support is removed.
+    'data': None,
     'env': {},
-    'extra_args': extra_args or [],
-    'grace_period': grace_period,
-    'hard_timeout': hard_timeout,
+    'extra_args': [],
+    'grace_period': 30.,
+    'hard_timeout': 10.,
     'inputs_ref': inputs_ref,
-    'io_timeout': io_timeout,
+    'io_timeout': 10.,
     'task_id': 23,
   }
+  assert 'data' not in kwargs, kwargs
+  out.update(kwargs)
   return out
 
 
@@ -65,9 +72,16 @@ class TestTaskRunnerBase(net_utils.TestCase):
   def setUp(self):
     super(TestTaskRunnerBase, self).setUp()
     self.root_dir = tempfile.mkdtemp(prefix='task_runner')
+    logging.info('Temp: %s', self.root_dir)
     self.work_dir = os.path.join(self.root_dir, 'work')
     os.chdir(self.root_dir)
     os.mkdir(self.work_dir)
+    # Create the logs directory so run_isolated.py can put its log there.
+    os.mkdir(os.path.join(self.root_dir, 'logs'))
+
+    self.mock(
+        task_runner, 'get_run_isolated',
+        lambda: [sys.executable, os.path.join(CLIENT_DIR, 'run_isolated.py')])
 
   def tearDown(self):
     os.chdir(test_env_bot_code.BOT_DIR)
@@ -155,27 +169,6 @@ class TestTaskRunner(TestTaskRunnerBase):
     server = xsrf_client.XsrfRemote('https://localhost:1/')
     return task_runner.run_command(
         server, task_details, self.work_dir, 3600., start)
-
-  def test_download_data(self):
-    requests = [
-      (
-        'https://localhost:1/a',
-        {},
-        compress_to_zip({'file1': 'content1', 'file2': 'content2'}),
-        None,
-      ),
-      (
-        'https://localhost:1/b',
-        {},
-        compress_to_zip({'file3': 'content3'}),
-        None,
-      ),
-    ]
-    self.expected_requests(requests)
-    items = [(i[0], 'foo.zip') for i in requests]
-    task_runner.download_data(self.root_dir, items)
-    self.assertEqual(
-        ['file1', 'file2', 'file3', 'work'], sorted(os.listdir(self.root_dir)))
 
   def test_load_and_run_raw(self):
     requests = [
@@ -632,10 +625,10 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
   def _load_and_run(self, manifest):
     # Dot not mock time since this test class is testing timeouts.
     server = xsrf_client.XsrfRemote('https://localhost:1/')
-    in_file = os.path.join(self.work_dir, 'manifest.json')
+    in_file = os.path.join(self.work_dir, 'task_runner_in.json')
     with open(in_file, 'wb') as f:
       json.dump(manifest, f)
-    out_file = os.path.join(self.work_dir, 'task_summary.json')
+    out_file = os.path.join(self.work_dir, 'task_runner_out.json')
     task_runner.load_and_run(in_file, server, 3600., time.time(), out_file)
     with open(out_file, 'rb') as f:
       return json.load(f)
@@ -778,62 +771,75 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     self.assertEqual(expected, self._run_command(task_details))
 
   def test_grand_children(self):
+    """Runs a normal test involving 3 level deep subprocesses."""
     # Uses load_and_run()
-    data = [
-      ('http://localhost:1/foo.zip', 'ignored'),
-    ]
-    parent = (
-      'import subprocess, sys\n'
-      'sys.exit(subprocess.call([sys.executable, \'-u\', \'children.py\']))\n')
-    children = (
-      'import subprocess, sys\n'
-      'sys.exit(subprocess.call('
-          '[sys.executable, \'-u\', \'grand_children.py\']))\n')
-    grand_children = 'print \'hi\''
-
-    requests = self.gen_requests(exit_code=0, output='hi\n')
-    requests.append(
-      (
-        'http://localhost:1/foo.zip',
-        {},
-        compress_to_zip(
-            {'children.py': children, 'grand_children.py': grand_children}),
-        None,
-      ))
-    self.expected_requests(requests)
-
-    manifest = get_manifest(parent, data=data)
-    expected = {
-      u'exit_code': 0,
-      u'hard_timeout': False,
-      u'io_timeout': False,
-      u'must_signal_internal_failure': None,
-      u'version': task_runner.OUT_VERSION,
+    files = {
+      'parent.py': (
+        'import subprocess, sys\n'
+        'sys.exit(subprocess.call([sys.executable,\'-u\',\'children.py\']))\n'),
+      'children.py': (
+        'import subprocess, sys\n'
+        'sys.exit(subprocess.call('
+            '[sys.executable, \'-u\', \'grand_children.py\']))\n'),
+      'grand_children.py': 'print \'hi\'',
     }
-    self.assertEqual(expected, self._load_and_run(manifest))
+    server = isolateserver_mock.MockIsolateServer()
+    try:
+      isolated = json.dumps({
+        'command': ['python', 'parent.py'],
+        'files': {
+          name: {
+            'h': server.add_content_compressed('default-gzip', content),
+            's': len(content),
+          } for name, content in files.iteritems()
+        },
+      })
+      isolated_digest = server.add_content_compressed('default-gzip', isolated)
+      self.expected_requests(self.gen_requests(exit_code=0, output='hi\n'))
+      manifest = get_manifest(
+          inputs_ref={
+            'isolated': isolated_digest,
+            'namespace': 'default-gzip',
+            'isolatedserver': server.url,
+          })
+      expected = {
+        u'exit_code': 0,
+        u'hard_timeout': False,
+        u'io_timeout': False,
+        u'must_signal_internal_failure': None,
+        u'version': task_runner.OUT_VERSION,
+      }
+      self.assertEqual(expected, self._load_and_run(manifest))
+    finally:
+      server.close()
 
-  def test_hard_signal_no_grace_grand_children(self):
+  def test_io_signal_no_grace_grand_children(self):
+    """Handles grand-children process hanging and signal management.
+
+    In this case, the I/O timeout is implemented by task_runner. An hard timeout
+    would be implemented by run_isolated (depending on overhead).
+    """
     # Uses load_and_run()
     # Actually 0xc000013a
     exit_code = -1073741510 if sys.platform == 'win32' else -signal.SIGTERM
 
-    data = [
-      ('http://localhost:1/foo.zip', 'ignored'),
-    ]
-    parent = (
-      'import subprocess, sys\n'
-      'p = subprocess.Popen([sys.executable, \'-u\', \'children.py\'])\n'
-      'print(p.pid)\n'
-      'p.wait()\n'
-      'sys.exit(p.returncode)\n')
-    children = (
-      'import subprocess, sys\n'
-      'p = subprocess.Popen([sys.executable, \'-u\', \'grand_children.py\'])\n'
-      'print(p.pid)\n'
-      'p.wait()\n'
-      'sys.exit(p.returncode)\n')
-    grand_children = self.SCRIPT_SIGNAL_HANG
-
+    files = {
+      'parent.py': (
+        'import subprocess, sys\n'
+        'print(\'parent\')\n'
+        'p = subprocess.Popen([sys.executable, \'-u\', \'children.py\'])\n'
+        'print(p.pid)\n'
+        'p.wait()\n'
+        'sys.exit(p.returncode)\n'),
+      'children.py': (
+        'import subprocess, sys\n'
+        'print(\'children\')\n'
+        'p = subprocess.Popen([sys.executable,\'-u\',\'grand_children.py\'])\n'
+        'print(p.pid)\n'
+        'p.wait()\n'
+        'sys.exit(p.returncode)\n'),
+      'grand_children.py': self.SCRIPT_SIGNAL_HANG,
+    }
     # We need to catch the pid of the grand children to be able to kill it, so
     # create our own check_final() instead of using self._gen_requests().
     to_kill = []
@@ -841,17 +847,21 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       self.assertLess(self.SHORT_TIME_OUT, kwargs['data'].pop('cost_usd'))
       self.assertLess(self.SHORT_TIME_OUT, kwargs['data'].pop('duration'))
       # It makes the diffing easier.
-      output = base64.b64decode(kwargs['data'].pop('output'))
+      output = base64.b64decode(kwargs['data'].pop('output', ''))
       # The command print the pid of this child and grand-child processes, each
       # on its line.
-      to_kill.extend(int(i) for i in output.splitlines()[:2])
+      for line in output.splitlines():
+        try:
+          to_kill.append(int(line))
+        except ValueError:
+          pass
       self.assertEqual(
           {
             'data': {
               'exit_code': exit_code,
-              'hard_timeout': True,
+              'hard_timeout': False,
               'id': u'localhost',
-              'io_timeout': False,
+              'io_timeout': True,
               'output_chunk_start': 0,
               'task_id': 23,
             },
@@ -874,37 +884,54 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
         check_final,
         {},
       ),
-      (
-        'http://localhost:1/foo.zip',
-        {},
-        compress_to_zip(
-            {'children.py': children, 'grand_children.py': grand_children}),
-        None,
-      ),
     ]
     self.expected_requests(requests)
 
+    server = isolateserver_mock.MockIsolateServer()
     try:
-      manifest = get_manifest(
-          parent, hard_timeout=self.SHORT_TIME_OUT,
-          grace_period=self.SHORT_TIME_OUT, data=data)
-      expected = {
-        u'exit_code': exit_code,
-        u'hard_timeout': True,
-        u'io_timeout': False,
-        u'must_signal_internal_failure': None,
-        u'version': task_runner.OUT_VERSION,
-      }
-      self.assertEqual(expected, self._load_and_run(manifest))
+      # TODO(maruel): -u is needed if you don't want python buffering to
+      # interfere.
+      isolated = json.dumps({
+        'command': ['python', '-u', 'parent.py'],
+        'files': {
+          name: {
+            'h': server.add_content_compressed('default-gzip', content),
+            's': len(content),
+          } for name, content in files.iteritems()
+        },
+      })
+      isolated_digest = server.add_content_compressed('default-gzip', isolated)
+      try:
+        manifest = get_manifest(
+            inputs_ref={
+              'isolated': isolated_digest,
+              'namespace': 'default-gzip',
+              'isolatedserver': server.url,
+            },
+            # TODO(maruel): A bit cheezy, we'd want the I/O timeout to be just
+            # enough to have the time for the PID to be printed but not more.
+            io_timeout=1,
+            grace_period=self.SHORT_TIME_OUT)
+        expected = {
+          u'exit_code': exit_code,
+          u'hard_timeout': False,
+          u'io_timeout': True,
+          u'must_signal_internal_failure': None,
+          u'version': task_runner.OUT_VERSION,
+        }
+        self.assertEqual(expected, self._load_and_run(manifest))
+        self.assertEqual(2, len(to_kill))
+      finally:
+        for k in to_kill:
+          try:
+            if sys.platform == 'win32':
+              os.kill(k, signal.SIGTERM)
+            else:
+              os.kill(k, signal.SIGKILL)
+          except OSError:
+            pass
     finally:
-      for k in to_kill:
-        try:
-          if sys.platform == 'win32':
-            os.kill(k, signal.SIGTERM)
-          else:
-            os.kill(k, signal.SIGKILL)
-        except OSError:
-          pass
+      server.close()
 
 
 class TaskRunnerSmoke(unittest.TestCase):
@@ -912,6 +939,7 @@ class TaskRunnerSmoke(unittest.TestCase):
   def setUp(self):
     super(TaskRunnerSmoke, self).setUp()
     self.root_dir = tempfile.mkdtemp(prefix='task_runner')
+    logging.info('Temp: %s', self.root_dir)
     self._server = fake_swarming.Server(self)
 
   def tearDown(self):

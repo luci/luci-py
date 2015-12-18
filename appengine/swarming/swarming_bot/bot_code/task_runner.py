@@ -87,21 +87,30 @@ def download_data(work_dir, files):
       zip_file.extractall(work_dir)
 
 
+def get_run_isolated():
+  """Returns the path to itself to run run_isolated.
+
+  Mocked in test to point to the real run_isolated.py script.
+  """
+  return [sys.executable, THIS_FILE, 'run_isolated']
+
+
 def get_isolated_cmd(work_dir, task_details, isolated_result):
   """Returns the command to call run_isolated. Mocked in tests."""
   bot_dir = os.path.dirname(work_dir)
   if os.path.isfile(isolated_result):
     os.remove(isolated_result)
-  cmd = [
-    sys.executable, THIS_FILE, 'run_isolated',
-    '--isolated', task_details.inputs_ref['isolated'].encode('utf-8'),
-    '--namespace', task_details.inputs_ref['namespace'].encode('utf-8'),
-    '-I', task_details.inputs_ref['isolatedserver'].encode('utf-8'),
-    '--json', isolated_result,
-    '--log-file', os.path.join(bot_dir, 'logs', 'run_isolated.log'),
-    '--cache', os.path.join(bot_dir, 'cache'),
-    '--root-dir', os.path.join(work_dir, 'isolated'),
-  ]
+  cmd = get_run_isolated()
+  cmd.extend(
+      [
+        '--isolated', task_details.inputs_ref['isolated'].encode('utf-8'),
+        '--namespace', task_details.inputs_ref['namespace'].encode('utf-8'),
+        '-I', task_details.inputs_ref['isolatedserver'].encode('utf-8'),
+        '--json', isolated_result,
+        '--log-file', os.path.join(bot_dir, 'logs', 'run_isolated.log'),
+        '--cache', os.path.join(bot_dir, 'cache'),
+        '--root-dir', os.path.join(work_dir, 'isolated'),
+      ])
   if task_details.hard_timeout:
     cmd.extend(('--hard-timeout', str(task_details.hard_timeout)))
   if task_details.grace_period:
@@ -435,13 +444,14 @@ def run_command(
     params['hard_timeout'] = had_hard_timeout
     if isolated_result:
       try:
-        if kill_sent and not os.path.isfile(isolated_result):
+        if ((had_io_timeout or had_hard_timeout) and
+            not os.path.isfile(isolated_result)):
           # It's possible that run_isolated failed to quit quickly enough; it
           # could be because there was too much data to upload back or something
           # else. Do not create an internal error, just send back the (partial)
           # view as task_runner saw it, for example the real exit_code is
           # unknown.
-          logging.warning('kill_sent is True and there\'s no result file')
+          logging.warning('TIMED_OUT and there\'s no result file')
           exit_code = -1
         else:
           # See run_isolated.py for the format.
@@ -450,18 +460,21 @@ def run_command(
           logging.debug('run_isolated:\n%s', run_isolated_result)
           # TODO(maruel): Grab statistics (cache hit rate, data downloaded,
           # mapping time, etc) from run_isolated and push them to the server.
-          params['outputs_ref'] = run_isolated_result['outputs_ref']
-          had_hard_timeout = run_isolated_result['had_hard_timeout']
+          if run_isolated_result['outputs_ref']:
+            params['outputs_ref'] = run_isolated_result['outputs_ref']
+          had_hard_timeout = (
+              had_hard_timeout or run_isolated_result['had_hard_timeout'])
           params['hard_timeout'] = had_hard_timeout
-          if run_isolated_result['internal_failure']:
-            must_signal_internal_failure = (
-                run_isolated_result['internal_failure'])
-            logging.error('%s', must_signal_internal_failure)
-          elif exit_code:
-            # TODO(maruel): Grab stdout from run_isolated.
-            must_signal_internal_failure = (
-                'run_isolated internal failure %d' % exit_code)
-            logging.error('%s', must_signal_internal_failure)
+          if not had_io_timeout and not had_hard_timeout:
+            if run_isolated_result['internal_failure']:
+              must_signal_internal_failure = (
+                  run_isolated_result['internal_failure'])
+              logging.error('%s', must_signal_internal_failure)
+            elif exit_code:
+              # TODO(maruel): Grab stdout from run_isolated.
+              must_signal_internal_failure = (
+                  'run_isolated internal failure %d' % exit_code)
+              logging.error('%s', must_signal_internal_failure)
           exit_code = run_isolated_result['exit_code']
       except (IOError, OSError, ValueError) as e:
         logging.error('Swallowing error: %s', e)
