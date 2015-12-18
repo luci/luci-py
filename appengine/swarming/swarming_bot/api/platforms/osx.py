@@ -28,6 +28,19 @@ def _get_SPDisplaysDataType():
 
 
 @tools.cached
+def get_hardware_model_string():
+  """Returns the Mac model string.
+
+  Returns:
+    A string like Macmini5,3 or MacPro6,1.
+  """
+  try:
+    return subprocess.check_output(['sysctl', '-n', 'hw.model']).rstrip()
+  except (OSError, subprocess.CalledProcessError):
+    return None
+
+
+@tools.cached
 def get_os_version_number():
   """Returns the normalized OS version number as a string.
 
