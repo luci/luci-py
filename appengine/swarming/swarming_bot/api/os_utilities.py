@@ -32,6 +32,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib
 import urllib2
 
 from api import parallel
@@ -486,6 +487,77 @@ def authenticated_http_request(service_account, *args, **kwargs):
   return http.request(*args, **kwargs)
 
 
+class GetTimeseriesDataFailure(Exception):
+  pass
+
+
+def get_timeseries_data(name, project, service_account, **kwargs):
+  """Gets timeseries data from Cloud Monitoring.
+
+  Args:
+    name: Name of the custom metric. Must already exist.
+    project: Project the metric exists in. Must already exist.
+    service_account: Service account to use. For GCE, the name of the
+      service account, otherwise the path to the service account JSON file.
+
+  **kwargs:
+    count: If specified, the maximum number of data points per page.
+    labels: If specified, a list of labels to filter the returned timeseries
+      data. In general, each label should be of the form "key<operator>value",
+      where <operator> is one of ==, !=, =~, !~ meaning (respectively) that the
+      key matches, does not match, regex matches, and does not regex match the
+      value.
+    oldest: If specified, the RFC 3339 timestamp string of the earliest time to
+      exclude timeseries data for. No timeseries data timestamped with this
+      timestamp or earlier will be returned. If unspecified, adheres to the
+      Cloud Monitoring default.
+    page_token: If specified, the token used to access a specific page of
+      results.
+    youngest: If specified, the RFC 3339 timestamp string of the latest time to
+      include timeseries data for. No timeseries data timestamped after this
+      time will be returned. If unspecified, defaults to the current time.
+
+  Returns:
+    A 2-tuple (list of matching timeseries data dicts, next page token).
+
+  Raises:
+    GetTimeseriesDataFailure
+  """
+  params = {
+      'youngest': kwargs.get('youngest') or time.strftime(
+          '%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+  }
+  if kwargs.get('count'):
+    params['count'] = kwargs['count']
+  if kwargs.get('labels'):
+    params['labels'] = kwargs['labels']
+  if kwargs.get('oldest'):
+    params['oldest'] = kwargs['oldest']
+  if kwargs.get('page_token'):
+    params['pageToken'] = kwargs['page_token']
+
+  metric = urllib.quote('custom.cloudmonitoring.googleapis.com/%s' % name, '')
+  params = urllib.urlencode(params, True)
+  url = '%s/projects/%s/timeseries/%s?%s' % (
+      MONITORING_ENDPOINT, project, metric, params)
+  logging.info('Attempting to get timeseries data: %s', url)
+  try:
+    response, content = authenticated_http_request(
+        service_account, url, method='GET', scopes=MONITORING_SCOPES)
+  except (AuthenticatedHttpRequestFailure, IOError) as e:
+    raise GetTimeseriesDataFailure(e)
+
+  if response['status'] != '200':
+    try:
+      content = json.loads(content)
+    except ValueError:
+      pass
+    raise GetTimeseriesDataFailure(content)
+
+  content = json.loads(content)
+  return content.get('timeseries', []), content.get('nextPageToken')
+
+
 class SendMetricsFailure(Exception):
   pass
 
@@ -498,9 +570,8 @@ def send_metric(name, value, labels, project, service_account):
     value: Value to send. Must be int or float.
     labels: Labels to include with the metric. Must be a dict.
     project: Project the metric exists in. Must already exist.
-    service_account: Service account to use. For GCE, the name of
-      the service account, otherwise the path to the service account
-      JSON file.
+    service_account: Service account to use. For GCE, the name of the
+      service account, otherwise the path to the service account JSON file.
 
   Raises:
     SendMetricsFailure
