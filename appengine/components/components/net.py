@@ -7,6 +7,7 @@
 import json
 import logging
 import urllib
+import urlparse
 
 from google.appengine.api import urlfetch
 from google.appengine.ext import ndb
@@ -43,6 +44,20 @@ ndb.add_flow_exception(Error)
 def urlfetch_async(**kwargs):
   """To be mocked in tests."""
   return ndb.get_context().urlfetch(**kwargs)
+
+
+def is_transient_error(response, url):
+  """Returns True to retry the request."""
+  if response.status_code >= 500 or response.status_code == 408:
+    return True
+  # Retry 404 iff it is a Cloud Endpoints API call *and* the
+  # result is not JSON. This assumes that we only use JSON encoding.
+  if response.status_code == 404:
+    content_type = response.headers.get('Content-Type', '')
+    return (
+        urlparse.urlparse(url).path.startswith('/_ah/api/') and
+        not content_type.startswith('application/json'))
+  return False
 
 
 @ndb.tasklet
@@ -129,7 +144,7 @@ def request_async(
       continue
 
     # Transient error on the other side.
-    if response.status_code >= 500 or response.status_code == 408:
+    if is_transient_error(response, url):
       logging.warning(
           '%s %s failed with HTTP %d: %r',
           method, url, response.status_code, response.content)

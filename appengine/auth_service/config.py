@@ -529,9 +529,12 @@ def _fetch_configs(paths):
     for p in paths
   ]
   configs_url = _get_configs_url()
+  ndb.Future.wait_all(futures)
   out = {}
   for path, future in zip(paths, futures):
     rev, conf = future.get_result()
+    if conf is None:
+      raise config.CannotLoadConfigError('Config %s is missing' % path)
     try:
       validation.validate(config.self_config_set(), path, conf)
     except ValueError as exc:

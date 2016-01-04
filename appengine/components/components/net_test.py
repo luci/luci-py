@@ -19,7 +19,7 @@ from components import net
 from test_support import test_case
 
 
-Response = collections.namedtuple('Response', 'status_code content')
+Response = collections.namedtuple('Response', 'status_code content headers')
 
 
 class NetTest(test_case.TestCase):
@@ -59,7 +59,7 @@ class NetTest(test_case.TestCase):
         'method': 'POST',
         'payload': 'post body',
         'url': 'http://localhost/123?a=%3D&b=%26',
-      }, Response(200, 'response body')),
+      }, Response(200, 'response body', {})),
     ])
     response = net.request(
         url='http://localhost/123',
@@ -76,39 +76,63 @@ class NetTest(test_case.TestCase):
   def test_retries_transient_errors(self):
     self.mock_urlfetch([
       ({'url': 'http://localhost/123'}, urlfetch.Error()),
-      ({'url': 'http://localhost/123'}, Response(408, 'clien timeout')),
-      ({'url': 'http://localhost/123'}, Response(500, 'server error')),
-      ({'url': 'http://localhost/123'}, Response(200, 'response body')),
+      ({'url': 'http://localhost/123'}, Response(408, 'clien timeout', {})),
+      ({'url': 'http://localhost/123'}, Response(500, 'server error', {})),
+      ({'url': 'http://localhost/123'}, Response(200, 'response body', {})),
     ])
     response = net.request('http://localhost/123', max_attempts=4)
     self.assertEqual('response body', response)
 
   def test_gives_up_retrying(self):
     self.mock_urlfetch([
-      ({'url': 'http://localhost/123'}, Response(500, 'server error')),
-      ({'url': 'http://localhost/123'}, Response(500, 'server error')),
-      ({'url': 'http://localhost/123'}, Response(200, 'response body')),
+      ({'url': 'http://localhost/123'}, Response(500, 'server error', {})),
+      ({'url': 'http://localhost/123'}, Response(500, 'server error', {})),
+      ({'url': 'http://localhost/123'}, Response(200, 'response body', {})),
     ])
     with self.assertRaises(net.Error):
       net.request('http://localhost/123', max_attempts=2)
 
   def test_404(self):
     self.mock_urlfetch([
-      ({'url': 'http://localhost/123'}, Response(404, 'Not found')),
+      ({'url': 'http://localhost/123'}, Response(404, 'Not found', {})),
     ])
     with self.assertRaises(net.NotFoundError):
       net.request('http://localhost/123')
 
+  def test_crappy_cloud_endpoints_404_is_retried(self):
+    self.mock_urlfetch([
+      (
+        {'url': 'http://localhost/_ah/api/blah'},
+        Response(404, 'Not found', {})
+      ),
+      (
+        {'url': 'http://localhost/_ah/api/blah'},
+        Response(200, 'response body', {})
+      ),
+    ])
+    response = net.request('http://localhost/_ah/api/blah')
+    self.assertEqual('response body', response)
+
+  def test_legitimate_cloud_endpoints_404_is_not_retried(self):
+    self.mock_urlfetch([
+      (
+        {'url': 'http://localhost/_ah/api/blah'},
+        Response(404, '{}', {'Content-Type': 'application/json'})
+      ),
+    ])
+    with self.assertRaises(net.NotFoundError):
+      net.request('http://localhost/_ah/api/blah')
+
   def test_401(self):
     self.mock_urlfetch([
-      ({'url': 'http://localhost/123'}, Response(401, 'Auth error')),
+      ({'url': 'http://localhost/123'}, Response(401, 'Auth error', {})),
     ])
     with self.assertRaises(net.AuthError):
       net.request('http://localhost/123')
 
   def test_403(self):
     self.mock_urlfetch([
-      ({'url': 'http://localhost/123'}, Response(403, 'Auth error')),
+      ({'url': 'http://localhost/123'}, Response(403, 'Auth error', {})),
     ])
     with self.assertRaises(net.AuthError):
       net.request('http://localhost/123')
@@ -125,7 +149,7 @@ class NetTest(test_case.TestCase):
         'method': 'POST',
         'payload': '{"key":"value"}',
         'url': 'http://localhost/123?a=%3D&b=%26',
-      }, Response(200, '{"a":"b"}')),
+      }, Response(200, '{"a":"b"}', {})),
     ])
     response = net.json_request(
         url='http://localhost/123',
@@ -141,7 +165,7 @@ class NetTest(test_case.TestCase):
 
   def test_json_bad_response(self):
     self.mock_urlfetch([
-      ({'url': 'http://localhost/123'}, Response(200, 'not a json')),
+      ({'url': 'http://localhost/123'}, Response(200, 'not a json', {})),
     ])
     with self.assertRaises(net.Error):
       net.json_request('http://localhost/123')
