@@ -253,17 +253,28 @@ def get_ip():
       s.close()
 
 
+@tools.cached
 def get_hostname():
   """Returns the machine's hostname."""
+  if platforms.is_gce():
+    # When running on GCE, always use the hostname as defined by GCE. It's
+    # possible the VM hadn't learned about it yet.
+    meta = platforms.gce.get_metadata() or {}
+    hostname = meta.get('instance', {}).get('hostname')
+    if hostname:
+      return unicode(hostname)
+
   # Windows enjoys putting random case in there. Enforces lower case for sanity.
   hostname = socket.getfqdn().lower()
   if hostname.endswith('.in-addr.arpa'):
-    # The base name will be the IPv4 address reversed, which is not useful. This
-    # happens on OSX.
+    # When OSX fails to get the FDQN, it returns as the base name the IPv4
+    # address reversed, which is not useful. Get the base hostname as defined by
+    # the host itself instead of the FQDN since the returned FQDN is useless.
     hostname = socket.gethostname()
   return unicode(hostname)
 
 
+@tools.cached
 def get_hostname_short():
   """Returns the base host name."""
   return get_hostname().split(u'.', 1)[0]
@@ -927,19 +938,29 @@ def setup_auto_startup_win(command, cwd, batch_name):
   content = (
       '@echo off\r\n'
       ':: This file was generated automatically by os_platforms.py.\r\n'
-      'cd /d %s\r\n'
-      'mkdir logs\r\n'
-      'del logs\\bot_stdout.log.9\r\n'
-      'move logs\\bot_stdout.log.8 logs\\bot_stdout.log.9\r\n'
-      'move logs\\bot_stdout.log.7 logs\\bot_stdout.log.8\r\n'
-      'move logs\\bot_stdout.log.6 logs\\bot_stdout.log.7\r\n'
-      'move logs\\bot_stdout.log.5 logs\\bot_stdout.log.6\r\n'
-      'move logs\\bot_stdout.log.4 logs\\bot_stdout.log.5\r\n'
-      'move logs\\bot_stdout.log.3 logs\\bot_stdout.log.4\r\n'
-      'move logs\\bot_stdout.log.2 logs\\bot_stdout.log.3\r\n'
-      'move logs\\bot_stdout.log.1 logs\\bot_stdout.log.2\r\n'
-      'move logs\\bot_stdout.log logs\\bot_stdout.log.1\r\n'
-      '%s 1>> logs\\bot_stdout.log 2>&1\r\n') % (cwd, ' '.join(command))
+      'setlocal enableextensions enabledelayedexpansion\r\n'
+      'cd /d %(root)s\r\n'
+      '\r\n'
+      'if not exist logs mkdir logs\r\n'
+      'if exist logs\\bot_stdout.log.9 del logs\\bot_stdout.log.9\r\n'
+      'for %%%%i in (8 7 6 5 4 3 2 1) do (\r\n'
+      '  if exist logs\\bot_stdout.log.%%%%i (\r\n'
+      '    set /a "j=%%%%i+1"\r\n'
+      '    echo move logs\\bot_stdout.log.%%%%i logs\\bot_stdout.log.!j!\r\n'
+      '    move logs\\bot_stdout.log.%%%%i logs\\bot_stdout.log.!j!\r\n'
+      '    set j=\r\n'
+      '  )\r\n'
+      ')\r\n'
+      'if exist logs\\bot_stdout.log (\r\n'
+      '  echo move logs\\bot_stdout.log logs\\bot_stdout.log.1\r\n'
+      '  move logs\\bot_stdout.log logs\\bot_stdout.log.1\r\n'
+      ')\r\n'
+      '\r\n'
+      'echo Running: %(command)s\r\n'
+      '%(command)s 1>> logs\\bot_stdout.log 2>&1\r\n') % {
+        'root': cwd,
+        'command': ' '.join(command)
+      }
   success = _write(batch_path, content)
   if success and sys.platform == 'cygwin':
     # For some reason, cygwin tends to create the file with 0644.

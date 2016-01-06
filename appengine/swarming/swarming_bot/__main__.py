@@ -75,6 +75,13 @@ def CMDrun_isolated(args):
   return run_isolated.main(args)
 
 
+def CMDsetup(_args):
+  """Setup the bot to auto-start but doesn't start the bot."""
+  logging_utils.prepare_logging(os.path.join('logs', 'bot_config.log'))
+  from bot_code import bot_main
+  bot_main.setup_bot(True)
+  return 0
+
 
 def CMDshell(args):
   """Starts a shell with api.* in.."""
