@@ -5,6 +5,7 @@
 
 """Given current git checkout state return version string to use for an app."""
 
+import contextlib
 import getpass
 import logging
 import optparse
@@ -21,6 +22,16 @@ from depot_tools import git_common
 
 def git(cmd, cwd):
   return subprocess.check_output(['git'] + cmd, cwd=cwd)
+
+
+@contextlib.contextmanager
+def chdir(path):
+  orig = os.getcwd()
+  try:
+    os.chdir(path)
+    yield
+  finally:
+    os.chdir(orig)
 
 
 def get_pseudo_revision(root, remote):
@@ -44,10 +55,11 @@ def get_pseudo_revision(root, remote):
     - upstream commit hash this branch is based of.
   """
   mergebase = git(['merge-base', 'HEAD', remote], cwd=root).rstrip()
-  targets = git_common.parse_commitrefs(mergebase)
-  git_number.load_generation_numbers(targets)
-  git_number.finalize(targets)
-  return git_number.get_num(targets[0]), mergebase
+  with chdir(root):
+    targets = git_common.parse_commitrefs(mergebase)
+    git_number.load_generation_numbers(targets)
+    git_number.finalize(targets)
+    return git_number.get_num(targets[0]), mergebase
 
 
 def is_pristine(root, mergebase):
