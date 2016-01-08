@@ -49,6 +49,7 @@ KNOWN_APPS = frozenset([
     'com.motorola.motosignature.app',
     'com.motorola.triggerenroll',
     'com.motorola.triggertrainingservice',
+    'com.nuance.xt9.input',
     'com.qualcomm.atfwd',
     'com.qualcomm.cabl',
     'com.qualcomm.qcrilmsgtunnel',
