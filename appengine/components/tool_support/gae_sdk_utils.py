@@ -382,6 +382,7 @@ class Application(object):
     cmd = [
       sys.executable,
       os.path.join(gae_sdk_path(), 'dev_appserver.py'),
+      '--application', self.app_id,
       '--skip_sdk_update_check=yes',
       '--require_indexes=yes',
     ] + self.module_yamls + args
