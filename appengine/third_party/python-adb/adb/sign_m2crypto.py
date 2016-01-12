@@ -27,7 +27,7 @@ class M2CryptoSigner(adb_protocol.AuthSigner):
     self.rsa_key = RSA.load_key(rsa_key_path)
 
   def Sign(self, data):
-    return self.rsa_key.sign(data.digest(), 'sha1')
+    return self.rsa_key.sign(data, 'sha1')
 
   def GetPublicKey(self):
     return self.public_key

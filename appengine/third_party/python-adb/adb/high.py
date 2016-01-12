@@ -176,13 +176,31 @@ def _InitCache(device):
 ### Public API.
 
 
-# List of known CPU scaling governor values.
+# List of known CPU scaling governor values. Each devices has a subset of these.
+# There are other scaling governors not listed there that can be seen on
+# non-standard non-Nexus builds.
 KNOWN_CPU_SCALING_GOVERNOR_VALUES = (
-    'conservative',  # Not available on Nexus 10
-    'interactive',   # Default on Nexus 10.
-    'ondemand',      # Not available on Nexus 10. Default on Nexus 4 and later.
+    # conservative tries to keep the CPU at its lowest frequency as much as
+    # possible. It slowly ramp up CPU frequency by going through all the
+    # intermediate frequencies then quickly drop to the lowest frequency as fast
+    # as possible.
+    'conservative',
+    # interactive quickly scales up frequency on load then slowly scales back
+    # when there isn't much load.
+    'interactive',
+    # ondemand quickly scales up frequency on load then quickly scales back when
+    # there isn't much load.
+    'ondemand',
+    # performance locks the CPU frequency at its maximum supported frequency; it
+    # is the equivalent of userspace at cpuinfo_max_freq. On a ARM based device
+    # without active cooling, this means that eventually the CPU will hit
+    # temperature based throttling.
     'performance',
-    'powersave',     # Not available on Nexus 10.
+    # powersave locks the CPU frequency to its lowest supported frequency; it is
+    # the equivalent of userspace at cpuinfo_min_freq.
+    'powersave',
+    # userspace overrides the scaling governor with an user defined constant
+    # frequency.
     'userspace',
 )
 
@@ -501,21 +519,47 @@ class HighDevice(object):
     return success and (val or '').strip() == str(speed)
 
   def GetTemperatures(self):
-    """Returns the device's 2 temperatures if available.
-
-    Returns None otherwise.
-    """
-    # Not all devices export this file. On other devices, the only real way to
+    """Returns the device's temperatures if available as a dict."""
+    # Not all devices export these files. On other devices, the only real way to
     # read it is via Java
     # developer.android.com/guide/topics/sensors/sensors_environment.html
-    temps = []
-    try:
-      for i in xrange(2):
-        out = self.PullContent('/sys/class/thermal/thermal_zone%d/temp' % i)
-        temps.append(int(out))
-    except (TypeError, ValueError):
-      return None
-    return temps
+    out = {}
+    for sensor in self.List('/sys/class/thermal'):
+      if sensor.filename in ('.', '..'):
+        continue
+      if not sensor.filename.startswith('thermal_zone'):
+        continue
+      path = '/sys/class/thermal/' + sensor.filename
+      # Expected files:
+      # - mode: enabled or disabled.
+      # - temp: temperature as reported by the sensor, generally in C or mC.
+      # - type: driver name.
+      # - power/
+      # - trip_point_0_temp
+      # - trip_point_0_type
+      # - trip_point_1_temp
+      # - trip_point_1_type
+      # - subsystem/ -> link back to ../../../../class/thermal
+      # - policy
+      # - uevent
+      # - passive
+      temp = self.PullContent(path + '/temp')
+      if not temp:
+        continue
+      # Assumes it's in °C.
+      value = float(temp)
+      if value > 1000:
+        # Then assumes it's in m°C.
+        # TODO(maruel): Discern near cold temperature, e.g. 0.1°C.
+        value = value / 1000.
+      if value <= 0.:
+        # TODO(maruel): Support cold temperatures below 0°C.
+        continue
+      sensor_type = self.PullContent(path + '/type')
+      if sensor_type and not sensor_type.startswith('tsens_tz_sensor'):
+        out[sensor_type.strip()] = value
+    # Filter out unnecessary stuff.
+    return out
 
   def GetBattery(self):
     """Returns details about the battery's state."""
@@ -745,7 +789,7 @@ class HighDevice(object):
     if self.Shell('restorecon /data/misc/adb')[1] != 0:
       return False
     if not self.PushContent(
-        '/data/misc/adb/adb_keys', ''.join(k + '\n' for k in sorted(keys))):
+        ''.join(k + '\n' for k in sorted(keys)), '/data/misc/adb/adb_keys'):
       return False
     if self.Shell('restorecon /data/misc/adb/adb_keys')[1] != 0:
       return False
