@@ -6,17 +6,31 @@
 
 import logging
 
+from google.appengine.ext import ndb
+
 from components import net
 from components import utils
+from components.datastore_utils import config
 
 
-MACHINE_PROVIDER_API_URL = 'https://machine-provider.appspot.com/_ah/api'
-
-CATALOG_BASE_URL = '%s/catalog/v1' % MACHINE_PROVIDER_API_URL
-MACHINE_PROVIDER_BASE_URL = '%s/machine_provider/v1' % MACHINE_PROVIDER_API_URL
 MACHINE_PROVIDER_SCOPES = (
     'https://www.googleapis.com/auth/userinfo.email',
 )
+
+
+class MachineProviderConfiguration(config.GlobalConfig):
+  """Configuration for talking to the Machine Provider."""
+  # URL of the Machine Provider instance to use.
+  instance_url = ndb.StringProperty(required=True)
+
+  @classmethod
+  def get_instance_url(cls):
+    """Returns the URL of the Machine Provider instance."""
+    return cls.cached().instance_url
+
+  def set_defaults(self):
+    """Sets default values used to initialize the config."""
+    self.instance_url = 'https://machine-provider.appspot.com'
 
 
 def add_machines(requests):
@@ -27,8 +41,9 @@ def add_machines(requests):
   """
   logging.info('Sending batched add_machines request')
   return net.json_request(
-      '%s/add_machines' % CATALOG_BASE_URL,
+      '%s/_ah/api/catalog/v1/add_machines' %
+          MachineProviderConfiguration.get_instance_url(),
       method='POST',
       payload=utils.to_json_encodable({'requests': requests}),
       scopes=MACHINE_PROVIDER_SCOPES,
-  )
+ )
