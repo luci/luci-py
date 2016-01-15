@@ -201,6 +201,9 @@ class EndpointsTestCase(TestCase):
   # Should be set in subclasses to a subclass of remote.Service.
   api_service_cls = None
 
+  # See call_should_fail.
+  expected_fail_status = None
+
   _endpoints = None
 
   def setUp(self):
@@ -208,15 +211,28 @@ class EndpointsTestCase(TestCase):
     self._endpoints = Endpoints(self.api_service_cls)
 
   def call_api(self, method, body=None, status=200):
+    if self.expected_fail_status:
+      status = self.expected_fail_status
     return self._endpoints.call_api(method, body, status)
 
   @contextlib.contextmanager
-  def call_should_fail(self, _status):
+  def call_should_fail(self, status):
     """Asserts that Endpoints call inside the guarded region of code fails."""
-    # This should be a call_api(..., status=<something>). Unfortunately,
-    # Cloud Endpoints doesn't interact with webtest properly. See
-    # https://code.google.com/p/googleappengine/issues/detail?id=10544 and
-    # http://stackoverflow.com/questions/24219654/content-length-error-in-
-    #   google-cloud-endpoints-testing
-    with self.assertRaises(AssertionError):
+    # TODO(vadimsh): Get rid of this function and just use
+    # call_api(..., status=...). It existed as a workaround for bug that has
+    # been fixed:
+    # https://code.google.com/p/googleappengine/issues/detail?id=10544
+    assert self.expected_fail_status is None, 'nested call_should_fail'
+    assert status is not None
+    self.expected_fail_status = int(status)
+    try:
       yield
+    except AssertionError:
+      # Assertion can happen if tests are running on GAE < 1.9.31, where
+      # endpoints bug still exists (and causes webapp guts to raise assertion).
+      # It should be rare (since we are switching to GAE >= 1.9.31), so don't
+      # bother to check that assertion was indeed raised. Just skip it if it
+      # did.
+      pass
+    finally:
+      self.expected_fail_status = None

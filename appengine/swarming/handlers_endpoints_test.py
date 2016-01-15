@@ -572,11 +572,9 @@ class TasksApiTest(BaseTest):
               using_filter = bool(start or end or tags)
               if ((using_filter, state, sort) in blacklisted or
                   (None, state, sort) in blacklisted):
-                # TODO(maruel): Update as soon as new GAE SDK is released.
-                # https://code.google.com/p/googleappengine/issues/detail?id=10544
                 try:
-                  with self.assertRaises(AssertionError):
-                    self.call_api('list', body=message_to_dict(request))
+                  self.call_api(
+                      'list', body=message_to_dict(request), status=400)
                 except:  # pylint: disable=bare-except
                   self.fail(
                       'Is actually supported: (%s, %s, %s)' %
