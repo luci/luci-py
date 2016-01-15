@@ -9,6 +9,7 @@ import logging
 
 from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
+from protorpc.remote import protojson
 import webapp2
 
 from components import decorators
@@ -110,11 +111,11 @@ def lease_machine(machine_key, lease):
   ndb.put_multi([lease, machine])
   params = {
       'lease_id': lease.key.id(),
+      'lease_json': protojson.encode_message(lease.request),
       'machine_id': machine.key.id(),
+      'machine_project': machine.pubsub_topic_project,
+      'machine_topic': machine.pubsub_topic,
   }
-  if lease.request.pubsub_topic:
-    params['pubsub_project'] = lease.request.pubsub_project
-    params['pubsub_topic'] = lease.request.pubsub_topic
   if not utils.enqueue_task(
       '/internal/queues/fulfill-lease-request',
       'fulfill-lease-request',

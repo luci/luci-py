@@ -27,26 +27,40 @@ class LeaseRequestFulfiller(webapp2.RequestHandler):
 
     Params:
       lease_id: ID of the LeaseRequest being fulfilled.
+      lease_json: JSON-encoded string representation of the
+        rpc_messages.LeaseRequest being fulfilled.
       machine_id: ID of the CatalogMachineEntry fulfilling the LeaseRequest.
-      pubsub_topic: If specified, topic that the lease fulfillment should be
-        published to.
-      pubsub_project: If specified, project that the lease fulfillment topic is
-        contained in.
+      machine_project: Project that the machine communication topic is contained
+        in.
+      machine_topic: Topic that the machine communication should occur on.
     """
     lease_id = self.request.get('lease_id')
+    lease_json = json.loads(self.request.get('lease_json'))
     machine_id = self.request.get('machine_id')
-    pubsub_project = self.request.get('pubsub_project')
-    pubsub_topic = self.request.get('pubsub_topic')
+    machine_project = self.request.get('machine_project')
+    machine_topic = self.request.get('machine_topic')
 
-    if pubsub_topic:
+    if lease_json.get('pubsub_topic'):
       pubsub.publish(
-          pubsub.full_topic_name(pubsub_project, pubsub_topic),
+          pubsub.full_topic_name(
+              lease_json['pubsub_project'],
+              lease_json['pubsub_topic'],
+          ),
           'FULFILLED',
           {
               'machine_id': machine_id,
               'request_hash': lease_id,
           },
-    )
+      )
+
+    if lease_json.get('on_lease', {}).get('swarming_server'):
+      pubsub.publish(
+          pubsub.full_topic_name(machine_project, machine_topic),
+          'CONNECT',
+          {
+              'swarming_server': lease_json['on_lease']['swarming_server'],
+          },
+      )
 
 
 class MachineReclaimer(webapp2.RequestHandler):

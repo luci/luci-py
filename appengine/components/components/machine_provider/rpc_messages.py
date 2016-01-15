@@ -9,6 +9,7 @@
 from protorpc import messages
 
 from components.machine_provider.dimensions import *
+from components.machine_provider.instructions import *
 from components.machine_provider.policies import *
 
 
@@ -103,6 +104,8 @@ class LeaseRequest(messages.Message):
   pubsub_topic = messages.StringField(4)
   # Cloud Pub/Sub project name to communicate on regarding this request.
   pubsub_project = messages.StringField(5)
+  # Instructions to give the machine once it's been leased.
+  on_lease = messages.MessageField(Instruction, 6)
 
 
 class LeaseRequestError(messages.Enum):
