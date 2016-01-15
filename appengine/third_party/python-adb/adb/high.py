@@ -1,3 +1,4 @@
+# coding=utf-8
 # Copyright 2015 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -669,7 +670,7 @@ class HighDevice(object):
     out, _ = self.Shell('pm list packages')
     if not out:
       return None
-    return [l.split(':', 1)[1] for l in out.strip().splitlines()]
+    return [l.split(':', 1)[1] for l in out.strip().splitlines() if ':' in l]
 
   def InstallAPK(self, destdir, apk):
     """Installs apk to destdir directory."""
