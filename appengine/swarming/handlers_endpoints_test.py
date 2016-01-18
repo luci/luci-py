@@ -962,6 +962,7 @@ class BotsApiTest(BaseTest):
           u'is_dead': False,
           u'last_seen_ts': now_str,
           u'quarantined': False,
+          u'state': u'{"ram":65}',
           u'version': u'123456789',
         },
       ],
@@ -998,6 +999,7 @@ class BotApiTest(BaseTest):
       u'is_dead': False,
       u'last_seen_ts': now_str,
       u'quarantined': False,
+      u'state': u'{"ram":65}',
       u'version': u'123456789',
     }
     response = self.call_api('get', body={'bot_id': 'id1'})

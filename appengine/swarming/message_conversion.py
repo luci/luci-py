@@ -85,7 +85,8 @@ def bot_info_to_rpc(entity, now):
       entity,
       dimensions=_string_list_pairs_from_dict(entity.dimensions),
       is_dead=entity.is_dead(now),
-      bot_id=entity.id)
+      bot_id=entity.id,
+      state=json.dumps(entity.state, sort_keys=True, separators=(',', ':')))
 
 
 def bot_event_to_rpc(entity):

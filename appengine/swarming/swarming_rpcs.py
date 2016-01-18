@@ -293,6 +293,8 @@ class BotInfo(messages.Message):
   task_id = messages.StringField(8)
   task_name = messages.StringField(9)
   version = messages.StringField(10)
+  # Encoded as json since it's an arbitrary dict.
+  state = messages.StringField(11)
 
 
 class BotList(messages.Message):
