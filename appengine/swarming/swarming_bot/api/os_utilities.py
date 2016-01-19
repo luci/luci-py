@@ -845,6 +845,10 @@ def get_state(threshold_mb=4*1024, threshold_relative=0.15, skip=None):
     model = platforms.osx.get_hardware_model_string()
     if model:
       state[u'model'] = model
+  if sys.platform == 'linux2':
+    temp = platforms.linux.get_temperatures()
+    if temp is not None:
+      state[u'temp'] = temp
 
   # TODO(maruel): Put an arbitrary limit on the amount of junk that can stay in
   # TEMP dir once we eyeballed that not the whole fleet will instantly

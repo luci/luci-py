@@ -4,6 +4,7 @@
 
 """GNU/Linux specific utility functions."""
 
+import os
 import pipes
 import platform
 import re
@@ -23,6 +24,26 @@ def get_os_version_number():
   # On Ubuntu it will return a string like '12.04'. On Raspbian, it will look
   # like '7.6'.
   return unicode(platform.linux_distribution()[1])
+
+
+def get_temperatures():
+  """Returns the temperatures measured via thermal_zones
+
+  Returns:
+    - dict of temperatures found on device in degrees C
+      (e.g. {'thermal_zone0': 43.0, 'thermal_zone1': 46.117})
+  """
+  temps = {}
+  for filename in os.listdir('/sys/class/thermal/'):
+    if re.match(r'^thermal_zone\d+', filename):
+      try:
+        with open(os.path.join('/sys/class/thermal', filename, 'temp'),
+                  'rb') as f:
+          # Convert from milli-C to Celsius
+          temps[filename] = int(f.read()) / 1000.0
+      except (IOError, OSError):
+        pass
+  return temps
 
 
 def get_gpu():
