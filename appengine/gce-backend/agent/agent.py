@@ -12,6 +12,7 @@ import json
 import logging
 import logging.handlers
 import os
+import pwd
 import shutil
 import socket
 import subprocess
@@ -28,6 +29,7 @@ THIS_DIR = os.path.dirname(__file__)
 LOG_DIR = os.path.join(THIS_DIR, 'logs')
 LOG_FILE = os.path.join(LOG_DIR, '%s.log' % os.path.basename(__file__))
 
+CHROME_BOT = 'chrome-bot'
 METADATA_BASE_URL = 'http://metadata/computeMetadata/v1'
 PUBSUB_BASE_URL = 'https://pubsub.googleapis.com/v1/projects'
 SWARMING_BOT_DIR = '/b/swarm_slave'
@@ -238,6 +240,8 @@ def main():
 
         if not os.path.exists(SWARMING_BOT_DIR):
           os.mkdir(SWARMING_BOT_DIR)
+        chrome_bot = pwd.getpwnam(CHROME_BOT)
+        os.chown(SWARMING_BOT_DIR, chrome_bot.pw_uid, chrome_bot.pw_gid)
 
         if os.path.exists(SWARMING_BOT_ZIP):
           # Delete just the zip, not the whole directory so logs are kept.
