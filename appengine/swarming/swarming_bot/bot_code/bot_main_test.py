@@ -106,6 +106,7 @@ class TestBotMain(net_utils.TestCase):
       self.assertGreater(disk.pop('free_mb'), 1.)
     self.assertGreater(actual.pop('nb_files_in_temp'), 0)
     self.assertGreater(expected.pop('nb_files_in_temp'), 0)
+    self.assertEqual(sorted(expected.pop('temp')), sorted(actual.pop('temp')))
     self.assertEqual(expected, actual)
 
   def test_setup_bot(self):

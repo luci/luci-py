@@ -834,6 +834,7 @@ def get_state(threshold_mb=4*1024, threshold_relative=0.15, skip=None):
     u'ram': get_physical_ram(),
     u'running_time': int(round(time.time() - _STARTED_TS)),
     u'started_ts': int(round(_STARTED_TS)),
+    u'user': getpass.getuser(),
   }
   if sys.platform in ('cygwin', 'win32'):
     state[u'cygwin'] = [sys.platform == 'cygwin']
