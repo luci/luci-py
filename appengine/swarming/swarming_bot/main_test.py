@@ -52,10 +52,12 @@ class SimpleMainTest(TestCase):
     expected = bot_main.get_attributes(None)
     NON_DETERMINISTIC = (
       u'cwd', u'disks', u'nb_files_in_temp', u'pid', u'running_time',
-      u'started_ts', u'temp')
+      u'started_ts')
     for key in NON_DETERMINISTIC:
       del actual[u'state'][key]
       del expected[u'state'][key]
+    actual[u'state'].pop('temp', None)
+    expected[u'state'].pop('temp', None)
     del actual[u'version']
     del expected[u'version']
     self.assertAlmostEqual(

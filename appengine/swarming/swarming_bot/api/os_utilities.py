@@ -848,7 +848,7 @@ def get_state(threshold_mb=4*1024, threshold_relative=0.15, skip=None):
       state[u'model'] = model
   if sys.platform == 'linux2':
     temp = platforms.linux.get_temperatures()
-    if temp is not None:
+    if temp:
       state[u'temp'] = temp
 
   # TODO(maruel): Put an arbitrary limit on the amount of junk that can stay in
