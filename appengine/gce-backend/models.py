@@ -104,6 +104,8 @@ class InstanceGroup(ndb.Model):
     InstanceGroup is a root entity.
     id: Hash of the instance group name.
   """
+  # Current number of instances in this instance group.
+  current_size = ndb.ComputedProperty(lambda self: len(self.members or []))
   # rpc_messages.Dimensions describing members of this instance group.
   dimensions = msgprop.MessageProperty(rpc_messages.Dimensions, required=True)
   # Names of members of this instance group.
@@ -114,6 +116,8 @@ class InstanceGroup(ndb.Model):
   policies = msgprop.MessageProperty(rpc_messages.Policies, required=True)
   # Name of the project this instance group exists in.
   project = ndb.StringProperty(required=True)
+  # Number of instances that should be in this instance group.
+  target_size = ndb.IntegerProperty(required=True)
   # Zone the members of this instance group exist in. e.g. us-central1-f.
   zone = ndb.StringProperty(required=True)
 

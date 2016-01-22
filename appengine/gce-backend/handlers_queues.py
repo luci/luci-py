@@ -232,6 +232,31 @@ class InstanceDeleter(webapp2.RequestHandler):
     reschedule_instance_deletion(instance_group_key, instances)
 
 
+class InstanceGroupResizer(webapp2.RequestHandler):
+  """Worker for resizing instance groups."""
+
+  @decorators.require_taskqueue('resize-instance-group')
+  def post(self):
+    """Resizes an instance group.
+
+    Params:
+      group: Name of the instance group to resize.
+      project: Name of the project the instance group exists in.
+      size: Size the instance group should be set to.
+      zone: Zone the instances exist in. e.g. us-central1-f.
+    """
+    group = self.request.get('group')
+    project = self.request.get('project')
+    size = self.request.get('size')
+    zone = self.request.get('zone')
+
+    api = gce.Project(project)
+    errors = api.resize_managed_instance_group(group, zone, size)
+    if errors:
+      logging.error(
+          'Error resizing instance group:\n%s', json.dumps(errors, indent=2))
+
+
 @ndb.transactional
 def set_prepared_instance_states(instance_group_key, succeeded, failed):
   """Sets the states of prepared instances.
@@ -523,5 +548,6 @@ def create_queues_app():
        InstanceMetadataOperationChecker),
       ('/internal/queues/delete-instances', InstanceDeleter),
       ('/internal/queues/prepare-instances', InstancePreparer),
+      ('/internal/queues/resize-instance-group', InstanceGroupResizer),
       ('/internal/queues/update-instance-metadata', InstanceMetadataUpdater),
   ])

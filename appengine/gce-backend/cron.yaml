@@ -3,5 +3,7 @@ cron:
   schedule: every 1 minutes
 - url: /internal/cron/process-instance-templates
   schedule: every 1 minutes
+- url: /internal/cron/resize-instance-groups
+  schedule: every 1 minutes
 - url: /pubsub/machine-provider
   schedule: every 1 minutes

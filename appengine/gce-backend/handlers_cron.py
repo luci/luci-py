@@ -68,7 +68,7 @@ class InstanceTemplateProcessor(webapp2.RequestHandler):
 
 @ndb.transactional
 def process_instance_group(
-    name, dimensions, policies, instances, zone, project):
+    name, dimensions, policies, instances, zone, project, target_size):
   """Processes an InstanceGroup entity.
 
   We store an InstanceGroup entity in the datastore if one doesn't already
@@ -84,6 +84,7 @@ def process_instance_group(
       this instance group.
     zone: Zone these instances exist in. e.g. us-central1-f.
     project: Project these instances exist in.
+    target_size: Number of instances that should be in this instance group.
   """
   instance_dicts = {state: {} for state in state_machine.STATE_MACHINE}
 
@@ -156,6 +157,7 @@ def process_instance_group(
       name=name,
       policies=policies,
       project=project,
+      target_size=target_size,
       zone=zone,
   ).put()
 
@@ -230,11 +232,67 @@ class InstanceGroupProcessor(webapp2.RequestHandler):
           instances,
           template.zone,
           template.instance_group_project,
+          template.initial_size,
       )
+
+
+@ndb.transactional
+def schedule_resize(instance_group_key):
+  """Schedules a resize operation for the given instance group.
+
+  Args:
+    instance_group_key: ndb.Key() for the models.InstanceGroup which should
+      be resized.
+  """
+  instance_group = instance_group_key.get()
+
+  if not instance_group:
+    logging.error('Instance group no longer exists: %s', instance_group_key)
+    return
+
+  if instance_group.current_size == instance_group.target_size:
+    logging.warning(
+        'Instance group is already at target size: %s',
+        instance_group.target_size,
+    )
+    return
+
+  if not utils.enqueue_task(
+      '/internal/queues/resize-instance-group',
+      'resize-instance-group',
+      params={
+          'group': instance_group.name,
+          'project': instance_group.project,
+          'size': instance_group.target_size,
+          'zone': instance_group.zone,
+      },
+      transactional=True,
+  ):
+    logging.warning('Failed to enqueue instance group resize task')
+    # Just let the cron job try again later.
+
+
+class InstanceGroupResizer(webapp2.RequestHandler):
+  """Worker for resizing instance group managers."""
+
+  @decorators.require_cronjob
+  def get(self):
+    # TODO(smut): Replace with autoscaling.
+    # Currently this enforces a static size on instance groups equal to the
+    # initial size specified by the models.InstanceTemplate used to create them.
+    # In other words, this replenishes the instance group only when an instance
+    # is reclaimed and deleted. In the future, we should dynamically autoscale
+    # instance groups depending on utilization (i.e. what fraction are leased).
+
+    # Ensure each instance group is appropriately sized.
+    for group in models.InstanceGroup.query():
+      if group.current_size != group.target_size:
+        schedule_resize(group.key)
 
 
 def create_cron_app():
   return webapp2.WSGIApplication([
       ('/internal/cron/process-instance-groups', InstanceGroupProcessor),
       ('/internal/cron/process-instance-templates', InstanceTemplateProcessor),
+      ('/internal/cron/resize-instance-groups', InstanceGroupResizer),
   ])

@@ -338,6 +338,26 @@ class Project(object):
         for instance in response.get('managedInstances', [])
     }
 
+  def resize_managed_instance_group(self, manager, zone, size):
+    """Resizes the instance group managed by the given instance group manager.
+
+    Args:
+      manager: Name of the instance group manager.
+      zone: Zone to resize the instance group in. e.g. us-central1-f
+      size: Desired number of instances in the instance group.
+
+    Returns:
+      A list of error dicts containing "code", "location", and "message" keys.
+    """
+    response = self.call_api(
+        '/zones/%s/instanceGroupManagers/%s/resize' % (zone, manager),
+        method='POST',
+        params={
+            'size': size,
+        },
+    )
+    return response.get('error', {}).get('errors', [])
+
 
 class ZoneOperation(object):
   """Asynchronous GCE operation returned by some Project methods.
