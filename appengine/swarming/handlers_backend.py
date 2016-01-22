@@ -5,6 +5,7 @@
 """Main entry point for Swarming backend handlers."""
 
 import json
+import logging
 
 import webapp2
 from google.appengine.api import datastore_errors
@@ -12,6 +13,7 @@ from google.appengine.api import taskqueue
 
 import mapreduce_jobs
 from components import decorators
+from components import machine_provider
 from server import stats
 from server import task_scheduler
 
@@ -49,6 +51,16 @@ class CronTriggerCleanupDataHandler(webapp2.RequestHandler):
                   queue_name='cleanup')
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
+
+
+class CronMachineProviderBotHandler(webapp2.RequestHandler):
+  """Handles bots leased from the Machine Provider."""
+
+  @decorators.require_cronjob
+  def get(self):
+    logging.info('MachineProviderConfiguration: %s',
+                 machine_provider.MachineProviderConfiguration.cached())
+    # TODO(smut): Manage bots leased from the Machine Provider.
 
 
 class TaskCleanupDataHandler(webapp2.RequestHandler):
@@ -99,6 +111,7 @@ def get_routes():
 
     ('/internal/cron/stats/update', stats.InternalStatsUpdateHandler),
     ('/internal/cron/trigger_cleanup_data', CronTriggerCleanupDataHandler),
+    ('/internal/cron/machine_provider', CronMachineProviderBotHandler),
 
     # Task queues.
     ('/internal/taskqueue/cleanup_data', TaskCleanupDataHandler),

@@ -18,6 +18,10 @@ cron:
   url: /internal/cron/abort_expired_task_to_run
   schedule: every 1 minutes
 
+- description: Manage bots leased from Machine Provider.
+  url: /internal/cron/machine_provider
+  schedule: every 1 minutes synchronized
+
 ### ereporter2
 
 - description: ereporter2 cleanup
