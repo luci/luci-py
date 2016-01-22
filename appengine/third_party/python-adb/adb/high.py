@@ -525,7 +525,7 @@ class HighDevice(object):
     # read it is via Java
     # developer.android.com/guide/topics/sensors/sensors_environment.html
     out = {}
-    for sensor in self.List('/sys/class/thermal'):
+    for sensor in self.List('/sys/class/thermal') or []:
       if sensor.filename in ('.', '..'):
         continue
       if not sensor.filename.startswith('thermal_zone'):
@@ -641,7 +641,7 @@ class HighDevice(object):
 
     # <NAME> <UP/DOWN> <IP/MASK> <UNKNOWN> <MAC>
     out, exit_code = self.Shell('netcfg')
-    if exit_code:
+    if exit_code or out is None:
       return []
     parts = (l.split() for l in out.splitlines())
     return {

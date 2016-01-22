@@ -162,7 +162,11 @@ class AdbCommands(object):
     return mode, size, mtime
 
   def List(self, device_path):
-    """Return a directory listing of the given path."""
+    """Return a directory listing of the given path.
+
+    Returns:
+      list of file_sync_protocol.DeviceFile.
+    """
     connection = self.conn.Open(destination='sync:')
     listing = filesync_protocol.FilesyncProtocol.List(connection, device_path)
     connection.Close()
