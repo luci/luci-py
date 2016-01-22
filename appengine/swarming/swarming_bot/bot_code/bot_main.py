@@ -606,9 +606,15 @@ def update_bot(botobj, version):
   # to survive, and it'll restart it if it disappears. os.exec*() replaces the
   # process so this is fine.
   ret = common.exec_python([new_zip, 'start_slave', '--survive'])
-  if ret not in (0, 1073807364):
+  if ret in (1073807364, -1073741510):
     # 1073807364 is returned when the process is killed due to shutdown. No need
     # to alert anyone in that case.
+    # -1073741510 is returned when rebooting too. This can happen when the
+    # parent code was running the old version and gets confused and decided to
+    # poll again.
+    # In any case, zap out the error code.
+    ret = 0
+  elif ret:
     botobj.post_error('Bot failed to respawn after update: %s' % ret)
   sys.exit(ret)
 
