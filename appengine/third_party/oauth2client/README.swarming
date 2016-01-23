@@ -1,0 +1,13 @@
+Name: oauth2client
+Short Name: oauth2client
+URL: https://chromium.googlesource.com/infra/third_party/oauth2client.git
+Version: 1.4.2
+Revision: e8b1e794d28f2117dd3e2b8feeb506b4c199c533
+License: Apache License, Version 2.0
+
+Description:
+The oauth2client is a client library for OAuth 2.0.
+
+Local Modifications:
+- Installed using glyco (see client/third_party/README.txt for more info)
+- Added README.swarming

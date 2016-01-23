@@ -1,0 +1,14 @@
+Name: google-api-python-client
+Short Name: googleapiclient
+Version: 1.3.1
+Revision: 705:49d45a6c3318
+Home-page: https://chromium.googlesource.com/external/github.com/google/google-api-python-client
+License: Apache 2.0
+Description:
+The Google API Client for Python is a client library for
+accessing the Plus, Moderator, and many other Google APIs.
+
+Local Modifications:
+- Installed using glyco (see client/third_party/README.txt for more info)
+- Removed apiclient
+- Added README.swarming
