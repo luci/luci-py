@@ -1,0 +1,14 @@
+Name: gae_ts_mon
+Short Name: gae_ts_mon
+URL: https://chromium.googlesource.com/infra/infra/+/master/appengine_module/gae_ts_mon/
+Version: 1.0.0
+Revision: 4697:a80414209295
+License: Chromium License
+
+Description:
+Timeseries monitoring library for Google AppEngine.
+
+Local Modifications:
+- Removed all test/ directories.
+- Copied LICENSE from the root of infra.git.
+- Updated symlinks to point to the correct places within luci-py.
