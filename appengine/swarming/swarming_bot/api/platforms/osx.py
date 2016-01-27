@@ -17,10 +17,10 @@ from utils import tools
 
 
 @tools.cached
-def _get_SPDisplaysDataType():
+def _get_system_profiler(data_type):
   """Returns an XML about the system display properties."""
   sp = subprocess.check_output(
-      ['system_profiler', 'SPDisplaysDataType', '-xml'])
+      ['system_profiler', data_type, '-xml'])
   return plistlib.readPlistFromString(sp)[0]['_items']
 
 
@@ -107,11 +107,21 @@ def generate_launchd_plist(command, cwd, plistname):
   return header
 
 
+@tools.cached
+def get_audio():
+  """Returns the audio cards that are "connected"."""
+  return [
+    card['_name'] for card in _get_system_profiler('SPAudioDataType')
+    if card.get('coreaudio_default_audio_output_device') == 'spaudio_yes'
+  ]
+
+
+@tools.cached
 def get_gpu():
   """Returns video device as listed by 'system_profiler'. See get_gpu()."""
   dimensions = set()
   state = set()
-  for card in _get_SPDisplaysDataType():
+  for card in _get_system_profiler('SPDisplaysDataType'):
     # Warning: the value provided depends on the driver manufacturer.
     # Other interesting values: spdisplays_vram, spdisplays_revision-id
     ven_id = u'UNKNOWN'
@@ -133,12 +143,13 @@ def get_gpu():
   return sorted(dimensions), sorted(state)
 
 
+@tools.cached
 def get_monitor_hidpi():
   """Returns True if the monitor is hidpi."""
   hidpi = any(
     any(m.get('spdisplays_retina') == 'spdisplays_yes'
         for m in card['spdisplays_ndrvs'])
-    for card in _get_SPDisplaysDataType()
+    for card in _get_system_profiler('SPDisplaysDataType')
     if 'spdisplays_ndrvs' in card)
   return str(int(hidpi))
 

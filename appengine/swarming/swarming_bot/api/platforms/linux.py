@@ -26,6 +26,22 @@ def get_os_version_number():
   return unicode(platform.linux_distribution()[1])
 
 
+@tools.cached
+def _lspci():
+  """Returns list of PCI devices found.
+
+  list(Bus, Type, Vendor [ID], Device [ID], extra...)
+  """
+  try:
+    lines = subprocess.check_output(
+        ['lspci', '-mm', '-nn'], stderr=subprocess.PIPE).splitlines()
+  except (OSError, subprocess.CalledProcessError):
+    # It normally happens on Google Compute Engine as lspci is not installed by
+    # default and on ARM since they do not have a PCI bus.
+    return None
+  return [shlex.split(l) for l in lines]
+
+
 def get_temperatures():
   """Returns the temperatures measured via thermal_zones
 
@@ -46,13 +62,24 @@ def get_temperatures():
   return temps
 
 
+@tools.cached
+def get_audio():
+  """Returns information about the audio."""
+  pci_devices = _lspci()
+  if not pci_devices:
+    return None
+  # Join columns 'Vendor' and 'Device'. 'man lspci' for more details.
+  return [
+    u': '.join(l[2:4]) for l in pci_devices if l[1] == 'Audio device [0403]'
+  ]
+
+
+@tools.cached
 def get_gpu():
   """Returns video device as listed by 'lspci'. See get_gpu().
   """
-  try:
-    pci_devices = subprocess.check_output(
-        ['lspci', '-mm', '-nn'], stderr=subprocess.PIPE).splitlines()
-  except (OSError, subprocess.CalledProcessError):
+  pci_devices = _lspci()
+  if not pci_devices:
     # It normally happens on Google Compute Engine as lspci is not installed by
     # default and on ARM since they do not have a PCI bus. In either case, we
     # don't care about the GPU.
@@ -61,9 +88,7 @@ def get_gpu():
   dimensions = set()
   state = set()
   re_id = re.compile(r'^(.+?) \[([0-9a-f]{4})\]$')
-  for pci_device in pci_devices:
-    # Bus, Type, Vendor [ID], Device [ID], extra...
-    line = shlex.split(pci_device)
+  for line in pci_devices:
     # Look for display class as noted at http://wiki.osdev.org/PCI
     dev_type = re_id.match(line[1]).group(2)
     if dev_type.startswith('03'):

@@ -333,6 +333,18 @@ def get_disks_info():
 
 
 @tools.cached
+def get_audio():
+  """Returns the active audio card(s)."""
+  if sys.platform == 'darwin':
+    return platforms.osx.get_audio()
+  elif sys.platform == 'linux2':
+    return platforms.linux.get_audio()
+  elif sys.platform == 'win32':
+    return platforms.win.get_audio()
+  return None
+
+
+@tools.cached
 def get_gpu():
   """Returns the installed video card(s) name.
 
@@ -826,6 +838,7 @@ def get_state(threshold_mb=4*1024, threshold_relative=0.15, skip=None):
   except OSError:
     nb_files_in_temp = 'N/A'
   state = {
+    u'audio': get_audio(),
     u'cost_usd_hour': get_cost_hour(),
     u'cwd': os.getcwd(),
     u'disks': get_disks_info(),

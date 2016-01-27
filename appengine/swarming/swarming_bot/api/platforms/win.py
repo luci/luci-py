@@ -108,7 +108,7 @@ def get_os_version_number():
   # - Win10: Microsoft Windows [Version 10.0.10240]
   # - Win7 or Win2K8R2: Microsoft Windows [Version 6.1.7601]
   out = subprocess.check_output(['cmd.exe', '/c', 'ver']).strip()
-  return re.search(r'\[Version (\d+\.\d+)\.\d+\]', out).group(1)
+  return re.search(r'\[Version (\d+\.\d+)\.\d+\]', out, re.IGNORECASE).group(1)
 
 
 @tools.cached
@@ -152,8 +152,8 @@ def get_disks_info():
 
 
 @tools.cached
-def get_gpu():
-  """Returns video device as listed by WMI. See get_gpu()."""
+def _get_wmi_wbem():
+  """Returns a WMI client ready to do queries."""
   try:
     import win32com.client  # pylint: disable=F0401
   except ImportError:
@@ -161,10 +161,33 @@ def get_gpu():
     # installed by Swarming devs. If you find yourself needing it to run without
     # pywin32, for example in cygwin, please send us a CL with the
     # implementation that doesn't use pywin32.
-    return None, None
+    return None
 
   wmi_service = win32com.client.Dispatch('WbemScripting.SWbemLocator')
-  wbem = wmi_service.ConnectServer('.', 'root\\cimv2')
+  return wmi_service.ConnectServer('.', 'root\\cimv2')
+
+
+@tools.cached
+def get_audio():
+  """Returns audio device as listed by WMI."""
+  wbem = _get_wmi_wbem()
+  if not wbem:
+    return None
+  # https://msdn.microsoft.com/library/aa394463.aspx
+  return [
+    device.Name
+    for device in wbem.ExecQuery('SELECT * FROM Win32_SoundDevice')
+    if device.Status == 'OK'
+  ]
+
+
+@tools.cached
+def get_gpu():
+  """Returns video device as listed by WMI."""
+  wbem = _get_wmi_wbem()
+  if not wbem:
+    return None, None
+
   dimensions = set()
   state = set()
   # https://msdn.microsoft.com/library/aa394512.aspx
