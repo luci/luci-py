@@ -439,6 +439,7 @@ class TasksHandler(auth.AuthenticatingHandler):
     sort = self.request.get('sort', self.SORT_CHOICES[0][0])
     state = self.request.get('state', self.STATE_CHOICES[0][0][0])
     task_name = self.request.get('task_name', '').strip()
+    counts = self.request.get('counts', '').strip()
     task_tags = [
       line for line in self.request.get('task_tag', '').splitlines() if line
     ]
@@ -454,7 +455,12 @@ class TasksHandler(auth.AuthenticatingHandler):
       state = 'all'
 
     now = utils.utcnow()
-    counts_future = self._get_counts_future(now)
+    # "Temporarily" disable the count. This is too slow on the prod server
+    # (>10s). The fix is to have the web page do a XHR query to get the values
+    # asynchronously.
+    counts_future = None
+    if counts == 'true':
+      counts_future = self._get_counts_future(now)
 
     # This call is synchronous.
     try:
@@ -554,12 +560,14 @@ class TasksHandler(auth.AuthenticatingHandler):
     """Converts STATE_CHOICES with _get_counts_future() into nice text."""
     # Appends the number of tasks for each filter. It gives a sense of how much
     # things are going on.
-    counts = {k: v.get_result() for k, v in counts_future.iteritems()}
+    if counts_future:
+      counts = {k: v.get_result() for k, v in counts_future.iteritems()}
     state_choices = []
     for choice_list in self.STATE_CHOICES:
       state_choices.append([])
       for state_key, name, title in choice_list:
-        name += ' (%d)' % counts[state_key]
+        if counts_future:
+          name += ' (%d)' % counts[state_key]
         state_choices[-1].append((state_key, name, title))
     return state_choices
 
