@@ -1101,7 +1101,10 @@ def restart_and_return(message=None):
       ['shutdown', '-r', '-f', '-t', '1'],
       ['shutdown', '-r', '-f', '1'],
     ]
-  elif sys.platform == 'linux2' or sys.platform == 'darwin':
+  elif sys.platform == 'linux2':
+    cmds = [['sudo', '/sbin/shutdown', '-f', '-r', 'now']]
+  elif sys.platform == 'darwin':
+    # -f is supported on linux but not OSX.
     cmds = [['sudo', '/sbin/shutdown', '-r', 'now']]
   else:
     cmds = [['sudo', 'shutdown', '-r', 'now']]
