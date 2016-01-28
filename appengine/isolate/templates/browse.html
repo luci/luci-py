@@ -5,17 +5,13 @@
 {% block headers %}
 <style>
   html, body {
-    display: table;
     height: 100%;
-    /* TODO(maruel): Figure out how to be able to keep margins! */
     margin: 0;
-    overflow: hidden;
     width: 100%;
   }
   div.use_all_space {
-    display: table-row;
-    height: 100%;
     margin: 0;
+    overflow-y: hidden;
     padding: 0;
     width: 100%;
   }
@@ -24,8 +20,8 @@
     white-space: pre-wrap;
   }
   iframe.use_all_space {
-    height: 100%;
     margin: 0;
+    overflow-y: hidden;
     padding: 0;
     width: 100%;
   }

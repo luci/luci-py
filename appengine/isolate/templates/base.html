@@ -36,20 +36,22 @@ found in the LICENSE file. -->
   </div>
   {% block body %}
   {% endblock %}
-  <hr>
-  <div style="float: left;"><p>
-    <a target="_blank" href="https://cloud.google.com/appengine/"><img border="0"
-    src="/third_party/appengine-noborder-120x30.gif"
-    alt="Powered by Google App Engine" /></a></p>
-  </div>
-  <div style="float: right; text-align: right;">
-    <div style="margin-top: 1.2em; color: #777; font-size: 14px;">
-      Server version
-      {% if app_revision_url %}
-        <a href="{{app_revision_url}}" target="_blank">{{app_version}}</a>
-      {% else %}
-        {{app_version}}
-      {% endif %}
+  <div style="width:100%">
+    <hr>
+    <div style="float: left;"><p>
+      <a target="_blank" href="https://cloud.google.com/appengine/"><img border="0"
+      src="/third_party/appengine-noborder-120x30.gif"
+      alt="Powered by Google App Engine" /></a></p>
+    </div>
+    <div style="float: right; text-align: right;">
+      <div style="margin-top: 1.2em; color: #777; font-size: 14px;">
+        Server version
+        {% if app_revision_url %}
+          <a href="{{app_revision_url}}" target="_blank">{{app_version}}</a>
+        {% else %}
+          {{app_version}}
+        {% endif %}
+      </div>
     </div>
   </div>
 
