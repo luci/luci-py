@@ -50,15 +50,16 @@ def get_temperatures():
       (e.g. {'thermal_zone0': 43.0, 'thermal_zone1': 46.117})
   """
   temps = {}
-  for filename in os.listdir('/sys/class/thermal/'):
-    if re.match(r'^thermal_zone\d+', filename):
-      try:
-        with open(os.path.join('/sys/class/thermal', filename, 'temp'),
-                  'rb') as f:
-          # Convert from milli-C to Celsius
-          temps[filename] = int(f.read()) / 1000.0
-      except (IOError, OSError):
-        pass
+  path = '/sys/class/thermal'
+  if os.path.isdir(path):
+    for filename in os.listdir(path):
+      if re.match(r'^thermal_zone\d+', filename):
+        try:
+          with open(os.path.join(path, filename, 'temp'), 'rb') as f:
+            # Convert from milli-C to Celsius
+            temps[filename] = int(f.read()) / 1000.0
+        except (IOError, OSError):
+          pass
   return temps
 
 
