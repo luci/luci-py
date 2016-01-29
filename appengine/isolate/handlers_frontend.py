@@ -167,13 +167,14 @@ class BrowseHandler(auth.AuthenticatingHandler):
               separators=(',', ': '))
         except ValueError:
           pass
+      content = content.decode('utf8', 'replace')
     params = {
-      'content': content,
-      'digest': digest,
-      'namespace': namespace,
+      u'content': content,
+      u'digest': unicode(digest),
+      u'namespace': unicode(namespace),
       # TODO(maruel): Add back once Web UI authentication is switched to OAuth2.
       #'onload': 'update()' if digest else '',
-      'onload': '',
+      u'onload': '',
     }
     self.response.write(template.render('isolate/browse.html', params))
 
