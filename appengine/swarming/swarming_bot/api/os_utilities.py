@@ -1107,14 +1107,14 @@ def restart_and_return(message=None):
     # now, just try both. Once pre-systemd system are not supported anymore,
     # remove the call with -f.
     cmds = [
-      ['sudo', '/sbin/shutdown', '-f', '-r', 'now'],
-      ['sudo', '/sbin/shutdown', '-r', 'now'],
+      ['sudo', '-n', '/sbin/shutdown', '-f', '-r', 'now'],
+      ['sudo', '-n', '/sbin/shutdown', '-r', 'now'],
     ]
   elif sys.platform == 'darwin':
     # -f is supported on linux but not OSX.
-    cmds = [['sudo', '/sbin/shutdown', '-r', 'now']]
+    cmds = [['sudo', '-n', '/sbin/shutdown', '-r', 'now']]
   else:
-    cmds = [['sudo', 'shutdown', '-r', 'now']]
+    cmds = [['sudo', '-n', 'shutdown', '-r', 'now']]
 
   success = False
   for cmd in cmds:
