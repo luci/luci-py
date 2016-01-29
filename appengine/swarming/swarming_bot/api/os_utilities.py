@@ -1102,7 +1102,14 @@ def restart_and_return(message=None):
       ['shutdown', '-r', '-f', '1'],
     ]
   elif sys.platform == 'linux2':
-    cmds = [['sudo', '/sbin/shutdown', '-f', '-r', 'now']]
+    # systemd removed support for -f. So Ubuntu 14.04 supports -f but 16.04
+    # won't. This is also the case of Raspbian Jessie, which is on systemd. For
+    # now, just try both. Once pre-systemd system are not supported anymore,
+    # remove the call with -f.
+    cmds = [
+      ['sudo', '/sbin/shutdown', '-f', '-r', 'now'],
+      ['sudo', '/sbin/shutdown', '-r', 'now'],
+    ]
   elif sys.platform == 'darwin':
     # -f is supported on linux but not OSX.
     cmds = [['sudo', '/sbin/shutdown', '-r', 'now']]
