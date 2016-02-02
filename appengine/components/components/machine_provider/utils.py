@@ -47,3 +47,19 @@ def add_machines(requests):
       payload=utils.to_json_encodable({'requests': requests}),
       scopes=MACHINE_PROVIDER_SCOPES,
  )
+
+
+def lease_machines(requests):
+  """Lease machines from the Machine Provider.
+
+  Args:
+    requests: A list of rpc_messages.LeaseRequest instances.
+  """
+  logging.info('Sending batched lease_machines request')
+  return net.json_request(
+      '%s/_ah/api/machine_provider/v1/batched_lease' %
+          MachineProviderConfiguration.get_instance_url(),
+      method='POST',
+      payload=utils.to_json_encodable({'requests': requests}),
+      scopes=MACHINE_PROVIDER_SCOPES,
+  )

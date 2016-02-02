@@ -108,6 +108,12 @@ class LeaseRequest(messages.Message):
   on_lease = messages.MessageField(Instruction, 6)
 
 
+class BatchedLeaseRequest(messages.Message):
+  """Represents a batched set of LeaseRequests."""
+  # LeaseRequest instances to batch together.
+  requests = messages.MessageField(LeaseRequest, 1, repeated=True)
+
+
 class LeaseRequestError(messages.Enum):
   """Represents an error in a LeaseRequest."""
   # Request IDs are intended to be unique.
@@ -119,6 +125,10 @@ class LeaseRequestError(messages.Enum):
   INVALID_PROJECT = 3
   # Didn't specify a Cloud Pub/Sub topic.
   UNSPECIFIED_TOPIC = 4
+  # Request couldn't be processed in time.
+  DEADLINE_EXCEEDED = 5
+  # Miscellaneous transient error.
+  TRANSIENT_ERROR = 6
 
 
 class LeaseResponse(messages.Message):
@@ -128,3 +138,10 @@ class LeaseResponse(messages.Message):
   # LeaseRequestError instance indicating an error with the request, or None
   # if there is no error.
   error = messages.EnumField(LeaseRequestError, 2)
+  # Request ID used by the client to generate the LeaseRequest.
+  client_request_id = messages.StringField(3, required=True)
+
+
+class BatchedLeaseResponse(messages.Message):
+  """Represents a response to a batched lease request."""
+  responses = messages.MessageField(LeaseResponse, 1, repeated=True)

@@ -8,12 +8,14 @@ import json
 import logging
 
 import webapp2
+from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.appengine.api import taskqueue
 
 import mapreduce_jobs
 from components import decorators
 from components import machine_provider
+from server import lease_management
 from server import stats
 from server import task_scheduler
 
@@ -58,9 +60,15 @@ class CronMachineProviderBotHandler(webapp2.RequestHandler):
 
   @decorators.require_cronjob
   def get(self):
-    logging.info('MachineProviderConfiguration: %s',
-                 machine_provider.MachineProviderConfiguration.cached())
-    # TODO(smut): Manage bots leased from the Machine Provider.
+    swarming_server = app_identity.get_default_version_hostname()
+    # TODO(smut): Parallelize when there are lots of machine types.
+    for machine_type_key in lease_management.MachineType.query().fetch(
+        keys_only=True):
+      lease_requests = lease_management.get_lease_requests(
+          machine_type_key, swarming_server)
+      if lease_requests:
+        responses = machine_provider.lease_machines(lease_requests)
+        lease_management.update_leases(machine_type_key, responses)
 
 
 class TaskCleanupDataHandler(webapp2.RequestHandler):

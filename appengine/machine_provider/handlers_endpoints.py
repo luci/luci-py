@@ -9,7 +9,9 @@ import json
 import logging
 
 import endpoints
+from google.appengine import runtime
 from google.appengine.api import app_identity
+from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
 from protorpc import protobuf
@@ -17,6 +19,7 @@ from protorpc import remote
 
 from components import auth
 from components import pubsub
+from components import utils
 from components.machine_provider import rpc_messages
 
 import acl
@@ -247,6 +250,58 @@ class CatalogEndpoints(remote.Service):
 class MachineProviderEndpoints(remote.Service):
   """Implements cloud endpoints for the Machine Provider."""
 
+  @auth.endpoints_method(
+      rpc_messages.BatchedLeaseRequest,
+      rpc_messages.BatchedLeaseResponse,
+  )
+  @auth.require(acl.can_issue_lease_requests)
+  def batched_lease(self, request):
+    """Handles an incoming BatchedLeaseRequest.
+
+    Batches are intended to save on RPCs only. The batched requests will not
+    execute transactionally.
+    """
+    # To avoid having large batches timed out by AppEngine after 60 seconds
+    # when some requests have been processed and others haven't, enforce a
+    # smaller deadline on ourselves to process the entire batch.
+    DEADLINE_SECS = 30
+    start_time = utils.utcnow()
+    user = auth.get_current_identity().to_bytes()
+    logging.info('Received BatchedLeaseRequest:\nUser: %s\n%s', user, request)
+    responses = []
+    for request in request.requests:
+      request_hash = models.LeaseRequest.generate_key(user, request).id()
+      logging.info(
+          'Processing LeaseRequest:\nRequest hash: %s\n%s',
+          request_hash,
+          request,
+      )
+      if (utils.utcnow() - start_time).seconds > DEADLINE_SECS:
+        logging.warning(
+          'BatchedLeaseRequest exceeded enforced deadline: %s', DEADLINE_SECS)
+        responses.append(
+            client_request_id=request.request_id,
+            error=rpc_messages.LeaseRequestError.DEADLINE_EXCEEDED,
+            request_hash=request_hash,
+        )
+      else:
+        try:
+          responses.append(self._lease(request, user, request_hash))
+        except (
+            datastore_errors.NotSavedError,
+            datastore_errors.Timeout,
+            runtime.apiproxy_errors.CancelledError,
+            runtime.apiproxy_errors.DeadlineExceededError,
+            runtime.apiproxy_errors.OverQuotaError,
+        ) as e:
+          logging.warning('Exception processing LeaseRequest:\n%s', e)
+          responses.append(
+              client_request_id=request.request_id,
+              error=rpc_messages.LeaseRequestError.TRANSIENT_ERROR,
+              request_hash=request_hash,
+          )
+    return rpc_messages.BatchedLeaseResponse(responses=responses)
+
   @auth.endpoints_method(rpc_messages.LeaseRequest, rpc_messages.LeaseResponse)
   @auth.require(acl.can_issue_lease_requests)
   def lease(self, request):
@@ -261,6 +316,10 @@ class MachineProviderEndpoints(remote.Service):
         request_hash,
         request,
     )
+    return self._lease(request, user, request_hash)
+
+  def _lease(self, request, user, request_hash):
+    """Handles an incoming LeaseRequest."""
     if request.pubsub_topic:
       if not pubsub.validate_topic(request.pubsub_topic):
         logging.warning(
@@ -268,6 +327,7 @@ class MachineProviderEndpoints(remote.Service):
             request.pubsub_topic,
         )
         return rpc_messages.LeaseResponse(
+            client_request_id=request.request_id,
             error=rpc_messages.LeaseRequestError.INVALID_TOPIC,
         )
       if not request.pubsub_project:
@@ -283,6 +343,7 @@ class MachineProviderEndpoints(remote.Service):
             request.pubsub_topic,
         )
         return rpc_messages.LeaseResponse(
+            client_request_id=request.request_id,
             error=rpc_messages.LeaseRequestError.INVALID_PROJECT,
         )
       elif not request.pubsub_topic:
@@ -291,6 +352,7 @@ class MachineProviderEndpoints(remote.Service):
             request.pubsub_project,
         )
         return rpc_messages.LeaseResponse(
+            client_request_id=request.request_id,
             error=rpc_messages.LeaseRequestError.UNSPECIFIED_TOPIC,
         )
     duplicate = models.LeaseRequest.get_by_id(request_hash)
@@ -312,12 +374,15 @@ class MachineProviderEndpoints(remote.Service):
             duplicate.request
         )
         return rpc_messages.LeaseResponse(
+            client_request_id=request.request_id,
             error=rpc_messages.LeaseRequestError.REQUEST_ID_REUSE,
         )
     else:
       logging.info('Storing LeaseRequest')
-      response = rpc_messages.LeaseResponse()
-      response.request_hash = request_hash
+      response = rpc_messages.LeaseResponse(
+          client_request_id=request.request_id,
+          request_hash=request_hash,
+      )
       models.LeaseRequest(
           deduplication_checksum=deduplication_checksum,
           id=request_hash,
