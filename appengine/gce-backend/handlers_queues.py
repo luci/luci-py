@@ -439,6 +439,12 @@ class InstanceMetadataUpdater(webapp2.RequestHandler):
       else:
         fingerprint = existing_metadata['metadata']['fingerprint']
         items = existing_metadata['metadata']['items']
+        # Update existing metadata keys with new desired values.
+        for item in items:
+          if item['key'] in new_metadata:
+            item['value'] = new_metadata[item['key']]
+            new_metadata.pop(item['key'])
+        # Tack on new metadata key/value pairs.
         items.extend(
             {'key': k, 'value': v} for k, v in new_metadata.iteritems())
         logging.info('New metadata:\n%s', json.dumps(items, indent=2))
