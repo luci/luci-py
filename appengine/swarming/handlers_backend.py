@@ -60,7 +60,7 @@ class CronMachineProviderBotHandler(webapp2.RequestHandler):
 
   @decorators.require_cronjob
   def get(self):
-    swarming_server = app_identity.get_default_version_hostname()
+    swarming_server = 'https://%s' % app_identity.get_default_version_hostname()
     # TODO(smut): Parallelize when there are lots of machine types.
     for machine_type_key in lease_management.MachineType.query().fetch(
         keys_only=True):
