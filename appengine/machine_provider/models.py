@@ -26,9 +26,6 @@ class Enum(frozenset):
     raise AttributeError(attr)
 
 
-LeaseRequestStates = Enum(['UNTRIAGED', 'PENDING', 'FULFILLED', 'DENIED'])
-
-
 class LeaseRequest(ndb.Model):
   """Datastore representation of a LeaseRequest.
 
@@ -46,13 +43,12 @@ class LeaseRequest(ndb.Model):
   machine_id = ndb.StringProperty()
   # auth.model.Identity of the issuer of the original request.
   owner = auth.IdentityProperty(required=True)
-  # Element of LeaseRequestStates giving the state of this request.
-  state = ndb.StringProperty(choices=LeaseRequestStates, required=True)
   # rpc_messages.LeaseRequest instance representing the original request.
   request = msgprop.MessageProperty(rpc_messages.LeaseRequest, required=True)
   # rpc_messages.LeaseResponse instance representing the current response.
   # This field will be updated as the request is being processed.
-  response = msgprop.MessageProperty(rpc_messages.LeaseResponse)
+  response = msgprop.MessageProperty(
+      rpc_messages.LeaseResponse, indexed_fields=['state'])
 
   @classmethod
   def compute_deduplication_checksum(cls, request):
@@ -90,7 +86,9 @@ class LeaseRequest(ndb.Model):
     Yields:
       Untriaged LeaseRequests in no guaranteed order.
     """
-    for request in cls.query(cls.state == LeaseRequestStates.UNTRIAGED):
+    for request in cls.query(
+        cls.response.state == rpc_messages.LeaseRequestState.UNTRIAGED
+    ):
       yield request
 
 

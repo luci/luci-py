@@ -51,8 +51,9 @@ class LeaseRequestProcessorTest(test_case.TestCase):
         ),
         owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
         request=request,
-        response=rpc_messages.LeaseResponse(),
-        state=models.LeaseRequestStates.UNTRIAGED,
+        response=rpc_messages.LeaseResponse(
+            client_request_id='fake-id',
+        ),
     ).put()
     models.CatalogMachineEntry.create_and_put(
         rpc_messages.Dimensions(
@@ -100,8 +101,9 @@ class MachineReclamationProcessorTest(test_case.TestCase):
         ),
         owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
         request=request,
-        response=rpc_messages.LeaseResponse(),
-        state=models.LeaseRequestStates.UNTRIAGED,
+        response=rpc_messages.LeaseResponse(
+            client_request_id='fake-id',
+        ),
     )
     dimensions = rpc_messages.Dimensions(
         backend=rpc_messages.Backend.DUMMY,

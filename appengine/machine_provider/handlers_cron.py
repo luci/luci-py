@@ -95,14 +95,15 @@ def lease_machine(machine_key, lease):
   if machine.state != models.CatalogMachineEntryStates.AVAILABLE:
     logging.warning('CatalogMachineEntry no longer available:\n%s', machine)
     return False
-  if lease.state != models.LeaseRequestStates.UNTRIAGED:
+  if lease.response.state != rpc_messages.LeaseRequestState.UNTRIAGED:
     logging.warning('LeaseRequest no longer untriaged:\n%s', lease)
     return False
 
   logging.info('Leasing CatalogMachineEntry:\n%s', machine)
   lease.leased_ts = utils.utcnow()
   lease.machine_id = machine.key.id()
-  lease.state = models.LeaseRequestStates.FULFILLED
+  lease.response.hostname = machine.dimensions.hostname
+  lease.response.state = rpc_messages.LeaseRequestState.FULFILLED
   machine.lease_id = lease.key.id()
   machine.lease_expiration_ts = lease.leased_ts + datetime.timedelta(
       seconds=lease.request.duration,
@@ -110,9 +111,9 @@ def lease_machine(machine_key, lease):
   machine.state = models.CatalogMachineEntryStates.LEASED
   ndb.put_multi([lease, machine])
   params = {
-      'lease_id': lease.key.id(),
-      'lease_json': protojson.encode_message(lease.request),
-      'machine_id': machine.key.id(),
+      'policies': protojson.encode_message(machine.policies),
+      'request_json': protojson.encode_message(lease.request),
+      'response_json': protojson.encode_message(lease.response),
       'machine_project': machine.pubsub_topic_project,
       'machine_topic': machine.pubsub_topic,
   }
@@ -150,14 +151,14 @@ def provide_capacity(capacity_key, lease):
   if capacity.count == 0:
     logging.warning('CatalogCapacityEntry no longer available:\n%s', capacity)
     return False
-  if lease.state != models.LeaseRequestStates.UNTRIAGED:
+  if lease.response.state != rpc_messages.LeaseRequestState.UNTRIAGED:
     logging.warning('LeaseRequest no longer untriaged:\n%s', lease)
     return False
 
   logging.info('Preparing CatalogCapacityEntry:\n%s', capacity)
   capacity.count -= 0
   capacity.put()
-  lease.state = models.LeaseRequest.States.PENDING
+  lease.response.state = rpc_messages.LeaseRequestState.PENDING
   lease.put()
   return True
   # TODO: Contact the backend to provision this capacity.
@@ -215,7 +216,9 @@ def reclaim_machine(machine_key, reclamation_ts):
 
   logging.info('Reclaiming CatalogMachineEntry:\n%s', machine)
   lease = models.LeaseRequest.get_by_id(machine.lease_id)
+  hostname = lease.response.hostname
   lease.machine_id = None
+  lease.response.hostname = None
   machine.lease_id = None
   machine.lease_expiration_ts = None
 
@@ -244,11 +247,10 @@ def reclaim_machine(machine_key, reclamation_ts):
     ndb.put_multi([lease, machine])
 
   params = {
-      'backend_project': machine.policies.backend_project,
-      'backend_topic': machine.policies.backend_topic,
-      'hostname': machine.dimensions.hostname,
-      'lease_id': lease.key.id(),
-      'machine_id': machine.key.id(),
+      'hostname': hostname,
+      'policies': protojson.encode_message(machine.policies),
+      'request_json': protojson.encode_message(lease.request),
+      'response_json': protojson.encode_message(lease.response),
   }
   backend_attributes = {}
   for attribute in machine.policies.backend_attributes:

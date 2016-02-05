@@ -18,6 +18,43 @@ from components.machine_provider import rpc_messages
 import models
 
 
+def maybe_notify_backend(message, hostname, policies):
+  """Informs the backend of the status of a request if there's a Pub/Sub topic.
+
+  Args:
+    message: The message string to send.
+    hostname: The hostname of the machine this message concerns.
+    policies: A dict representation of an rpc_messages.Policies instance.
+  """
+  if policies.get('backend_topic'):
+    attributes = {
+        attribute['key']: attribute['value']
+        for attribute in policies['backend_attributes']
+    }
+    attributes['hostname'] = hostname
+    pubsub.publish(
+        pubsub.full_topic_name(
+            policies['backend_project'], policies['backend_topic']),
+        message,
+        attributes,
+    )
+
+
+def maybe_notify_lessee(request, response):
+  """Informs the lessee of the status of a request if there's a Pub/Sub topic.
+
+  Args:
+    request: A dict representation of an rpc_messages.LeaseRequest instance.
+    response: A dict representation of an rpc_messages.LeaseResponse instance.
+  """
+  if request.get('pubsub_topic'):
+    pubsub.publish(
+        pubsub.full_topic_name(
+            request['pubsub_project'], request['pubsub_topic']),
+        json.dumps(response),
+    )
+
+
 class LeaseRequestFulfiller(webapp2.RequestHandler):
   """Worker for fulfilling lease requests."""
 
@@ -26,39 +63,32 @@ class LeaseRequestFulfiller(webapp2.RequestHandler):
     """Fulfill a lease request.
 
     Params:
-      lease_id: ID of the LeaseRequest being fulfilled.
-      lease_json: JSON-encoded string representation of the
-        rpc_messages.LeaseRequest being fulfilled.
-      machine_id: ID of the CatalogMachineEntry fulfilling the LeaseRequest.
       machine_project: Project that the machine communication topic is contained
         in.
       machine_topic: Topic that the machine communication should occur on.
+      policies: JSON-encoded string representation of the
+        rpc_messages.Policies governing this machine.
+      request_json: JSON-encoded string representation of the
+        rpc_messages.LeaseRequest being fulfilled.
+      response_json: JSON-encoded string representation of the
+        rpc_messages.LeaseResponse being delivered.
     """
-    lease_id = self.request.get('lease_id')
-    lease_json = json.loads(self.request.get('lease_json'))
-    machine_id = self.request.get('machine_id')
     machine_project = self.request.get('machine_project')
     machine_topic = self.request.get('machine_topic')
+    policies = json.loads(self.request.get('policies'))
+    request = json.loads(self.request.get('request_json'))
+    response = json.loads(self.request.get('response_json'))
 
-    if lease_json.get('pubsub_topic'):
-      pubsub.publish(
-          pubsub.full_topic_name(
-              lease_json['pubsub_project'],
-              lease_json['pubsub_topic'],
-          ),
-          'FULFILLED',
-          {
-              'machine_id': machine_id,
-              'request_hash': lease_id,
-          },
-      )
+    maybe_notify_backend('LEASED', response['hostname'], policies)
+    maybe_notify_lessee(request, response)
 
-    if lease_json.get('on_lease', {}).get('swarming_server'):
+    # Inform the machine.
+    if request.get('on_lease', {}).get('swarming_server'):
       pubsub.publish(
           pubsub.full_topic_name(machine_project, machine_topic),
           'CONNECT',
           {
-              'swarming_server': lease_json['on_lease']['swarming_server'],
+              'swarming_server': request['on_lease']['swarming_server'],
           },
       )
 
@@ -71,47 +101,21 @@ class MachineReclaimer(webapp2.RequestHandler):
     """Reclaim a machine.
 
     Params:
-      backend_project: If specified, project that the machine reclamation
-        topic is contained in for the backend.
-      backend_attributes: If specified, JSON-encoded dict of attributes to
-        include in the machine reclamation message for the backend.
-      backend_topic: If specified, topic that the machine reclamation should
-        be published to for the backend.
-      hostname: Hostname being reclaimed.
-      lease_id: ID of the LeaseRequest the machine was leased for.
-      lessee_project: If specified, project that the machine reclamation and
-        lease expiration topic is contained in.
-      lessee_topic: If specified, topic that the machine reclamation and lease
-        expiration should be published to for the lessee.
-      machine_id: ID of the CatalogMachineEntry being reclaimed.
+      hostname: Hostname of the machine being reclaimed.
+      policies: JSON-encoded string representation of the
+        rpc_messages.Policies governing this machine.
+      request_json: JSON-encoded string representation of the
+        rpc_messages.LeaseRequest being fulfilled.
+      response_json: JSON-encoded string representation of the
+        rpc_messages.LeaseResponse being delivered.
     """
-    backend_attributes = json.loads(self.request.get('backend_attributes', {}))
-    backend_project = self.request.get('backend_project')
-    backend_topic = self.request.get('backend_topic')
     hostname = self.request.get('hostname')
-    lease_id = self.request.get('lease_id')
-    lessee_project = self.request.get('lessee_project')
-    lessee_topic = self.request.get('lessee_topic')
-    machine_id = self.request.get('machine_id')
+    policies = json.loads(self.request.get('policies'))
+    request = json.loads(self.request.get('request_json'))
+    response = json.loads(self.request.get('response_json'))
 
-    if lessee_topic:
-      pubsub.publish(
-          pubsub.full_topic_name(lessee_project, lessee_topic),
-          'RECLAIMED',
-          {
-              'machine_id': machine_id,
-              'request_hash': lease_id,
-          },
-    )
-
-    if backend_topic:
-      attributes = backend_attributes.copy()
-      attributes['hostname'] = hostname
-      pubsub.publish(
-          pubsub.full_topic_name(backend_project, backend_topic),
-          'RECLAIMED',
-          attributes,
-    )
+    maybe_notify_backend('RECLAIMED', hostname, policies)
+    maybe_notify_lessee(request, response)
 
 
 @ndb.transactional

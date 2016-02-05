@@ -131,6 +131,18 @@ class LeaseRequestError(messages.Enum):
   TRANSIENT_ERROR = 6
 
 
+class LeaseRequestState(messages.Enum):
+  """Represents the state of a LeaseRequest."""
+  # LeaseRequest has been received, but not processed yet.
+  UNTRIAGED = 0
+  # LeaseRequest is pending provisioning of additional capacity.
+  PENDING = 1
+  # LeaseRequest has been fulfilled.
+  FULFILLED = 2
+  # LeaseRequest has been denied.
+  DENIED = 3
+
+
 class LeaseResponse(messages.Message):
   """Represents a response to a LeaseRequest."""
   # SHA-1 identifying the LeaseRequest this response refers to.
@@ -140,6 +152,10 @@ class LeaseResponse(messages.Message):
   error = messages.EnumField(LeaseRequestError, 2)
   # Request ID used by the client to generate the LeaseRequest.
   client_request_id = messages.StringField(3, required=True)
+  # State of the LeaseRequest.
+  state = messages.EnumField(LeaseRequestState, 4)
+  # Hostname of the machine available for this request.
+  hostname = messages.StringField(5)
 
 
 class BatchedLeaseResponse(messages.Message):

@@ -382,6 +382,7 @@ class MachineProviderEndpoints(remote.Service):
       response = rpc_messages.LeaseResponse(
           client_request_id=request.request_id,
           request_hash=request_hash,
+          state=rpc_messages.LeaseRequestState.UNTRIAGED,
       )
       models.LeaseRequest(
           deduplication_checksum=deduplication_checksum,
@@ -389,7 +390,6 @@ class MachineProviderEndpoints(remote.Service):
           owner=auth.get_current_identity(),
           request=request,
           response=response,
-          state=models.LeaseRequestStates.UNTRIAGED,
       ).put()
       logging.info('Sending LeaseResponse:\n%s', response)
       return response
