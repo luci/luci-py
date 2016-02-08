@@ -251,8 +251,7 @@ def main():
             attributes.get('swarming_server'), 'bot_code'))
         with open(SWARMING_BOT_ZIP, 'w') as fd:
           shutil.copyfileobj(bot_code, fd)
-        # Make swarming_bot.zip readable/executable by everyone.
-        os.chmod(SWARMING_BOT_ZIP, 0755)
+        os.chown(SWARMING_BOT_ZIP, chrome_bot.pw_uid, chrome_bot.pw_gid)
 
         pubsub.acknowledge(subscription, project, ack_ids)
         subprocess.check_call(['/sbin/shutdown', '-r', 'now'])
