@@ -15,7 +15,6 @@ from google.appengine.api import users
 import acl
 import config
 import gcs
-import handlers_api
 import mapreduce_jobs
 import model
 import stats
@@ -303,13 +302,8 @@ def create_application(debug):
 
   The basic layouts is as follow:
   - /restricted/.* requires being an instance administrator.
-  - /content/.* has the public HTTP API.
   - /stats/.* has statistics.
   """
   acl.bootstrap()
   template.bootstrap()
-
-  routes = get_routes()
-  routes.extend(handlers_api.get_routes())
-
-  return webapp2.WSGIApplication(routes, debug=debug)
+  return webapp2.WSGIApplication(get_routes(), debug=debug)

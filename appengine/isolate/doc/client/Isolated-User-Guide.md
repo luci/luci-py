@@ -52,9 +52,6 @@ cache, to speed up repetitive downloads.
 #### Web
 
   - Browsing any file via `https://host/browse`.
-  - Point your web browser at
-    `https://host/content/retrieve/default-gzip/<hash_of_the_file>` to download
-    a single file from there.
 
 
 ### Running an isolated test

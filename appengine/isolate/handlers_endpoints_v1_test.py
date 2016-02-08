@@ -54,7 +54,7 @@ def generate_digest(content):
     content: the content to be hashed
 
   Returns:
-    a Digest corresponding to the content/ namespace pair
+    a Digest corresponding to the namespace pair
   """
   return handlers_endpoints_v1.Digest(
       digest=hash_content(content), size=len(content))
@@ -90,7 +90,7 @@ def preupload_status_to_request(preupload_status, content):
 validate = handlers_endpoints_v1.TokenSigner.validate
 
 
-def pad_string(string, size=handlers_endpoints_v1.MIN_SIZE_FOR_DIRECT_GS):
+def pad_string(string, size=handlers_endpoints_v1.MIN_SIZE_FOR_GS):
   return string + '0' * (size - len(string))
 
 

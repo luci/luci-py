@@ -29,8 +29,8 @@ from components import utils
 import acl
 import config
 import gcs
-from handlers_api import hash_content
-from handlers_api import MIN_SIZE_FOR_DIRECT_GS
+from handlers_endpoints_v1 import hash_content
+from handlers_endpoints_v1 import MIN_SIZE_FOR_GS
 import model
 import stats
 
@@ -431,7 +431,7 @@ class IsolateServiceV2(remote.Service):
     if digest.is_isolated and digest.size <= model.MAX_MEMCACHE_ISOLATED:
       return False
     # All other large enough files go through GS.
-    return digest.size >= MIN_SIZE_FOR_DIRECT_GS
+    return digest.size >= MIN_SIZE_FOR_GS
 
   @property
   def gs_url_signer(self):

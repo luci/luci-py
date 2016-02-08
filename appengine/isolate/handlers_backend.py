@@ -262,8 +262,10 @@ class InternalCleanupTriggerHandler(webapp2.RequestHandler):
 
 
 class InternalTagWorkerHandler(webapp2.RequestHandler):
-  """Tags .expiration_ts and .next_tag_ts for ContentEntry tested for with
-  /content/contains.
+  """Tags hot ContentEntry entities that were tested for presence.
+
+  Updates .expiration_ts and .next_tag_ts in ContentEntry to note that a client
+  tagged them.
 
   This makes sure they are not evicted from the LRU cache too fast.
   """

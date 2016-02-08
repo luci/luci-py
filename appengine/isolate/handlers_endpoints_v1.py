@@ -29,10 +29,13 @@ from components import utils
 import acl
 import config
 import gcs
-from handlers_api import hash_content
-from handlers_api import MIN_SIZE_FOR_DIRECT_GS
 import model
 import stats
+
+
+# The minimum size, in bytes, an entry must be before it gets stored in Google
+# Cloud Storage, otherwise it is stored as a blob property.
+MIN_SIZE_FOR_GS = 501
 
 
 ### Request Types
@@ -141,6 +144,26 @@ def entry_key_or_error(namespace, digest):
     return model.get_entry_key(namespace, digest)
   except ValueError as error:
     raise endpoints.BadRequestException(error.message)
+
+
+def hash_content(content, namespace):
+  """Decompresses and hashes given |content|.
+
+  Returns tuple (hex digest, expanded size).
+
+  Raises ValueError in case of errors.
+  """
+  expanded_size = 0
+  digest = hashlib.sha1()
+  try:
+    for data in model.expand_content(namespace, [content]):
+      expanded_size += len(data)
+      digest.update(data)
+      # Make sure the data is GC'ed.
+      del data
+    return digest.hexdigest(), expanded_size
+  except zlib.error as e:
+    raise ValueError('Data is corrupted: %s' % e)
 
 
 ### API
@@ -441,7 +464,7 @@ class IsolateService(remote.Service):
     if digest.is_isolated and digest.size <= model.MAX_MEMCACHE_ISOLATED:
       return False
     # All other large enough files go through GS.
-    return digest.size >= MIN_SIZE_FOR_DIRECT_GS
+    return digest.size >= MIN_SIZE_FOR_GS
 
   @property
   def gs_url_signer(self):

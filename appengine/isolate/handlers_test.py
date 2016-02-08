@@ -123,9 +123,7 @@ class MainTest(test_case.TestCase):
 
   @staticmethod
   def gen_content(namespace='default', content='Foo'):
-    h = hashlib.sha1()
-    h.update(content)
-    hashhex = h.hexdigest()
+    hashhex = hashlib.sha1(content).hexdigest()
     key = model.get_entry_key(namespace, hashhex)
     model.new_content_entry(
         key,

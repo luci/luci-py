@@ -265,18 +265,8 @@ misses lower, the batches are larger.
 #### URL endpoints
 
 The number of supported requests is designed to be limited for its specific
-intended use case:
-  - `/content/generate_blobstore_url/<namespace>/<hashkey>` POST request to work
-    around AppEngine limitation to store large objects. Creates and returns a
-    temporary url endpoint to be used to store a large object.
-  - `/content/retrieve/<namespace>/<hashkey>` GET request to retrieve a single
-    object.
-  - `/content/store/<namespace>/<hashkey>` POST request to store a single small
-    object inline. Will store it in blobstore transparently if it is too large.
-  - `/content/contains/<namespace>` POST request with the payload a series of
-    consecutive hashes in binary form to be tested for. The result is a string
-    of binary values, byte 0 or 1, to signal the presence of each items in the
-    corresponding index.
+intended use case. See the current API by visiting a live instance with path
+`/_ah/api/explorer` to see the generated documentation.
 
 
 #### Comparison to a few off-the-shelf CAS solutions
