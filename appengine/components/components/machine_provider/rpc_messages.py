@@ -156,6 +156,8 @@ class LeaseResponse(messages.Message):
   state = messages.EnumField(LeaseRequestState, 4)
   # Hostname of the machine available for this request.
   hostname = messages.StringField(5)
+  # Timestamp indicating lease expiration seconds from epoch in UTC.
+  lease_expiration_ts = messages.IntegerField(6)
 
 
 class BatchedLeaseResponse(messages.Message):

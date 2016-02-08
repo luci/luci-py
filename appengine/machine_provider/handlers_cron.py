@@ -5,6 +5,7 @@
 """Cron jobs for processing lease requests."""
 
 import datetime
+import time
 import logging
 
 from google.appengine.api import taskqueue
@@ -101,13 +102,17 @@ def lease_machine(machine_key, lease):
 
   logging.info('Leasing CatalogMachineEntry:\n%s', machine)
   lease.leased_ts = utils.utcnow()
-  lease.machine_id = machine.key.id()
-  lease.response.hostname = machine.dimensions.hostname
-  lease.response.state = rpc_messages.LeaseRequestState.FULFILLED
-  machine.lease_id = lease.key.id()
-  machine.lease_expiration_ts = lease.leased_ts + datetime.timedelta(
+  lease_expiration_ts = lease.leased_ts + datetime.timedelta(
       seconds=lease.request.duration,
   )
+  lease.machine_id = machine.key.id()
+  lease.response.hostname = machine.dimensions.hostname
+  # datetime_to_timestamp returns microseconds, which are too fine grain.
+  lease.response.lease_expiration_ts = utils.datetime_to_timestamp(
+      lease_expiration_ts) / 1000 / 1000
+  lease.response.state = rpc_messages.LeaseRequestState.FULFILLED
+  machine.lease_id = lease.key.id()
+  machine.lease_expiration_ts = lease_expiration_ts
   machine.state = models.CatalogMachineEntryStates.LEASED
   ndb.put_multi([lease, machine])
   params = {

@@ -27,8 +27,8 @@ in terms of Machine Provider Dimensions (not to be confused with Swarming's own
 bot dimensions) as well as a target size which describes the number of machines
 of this type we want connected at once.
 
-handlers_backend.py calls get_lease_requests (below) to generate a number of
-lease requests equal to the target size minus the current number of active
+handlers_backend.py calls generate_lease_requests (below) to generate a number
+of lease requests equal to the target size minus the current number of active
 leases, then performs the RPC to send these requests to the Machine Provider,
 and finally it calls update_leases (below) with the results of the lease
 request to associate the new active leases with the machine type.
@@ -42,26 +42,23 @@ the result of the call. Therefore the procedure is broken up into two
 transactions with an RPC in between.
 
 With the transaction broken into two, the choice of request ID is the only way
-to prevents duplicate lease requests (e.g. if get_lease_requests runs twice
+to prevents duplicate lease requests (e.g. if generate_lease_requests runs twice
 before update_leases gets to run). Machine Provider supports idempotent RPCs
 so long as the client-generated request ID is the same.
 
-Therefore, we ensure get_lease_requests always generates lease requests with
-the same request ID until update_lease is called. This is done by keeping a
+Therefore, we ensure generate_lease_requests always generates lease requests
+with the same request ID until update_lease is called. This is done by keeping a
 count of the number of requests generated so far. If the request count is n,
-get_lease_requests will always generate requests with IDs n + 1, n + 2, ...
+generate_lease_requests will always generate requests with IDs n + 1, n + 2, ...
 up to n + target size - current size, where current size is the number of
 currently active lease requests.
 
-update_lease takes the RPC result and increments the request count and the
-current size by the number of requests.
+update_lease takes the RPC result and updates the pending request entries.
 
 TODO(smut): Consider request count overflow.
-
-TODO(smut): Check on the status of active lease requests, purge them when
-machines get reclaimed.
 """
 
+import datetime
 import logging
 
 from google.appengine.ext import ndb
@@ -75,8 +72,14 @@ class MachineLease(ndb.Model):
 
   Standalone MachineLease entities should not exist in the datastore.
   """
+  # Request ID used to generate this request.
+  client_request_id = ndb.StringProperty(required=True)
+  # Hostname of the machine currently allocated for this request.
+  hostname = ndb.StringProperty()
   # Request hash returned by the server for the request for this machine.
-  request_hash = ndb.StringProperty(required=True)
+  request_hash = ndb.StringProperty()
+  # DateTime indicating lease expiration time.
+  lease_expiration_ts = ndb.DateTimeProperty()
 
 
 class MachineType(ndb.Model):
@@ -108,8 +111,12 @@ class MachineType(ndb.Model):
 
 
 @ndb.transactional
-def get_lease_requests(machine_type_key, swarming_server):
-  """Returns a list of requests to lease machines up to the target.
+def generate_lease_requests(machine_type_key, swarming_server):
+  """Generates lease requests.
+
+  The list includes new requests to lease machines up to the targeted
+  size for the given machine type as well as requests to get the status
+  of pending lease requests.
 
   Args:
     machine_type_key: ndb.Key for a MachineType instance.
@@ -120,11 +127,15 @@ def get_lease_requests(machine_type_key, swarming_server):
   """
   machine_type = machine_type_key.get()
   if not machine_type:
-    logging.warning('MachineType no longer exists: %s', machine_type_key)
+    logging.warning('MachineType no longer exists: %s', machine_type_key.id())
     return []
+
+  lease_requests = _generate_lease_request_status_updates(
+      machine_type, swarming_server)
+
   if not machine_type.enabled:
-    logging.warning('MachineType is not enabled: %s', machine_type.key.id())
-    return []
+    logging.warning('MachineType is not enabled: %s\n', machine_type.key.id())
+    return lease_requests
   if machine_type.current_size >= machine_type.target_size:
     logging.info(
         'MachineType %s is at capacity: %d/%d',
@@ -132,8 +143,55 @@ def get_lease_requests(machine_type_key, swarming_server):
         machine_type.current_size,
         machine_type.target_size,
     )
-    return []
+    return lease_requests
 
+  new_requests = _generate_lease_requests_for_new_machines(
+      machine_type, swarming_server)
+
+  if new_requests:
+    machine_type.put()
+    lease_requests.extend(new_requests)
+
+  return lease_requests
+
+
+def _generate_lease_request_status_updates(machine_type, swarming_server):
+  """Generates status update requests for pending lease requests.
+
+  Args:
+    machine_type: MachineType instance.
+    swarming_server: URL for the Swarming server to connect to.
+
+  Returns:
+    A list of lease requests.
+  """
+  lease_requests = []
+  for request in machine_type.leases:
+    if not request.hostname:
+      # We don't know the hostname yet, meaning this request is still pending.
+      lease_requests.append(machine_provider.LeaseRequest(
+          dimensions=machine_type.mp_dimensions,
+          duration=machine_type.lease_duration_secs,
+          on_lease=machine_provider.Instruction(
+              swarming_server=swarming_server),
+          request_id=request.client_request_id,
+      ))
+  return lease_requests
+
+
+def _generate_lease_requests_for_new_machines(machine_type, swarming_server):
+  """Generates requests to lease machines up to the target.
+
+  Extends machine_type.leases by the number of new lease requests generated,
+  but does not write the result to the datastore.
+
+  Args:
+    machine_type: MachineType instance.
+    swarming_server: URL for the Swarming server to connect to.
+
+  Returns:
+    A list of lease requests.
+  """
   lease_requests = []
   request_number = machine_type.request_count
   for _ in xrange(machine_type.target_size - machine_type.current_size):
@@ -145,7 +203,8 @@ def get_lease_requests(machine_type_key, swarming_server):
         on_lease=machine_provider.Instruction(swarming_server=swarming_server),
         request_id=request_id,
     ))
-
+    machine_type.leases.append(MachineLease(client_request_id=request_id))
+  machine_type.request_count = request_number
   return lease_requests
 
 
@@ -162,41 +221,66 @@ def update_leases(machine_type_key, responses):
     logging.warning('MachineType no longer exists: %s', machine_type_key)
     return
 
-  lease_requests = []
-
-  # The request IDs should form a contiguous block starting at
-  # machine_type.request_count + 1 (see get_lease_requests, above).
-  request_ids = []
+  lease_request_map = {
+      request.client_request_id: request for request in machine_type.leases
+  }
   for response in responses.get('responses', []):
-    lease_requests.append(MachineLease(request_hash=response['request_hash']))
-    request_ids.append(int(response['client_request_id'].rsplit('-', 1)[-1]))
-  if request_ids:
-    request_ids = sorted(request_ids)
-    if machine_type.request_count + 1 == request_ids[0]:
-      logging.info(
-          'Advancing request_id for MachineType %s from %d to %d',
-          machine_type.key.id(),
-          machine_type.request_count,
-          request_ids[-1],
-      )
-      machine_type.leases.extend(lease_requests)
-      machine_type.request_count = request_ids[-1]
-      machine_type.put()
-    elif machine_type.request_count == request_ids[-1]:
-      # We already processed these responses. We probably had a cron job
-      # overrun which scheduled duplicate lease requests. Since the Machine
-      # Provider makes lease requests idempotent, just ignore the results.
-      logging.warning(
-          'Not advancing request_id for MachineType %s from %d to %d',
-          machine_type.key.id(),
-          machine_type.request_count,
-          request_ids[-1],
-      )
+    request_id = response['client_request_id']
+    request = lease_request_map.get(request_id)
+    if not request:
+      logging.error('Unknown request ID: %s', request_id)
+      continue
+
+    if response.get('error'):
+      error = machine_provider.LeaseRequestError.lookup_by_name(
+          response['error'])
+      if error in (
+          machine_provider.LeaseRequestError.DEADLINE_EXCEEDED,
+          machine_provider.LeaseRequestError.TRANSIENT_ERROR,
+      ):
+        # Retryable errors. Just try again later.
+        logging.warning(
+            'Request not processed, trying again later: %s', request_id)
+      else:
+        # TODO(smut): Handle specific errors.
+        logging.warning(
+            'Error %s for request ID %s',
+            response['error'],
+            request_id,
+        )
+        lease_request_map.pop(request_id)
     else:
-      logging.error(
-          'Unexpected request_id for MachineType %s: expected %d or %d, got %d',
-          machine_type.key.id(),
-          request_ids[0],
-          request_ids[-1],
-          machine_type.request_count,
-      )
+      request.request_hash = response['request_hash']
+      state = machine_provider.LeaseRequestState.lookup_by_name(
+          response['state'])
+      if state == machine_provider.LeaseRequestState.DENIED:
+        logging.warning('Request ID denied: %s', request_id)
+        lease_request_map.pop(request_id)
+      elif state == machine_provider.LeaseRequestState.FULFILLED:
+        if response.get('hostname'):
+          logging.info(
+              'Request ID %s fulfilled:\nHostname: %s\nExpiration: %s',
+              request_id,
+              response['hostname'],
+              response['lease_expiration_ts'],
+          )
+          request.hostname = response['hostname']
+          request.lease_expiration_ts = datetime.datetime.utcfromtimestamp(
+              int(response['lease_expiration_ts']))
+        else:
+          # Lease expired. This shouldn't happen, because it means we had a
+          # pending request which was fulfilled and expired before we were
+          # able to check its status.
+          logging.warning('Request ID fulfilled and expired: %s', request_id)
+          lease_request_map.pop(request_id)
+      else:
+        # Lease request isn't processed yet. Just try again later.
+        logging.info(
+            'Request ID %s in state: %s', request_id, response['state'])
+
+  # TODO(smut): Cleanup expired leases.
+  # Alternately we would release leases near expiration early.
+
+  machine_type.leases = sorted(
+      lease_request_map.values(), key=lambda lease: lease.client_request_id)
+  machine_type.put()

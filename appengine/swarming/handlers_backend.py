@@ -64,7 +64,7 @@ class CronMachineProviderBotHandler(webapp2.RequestHandler):
     # TODO(smut): Parallelize when there are lots of machine types.
     for machine_type_key in lease_management.MachineType.query().fetch(
         keys_only=True):
-      lease_requests = lease_management.get_lease_requests(
+      lease_requests = lease_management.generate_lease_requests(
           machine_type_key, swarming_server)
       if lease_requests:
         responses = machine_provider.lease_machines(lease_requests)
