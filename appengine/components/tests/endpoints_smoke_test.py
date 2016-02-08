@@ -65,20 +65,6 @@ class CloudEndpointsSmokeTest(unittest.TestCase):
     response = self.app.client.json_request(
         '/_ah/api/testing_service/v1/forbidden')
     self.assertEqual(403, response.http_code)
-    expected = {
-      u'error': {
-        u'code': 403,
-        u'errors': [
-          {
-            u'domain': u'global',
-            u'message': u'Forbidden',
-            u'reason': u'forbidden',
-          }
-        ],
-        u'message': u'Forbidden',
-      },
-    }
-    self.assertEqual(expected, response.body)
 
   def check_host_token(self):
     # Create token first.
