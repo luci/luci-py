@@ -163,3 +163,46 @@ class LeaseResponse(messages.Message):
 class BatchedLeaseResponse(messages.Message):
   """Represents a response to a batched lease request."""
   responses = messages.MessageField(LeaseResponse, 1, repeated=True)
+
+
+class LeaseReleaseRequest(messages.Message):
+  """Represents a request to voluntarily cancel a LeaseRequest."""
+  # Per-user unique ID used to identify the LeaseRequest.
+  request_id = messages.StringField(1, required=True)
+
+
+class BatchedLeaseReleaseRequest(messages.Message):
+  """Represents a batched set of lease release requests."""
+  requests = messages.MessageField(LeaseReleaseRequest, 1, repeated=True)
+
+
+class LeaseReleaseRequestError(messages.Enum):
+  """Represents an error in a LeaseReleaseRequest."""
+  # Request ID referred to non-existent request for this user.
+  NOT_FOUND = 1
+  # Request ID referred to an unfulfilled request.
+  NOT_FULFILLED = 2
+  # Request ID referred to a fulfilled request whose machine was
+  # already reclaimed.
+  ALREADY_RECLAIMED = 3
+  # Request couldn't be processed in time.
+  DEADLINE_EXCEEDED = 4
+  # Miscellaneous transient error.
+  TRANSIENT_ERROR = 5
+
+
+class LeaseReleaseResponse(messages.Message):
+  """Represents a response to a LeaseReleaseRequest."""
+  # SHA-1 identifying the LeaseRequest this response refers to.
+  request_hash = messages.StringField(1)
+  # LeaseReleaseRequestError indicating an error with the request, or None
+  # if there is no error.
+  error = messages.EnumField(LeaseReleaseRequestError, 2)
+  # Request ID used by the client to generate the LeaseRequest
+  # referred to by the LeaseReleaseRequest.
+  client_request_id = messages.StringField(3, required=True)
+
+
+class BatchedLeaseReleaseResponse(messages.Message):
+  """Represents responses to a batched set of lease release requests."""
+  responses = messages.MessageField(LeaseReleaseResponse, 1, repeated=True)

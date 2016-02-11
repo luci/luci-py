@@ -291,6 +291,53 @@ class MachineReclamationProcessor(webapp2.RequestHandler):
       reclaim_machine(machine_key, now)
 
 
+@ndb.transactional(xg=True)
+def release_lease(lease_key):
+  """Releases a lease on a machine.
+
+  Args:
+    lease_key: ndb.Key for a models.LeaseRequest entity.
+  """
+  lease = lease_key.get()
+  if not lease:
+    logging.warning('LeaseRequest not found: %s', lease_key)
+    return
+  if not lease.released:
+    logging.warning('LeaseRequest not released:\n%s', lease)
+    return
+
+  lease.released = False
+  if not lease.machine_id:
+    logging.warning('LeaseRequest has no associated machine:\n%s', lease)
+    lease.put()
+    return
+
+  machine = ndb.Key(models.CatalogMachineEntry, lease.machine_id).get()
+  if not machine:
+    logging.error('LeaseRequest has non-existent machine leased:\n%s', lease)
+    lease.put()
+    return
+
+  # Just expire the lease now and let MachineReclamationProcessor handle it.
+  logging.info('Expiring LeaseRequest:\n%s', lease)
+  now = utils.utcnow()
+  lease.response.lease_expiration_ts = utils.datetime_to_timestamp(
+      now) / 1000 / 1000
+  machine.lease_expiration_ts = now
+  ndb.put_multi([lease, machine])
+
+
+class LeaseReleaseProcessor(webapp2.RequestHandler):
+  """Worker for processing voluntary lease releases."""
+
+  @decorators.require_cronjob
+  def get(self):
+    for lease_key in models.LeaseRequest.query(
+        models.LeaseRequest.released == True,
+    ).fetch(keys_only=True):
+      release_lease(lease_key)
+
+
 @ndb.transactional
 def create_subscription(machine_key):
   """Creates a Cloud Pub/Sub subscription for machine communication.
@@ -358,5 +405,6 @@ def create_cron_app():
   return webapp2.WSGIApplication([
       ('/internal/cron/process-lease-requests', LeaseRequestProcessor),
       ('/internal/cron/process-machine-reclamations', MachineReclamationProcessor),
+      ('/internal/cron/process-lease-releases', LeaseReleaseProcessor),
       ('/internal/cron/process-new-machines', NewMachineProcessor),
   ])

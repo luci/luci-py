@@ -43,6 +43,8 @@ class LeaseRequest(ndb.Model):
   machine_id = ndb.StringProperty()
   # auth.model.Identity of the issuer of the original request.
   owner = auth.IdentityProperty(required=True)
+  # Whether this lease request has been released voluntarily by the owner.
+  released = ndb.BooleanProperty()
   # rpc_messages.LeaseRequest instance representing the original request.
   request = msgprop.MessageProperty(rpc_messages.LeaseRequest, required=True)
   # rpc_messages.LeaseResponse instance representing the current response.

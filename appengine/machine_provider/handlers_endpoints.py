@@ -279,11 +279,11 @@ class MachineProviderEndpoints(remote.Service):
       if (utils.utcnow() - start_time).seconds > DEADLINE_SECS:
         logging.warning(
           'BatchedLeaseRequest exceeded enforced deadline: %s', DEADLINE_SECS)
-        responses.append(
+        responses.append(rpc_messages.LeaseResponse(
             client_request_id=request.request_id,
             error=rpc_messages.LeaseRequestError.DEADLINE_EXCEEDED,
             request_hash=request_hash,
-        )
+        ))
       else:
         try:
           responses.append(self._lease(request, user, request_hash))
@@ -295,11 +295,11 @@ class MachineProviderEndpoints(remote.Service):
             runtime.apiproxy_errors.OverQuotaError,
         ) as e:
           logging.warning('Exception processing LeaseRequest:\n%s', e)
-          responses.append(
+          responses.append(rpc_messages.LeaseResponse(
               client_request_id=request.request_id,
               error=rpc_messages.LeaseRequestError.TRANSIENT_ERROR,
               request_hash=request_hash,
-          )
+          ))
     return rpc_messages.BatchedLeaseResponse(responses=responses)
 
   @auth.endpoints_method(rpc_messages.LeaseRequest, rpc_messages.LeaseResponse)
@@ -393,6 +393,119 @@ class MachineProviderEndpoints(remote.Service):
       ).put()
       logging.info('Sending LeaseResponse:\n%s', response)
       return response
+
+  @auth.endpoints_method(
+      rpc_messages.BatchedLeaseReleaseRequest,
+      rpc_messages.BatchedLeaseReleaseResponse,
+  )
+  @auth.require(acl.can_issue_lease_requests)
+  def batched_release(self, request):
+    """Handles an incoming BatchedLeaseReleaseRequest.
+
+    Batches are intended to save on RPCs only. The batched requests will not
+    execute transactionally.
+    """
+    # TODO(smut): Dedupe common logic in batched RPC handling.
+    DEADLINE_SECS = 30
+    start_time = utils.utcnow()
+    user = auth.get_current_identity().to_bytes()
+    logging.info(
+        'Received BatchedLeaseReleaseRequest:\nUser: %s\n%s', user, request)
+    responses = []
+    for request in request.requests:
+      request_hash = models.LeaseRequest.generate_key(user, request).id()
+      logging.info(
+          'Processing LeaseReleaseRequest:\nRequest hash: %s\n%s',
+          request_hash,
+          request,
+      )
+      if (utils.utcnow() - start_time).seconds > DEADLINE_SECS:
+        logging.warning(
+          'BatchedLeaseReleaseRequest exceeded enforced deadline: %s',
+          DEADLINE_SECS,
+        )
+        responses.append(rpc_messages.LeaseReleaseResponse(
+            client_request_id=request.request_id,
+            error=rpc_messages.LeaseReleaseRequestError.DEADLINE_EXCEEDED,
+            request_hash=request_hash,
+        ))
+      else:
+        try:
+          responses.append(rpc_messages.LeaseReleaseResponse(
+              client_request_id=request.request_id,
+              error=self._release(request_hash),
+              request_hash=request_hash,
+          ))
+        except (
+            datastore_errors.NotSavedError,
+            datastore_errors.Timeout,
+            runtime.apiproxy_errors.CancelledError,
+            runtime.apiproxy_errors.DeadlineExceededError,
+            runtime.apiproxy_errors.OverQuotaError,
+        ) as e:
+          logging.warning('Exception processing LeaseReleaseRequest:\n%s', e)
+          responses.append(rpc_messages.LeaseReleaseResponse(
+              client_request_id=request.request_id,
+              error=rpc_messages.LeaseReleaseRequestError.TRANSIENT_ERROR,
+              request_hash=request_hash,
+          ))
+    return rpc_messages.BatchedLeaseReleaseResponse(responses=responses)
+
+  @auth.endpoints_method(
+      rpc_messages.LeaseReleaseRequest, rpc_messages.LeaseReleaseResponse)
+  @auth.require(acl.can_issue_lease_requests)
+  def release(self, request):
+    """Handles an incoming LeaseReleaseRequest."""
+    user = auth.get_current_identity().to_bytes()
+    request_hash = models.LeaseRequest.generate_key(user, request).id()
+    logging.info(
+        'Received LeaseReleaseRequest:\nUser: %s\nLeaseRequest: %s\n%s',
+        user,
+        request_hash,
+        request,
+    )
+    return rpc_messages.LeaseReleaseResponse(
+        client_request_id=request.request_id,
+        error=self._release(request_hash),
+        request_hash=request_hash,
+    )
+
+  @staticmethod
+  @ndb.transactional
+  def _release(request_hash):
+    """Releases a LeaseRequest.
+
+    Args:
+      request_hash: ID of a models.LeaseRequest entity in the datastore to
+        release.
+
+    Returns:
+      rpc_messages.LeaseReleaseRequestError indicating an error that occurred,
+      or None if there was no error and the lease was released successfully.
+    """
+    request = ndb.Key(models.LeaseRequest, request_hash).get()
+    if not request:
+      logging.warning(
+          'LeaseReleaseRequest referred to non-existent LeaseRequest: %s',
+          request_hash,
+      )
+      return rpc_messages.LeaseReleaseRequestError.NOT_FOUND
+    if request.response.state != rpc_messages.LeaseRequestState.FULFILLED:
+      logging.warning(
+          'LeaseReleaseRequest referred to unfulfilled LeaseRequest: %s',
+          request_hash,
+      )
+      return rpc_messages.LeaseReleaseRequestError.NOT_FULFILLED
+      # TODO(smut): Cancel the request.
+    if not request.machine_id:
+      logging.warning(
+          'LeaseReleaseRequest referred to already reclaimed LeaseRequest: %s',
+          request_hash,
+      )
+      return rpc_messages.LeaseReleaseRequestError.ALREADY_RECLAIMED
+    logging.info('Releasing LeaseRequest: %s', request_hash)
+    request.released = True
+    request.put()
 
 
 def create_endpoints_app():

@@ -1,6 +1,8 @@
 cron:
 - url: /internal/cron/process-lease-requests
   schedule: every 1 minutes
+- url: /internal/cron/process-lease-releases
+  schedule: every 1 minutes
 - url: /internal/cron/process-machine-reclamations
   schedule: every 1 minutes
 - url: /internal/cron/process-new-machines
