@@ -65,6 +65,7 @@ from google.appengine.ext import ndb
 from google.appengine.ext.ndb import msgprop
 
 from components import machine_provider
+from components import utils
 
 
 class MachineLease(ndb.Model):
@@ -130,6 +131,7 @@ def generate_lease_requests(machine_type_key, swarming_server):
     logging.warning('MachineType no longer exists: %s', machine_type_key.id())
     return []
 
+  expired_requests = _clean_up_expired_leases(machine_type)
   lease_requests = _generate_lease_request_status_updates(
       machine_type, swarming_server)
 
@@ -148,11 +150,42 @@ def generate_lease_requests(machine_type_key, swarming_server):
   new_requests = _generate_lease_requests_for_new_machines(
       machine_type, swarming_server)
 
-  if new_requests:
+  if new_requests or expired_requests:
     machine_type.put()
     lease_requests.extend(new_requests)
 
   return lease_requests
+
+
+def _clean_up_expired_leases(machine_type):
+  """Cleans up expired leases.
+
+  Prunes expired leases from machine_type.leases,
+  but does not write the result to the datastore.
+
+  Args:
+    machine_type: MachineType instance.
+
+  Returns:
+    A list of leases that were removed.
+  """
+  active = []
+  expired = []
+
+  for request in machine_type.leases:
+    if request.hostname and request.lease_expiration_ts <= utils.utcnow():
+      logging.warning(
+          'Request ID %s expired:\nHostname: %s\nExpiration: %s',
+          request.client_request_id,
+          request.hostname,
+          request.lease_expiration_ts,
+      )
+      expired.append(request)
+    else:
+      active.append(request)
+
+  machine_type.leases = active
+  return expired
 
 
 def _generate_lease_request_status_updates(machine_type, swarming_server):
@@ -277,9 +310,6 @@ def update_leases(machine_type_key, responses):
         # Lease request isn't processed yet. Just try again later.
         logging.info(
             'Request ID %s in state: %s', request_id, response['state'])
-
-  # TODO(smut): Cleanup expired leases.
-  # Alternately we would release leases near expiration early.
 
   machine_type.leases = sorted(
       lease_request_map.values(), key=lambda lease: lease.client_request_id)
