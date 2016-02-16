@@ -38,6 +38,14 @@ PROTOCOL = 0x01
 DeviceIsAvailable = common.InterfaceMatcher(CLASS, SUBCLASS, PROTOCOL)
 
 
+try:
+  # Imported locally to keep compatibility with previous code.
+  from sign_m2crypto import M2CryptoSigner
+except ImportError:
+  # Ignore this error when M2Crypto is not installed, there are other options.
+  pass
+
+
 class AdbCommands(object):
   """Exposes adb-like methods for use.
 

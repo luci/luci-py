@@ -31,10 +31,10 @@ import threading
 import time
 
 
-from adb import adb_commands_safe
 from adb import common
-from adb import parallel
 from adb import sign_pythonrsa
+from adb.contrib import adb_commands_safe
+from adb.contrib import parallel
 
 
 ### Private stuff.

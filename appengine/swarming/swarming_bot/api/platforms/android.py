@@ -13,10 +13,10 @@ import logging
 import os
 
 
-from adb import adb_commands_safe
 from adb import adb_protocol
 from adb import common
-from adb import high
+from adb.contrib import adb_commands_safe
+from adb.contrib import high
 
 
 # Master switch that can easily be temporarily increased to INFO or even DEBUG

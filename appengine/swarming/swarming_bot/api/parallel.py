@@ -4,4 +4,4 @@
 
 """Kept for compatibility."""
 
-from adb.parallel import pmap
+from adb.contrib.parallel import pmap

@@ -179,18 +179,16 @@ FILES = (
     'utils/threading_utils.py',
     'utils/tools.py',
     'utils/zip_package.py',
-
-    # TODO(maruel): Find a way to only include these on linux platforms but it's
-    # not that large so it is not a big deal.
     'adb/__init__.py',
     'adb/adb_commands.py',
-    'adb/adb_commands_safe.py',
     'adb/adb_protocol.py',
     'adb/common.py',
+    'adb/contrib/__init__.py',
+    'adb/contrib/adb_commands_safe.py',
+    'adb/contrib/high.py',
+    'adb/contrib/parallel.py',
     'adb/fastboot.py',
     'adb/filesync_protocol.py',
-    'adb/high.py',
-    'adb/parallel.py',
     'adb/sign_pythonrsa.py',
     'adb/usb_exceptions.py',
     'python_libusb1/__init__.py',
