@@ -444,13 +444,18 @@ class SwarmingBotService(remote.Service):
       BotId, swarming_rpcs.TerminateResponse,
       name='terminate',
       path='{bot_id}/terminate')
-  @auth.require(acl.is_bot_or_admin)
+  @auth.require(acl.is_bot_or_privileged_user)
   def terminate(self, request):
     """Asks a bot to terminate itself gracefully.
 
     The bot will stay in the DB, use 'delete' to remove it from the DB
     afterward. This request returns a pseudo-taskid that can be waited for to
     wait for the bot to turn down.
+
+    This command is particularly useful when a privileged user needs to safely
+    debug a machine specific issue. The user can trigger a terminate for one of
+    the bot exhibiting the issue, wait for the pseudo-task to run then access
+    the machine with the guarantee that the bot is not running anymore.
     """
     # TODO(maruel): Disallow a terminate task when there's one currently
     # pending or if the bot is considered 'dead', e.g. no contact since 10
