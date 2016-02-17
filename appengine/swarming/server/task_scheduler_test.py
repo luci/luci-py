@@ -90,7 +90,7 @@ def _quick_reap():
   request = task_request.make_request(data, True)
   _result_summary = task_scheduler.schedule_request(request)
   reaped_request, run_result = task_scheduler.bot_reap_task(
-      {'OS': 'Windows-3.1.1'}, 'localhost', 'abc')
+      {'OS': 'Windows-3.1.1'}, 'localhost', 'abc', None)
   return run_result
 
 
@@ -151,10 +151,43 @@ class TaskSchedulerApiTest(test_case.TestCase):
       u'foo': u'bar',
     }
     actual_request, run_result  = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost', 'abc')
+        bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(request, actual_request)
     self.assertEqual('localhost', run_result.bot_id)
     self.assertEqual(None, task_to_run.TaskToRun.query().get().queue_number)
+
+  def test_bot_reap_task_not_enough_time(self):
+    data = _gen_request(
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+    request = task_request.make_request(data, True)
+    _result_summary = task_scheduler.schedule_request(request)
+    bot_dimensions = {
+      u'OS': [u'Windows', u'Windows-3.1.1'],
+      u'hostname': u'localhost',
+      u'foo': u'bar',
+    }
+    actual_request, run_result  = task_scheduler.bot_reap_task(
+        bot_dimensions, 'localhost', 'abc', 0)
+    self.failIf(actual_request)
+    self.failIf(run_result)
+    self.failUnless(task_to_run.TaskToRun.query().get().queue_number)
+
+  def test_bot_reap_task_enough_time(self):
+    data = _gen_request(
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+    request = task_request.make_request(data, True)
+    _result_summary = task_scheduler.schedule_request(request)
+    bot_dimensions = {
+      u'OS': [u'Windows', u'Windows-3.1.1'],
+      u'hostname': u'localhost',
+      u'foo': u'bar',
+    }
+    actual_request, run_result  = task_scheduler.bot_reap_task(
+        bot_dimensions, 'localhost', 'abc',
+        utils.time_time() + 86400 + 600 + 3 * 30 + 10 + 1)
+    self.assertEqual(request, actual_request)
+    self.assertEqual('localhost', run_result.bot_id)
+    self.failIf(task_to_run.TaskToRun.query().get().queue_number)
 
   def test_exponential_backoff(self):
     self.mock(
@@ -215,7 +248,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       u'foo': u'bar',
     }
     actual_request, run_result = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost', 'abc')
+        bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(request, actual_request)
     self.assertEqual('localhost', run_result.bot_id)
     self.assertEqual(None, task_to_run.TaskToRun.query().get().queue_number)
@@ -242,7 +275,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     }
     self.assertEqual(None, task_to_run.TaskToRun.query().get().queue_number)
     actual_request_2, run_result_2 = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost', 'abc')
+        bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(None, actual_request_2)
     result_summary_duped, run_results_duped = get_results(request.key)
     expected = {
@@ -388,7 +421,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       u'foo': u'bar',
     }
     actual_request, run_result = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost', 'abc')
+        bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(request, actual_request)
     self.assertEqual('localhost', run_result.bot_id)
     self.assertEqual(None, task_to_run.TaskToRun.query().get().queue_number)
@@ -464,7 +497,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.mock_now(reaped_ts)
     bot_dimensions = {u'OS': u'Windows-3.1.1'}
     reaped_request, run_result = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost', 'abc')
+        bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(request, reaped_request)
     self.assertTrue(run_result)
     result_summary, run_results = get_results(request.key)
@@ -594,7 +627,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     _result_summary = task_scheduler.schedule_request(request)
     bot_dimensions = {'OS': 'Windows-3.1.1'}
     reaped_request, run_result = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost', 'abc')
+        bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(request, reaped_request)
     self.assertEqual(
         (True, True),
@@ -715,7 +748,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       u'foo': u'bar',
     }
     _, run_result = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost', 'abc')
+        bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual('localhost', run_result.bot_id)
 
     # Attempt to terminate the task with success, but make PubSub call fail.
@@ -743,7 +776,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     result_summary = task_scheduler.schedule_request(request)
     bot_dimensions = {'OS': 'Windows-3.1.1'}
     reaped_request, run_result = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost', 'abc')
+        bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(
         (True, True),
         task_scheduler.bot_update_task(
@@ -816,7 +849,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         True)
     result_summary = task_scheduler.schedule_request(request)
     reaped_request, run_result = task_scheduler.bot_reap_task(
-        {'OS': 'Windows-3.1.1'}, 'localhost', 'abc')
+        {'OS': 'Windows-3.1.1'}, 'localhost', 'abc', None)
 
     self.assertEqual(
         None, task_scheduler.bot_kill_task(run_result.key, 'localhost'))
@@ -878,7 +911,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     request = task_request.make_request(data, True)
     result_summary = task_scheduler.schedule_request(request)
     reaped_request, run_result = task_scheduler.bot_reap_task(
-        {'OS': 'Windows-3.1.1'}, 'localhost', 'abc')
+        {'OS': 'Windows-3.1.1'}, 'localhost', 'abc', None)
     expected = (
       'Bot bot1 sent task kill for task 1d69b9f088008811 owned by bot '
       'localhost')
@@ -907,7 +940,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     request = task_request.make_request(data, True)
     result_summary = task_scheduler.schedule_request(request)
     reaped_request, run_result = task_scheduler.bot_reap_task(
-        {'OS': 'Windows-3.1.1'}, 'localhost', 'abc')
+        {'OS': 'Windows-3.1.1'}, 'localhost', 'abc', None)
     ok, was_running = task_scheduler.cancel_task(result_summary.key)
     self.assertEqual(False, ok)
     self.assertEqual(True, was_running)
@@ -978,7 +1011,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       u'foo': u'bar',
     }
     _request, run_result = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost', 'abc')
+        bot_dimensions, 'localhost', 'abc', None)
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
     self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died('f.local'))
     self.assertEqual(task_result.State.BOT_DIED, run_result.key.get().state)
@@ -1044,7 +1077,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       u'foo': u'bar',
     }
     _request, run_result = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost', 'abc')
+        bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(task_result.State.RUNNING, run_result.state)
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
@@ -1107,7 +1140,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     # Task was retried.
     now_2 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 2)
     _request, run_result = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost-second', 'abc')
+        bot_dimensions, 'localhost-second', 'abc', None)
     logging.info('%s', [t.to_dict() for t in task_to_run.TaskToRun.query()])
     self.assertEqual(2, run_result.try_number)
     self.assertEqual(
@@ -1164,7 +1197,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       u'foo': u'bar',
     }
     _request, run_result = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost', 'abc')
+        bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(task_result.State.RUNNING, run_result.state)
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
@@ -1224,7 +1257,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     # Task was retried but the same bot polls again, it's denied the task.
     now_2 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 2)
     request, run_result = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost', 'abc')
+        bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(None, request)
     self.assertEqual(None, run_result)
     logging.info('%s', [t.to_dict() for t in task_to_run.TaskToRun.query()])
@@ -1245,7 +1278,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       u'foo': u'bar',
     }
     _request, run_result = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost', 'abc')
+        bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(task_result.State.RUNNING, run_result.state)
     self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
@@ -1253,7 +1286,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 2)
     # It must be a different bot.
     _request, run_result = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost-second', 'abc')
+        bot_dimensions, 'localhost-second', 'abc', None)
     now_2 = self.mock_now(self.now + 2 * task_result.BOT_PING_TOLERANCE, 3)
     self.assertEqual(
         (['1d69b9f088008812'], 0, 0),
@@ -1303,7 +1336,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       u'foo': u'bar',
     }
     _request, run_result = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost', 'abc')
+        bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(task_result.State.RUNNING, run_result.state)
     self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 601)

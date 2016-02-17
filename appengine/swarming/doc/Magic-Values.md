@@ -49,6 +49,10 @@ always set:
 ### state
 
   - `cost_usd_hour`: reports the base cost of this bot in $USD/hour.
+  - `lease_expiration_ts`: when set to an integer or floating point value,
+    informs the server of the time (in UTC seconds since epoch) that the bot
+    will disconnect from the server. The server will not allow the bot to
+    reap any tasks projected to end after the bot disconnects.
   - `periodic_reboot_secs`: when set to a integer, instructs the server to send
     a reboot command after this period. The actual period is fuzzed with a 10%
     delta.

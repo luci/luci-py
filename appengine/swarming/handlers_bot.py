@@ -205,6 +205,13 @@ class _BotBaseHandler(auth.ApiHandler):
         quarantined_msg = 'Dimensions product %d is too high' % dimensions_count
         break
 
+      if not isinstance(
+          state.get('lease_expiration_ts'), (None.__class__, int)):
+        quarantined_msg = (
+            'lease_expiration_ts (%r) must be int or None' % (
+                state['lease_expiration_ts']))
+        break
+
     if quarantined_msg:
       line = 'Quarantined Bot\nhttps://%s/restricted/bot/%s\n%s' % (
           app_identity.get_default_version_hostname(), bot_id,
@@ -331,7 +338,7 @@ class BotPollHandler(_BotBaseHandler):
     try:
       # This is a fairly complex function call, exceptions are expected.
       request, run_result = task_scheduler.bot_reap_task(
-          dimensions, bot_id, version)
+          dimensions, bot_id, version, state.get('lease_expiration_ts'))
       if not request:
         # No task found, tell it to sleep a bit.
         bot_event('request_sleep')

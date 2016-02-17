@@ -289,7 +289,7 @@ def set_lookup_cache(task_key, is_available_to_schedule):
     memcache.set(key, True, time=cache_lifetime, namespace='task_to_run')
 
 
-def yield_next_available_task_to_dispatch(bot_dimensions):
+def yield_next_available_task_to_dispatch(bot_dimensions, deadline):
   """Yields next available (TaskRequest, TaskToRun) in decreasing order of
   priority.
 
@@ -301,6 +301,8 @@ def yield_next_available_task_to_dispatch(bot_dimensions):
   Arguments:
   - bot_dimensions: dimensions (as a dict) defined by the bot that can be
       matched.
+  - deadline: UTC timestamp (as an int) that the bot must be able to
+      complete the task by. None if there is no such deadline.
   """
   # List of all the valid dimensions hashed.
   accepted_dimensions_hash = frozenset(
@@ -314,6 +316,7 @@ def yield_next_available_task_to_dispatch(bot_dimensions):
   ignored = 0
   no_queue = 0
   real_mismatch = 0
+  too_long = 0
   total = 0
   # Be very aggressive in fetching the largest amount of items as possible. Note
   # that we use the default ndb.EVENTUAL_CONSISTENCY so stale items may be
@@ -400,6 +403,29 @@ def yield_next_available_task_to_dispatch(bot_dimensions):
         real_mismatch += 1
         continue
 
+      # If the bot has a deadline, don't allow it to reap the task unless it can
+      # be completed before the deadline. We have to assume the task takes the
+      # theoretical maximum amount of time possible, which is governed by
+      # execution_timeout_secs. An isolated task's download phase is not subject
+      # to this limit, so we need to add io_timeout_secs. When a task is
+      # signalled that it's about to be killed, it receives a grace period as
+      # well. grace_period_secs is given by run_isolated to the task execution
+      # process, by task_runner to run_isolated, and by bot_main to the
+      # task_runner. Lastly, add a few seconds to account for any overhead.
+      if deadline is not None:
+        if not request.properties.execution_timeout_secs:
+          # Task never times out, so it cannot be accepted.
+          too_long += 1
+          continue
+        max_task_time = (utils.time_time() +
+                         request.properties.execution_timeout_secs +
+                         (request.properties.io_timeout_secs or 600) +
+                         3 * (request.properties.grace_period_secs or 30) +
+                         10)
+        if deadline <= max_task_time:
+          too_long += 1
+          continue
+
       # It's a valid task! Note that in the meantime, another bot may have
       # reaped it.
       yield request, task
@@ -408,7 +434,8 @@ def yield_next_available_task_to_dispatch(bot_dimensions):
     duration = (utils.utcnow() - now).total_seconds()
     logging.info(
         '%d/%s in %5.2fs: %d total, %d exp %d no_queue, %d hash mismatch, '
-        '%d cache negative, %d dimensions mismatch, %d ignored, %d broken',
+        '%d cache negative, %d dimensions mismatch, %d ignored, %d broken, '
+        '%d not executable by deadline (UTC %s)',
         opts.batch_size,
         opts.prefetch_size,
         duration,
@@ -419,7 +446,9 @@ def yield_next_available_task_to_dispatch(bot_dimensions):
         cache_lookup,
         real_mismatch,
         ignored,
-        broken)
+        broken,
+        too_long,
+        deadline)
 
 
 def yield_expired_task_to_run():

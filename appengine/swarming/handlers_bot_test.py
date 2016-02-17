@@ -25,6 +25,7 @@ import webtest
 
 import handlers_bot
 from components import ereporter2
+from components import utils
 from server import bot_archive
 from server import bot_management
 from server import task_result
@@ -329,6 +330,56 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'state': u'RUNNING',
       u'task_id': u'5cee488008811',
       u'try_number': u'1',
+    }
+    self.assertEqual(expected, response)
+
+  def test_poll_not_enough_time(self):
+    # Make sure there's a task that we don't get.
+    _, task_id = self.client_create_task_raw()
+    self.assertEqual('0', task_id[-1])
+    token, params = self.get_bot_token()
+    params['state']['lease_expiration_ts'] = 0
+    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    expected = {
+      u'cmd': u'sleep',
+      u'quarantined': False,
+    }
+    self.assertTrue(response.pop('duration'))
+    self.assertEqual(expected, response)
+
+  def test_poll_enough_time(self):
+    # Successfully poll a task.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+    _, task_id = self.client_create_task_isolated()
+    self.assertEqual('0', task_id[-1])
+    token, params = self.get_bot_token()
+    params['state']['lease_expiration_ts'] = (
+        int(utils.time_time()) + 3600 + 1200 + 3 * 30 + 10 + 1)
+    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    # Convert TaskResultSummary reference to TaskRunResult.
+    task_id = task_id[:-1] + '1'
+    expected = {
+      u'cmd': u'run',
+      u'manifest': {
+        u'bot_id': u'bot1',
+        u'command': None,
+        u'data': [],
+        u'dimensions': {u'os': u'Amiga'},
+        u'env': {},
+        u'extra_args': [],
+        u'hard_timeout': 3600,
+        u'grace_period': 30,
+        u'host': u'http://localhost:8080',
+        u'inputs_ref': {
+          u'isolated': u'0123456789012345678901234567890123456789',
+          u'isolatedserver': u'http://localhost:1',
+          u'namespace': u'default-gzip',
+        },
+        u'io_timeout': 1200,
+        u'task_id': task_id,
+      },
     }
     self.assertEqual(expected, response)
 

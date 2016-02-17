@@ -497,7 +497,7 @@ def schedule_request(request):
   return result_summary
 
 
-def bot_reap_task(dimensions, bot_id, bot_version):
+def bot_reap_task(dimensions, bot_id, bot_version, deadline):
   """Reaps a TaskToRun if one is available.
 
   The process is to find a TaskToRun where its .queue_number is set, then
@@ -508,7 +508,7 @@ def bot_reap_task(dimensions, bot_id, bot_version):
     The TaskToRun involved is not returned.
   """
   assert bot_id
-  q = task_to_run.yield_next_available_task_to_dispatch(dimensions)
+  q = task_to_run.yield_next_available_task_to_dispatch(dimensions, deadline)
   # When a large number of bots try to reap hundreds of tasks simultaneously,
   # they'll constantly fail to call reap_task_to_run() as they'll get preempted
   # by other bots. So randomly jump farther in the queue when the number of

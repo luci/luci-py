@@ -61,11 +61,12 @@ def _task_to_run_to_dict(i):
   return out
 
 
-def _yield_next_available_task_to_dispatch(bot_dimensions):
+def _yield_next_available_task_to_dispatch(bot_dimensions, deadline):
   return [
     _task_to_run_to_dict(to_run)
     for _request, to_run in
-        task_to_run.yield_next_available_task_to_dispatch(bot_dimensions)
+        task_to_run.yield_next_available_task_to_dispatch(
+            bot_dimensions, deadline)
   ]
 
 
@@ -408,7 +409,7 @@ class TaskToRunApiTest(TestCase):
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     # Bot declares no dimensions, so it will fail to match.
     bot_dimensions = {}
-    actual = _yield_next_available_task_to_dispatch(bot_dimensions)
+    actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
     self.assertEqual([], actual)
 
   def test_yield_next_available_task_to_dispatch_none_mismatch(self):
@@ -416,7 +417,7 @@ class TaskToRunApiTest(TestCase):
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     # Bot declares other dimensions, so it will fail to match.
     bot_dimensions = {'OS': 'Windows-3.0'}
-    actual = _yield_next_available_task_to_dispatch(bot_dimensions)
+    actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
     self.assertEqual([], actual)
 
   def test_yield_next_available_task_to_dispatch(self):
@@ -427,7 +428,7 @@ class TaskToRunApiTest(TestCase):
         properties=dict(dimensions=request_dimensions))
     # Bot declares exactly same dimensions so it matches.
     bot_dimensions = request_dimensions
-    actual = _yield_next_available_task_to_dispatch(bot_dimensions)
+    actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
     expected = [
       {
         'dimensions_hash': _hash_dimensions(request_dimensions),
@@ -445,7 +446,7 @@ class TaskToRunApiTest(TestCase):
     bot_dimensions = {
       u'OS': u'Windows-3.1.1', u'hostname': u'localhost', u'foo': u'bar',
     }
-    actual = _yield_next_available_task_to_dispatch(bot_dimensions)
+    actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
     expected = [
       {
         'dimensions_hash': _hash_dimensions(request_dimensions),
@@ -459,7 +460,7 @@ class TaskToRunApiTest(TestCase):
     request_dimensions = {u'OS': u'Windows-3.1.1', u'foo': u'bar'}
     _gen_new_task_to_run(properties=dict(dimensions=request_dimensions))
     bot_dimensions = request_dimensions
-    actual = _yield_next_available_task_to_dispatch(bot_dimensions)
+    actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
     expected = [
       {
         'dimensions_hash': _hash_dimensions(request_dimensions),
@@ -479,7 +480,7 @@ class TaskToRunApiTest(TestCase):
       u'hostname': u'localhost',
       u'foo': u'bar',
     }
-    actual = _yield_next_available_task_to_dispatch(bot_dimensions)
+    actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
     expected = [
       {
         'dimensions_hash': _hash_dimensions(request_dimensions),
@@ -502,7 +503,7 @@ class TaskToRunApiTest(TestCase):
     bot_dimensions = {
       u'OS': u'Windows-3.1.1', u'hostname': u'localhost', u'foo': u'bar',
     }
-    actual = _yield_next_available_task_to_dispatch(bot_dimensions)
+    actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
     expected = [
       {
         'dimensions_hash': _hash_dimensions(request_dimensions_1),
@@ -534,7 +535,7 @@ class TaskToRunApiTest(TestCase):
     bot_dimensions = {
       u'OS': u'Windows-3.1.1', u'hostname': u'localhost', u'foo': u'bar',
     }
-    actual = _yield_next_available_task_to_dispatch(bot_dimensions)
+    actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
     expected = [
       {
         'dimensions_hash': _hash_dimensions(request_dimensions_2),
@@ -575,7 +576,37 @@ class TaskToRunApiTest(TestCase):
       },
     ]
     bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
-    actual = _yield_next_available_task_to_dispatch(bot_dimensions)
+    actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
+    self.assertEqual(expected, actual)
+
+  def test_yield_next_available_task_to_run_task_exceeds_deadline(self):
+    request_dimensions = {
+      u'OS': u'Windows-3.1.1', u'hostname': u'localhost', u'foo': u'bar',
+    }
+    _gen_new_task_to_run(
+        properties=dict(dimensions=request_dimensions))
+    # Bot declares exactly same dimensions so it matches.
+    bot_dimensions = request_dimensions
+    actual = _yield_next_available_task_to_dispatch(bot_dimensions, 0)
+    self.failIf(actual)
+
+  def test_yield_next_available_task_to_run_task_meets_deadline(self):
+    request_dimensions = {
+      u'OS': u'Windows-3.1.1', u'hostname': u'localhost', u'foo': u'bar',
+    }
+    _gen_new_task_to_run(
+        properties=dict(dimensions=request_dimensions))
+    # Bot declares exactly same dimensions so it matches.
+    bot_dimensions = request_dimensions
+    actual = _yield_next_available_task_to_dispatch(
+        bot_dimensions, utils.time_time() + 86400 + 600 + 3 * 30 + 10 + 1)
+    expected = [
+      {
+        'dimensions_hash': _hash_dimensions(request_dimensions),
+        'expiration_ts': self.expiration_ts,
+        'queue_number': '0x000a890b67ba1346',
+      },
+    ]
     self.assertEqual(expected, actual)
 
   def test_yield_expired_task_to_run(self):
@@ -583,7 +614,7 @@ class TaskToRunApiTest(TestCase):
     _gen_new_task_to_run(
         created_ts=now,
         expiration_ts=now+datetime.timedelta(seconds=60))
-    self.assertEqual(1, len(_yield_next_available_task_to_dispatch({})))
+    self.assertEqual(1, len(_yield_next_available_task_to_dispatch({}, None)))
     self.assertEqual(
         0, len(list(task_to_run.yield_expired_task_to_run())))
 
@@ -591,7 +622,7 @@ class TaskToRunApiTest(TestCase):
     # set because the cron job wasn't run, they are still not yielded by
     # yield_next_available_task_to_dispatch()
     self.mock_now(self.now, 61)
-    self.assertEqual(0, len(_yield_next_available_task_to_dispatch({})))
+    self.assertEqual(0, len(_yield_next_available_task_to_dispatch({}, None)))
     self.assertEqual(
         1, len(list(task_to_run.yield_expired_task_to_run())))
 
@@ -600,7 +631,7 @@ class TaskToRunApiTest(TestCase):
     to_run = _gen_new_task_to_run(properties=dict(dimensions=req_dimensions))
     bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
     self.assertEqual(
-        1, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
+        1, len(_yield_next_available_task_to_dispatch(bot_dimensions, None)))
 
     self.assertEqual(True, to_run.is_reapable)
     to_run.queue_number = None
