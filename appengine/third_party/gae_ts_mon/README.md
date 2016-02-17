@@ -12,6 +12,7 @@
         - description: Send ts_mon metrics
           url: /internal/cron/ts_mon/send
           schedule: every 1 minutes
+          target: <cron_module_name>  # optional
 
 1.  Include the URL handler for that scheduled task in your `app.yaml` file.
 
@@ -25,16 +26,25 @@
         [...]
 
         app = webapp2.WSGIApplication(my_handlers)
-        gae_ts_mon.initialize(app)
+        gae_ts_mon.initialize(app, cron_module='<cron_module_name>')
 
     You must do this in every top-level request handler that's listed in your
     app.yaml to ensure metrics are registered no matter which type of request
     an instance receives first.
 
+    The `gae_ts_mon.initialize` method takes a few optional parameters:
+     - `cron_module` (str, default='default'): if you specified a custom
+       module for the cron job, you must specify it in every call to
+       `initialize`.
+     - `enable` (bool, default=`True`): to enable/disable sending the actual
+       metrics. The value can be dynamically defined (e.g. retrieved from the
+       Datastore), but it will only take effect once an instance restarts.
+
 1.  Give your app's service account permission to send metrics to the API.  You
     can find the name of your service account on the `Permissions` page of your
     project in the cloud console - it'll look something like
-    `app-id@appspot.gserviceaccount.com`.  Add it as a "Publisher" of the
+    `app-id@appspot.gserviceaccount.com`.  Or search the default module's logs
+    for `"Initializing with service account"`.  Add it as a "Publisher" of the
     "monacq" PubSub topic in the
     [chrome-infra-mon-pubsub project](https://pantheon.corp.google.com/project/chrome-infra-mon-pubsub/cloudpubsub/topicList)
     by selecting it from the list and clicking "Permissions". If you see an
@@ -68,3 +78,53 @@ Multiple Appengine modules are fully supported - the module name will appear in
 as `job_name` field in metrics when they are exported.
 
 The scheduled task only needs to run in one module.
+
+## Global Metrics
+
+Normally, each AppEnigne app's instance sends its own set of metrics
+at its own pace.  This can be a problem, however, if you want to
+report a metric that only makes sense globally, e.g. the count of
+certain Datastore entities computed once a minute in a cron job.
+
+Setting such a metric in an individual instance is incorrect, since a
+cron job will run in a randomly selected instance, and that instance
+will continue to send the same old value until it's picked by the cron
+job again. The receiving monitoring endpoint will not be able to tell
+which metric is the most recent, and by default will try to sum up the
+values from all the instances, resulting in a wrong value.
+
+A "global" metric is a metric that is not tied to an instance, and is
+guaranteed to be computed and sent at most once per minute,
+globally. Here's an example of how to set up a global metric:
+
+    from infra_libs import ts_mon
+
+    # Override default target fields for app-global metrics.
+    TARGET_FIELDS = {
+        'job_name':  '',  # module name
+        'hostname': '',  # version
+        'task_num':  0,  # instance ID
+    }
+
+    remaining = ts_mon.GaugeMetric('goats/remaining')
+    in_flight = ts_mon.GaugeMetric('goats/in_flight)
+
+    def set_global_metrics():
+      # Query some global resource, e.g. Datastore
+      remaining.set(len(goats_to_teleport()), target_fields=TARGET_FIELDS)
+      in_flight.set(len(goats_being_teleported()), target_fields=TARGET_FIELDS)
+
+    ts_mon.register_global_metrics([remaining, in_flight])
+    ts_mon.register_global_metrics_callback('my callback', set_global_metrics)
+
+The registered callback will be called at most once per minute, and
+only one instance will be running it at a time. A global metric is
+then cleared the moment it is sent.  Thus, global metrics will be sent
+at the correct intervals, regardless of the number of instances the
+app is currently running.
+
+Note also the use of `target_fields` parameter: it overrides the
+default target fields which would otherwise distinguish the metric per
+module, version, or instance ID. Using `target_fields` in regular,
+"local" metrics is not allowed, as it would result in errors on the
+monitoring endpoint, and loss of data.

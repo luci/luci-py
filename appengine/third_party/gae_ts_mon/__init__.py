@@ -7,8 +7,12 @@ import imp
 import os
 import sys
 
-# Adds itself to sys.path so the packages inside work.
-from . import third_party
+# Adds third_party to sys.path so the packages inside work.  Do not
+# import third_party directly - it mysteriously flakes on GAE under
+# heavy load.
+third_party_dir = os.path.join(os.path.dirname(__file__), 'third_party')
+if third_party_dir not in sys.path:  # pragma: no cover
+  sys.path.insert(0, third_party_dir)
 
 # Add the gae_ts_mon/protobuf directory into the path for the google package, so
 # "import google.protobuf" works.
@@ -32,7 +36,10 @@ sys.modules['infra_libs'].httplib2_utils = infra_libs.ts_mon.httplib2_utils
 sys.modules['infra_libs.httplib2_utils'] = infra_libs.ts_mon.httplib2_utils
 
 from infra_libs.ts_mon.config import initialize
+from infra_libs.ts_mon.config import reset_for_unittest
 from infra_libs.ts_mon.handlers import app
+from infra_libs.ts_mon.shared import register_global_metrics
+from infra_libs.ts_mon.shared import register_global_metrics_callback
 
 # The remaining lines are copied from infra_libs/ts_mon/__init__.py.
 from infra_libs.ts_mon.common.distribution import Distribution
@@ -53,7 +60,6 @@ from infra_libs.ts_mon.common.helpers import ScopedIncrementCounter
 
 from infra_libs.ts_mon.common.interface import close
 from infra_libs.ts_mon.common.interface import flush
-from infra_libs.ts_mon.common.interface import reset_for_unittest
 
 from infra_libs.ts_mon.common.metrics import BooleanMetric
 from infra_libs.ts_mon.common.metrics import CounterMetric
