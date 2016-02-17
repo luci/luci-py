@@ -153,8 +153,31 @@ def _with_existing_topic(topic, callback):
     return callback()
 
 
-def publish(topic, message, attributes=None):
+def publish_multi(topic, messages):
   """Publish messages to Cloud Pub/Sub. Creates the topic if it doesn't exist.
+
+  Args:
+    topic: Full name of the topic to publish to.
+    messages: Content of the message to publish mapped to any attributes to
+      send with the message.
+
+  Raises:
+    Error or TransientError.
+  """
+  assert validate_full_name(topic, 'topics'), topic
+  messages = [
+      {'attributes': attributes or {}, 'data': base64.b64encode(message)}
+      for message, attributes in messages.iteritems()
+  ]
+
+  def call_publish():
+    _call('POST', '%s:publish' % topic, payload={'messages': messages})
+
+  _with_existing_topic(topic, call_publish)
+
+
+def publish(topic, message, attributes):
+  """Publish a message to Cloud Pub/Sub. Creates the topic if it doesn't exist.
 
   Args:
     topic: Full name of the topic to publish to.
@@ -164,20 +187,7 @@ def publish(topic, message, attributes=None):
   Raises:
     Error or TransientError.
   """
-  assert validate_full_name(topic, 'topics'), topic
-
-  def call_publish():
-    _call(
-        'POST', '%s:publish' % topic,
-        payload={
-            'messages': [{
-                'attributes': attributes or {},
-                'data': base64.b64encode(message),
-            }],
-        },
-    )
-
-  _with_existing_topic(topic, call_publish)
+  publish_multi(topic, {message: attributes})
 
 
 def get_subscription(subscription):

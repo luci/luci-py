@@ -83,14 +83,15 @@ class LeaseRequestFulfiller(webapp2.RequestHandler):
     maybe_notify_lessee(request, response)
 
     # Inform the machine.
+    messages = {
+        'LEASED': {'lease_expiration_ts': str(response['lease_expiration_ts'])}
+    }
     if request.get('on_lease', {}).get('swarming_server'):
-      pubsub.publish(
-          pubsub.full_topic_name(machine_project, machine_topic),
-          'CONNECT',
-          {
-              'swarming_server': request['on_lease']['swarming_server'],
-          },
-      )
+      messages['CONNECT'] = {
+          'swarming_server': request['on_lease']['swarming_server']
+      }
+    pubsub.publish_multi(
+        pubsub.full_topic_name(machine_project, machine_topic), messages)
 
 
 class MachineReclaimer(webapp2.RequestHandler):
