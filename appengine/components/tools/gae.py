@@ -310,6 +310,7 @@ def CMDupload(parser, args):
   app.update_indexes()
   app.update_queues()
   app.update_cron()
+  app.update_dispatch()
 
   print('-' * 80)
   print('New version:')

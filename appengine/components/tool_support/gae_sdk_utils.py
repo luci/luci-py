@@ -227,6 +227,10 @@ class Application(object):
               (module_id, yaml_path, self._modules[module_id].path))
         self._modules[module_id] = ModuleFile(yaml_path, data)
 
+    self.dispatch_yaml = os.path.join(app_dir, 'dispatch.yaml')
+    if not os.path.isfile(self.dispatch_yaml):
+      self.dispatch_yaml= None
+
     if 'default' not in self._modules:
       raise ValueError('Default module is missing')
 
@@ -368,6 +372,11 @@ class Application(object):
     if os.path.isfile(os.path.join(self.default_module_dir, 'cron.yaml')):
       self.run_appcfg(['update_cron', self.default_module_dir])
 
+  def update_dispatch(self):
+    """Deploys new dispatch.yaml."""
+    if self.dispatch_yaml:
+      self.run_appcfg(['update_dispatch', self.app_dir])
+
   def spawn_dev_appserver(self, args, open_ports=False, **kwargs):
     """Launches subprocess with dev_appserver.py.
 
@@ -385,7 +394,10 @@ class Application(object):
       '--application', self.app_id,
       '--skip_sdk_update_check=yes',
       '--require_indexes=yes',
-    ] + self.module_yamls + args
+    ] + self.module_yamls
+    if self.dispatch_yaml:
+      cmd += [self.dispatch_yaml]
+    cmd += args
     if open_ports:
       cmd.extend(('--host', '0.0.0.0', '--admin_host', '0.0.0.0'))
     if self._verbose:
