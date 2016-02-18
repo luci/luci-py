@@ -48,6 +48,9 @@ class GlobalConfig(config.GlobalConfig):
   # id to inject into pages if applicable.
   google_analytics = ndb.StringProperty(indexed=False, default='')
 
+  # Enable ts_mon based monitoring.
+  enable_ts_monitoring = ndb.BooleanProperty(indexed=False, default=False)
+
   def set_defaults(self):
     self.global_secret = os.urandom(16)
     self.gs_bucket = app_identity.get_application_id()

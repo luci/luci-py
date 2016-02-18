@@ -12,18 +12,24 @@ tested via a smoke test.
 import os
 import sys
 
+import gae_ts_mon
+
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
 
 from components import ereporter2
 from components import utils
 
+import config
 import handlers_backend
 
 
 def create_application():
   ereporter2.register_formatter()
-  return handlers_backend.create_application(False)
+  backend = handlers_backend.create_application(False)
+  enable_ts_mon = config.settings().enable_ts_monitoring
+  gae_ts_mon.initialize(backend, enable=enable_ts_mon)
+  return backend
 
 
 app = create_application()

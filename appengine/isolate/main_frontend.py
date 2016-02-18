@@ -13,6 +13,7 @@ import os
 import sys
 
 import endpoints
+import gae_ts_mon
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
@@ -21,6 +22,7 @@ from components import auth
 from components import ereporter2
 from components import utils
 
+import config
 import handlers_frontend
 import handlers_endpoints_v1
 import handlers_endpoints_v2
@@ -31,6 +33,8 @@ def create_application():
 
   # App that serves HTML pages and old API.
   frontend = handlers_frontend.create_application(False)
+  enable_ts_mon = config.settings().enable_ts_monitoring
+  gae_ts_mon.initialize(frontend, enable=enable_ts_mon)
   # App that serves new endpoints API.
   api = endpoints.api_server([handlers_endpoints_v1.IsolateService,
                               handlers_endpoints_v2.IsolateServiceV2])
