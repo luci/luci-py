@@ -22,6 +22,10 @@ cron:
   url: /internal/cron/machine_provider
   schedule: every 1 minutes synchronized
 
+- description: Clean up bots leased from Machine Provider.
+  url: /internal/cron/machine_provider_cleanup
+  schedule: every 5 minutes
+
 ### ereporter2
 
 - description: ereporter2 cleanup

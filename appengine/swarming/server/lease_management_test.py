@@ -5,6 +5,7 @@
 
 """Unit tests for lease_management.py."""
 
+import datetime
 import json
 import unittest
 
@@ -16,8 +17,10 @@ from protorpc.remote import protojson
 import webtest
 
 from components import machine_provider
+from components import utils
 from test_support import test_case
 
+import bot_management
 import lease_management
 
 
@@ -31,6 +34,85 @@ def rpc_to_json(rpc_message):
     A string representing a JSON dict.
   """
   return json.loads(protojson.encode_message(rpc_message))
+
+
+class CleanUpBotsTest(test_case.TestCase):
+  """Tests for lease_management.clean_up_bots."""
+
+  def test_no_machine_types(self):
+    lease_management.clean_up_bots()
+
+  def test_none_pending_deletion(self):
+    machine_type = lease_management.MachineType(
+        id='none-pending-deletion',
+        request_id_base='none-pending-deletion',
+        target_size=2,
+    )
+    machine_type.put()
+
+    lease_management.clean_up_bots()
+    updated_machine_type = machine_type.key.get()
+    self.failIf(updated_machine_type.pending_deletion)
+
+  def test_pending_deletion(self):
+    bot_ids = []
+    for i in xrange(200):
+      bot_ids.append('fake-bot-%d' % i)
+      bot_management.BotInfo(key=bot_management.get_info_key(bot_ids[-1])).put()
+    machine_type = lease_management.MachineType(
+        id='few-pending-deletion',
+        pending_deletion=bot_ids,
+        request_id_base='few-pending-deletion',
+        target_size=2,
+    )
+    machine_type.put()
+
+    lease_management.clean_up_bots()
+    updated_machine_type = machine_type.key.get()
+    self.failIf(updated_machine_type.pending_deletion)
+    for bot_id in bot_ids:
+      self.failIf(bot_management.get_info_key(bot_id).get())
+
+
+class ClearBotsPendingDeletionTest(test_case.TestCase):
+  """Tests for lease_management._clear_bots_pending_deletion."""
+
+  def test_machine_type_not_found(self):
+    machine_type = lease_management.MachineType(
+        id='not-found',
+        pending_deletion=['fake-bot-1', 'fake-bot-2'],
+    )
+
+    lease_management._clear_bots_pending_deletion(
+        machine_type.key, ['fake-bot-1', 'fake-bot-2'])
+    self.assertEqual(len(machine_type.pending_deletion), 2)
+
+  def test_machine_type_none_pending_deletion(self):
+    machine_type = lease_management.MachineType(
+        id='none-pending-deletion',
+        request_id_base='none-pending-deletion',
+        target_size=2,
+    )
+    machine_type.put()
+
+    lease_management._clear_bots_pending_deletion(machine_type.key, [])
+    updated_machine_type = machine_type.key.get()
+    self.failIf(updated_machine_type.pending_deletion)
+
+  def test_machine_type_pending_deletion(self):
+    machine_type = lease_management.MachineType(
+        id='pending-deletion',
+        pending_deletion=['fake-bot-1', 'fake-bot-2'],
+        request_id_base='pending-deletion',
+        target_size=2,
+    )
+    machine_type.put()
+
+    lease_management._clear_bots_pending_deletion(
+        machine_type.key, ['fake-bot-1'])
+    updated_machine_type = machine_type.key.get()
+    self.assertEqual(len(updated_machine_type.pending_deletion), 1)
+    self.assertEqual(updated_machine_type.pending_deletion[0], 'fake-bot-2')
 
 
 class GenerateLeaseRequestsTest(test_case.TestCase):
@@ -99,6 +181,90 @@ class GenerateLeaseRequestsTest(test_case.TestCase):
     self.assertEqual(
         updated_machine_type.leases[0].client_request_id, 'need-one-1')
     self.assertEqual(updated_machine_type.request_count, 1)
+
+
+class CleanUpExpiredLeasesTest(test_case.TestCase):
+  """Tests for lease_management._clean_up_expired_leases."""
+
+  def test_machine_type_no_leases(self):
+    machine_type = lease_management.MachineType(
+        id='no-leases',
+        leases=[],
+        mp_dimensions=machine_provider.Dimensions(
+            os_family=machine_provider.OSFamily.LINUX,
+        ),
+        request_id_base='no-leases',
+        target_size=2,
+    )
+
+    expired  = lease_management._clean_up_expired_leases(machine_type)
+    self.failIf(expired)
+    self.failIf(machine_type.leases)
+    self.failIf(machine_type.pending_deletion)
+
+  def test_machine_type_no_expired_leases(self):
+    machine_type = lease_management.MachineType(
+        id='no-leases',
+        leases=[
+            lease_management.MachineLease(
+                client_request_id='fake-id-1',
+                request_hash='fake-hash-1',
+            ),
+            lease_management.MachineLease(
+                client_request_id='fake-id-2',
+                hostname='fake-host',
+                lease_expiration_ts=(
+                    utils.utcnow() + datetime.timedelta(seconds=60)),
+                request_hash='fake-hash-2',
+            ),
+        ],
+        mp_dimensions=machine_provider.Dimensions(
+            os_family=machine_provider.OSFamily.LINUX,
+        ),
+        request_id_base='no-leases',
+        target_size=2,
+    )
+
+    expired  = lease_management._clean_up_expired_leases(machine_type)
+    self.failIf(expired)
+    self.assertEqual(len(machine_type.leases), 2)
+    self.failIf(machine_type.pending_deletion)
+
+  def test_machine_type_one_expired_lease(self):
+    machine_type = lease_management.MachineType(
+        id='no-leases',
+        leases=[
+            lease_management.MachineLease(
+                client_request_id='fake-id-1',
+                request_hash='fake-hash-1',
+            ),
+            lease_management.MachineLease(
+                client_request_id='fake-id-2',
+                hostname='fake-host-2',
+                lease_expiration_ts=utils.EPOCH,
+                request_hash='fake-hash-2',
+            ),
+        ],
+        mp_dimensions=machine_provider.Dimensions(
+            os_family=machine_provider.OSFamily.LINUX,
+        ),
+        pending_deletion=[
+          'fake-host-3',
+        ],
+        request_id_base='no-leases',
+        target_size=2,
+    )
+
+    expired  = lease_management._clean_up_expired_leases(machine_type)
+    self.assertEqual(len(expired), 1)
+    self.assertEqual(expired[0], 'fake-host-2')
+    self.assertEqual(len(machine_type.leases), 1)
+    self.assertEqual(machine_type.leases[0].client_request_id, 'fake-id-1')
+    self.assertEqual(machine_type.leases[0].request_hash, 'fake-hash-1')
+    self.assertEqual(len(machine_type.pending_deletion), 2)
+    hostnames = sorted(machine_type.pending_deletion)
+    self.assertEqual(hostnames[0], 'fake-host-2')
+    self.assertEqual(hostnames[1], 'fake-host-3')
 
 
 class GenerateLeaseRequestStatusUpdatesTest(test_case.TestCase):

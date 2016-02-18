@@ -61,7 +61,6 @@ class CronMachineProviderBotHandler(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
     swarming_server = 'https://%s' % app_identity.get_default_version_hostname()
-    # TODO(smut): Parallelize when there are lots of machine types.
     for machine_type_key in lease_management.MachineType.query().fetch(
         keys_only=True):
       lease_requests = lease_management.generate_lease_requests(
@@ -69,6 +68,14 @@ class CronMachineProviderBotHandler(webapp2.RequestHandler):
       if lease_requests:
         responses = machine_provider.lease_machines(lease_requests)
         lease_management.update_leases(machine_type_key, responses)
+
+
+class CronMachineProviderCleanUpHandler(webapp2.RequestHandler):
+  """Cleans up leftover BotInfo entities."""
+
+  @decorators.require_cronjob
+  def get(self):
+    lease_management.clean_up_bots()
 
 
 class TaskCleanupDataHandler(webapp2.RequestHandler):
@@ -120,6 +127,8 @@ def get_routes():
     ('/internal/cron/stats/update', stats.InternalStatsUpdateHandler),
     ('/internal/cron/trigger_cleanup_data', CronTriggerCleanupDataHandler),
     ('/internal/cron/machine_provider', CronMachineProviderBotHandler),
+    ('/internal/cron/machine_provider_cleanup',
+        CronMachineProviderCleanUpHandler),
 
     # Task queues.
     ('/internal/taskqueue/cleanup_data', TaskCleanupDataHandler),

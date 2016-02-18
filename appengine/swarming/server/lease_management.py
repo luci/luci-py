@@ -66,6 +66,7 @@ from google.appengine.ext.ndb import msgprop
 
 from components import machine_provider
 from components import utils
+from server import bot_management
 
 
 class MachineLease(ndb.Model):
@@ -103,12 +104,72 @@ class MachineType(ndb.Model):
   # machine_provider.Dimensions describing the machine.
   mp_dimensions = msgprop.MessageProperty(
       machine_provider.Dimensions, indexed=False)
+  # Number of bots pending deletion.
+  num_pending_deletion = ndb.ComputedProperty(
+      lambda self: len(self.pending_deletion))
+  # List of hostnames whose leases have expired and should be deleted.
+  pending_deletion = ndb.StringProperty(indexed=False, repeated=True)
   # Last request number used.
   request_count = ndb.IntegerProperty(default=0, required=True)
   # Request ID base string.
   request_id_base = ndb.StringProperty(indexed=False, required=True)
   # Target number of machines of this type to have leased at once.
   target_size = ndb.IntegerProperty(indexed=False, required=True)
+
+
+def clean_up_bots():
+  """Cleans up expired leases."""
+  # Maximum number of in-flight ndb.Futures.
+  MAX_IN_FLIGHT = 50
+
+  bot_ids = []
+  deleted = {}
+  for machine_type in MachineType.query(MachineType.num_pending_deletion > 0):
+    bot_ids.extend(machine_type.pending_deletion)
+    deleted[machine_type.key] = machine_type.pending_deletion
+
+  # Generate a few asynchronous requests at a time in order to
+  # prevent having too many in-flight ndb.Futures at a time.
+  futures = []
+  while bot_ids:
+    num_futures = len(futures)
+    if num_futures < MAX_IN_FLIGHT:
+      keys = [bot_management.get_info_key(bot_id)
+              for bot_id in bot_ids[:MAX_IN_FLIGHT - num_futures]]
+      bot_ids = bot_ids[MAX_IN_FLIGHT - num_futures:]
+      futures.extend(ndb.delete_multi_async(keys))
+
+    ndb.Future.wait_any(futures)
+    futures = [future for future in futures if not future.done()]
+
+  if futures:
+    ndb.Future.wait_all(futures)
+
+  # There should be relatively few MachineType entitites, so
+  # just process them sequentially.
+  # TODO(smut): Parallelize this.
+  for machine_key, hostnames in deleted.iteritems():
+    _clear_bots_pending_deletion(machine_key, hostnames)
+
+
+@ndb.transactional
+def _clear_bots_pending_deletion(machine_type_key, hostnames):
+  """Clears the list of bots pending deletion.
+
+  Args:
+    machine_type_key: ndb.Key for a MachineType instance.
+    hostnames: List of bots pending deletion.
+  """
+  machine_type = machine_type_key.get()
+  if not machine_type:
+    logging.warning('MachineType no longer exists: %s', machine_type_key.id())
+    return
+
+  num_pending_deletion = len(machine_type.pending_deletion)
+  machine_type.pending_deletion = [
+      host for host in machine_type.pending_deletion if host not in hostnames]
+  if len(machine_type.pending_deletion) != num_pending_deletion:
+    machine_type.put()
 
 
 @ndb.transactional
@@ -180,11 +241,12 @@ def _clean_up_expired_leases(machine_type):
           request.hostname,
           request.lease_expiration_ts,
       )
-      expired.append(request)
+      expired.append(request.hostname)
     else:
       active.append(request)
 
   machine_type.leases = active
+  machine_type.pending_deletion.extend(expired)
   return expired
 
 
