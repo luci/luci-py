@@ -1,6 +1,15 @@
 {% set title = 'Isolate global config' %}
 {% extends "isolate/base.html" %}
 
+{% block headers %}
+<script>
+function onclick_ts_mon() {
+  document.getElementById("enable_ts_monitoring_hidden").disabled =
+    document.getElementById("enable_ts_monitoring").checked;
+  }
+</script>
+{% endblock %}
+
 {% block body %}
 <h1>Server global config</h1>
 
@@ -23,6 +32,11 @@ Last updated on: <strong>{{cfg.updated_ts|datetimeformat}}</strong>.<br>
     Default expiration (secs):<br />
     <input type="text" name="default_expiration"
         value="{{cfg.default_expiration}}" size="60" />
+  </div>
+  <h2>Timeseries Monitoring</h2>
+  <div>
+   Enable: <input id="enable_ts_monitoring" type="checkbox" name="enable_ts_monitoring" value="True" onclick="onclick_ts_mon()" {% if cfg.enable_ts_monitoring %}checked{% endif %}>
+   <input id="enable_ts_monitoring_hidden" type="hidden" name="enable_ts_monitoring" value="False">
   </div>
   <h2>Google storage</h2>
   See this <a href="https://developers.google.com/storage/docs/accesscontrol#About-the-Client-ID">

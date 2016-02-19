@@ -63,11 +63,24 @@ class RestrictedConfigHandler(auth.AuthenticatingHandler):
   def get(self):
     self.common(None)
 
+  @staticmethod
+  def cast_to_type(param_name, value):
+    def to_bool(value):
+      if type(value) is bool:
+        return value
+      return {'True': True, 'False': False}.get(value, False)
+
+    cast = {
+        'enable_ts_monitoring': to_bool,
+    }.get(param_name, str)
+    return cast(value)
+
   @auth.require(auth.is_admin)
   def post(self):
     # Convert MultiDict into a dict.
     params = {
-      k: self.request.params.getone(k) for k in self.request.params
+      k: self.cast_to_type(k, self.request.params.getone(k))
+      for k in self.request.params
       if k not in ('keyid', 'xsrf_token')
     }
     cfg = config.settings(fresh=True)
