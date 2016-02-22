@@ -58,15 +58,28 @@ class RestrictedConfigHandler(auth.AuthenticatingHandler):
   def get(self):
     self.common(None)
 
+  @staticmethod
+  def cast_to_type(param_name, value):
+    def to_bool(value):
+      if type(value) is bool:
+        return value
+      return {'True': True, 'False': False}.get(value, False)
+
+    cast = {
+        'bot_death_timeout_secs': int,
+        'enable_ts_monitoring': to_bool,
+        'reusable_task_age_secs': int,
+    }.get(param_name, str)
+    return cast(value)
+
   @auth.require(acl.is_admin)
   def post(self):
     # Convert MultiDict into a dict.
     params = {
-      k: self.request.params.getone(k) for k in self.request.params
+      k: self.cast_to_type(k, self.request.params.getone(k))
+      for k in self.request.params
       if k not in ('keyid', 'xsrf_token')
     }
-    params['bot_death_timeout_secs'] = int(params['bot_death_timeout_secs'])
-    params['reusable_task_age_secs'] = int(params['reusable_task_age_secs'])
     cfg = config.settings(fresh=True)
     keyid = int(self.request.get('keyid', '0'))
     if cfg.key.integer_id() != keyid:

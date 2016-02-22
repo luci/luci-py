@@ -21,6 +21,9 @@ class GlobalConfig(config.GlobalConfig):
   # The amount of time that has to pass before a machine is considered dead.
   bot_death_timeout_secs = ndb.IntegerProperty(default=10*60)
 
+  # Enable ts_mon based monitoring.
+  enable_ts_monitoring = ndb.BooleanProperty(indexed=False, default=False)
+
 
 def settings(fresh=False):
   """Loads GlobalConfig or a default one if not present.

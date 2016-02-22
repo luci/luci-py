@@ -13,6 +13,7 @@ import os
 import sys
 
 import endpoints
+import gae_ts_mon
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
@@ -21,15 +22,21 @@ from components import ereporter2
 
 import handlers_endpoints
 import handlers_frontend
+from server import config
 
 
 def create_application():
   ereporter2.register_formatter()
+  enable_ts_mon = config.settings().enable_ts_monitoring
   # App that serves HTML pages and old API.
-  a = handlers_frontend.create_application(False)
+  frontend_app = handlers_frontend.create_application(False)
+  gae_ts_mon.initialize(frontend_app, enable=enable_ts_mon)
+  # Local import, because it instantiates the mapreduce app.
+  from mapreduce import main
+  gae_ts_mon.initialize(main.APP, enable=enable_ts_mon)
   # App that serves new endpoints API.
   api = endpoints.api_server([handlers_endpoints.swarming_api])
-  return a, api
+  return frontend_app, api, main.APP
 
 
-app, endpoints_app = create_application()
+app, endpoints_app, mapreduce_app = create_application()

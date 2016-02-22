@@ -1,6 +1,15 @@
 {% set title = 'Swarming global config' %}
 {% extends "swarming/base.html" %}
 
+{% block headers %}
+<script>
+function onclick_ts_mon() {
+  document.getElementById("enable_ts_monitoring_hidden").disabled =
+    document.getElementById("enable_ts_monitoring").checked;
+  }
+</script>
+{% endblock %}
+
 {% block body %}
 <h1>Server global config</h1>
 
@@ -16,11 +25,18 @@ Last updated on:
 
 <form method="post" action="{{path}}">
   <h2>General</h2>
+  <p>
   Google Analytics ID:
-  <input name="google_analytics" value="{{cfg.google_analytics}}"/><br>
+  <input name="google_analytics" value="{{cfg.google_analytics}}"/>
+  </p>
+
+  <p>
+  Enable timeseries monitoring: <input id="enable_ts_monitoring" type="checkbox" name="enable_ts_monitoring" value="True" onclick="onclick_ts_mon()" {% if cfg.enable_ts_monitoring %}checked{% endif %}>
+   <input id="enable_ts_monitoring_hidden" type="hidden" name="enable_ts_monitoring" value="False">
+  </p>
 
   <h2>Bots</h2>
-  Delay in seconds before a bot is considered dead with it stops pinging:
+  Delay in seconds before a bot is considered dead after it stops pinging:
   <input name="bot_death_timeout_secs" value="{{cfg.bot_death_timeout_secs}}"/>
   <br>
 

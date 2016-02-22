@@ -17,12 +17,12 @@ handlers:
   secure: always
 
 - url: /internal/mapreduce(/.*)?
-  script: mapreduce.main.APP
+  script: main.mapreduce_app
   secure: always
   login: admin
 
 - url: /restricted/mapreduce(/.*)?
-  script: mapreduce.main.APP
+  script: main.mapreduce_app
   secure: always
   login: admin
 
