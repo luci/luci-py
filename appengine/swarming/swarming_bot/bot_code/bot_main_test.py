@@ -367,7 +367,8 @@ class TestBotMain(net_utils.TestCase):
     }
     # Method should have "self" as first argument - pylint: disable=E0213
     class Popen(object):
-      def __init__(self2, cmd, detached, cwd, env, stdout, stderr):
+      def __init__(
+          self2, cmd, detached, cwd, env, stdout, stderr, stdin, close_fds):
         self2.returncode = None
         self2._out_file = os.path.join(
             self.root_dir, 'work', 'task_runner_out.json')
@@ -385,6 +386,8 @@ class TestBotMain(net_utils.TestCase):
         self.assertEqual('24', env['SWARMING_TASK_ID'])
         self.assertTrue(stdout)
         self.assertEqual(subprocess42.STDOUT, stderr)
+        self.assertEqual(subprocess42.PIPE, stdin)
+        self.assertEqual(sys.platform != 'win32', close_fds)
 
       def wait(self2, timeout=None): # pylint: disable=unused-argument
         self2.returncode = returncode

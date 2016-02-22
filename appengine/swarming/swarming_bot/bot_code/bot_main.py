@@ -318,6 +318,7 @@ def run_bot(arg_error):
       logging.exception('server_ping threw')
 
     if quit_bit.is_set():
+      logging.info('Early quit 1')
       return 0
 
     # If this fails, there's hardly anything that can be done, the bot can't
@@ -327,11 +328,13 @@ def run_bot(arg_error):
       botobj.post_error('Bootstrapping error: %s' % arg_error)
 
     if quit_bit.is_set():
+      logging.info('Early quit 2')
       return 0
 
     call_hook(botobj, 'on_bot_startup')
 
     if quit_bit.is_set():
+      logging.info('Early quit 3')
       return 0
 
     # This environment variable is accessible to the tasks executed by this bot.
@@ -363,6 +366,7 @@ def run_bot(arg_error):
         msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
         botobj.post_error(msg)
         consecutive_sleeps = 0
+    logging.info('Quitting')
 
   # Tell the server we are going away.
   botobj.post_event('bot_shutdown', 'Signal was received')
@@ -411,6 +415,9 @@ def poll_server(botobj, quit_bit):
     if run_manifest(botobj, resp['manifest'], start):
       # Completed a task successfully so update swarming_bot.zip if necessary.
       update_lkgbc(botobj)
+    # TODO(maruel): Handle the case where quit_bit.is_set() happens here. This
+    # is concerning as this means a signal (often SIGTERM) was received while
+    # running the task. Make sure the host is properly restarting.
   elif cmd == 'update':
     update_bot(botobj, resp['version'])
   elif cmd == 'restart':
@@ -505,8 +512,10 @@ def run_manifest(botobj, manifest, start):
           detached=True,
           cwd=botobj.base_dir,
           env=env,
+          stdin=subprocess42.PIPE,
           stdout=f,
-          stderr=subprocess42.STDOUT)
+          stderr=subprocess42.STDOUT,
+          close_fds=sys.platform != 'win32')
       try:
         proc.wait(hard_timeout)
       except subprocess42.TimeoutExpired:
