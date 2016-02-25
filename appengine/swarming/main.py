@@ -27,7 +27,9 @@ from server import config
 
 def create_application():
   ereporter2.register_formatter()
-  enable_ts_mon = config.settings().enable_ts_monitoring
+  # TODO(sergeyberezin): Fix today.
+  #enable_ts_mon = config.settings().enable_ts_monitoring
+  enable_ts_mon = False
   # App that serves HTML pages and old API.
   frontend_app = handlers_frontend.create_application(False)
   gae_ts_mon.initialize(frontend_app, enable=enable_ts_mon)

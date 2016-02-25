@@ -27,7 +27,9 @@ import handlers_backend
 def create_application():
   ereporter2.register_formatter()
   backend = handlers_backend.create_application(False)
-  enable_ts_mon = config.settings().enable_ts_monitoring
+  # TODO(sergeyberezin): Fix today.
+  #enable_ts_mon = config.settings().enable_ts_monitoring
+  enable_ts_mon = False
   gae_ts_mon.initialize(backend, enable=enable_ts_mon)
   return backend
 
