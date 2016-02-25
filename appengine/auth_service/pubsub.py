@@ -76,14 +76,17 @@ def deauthorize_subscriber(email):
 
 def revoke_stale_authorization():
   """Removes pubsub.subscriber role from accounts that no longer have access."""
-  with pubsub.iam_policy(topic_name()) as p:
-    for iam_ident in p.members('roles/pubsub.subscriber'):
-      email = _iam_ident_to_email(iam_ident)
-      if email:
-        ident = auth.Identity.from_bytes('user:' + email)
-        if not acl.is_trusted_service(ident):
-          logging.warning('Removing "%s" from subscribers list', iam_ident)
-          p.remove_member('roles/pubsub.subscriber', iam_ident)
+  try:
+    with pubsub.iam_policy(topic_name()) as p:
+      for iam_ident in p.members('roles/pubsub.subscriber'):
+        email = _iam_ident_to_email(iam_ident)
+        if email:
+          ident = auth.Identity.from_bytes('user:' + email)
+          if not acl.is_trusted_service(ident):
+            logging.warning('Removing "%s" from subscribers list', iam_ident)
+            p.remove_member('roles/pubsub.subscriber', iam_ident)
+  except Error as e:
+    logging.warning('Failed to revoke stale users: %s', e)
 
 
 def publish_authdb_change(state):
