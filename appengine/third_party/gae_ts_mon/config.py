@@ -59,7 +59,7 @@ def _flush_metrics_if_needed_locked(time_now):
     interface.state.last_flushed = entity.last_updated
     updated_sec_ago = (time_now - entity.last_updated).total_seconds()
     if updated_sec_ago > shared.INSTANCE_EXPECTED_TO_HAVE_TASK_NUM_SEC:
-      logging.warning('Instance %s is %n seconds old with no task_num.',
+      logging.warning('Instance %s is %d seconds old with no task_num.',
                       shared.instance_key_id(), updated_sec_ago)
     return False
   interface.state.target.task_num = entity.task_num
@@ -99,7 +99,7 @@ def _internal_callback():
         modules.get_default_version(module_name), target_fields=target_fields)
 
 
-def initialize(app=None, enable=True, cron_module='default',
+def initialize(app=None, is_enabled_fn=None, cron_module='default',
                is_local_unittest=None):
   """Instruments webapp2 `app` with gae_ts_mon metrics.
 
@@ -107,7 +107,8 @@ def initialize(app=None, enable=True, cron_module='default',
 
   Args:
     app (webapp2 app): the app to instrument.
-    enable (bool): enables sending the actual metrics.
+    is_enabled_fn (function or None): a function returning bool if ts_mon should
+      send the actual metrics. None (default) is equivalent to lambda: True.
       This allows apps to turn monitoring on or off dynamically, per app.
     cron_module (str): the name of the module handling the
       /internal/cron/ts_mon/send endpoint. This allows moving the cron job
@@ -121,7 +122,10 @@ def initialize(app=None, enable=True, cron_module='default',
     # application ID will fail.
     is_local_unittest = ('expect_tests' in sys.argv[0])
 
-  if enable and app is not None:
+  if is_enabled_fn is not None:
+    interface.state.flush_enabled_fn = is_enabled_fn
+
+  if app is not None:
     instrument_wsgi_application(app)
     if is_local_unittest or modules.get_current_module_name() == cron_module:
       instrument_wsgi_application(handlers.app)
@@ -136,7 +140,6 @@ def initialize(app=None, enable=True, cron_module='default',
     service_name = app_identity.get_application_id()
     job_name = modules.get_current_module_name()
     hostname = modules.get_current_version_name()
-    shared.get_instance_entity()  # Create an Instance entity.
     runtime.set_shutdown_hook(_shutdown_hook)
 
   interface.state.target = targets.TaskTarget(
@@ -160,10 +163,8 @@ def initialize(app=None, enable=True, cron_module='default',
   shared.register_global_metrics_callback(
       shared.INTERNAL_CALLBACK_NAME, _internal_callback)
 
-  logging.info('Initialized (%s) ts_mon with service_name=%s, job_name=%s, '
-               'hostname=%s',
-               'enabled' if enable else 'disabled',
-               service_name, job_name, hostname)
+  logging.info('Initialized ts_mon with service_name=%s, job_name=%s, '
+               'hostname=%s', service_name, job_name, hostname)
 
 
 def _instrumented_dispatcher(dispatcher, request, response, time_fn=time.time):

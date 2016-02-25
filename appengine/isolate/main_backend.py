@@ -27,10 +27,11 @@ import handlers_backend
 def create_application():
   ereporter2.register_formatter()
   backend = handlers_backend.create_application(False)
-  # TODO(sergeyberezin): Fix today.
-  #enable_ts_mon = config.settings().enable_ts_monitoring
-  enable_ts_mon = False
-  gae_ts_mon.initialize(backend, enable=enable_ts_mon)
+
+  def is_enabled_callback():
+    return config.settings().enable_ts_monitoring
+
+  gae_ts_mon.initialize(backend, is_enabled_fn=is_enabled_callback)
   return backend
 
 

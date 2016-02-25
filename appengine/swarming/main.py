@@ -27,15 +27,16 @@ from server import config
 
 def create_application():
   ereporter2.register_formatter()
-  # TODO(sergeyberezin): Fix today.
-  #enable_ts_mon = config.settings().enable_ts_monitoring
-  enable_ts_mon = False
+
+  def is_enabled_callback():
+    return config.settings().enable_ts_monitoring
+
   # App that serves HTML pages and old API.
   frontend_app = handlers_frontend.create_application(False)
-  gae_ts_mon.initialize(frontend_app, enable=enable_ts_mon)
+  gae_ts_mon.initialize(frontend_app, is_enabled_fn=is_enabled_callback)
   # Local import, because it instantiates the mapreduce app.
   from mapreduce import main
-  gae_ts_mon.initialize(main.APP, enable=enable_ts_mon)
+  gae_ts_mon.initialize(main.APP, is_enabled_fn=is_enabled_callback)
   # App that serves new endpoints API.
   api = endpoints.api_server([handlers_endpoints.swarming_api])
   return frontend_app, api, main.APP

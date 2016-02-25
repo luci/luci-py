@@ -36,9 +36,11 @@
      - `cron_module` (str, default='default'): if you specified a custom
        module for the cron job, you must specify it in every call to
        `initialize`.
-     - `enable` (bool, default=`True`): to enable/disable sending the actual
-       metrics. The value can be dynamically defined (e.g. retrieved from the
-       Datastore), but it will only take effect once an instance restarts.
+     - `is_enabled_fn` (function with no arguments returning `bool`):
+       a callback to enable/disable sending the actual metrics. Default: `None`
+       which is equivalent to `lambda: True`. The callback is called on every
+       metrics flush, and takes effect immediately. Make sure the callback is
+       efficient, or it will slow down your requests.
 
 1.  Give your app's service account permission to send metrics to the API.  You
     can find the name of your service account on the `Permissions` page of your
