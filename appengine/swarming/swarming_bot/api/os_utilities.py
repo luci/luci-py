@@ -361,11 +361,11 @@ def get_gpu():
   else:
     dimensions, state = None, None
 
-  # 15ad is VMWare. It's akin not having a GPU card.
-  dimensions = dimensions or [u'none']
-  if '15ad' in dimensions:
-    dimensions.append(u'none')
-    dimensions.sort()
+  # 15ad is VMWare. It's akin not having a GPU card so replace it with the
+  # string 'none'.
+  if not dimensions or '15ad' in dimensions:
+    dimensions = [u'none']
+  dimensions.sort()
   return dimensions, state
 
 
