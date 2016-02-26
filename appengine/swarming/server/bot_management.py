@@ -295,8 +295,7 @@ def should_restart_bot(bot_id, state):
 
   Args:
     bot_id: ID of the bot.
-    state: A dictionary representing current bot state, see
-        handlers_api.BotPollHandler for the list of keys.
+    state: dict representing current bot state.
 
   Returns:
     Tuple (True to restart, text message explaining the reason).
