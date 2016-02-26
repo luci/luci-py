@@ -137,7 +137,7 @@ def clean_up_bots():
       keys = [bot_management.get_info_key(bot_id)
               for bot_id in bot_ids[:MAX_IN_FLIGHT - num_futures]]
       bot_ids = bot_ids[MAX_IN_FLIGHT - num_futures:]
-      futures.extend(ndb.delete_multi_async(keys))
+      futures.extend(ndb.transaction_async(key.delete) for key in keys)
 
     ndb.Future.wait_any(futures)
     futures = [future for future in futures if not future.done()]
