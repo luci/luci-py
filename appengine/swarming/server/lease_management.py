@@ -125,6 +125,8 @@ def clean_up_bots():
   bot_ids = []
   deleted = {}
   for machine_type in MachineType.query(MachineType.num_pending_deletion > 0):
+    logging.info(
+        'Deleting bots: %s', ', '.join(sorted(machine_type.pending_deletion)))
     bot_ids.extend(machine_type.pending_deletion)
     deleted[machine_type.key] = machine_type.pending_deletion
 
@@ -149,6 +151,7 @@ def clean_up_bots():
   # just process them sequentially.
   # TODO(smut): Parallelize this.
   for machine_key, hostnames in deleted.iteritems():
+    logging.info('Deleted bots: %s', ', '.join(sorted(hostnames)))
     _clear_bots_pending_deletion(machine_key, hostnames)
 
 
