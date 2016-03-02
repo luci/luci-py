@@ -82,6 +82,7 @@ includes:
 - components/auth
 - components/ereporter2
 - components/static_third_party.yaml
+- gae_ts_mon
 
 libraries:
 - name: endpoints

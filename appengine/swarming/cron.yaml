@@ -35,3 +35,9 @@ cron:
 - description: ereporter2 mail exception report
   url: /internal/cron/ereporter2/mail
   schedule: every 1 hours synchronized
+
+### gae_ts_mon
+
+- description: Send ts_mon metrics
+  url: /internal/cron/ts_mon/send
+  schedule: every 1 minutes
