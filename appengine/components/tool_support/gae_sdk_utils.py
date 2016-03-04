@@ -498,7 +498,7 @@ def setup_env(app_dir, app_id, version, module_id, remote_api=False):
     os.environ['CURRENT_MODULE_ID'] = module_id
 
 
-def app_sdk_options(parser, app_dir=None):
+def add_sdk_options(parser, app_dir=None):
   """Adds common command line options used by tools that wrap GAE SDK.
 
   Args:
@@ -514,6 +514,11 @@ def app_sdk_options(parser, app_dir=None):
         '-p', '--app-dir', help='Path to application directory with app.yaml.')
   parser.add_option('-A', '--app-id', help='Defaults to name in app.yaml.')
   parser.add_option('-v', '--verbose', action='store_true')
+
+
+def app_sdk_options(parser, app_dir=None):
+  """Legacy pass-through to add_sdk_options."""
+  add_sdk_options(parser, app_dir)
 
 
 def process_sdk_options(parser, options, app_dir):

@@ -375,7 +375,7 @@ class OptionParser(optparse.OptionParser):
         help='Do not ask for confirmation')
 
   def parse_args(self, *args, **kwargs):
-    gae_sdk_utils.app_sdk_options(self, self.app_dir)
+    gae_sdk_utils.add_sdk_options(self, self.app_dir)
     options, args = optparse.OptionParser.parse_args(self, *args, **kwargs)
     if not self.allow_positional_args and args:
       self.error('Unknown arguments: %s' % args)
