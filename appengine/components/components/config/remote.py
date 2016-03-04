@@ -286,16 +286,18 @@ def format_url(url_format, *args):
   return url_format % tuple(urllib.quote(a, '') for a in args)
 
 
-def get_provider():
+@ndb.tasklet
+def get_provider_async():
   """Returns True if config service hostname is set."""
-  settings = common.ConfigSettings.cached()
+  settings = yield common.ConfigSettings.cached_async()
+  provider = None
   if settings and settings.service_hostname:
-    return Provider(settings.service_hostname)
-  return None
+    provider = Provider(settings.service_hostname)
+  raise ndb.Return(provider)
 
 
 def cron_update_last_good_configs():
-  provider = get_provider()
+  provider = get_provider_async().get_result()
   if provider:
     f = LastGoodConfig.query().map_async(
         provider._update_last_good_config_async, keys_only=True)

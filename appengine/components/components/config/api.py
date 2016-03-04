@@ -6,13 +6,14 @@
 
 Uses remote.Provider or fs.Provider to load configs, depending on whether config
 service hostname is configured in common.ConfigSettings.
-See _get_config_provider().
+See _get_config_provider_async().
 
 Provider do not do type conversion, api.py does.
 """
 
 import collections
 import logging
+import sys
 
 from google.appengine.ext import ndb
 
@@ -40,14 +41,15 @@ class CannotLoadConfigError(Error):
   """A config could not be loaded."""
 
 
-def _get_config_provider():  # pragma: no cover
+@ndb.tasklet
+def _get_config_provider_async():  # pragma: no cover
   """Returns a config provider to load configs.
 
   There are two config provider implementations: remote.Provider and
   fs.Provider. Both implement get_async(), get_project_configs_async(),
   get_ref_configs_async() with same signatures.
   """
-  return remote.get_provider() or fs.get_provider()
+  raise ndb.Return((yield remote.get_provider_async()) or fs.get_provider())
 
 
 @ndb.tasklet
@@ -96,7 +98,8 @@ def get_async(
           'specified')
 
   try:
-    revision, config = yield _get_config_provider().get_async(
+    provider = yield _get_config_provider_async()
+    revision, config = yield provider.get_async(
         config_set, path, revision=revision, store_last_good=store_last_good)
   except Exception as ex:
     raise CannotLoadConfigError(
@@ -105,7 +108,7 @@ def get_async(
             path,
             revision,
             ex,
-        ))
+        )), None, sys.exc_info()[2]
 
   raise ndb.Return((revision, common._convert_config(config, dest_type)))
 
@@ -149,7 +152,8 @@ def get_ref_config(*args, **kwargs):
 @ndb.tasklet
 def get_projects_async():
   """Returns a list of registered projects (type Project)."""
-  project_dicts = yield _get_config_provider().get_projects_async()
+  provider = yield _get_config_provider_async()
+  project_dicts = yield provider.get_projects_async()
   empty = Project('', '', '', '')
   raise ndb.Return([empty._replace(**p) for p in project_dicts])
 
@@ -177,7 +181,8 @@ def get_project_configs_async(path, dest_type=None):
   assert path
   common._validate_dest_type(dest_type)
 
-  configs = yield _get_config_provider().get_project_configs_async(path)
+  provider = yield _get_config_provider_async()
+  configs = yield provider.get_project_configs_async(path)
   result = {}
   for config_set, (revision, content) in configs.iteritems():
     assert config_set and config_set.startswith('projects/'), config_set
@@ -216,7 +221,8 @@ def get_ref_configs_async(path, dest_type=None):
   """
   assert path
   common._validate_dest_type(dest_type)
-  configs = yield _get_config_provider().get_ref_configs_async(path)
+  provider = yield _get_config_provider_async()
+  configs = yield provider.get_ref_configs_async(path)
   result = {}
   for config_set, (revision, content) in configs.iteritems():
     assert config_set and config_set.startswith('projects/'), config_set
@@ -239,6 +245,7 @@ def get_ref_configs(path, dest_type=None):
   return get_ref_configs_async(path, dest_type).get_result()
 
 
+@ndb.tasklet
 def get_config_set_location_async(config_set):  # pragma: no cover
   """Returns URL of where configs for a given config set are stored.
 
@@ -251,7 +258,9 @@ def get_config_set_location_async(config_set):  # pragma: no cover
   Returns:
     URL or None if no such config set. In file system mode always None.
   """
-  return _get_config_provider().get_config_set_location_async(config_set)
+  provider = yield _get_config_provider_async()
+  location = yield provider.get_config_set_location_async(config_set)
+  raise ndb.Return(location)
 
 
 def get_config_set_location(config_set):  # pragma: no cover

@@ -55,7 +55,7 @@ class GlobalConfig(ndb.Model):
   updated_by = auth.IdentityProperty(indexed=False)
 
   @classmethod
-  def cached(cls):
+  def cached_async(cls):
     """Fetches config entry from local cache or datastore.
 
     Bootstraps it if missing. May return slightly stale data but in most cases
@@ -67,17 +67,20 @@ class GlobalConfig(ndb.Model):
     # a first attempt (it's not a big deal if it happens concurrently in MT
     # environment, last one wins). Same can be achieved with metaclasses, but no
     # one likes metaclasses.
-    if not cls._config_fetcher:
+    if not cls._config_fetcher_async:
       @utils.cache_with_expiration(expiration_sec=60)
-      def config_fetcher():
-        conf = cls.fetch()
+      @ndb.tasklet
+      def config_fetcher_async():
+        conf = yield cls.fetch_async()
         if not conf:
           conf = cls()
           conf.set_defaults()
-          conf.store(updated_by=auth.get_service_self_identity())
-        return conf
-      cls._config_fetcher = staticmethod(config_fetcher)
-    return cls._config_fetcher()
+          yield conf.store_async(updated_by=auth.get_service_self_identity())
+        raise ndb.Return(conf)
+      cls._config_fetcher_async = staticmethod(config_fetcher_async)
+    return cls._config_fetcher_async()
+
+  cached = utils.sync_of(cached_async)
 
   @classmethod
   def clear_cache(cls):
@@ -85,24 +88,29 @@ class GlobalConfig(ndb.Model):
 
     So the next call to .cached() returns the fresh instance from ndb.
     """
-    if cls._config_fetcher:
-      utils.clear_cache(cls._config_fetcher)
+    if cls._config_fetcher_async:
+      utils.clear_cache(cls._config_fetcher_async)
 
   @classmethod
-  def fetch(cls):
+  def fetch_async(cls):
     """Returns the current up-to-date version of the config entity.
 
     Always fetches it from datastore. May return None if missing.
     """
-    return datastore_utils.get_versioned_most_recent(cls, cls._get_root_key())
+    return datastore_utils.get_versioned_most_recent_async(
+        cls, cls._get_root_key())
 
-  def store(self, updated_by=None):
+  fetch = utils.sync_of(fetch_async)
+
+  def store_async(self, updated_by=None):
     """Stores a new version of the config entity."""
     # Create an incomplete key, to be completed by 'store_new_version'.
     self.key = ndb.Key(self.__class__, None, parent=self._get_root_key())
     self.updated_by = updated_by or auth.get_current_identity()
     self.updated_ts = utils.utcnow()
-    return datastore_utils.store_new_version(self, self._get_root_model())
+    return datastore_utils.store_new_version_async(self, self._get_root_model())
+
+  store = utils.sync_of(store_async)
 
   def modify(self, updated_by=None, **kwargs):
     """Applies |kwargs| dict to the entity and stores the entity if changed."""
@@ -121,7 +129,7 @@ class GlobalConfig(ndb.Model):
 
   ### Private stuff.
 
-  _config_fetcher = None
+  _config_fetcher_async = None
 
   @classmethod
   def _get_root_model(cls):

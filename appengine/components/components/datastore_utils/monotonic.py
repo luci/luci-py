@@ -8,6 +8,7 @@ from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 from google.appengine.runtime import apiproxy_errors
 
+from components import utils
 from . import txn
 
 
@@ -15,10 +16,14 @@ __all__ = [
   'HIGH_KEY_ID',
   'Root',
   'get_versioned_most_recent',
+  'get_versioned_most_recent_async',
   'get_versioned_most_recent_with_root',
+  'get_versioned_most_recent_with_root_async',
   'get_versioned_root_model',
   'insert',
+  'insert_async',
   'store_new_version',
+  'store_new_version_async',
 ]
 
 
@@ -43,7 +48,8 @@ class Root(ndb.Model):
   current = ndb.IntegerProperty(indexed=False)
 
 
-def insert(entity, new_key_callback=None, extra=None):
+@ndb.tasklet
+def insert_async(entity, new_key_callback=None, extra=None):
   """Inserts an entity in the DB and guarantees creation.
 
   Similar in principle to ndb.Model.get_or_insert() except that it only succeeds
@@ -59,6 +65,7 @@ def insert(entity, new_key_callback=None, extra=None):
     new_key_callback: function to generates a new key if the previous key was
         already taken. If this function returns None, the execution is aborted.
         If this parameter is None, insertion is only tried once.
+        May return a future.
     extra: additional entities to store simultaneously. For example a bookeeping
         entity that must be updated simultaneously along |entity|. All the
         entities must be inside the same entity group. This function is not safe
@@ -76,36 +83,48 @@ def insert(entity, new_key_callback=None, extra=None):
     entities.extend(extra)
     root = entity.key.pairs()[0]
     assert all(i.key and i.key.pairs()[0] == root for i in extra), extra
-  if not new_key_callback:
-    new_key_callback = lambda: None
 
+  def new_key_callback_async():
+    key = None
+    if new_key_callback:
+      key = new_key_callback()
+    if isinstance(key, ndb.Future):
+       return key
+    future = ndb.Future()
+    future.set_result(key)
+    return future
+
+  @ndb.tasklet
   def run():
-    if entities[0].key.get():
+    if (yield entities[0].key.get_async()):
       # The entity exists, abort.
-      return False
-    ndb.put_multi(entities)
-    return True
+      raise ndb.Return(False)
+    yield ndb.put_multi_async(entities)
+    raise ndb.Return(True)
 
   # TODO(maruel): Run a severe load test and count the number of retries.
   while True:
     # First iterate outside the transaction in case the first entity key number
     # selected is already used.
-    while entity.key and entity.key.id() and entity.key.get():
-      entity.key = new_key_callback()
+    while entity.key and entity.key.id() and (yield entity.key.get_async()):
+      entity.key = yield new_key_callback_async()
 
     if not entity.key or not entity.key.id():
       break
 
     try:
-      if txn.transaction(run, retries=0):
+      if (yield txn.transaction_async(run, retries=0)):
         break
     except txn.CommitError:
       # Retry with the same key.
       pass
     else:
       # Entity existed. Get the next key.
-      entity.key = new_key_callback()
-  return entity.key
+      entity.key = yield new_key_callback_async()
+  raise ndb.Return(entity.key)
+
+
+insert = utils.sync_of(insert_async)
 
 
 def get_versioned_root_model(model_name):
@@ -124,12 +143,17 @@ def get_versioned_root_model(model_name):
   return _Root
 
 
-def get_versioned_most_recent(cls, root_key):
+@ndb.tasklet
+def get_versioned_most_recent_async(cls, root_key):
   """Returns the most recent entity of cls child of root_key."""
-  return get_versioned_most_recent_with_root(cls, root_key)[1]
+  _, entity = yield get_versioned_most_recent_with_root_async(cls, root_key)
+  raise ndb.Return(entity)
 
 
-def get_versioned_most_recent_with_root(cls, root_key):
+get_versioned_most_recent = utils.sync_of(get_versioned_most_recent_async)
+
+@ndb.tasklet
+def get_versioned_most_recent_with_root_async(cls, root_key):
   """Returns the most recent instance of a versioned entity and the root entity.
 
   Getting the root entity is needed to get the current index.
@@ -142,11 +166,18 @@ def get_versioned_most_recent_with_root(cls, root_key):
 
   root = root_key.get()
   if not root or not root.current:
-    return None, None
-  return root, ndb.Key(cls, root.current, parent=root_key).get()
+    raise ndb.Return(None, None)
+  entity = yield ndb.Key(cls, root.current, parent=root_key).get_async()
+  raise ndb.Return(root, entity)
 
 
-def store_new_version(entity, root_cls, extra=None):
+get_versioned_most_recent_with_root = utils.sync_of(
+  get_versioned_most_recent_with_root_async
+)
+
+
+@ndb.tasklet
+def store_new_version_async(entity, root_cls, extra=None):
   """Stores a new version of the instance.
 
   entity.key is updated to the key used to store the entity. Only the parent key
@@ -175,7 +206,7 @@ def store_new_version(entity, root_cls, extra=None):
       'This function is unsafe for root entity, use store_new_version_safe '
       'which is not yet implemented')
   root_key = entity.key.parent()
-  root = root_key.get() or root_cls(key=root_key)
+  root = (yield root_key.get_async()) or root_cls(key=root_key)
   root.current = root.current or HIGH_KEY_ID
   flat = list(entity.key.flat())
   flat[-1] = root.current
@@ -188,4 +219,8 @@ def store_new_version(entity, root_cls, extra=None):
 
   extra = (extra or [])[:]
   extra.append(root)
-  return insert(entity, _new_key_minus_one_current, extra=extra)
+  result = yield insert_async(entity, _new_key_minus_one_current, extra=extra)
+  raise ndb.Return(result)
+
+
+store_new_version = utils.sync_of(store_new_version_async)

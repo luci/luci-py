@@ -28,7 +28,9 @@ class ApiTestCase(test_case.TestCase):
   def setUp(self):
     super(ApiTestCase, self).setUp()
     self.provider = mock.Mock()
-    self.mock(config.api, '_get_config_provider', lambda: self.provider)
+    provider_future = ndb.Future()
+    provider_future.set_result(self.provider)
+    self.mock(config.api, '_get_config_provider_async', lambda: provider_future)
     self.provider.get_async.return_value = ndb.Future()
     self.provider.get_async.return_value.set_result(
         ('deadbeef', 'param: "value"'))

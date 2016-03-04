@@ -28,7 +28,9 @@ class RemoteTestCase(test_case.TestCase):
     net.json_request_async.side_effect = self.json_request_async
 
     self.provider = remote.Provider('luci-config.appspot.com')
-    self.mock(remote, 'get_provider', lambda: self.provider)
+    provider_future = ndb.Future()
+    provider_future.set_result(self.provider)
+    self.mock(remote, 'get_provider_async', lambda: provider_future)
 
   @ndb.tasklet
   def json_request_async(self, url, **kwargs):

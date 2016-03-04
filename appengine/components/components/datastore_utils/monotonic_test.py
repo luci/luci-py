@@ -84,13 +84,14 @@ class MonotonicTest(test_case.TestCase):
   def test_insert_transaction_failure(self):
     EntityX(id=1, parent=self.parent).put()
     calls = []
-    def transaction(*args, **kwargs):
+    def transaction_async(*args, **kwargs):
       calls.append(1)
       if len(calls) < 2:
         raise txn.CommitError()
-      return old_transaction(*args, **kwargs)
+      return old_transaction_async(*args, **kwargs)
 
-    old_transaction = self.mock(txn, 'transaction', transaction)
+    old_transaction_async = self.mock(
+        txn, 'transaction_async', transaction_async)
 
     actual = monotonic.insert(EntityX(id=2, parent=self.parent))
     expected = ndb.Key('EntityX', 2, parent=self.parent)
@@ -217,12 +218,13 @@ class MonotonicTest(test_case.TestCase):
     actual = monotonic.store_new_version(EntityX(a=1, parent=parent), cls)
 
     calls = []
-    def transaction(*args, **kwargs):
+    def transaction_async(*args, **kwargs):
       calls.append(1)
       if len(calls) < 2:
         raise txn.CommitError()
-      return old_transaction(*args, **kwargs)
-    old_transaction = self.mock(txn, 'transaction', transaction)
+      return old_transaction_async(*args, **kwargs)
+    old_transaction_async = self.mock(
+        txn, 'transaction_async', transaction_async)
 
     actual = monotonic.store_new_version(EntityX(a=2, parent=parent), cls)
     self.assertEqual(

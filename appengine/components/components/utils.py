@@ -616,3 +616,21 @@ def import_jinja2():
     if os.path.basename(i) == 'jinja2':
       sys.path.remove(i)
   sys.path.append(os.path.join(THIS_DIR, 'third_party'))
+
+
+def sync_of(async_fn):
+  """Returns a synchronous version of an asynchronous function."""
+  is_static_method = isinstance(async_fn, staticmethod)
+  is_class_method = isinstance(async_fn, classmethod)
+  if is_static_method or is_class_method:
+    async_fn = async_fn.__func__
+
+  @functools.wraps(async_fn)
+  def sync(*args, **kwargs):
+    return async_fn(*args, **kwargs).get_result()
+
+  if is_static_method:
+    sync = staticmethod(sync)
+  elif is_class_method:
+    sync = classmethod(sync)
+  return sync
