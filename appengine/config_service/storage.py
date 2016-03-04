@@ -9,11 +9,11 @@ import logging
 
 from google.appengine.api import app_identity
 from google.appengine.ext import ndb
+from google.appengine.ext.ndb import msgprop
 from google.protobuf import text_format
 
+from components import config
 from components import utils
-from components.datastore_utils import txn
-
 
 class Blob(ndb.Model):
   """Content-addressed blob. Immutable.
@@ -38,7 +38,30 @@ class ConfigSet(ndb.Model):
   """
   # last imported revision of the config set. See also Revision and File.
   latest_revision = ndb.StringProperty(required=True)
+  latest_revision_url = ndb.StringProperty(indexed=False)
+  latest_revision_time = ndb.DateTimeProperty(indexed=False)
+  latest_revision_committer_email = ndb.StringProperty(indexed=False)
+
   location = ndb.StringProperty(required=True)
+
+
+class ImportAttempt(ndb.Model):
+  """Describes what happened last time we tried to import a config set.
+
+  Entity key:
+    Parent is ConfigSet (does not have to exist).
+    ID is "last".
+  """
+  time = ndb.DateTimeProperty(auto_now_add=True, required=True, indexed=False)
+  revision = ndb.StringProperty(required=True, indexed=False)
+  success = ndb.BooleanProperty(required=True, indexed=False)
+  message = ndb.StringProperty(required=True, indexed=False)
+
+  class ValidationMessage(ndb.Model):
+    severity = msgprop.EnumProperty(config.Severity, indexed=False)
+    text = ndb.StringProperty(indexed=False)
+
+  validation_messages = ndb.StructuredProperty(ValidationMessage, repeated=True)
 
 
 class Revision(ndb.Model):
@@ -68,18 +91,18 @@ class File(ndb.Model):
     assert not self.key.id().startswith('/')
 
 
+def last_import_attempt_key(config_set):
+  return ndb.Key(ConfigSet, config_set, ImportAttempt, 'last')
+
+
 @ndb.tasklet
-def get_mapping_async(config_set=None):
+def get_config_sets_async(config_set=None):
   if config_set:
     existing = yield ConfigSet.get_by_id_async(config_set)
     config_sets = [existing or ConfigSet(id=config_set)]
   else:
     config_sets = yield ConfigSet.query().fetch_async()
-  raise ndb.Return({
-      cs.key.id(): cs.location
-      for cs in config_sets
-      if cs
-    })
+  raise ndb.Return(config_sets)
 
 
 @ndb.tasklet

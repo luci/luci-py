@@ -4,17 +4,15 @@
 # found in the LICENSE file.
 
 import base64
-import copy
+import datetime
 import httplib
 
-from test_env import future
 import test_env
+from test_env import future
+
 test_env.setup_test_env()
 
-import endpoints
-
-from components import auth
-from components import utils
+from components import config
 from components.config.proto import project_config_pb2
 from components.config.proto import service_config_pb2
 from test_support import test_case
@@ -63,18 +61,19 @@ class ApiTest(test_case.EndpointsTestCase):
   ##############################################################################
   # get_mapping
 
-  def test_get_config_one(self):
-    self.mock(storage, 'get_mapping_async', mock.Mock())
-    storage.get_mapping_async.return_value = future({
-      'services/x': 'http://x',
-    })
+  def test_get_mapping_one(self):
+    self.mock(storage, 'get_config_sets_async', mock.Mock())
+    storage.get_config_sets_async.return_value = future([
+      storage.ConfigSet(id='services/x', location='http://x'),
+    ])
 
     req = {
       'config_set': 'services/x',
     }
     resp = self.call_api('get_mapping', req).json_body
 
-    storage.get_mapping_async.assert_called_once_with(config_set='services/x')
+    storage.get_config_sets_async.assert_called_once_with(
+        config_set='services/x')
 
     self.assertEqual(resp, {
       'mappings': [
@@ -85,7 +84,7 @@ class ApiTest(test_case.EndpointsTestCase):
       ],
     })
 
-  def test_get_config_one_forbidden(self):
+  def test_get_mapping_one_forbidden(self):
     self.mock(acl, 'can_read_config_set', mock.Mock(return_value=False))
     with self.call_should_fail(httplib.FORBIDDEN):
       req = {
@@ -93,13 +92,12 @@ class ApiTest(test_case.EndpointsTestCase):
       }
       self.call_api('get_mapping', req)
 
-  def test_get_config_all(self):
-    self.mock(storage, 'get_mapping_async', mock.Mock())
-    storage.get_mapping_async.return_value = future({
-      'services/x': 'http://x',
-      'services/y': 'http://y',
-    })
-
+  def test_get_mapping_all(self):
+    self.mock(storage, 'get_config_sets_async', mock.Mock())
+    storage.get_config_sets_async.return_value = future([
+      storage.ConfigSet(id='services/x', location='http://x'),
+      storage.ConfigSet(id='services/y', location='http://y'),
+    ])
     resp = self.call_api('get_mapping', {}).json_body
 
     self.assertEqual(resp, {
@@ -115,12 +113,12 @@ class ApiTest(test_case.EndpointsTestCase):
       ],
     })
 
-  def test_get_config_all_partially_forbidden(self):
-    self.mock(storage, 'get_mapping_async', mock.Mock())
-    storage.get_mapping_async.return_value = future({
-      'services/x': 'http://x',
-      'services/y': 'http://y',
-    })
+  def test_get_mapping_all_partially_forbidden(self):
+    self.mock(storage, 'get_config_sets_async', mock.Mock())
+    storage.get_config_sets_async.return_value = future([
+      storage.ConfigSet(id='services/x', location='http://x'),
+      storage.ConfigSet(id='services/y', location='http://y'),
+    ])
     self.mock(acl, 'can_read_config_set', mock.Mock(side_effect=[True, False]))
 
     resp = self.call_api('get_mapping', {}).json_body
@@ -130,6 +128,244 @@ class ApiTest(test_case.EndpointsTestCase):
         {
           'config_set': 'services/x',
           'location': 'http://x',
+        },
+      ],
+    })
+
+  ##############################################################################
+  # get_config_sets
+
+  def test_get_config_one(self):
+    self.mock(storage, 'get_config_sets_async', mock.Mock())
+    storage.get_config_sets_async.return_value = future([
+      storage.ConfigSet(
+          id='services/x',
+          location='https://x.googlesource.com/x',
+          latest_revision='deadbeef',
+          latest_revision_url='https://x.googlesource.com/x/+/deadbeef',
+          latest_revision_time=datetime.datetime(2016, 1, 1),
+          latest_revision_committer_email='john@doe.com',
+      ),
+    ])
+
+    req = {
+      'config_set': 'services/x',
+    }
+    resp = self.call_api('get_config_sets', req).json_body
+
+    storage.get_config_sets_async.assert_called_once_with(
+        config_set='services/x')
+
+    self.assertEqual(resp, {
+      'config_sets': [
+        {
+          'config_set': 'services/x',
+          'location': 'https://x.googlesource.com/x',
+          'revision': {
+            'id': 'deadbeef',
+            'url': 'https://x.googlesource.com/x/+/deadbeef',
+            'timestamp': '1451606400000000',
+            'committer_email': 'john@doe.com',
+          },
+        },
+      ],
+    })
+
+  def test_get_config_one_with_last_attempt(self):
+    self.mock(storage, 'get_config_sets_async', mock.Mock())
+    storage.get_config_sets_async.return_value = future([
+      storage.ConfigSet(
+          id='services/x',
+          location='https://x.googlesource.com/x',
+          latest_revision='deadbeef',
+          latest_revision_url='https://x.googlesource.com/x/+/deadbeef',
+          latest_revision_time=datetime.datetime(2016, 1, 1),
+          latest_revision_committer_email='john@doe.com',
+      ),
+    ])
+
+    storage.ImportAttempt(
+        key=storage.last_import_attempt_key('services/x'),
+        time=datetime.datetime(2016, 1, 2),
+        revision='badcoffee',
+        success=False,
+        message='Validation errors',
+        validation_messages=[
+          storage.ImportAttempt.ValidationMessage(
+              severity=config.Severity.ERROR,
+              text='error!',
+          ),
+          storage.ImportAttempt.ValidationMessage(
+              severity=config.Severity.WARNING,
+              text='warning!',
+          ),
+        ],
+    ).put()
+
+    req = {
+      'config_set': 'services/x',
+    }
+    resp = self.call_api('get_config_sets', req).json_body
+
+    storage.get_config_sets_async.assert_called_once_with(
+        config_set='services/x')
+
+    expected_resp = {
+      'config_sets': [
+        {
+          'config_set': 'services/x',
+          'location': 'https://x.googlesource.com/x',
+          'revision': {
+            'id': 'deadbeef',
+            'url': 'https://x.googlesource.com/x/+/deadbeef',
+            'timestamp': '1451606400000000',
+            'committer_email': 'john@doe.com',
+          },
+        },
+      ],
+    }
+    self.assertEqual(resp, expected_resp)
+
+    req['include_last_import_attempt'] = True
+    resp = self.call_api('get_config_sets', req).json_body
+    expected_resp['config_sets'][0]['last_import_attempt'] = {
+      'timestamp': '1451692800000000',
+      'revision': 'badcoffee',
+      'success': False,
+      'message': 'Validation errors',
+      'validation_messages': [
+        {
+          'severity': 'ERROR',
+          'text': 'error!',
+        },
+        {
+          'severity': 'WARNING',
+          'text': 'warning!',
+        },
+      ]
+    }
+    self.assertEqual(resp, expected_resp)
+
+  def test_get_config_one_forbidden(self):
+    self.mock(acl, 'can_read_config_set', mock.Mock(return_value=False))
+    with self.call_should_fail(httplib.FORBIDDEN):
+      req = {
+        'config_set': 'services/x',
+      }
+      self.call_api('get_config_sets', req)
+
+  def test_get_config_all(self):
+    self.mock(storage, 'get_config_sets_async', mock.Mock())
+    storage.get_config_sets_async.return_value = future([
+      storage.ConfigSet(
+          id='services/x',
+          location='https://x.googlesource.com/x',
+          latest_revision='deadbeef',
+          latest_revision_url='https://x.googlesource.com/x/+/deadbeef',
+          latest_revision_time=datetime.datetime(2016, 1, 1),
+          latest_revision_committer_email='john@doe.com',
+      ),
+      storage.ConfigSet(
+          id='projects/y',
+          location='https://y.googlesource.com/y',
+          latest_revision='badcoffee',
+          latest_revision_url='https://y.googlesource.com/y/+/badcoffee',
+          latest_revision_time=datetime.datetime(2016, 1, 2),
+          latest_revision_committer_email='john@doe.com',
+      ),
+    ])
+
+    resp = self.call_api('get_config_sets', {}).json_body
+
+    storage.get_config_sets_async.assert_called_once_with(config_set=None)
+
+    self.assertEqual(resp, {
+      'config_sets': [
+        {
+          'config_set': 'services/x',
+          'location': 'https://x.googlesource.com/x',
+          'revision': {
+            'id': 'deadbeef',
+            'url': 'https://x.googlesource.com/x/+/deadbeef',
+            'timestamp': '1451606400000000',
+            'committer_email': 'john@doe.com',
+          },
+        },
+        {
+          'config_set': 'projects/y',
+          'location': 'https://y.googlesource.com/y',
+          'revision': {
+            'id': 'badcoffee',
+            'url': 'https://y.googlesource.com/y/+/badcoffee',
+            'timestamp': '1451692800000000',
+            'committer_email': 'john@doe.com',
+          },
+        },
+      ],
+    })
+
+  def test_get_config_all_partially_forbidden(self):
+    self.mock(storage, 'get_config_sets_async', mock.Mock())
+    storage.get_config_sets_async.return_value = future([
+      storage.ConfigSet(
+          id='services/x',
+          location='https://x.googlesource.com/x',
+          latest_revision='deadbeef',
+      ),
+      storage.ConfigSet(
+          id='projects/y',
+          location='https://y.googlesource.com/y',
+          latest_revision='badcoffee',
+      ),
+    ])
+    self.mock(acl, 'can_read_config_set', mock.Mock(side_effect=[True, False]))
+
+    resp = self.call_api('get_config_sets', {}).json_body
+
+    self.assertEqual(resp, {
+      'config_sets': [
+        {
+          'config_set': 'services/x',
+          'location': 'https://x.googlesource.com/x',
+          'revision': {
+            'id': 'deadbeef',
+          }
+        },
+      ],
+    })
+
+  def test_get_config_one(self):
+    self.mock(storage, 'get_config_sets_async', mock.Mock())
+    storage.get_config_sets_async.return_value = future([
+      storage.ConfigSet(
+          id='services/x',
+          location='https://x.googlesource.com/x',
+          latest_revision='deadbeef',
+          latest_revision_url='https://x.googlesource.com/x/+/deadbeef',
+          latest_revision_time=datetime.datetime(2016, 1, 1),
+          latest_revision_committer_email='john@doe.com',
+      ),
+    ])
+
+    req = {
+      'config_set': 'services/x',
+    }
+    resp = self.call_api('get_config_sets', req).json_body
+
+    storage.get_config_sets_async.assert_called_once_with(
+        config_set='services/x')
+
+    self.assertEqual(resp, {
+      'config_sets': [
+        {
+          'config_set': 'services/x',
+          'location': 'https://x.googlesource.com/x',
+          'revision': {
+            'id': 'deadbeef',
+            'url': 'https://x.googlesource.com/x/+/deadbeef',
+            'timestamp': '1451606400000000',
+            'committer_email': 'john@doe.com',
+          },
         },
       ],
     })

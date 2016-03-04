@@ -2,11 +2,13 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import logging
 import re
 
 from google.appengine.api import app_identity
 from google.appengine.api import lib_config
 from google.appengine.ext import ndb
+from protorpc import messages
 
 # Config component is using google.protobuf package, it requires some python
 # package magic hacking.
@@ -18,6 +20,14 @@ from google import protobuf
 from components import auth
 from components import utils
 from components.datastore_utils import config
+
+
+class Severity(messages.Enum):
+  DEBUG = logging.DEBUG
+  INFO = logging.INFO
+  WARNING = logging.WARNING
+  ERROR = logging.ERROR
+  CRITICAL = logging.CRITICAL
 
 
 ################################################################################

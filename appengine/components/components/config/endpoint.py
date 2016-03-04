@@ -44,14 +44,8 @@ class ValidateRequestMessage(messages.Message):
 
 
 class ValidationMessage(messages.Message):
-  class Severity(messages.Enum):
-    DEBUG = logging.DEBUG
-    INFO = logging.INFO
-    WARNING = logging.WARNING
-    ERROR = logging.ERROR
-    CRITICAL = logging.CRITICAL
   text = messages.StringField(1, required=True)
-  severity = messages.EnumField(Severity, 2, required=True)
+  severity = messages.EnumField(common.Severity, 2, required=True)
 
 
 class ValidateResponseMessage(messages.Message):
@@ -151,7 +145,7 @@ class ConfigApi(remote.Service):
     res = ValidateResponseMessage()
     for m in ctx.result().messages:
       res.messages.append(ValidationMessage(
-          severity=ValidationMessage.Severity.lookup_by_number(m.severity),
+          severity=common.Severity.lookup_by_number(m.severity),
           text=m.text,
       ))
     return res

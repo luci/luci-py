@@ -3,6 +3,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import datetime
 import os
 
 from test_env import future
@@ -14,7 +15,7 @@ from google.appengine.ext import ndb
 
 import mock
 
-from components import auth
+from components import config
 from components import gitiles
 from components import net
 from components.config.proto import project_config_pb2
@@ -22,6 +23,7 @@ from components.config.proto import service_config_pb2
 from test_support import test_case
 
 import gitiles_import
+import notifications
 import projects
 import storage
 import validation
@@ -32,6 +34,28 @@ TEST_ARCHIVE_PATH = os.path.join(
 
 
 class GitilesImportTestCase(test_case.TestCase):
+  john = gitiles.Contribution(
+      'John Doe', 'john@doe.com', datetime.datetime(2016, 1, 1))
+  test_commit = gitiles.Commit(
+      sha='a1841f40264376d170269ee9473ce924b7c2c4e9',
+      tree='deadbeef',
+      parents=['beefdead'],
+      author=john,
+      committer=john,
+      message=None,
+      tree_diff=None)
+
+  def assert_attempt(self, success, msg, config_set=None, no_revision=False):
+    config_set = config_set or 'config_set'
+    attempt = storage.last_import_attempt_key(config_set).get()
+    self.assertIsNotNone(attempt)
+    self.assertEqual(
+        attempt.revision, '' if no_revision else self.test_commit.sha
+    )
+    self.assertEqual(attempt.success, success)
+    self.assertEqual(attempt.message, msg)
+    return attempt
+
   def test_get_gitiles_config_corrupted(self):
     self.mock(storage, 'get_latest_async', mock.Mock())
     storage.get_latest_async.return_value = future('garbage')
@@ -53,23 +77,20 @@ class GitilesImportTestCase(test_case.TestCase):
             treeish='luci/config',
             path='/',
         ),
-        'a1841f40264376d170269ee9473ce924b7c2c4e9',
-        create_config_set=True)
+        self.test_commit)
 
     gitiles.get_archive.assert_called_once_with(
         'localhost', 'project', 'a1841f40264376d170269ee9473ce924b7c2c4e9', '/',
         deadline=15)
     saved_config_set = storage.ConfigSet.get_by_id('config_set')
     self.assertIsNotNone(saved_config_set)
-    self.assertEqual(
-        saved_config_set.latest_revision,
-        'a1841f40264376d170269ee9473ce924b7c2c4e9')
+    self.assertEqual(saved_config_set.latest_revision, self.test_commit.sha)
     self.assertEqual(
         saved_config_set.location,
         'https://localhost/project/+/luci/config')
 
     saved_revision = storage.Revision.get_by_id(
-        'a1841f40264376d170269ee9473ce924b7c2c4e9', parent=saved_config_set.key)
+        self.test_commit.sha, parent=saved_config_set.key)
     self.assertIsNotNone(saved_revision)
 
     saved_file = storage.File.get_by_id(
@@ -81,6 +102,7 @@ class GitilesImportTestCase(test_case.TestCase):
     saved_blob = storage.Blob.get_by_id(saved_file.content_hash)
     self.assertIsNotNone(saved_blob)
     self.assertEqual(saved_blob.content, 'x\n')
+    self.assert_attempt(True, 'Imported')
 
     # Run second time, assert nothing is fetched from gitiles.
     ndb.Key(storage.ConfigSet, 'config_set').delete()
@@ -92,11 +114,12 @@ class GitilesImportTestCase(test_case.TestCase):
             project='project',
             treeish='master',
             path='/'),
-        'a1841f40264376d170269ee9473ce924b7c2c4e9',
-        create_config_set=True)
+        self.test_commit)
     self.assertFalse(gitiles.get_archive.called)
+    self.assert_attempt(True, 'Up-to-date')
 
   def test_import_revision_no_acrhive(self):
+    self.mock_get_log()
     self.mock(gitiles, 'get_archive', mock.Mock(return_value=None))
 
     gitiles_import.import_revision(
@@ -106,11 +129,17 @@ class GitilesImportTestCase(test_case.TestCase):
           project='project',
           treeish='master',
           path='/'),
-        'a1841f40264376d170269ee9473ce924b7c2c4e9')
+        self.test_commit)
+    self.assert_attempt(True, 'Config directory not found. Imported as empty')
 
   def test_import_invalid_revision(self):
     self.mock_get_archive()
-    self.mock(validation, 'validate_config', mock.Mock(return_value=False))
+    self.mock(notifications, 'notify_gitiles_rejection', mock.Mock())
+
+    def validate_config(config_set, filename, content, ctx):
+      if filename == 'test_archive/x':
+        ctx.error('bad config!')
+    self.mock(validation, 'validate_config', validate_config)
 
     gitiles_import.import_revision(
         'config_set',
@@ -119,22 +148,20 @@ class GitilesImportTestCase(test_case.TestCase):
           project='project',
           treeish='master',
           path='/'),
-        'a1841f40264376d170269ee9473ce924b7c2c4e9')
+        self.test_commit)
     # Assert not saved.
     self.assertIsNone(storage.ConfigSet.get_by_id('config_set'))
 
+    saved_attempt = self.assert_attempt(False, 'Validation errors')
+    self.assertEqual(len(saved_attempt.validation_messages), 1)
+    val_msg = saved_attempt.validation_messages[0]
+    self.assertEqual(val_msg.severity, config.Severity.ERROR)
+    self.assertEqual(val_msg.text, 'bad config!')
+
   def mock_get_log(self):
-    latest_commit = gitiles.Commit(
-        sha='a1841f40264376d170269ee9473ce924b7c2c4e9',
-        tree='deadbeef',
-        parents=['beefdead'],
-        author=None,
-        committer=None,
-        message=None,
-        tree_diff=None)
     self.mock(gitiles, 'get_log', mock.Mock())
     gitiles.get_log.return_value = gitiles.Log(
-        commits=[latest_commit],
+        commits=[self.test_commit],
         next_cursor=None,
     )
 
@@ -157,12 +184,14 @@ class GitilesImportTestCase(test_case.TestCase):
     self.assertTrue(storage.Revision.get_by_id(
         'a1841f40264376d170269ee9473ce924b7c2c4e9',
         parent=saved_config_set.key))
+    self.assert_attempt(True, 'Imported')
 
     # Import second time, import_revision should not be called.
     self.mock(gitiles_import, 'import_revision', mock.Mock())
     gitiles_import.import_config_set(
         'config_set', gitiles.Location.parse('https://localhost/project'))
     self.assertFalse(gitiles_import.import_revision.called)
+    self.assert_attempt(True, 'Up-to-date')
 
   def test_import_config_set_with_log_failed(self):
     self.mock(gitiles_import, 'import_revision', mock.Mock())
@@ -170,6 +199,8 @@ class GitilesImportTestCase(test_case.TestCase):
     gitiles_import.import_config_set(
         'config_set',
         gitiles.Location.parse('https://localhost/project'))
+
+    self.assert_attempt(False, 'Could not load commit log', no_revision=True)
 
   def test_import_config_set_with_auth_error(self):
     self.mock(gitiles, 'get_log', mock.Mock())
@@ -179,6 +210,8 @@ class GitilesImportTestCase(test_case.TestCase):
     gitiles_import.import_config_set(
         'config_set',
         gitiles.Location.parse('https://localhost/project'))
+    self.assert_attempt(
+        False, 'Could not import: permission denied', no_revision=True)
 
   def test_deadline_exceeded(self):
     self.mock_get_log()
@@ -189,6 +222,7 @@ class GitilesImportTestCase(test_case.TestCase):
     gitiles_import.import_config_set(
         'config_set',
         gitiles.Location.parse('https://localhost/project'))
+    self.assert_attempt(False, 'Could not import: deadline exceeded')
 
   def test_import_services(self):
     self.mock(gitiles_import, 'import_config_set', mock.Mock())

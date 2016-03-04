@@ -5,6 +5,7 @@
 import logging
 
 from google.appengine.api import memcache
+from google.appengine.ext import ndb
 from protorpc import messages
 from protorpc import message_types
 from protorpc import remote
@@ -12,6 +13,7 @@ import endpoints
 
 from components import auth
 from components import utils
+from components.config import endpoint as cfg_endpoint
 
 import acl
 import projects
@@ -30,6 +32,44 @@ class Project(messages.Message):
   name = messages.StringField(2)
   repo_type = messages.EnumField(projects.RepositoryType, 3, required=True)
   repo_url = messages.StringField(4, required=True)
+
+
+class ConfigSet(messages.Message):
+  """Describes a config set."""
+
+  class Revision(messages.Message):
+    id = messages.StringField(1)
+    url = messages.StringField(2)
+    timestamp = messages.IntegerField(3)
+    committer_email = messages.StringField(4)
+
+  class ImportAttempt(messages.Message):
+    timestamp = messages.IntegerField(1)
+    revision = messages.StringField(2)
+    success = messages.BooleanField(3)
+    message = messages.StringField(4)
+    validation_messages = messages.MessageField(
+        cfg_endpoint.ValidationMessage, 5, repeated=True)
+
+  config_set = messages.StringField(1, required=True)
+  location = messages.StringField(2)
+  revision = messages.MessageField(Revision, 3)
+  last_import_attempt = messages.MessageField(ImportAttempt, 4)
+
+
+def attempt_to_msg(entity):
+  if entity is None:
+    return None
+  return ConfigSet.ImportAttempt(
+    timestamp=utils.datetime_to_timestamp(entity.time),
+    revision=entity.revision,
+    success=entity.success,
+    message=entity.message,
+    validation_messages=[
+      cfg_endpoint.ValidationMessage(severity=m.severity, text=m.text)
+      for m in entity.validation_messages
+    ],
+  )
 
 
 GET_CONFIG_MULTI_REQUEST_RESOURCE_CONTAINER = endpoints.ResourceContainer(
@@ -79,17 +119,69 @@ class ConfigApi(remote.Service):
       path='mapping')
   @auth.public # ACL check inside
   def get_mapping(self, request):
-    """Returns config-set mapping, one or all."""
+    """DEPRECATED. Use get_config_sets."""
     if request.config_set and not self.can_read_config_set(request.config_set):
       raise endpoints.ForbiddenException()
 
-    res = self.GetMappingResponseMessage()
-    mapping = storage.get_mapping_async(
+    config_sets = storage.get_config_sets_async(
         config_set=request.config_set).get_result()
-    for config_set, location in sorted(mapping.iteritems()):
-      if self.can_read_config_set(config_set):
-        res.mappings.append(
-            res.Mapping(config_set=config_set, location=location))
+    return self.GetMappingResponseMessage(
+        mappings=[
+          self.GetMappingResponseMessage.Mapping(
+              config_set=cs.key.id(), location=cs.location)
+          for cs in config_sets
+          if self.can_read_config_set(cs.key.id())
+        ]
+    )
+
+  ##############################################################################
+  # endpoint: get_config_set
+
+  class GetConfigSetsResponseMessage(messages.Message):
+    config_sets = messages.MessageField(ConfigSet, 1, repeated=True)
+
+  @auth.endpoints_method(
+    endpoints.ResourceContainer(
+        message_types.VoidMessage,
+        config_set=messages.StringField(1),
+        include_last_import_attempt=messages.BooleanField(2),
+    ),
+    GetConfigSetsResponseMessage,
+    http_method='GET',
+    path='config-sets')
+  @auth.public # ACL check inside
+  def get_config_sets(self, request):
+    """Returns config sets."""
+    if request.config_set and not self.can_read_config_set(request.config_set):
+      raise endpoints.ForbiddenException()
+
+    config_sets = storage.get_config_sets_async(
+        config_set=request.config_set).get_result()
+
+    if request.include_last_import_attempt:
+      attempts = ndb.get_multi([
+        storage.last_import_attempt_key(cs.key.id()) for cs in config_sets
+      ])
+    else:
+      attempts = [None] * len(config_sets)
+
+    res = self.GetConfigSetsResponseMessage()
+    for cs, attempt in zip(config_sets, attempts):
+      if self.can_read_config_set(cs.key.id()):
+        timestamp = None
+        if cs.latest_revision_time:
+          timestamp = utils.datetime_to_timestamp(cs.latest_revision_time)
+        res.config_sets.append(ConfigSet(
+            config_set=cs.key.id(),
+            location=cs.location,
+            revision=ConfigSet.Revision(
+                id=cs.latest_revision,
+                url=cs.latest_revision_url,
+                timestamp=timestamp,
+                committer_email=cs.latest_revision_committer_email,
+            ),
+            last_import_attempt=attempt_to_msg(attempt),
+        ))
     return res
 
   ##############################################################################

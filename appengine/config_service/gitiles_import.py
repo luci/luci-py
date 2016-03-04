@@ -59,15 +59,17 @@ def get_gitiles_config():
   return cfg.gitiles
 
 
-def import_revision(
-    config_set, base_location, revision, create_config_set=False):
+def import_revision(config_set, base_location, commit):
   """Imports a referenced Gitiles revision into a config set.
 
   |base_location| will be used to set storage.ConfigSet.location.
 
-  If |create_config_set| is True and Revision entity does not exist,
-  then creates ConfigSet with latest_revision set to |location.treeish|.
+  Updates last ImportAttempt for the config set.
+
+  If Revision entity does not exist, then creates ConfigSet initialized from
+  arguments.
   """
+  revision = commit.sha
   assert re.match('[0-9a-f]{40}', revision), (
       '"%s" is not a valid sha' % revision
   )
@@ -76,69 +78,111 @@ def import_revision(
       storage.ConfigSet, config_set,
       storage.Revision, revision)
 
-  updated_config_set = storage.ConfigSet(
-      id=config_set,
-      latest_revision=revision,
-      location=str(base_location))
-
+  location = base_location._replace(treeish=revision)
+  attempt = storage.ImportAttempt(
+      key=storage.last_import_attempt_key(config_set),
+      revision=revision)
   if rev_key.get():
-    if create_config_set:
-      updated_config_set.put()
+    attempt.success = True
+    attempt.message = 'Up-to-date'
+    attempt.put()
     return
 
-  entities_to_put = [storage.Revision(key=rev_key)]
-  if create_config_set:
-    entities_to_put.append(updated_config_set)
+  rev_entities = [
+    storage.ConfigSet(
+        id=config_set,
+        latest_revision=revision,
+        latest_revision_url=str(location),
+        latest_revision_committer_email=commit.committer.email,
+        latest_revision_time=commit.committer.time,
+        location=str(base_location),
+    ),
+    storage.Revision(key=rev_key),
+  ]
 
-  # Fetch archive, extract files and save them to Blobs outside ConfigSet
-  # transaction.
-  location = base_location._replace(treeish=revision)
+  # Fetch archive outside ConfigSet transaction.
   archive = location.get_archive(
       deadline=get_gitiles_config().fetch_archive_deadline)
   if not archive:
     logging.warning(
         'Configuration %s does not exist. Probably it was deleted', config_set)
+    attempt.success = True
+    attempt.message = 'Config directory not found. Imported as empty'
   else:
-    logging.info('%s archive size: %d bytes' % (config_set, len(archive)))
+    # Extract files and save them to Blobs outside ConfigSet transaction.
+    files, validation_result = _read_and_validate_archive(
+        config_set, rev_key, archive)
+    if validation_result.has_errors:
+      logging.warning('Invalid revision %s@%s', config_set, revision)
+      notifications.notify_gitiles_rejection(
+          config_set, location, validation_result)
 
-    stream = StringIO.StringIO(archive)
-    blob_futures = []
-    with tarfile.open(mode='r|gz', fileobj=stream) as tar:
-      files = {}
-      ctx = config.validation.Context()
-      for item in tar:
-        if not item.isreg():  # pragma: no cover
-          continue
-        with contextlib.closing(tar.extractfile(item)) as extracted:
-          content = extracted.read()
-          files[item.name] = content
-          validation.validate_config(config_set, item.name, content, ctx=ctx)
-      if ctx.result().has_errors:
-        logging.warning('Invalid revision %s@%s', config_set, revision)
-        notifications.notify_gitiles_rejection(
-            config_set, location, ctx.result())
-        return
-      for name, content in files.iteritems():
-        content_hash = storage.compute_hash(content)
-        blob_futures.append(storage.import_blob_async(
-            content=content, content_hash=content_hash))
-        entities_to_put.append(
-            storage.File(
-                id=name,
-                parent=rev_key,
-                content_hash=content_hash)
+      attempt.success = False
+      attempt.message = 'Validation errors'
+      attempt.validation_messages = [
+        storage.ImportAttempt.ValidationMessage(
+            severity=config.Severity.lookup_by_number(m.severity),
+            text=m.text,
         )
-
-    # Wait for Blobs to be imported before proceeding.
-    ndb.Future.wait_all(blob_futures)
+        for m in validation_result.messages
+      ]
+      attempt.put()
+      return
+    rev_entities += files
+    attempt.success = True
+    attempt.message = 'Imported'
 
   @ndb.transactional
-  def do_import():
+  def txn():
     if not rev_key.get():
-      ndb.put_multi(entities_to_put)
+      ndb.put_multi(rev_entities)
+    attempt.put()
 
-  do_import()
+  txn()
   logging.info('Imported revision %s/%s', config_set, location.treeish)
+
+
+def _read_and_validate_archive(config_set, rev_key, archive):
+  """Reads an archive, validates all files, imports blobs and returns files.
+
+  If all files are valid, saves contents to Blob entities and returns
+  files with their hashes.
+
+  Return:
+      (files, validation_result) tuple.
+  """
+  logging.info('%s archive size: %d bytes' % (config_set, len(archive)))
+
+  stream = StringIO.StringIO(archive)
+  blob_futures = []
+  with tarfile.open(mode='r|gz', fileobj=stream) as tar:
+    files = {}
+    ctx = config.validation.Context()
+    for item in tar:
+      if not item.isreg():  # pragma: no cover
+        continue
+      with contextlib.closing(tar.extractfile(item)) as extracted:
+        content = extracted.read()
+        files[item.name] = content
+        validation.validate_config(config_set, item.name, content, ctx=ctx)
+
+  if ctx.result().has_errors:
+    return [], ctx.result()
+
+  entities = []
+  for name, content in files.iteritems():
+    content_hash = storage.compute_hash(content)
+    blob_futures.append(storage.import_blob_async(
+      content=content, content_hash=content_hash))
+    entities.append(
+      storage.File(
+        id=name,
+        parent=rev_key,
+        content_hash=content_hash)
+    )
+  # Wait for Blobs to be imported before proceeding.
+  ndb.Future.wait_all(blob_futures)
+  return entities, ctx.result()
 
 
 def import_config_set(config_set, location):
@@ -150,12 +194,23 @@ def import_config_set(config_set, location):
   """
   assert config_set
   assert location
+
+  commit = None
+  def save_attempt(success, msg):
+    storage.ImportAttempt(
+      key=storage.last_import_attempt_key(config_set),
+      revision=commit.sha if commit else '',
+      success=success,
+      message=msg,
+    ).put()
+
   try:
     logging.debug('Importing %s from %s', config_set, location)
 
     log = location.get_log(
         limit=1, deadline=get_gitiles_config().fetch_log_deadline)
     if not log or not log.commits:
+      save_attempt(False, 'Could not load commit log')
       logging.warning('Could not load commit log for %s', location)
       return
     commit = log.commits[0]
@@ -163,18 +218,18 @@ def import_config_set(config_set, location):
     config_set_key = ndb.Key(storage.ConfigSet, config_set)
     config_set_entity = config_set_key.get()
     if config_set_entity and config_set_entity.latest_revision == commit.sha:
-      logging.debug('Config set %s is up to date', config_set)
+      save_attempt(True, 'Up-to-date')
+      logging.debug('Config set %s is up-to-date', config_set)
       return
 
-    # ConfigSet.latest_revision needs to be updated in the same transaction as
-    # Revision. Assume ConfigSet.latest_revision is the only attribute and
-    # use import_revision's create_config_set parameter to set latest_revision.
-    import_revision(config_set, location, commit.sha, create_config_set=True)
+    import_revision(config_set, location, commit)
   except urlfetch_errors.DeadlineExceededError:
+    save_attempt(False, 'Could not import: deadline exceeded')
     logging.error(
         'Could not import config set %s from %s: urlfetch deadline exceeded',
         config_set, location)
   except net.AuthError:
+    save_attempt(False, 'Could not import: permission denied')
     logging.error(
         'Could not import config set %s from %s: permission denied',
         config_set, location)
