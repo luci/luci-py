@@ -34,18 +34,19 @@ class Project(messages.Message):
   repo_url = messages.StringField(4, required=True)
 
 
+class Revision(messages.Message):
+  id = messages.StringField(1)
+  url = messages.StringField(2)
+  timestamp = messages.IntegerField(3)
+  committer_email = messages.StringField(4)
+
+
 class ConfigSet(messages.Message):
   """Describes a config set."""
 
-  class Revision(messages.Message):
-    id = messages.StringField(1)
-    url = messages.StringField(2)
-    timestamp = messages.IntegerField(3)
-    committer_email = messages.StringField(4)
-
   class ImportAttempt(messages.Message):
     timestamp = messages.IntegerField(1)
-    revision = messages.StringField(2)
+    revision = messages.MessageField(Revision, 2)
     success = messages.BooleanField(3)
     message = messages.StringField(4)
     validation_messages = messages.MessageField(
@@ -62,7 +63,12 @@ def attempt_to_msg(entity):
     return None
   return ConfigSet.ImportAttempt(
     timestamp=utils.datetime_to_timestamp(entity.time),
-    revision=entity.revision,
+    revision=Revision(
+        id=entity.revision.id,
+        url=entity.revision.url,
+        timestamp=utils.datetime_to_timestamp(entity.revision.time),
+        committer_email=entity.revision.committer_email,
+    ) if entity.revision else None,
     success=entity.success,
     message=entity.message,
     validation_messages=[
@@ -174,7 +180,7 @@ class ConfigApi(remote.Service):
         res.config_sets.append(ConfigSet(
             config_set=cs.key.id(),
             location=cs.location,
-            revision=ConfigSet.Revision(
+            revision=Revision(
                 id=cs.latest_revision,
                 url=cs.latest_revision_url,
                 timestamp=timestamp,

@@ -45,6 +45,17 @@ class ConfigSet(ndb.Model):
   location = ndb.StringProperty(required=True)
 
 
+class RevisionInfo(ndb.Model):
+  """Contains revision metadata.
+
+  Used with StructuredProperty.
+  """
+  id = ndb.StringProperty(required=True, indexed=False)
+  url = ndb.StringProperty(indexed=False)
+  time = ndb.DateTimeProperty(indexed=False)
+  committer_email = ndb.StringProperty(indexed=False)
+
+
 class ImportAttempt(ndb.Model):
   """Describes what happened last time we tried to import a config set.
 
@@ -53,7 +64,7 @@ class ImportAttempt(ndb.Model):
     ID is "last".
   """
   time = ndb.DateTimeProperty(auto_now_add=True, required=True, indexed=False)
-  revision = ndb.StringProperty(required=True, indexed=False)
+  revision = ndb.StructuredProperty(RevisionInfo, indexed=False)
   success = ndb.BooleanProperty(required=True, indexed=False)
   message = ndb.StringProperty(required=True, indexed=False)
 

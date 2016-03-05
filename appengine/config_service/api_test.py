@@ -187,7 +187,12 @@ class ApiTest(test_case.EndpointsTestCase):
     storage.ImportAttempt(
         key=storage.last_import_attempt_key('services/x'),
         time=datetime.datetime(2016, 1, 2),
-        revision='badcoffee',
+        revision=storage.RevisionInfo(
+          id='badcoffee',
+          url='https://x.googlesource.com/x/+/badcoffee',
+          time=datetime.datetime(2016, 1, 1),
+          committer_email='john@doe.com',
+        ),
         success=False,
         message='Validation errors',
         validation_messages=[
@@ -230,7 +235,12 @@ class ApiTest(test_case.EndpointsTestCase):
     resp = self.call_api('get_config_sets', req).json_body
     expected_resp['config_sets'][0]['last_import_attempt'] = {
       'timestamp': '1451692800000000',
-      'revision': 'badcoffee',
+      'revision': {
+        'id': 'badcoffee',
+        'url': 'https://x.googlesource.com/x/+/badcoffee',
+        'timestamp': '1451606400000000',
+        'committer_email': 'john@doe.com',
+      },
       'success': False,
       'message': 'Validation errors',
       'validation_messages': [

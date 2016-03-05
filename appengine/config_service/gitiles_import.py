@@ -45,6 +45,20 @@ DEFAULT_GITILES_IMPORT_CONFIG = service_config_pb2.ImportCfg.Gitiles(
 )
 
 
+def _commit_to_revision_info(commit, location):
+  if commit is None:
+    return None
+  url = ''
+  if location:
+    url = str(location._replace(treeish=commit.sha))
+  return storage.RevisionInfo(
+      id=commit.sha,
+      url=url,
+      committer_email=commit.committer.email,
+      time=commit.committer.time,
+  )
+
+
 def get_gitiles_config():
   cfg = service_config_pb2.ImportCfg(gitiles=DEFAULT_GITILES_IMPORT_CONFIG)
   try:
@@ -81,7 +95,7 @@ def import_revision(config_set, base_location, commit):
   location = base_location._replace(treeish=revision)
   attempt = storage.ImportAttempt(
       key=storage.last_import_attempt_key(config_set),
-      revision=revision)
+      revision=_commit_to_revision_info(commit, location))
   if rev_key.get():
     attempt.success = True
     attempt.message = 'Up-to-date'
@@ -199,7 +213,7 @@ def import_config_set(config_set, location):
   def save_attempt(success, msg):
     storage.ImportAttempt(
       key=storage.last_import_attempt_key(config_set),
-      revision=commit.sha if commit else '',
+      revision=_commit_to_revision_info(commit, location),
       success=success,
       message=msg,
     ).put()

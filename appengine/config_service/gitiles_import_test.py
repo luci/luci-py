@@ -49,9 +49,16 @@ class GitilesImportTestCase(test_case.TestCase):
     config_set = config_set or 'config_set'
     attempt = storage.last_import_attempt_key(config_set).get()
     self.assertIsNotNone(attempt)
-    self.assertEqual(
-        attempt.revision, '' if no_revision else self.test_commit.sha
-    )
+    if no_revision:
+      self.assertIsNone(attempt.revision)
+    else:
+      self.assertEqual(attempt.revision.id, self.test_commit.sha)
+      self.assertEqual(attempt.revision.time, self.test_commit.committer.time)
+      self.assertEqual(
+          attempt.revision.url,
+          'https://localhost/project/+/a1841f40264376d170269ee9473ce924b7c2c4e9'
+      )
+      self.assertEqual(attempt.revision.committer_email, 'john@doe.com')
     self.assertEqual(attempt.success, success)
     self.assertEqual(attempt.message, msg)
     return attempt
