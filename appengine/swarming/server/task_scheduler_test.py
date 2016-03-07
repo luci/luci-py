@@ -1417,7 +1417,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         pass
 
     self.assertEqual(67, len(saved))
-    self.assertEqual(67, task_request.TaskRequest.query().count())
+    self.assertEqual(100, task_request.TaskRequest.query().count())
     self.assertEqual(67, task_result.TaskResultSummary.query().count())
 
     # Now the DB is full of half-corrupted entities.
