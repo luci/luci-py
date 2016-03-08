@@ -36,6 +36,9 @@ components.auth and components.datastore_utils. components.datastore_utils is on
 # Pylint fails to recognize that ndb.Model.key is defined in ndb.Model.
 # pylint: disable=attribute-defined-outside-init
 
+import datetime
+import threading
+
 from google.appengine.ext import ndb
 
 from components import auth
@@ -61,23 +64,39 @@ class GlobalConfig(ndb.Model):
     Bootstraps it if missing. May return slightly stale data but in most cases
     doesn't do any RPCs. Should be used for read-only access to config.
     """
-    # @utils.cache_with_expiration can't be used directly with 'cached' since it
-    # will be applied to base class method, not a concrete implementation
-    # specific to a subclass. So build new class specific fetcher on the fly on
-    # a first attempt (it's not a big deal if it happens concurrently in MT
+    # Build new class-specific fetcher function with cache on the fly on
+    # the first attempt (it's not a big deal if it happens concurrently in MT
     # environment, last one wins). Same can be achieved with metaclasses, but no
     # one likes metaclasses.
     if not cls._config_fetcher_async:
-      @utils.cache_with_expiration(expiration_sec=60)
       @ndb.tasklet
-      def config_fetcher_async():
+      def fetcher():
+        with fetcher.cache_lock:
+          expiry = fetcher.cache_expiry
+          if expiry is not None and utils.utcnow() < expiry:
+            raise ndb.Return(fetcher.cache_value)
+
+        # Do not lock while yielding, it would cause deadlock.
+        # Also do not cache a future, it might cross ndb context boundary.
+        # If there is no cached value, multiple concurrent requests will make
+        # multiple RPCs, but as soon as one of them updates cache, subsequent
+        # requests will use the cached value, for a minute.
         conf = yield cls.fetch_async()
         if not conf:
           conf = cls()
           conf.set_defaults()
           yield conf.store_async(updated_by=auth.get_service_self_identity())
+
+        with fetcher.cache_lock:
+          fetcher.cache_expiry = utils.utcnow() + datetime.timedelta(minutes=1)
+          fetcher.cache_value = conf
         raise ndb.Return(conf)
-      cls._config_fetcher_async = staticmethod(config_fetcher_async)
+
+      fetcher.cache_lock = threading.Lock()
+      fetcher.cache_expiry = None
+      fetcher.cache_value = None
+
+      cls._config_fetcher_async = staticmethod(fetcher)
     return cls._config_fetcher_async()
 
   cached = utils.sync_of(cached_async)
@@ -89,7 +108,7 @@ class GlobalConfig(ndb.Model):
     So the next call to .cached() returns the fresh instance from ndb.
     """
     if cls._config_fetcher_async:
-      utils.clear_cache(cls._config_fetcher_async)
+      cls._config_fetcher_async.cache_expiry = None
 
   @classmethod
   def fetch_async(cls):
