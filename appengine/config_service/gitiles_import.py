@@ -36,6 +36,8 @@ import storage
 import validation
 
 
+GITILES_STORAGE_TYPE = admin.ServiceConfigStorageType.GITILES
+GITILES_LOCATION_TYPE = service_config_pb2.ConfigSetLocation.GITILES
 DEFAULT_GITILES_IMPORT_CONFIG = service_config_pb2.ImportCfg.Gitiles(
     fetch_log_deadline=15,
     fetch_archive_deadline=15,
@@ -43,6 +45,14 @@ DEFAULT_GITILES_IMPORT_CONFIG = service_config_pb2.ImportCfg.Gitiles(
     project_config_default_path='/',
     ref_config_default_path='luci',
 )
+
+
+class Error(Exception):
+  """A config set import-specific error."""
+
+
+class NotFoundError(Error):
+  """A service, project or ref is not found."""
 
 
 def _commit_to_revision_info(commit, location):
@@ -73,7 +83,10 @@ def get_gitiles_config():
   return cfg.gitiles
 
 
-def import_revision(config_set, base_location, commit):
+## Low level import functions
+
+
+def _import_revision(config_set, base_location, commit):
   """Imports a referenced Gitiles revision into a config set.
 
   |base_location| will be used to set storage.ConfigSet.location.
@@ -199,7 +212,7 @@ def _read_and_validate_archive(config_set, rev_key, archive):
   return entities, ctx.result()
 
 
-def import_config_set(config_set, location):
+def _import_config_set(config_set, location):
   """Imports the latest version of config set from a Gitiles location.
 
   Args:
@@ -225,8 +238,7 @@ def import_config_set(config_set, location):
         limit=1, deadline=get_gitiles_config().fetch_log_deadline)
     if not log or not log.commits:
       save_attempt(False, 'Could not load commit log')
-      logging.warning('Could not load commit log for %s', location)
-      return
+      raise NotFoundError('Could not load commit log for %s' % (location,))
     commit = log.commits[0]
 
     config_set_key = ndb.Key(storage.ConfigSet, config_set)
@@ -236,20 +248,123 @@ def import_config_set(config_set, location):
       logging.debug('Config set %s is up-to-date', config_set)
       return
 
-    import_revision(config_set, location, commit)
+    _import_revision(config_set, location, commit)
   except urlfetch_errors.DeadlineExceededError:
     save_attempt(False, 'Could not import: deadline exceeded')
-    logging.error(
-        'Could not import config set %s from %s: urlfetch deadline exceeded',
-        config_set, location)
+    raise Error(
+        'Could not import config set %s from %s: urlfetch deadline exceeded' %
+            (config_set, location))
   except net.AuthError:
     save_attempt(False, 'Could not import: permission denied')
-    logging.error(
-        'Could not import config set %s from %s: permission denied',
-        config_set, location)
+    raise Error(
+        'Could not import config set %s from %s: permission denied' % (
+            config_set, location))
+
+
+## Import individual config set
+
+
+def import_service(service_id, conf=None):
+  if not config.validation.is_valid_service_id(service_id):
+    raise ValueError('Invalid service id: %s' % service_id)
+  # TODO(nodir): import services from location specified in services.cfg
+  conf = conf or admin.GlobalConfig.fetch()
+  if not conf:
+    raise Exception('not configured')
+  if conf.services_config_storage_type != GITILES_STORAGE_TYPE:
+    raise Error('services are not stored on Gitiles')
+  if not conf.services_config_location:
+    raise Error('services config location is not set')
+  location_root = gitiles.Location.parse_resolve(conf.services_config_location)
+  service_location = location_root._replace(
+      path=os.path.join(location_root.path, service_id))
+  _import_config_set('services/%s' % service_id, service_location)
+
+
+def import_project(project_id, loc=None):
+  if not config.validation.is_valid_project_id(project_id):
+    raise ValueError('Invalid project id: %s' % project_id)
+
+  if loc is None:
+    project = projects.get_project(project_id)
+    if project is None:
+      raise NotFoundError('project %s not found' % project_id)
+    if project.config_location.storage_type != GITILES_LOCATION_TYPE:
+      raise Error('project %s is not a Gitiles project' % project_id)
+    loc = gitiles.Location.parse_resolve(project.config_location.url)
+
+  # Adjust location
+  cfg = get_gitiles_config()
+  if not loc.treeish or loc.treeish == 'HEAD':
+    loc = loc._replace(treeish=cfg.project_config_default_ref)
+  loc = loc._replace(
+      path=loc.path.strip('/') or cfg.project_config_default_path,
+  )
+
+  # Update project repo info.
+  repo_url = str(loc._replace(treeish=None, path=None))
+  projects.update_import_info(
+      project_id, projects.RepositoryType.GITILES, repo_url)
+
+  _import_config_set('projects/%s' % project_id, loc)
+
+
+def import_ref(project_id, ref_name):
+  if not config.validation.is_valid_project_id(project_id):
+    raise ValueError('Invalid project id "%s"' % project_id)
+  if not config.validation.is_valid_ref_name(ref_name):
+    raise ValueError('Invalid ref name "%s"' % ref_name)
+
+  project = projects.get_project(project_id)
+  if project is None:
+    raise NotFoundError('project %s not found' % project_id)
+  if project.config_location.storage_type != GITILES_LOCATION_TYPE:
+    raise Error('project %s is not a Gitiles project' % project_id)
+  loc = gitiles.Location.parse_resolve(project.config_location.url)
+
+  ref = projects.get_ref(project_id, ref_name)
+  if ref is None:
+    raise NotFoundError(
+        ('ref "%s" is not found in project %s. '
+         'Possibly it is not declared in projects/%s:refs.cfg') %
+        (ref_name, project_id, project_id))
+  cfg = get_gitiles_config()
+  loc = loc._replace(
+      treeish=ref_name,
+      path=ref.config_path or cfg.ref_config_default_path,
+  )
+  _import_config_set('projects/%s/%s' % (project_id, ref_name), loc)
+
+
+def import_config_set(config_set):
+  """Imports a config set."""
+  service_match = config.SERVICE_CONFIG_SET_RGX.match(config_set)
+  if service_match:
+    service_id = service_match.group(1)
+    return import_service(service_id)
+
+  project_match = config.PROJECT_CONFIG_SET_RGX.match(config_set)
+  if project_match:
+    project_id = project_match.group(1)
+    return import_project(project_id)
+
+  ref_match = config.REF_CONFIG_SET_RGX.match(config_set)
+  if ref_match:
+    project_id = ref_match.group(1)
+    ref_name = ref_match.group(2)
+    return import_ref(project_id, ref_name)
+
+  raise ValueError('Invalid config set "%s' % config_set)
+
+
+## Bulk import in a cron job
 
 
 def import_services(location_root):
+  """Imports all services, assuming they are in Gitiles.
+
+  Logs errors, does not raise them.
+  """
   # TODO(nodir): import services from location specified in services.cfg
   assert location_root
   tree = location_root.get_tree()
@@ -263,45 +378,22 @@ def import_services(location_root):
       continue
     service_location = location_root._replace(
         path=os.path.join(location_root.path, service_entry.name))
-    import_config_set('services/%s' % service_id, service_location)
-
-
-def import_project(project_id, location):
-  cfg = get_gitiles_config()
-
-  # Adjust location
-  treeish = location.treeish
-  if not treeish or treeish == 'HEAD':
-    treeish = cfg.project_config_default_ref
-  location = location._replace(
-      treeish=treeish,
-      path=location.path.strip('/') or cfg.project_config_default_path,
-  )
-
-  # Update project repo info.
-  repo_url = str(location._replace(treeish=None, path=None))
-  projects.update_import_info(
-      project_id, projects.RepositoryType.GITILES, repo_url)
-
-  import_config_set('projects/%s' % project_id, location)
-
-  # Import refs
-  for ref in projects.get_refs(project_id):
-    assert ref.name
-    assert ref.name.startswith('refs/'), ref.name
-    ref_location = location._replace(
-        treeish=ref.name,
-        path=ref.config_path or cfg.ref_config_default_path,
-    )
-    import_config_set(
-        'projects/%s/%s' % (project_id, ref.name), ref_location)
+    cs = 'services/%s' % service_id
+    try:
+      _import_config_set(cs, service_location)
+    except Exception:
+      logging.exception('Could not import %s', cs)
 
 
 def import_projects():
-  """Imports project configs that are stored in Gitiles."""
+  """Imports all project and ref config sets that are stored in Gitiles.
+
+  Logs errors, does not raise them.
+  """
+  cfg = get_gitiles_config()
   for project in projects.get_projects():
     loc = project.config_location
-    if loc.storage_type != service_config_pb2.ConfigSetLocation.GITILES:
+    if loc.storage_type != GITILES_LOCATION_TYPE:
       continue
     try:
       location = gitiles.Location.parse_resolve(loc.url)
@@ -316,14 +408,28 @@ def import_projects():
 
     try:
       import_project(project.id, location)
-    except Exception as ex:
-      logging.exception('Could not import project %s', project.id)
+    except Exception:
+      logging.exception('Could not import projects/%s', project.id)
+
+
+    # Import refs of the project
+    for ref in projects.get_refs(project.id):
+      assert ref.name
+      assert ref.name.startswith('refs/'), ref.name
+      ref_location = location._replace(
+          treeish=ref.name,
+          path=ref.config_path or cfg.ref_config_default_path,
+      )
+      try:
+        ref_cs = 'projects/%s/%s' % (project.id, ref.name)
+        _import_config_set(ref_cs, ref_location)
+      except Exception:
+        logging.exception('Could not import %s', ref_cs)
 
 
 def cron_run_import():  # pragma: no cover
   conf = admin.GlobalConfig.fetch()
-  gitiles_type = admin.ServiceConfigStorageType.GITILES
-  if (conf and conf.services_config_storage_type == gitiles_type and
+  if (conf and conf.services_config_storage_type == GITILES_STORAGE_TYPE and
       conf.services_config_location):
     loc = gitiles.Location.parse_resolve(conf.services_config_location)
     import_services(loc)

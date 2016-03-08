@@ -88,6 +88,14 @@ def is_valid_service_id(service_id):
   return bool(common.SERVICE_ID_RGX.match(service_id))
 
 
+def is_valid_project_id(service_id):
+  return bool(common.PROJECT_ID_RGX.match(service_id))
+
+
+def is_valid_ref_name(ref):
+  return bool(common.REF_NAME_RGX.match(ref))
+
+
 ConfigPattern = collections.namedtuple(
     'ConfigPattern',
     [

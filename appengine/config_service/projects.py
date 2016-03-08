@@ -69,6 +69,14 @@ def get_projects():
   return cfg.projects or []
 
 
+def get_project(id):
+  """Returns a project by id."""
+  for p in get_projects():
+    if p.id == id:
+      return p
+  return None
+
+
 def project_exists(project_id):
   # TODO(nodir): optimize
   return any(p.id == project_id for p in get_projects())
@@ -93,7 +101,7 @@ def get_metadata(project_id):
 
 
 def get_refs(project_id):
-  """Returns list of project refs stored in refs.cfg.
+  """Returns a list of project refs stored in refs.cfg.
 
   Never returns None.
   """
@@ -103,6 +111,15 @@ def get_refs(project_id):
   if not cfg.refs and not project_exists(project_id):
     return None
   return cfg.refs or DEFAULT_REF_CFG.refs
+
+
+def get_ref(project_id, ref_name):
+  """Returns a ref of a project by name."""
+  for ref in get_refs(project_id):
+    # TODO(nodir): take into account regexes here when they are supported.
+    if ref.name == ref_name:
+      return ref
+  return None
 
 
 def _get_project_config(project_id, path, message_factory):

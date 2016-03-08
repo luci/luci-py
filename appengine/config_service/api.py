@@ -16,6 +16,7 @@ from components import utils
 from components.config import endpoint as cfg_endpoint
 
 import acl
+import gitiles_import
 import projects
 import storage
 import validation
@@ -356,6 +357,33 @@ class ConfigApi(remote.Service):
 
     return get_config_multi('refs', request.path, request.hashes_only)
 
+  ##############################################################################
+  # endpoint: reimport
+
+  @auth.endpoints_method(
+    endpoints.ResourceContainer(
+        message_types.VoidMessage,
+        config_set=messages.StringField(1, required=True)
+    ),
+    message_types.VoidMessage,
+    http_method='POST',
+    path='reimport')
+  @auth.public # ACL check inside
+  def reimport(self, request):
+    """Reimports a config set."""
+    if not auth.is_admin():
+      raise endpoints.ForbiddenException('Only admins are allowed to do this')
+    # Assume it is Gitiles.
+    try:
+      gitiles_import.import_config_set(request.config_set)
+      return message_types.VoidMessage()
+    except gitiles_import.NotFoundError as e:
+      raise endpoints.NotFoundException(e.message)
+    except ValueError as e:
+      raise endpoints.BadRequestException(e.message)
+    except gitiles_import.Error as e:
+      raise endpoints.InternalServerErrorException(e.message)
+
 
 @utils.memcache('projects_with_details', time=60)  # 1 min.
 def get_projects():
@@ -364,7 +392,7 @@ def get_projects():
   Does not return projects that have no repo information. It might happen due
   to eventual consistency.
 
-  Caches results in main memory for 10 min.
+  Caches results in memcache for 10 min.
   """
   result = []
   for p in projects.get_projects():

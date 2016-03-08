@@ -61,6 +61,7 @@ message Service {
   // Where to import "services/<id>" config set from. If config_location.url is
   // relative, it is relative to the current configuration file.
   // If not specified, defaults to "../<id>/".
+  // Not yet implemented.
   optional ConfigSetLocation config_location = 3;
   // An HTTPS endpoint that returns JSON-encoded ServiceDynamicMetadata in body.
   optional string metadata_url = 4;

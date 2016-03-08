@@ -12,6 +12,7 @@ from test_env import future
 
 test_env.setup_test_env()
 
+from components import auth
 from components import config
 from components.config.proto import project_config_pb2
 from components.config.proto import service_config_pb2
@@ -20,6 +21,7 @@ import mock
 
 import acl
 import api
+import gitiles_import
 import projects
 import storage
 
@@ -614,6 +616,37 @@ class ApiTest(test_case.EndpointsTestCase):
     req = {'path': 'cq.cfg'}
     resp = self.call_api('get_ref_configs', req).json_body
     self.assertEqual(resp, {})
+
+  ##############################################################################
+  # reimport
+
+  def test_reimport_without_permissions(self):
+    req = {'config_set': 'services/x'}
+    with self.call_should_fail(403):
+      self.call_api('reimport', req)
+
+  def test_reimport(self):
+    self.mock(auth, 'is_admin', mock.Mock(return_value=True))
+    self.mock(gitiles_import, 'import_config_set', mock.Mock())
+    req = {'config_set': 'services/x'}
+    self.call_api('reimport', req)
+    gitiles_import.import_config_set.assert_called_once_with('services/x')
+
+  def test_reimport_not_found(self):
+    self.mock(auth, 'is_admin', mock.Mock(return_value=True))
+    self.mock(gitiles_import, 'import_config_set', mock.Mock())
+    gitiles_import.import_config_set.side_effect = gitiles_import.NotFoundError
+    req = {'config_set': 'services/x'}
+    with self.call_should_fail(404):
+      self.call_api('reimport', req)
+
+  def test_reimport_bad_request(self):
+    self.mock(auth, 'is_admin', mock.Mock(return_value=True))
+    self.mock(gitiles_import, 'import_config_set', mock.Mock())
+    gitiles_import.import_config_set.side_effect = gitiles_import.Error
+    req = {'config_set': 'services/x'}
+    with self.call_should_fail(500):
+      self.call_api('reimport', req)
 
 
 if __name__ == '__main__':
