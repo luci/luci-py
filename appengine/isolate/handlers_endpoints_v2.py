@@ -7,6 +7,7 @@
 import binascii
 import datetime
 import hashlib
+import logging
 import os
 import re
 import time
@@ -175,6 +176,7 @@ class IsolateServiceV2(remote.Service):
         ...
         ])
     """
+    logging.error('V2')
     response = UrlCollection(items=[])
 
     # check for namespace error
@@ -236,6 +238,7 @@ class IsolateServiceV2(remote.Service):
   @auth.require(acl.isolate_readable)
   def retrieve(self, request):
     """Retrieves content from a storage location."""
+    logging.error('V2')
     content = None
     key = None
     offset = request.offset
@@ -282,6 +285,7 @@ class IsolateServiceV2(remote.Service):
   @auth.endpoints_method(message_types.VoidMessage, ServerDetails)
   @auth.require(acl.isolate_readable)
   def server_details(self, _request):
+    logging.error('V2')
     return ServerDetails(server_version=utils.get_app_version())
 
   ### Utility
