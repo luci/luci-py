@@ -784,6 +784,7 @@ def get_dimensions():
     u'gpu': get_gpu()[0],
     u'id': [get_hostname_short()],
     u'os': [os_name],
+    u'pool': [u'default'],
   }
   os_version_name = get_os_version_name()
   if os_version_name:

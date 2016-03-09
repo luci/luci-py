@@ -73,7 +73,7 @@ class TestOsUtilities(auto_stub.TestCase):
     actual.discard(u'zone')
     # Only set on Mac.
     actual.discard(u'hidpi')
-    expected = set([u'cores', u'cpu', u'gpu', u'id', u'os'])
+    expected = {u'cores', u'cpu', u'gpu', u'id', u'os', u'pool'}
     self.assertEqual(expected, actual)
 
   def test_get_state(self):

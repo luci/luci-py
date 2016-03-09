@@ -50,6 +50,7 @@ class TestBotMain(net_utils.TestCase):
       'dimensions': {
         'foo': ['bar'],
         'id': ['localhost'],
+        'pool': ['default'],
       },
       'state': {
         'cost_usd_hour': 3600.,
@@ -83,7 +84,7 @@ class TestBotMain(net_utils.TestCase):
     dimensions = set(bot_main.get_dimensions(None))
     dimensions.discard('hidpi')
     dimensions.discard('zone')  # Only set on GCE bots.
-    expected = {'cores', 'cpu', 'gpu', 'id', 'machine_type', 'os'}
+    expected = {'cores', 'cpu', 'gpu', 'id', 'machine_type', 'os', 'pool'}
     self.assertEqual(expected, dimensions)
 
   def test_get_dimensions_load_test(self):
@@ -406,14 +407,14 @@ class TestBotMain(net_utils.TestCase):
         self.assertEqual(self.attributes['dimensions'], botobj.dimensions)
         self.assertEqual(False, failure)
         self.assertEqual(False, internal_failure)
-        self.assertEqual({'os': 'Amiga'}, dimensions)
+        self.assertEqual({'os': 'Amiga', 'pool': 'default'}, dimensions)
         self.assertEqual(result, summary)
     self.mock(bot_main, 'call_hook', call_hook)
     result = self._mock_popen(url='https://localhost:3')
 
     manifest = {
       'command': ['echo', 'hi'],
-      'dimensions': {'os': 'Amiga'},
+      'dimensions': {'os': 'Amiga', 'pool': 'default'},
       'grace_period': 30,
       'hard_timeout': 60,
       'host': 'https://localhost:3',
@@ -429,14 +430,14 @@ class TestBotMain(net_utils.TestCase):
         failure, internal_failure, dimensions, summary = args
         self.assertEqual(True, failure)
         self.assertEqual(False, internal_failure)
-        self.assertEqual({}, dimensions)
+        self.assertEqual({'pool': 'default'}, dimensions)
         self.assertEqual(result, summary)
     self.mock(bot_main, 'call_hook', call_hook)
     result = self._mock_popen(exit_code=1)
 
     manifest = {
       'command': ['echo', 'hi'],
-      'dimensions': {},
+      'dimensions': {'pool': 'default'},
       'grace_period': 30,
       'hard_timeout': 60,
       'io_timeout': 60,
@@ -452,14 +453,14 @@ class TestBotMain(net_utils.TestCase):
         failure, internal_failure, dimensions, summary = args
         self.assertEqual(False, failure)
         self.assertEqual(True, internal_failure)
-        self.assertEqual({}, dimensions)
+        self.assertEqual({'pool': 'default'}, dimensions)
         self.assertEqual(result, summary)
     self.mock(bot_main, 'call_hook', call_hook)
     result = self._mock_popen(returncode=1)
 
     manifest = {
       'command': ['echo', 'hi'],
-      'dimensions': {},
+      'dimensions': {'pool': 'default'},
       'grace_period': 30,
       'hard_timeout': 60,
       'io_timeout': 60,
@@ -479,7 +480,7 @@ class TestBotMain(net_utils.TestCase):
         failure, internal_failure, dimensions, summary = args
         self.assertEqual(False, failure)
         self.assertEqual(True, internal_failure)
-        self.assertEqual({}, dimensions)
+        self.assertEqual({'pool': 'default'}, dimensions)
         self.assertEqual({}, summary)
     self.mock(bot_main, 'call_hook', call_hook)
     def raiseOSError(*_a, **_k):
@@ -488,7 +489,7 @@ class TestBotMain(net_utils.TestCase):
 
     manifest = {
       'command': ['echo', 'hi'],
-      'dimensions': {},
+      'dimensions': {'pool': 'default'},
       'grace_period': 30,
       'hard_timeout': 60,
       'task_id': '24',
