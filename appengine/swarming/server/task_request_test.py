@@ -35,7 +35,11 @@ def _gen_request(properties=None, **kwargs):
       [u'http://localhost/foo', u'foo.zip'],
       [u'http://localhost/bar', u'bar.zip'],
     ],
-    'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
+    'dimensions': {
+      u'OS': u'Windows-3.1.1',
+      u'hostname': u'localhost',
+      u'pool': u'default',
+    },
     'env': {u'foo': u'bar', u'joe': u'2'},
     'execution_timeout_secs': 30,
     'grace_period_secs': 30,
@@ -194,7 +198,11 @@ class TaskRequestApiTest(TestCase):
         [u'http://localhost/bar', u'bar.zip'],
         [u'http://localhost/foo', u'foo.zip'],
       ],
-      'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
+      'dimensions': {
+        u'OS': u'Windows-3.1.1',
+        u'hostname': u'localhost',
+        u'pool': u'default',
+      },
       'env': {u'foo': u'bar', u'joe': u'2'},
       'extra_args': [],
       'execution_timeout_secs': 30,
@@ -209,12 +217,15 @@ class TaskRequestApiTest(TestCase):
       'parent_task_id': unicode(parent_id),
       'priority': 49,
       'properties': expected_properties,
-      'properties_hash': 'b45f6f868f9227c3035cd82b4a5b0360f5ce6f61',
+      # Intentionally hard code the hash value since it has to be deterministic.
+      # Other unit tests should use the calculated value.
+      'properties_hash': '53fa20ad568a37eeb176d6def0528f07a48b5e6b',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'tags': [
         u'OS:Windows-3.1.1',
         u'hostname:localhost',
+        u'pool:default',
         u'priority:49',
         u'tag:1',
         u'user:Jesus',
@@ -252,7 +263,11 @@ class TaskRequestApiTest(TestCase):
         [u'http://localhost/bar', u'bar.zip'],
         [u'http://localhost/foo', u'foo.zip'],
       ],
-      'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
+      'dimensions': {
+        u'OS': u'Windows-3.1.1',
+        u'hostname': u'localhost',
+        u'pool': u'default',
+      },
       'env': {u'foo': u'bar', u'joe': u'2'},
       'extra_args': [],
       'execution_timeout_secs': 30,
@@ -267,12 +282,15 @@ class TaskRequestApiTest(TestCase):
       'parent_task_id': unicode(parent_id),
       'priority': 49,
       'properties': expected_properties,
-      'properties_hash': 'b45f6f868f9227c3035cd82b4a5b0360f5ce6f61',
+      # Intentionally hard code the hash value since it has to be deterministic.
+      # Other unit tests should use the calculated value.
+      'properties_hash': '53fa20ad568a37eeb176d6def0528f07a48b5e6b',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'tags': [
         u'OS:Windows-3.1.1',
         u'hostname:localhost',
+        u'pool:default',
         u'priority:49',
         u'tag:1',
         u'user:Jesus',
@@ -304,9 +322,11 @@ class TaskRequestApiTest(TestCase):
         _gen_request(properties=dict(idempotent=True)), True)
     as_dict = request.to_dict()
     self.assertEqual(True, as_dict['properties']['idempotent'])
+    # Intentionally hard code the hash value since it has to be deterministic.
+    # Other unit tests should use the calculated value.
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        'b45f6f868f9227c3035cd82b4a5b0360f5ce6f61', as_dict['properties_hash'])
+        '53fa20ad568a37eeb176d6def0528f07a48b5e6b', as_dict['properties_hash'])
 
   def test_duped(self):
     # Two TestRequest with the same properties.
@@ -444,7 +464,11 @@ class TaskRequestApiTest(TestCase):
         [u'http://localhost/bar', u'bar.zip'],
         [u'http://localhost/foo', u'foo.zip'],
       ],
-      'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
+      'dimensions': {
+        u'OS': u'Windows-3.1.1',
+        u'hostname': u'localhost',
+        u'pool': u'default',
+      },
       'env': {u'foo': u'bar', u'joe': u'2'},
       'execution_timeout_secs': 30,
       'extra_args': [],
@@ -469,6 +493,7 @@ class TaskRequestApiTest(TestCase):
       'tags': [
         u'OS:Windows-3.1.1',
         u'hostname:localhost',
+        u'pool:default',
         u'priority:49',
         u'tag:1',
         u'user:mocked@example.com',

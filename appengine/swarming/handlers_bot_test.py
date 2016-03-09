@@ -61,7 +61,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.mock(ereporter2, 'log_request', add_error)
     headers = {'X-XSRF-Token-Request': '1'}
     params = {
-      'dimensions': {'id': ['id1']},
+      'dimensions': {
+        'id': ['id1'],
+        'pool': ['default'],
+      },
       'state': {u'running_time': 0, u'sleep_streak': 0},
       'version': '1',
     }
@@ -111,6 +114,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       'foo': 1,
       'dimensions': {
         'id': ['bot1'],
+        'pool': ['default'],
       },
       'state': {
         'bar': 2,
@@ -241,7 +245,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'bot_id': u'bot1',
         u'command': [u'python', u'run_test.py'],
         u'data': [],
-        u'dimensions': {u'os': u'Amiga'},
+        u'dimensions': {
+          u'os': u'Amiga',
+          u'pool': u'default',
+        },
         u'env': {},
         u'extra_args': [],
         u'grace_period': 30,
@@ -258,6 +265,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'bot_dimensions': [
         {u'key': u'id', u'value': [u'bot1']},
         {u'key': u'os', u'value': [u'Amiga']},
+        {u'key': u'pool', u'value': [u'default']},
       ],
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
@@ -295,7 +303,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'bot_id': u'bot1',
         u'command': None,
         u'data': [],
-        u'dimensions': {u'os': u'Amiga'},
+        u'dimensions': {
+          u'os': u'Amiga',
+          u'pool': u'default',
+        },
         u'env': {},
         u'extra_args': [],
         u'hard_timeout': 3600,
@@ -316,6 +327,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'bot_dimensions': [
         {u'key': u'id', u'value': [u'bot1']},
         {u'key': u'os', u'value': [u'Amiga']},
+        {u'key': u'pool', u'value': [u'default']},
       ],
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
@@ -366,7 +378,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'bot_id': u'bot1',
         u'command': None,
         u'data': [],
-        u'dimensions': {u'os': u'Amiga'},
+        u'dimensions': {
+          u'os': u'Amiga',
+          u'pool': u'default',
+        },
         u'env': {},
         u'extra_args': [],
         u'hard_timeout': 3600,
@@ -507,7 +522,11 @@ class BotApiTest(test_env_handlers.AppTestBase):
         e.to_dict() for e in bot_management.get_events_query('bot1', True)]
     expected = [
       {
-        'dimensions': {u'id': [u'bot1'], u'os': [u'Amiga']},
+        'dimensions': {
+          u'id': [u'bot1'],
+          u'os': [u'Amiga'],
+          u'pool': [u'default'],
+        },
         'event_type': u'bot_rebooting',
         'external_ip': u'192.168.2.2',
         'message': u'for the best',
@@ -522,7 +541,11 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'version': self.bot_version,
       },
       {
-        'dimensions': {u'id': [u'bot1'], u'os': [u'Amiga']},
+        'dimensions': {
+          u'id': [u'bot1'],
+          u'os': [u'Amiga'],
+          u'pool': [u'default'],
+        },
         'event_type': u'bot_connected',
         'external_ip': u'192.168.2.2',
         'message': None,
@@ -567,6 +590,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'bot_dimensions': [
           {u'key': u'id', u'value': [u'bot1']},
           {u'key': u'os', u'value': [u'Amiga']},
+          {u'key': u'pool', u'value': [u'default']},
         ],
         u'bot_id': u'bot1',
         u'bot_version': self.bot_version,
@@ -704,6 +728,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'bot_dimensions': [
         {u'key': u'id', u'value': [u'bot1']},
         {u'key': u'os', u'value': [u'Amiga']},
+        {u'key': u'pool', u'value': [u'default']},
       ],
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
@@ -757,6 +782,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'bot_dimensions': [
         {u'key': u'id', u'value': [u'bot1']},
         {u'key': u'os', u'value': [u'Amiga']},
+        {u'key': u'pool', u'value': [u'default']},
       ],
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,

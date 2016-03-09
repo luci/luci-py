@@ -138,6 +138,7 @@ class AppTestBase(test_case.TestCase):
       'dimensions': {
         'id': [bot],
         'os': ['Amiga'],
+        'pool': ['default'],
       },
       'state': {
         'running_time': 1234.0,
@@ -193,6 +194,7 @@ class AppTestBase(test_case.TestCase):
     params = {
       'dimensions': [
         {'key': 'os', 'value': 'Amiga'},
+        {'key': 'pool', 'value': 'default'},
       ],
       'env': [],
       'execution_timeout_secs': 3600,

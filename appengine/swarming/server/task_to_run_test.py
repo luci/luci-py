@@ -33,7 +33,7 @@ def _gen_request(properties=None, **kwargs):
   props = {
     'commands': [[u'command1']],
     'data': [],
-    'dimensions': {},
+    'dimensions': {u'pool': u'default'},
     'env': {},
     'execution_timeout_secs': 24*60*60,
     'io_timeout_secs': None,
@@ -276,8 +276,9 @@ class TaskToRunApiTest(TestCase):
   def test_request_to_task_to_run_key(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     request = task_request.make_request(_gen_request(), True)
+    # Ensures that the hash value is constant for the same input.
     self.assertEqual(
-        ndb.Key('TaskRequest', 0x7e296460f77ff77e, 'TaskToRun', 2471203225),
+        ndb.Key('TaskRequest', 0x7e296460f77ff77e, 'TaskToRun', 3420117132),
         task_to_run.request_to_task_to_run_key(request))
 
   def test_validate_to_run_key(self):
@@ -314,7 +315,7 @@ class TaskToRunApiTest(TestCase):
 
   def test_new_task_to_run(self):
     self.mock(random, 'getrandbits', lambda _: 0x12)
-    request_dimensions = {u'OS': u'Windows-3.1.1'}
+    request_dimensions = {u'OS': u'Windows-3.1.1', u'pool': u'default'}
     now = utils.utcnow()
     data = _gen_request(
         properties={
@@ -406,7 +407,9 @@ class TaskToRunApiTest(TestCase):
 
   def test_yield_next_available_task_to_dispatch_none(self):
     _gen_new_task_to_run(
-        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+        properties={
+          'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
+        })
     # Bot declares no dimensions, so it will fail to match.
     bot_dimensions = {}
     actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
@@ -414,15 +417,20 @@ class TaskToRunApiTest(TestCase):
 
   def test_yield_next_available_task_to_dispatch_none_mismatch(self):
     _gen_new_task_to_run(
-        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+        properties={
+          'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
+        })
     # Bot declares other dimensions, so it will fail to match.
-    bot_dimensions = {'OS': 'Windows-3.0'}
+    bot_dimensions = {'OS': 'Windows-3.0', u'pool': u'default'}
     actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
     self.assertEqual([], actual)
 
   def test_yield_next_available_task_to_dispatch(self):
     request_dimensions = {
-      u'OS': u'Windows-3.1.1', u'hostname': u'localhost', u'foo': u'bar',
+      u'OS': u'Windows-3.1.1',
+      u'hostname': u'localhost',
+      u'foo': u'bar',
+      u'pool': u'default',
     }
     _gen_new_task_to_run(
         properties=dict(dimensions=request_dimensions))
@@ -439,12 +447,17 @@ class TaskToRunApiTest(TestCase):
     self.assertEqual(expected, actual)
 
   def test_yield_next_available_task_to_dispatch_subset(self):
-    request_dimensions = {u'OS': u'Windows-3.1.1', u'foo': u'bar'}
+    request_dimensions = {
+      u'OS': u'Windows-3.1.1',
+      u'pool': u'default',
+    }
     _gen_new_task_to_run(
         properties=dict(dimensions=request_dimensions))
     # Bot declares more dimensions than needed, this is fine and it matches.
     bot_dimensions = {
-      u'OS': u'Windows-3.1.1', u'hostname': u'localhost', u'foo': u'bar',
+      u'OS': u'Windows-3.1.1',
+      u'hostname': u'localhost',
+      u'pool': u'default',
     }
     actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
     expected = [
@@ -457,7 +470,10 @@ class TaskToRunApiTest(TestCase):
     self.assertEqual(expected, actual)
 
   def test_yield_next_available_task_shard(self):
-    request_dimensions = {u'OS': u'Windows-3.1.1', u'foo': u'bar'}
+    request_dimensions = {
+      u'OS': u'Windows-3.1.1',
+      u'pool': u'default',
+    }
     _gen_new_task_to_run(properties=dict(dimensions=request_dimensions))
     bot_dimensions = request_dimensions
     actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
@@ -471,14 +487,17 @@ class TaskToRunApiTest(TestCase):
     self.assertEqual(expected, actual)
 
   def test_yield_next_available_task_to_dispatch_subset_multivalue(self):
-    request_dimensions = {u'OS': u'Windows-3.1.1', u'foo': u'bar'}
+    request_dimensions = {
+      u'OS': u'Windows-3.1.1',
+      u'pool': u'default',
+    }
     _gen_new_task_to_run(
         properties=dict(dimensions=request_dimensions))
     # Bot declares more dimensions than needed.
     bot_dimensions = {
       u'OS': [u'Windows', u'Windows-3.1.1'],
-      u'hostname': u'localhost',
-      u'foo': u'bar',
+      u'hostname': [u'localhost'],
+      u'pool': [u'default'],
     }
     actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
     expected = [
@@ -492,16 +511,23 @@ class TaskToRunApiTest(TestCase):
 
   def test_yield_next_available_task_to_dispatch_multi_normal(self):
     # Task added one after the other, normal case.
-    request_dimensions_1 = {u'OS': u'Windows-3.1.1', u'foo': u'bar'}
+    request_dimensions_1 = {
+      u'OS': u'Windows-3.1.1',
+      u'foo': u'bar',
+      u'pool': u'default',
+    }
     _gen_new_task_to_run(properties=dict(dimensions=request_dimensions_1))
 
     # It's normally time ordered.
     self.mock_now(self.now, 1)
-    request_dimensions_2 = {u'hostname': u'localhost'}
+    request_dimensions_2 = {u'hostname': u'localhost', u'pool': u'default'}
     _gen_new_task_to_run(properties=dict(dimensions=request_dimensions_2))
 
     bot_dimensions = {
-      u'OS': u'Windows-3.1.1', u'hostname': u'localhost', u'foo': u'bar',
+      u'OS': u'Windows-3.1.1',
+      u'hostname': u'localhost',
+      u'foo': u'bar',
+      u'pool': u'default',
     }
     actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
     expected = [
@@ -523,17 +549,24 @@ class TaskToRunApiTest(TestCase):
     # value) but with a timestamp sooner (for example, time desynchronization
     # between machines) is still returned in the timestamp order, e.g. priority
     # is done based on timestamps and priority only.
-    request_dimensions_1 = {u'OS': u'Windows-3.1.1', u'foo': u'bar'}
+    request_dimensions_1 = {
+      u'OS': u'Windows-3.1.1',
+      u'foo': u'bar',
+      u'pool': u'default',
+    }
     _gen_new_task_to_run(properties=dict(dimensions=request_dimensions_1))
 
     # The second shard is added before the first, potentially because of a
     # desynchronized clock. It'll have higher priority.
     self.mock_now(self.now, -1)
-    request_dimensions_2 = {u'hostname': u'localhost'}
+    request_dimensions_2 = {u'hostname': u'localhost', u'pool': u'default'}
     _gen_new_task_to_run(properties=dict(dimensions=request_dimensions_2))
 
     bot_dimensions = {
-      u'OS': u'Windows-3.1.1', u'hostname': u'localhost', u'foo': u'bar',
+      u'OS': u'Windows-3.1.1',
+      u'hostname': u'localhost',
+      u'foo': u'bar',
+      u'pool': u'default',
     }
     actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
     expected = [
@@ -553,12 +586,12 @@ class TaskToRunApiTest(TestCase):
 
   def test_yield_next_available_task_to_dispatch_priority(self):
     # Task added later but with higher priority are returned first.
-    request_dimensions_1 = {u'OS': u'Windows-3.1.1'}
+    request_dimensions_1 = {u'OS': u'Windows-3.1.1', u'pool': u'default'}
     _gen_new_task_to_run(properties=dict(dimensions=request_dimensions_1))
 
     # This one is later but has higher priority.
     self.mock_now(self.now, 60)
-    request_dimensions_2 = {u'OS': u'Windows-3.1.1'}
+    request_dimensions_2 = {u'OS': u'Windows-3.1.1', u'pool': u'default'}
     _gen_new_task_to_run(
         properties=dict(dimensions=request_dimensions_2), priority=10)
 
@@ -575,13 +608,20 @@ class TaskToRunApiTest(TestCase):
         'queue_number': '0x000a890b67ba1346',
       },
     ]
-    bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
+    bot_dimensions = {
+      u'OS': u'Windows-3.1.1',
+      u'hostname': u'localhost',
+      u'pool': u'default',
+    }
     actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
     self.assertEqual(expected, actual)
 
   def test_yield_next_available_task_to_run_task_exceeds_deadline(self):
     request_dimensions = {
-      u'OS': u'Windows-3.1.1', u'hostname': u'localhost', u'foo': u'bar',
+      u'OS': u'Windows-3.1.1',
+      u'hostname': u'localhost',
+      u'foo': u'bar',
+      u'pool': u'default',
     }
     _gen_new_task_to_run(
         properties=dict(dimensions=request_dimensions))
@@ -592,7 +632,10 @@ class TaskToRunApiTest(TestCase):
 
   def test_yield_next_available_task_to_run_task_meets_deadline(self):
     request_dimensions = {
-      u'OS': u'Windows-3.1.1', u'hostname': u'localhost', u'foo': u'bar',
+      u'OS': u'Windows-3.1.1',
+      u'hostname': u'localhost',
+      u'foo': u'bar',
+      u'pool': u'default',
     }
     _gen_new_task_to_run(
         properties=dict(dimensions=request_dimensions))
@@ -614,7 +657,10 @@ class TaskToRunApiTest(TestCase):
     _gen_new_task_to_run(
         created_ts=now,
         expiration_ts=now+datetime.timedelta(seconds=60))
-    self.assertEqual(1, len(_yield_next_available_task_to_dispatch({}, None)))
+    self.assertEqual(
+        1,
+        len(_yield_next_available_task_to_dispatch(
+          {u'pool': u'default'}, None)))
     self.assertEqual(
         0, len(list(task_to_run.yield_expired_task_to_run())))
 
@@ -627,9 +673,13 @@ class TaskToRunApiTest(TestCase):
         1, len(list(task_to_run.yield_expired_task_to_run())))
 
   def test_is_reapable(self):
-    req_dimensions = {u'OS': u'Windows-3.1.1'}
+    req_dimensions = {u'OS': u'Windows-3.1.1', u'pool': u'default'}
     to_run = _gen_new_task_to_run(properties=dict(dimensions=req_dimensions))
-    bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
+    bot_dimensions = {
+      u'OS': u'Windows-3.1.1',
+      u'hostname': u'localhost',
+      u'pool': u'default',
+    }
     self.assertEqual(
         1, len(_yield_next_available_task_to_dispatch(bot_dimensions, None)))
 
@@ -640,7 +690,9 @@ class TaskToRunApiTest(TestCase):
 
   def test_set_lookup_cache(self):
     to_run = _gen_new_task_to_run(
-        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+        properties={
+          'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
+        })
     self.assertEqual(False, task_to_run._lookup_cache_is_taken(to_run.key))
     task_to_run.set_lookup_cache(to_run.key, True)
     self.assertEqual(False, task_to_run._lookup_cache_is_taken(to_run.key))

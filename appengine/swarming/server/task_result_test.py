@@ -36,7 +36,7 @@ def _gen_request(properties=None, **kwargs):
   props = {
     'commands': [[u'command1']],
     'data': [],
-    'dimensions': {},
+    'dimensions': {u'pool': u'default'},
     'env': {},
     'execution_timeout_secs': 24*60*60,
     'io_timeout_secs': None,
@@ -159,7 +159,12 @@ class TaskResultApiTest(TestCase):
       'server_versions': [],
       'started_ts': None,
       'state': task_result.State.PENDING,
-      'tags': [u'priority:50', u'tag:1', u'user:Jesus'],
+      'tags': [
+        u'pool:default',
+        u'priority:50',
+        u'tag:1',
+        u'user:Jesus',
+      ],
       'try_number': None,
       'user': u'Jesus',
     }
@@ -239,7 +244,12 @@ class TaskResultApiTest(TestCase):
       'started_ts': None,
       'state': task_result.State.PENDING,
       'try_number': None,
-      'tags': [u'priority:50', u'tag:1', u'user:Jesus'],
+      'tags': [
+        u'pool:default',
+        u'priority:50',
+        u'tag:1',
+        u'user:Jesus',
+      ],
       'user': u'Jesus',
     }
     self.assertEqual(expected, result_summary.to_dict())
@@ -280,7 +290,12 @@ class TaskResultApiTest(TestCase):
       'server_versions': [u'v1a'],
       'started_ts': reap_ts,
       'state': task_result.State.RUNNING,
-      'tags': [u'priority:50', u'tag:1', u'user:Jesus'],
+      'tags': [
+        u'pool:default',
+        u'priority:50',
+        u'tag:1',
+        u'user:Jesus',
+      ],
       'try_number': 1,
       'user': u'Jesus',
     }
@@ -321,7 +336,12 @@ class TaskResultApiTest(TestCase):
       'server_versions': [u'v1a'],
       'started_ts': reap_ts,
       'state': task_result.State.COMPLETED,
-      'tags': [u'priority:50', u'tag:1', u'user:Jesus'],
+      'tags': [
+        u'pool:default',
+        u'priority:50',
+        u'tag:1',
+        u'user:Jesus',
+      ],
       'try_number': 1,
       'user': u'Jesus',
     }

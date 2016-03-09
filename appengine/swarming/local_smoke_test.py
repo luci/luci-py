@@ -98,7 +98,7 @@ class SwarmingClient(object):
     try:
       cmd = [
         '--user', 'joe@localhost',
-        '-d', 'cpu', 'x86',
+        '-d', 'pool', 'default',
         '--dump-json', tmp,
         '--raw-cmd',
       ]
@@ -119,7 +119,7 @@ class SwarmingClient(object):
     try:
       cmd = [
         '--user', 'joe@localhost',
-        '-d', 'cpu', 'x86',
+        '-d', 'pool', 'default',
         '--dump-json', tmp,
         '--task-name', name,
         '-I',  self._isolate_server,
@@ -230,7 +230,7 @@ def gen_expected(**kwargs):
     u'properties_hash': None,
     u'server_versions': [u'1'],
     u'state': 0x70,  # task_result.State.COMPLETED.
-    u'tags': [u'cpu:x86', u'priority:100', u'user:joe@localhost'],
+    u'tags': [u'pool:default', u'priority:100', u'user:joe@localhost'],
     u'try_number': 1,
     u'user': u'joe@localhost',
   }

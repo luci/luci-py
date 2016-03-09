@@ -147,7 +147,7 @@ class TasksApiTest(BaseTest):
         properties=swarming_rpcs.TaskProperties(
             command=['rm', '-rf', '/'],
             dimensions=[
-              swarming_rpcs.StringPair(key='a', value='b'),
+              swarming_rpcs.StringPair(key='pool', value='default'),
             ],
             env=[
               swarming_rpcs.StringPair(key='PATH', value='/'),
@@ -169,7 +169,7 @@ class TasksApiTest(BaseTest):
         u'properties': {
           u'command': [u'rm', u'-rf', u'/'],
           u'dimensions': [
-            {u'key': u'a', u'value': u'b'},
+            {u'key': u'pool', u'value': u'default'},
           ],
           u'env': [
             {u'key': u'PATH', u'value': u'/'},
@@ -182,8 +182,8 @@ class TasksApiTest(BaseTest):
         u'pubsub_topic': u'projects/abc/topics/def',
         u'pubsub_userdata': u'userdata',
         u'tags': [
-          u'a:b',
           u'foo:bar',
+          u'pool:default',
           u'priority:200',
           u'user:joe@localhost',
         ],
@@ -219,6 +219,7 @@ class TasksApiTest(BaseTest):
             command=['python', 'run_test.py'],
             dimensions=[
               swarming_rpcs.StringPair(key='os', value='Amiga'),
+              swarming_rpcs.StringPair(key='pool', value='default'),
             ],
             execution_timeout_secs=3600,
             io_timeout_secs=1200,
@@ -236,6 +237,7 @@ class TasksApiTest(BaseTest):
           u'command': [u'python', u'run_test.py'],
           u'dimensions': [
             {u'key': u'os', u'value': u'Amiga'},
+            {u'key': u'pool', u'value': u'default'},
           ],
           u'execution_timeout_secs': u'3600',
           u'grace_period_secs': u'30',
@@ -245,6 +247,7 @@ class TasksApiTest(BaseTest):
         u'tags': [
           u'foo:bar',
           u'os:Amiga',
+          u'pool:default',
           u'priority:200',
           u'user:joe@localhost',
         ],
@@ -255,6 +258,7 @@ class TasksApiTest(BaseTest):
         u'bot_dimensions': [
           {u'key': u'id', u'value': [u'bot1']},
           {u'key': u'os', u'value': [u'Amiga']},
+          {u'key': u'pool', u'value': [u'default']},
         ],
         u'bot_id': u'bot1',
         u'bot_version': self.bot_version,
@@ -274,6 +278,7 @@ class TasksApiTest(BaseTest):
         u'tags': [
           u'foo:bar',
           u'os:Amiga',
+          u'pool:default',
           u'priority:200',
           u'user:joe@localhost',
         ],
@@ -292,6 +297,7 @@ class TasksApiTest(BaseTest):
           u'bot_dimensions': [
             {u'key': u'id', u'value': [u'bot1']},
             {u'key': u'os', u'value': [u'Amiga']},
+            {u'key': u'pool', u'value': [u'default']},
           ],
           u'bot_id': u'bot1',
           u'bot_version': self.bot_version,
@@ -311,6 +317,7 @@ class TasksApiTest(BaseTest):
           u'tags': [
             u'foo:bar',
             u'os:Amiga',
+            u'pool:default',
             u'priority:200',
             u'user:joe@localhost',
           ],
@@ -348,14 +355,21 @@ class TasksApiTest(BaseTest):
           u'priority': u'200',
           u'properties': {
             u'command': [u'python', u'run_test.py'],
-            u'dimensions': [{u'key': u'os', u'value': u'Amiga'}],
+            u'dimensions': [
+              {u'key': u'os', u'value': u'Amiga'},
+              {u'key': u'pool', u'value': u'default'},
+            ],
             u'execution_timeout_secs': u'3600',
             u'grace_period_secs': u'30',
             u'idempotent': True,
             u'io_timeout_secs': u'1200',
           },
           u'tags': [
-            u'foo:bar', u'os:Amiga', u'priority:200', u'user:joe@localhost',
+            u'foo:bar',
+            u'os:Amiga',
+            u'pool:default',
+            u'priority:200',
+            u'user:joe@localhost',
           ],
           u'user': u'joe@localhost',
         },
@@ -367,15 +381,23 @@ class TasksApiTest(BaseTest):
           u'priority': u'10',
           u'properties': {
             u'command': [u'python', u'run_test.py'],
-            u'dimensions': [{u'key': u'os', u'value': u'Amiga'}],
+            u'dimensions': [
+              {u'key': u'os', u'value': u'Amiga'},
+              {u'key': u'pool', u'value': u'default'},
+            ],
             u'execution_timeout_secs': u'3600',
             u'grace_period_secs': u'30',
             u'idempotent': True,
             u'io_timeout_secs': u'1200',
           },
           u'tags': [
-            u'commit:post', u'os:Amiga', u'os:Win', u'priority:10',
-            u'project:yay', u'user:joe@localhost',
+            u'commit:post',
+            u'os:Amiga',
+            u'os:Win',
+            u'pool:default',
+            u'priority:10',
+            u'project:yay',
+            u'user:joe@localhost',
           ],
           u'user': u'joe@localhost',
         },
@@ -398,8 +420,8 @@ class TasksApiTest(BaseTest):
         priority=200,
         properties=swarming_rpcs.TaskProperties(
             dimensions=[
+              swarming_rpcs.StringPair(key='pool', value='default'),
               swarming_rpcs.StringPair(key='foo', value='bar'),
-              swarming_rpcs.StringPair(key='a', value='b'),
             ],
             env=[
               swarming_rpcs.StringPair(key='PATH', value='/'),
@@ -421,8 +443,8 @@ class TasksApiTest(BaseTest):
         u'priority': u'200',
         u'properties': {
           u'dimensions': [
-            {u'key': u'a', u'value': u'b'},
             {u'key': u'foo', u'value': u'bar'},
+            {u'key': u'pool', u'value': u'default'},
           ],
           u'env': [
             {u'key': u'PATH', u'value': u'/'},
@@ -438,8 +460,8 @@ class TasksApiTest(BaseTest):
           u'io_timeout_secs': u'30',
         },
         u'tags': [
-          u'a:b',
           u'foo:bar',
+          u'pool:default',
           u'priority:200',
           u'user:joe@localhost',
         ],
@@ -622,11 +644,13 @@ class TasksApiTest(BaseTest):
     entity = task_pack.unpack_result_summary_key(first_id).get()
     entity.modified_ts = now_120
     entity.put()
+    properties_hash = entity.properties_hash.encode('hex')
 
     second = {
       u'bot_dimensions': [
         {u'key': u'id', u'value': [u'bot1']},
         {u'key': u'os', u'value': [u'Amiga']},
+        {u'key': u'pool', u'value': [u'default']},
       ],
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
@@ -647,6 +671,7 @@ class TasksApiTest(BaseTest):
         u'commit:pre',
         u'os:Amiga',
         u'os:Win',
+        u'pool:default',
         u'priority:10',
         u'project:yay',
         u'user:jack@localhost',
@@ -659,6 +684,7 @@ class TasksApiTest(BaseTest):
       u'bot_dimensions': [
         {u'key': u'id', u'value': [u'bot1']},
         {u'key': u'os', u'value': [u'Amiga']},
+        {u'key': u'pool', u'value': [u'default']},
       ],
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
@@ -671,7 +697,7 @@ class TasksApiTest(BaseTest):
       u'internal_failure': False,
       u'modified_ts': str_now_120,
       u'name': u'first',
-      u'properties_hash': u'8771754ee465a689f19c87f2d21ea0d9b8dd4f64',
+      u'properties_hash': properties_hash,
       u'server_versions': [u'v1a'],
       u'started_ts': str_now,
       u'state': u'COMPLETED',
@@ -679,6 +705,7 @@ class TasksApiTest(BaseTest):
         u'commit:post',
         u'os:Amiga',
         u'os:Win',
+        u'pool:default',
         u'priority:10',
         u'project:yay',
         u'user:joe@localhost',
@@ -737,7 +764,12 @@ class TaskApiTest(BaseTest):
       u'modified_ts': str_now,
       u'name': u'hi',
       u'state': u'CANCELED',
-      u'tags': [u'os:Amiga', u'priority:10', u'user:joe@localhost'],
+      u'tags': [
+        u'os:Amiga',
+        u'pool:default',
+        u'priority:10',
+        u'user:joe@localhost',
+      ],
       u'task_id': task_id,
       u'user': u'joe@localhost',
     }
@@ -778,7 +810,12 @@ class TaskApiTest(BaseTest):
       u'modified_ts': str_now,
       u'name': u'hi',
       u'state': u'PENDING',
-      u'tags': [u'os:Amiga', u'priority:10', u'user:joe@localhost'],
+      u'tags': [
+        u'os:Amiga',
+        u'pool:default',
+        u'priority:10',
+        u'user:joe@localhost',
+      ],
       u'task_id': u'5cee488008810',
       u'user': u'joe@localhost',
     }
@@ -798,6 +835,7 @@ class TaskApiTest(BaseTest):
       u'bot_dimensions': [
         {u'key': u'id', u'value': [u'bot1']},
         {u'key': u'os', u'value': [u'Amiga']},
+        {u'key': u'pool', u'value': [u'default']},
       ],
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
@@ -828,6 +866,7 @@ class TaskApiTest(BaseTest):
       u'bot_dimensions': [
         {u'key': u'id', u'value': [u'bot1']},
         {u'key': u'os', u'value': [u'Amiga']},
+        {u'key': u'pool', u'value': [u'default']},
       ],
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
@@ -924,13 +963,21 @@ class TaskApiTest(BaseTest):
       u'priority': u'10',
       u'properties': {
         u'command': [u'python', u'run_test.py'],
-        u'dimensions': [{u'key': u'os', u'value': u'Amiga'},],
+        u'dimensions': [
+          {u'key': u'os', u'value': u'Amiga'},
+          {u'key': u'pool', u'value': u'default'},
+        ],
         u'execution_timeout_secs': u'3600',
         u'grace_period_secs': u'30',
         u'idempotent': False,
         u'io_timeout_secs': u'1200',
       },
-      u'tags': [u'os:Amiga', u'priority:10', u'user:joe@localhost'],
+      u'tags': [
+        u'os:Amiga',
+        u'pool:default',
+        u'priority:10',
+        u'user:joe@localhost',
+      ],
       u'user': u'joe@localhost',
     }
     self.assertEqual(expected, response.json)
@@ -1074,6 +1121,7 @@ class BotApiTest(BaseTest):
           u'bot_dimensions': [
             {u'key': u'id', u'value': [u'bot1']},
             {u'key': u'os', u'value': [u'Amiga']},
+            {u'key': u'pool', u'value': [u'default']},
           ],
           u'bot_id': u'bot1',
           u'bot_version': self.bot_version,
@@ -1127,6 +1175,7 @@ class BotApiTest(BaseTest):
     dimensions = [
       {u'key': u'id', u'value': [u'bot1']},
       {u'key': u'os', u'value': [u'Amiga']},
+      {u'key': u'pool', u'value': [u'default']},
     ]
     state = unicode(json.dumps(
         {'running_time': 1234., 'sleep_streak': 0,
