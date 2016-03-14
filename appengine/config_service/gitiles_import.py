@@ -360,6 +360,16 @@ def import_config_set(config_set):
 ## Bulk import in a cron job
 
 
+@contextlib.contextmanager
+def _log_import_error(cs):
+  try:
+    yield
+  except NotFoundError as ex:
+    logging.warning(ex)
+  except Exception:
+    logging.exception('Could not import %s', cs)
+
+
 def import_services(location_root):
   """Imports all services, assuming they are in Gitiles.
 
@@ -379,10 +389,8 @@ def import_services(location_root):
     service_location = location_root._replace(
         path=os.path.join(location_root.path, service_entry.name))
     cs = 'services/%s' % service_id
-    try:
+    with _log_import_error(cs):
       _import_config_set(cs, service_location)
-    except Exception:
-      logging.exception('Could not import %s', cs)
 
 
 def import_projects():
@@ -406,10 +414,8 @@ def import_projects():
           project.config_location, ex.message)
       continue
 
-    try:
+    with _log_import_error('projects/%s' % project.id):
       import_project(project.id, location)
-    except Exception:
-      logging.exception('Could not import projects/%s', project.id)
 
 
     # Import refs of the project
@@ -420,11 +426,9 @@ def import_projects():
           treeish=ref.name,
           path=ref.config_path or cfg.ref_config_default_path,
       )
-      try:
-        ref_cs = 'projects/%s/%s' % (project.id, ref.name)
+      ref_cs = 'projects/%s/%s' % (project.id, ref.name)
+      with _log_import_error(ref_cs):
         _import_config_set(ref_cs, ref_location)
-      except Exception:
-        logging.exception('Could not import %s', ref_cs)
 
 
 def cron_run_import():  # pragma: no cover
