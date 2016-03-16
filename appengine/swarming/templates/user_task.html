@@ -308,7 +308,7 @@
         <td>State</td>
         <td>
           {{task.to_string()}} ({{task.state}})
-          {% if task.can_be_canceled and is_admin %}
+          {% if task.can_be_canceled and is_privileged_user %}
             <form id="cancel" method="post" action="/user/tasks/cancel">
               <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
               <input type="hidden" name="task_id" value="{{task.task_id}}" />

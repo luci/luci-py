@@ -686,7 +686,7 @@ class TaskCancelHandler(auth.AuthenticatingHandler):
   TaskResultSummary accordingly.
   """
 
-  @auth.require(acl.is_admin)
+  @auth.require(acl.is_privileged_user)
   def post(self):
     key_id = self.request.get('task_id', '')
     try:
