@@ -136,19 +136,6 @@ def _validate_command(prop, value):
         '%s must be a list of commands, each a list of arguments' % prop._name)
 
 
-def _validate_data(prop, value):
-  """Validates TaskProperties.data and sort the URLs."""
-  def check(i):
-    return (
-        isinstance(i, list) and len(i) == 2 and
-        isinstance(i[0], unicode) and isinstance(i[1], unicode))
-
-  if not all(check(i) for i in value):
-    # pylint: disable=W0212
-    raise TypeError('%s must be a list of (url, file)' % prop._name)
-  return sorted(value)
-
-
 def _validate_dict_of_strings(prop, value):
   """Validates TaskProperties.dimensions and TaskProperties.env."""
   if not all(
@@ -239,13 +226,11 @@ class TaskProperties(ndb.Model):
   This model is immutable.
 
   New-style TaskProperties supports invocation of run_isolated. When this
-  behavior is desired, .data must be omitted; instead, the member
-  .inputs_ref must be suppled. .extra_args can be supplied to pass extraneous
-  arguments.
+  behavior is desired, the member .inputs_ref must be suppled. .extra_args can
+  be supplied to pass extraneous arguments.
 
   TODO(maruel): Overhaul of this entity:
   - Convert commands to command as a single list of strings.
-  - Delete data
   Doing so will cause a new property hash on all entities, which will
   temporarily break the task deduplication. This happens whenever an new member
   is added anyway.
@@ -257,11 +242,6 @@ class TaskProperties(ndb.Model):
   # other. Encoded json.
   commands = datastore_utils.DeterministicJsonProperty(
       validator=_validate_command, json_type=list, indexed=False)
-
-  # List of (URLs, local file) for the bot to download. Encoded as json. Must be
-  # sorted by URLs. Optional.
-  data = datastore_utils.DeterministicJsonProperty(
-      validator=_validate_data, json_type=list, indexed=False)
 
   # File inputs of the task. Only inputs_ref or command&data can be specified.
   inputs_ref = ndb.LocalStructuredProperty(FilesRef)
@@ -306,7 +286,6 @@ class TaskProperties(ndb.Model):
     """If True, it is a terminate request."""
     return (
         not self.commands and
-        not self.data and
         self.dimensions.keys() == [u'id'] and
         not self.inputs_ref and
         not self.env and
@@ -337,8 +316,6 @@ class TaskProperties(ndb.Model):
         raise datastore_errors.BadValueError('only one command is supported')
       if bool(self.commands) == bool(self.inputs_ref):
         raise datastore_errors.BadValueError('use one of command or inputs_ref')
-      if self.data and not self.commands:
-        raise datastore_errors.BadValueError('data requires commands')
       if self.extra_args and not self.inputs_ref:
         raise datastore_errors.BadValueError('extra_args require inputs_ref')
       if self.inputs_ref:

@@ -135,7 +135,6 @@ def new_task_request_from_rpc(msg, now):
       task_request.TaskProperties,
       props,
       commands=[props.command] if props.command else [],
-      data=[],
       dimensions={i.key: i.value for i in props.dimensions},
       env={i.key: i.value for i in props.env},
       inputs_ref=inputs_ref)

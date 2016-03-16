@@ -4,7 +4,6 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-import StringIO
 import base64
 import json
 import logging
@@ -15,7 +14,6 @@ import sys
 import tempfile
 import time
 import unittest
-import zipfile
 
 import test_env_bot_code
 test_env_bot_code.setup_test_env()
@@ -39,22 +37,11 @@ sys.path.insert(0, os.path.join(CLIENT_DIR, 'tests'))
 import isolateserver_mock
 
 
-def compress_to_zip(files):
-  # TODO(maruel): Remove once 'data' support is removed.
-  out = StringIO.StringIO()
-  with zipfile.ZipFile(out, 'w') as zip_file:
-    for item, content in files.iteritems():
-      zip_file.writestr(item, content)
-  return out.getvalue()
-
-
 def get_manifest(script=None, inputs_ref=None, **kwargs):
   out = {
     'bot_id': 'localhost',
     'command':
         [sys.executable, '-u', '-c', script] if not inputs_ref else None,
-    # TODO(maruel): Remove once support is removed.
-    'data': None,
     'env': {},
     'extra_args': [],
     'grace_period': 30.,
@@ -63,7 +50,6 @@ def get_manifest(script=None, inputs_ref=None, **kwargs):
     'io_timeout': 10.,
     'task_id': 23,
   }
-  assert 'data' not in kwargs, kwargs
   out.update(kwargs)
   return out
 
@@ -171,15 +157,6 @@ class TestTaskRunner(TestTaskRunnerBase):
         server, task_details, self.work_dir, 3600., start)
 
   def test_load_and_run_raw(self):
-    requests = [
-      (
-        'https://localhost:1/f',
-        {},
-        compress_to_zip({'file3': 'content3'}),
-        None,
-      ),
-    ]
-    self.expected_requests(requests)
     server = xsrf_client.XsrfRemote('https://localhost:1/')
 
     def run_command(
@@ -204,7 +181,6 @@ class TestTaskRunner(TestTaskRunnerBase):
       data = {
         'bot_id': 'localhost',
         'command': ['a'],
-        'data': [('https://localhost:1/f', 'foo.zip')],
         'env': {'d': 'e'},
         'extra_args': [],
         'grace_period': 30.,
@@ -253,7 +229,6 @@ class TestTaskRunner(TestTaskRunnerBase):
       data = {
         'bot_id': 'localhost',
         'command': None,
-        'data': None,
         'env': {'d': 'e'},
         'extra_args': ['foo', 'bar'],
         'grace_period': 30.,
@@ -370,7 +345,6 @@ class TestTaskRunner(TestTaskRunnerBase):
             'executable_that_shouldnt_be_on_your_system',
             'thus_raising_OSError',
           ],
-          'data': [],
           'env': {},
           'extra_args': [],
           'grace_period': 30.,
@@ -488,7 +462,6 @@ class TestTaskRunner(TestTaskRunnerBase):
         {
           'bot_id': 'localhost',
           'command': ['large', 'executable'],
-          'data': [],
           'env': {'foo': 'bar'},
           'extra_args': [],
           'grace_period': 30.,

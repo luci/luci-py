@@ -32,7 +32,6 @@ def _gen_request(properties=None, **kwargs):
   """Creates a TaskRequest."""
   props = {
     'commands': [[u'command1']],
-    'data': [],
     'dimensions': {u'pool': u'default'},
     'env': {},
     'execution_timeout_secs': 24*60*60,
@@ -320,7 +319,6 @@ class TaskToRunApiTest(TestCase):
     data = _gen_request(
         properties={
           'commands': [[u'command1', u'arg1']],
-          'data': [[u'http://localhost/foo', u'foo.zip']],
           'dimensions': request_dimensions,
           'env': {u'foo': u'bar'},
           'execution_timeout_secs': 30,
@@ -335,7 +333,6 @@ class TaskToRunApiTest(TestCase):
     data = _gen_request(
         properties={
           'commands': [[u'command1', u'arg1']],
-          'data': [[u'http://localhost/foo', u'foo.zip']],
           'dimensions': request_dimensions,
           'env': {u'foo': u'bar'},
           'execution_timeout_secs': 30,

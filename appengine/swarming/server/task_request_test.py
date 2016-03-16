@@ -31,10 +31,6 @@ def _gen_request(properties=None, **kwargs):
   """Creates a TaskRequest."""
   props = {
     'commands': [[u'command1', u'arg1']],
-    'data': [
-      [u'http://localhost/foo', u'foo.zip'],
-      [u'http://localhost/bar', u'bar.zip'],
-    ],
     'dimensions': {
       u'OS': u'Windows-3.1.1',
       u'hostname': u'localhost',
@@ -193,11 +189,6 @@ class TaskRequestApiTest(TestCase):
     request = task_request.make_request(r, True)
     expected_properties = {
       'commands': [[u'command1', u'arg1']],
-      'data': [
-        # Items were sorted.
-        [u'http://localhost/bar', u'bar.zip'],
-        [u'http://localhost/foo', u'foo.zip'],
-      ],
       'dimensions': {
         u'OS': u'Windows-3.1.1',
         u'hostname': u'localhost',
@@ -219,7 +210,7 @@ class TaskRequestApiTest(TestCase):
       'properties': expected_properties,
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
-      'properties_hash': '53fa20ad568a37eeb176d6def0528f07a48b5e6b',
+      'properties_hash': 'cad6addd80cb545042968d267f7561c87323b45a',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'tags': [
@@ -243,7 +234,6 @@ class TaskRequestApiTest(TestCase):
         _gen_request(
             properties={
               'commands': None,
-              'data': None,
               'inputs_ref': {
                 'isolated': '0123456789012345678901234567890123456789',
                 'isolatedserver': 'http://localhost:1',
@@ -258,11 +248,6 @@ class TaskRequestApiTest(TestCase):
         True)
     expected_properties = {
       'commands': [[u'command1', u'arg1']],
-      'data': [
-        # Items were sorted.
-        [u'http://localhost/bar', u'bar.zip'],
-        [u'http://localhost/foo', u'foo.zip'],
-      ],
       'dimensions': {
         u'OS': u'Windows-3.1.1',
         u'hostname': u'localhost',
@@ -284,7 +269,7 @@ class TaskRequestApiTest(TestCase):
       'properties': expected_properties,
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
-      'properties_hash': '53fa20ad568a37eeb176d6def0528f07a48b5e6b',
+      'properties_hash': 'cad6addd80cb545042968d267f7561c87323b45a',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'tags': [
@@ -326,7 +311,7 @@ class TaskRequestApiTest(TestCase):
     # Other unit tests should use the calculated value.
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        '53fa20ad568a37eeb176d6def0528f07a48b5e6b', as_dict['properties_hash'])
+        'cad6addd80cb545042968d267f7561c87323b45a', as_dict['properties_hash'])
 
   def test_duped(self):
     # Two TestRequest with the same properties.
@@ -392,18 +377,6 @@ class TaskRequestApiTest(TestCase):
           _gen_request(properties=dict(env={u'a': 1})), True)
     task_request.make_request(_gen_request(properties=dict(env={})), True)
 
-    with self.assertRaises(TypeError):
-      task_request.make_request(
-          _gen_request(properties=dict(data=[['a',]])), True)
-    with self.assertRaises(TypeError):
-      task_request.make_request(
-          _gen_request(properties=dict(data=[('a', '1')])), True)
-    with self.assertRaises(TypeError):
-      task_request.make_request(
-          _gen_request(properties=dict(data=[(u'a', u'1')])), True)
-    task_request.make_request(
-        _gen_request(properties=dict(data=[[u'a', u'1']])), True)
-
     with self.assertRaises(datastore_errors.BadValueError):
       task_request.make_request(
           _gen_request(priority=task_request.MAXIMUM_PRIORITY+1), True)
@@ -459,11 +432,6 @@ class TaskRequestApiTest(TestCase):
     # - parent_task_id was reset to None.
     expected_properties = {
       'commands': [[u'command1', u'arg1']],
-      'data': [
-        # Items were sorted.
-        [u'http://localhost/bar', u'bar.zip'],
-        [u'http://localhost/foo', u'foo.zip'],
-      ],
       'dimensions': {
         u'OS': u'Windows-3.1.1',
         u'hostname': u'localhost',

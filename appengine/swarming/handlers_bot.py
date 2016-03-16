@@ -378,7 +378,6 @@ class BotPollHandler(_BotBaseHandler):
         'command':
             request.properties.commands[0]
             if request.properties.commands else None,
-        'data': request.properties.data,
         'dimensions': request.properties.dimensions,
         'env': request.properties.env,
         'extra_args': request.properties.extra_args,

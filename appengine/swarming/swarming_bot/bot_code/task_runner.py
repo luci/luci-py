@@ -14,7 +14,6 @@ up to the calling process (bot_main.py) to signal that there was an internal
 failure and to cancel this task run and ask the server to retry it.
 """
 
-import StringIO
 import base64
 import json
 import logging
@@ -22,9 +21,7 @@ import optparse
 import os
 import signal
 import sys
-import tempfile
 import time
-import zipfile
 
 import xsrf_client
 from utils import net
@@ -71,20 +68,6 @@ def monotonic_time():
     # TODO(maruel): If delta is large, probably worth alerting via ereporter2.
     _last_now = now
   return _last_now
-
-
-def download_data(work_dir, files):
-  """Downloads and expands the zip files enumerated in the test run data.
-
-  That is only for old style commands.
-  """
-  for data_url, _ in files:
-    logging.info('Downloading: %s', data_url)
-    content = net.url_read(data_url)
-    if content is None:
-      raise Exception('Failed to download %s' % data_url)
-    with zipfile.ZipFile(StringIO.StringIO(content)) as zip_file:
-      zip_file.extractall(work_dir)
 
 
 def get_run_isolated():
@@ -143,8 +126,6 @@ class TaskDetails(object):
 
     # Raw command. Only self.command or self.inputs_ref can be set.
     self.command = data['command'] or []
-    # TODO(maruel): Deprecated.
-    self.data = data['data'] or []
 
     # Isolated command. Is a serialized version of task_request.FilesRef.
     self.inputs_ref = data['inputs_ref']
@@ -189,10 +170,6 @@ def load_and_run(in_file, swarming_server, cost_usd_hour, start, out_file):
 
       with open(in_file, 'rb') as f:
         task_details = TaskDetails(json.load(f))
-
-      # Download the script to run in the temporary directory.
-      # TODO(maruel): Remove.
-      download_data(work_dir, task_details.data)
 
       task_result = run_command(
           swarming_server, task_details, work_dir, cost_usd_hour, start)
