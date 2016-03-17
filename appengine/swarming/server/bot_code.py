@@ -9,6 +9,7 @@ bot_archive.py.
 """
 
 import collections
+import logging
 import os.path
 
 from google.appengine.api import memcache
@@ -170,6 +171,8 @@ def get_swarming_bot_zip(host):
   bot_version = get_bot_version(host)
   content = memcache.get('code-%s' + bot_version, namespace='bot_code')
   if content:
+    logging.debug(
+        'memcached bot code %s; %d bytes', bot_version, len(content))
     return content
 
   # Get the start bot script from the database, if present. Pass an empty
@@ -179,4 +182,5 @@ def get_swarming_bot_zip(host):
   content, bot_version = bot_archive.get_swarming_bot_zip(
       bot_dir, host, utils.get_app_version(), additionals)
   memcache.set('code-%s' + bot_version, content, namespace='bot_code')
+  logging.info('generated bot code %s; %d bytes', bot_version, len(content))
   return content

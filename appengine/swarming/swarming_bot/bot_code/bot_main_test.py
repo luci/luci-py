@@ -12,6 +12,7 @@ import tempfile
 import threading
 import time
 import unittest
+import zipfile
 
 import test_env_bot_code
 test_env_bot_code.setup_test_env()
@@ -503,27 +504,34 @@ class TestBotMain(net_utils.TestCase):
     # Under the test however forever-blocking calls finish, and post_error is
     # called.
     self.mock(self.bot, 'post_error', lambda *_: None)
-    self.mock(net, 'url_retrieve', lambda *_: True)
+    # Mock the file to download in the temporary directory.
+    self.mock(
+        bot_main, 'THIS_FILE',
+        os.path.join(self.root_dir, 'swarming_bot.1.zip'))
+    new_zip = os.path.join(self.root_dir, 'swarming_bot.2.zip')
+    # This is necessary otherwise zipfile will crash.
+    self.mock(time, 'time', lambda: 1400000000)
+    def url_retrieve(f, url):
+      self.assertEqual(
+          'https://localhost:1/swarming/api/v1/bot/bot_code/123', url)
+      self.assertEqual(new_zip, f)
+      # Create a valid zip that runs properly.
+      with zipfile.ZipFile(f, 'w') as z:
+        z.writestr('__main__.py', 'print("hi")')
+      return True
+    self.mock(net, 'url_retrieve', url_retrieve)
 
     calls = []
     def exec_python(args):
       calls.append(args)
       return 23
     self.mock(bot_main.common, 'exec_python', exec_python)
-    self.mock(
-        bot_main, 'THIS_FILE',
-        os.path.join(test_env_bot_code.BOT_DIR, 'swarming_bot.1.zip'))
 
     with self.assertRaises(SystemExit) as e:
       bot_main.update_bot(self.bot, '123')
     self.assertEqual(23, e.exception.code)
 
-    cmd = [
-      os.path.join(test_env_bot_code.BOT_DIR, 'swarming_bot.2.zip'),
-      'start_slave',
-      '--survive',
-    ]
-    self.assertEqual([cmd], calls)
+    self.assertEqual([[new_zip, 'start_slave', '--survive']], calls)
 
   def test_main(self):
     def check(x):

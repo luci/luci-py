@@ -41,8 +41,8 @@ def CMDattributes(_args):
   """Prints out the bot's attributes."""
   from bot_code import bot_main
   json.dump(
-      bot_main.get_attributes(None), sys.stdout, indent=2, sort_keys=True,
-      separators=(',', ': '))
+      bot_main.get_attributes(bot_main.get_bot()), sys.stdout, indent=2,
+      sort_keys=True, separators=(',', ': '))
   print('')
   return 0
 
@@ -53,6 +53,19 @@ def CMDconfig(_args):
   from bot_code import bot_main
   json.dump(bot_main.get_config(), sys.stdout, indent=2, sort_keys=True)
   print('')
+  return 0
+
+
+def CMDis_fine(_args):
+  """Just reports that the code doesn't throw.
+
+  That ensures that the bot has minimal viability before transfering control to
+  it. For now, it just imports bot_main but later it'll check the config, etc.
+  """
+  # pylint: disable=unused-variable
+  from bot_code import bot_main
+  from config import bot_config
+  # We're #goodenough.
   return 0
 
 

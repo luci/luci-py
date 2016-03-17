@@ -580,10 +580,9 @@ def update_bot(botobj, version):
   Use alternating files; first load swarming_bot.1.zip, then swarming_bot.2.zip,
   never touching swarming_bot.zip which was the originally bootstrapped file.
 
-  Does not return.
+  LKGBC is handled by update_lkgbc().
 
-  TODO(maruel): Create LKGBC:
-  https://code.google.com/p/swarming/issues/detail?id=112
+  Does not return.
   """
   # Alternate between .1.zip and .2.zip.
   new_zip = 'swarming_bot.1.zip'
@@ -594,8 +593,7 @@ def update_bot(botobj, version):
   # Download as a new file.
   url = botobj.remote.url + '/swarming/api/v1/bot/bot_code/%s' % version
   if not net.url_retrieve(new_zip, url):
-    # Try without a specific version. It can happen when a server is rapidly
-    # updated multiple times in a row.
+    # It can happen when a server is rapidly updated multiple times in a row.
     botobj.post_error(
         'Unable to download %s from %s; first tried version %s' %
         (new_zip, url, version))
@@ -603,9 +601,24 @@ def update_bot(botobj, version):
     time.sleep(2)
     return
 
-  logging.info('Restarting to %s.', new_zip)
+  s = os.stat(new_zip)
+  logging.info('Restarting to %s; %d bytes.', new_zip, s.st_size)
   sys.stdout.flush()
   sys.stderr.flush()
+
+  proc = subprocess42.Popen(
+     [sys.executable, new_zip, 'is_fine'],
+     stdout=subprocess42.PIPE, stderr=subprocess42.STDOUT)
+  output, _ = proc.communicate()
+  if proc.poll():
+    botobj.post_error(
+        'New bot code is bad: proc exit = %s. stdout:\n%s' %
+        (proc.returncode, output))
+    # Poll again, the server may have better code next time. To prevent
+    # busy-loop, sleep a little.
+    time.sleep(2)
+    return
+
   # Don't forget to release the singleton before restarting itself.
   SINGLETON.release()
 
