@@ -233,12 +233,13 @@ def get_cpu_bitness():
 
   Unless someone ported python to PDP-10 or 286.
 
-  Note: this function may return 32 bits on 64 bits OS in case of a 32 bits
-  python process.
+  OSX or Windows, we don't care about userland, we report the bitness of the
+  kernel.
+  On other platforms (Linux), we explicitly want to report 32 bits userland,
+  independent of the kernel bitness.
   """
-  if platform.machine().endswith('64'):
+  if sys.platform in ('darwin', 'win32') and platform.machine().endswith('64'):
     return u'64'
-  # TODO(maruel): Work harder to figure out if OS is 64 bits.
   return u'64' if sys.maxsize > 2**32 else u'32'
 
 
