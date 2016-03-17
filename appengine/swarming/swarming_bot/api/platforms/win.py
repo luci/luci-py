@@ -44,7 +44,7 @@ def _get_mount_points():
   DRIVE_FIXED = 3
   # https://msdn.microsoft.com/library/windows/desktop/aa364939.aspx
   return [
-    letter + ':\\'
+    u'%s:\\' % letter
     for letter in string.lowercase
     if ctypes.windll.kernel32.GetDriveTypeW(letter + ':\\') == DRIVE_FIXED
   ]
@@ -58,8 +58,8 @@ def _get_disk_info(mount_point):
       ctypes.c_wchar_p(mount_point), None, ctypes.pointer(total_bytes),
       ctypes.pointer(free_bytes))
   return {
-    'free_mb': round(free_bytes.value / 1024. / 1024., 1),
-    'size_mb': round(total_bytes.value / 1024. / 1024., 1),
+    u'free_mb': round(free_bytes.value / 1024. / 1024., 1),
+    u'size_mb': round(total_bytes.value / 1024. / 1024., 1),
   }
 
 
@@ -148,7 +148,7 @@ def get_startup_dir():
 
 def get_disks_info():
   """Returns disk infos on all mount point in Mb."""
-  return dict((p, _get_disk_info(p)) for p in _get_mount_points())
+  return {p: _get_disk_info(p) for p in _get_mount_points()}
 
 
 @tools.cached

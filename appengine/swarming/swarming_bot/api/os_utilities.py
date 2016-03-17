@@ -47,6 +47,19 @@ from third_party.oauth2client import client
 cached = tools.cached
 
 
+# Global configurable values. These are meant to be the default values under
+# which the bot will self-quarantine when the disk size is too small. Setting
+# either of the following value to 0 or None disables self-quarantine.
+# Self-quarantine only happens when *both* thresholds are under.
+#
+# THRESHOLD_MB is the number of MiB below which the bot will quarantine itself
+# automatically.
+THRESHOLD_MB = 4*1024
+# THRESHOLD_RELATIVE is the minimum free space percentage under which the bot
+# will quarantine itself automatically.
+THRESHOLD_RELATIVE = 0.15
+
+
 # https://cloud.google.com/compute/pricing#machinetype
 GCE_MACHINE_COST_HOUR_US = {
   u'n1-standard-1': 0.063,
@@ -105,6 +118,7 @@ GCE_WINDOWS_COST_CORE_HOUR = 0.04
 
 MONITORING_ENDPOINT = 'https://www.googleapis.com/cloudmonitoring/v2beta2'
 MONITORING_SCOPES = ['https://www.googleapis.com/auth/monitoring']
+
 
 ### Private stuff.
 
@@ -333,8 +347,39 @@ def get_disks_info():
 
 
 @tools.cached
+def get_disk_size(path):
+  """Returns the partition size that is referenced by this path."""
+  # Find the disk for the path.
+  path = os.path.realpath(path)
+  paths = sorted(
+      ((p, k[u'size_mb']) for p, k in get_disks_info().iteritems()),
+      key=lambda x: -len(x[0]))
+  # It'd be nice if it were possible to know on a per-path basis, e.g. you can
+  # have both case sensitive and insensitive partitions mounted on OSX.
+  case_insensitive = sys.platform in ('darwin', 'win32')
+  if case_insensitive:
+    path = path.lower()
+  for base, size_mb in paths:
+    if path.startswith(base.lower() if case_insensitive else base):
+      return size_mb
+  # We have no idea.
+  return 0.
+
+
+@tools.cached
+def get_min_free_space(path):
+  """Returns the minimum free space (in MiB) required to not self-quarantine.
+
+  Returns 0 when disabled.
+  """
+  return min(THRESHOLD_MB or 0, get_disk_size(path) * THRESHOLD_RELATIVE or 0)
+
+
+@tools.cached
 def get_audio():
   """Returns the active audio card(s)."""
+  # There's a risk that an audio card may "appear", which may be especially true
+  # on OSX when an audio cable is plugged in.
   if sys.platform == 'darwin':
     return platforms.osx.get_audio()
   elif sys.platform == 'linux2':
@@ -408,7 +453,7 @@ def get_cost_hour():
   # Assume HDD for now, it's the cheapest. That's not true, we do have SSDs.
   disk_gb_cost = 0.
   for disk in get_disks_info().itervalues():
-    disk_gb_cost += disk['free_mb'] / 1024. * (
+    disk_gb_cost += disk[u'free_mb'] / 1024. * (
         GCE_HDD_GB_COST_MONTH / 30. / 24.)
 
   # TODO(maruel): Network. It's not a constant cost, it's per task.
@@ -815,7 +860,7 @@ def get_dimensions():
   return dimensions
 
 
-def get_state(threshold_mb=4*1024, threshold_relative=0.15, skip=None):
+def get_state(skip=None):
   """Returns dict with a state of the bot reported to the server with each poll.
 
   Supposed to be use only for dynamic state that changes while bot is running.
@@ -825,8 +870,6 @@ def get_state(threshold_mb=4*1024, threshold_relative=0.15, skip=None):
   tasks.
 
   Arguments:
-  - threshold_mb: number of mb below which the bot will quarantine itself
-        automatically. Set to 0 or None to disable.
   - skip: list of partitions to skip for automatic quarantining on low free
         space.
   """
@@ -874,37 +917,35 @@ def get_state(threshold_mb=4*1024, threshold_relative=0.15, skip=None):
     state[u'quarantined'] = 'Failed to access TEMP (%s)' % tmpdir
   elif nb_files_in_temp > 1024:
     state[u'quarantined'] = '> 1024 files in TEMP (%s)' % tmpdir
-  auto_quarantine_on_low_space(state, threshold_mb, threshold_relative, skip)
+  auto_quarantine_on_low_space(state, skip)
   return state
 
 
-def auto_quarantine_on_low_space(
-    state, threshold_mb, threshold_relative, skip=None):
+def auto_quarantine_on_low_space(state, skip=None):
   """Quarantines when there's not enough free space on any partition.
 
-  It will quarantine only if both threshold_mb, as the total free space and
-  threshold_relative, as the free space fraction versus the total partition
+  It will quarantine only if both THRESHOLD_MB, as the total free space and
+  THRESHOLD_RELATIVE, as the free space fraction versus the total partition
   size, are both underwater.
 
   Modifies state in-place. Assumes state['free_disks'] is valid.
   """
-  if not threshold_mb or not threshold_relative or state.get(u'quarantined'):
+  if state.get(u'quarantined'):
     return
   if skip is None:
     # Do not check these mount points for low disk space.
-    skip = ['/boot', '/boot/efi']
+    skip = (u'/boot', u'/boot/efi')
 
-  s = []
-  for mount, infos in state[u'disks'].iteritems():
-    if mount in skip:
-      continue
-    free_mb = infos['free_mb']
-    size_mb = infos['size_mb']
-    # Both checks must fail.
-    if free_mb < threshold_mb and free_mb < (size_mb * threshold_relative):
-      s.append('Not enough free disk space on %s.' % mount)
+  s = [
+    'Not enough free disk space on %s.' % mount
+    for mount, infos in sorted(state[u'disks'].iteritems())
+    if mount not in skip and infos[u'free_mb'] < get_min_free_space(mount)
+  ]
   if s:
     state[u'quarantined'] = '\n'.join(s)
+
+
+## State mutating.
 
 
 def rmtree(path):

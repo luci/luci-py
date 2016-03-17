@@ -381,6 +381,8 @@ class TestBotMain(net_utils.TestCase):
           os.path.join(self.root_dir, 'work', 'task_runner_in.json'),
           '--out-file', self2._out_file,
           '--cost-usd-hour', '3600.0', '--start', '100.0',
+          '--min-free-space-mib',
+          str(os_utilities.get_min_free_space(bot_main.THIS_FILE)),
         ]
         self.assertEqual(expected, cmd)
         self.assertEqual(True, detached)

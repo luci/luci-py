@@ -499,6 +499,7 @@ def run_manifest(botobj, manifest, start):
       '--cost-usd-hour', str(botobj.state.get('cost_usd_hour') or 0.),
       # Include the time taken to poll the task in the cost.
       '--start', str(start),
+      '--min-free-space-mib', str(os_utilities.get_min_free_space(THIS_FILE)),
     ]
     logging.debug('Running command: %s', command)
     # Put the output file into the current working directory, which should be
