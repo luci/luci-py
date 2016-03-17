@@ -43,8 +43,8 @@ def _get_system_profiler(data_type):
 
 @tools.cached
 def _get_libc():
-  ctypes.cdll.LoadLibrary('libc.dylib')
-  return ctypes.CDLL('libc.dylib')
+  ctypes.cdll.LoadLibrary('/usr/lib/libc.dylib')
+  return ctypes.CDLL('/usr/lib/libc.dylib')
 
 
 def _sysctl(ctl, item, result):

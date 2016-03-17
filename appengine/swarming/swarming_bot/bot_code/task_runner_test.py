@@ -165,7 +165,8 @@ class TestTaskRunner(TestTaskRunnerBase):
         min_free_space_mib):
       self.assertEqual(server, swarming_server)
       # Necessary for OSX.
-      self.assertEqual(os.path.realpath(self.work_dir), work_dir)
+      self.assertEqual(
+          os.path.realpath(self.work_dir), os.path.realpath(work_dir))
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
@@ -215,7 +216,8 @@ class TestTaskRunner(TestTaskRunnerBase):
         min_free_space_mib):
       self.assertEqual(server, swarming_server)
       # Necessary for OSX.
-      self.assertEqual(os.path.realpath(self.work_dir), work_dir)
+      self.assertEqual(
+          os.path.realpath(self.work_dir), os.path.realpath(work_dir))
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)

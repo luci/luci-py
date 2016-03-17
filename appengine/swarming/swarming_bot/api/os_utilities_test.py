@@ -86,6 +86,8 @@ class TestOsUtilities(auto_stub.TestCase):
     }
     if sys.platform in ('cygwin', 'win32'):
       expected.add(u'cygwin')
+    if sys.platform == 'darwin':
+      expected.add(u'model')
     if sys.platform == 'win32':
       expected.add(u'integrity')
     self.assertEqual(expected, set(actual))
