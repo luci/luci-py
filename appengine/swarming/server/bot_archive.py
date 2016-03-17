@@ -30,6 +30,7 @@ FILES = (
     'api/os_utilities.py',
     'api/platforms/__init__.py',
     'api/platforms/android.py',
+    'api/platforms/common.py',
     'api/platforms/gce.py',
     'api/platforms/linux.py',
     'api/platforms/osx.py',

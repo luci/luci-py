@@ -16,6 +16,9 @@ import sys
 from utils import tools
 
 
+## Private stuff.
+
+
 _WIN32_CLIENT_NAMES = {
     '5.0': '2000',
     '5.1': 'XP',
@@ -63,7 +66,23 @@ def _get_disk_info(mount_point):
   }
 
 
-### Public API.
+@tools.cached
+def _get_wmi_wbem():
+  """Returns a WMI client ready to do queries."""
+  try:
+    import win32com.client  # pylint: disable=F0401
+  except ImportError:
+    # win32com is included in pywin32, which is an optional package that is
+    # installed by Swarming devs. If you find yourself needing it to run without
+    # pywin32, for example in cygwin, please send us a CL with the
+    # implementation that doesn't use pywin32.
+    return None
+
+  wmi_service = win32com.client.Dispatch('WbemScripting.SWbemLocator')
+  return wmi_service.ConnectServer('.', 'root\\cimv2')
+
+
+## Public API.
 
 
 def from_cygwin_path(path):
@@ -152,22 +171,6 @@ def get_disks_info():
 
 
 @tools.cached
-def _get_wmi_wbem():
-  """Returns a WMI client ready to do queries."""
-  try:
-    import win32com.client  # pylint: disable=F0401
-  except ImportError:
-    # win32com is included in pywin32, which is an optional package that is
-    # installed by Swarming devs. If you find yourself needing it to run without
-    # pywin32, for example in cygwin, please send us a CL with the
-    # implementation that doesn't use pywin32.
-    return None
-
-  wmi_service = win32com.client.Dispatch('WbemScripting.SWbemLocator')
-  return wmi_service.ConnectServer('.', 'root\\cimv2')
-
-
-@tools.cached
 def get_audio():
   """Returns audio device as listed by WMI."""
   wbem = _get_wmi_wbem()
@@ -179,6 +182,32 @@ def get_audio():
     for device in wbem.ExecQuery('SELECT * FROM Win32_SoundDevice')
     if device.Status == 'OK'
   ]
+
+
+@tools.cached
+def get_cpuinfo():
+  # Ironically, the data returned by WMI is mostly worthless.
+  # Another option is IsProcessorFeaturePresent().
+  # https://msdn.microsoft.com/en-us/library/windows/desktop/ms724482.aspx
+  import _winreg
+  k = _winreg.OpenKey(
+      _winreg.HKEY_LOCAL_MACHINE,
+      'HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0')
+  try:
+    identifier, _ = _winreg.QueryValueEx(k, 'Identifier')
+    match = re.match(
+        ur'^.+ Family (\d+) Model (\d+) Stepping (\d+)$', identifier)
+    name, _ = _winreg.QueryValueEx(k, 'ProcessorNameString')
+    vendor, _ = _winreg.QueryValueEx(k, 'VendorIdentifier')
+    return {
+      u'model': [
+        int(match.group(1)), int(match.group(2)), int(match.group(3))
+      ],
+      u'name': name,
+      u'vendor': vendor,
+    }
+  finally:
+    k.Close()
 
 
 @tools.cached

@@ -29,9 +29,9 @@
       {% if v is string %}
         {{v}}<br>
       {% elif v is mapping %}
-      <br>{{render_dict_idented(v, indent + '&nbsp;&nbsp;')}}
+        <br>{{render_dict_idented(v, indent + '&nbsp;&nbsp;')}}
       {% elif v is sequence %}
-        {{v|sort|join(' | ')}}<br>
+        {{v|join(' | ')}}<br>
       {% else %}
         {{v}}<br>
       {% endif %}

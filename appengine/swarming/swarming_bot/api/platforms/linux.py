@@ -13,17 +13,23 @@ import subprocess
 
 from utils import tools
 
+import common
 
-@tools.cached
-def get_os_version_number():
-  """Returns the normalized OS version number as a string.
 
-  Returns:
-    - 12.04, 10.04, etc.
-  """
-  # On Ubuntu it will return a string like '12.04'. On Raspbian, it will look
-  # like '7.6'.
-  return unicode(platform.linux_distribution()[1])
+## Private stuff.
+
+
+# Blacklist many features we don't care about, to reduce the length of the
+# string.
+# http://unix.stackexchange.com/questions/43539/what-do-the-flags-in-proc-cpuinfo-mean
+_CPU_BLACKLIST = {
+  'abm', 'apic', 'bmi1', 'bmi2', 'clflush', 'cmov', 'constant_tsc', 'cx16',
+  'cx8', 'de', 'eagerfpu', 'f16c', 'fpu', 'fsgsbase', 'fxsr', 'ht', 'lahf_lm',
+  'lm', 'mca', 'mce', 'mmx', 'movbe', 'msr', 'mtrr', 'nopl', 'nx', 'pae', 'pat',
+  'pclmulqdq', 'pdpe1gb', 'pge', 'pni', 'popcnt', 'pse', 'pse36', 'rdrand',
+  'rdtscp', 'sep', 'smep', 'ss', 'sse', 'sse2', 'syscall', 'tsc', 'vme',
+  'x2apic', 'xsave', 'xsaveopt', 'xtopology',
+}
 
 
 @tools.cached
@@ -40,6 +46,21 @@ def _lspci():
     # default and on ARM since they do not have a PCI bus.
     return None
   return [shlex.split(l) for l in lines]
+
+
+## Public API.
+
+
+@tools.cached
+def get_os_version_number():
+  """Returns the normalized OS version number as a string.
+
+  Returns:
+    - 12.04, 10.04, etc.
+  """
+  # On Ubuntu it will return a string like '12.04'. On Raspbian, it will look
+  # like '7.6'.
+  return unicode(platform.linux_distribution()[1])
 
 
 def get_temperatures():
@@ -76,6 +97,41 @@ def get_audio():
 
 
 @tools.cached
+def get_cpuinfo():
+  with open('/proc/cpuinfo', 'rb') as f:
+    values = common._safe_parse(f.read())
+  cpu_info = {u'name': values[u'model name']}
+  if u'vendor_id' in values:
+    # Intel.
+    cpu_info[u'flags'] = values[u'flags']
+    cpu_info[u'model'] = [
+      int(values[u'cpu family']), int(values[u'model']),
+      int(values[u'stepping']), int(values[u'microcode'], 0),
+    ]
+    cpu_info[u'vendor'] = values[u'vendor_id']
+  else:
+    # CPU implementer == 0x41 means ARM.
+    # TODO(maruel): Add MIPS.
+    cpu_info[u'flags'] = values[u'Features']
+    cpu_info[u'model'] = (
+      int(values[u'CPU variant'], 0), int(values[u'CPU part'], 0),
+      int(values[u'CPU revision']),
+    )
+    # ARM CPUs have a serial number embedded. Intel did try on the Pentium III
+    # but gave up after backlash;
+    # http://www.wired.com/1999/01/intel-on-privacy-whoops/
+    # http://www.theregister.co.uk/2000/05/04/intel_processor_serial_number_q/
+    # It is very ironic that ARM based manufacturers are getting away with.
+    cpu_info[u'serial'] = values[u'Serial'].lstrip(u'0')
+    cpu_info[u'revision'] = values[u'Revision']
+    cpu_info[u'vendor'] = values[u'Hardware']
+
+  cpu_info[u'flags'] = sorted(
+      i for i in cpu_info[u'flags'].split() if i not in _CPU_BLACKLIST)
+  return cpu_info
+
+
+@tools.cached
 def get_gpu():
   """Returns video device as listed by 'lspci'. See get_gpu().
   """
@@ -100,6 +156,21 @@ def get_gpu():
       dimensions.add(u'%s:%s' % (ven_id, device.group(2)))
       state.add(u'%s %s' % (vendor.group(1), device.group(1)))
   return sorted(dimensions), sorted(state)
+
+
+def get_uptime():
+  """Returns uptime in seconds since system startup.
+
+  Includes sleep time.
+  """
+  try:
+    with open('/proc/uptime', 'rb') as f:
+      return float(f.read().split()[0])
+  except (IOError, OSError, ValueError):
+    return 0.
+
+
+## Mutating code.
 
 
 def generate_initd(command, cwd, user):
@@ -232,15 +303,3 @@ def generate_autostart_destkop(command, name):
       'cmd': ' '.join(pipes.quote(c) for c in command),
       'name': name,
     }
-
-
-def get_uptime():
-  """Returns uptime in seconds since system startup.
-
-  Includes sleep time.
-  """
-  try:
-    with open('/proc/uptime', 'rb') as f:
-      return float(f.read().split()[0])
-  except (IOError, OSError, ValueError):
-    return 0.

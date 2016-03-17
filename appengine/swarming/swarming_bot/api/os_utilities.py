@@ -243,6 +243,16 @@ def get_cpu_bitness():
   return u'64' if sys.maxsize > 2**32 else u'32'
 
 
+@tools.cached
+def get_cpuinfo():
+  """Returns the flags of the processor."""
+  if sys.platform == 'darwin':
+    return platforms.osx.get_cpuinfo()
+  if sys.platform == 'win32':
+    return platforms.win.get_cpuinfo()
+  return platforms.linux.get_cpuinfo()
+
+
 def get_ip():
   """Returns the IP that is the most likely to be used for TCP connections."""
   # Tries for ~0.5s then give up.
@@ -896,6 +906,7 @@ def get_state(skip=None):
     nb_files_in_temp = 'N/A'
   state = {
     u'audio': get_audio(),
+    u'cpuinfo': get_cpuinfo(),
     u'cost_usd_hour': get_cost_hour(),
     u'cwd': os.getcwd(),
     u'disks': get_disks_info(),
