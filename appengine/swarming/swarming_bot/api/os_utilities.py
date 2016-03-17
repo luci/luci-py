@@ -516,6 +516,18 @@ def get_locale():
   return 'Unknown'
 
 
+def get_uptime():
+  """Returns uptime as a float in seconds.
+
+  May or may not include sleep time.
+  """
+  if sys.platform == 'darwin':
+    return platforms.osx.get_uptime()
+  if sys.platform == 'win32':
+    return platforms.win.get_uptime()
+  return platforms.linux.get_uptime()
+
+
 class AuthenticatedHttpRequestFailure(Exception):
   pass
 
@@ -873,9 +885,9 @@ def get_state(skip=None):
   - skip: list of partitions to skip for automatic quarantining on low free
         space.
   """
-  # TODO(vadimsh): Send 'uptime', number of open file descriptors, processes or
-  # any other leaky resources. So that the server can decided to reboot the bot
-  # to clean up.
+  # TODO(vadimsh): Send number of open file descriptors, processes or any other
+  # leaky resources. So that the server can decided to reboot the bot to clean
+  # up.
   tmpdir = tempfile.gettempdir()
   try:
     nb_files_in_temp = len(os.listdir(tmpdir))
@@ -895,6 +907,7 @@ def get_state(skip=None):
     u'ram': get_physical_ram(),
     u'running_time': int(round(time.time() - _STARTED_TS)),
     u'started_ts': int(round(_STARTED_TS)),
+    u'uptime': int(round(get_uptime())),
     u'user': getpass.getuser(),
   }
   if sys.platform in ('cygwin', 'win32'):

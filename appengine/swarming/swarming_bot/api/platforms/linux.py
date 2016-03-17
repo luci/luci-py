@@ -232,3 +232,15 @@ def generate_autostart_destkop(command, name):
       'cmd': ' '.join(pipes.quote(c) for c in command),
       'name': name,
     }
+
+
+def get_uptime():
+  """Returns uptime in seconds since system startup.
+
+  Includes sleep time.
+  """
+  try:
+    with open('/proc/uptime', 'rb') as f:
+      return float(f.read().split()[0])
+  except (IOError, OSError, ValueError):
+    return 0.

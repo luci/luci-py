@@ -352,3 +352,14 @@ def get_physical_ram():
   stat.dwLength = ctypes.sizeof(MemoryStatusEx)  # pylint: disable=W0201
   ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
   return int(round(stat.dwTotalPhys / 1024. / 1024.))
+
+
+def get_uptime():
+  """Return uptime for Windows 7 and later.
+
+  Excludes sleep time.
+  """
+  val = ctypes.c_ulonglong(0)
+  if ctypes.windll.kernel32.QueryUnbiasedInterruptTime(ctypes.byref(val)) != 0:
+    return val.value / 10000000.
+  return 0.

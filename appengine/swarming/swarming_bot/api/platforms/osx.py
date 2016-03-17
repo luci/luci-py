@@ -10,6 +10,7 @@ import os
 import platform
 import re
 import subprocess
+import time
 
 import plistlib
 
@@ -22,6 +23,25 @@ def _get_system_profiler(data_type):
   sp = subprocess.check_output(
       ['system_profiler', data_type, '-xml'])
   return plistlib.readPlistFromString(sp)[0]['_items']
+
+
+@tools.cached
+def _get_libc():
+  ctypes.cdll.LoadLibrary('libc.dylib')
+  return ctypes.CDLL('libc.dylib')
+
+
+def _sysctl(ctl, item, result):
+  """Calls sysctl. Ignores return value."""
+  arr = (ctypes.c_int * 2)(ctl, item)
+  size = ctypes.c_size_t(ctypes.sizeof(result))
+  _get_libc().sysctl(
+      arr, len(arr), ctypes.byref(result), ctypes.byref(size),
+      ctypes.c_void_p(), ctypes.c_size_t(0))
+
+
+class _timeval(ctypes.Structure):
+  _fields_ = [('tv_sec', ctypes.c_long), ('tv_usec', ctypes.c_int)]
 
 
 ### Public API.
@@ -205,13 +225,18 @@ def get_physical_ram():
   CTL_HW = 6
   HW_MEMSIZE = 24
   result = ctypes.c_uint64(0)
-  arr = (ctypes.c_int * 2)()
-  arr[0] = CTL_HW
-  arr[1] = HW_MEMSIZE
-  size = ctypes.c_size_t(ctypes.sizeof(result))
-  ctypes.cdll.LoadLibrary("libc.dylib")
-  libc = ctypes.CDLL("libc.dylib")
-  libc.sysctl(
-      arr, 2, ctypes.byref(result), ctypes.byref(size), None,
-      ctypes.c_size_t(0))
+  _sysctl(CTL_HW, HW_MEMSIZE, result)
   return int(round(result.value / 1024. / 1024.))
+
+
+def get_uptime():
+  """Returns uptime in seconds since system startup.
+
+  Includes sleep time.
+  """
+  CTL_KERN = 1
+  KERN_BOOTTIME = 21
+  result = _timeval()
+  _sysctl(CTL_KERN, KERN_BOOTTIME, result)
+  start = float(result.tv_sec) + float(result.tv_usec) / 1000000.
+  return time.time() - start
