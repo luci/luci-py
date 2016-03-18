@@ -23,12 +23,14 @@ import common
 # string.
 # http://unix.stackexchange.com/questions/43539/what-do-the-flags-in-proc-cpuinfo-mean
 _CPU_BLACKLIST = {
-  'abm', 'apic', 'bmi1', 'bmi2', 'clflush', 'cmov', 'constant_tsc', 'cx16',
-  'cx8', 'de', 'eagerfpu', 'f16c', 'fpu', 'fsgsbase', 'fxsr', 'ht', 'lahf_lm',
-  'lm', 'mca', 'mce', 'mmx', 'movbe', 'msr', 'mtrr', 'nopl', 'nx', 'pae', 'pat',
-  'pclmulqdq', 'pdpe1gb', 'pge', 'pni', 'popcnt', 'pse', 'pse36', 'rdrand',
-  'rdtscp', 'sep', 'smep', 'ss', 'sse', 'sse2', 'syscall', 'tsc', 'vme',
-  'x2apic', 'xsave', 'xsaveopt', 'xtopology',
+  'abm', 'aperfmperf', 'apic', 'arat', 'arch_perfmon', 'bmi1', 'bmi2', 'bts',
+  'clflush', 'cmov', 'constant_tsc', 'cx16', 'cx8', 'de', 'dtherm', 'dts',
+  'eagerfpu', 'f16c', 'fpu', 'fsgsbase', 'fxsr', 'ht', 'ida', 'lahf_lm', 'lm',
+  'mca', 'mce', 'mmx', 'movbe', 'msr', 'mtrr', 'nonstop_tsc', 'nopl', 'nx',
+  'pae', 'pat', 'pcid', 'pclmulqdq', 'pebs', 'pdpe1gb', 'pge', 'pln', 'pni',
+  'popcnt', 'pse', 'pse36', 'pts', 'rdrand', 'rdtscp', 'sep', 'smep', 'ss',
+  'sse', 'sse2', 'syscall', 'tsc', 'tsc_adjust', 'tsc_deadline_timer',
+  'tsc_reliable', 'vme', 'x2apic', 'xsave', 'xsaveopt', 'xtopology',
 }
 
 
