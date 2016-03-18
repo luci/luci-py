@@ -102,7 +102,11 @@ def get_audio():
 def get_cpuinfo():
   with open('/proc/cpuinfo', 'rb') as f:
     values = common._safe_parse(f.read())
-  cpu_info = {u'name': values[u'model name']}
+  cpu_info = {
+    # SAMSUNG EXYNOS5 uses 'Processor' instead of 'model name' as the key for
+    # its name.
+    u'name': values.get(u'model name') or values.get(u'Processor') or u'N/A',
+  }
   if u'vendor_id' in values:
     # Intel.
     cpu_info[u'flags'] = values[u'flags']
