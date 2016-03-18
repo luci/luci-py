@@ -23,6 +23,7 @@ import time
 
 
 from adb import adb_commands
+from adb import adb_protocol
 from adb import common
 from adb import usb_exceptions
 
