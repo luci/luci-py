@@ -248,6 +248,9 @@ def get_cpuinfo():
   """Returns the flags of the processor."""
   if sys.platform == 'darwin':
     return platforms.osx.get_cpuinfo()
+  if sys.platform == 'cygwin':
+    # Eventually fix this.
+    return {}
   if sys.platform == 'win32':
     return platforms.win.get_cpuinfo()
   return platforms.linux.get_cpuinfo()
