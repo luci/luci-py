@@ -26,10 +26,11 @@ import common
 # string.
 # http://unix.stackexchange.com/questions/43539/what-do-the-flags-in-proc-cpuinfo-mean
 _CPU_BLACKLIST = {
-  'apic', 'clfsh', 'cmov', 'cx16', 'cx8', 'de', 'ds', 'fpu', 'fxsr', 'htt',
-  'mca', 'mce', 'mmx', 'mon', 'msr', 'mtrr', 'pae', 'pat', 'pclmulqdq', 'pge',
-  'popcnt', 'pse', 'pse36', 'sep', 'ss', 'sse', 'sse2', 'tsc', 'vme', 'vmm',
-  'x2apic',
+  'acpi', 'apic', 'clfsh', 'cmov', 'cx16', 'cx8', 'de', 'ds', 'dscpl', 'dtes64',
+  'est', 'f16c', 'fma', 'fpu', 'fxsr', 'htt', 'mca', 'mce', 'mmx', 'mon',
+  'movbe', 'msr', 'mtrr', 'osxsave', 'pae', 'pat', 'pbe', 'pcid', 'pclmulqdq',
+  'pdcm', 'pge', 'popcnt', 'pse', 'pse36', 'rdrand', 'seglim64', 'sep', 'ss',
+  'sse', 'sse2', 'tm', 'tm2', 'tpr', 'tsc', 'tsctmr', 'vme', 'vmm', 'x2apic',
 }
 
 
