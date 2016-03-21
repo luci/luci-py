@@ -68,7 +68,11 @@ class Bot(object):
 
   @property
   def server(self):
-    """URL of the swarming server this bot is connected to."""
+    """URL of the swarming server this bot is connected to.
+
+    It includes the https:// prefix but without trailing /, so it looks like
+    "https://foo-bar.appspot.com".
+    """
     return self._server
 
   @property
