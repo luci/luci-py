@@ -25,7 +25,6 @@ from components import utils
 import config
 import handlers_frontend
 import handlers_endpoints_v1
-import handlers_endpoints_v2
 
 
 def create_application():
@@ -39,8 +38,7 @@ def create_application():
 
   gae_ts_mon.initialize(frontend, is_enabled_fn=is_enabled_callback)
   # App that serves new endpoints API.
-  api = endpoints.api_server([handlers_endpoints_v1.IsolateService,
-                              handlers_endpoints_v2.IsolateServiceV2])
+  api = endpoints.api_server([handlers_endpoints_v1.IsolateService])
   return frontend, api
 
 
