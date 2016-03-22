@@ -491,6 +491,9 @@ def run_manifest(botobj, manifest, start):
     task_result_file = os.path.join(work_dir, 'task_runner_out.json')
     if os.path.exists(task_result_file):
       os.remove(task_result_file)
+    # Add a "250 MiB slack space" for logs, temporary files and whatever other
+    # leak.
+    free_mib = os_utilities.get_min_free_space(THIS_FILE) + 250.
     command = [
       sys.executable, THIS_FILE, 'task_runner',
       '--swarming-server', url,
@@ -499,7 +502,7 @@ def run_manifest(botobj, manifest, start):
       '--cost-usd-hour', str(botobj.state.get('cost_usd_hour') or 0.),
       # Include the time taken to poll the task in the cost.
       '--start', str(start),
-      '--min-free-space-mib', str(os_utilities.get_min_free_space(THIS_FILE)),
+      '--min-free-space-mib', str(free_mib),
     ]
     logging.debug('Running command: %s', command)
     # Put the output file into the current working directory, which should be
