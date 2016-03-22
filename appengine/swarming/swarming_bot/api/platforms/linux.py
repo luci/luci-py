@@ -19,21 +19,6 @@ import common
 ## Private stuff.
 
 
-# Blacklist many features we don't care about, to reduce the length of the
-# string.
-# http://unix.stackexchange.com/questions/43539/what-do-the-flags-in-proc-cpuinfo-mean
-_CPU_BLACKLIST = {
-  'abm', 'aperfmperf', 'apic', 'arat', 'arch_perfmon', 'bmi1', 'bmi2', 'bts',
-  'clflush', 'cmov', 'constant_tsc', 'cx16', 'cx8', 'de', 'dtherm', 'dts',
-  'eagerfpu', 'f16c', 'fpu', 'fsgsbase', 'fxsr', 'ht', 'ida', 'lahf_lm', 'lm',
-  'mca', 'mce', 'mmx', 'movbe', 'msr', 'mtrr', 'nonstop_tsc', 'nopl', 'nx',
-  'pae', 'pat', 'pcid', 'pclmulqdq', 'pebs', 'pdpe1gb', 'pge', 'pln', 'pni',
-  'popcnt', 'pse', 'pse36', 'pts', 'rdrand', 'rdtscp', 'sep', 'smep', 'ss',
-  'sse', 'sse2', 'syscall', 'tsc', 'tsc_adjust', 'tsc_deadline_timer',
-  'tsc_reliable', 'vme', 'x2apic', 'xsave', 'xsaveopt', 'xtopology',
-}
-
-
 @tools.cached
 def _lspci():
   """Returns list of PCI devices found.
@@ -102,11 +87,7 @@ def get_audio():
 def get_cpuinfo():
   with open('/proc/cpuinfo', 'rb') as f:
     values = common._safe_parse(f.read())
-  cpu_info = {
-    # SAMSUNG EXYNOS5 uses 'Processor' instead of 'model name' as the key for
-    # its name.
-    u'name': values.get(u'model name') or values.get(u'Processor') or u'N/A',
-  }
+  cpu_info = {}
   if u'vendor_id' in values:
     # Intel.
     cpu_info[u'flags'] = values[u'flags']
@@ -114,6 +95,7 @@ def get_cpuinfo():
       int(values[u'cpu family']), int(values[u'model']),
       int(values[u'stepping']), int(values[u'microcode'], 0),
     ]
+    cpu_info[u'name'] = values[u'model name']
     cpu_info[u'vendor'] = values[u'vendor_id']
   else:
     # CPU implementer == 0x41 means ARM.
@@ -130,10 +112,21 @@ def get_cpuinfo():
     # It is very ironic that ARM based manufacturers are getting away with.
     cpu_info[u'serial'] = values[u'Serial'].lstrip(u'0')
     cpu_info[u'revision'] = values[u'Revision']
-    cpu_info[u'vendor'] = values[u'Hardware']
 
-  cpu_info[u'flags'] = sorted(
-      i for i in cpu_info[u'flags'].split() if i not in _CPU_BLACKLIST)
+    # 'Hardware' field has better content so use it instead of 'model name' /
+    # 'Processor' field.
+    cpu_info[u'name'] = values[u'Hardware']
+    # Samsung felt this was useful information. Strip that.
+    suffix = ' (Flattened Device Tree)'
+    if cpu_info[u'name'].endswith(suffix):
+      cpu_info[u'name'] = cpu_info[u'name'][:-len(suffix)]
+    # SAMSUNG EXYNOS5 uses 'Processor' instead of 'model name' as the key for
+    # its name <insert exasperation meme here>.
+    cpu_info[u'vendor'] = (
+        values.get(u'model name') or values.get(u'Processor') or u'N/A')
+
+  # http://unix.stackexchange.com/questions/43539/what-do-the-flags-in-proc-cpuinfo-mean
+  cpu_info[u'flags'] = sorted(i for i in cpu_info[u'flags'].split())
   return cpu_info
 
 

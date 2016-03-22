@@ -857,6 +857,8 @@ def get_dimensions():
     u'os': [os_name],
     u'pool': [u'default'],
   }
+  if u'avx2' in get_cpuinfo().get(u'flags', []):
+    dimensions[u'cpu'].append(cpu_type + u'-' + cpu_bitness + u'-avx2')
   os_version_name = get_os_version_name()
   if os_version_name:
     # This only happens on Windows.
@@ -909,7 +911,7 @@ def get_state(skip=None):
     nb_files_in_temp = 'N/A'
   state = {
     u'audio': get_audio(),
-    u'cpuinfo': get_cpuinfo(),
+    u'cpu': get_cpuinfo().get(u'name', u'N/A'),
     u'cost_usd_hour': get_cost_hour(),
     u'cwd': os.getcwd(),
     u'disks': get_disks_info(),

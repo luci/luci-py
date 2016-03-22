@@ -22,18 +22,6 @@ import common
 ## Private stuff.
 
 
-# Blacklist many features we don't care about, to reduce the length of the
-# string.
-# http://unix.stackexchange.com/questions/43539/what-do-the-flags-in-proc-cpuinfo-mean
-_CPU_BLACKLIST = {
-  'acpi', 'apic', 'clfsh', 'cmov', 'cx16', 'cx8', 'de', 'ds', 'dscpl', 'dtes64',
-  'est', 'f16c', 'fma', 'fpu', 'fxsr', 'htt', 'mca', 'mce', 'mmx', 'mon',
-  'movbe', 'msr', 'mtrr', 'osxsave', 'pae', 'pat', 'pbe', 'pcid', 'pclmulqdq',
-  'pdcm', 'pge', 'popcnt', 'pse', 'pse36', 'rdrand', 'seglim64', 'sep', 'ss',
-  'sse', 'sse2', 'tm', 'tm2', 'tpr', 'tsc', 'tsctmr', 'vme', 'vmm', 'x2apic',
-}
-
-
 @tools.cached
 def _get_system_profiler(data_type):
   """Returns an XML about the system display properties."""
@@ -171,10 +159,10 @@ def get_cpuinfo():
   """Returns CPU information."""
   values = common._safe_parse(
       subprocess.check_output(['sysctl', 'machdep.cpu']))
+  # http://unix.stackexchange.com/questions/43539/what-do-the-flags-in-proc-cpuinfo-mean
   return {
     u'flags': sorted(
-        i.lower() for i in values[u'machdep.cpu.features'].split()
-        if i.lower() not in _CPU_BLACKLIST),
+        i.lower() for i in values[u'machdep.cpu.features'].split()),
     u'model': [
       int(values['machdep.cpu.family']), int(values['machdep.cpu.model']),
       int(values['machdep.cpu.stepping']),

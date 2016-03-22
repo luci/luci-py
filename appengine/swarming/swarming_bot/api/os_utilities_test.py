@@ -80,7 +80,7 @@ class TestOsUtilities(auto_stub.TestCase):
     actual = os_utilities.get_state()
     actual.pop('temp', None)
     expected = {
-      u'audio', u'cost_usd_hour', u'cpuinfo', u'cwd', u'disks', u'gpu', u'ip',
+      u'audio', u'cost_usd_hour', u'cpu', u'cwd', u'disks', u'gpu', u'ip',
       u'hostname', u'locale', u'nb_files_in_temp', u'pid', u'ram',
       u'running_time', u'started_ts', u'uptime', u'user',
     }
