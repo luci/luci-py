@@ -44,6 +44,20 @@ from tool_support import gae_sdk_utils
 from tools import calculate_version
 
 
+def CMDapp_dir(parser, args):
+  """Prints a root directory of the application."""
+  # parser.app_dir is None if app root directory discovery fails. Fail the
+  # command even before invoking CLI parser, or it will ask to pass --app_dir to
+  # 'app-dir' subcommand, which is ridiculous.
+  if not parser.app_dir:
+    print >> sys.stderr, 'Can\'t discover an application root directory.'
+    return 1
+  parser.add_tag_option()
+  app, _, _ = parser.parse_args(args)
+  print app.app_dir
+  return 0
+
+
 @subcommand.usage('[version_id version_id ...]')
 def CMDcleanup(parser, args):
   """Removes old versions of GAE application modules.
@@ -383,32 +397,49 @@ class OptionParser(optparse.OptionParser):
     return app, options, args
 
 
-def find_app_yaml(search_dir):
-  """Locates app.yaml file in |search_dir| or any of its parent directories."""
+def find_app_dir(search_dir):
+  """Locates GAE app root directory (or returns None if not found).
+
+  Starts by examining search_dir, then its parent, and so on, until it discovers
+  git repository root or filesystem root.
+
+  A directory is a suspect for an app root if it looks like an app root, but its
+  parent directory does not. It allows to detect multi-module Go apps. Their
+  default module directory usually contains app.yaml and looks similar to
+  one-module GAE app. By looking at the parent we can figure out that it's
+  indeed just one module of multi-module app.
+  """
+  cached_check = {}
+  def is_app_dir(p):
+    if p not in cached_check:
+      cached_check[p] = gae_sdk_utils.is_app_dir(p)
+    return cached_check[p]
+
+  def is_root(p):
+    return os.path.isdir(os.path.join(p, '.git')) or os.path.dirname(p) == p
+
   while True:
-    attempt = os.path.join(search_dir, 'app.yaml')
-    if os.path.isfile(attempt):
-      return attempt
-    prev_dir = search_dir
-    search_dir = os.path.dirname(search_dir)
-    if search_dir == prev_dir:
-      return None
+    if is_root(search_dir):
+      return search_dir if is_app_dir(search_dir) else None
+    parent = os.path.dirname(search_dir)
+    if is_app_dir(search_dir) and not is_app_dir(parent):
+      return search_dir
+    search_dir = parent
 
 
 def main(args):
   # gae.py may be symlinked into app's directory or its subdirectory (to avoid
   # typing --app-dir all the time). If linked into subdirectory, discover root
   # by locating app.yaml. It is used for Python GAE apps and one-module Go apps
-  # that have all YAMLs in app root dir. For multi-module Go apps (that put
-  # app.yaml into per-module dir) gae.py MUST be symlinked into app root dir.
+  # that have all YAMLs in app root dir.
   app_dir = None
   if IS_SYMLINKED:
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    app_yaml_path = find_app_yaml(script_dir)
-    if app_yaml_path:
-      app_dir = os.path.dirname(app_yaml_path)
-    else:
-      app_dir = script_dir
+    app_dir = find_app_dir(script_dir)
+
+  # If not symlinked into an app directory, try to discover app root starting
+  # from cwd.
+  app_dir = app_dir or find_app_dir(os.getcwd())
 
   colorama.init()
   dispatcher = subcommand.CommandDispatcher(__name__)

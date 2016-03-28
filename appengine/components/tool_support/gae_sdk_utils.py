@@ -89,13 +89,13 @@ def find_gae_sdk(sdk_name=PYTHON_GAE_SDK, search_dir=TOOLS_DIR):
   return None
 
 
-def find_app_runtime_and_yamls(app_dir):
+def find_app_yamls(app_dir):
   """Searches for app.yaml and module-*.yaml in app_dir or its subdirs.
 
   Recognizes Python and Go GAE apps.
 
   Returns:
-    (app runtime e.g. 'python27', list of abs path to module yamls).
+    List of abs path to module yamls.
 
   Raises:
     ValueError if not a valid GAE app.
@@ -107,7 +107,7 @@ def find_app_runtime_and_yamls(app_dir):
     yamls.append(app_yaml)
   yamls.extend(glob.glob(os.path.join(app_dir, 'module-*.yaml')))
   if yamls:
-    return get_app_runtime(yamls), yamls
+    return yamls
 
   # Look in per-module subdirectories. Only Go apps are structured that way.
   # See https://cloud.google.com/appengine/docs/go/#Go_Organizing_Go_apps.
@@ -119,15 +119,30 @@ def find_app_runtime_and_yamls(app_dir):
     if os.path.isfile(app_yaml):
       yamls.append(app_yaml)
     yamls.extend(glob.glob(os.path.join(subdir, 'module-*.yaml')))
-  if yamls:
-    rt = get_app_runtime(yamls)
-    if rt != 'go':
-      raise ValueError(
-          'Per-module directories imply "go" runtime, got "%s" instead' % rt)
-    return rt, yamls
+  if not yamls:
+    raise ValueError(
+        'Not a GAE application directory, no module *.yamls found: %s' %
+        app_dir)
 
-  raise ValueError(
-      'Not a GAE application directory, no module *.yamls found: %s' % app_dir)
+  # There should be one and only one app.yaml.
+  app_yamls = [p for p in yamls if os.path.basename(p) == 'app.yaml']
+  if not app_yamls:
+    raise ValueError(
+        'Not a GAE application directory, no app.yaml found: %s' % app_dir)
+  if len(app_yamls) > 1:
+    raise ValueError(
+        'Not a GAE application directory, multiple app.yaml found (%s): %s' %
+        (app_yamls, app_dir))
+  return yamls
+
+
+def is_app_dir(path):
+  """Returns True if |path| is structure like GAE app directory."""
+  try:
+    find_app_yamls(path)
+    return True
+  except ValueError:
+    return False
 
 
 def get_module_runtime(yaml_path):
@@ -217,7 +232,7 @@ class Application(object):
 
     # Module ID -> (path to YAML, deserialized content of module YAML).
     self._modules = {}
-    for yaml_path in find_app_runtime_and_yamls(self._app_dir)[1]:
+    for yaml_path in find_app_yamls(self._app_dir):
       with open(yaml_path) as f:
         data = yaml.load(f)
         module_id = data.get('module', 'default')
@@ -503,15 +518,16 @@ def add_sdk_options(parser, app_dir=None):
 
   Args:
     parser: OptionParser to add options to.
-    app_dir: if give, --app-dir option won't be added, and passed directory will
-        be used to locate app.yaml instead.
+    app_dir: default value for --app-dir option.
   """
   parser.add_option(
       '-s', '--sdk-path',
       help='Path to AppEngine SDK. Will try to find by itself.')
   if not app_dir:
     parser.add_option(
-        '-p', '--app-dir', help='Path to application directory with app.yaml.')
+        '-p', '--app-dir',
+        default=app_dir,
+        help='Path to application directory with app.yaml.')
   parser.add_option('-A', '--app-id', help='Defaults to name in app.yaml.')
   parser.add_option('-v', '--verbose', action='store_true')
 
@@ -541,7 +557,7 @@ def process_sdk_options(parser, options, app_dir):
   app_dir = os.path.abspath(app_dir or options.app_dir)
 
   try:
-    runtime = find_app_runtime_and_yamls(app_dir)[0]
+    runtime = get_app_runtime(find_app_yamls(app_dir))
   except (BadEnvironmentConfig, ValueError) as exc:
     parser.error(str(exc))
 
