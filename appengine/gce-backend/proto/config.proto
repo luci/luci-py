@@ -1,0 +1,65 @@
+// Copyright 2016 The Swarming Authors. All rights reserved.
+// Use of this source code is governed by the Apache v2.0 license that can be
+// found in the LICENSE file.
+
+// GCE Backend config schema.
+
+package gce_backend;
+
+
+// List of InstanceTemplates to manage.
+message InstanceTemplateConfig {
+  // GCE instance template to manage.
+  message InstanceTemplate {
+    // GCE service account.
+    message ServiceAccount {
+      // Service account name.
+      optional string name = 1;
+      // Scopes to authorize.
+      repeated string scopes = 2;
+    }
+
+    // Globally-unique base name.
+    optional string base_name = 1;
+    // Project to create instance template in.
+    optional string project = 2;
+    // Machine Provider dimensions. Each string
+    // should be formatted as "key:value".
+    repeated string dimensions = 3;
+    // Image name.
+    optional string image_name = 4;
+    // Disk size (GiB).
+    optional int32 disk_size_gb = 5;
+    // Service accounts. Must be at least one.
+    // First one will be used to subscribe to
+    // the Machine Provider Pub/Sub topic.
+    repeated ServiceAccount service_accounts = 6;
+    // Tags to attach when creating instances.
+    repeated string tags = 7;
+    // Metadata to attach when creating instances.
+    // Each string should be formatted as "key:value".
+    repeated string metadata = 8;
+  }
+
+  repeated InstanceTemplate templates = 1;
+}
+
+
+// List of InstanceGroupManagers to manage.
+message InstanceGroupManagerConfig {
+  // GCE instance group manager to manage.
+  message InstanceGroupManager {
+    // Base name of an InstanceTemplate to use.
+    optional string template_base_name = 1;
+    // Minimum size of the instance group. Also used as
+    // initial size when creating the instance group.
+    // Must be at least 1.
+    optional int32 minimum_size = 2;
+    // Maximum size of the instance group. Must be at
+    // least equal to the minimum size. Leave unspecified
+    // for unlimited.
+    optional int32 maximum_size = 3;
+  }
+
+  repeated InstanceGroupManager managers = 1;
+}
