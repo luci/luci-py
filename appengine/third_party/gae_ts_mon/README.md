@@ -32,6 +32,10 @@
     app.yaml to ensure metrics are registered no matter which type of request
     an instance receives first.
 
+    If your app does not contain a `webapp2.WSGIApplication` instance
+    (e.g. it's a Cloud Endpoints only app), then pass `None` as the
+    first argument to `gae_ts_mon.initialize`.
+
     The `gae_ts_mon.initialize` method takes a few optional parameters:
      - `cron_module` (str, default='default'): if you specified a custom
        module for the cron job, you must specify it in every call to
@@ -41,6 +45,13 @@
        which is equivalent to `lambda: True`. The callback is called on every
        metrics flush, and takes effect immediately. Make sure the callback is
        efficient, or it will slow down your requests.
+
+1.  Instrument all Cloud Endpoint methods if you have any by adding a decorator:
+
+        @gae_ts_mon.instrument_endpoint()
+        @endpoints.method(...)
+        def your_method(self, request):
+          ...
 
 1.  Give your app's service account permission to send metrics to the API.  You
     can find the name of your service account on the `Permissions` page of your
