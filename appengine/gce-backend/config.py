@@ -4,6 +4,7 @@
 
 """Utilities for reading GCE Backend configuration."""
 
+import collections
 import logging
 
 from components import utils
@@ -53,6 +54,10 @@ def update_config():
     return
 
   stored_config = Configuration.fetch()
+  if not stored_config:
+    logging.info('Bootstrapping empty configuration')
+    Configuration.cached()
+    stored_config = Configuration.fetch()
   if stored_config.revision != revision:
     logging.info('Updating configuration to %s', revision)
     stored_config.modify(
@@ -81,4 +86,15 @@ def validate_template_config(config, context):
 )
 def validate_manager_config(config, context):
   """Validates an InstanceGroupManagerConfig instance."""
-  pass
+  # We don't do any GCE-specific validation here. Just require per-template
+  # unique zone because template+zone is used as a key in the datastore.
+  zones = collections.defaultdict(set)
+  for manager in config.managers:
+    if manager.zone in zones[manager.template_base_name]:
+      context.error(
+          'zone %s is not unique in template %s.',
+          manager.zone,
+          manager.template_base_name,
+      )
+    else:
+      zones[manager.template_base_name].add(manager.zone)

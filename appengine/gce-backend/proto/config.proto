@@ -59,6 +59,9 @@ message InstanceGroupManagerConfig {
     // least equal to the minimum size. Leave unspecified
     // for unlimited.
     optional int32 maximum_size = 3;
+    // GCE zone to create the instance group manager in.
+    // Must be unique per template. e.g. us-central1-b.
+    optional string zone = 4;
   }
 
   repeated InstanceGroupManager managers = 1;

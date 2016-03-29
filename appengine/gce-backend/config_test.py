@@ -61,7 +61,7 @@ class UpdateConfigTest(test_case.TestCase):
     self.assertEqual(config.Configuration.cached().revision, 'mock-revision')
 
   def test_repeated_base_names(self):
-    """Ensures duplicate base names rejects the entire config."""
+    """Ensures duplicate base names reject the entire config."""
     template_config = config_pb2.InstanceTemplateConfig(
         templates=[
             config_pb2.InstanceTemplateConfig.InstanceTemplate(
@@ -85,6 +85,56 @@ class UpdateConfigTest(test_case.TestCase):
         ],
     )
     self.install_mock(template_config=template_config)
+
+    config.update_config()
+    self.failIf(config.Configuration.cached().template_config)
+    self.failIf(config.Configuration.cached().manager_config)
+    self.failIf(config.Configuration.cached().revision)
+
+  def test_repeated_zone_different_base_name(self):
+    """Ensures repeated zones in different base names are valid."""
+    manager_config = config_pb2.InstanceGroupManagerConfig(
+        managers=[
+            config_pb2.InstanceGroupManagerConfig.InstanceGroupManager(
+                template_base_name='base-name-1',
+                zone='us-central1-a',
+            ),
+            config_pb2.InstanceGroupManagerConfig.InstanceGroupManager(
+                template_base_name='base-name-2',
+                zone='us-central1-a',
+            ),
+            config_pb2.InstanceGroupManagerConfig.InstanceGroupManager(
+                template_base_name='base-name-3',
+                zone='us-central1-a',
+            ),
+        ],
+    )
+    self.install_mock(manager_config=manager_config)
+
+    config.update_config()
+    self.failIf(config.Configuration.cached().template_config)
+    self.failUnless(config.Configuration.cached().manager_config)
+    self.assertEqual(config.Configuration.cached().revision, 'mock-revision')
+
+  def test_repeated_zone_same_base_name(self):
+    """Ensures repeated zones in a base name reject the entire config."""
+    manager_config = config_pb2.InstanceGroupManagerConfig(
+        managers=[
+            config_pb2.InstanceGroupManagerConfig.InstanceGroupManager(
+                template_base_name='base-name-1',
+                zone='us-central1-a',
+            ),
+            config_pb2.InstanceGroupManagerConfig.InstanceGroupManager(
+                template_base_name='base-name-2',
+                zone='us-central1-b',
+            ),
+            config_pb2.InstanceGroupManagerConfig.InstanceGroupManager(
+                template_base_name='base-name-1',
+                zone='us-central1-a',
+            ),
+        ],
+    )
+    self.install_mock(manager_config=manager_config)
 
     config.update_config()
     self.failIf(config.Configuration.cached().template_config)
