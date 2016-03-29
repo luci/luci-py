@@ -82,6 +82,29 @@ def _get_wmi_wbem():
   return wmi_service.ConnectServer('.', 'root\\cimv2')
 
 
+@tools.cached
+def _get_os_numbers():
+  """Returns the normalized OS version and build numbers as strings.
+
+  Actively work around AppCompat version lie shim.
+
+  Returns:
+    - 5.1, 6.1, etc. There is no way to distinguish between Windows 7
+      and Windows Server 2008R2 since they both report 6.1.
+  """
+  # Windows is lying to us until python adds to its manifest:
+  #   <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
+  # and it doesn't.
+  # So ask nicely to cmd.exe instead, which will always happily report the right
+  # version. Here's some sample output:
+  # - XP: Microsoft Windows XP [Version 5.1.2600]
+  # - Win10: Microsoft Windows [Version 10.0.10240]
+  # - Win7 or Win2K8R2: Microsoft Windows [Version 6.1.7601]
+  out = subprocess.check_output(['cmd.exe', '/c', 'ver']).strip()
+  match = re.search(r'\[Version (\d+\.\d+)\.(\d+)\]', out, re.IGNORECASE)
+  return match.group(1), match.group(2)
+
+
 ## Public API.
 
 
@@ -112,33 +135,29 @@ def to_cygwin_path(path):
 def get_os_version_number():
   """Returns the normalized OS version number as a string.
 
-  Actively work around AppCompat version lie shim.
-
   Returns:
-    - 5.1, 6.1, etc. There is no way to distinguish between Windows 7
-      and Windows Server 2008R2 since they both report 6.1.
+    - '5.1', '6.1', '10.0', etc. There is no way to distinguish between Windows
+      7 and Windows Server 2008R2 since they both report 6.1.
   """
-  # Windows is lying to us until python adds to its manifest:
-  #   <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
-  # and it doesn't.
-  # So ask nicely to cmd.exe instead, which will always happily report the right
-  # version. Here's some sample output:
-  # - XP: Microsoft Windows XP [Version 5.1.2600]
-  # - Win10: Microsoft Windows [Version 10.0.10240]
-  # - Win7 or Win2K8R2: Microsoft Windows [Version 6.1.7601]
-  out = subprocess.check_output(['cmd.exe', '/c', 'ver']).strip()
-  return re.search(r'\[Version (\d+\.\d+)\.\d+\]', out, re.IGNORECASE).group(1)
+  return _get_os_numbers()[0]
 
 
 @tools.cached
 def get_os_version_name():
-  """Returns the marketing name of the OS including the service pack."""
+  """Returns the marketing name of the OS including the service pack.
+
+  On Windows 10, use the build number since there will be no service pack.
+  """
   # Python keeps a local map in platform.py and it is updated at newer python
   # release. Since our python release is a bit old, do not rely on it.
   is_server = sys.getwindowsversion().product_type == 3
   lookup = _WIN32_SERVER_NAMES if is_server else _WIN32_CLIENT_NAMES
-  version_number = get_os_version_number()
+  version_number, build_number = _get_os_numbers()
   marketing_name = lookup.get(version_number, version_number)
+  if version_number == '10.0':
+    # Windows 10 doesn't have service packs, the build number now is the
+    # reference number.
+    return '%s-%s' % (marketing_name, build_number)
   service_pack = platform.win32_ver()[2] or 'SP0'
   return '%s-%s' % (marketing_name, service_pack)
 
