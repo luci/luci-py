@@ -7,6 +7,7 @@
 import binascii
 import datetime
 import hashlib
+import logging
 import os
 import re
 import time
@@ -277,12 +278,11 @@ class IsolateService(remote.Service):
     if memcache_entry is not None:
       content = memcache_entry
       found = 'memcache'
-
-    # try ndb
     else:
       key = entry_key_or_error(request.namespace.namespace, request.digest)
       stored = key.get()
       if stored is None:
+        logging.debug('%s', request.digest)
         raise endpoints.NotFoundException('Unable to retrieve the entry.')
       content = stored.content  # will be None if entity is in GCS
       found = 'inline'
@@ -290,6 +290,7 @@ class IsolateService(remote.Service):
     # Return and log stats here if something has been found.
     if content is not None:
       # make sure that offset is acceptable
+      logging.debug('%s', request.digest)
       if offset < 0 or offset > len(content):
         raise endpoints.BadRequestException(
             'Invalid offset %d. Offset must be between 0 and content length.' %
@@ -299,6 +300,7 @@ class IsolateService(remote.Service):
 
     # The data is in GS; log stats and return the URL.
     if offset < 0 or offset > stored.compressed_size:
+      logging.debug('%s', request.digest)
       raise endpoints.BadRequestException(
           'Invalid offset %d. Offset must be between 0 and content length.' %
           offset)
@@ -317,9 +319,14 @@ class IsolateService(remote.Service):
 
   ### Utility
 
-  def storage_helper(self, request, uploaded_to_gs):
-    """Implement shared logic between store_inline and finalize_gs."""
-    # validate token or error out
+  @staticmethod
+  def storage_helper(request, uploaded_to_gs):
+    """Implement shared logic between store_inline and finalize_gs.
+
+    Arguments:
+      request: either StorageRequest or FinalizeRequest.
+      uploaded_to_gs: bool.
+    """
     if not request.upload_ticket:
       raise endpoints.BadRequestException(
           'Upload ticket was empty or not provided.')
@@ -330,21 +337,17 @@ class IsolateService(remote.Service):
       raise endpoints.BadRequestException(
           'Ticket validation failed: %s' % error.message)
 
-    # read data and convert types
     digest = embedded['d'].encode('utf-8')
     is_isolated = bool(int(embedded['i']))
     namespace = embedded['n']
     size = int(embedded['s'])
-
-    # create a key
     key = entry_key_or_error(namespace, digest)
 
-    # get content and compressed size
     if uploaded_to_gs:
-      # ensure that file info is uploaded to GS first
-      # TODO(cmassaro): address analogous TODO from handlers_api
+      # Ensure that file info is uploaded to GS first.
       file_info = gcs.get_file_info(config.settings().gs_bucket, key.id())
       if not file_info:
+        logging.debug('%s', digest)
         raise endpoints.BadRequestException(
             'File should be in Google Storage.\nFile: \'%s\' Size: %d.' % (
                 key.id(), size))
@@ -354,7 +357,11 @@ class IsolateService(remote.Service):
       content = request.content
       compressed_size = len(content)
 
-    # all is well; create an entry
+    # Look if the entity was already stored. Alert in that case but ignore it.
+    if key.get():
+      # TODO(maruel): Using logging.error to catch these in the short term.
+      logging.error('Overwritting ContentEntry\n%s', digest)
+
     entry = model.new_content_entry(
         key=key,
         is_isolated=is_isolated,
@@ -364,17 +371,17 @@ class IsolateService(remote.Service):
         content=content,
     )
 
-    # DB: assert that embedded content is the data sent by the request
     if not uploaded_to_gs:
+      # Assert that embedded content is the data sent by the request.
+      logging.debug('%s', digest)
       if (digest, size) != hash_content(content, namespace):
         raise endpoints.BadRequestException(
             'Embedded digest does not match provided data: '
             '(digest, size): (%r, %r); expected: %r' % (
                 digest, size, hash_content(content, namespace)))
       entry.put()
-
-    # GCS: enqueue verification task
     else:
+      # Enqueue verification task transactionally as the entity is stored.
       try:
         store_and_enqueue_verify_task(entry, utils.get_task_queue_host())
       except (
@@ -422,15 +429,15 @@ class IsolateService(remote.Service):
           'Ticket generation failed: %s' % error.message)
     return result
 
-  @classmethod
-  def check_entries_exist(cls, entries):
+  @staticmethod
+  def check_entries_exist(entries):
     """Assess which entities already exist in the datastore.
 
     Arguments:
       entries: a DigestCollection to be posted
 
     Yields:
-      digest, Boolean pairs, where Boolean indicates existence of the entry
+      (Digest, ContentEntry or None)
 
     Raises:
       BadRequestException if any digest is not a valid hexadecimal number.
@@ -445,20 +452,53 @@ class IsolateService(remote.Service):
     # Pick first one that finishes and yield it, rinse, repeat.
     while futures:
       future = ndb.Future.wait_any(futures)
-      # TODO(maruel): For items that were present, make sure
-      # future.get_result().compressed_size == digest.size.
-      yield futures.pop(future), bool(future.get_result())
+      yield futures.pop(future), future.get_result()
 
   @classmethod
   def partition_collection(cls, entries):
     """Create sets of existent and new digests."""
     seen_unseen = [set(), set()]
-    for digest, exists in cls.check_entries_exist(entries):
-      seen_unseen[exists].add(digest)
+    for digest, obj in cls.check_entries_exist(entries):
+      if obj and obj.expanded_size != digest.size:
+        # It is important to note that when a file is uploaded to GCS,
+        # ContentEntry is only stored in the finalize call, which is (supposed)
+        # to be called only after the GCS upload completed successfuly.
+        #
+        # There is 3 cases:
+        # - Race condition flow:
+        #   - Client 1 preuploads with cache miss.
+        #   - Client 2 preuploads with cache miss.
+        #   - Client 1 uploads to GCS.
+        #   - Client 2 uploads to GCS; note that both write to the same file.
+        #   - Client 1 finalizes, stores ContentEntry and initiates the task
+        #     queue.
+        #   - Client 2 finalizes, overwrites ContentEntry and initiates a second
+        #     task queue.
+        # - Object was not yet verified. It can be either because of an almost
+        #   race condition, as observed by second client after the first client
+        #   finished uploading but before the task queue completed or because
+        #   there is an issue with the task queue. In this case,
+        #   expanded_size == -1.
+        # - Two objects have the same digest but different content and it happen
+        #   that the content has different size. In this case,
+        #   expanded_size != -1.
+        #
+        # TODO(maruel): Using logging.error to catch these in the short term.
+        logging.error(
+            'Upload race.\n%s is not yet fully uploaded.', digest.digest)
+        # TODO(maruel): Force the client to upload.
+        #obj = None
+      seen_unseen[bool(obj)].add(digest)
+    logging.debug(
+        'Hit:%s',
+        ''.join(sorted('\n%s' % d.digest for d in seen_unseen[True])))
+    logging.debug(
+        'Missing:%s',
+        ''.join(sorted('\n%s' % d.digest for d in seen_unseen[False])))
     return seen_unseen
 
-  @classmethod
-  def should_push_to_gs(cls, digest):
+  @staticmethod
+  def should_push_to_gs(digest):
     """True to direct client to upload given EntryInfo directly to GS."""
     # Relatively small *.isolated files go through app engine to cache them.
     if digest.is_isolated and digest.size <= model.MAX_MEMCACHE_ISOLATED:
@@ -477,8 +517,8 @@ class IsolateService(remote.Service):
           settings.gs_private_key)
     return self._gs_url_signer
 
-  @classmethod
-  def tag_existing(cls, collection):
+  @staticmethod
+  def tag_existing(collection):
     """Tag existing digests with new timestamp.
 
     Arguments:
