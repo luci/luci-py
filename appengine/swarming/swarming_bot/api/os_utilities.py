@@ -966,11 +966,14 @@ def auto_quarantine_on_low_space(state, skip=None):
     # Do not check these mount points for low disk space.
     skip = (u'/boot', u'/boot/efi')
 
-  s = [
-    'Not enough free disk space on %s.' % mount
-    for mount, infos in sorted(state[u'disks'].iteritems())
-    if mount not in skip and infos[u'free_mb'] < get_min_free_space(mount)
-  ]
+  s = []
+  for mount, infos in sorted(state[u'disks'].iteritems()):
+    if mount not in skip:
+      min_free = get_min_free_space(mount)
+      if infos[u'free_mb'] < min_free:
+        s.append(
+            'Not enough free disk space on %s. %.1fmib < %.1fmib' %
+            (mount, infos[u'free_mb'], min_free))
   if s:
     state[u'quarantined'] = '\n'.join(s)
 
