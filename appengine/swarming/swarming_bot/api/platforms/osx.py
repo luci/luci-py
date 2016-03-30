@@ -73,6 +73,9 @@ def _get_xcode_version(xcode_app):
     return out[0].split()[-1], out[1].split()[-1]
 
 
+## Public API.
+
+
 def get_xcode_state():
   """Returns the state of Xcode installations on this machine."""
   state = {}
@@ -87,10 +90,75 @@ def get_xcode_state():
           'version': version[0],
           'build version': version[1],
         }
+        device_support_dir = os.path.join(
+            xcode_app, 'Contents', 'Developer', 'Platforms',
+            'iPhoneOS.platform', 'DeviceSupport')
+        if os.path.exists(device_support_dir):
+          state[xcode_app]['device support'] = os.listdir(device_support_dir)
   return state
 
 
-## Public API.
+def get_xcode_versions():
+  """Returns a list of Xcode versions installed on this machine."""
+  return sorted(xcode['version'] for xcode in get_xcode_state().itervalues())
+
+
+def get_current_xcode_version():
+  """Returns the active version of Xcode."""
+  try:
+    out = subprocess.check_output(['xcodebuild', '-version']).splitlines()
+  except (OSError, subprocess.CalledProcessError):
+    return None
+  return out[0].split()[-1], out[1].split()[-1]
+
+
+def get_ios_device_ids():
+  """Returns a list of UDIDs of attached iOS devices.
+
+  Requires idevice_id in $PATH. idevice_id is part of libimobiledevice.
+  See http://libimobiledevice.org.
+  """
+  try:
+    return subprocess.check_output(['idevice_id', '--list']).splitlines()
+  except (OSError, subprocess.CalledProcessError):
+    return []
+
+
+def get_ios_version(udid):
+  """Returns the OS version of the specified iOS device.
+
+  Requires ideviceinfo in $PATH. ideviceinfo is part of libimobiledevice.
+  See http://libimobiledevice.org.
+
+  Args:
+    udid: UDID string as returned by get_ios_device_ids.
+  """
+  try:
+    out = subprocess.check_output(
+        ['ideviceinfo', '-k', 'ProductVersion', '-u', udid]).splitlines()
+    if len(out) == 1:
+      return out[0]
+  except (OSError, subprocess.CalledProcessError):
+    pass
+
+
+@tools.cached
+def get_ios_device_type(udid):
+  """Returns the type of the specified iOS device.
+
+  Requires ideviceinfo in $PATH. ideviceinfo is part of libimobiledevice.
+  See http://libimobiledevice.org.
+
+  Args:
+    udid: UDID string as returned by get_ios_device_ids.
+  """
+  try:
+    out = subprocess.check_output(
+        ['ideviceinfo', '-k', 'ProductType', '-u', udid]).splitlines()
+    if len(out) == 1:
+      return out[0]
+  except (OSError, subprocess.CalledProcessError):
+    pass
 
 
 @tools.cached

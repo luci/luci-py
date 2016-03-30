@@ -885,6 +885,20 @@ def get_dimensions():
     dimensions[u'os'].append(u'Linux')
     dimensions[u'os'].sort()
 
+  if sys.platform == 'darwin':
+    udids = platforms.osx.get_ios_device_ids()
+    device_types = set()
+    for udid in udids:
+      version = platforms.osx.get_ios_version(udid)
+      if version:
+        dimensions[u'os'].append('iOS-%s' % version)
+      device_type = platforms.osx.get_ios_device_type(udid)
+      if device_type:
+        device_types.add(device_type)
+    if device_types:
+      dimensions[u'device'] = sorted(device_types)
+    dimensions[u'xcode_version'] = platforms.osx.get_xcode_versions()
+
   return dimensions
 
 
@@ -937,6 +951,7 @@ def get_state(skip=None):
     model = platforms.osx.get_hardware_model_string()
     if model:
       state[u'model'] = model
+    state[u'xcode'] = platforms.osx.get_xcode_state()
   if sys.platform == 'linux2':
     temp = platforms.linux.get_temperatures()
     if temp:
