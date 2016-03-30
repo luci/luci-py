@@ -359,8 +359,8 @@ class IsolateService(remote.Service):
 
     # Look if the entity was already stored. Alert in that case but ignore it.
     if key.get():
-      # TODO(maruel): Using logging.error to catch these in the short term.
-      logging.error('Overwritting ContentEntry\n%s', digest)
+      # TODO(maruel): Handle these more gracefully.
+      logging.warning('Overwritting ContentEntry\n%s', digest)
 
     entry = model.new_content_entry(
         key=key,
