@@ -39,6 +39,8 @@ message InstanceTemplateConfig {
     // Metadata to attach when creating instances.
     // Each string should be formatted as "key:value".
     repeated string metadata = 8;
+    // GCE machine type.
+    optional string machine_type = 9;
   }
 
   repeated InstanceTemplate templates = 1;
