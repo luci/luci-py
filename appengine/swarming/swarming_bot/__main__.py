@@ -96,6 +96,14 @@ def CMDsetup(_args):
   return 0
 
 
+def CMDserver(_args):
+  """Prints the server url. It's like 'config' but easier to parse."""
+  logging_utils.prepare_logging(None)
+  from bot_code import bot_main
+  print bot_main.get_config()['server']
+  return 0
+
+
 def CMDshell(args):
   """Starts a shell with api.* in.."""
   logging_utils.prepare_logging(None)
