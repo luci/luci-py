@@ -11,6 +11,7 @@ import logging
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 import endpoints
+import gae_ts_mon
 from protorpc import messages
 from protorpc import message_types
 from protorpc import remote
@@ -83,6 +84,7 @@ VersionRequest = endpoints.ResourceContainer(
 
 @swarming_api.api_class(resource_name='server', path='server')
 class SwarmingServerService(remote.Service):
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       message_types.VoidMessage, swarming_rpcs.ServerDetails,
       http_method='GET')
@@ -91,6 +93,7 @@ class SwarmingServerService(remote.Service):
     """Returns information about the server."""
     return swarming_rpcs.ServerDetails(server_version=utils.get_app_version())
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       VersionRequest, swarming_rpcs.FileContent,
       http_method='GET')
@@ -106,6 +109,7 @@ class SwarmingServerService(remote.Service):
         when=obj.when,
         version=obj.version)
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       VersionRequest, swarming_rpcs.FileContent,
       http_method='GET')
@@ -121,6 +125,7 @@ class SwarmingServerService(remote.Service):
         when=obj.when,
         version=obj.version)
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       swarming_rpcs.FileContentRequest, swarming_rpcs.FileContent)
   @auth.require(acl.is_admin)
@@ -133,6 +138,7 @@ class SwarmingServerService(remote.Service):
         when=obj.created_ts,
         version=obj.version)
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       swarming_rpcs.FileContentRequest, swarming_rpcs.FileContent)
   @auth.require(acl.is_admin)
@@ -154,6 +160,7 @@ TaskId = endpoints.ResourceContainer(
 @swarming_api.api_class(resource_name='task', path='task')
 class SwarmingTaskService(remote.Service):
   """Swarming's task-related API."""
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       TaskId, swarming_rpcs.TaskResult,
       name='result',
@@ -173,6 +180,7 @@ class SwarmingTaskService(remote.Service):
     return message_conversion.task_result_to_rpc(
         get_result_entity(request.task_id))
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       TaskId, swarming_rpcs.TaskRequest,
       name='request',
@@ -186,6 +194,7 @@ class SwarmingTaskService(remote.Service):
     request_key = task_pack.result_summary_key_to_request_key(summary_key)
     return message_conversion.task_request_to_rpc(get_or_raise(request_key))
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       TaskId, swarming_rpcs.CancelResponse,
       name='cancel',
@@ -201,6 +210,7 @@ class SwarmingTaskService(remote.Service):
     ok, was_running = task_scheduler.cancel_task(summary_key)
     return swarming_rpcs.CancelResponse(ok=ok, was_running=was_running)
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       TaskId, swarming_rpcs.TaskOutput,
       name='stdout',
@@ -224,6 +234,7 @@ class SwarmingTaskService(remote.Service):
 @swarming_api.api_class(resource_name='tasks', path='tasks')
 class SwarmingTasksService(remote.Service):
   """Swarming's tasks-related API."""
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       swarming_rpcs.NewTaskRequest, swarming_rpcs.TaskRequestMetadata)
   @auth.require(acl.is_bot_or_user)
@@ -253,6 +264,7 @@ class SwarmingTasksService(remote.Service):
         task_id=task_pack.pack_result_summary_key(result_summary.key),
         task_result=previous_result)
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       swarming_rpcs.TasksRequest, swarming_rpcs.TaskList,
       http_method='GET')
@@ -286,6 +298,7 @@ class SwarmingTasksService(remote.Service):
         items=[message_conversion.task_result_to_rpc(i) for i in items],
         now=now)
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       swarming_rpcs.TasksRequest, swarming_rpcs.TaskRequests,
       http_method='GET')
@@ -322,6 +335,7 @@ class SwarmingTasksService(remote.Service):
         items=[message_conversion.task_request_to_rpc(i) for i in items],
         now=now)
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       swarming_rpcs.TasksCountRequest, swarming_rpcs.TasksCount,
       http_method='GET')
@@ -370,6 +384,7 @@ BotTasksRequest = endpoints.ResourceContainer(
 @swarming_api.api_class(resource_name='bot', path='bot')
 class SwarmingBotService(remote.Service):
   """Bot-related API. Permits querying information about the bot's properties"""
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       BotId, swarming_rpcs.BotInfo,
       name='get',
@@ -386,6 +401,7 @@ class SwarmingBotService(remote.Service):
     bot = get_or_raise(bot_management.get_info_key(request.bot_id))
     return message_conversion.bot_info_to_rpc(bot, utils.utcnow())
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       BotId, swarming_rpcs.DeletedResponse,
       name='delete',
@@ -408,6 +424,7 @@ class SwarmingBotService(remote.Service):
     bot_key.delete()
     return swarming_rpcs.DeletedResponse(deleted=True)
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       BotEventsRequest, swarming_rpcs.BotEvents,
       name='events',
@@ -440,6 +457,7 @@ class SwarmingBotService(remote.Service):
         items=[message_conversion.bot_event_to_rpc(r) for r in items],
         now=now)
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       BotId, swarming_rpcs.TerminateResponse,
       name='terminate',
@@ -488,6 +506,7 @@ class SwarmingBotService(remote.Service):
     return swarming_rpcs.TerminateResponse(
         task_id=task_pack.pack_result_summary_key(result_summary.key))
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       BotTasksRequest, swarming_rpcs.BotTasks,
       name='tasks',
@@ -527,6 +546,7 @@ class SwarmingBotService(remote.Service):
 @swarming_api.api_class(resource_name='bots', path='bots')
 class SwarmingBotsService(remote.Service):
   """Bots-related API."""
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       swarming_rpcs.BotsRequest, swarming_rpcs.BotList,
       http_method='GET')
