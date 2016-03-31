@@ -203,6 +203,9 @@ KNOWN_CPU_SCALING_GOVERNOR_VALUES = (
     # userspace overrides the scaling governor with an user defined constant
     # frequency.
     'userspace',
+    # hotplug is alike ondemand but enables turning off unused CPU cores during
+    # periods of low utilization.
+    'hotplug',
 )
 
 
