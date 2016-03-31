@@ -244,10 +244,8 @@ class _TaskResultCommon(ndb.Model):
   It is not meant to be instantiated on its own.
 
   TODO(maruel): Overhaul this entity:
-  - Back fill bot_dimensions with bot dimensions when possible.
   - Convert exit_codes to exit_code, a single value.
   - Convert durations to duration, a single value.
-  - Convert stdout_chunks to stdout_chunk, a single value.
   - Get rid of TaskOutput as it is not needed anymore (?)
   """
   # Bot that ran this task.
@@ -277,10 +275,8 @@ class _TaskResultCommon(ndb.Model):
   # automatically if possible.
   internal_failure = ndb.BooleanProperty(default=False)
 
-  # Number of TaskOutputChunk entities for each output for each command. Set to
-  # 0 when no output has been collected for a specific index. Ordered by
-  # command.
-  stdout_chunks = ndb.IntegerProperty(repeated=True, indexed=False)
+  # Number of TaskOutputChunk entities for the output.
+  stdout_chunks = ndb.IntegerProperty(indexed=False)
 
   # Aggregated exit codes. Ordered by command.
   exit_codes = ndb.IntegerProperty(repeated=True, indexed=False)
@@ -416,40 +412,23 @@ class _TaskResultCommon(ndb.Model):
     if not self.server_versions or self.server_versions[-1] != server_version:
       self.server_versions.append(server_version)
 
-  def get_outputs(self):
-    """Yields the actual outputs as a generator of strings."""
-    # TODO(maruel): Make this function async.
-    if not self.run_result_key or not self.stdout_chunks:
-      # The task was not reaped or no output was streamed yet.
-      return []
-
-    # Fetch everything in parallel.
-    futures = [
-      self.get_command_output_async(command_index)
-      for command_index in xrange(len(self.stdout_chunks))
-    ]
-    return (future.get_result() for future in futures)
+  def get_output(self):
+    """Returns the output, either as str or None if no output is present."""
+    return self.get_output_async().get_result()
 
   @ndb.tasklet
-  def get_command_output_async(self, command_index):
-    """Returns the stdout for a single command as a ndb.Future.
+  def get_output_async(self):
+    """Returns the stdout as a ndb.Future.
 
     Use out.get_result() to get the data as a str or None if no output is
     present.
     """
-    assert isinstance(command_index, int), command_index
-    if (not self.run_result_key or
-        command_index >= len(self.stdout_chunks or [])):
+    if not self.run_result_key or not self.stdout_chunks:
       # The task was not reaped or no output was streamed for this index yet.
       raise ndb.Return(None)
 
-    number_chunks = self.stdout_chunks[command_index]
-    if not number_chunks:
-      raise ndb.Return(None)
-
-    output_key = _run_result_key_to_output_key(
-        self.run_result_key, command_index)
-    out = yield TaskOutput.get_output_async(output_key, number_chunks)
+    output_key = _run_result_key_to_output_key(self.run_result_key)
+    out = yield TaskOutput.get_output_async(output_key, self.stdout_chunks)
     raise ndb.Return(out)
 
   def _pre_put_hook(self):
@@ -539,21 +518,17 @@ class TaskRunResult(_TaskResultCommon):
     """Retry number this task. 1 based."""
     return self.key.integer_id()
 
-  def append_output(self, command_index, output, output_chunk_start):
+  def append_output(self, output, output_chunk_start):
     """Appends output to the stdout of the command.
 
     Returns the entities to save.
     """
-    while len(self.stdout_chunks) <= command_index:
-      # The reason for this to be a loop is that items could be handled out of
-      # order.
-      self.stdout_chunks.append(0)
-    entities, self.stdout_chunks[command_index] = _output_append(
-        _run_result_key_to_output_key(self.key, command_index),
-        self.stdout_chunks[command_index],
+    entities, self.stdout_chunks = _output_append(
+        _run_result_key_to_output_key(self.key),
+        self.stdout_chunks,
         output,
         output_chunk_start)
-    assert self.stdout_chunks[command_index] <= TaskOutput.PUT_MAX_CHUNKS
+    assert self.stdout_chunks <= TaskOutput.PUT_MAX_CHUNKS
     return entities
 
   def to_dict(self):
@@ -718,11 +693,10 @@ class TaskResultSummary(_TaskResultCommon):
 ### Private stuff.
 
 
-def _run_result_key_to_output_key(run_result_key, command_index):
+def _run_result_key_to_output_key(run_result_key):
   """Returns a ndb.key to a TaskOutput. command_index is zero-indexed."""
   assert run_result_key.kind() == 'TaskRunResult', run_result_key
-  assert command_index >= 0, command_index
-  return ndb.Key(TaskOutput, command_index+1, parent=run_result_key)
+  return ndb.Key(TaskOutput, 1, parent=run_result_key)
 
 
 def _output_key_to_output_chunk_key(output_key, chunk_number):

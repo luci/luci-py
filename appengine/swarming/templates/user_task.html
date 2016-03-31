@@ -442,10 +442,12 @@
 <div class=code>  git clone https://github.com/luci/client-py</div>
 </div>
 
-<h3>Outputs:</h3>
+{% set output = task.get_output() %}
+{% if output is not none %}
+<h3>Output:</h3>
 <pre>
-{% for out in task.get_outputs() %}Output:
-{{out.decode('utf-8', 'replace')}}{% endfor %}{% if is_running %}<p class="console"><span class="blink">|</span>{% endif %}
+{{task.get_output().decode('utf-8', 'replace')}}{% if is_running %}<p class="console"><span class="blink">|</span>{% endif %}
 </pre>
+{% endif %}
 
 {% endblock %}

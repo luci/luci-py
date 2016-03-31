@@ -662,8 +662,7 @@ def bot_update_task(
     to_put = [run_result]
     if output:
       # This does 1 multi GETs. This also modifies run_result in place.
-      to_put.extend(
-          run_result.append_output(0, output, output_chunk_start or 0))
+      to_put.extend(run_result.append_output(output, output_chunk_start or 0))
 
     run_result.cost_usd = max(cost_usd, run_result.cost_usd or 0.)
     run_result.modified_ts = now

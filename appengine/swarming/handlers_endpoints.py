@@ -225,7 +225,7 @@ class SwarmingTaskService(remote.Service):
     # supported by cloud endpoints.
     logging.info('%s', request)
     result = get_result_entity(request.task_id)
-    output = result.get_command_output_async(0).get_result()
+    output = result.get_output()
     if output:
       output = output.decode('utf-8', 'replace')
     return swarming_rpcs.TaskOutput(output=output)

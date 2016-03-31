@@ -773,7 +773,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         task_scheduler.bot_update_task(
             run_result.key, 'localhost', 'hey', 2, 0, 0.1, False, False,
             0.1, None))
-    self.assertEqual(['hihey'], list(run_result.key.get().get_outputs()))
+    self.assertEqual('hihey', run_result.key.get().get_output())
 
   def test_bot_update_task_new_overwrite(self):
     run_result = _quick_reap()
@@ -787,7 +787,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         task_scheduler.bot_update_task(
             run_result.key, 'localhost', 'hey', 1, None, None, False, False,
             0.1, None))
-    self.assertEqual(['hhey'], list(run_result.key.get().get_outputs()))
+    self.assertEqual('hhey', run_result.key.get().get_output())
 
   def test_bot_update_exception(self):
     run_result = _quick_reap()
