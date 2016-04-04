@@ -814,7 +814,7 @@ def get_state_all_devices_android(devices):
       return {u'state': 'unavailable'}
     return {
       u'battery': device.GetBattery(),
-      u'build': {key: properties[u'ro.'+key] for key in keys},
+      u'build': {key: properties.get(u'ro.'+key, '<missing>') for key in keys},
       u'cpu': device.GetCPUScale(),
       u'disk': device.GetDisk(),
       u'imei': device.GetIMEI(),
