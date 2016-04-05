@@ -311,7 +311,7 @@ class BotHandler(auth.AuthenticatingHandler):
               run_results[index-1].started_ts - run_results[index].ended_ts)
           # We are taking the whole time the bot was doing work, not just the
           # duration associated with the task.
-          duration = run_results[index].duration_total
+          duration = run_results[index].duration_as_seen_by_server
           if duration:
             run_time += duration
 
@@ -515,10 +515,11 @@ class TasksHandler(auth.AuthenticatingHandler):
         t.cost_saved_usd for t in tasks if t.cost_saved_usd)
     # Include the overhead in the total amount of time saved, since it's
     # overhead saved.
-    # In theory, t.duration_total should always be set when t.deduped_from is
-    # set but there has some broken entities in the datastore.
+    # In theory, t.duration_as_seen_by_server should always be set when
+    # t.deduped_from is set but there has some broken entities in the datastore.
     total_saved = safe_sum(
-        t.duration_total for t in tasks if t.deduped_from and t.duration_total)
+        t.duration_as_seen_by_server for t in tasks
+        if t.deduped_from and t.duration_as_seen_by_server)
     duration_sum = safe_sum(durations)
     total_saved_percent = (
         (100. * total_saved.total_seconds() / duration_sum.total_seconds())

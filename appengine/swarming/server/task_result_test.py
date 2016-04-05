@@ -146,8 +146,8 @@ class TaskResultApiTest(TestCase):
       'cost_saved_usd': None,
       'created_ts': self.now,
       'deduped_from': None,
-      'durations': [],
-      'exit_codes': [],
+      'duration': None,
+      'exit_code': None,
       'failure': False,
       'id': '1d69b9f088008810',
       'internal_failure': False,
@@ -194,8 +194,8 @@ class TaskResultApiTest(TestCase):
       'children_task_ids': [],
       'completed_ts': None,
       'cost_usd': 0.,
-      'durations': [],
-      'exit_codes': [],
+      'duration': None,
+      'exit_code': None,
       'failure': False,
       'id': '1d69b9f088008811',
       'internal_failure': False,
@@ -230,8 +230,8 @@ class TaskResultApiTest(TestCase):
       'cost_saved_usd': None,
       'created_ts': self.now,
       'deduped_from': None,
-      'durations': [],
-      'exit_codes': [],
+      'duration': None,
+      'exit_code': None,
       'failure': False,
       'id': '1d69b9f088008810',
       'internal_failure': False,
@@ -277,8 +277,8 @@ class TaskResultApiTest(TestCase):
       'cost_saved_usd': None,
       'created_ts': self.now,
       'deduped_from': None,
-      'durations': [],
-      'exit_codes': [],
+      'duration': None,
+      'exit_code': None,
       'failure': False,
       'id': '1d69b9f088008810',
       'internal_failure': False,
@@ -305,7 +305,8 @@ class TaskResultApiTest(TestCase):
     complete_ts = self.now + datetime.timedelta(seconds=6)
     self.mock_now(complete_ts)
     run_result.completed_ts = complete_ts
-    run_result.exit_codes.append(0)
+    run_result.duration = 0.1
+    run_result.exit_code = 0
     run_result.state = task_result.State.COMPLETED
     run_result.modified_ts = utils.utcnow()
     ndb.transaction(lambda: ndb.put_multi(run_result.append_output('foo', 0)))
@@ -322,8 +323,8 @@ class TaskResultApiTest(TestCase):
       'cost_saved_usd': None,
       'created_ts': self.now,
       'deduped_from': None,
-      'durations': [],
-      'exit_codes': [0],
+      'duration': 0.1,
+      'exit_code': 0,
       'failure': False,
       'id': '1d69b9f088008810',
       'internal_failure': False,
@@ -346,7 +347,8 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(expected, result_summary.key.get().to_dict())
     self.assertEqual('foo', result_summary.get_output())
     self.assertEqual(
-        datetime.timedelta(seconds=2), result_summary.duration_total)
+        datetime.timedelta(seconds=2),
+        result_summary.duration_as_seen_by_server)
     self.assertEqual(
         datetime.timedelta(seconds=2),
         result_summary.duration_now(utils.utcnow()))
@@ -456,7 +458,7 @@ class TaskResultApiTest(TestCase):
         started_ts=datetime.datetime(2010, 1, 1, 0, 0, 0),
         completed_ts=datetime.datetime(2010, 1, 1, 0, 2, 0))
     self.assertEqual(
-        datetime.timedelta(seconds=120), run_result.duration_total)
+        datetime.timedelta(seconds=120), run_result.duration_as_seen_by_server)
     self.assertEqual(
         datetime.timedelta(seconds=120),
         run_result.duration_now(utils.utcnow()))
@@ -464,7 +466,7 @@ class TaskResultApiTest(TestCase):
     run_result = task_result.TaskRunResult(
         started_ts=datetime.datetime(2010, 1, 1, 0, 0, 0),
         abandoned_ts=datetime.datetime(2010, 1, 1, 0, 1, 0))
-    self.assertEqual(None, run_result.duration_total)
+    self.assertEqual(None, run_result.duration_as_seen_by_server)
     self.assertEqual(None, run_result.duration_now(utils.utcnow()))
 
   def test_run_result_timeout(self):
@@ -474,6 +476,8 @@ class TaskResultApiTest(TestCase):
     ndb.transaction(result_summary.put)
     run_result = task_result.new_run_result(request, 1, 'localhost', 'abc', {})
     run_result.state = task_result.State.TIMED_OUT
+    run_result.duration = 0.1
+    run_result.exit_code = -1
     run_result.completed_ts = utils.utcnow()
     run_result.modified_ts = utils.utcnow()
     result_summary.set_from_run_result(run_result, request)

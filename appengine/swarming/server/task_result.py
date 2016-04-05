@@ -244,8 +244,6 @@ class _TaskResultCommon(ndb.Model):
   It is not meant to be instantiated on its own.
 
   TODO(maruel): Overhaul this entity:
-  - Convert exit_codes to exit_code, a single value.
-  - Convert durations to duration, a single value.
   - Get rid of TaskOutput as it is not needed anymore (?)
   """
   # Bot that ran this task.
@@ -278,11 +276,12 @@ class _TaskResultCommon(ndb.Model):
   # Number of TaskOutputChunk entities for the output.
   stdout_chunks = ndb.IntegerProperty(indexed=False)
 
-  # Aggregated exit codes. Ordered by command.
-  exit_codes = ndb.IntegerProperty(repeated=True, indexed=False)
+  # Process exit code.
+  exit_code = ndb.IntegerProperty(indexed=False, name='exit_codes')
 
-  # Aggregated durations in seconds. Ordered by command.
-  durations = ndb.FloatProperty(repeated=True, indexed=False)
+  # Task duration in seconds as seen by the task_runner, including isolation
+  # overhead.
+  duration = ndb.FloatProperty(indexed=False, name='durations')
 
   # Time when a bot reaped this task.
   started_ts = ndb.DateTimeProperty()
@@ -320,8 +319,11 @@ class _TaskResultCommon(ndb.Model):
     return self.state == State.PENDING
 
   @property
-  def duration_total(self):
-    """Returns the timedelta the task spent executing, including overhead.
+  def duration_as_seen_by_server(self):
+    """Returns the timedelta the task spent executing, including server<->bot
+    communication overhead.
+
+    This is the task duration as seen by the server, not by the bot.
 
     Task abandoned or not yet completed are not applicable and return None.
     """
@@ -330,10 +332,9 @@ class _TaskResultCommon(ndb.Model):
     return self.completed_ts - self.started_ts
 
   def duration_now(self, now):
-    """Returns the timedelta the task spent executing as of now, including
-    overhead.
+    """Returns the timedelta the task spent executing as of now.
 
-    Similar to .duration_total except that its return value is not
+    Similar to .duration_as_seen_by_server except that its return value is not
     deterministic. Task abandoned is not applicable and return None.
     """
     if not self.started_ts or self.abandoned_ts:
@@ -343,10 +344,6 @@ class _TaskResultCommon(ndb.Model):
   @property
   def ended_ts(self):
     return self.completed_ts or self.abandoned_ts
-
-  @property
-  def exit_code(self):
-    return self.exit_codes[0] if self.exit_codes else None
 
   @property
   def is_exceptional(self):
@@ -434,10 +431,6 @@ class _TaskResultCommon(ndb.Model):
   def _pre_put_hook(self):
     """Use extra validation that cannot be validated throught 'validator'."""
     super(_TaskResultCommon, self)._pre_put_hook()
-    # TODO(vadimsh): Map reduce jobs use non-transactional put for old entities
-    # for performance reasons.
-    # assert ndb.in_transaction(), (
-    #     'Saving %s outside of transaction' % self.__class__.__name__)
     if self.state == State.EXPIRED:
       if self.failure or self.exit_code is not None:
         raise datastore_errors.BadValueError(
@@ -449,8 +442,32 @@ class _TaskResultCommon(ndb.Model):
     if not self.modified_ts:
       raise datastore_errors.BadValueError('Must update .modified_ts')
 
+    if (self.duration is None) != (self.exit_code is None):
+        raise datastore_errors.BadValueError(
+            'duration and exit_code must both be None or not None')
+    if self.state in State.STATES_DONE:
+      if self.duration is None:
+        raise datastore_errors.BadValueError(
+            'duration and exit_code must be set with state %s' %
+            State.to_string(self.state))
+    else:
+      if self.duration is not None:
+        raise datastore_errors.BadValueError(
+            'duration and exit_code must not be set with state %s' %
+            State.to_string(self.state))
+
     self.children_task_ids = sorted(
         set(self.children_task_ids), key=lambda x: int(x, 16))
+
+  @classmethod
+  def _properties_fixed(cls):
+    """Returns all properties with their member name, excluding computed
+    properties.
+    """
+    return [
+      prop._code_name for prop in cls._properties.itervalues()
+      if not isinstance(prop, ndb.ComputedProperty)
+    ]
 
 
 class TaskRunResult(_TaskResultCommon):
@@ -618,8 +635,8 @@ class TaskResultSummary(_TaskResultCommon):
 
   def reset_to_pending(self):
     """Resets this entity to pending state."""
-    self.durations = []
-    self.exit_codes = []
+    self.duration = None
+    self.exit_code = None
     self.internal_failure = False
     self.state = State.PENDING
     self.started_ts = None
@@ -632,10 +649,7 @@ class TaskResultSummary(_TaskResultCommon):
     set.
     """
     assert isinstance(run_result, TaskRunResult), run_result
-    for property_name in _TaskResultCommon._properties:
-      if isinstance(
-          getattr(_TaskResultCommon, property_name), ndb.ComputedProperty):
-        continue
+    for property_name in _TaskResultCommon._properties_fixed():
       setattr(self, property_name, getattr(run_result, property_name))
     # Include explicit support for 'state' and 'try_number'. TaskRunResult.state
     # is a ComputedProperty so it can't be copied as-is, and try_number is a
@@ -669,10 +683,7 @@ class TaskResultSummary(_TaskResultCommon):
     if self.try_number and self.try_number > run_result.try_number:
       return False
 
-    for property_name in _TaskResultCommon._properties:
-      if isinstance(
-          getattr(_TaskResultCommon, property_name), ndb.ComputedProperty):
-        continue
+    for property_name in _TaskResultCommon._properties_fixed():
       if getattr(self, property_name) != getattr(run_result, property_name):
         return True
     # Include explicit support for 'state' and 'try_number'. TaskRunResult.state

@@ -145,8 +145,9 @@ def _update_stats(run_result, bot_id, request, completed):
   """Updates stats after a bot task update notification."""
   if completed:
     runtime_ms = 0
-    if run_result.duration_total:
-      runtime_ms = _secs_to_ms(run_result.duration_total.total_seconds())
+    if run_result.duration_as_seen_by_server:
+      runtime_ms = _secs_to_ms(
+          run_result.duration_as_seen_by_server.total_seconds())
     pending_ms = 0
     if run_result.started_ts:
       pending_ms = _secs_to_ms(
@@ -263,7 +264,7 @@ def _handle_dead_bot(run_result_key):
   return task_is_retried
 
 
-def _copy_entity(src, dst, skip_list):
+def _copy_summary(src, dst, skip_list):
   """Copies the attributes of entity src into dst.
 
   It doesn't copy the key nor any member in skip_list.
@@ -271,8 +272,7 @@ def _copy_entity(src, dst, skip_list):
   assert type(src) == type(dst), '%s!=%s' % (src.__class__, dst.__class__)
   # Access to a protected member _XX of a client class - pylint: disable=W0212
   kwargs = {
-    k: getattr(src, k) for k, v in src.__class__._properties.iteritems()
-    if not isinstance(v, ndb.ComputedProperty) and k not in skip_list
+    k: getattr(src, k) for k in src._properties_fixed() if k not in skip_list
   }
   dst.populate(**kwargs)
 
@@ -439,7 +439,7 @@ def schedule_request(request):
       # functionality.
       # Setting task.queue_number to None removes it from the scheduling.
       task.queue_number = None
-      _copy_entity(
+      _copy_summary(
           dupe_summary, result_summary, ('created_ts', 'name', 'user', 'tags'))
       result_summary.properties_hash = None
       result_summary.try_number = 0
@@ -567,8 +567,8 @@ def bot_update_task(
   - bot_id: Self advertised bot id to ensure it's the one expected.
   - output: Data to append to this command output.
   - output_chunk_start: Index of output in the stdout stream.
-  - exit_code: Mark that this command is terminated.
-  - duration: Time spent in seconds for this command.
+  - exit_code: Mark that this task completed.
+  - duration: Time spent in seconds for this task.
   - hard_timeout: Bool set if an hard timeout occured.
   - io_timeout: Bool set if an I/O timeout occured.
   - cost_usd: Cost in $USD of this task up to now.
@@ -585,6 +585,10 @@ def bot_update_task(
   assert output is None or isinstance(output, str)
   if cost_usd is not None and cost_usd < 0.:
     raise ValueError('cost_usd must be None or greater or equal than 0')
+  if (duration is None) != (exit_code is None):
+    raise ValueError(
+        'had unexpected duration; expected iff a command completes\n'
+        'duration: %r; exit: %r' % (duration, exit_code))
 
   packed = task_pack.pack_run_result_key(run_result_key)
   logging.debug(
@@ -619,37 +623,29 @@ def bot_update_task(
       return None, None, False, 'TaskRunResult is broken; %s' % (
           run_result.to_dict())
 
-    # This happens as an HTTP request is retried when the DB write succeeded but
-    # it still returned HTTP 500.
-    if run_result.exit_code is not None and exit_code is not None:
-      if run_result.exit_code != exit_code:
-        result_summary_future.wait()
-        return None, None, False, 'got 2 different exit_code; %s then %s' % (
-            run_result.exit_code, exit_code)
-
-    if run_result.durations and duration is not None:
-      if run_result.durations[0] != duration:
-        result_summary_future.wait()
-        return None, None, False, 'got 2 different durations; %s then %s' % (
-            run_result.durations[0], duration)
-
-    if (duration is None) != (exit_code is None):
-      result_summary_future.wait()
-      return None, None, False, (
-          'had unexpected duration; expected iff a command completes\n'
-          'duration: %s vs %s; exit: %s vs %s' % (
-            run_result.durations, duration, run_result.exit_code, exit_code))
-
-    # If the command completed. Check if the value wasn't set already.
-    if duration is not None and not run_result.durations:
-      run_result.durations.append(duration)
-    if exit_code is not None and run_result.exit_code is None:
-      run_result.exit_codes.append(exit_code)
+    # Assumptions:
+    # - duration and exit_code are both set or not set.
+    # - same for run_result.
+    if exit_code is not None:
+      if run_result.exit_code is not None:
+        # This happens as an HTTP request is retried when the DB write succeeded
+        # but it still returned HTTP 500.
+        if run_result.exit_code != exit_code:
+          result_summary_future.wait()
+          return None, None, False, 'got 2 different exit_code; %s then %s' % (
+              run_result.exit_code, exit_code)
+        if run_result.duration != duration:
+          result_summary_future.wait()
+          return None, None, False, 'got 2 different durations; %s then %s' % (
+              run_result.duration, duration)
+      else:
+        run_result.duration = duration
+        run_result.exit_code = exit_code
+    task_completed = run_result.exit_code is not None
 
     if outputs_ref:
       run_result.outputs_ref = task_request.FilesRef(**outputs_ref)
 
-    task_completed = run_result.exit_code is not None
     if run_result.state in task_result.State.STATES_RUNNING:
       if hard_timeout or io_timeout:
         run_result.state = task_result.State.TIMED_OUT

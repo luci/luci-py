@@ -158,8 +158,6 @@ def task_result_to_rpc(entity):
       if entity.outputs_ref else None)
   kwargs = {
     'bot_dimensions': _string_list_pairs_from_dict(entity.bot_dimensions or {}),
-    'duration': (entity.durations or [None])[0],
-    'exit_code': entity.exit_code,
     'outputs_ref': outputs_ref,
     'state': swarming_rpcs.StateField(entity.state),
   }
