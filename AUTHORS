@@ -1,15 +1,15 @@
-# This is the official list of Swarming Authors for copyright purposes.
-#
-# Names should be added to this file with this pattern:
-# - For individuals:
-#     Name <email address>
-# - For organizations:
-#     Organization <fnmatch pattern>
-#   See python fnmatch module documentation for more information.
-#
+# This is the official list of LUCI authors for copyright purposes.
+# This file is distinct from the CONTRIBUTORS files.
+# See the latter for an explanation.
+
+# Names should be added to this file as one of
+#     Organization's name <fnmatch pattern>
+#     Individual's name <submission email address>
+#     Individual's name <submission email address> <email2> <emailN>
+# See CONTRIBUTORS for the meaning of multiple email addresses.
+
 # Please keep the list sorted.
 
-Christopher Sharp <csharp@chromium.org>
+Cem Kocagil <ckocagil@chromium.org>
+Cloudera <*@cloudera.com>
 Google Inc. <*@google.com>
-Marc-Antoine Ruel <maruel@chromium.org>
-Vadim Shtayura <vadimsh@chromium.org>
