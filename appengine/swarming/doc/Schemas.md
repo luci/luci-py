@@ -57,13 +57,13 @@ block depends on the previous ones:
                |TaskRunResult|  |TaskRunResult|                   task_result.py
                |id=1 <try #> |  |id=2         |
                +-------------+  +-------------+
-                ^           ^           ...
-                |           |
-        +----------------+  +----------+
-        |TaskOutput      |  |TaskOutput| ...                      task_result.py
-        |id=1 <cmd index>|  |id=2      |
-        +----------------+  +----------+
-                 ^      ^        ...
+                ^                       ...
+                |
+       +-----------------+
+       |TaskOutput       |                                        task_result.py
+       |id=1 (not stored)|
+       +-----------------+
+                 ^      ^
                  |      |
     +---------------+  +---------------+
     |TaskOutputChunk|  |TaskOutputChunk| ...                      task_result.py

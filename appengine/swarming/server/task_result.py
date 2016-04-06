@@ -11,9 +11,8 @@ store tasks results.
   account retries.
 - TaskRunResult represents the result for one 'try'. There can
   be multiple tries for one job, for example if a bot dies.
-- The stdout of each command in TaskResult.properties.commands is saved inside
-  TaskOutput.
-- It is chunked in TaskOutputChunk to fit the entity size limit.
+- The stdout of the task is saved under TaskOutput, chunked in TaskOutputChunk
+  entities to fit the entity size limit.
 
 Graph of schema:
 
@@ -45,13 +44,13 @@ Graph of schema:
                |  +--------+ |  |  +--------+ |
                |id=1 <try #> |  |id=2         |
                +-------------+  +-------------+
-                ^           ^           ...
-                |           |
-        +----------------+  +----------+
-        |TaskOutput      |  |TaskOutput| ...
-        |id=1 <cmd index>|  |id=2      |
-        +----------------+  +----------+
-                 ^      ^        ...
+                ^                       ...
+                |
+       +-----------------+
+       |TaskOutput       |
+       |id=1 (not stored)|
+       +-----------------+
+                 ^      ^
                  |      |
     +---------------+  +---------------+
     |TaskOutputChunk|  |TaskOutputChunk| ...
@@ -138,18 +137,17 @@ def _validate_task_summary_id(_prop, value):
 
 
 def _calculate_failure(result_common):
-  # When a command times out, there may not be any exit code, it is still a user
-  # process failure mode, not an infrastructure failure mode.
+  # When the task command times out, there may not be any exit code, it is still
+  # a user process failure mode, not an infrastructure failure mode.
   return (
       bool(result_common.exit_code) or
       result_common.state == State.TIMED_OUT)
 
 
 class TaskOutput(ndb.Model):
-  """Phantom entity to represent a command output stored as small chunks.
+  """Phantom entity to represent the task output stored as small chunks.
 
-  Parent is TaskRunResult. Key id is the command's index + 1, because id 0 is
-  invalid.
+  Parent is TaskRunResult. Key id is 1.
 
   Child entities TaskOutputChunk are aggregated for the whole output.
 
@@ -188,7 +186,7 @@ class TaskOutput(ndb.Model):
   @classmethod
   @ndb.tasklet
   def get_output_async(cls, output_key, number_chunks):
-    """Returns the stdout for a single command as a ndb.Future."""
+    """Returns the stdout for the task as a ndb.Future."""
     # TODO(maruel): Save number_chunks locally in this entity.
     if not number_chunks:
       raise ndb.Return(None)
@@ -218,7 +216,7 @@ class TaskOutput(ndb.Model):
 
 
 class TaskOutputChunk(ndb.Model):
-  """Represents a chunk of a command output.
+  """Represents a chunk of the task output.
 
   Parent is TaskOutput. Key id is monotonically increasing starting from 1,
   since 0 is not a valid id.
@@ -536,7 +534,7 @@ class TaskRunResult(_TaskResultCommon):
     return self.key.integer_id()
 
   def append_output(self, output, output_chunk_start):
-    """Appends output to the stdout of the command.
+    """Appends output to the stdout.
 
     Returns the entities to save.
     """
@@ -705,7 +703,7 @@ class TaskResultSummary(_TaskResultCommon):
 
 
 def _run_result_key_to_output_key(run_result_key):
-  """Returns a ndb.key to a TaskOutput. command_index is zero-indexed."""
+  """Returns a ndb.key to a TaskOutput."""
   assert run_result_key.kind() == 'TaskRunResult', run_result_key
   return ndb.Key(TaskOutput, 1, parent=run_result_key)
 
@@ -713,7 +711,7 @@ def _run_result_key_to_output_key(run_result_key):
 def _output_key_to_output_chunk_key(output_key, chunk_number):
   """Returns a ndb.key to a TaskOutputChunk.
 
-  Both command_index and chunk_number are zero-indexed.
+  Is chunk_number zero-indexed.
   """
   assert output_key.kind() == 'TaskOutput', output_key
   assert chunk_number >= 0, chunk_number

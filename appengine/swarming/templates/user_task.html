@@ -76,6 +76,21 @@
 {% block body %}
 {% import 'swarming/bot_view.html' as bot_view %}
 
+
+{% macro summarize_array(values) %}
+  {% if not values %}
+    &#8209;&#8209;
+  {% else %}
+    {{values|sum|filesizeformat}} total; {{values|length}} items;
+    {% if values|length <= 10 %}
+      ({{values|map('filesizeformat')|join('; ')}})
+    {% else %}
+      ({{values[0]|filesizeformat}}; {{values[1]|filesizeformat}}; {{values[2]|filesizeformat}}; {{values[3]|filesizeformat}}; {{values[4]|filesizeformat}}; ...; {{values[-5]|filesizeformat}}; {{values[-4]|filesizeformat}}; {{values[-3]|filesizeformat}}; {{values[-2]|filesizeformat}}; {{values[-1]|filesizeformat}})
+    {% endif %}
+  {% endif %}
+{% endmacro %}
+
+
 <h1>Task summary</h1>
 <a href="/user/tasks">Back to tasks list</a>
 <p>
@@ -252,6 +267,10 @@
           {% endif %}
         </td>
       </tr>
+      <tr title="Link to the bot that executed this task, if any.">
+        <td>Bot</td>
+        <td>{{bot_view.bot_link(task.bot_id, is_privileged_user)}}</td>
+      </tr>
       <tr title="The next task executed by this bot, if any.">
         <td>Following task</td>
         <td>
@@ -261,45 +280,6 @@
           </a>
           {% else %}
           &#8209;&#8209;
-          {% endif %}
-        </td>
-      </tr>
-      <tr title="When the bot was handed this task.">
-        <td>Started</td>
-        <td>{{task.started_ts|datetimeformat}}</td>
-      </tr>
-      <tr title="Last time this bot sent an update about this task.">
-        <td>Last updated</td>
-        <td>{{(now-task.modified_ts)|timedeltaformat}} ago</td>
-      </tr>
-      <tr title="Time between when the request was done and the bot started the task.">
-        <td>Pending time</td>
-        <td>
-          {{bot_view.pending_star(task)}}{{task.pending_now(now)|timedeltaformat}}
-        </td>
-      </tr>
-      <tr title="When the task was completed, if done.">
-        <td>Completed</td>
-        <td>{{task.completed_ts|datetimeformat}}</td>
-      </tr>
-      <tr title="Duration of the task, up to now if the task is still on-going.">
-        <td>Duration</td>
-        <td>
-          {{bot_view.running_star(task)}}{{task.duration_now(now)|timedeltaformat}}
-        </td>
-      </tr>
-      <tr title="Moment where the task was declared a failure by the server due to internal error or expiration.">
-        <td>Abandoned</td>
-        <td>
-          {{task.abandoned_ts|datetimeformat}}
-          {% if task.abandoned_ts %}
-            {% if task.started_ts %}
-              ({{(task.abandoned_ts-task.started_ts)|timedeltaformat}} since task
-              started)
-            {% else %}
-              ({{(task.abandoned_ts-request.created_ts)|timedeltaformat}} since
-              task request)
-            {% endif %}
           {% endif %}
         </td>
       </tr>
@@ -317,47 +297,26 @@
           {% endif %}
         </td>
       </tr>
-      <tr title="Link to the bot that executed this task, if any.">
-        <td>Bot</td>
-        <td>{{bot_view.bot_link(task.bot_id, is_privileged_user)}}</td>
+      <tr title="When the bot was handed this task.">
+        <td>Started</td>
+        <td>{{task.started_ts|datetimeformat}}</td>
       </tr>
-      <tr title="Current bot dimensions. TODO(maruel): List dimensions at time of task reaping.">
-        <td>Bot dimensions</td>
+      <tr title="When the task was completed, if done.">
+        <td>Completed</td>
+        <td>{{task.completed_ts|datetimeformat}}</td>
+      </tr>
+      <tr title="Moment where the task was declared a failure by the server due to internal error or expiration.">
+        <td>Abandoned</td>
         <td>
-          {% if task.bot_dimensions %}
-            {{bot_view.render_dict(task.bot_dimensions)}}
-          {% else %}
-            {{bot_view.bot_dimensions(bot)}}
+          {{task.abandoned_ts|datetimeformat}}
+          {% if task.abandoned_ts %}
+            {% if task.started_ts %}
+              ({{(task.abandoned_ts-task.started_ts)|timedeltaformat}} since task started)
+            {% else %}
+              ({{(task.abandoned_ts-request.created_ts)|timedeltaformat}} since task request)
+            {% endif %}
           {% endif %}
         </td>
-      </tr>
-      <tr title="Current bot version. TODO(maruel): List bot version at time of task reaping.">
-        <td>Bot version</td>
-        <td>{{task.bot_version}}</td>
-      </tr>
-      <tr title="List of server versions that touched this task.">
-        <td>Server version</td>
-        <td>
-          {% for v in task.server_versions %}
-            {% if is_gae_admin %}
-              <a href="https://appengine.google.com/logs?&app_id={{full_appid}}&version_id={{v}}">
-                {{v}}
-              </a>
-            {% else %}
-              {{v}}
-            {% endif %}
-          {% endfor %}
-        </td>
-      </tr>
-      <tr class="{% if task.failure %}failed_test{% endif%}"
-        title="True if the task failed normally.">
-        <td>Failure</td>
-        <td>{{task.failure}}</td>
-      </tr>
-      <tr class="{% if task.internal_failure %}failed_test{% endif%}"
-        title="True if an internal Swarming error occured for this task. A BSOD is considered an internal failure.">
-        <td>Internal failure</td>
-        <td>{{task.internal_failure}}</td>
       </tr>
       <tr class="{% if task.exit_code %}failed_test{% endif%}"
         title="Process exit code for each commands executed on the bot.">
@@ -390,8 +349,82 @@
           {% endif %}
         </td>
       </tr>
-      <tr title="Cost of running this task, as reported by the bot, if
-      applicable.">
+      <tr title="This task was not executed, results from the task listed here were reused as-is.">
+        <td>
+          {% if task.deduped_from %}
+            <strong>Was deduped from</strong>
+          {% else %}
+            Was deduped from
+          {% endif %}
+        </td>
+        <td>
+          {% if task.deduped_from %}
+            <a href="/user/task/{{task.deduped_from}}">{{task.deduped_from}}</a>
+          {% else %}
+            &#8209;&#8209;
+          {% endif %}
+        </td>
+      </tr>
+      <tr class="{% if task.internal_failure %}failed_test{% endif%}"
+        title="True if an internal Swarming error occured for this task. A BSOD is considered an internal failure.">
+        <td>Internal failure</td>
+        <td>{{task.internal_failure}}</td>
+      </tr>
+      <tr title="A task may be tried 2 times. This list the try number starting at 1.">
+        <td>Try number</td>
+        <td>{{task.try_number}}</td>
+      </tr>
+      <tr title="Last time this bot sent an update about this task.">
+        <td>Last updated</td>
+        <td>{{(now-task.modified_ts)|timedeltaformat}} ago</td>
+      </tr>
+      <tr title="Current bot dimensions.">
+        <td>Bot dimensions</td>
+        <td>
+          {% if task.bot_dimensions %}
+            {{bot_view.render_dict(task.bot_dimensions)}}
+          {% else %}
+            {{bot_view.bot_dimensions(bot)}}
+          {% endif %}
+        </td>
+      </tr>
+      <tr title="Current bot version. TODO(maruel): List bot version at time of task reaping.">
+        <td>Bot version</td>
+        <td>{{task.bot_version}}</td>
+      </tr>
+      <tr title="List of server versions that touched this task.">
+        <td>Server version</td>
+        <td>
+          {% for v in task.server_versions %}
+            {% if is_gae_admin %}
+              <a href="https://appengine.google.com/logs?&app_id={{full_appid}}&version_id={{v}}">
+                {{v}}
+              </a>
+            {% else %}
+              {{v}}
+            {% endif %}
+          {% endfor %}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div title="Information about how fast we got the results.">
+  <h2>Performance</h2>
+  <table class="property_table">
+    <tbody>
+      <tr title="Time between when the request was done and the bot started the task.">
+        <td>Pending time</td>
+        <td>
+          {{bot_view.pending_star(task)}}{{task.pending_now(now)|timedeltaformat(include_ms=True)}}
+        </td>
+      </tr>
+      <tr title="Duration of the task, up to now if the task is still on-going.">
+        <td>Duration </td>
+        <td>{{task.duration_now(now)|timedeltaformat(include_ms=True)}}</td>
+      </tr>
+      <tr title="Cost of running this task, as reported by the bot, if applicable.">
         {% if task.cost_saved_usd %}
           <td>$ USD saved</td>
           <td>
@@ -408,18 +441,6 @@
           </td>
         {% endif %}
       </tr>
-      <tr title="A task may be tried 2 times. This list the try number starting at 1.">
-        <td>Try number</td>
-        <td>{{task.try_number}}</td>
-      </tr>
-      {% if task.deduped_from %}
-        <tr title="This task was not executed, results from the task listed here were reused as-is.">
-          <td><strong>Was deduped from</strong></td>
-          <td>
-            <a href="/user/task/{{task.deduped_from}}">{{task.deduped_from}}</a>
-          </td>
-        </tr>
-      {% endif %}
     </tbody>
   </table>
 </div>

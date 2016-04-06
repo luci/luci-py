@@ -4,6 +4,7 @@
 
 """Setups jinja2 environment to be reused by all components and services."""
 
+import datetime
 import os
 import urllib
 
@@ -52,19 +53,26 @@ def _natsorted(value):
   return natsort.natsorted(value or [])
 
 
-def _timedeltaformat(value):
-  """Formats a timedelta in a sane way. Ignores micro seconds, we're not that
-  fast.
+def _timedeltaformat(value, include_ms=False):
+  """Formats a timedelta in a sane way.
+
+  Ignores sub-second precision by default.
   """
   if not value:
     return NON_BREAKING_HYPHEN + NON_BREAKING_HYPHEN
-  hours, remainder = divmod(int(round(value.total_seconds())), 3600)
+  total_seconds = value.total_seconds()
+  suffix = ''
+  if include_ms:
+    ms = int(round(total_seconds-int(total_seconds), 3) * 1000)
+    if ms:
+      suffix = '.%03d' % ms
+  hours, remainder = divmod(int(round(total_seconds)), 3600)
   minutes, seconds = divmod(remainder, 60)
   if hours:
-    return '%d:%02d:%02d' % (hours, minutes, seconds)
+    return '%d:%02d:%02d%s' % (hours, minutes, seconds, suffix)
   # Always prefix minutes, even if 0, otherwise this looks weird. Revisit this
   # decision if bikeshedding is desired.
-  return '%d:%02d' % (minutes, seconds)
+  return '%d:%02d%s' % (minutes, seconds, suffix)
 
 
 def _utf8(s):
