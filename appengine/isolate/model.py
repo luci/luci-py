@@ -1,3 +1,4 @@
+# coding=utf-8
 # Copyright 2014 The LUCI Authors. All rights reserved.
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
@@ -202,19 +203,41 @@ def new_content_entry(key, **kwargs):
 def delete_entry_and_gs_entry(keys_to_delete):
   """Deletes synchronously a list of ContentEntry and their GS files.
 
-  It deletes the ContentEntry first, then the files in GS. The worst case is
-  that the GS files are left behind and will be reaped by a lost GS task
-  queue. The reverse is much worse, having a ContentEntry pointing to a
-  deleted GS entry will lead to lookup failures.
+  For each ContentEntry, it deletes the ContentEntry first, then the files in
+  GS. The worst case is that the GS files are left behind and will be reaped by
+  a lost GS task queue. The reverse is much worse, having a ContentEntry
+  pointing to a deleted GS entry will lead to lookup failures.
   """
-  # Always delete ContentEntry first.
-  ndb.delete_multi(keys_to_delete)
+  futures = {}
+  exc = None
+  bucket = config.settings().gs_bucket
   # Note that some content entries may NOT have corresponding GS files. That
   # happens for small entries stored inline in the datastore or memcache. Since
   # this function operates only on keys, it can't distinguish "large" entries
   # stored in GS from "small" ones stored inline. So instead it tries to delete
   # all corresponding GS files, silently skipping ones that are not there.
-  gcs.delete_files(
-      config.settings().gs_bucket,
-      (i.id() for i in keys_to_delete),
-      ignore_missing=True)
+  for key in keys_to_delete:
+    # Always delete ContentEntry first.
+    futures[key.delete_async()] = key.string_id()
+    # Note: this is worst case O(n²) but will scale better than that. The goal
+    # is to delete files as soon as possible.
+    for f in futures.keys():
+      try:
+        if f.done():
+          # This is synchronous.
+          gcs.delete_file(bucket, futures.pop(f), ignore_missing=True)
+      except Exception as exc:
+        break
+    if exc:
+      break
+
+  while futures:
+    try:
+      f = ndb.Future.wait_any(futures)
+      # This is synchronous.
+      gcs.delete_file(bucket, futures.pop(f), ignore_missing=True)
+    except Exception as exc:
+      continue
+
+  if exc:
+    raise exc  # pylint: disable=raising-bad-type

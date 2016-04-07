@@ -94,6 +94,44 @@ def list_files(bucket, subdir=None, batch_size=100):
       break
 
 
+def delete_file(bucket, filename, ignore_missing=False):
+  """Deletes one file stored in GS.
+
+  Arguments:
+    bucket: a bucket that contains the files.
+    filename: file path to delete (relative to a bucket root).
+    ignore_missing: if True, will silently skip missing files, otherwise will
+        print a warning to log.
+  """
+  retry_params = _make_retry_params()
+  max_tries = 4
+  for i in xrange(max_tries+1):
+    try:
+      cloudstorage.delete(
+          '/%s/%s' % (bucket, filename), retry_params=retry_params)
+      return
+    except cloudstorage.errors.NotFoundError:
+      if not ignore_missing:
+        logging.warning(
+            'Trying to delete a GS file that\'s not there: /%s/%s',
+            bucket, filename)
+      return
+    except cloudstorage.errors.TransientError as e:
+      if i == max_tries:
+        raise
+      time.sleep(1 + i * 2)
+      continue
+    except cloudstorage.errors.FatalError as e:
+      if 'But got status 429' in e.message:
+        if i == max_tries:
+          raise
+        # There's a bug in cloudstorage.check_status() that mishandles HTTP
+        # 429.
+        time.sleep(1 + i * 2)
+        continue
+      raise
+
+
 def delete_files(bucket, filenames, ignore_missing=False):
   """Deletes multiple files stored in GS.
 
@@ -109,16 +147,8 @@ def delete_files(bucket, filenames, ignore_missing=False):
   """
   # Sadly Google Cloud Storage client library doesn't support batch deletes,
   # so do it one by one.
-  retry_params = _make_retry_params()
   for filename in filenames:
-    try:
-      cloudstorage.delete(
-          '/%s/%s' % (bucket, filename), retry_params=retry_params)
-    except cloudstorage.errors.NotFoundError:
-      if not ignore_missing:
-        logging.warning(
-            'Trying to delete a GS file that\'s not there: /%s/%s',
-            bucket, filename)
+    delete_file(bucket, filename, ignore_missing)
   return []
 
 
@@ -212,7 +242,7 @@ def write_file(bucket, filename, content):
         '\'/%s/%s\', wrote %d bytes, failed at writting %d bytes: %s %s',
         bucket, filename, written, last_chunk_size, exc.__class__.__name__, exc)
     # Delete an incomplete file.
-    delete_files(bucket, [filename], ignore_missing=True)
+    delete_file(bucket, filename, ignore_missing=True)
     return False
 
 
