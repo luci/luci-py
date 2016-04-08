@@ -3,7 +3,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Utilities for reading GCE Backend configuration."""
+"""Unit tests for config.py."""
 
 import unittest
 
@@ -42,14 +42,14 @@ class UpdateConfigTest(test_case.TestCase):
       manager_config: What to return when managers.cfg is requested. Defaults
         to an empty config_pb2.InstanceGroupManagerConfig instance.
     """
-    def get_self_config(path, **kwargs):
+    def get(_, path, **kwargs):
       self.assertIn(path, ('templates.cfg', 'managers.cfg'))
       if path == 'templates.cfg':
         proto = template_config or config_pb2.InstanceTemplateConfig()
       elif path == 'managers.cfg':
         proto = manager_config or config_pb2.InstanceGroupManagerConfig()
       return revision or 'mock-revision', proto
-    self.mock(config.config, 'get_self_config', get_self_config)
+    self.mock(config.config, 'get', get)
 
   def test_empty_configs(self):
     """Ensures empty configs are successfully stored."""

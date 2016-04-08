@@ -21,6 +21,8 @@ from proto import config_pb2
 
 class Configuration(datastore_utils.config.GlobalConfig):
   """Configuration for this service."""
+  # Name of the config set in the config service.
+  config_set = ndb.StringProperty()
   # Text-formatted proto.config_pb2.InstanceTemplateConfig.
   template_config = ndb.TextProperty()
   # Text-formatted proto.config_pb2.InstanceGroupManagerConfig.
@@ -28,14 +30,31 @@ class Configuration(datastore_utils.config.GlobalConfig):
   # Revision of the configs.
   revision = ndb.StringProperty()
 
+  @classmethod
+  def load(cls):
+    """Loads text-formatted template and manager configs into message.Messages.
+
+    Returns:
+      A 2-tuple of (InstanceTemplateConfig, InstanceGroupManagerConfig).
+    """
+    configuration = cls.cached()
+    template_config = config_pb2.InstanceTemplateConfig()
+    protobuf.text_format.Merge(configuration.template_config, template_config)
+    manager_config = config_pb2.InstanceGroupManagerConfig()
+    protobuf.text_format.Merge(configuration.manager_config, manager_config)
+    return template_config, manager_config
+
 
 def update_config():
   """Updates the local configuration from the config service."""
-  revision, template_config = config.get_self_config(
+  config_set = Configuration.cached().config_set
+  revision, template_config = config.get(
+      config_set,
       'templates.cfg',
       dest_type=config_pb2.InstanceTemplateConfig,
   )
-  _, manager_config = config.get_self_config(
+  _, manager_config = config.get(
+      config_set,
       'managers.cfg',
       dest_type=config_pb2.InstanceGroupManagerConfig,
       revision=revision,
@@ -54,10 +73,6 @@ def update_config():
     return
 
   stored_config = Configuration.fetch()
-  if not stored_config:
-    logging.info('Bootstrapping empty configuration')
-    Configuration.cached()
-    stored_config = Configuration.fetch()
   if stored_config.revision != revision:
     logging.info('Updating configuration to %s', revision)
     stored_config.modify(
@@ -67,7 +82,6 @@ def update_config():
     )
 
 
-@config.validation.self_rule('templates.cfg', config_pb2.InstanceTemplateConfig)
 def validate_template_config(config, context):
   """Validates an InstanceTemplateConfig instance."""
   # We don't do any GCE-specific validation here. Just require globally
@@ -80,10 +94,6 @@ def validate_template_config(config, context):
       base_names.add(template.base_name)
 
 
-@config.validation.self_rule(
-    'managers.cfg',
-    config_pb2.InstanceGroupManagerConfig,
-)
 def validate_manager_config(config, context):
   """Validates an InstanceGroupManagerConfig instance."""
   # We don't do any GCE-specific validation here. Just require per-template
