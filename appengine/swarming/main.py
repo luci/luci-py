@@ -22,6 +22,7 @@ from components import ereporter2
 
 import handlers_endpoints
 import handlers_frontend
+import ts_mon_metrics
 from server import config
 
 
@@ -39,6 +40,7 @@ def create_application():
   gae_ts_mon.initialize(main.APP, is_enabled_fn=is_enabled_callback)
   # App that serves new endpoints API.
   api = endpoints.api_server([handlers_endpoints.swarming_api])
+  ts_mon_metrics.initialize()
   return frontend_app, api, main.APP
 
 

@@ -21,6 +21,7 @@ from google.appengine.runtime import apiproxy_errors
 from components import datastore_utils
 from components import pubsub
 from components import utils
+import ts_mon_metrics
 from server import config
 from server import stats
 from server import task_pack
@@ -693,6 +694,8 @@ def bot_update_task(
     _update_stats(run_result, bot_id, request, task_completed)
   if error:
     logging.error('Task %s %s', packed, error)
+  if task_completed:
+    ts_mon_metrics.update_jobs_completed_metrics(smry, bot_id)
   return True, task_completed
 
 
@@ -815,6 +818,8 @@ def cron_abort_expired_task_to_run(host):
       if _expire_task(to_run.key, request):
         # TODO(maruel): Know which try it is.
         killed.append(request)
+        ts_mon_metrics.tasks_expired.increment(
+            fields=ts_mon_metrics.extract_job_fields(request.tags))
         stats.add_task_entry(
             'task_request_expired',
             task_pack.request_key_to_result_summary_key(request.key),
