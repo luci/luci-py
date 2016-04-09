@@ -174,6 +174,14 @@ def setup_bot(skip_reboot):
 ### end of bot_config handler part.
 
 
+def get_min_free_space():
+  """Returns free disk space needed.
+
+  Add a "250 MiB slack space" for logs, temporary files and whatever other leak.
+  """
+  return int((os_utilities.get_min_free_space(THIS_FILE) + 250.) * 1024 * 1024)
+
+
 def generate_version():
   """Returns the bot's code version."""
   try:
@@ -293,6 +301,45 @@ def get_bot():
       on_shutdown_hook)
 
 
+def clean_isolated_cache(botobj):
+  """Asks run_isolated to clean its cache.
+
+  This may take a while but it ensures that in the case of a run_isolated run
+  failed and it temporarily used more space than min_free_disk, it can cleans up
+  the mess properly.
+
+  It will remove unexpected files, remove corrupted files, trim the cache size
+  based on the policies and update state.json.
+  """
+  bot_dir = botobj.base_dir
+  cmd = [
+    sys.executable, THIS_FILE, 'run_isolated',
+    '--clean',
+    '--log-file', os.path.join(bot_dir, 'logs', 'run_isolated.log'),
+    '--cache', os.path.join(bot_dir, 'cache'),
+    '--min-free-space', str(get_min_free_space()),
+  ]
+  logging.info('Running: %s', cmd)
+  try:
+    # Intentionally do not use a timeout, it can take a while to hash 50gb but
+    # better be safe than sorry.
+    proc = subprocess42.Popen(
+        cmd,
+        stdin=subprocess42.PIPE,
+        stdout=subprocess42.PIPE, stderr=subprocess42.STDOUT,
+        cwd=bot_dir,
+        detached=True,
+        close_fds=sys.platform != 'win32')
+    output, _ = proc.communicate(None)
+    logging.info('Result:\n%s', output)
+    if proc.returncode:
+      botobj.post_error(
+          'swarming_bot.zip failure during run_isolated --clean:\n%s' % output)
+  except OSError:
+    botobj.post_error(
+        'swarming_bot.zip internal failure during run_isolated --clean')
+
+
 def run_bot(arg_error):
   """Runs the bot until it reboots or self-update or a signal is received.
 
@@ -331,6 +378,8 @@ def run_bot(arg_error):
       logging.info('Early quit 2')
       return 0
 
+    clean_isolated_cache(botobj)
+
     call_hook(botobj, 'on_bot_startup')
 
     if quit_bit.is_set():
@@ -349,8 +398,6 @@ def run_bot(arg_error):
     except Exception as e:
       botobj.post_error('Failed to remove work: %s' % e)
 
-    # TODO(maruel): Run 'health check' on startup.
-    # https://code.google.com/p/swarming/issues/detail?id=112
     consecutive_sleeps = 0
     while not quit_bit.is_set():
       try:
@@ -491,9 +538,6 @@ def run_manifest(botobj, manifest, start):
     task_result_file = os.path.join(work_dir, 'task_runner_out.json')
     if os.path.exists(task_result_file):
       os.remove(task_result_file)
-    # Add a "250 MiB slack space" for logs, temporary files and whatever other
-    # leak.
-    free_mib = os_utilities.get_min_free_space(THIS_FILE) + 250.
     command = [
       sys.executable, THIS_FILE, 'task_runner',
       '--swarming-server', url,
@@ -502,7 +546,7 @@ def run_manifest(botobj, manifest, start):
       '--cost-usd-hour', str(botobj.state.get('cost_usd_hour') or 0.),
       # Include the time taken to poll the task in the cost.
       '--start', str(start),
-      '--min-free-space-mib', str(free_mib),
+      '--min-free-space', str(get_min_free_space()),
     ]
     logging.debug('Running command: %s', command)
     # Put the output file into the current working directory, which should be
@@ -614,7 +658,7 @@ def update_bot(botobj, version):
      [sys.executable, new_zip, 'is_fine'],
      stdout=subprocess42.PIPE, stderr=subprocess42.STDOUT)
   output, _ = proc.communicate()
-  if proc.poll():
+  if proc.returncode:
     botobj.post_error(
         'New bot code is bad: proc exit = %s. stdout:\n%s' %
         (proc.returncode, output))

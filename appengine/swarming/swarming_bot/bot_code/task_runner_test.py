@@ -162,7 +162,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     def run_command(
         swarming_server, task_details, work_dir, cost_usd_hour, start,
-        min_free_space_mib):
+        min_free_space):
       self.assertEqual(server, swarming_server)
       # Necessary for OSX.
       self.assertEqual(
@@ -170,7 +170,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
-      self.assertEqual(1, min_free_space_mib)
+      self.assertEqual(1, min_free_space)
       return {
         u'exit_code': 1,
         u'hard_timeout': False,
@@ -213,7 +213,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     def run_command(
         swarming_server, task_details, work_dir, cost_usd_hour, start,
-        min_free_space_mib):
+        min_free_space):
       self.assertEqual(server, swarming_server)
       # Necessary for OSX.
       self.assertEqual(
@@ -221,7 +221,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
-      self.assertEqual(1, min_free_space_mib)
+      self.assertEqual(1, min_free_space)
       return {
         u'exit_code': 0,
         u'hard_timeout': False,
@@ -308,7 +308,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       'sys.stdout.write(\'hi\\n\')')
     self.mock(
         task_runner, 'get_isolated_cmd',
-        lambda _work_dir, _details, isolated_result, min_free_space_mib:
+        lambda _work_dir, _details, isolated_result, min_free_space:
           [sys.executable, '-u', '-c', SCRIPT_ISOLATED, isolated_result])
     expected = {
       u'exit_code': 0,
@@ -489,13 +489,13 @@ class TestTaskRunner(TestTaskRunnerBase):
   def test_main(self):
     def load_and_run(
         manifest, swarming_server, cost_usd_hour, start, json_file,
-        min_free_space_mib):
+        min_free_space):
       self.assertEqual('foo', manifest)
       self.assertEqual('http://localhost', swarming_server.url)
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
       self.assertEqual('task_summary.json', json_file)
-      self.assertEqual(1., min_free_space_mib)
+      self.assertEqual(1, min_free_space)
 
     self.mock(task_runner, 'load_and_run', load_and_run)
     cmd = [
@@ -504,20 +504,20 @@ class TestTaskRunner(TestTaskRunnerBase):
       '--out-file', 'task_summary.json',
       '--cost-usd-hour', '3600',
       '--start', str(time.time()),
-      '--min-free-space-mib', '1.0',
+      '--min-free-space', '1',
     ]
     self.assertEqual(0, task_runner.main(cmd))
 
   def test_main_reboot(self):
     def load_and_run(
         manifest, swarming_server, cost_usd_hour, start, json_file,
-        min_free_space_mib):
+        min_free_space):
       self.assertEqual('foo', manifest)
       self.assertEqual('http://localhost', swarming_server.url)
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
       self.assertEqual('task_summary.json', json_file)
-      self.assertEqual(1., min_free_space_mib)
+      self.assertEqual(1, min_free_space)
 
     self.mock(task_runner, 'load_and_run', load_and_run)
     cmd = [
@@ -526,7 +526,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       '--out-file', 'task_summary.json',
       '--cost-usd-hour', '3600',
       '--start', str(time.time()),
-      '--min-free-space-mib', '1.0',
+      '--min-free-space', '1',
     ]
     self.assertEqual(0, task_runner.main(cmd))
 

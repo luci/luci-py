@@ -203,6 +203,26 @@ class TestBotMain(net_utils.TestCase):
 
     self.mock(bot_main, 'get_remote', lambda: self.server)
 
+    # Method should have "self" as first argument - pylint: disable=E0213
+    # pylint: disable=unused-argument
+    class Popen(object):
+      def __init__(
+          self2, cmd, detached, cwd, stdout, stderr, stdin, close_fds):
+        self2.returncode = None
+        expected = [sys.executable, bot_main.THIS_FILE, 'run_isolated']
+        self.assertEqual(expected, cmd[:len(expected)])
+        self.assertEqual(True, detached)
+        self.assertEqual(subprocess42.PIPE, stdout)
+        self.assertEqual(subprocess42.STDOUT, stderr)
+        self.assertEqual(subprocess42.PIPE, stdin)
+        self.assertEqual(sys.platform != 'win32', close_fds)
+
+      def communicate(self2, i):
+        self.assertEqual(None, i)
+        self2.returncode = 0
+        return '', None
+    self.mock(subprocess42, 'Popen', Popen)
+
     self.expected_requests(
         [
           (
@@ -383,8 +403,10 @@ class TestBotMain(net_utils.TestCase):
           os.path.join(self.root_dir, 'work', 'task_runner_in.json'),
           '--out-file', self2._out_file,
           '--cost-usd-hour', '3600.0', '--start', '100.0',
-          '--min-free-space-mib',
-          str(os_utilities.get_min_free_space(bot_main.THIS_FILE) + 250.),
+          '--min-free-space',
+          str(int(
+            (os_utilities.get_min_free_space(bot_main.THIS_FILE) + 250.) *
+            1024 * 1024)),
         ]
         self.assertEqual(expected, cmd)
         self.assertEqual(True, detached)
