@@ -448,7 +448,8 @@ class _TaskResultCommon(ndb.Model):
         raise datastore_errors.BadValueError(
             'duration and exit_code must be set with state %s' %
             State.to_string(self.state))
-    else:
+    elif self.state != State.BOT_DIED:
+      # With BOT_DIED, it can be either ways.
       if self.duration is not None:
         raise datastore_errors.BadValueError(
             'duration and exit_code must not be set with state %s' %
