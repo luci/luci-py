@@ -71,6 +71,10 @@ MAXIMUM_PRIORITY = 255
 _ONE_DAY_SECS = 24*60*60 + 10
 
 
+# Seven day in seconds. Add 10s to account for small jitter.
+_SEVEN_DAYS_SECS = 7*24*60*60 + 10
+
+
 # Minimum value for timeouts.
 _MIN_TIMEOUT_SECS = 1 if utils.is_local_dev_server() else 30
 
@@ -149,10 +153,10 @@ def _validate_expiration(prop, value):
   """Validates TaskRequest.expiration_ts."""
   now = utils.utcnow()
   offset = int(round((value - now).total_seconds()))
-  if not (_MIN_TIMEOUT_SECS <= offset <= _ONE_DAY_SECS):
+  if not (_MIN_TIMEOUT_SECS <= offset <= _SEVEN_DAYS_SECS):
     # pylint: disable=W0212
     raise datastore_errors.BadValueError(
-        '%s (%s, %ds from now) must effectively be between %ds and one day '
+        '%s (%s, %ds from now) must effectively be between %ds and 7 days '
         'from now (%s)' %
         (prop._name, value, offset, _MIN_TIMEOUT_SECS, now))
 

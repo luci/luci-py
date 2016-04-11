@@ -403,12 +403,27 @@ class TaskRequestApiTest(TestCase):
                   now+datetime.timedelta(
                       seconds=task_request._MIN_TIMEOUT_SECS-1)),
           True)
+    with self.assertRaises(datastore_errors.BadValueError):
+      task_request.make_request(
+          _gen_request(
+              created_ts=now,
+              expiration_ts=
+                  now+datetime.timedelta(
+                      seconds=task_request._SEVEN_DAYS_SECS+1)),
+          True)
     task_request.make_request(
         _gen_request(
               created_ts=now,
               expiration_ts=
                   now+datetime.timedelta(
                       seconds=task_request._MIN_TIMEOUT_SECS)),
+        True)
+    task_request.make_request(
+        _gen_request(
+              created_ts=now,
+              expiration_ts=
+                  now+datetime.timedelta(
+                      seconds=task_request._SEVEN_DAYS_SECS)),
         True)
 
     # Try with isolated/isolatedserver/namespace.
