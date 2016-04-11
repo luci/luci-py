@@ -100,6 +100,8 @@ class InstanceTemplateRevision(ndb.Model):
   machine_type = ndb.StringProperty(indexed=False)
   # Initial metadata to apply when creating instances from this template.
   metadata = ndb.JsonProperty()
+  # Project to create the instance template in.
+  project = ndb.StringProperty(indexed=False)
   # List of service accounts available to instances created from this template.
   service_accounts = ndb.LocalStructuredProperty(ServiceAccount, repeated=True)
   # Initial list of tags to apply when creating instances from this template.

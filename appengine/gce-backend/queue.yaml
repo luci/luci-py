@@ -1,13 +1,3 @@
 queue:
- - name: catalog-instance-group
-   rate: 1/s
- - name: check-metadata-operation
-   rate: 1/s
- - name: delete-instances
-   rate: 1/s
- - name: prepare-instances
-   rate: 1/s
- - name: resize-instance-group
-   rate: 1/s
- - name: update-instance-metadata
+ - name: create-instance-template
    rate: 1/s

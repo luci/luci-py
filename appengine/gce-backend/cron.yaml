@@ -1,4 +1,6 @@
 cron:
+- url: /internal/cron/create-instance-templates
+  schedule: every 1 minutes
 - url: /internal/cron/import-config
   schedule: every 1 minutes synchronized
 - url: /internal/cron/process-config

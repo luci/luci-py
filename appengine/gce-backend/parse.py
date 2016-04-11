@@ -119,6 +119,7 @@ def compute_template_checksum(template_cfg):
       'image-name': template_cfg.image_name,
       'machine-type': template_cfg.machine_type,
       'metadata': _load_dict(template_cfg.metadata),
+      'project': template_cfg.project,
       'service-accounts': [],
       'tags': sorted(template_cfg.tags),
   }
@@ -362,6 +363,7 @@ def ensure_entities_exist(template_cfg, manager_cfgs, max_concurrent=50):
         image_name=template_cfg.image_name,
         machine_type=template_cfg.machine_type,
         metadata=_load_dict(template_cfg.metadata),
+        project=template_cfg.project,
         service_accounts=_load_service_accounts(template_cfg.service_accounts),
         tags=list(template_cfg.tags),
     )

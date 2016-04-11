@@ -11,6 +11,7 @@ import webapp2
 from components import decorators
 
 import config
+import instance_templates
 import parse
 
 
@@ -36,8 +37,18 @@ class ConfigProcessHandler(webapp2.RequestHandler):
     )
 
 
+class InstanceTemplateCreationHandler(webapp2.RequestHandler):
+  """Worker for creating GCE Instance Templates."""
+
+  @decorators.require_cronjob
+  def get(self):
+    instance_templates.schedule_creation()
+
+
 def create_cron_app():
   return webapp2.WSGIApplication([
+      ('/internal/cron/create-instance-templates',
+       InstanceTemplateCreationHandler),
       ('/internal/cron/import-config', ConfigImportHandler),
       ('/internal/cron/process-config', ConfigProcessHandler),
   ])

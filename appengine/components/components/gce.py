@@ -218,6 +218,63 @@ class Project(object):
       if not page_token:
         break
 
+  def create_instance_template(
+      self, name, disk_size_gb, image, machine_type, network, tags=None,
+      metadata=None, service_accounts=None):
+    """
+    Args:
+      name: Name of the instance template.
+      disk_size_gb: Disk size in GiB for instances created from this template.
+      image: Image to use for instances created from this template.
+      machine_type: GCE machine type for instances created from this template.
+        e.g. n1-standard-8.
+      network: URL of the network instances created from this template should be
+        a part of.
+      tags: List of strings to attach as tags to instances created from this
+        template.
+      metadata: List of {'key': ..., 'value': ...} dicts to attach as metadata
+        to instances created from this template.
+      service_accounts: List of {'email': ..., 'scopes': [...]} dicts to make
+        available to instances created from this template.
+
+    Returns:
+      A compute#operation dict.
+    """
+    tags = tags or []
+    metadata = metadata or []
+    service_accounts = service_accounts or []
+    return self.call_api(
+        '/global/instanceTemplates',
+        method='POST',
+        payload={
+            'name': name,
+            'properties': {
+                'disks': [
+                  {
+                      'boot': True,
+                      'initializeParams': {
+                          'diskSizeGb': disk_size_gb,
+                          'sourceImage': image,
+                      },
+                  },
+                ],
+                'machineType': machine_type,
+                'metadata': {
+                    'items': metadata,
+                },
+                'networkInterfaces': [
+                  {
+                      'network': network,
+                  },
+                ],
+                'serviceAccounts': service_accounts,
+                'tags': {
+                    'items': tags,
+                },
+            },
+        },
+    )
+
   def create_instance_group_manager(self, name, template, size, zone):
     """Creates an instance group manager from the given template.
 
@@ -423,6 +480,34 @@ def is_valid_zone(zone):
 def is_valid_instance(instance):
   """True if string looks like a valid GCE instance name."""
   return re.match(r'^[a-z0-9\-_]+$', instance)
+
+
+def is_valid_image(image):
+  """True if string looks like a valid GCE image name."""
+  return re.match(r'^[a-z0-9\-_]+$', image)
+
+
+def is_valid_network(network):
+  """True if string looks like a valid GCE network name."""
+  return re.match(r'^[a-z0-9\-_]+$', network)
+
+
+def get_image_url(project_id, image):
+  """Returns full image URL given image name."""
+  assert is_valid_project_id(project_id), project_id
+  assert is_valid_image(image), image
+  return (
+      'https://www.googleapis.com/compute/v1/projects/%s/global/images/%s' % (
+          project_id, image))
+
+
+def get_network_url(project_id, network):
+  """Returns full network URL given network name."""
+  assert is_valid_project_id(project_id), project_id
+  assert is_valid_network(network), network
+  return (
+      'https://www.googleapis.com/compute/v1/projects/%s/global/networks/%s' % (
+          project_id, network))
 
 
 def get_zone_url(project_id, zone):
