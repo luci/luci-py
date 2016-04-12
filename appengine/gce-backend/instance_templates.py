@@ -15,16 +15,8 @@ from components import utils
 import models
 
 
-class Error(Exception):
-  pass
-
-
-class InstanceTemplateCreationFailed(Error):
-  pass
-
-
 def get_instance_template_key(base_name):
-  """Returns a key an InstanceTemplate.
+  """Returns a key for an InstanceTemplate.
 
   Args:
     base_name: Base name for the models.InstanceTemplate.
@@ -170,4 +162,6 @@ def schedule_creation():
             },
         ):
           logging.warning(
-              'Failed to enqueue task for InstanceTemplateRevision: %s', key)
+              'Failed to enqueue task for InstanceTemplateRevision: %s',
+              instance_template.active,
+          )

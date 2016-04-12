@@ -103,7 +103,7 @@ class CreateTest(test_case.TestCase):
     instance_templates.create(key)
     self.assertEqual(key.get().url, expected_url)
 
-  def test_doesnt_updates_when_creation_fails(self):
+  def test_doesnt_update_when_creation_fails(self):
     """Ensures an instance template is not updated when creation fails."""
     def create_instance_template(*args, **kwargs):
       raise net.Error('', 403, '')

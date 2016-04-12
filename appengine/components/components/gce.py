@@ -275,14 +275,17 @@ class Project(object):
         },
     )
 
-  def create_instance_group_manager(self, name, template, size, zone):
+  def create_instance_group_manager(
+      self, name, instance_template, size, zone, base_name=None):
     """Creates an instance group manager from the given template.
 
     Args:
      name: Name of the instance group.
-     template: A dict describing a GCE instance template.
+     instance_template: URL of the instance template to create instances from.
      size: Number of instances the group manager should maintain.
-     zone: Zone to create the instance group in.
+     zone: Zone to create the instance group in. e.g. us-central1-b.
+     base_name: Base name for instances created by tihs instance group manager.
+       Defaults to name.
 
     Returns:
       A compute#operation dict.
@@ -291,9 +294,8 @@ class Project(object):
         '/zones/%s/instanceGroupManagers' % zone,
         method='POST',
         payload={
-            'baseInstanceName': name,
-            'description': template['description'],
-            'instanceTemplate': template['selfLink'],
+            'baseInstanceName': base_name or name,
+            'instanceTemplate': instance_template,
             'name': name,
             'targetSize': size,
         },

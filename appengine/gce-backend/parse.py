@@ -18,7 +18,7 @@ import models
 
 
 def get_instance_template_key(template_cfg):
-  """Returns a key an InstanceTemplate for the given config.
+  """Returns a key for an InstanceTemplate for the given config.
 
   Args:
     template_cfg: proto.config_pb2.InstanceTemplateConfig.InstanceTemplate.

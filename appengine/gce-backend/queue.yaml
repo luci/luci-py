@@ -1,3 +1,5 @@
 queue:
+ - name: create-instance-group-manager
+   rate: 1/s
  - name: create-instance-template
    rate: 1/s
