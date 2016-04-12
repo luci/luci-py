@@ -101,6 +101,16 @@ class TaskPackApiTest(test_case.TestCase):
     with self.assertRaises(NotImplementedError):
       task_pack.result_summary_key_to_run_result_key(result_summary_key, 3)
 
+  def test_run_result_key_to_performance_stats_key(self):
+    request_key = task_pack.unpack_request_key('11')
+    result_summary_key = task_pack.request_key_to_result_summary_key(
+        request_key)
+    run_result_key = task_pack.result_summary_key_to_run_result_key(
+        result_summary_key, 1)
+    perf_stats_key = task_pack.run_result_key_to_performance_stats_key(
+        run_result_key)
+    self.assertEqual('PerformanceStats',perf_stats_key.kind())
+
   def test_run_result_key_to_result_summary_key(self):
     request_key = task_pack.unpack_request_key('11')
     result_summary_key = task_pack.request_key_to_result_summary_key(

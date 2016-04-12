@@ -424,6 +424,24 @@
         <td>Duration </td>
         <td>{{task.duration_now(now)|timedeltaformat(include_ms=True)}}</td>
       </tr>
+      {% if task.performance_stats_key %}
+        <tr title="Overhead from installing isolated inputs">
+          <td>Overhead isolated inputs</td>
+          <td>{{task.overhead_isolated_inputs|timedeltaformat(include_ms=True)}}</td>
+        </tr>
+        <tr title="Overhead from pushing isolated outputs">
+          <td>Overhead isolated outputs</td>
+          <td>{{task.overhead_isolated_outputs|timedeltaformat(include_ms=True)}}</td>
+        </tr>
+      {% endif %}
+      <tr title="Overhead from task_runner This is bot side overheads excluding isolated setup and teardown.">
+        <td>Overhead bot (miscellaneous)</td>
+        <td>{{task.overhead_task_runner|timedeltaformat(include_ms=True)}}</td>
+      </tr>
+      <tr title="Overhead from server<-> communication. Includes DB access.">
+        <td>Overhead server<->bot communication</td>
+        <td>{{task.overhead_server|timedeltaformat(include_ms=True)}}</td>
+      </tr>
       <tr title="Cost of running this task, as reported by the bot, if applicable.">
         {% if task.cost_saved_usd %}
           <td>$ USD saved</td>
@@ -441,6 +459,28 @@
           </td>
         {% endif %}
       </tr>
+      {% if task.performance_stats.is_valid %}
+        <tr title="Size of the bot cache before this task started. This cache permits to reduce the amount of items downloaded.">
+          <td>Initial bot cache</td>
+          <td>{{task.performance_stats.isolated_download.initial_size|filesizeformat}} total; {{task.performance_stats.isolated_download.initial_number_items}} items</td>
+        </tr>
+        <tr title="Items found in the cache so the bot didn't have to download these before starting the task. This means these items are used by multiple tasks.">
+          <td>Task inputs: Hot items</td>
+          <td>{{summarize_array(task.performance_stats.isolated_download.items_hot_array)}}</td>
+        </tr>
+        <tr title="Items missing from the cache, so they had to be downloaded before the task could start.">
+          <td>Task inputs: Cold items (i.e. downloaded)</td>
+          <td>{{summarize_array(task.performance_stats.isolated_download.items_cold_array)}}</td>
+        </tr>
+        <tr title="Task outputs (via ISOLATED_OUTDIR) that were already on the isolated server.">
+          <td>Task results: Hot items</td>
+          <td>{{summarize_array(task.performance_stats.isolated_upload.items_hot_array)}}</td>
+        </tr>
+        <tr title="Task outputs (via ISOLATED_OUTDIR) that were missing from the isolated server.">
+          <td>Task results: Cold items (i.e. uploaded)</td>
+          <td>{{summarize_array(task.performance_stats.isolated_upload.items_cold_array)}}</td>
+        </tr>
+      {% endif %}
     </tbody>
   </table>
 </div>

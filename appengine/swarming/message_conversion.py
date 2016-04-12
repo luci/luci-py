@@ -149,15 +149,27 @@ def new_task_request_from_rpc(msg, now):
       properties=properties)
 
 
-def task_result_to_rpc(entity):
+def task_result_to_rpc(entity, send_stats):
   """"Returns a swarming_rpcs.TaskResult from a task_result.TaskResultSummary or
   task_result.TaskRunResult.
   """
   outputs_ref = (
       _ndb_to_rpc(swarming_rpcs.FilesRef, entity.outputs_ref)
       if entity.outputs_ref else None)
+  performance_stats = None
+  if send_stats and entity.performance_stats.is_valid:
+      performance_stats = _ndb_to_rpc(
+          swarming_rpcs.PerformanceStats,
+          entity.performance_stats,
+          isolated_download=_ndb_to_rpc(
+              swarming_rpcs.IsolatedOperation,
+              entity.performance_stats.isolated_download),
+          isolated_upload=_ndb_to_rpc(
+              swarming_rpcs.IsolatedOperation,
+              entity.performance_stats.isolated_upload))
   kwargs = {
     'bot_dimensions': _string_list_pairs_from_dict(entity.bot_dimensions or {}),
+    'performance_stats': performance_stats,
     'outputs_ref': outputs_ref,
     'state': swarming_rpcs.StateField(entity.state),
   }

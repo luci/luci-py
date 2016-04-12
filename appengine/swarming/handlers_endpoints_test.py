@@ -4,6 +4,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import base64
 import datetime
 import json
 import logging
@@ -30,6 +31,7 @@ import swarming_rpcs
 from server import acl
 from server import bot_management
 from server import config
+from server import large
 from server import task_pack
 from server import task_request
 from server import task_result
@@ -336,6 +338,13 @@ class TasksApiTest(BaseTest):
     self.assertEqual(2, task_result.TaskResultSummary.query().count())
     self.assertEqual(1, task_result.TaskRunResult.query().count())
 
+    # Deduped task have no performance data associated.
+    request = swarming_rpcs.TasksRequest(
+        state=swarming_rpcs.TaskState.DEDUPED,
+        include_performance_stats=True)
+    actual = self.call_api('list', body=message_to_dict(request)).json
+    self.assertEqual(expected, actual)
+
     # Use the occasion to test 'count' and 'requests'.
     start = utils.datetime_to_timestamp(now) / 1000000. - 1
     end = utils.datetime_to_timestamp(now_30) / 1000000. + 1
@@ -475,25 +484,27 @@ class TasksApiTest(BaseTest):
   def test_list_ok(self):
     """Asserts that list requests all TaskResultSummaries."""
     first, second, str_now_120, start, end = self._gen_two_tasks()
+    first_no_perf = first.copy()
     # Basic request.
-    request = swarming_rpcs.TasksRequest(end=end, start=start)
-    self.assertEqual(
-        {u'now': str_now_120, u'items': [second, first]},
-        self.call_api('list', body=message_to_dict(request)).json)
+    request = swarming_rpcs.TasksRequest(
+        end=end, start=start, include_performance_stats=True)
+    expected = {u'now': str_now_120, u'items': [second, first]}
+    actual = self.call_api('list', body=message_to_dict(request)).json
+    self.assertEqual(expected, actual)
 
     # Sort by CREATED_TS.
     request = swarming_rpcs.TasksRequest(
         sort=swarming_rpcs.TaskSort.CREATED_TS)
+    actual = self.call_api('list', body=message_to_dict(request)).json
     self.assertEqual(
-        {u'now': str_now_120, u'items': [second, first]},
-        self.call_api('list', body=message_to_dict(request)).json)
+        {u'now': str_now_120, u'items': [second, first_no_perf]}, actual)
 
     # Sort by MODIFIED_TS.
     request = swarming_rpcs.TasksRequest(
         sort=swarming_rpcs.TaskSort.MODIFIED_TS)
+    actual = self.call_api('list', body=message_to_dict(request)).json
     self.assertEqual(
-        {u'now': str_now_120, u'items': [first, second]},
-        self.call_api('list', body=message_to_dict(request)).json)
+        {u'now': str_now_120, u'items': [first_no_perf, second]}, actual)
 
     # With two tags.
     request = swarming_rpcs.TasksRequest(
@@ -697,7 +708,7 @@ class TasksApiTest(BaseTest):
       u'internal_failure': False,
       u'modified_ts': str_now_120,
       u'name': u'first',
-      u'properties_hash': properties_hash,
+      u'properties_hash': unicode(properties_hash),
       u'server_versions': [u'v1a'],
       u'started_ts': str_now,
       u'state': u'COMPLETED',
@@ -861,6 +872,7 @@ class TaskApiTest(BaseTest):
     self.client_create_task_raw()
     self.set_as_bot()
     task_id = self.bot_run_task()
+    # First ask without perf metadata.
     response = self.call_api('result', body={'task_id': task_id})
     expected = {
       u'bot_dimensions': [
@@ -886,6 +898,11 @@ class TaskApiTest(BaseTest):
       u'try_number': u'1',
     }
     self.assertEqual(expected, response.json)
+    response = self.call_api(
+        'result',
+        body={'task_id': task_id, 'include_performance_stats': True})
+    actual = response.json
+    self.assertEqual(expected, actual)
 
   def test_stdout_ok(self):
     """Asserts that stdout reports a task's output."""
@@ -1109,9 +1126,10 @@ class BotApiTest(BaseTest):
     end = (
         utils.datetime_to_timestamp(now_1 + datetime.timedelta(seconds=0.5)) /
         1000000.)
-    request = swarming_rpcs.BotTasksRequest(end=end, start=start)
 
     self.set_as_privileged_user()
+    request = swarming_rpcs.BotTasksRequest(
+        end=end, start=start, include_performance_stats=True)
     body = message_to_dict(request)
     body['bot_id'] = 'bot1'
     response = self.call_api('tasks', body=body)
@@ -1143,7 +1161,8 @@ class BotApiTest(BaseTest):
       ],
       u'now': unicode(now_1.strftime(self.DATETIME_FORMAT)),
     }
-    self.assertEqual(expected, response.json)
+    actual = response.json
+    self.assertEqual(expected, actual)
 
   def test_events(self):
     # Run one task, push an event manually.

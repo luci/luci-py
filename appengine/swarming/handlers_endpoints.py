@@ -14,6 +14,7 @@ import endpoints
 import gae_ts_mon
 from protorpc import messages
 from protorpc import message_types
+from protorpc import protojson
 from protorpc import remote
 
 from components import auth
@@ -33,6 +34,16 @@ from server import task_scheduler
 
 
 ### Helper Methods
+
+
+# Add support for BooleanField in protorpc in endpoints GET requests.
+_old_decode_field = protojson.ProtoJson.decode_field
+def _decode_field(self, field, value):
+  if (isinstance(field, messages.BooleanField) and
+      isinstance(value, basestring)):
+    return value.lower() == 'true'
+  return _old_decode_field(self, field, value)
+protojson.ProtoJson.decode_field = _decode_field
 
 
 def get_result_key(task_id):
@@ -157,12 +168,17 @@ TaskId = endpoints.ResourceContainer(
     task_id=messages.StringField(1, required=True))
 
 
+TaskIdWithPerf = endpoints.ResourceContainer(
+    swarming_rpcs.PerformanceStatsRequest,
+    task_id=messages.StringField(1, required=True))
+
+
 @swarming_api.api_class(resource_name='task', path='task')
 class SwarmingTaskService(remote.Service):
   """Swarming's task-related API."""
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
-      TaskId, swarming_rpcs.TaskResult,
+      TaskIdWithPerf, swarming_rpcs.TaskResult,
       name='result',
       path='{task_id}/result',
       http_method='GET')
@@ -177,8 +193,12 @@ class SwarmingTaskService(remote.Service):
     A summary ID ends with '0', a run ID ends with '1' or '2'.
     """
     logging.info('%s', request)
+    key, _, = get_result_key(request.task_id)
+    result = key.get()
+    if not result:
+      raise endpoints.NotFoundException('%s not found.' % key.id())
     return message_conversion.task_result_to_rpc(
-        get_result_entity(request.task_id))
+        result, request.include_performance_stats)
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
@@ -257,7 +277,8 @@ class SwarmingTasksService(remote.Service):
 
     previous_result = None
     if result_summary.deduped_from:
-      previous_result = message_conversion.task_result_to_rpc(result_summary)
+      previous_result = message_conversion.task_result_to_rpc(
+          result_summary, False)
 
     return swarming_rpcs.TaskRequestMetadata(
         request=message_conversion.task_request_to_rpc(posted_request),
@@ -295,7 +316,11 @@ class SwarmingTasksService(remote.Service):
           'This combination is unsupported, sorry.')
     return swarming_rpcs.TaskList(
         cursor=cursor,
-        items=[message_conversion.task_result_to_rpc(i) for i in items],
+        items=[
+          message_conversion.task_result_to_rpc(
+              i, request.include_performance_stats)
+          for i in items
+        ],
         now=now)
 
   @gae_ts_mon.instrument_endpoint()
@@ -310,6 +335,9 @@ class SwarmingTasksService(remote.Service):
     possible.
     """
     logging.info('%s', request)
+    if request.include_performance_stats:
+      raise endpoints.BadRequestException(
+          'Can\'t set include_performance_stats for tasks/list')
     now = utils.utcnow()
     try:
       # Get the TaskResultSummary keys, then fetch the corresponding
@@ -539,7 +567,11 @@ class SwarmingBotService(remote.Service):
           'Inappropriate filter for bot.tasks: %s' % e)
     return swarming_rpcs.BotTasks(
         cursor=cursor,
-        items=[message_conversion.task_result_to_rpc(r) for r in items],
+        items=[
+          message_conversion.task_result_to_rpc(
+              r, request.include_performance_stats)
+          for r in items
+        ],
         now=now)
 
 

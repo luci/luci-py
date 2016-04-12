@@ -20,14 +20,16 @@ block depends on the previous ones:
       taking in account retries.
     - A TaskToRun is created to dispatch this request so it can be run on a
       bot. It is marked as ready to be triggered when created.
-  - Bots poll for work. Once a bot reaps a TaskToRun, it creates the
+  - Bots poll for work. Once a bot reaps a TaskToRun, the server creates the
     corresponding TaskRunResult for this run and updates it as required until
     completed. The TaskRunResult describes the result for this run on this
-    specific bot. If the TaskRequest is retried automatically due to the bot
-    dying, an automatic on task failure or another infrastructure related
-    failure, another TaskRunResult will be created when another bot reaps the
-    task again. TaskResultSummary is the summary of the last relevant
-    TaskRunResult.
+    specific bot.
+  - When the bot is done, a PerformanceStats entity is saved as a child entity
+    of the TaskRunResult.
+  - If the TaskRequest is retried automatically due to the bot dying, an
+    automatic on task failure or another infrastructure related failure, another
+    TaskRunResult will be created when another bot reaps the task again.
+    TaskResultSummary is the summary of the last relevant TaskRunResult.
 
 
 ## Overall schema graph of a task request with 2 tries
@@ -57,12 +59,12 @@ block depends on the previous ones:
                |TaskRunResult|  |TaskRunResult|                   task_result.py
                |id=1 <try #> |  |id=2         |
                +-------------+  +-------------+
-                ^                       ...
-                |
-       +-----------------+
-       |TaskOutput       |                                        task_result.py
-       |id=1 (not stored)|
-       +-----------------+
+                ^           ^           ...
+                |           |
+       +-----------------+ +----------------+
+       |TaskOutput       | |PerformanceStats|                     task_result.py
+       |id=1 (not stored)| |id=1            |
+       +-----------------+ +----------------+
                  ^      ^
                  |      |
     +---------------+  +---------------+
@@ -86,9 +88,12 @@ reduce DB contention.
   - TaskRunResult has monotonically increasing key id starting at 1.
   - TaskToRun has the key id as the first 32 bits of the SHA-1 of the
     TaskRequest.properties.dimensions.
+  - PerformanceStats has key id = 1.
+
 
 ### Notes
 
   - Each root entity is tagged as Root.
   - Each line is annotated with the file that define the entities on this line.
-  - Dotted line means a similar key relationship without actual entity hierarchy.
+  - Dotted line means a similar key relationship without actual entity
+    hierarchy.

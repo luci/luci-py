@@ -44,12 +44,12 @@ Graph of schema:
                |  +--------+ |  |  +--------+ |
                |id=1 <try #> |  |id=2         |
                +-------------+  +-------------+
-                ^                       ...
-                |
-       +-----------------+
-       |TaskOutput       |
-       |id=1 (not stored)|
-       +-----------------+
+                ^           ^           ...
+                |           |
+       +-----------------+ +----------------+
+       |TaskOutput       | |PerformanceStats|
+       |id=1 (not stored)| |id=1            |
+       +-----------------+ +----------------+
                  ^      ^
                  |      |
     +---------------+  +---------------+
@@ -69,6 +69,7 @@ from google.appengine.ext import ndb
 
 from components import datastore_utils
 from components import utils
+from server import large
 from server import task_pack
 from server import task_request
 
@@ -134,6 +135,17 @@ def _validate_task_summary_id(_prop, value):
     return None
   task_pack.unpack_result_summary_key(value)
   return value
+
+
+class LargeIntegerArray(ndb.BlobProperty):
+  """Contains a large integer array as compressed by large."""
+  def __init__(self, **kwargs):
+    # pylint: disable=E1002
+    super(LargeIntegerArray, self).__init__(
+        indexed=False, compressed=False, **kwargs)
+
+  def _do_validate(self, value):
+    return super(LargeIntegerArray, self)._do_validate(value) or None
 
 
 def _calculate_failure(result_common):
@@ -235,6 +247,63 @@ class TaskOutputChunk(ndb.Model):
     return self.key.integer_id() - 1
 
 
+class IsolatedOperation(ndb.Model):
+  """Statistics for an isolated operation.
+
+  This entity is not stored in the DB. It is only embedded in PerformanceStats.
+  """
+  # Duration of the isolation operation in seconds.
+  duration = ndb.FloatProperty(indexed=False)
+  # Initial cache size, if applicable.
+  initial_number_items = ndb.IntegerProperty(indexed=False)
+  initial_size = ndb.IntegerProperty(indexed=False)
+  # Items operated on.
+  # These buffers are compressed as deflate'd delta-encoded varints. See
+  # large.py for the code to handle these.
+  items_cold = LargeIntegerArray()
+  items_hot = LargeIntegerArray()
+
+  @property
+  def items_cold_array(self):
+    # It seems like it's impossible to add it as a method to LargeIntegerArray
+    # in a way that works in jinja2 templates.
+    return large.unpack(self.items_cold or '')
+
+  @property
+  def items_hot_array(self):
+    return large.unpack(self.items_hot or '')
+
+
+class PerformanceStats(ndb.Model):
+  """Statistics for an isolated task from the point of view of the bot.
+
+  Parent is TaskRunResult. Key id is 1.
+
+  Data from the client who uploaded the initial data is not tracked here, since
+  it is generally operating on data that is used across multiple different
+  tasks.
+
+  This entity only exist for isolated tasks. For "raw command task", this entity
+  is not stored, since there's nothing to note.
+  """
+  # Miscellaneous overhead in second, in addition to the overhead from
+  # isolated_download.duration and isolated_upload.duration.
+  bot_overhead = ndb.FloatProperty(indexed=False)
+  # Runtime dependencies download operation before the task.
+  isolated_download = ndb.LocalStructuredProperty(IsolatedOperation)
+  # Results uploading operation after the task.
+  isolated_upload = ndb.LocalStructuredProperty(IsolatedOperation)
+
+  @property
+  def is_valid(self):
+    return self.bot_overhead is not None
+
+  def _pre_put_hook(self):
+    if self.bot_overhead is None:
+      raise datastore_errors.BadValueError(
+          'PerformanceStats.bot_overhead is required')
+
+
 class _TaskResultCommon(ndb.Model):
   """Contains properties that is common to both TaskRunResult and
   TaskResultSummary.
@@ -277,8 +346,10 @@ class _TaskResultCommon(ndb.Model):
   # Process exit code.
   exit_code = ndb.IntegerProperty(indexed=False, name='exit_codes')
 
-  # Task duration in seconds as seen by the task_runner, including isolation
-  # overhead.
+  # Task duration in seconds as seen by the process who started the child task,
+  # excluding all overheads. If the task was not isolated, this is the value
+  # returned by task_runner. If the task was isolated, this is the value
+  # returned by run_isolated.
   duration = ndb.FloatProperty(indexed=False, name='durations')
 
   # Time when a bot reaped this task.
@@ -330,11 +401,11 @@ class _TaskResultCommon(ndb.Model):
     return self.completed_ts - self.started_ts
 
   def duration_now(self, now):
-    """Returns the timedelta the task spent executing as of now.
-
-    Similar to .duration_as_seen_by_server except that its return value is not
-    deterministic. Task abandoned is not applicable and return None.
+    """Returns the timedelta the task spent executing as of now, including
+    overhead while running but excluding overhead after running..
     """
+    if self.duration is not None:
+      return datetime.timedelta(seconds=self.duration)
     if not self.started_ts or self.abandoned_ts:
       return None
     return (self.completed_ts or now) - self.started_ts
@@ -359,6 +430,62 @@ class _TaskResultCommon(ndb.Model):
   def is_running(self):
     """Returns True if the task is still pending. Mostly for html view."""
     return self.state == State.RUNNING
+
+  @property
+  def performance_stats(self):
+    """Returns the PerformanceStats associated with this task results.
+
+    Returns an empty instance if none is available.
+    """
+    # Keeps a cache. It's still paying the full latency cost of a DB fetch.
+    if not hasattr(self, '_performance_stats_cache'):
+      key = None if self.deduped_from else self.performance_stats_key
+      # pylint: disable=attribute-defined-outside-init
+      self._performance_stats_cache = (
+          (key.get() if key else None) or
+          PerformanceStats(
+              isolated_download=IsolatedOperation(),
+              isolated_upload=IsolatedOperation()))
+    return self._performance_stats_cache
+
+  @property
+  def overhead_isolated_inputs(self):
+    """Returns the overhead from isolated setup in timedelta."""
+    perf = self.performance_stats
+    if perf.isolated_download.duration is not None:
+      return datetime.timedelta(seconds=perf.isolated_download.duration)
+
+  @property
+  def overhead_isolated_outputs(self):
+    """Returns the overhead from isolated results upload in timedelta."""
+    perf = self.performance_stats
+    if perf.isolated_upload.duration is not None:
+      return datetime.timedelta(seconds=perf.isolated_upload.duration)
+
+  @property
+  def overhead_server(self):
+    """Returns the overhead from server<->bot communication in timedelta."""
+    perf = self.performance_stats
+    if perf.bot_overhead is not None:
+      duration = self.duration + perf.bot_overhead
+      duration += (perf.isolated_download.duration or 0)
+      duration += (perf.isolated_upload.duration or 0)
+      out = (
+          self.duration_as_seen_by_server -
+          datetime.timedelta(seconds=duration))
+      if out.total_seconds() >= 0:
+        return out
+
+  @property
+  def overhead_task_runner(self):
+    """Returns the overhead from task_runner in timedelta, excluding isolated
+    overhead.
+
+    This is purely bookeeping type of overhead.
+    """
+    perf = self.performance_stats
+    if perf.bot_overhead is not None:
+      return datetime.timedelta(seconds=perf.bot_overhead)
 
   @property
   def pending(self):
@@ -455,6 +582,14 @@ class _TaskResultCommon(ndb.Model):
             'duration and exit_code must not be set with state %s' %
             State.to_string(self.state))
 
+    if self.deduped_from:
+      if self.state != State.COMPLETED:
+        raise datastore_errors.BadValueError(
+            'state must be COMPLETED on deduped task')
+      if self.failure:
+        raise datastore_errors.BadValueError(
+            'failure can\'t be True on deduped task')
+
     self.children_task_ids = sorted(
         set(self.children_task_ids), key=lambda x: int(x, 16))
 
@@ -506,6 +641,10 @@ class TaskRunResult(_TaskResultCommon):
     # is saved a lot. Maybe we'll need to rethink this, maybe TaskRunSummary
     # wasn't a great idea after all.
     return self.request_key.get().created_ts
+
+  @property
+  def performance_stats_key(self):
+    return task_pack.run_result_key_to_performance_stats_key(self.key)
 
   @property
   def name(self):
@@ -613,6 +752,12 @@ class TaskResultSummary(_TaskResultCommon):
     return sum(self.costs_usd) if self.costs_usd else 0.
 
   @property
+  def performance_stats_key(self):
+    key = self.run_result_key
+    if key:
+      return task_pack.run_result_key_to_performance_stats_key(key)
+
+  @property
   def task_id(self):
     return task_pack.pack_result_summary_key(self.key)
 
@@ -637,8 +782,9 @@ class TaskResultSummary(_TaskResultCommon):
     self.duration = None
     self.exit_code = None
     self.internal_failure = False
-    self.state = State.PENDING
+    self.outputs_ref = None
     self.started_ts = None
+    self.state = State.PENDING
 
   def set_from_run_result(self, run_result, request):
     """Copies all the relevant properties from a TaskRunResult into this

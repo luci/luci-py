@@ -78,6 +78,13 @@ def run_result_key_to_result_summary_key(run_result_key):
   return run_result_key.parent()
 
 
+def run_result_key_to_performance_stats_key(run_result_key):
+  """Returns the PerformanceStats ndb.Key for this TaskRunResult.key.
+  """
+  assert run_result_key.kind() == 'TaskRunResult', run_result_key
+  return ndb.Key('PerformanceStats', 1, parent=run_result_key)
+
+
 ### Packing and unpacking.
 
 

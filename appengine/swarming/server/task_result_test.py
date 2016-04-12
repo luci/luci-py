@@ -13,6 +13,7 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
+from google.appengine.api import datastore_errors
 from google.appengine.ext import deferred
 from google.appengine.ext import ndb
 
@@ -309,6 +310,14 @@ class TaskResultApiTest(TestCase):
     run_result.exit_code = 0
     run_result.state = task_result.State.COMPLETED
     run_result.modified_ts = utils.utcnow()
+    task_result.PerformanceStats(
+        key=task_pack.run_result_key_to_performance_stats_key(run_result.key),
+        bot_overhead=0.1,
+        isolated_download=task_result.IsolatedOperation(
+            duration=0.05, initial_number_items=10, initial_size=10000,
+            items_cold='foo', items_hot='bar'),
+        isolated_upload=task_result.IsolatedOperation(
+            duration=0.01, items_cold='foo')).put()
     ndb.transaction(lambda: ndb.put_multi(run_result.append_output('foo', 0)))
     result_summary.set_from_run_result(run_result, request)
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
@@ -345,12 +354,30 @@ class TaskResultApiTest(TestCase):
       'user': u'Jesus',
     }
     self.assertEqual(expected, result_summary.key.get().to_dict())
+    expected = {
+      'bot_overhead': 0.1,
+      'isolated_download': {
+        'duration': 0.05,
+        'initial_number_items': 10,
+        'initial_size': 10000,
+        'items_cold': 'foo',
+        'items_hot': 'bar',
+      },
+      'isolated_upload': {
+        'duration': 0.01,
+        'initial_number_items': None,
+        'initial_size': None,
+        'items_cold': 'foo',
+        'items_hot': None,
+      },
+    }
+    self.assertEqual(expected, result_summary.performance_stats.to_dict())
     self.assertEqual('foo', result_summary.get_output())
     self.assertEqual(
         datetime.timedelta(seconds=2),
         result_summary.duration_as_seen_by_server)
     self.assertEqual(
-        datetime.timedelta(seconds=2),
+        datetime.timedelta(seconds=0.1),
         result_summary.duration_now(utils.utcnow()))
     self.assertEqual(
         datetime.timedelta(seconds=4), result_summary.pending)
@@ -486,6 +513,10 @@ class TaskResultApiTest(TestCase):
     result_summary = result_summary.key.get()
     self.assertEqual(True, run_result.failure)
     self.assertEqual(True, result_summary.failure)
+
+  def test_performance_stats_pre_put_hook(self):
+    with self.assertRaises(datastore_errors.BadValueError):
+      task_result.PerformanceStats().put()
 
   def test_get_tasks(self):
     # Indirectly tested by both frontend and API.

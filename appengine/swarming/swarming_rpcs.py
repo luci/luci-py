@@ -128,7 +128,10 @@ class TaskRequest(messages.Message):
 
 
 class TasksRequest(messages.Message):
-  """Request to get some subset of available tasks."""
+  """Request to get some subset of available tasks.
+
+  This message can be used both to fetch the requests or the results.
+  """
   limit = messages.IntegerField(1, default=200)
   cursor = messages.StringField(2)
   # These should be DateTimeField but endpoints + protorpc have trouble encoding
@@ -141,6 +144,9 @@ class TasksRequest(messages.Message):
   state = messages.EnumField(TaskState, 5, default='ALL')
   tags = messages.StringField(6, repeated=True)
   sort = messages.EnumField(TaskSort, 7, default='CREATED_TS')
+  # Only applicable when fetching results. This incurs more DB operations and
+  # more data is returned so this is a bit slower.
+  include_performance_stats = messages.BooleanField(8, default=False)
 
 
 class TasksCountRequest(messages.Message):
@@ -156,7 +162,30 @@ class TasksCountRequest(messages.Message):
   tags = messages.StringField(6, repeated=True)
 
 
+class PerformanceStatsRequest(messages.Message):
+  # Only applicable when fetching results. This incurs more DB operations and
+  # more data is returned so this is a bit slower.
+  include_performance_stats = messages.BooleanField(1, default=False)
+
+
 ### Task-Related Responses
+
+
+class IsolatedOperation(messages.Message):
+  duration = messages.FloatField(1)
+  initial_number_items = messages.IntegerField(2)
+  initial_size = messages.IntegerField(3)
+  # These buffers are compressed as deflate'd delta-encoded varints. They are
+  # all the items for an isolated operation, which can scale in the 100k range.
+  # So can be large! See //client/utils/large.py for the code to handle these.
+  items_cold = messages.BytesField(4)
+  items_hot = messages.BytesField(5)
+
+
+class PerformanceStats(messages.Message):
+  bot_overhead = messages.FloatField(1)
+  isolated_download = messages.MessageField(IsolatedOperation, 2)
+  isolated_upload = messages.MessageField(IsolatedOperation, 3)
 
 
 class CancelResponse(messages.Message):
@@ -202,6 +231,8 @@ class TaskResult(messages.Message):
   tags = messages.StringField(24, repeated=True)
   # Only in TaskResultSummary.
   user = messages.StringField(25)
+  # Statistics about overhead for an isolated task. Only sent when requested.
+  performance_stats = messages.MessageField(PerformanceStats, 26)
 
 
 class TaskList(messages.Message):
@@ -276,6 +307,9 @@ class BotTasksRequest(messages.Message):
   # per day to have to bother with this, just enumerate all the tasks run on the
   # bot and filter on client side.
   sort = messages.EnumField(TaskSort, 7, default='CREATED_TS')
+  # Only applicable when fetching results. This incurs more DB operations and
+  # more data is returned so this is a bit slower.
+  include_performance_stats = messages.BooleanField(8, default=False)
 
 
 ### Bot-Related Responses
