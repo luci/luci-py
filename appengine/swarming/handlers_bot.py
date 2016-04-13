@@ -372,14 +372,16 @@ class BotPollHandler(_BotBaseHandler):
       self.abort(500, 'Deadline')
 
   def _cmd_run(self, request, run_result_key, bot_id):
-    # Only one of 'command' or 'inputs_ref' can be set.
+    cmd = None
+    if request.properties.commands:
+      cmd = request.properties.commands[0]
+    elif request.properties.command:
+      cmd = request.properties.command
     out = {
       'cmd': 'run',
       'manifest': {
         'bot_id': bot_id,
-        'command':
-            request.properties.commands[0]
-            if request.properties.commands else None,
+        'command': cmd,
         'dimensions': request.properties.dimensions,
         'env': request.properties.env,
         'extra_args': request.properties.extra_args,

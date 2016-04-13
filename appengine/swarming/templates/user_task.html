@@ -240,9 +240,13 @@
           <tr title="Actual command executed by the bot.">
             <td>Commands</td>
             <td>
-              {% for cmd in request.properties.commands %}
-              {{cmd|join(' ')}}<br>
-              {% endfor %}
+              {% if request.properties.commands %}
+                {{request.properties.commands[0]|join(' ')}}<br>
+              {% elif request.properties.command %}
+                {{request.properties.command|join(' ')}}<br>
+              {% else %}
+                &#8209;&#8209;
+              {% endif %}
             </td>
           </tr>
         {% endif %}

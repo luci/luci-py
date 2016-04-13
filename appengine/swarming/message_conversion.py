@@ -107,10 +107,15 @@ def task_request_to_rpc(entity):
     inputs_ref = _ndb_to_rpc(
         swarming_rpcs.FilesRef, entity.properties.inputs_ref)
   props = entity.properties
+  cmd = None
+  if props.commands:
+    cmd = props.commands[0]
+  elif props.command:
+    cmd = props.command
   properties = _ndb_to_rpc(
       swarming_rpcs.TaskProperties,
       props,
-      command=(props.commands or [[]])[0],
+      command=cmd,
       dimensions=_string_pairs_from_dict(props.dimensions),
       env=_string_pairs_from_dict(props.env),
       inputs_ref=inputs_ref)
@@ -134,7 +139,10 @@ def new_task_request_from_rpc(msg, now):
   properties = _rpc_to_ndb(
       task_request.TaskProperties,
       props,
-      commands=[props.command] if props.command else [],
+      # Passing command=None is supported at API level but not at NDB level.
+      command=props.command or [],
+      # Legacy, ignored.
+      commands=None,
       dimensions={i.key: i.value for i in props.dimensions},
       env={i.key: i.value for i in props.env},
       inputs_ref=inputs_ref)

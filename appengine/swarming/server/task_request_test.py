@@ -30,7 +30,7 @@ from server import task_request
 def _gen_request(properties=None, **kwargs):
   """Creates a TaskRequest."""
   props = {
-    'commands': [[u'command1', u'arg1']],
+    'command': [u'command1', u'arg1'],
     'dimensions': {
       u'OS': u'Windows-3.1.1',
       u'hostname': u'localhost',
@@ -136,11 +136,6 @@ class TaskRequestPrivateTest(TestCase):
     with self.assertRaises(ValueError):
       task_request._validate_task_run_id(Prop(), '1')
 
-  def test_validate_command(self):
-    task_request._validate_command(Prop(), [[u'a', u'b']])
-    with self.assertRaises(datastore_errors.BadValueError):
-      task_request._validate_command(Prop(), [[u'a', u'b'], [u'c']])
-
   def test_validate_isolated(self):
     task_request._validate_isolated(
         Prop(), '0123456789012345678901234567890123456789')
@@ -188,7 +183,7 @@ class TaskRequestApiTest(TestCase):
         properties=dict(idempotent=True), parent_task_id=parent_id)
     request = task_request.make_request(r, True)
     expected_properties = {
-      'commands': [[u'command1', u'arg1']],
+      'command': [u'command1', u'arg1'],
       'dimensions': {
         u'OS': u'Windows-3.1.1',
         u'hostname': u'localhost',
@@ -210,7 +205,7 @@ class TaskRequestApiTest(TestCase):
       'properties': expected_properties,
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
-      'properties_hash': 'cad6addd80cb545042968d267f7561c87323b45a',
+      'properties_hash': 'a406d174c469cb2ef6f56a49c3df0de0ae3db369',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'tags': [
@@ -233,7 +228,7 @@ class TaskRequestApiTest(TestCase):
     parent = task_request.make_request(
         _gen_request(
             properties={
-              'commands': None,
+              'command': [],
               'inputs_ref': {
                 'isolated': '0123456789012345678901234567890123456789',
                 'isolatedserver': 'http://localhost:1',
@@ -247,7 +242,7 @@ class TaskRequestApiTest(TestCase):
         _gen_request(properties={'idempotent':True}, parent_task_id=parent_id),
         True)
     expected_properties = {
-      'commands': [[u'command1', u'arg1']],
+      'command': [u'command1', u'arg1'],
       'dimensions': {
         u'OS': u'Windows-3.1.1',
         u'hostname': u'localhost',
@@ -269,7 +264,7 @@ class TaskRequestApiTest(TestCase):
       'properties': expected_properties,
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
-      'properties_hash': 'cad6addd80cb545042968d267f7561c87323b45a',
+      'properties_hash': 'a406d174c469cb2ef6f56a49c3df0de0ae3db369',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'tags': [
@@ -311,7 +306,7 @@ class TaskRequestApiTest(TestCase):
     # Other unit tests should use the calculated value.
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        'cad6addd80cb545042968d267f7561c87323b45a', as_dict['properties_hash'])
+        'a406d174c469cb2ef6f56a49c3df0de0ae3db369', as_dict['properties_hash'])
 
   def test_duped(self):
     # Two TestRequest with the same properties.
@@ -356,18 +351,17 @@ class TaskRequestApiTest(TestCase):
 
     with self.assertRaises(datastore_errors.BadValueError):
       task_request.make_request(
-          _gen_request(properties=dict(commands=[])), True)
-    with self.assertRaises(TypeError):
+          _gen_request(properties=dict(command=[])), True)
+    with self.assertRaises(datastore_errors.BadValueError):
       task_request.make_request(
-          _gen_request(properties=dict(commands={'a': 'b'})), True)
-    with self.assertRaises(TypeError):
+          _gen_request(properties=dict(command={'a': 'b'})), True)
+    with self.assertRaises(datastore_errors.BadValueError):
       task_request.make_request(
-          _gen_request(properties=dict(commands=['python'])), True)
-    with self.assertRaises(TypeError):
-      task_request.make_request(
-          _gen_request(properties=dict(commands=[['python']])), True)
+          _gen_request(properties=dict(command='python')), True)
     task_request.make_request(
-        _gen_request(properties=dict(commands=[[u'python']])), True)
+        _gen_request(properties=dict(command=['python'])), True)
+    task_request.make_request(
+        _gen_request(properties=dict(command=[u'python'])), True)
 
     with self.assertRaises(TypeError):
       task_request.make_request(
@@ -430,7 +424,8 @@ class TaskRequestApiTest(TestCase):
     with self.assertRaises(datastore_errors.BadValueError):
       task_request.make_request(
           _gen_request(properties=dict(
-              commands=['see', 'spot', 'run'], isolated='something.isolated')),
+              command=['see', 'spot', 'run'],
+              inputs_ref=task_request.FilesRef())),
           True)
 
   def test_make_request_clone(self):
@@ -446,7 +441,7 @@ class TaskRequestApiTest(TestCase):
     # - idempotent was reset to False.
     # - parent_task_id was reset to None.
     expected_properties = {
-      'commands': [[u'command1', u'arg1']],
+      'command': [u'command1', u'arg1'],
       'dimensions': {
         u'OS': u'Windows-3.1.1',
         u'hostname': u'localhost',

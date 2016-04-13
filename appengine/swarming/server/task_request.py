@@ -124,22 +124,6 @@ def _validate_namespace(prop, value):
     raise datastore_errors.BadValueError('malformed %s' % prop._name)
 
 
-def _validate_command(prop, value):
-  """Validates TaskProperties.command."""
-  # pylint: disable=W0212
-  if not value:
-    return []
-  if len(value) != 1:
-    raise datastore_errors.BadValueError(
-        '%s must be a list of one item' % prop._name)
-  def check(line):
-    return isinstance(line, list) and all(isinstance(j, unicode) for j in line)
-
-  if not all(check(i) for i in value):
-    raise TypeError(
-        '%s must be a list of commands, each a list of arguments' % prop._name)
-
-
 def _validate_dict_of_strings(prop, value):
   """Validates TaskProperties.dimensions and TaskProperties.env."""
   if not all(
@@ -232,20 +216,18 @@ class TaskProperties(ndb.Model):
   New-style TaskProperties supports invocation of run_isolated. When this
   behavior is desired, the member .inputs_ref must be suppled. .extra_args can
   be supplied to pass extraneous arguments.
-
-  TODO(maruel): Overhaul of this entity:
-  - Convert commands to command as a single list of strings.
-  Doing so will cause a new property hash on all entities, which will
-  temporarily break the task deduplication. This happens whenever an new member
-  is added anyway.
   """
   # Hashing algorithm used to hash TaskProperties to create its key.
   HASHING_ALGO = hashlib.sha1
 
-  # Commands to run. It is a list of lists. Each command is run one after the
-  # other. Encoded json.
+  # Commands to run. It is a list of 1 item, the command to run.
+  # TODO(maruel): Remove after 2016-06-01.
   commands = datastore_utils.DeterministicJsonProperty(
-      validator=_validate_command, json_type=list, indexed=False)
+      json_type=list, indexed=False)
+  # Command to run. This is only relevant when self._inputs_ref is None. This is
+  # what is called 'raw commands', in the sense that no inputs files are
+  # declared.
+  command = ndb.StringProperty(repeated=True, indexed=False)
 
   # File inputs of the task. Only inputs_ref or command&data can be specified.
   inputs_ref = ndb.LocalStructuredProperty(FilesRef)
@@ -290,6 +272,7 @@ class TaskProperties(ndb.Model):
     """If True, it is a terminate request."""
     return (
         not self.commands and
+        not self.command and
         self.dimensions.keys() == [u'id'] and
         not self.inputs_ref and
         not self.env and
@@ -313,12 +296,18 @@ class TaskProperties(ndb.Model):
       return None
     return self.HASHING_ALGO(utils.encode_to_json(self)).digest()
 
+  def to_dict(self):
+    out = super(TaskProperties, self).to_dict(exclude=['commands'])
+    out['command'] = self.commands[0] if self.commands else self.command
+    return out
+
   def _pre_put_hook(self):
     super(TaskProperties, self)._pre_put_hook()
+    if self.commands:
+        raise datastore_errors.BadValueError(
+            'commands is not supported anymore')
     if not self.is_terminate:
-      if len(self.commands or []) > 1:
-        raise datastore_errors.BadValueError('only one command is supported')
-      if bool(self.commands) == bool(self.inputs_ref):
+      if bool(self.command) == bool(self.inputs_ref):
         raise datastore_errors.BadValueError('use one of command or inputs_ref')
       if self.extra_args and not self.inputs_ref:
         raise datastore_errors.BadValueError('extra_args require inputs_ref')
@@ -397,8 +386,11 @@ class TaskRequest(ndb.Model):
 
   def to_dict(self):
     """Converts properties_hash to hex so it is json serializable."""
-    out = super(TaskRequest, self).to_dict(exclude=['pubsub_auth_token'])
+    # to_dict() doesn't recurse correctly into ndb.LocalStructuredProperty!
+    out = super(TaskRequest, self).to_dict(
+        exclude=['pubsub_auth_token', 'properties'])
     properties_hash = self.properties.properties_hash
+    out['properties'] = self.properties.to_dict()
     out['properties_hash'] = (
         properties_hash.encode('hex') if properties_hash else None)
     return out

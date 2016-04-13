@@ -31,7 +31,7 @@ from server import task_to_run
 def _gen_request(properties=None, **kwargs):
   """Creates a TaskRequest."""
   props = {
-    'commands': [[u'command1']],
+    'command': [u'command1'],
     'dimensions': {u'pool': u'default'},
     'env': {},
     'execution_timeout_secs': 24*60*60,
@@ -318,7 +318,7 @@ class TaskToRunApiTest(TestCase):
     now = utils.utcnow()
     data = _gen_request(
         properties={
-          'commands': [[u'command1', u'arg1']],
+          'command': [u'command1', u'arg1'],
           'dimensions': request_dimensions,
           'env': {u'foo': u'bar'},
           'execution_timeout_secs': 30,
@@ -332,7 +332,7 @@ class TaskToRunApiTest(TestCase):
     self.mock(random, 'getrandbits', lambda _: 0x23)
     data = _gen_request(
         properties={
-          'commands': [[u'command1', u'arg1']],
+          'command': [u'command1', u'arg1'],
           'dimensions': request_dimensions,
           'env': {u'foo': u'bar'},
           'execution_timeout_secs': 30,
