@@ -406,11 +406,14 @@ class TaskRequest(ndb.Model):
     elif self.priority == 0:
       raise datastore_errors.BadValueError(
           'priority 0 can only be used for terminate request')
-    self.tags.append('priority:%s' % self.priority)
-    self.tags.append('user:%s' % self.user)
-    for key, value in self.properties.dimensions.iteritems():
-      self.tags.append('%s:%s' % (key, value))
-    self.tags = sorted(set(self.tags))
+
+    if not self.properties.dimensions:
+      raise datastore_errors.BadValueError('dimensions must be specified')
+    dim_keys = self.properties.dimensions.keys()
+    if 'pool' not in dim_keys and 'id' not in dim_keys:
+      raise datastore_errors.BadValueError(
+          'At least one of \'id\' or \'pool\' must be used as dimensions')
+
     if (self.pubsub_topic and
         not pubsub.validate_full_name(self.pubsub_topic, 'topics')):
       raise datastore_errors.BadValueError(
@@ -421,6 +424,12 @@ class TaskRequest(ndb.Model):
     if self.pubsub_userdata and not self.pubsub_topic:
       raise datastore_errors.BadValueError(
           'pubsub_userdata requires pubsub_topic')
+
+    self.tags.append('priority:%s' % self.priority)
+    self.tags.append('user:%s' % self.user)
+    for key, value in self.properties.dimensions.iteritems():
+      self.tags.append('%s:%s' % (key, value))
+    self.tags = sorted(set(self.tags))
 
 
 def _new_request_key():

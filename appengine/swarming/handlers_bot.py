@@ -158,8 +158,8 @@ class _BotBaseHandler(auth.ApiHandler):
     request = self.parse_body()
     version = request.get('version', None)
 
-    dimensions = request.get('dimensions', {})
-    state = request.get('state', {})
+    dimensions = request.get('dimensions') or {}
+    state = request.get('state') or {}
     bot_id = None
     if dimensions.get('id'):
       dimension_id = dimensions['id']
@@ -190,6 +190,9 @@ class _BotBaseHandler(auth.ApiHandler):
 
       if not bot_id:
         quarantined_msg = 'Missing bot id'
+        break
+      if not dimensions.get('pool'):
+        quarantined_msg = 'Missing \'pool\' dimension'
         break
 
       if not all(
