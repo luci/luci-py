@@ -583,8 +583,7 @@ def bot_update_task(
   - A command is updated after it had an exit code assigned to.
 
   Returns:
-    tuple(bool, bool); first is if the update succeeded, second is if the task
-    completed.
+    TaskRunResult.state or None in case of failure.
   """
   assert output_chunk_start is None or isinstance(output_chunk_start, int)
   assert output is None or isinstance(output, str)
@@ -616,22 +615,27 @@ def bot_update_task(
   now = utils.utcnow()
 
   def run():
+    """Returns tuple(TaskRunResult, bool(completed), str(error)).
+
+    Any error is returned as a string to be passed to logging.error() instead of
+    logging inside the transaction for performance.
+    """
     # 2 consecutive GETs, one PUT.
     run_result_future = run_result_key.get_async()
     result_summary_future = result_summary_key.get_async()
     run_result = run_result_future.get_result()
     if not run_result:
       result_summary_future.wait()
-      return None, None, False, 'is missing'
+      return None, None, 'is missing'
 
     if run_result.bot_id != bot_id:
       result_summary_future.wait()
-      return None, None, False, (
+      return None, None, (
           'expected bot (%s) but had update from bot %s' % (
           run_result.bot_id, bot_id))
 
     if not run_result.started_ts:
-      return None, None, False, 'TaskRunResult is broken; %s' % (
+      return None, None, 'TaskRunResult is broken; %s' % (
           run_result.to_dict())
 
     # Assumptions:
@@ -643,16 +647,15 @@ def bot_update_task(
         # but it still returned HTTP 500.
         if run_result.exit_code != exit_code:
           result_summary_future.wait()
-          return None, None, False, 'got 2 different exit_code; %s then %s' % (
+          return None, None, 'got 2 different exit_code; %s then %s' % (
               run_result.exit_code, exit_code)
         if run_result.duration != duration:
           result_summary_future.wait()
-          return None, None, False, 'got 2 different durations; %s then %s' % (
+          return None, None, 'got 2 different durations; %s then %s' % (
               run_result.duration, duration)
       else:
         run_result.duration = duration
         run_result.exit_code = exit_code
-    task_completed = run_result.exit_code is not None
 
     if outputs_ref:
       run_result.outputs_ref = outputs_ref
@@ -661,7 +664,7 @@ def bot_update_task(
       if hard_timeout or io_timeout:
         run_result.state = task_result.State.TIMED_OUT
         run_result.completed_ts = now
-      elif task_completed:
+      elif run_result.exit_code is not None:
         run_result.state = task_result.State.COMPLETED
         run_result.completed_ts = now
 
@@ -692,25 +695,26 @@ def bot_update_task(
     to_put.append(result_summary)
     ndb.put_multi(to_put)
 
-    return result_summary, run_result, task_completed, None
+    return result_summary, run_result, None
 
   try:
-    smry, run_result, task_completed, error = datastore_utils.transaction(run)
+    smry, run_result, error = datastore_utils.transaction(run)
   except datastore_utils.CommitError as e:
     logging.info('Got commit error: %s', e)
     # It is important that the caller correctly surface this error.
-    return False, False
-
-  if run_result:
-    # Caller must retry if PubSub enqueue fails.
-    if not _maybe_pubsub_notify_now(smry, request):
-      return False, False
-    _update_stats(run_result, bot_id, request, task_completed)
+    return None
+  assert bool(error) != bool(run_result), (error, run_result)
   if error:
     logging.error('Task %s %s', packed, error)
+    return None
+  # Caller must retry if PubSub enqueue fails.
+  task_completed = run_result.state != task_result.State.RUNNING
+  if not _maybe_pubsub_notify_now(smry, request):
+    return None
+  _update_stats(run_result, bot_id, request, task_completed)
   if task_completed:
     ts_mon_metrics.update_jobs_completed_metrics(smry, bot_id)
-  return True, task_completed
+  return run_result.state
 
 
 def bot_kill_task(run_result_key, bot_id):

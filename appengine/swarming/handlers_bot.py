@@ -541,7 +541,7 @@ class BotTaskUpdateHandler(auth.ApiHandler):
       outputs_ref = task_request.FilesRef(**outputs_ref)
 
     try:
-      success, completed = task_scheduler.bot_update_task(
+      state = task_scheduler.bot_update_task(
           run_result_key=run_result_key,
           bot_id=bot_id,
           output=output,
@@ -553,11 +553,15 @@ class BotTaskUpdateHandler(auth.ApiHandler):
           cost_usd=cost_usd,
           outputs_ref=outputs_ref,
           performance_stats=performance_stats)
-      if not success:
+      if not state:
         logging.info('Failed to update, please retry')
         self.abort_with_error(500, error='Failed to update, please retry')
 
-      action = 'task_completed' if completed else 'task_update'
+      if state in (task_result.State.COMPLETED, task_result.State.TIMED_OUT):
+        action = 'task_completed'
+      else:
+        assert state == task_result.State.RUNNING, state
+        action = 'task_update'
       bot_management.bot_event(
           event_type=action, bot_id=bot_id,
           external_ip=self.request.remote_addr, dimensions=None, state=None,
