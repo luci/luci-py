@@ -507,12 +507,13 @@ class _TaskResultCommon(ndb.Model):
     return (self.started_ts or now) - self.created_ts
 
   @property
-  def priority(self):
-    # TODO(maruel): This property is not efficient at lookup time so it is
-    # probably better to duplicate the data. The trade off is that TaskRunResult
-    # is saved a lot. Maybe we'll need to rethink this, maybe TaskRunSummary
-    # wasn't a great idea after all.
-    return self.request_key.get().priority
+  def request(self):
+    """Returns the TaskRequest that is related to this entity."""
+    # Keeps a cache. It's still paying the full latency cost of a DB fetch.
+    if not hasattr(self, '_request_cache'):
+      # pylint: disable=attribute-defined-outside-init
+      self._request_cache = self.request_key.get()
+    return self._request_cache
 
   @property
   def run_result_key(self):
@@ -631,16 +632,8 @@ class TaskRunResult(_TaskResultCommon):
   deduped_from = None
 
   @property
-  def task_id(self):
-    return task_pack.pack_run_result_key(self.key)
-
-  @property
   def created_ts(self):
-    # TODO(maruel): This property is not efficient at lookup time so it is
-    # probably better to duplicate the data. The trade off is that TaskRunResult
-    # is saved a lot. Maybe we'll need to rethink this, maybe TaskRunSummary
-    # wasn't a great idea after all.
-    return self.request_key.get().created_ts
+    return self.request.created_ts
 
   @property
   def performance_stats_key(self):
@@ -648,11 +641,7 @@ class TaskRunResult(_TaskResultCommon):
 
   @property
   def name(self):
-    # TODO(maruel): This property is not efficient at lookup time so it is
-    # probably better to duplicate the data. The trade off is that TaskRunResult
-    # is saved a lot. Maybe we'll need to rethink this, maybe TaskRunSummary
-    # wasn't a great idea after all.
-    return self.request_key.get().name
+    return self.request.name
 
   @property
   def request_key(self):
@@ -667,6 +656,10 @@ class TaskRunResult(_TaskResultCommon):
   @property
   def run_result_key(self):
     return self.key
+
+  @property
+  def task_id(self):
+    return task_pack.pack_run_result_key(self.key)
 
   @property
   def try_number(self):
@@ -758,10 +751,6 @@ class TaskResultSummary(_TaskResultCommon):
       return task_pack.run_result_key_to_performance_stats_key(key)
 
   @property
-  def task_id(self):
-    return task_pack.pack_result_summary_key(self.key)
-
-  @property
   def request_key(self):
     """Returns the TaskRequest ndb.Key that is related to this entity."""
     return task_pack.result_summary_key_to_request_key(self.key)
@@ -776,6 +765,10 @@ class TaskResultSummary(_TaskResultCommon):
       return None
     return task_pack.result_summary_key_to_run_result_key(
         self.key, self.try_number)
+
+  @property
+  def task_id(self):
+    return task_pack.pack_result_summary_key(self.key)
 
   def reset_to_pending(self):
     """Resets this entity to pending state."""

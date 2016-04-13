@@ -169,7 +169,7 @@ class TaskResultApiTest(TestCase):
       'user': u'Jesus',
     }
     self.assertEqual(expected, actual.to_dict())
-    self.assertEqual(50, actual.priority)
+    self.assertEqual(50, actual.request.priority)
     self.assertEqual(True, actual.can_be_canceled)
     actual.state = task_result.State.RUNNING
     self.assertEqual(False, actual.can_be_canceled)
@@ -208,7 +208,7 @@ class TaskResultApiTest(TestCase):
       'try_number': 1,
     }
     self.assertEqual(expected, actual.to_dict())
-    self.assertEqual(50, actual.priority)
+    self.assertEqual(50, actual.request.priority)
     self.assertEqual(False, actual.can_be_canceled)
 
   def test_integration(self):

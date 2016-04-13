@@ -276,7 +276,7 @@
             {% endif %}
           </td>
           <td>{{bot_view.bot_link(task.bot_id, is_privileged_user)}}</td>
-          <td>{{task.priority}}</td>
+          <td>{{task.request.priority}}</td>
         </tr>
       {% endfor %}
       {% if show_footer %}
