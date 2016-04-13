@@ -139,7 +139,7 @@ def clean_up_bots():
       keys = [bot_management.get_info_key(bot_id)
               for bot_id in bot_ids[:MAX_IN_FLIGHT - num_futures]]
       bot_ids = bot_ids[MAX_IN_FLIGHT - num_futures:]
-      futures.extend(ndb.transaction_async(key.delete) for key in keys)
+      futures.extend(ndb.delete_multi_async(keys))
 
     ndb.Future.wait_any(futures)
     futures = [future for future in futures if not future.done()]
@@ -151,7 +151,13 @@ def clean_up_bots():
   # just process them sequentially.
   # TODO(smut): Parallelize this.
   for machine_key, hostnames in deleted.iteritems():
-    logging.info('Deleted bots: %s', ', '.join(sorted(hostnames)))
+    successfully_deleted = []
+    for hostname in hostnames:
+      if bot_management.get_info_key(hostname).get():
+        logging.error('Failed to delete BotInfo: %s', hostname)
+      else:
+        successfully_deleted.append(hostname)
+    logging.info('Deleted bots: %s', ', '.join(sorted(successfully_deleted)))
     _clear_bots_pending_deletion(machine_key, hostnames)
 
 
@@ -165,7 +171,7 @@ def _clear_bots_pending_deletion(machine_type_key, hostnames):
   """
   machine_type = machine_type_key.get()
   if not machine_type:
-    logging.warning('MachineType no longer exists: %s', machine_type_key.id())
+    logging.error('MachineType no longer exists: %s', machine_type_key.id())
     return
 
   num_pending_deletion = len(machine_type.pending_deletion)
