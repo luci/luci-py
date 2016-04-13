@@ -282,7 +282,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     }
     self.assertEqual(expected, response)
 
-  def test_poll_task_isolated(self):
+  def test_complete_task_isolated(self):
     # Successfully poll a task.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
@@ -320,6 +320,41 @@ class BotApiTest(test_env_handlers.AppTestBase):
       },
     }
     self.assertEqual(expected, response)
+
+    # Complete the isolated task.
+    params = {
+      'cost_usd': 0.1,
+      'duration': 3.,
+      'bot_overhead': 0.1,
+      'exit_code': 0,
+      'id': 'bot1',
+      'isolated_stats': {
+        'download': {
+          'duration': 0.1,
+          'initial_number_items': 10,
+          'initial_size': 1000,
+          'items_cold': '',
+          'items_hot': '',
+        },
+        'upload': {
+          'duration': 0.1,
+          'items_cold': '',
+          'items_hot': '',
+        },
+      },
+      'output': base64.b64encode('Ahahah'),
+      'output_chunk_start': 0,
+      'outputs_ref': {
+        u'isolated': u'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        u'isolatedserver': u'http://localhost:1',
+        u'namespace': u'default-gzip',
+      },
+      'task_id': task_id,
+    }
+    response = self.post_with_token(
+        '/swarming/api/v1/bot/task_update', params, token)
+    self.assertEqual({u'ok': True}, response)
+
     response = self.client_get_results(task_id)
     expected = {
       u'bot_dimensions': [
@@ -329,15 +364,23 @@ class BotApiTest(test_env_handlers.AppTestBase):
       ],
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
-      u'costs_usd': [0.],
+      u'completed_ts': str_now,
+      u'costs_usd': [0.1],
       u'created_ts': str_now,
+      u'duration': 3.,
+      u'exit_code': u'0',
       u'failure': False,
       u'internal_failure': False,
       u'modified_ts': str_now,
       u'name': u'hi',
+      u'outputs_ref': {
+        u'isolated': u'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        u'isolatedserver': u'http://localhost:1',
+        u'namespace': u'default-gzip',
+      },
       u'server_versions': [u'v1a'],
       u'started_ts': str_now,
-      u'state': u'RUNNING',
+      u'state': u'COMPLETED',
       u'task_id': u'5cee488008811',
       u'try_number': u'1',
     }
@@ -560,7 +603,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, actual)
 
   def test_task_complete(self):
-    # Runs a task with 2 commands up to completion.
+    # Runs a task up to completion.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
@@ -603,7 +646,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'task_id': u'5cee488008811',
         u'try_number': u'1',
       }
-      out.update(**kwargs)
+      out.update((unicode(k), v) for k, v in kwargs.iteritems())
       return out
 
     def _cycle(params, expected):

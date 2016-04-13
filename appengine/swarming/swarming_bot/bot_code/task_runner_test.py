@@ -24,6 +24,7 @@ import net_utils
 from api import os_utilities
 from depot_tools import fix_encoding
 from utils import file_path
+from utils import large
 from utils import logging_utils
 from utils import subprocess42
 from utils import tools
@@ -597,7 +598,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
             'data': {
               'exit_code': exit_code,
               'hard_timeout': hard_timeout,
-              'id': u'localhost',
+              'id': 'localhost',
               'io_timeout': io_timeout,
               'output': output,
               'output_chunk_start': 0,
@@ -756,7 +757,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     }
     self.assertEqual(expected, self._run_command(task_details))
 
-  def test_grand_children(self):
+  def test_isolated_grand_children(self):
     """Runs a normal test involving 3 level deep subprocesses."""
     # Uses load_and_run()
     files = {
@@ -769,6 +770,69 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
             '[sys.executable, \'-u\', \'grand_children.py\']))\n'),
       'grand_children.py': 'print \'hi\'',
     }
+
+    def check_final(kwargs):
+      # Warning: this modifies input arguments.
+      self.assertLess(0, kwargs['data'].pop('cost_usd'))
+      self.assertLess(0, kwargs['data'].pop('bot_overhead'))
+      self.assertLess(0, kwargs['data'].pop('duration'))
+      self.assertLess(
+          0., kwargs['data']['isolated_stats']['download'].pop('duration'))
+      # duration==0 can happen on Windows when the clock is in the default
+      # resolution, 15.6ms.
+      self.assertLessEqual(
+          0., kwargs['data']['isolated_stats']['upload'].pop('duration'))
+      # Makes the diffing easier.
+      kwargs['data']['output'] = base64.b64decode(kwargs['data']['output'])
+      for k in ('download', 'upload'):
+        for j in ('items_cold', 'items_hot'):
+          kwargs['data']['isolated_stats'][k][j] = large.unpack(
+              base64.b64decode(kwargs['data']['isolated_stats'][k][j]))
+      self.assertEqual(
+          {
+            'data': {
+              'exit_code': 0,
+              'hard_timeout': False,
+              'id': u'localhost',
+              'io_timeout': False,
+              'isolated_stats': {
+                u'download': {
+                  u'initial_number_items': 0,
+                  u'initial_size': 0,
+                  u'items_cold': [10, 86, 94, 276],
+                  u'items_hot': [],
+                },
+                u'upload': {
+                  u'items_cold': [],
+                  u'items_hot': [],
+                },
+              },
+              'output': 'hi\n',
+              'output_chunk_start': 0,
+              'task_id': 23,
+            },
+            'headers': {'X-XSRF-Token': 'token'},
+          },
+          kwargs)
+    requests = [
+      (
+        'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
+        {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
+        {'xsrf_token': 'token'},
+      ),
+      (
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
+        self.get_check_first(0.),
+        {},
+      ),
+      (
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
+        check_final,
+        {},
+      ),
+    ]
+    self.expected_requests(requests)
+
     server = isolateserver_mock.MockIsolateServer()
     try:
       isolated = json.dumps({
@@ -781,7 +845,6 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
         },
       })
       isolated_digest = server.add_content_compressed('default-gzip', isolated)
-      self.expected_requests(self.gen_requests(exit_code=0, output='hi\n'))
       manifest = get_manifest(
           inputs_ref={
             'isolated': isolated_digest,
@@ -799,14 +862,15 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     finally:
       server.close()
 
-  def test_io_signal_no_grace_grand_children(self):
+  def test_isolated_io_signal_no_grace_grand_children(self):
     """Handles grand-children process hanging and signal management.
 
     In this case, the I/O timeout is implemented by task_runner. An hard timeout
     would be implemented by run_isolated (depending on overhead).
     """
     # Uses load_and_run()
-    # Actually 0xc000013a
+    # https://msdn.microsoft.com/library/cc704588.aspx
+    # STATUS_CONTROL_C_EXIT=0xC000013A. Python sees it as -1073741510.
     exit_code = -1073741510 if sys.platform == 'win32' else -signal.SIGTERM
 
     files = {
@@ -832,10 +896,19 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     def check_final(kwargs):
       self.assertLess(self.SHORT_TIME_OUT, kwargs['data'].pop('cost_usd'))
       self.assertLess(self.SHORT_TIME_OUT, kwargs['data'].pop('duration'))
-      # It makes the diffing easier.
-      output = base64.b64decode(kwargs['data'].pop('output', ''))
+      self.assertLess(0., kwargs['data'].pop('bot_overhead'))
+      self.assertLess(
+          0., kwargs['data']['isolated_stats']['download'].pop('duration'))
+      self.assertLess(
+          0., kwargs['data']['isolated_stats']['upload'].pop('duration'))
+      # Makes the diffing easier.
+      for k in ('download', 'upload'):
+        for j in ('items_cold', 'items_hot'):
+          kwargs['data']['isolated_stats'][k][j] = large.unpack(
+              base64.b64decode(kwargs['data']['isolated_stats'][k][j]))
       # The command print the pid of this child and grand-child processes, each
       # on its line.
+      output = base64.b64decode(kwargs['data'].pop('output', ''))
       for line in output.splitlines():
         try:
           to_kill.append(int(line))
@@ -848,6 +921,18 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
               'hard_timeout': False,
               'id': u'localhost',
               'io_timeout': True,
+              'isolated_stats': {
+                u'download': {
+                  u'initial_number_items': 0,
+                  u'initial_size': 0,
+                  u'items_cold': [144, 150, 285, 307],
+                  u'items_hot': [],
+                },
+                u'upload': {
+                  u'items_cold': [],
+                  u'items_hot': [],
+                },
+              },
               'output_chunk_start': 0,
               'task_id': 23,
             },
@@ -941,6 +1026,11 @@ class TaskRunnerSmoke(unittest.TestCase):
 
   def test_signal(self):
     # Tests when task_runner gets a SIGTERM.
+
+    # https://msdn.microsoft.com/library/cc704588.aspx
+    # STATUS_ENTRYPOINT_NOT_FOUND=0xc0000139. Python sees it as -1073741510.
+    exit_code = -1073741510 if sys.platform == 'win32' else -signal.SIGTERM
+
     os.mkdir(os.path.join(self.root_dir, 'work'))
     signal_file = os.path.join(self.root_dir, 'work', 'signal')
     open(signal_file, 'wb').close()
@@ -990,6 +1080,7 @@ class TaskRunnerSmoke(unittest.TestCase):
       for event in task:
         event.pop('cost_usd')
         event.pop('duration', None)
+        event.pop('bot_overhead', None)
     expected = {
       '23': [
         {
@@ -997,7 +1088,7 @@ class TaskRunnerSmoke(unittest.TestCase):
           u'task_id': 23,
         },
         {
-          u'exit_code': 1 if sys.platform == 'win32' else -signal.SIGTERM,
+          u'exit_code': exit_code,
           u'hard_timeout': False,
           u'id': u'localhost',
           u'io_timeout': False,
@@ -1017,7 +1108,7 @@ class TaskRunnerSmoke(unittest.TestCase):
     }
     self.assertEqual(expected, set(os.listdir(self.root_dir)))
     expected = {
-      u'exit_code': 1 if sys.platform == 'win32' else -signal.SIGTERM,
+      u'exit_code': exit_code,
       u'hard_timeout': False,
       u'io_timeout': False,
       u'must_signal_internal_failure':

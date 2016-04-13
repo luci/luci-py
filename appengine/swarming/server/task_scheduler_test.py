@@ -270,8 +270,17 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(
         (True, True),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 'Foo1', 0, 0, 0.1, False, False,
-            0.1, None))
+            run_result_key=run_result.key,
+            bot_id='localhost',
+            output='Foo1',
+            output_chunk_start=0,
+            exit_code=0,
+            duration=0.1,
+            hard_timeout=False,
+            io_timeout=False,
+            cost_usd=0.1,
+            outputs_ref=None,
+            performance_stats=None))
     return unicode(run_result.task_id)
 
   def _task_deduped(
@@ -462,8 +471,17 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(
         (True, True),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 'Foo1', 0, 0, 0.1, False, False,
-            0.1, None))
+            run_result_key=run_result.key,
+            bot_id='localhost',
+            output='Foo1',
+            output_chunk_start=0,
+            exit_code=0,
+            duration=0.1,
+            hard_timeout=False,
+            io_timeout=False,
+            cost_usd=0.1,
+            outputs_ref=None,
+            performance_stats=None))
 
     parent_id = run_result.task_id
     request = task_request.make_request(
@@ -605,16 +623,48 @@ class TaskSchedulerApiTest(test_case.TestCase):
     # The bot completes the task.
     done_ts = self.now + datetime.timedelta(seconds=120)
     self.mock_now(done_ts)
+    outputs_ref = task_request.FilesRef(
+        isolated='a'*40, isolatedserver='http://localhost', namespace='c')
+    performance_stats = task_result.PerformanceStats(
+        bot_overhead=0.1,
+        isolated_download=task_result.IsolatedOperation(
+          duration=0.1,
+          initial_number_items=10,
+          initial_size=1000,
+          items_cold='aa',
+          items_hot='bb'),
+        isolated_upload=task_result.IsolatedOperation(
+          duration=0.1,
+          items_cold='aa',
+          items_hot='bb'))
     self.assertEqual(
         (True, True),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 'Foo1', 0, 0, 0.1, False, False,
-            0.1, None))
+            run_result_key=run_result.key,
+            bot_id='localhost',
+            output='Foo1',
+            output_chunk_start=0,
+            exit_code=0,
+            duration=3.,
+            hard_timeout=False,
+            io_timeout=False,
+            cost_usd=0.1,
+            outputs_ref=outputs_ref,
+            performance_stats=performance_stats))
     self.assertEqual(
         (True, False),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 'Bar22', 0, 0, 0.2, False, False, 0.1,
-            None))
+            run_result_key=run_result.key,
+            bot_id='localhost',
+            output='Bar22',
+            output_chunk_start=0,
+            exit_code=0,
+            duration=0.2,
+            hard_timeout=False,
+            io_timeout=False,
+            cost_usd=0.1,
+            outputs_ref=None,
+            performance_stats=None))
     result_summary, run_results = get_results(request.key)
     expected = {
       'abandoned_ts': None,
@@ -627,14 +677,18 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'cost_saved_usd': None,
       'created_ts': created_ts,
       'deduped_from': None,
-      'duration': 0.1,
+      'duration': 3.0,
       'exit_code': 0,
       'failure': False,
       'id': '1d69b9f088008810',
       'internal_failure': False,
       'modified_ts': done_ts,
       'name': u'Request name',
-      'outputs_ref': None,
+      'outputs_ref': {
+        'isolated': u'a'*40,
+        'isolatedserver': u'http://localhost',
+        'namespace': u'c',
+      },
       'properties_hash': None,
       'server_versions': [u'v1a'],
       'started_ts': reaped_ts,
@@ -659,13 +713,17 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'children_task_ids': [],
         'completed_ts': done_ts,
         'cost_usd': 0.1,
-        'duration': 0.1,
+        'duration': 3.0,
         'exit_code': 0,
         'failure': False,
         'id': '1d69b9f088008811',
         'internal_failure': False,
         'modified_ts': done_ts,
-        'outputs_ref': None,
+        'outputs_ref': {
+          'isolated': u'a'*40,
+          'isolatedserver': u'http://localhost',
+          'namespace': u'c',
+        },
         'server_versions': [u'v1a'],
         'started_ts': reaped_ts,
         'state': State.COMPLETED,
@@ -689,8 +747,17 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(
         (True, True),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 'Foo1', 0, 1, 0.1, False, False, 0.1,
-            None))
+            run_result_key=run_result.key,
+            bot_id='localhost',
+            output='Foo1',
+            output_chunk_start=0,
+            exit_code=1,
+            duration=0.1,
+            hard_timeout=False,
+            io_timeout=False,
+            cost_usd=0.1,
+            outputs_ref=None,
+            performance_stats=None))
     result_summary, run_results = get_results(request.key)
 
     expected = {
@@ -766,13 +833,31 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(
         (True, False),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 'hi', 0, None, None, False, False, 0.1,
-            None))
+            run_result_key=run_result.key,
+            bot_id='localhost',
+            output='hi',
+            output_chunk_start=0,
+            exit_code=None,
+            duration=None,
+            hard_timeout=False,
+            io_timeout=False,
+            cost_usd=0.1,
+            outputs_ref=None,
+            performance_stats=None))
     self.assertEqual(
         (True, True),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 'hey', 2, 0, 0.1, False, False,
-            0.1, None))
+            run_result_key=run_result.key,
+            bot_id='localhost',
+            output='hey',
+            output_chunk_start=2,
+            exit_code=0,
+            duration=0.1,
+            hard_timeout=False,
+            io_timeout=False,
+            cost_usd=0.1,
+            outputs_ref=None,
+            performance_stats=None))
     self.assertEqual('hihey', run_result.key.get().get_output())
 
   def test_bot_update_task_new_overwrite(self):
@@ -780,13 +865,31 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(
         (True, False),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 'hi', 0, None, None, False, False,
-            0.1, None))
+            run_result_key=run_result.key,
+            bot_id='localhost',
+            output='hi',
+            output_chunk_start=0,
+            exit_code=None,
+            duration=None,
+            hard_timeout=False,
+            io_timeout=False,
+            cost_usd=0.1,
+            outputs_ref=None,
+            performance_stats=None))
     self.assertEqual(
         (True, False),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 'hey', 1, None, None, False, False,
-            0.1, None))
+            run_result_key=run_result.key,
+            bot_id='localhost',
+            output='hey',
+            output_chunk_start=1,
+            exit_code=None,
+            duration=None,
+            hard_timeout=False,
+            io_timeout=False,
+            cost_usd=0.1,
+            outputs_ref=None,
+            performance_stats=None))
     self.assertEqual('hhey', run_result.key.get().get_output())
 
   def test_bot_update_exception(self):
@@ -798,8 +901,17 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(
         (False, False),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 'hi', 0, 0, 0.1, False, False, 0.1,
-            None))
+            run_result_key=run_result.key,
+            bot_id='localhost',
+            output='hi',
+            output_chunk_start=0,
+            exit_code=0,
+            duration=0.1,
+            hard_timeout=False,
+            io_timeout=False,
+            cost_usd=0.1,
+            outputs_ref=None,
+            performance_stats=None))
 
   def test_bot_update_pubsub_error(self):
     data = _gen_request(
@@ -824,16 +936,34 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(
         (False, False),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 'Foo1', 0, 0, 0.1, False, False,
-            0.1, None))
+            run_result_key=run_result.key,
+            bot_id='localhost',
+            output='Foo1',
+            output_chunk_start=0,
+            exit_code=0,
+            duration=0.1,
+            hard_timeout=False,
+            io_timeout=False,
+            cost_usd=0.1,
+            outputs_ref=None,
+            performance_stats=None))
 
     # Bot retries bot_update, now PubSub works and notification is sent.
     pub_sub_calls = self.mock_pub_sub(publish_successful=True)
     self.assertEqual(
         (True, True),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 'Foo1', 0, 0, 0.1, False, False,
-            0.1, None))
+            run_result_key=run_result.key,
+            bot_id='localhost',
+            output='Foo1',
+            output_chunk_start=0,
+            exit_code=0,
+            duration=0.1,
+            hard_timeout=False,
+            io_timeout=False,
+            cost_usd=0.1,
+            outputs_ref=None,
+            performance_stats=None))
     self.assertEqual(1, len(pub_sub_calls)) # notification is sent
 
   def _bot_update_timeouts(self, hard, io):
@@ -850,7 +980,17 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(
         (True, True),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 'hi', 0, 0, 0.1, hard, io, 0.1, None))
+            run_result_key=run_result.key,
+            bot_id='localhost',
+            output='hi',
+            output_chunk_start=0,
+            exit_code=0,
+            duration=0.1,
+            hard_timeout=hard,
+            io_timeout=io,
+            cost_usd=0.1,
+            outputs_ref=None,
+            performance_stats=None))
     expected = {
       'abandoned_ts': None,
       'bot_dimensions': bot_dimensions,
@@ -1260,8 +1400,17 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(
         (True, True),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost-second', 'Foo1', 0, 0, 0.1, False, False,
-            0.1, None))
+            run_result_key=run_result.key,
+            bot_id='localhost-second',
+            output='Foo1',
+            output_chunk_start=0,
+            exit_code=0,
+            duration=0.1,
+            hard_timeout=False,
+            io_timeout=False,
+            cost_usd=0.1,
+            outputs_ref=None,
+            performance_stats=None))
     expected = {
       'abandoned_ts': None,
       'bot_dimensions': bot_dimensions,

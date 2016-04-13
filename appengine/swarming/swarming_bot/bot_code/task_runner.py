@@ -286,6 +286,7 @@ def run_command(
   Returns:
     Metadata about the command.
   """
+  # TODO(maruel): This function is incomprehensible, split and refactor.
   # Signal the command is about to be started.
   last_packet = start = now = monotonic_time()
   params = {
@@ -461,6 +462,21 @@ def run_command(
                   'run_isolated internal failure %d' % exit_code)
               logging.error('%s', must_signal_internal_failure)
           exit_code = run_isolated_result['exit_code']
+          if run_isolated_result.get('duration') is not None:
+            # Calculate the real task duration as measured by run_isolated and
+            # calculate the remaining overhead.
+            params['bot_overhead'] = params['duration']
+            params['duration'] = run_isolated_result['duration']
+            params['bot_overhead'] -= params['duration']
+            params['bot_overhead'] -= run_isolated_result.get(
+                'download', {}).get('duration', 0)
+            params['bot_overhead'] -= run_isolated_result.get(
+                'upload', {}).get('duration', 0)
+            if params['bot_overhead'] < 0:
+              params['bot_overhead'] = 0
+          stats = run_isolated_result.get('stats')
+          if stats:
+            params['isolated_stats'] = stats
       except (IOError, OSError, ValueError) as e:
         logging.error('Swallowing error: %s', e)
         if not must_signal_internal_failure:

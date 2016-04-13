@@ -26,6 +26,8 @@ from server import bot_code
 from server import bot_management
 from server import stats
 from server import task_pack
+from server import task_request
+from server import task_result
 from server import task_scheduler
 from server import task_to_run
 
@@ -458,9 +460,9 @@ class BotTaskUpdateHandler(auth.ApiHandler):
   out-of-order packets.
   """
   ACCEPTED_KEYS = {
-    u'cost_usd', u'duration', u'exit_code', u'hard_timeout',
-    u'id', u'io_timeout', u'output', u'output_chunk_start', u'outputs_ref',
-    u'task_id',
+    u'bot_overhead', u'cost_usd', u'duration', u'exit_code',
+    u'hard_timeout', u'id', u'io_timeout', u'isolated_stats', u'output',
+    u'output_chunk_start', u'outputs_ref', u'task_id',
   }
   REQUIRED_KEYS = {u'id', u'task_id'}
 
@@ -482,15 +484,46 @@ class BotTaskUpdateHandler(auth.ApiHandler):
     cost_usd = request['cost_usd']
     task_id = request['task_id']
 
+    bot_overhead = request.get('bot_overhead')
     duration = request.get('duration')
     exit_code = request.get('exit_code')
     hard_timeout = request.get('hard_timeout')
     io_timeout = request.get('io_timeout')
+    isolated_stats = request.get('isolated_stats')
     output = request.get('output')
     output_chunk_start = request.get('output_chunk_start')
     outputs_ref = request.get('outputs_ref')
 
+    if bool(isolated_stats) != (bot_overhead is not None):
+      ereporter2.log_request(
+          request=self.request,
+          source='server',
+          category='task_failure',
+          message='Failed to update task: %s' % task_id)
+      self.abort_with_error(
+          400,
+          error='Both bot_overhead and isolated_stats must be set '
+                'simultaneously\nbot_overhead: %s\nisolated_stats: %s' %
+                (bot_overhead, isolated_stats))
+
     run_result_key = task_pack.unpack_run_result_key(task_id)
+    performance_stats = None
+    if isolated_stats:
+      download = isolated_stats['download']
+      upload = isolated_stats['upload']
+      performance_stats = task_result.PerformanceStats(
+          bot_overhead=bot_overhead,
+          isolated_download=task_result.IsolatedOperation(
+              duration=download['duration'],
+              initial_number_items=download['initial_number_items'],
+              initial_size=download['initial_size'],
+              items_cold=base64.b64decode(download['items_cold']),
+              items_hot=base64.b64decode(download['items_hot'])),
+          isolated_upload=task_result.IsolatedOperation(
+              duration=upload['duration'],
+              items_cold=base64.b64decode(upload['items_cold']),
+              items_hot=base64.b64decode(upload['items_hot'])))
+
     if output is not None:
       try:
         output = base64.b64decode(output)
@@ -502,11 +535,22 @@ class BotTaskUpdateHandler(auth.ApiHandler):
         # and returning a HTTP 500 would only force the bot to stay in a retry
         # loop.
         logging.error('Failed to decode output\n%s\n%r', e, output)
+    if outputs_ref:
+      outputs_ref = task_request.FilesRef(**outputs_ref)
 
     try:
       success, completed = task_scheduler.bot_update_task(
-          run_result_key, bot_id, output, output_chunk_start,
-          exit_code, duration, hard_timeout, io_timeout, cost_usd, outputs_ref)
+          run_result_key=run_result_key,
+          bot_id=bot_id,
+          output=output,
+          output_chunk_start=output_chunk_start,
+          exit_code=exit_code,
+          duration=duration,
+          hard_timeout=hard_timeout,
+          io_timeout=io_timeout,
+          cost_usd=cost_usd,
+          outputs_ref=outputs_ref,
+          performance_stats=performance_stats)
       if not success:
         logging.info('Failed to update, please retry')
         self.abort_with_error(500, error='Failed to update, please retry')

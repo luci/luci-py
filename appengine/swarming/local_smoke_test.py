@@ -9,6 +9,7 @@ It starts both a Swarming server and a Swarming bot and triggers tasks with the
 Swarming client to ensure the system works end to end.
 """
 
+import base64
 import json
 import glob
 import logging
@@ -31,6 +32,7 @@ from tools import start_servers
 sys.path.insert(0, CLIENT_DIR)
 from third_party.depot_tools import fix_encoding
 from utils import file_path
+from utils import large
 from utils import subprocess42
 sys.path.pop(0)
 
@@ -147,7 +149,7 @@ class SwarmingClient(object):
         # swarming.py collect will return the exit code of the task.
         args = [
           '--task-summary-json', tmp, task_id, '--task-output-dir', tmpdir,
-          '--timeout', '20',
+          '--timeout', '20', '--perf',
         ]
         self._run('collect', args)
         with open(tmp, 'rb') as f:
@@ -234,7 +236,10 @@ def gen_expected(**kwargs):
     u'try_number': 1,
     u'user': u'joe@localhost',
   }
-  assert set(expected).issuperset(kwargs)
+  # This is not part of the 'old' protocol that is emulated in
+  # convert_to_old_format.py in //client/swarming.py.
+  keys = set(expected) | {u'performance_stats'}
+  assert keys.issuperset(kwargs)
   expected.update(kwargs)
   return expected
 
@@ -381,6 +386,18 @@ class Test(unittest.TestCase):
     expected_summary = self.gen_expected(
         name=u'isolated_task',
         isolated_out=RESULT_HEY_ISOLATED_OUT,
+        performance_stats={
+          u'isolated_download': {
+            u'initial_number_items': u'0',
+            u'initial_size': u'0',
+            u'items_cold': [112, 200],
+            u'items_hot': [],
+          },
+          u'isolated_upload': {
+            u'items_cold': [3, 118],
+            u'items_hot': [],
+          },
+        },
         outputs=[u'hi\n'],
         outputs_ref=RESULT_HEY_OUTPUTS_REF)
     expected_files = {os.path.join('0', 'result.txt'): 'hey'}
@@ -405,6 +422,18 @@ class Test(unittest.TestCase):
         name=u'isolated_hard_timeout',
         exit_codes=[SIGNAL_TERM],
         failure=True,
+        performance_stats={
+          u'isolated_download': {
+            u'initial_number_items': u'2',
+            u'initial_size': u'312',
+            u'items_cold': [172, 200],
+            u'items_hot': [],
+          },
+          u'isolated_upload': {
+            u'items_cold': [],
+            u'items_hot': [],
+          },
+        },
         state=0x40)  # task_result.State.TIMED_OUT
     # Hard timeout is enforced by run_isolated, I/O timeout by task_runner.
     self._run_isolated(
@@ -439,6 +468,18 @@ class Test(unittest.TestCase):
     expected_summary = self.gen_expected(
         name=u'isolated_hard_timeout_grace',
         isolated_out=RESULT_HEY_ISOLATED_OUT,
+        performance_stats={
+          u'isolated_download': {
+            u'initial_number_items': u'4',
+            u'initial_size': u'684',
+            u'items_cold': [200, 407],
+            u'items_hot': [],
+          },
+          u'isolated_upload': {
+            u'items_cold': [],
+            u'items_hot': [3, 118],
+          },
+        },
         outputs=[u'hi\ngot signal 15\n'],
         outputs_ref=RESULT_HEY_OUTPUTS_REF,
         failure=True,
@@ -477,12 +518,23 @@ class Test(unittest.TestCase):
     self.assertTrue(result['shards'][0])
     result = result['shards'][0].copy()
     # These are not deterministic (or I'm too lazy to calculate the value).
+    if expected.get('performance_stats'):
+      self.assertLess(
+          0, result['performance_stats'].pop('bot_overhead'))
+      self.assertLess(
+          0, result['performance_stats']['isolated_download'].pop('duration'))
+      self.assertLess(
+          0, result['performance_stats']['isolated_upload'].pop('duration'))
+      for k in ('isolated_download', 'isolated_upload'):
+        for j in ('items_cold', 'items_hot'):
+          result['performance_stats'][k][j] = large.unpack(
+              base64.b64decode(result['performance_stats'][k].get(j, '')))
     bot_version = result.pop('bot_version')
     self.assertTrue(bot_version)
-    self.assertTrue(result.pop('costs_usd'))
+    self.assertLess(0, result.pop('costs_usd'))
     self.assertTrue(result.pop('created_ts'))
     self.assertTrue(result.pop('completed_ts'))
-    self.assertTrue(result.pop('durations'))
+    self.assertLess(0, result.pop('durations'))
     self.assertTrue(result.pop('id'))
     self.assertTrue(result.pop('modified_ts'))
     self.assertTrue(result.pop('started_ts'))
@@ -530,7 +582,7 @@ def main():
     sys.argv.remove('--leak')
   if verbose:
     logging.basicConfig(level=logging.INFO)
-    unittest.TestCase.maxDiff = None
+    Test.maxDiff = None
   else:
     logging.basicConfig(level=logging.ERROR)
 

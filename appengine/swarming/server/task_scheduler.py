@@ -442,6 +442,8 @@ def schedule_request(request):
       task.queue_number = None
       _copy_summary(
           dupe_summary, result_summary, ('created_ts', 'name', 'user', 'tags'))
+      # Zap irrelevant properties. PerformanceStats is also not copied over,
+      # since it's not relevant.
       result_summary.properties_hash = None
       result_summary.try_number = 0
       result_summary.cost_saved_usd = result_summary.cost_usd
@@ -559,8 +561,8 @@ def bot_reap_task(dimensions, bot_id, bot_version, deadline):
 
 
 def bot_update_task(
-    run_result_key, bot_id, output, output_chunk_start,
-    exit_code, duration, hard_timeout, io_timeout, cost_usd, outputs_ref):
+    run_result_key, bot_id, output, output_chunk_start, exit_code, duration,
+    hard_timeout, io_timeout, cost_usd, outputs_ref, performance_stats):
   """Updates a TaskRunResult and TaskResultSummary, along TaskOutput.
 
   Arguments:
@@ -569,11 +571,13 @@ def bot_update_task(
   - output: Data to append to this command output.
   - output_chunk_start: Index of output in the stdout stream.
   - exit_code: Mark that this task completed.
-  - duration: Time spent in seconds for this task.
+  - duration: Time spent in seconds for this task, excluding overheads.
   - hard_timeout: Bool set if an hard timeout occured.
   - io_timeout: Bool set if an I/O timeout occured.
   - cost_usd: Cost in $USD of this task up to now.
-  - outputs_ref: Serialized FilesRef instance or None.
+  - outputs_ref: task_request.FilesRef instance or None.
+  - performance_stats: task_result.PerformanceStats instance or None. Can only
+        be set when the task is completing.
 
   Invalid states, these are flat out refused:
   - A command is updated after it had an exit code assigned to.
@@ -590,12 +594,18 @@ def bot_update_task(
     raise ValueError(
         'had unexpected duration; expected iff a command completes\n'
         'duration: %r; exit: %r' % (duration, exit_code))
+  if performance_stats and duration is None:
+    raise ValueError(
+        'duration must be set when performance_stats is set\n'
+        'duration: %s; performance_stats: %s' %
+        (duration, performance_stats))
 
   packed = task_pack.pack_run_result_key(run_result_key)
   logging.debug(
-      'bot_update_task(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)',
+      'bot_update_task(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)',
       packed, bot_id, len(output) if output else output, output_chunk_start,
-      exit_code, duration, hard_timeout, io_timeout, cost_usd, outputs_ref)
+      exit_code, duration, hard_timeout, io_timeout, cost_usd, outputs_ref,
+      performance_stats)
 
   result_summary_key = task_pack.run_result_key_to_result_summary_key(
       run_result_key)
@@ -645,7 +655,7 @@ def bot_update_task(
     task_completed = run_result.exit_code is not None
 
     if outputs_ref:
-      run_result.outputs_ref = task_request.FilesRef(**outputs_ref)
+      run_result.outputs_ref = outputs_ref
 
     if run_result.state in task_result.State.STATES_RUNNING:
       if hard_timeout or io_timeout:
@@ -660,6 +670,10 @@ def bot_update_task(
     if output:
       # This does 1 multi GETs. This also modifies run_result in place.
       to_put.extend(run_result.append_output(output, output_chunk_start or 0))
+    if performance_stats:
+      performance_stats.key = task_pack.run_result_key_to_performance_stats_key(
+          run_result.key)
+      to_put.append(performance_stats)
 
     run_result.cost_usd = max(cost_usd, run_result.cost_usd or 0.)
     run_result.modified_ts = now

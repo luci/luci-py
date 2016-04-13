@@ -28,6 +28,7 @@ import gae_ts_mon
 from test_support import test_case
 
 from server import acl
+from server import large
 from server import stats
 
 
@@ -165,15 +166,35 @@ class AppTestBase(test_case.TestCase):
     return self.post_with_token('/swarming/api/v1/bot/poll', params, token)
 
   def bot_complete_task(self, token, **kwargs):
+    # Emulate an isolated task.
     params = {
       'cost_usd': 0.1,
       'duration': 0.1,
+      'bot_overhead': 0.1,
       'exit_code': 0,
       'id': 'bot1',
+      'isolated_stats': {
+        'download': {
+          'duration': 1.,
+          'initial_number_items': 10,
+          'initial_size': 100000,
+          'items_cold': [20],
+          'items_hot': [30],
+        },
+        'upload': {
+          'duration': 2.,
+          'items_cold': [40],
+          'items_hot': [50],
+        },
+      },
       'output': base64.b64encode(u'rÉsult string'.encode('utf-8')),
       'output_chunk_start': 0,
       'task_id': None,
     }
+    for k in ('download', 'upload'):
+      for j in ('items_cold', 'items_hot'):
+        params['isolated_stats'][k][j] = base64.b64encode(
+            large.pack(params['isolated_stats'][k][j]))
     params.update(kwargs)
     response = self.post_with_token(
         '/swarming/api/v1/bot/task_update', params, token)

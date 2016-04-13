@@ -485,11 +485,16 @@ class TasksApiTest(BaseTest):
     """Asserts that list requests all TaskResultSummaries."""
     first, second, str_now_120, start, end = self._gen_two_tasks()
     first_no_perf = first.copy()
+    first_no_perf.pop('performance_stats')
     # Basic request.
     request = swarming_rpcs.TasksRequest(
         end=end, start=start, include_performance_stats=True)
     expected = {u'now': str_now_120, u'items': [second, first]}
     actual = self.call_api('list', body=message_to_dict(request)).json
+    for k in ('isolated_download', 'isolated_upload'):
+      for j in ('items_cold', 'items_hot'):
+        actual['items'][1]['performance_stats'][k][j] = large.unpack(
+            base64.b64decode(actual['items'][1]['performance_stats'][k][j]))
     self.assertEqual(expected, actual)
 
     # Sort by CREATED_TS.
@@ -706,6 +711,21 @@ class TasksApiTest(BaseTest):
       u'exit_code': u'0',
       u'failure': False,
       u'internal_failure': False,
+      u'performance_stats': {
+        u'bot_overhead': 0.1,
+        u'isolated_download': {
+          u'duration': 1.0,
+          u'initial_number_items': u'10',
+          u'initial_size': u'100000',
+          u'items_cold': [20],
+          u'items_hot': [30],
+        },
+        u'isolated_upload': {
+          u'duration': 2.0,
+          u'items_cold': [40],
+          u'items_hot': [50],
+        },
+      },
       u'modified_ts': str_now_120,
       u'name': u'first',
       u'properties_hash': unicode(properties_hash),
@@ -898,10 +918,29 @@ class TaskApiTest(BaseTest):
       u'try_number': u'1',
     }
     self.assertEqual(expected, response.json)
+    expected[u'performance_stats'] = {
+      u'bot_overhead': 0.1,
+      u'isolated_download': {
+        u'duration': 1.0,
+        u'initial_number_items': u'10',
+        u'initial_size': u'100000',
+        u'items_cold': [20],
+        u'items_hot': [30],
+      },
+      u'isolated_upload': {
+        u'duration': 2.0,
+        u'items_cold': [40],
+        u'items_hot': [50],
+      },
+    }
     response = self.call_api(
         'result',
         body={'task_id': task_id, 'include_performance_stats': True})
     actual = response.json
+    for k in ('isolated_download', 'isolated_upload'):
+      for j in ('items_cold', 'items_hot'):
+        actual['performance_stats'][k][j] = large.unpack(
+            base64.b64decode(actual['performance_stats'][k][j]))
     self.assertEqual(expected, actual)
 
   def test_stdout_ok(self):
@@ -1152,6 +1191,21 @@ class BotApiTest(BaseTest):
           u'internal_failure': False,
           u'modified_ts': now_1_str,
           u'name': u'philbert',
+          u'performance_stats': {
+            u'bot_overhead': 0.1,
+            u'isolated_download': {
+              u'duration': 1.0,
+              u'initial_number_items': u'10',
+              u'initial_size': u'100000',
+              u'items_cold': [20],
+              u'items_hot': [30],
+            },
+            u'isolated_upload': {
+              u'duration': 2.0,
+              u'items_cold': [40],
+              u'items_hot': [50],
+            },
+          },
           u'server_versions': [u'v1a'],
           u'started_ts': now_1_str,
           u'state': u'COMPLETED',
@@ -1162,6 +1216,10 @@ class BotApiTest(BaseTest):
       u'now': unicode(now_1.strftime(self.DATETIME_FORMAT)),
     }
     actual = response.json
+    for k in ('isolated_download', 'isolated_upload'):
+      for j in ('items_cold', 'items_hot'):
+        actual['items'][0]['performance_stats'][k][j] = large.unpack(
+            base64.b64decode(actual['items'][0]['performance_stats'][k][j]))
     self.assertEqual(expected, actual)
 
   def test_events(self):
