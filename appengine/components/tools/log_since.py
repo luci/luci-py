@@ -83,7 +83,7 @@ def main():
   out = '\n'.join(
     '%s %-*s %s' % (parts[0], maxlen, parts[1], parts[2])
     for parts in lines)
-  sys.stdout.write(out)
+  print(out)
 
   if options.files:
     print('')
