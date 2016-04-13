@@ -41,7 +41,6 @@ FILES = (
     'bot_code/common.py',
     'bot_code/singleton.py',
     'bot_code/task_runner.py',
-    'bot_code/xsrf_client.py',
     'client/auth.py',
     'client/isolated_format.py',
     'client/isolateserver.py',

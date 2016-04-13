@@ -19,9 +19,8 @@ import bot
 class TestBot(unittest.TestCase):
   def test_bot(self):
     obj = bot.Bot(
-        None,
         {'dimensions': {'foo': 'bar'}},
-        'https://localhost:1/',
+        'https://localhost:1',
         '1234-1a2b3c4-tainted-joe',
         'base_dir',
         None)
@@ -33,14 +32,14 @@ class TestBot(unittest.TestCase):
     self.assertEqual('base_dir', obj.base_dir)
 
   def test_bot_call_later(self):
-    obj = bot.Bot(None, {}, 'https://localhost:1/', '1234-1a2b3c4-tainted-joe',
+    obj = bot.Bot({}, 'https://localhost:1', '1234-1a2b3c4-tainted-joe',
                   'base_dir', None)
     ev = threading.Event()
     obj.call_later(0.001, ev.set)
     self.assertTrue(ev.wait(1))
 
   def test_bot_call_later_cancel(self):
-    obj = bot.Bot(None, {}, 'https://localhost:1/', '1234-1a2b3c4-tainted-joe',
+    obj = bot.Bot({}, 'https://localhost:1', '1234-1a2b3c4-tainted-joe',
                   'base_dir', None)
     ev = threading.Event()
     obj.call_later(0.1, ev.set)

@@ -30,7 +30,6 @@ from utils import subprocess42
 from utils import tools
 import fake_swarming
 import task_runner
-import xsrf_client
 
 CLIENT_DIR = os.path.normpath(
     os.path.join(test_env_bot_code.BOT_DIR, '..', '..', '..', 'client'))
@@ -87,11 +86,6 @@ class TestTaskRunnerBase(net_utils.TestCase):
   def gen_requests(self, cost_usd=0., **kwargs):
     return [
       (
-        'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
-        {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
-        {'xsrf_token': 'token'},
-      ),
-      (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         self.get_check_first(cost_usd),
         {},
@@ -116,7 +110,6 @@ class TestTaskRunnerBase(net_utils.TestCase):
             'id': 'localhost',
             'task_id': 23,
           },
-          'headers': {'X-XSRF-Token': 'token'},
         },
         kwargs)
     return check_first
@@ -144,7 +137,6 @@ class TestTaskRunner(TestTaskRunnerBase):
           'output_chunk_start': 0,
           'task_id': 23,
         },
-        'headers': {'X-XSRF-Token': 'token'},
       }
       if outputs_ref:
         expected['data']['outputs_ref'] = outputs_ref
@@ -154,12 +146,12 @@ class TestTaskRunner(TestTaskRunnerBase):
   def _run_command(self, task_details):
     start = time.time()
     self.mock(time, 'time', lambda: start + 10)
-    server = xsrf_client.XsrfRemote('https://localhost:1/')
+    server = 'https://localhost:1'
     return task_runner.run_command(
         server, task_details, self.work_dir, 3600., start, 1)
 
   def test_load_and_run_raw(self):
-    server = xsrf_client.XsrfRemote('https://localhost:1/')
+    server = 'https://localhost:1'
 
     def run_command(
         swarming_server, task_details, work_dir, cost_usd_hour, start,
@@ -210,7 +202,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
   def test_load_and_run_isolated(self):
     self.expected_requests([])
-    server = xsrf_client.XsrfRemote('https://localhost:1/')
+    server = 'https://localhost:1'
 
     def run_command(
         swarming_server, task_details, work_dir, cost_usd_hour, start,
@@ -423,16 +415,10 @@ class TestTaskRunner(TestTaskRunnerBase):
               'output_chunk_start': 100002*4,
               'task_id': 23,
             },
-            'headers': {'X-XSRF-Token': 'token'},
           },
           kwargs)
 
     requests = [
-      (
-        'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
-        {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
-        {'xsrf_token': 'token'},
-      ),
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         {
@@ -441,7 +427,6 @@ class TestTaskRunner(TestTaskRunnerBase):
             'id': 'localhost',
             'task_id': 23,
           },
-          'headers': {'X-XSRF-Token': 'token'},
         },
         {},
       ),
@@ -455,7 +440,6 @@ class TestTaskRunner(TestTaskRunnerBase):
             'output_chunk_start': 0,
             'task_id': 23,
           },
-          'headers': {'X-XSRF-Token': 'token'},
         },
         {},
       ),
@@ -492,7 +476,7 @@ class TestTaskRunner(TestTaskRunnerBase):
         manifest, swarming_server, cost_usd_hour, start, json_file,
         min_free_space):
       self.assertEqual('foo', manifest)
-      self.assertEqual('http://localhost', swarming_server.url)
+      self.assertEqual('http://localhost', swarming_server)
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
       self.assertEqual('task_summary.json', json_file)
@@ -514,7 +498,7 @@ class TestTaskRunner(TestTaskRunnerBase):
         manifest, swarming_server, cost_usd_hour, start, json_file,
         min_free_space):
       self.assertEqual('foo', manifest)
-      self.assertEqual('http://localhost', swarming_server.url)
+      self.assertEqual('http://localhost', swarming_server)
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
       self.assertEqual('task_summary.json', json_file)
@@ -604,14 +588,13 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
               'output_chunk_start': 0,
               'task_id': 23,
             },
-            'headers': {'X-XSRF-Token': 'token'},
           },
           kwargs)
     return check_final
 
   def _load_and_run(self, manifest):
     # Dot not mock time since this test class is testing timeouts.
-    server = xsrf_client.XsrfRemote('https://localhost:1/')
+    server = 'https://localhost:1'
     in_file = os.path.join(self.work_dir, 'task_runner_in.json')
     with open(in_file, 'wb') as f:
       json.dump(manifest, f)
@@ -622,7 +605,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
 
   def _run_command(self, task_details):
     # Dot not mock time since this test class is testing timeouts.
-    server = xsrf_client.XsrfRemote('https://localhost:1/')
+    server = 'https://localhost:1'
     return task_runner.run_command(
         server, task_details, self.work_dir, 3600., time.time(), 1)
 
@@ -811,15 +794,9 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
               'output_chunk_start': 0,
               'task_id': 23,
             },
-            'headers': {'X-XSRF-Token': 'token'},
           },
           kwargs)
     requests = [
-      (
-        'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
-        {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
-        {'xsrf_token': 'token'},
-      ),
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         self.get_check_first(0.),
@@ -936,15 +913,9 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
               'output_chunk_start': 0,
               'task_id': 23,
             },
-            'headers': {'X-XSRF-Token': 'token'},
           },
           kwargs)
     requests = [
-      (
-        'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
-        {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
-        {'xsrf_token': 'token'},
-      ),
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         self.get_check_first(0.),

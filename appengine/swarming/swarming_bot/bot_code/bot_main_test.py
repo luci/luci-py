@@ -21,7 +21,6 @@ test_env_bot_code.setup_test_env()
 import net_utils
 
 import bot_main
-import xsrf_client
 from api import bot
 from api import os_utilities
 from depot_tools import fix_encoding
@@ -46,7 +45,7 @@ class TestBotMain(net_utils.TestCase):
     os.chdir(self.root_dir)
     # __main__ does it for us.
     os.mkdir('logs')
-    self.server = xsrf_client.XsrfRemote('https://localhost:1/')
+    self.url = 'https://localhost:1'
     self.attributes = {
       'dimensions': {
         'foo': ['bar'],
@@ -55,13 +54,14 @@ class TestBotMain(net_utils.TestCase):
       },
       'state': {
         'cost_usd_hour': 3600.,
+        'sleep_streak': 0,
       },
       'version': '123',
     }
     self.mock(zip_package, 'generate_version', lambda: '123')
     self.bot = bot.Bot(
-        self.server, self.attributes, 'https://localhost:1/', 'version1',
-        self.root_dir, self.fail)
+        self.attributes, 'https://localhost:1', 'version1', self.root_dir,
+        self.fail)
     self.mock(self.bot, 'post_error', self.fail)
     self.mock(self.bot, 'restart', self.fail)
     self.mock(subprocess42, 'call', self.fail)
@@ -115,7 +115,6 @@ class TestBotMain(net_utils.TestCase):
     self.assertEqual(expected, actual)
 
   def test_setup_bot(self):
-    self.mock(bot_main, 'get_remote', lambda: self.server)
     setup_bots = []
     def setup_bot(_bot):
       setup_bots.append(1)
@@ -148,21 +147,12 @@ class TestBotMain(net_utils.TestCase):
   def test_post_error_task(self):
     self.mock(time, 'time', lambda: 126.0)
     self.mock(logging, 'error', lambda *_, **_kw: None)
-    self.mock(bot_main, 'get_remote', lambda: self.server)
-    # get_state() return value changes over time. Hardcode its value for the
-    # duration of this test.
-    self.mock(os_utilities, 'get_state', lambda : {'foo': 'bar'})
+    self.mock(
+        bot_main, 'get_config',
+        lambda: {'server': self.url, 'server_version': '1'})
     expected_attribs = bot_main.get_attributes(None)
     self.expected_requests(
         [
-          (
-            'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
-            {
-              'data': expected_attribs,
-              'headers': {'X-XSRF-Token-Request': '1'},
-            },
-            {'xsrf_token': 'token'},
-          ),
           (
             'https://localhost:1/swarming/api/v1/bot/task_error/23',
             {
@@ -171,13 +161,12 @@ class TestBotMain(net_utils.TestCase):
                 'message': 'error',
                 'task_id': 23,
               },
-              'headers': {'X-XSRF-Token': 'token'},
             },
-            {},
+            {'resp': 1},
           ),
         ])
     botobj = bot_main.get_bot()
-    bot_main.post_error_task(botobj, 'error', 23)
+    self.assertEqual({'resp': 1}, bot_main.post_error_task(botobj, 'error', 23))
 
   def test_run_bot(self):
     # Test the run_bot() loop. Does not use self.bot.
@@ -187,21 +176,26 @@ class TestBotMain(net_utils.TestCase):
 
     def poll_server(botobj, _):
       sleep_streak = botobj.state['sleep_streak']
-      self.assertEqual(botobj.remote, self.server)
+      self.assertEqual(self.url, botobj.server)
       if sleep_streak == 5:
         raise Exception('Jumping out of the loop')
       return False
     self.mock(bot_main, 'poll_server', poll_server)
 
     def post_error(botobj, e):
-      self.assertEqual(self.server, botobj._remote)
+      self.assertEqual(self.url, botobj.server)
       lines = e.splitlines()
       self.assertEqual('Jumping out of the loop', lines[0])
       self.assertEqual('Traceback (most recent call last):', lines[1])
       raise Foo('Necessary to get out of the loop')
     self.mock(bot.Bot, 'post_error', post_error)
 
-    self.mock(bot_main, 'get_remote', lambda: self.server)
+    self.mock(
+        bot_main, 'get_config',
+        lambda: {'server': self.url, 'server_version': '1'})
+    self.mock(
+        bot_main, 'get_dimensions', lambda _: self.attributes['dimensions'])
+    self.mock(os_utilities, 'get_state', lambda *_: self.attributes['state'])
 
     # Method should have "self" as first argument - pylint: disable=E0213
     # pylint: disable=unused-argument
@@ -229,12 +223,17 @@ class TestBotMain(net_utils.TestCase):
             'https://localhost:1/swarming/api/v1/bot/server_ping',
             {}, 'foo', None,
           ),
+          (
+            'https://localhost:1/swarming/api/v1/bot/handshake',
+            {'data': self.attributes},
+            {'bot_version': '123', 'server': self.url, 'server_version': 1},
+          ),
         ])
 
     with self.assertRaises(Foo):
       bot_main.run_bot(None)
     self.assertEqual(
-        os_utilities.get_hostname_short(), os.environ['SWARMING_BOT_ID'])
+        self.attributes['dimensions']['id'][0], os.environ['SWARMING_BOT_ID'])
 
   def test_poll_server_sleep(self):
     slept = []
@@ -246,16 +245,8 @@ class TestBotMain(net_utils.TestCase):
     self.expected_requests(
         [
           (
-            'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
-            {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
-            {'xsrf_token': 'token'},
-          ),
-          (
             'https://localhost:1/swarming/api/v1/bot/poll',
-            {
-              'data': self.attributes,
-              'headers': {'X-XSRF-Token': 'token'},
-            },
+            {'data': self.attributes},
             {
               'cmd': 'sleep',
               'duration': 1.24,
@@ -275,16 +266,8 @@ class TestBotMain(net_utils.TestCase):
     self.expected_requests(
         [
           (
-            'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
-            {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
-            {'xsrf_token': 'token'},
-          ),
-          (
             'https://localhost:1/swarming/api/v1/bot/poll',
-            {
-              'data': self.bot._attributes,
-              'headers': {'X-XSRF-Token': 'token'},
-            },
+            {'data': self.bot._attributes},
             {
               'cmd': 'run',
               'manifest': {'foo': 'bar'},
@@ -305,16 +288,8 @@ class TestBotMain(net_utils.TestCase):
     self.expected_requests(
         [
           (
-            'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
-            {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
-            {'xsrf_token': 'token'},
-          ),
-          (
             'https://localhost:1/swarming/api/v1/bot/poll',
-            {
-              'data': self.attributes,
-              'headers': {'X-XSRF-Token': 'token'},
-            },
+            {'data': self.attributes},
             {
               'cmd': 'update',
               'version': '123',
@@ -335,16 +310,8 @@ class TestBotMain(net_utils.TestCase):
     self.expected_requests(
         [
           (
-            'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
-            {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
-            {'xsrf_token': 'token'},
-          ),
-          (
             'https://localhost:1/swarming/api/v1/bot/poll',
-            {
-              'data': self.attributes,
-              'headers': {'X-XSRF-Token': 'token'},
-            },
+            {'data': self.attributes},
             {
               'cmd': 'restart',
               'message': 'Please die now',
@@ -365,15 +332,9 @@ class TestBotMain(net_utils.TestCase):
     self.expected_requests(
         [
           (
-            'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
-            {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
-            {'xsrf_token': 'token'},
-          ),
-          (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
               'data': self.attributes,
-              'headers': {'X-XSRF-Token': 'token'},
             },
             {
               'cmd': 'restart',
@@ -583,7 +544,7 @@ class TestBotMain(net_utils.TestCase):
 if __name__ == '__main__':
   fix_encoding.fix_encoding()
   if '-v' in sys.argv:
-    unittest.TestCase.maxDiff = None
+    TestBotMain.maxDiff = None
   logging.basicConfig(
       level=logging.DEBUG if '-v' in sys.argv else logging.CRITICAL)
   unittest.main()

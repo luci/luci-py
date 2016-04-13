@@ -23,7 +23,6 @@ import signal
 import sys
 import time
 
-import xsrf_client
 from utils import net
 from utils import on_error
 from utils import subprocess42
@@ -205,7 +204,7 @@ def post_update(swarming_server, params, exit_code, stdout, output_chunk_start):
   """Posts task update to task_update.
 
   Arguments:
-    swarming_server: XsrfRemote instance.
+    swarming_server: Base URL to Swarming server.
     params: Default JSON parameters for the POST.
     exit_code: Process exit code, only when a command completed.
     stdout: Incremental output since last call, if any.
@@ -222,8 +221,9 @@ def post_update(swarming_server, params, exit_code, stdout, output_chunk_start):
     params['output_chunk_start'] = output_chunk_start
   # TODO(maruel): Support early cancellation.
   # https://code.google.com/p/swarming/issues/detail?id=62
-  resp = swarming_server.url_read_json(
-      '/swarming/api/v1/bot/task_update/%s' % params['task_id'], data=params)
+  resp = net.url_read_json(
+      swarming_server+'/swarming/api/v1/bot/task_update/%s' % params['task_id'],
+      data=params)
   logging.debug('post_update() = %s', resp)
   if resp.get('error'):
     # Abandon it. This will force a process exit.
@@ -522,16 +522,14 @@ def main(args):
   on_error.report_on_exception_exit(options.swarming_server)
 
   logging.info('starting')
-  remote = xsrf_client.XsrfRemote(options.swarming_server)
-
   now = monotonic_time()
   if options.start > now:
     options.start = now
 
   try:
     load_and_run(
-        options.in_file, remote, options.cost_usd_hour, options.start,
-        options.out_file, options.min_free_space)
+        options.in_file, options.swarming_server, options.cost_usd_hour,
+        options.start, options.out_file, options.min_free_space)
     return 0
   finally:
     logging.info('quitting')

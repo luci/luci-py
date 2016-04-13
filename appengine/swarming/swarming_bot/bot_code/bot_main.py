@@ -30,7 +30,6 @@ import zipfile
 
 import common
 import singleton
-import xsrf_client
 from api import bot
 from api import os_utilities
 from utils import file_path
@@ -207,17 +206,6 @@ def get_attributes(botobj):
   }
 
 
-def get_remote():
-  """Return a XsrfRemote instance to the preconfigured server."""
-  global _ERROR_HANDLER_WAS_REGISTERED
-  config = get_config()
-  server = config['server']
-  if not _ERROR_HANDLER_WAS_REGISTERED:
-    on_error.report_on_exception_exit(server)
-    _ERROR_HANDLER_WAS_REGISTERED = True
-  return xsrf_client.XsrfRemote(server, '/swarming/api/v1/bot/handshake')
-
-
 def post_error_task(botobj, error, task_id):
   """Posts given error as failure cause for the task.
 
@@ -234,18 +222,14 @@ def post_error_task(botobj, error, task_id):
         any reason the local test runner script can not be run successfully,
         this function is invoked.
   """
-  # TODO(maruel): It could be good to send a signal when the task hadn't started
-  # at all. In this case the server could retry the task even if it doesn't have
-  # 'idempotent' set. See
-  # https://code.google.com/p/swarming/issues/detail?id=108.
   logging.error('Error: %s', error)
   data = {
     'id': botobj.id,
     'message': error,
     'task_id': task_id,
   }
-  return botobj.remote.url_read_json(
-      '/swarming/api/v1/bot/task_error/%s' % task_id, data=data)
+  return net.url_read_json(
+      botobj.server + '/swarming/api/v1/bot/task_error/%s' % task_id, data=data)
 
 
 def on_shutdown_hook(b):
@@ -270,31 +254,17 @@ def get_bot():
     'version': generate_version(),
   }
   config = get_config()
-  while True:
-    try:
-      # Handshake to get an XSRF token even if there were errors.
-      remote = get_remote()
-      remote.xsrf_request_params = attributes.copy()
-      # Create a temporary object to call the hooks.
-      botobj = bot.Bot(
-          remote,
-          attributes,
-          config['server'],
-          config['server_version'],
-          os.path.dirname(THIS_FILE),
-          on_shutdown_hook)
-      attributes = get_attributes(botobj)
-      remote.xsrf_request_params = attributes.copy()
-      break
-    except Exception:
-      # Continue looping. The main reason to get into this situation is when the
-      # network is down for > 20 minutes. It's worth continuing to loop until
-      # the server is reachable again.
-      logging.exception('Catastrophic failure')
+  assert not config['server'].endswith('/'), config
 
-  return bot.Bot(
-      remote,
+  # Create a temporary object to call the hooks.
+  botobj = bot.Bot(
       attributes,
+      config['server'],
+      config['server_version'],
+      os.path.dirname(THIS_FILE),
+      on_shutdown_hook)
+  return bot.Bot(
+      get_attributes(botobj),
       config['server'],
       config['server_version'],
       os.path.dirname(THIS_FILE),
@@ -353,10 +323,11 @@ def run_bot(arg_error):
   # TODO(maruel): Set quit_bit when stdin is closed on Windows.
 
   with subprocess42.set_signal_handler(subprocess42.STOP_SIGNALS, handler):
+    config = get_config()
     try:
       # First thing is to get an arbitrary url. This also ensures the network is
       # up and running, which is necessary before trying to get the FQDN below.
-      resp = get_remote().url_read('/swarming/api/v1/bot/server_ping')
+      resp = net.url_read(config['server'] + '/swarming/api/v1/bot/server_ping')
       if resp is None:
         logging.error('No response from server_ping')
     except Exception as e:
@@ -371,6 +342,18 @@ def run_bot(arg_error):
     # If this fails, there's hardly anything that can be done, the bot can't
     # even get to the point to be able to self-update.
     botobj = get_bot()
+    resp = net.url_read_json(
+        botobj.server + '/swarming/api/v1/bot/handshake',
+        data=botobj._attributes)
+    if not resp:
+      logging.error('Failed to contact for handshake')
+    else:
+      logging.info('Connected to %s', resp.get('server_version'))
+      if resp.get('bot_version') != botobj._attributes['version']:
+        logging.warning(
+            'Found out we\'ll need to update: server said %s; we\'re %s',
+            resp.get('bot_version'), botobj._attributes['version'])
+
     if arg_error:
       botobj.post_error('Bootstrapping error: %s' % arg_error)
 
@@ -428,8 +411,8 @@ def poll_server(botobj, quit_bit):
   """
   # Access to a protected member _XXX of a client class - pylint: disable=W0212
   start = time.time()
-  resp = botobj.remote.url_read_json(
-      '/swarming/api/v1/bot/poll', data=botobj._attributes)
+  resp = net.url_read_json(
+     botobj.server + '/swarming/api/v1/bot/poll', data=botobj._attributes)
   if not resp:
     return False
   logging.debug('Server response:\n%s', resp)
@@ -453,9 +436,9 @@ def poll_server(botobj, quit_bit):
       'output_chunk_start': 0,
       'task_id': resp['task_id'],
     }
-    # TODO(maruel): Retry on failure.
-    botobj.remote.url_read_json(
-        '/swarming/api/v1/bot/task_update/%s' % resp['task_id'], data=params)
+    net.url_read_json(
+        botobj.server + '/swarming/api/v1/bot/task_update/%s' % resp['task_id'],
+        data=params)
     return False
 
   if cmd == 'run':
@@ -504,7 +487,7 @@ def run_manifest(botobj, manifest, start):
     if not manifest['command']:
       hard_timeout += manifest['io_timeout'] or 600
 
-  url = manifest.get('host', botobj.remote.url)
+  url = manifest.get('host', botobj.server)
   task_dimensions = manifest['dimensions']
   task_result = {}
 
@@ -639,7 +622,7 @@ def update_bot(botobj, version):
   new_zip = os.path.join(os.path.dirname(THIS_FILE), new_zip)
 
   # Download as a new file.
-  url = botobj.remote.url + '/swarming/api/v1/bot/bot_code/%s' % version
+  url = botobj.server + '/swarming/api/v1/bot/bot_code/%s' % version
   if not net.url_retrieve(new_zip, url):
     # It can happen when a server is rapidly updated multiple times in a row.
     botobj.post_error(
@@ -711,8 +694,16 @@ def update_lkgbc(botobj):
 
 def get_config():
   """Returns the data from config.json."""
+  global _ERROR_HANDLER_WAS_REGISTERED
+
   with contextlib.closing(zipfile.ZipFile(THIS_FILE, 'r')) as f:
-    return json.load(f.open('config/config.json', 'r'))
+    config = json.load(f.open('config/config.json', 'r'))
+
+  server = config.get('server', '')
+  if not _ERROR_HANDLER_WAS_REGISTERED and server:
+    on_error.report_on_exception_exit(server)
+    _ERROR_HANDLER_WAS_REGISTERED = True
+  return config
 
 
 def main(args):
@@ -750,6 +741,6 @@ def main(args):
   try:
     return run_bot(error)
   finally:
-    call_hook(bot.Bot(None, None, None, None, os.path.dirname(THIS_FILE), None),
+    call_hook(bot.Bot(None, None, None, os.path.dirname(THIS_FILE), None),
               'on_bot_shutdown')
     logging.info('main() returning')

@@ -244,14 +244,9 @@ class BotHandshakeHandler(_BotBaseHandler):
     {
       "bot_version": <sha-1 of swarming_bot.zip uncompressed content>,
       "server_version": "138-193f1f3",
-      "xsrf_token": "......",
     }
   """
 
-  # This handler is called to get XSRF token, there's nothing to enforce yet.
-  xsrf_token_enforce_on = ()
-
-  @auth.require_xsrf_token_request
   @auth.require(acl.is_bot)
   def post(self):
     (_request, bot_id, version, state,
@@ -265,8 +260,10 @@ class BotHandshakeHandler(_BotBaseHandler):
     data = {
       # This access token will be used to validate each subsequent request.
       'bot_version': bot_code.get_bot_version(self.request.host_url),
+      # TODO(maruel): Remove this once all the bots have been updated.
       'expiration_sec': auth.handler.XSRFToken.expiration_sec,
       'server_version': utils.get_app_version(),
+      # TODO(maruel): Remove this once all the bots have been updated.
       'xsrf_token': self.generate_xsrf_token(),
     }
     self.send_response(data)

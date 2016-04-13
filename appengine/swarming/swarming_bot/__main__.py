@@ -17,8 +17,6 @@ import shutil
 import sys
 import zipfile
 
-from bot_code import common
-
 # That's from ../../../client/
 from third_party.depot_tools import fix_encoding
 from utils import logging_utils
@@ -30,6 +28,13 @@ THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
 
 # libusb1 expects to be directly in sys.path.
 sys.path.insert(0, os.path.join(THIS_FILE, 'python_libusb1'))
+
+# Copied from //client/utils/oauth.py.
+sys.path.insert(0, os.path.join(THIS_FILE, 'third_party'))
+sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'pyasn1'))
+sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'rsa'))
+
+from bot_code import common
 
 
 # TODO(maruel): Use depot_tools/subcommand.py. The goal here is to have all the
