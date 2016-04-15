@@ -136,6 +136,31 @@ def entry_key_from_id(key_id):
       parent=datastore_utils.shard_key(hash_key, N, 'ContentShard'))
 
 
+def get_content(namespace, hash_key):
+  """Returns the content from either memcache or datastore, when stored inline.
+
+  This does NOT return data from GCS, it is up to the client to do that.
+
+  Returns:
+    tuple(content, ContentEntry)
+    At most only one of the two is set.
+
+  Raises LookupError if the content cannot be found.
+  Raises ValueError if the hash_key is invalid.
+  """
+  memcache_entry = memcache.get(hash_key, namespace='table_%s' % namespace)
+  if memcache_entry is not None:
+    return (memcache_entry, None)
+  else:
+    # Raises ValueError
+    key = get_entry_key(namespace, hash_key)
+    entity = key.get()
+    if entity is None:
+      raise LookupError("namespace %s, key %s does not refer to anything" %
+        (namespace, hash_key))
+    return (entity.content, entity)
+
+
 def expiration_jitter(now, expiration):
   """Returns expiration/next_tag pair to set in a ContentEntry."""
   jittered = random.uniform(1, 1.2) * expiration

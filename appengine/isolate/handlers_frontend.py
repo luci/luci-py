@@ -6,6 +6,7 @@
 
 import datetime
 import json
+import re
 
 import webapp2
 
@@ -151,44 +152,76 @@ class BrowseHandler(auth.AuthenticatingHandler):
     namespace = self.request.get('namespace', 'default-gzip')
     # Support 'hash' for compatibility with old links. To remove eventually.
     digest = self.request.get('digest', '') or self.request.get('hash', '')
-    content = None
+    params = {
+      u'digest': unicode(digest),
+      u'namespace': unicode(namespace),
+    }
+    # Check for existence of element, so we can 400/404
     if digest and namespace:
-      # TODO(maruel): Refactor into a function.
-      memcache_entry = memcache.get(digest, namespace='table_%s' % namespace)
-      if memcache_entry is not None:
-        raw_data = memcache_entry
-      else:
-        try:
-          key = model.get_entry_key(namespace, digest)
-        except ValueError:
-          self.abort(400, 'Invalid key')
-        entity = key.get()
-        if entity is None:
-          self.abort(404, 'Unable to retrieve the entry')
-        raw_data = entity.content
+      try:
+        model.get_content(namespace, digest)
+      except ValueError:
+        self.abort(400, 'Invalid key')
+      except LookupError:
+        self.abort(404, 'Unable to retrieve the entry')
+    self.response.write(template.render('isolate/browse.html', params))
+
+
+class ContentHandler(auth.AuthenticatingHandler):
+  @auth.autologin
+  @auth.require(acl.isolate_readable)
+  def get(self):
+    namespace = self.request.get('namespace', 'default-gzip')
+    digest = self.request.get('digest', '')
+    content = None
+
+    if digest and namespace:
+      try:
+        raw_data, entity = model.get_content(namespace, digest)
+      except ValueError:
+        self.abort(400, 'Invalid key')
+      except LookupError:
+        self.abort(404, 'Unable to retrieve the entry')
+
       if not raw_data:
-        stream = gcs.read_file(config.settings().gs_bucket, key.id())
+        stream = gcs.read_file(config.settings().gs_bucket, entity.key.id())
       else:
         stream = [raw_data]
       content = ''.join(model.expand_content(namespace, stream))
+
+      self.response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+      # We delete Content-Type before storing to it to avoid having two (yes,
+      # two) Content-Type headers.
+      del self.response.headers['Content-Type']
+      # Apparently, setting the content type to text/plain encourages the
+      # browser (Chrome, at least) to sniff the mime type and display
+      # things like images.  Images are autowrapped in <img> and text is
+      # wrapped in <pre>.
+      self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+      self.response.headers['Content-Disposition'] = str('filename=%s' % digest)
       if content.startswith('{'):
         # Try to format as JSON.
         try:
           content = json.dumps(
               json.loads(content), sort_keys=True, indent=2,
               separators=(',', ': '))
+          # If we don't wrap this in html, browsers will put content in a pre
+          # tag which is also styled with monospace/pre-wrap.  We can't use
+          # anchor tags in <pre>, so we force it to be a <div>, which happily
+          # accepts links.
+          content = (
+            '<div style="font-family:monospace;white-space:pre-wrap;">%s</div>'
+             % content)
+          # Linkify things that look like hashes
+          content = re.sub(r'([0-9a-f]{40})',
+            r'<a target="_blank" href="/browse?namespace=%s' % namespace +
+              r'&digest=\1">\1</a>',
+            content)
+          self.response.headers['Content-Type'] = 'text/html; charset=utf-8'
         except ValueError:
           pass
-      content = content.decode('utf8', 'replace')
-    params = {
-      u'content': content,
-      u'digest': unicode(digest),
-      u'namespace': unicode(namespace),
-      # TODO(maruel): Add back once Web UI authentication is switched to OAuth2.
-      #'onload': 'update()' if digest else '',
-      u'onload': '',
-    }
-    self.response.write(template.render('isolate/browse.html', params))
+
+    self.response.write(content)
 
 
 class StatsHandler(webapp2.RequestHandler):
@@ -298,6 +331,7 @@ def get_routes():
 
       # User web pages.
       webapp2.Route(r'/browse', BrowseHandler),
+      webapp2.Route(r'/content', ContentHandler),
       webapp2.Route(r'/stats', StatsHandler),
       webapp2.Route(r'/isolate/api/v1/stats/days', StatsGvizDaysHandler),
       webapp2.Route(r'/isolate/api/v1/stats/hours', StatsGvizHoursHandler),
