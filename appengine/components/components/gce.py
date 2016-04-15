@@ -10,6 +10,11 @@ import re
 from components import net
 
 
+AUTH_SCOPES = [
+    'https://www.googleapis.com/auth/compute',
+]
+
+
 MACHINE_TYPES = {
     'f1-micro':       {'cpus': 1,  'memory': 0.6},
     'g1-small':       {'cpus': 1,  'memory': 1.7},
@@ -85,7 +90,7 @@ class Project(object):
         method=method,
         payload=payload,
         params=params,
-        scopes=['https://www.googleapis.com/auth/compute'],
+        scopes=AUTH_SCOPES,
         service_account_key=self._service_account_key,
         deadline=30 if deadline is None else deadline)
 

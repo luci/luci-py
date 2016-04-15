@@ -26,23 +26,22 @@ class InstanceGroupManagerCreationHandler(webapp2.RequestHandler):
     Params:
       key: URL-safe key for a models.InstanceGroupManager.
     """
-    key = self.request.get('key')
-
-    key = ndb.Key(urlsafe=key)
-    entity = key.get()
-    if not entity:
-      logging.warning('InstanceGroupManager does not exist: %s', key)
-      return
-
-    if entity.url:
-      logging.info(
-          'Instance template exists for InstanceGroupManager: %s\nURL: %s',
-          key,
-          entity.url,
-      )
-      return
-
+    key = ndb.Key(urlsafe=self.request.get('key'))
     instance_group_managers.create(key)
+
+
+class InstanceGroupManagerDeletionHandler(webapp2.RequestHandler):
+  """Worker for deleting drained instance group managers."""
+
+  @decorators.require_taskqueue('delete-instance-group-manager')
+  def post(self):
+    """Deletes the instance group manager for the given InstanceGroupManager.
+
+    Params:
+      key: URL-safe key for a models.InstanceGroupManager.
+    """
+    key = ndb.Key(urlsafe=self.request.get('key'))
+    instance_group_managers.delete(key)
 
 
 class InstanceTemplateCreationHandler(webapp2.RequestHandler):
@@ -55,23 +54,22 @@ class InstanceTemplateCreationHandler(webapp2.RequestHandler):
     Params:
       key: URL-safe key for a models.InstanceTemplateRevision.
     """
-    key = self.request.get('key')
-
-    key = ndb.Key(urlsafe=key)
-    entity = key.get()
-    if not entity:
-      logging.warning('InstanceTemplateRevision does not exist: %s', key)
-      return
-
-    if entity.url:
-      logging.info(
-          'Instance template exists for InstanceTemplateRevision: %s\nURL: %s',
-          key,
-          entity.url,
-      )
-      return
-
+    key = ndb.Key(urlsafe=self.request.get('key'))
     instance_templates.create(key)
+
+
+class InstanceTemplateDeletionHandler(webapp2.RequestHandler):
+  """Worker for deleting drained instance templates."""
+
+  @decorators.require_taskqueue('delete-instance-template')
+  def post(self):
+    """Deletes the instance template for the given InstanceTemplateRevision.
+
+    Params:
+      key: URL-safe key for a models.InstanceTemplateRevision.
+    """
+    key = ndb.Key(urlsafe=self.request.get('key'))
+    instance_templates.delete(key)
 
 
 def create_queues_app():
@@ -80,4 +78,8 @@ def create_queues_app():
        InstanceGroupManagerCreationHandler),
       ('/internal/queues/create-instance-template',
        InstanceTemplateCreationHandler),
+      ('/internal/queues/delete-instance-group-manager',
+       InstanceGroupManagerDeletionHandler),
+      ('/internal/queues/delete-instance-template',
+       InstanceTemplateDeletionHandler),
   ])

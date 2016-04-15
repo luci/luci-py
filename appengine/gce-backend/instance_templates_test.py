@@ -16,8 +16,9 @@ from components import datastore_utils
 from components import net
 from test_support import test_case
 
-import models
+import instance_group_managers
 import instance_templates
+import models
 
 
 class CreateTest(test_case.TestCase):
@@ -28,15 +29,34 @@ class CreateTest(test_case.TestCase):
     key = ndb.Key(models.InstanceTemplateRevision, 'fake-key')
 
     instance_templates.create(key)
-
     self.failIf(key.get())
 
   def test_project_unspecified(self):
     """Ensures nothing happens when project is unspecified."""
-    key = models.InstanceTemplateRevision().put()
+    key = models.InstanceTemplateRevision(
+        key=instance_templates.get_instance_template_revision_key(
+            'base-name',
+            'revision',
+        ),
+    ).put()
 
     instance_templates.create(key)
     self.failIf(key.get().url)
+
+  def test_url_specified(self):
+    """Ensures nothing happens when URL is already specified."""
+    key = models.InstanceTemplateRevision(
+        key=instance_templates.get_instance_template_revision_key(
+            'base-name',
+            'revision',
+        ),
+        project='project',
+        url='url',
+    ).put()
+    expected_url = 'url'
+
+    instance_templates.create(key)
+    self.assertEqual(key.get().url, expected_url)
 
   def test_creates(self):
     """Ensures an instance template is created."""
@@ -96,7 +116,6 @@ class CreateTest(test_case.TestCase):
         ),
         image_name='image',
         project='project',
-        url='url-to-overwrite',
     ).put()
     expected_url = 'url'
 
@@ -124,6 +143,149 @@ class CreateTest(test_case.TestCase):
 
     self.assertRaises(net.Error, instance_templates.create, key)
     self.failIf(key.get().url)
+
+
+class DeleteTest(test_case.TestCase):
+  """Tests for instance_templates.delete."""
+
+  def test_entity_doesnt_exist(self):
+    """Ensures nothing happens when the entity doesn't exist."""
+    key = ndb.Key(models.InstanceTemplateRevision, 'fake-key')
+
+    instance_templates.delete(key)
+    self.failIf(key.get())
+
+  def test_deletes(self):
+    """Ensures an instance template is deleted."""
+    def json_request(url, *args, **kwargs):
+      return {'targetLink': url}
+    self.mock(instance_templates.net, 'json_request', json_request)
+
+    key = models.InstanceTemplateRevision(
+        key=instance_templates.get_instance_template_revision_key(
+            'base-name',
+            'revision',
+        ),
+        project='project',
+        url='url',
+    ).put()
+
+    instance_templates.delete(key)
+    self.failIf(key.get().url)
+
+  def test_url_unspecified(self):
+    """Ensures nothing happens when URL is unspecified."""
+    key = models.InstanceTemplateRevision(
+        key=instance_templates.get_instance_template_revision_key(
+            'base-name',
+            'revision',
+        ),
+        project='project',
+    ).put()
+
+    instance_templates.delete(key)
+    self.failIf(key.get().url)
+
+  def test_url_not_found(self):
+    """Ensures URL is updated when the instance template is not found."""
+    def json_request(url, *args, **kwargs):
+      raise net.Error('', 404, '')
+    self.mock(instance_templates.net, 'json_request', json_request)
+
+    key = models.InstanceTemplateRevision(
+        key=instance_templates.get_instance_template_revision_key(
+            'base-name',
+            'revision',
+        ),
+        project='project',
+        url='url',
+    ).put()
+
+    instance_templates.delete(key)
+    self.failIf(key.get().url)
+
+  def test_deletion_fails(self):
+    """Ensures nothing happens when instance template deletion fails."""
+    def json_request(url, *args, **kwargs):
+      raise net.Error('', 400, '')
+    self.mock(instance_templates.net, 'json_request', json_request)
+
+    key = models.InstanceTemplateRevision(
+        key=instance_templates.get_instance_template_revision_key(
+            'base-name',
+            'revision',
+        ),
+        project='project',
+        url='url',
+    ).put()
+    expected_url = 'url'
+
+    self.assertRaises(net.Error, instance_templates.delete, key)
+    self.assertEqual(key.get().url, expected_url)
+
+
+class GetInstanceTemplateToDeleteTest(test_case.TestCase):
+  """Tests for instance_templates.get_instance_template_to_delete."""
+
+  def test_entity_doesnt_exist(self):
+    """Ensures no URL when the entity doesn't exist."""
+    key = ndb.Key(models.InstanceTemplateRevision, 'fake-key')
+    self.failIf(instance_templates.get_instance_template_to_delete(key))
+
+  def test_active_instance_group_managers(self):
+    """Ensures no URL when there are active instance group managers."""
+    key = models.InstanceTemplateRevision(
+        key=instance_templates.get_instance_template_revision_key(
+            'base-name',
+            'revision',
+        ),
+        active=[
+            ndb.Key(models.InstanceGroupManager, 'fake-key'),
+        ],
+        url='url',
+    ).put()
+
+    self.failIf(instance_templates.get_instance_template_to_delete(key))
+
+  def test_drained_instance_group_managers(self):
+    """Ensures no URL when there are drained instance group managers."""
+    key = models.InstanceTemplateRevision(
+        key=instance_templates.get_instance_template_revision_key(
+            'base-name',
+            'revision',
+        ),
+        drained=[
+            ndb.Key(models.InstanceGroupManager, 'fake-key'),
+        ],
+        url='url',
+    ).put()
+
+    self.failIf(instance_templates.get_instance_template_to_delete(key))
+
+  def test_url_unspecified(self):
+    """Ensures no URL when URL is unspecified."""
+    key = models.InstanceTemplateRevision(
+        key=instance_templates.get_instance_template_revision_key(
+            'base-name',
+            'revision',
+        ),
+    ).put()
+
+    self.failIf(instance_templates.get_instance_template_to_delete(key))
+
+  def test_returns_url(self):
+    """Ensures URL is returned."""
+    key = models.InstanceTemplateRevision(
+        key=instance_templates.get_instance_template_revision_key(
+            'base-name',
+            'revision',
+        ),
+        url='url',
+    ).put()
+    expected_url = 'url'
+
+    self.assertEqual(
+        instance_templates.get_instance_template_to_delete(key), expected_url)
 
 
 class ScheduleCreationTest(test_case.TestCase):

@@ -73,18 +73,15 @@ def update_url(key, url):
     logging.warning('InstanceTemplateRevision does not exist: %s', key)
     return
 
-  if entity.url:
-    if entity.url == url:
-      return
-    # Sometimes the URLs get updated. For example, they used to be
-    # https://www.googleapis.com/compute/v1/projects/... but they
-    # changed to https://content.googleapis.com/compute/v1/projects/...
-    logging.warning(
-        'Updating URL for InstanceTemplateRevision: %s\nOld: %s\nNew: %s',
-        key,
-        entity.url,
-        url,
-    )
+  if entity.url == url:
+    return
+
+  logging.warning(
+      'Updating URL for InstanceTemplateRevision: %s\nOld: %s\nNew: %s',
+      key,
+      entity.url,
+      url,
+  )
 
   entity.url = url
   entity.put()
@@ -106,6 +103,13 @@ def create(key):
 
   if not entity.project:
     logging.warning('InstanceTemplateRevision project unspecified: %s', key)
+    return
+
+  if entity.url:
+    logging.info(
+        'Instance template for InstanceTemplateRevision already exists: %s',
+        key,
+    )
     return
 
   if entity.metadata:
@@ -165,3 +169,93 @@ def schedule_creation():
               'Failed to enqueue task for InstanceTemplateRevision: %s',
               instance_template.active,
           )
+
+
+def get_instance_template_to_delete(key):
+  """Returns the URL of the instance template to delete.
+
+  Args:
+    key: ndb.Key for a models.InstanceTemplateRevision entity.
+
+  Returns:
+    The URL of the instance template to delete, or None if there isn't one.
+  """
+  entity = key.get()
+  if not entity:
+    logging.warning('InstanceTemplateRevision does not exist: %s', key)
+    return
+
+  if entity.active:
+    logging.warning(
+        'InstanceTemplateRevision has active InstanceGroupManagers: %s', key)
+    return
+
+  if entity.drained:
+    logging.warning(
+        'InstanceTemplateRevision has drained InstanceGroupManagers: %s', key)
+    return
+
+  if not entity.url:
+    logging.warning('InstanceTemplateRevision has no associated URL: %s', key)
+    return
+
+  return entity.url
+
+
+def delete(key):
+  """Deletes the instance template for the given InstanceTemplateRevision.
+
+  Args:
+    key: ndb.Key for a models.InstanceTemplateRevision entity.
+
+  Raises:
+    net.Error: HTTP status code is not 200 (created) or 404 (already deleted).
+  """
+  url = get_instance_template_to_delete(key)
+  if not url:
+    return
+
+  try:
+    result = net.json_request(url, method='DELETE', scopes=gce.AUTH_SCOPES)
+    if result['targetLink'] != url:
+      logging.warning(
+          'InstanceTemplateRevision mismatch: %s\nExpected: %s\nFound: %s',
+          key,
+          url,
+          result['targetLink'],
+      )
+  except net.Error as e:
+    if e.status_code != 404:
+      # If the instance template isn't found, assume it's already deleted.
+      raise
+
+  update_url(key, None)
+
+
+def get_drained_instance_template_revisions():
+  """Returns drained InstanceTemplateRevisions.
+
+  Returns:
+    A list of ndb.Keys for models.InstanceTemplateRevision entities.
+  """
+  keys = []
+  for instance_template in models.InstanceTemplate.query():
+    for key in instance_template.drained:
+      keys.append(key)
+  return keys
+
+
+def schedule_deletion():
+  """Enqueues tasks to delete drained instance templates."""
+  for key in get_drained_instance_template_revisions():
+    entity = key.get()
+    if entity and entity.url and not entity.active and not entity.drained:
+      if not utils.enqueue_task(
+          '/internal/queues/delete-instance-template',
+          'delete-instance-template',
+          params={
+              'key': key.urlsafe(),
+          },
+      ):
+        logging.warning(
+            'Failed to enqueue task for InstanceTemplateRevision: %s', key)

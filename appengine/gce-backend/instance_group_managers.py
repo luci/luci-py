@@ -80,18 +80,15 @@ def update_url(key, url):
     logging.warning('InstanceGroupManager does not exist: %s', key)
     return
 
-  if entity.url:
-    if entity.url == url:
-      return
-    # Sometimes the URLs get updated. For example, they used to be
-    # https://www.googleapis.com/compute/v1/projects/... but they
-    # changed to https://content.googleapis.com/compute/v1/projects/...
-    logging.warning(
-        'Updating URL for InstanceGroupManager: %s\nOld: %s\nNew: %s',
-        key,
-        entity.url,
-        url,
-    )
+  if entity.url == url:
+    return
+
+  logging.warning(
+      'Updating URL for InstanceGroupManager: %s\nOld: %s\nNew: %s',
+      key,
+      entity.url,
+      url,
+  )
 
   entity.url = url
   entity.put()
@@ -109,6 +106,13 @@ def create(key):
   entity = key.get()
   if not entity:
     logging.warning('InstanceGroupManager does not exist: %s', key)
+    return
+
+  if entity.url:
+    logging.warning(
+        'Instance group manager for InstanceGroupManager already exists: %s',
+        key,
+    )
     return
 
   parent = key.parent().get()
@@ -172,3 +176,98 @@ def schedule_creation():
                   'Failed to enqueue task for InstanceGroupManager: %s',
                   instance_group_manager_key,
               )
+
+
+def get_instance_group_manager_to_delete(key):
+  """Returns the URL of the instance group manager to delete.
+
+  Args:
+    key: ndb.Key for a models.InstanceGroupManager entity.
+
+  Returns:
+    The URL of the instance group manager to delete, or None if there isn't one.
+  """
+  entity = key.get()
+  if not entity:
+    logging.warning('InstanceGroupManager does not exist: %s', key)
+    return
+
+  if entity.instances:
+    logging.warning('InstanceGroupManager has active Instances: %s', key)
+    return
+
+  if not entity.url:
+    logging.warning('InstanceGroupManager has no associated URL: %s', key)
+    return
+
+  return entity.url
+
+
+def delete(key):
+  """Deletes the instance group manager for the given InstanceGroupManager.
+
+  Args:
+    key: ndb.Key for a models.InstanceGroupManager entity.
+
+  Raises:
+    net.Error: HTTP status code is not 200 (deleted) or 404 (already deleted).
+  """
+  url = get_instance_group_manager_to_delete(key)
+  if not url:
+    return
+
+  try:
+    result = net.json_request(url, method='DELETE', scopes=gce.AUTH_SCOPES)
+    if result['targetLink'] != url:
+      logging.warning(
+          'InstanceGroupManager mismatch: %s\nExpected: %s\nFound: %s',
+          key,
+          url,
+          result['targetLink'],
+      )
+  except net.Error as e:
+    if e.status_code != 404:
+      # If the instance group manager isn't found, assume it's already deleted.
+      raise
+
+  update_url(key, None)
+
+
+def get_drained_instance_group_managers():
+  """Returns drained InstanceGroupManagers.
+
+  Returns:
+    A list of ndb.Keys for models.InstanceGroupManager entities.
+  """
+  keys = []
+
+  for instance_template_revision in models.InstanceTemplateRevision.query():
+    for key in instance_template_revision.drained:
+      keys.append(key)
+
+  # Also include implicitly drained InstanceGroupManagers, those that are active
+  # but are members of drained InstanceTemplateRevisions.
+  for instance_template in models.InstanceTemplate.query():
+    for instance_template_revision_key in instance_template.drained:
+      instance_template_revision = instance_template_revision_key.get()
+      if instance_template_revision:
+        for key in instance_template_revision.active:
+          keys.append(key)
+
+  return keys
+
+
+def schedule_deletion():
+  """Enqueues tasks to delete drained instance group managers."""
+  for key in get_drained_instance_group_managers():
+    entity = key.get()
+    if entity and entity.url and not entity.instances:
+      if not utils.enqueue_task(
+          '/internal/queues/delete-instance-group-managers',
+          'delete-instance-group-managers',
+          params={
+              'key': key.urlsafe(),
+          },
+      ):
+        logging.warning(
+          'Failed to enqueue task for InstanceGroupManager: %s', key)

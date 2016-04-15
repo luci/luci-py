@@ -26,7 +26,6 @@ class ComputeTemplateChecksumTest(test_case.TestCase):
   def test_empty_template(self):
     """Ensures empty template checksum is computable."""
     template = config_pb2.InstanceTemplateConfig.InstanceTemplate()
-
     self.failUnless(parse.compute_template_checksum(template))
 
   def test_checksum_is_order_independent(self):

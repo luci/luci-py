@@ -16,8 +16,8 @@ from components import datastore_utils
 from components import net
 from test_support import test_case
 
-import models
 import instance_group_managers
+import models
 
 
 class CreateTest(test_case.TestCase):
@@ -31,8 +31,23 @@ class CreateTest(test_case.TestCase):
 
     self.failIf(key.get())
 
-  def test_parent_nonexistent(self):
-    """Ensures nothing happens when parent does not exist."""
+  def test_url_specified(self):
+    """Ensures nothing happens when URL is already specified."""
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+        url='url',
+    ).put()
+    expected_url = 'url'
+
+    instance_group_managers.create(key)
+    self.assertEqual(key.get().url, expected_url)
+
+  def test_parent_doesnt_exist(self):
+    """Ensures nothing happens when the parent doesn't exist."""
     key = models.InstanceGroupManager(
         key=instance_group_managers.get_instance_group_manager_key(
             'base-name',
@@ -45,7 +60,7 @@ class CreateTest(test_case.TestCase):
     self.failIf(key.get().url)
 
   def test_parent_project_unspecified(self):
-    """Ensures nothing happens when parent does not specify project."""
+    """Ensures nothing happens when parent doesn't specify project."""
     key = models.InstanceGroupManager(
         key=instance_group_managers.get_instance_group_manager_key(
             'base-name',
@@ -59,7 +74,7 @@ class CreateTest(test_case.TestCase):
     self.failIf(key.get().url)
 
   def test_parent_url_unspecified(self):
-    """Ensures nothing happens when parent does not specify URL."""
+    """Ensures nothing happens when parent doesn't specify URL."""
     key = models.InstanceGroupManager(
         key=instance_group_managers.get_instance_group_manager_key(
             'base-name',
@@ -161,6 +176,232 @@ class CreateTest(test_case.TestCase):
 
     self.assertRaises(net.Error, instance_group_managers.create, key)
     self.failIf(key.get().url)
+
+
+class DeleteTest(test_case.TestCase):
+  """Tests for instance_group_managers.delete."""
+
+  def test_entity_doesnt_exist(self):
+    """Ensures nothing happens when the entity doesn't exist."""
+    key = ndb.Key(models.InstanceGroupManager, 'fake-key')
+
+    instance_group_managers.delete(key)
+    self.failIf(key.get())
+
+  def test_deletes(self):
+    """Ensures an instance group manager is deleted."""
+    def json_request(url, *args, **kwargs):
+      return {'targetLink': url}
+    self.mock(instance_group_managers.net, 'json_request', json_request)
+
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+        url='url',
+    ).put()
+
+    instance_group_managers.delete(key)
+    self.failIf(key.get().url)
+
+  def test_url_unspecified(self):
+    """Ensures nothing happens when URL is unspecified."""
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+    ).put()
+
+    instance_group_managers.delete(key)
+    self.failIf(key.get().url)
+
+  def test_url_not_found(self):
+    """Ensures URL is updated when the instance group manager is not found."""
+    def json_request(url, *args, **kwargs):
+      raise net.Error('', 404, '')
+    self.mock(instance_group_managers.net, 'json_request', json_request)
+
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+        url='url',
+    ).put()
+
+    instance_group_managers.delete(key)
+    self.failIf(key.get().url)
+
+  def test_deletion_fails(self):
+    """Ensures nothing happens when instance group manager deletion fails."""
+    def json_request(url, *args, **kwargs):
+      raise net.Error('', 400, '')
+    self.mock(instance_group_managers.net, 'json_request', json_request)
+
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+        url='url',
+    ).put()
+    expected_url = 'url'
+
+    self.assertRaises(net.Error, instance_group_managers.delete, key)
+    self.assertEqual(key.get().url, expected_url)
+
+
+class GetDrainedInstanceGroupManagersTest(test_case.TestCase):
+  """Tests for instance_group_managers.get_drained_instance_group_managers."""
+
+  def test_no_entities(self):
+    """Ensures nothing is returned when there are no entities."""
+    self.failIf(instance_group_managers.get_drained_instance_group_managers())
+
+  def test_nothing_active_or_drained(self):
+    """Ensures nothing is returned when there are no active/drained entities."""
+    models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+    ).put()
+
+    self.failIf(instance_group_managers.get_drained_instance_group_managers())
+
+  def test_active_only(self):
+    """Ensures nothing is returned when there are only active entities."""
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+    ).put()
+    models.InstanceTemplateRevision(
+        key=key.parent(),
+        active=[
+            key,
+        ],
+    ).put()
+
+    self.failIf(instance_group_managers.get_drained_instance_group_managers())
+
+  def test_drained(self):
+    """Ensures drained entities are returned."""
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+    ).put()
+    models.InstanceTemplateRevision(
+        key=key.parent(),
+        drained=[
+            key,
+        ],
+    ).put()
+    expected_keys = [key]
+
+    self.assertItemsEqual(
+        instance_group_managers.get_drained_instance_group_managers(),
+        expected_keys,
+    )
+
+  def test_implicitly_drained(self):
+    """Ensures implicitly drained entities are returned."""
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+    ).put()
+    models.InstanceTemplateRevision(
+        key=key.parent(),
+        active=[
+            key,
+        ],
+    ).put()
+    models.InstanceTemplate(
+        key=key.parent().parent(),
+        drained=[
+            key.parent(),
+        ],
+    ).put()
+    expected_keys = [
+        key,
+    ]
+
+    self.assertItemsEqual(
+        instance_group_managers.get_drained_instance_group_managers(),
+        expected_keys,
+    )
+
+
+class GetInstanceGroupManagerToDeleteTest(test_case.TestCase):
+  """Tests for instance_group_managers.get_instance_group_manager_to_delete."""
+
+  def test_entity_doesnt_exist(self):
+    """Ensures no URL when the entity doesn't exist."""
+    key = ndb.Key(models.InstanceGroupManager, 'fake-key')
+    self.failIf(
+        instance_group_managers.get_instance_group_manager_to_delete(key))
+
+  def test_instances(self):
+    """Ensures no URL when there are active instances."""
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+        instances=[
+            ndb.Key(models.Instance, 'fake-key'),
+        ],
+        url='url',
+    ).put()
+
+    self.failIf(
+        instance_group_managers.get_instance_group_manager_to_delete(key))
+
+  def test_url_unspecified(self):
+    """Ensures no URL when URL is unspecified."""
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+    ).put()
+
+    self.failIf(
+        instance_group_managers.get_instance_group_manager_to_delete(key))
+
+  def test_returns_url(self):
+    """Ensures URL is returned."""
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+        url='url',
+    ).put()
+    expected_url = 'url'
+
+    self.assertEqual(
+        instance_group_managers.get_instance_group_manager_to_delete(key),
+        expected_url,
+    )
 
 
 class ScheduleCreationTest(test_case.TestCase):

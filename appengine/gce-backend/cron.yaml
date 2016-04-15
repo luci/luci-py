@@ -1,9 +1,21 @@
 cron:
+- url: /internal/cron/cleanup-entities
+  schedule: every 1 minutes
+
 - url: /internal/cron/create-instance-group-managers
   schedule: every 1 minutes
+
+- url: /internal/cron/delete-instance-group-managers
+  schedule: every 1 minutes
+
 - url: /internal/cron/create-instance-templates
   schedule: every 1 minutes
+
+- url: /internal/cron/delete-instance-templates
+  schedule: every 1 minutes
+
 - url: /internal/cron/import-config
   schedule: every 1 minutes synchronized
+
 - url: /internal/cron/process-config
   schedule: every 1 minutes

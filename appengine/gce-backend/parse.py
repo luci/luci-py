@@ -15,6 +15,7 @@ from protorpc.remote import protojson
 from components.machine_provider import dimensions
 
 import models
+import utils
 
 
 def get_instance_template_key(template_cfg):
@@ -269,26 +270,6 @@ def ensure_instance_template_revision_active(template_cfg, instance_template):
   return True
 
 
-def _batch_process_async(items, f, max_concurrent=50):
-  """Processes asynchronous calls in parallel, but batched.
-
-  Args:
-    items: List of items to process.
-    f: f(item) -> ndb.Future. Asynchronous function to apply to each item.
-    max_concurrent: Maximum number of futures to have pending concurrently.
-  """
-  futures = []
-  while items:
-    num_futures = len(futures)
-    if num_futures < max_concurrent:
-      futures.extend([f(item) for item in items[:max_concurrent - num_futures]])
-      items = items[max_concurrent - num_futures:]
-    ndb.Future.wait_any(futures)
-    futures = [future for future in futures if not future.done()]
-  if futures:
-    ndb.Future.wait_all(futures)
-
-
 @ndb.transactional_tasklet
 def ensure_instance_group_manager_exists(template_cfg, manager_cfg):
   """Ensures an InstanceGroupManager exists for the given config.
@@ -413,4 +394,4 @@ def parse(template_cfgs, manager_cfgs, max_concurrent=50, max_concurrent_igm=5):
         max_concurrent=max_concurrent_igm,
     )
 
-  _batch_process_async(template_cfgs, f, max_concurrent=max_concurrent)
+  utils._batch_process_async(template_cfgs, f, max_concurrent=max_concurrent)
