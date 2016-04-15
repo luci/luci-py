@@ -67,6 +67,10 @@ from server import task_pack
 MAXIMUM_PRIORITY = 255
 
 
+# Enforced on both task request and bots.
+DIMENSION_KEY_RE = ur'^[a-zA-Z\-\_]+$'
+
+
 # One day in seconds. Add 10s to account for small jitter.
 _ONE_DAY_SECS = 24*60*60 + 10
 
@@ -125,12 +129,27 @@ def _validate_namespace(prop, value):
 
 
 def _validate_dict_of_strings(prop, value):
-  """Validates TaskProperties.dimensions and TaskProperties.env."""
+  """Validates TaskProperties.env."""
   if not all(
          isinstance(k, unicode) and isinstance(v, unicode)
          for k, v in value.iteritems()):
     # pylint: disable=W0212
     raise TypeError('%s must be a dict of strings' % prop._name)
+
+
+def _validate_dimensions(prop, value):
+  """Validates TaskProperties.dimensions."""
+  # pylint: disable=W0212
+  if not value:
+    raise datastore_errors.BadValueError(u'%s must be specified' % prop._name)
+  _validate_dict_of_strings(prop, value)
+  for key in value:
+    if not re.match(DIMENSION_KEY_RE, key):
+      raise datastore_errors.BadValueError(
+          u'key %r doesn\'t match %s' % (key, DIMENSION_KEY_RE))
+  if u'pool' not in value and u'id' not in value:
+    raise datastore_errors.BadValueError(
+        u'At least one of \'id\' or \'pool\' must be used as %s' % prop._name)
 
 
 def _validate_expiration(prop, value):
@@ -236,7 +255,7 @@ class TaskProperties(ndb.Model):
   # example, Windows or hostname. Encoded as json. Optional but highly
   # recommended.
   dimensions = datastore_utils.DeterministicJsonProperty(
-      validator=_validate_dict_of_strings, json_type=dict, indexed=False)
+      validator=_validate_dimensions, json_type=dict, indexed=False)
 
   # Environment variables. Encoded as json. Optional.
   env = datastore_utils.DeterministicJsonProperty(
@@ -406,13 +425,6 @@ class TaskRequest(ndb.Model):
     elif self.priority == 0:
       raise datastore_errors.BadValueError(
           'priority 0 can only be used for terminate request')
-
-    if not self.properties.dimensions:
-      raise datastore_errors.BadValueError('dimensions must be specified')
-    dim_keys = self.properties.dimensions.keys()
-    if 'pool' not in dim_keys and 'id' not in dim_keys:
-      raise datastore_errors.BadValueError(
-          'At least one of \'id\' or \'pool\' must be used as dimensions')
 
     if (self.pubsub_topic and
         not pubsub.validate_full_name(self.pubsub_topic, 'topics')):

@@ -365,6 +365,19 @@ class TaskRequestApiTest(TestCase):
 
     with self.assertRaises(TypeError):
       task_request.make_request(
+          _gen_request(properties=dict(dimensions=[])), True)
+    with self.assertRaises(datastore_errors.BadValueError):
+      task_request.make_request(
+          _gen_request(properties=dict(dimensions={})), True)
+    with self.assertRaises(datastore_errors.BadValueError):
+      task_request.make_request(
+          _gen_request(
+              properties=dict(dimensions={u'id': u'b', u'a:': u'b'})), True)
+    task_request.make_request(
+        _gen_request(properties=dict(dimensions={u'id': u'b'})), True)
+
+    with self.assertRaises(TypeError):
+      task_request.make_request(
           _gen_request(properties=dict(env=[])), True)
     with self.assertRaises(TypeError):
       task_request.make_request(

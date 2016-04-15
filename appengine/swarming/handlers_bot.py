@@ -7,6 +7,7 @@
 import base64
 import json
 import logging
+import re
 import textwrap
 
 import webob
@@ -197,6 +198,7 @@ class _BotBaseHandler(auth.ApiHandler):
 
       if not all(
           isinstance(key, unicode) and
+          re.match(task_request.DIMENSION_KEY_RE, key) and
           isinstance(values, list) and
           all(isinstance(value, unicode) for value in values)
           for key, values in dimensions.iteritems()):
