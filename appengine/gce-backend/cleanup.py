@@ -11,7 +11,7 @@ from google.appengine.ext import ndb
 import instance_group_managers
 import instance_templates
 import models
-import utils
+import utilities
 
 
 @ndb.transactional_tasklet
@@ -107,7 +107,7 @@ def cleanup_instance_group_managers(max_concurrent=50):
   Args:
     max_concurrent: Maximum number to delete concurrently.
   """
-  utils._batch_process_async(
+  utilities.batch_process_async(
       instance_group_managers.get_drained_instance_group_managers(),
       delete_instance_group_manager,
       max_concurrent=max_concurrent,
@@ -120,7 +120,7 @@ def cleanup_instance_template_revisions(max_concurrent=50):
   Args:
     max_concurrent: Maximum number to delete concurrently.
   """
-  utils._batch_process_async(
+  utilities.batch_process_async(
       instance_templates.get_drained_instance_template_revisions(),
       delete_instance_template_revision,
       max_concurrent=max_concurrent,
@@ -133,7 +133,7 @@ def cleanup_instance_templates(max_concurrent=50):
   Args:
     max_concurrent: Maximum number to delete concurrently.
   """
-  utils._batch_process_async(
+  utilities.batch_process_async(
       models.InstanceTemplate.query().fetch(keys_only=True),
       delete_instance_template,
       max_concurrent=max_concurrent,

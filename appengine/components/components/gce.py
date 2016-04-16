@@ -333,6 +333,31 @@ class Project(object):
         raise
     return resp
 
+  def get_instances_in_instance_group(
+      self, name, zone, max_results=None, page_token=None):
+    """Returns the instances in the specified GCE instance group.
+
+    Args:
+      name: Name of the instance group manager.
+      zone: Zone the instance group manager exists in.
+      max_results: If specified, maximum number of instances to return.
+      page_token: If specified, token to use to return a specific page of
+        instances.
+
+    Returns:
+      A compute#instanceGroupsListInstances dict.
+    """
+    params = {}
+    if max_results:
+      params['maxResults'] = max_results
+    if page_token:
+      params['pageToken'] = page_token
+    return self.call_api(
+        '/zones/%s/instanceGroups/%s/listInstances' % (zone, name),
+        method='POST',
+        params=params,
+    )
+
   def get_instance_group_manager(self, name, zone):
     """Returns the specified GCE instance group manager.
 
@@ -538,6 +563,11 @@ def get_region_url(project_id, region):
   assert is_valid_region(region), region
   return 'https://www.googleapis.com/compute/v1/projects/%s/regions/%s' % (
       project_id, region)
+
+
+def extract_instance_name(url):
+  """Given instance URL returns instance name."""
+  return url.rsplit('/', 1)[-1]
 
 
 def extract_region(region_url):

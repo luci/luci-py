@@ -196,7 +196,7 @@ def get_instance_template_to_delete(key):
     return
 
   if not entity.url:
-    logging.warning('InstanceTemplateRevision has no associated URL: %s', key)
+    logging.warning('InstanceTemplateRevision URL unspecified: %s', key)
     return
 
   return entity.url

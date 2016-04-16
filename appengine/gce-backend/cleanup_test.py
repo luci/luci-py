@@ -3,7 +3,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Unit tests for parse.py."""
+"""Unit tests for cleanup.py."""
 
 import unittest
 

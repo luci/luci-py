@@ -15,7 +15,7 @@ from protorpc.remote import protojson
 from components.machine_provider import dimensions
 
 import models
-import utils
+import utilities
 
 
 def get_instance_template_key(template_cfg):
@@ -394,4 +394,4 @@ def parse(template_cfgs, manager_cfgs, max_concurrent=50, max_concurrent_igm=5):
         max_concurrent=max_concurrent_igm,
     )
 
-  utils._batch_process_async(template_cfgs, f, max_concurrent=max_concurrent)
+  utilities.batch_process_async(template_cfgs, f, max_concurrent=max_concurrent)

@@ -7,7 +7,7 @@
 from google.appengine.ext import ndb
 
 
-def _batch_process_async(items, f, max_concurrent=50):
+def batch_process_async(items, f, max_concurrent=50):
   """Processes asynchronous calls in parallel, but batched.
 
   Args:

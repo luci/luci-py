@@ -14,6 +14,9 @@ cron:
 - url: /internal/cron/delete-instance-templates
   schedule: every 1 minutes
 
+- url: /internal/cron/fetch-instances
+  schedule: every 1 minutes
+
 - url: /internal/cron/import-config
   schedule: every 1 minutes synchronized
 

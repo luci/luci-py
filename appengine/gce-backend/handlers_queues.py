@@ -14,6 +14,21 @@ from components import decorators
 
 import instance_group_managers
 import instance_templates
+import instances
+
+
+class InstanceFetchHandler(webapp2.RequestHandler):
+  """Worker for fetching instances for an instance group manager."""
+
+  @decorators.require_taskqueue('fetch-instances')
+  def post(self):
+    """Fetches instances for the given InstanceGroupManager.
+
+    Params:
+      key: URL-safe key for a models.InstanceGroupManager.
+    """
+    key = ndb.Key(urlsafe=self.request.get('key'))
+    instances.ensure_entities_exist(key)
 
 
 class InstanceGroupManagerCreationHandler(webapp2.RequestHandler):
@@ -82,4 +97,5 @@ def create_queues_app():
        InstanceGroupManagerDeletionHandler),
       ('/internal/queues/delete-instance-template',
        InstanceTemplateDeletionHandler),
+      ('/internal/queues/fetch-instances', InstanceFetchHandler),
   ])

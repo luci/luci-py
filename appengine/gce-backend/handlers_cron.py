@@ -14,6 +14,7 @@ import cleanup
 import config
 import instance_group_managers
 import instance_templates
+import instances
 import parse
 
 
@@ -47,6 +48,14 @@ class EntityCleanupHandler(webapp2.RequestHandler):
     cleanup.cleanup_instance_group_managers()
     cleanup.cleanup_instance_template_revisions()
     cleanup.cleanup_instance_templates()
+
+
+class InstanceFetchHandler(webapp2.RequestHandler):
+  """Worker for fetching instances."""
+
+  @decorators.require_cronjob
+  def get(self):
+    instances.schedule_fetch()
 
 
 class InstanceGroupManagerCreationHandler(webapp2.RequestHandler):
@@ -92,6 +101,7 @@ def create_cron_app():
        InstanceGroupManagerDeletionHandler),
       ('/internal/cron/delete-instance-templates',
        InstanceTemplateDeletionHandler),
+      ('/internal/cron/fetch-instances', InstanceFetchHandler),
       ('/internal/cron/import-config', ConfigImportHandler),
       ('/internal/cron/process-config', ConfigProcessHandler),
   ])

@@ -21,6 +21,8 @@ def get_instance_group_manager_key(base_name, revision, zone):
 
   Args:
     base_name: Base name for the models.InstanceTemplate.
+    revision: Revision string for the models.InstanceTemplateRevision.
+    zone: Zone for the models.InstanceGroupManager.
 
   Returns:
     ndb.Key for a models.InstanceTemplate entity.
@@ -197,7 +199,7 @@ def get_instance_group_manager_to_delete(key):
     return
 
   if not entity.url:
-    logging.warning('InstanceGroupManager has no associated URL: %s', key)
+    logging.warning('InstanceGroupManager URL unspecified: %s', key)
     return
 
   return entity.url
