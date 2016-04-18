@@ -100,6 +100,15 @@ class AuthorizationError(Error):
 SecretKey = collections.namedtuple('SecretKey', ['name', 'scope'])
 
 
+# The chunk of AuthGroup used by AuthDB, preprocessed for faster membership
+# checks. We keep it in AuthDB in place of AuthGroup to reduce RAM usage.
+GroupEssence = collections.namedtuple('GroupEssence', [
+  'members',  # == set(m.to_bytes() for m in auth_group.members)
+  'globs',    # == auth_group.globs
+  'nested',   # == auth_group.nested
+])
+
+
 class AuthDB(object):
   """A read only in-memory database of auth configuration of a service.
 
@@ -129,7 +138,6 @@ class AuthDB(object):
           moment when entities were fetched from it.
     """
     self.global_config = global_config or model.AuthGlobalConfig()
-    self.groups = {g.key.string_id(): g for g in (groups or [])}
     self.secrets = {'local': {}, 'global': {}}
     self.ip_whitelists = {e.key.string_id(): e for e in (ip_whitelists or [])}
     self.ip_whitelist_assignments = (
@@ -143,47 +151,73 @@ class AuthDB(object):
       assert secret.key.string_id() not in self.secrets[scope], secret.key
       self.secrets[scope][secret.key.string_id()] = secret
 
+    # Preprocess groups for faster membership checks. Throw away original
+    # entities to reduce memory usage.
+    self.groups = {}
+    for entity in (groups or []):
+      self.groups[entity.key.string_id()] = GroupEssence(
+          members=frozenset(m.to_bytes() for m in entity.members),
+          globs=entity.globs or (),
+          nested=entity.nested or ())
+
   def is_group_member(self, group_name, identity):
     """Returns True if |identity| belongs to group |group_name|.
 
     Unknown groups are considered empty.
     """
+    # Will be used when checking self.group_members_set sets.
+    ident_as_bytes = identity.to_bytes()
+
     # While the code to add groups refuses to add cycle, this code ensures that
     # it doesn't go in a cycle by keeping track of the groups currently being
-    # visited via |seen| stack.
-    seen = []
+    # visited via |current| stack.
+    current = []
 
-    def is_group_member_internal(group_name, identity):
+    # Used to avoid revisiting same groups multiple times in case of
+    # diamond-like graphs, e.g. A->B, A->C, B->D, C->D.
+    visited = set()
+
+    def is_member(group_name):
       # Wildcard group that matches all identities (including anonymous!).
       if group_name == model.GROUP_ALL:
         return True
 
       # An unknown group is empty.
-      group_obj = self.groups.get(group_name)
-      if not group_obj:
-        logging.warning('Querying unknown group: %s via %s', group_name, seen)
+      group_essence = self.groups.get(group_name)
+      if not group_essence:
+        logging.warning(
+            'Querying unknown group: %s via %s', group_name, current)
         return False
 
-      # Use |seen| to detect and avoid cycles in group nesting graph.
-      if group_name in seen:
-        logging.warning('Cycle in a group graph: %s via %s', group_name, seen)
+      # In a group DAG a group can not reference any of its ancestors, since it
+      # creates a cycle.
+      if group_name in current:
+        logging.warning(
+            'Cycle in a group graph: %s via %s', group_name, current)
         return False
 
-      seen.append(group_name)
+      # Explored this group already (and didn't find |identity| there) while
+      # visiting some sibling branch? Can happen in diamond-like graphs.
+      if group_name in visited:
+        return False
+
+      current.append(group_name)
       try:
-        if any(identity == m for m in group_obj.members):
+        # Note that we don't include nested groups in GroupEssense.members sets
+        # because it blows up memory usage pretty bad. We don't have very deep
+        # nesting graphs, so checking nested groups separately is OK.
+        if ident_as_bytes in group_essence.members:
           return True
 
-        if any(glob.match(identity) for glob in group_obj.globs):
+        if any(glob.match(identity) for glob in group_essence.globs):
           return True
 
-        return any(
-            is_group_member_internal(nested, identity)
-            for nested in group_obj.nested)
+        return any(is_member(nested) for nested in group_essence.nested)
       finally:
-        seen.pop()
+        current.pop()
+        visited.add(group_name)
 
-    return is_group_member_internal(group_name, identity)
+    return is_member(group_name)
 
   def list_group(self, group_name, recursive=True):
     """Returns a set of all identities in a group.
@@ -196,31 +230,34 @@ class AuthDB(object):
       Set of Identity objects. Unknown groups are considered empty.
     """
     if not recursive:
-      group_obj = self.groups.get(group_name)
-      return set(group_obj.members) if group_obj else set()
+      group_essence = self.groups.get(group_name)
+      if not group_essence:
+        return set()
+      return set(model.Identity.from_bytes(m) for m in group_essence.members)
 
-    # While the code to add groups refuses to add cycle, this code ensures that
-    # it doesn't go in a cycle by keeping track of the groups visited in |seen|.
-    seen = set()
+    # Set of groups already added to 'listing'.
+    visited = set()
 
-    def list_group_internal(group_name):
+    # Updated by visit_group. We keep it in the closure to avoid passing more
+    # stuff through the thread stack.
+    listing = set()
+
+    def visit_group(group_name):
       # An unknown group is empty.
-      group_obj = self.groups.get(group_name)
-      if not group_obj:
-        return set()
+      group_essence = self.groups.get(group_name)
+      if not group_essence:
+        return
 
-      # Use |seen| to detect and avoid cycles in group nesting graph.
-      if group_name in seen:
-        logging.error('Cycle in a group graph\nInfo: %s, %s', group_name, seen)
-        return set()
-      seen.add(group_name)
+      if group_name in visited:
+        return
+      visited.add(group_name)
 
-      members = set(group_obj.members)
-      for nested in group_obj.nested:
-        members.update(list_group_internal(nested))
-      return members
+      listing.update(group_essence.members)
+      for nested in group_essence.nested:
+        visit_group(nested)
 
-    return list_group_internal(group_name)
+    visit_group(group_name)
+    return set(model.Identity.from_bytes(m) for m in listing)
 
   def get_secret(self, secret_key):
     """Returns list of strings with last known values of a secret.
