@@ -5,6 +5,13 @@ runtime: python27
 api_version: 1
 threadsafe: true
 
+instance_class: F4
+automatic_scaling:
+  min_idle_instances: 2
+  min_pending_latency: 50ms
+  max_pending_latency: 250ms
+  max_concurrent_requests: 4
+
 handlers:
 - url: /_ah/spi/.*
   script: main_frontend.endpoints_app
