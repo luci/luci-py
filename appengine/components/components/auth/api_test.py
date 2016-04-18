@@ -117,15 +117,35 @@ class AuthDBTest(test_case.TestCase):
     group2 = model.AuthGroup(id='Group2')
     group2.nested.append('Group1')
 
-    # Collect error messages.
-    errors = []
-    self.mock(api.logging, 'error', lambda *args: errors.append(args))
+    # Collect warnings.
+    warnings = []
+    self.mock(api.logging, 'warning', lambda msg, *_args: warnings.append(msg))
 
     # This should not hang, but produce error message.
     auth_db = api.AuthDB(groups=[group1, group2])
     self.assertFalse(
         auth_db.is_group_member('Group1', model.Anonymous))
-    self.assertEqual(1, len(errors))
+    self.assertEqual(1, len(warnings))
+    self.assertTrue('Cycle in a group graph' in warnings[0])
+
+  def test_not_real_nested_group_cycle_aka_issue_251(self):
+    # See https://github.com/luci/luci-py/issues/251.
+    #
+    # B -> A, C -> [B, A]. When traversing C, A is seen twice, and this is fine.
+    group_A = model.AuthGroup(id='A')
+    group_B = model.AuthGroup(id='B')
+    group_C = model.AuthGroup(id='C')
+
+    group_B.nested = ['A']
+    group_C.nested = ['A', 'B']
+
+    db = api.AuthDB(groups=[group_A, group_B, group_C])
+
+    # 'is_group_member' must not report 'Cycle in a group graph' warning.
+    warnings = []
+    self.mock(api.logging, 'warning', lambda msg, *_args: warnings.append(msg))
+    self.assertFalse(db.is_group_member('C', model.Anonymous))
+    self.assertFalse(warnings)
 
   def test_is_allowed_oauth_client_id(self):
     global_config = model.AuthGlobalConfig(

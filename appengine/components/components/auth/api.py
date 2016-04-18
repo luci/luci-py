@@ -149,8 +149,9 @@ class AuthDB(object):
     Unknown groups are considered empty.
     """
     # While the code to add groups refuses to add cycle, this code ensures that
-    # it doesn't go in a cycle by keeping track of the groups visited in |seen|.
-    seen = set()
+    # it doesn't go in a cycle by keeping track of the groups currently being
+    # visited via |seen| stack.
+    seen = []
 
     def is_group_member_internal(group_name, identity):
       # Wildcard group that matches all identities (including anonymous!).
@@ -160,26 +161,27 @@ class AuthDB(object):
       # An unknown group is empty.
       group_obj = self.groups.get(group_name)
       if not group_obj:
+        logging.warning('Querying unknown group: %s via %s', group_name, seen)
         return False
 
       # Use |seen| to detect and avoid cycles in group nesting graph.
       if group_name in seen:
-        logging.error('Cycle in a group graph\nInfo: %s, %s', group_name, seen)
+        logging.warning('Cycle in a group graph: %s via %s', group_name, seen)
         return False
-      seen.add(group_name)
 
-      # Globs first, there's usually a higher chance to find identity there.
-      if any(glob.match(identity) for glob in group_obj.globs):
-        return True
+      seen.append(group_name)
+      try:
+        if any(identity == m for m in group_obj.members):
+          return True
 
-      # Explicit member list, it's fast.
-      if any(identity == m for m in group_obj.members):
-        return True
+        if any(glob.match(identity) for glob in group_obj.globs):
+          return True
 
-      # Slowest nested group check last.
-      return any(
-          is_group_member_internal(nested, identity)
-          for nested in group_obj.nested)
+        return any(
+            is_group_member_internal(nested, identity)
+            for nested in group_obj.nested)
+      finally:
+        seen.pop()
 
     return is_group_member_internal(group_name, identity)
 
