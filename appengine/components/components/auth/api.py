@@ -334,10 +334,18 @@ def attempt_oauth_initialization(scope):
     except apiproxy_errors.DeadlineExceededError as e:
       logging.warning('DeadlineExceededError: %s', e)
       continue
+    except oauth.OAuthServiceFailureError as e:
+      logging.warning(
+          'oauth.OAuthServiceFailureError (%s): %s', e.__class__.__name__, e)
+      # oauth library "caches" the error code in os.environ and retrying
+      # oauth.get_client_id doesn't do anything. Clear this cache first, see
+      # oauth_api.py, _maybe_call_get_oauth_user in GAE SDK.
+      os.environ.pop('OAUTH_ERROR_CODE', None)
+      continue
     except oauth.Error as e:
       # Next call to oauth.get_client_id() will trigger same error and it will
       # be handled for real.
-      logging.warning('oauth.Error: %s', e)
+      logging.warning('oauth.Error (%s): %s', e.__class__.__name__, e)
       return
 
 
