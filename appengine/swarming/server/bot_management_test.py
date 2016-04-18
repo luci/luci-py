@@ -137,14 +137,14 @@ class BotManagementTest(test_case.TestCase):
     expected = [
       {
         'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
-       'event_type': u'request_task',
-       'external_ip': u'8.8.4.4',
-       'message': None,
-       'quarantined': False,
-       'state': {u'ram': 65},
-       'task_id': u'12311',
-       'ts': now,
-       'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',
+        'event_type': u'request_task',
+        'external_ip': u'8.8.4.4',
+        'message': None,
+        'quarantined': False,
+        'state': {u'ram': 65},
+        'task_id': u'12311',
+        'ts': now,
+        'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',
       },
     ]
     self.assertEqual(
