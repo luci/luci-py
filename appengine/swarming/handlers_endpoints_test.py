@@ -1076,6 +1076,19 @@ class BotsApiTest(BaseTest):
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
 
+    request = swarming_rpcs.BotsRequest(dimensions=['foo:bar', 'id:id1'])
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+
+    request = swarming_rpcs.BotsRequest(dimensions=['not:existing'])
+    response = self.call_api('list', body=message_to_dict(request))
+    del expected[u'items']
+    self.assertEqual(expected, response.json)
+
+    request = swarming_rpcs.BotsRequest(dimensions=['bad'])
+    with self.call_should_fail('400'):
+      self.call_api('list', body=message_to_dict(request))
+
 
 class BotApiTest(BaseTest):
   api_service_cls = handlers_endpoints.SwarmingBotService

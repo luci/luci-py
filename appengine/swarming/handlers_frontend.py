@@ -222,10 +222,17 @@ class BotsListHandler(auth.AuthenticatingHandler):
       order = datastore_query.PropertyOrder(
           sort_by, datastore_query.PropertyOrder.ASCENDING)
 
+    dimensions = (
+      l.strip() for l in self.request.get('dimensions', '').splitlines()
+    )
+    dimensions = [i for i in dimensions if i]
+
     now = utils.utcnow()
     cutoff = now - datetime.timedelta(
         seconds=config.settings().bot_death_timeout_secs)
 
+    # TODO(maruel): Counting becomes an issue at the 10k range, at that point it
+    # should be prepopulated in an entity and updated via a cron job.
     num_bots_busy_future = bot_management.BotInfo.query(
         bot_management.BotInfo.is_busy == True).count_async()
     num_bots_dead_future = bot_management.BotInfo.query(
@@ -233,8 +240,10 @@ class BotsListHandler(auth.AuthenticatingHandler):
     num_bots_quarantined_future = bot_management.BotInfo.query(
         bot_management.BotInfo.quarantined == True).count_async()
     num_bots_total_future = bot_management.BotInfo.query().count_async()
-    fetch_future = bot_management.BotInfo.query().order(order).fetch_page_async(
-        limit, start_cursor=cursor)
+    q = bot_management.BotInfo.query().order(order)
+    for d in dimensions:
+      q = q.filter(bot_management.BotInfo.dimensions_flat == d)
+    fetch_future = q.fetch_page_async(limit, start_cursor=cursor)
 
     # TODO(maruel): self.request.host_url should be the default AppEngine url
     # version and not the current one. It is only an issue when
@@ -253,6 +262,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
       'bots': bots,
       'current_version': version,
       'cursor': cursor.urlsafe() if cursor and more else '',
+      'dimensions': '\n'.join(dimensions),
       'is_admin': acl.is_admin(),
       'is_privileged_user': acl.is_privileged_user(),
       'limit': limit,

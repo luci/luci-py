@@ -591,6 +591,13 @@ class SwarmingBotsService(remote.Service):
     logging.info('%s', request)
     now = utils.utcnow()
     q = bot_management.BotInfo.query().order(bot_management.BotInfo.key)
+    for d in request.dimensions:
+      if not ':' in d:
+        raise endpoints.BadRequestException('Invalid dimensions')
+      parts = d.split(':', 1)
+      if len(parts) != 2 or any(i.strip() != i or not i for i in parts):
+        raise endpoints.BadRequestException('Invalid dimensions')
+      q = q.filter(bot_management.BotInfo.dimensions_flat == d)
     bots, cursor = datastore_utils.fetch_page(q, request.limit, request.cursor)
     return swarming_rpcs.BotList(
         cursor=cursor,

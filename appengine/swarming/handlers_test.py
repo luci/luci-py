@@ -337,22 +337,30 @@ class FrontendTest(AppTestBase):
     self.bot_poll('bot2')
 
     response = self.app.get('/restricted/bots', status=200)
-    reg = re.compile(r'<a\s+href="(.+?)">Next page</a>')
-    self.assertFalse(reg.search(response.body))
+    next_page_re = re.compile(r'<a\s+href="(.+?)">Next page</a>')
+    self.assertFalse(next_page_re.search(response.body))
     self.app.get('/restricted/bot/bot1', status=200)
     self.app.get('/restricted/bot/bot2', status=200)
 
     response = self.app.get('/restricted/bots?limit=1', status=200)
-    url = reg.search(response.body).group(1)
+    url = next_page_re.search(response.body).group(1)
     self.assertTrue(
         url.startswith('/restricted/bots?limit=1&sort_by=__key__&cursor='), url)
     response = self.app.get(url, status=200)
-    self.assertFalse(reg.search(response.body))
+    self.assertFalse(next_page_re.search(response.body))
 
+    # Test more complex indexes.
     for sort_by in handlers_frontend.BotsListHandler.ACCEPTABLE_BOTS_SORTS:
       response = self.app.get(
           '/restricted/bots?limit=1&sort_by=%s' % sort_by, status=200)
-      self.assertTrue(reg.search(response.body), sort_by)
+      self.assertTrue(next_page_re.search(response.body), sort_by)
+      response = self.app.get(
+          '/restricted/bots?limit=1&sort_by=%s&dimensions=os:Amiga%%0Aid:bot1' %
+          sort_by,
+          status=200)
+      # The bot1 should be in the response.
+      self.assertTrue('pool' in response.body, sort_by)
+      self.assertTrue('default' in response.body, sort_by)
 
 
 class FrontendAdminTest(AppTestBase):

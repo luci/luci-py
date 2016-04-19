@@ -54,11 +54,13 @@ BotRoot = datastore_utils.get_versioned_root_model('BotRoot')
 
 class _BotCommon(ndb.Model):
   """Data that is copied from the BotEvent into BotInfo for performance."""
-  # Dimensions are used for task selection.
-  dimensions = datastore_utils.DeterministicJsonProperty(json_type=dict)
-
-  # State is purely informative.
+  # State is purely informative. It is completely free form.
   state = datastore_utils.DeterministicJsonProperty(json_type=dict)
+
+  # TODO(maruel): For previous entities. Delete as soon as all old dead bots
+  # have been deleted.
+  dimensions_old = datastore_utils.DeterministicJsonProperty(
+      json_type=dict, name='dimensions')
 
   # IP address as seen by the HTTP handler.
   external_ip = ndb.StringProperty(indexed=False)
@@ -79,10 +81,32 @@ class _BotCommon(ndb.Model):
   task_id = ndb.StringProperty(indexed=False)
 
   @property
+  def dimensions(self):
+    """Returns a dict representation of self.dimensions_flat."""
+    if self.dimensions_old:
+      return self.dimensions_old
+    out = {}
+    for i in self.dimensions_flat:
+      k, v = i.split(':', 1)
+      out.setdefault(k, []).append(v)
+    return out
+
+  @property
   def task(self):
     if not self.task_id:
       return None
     return task_pack.unpack_run_result_key(self.task_id)
+
+  def to_dict(self, exclude=None):
+    exclude = ['dimensions_flat', 'dimensions_old'] + (exclude or [])
+    out = super(_BotCommon, self).to_dict(exclude=exclude)
+    out['dimensions'] = self.dimensions
+    return out
+
+  def _pre_put_hook(self):
+    super(_BotCommon, self)._pre_put_hook()
+    self.dimensions_old = None
+    self.dimensions_flat.sort()
 
 
 class BotInfo(_BotCommon):
@@ -93,6 +117,12 @@ class BotInfo(_BotCommon):
   This entity is a cache of the last BotEvent and is additionally updated on
   poll, which does not create a BotEvent.
   """
+  # Dimensions are used for task selection. They are encoded as a list of
+  # key:value. Keep in mind that the same key can be used multiple times. The
+  # list must be sorted.
+  # It IS indexed to enable searching for bots.
+  dimensions_flat = ndb.StringProperty(repeated=True)
+
   # First time this bot was seen.
   first_seen_ts = ndb.DateTimeProperty(auto_now_add=True, indexed=False)
 
@@ -114,11 +144,11 @@ class BotInfo(_BotCommon):
     timeout = config.settings().bot_death_timeout_secs
     return (now - self.last_seen_ts).total_seconds() >= timeout
 
-  def to_dict(self):
-    out = super(BotInfo, self).to_dict()
+  def to_dict(self, exclude=None):
+    exclude = ['is_busy'] + (exclude or [])
+    out = super(BotInfo, self).to_dict(exclude=exclude)
     # Inject the bot id, since it's the entity key.
     out['id'] = self.id
-    out.pop('is_busy')
     return out
 
   def to_dict_with_now(self, now):
@@ -146,6 +176,12 @@ class BotEvent(_BotCommon):
     'request_restart', 'request_update', 'request_sleep', 'request_task',
     'task_completed', 'task_error', 'task_update',
   }
+  # Dimensions are used for task selection. They are encoded as a list of
+  # key:value. Keep in mind that the same key can be used multiple times. The
+  # list must be sorted.
+  # It is NOT indexed because this is not needed for events.
+  dimensions_flat = ndb.StringProperty(repeated=True, indexed=False)
+
   # Common properties for all events (which includes everything in _BotCommon).
   ts = ndb.DateTimeProperty(auto_now_add=True)
   event_type = ndb.StringProperty(choices=ALLOWED_EVENTS)
@@ -171,6 +207,18 @@ class BotSettings(ndb.Model):
   # If set to True, no task is handed out to this bot due to the bot being in a
   # broken situation.
   quarantined = ndb.BooleanProperty()
+
+
+### Private APIs.
+
+
+def _dimensions_to_flat(dimensions):
+  out = []
+  for k, values in dimensions.iteritems():
+    for v in values:
+      out.append('%s:%s' % (k, v))
+  out.sort()
+  return out
 
 
 ### Public APIs.
@@ -231,7 +279,7 @@ def bot_event(
   bot_info.last_seen_ts = utils.utcnow()
   bot_info.external_ip = external_ip
   if dimensions:
-    bot_info.dimensions = dimensions
+    bot_info.dimensions_flat = _dimensions_to_flat(dimensions)
   if state:
     bot_info.state = state
   if quarantined is not None:
@@ -255,7 +303,7 @@ def bot_event(
       parent=get_root_key(bot_id),
       event_type=event_type,
       external_ip=external_ip,
-      dimensions=bot_info.dimensions,
+      dimensions_flat=bot_info.dimensions_flat,
       quarantined=bot_info.quarantined,
       state=bot_info.state,
       task_id=bot_info.task_id,

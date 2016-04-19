@@ -40,8 +40,20 @@
 </style>
 
 <script>
+  function get_limit() {
+    return document.getElementById('limitText').value;
+  }
+
+  function update_limit_text(val) {
+    document.getElementById('limitText').value = val;
+  }
+
+  function update_limit_range(val) {
+    document.getElementById('limitRange').value = val;
+  }
+
   function submit_form() {
-    document.getElementById("order").submit();
+    document.getElementById("filter_and_order").submit();
   }
 </script>
 {% endblock %}
@@ -52,45 +64,69 @@
 
 <h1>Known bots</h1>
 <a href="/">Back to root</a>
-<p>
-<table class=property_table>
-  <tbody>
-    <tr>
-      <td>Current bot version</td>
-      <td>{{current_version[:8]}}</td>
-    </tr>
-    <tr>
-      <td>Number of bots alive</td>
-      <td>{{num_bots_alive}}</td>
-    </tr>
-    <tr>
-      <td>Number of busy bots</td>
-      <td>{{num_bots_busy}}</td>
-    </tr>
-    <tr>
-      <td>Number of bots dead</td>
-      <td>{{num_bots_dead}}</td>
-    </tr>
-    <tr>
-      <td>Number of bots quarantined</td>
-      <td>{{num_bots_quarantined}}</td>
-    </tr>
-  </tbody>
+<p/>
+<form id="filter_and_order" name="filter_and_order" method="GET">
+<table>
+  <tr>
+    <td>
+      <table class=property_table>
+        <tbody>
+          <tr>
+            <td>Current bot version</td>
+            <td>{{current_version[:8]}}</td>
+          </tr>
+          <tr>
+            <td>Number of bots alive</td>
+            <td>{{num_bots_alive}}</td>
+          </tr>
+          <tr>
+            <td>Number of busy bots</td>
+            <td>{{num_bots_busy}}</td>
+          </tr>
+          <tr>
+            <td>Number of bots dead</td>
+            <td>{{num_bots_dead}}</td>
+          </tr>
+          <tr>
+            <td>Number of bots quarantined</td>
+            <td>{{num_bots_quarantined}}</td>
+          </tr>
+        </tbody>
+      </table>
+    </td>
+    <td>
+      <div title="Filter by bot dimensions.">
+        Filter by advertized bot dimensions<br>
+        Use "key:value" format, e.g. "gpu:none"
+        <br>
+        <textarea id="dimensions" name="dimensions" rows="3" cols="30">{{dimensions}}</textarea>
+        <br>
+        <input type="submit" value="Filter">
+      </div>
+    </td>
+    <td>
+      Limit:
+      <br>
+      <input type="range" id="limitRange" name="limit" value="{{limit}}" min=10
+          max=500 step=5 onchange="update_limit_text(this.value);"
+          onmousemove="update_limit_text(this.value);" >
+      <input type="text" id="limitText" value="{{limit}}" maxlength="3"
+          onchange="update_limit_range(this.value);">
+    </td>
+  </tr>
 </table>
-<p>
-
-<form id="order" name="order" method="GET">
-  {% for sort_option in sort_options %}
-    <label>
-      <input type="radio" name="sort_by" value="{{sort_option.key}}"
-          onchange="submit_form()"
-          {% if sort_by == sort_option.key %}checked{%endif%}>
-        {{sort_option.name}}
-      </input>
-    </label>
-  {% endfor %}
+<p/>
+{% for sort_option in sort_options %}
+  <label>
+    <input type="radio" name="sort_by" value="{{sort_option.key}}"
+        onchange="submit_form()"
+        {% if sort_by == sort_option.key %}checked{%endif%}>
+      {{sort_option.name}}
+    </input>
+  </label>
+{% endfor %}
+<p/>
 </form>
-<p>
 
 {% import 'swarming/bot_view.html' as bot_view %}
 <table id="machine-table" class="alterning_background"
@@ -133,8 +169,8 @@
 </table>
 
 {% if cursor %}
-<p>
-<a href="/restricted/bots?limit={{limit}}&sort_by={{sort_by}}&cursor={{cursor}}">Next page</a>
+<p/>
+<a href="/restricted/bots?limit={{limit}}&sort_by={{sort_by}}&cursor={{cursor|urlencode}}&dimensions={{dimensions|urlencode}}">Next page</a>
 {% endif %}
 
 {% endblock %}

@@ -274,6 +274,9 @@ class BotsRequest(messages.Message):
   """Information needed to request bot data."""
   limit = messages.IntegerField(1, default=200)
   cursor = messages.StringField(2)
+  # Must be a list of 'key:value' strings to filter the returned list of bots
+  # on.
+  dimensions = messages.StringField(3, repeated=True)
 
 
 class BotEventsRequest(messages.Message):

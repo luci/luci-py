@@ -16,10 +16,16 @@ indexes:
   - name: ts
     direction: desc
 
-- kind: TaskResultSummary
+- kind: BotInfo
   properties:
-  - name: failure
-  - name: state
+  - name: dimensions_flat
+  - name: last_seen_ts
+
+- kind: BotInfo
+  properties:
+  - name: dimensions_flat
+  - name: quarantined
+    direction: desc
 
 - kind: TaskResultSummary
   properties:
