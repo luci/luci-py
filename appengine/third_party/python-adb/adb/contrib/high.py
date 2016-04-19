@@ -259,7 +259,21 @@ def Initialize(pub_key, priv_key):
     return _ADB_KEYS[:]
 
 
-def GetDevices(
+def _ConnectFromHandles(handles, as_root=False, **kwargs):
+  """Connects to the devices provided by handles."""
+  def fn(handle):
+    device = HighDevice.Connect(handle, **kwargs)
+    if as_root and device.cache.has_su and not device.IsRoot():
+      # This updates the port path of the device thus clears its cache.
+      device.Root()
+    return device
+
+  devices = parallel.pmap(fn, handles)
+  _PER_DEVICE_CACHE.trim(devices)
+  return devices
+
+
+def GetLocalDevices(
     banner, default_timeout_ms, auth_timeout_ms, on_error=None, as_root=False):
   """Returns the list of devices available.
 
@@ -281,23 +295,47 @@ def GetDevices(
   with _ADB_KEYS_LOCK:
     if not _ADB_KEYS:
       return []
-  # List of unopened common.UsbHandle.
+  # Create unopened handles for all usb devices.
   handles = list(
       common.UsbHandle.FindDevicesSafe(
           adb_commands_safe.DeviceIsAvailable, timeout_ms=default_timeout_ms))
 
-  def fn(handle):
-    device = HighDevice.Connect(
-        handle, banner=banner, default_timeout_ms=default_timeout_ms,
-        auth_timeout_ms=auth_timeout_ms, on_error=on_error)
-    if as_root and device.cache.has_su and not device.IsRoot():
-      # This updates the port path of the device thus clears its cache.
-      device.Root()
-    return device
+  return _ConnectFromHandles(handles, banner=banner,
+                             default_timeout_ms=default_timeout_ms,
+                             auth_timeout_ms=auth_timeout_ms, on_error=on_error,
+                             as_root=as_root)
 
-  devices = parallel.pmap(fn, handles)
-  _PER_DEVICE_CACHE.trim(devices)
-  return devices
+
+def GetRemoteDevices(banner, endpoints, default_timeout_ms, auth_timeout_ms,
+                     on_error=None, as_root=False):
+  """Returns the list of devices available.
+
+  Caller MUST call CloseDevices(devices) on the return value or call .Close() on
+  each element to close the TCP handles.
+
+  Arguments:
+  - banner: authentication banner associated with the RSA keys. It's better to
+        use a constant.
+  - endpoints: list of ip[:port] endpoints of devices to connect to via TCP.
+  - default_timeout_ms: default I/O operation timeout.
+  - auth_timeout_ms: timeout for the user to accept the public key.
+  - on_error: callback when an internal failure occurs.
+  - as_root: if True, restarts adbd as root if possible.
+
+  Returns one of:
+    - list of HighDevice instances.
+    - None if adb is unavailable.
+  """
+  with _ADB_KEYS_LOCK:
+    if not _ADB_KEYS:
+      return []
+  # Create unopened handles for all remote devices.
+  handles = [common.TcpHandle(endpoint) for endpoint in endpoints]
+
+  return _ConnectFromHandles(handles, banner=banner,
+                             default_timeout_ms=default_timeout_ms,
+                             auth_timeout_ms=auth_timeout_ms, on_error=on_error,
+                             as_root=as_root)
 
 
 def CloseDevices(devices):

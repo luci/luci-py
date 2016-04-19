@@ -87,7 +87,7 @@ class AdbCommandsSafe(object):
   _SHELL_SUFFIX = ' ;echo -e "\n$?"'
 
   def __init__(
-      self, port_path, handle, banner, rsa_keys, on_error,
+      self, handle, banner, rsa_keys, on_error, port_path=None,
       default_timeout_ms=10000, auth_timeout_ms=10000, lost_timeout_ms=10000):
     """Constructs an AdbCommandsSafe.
 
@@ -108,9 +108,11 @@ class AdbCommandsSafe(object):
     assert isinstance(lost_timeout_ms, int), lost_timeout_ms
     assert isinstance(banner, str), banner
     assert on_error is None or callable(on_error), on_error
-    assert all(isinstance(p, int) for p in port_path), port_path
-    assert handle is None or isinstance(handle, common.UsbHandle), handle
+    assert handle is None or isinstance(handle, common.Handle), handle
     assert all('\n' not in r.GetPublicKey() for r in rsa_keys), rsa_keys
+
+    port_path = handle.port_path if handle else port_path
+
     _LOG.debug(
         'AdbCommandsSafe(%s, %s, %s, %s, %s, %s, %s, %s)',
         port_path, handle, banner, rsa_keys, on_error, default_timeout_ms,
@@ -129,7 +131,7 @@ class AdbCommandsSafe(object):
     self._adb_cmd = None
     self._serial = None
     self._handle = handle
-    self._port_path = '/'.join(str(p) for p in port_path)
+    self._port_path = '/'.join(str(p) for p in port_path) if port_path else None
 
   @classmethod
   def ConnectDevice(cls, port_path, **kwargs):
@@ -152,14 +154,14 @@ class AdbCommandsSafe(object):
     """Return a AdbCommandsSafe for a USB device referenced by a handle.
 
     Arguments:
-    - handle: an opened or unopened common.UsbHandle.
+    - handle: an opened or unopened common.Handle.
     - The rest are the same as __init__().
 
     Returns:
       AdbCommandsSafe.
     """
     # pylint: disable=protected-access
-    obj = cls(port_path=handle.port_path, handle=handle, **kwargs)
+    obj = cls(handle=handle, **kwargs)
     if not handle.is_open:
       obj._OpenHandle()
     if obj._handle:
@@ -568,6 +570,12 @@ class AdbCommandsSafe(object):
         # through.
         # Assume it worked, which is nasty.
         out = 'restarting adbd as root\n'
+      except adb_protocol.InvalidResponseError as e:
+        # Same issue as mentioned above, but this error surfaces itself as an
+        # InvalidResponseError exception when communicating over tcp.
+        if self._handle.is_local:
+          raise
+        out = 'restarting adbd as root\n'
       except self._ERRORS as e:
         if not self._Reset('(): %s', e, use_serial=True):
           break
@@ -605,6 +613,12 @@ class AdbCommandsSafe(object):
         # down. But the exception still swallows the output (!)
         # Assume it worked, which is nasty.
         out = 'restarting adbd as non root\n'
+      except adb_protocol.InvalidResponseError as e:
+        # Same issue as mentioned above, but this error surfaces itself as an
+        # InvalidResponseError exception when communicating over tcp.
+        if self._handle.is_local:
+          raise
+        out = 'restarting adbd as non root\n'
       except self._ERRORS as e:
         if not self._Reset('(): %s', e, use_serial=True):
           break
@@ -631,22 +645,25 @@ class AdbCommandsSafe(object):
     assert not self._adb_cmd
     # TODO(maruel): Add support for TCP/IP communication.
     try:
-      previous_port_path = self._port_path
-      if use_serial:
-        assert self._serial
-        self._handle = common.UsbHandle.Find(
-            adb_commands.DeviceIsAvailable, serial=self._serial,
-            timeout_ms=self._default_timeout_ms)
-        # Update the new found port path.
-        self._port_path = self._handle.port_path_str
+      if self.port_path:
+        previous_port_path = self._port_path
+        if use_serial:
+          assert self._serial
+          self._handle = common.UsbHandle.Find(
+              adb_commands.DeviceIsAvailable, serial=self._serial,
+              timeout_ms=self._default_timeout_ms)
+          # Update the new found port path.
+          self._port_path = self._handle.port_path_str
+        else:
+          self._handle = common.UsbHandle.Find(
+              adb_commands.DeviceIsAvailable, port_path=self.port_path,
+              timeout_ms=self._default_timeout_ms)
+        _LOG.info(
+            '%s._Find(%s) %s = %s',
+            previous_port_path, use_serial, self._serial,
+            self.port_path if self._handle else 'None')
       else:
-        self._handle = common.UsbHandle.Find(
-            adb_commands.DeviceIsAvailable, port_path=self.port_path,
-            timeout_ms=self._default_timeout_ms)
-      _LOG.info(
-          '%s._Find(%s) %s = %s',
-          previous_port_path, use_serial, self._serial,
-          self.port_path if self._handle else 'None')
+        self._handle = common.TcpHandle(self._serial)
     except (common.usb1.USBError, usb_exceptions.DeviceNotFoundError) as e:
       _LOG.debug(
           '%s._Find(%s) %s : %s', self.port_path, use_serial, self._serial, e)

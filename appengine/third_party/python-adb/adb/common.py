@@ -48,7 +48,50 @@ def InterfaceMatcher(clazz, subclass, protocol):
   return Matcher
 
 
-class UsbHandle(object):
+class Handle(object):
+  """Base class for a generic device communication handle."""
+
+  def __init__(self, serial=None, timeout_ms=None):
+    """Initialize the handle.
+
+    Arguments:
+      serial: Android device serial used to identify the device.
+      timeout_ms: Timeout in milliseconds for all I/O.
+    """
+    self._port_path = None
+    self._serial_number = serial
+    self._timeout_ms = timeout_ms or DEFAULT_TIMEOUT_MS
+
+  def Timeout(self, timeout_ms):
+    return timeout_ms if timeout_ms is not None else self._timeout_ms
+
+  # TODO(bpastene) Remove all dependencies on a non UsbHandle needing port_path
+  @property
+  def port_path(self):
+    return ''
+
+  @property
+  def is_local(self):
+    return True
+
+  @property
+  def serial_number(self):
+    return self._serial_number
+
+  def Open(self):
+    raise NotImplementedError()
+
+  def Close(self):
+    raise NotImplementedError()
+
+  def BulkWrite(self, data, timeout_ms=None):
+    raise NotImplementedError()
+
+  def BulkRead(self, length, timeout_ms=None):
+    raise NotImplementedError()
+
+
+class UsbHandle(Handle):
   """USB communication object. Not thread-safe.
 
   Handles reading and writing over USB with the proper endpoints, exceptions,
@@ -72,16 +115,14 @@ class UsbHandle(object):
       usb_info: String describing the usb path/serial/device, for debugging.
       timeout_ms: Timeout in milliseconds for all I/O.
     """
+    super(UsbHandle, self).__init__(serial=None, timeout_ms=timeout_ms)
     # Immutable.
     self._setting = setting
     self._device = device
     self._usb_info = usb_info or ''
-    self._timeout_ms = timeout_ms or DEFAULT_TIMEOUT_MS
 
     # State.
     self._handle = None
-    self._port_path = None
-    self._serial_number = None
     self._read_endpoint = None
     self._write_endpoint = None
     self._interface_number = None
@@ -187,9 +228,6 @@ class UsbHandle(object):
       self._write_endpoint = None
       self._interface_number = None
       self._max_read_packet_len = None
-
-  def Timeout(self, timeout_ms):
-    return timeout_ms if timeout_ms is not None else self._timeout_ms
 
   def FlushBuffers(self):
     while True:
@@ -331,15 +369,16 @@ class UsbHandle(object):
       yield handle
 
 
-class TcpHandle(object):
+class TcpHandle(Handle):
   """TCP connection object.
 
-     Provides same interface as UsbHandle but ignores timeout."""
+     Provides same interface as UsbHandle."""
 
-  def __init__(self, serial):
+  def __init__(self, serial, timeout_ms=None):
     """Initialize the TCP Handle.
     Arguments:
       serial: Android device serial of the form host or host:port.
+      timeout_ms: Timeout in milliseconds for all I/O.
 
     Host may be an IP address or a host name.
     """
@@ -348,26 +387,53 @@ class TcpHandle(object):
     else:
       host = serial
       port = 5555
-    self._serial_number = '%s:%s' % (host, port)
+    super(TcpHandle, self).__init__(serial='%s:%s' % (host, port),
+                                    timeout_ms=timeout_ms)
+    self._host = host
+    self._port = port
 
-    self._connection = socket.create_connection((host, port))
+    self._connection = None
 
   @property
-  def port_path(self):
-    return self.serial_number
+  def is_open(self):
+    return bool(self._connection)
 
   @property
-  def serial_number(self):
-    return self._serial_number
+  def is_local(self):
+    return False
 
-  def BulkWrite(self, data, timeout=None):  # pylint: disable=unused-argument
-    return self._connection.sendall(data)
-
-  def BulkRead(self, numbytes, timeout=None):  # pylint: disable=unused-argument
-    return self._connection.recv(numbytes)
-
-  def Timeout(self, timeout_ms):
-    return timeout_ms
+  def Open(self):
+    serial = self.serial_number
+    _LOG.info('Open() on connection to %s', serial)
+    try:
+      self._connection = socket.create_connection((self._host, self._port))
+      self._connection.settimeout(self._timeout_ms / 1000.0)
+    except Exception as e:
+      _LOG.exception('Open() on %s: Exception: %s', serial, e)
+      self.Close()
+      raise
 
   def Close(self):
-    return self._connection.close()
+    if self._connection is None:
+      return
+    try:
+      self._connection.close()
+    finally:
+      self._connection = None
+
+  def BulkWrite(self, data, timeout_ms=None):
+    try:
+      self._connection.settimeout(self.Timeout(timeout_ms) / 1000.0)
+      return self._connection.sendall(data)
+    except socket.timeout as e:
+      raise usb_exceptions.ReadFailedError(
+          'Could not send data (timeout %sms)' % (self.Timeout(timeout_ms)), e)
+
+  def BulkRead(self, length, timeout_ms=None):
+    try:
+      self._connection.settimeout(self.Timeout(timeout_ms) / 1000.0)
+      return self._connection.recv(length)
+    except socket.timeout as e:
+      raise usb_exceptions.ReadFailedError(
+          'Could not receive data (timeout %sms)' % (
+              self.Timeout(timeout_ms)), e)
