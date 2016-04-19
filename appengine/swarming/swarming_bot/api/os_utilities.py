@@ -580,7 +580,10 @@ def authenticated_http_request(service_account, *args, **kwargs):
       raise AuthenticatedHttpRequestFailure(e)
     http = oauth2client.authorize(http)
 
-  return http.request(*args, **kwargs)
+  try:
+    return http.request(*args, **kwargs)
+  except client.Error as e:
+    raise AuthenticatedHttpRequestFailure(e)
 
 
 class GetTimeseriesDataFailure(Exception):
