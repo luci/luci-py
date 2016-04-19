@@ -747,26 +747,40 @@ def get_dimensions_all_devices_android(devices):
   del dimensions[u'gpu']
   dimensions.pop(u'machine_type')
 
-  # Make sure all the devices use the same board and OS.
-  keys = (u'build.id', u'product.board')
-  for key in keys:
-    dimensions[key] = set()
+  # Each key in the following dict is a dimension and its value is the list of
+  # all possible device properties that can define that dimension.
+  # TODO(bpastene) Make sure all the devices use the same board and OS.
+  dimension_properties = {
+    u'device_os': ['build.id'],
+    u'device_type': ['build.product', 'product.board', 'product.device'],
+  }
+  for dim in dimension_properties:
+    dimensions[dim] = set()
   dimensions[u'android'] = []
   for device in devices:
     properties = device.cache.build_props
     if properties:
-      for key in keys:
-        real_key = u'ro.' + key
-        if real_key in properties:
-          dimensions[key].add(properties[real_key])
+      for dim, props in dimension_properties.iteritems():
+        for prop in props:
+          real_prop = u'ro.' + prop
+          if real_prop in properties and properties[real_prop].strip():
+            dimensions[dim].add(properties[real_prop].strip())
+            break
       # Only advertize devices that can be used.
       dimensions[u'android'].append(device.serial)
+
+  # Add the first character of each device_os to the dimension.
+  android_vers = {
+    os[0] for os in dimensions.get(u'device_os', []) if os and os[0].isupper()
+  }
+  dimensions[u'device_os'] = dimensions[u'device_os'].union(android_vers)
+
   dimensions[u'android'].sort()
-  for key in keys:
-    if not dimensions[key]:
-      del dimensions[key]
+  for dim in dimension_properties:
+    if not dimensions[dim]:
+      del dimensions[dim]
     else:
-      dimensions[key] = sorted(dimensions[key])
+      dimensions[dim] = sorted(dimensions[dim])
   nb_android = len(dimensions[u'android'])
   dimensions[u'android_devices'] = map(
       str, range(nb_android, max(0, nb_android-2), -1))

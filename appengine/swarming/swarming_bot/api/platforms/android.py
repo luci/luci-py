@@ -17,6 +17,7 @@ from adb import adb_protocol
 from adb import common
 from adb.contrib import adb_commands_safe
 from adb.contrib import high
+from api.platforms import gce
 
 
 # Master switch that can easily be temporarily increased to INFO or even DEBUG
@@ -105,10 +106,19 @@ def initialize(pub_key, priv_key):
   return high.Initialize(pub_key, priv_key)
 
 
-def get_devices(bot):
-  return high.GetDevices(
+def get_devices(bot, endpoints=None):
+  devices = []
+  if not gce.is_gce():
+    devices += high.GetLocalDevices(
       'swarming', 10000, 10000, on_error=bot.post_error if bot else None,
       as_root=True)
+
+  if endpoints:
+    devices += high.GetRemoteDevices(
+        'swarming', endpoints, 10000, 10000,
+        on_error=bot.post_error if bot else None, as_root=True)
+
+  return devices
 
 
 def close_devices(devices):
