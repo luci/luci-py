@@ -562,7 +562,8 @@ class BotTaskUpdateHandler(auth.ApiHandler):
       if state in (task_result.State.COMPLETED, task_result.State.TIMED_OUT):
         action = 'task_completed'
       else:
-        assert state == task_result.State.RUNNING, state
+        assert state in (
+            task_result.State.BOT_DIED, task_result.State.RUNNING), state
         action = 'task_update'
       bot_management.bot_event(
           event_type=action, bot_id=bot_id,
