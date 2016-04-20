@@ -15,8 +15,6 @@ repository.
   - [datastore_utils/](datastore_utils) is utility code to enhance NDB.
   - [ereporter2/](ereporter2) is a standalone components that sends alerts based
     on reading the server's log.
-  - [metrics/](metrics) is a module to interact with [Cloud Monitoring
-    Metrics](https://cloud.google.com/monitoring/custom-metrics).
   - [static/](static) contains third party javascript libraries.
   - [third_party/](third_party) contains third party python libraries used by
     components, that are needed on *all* servers.

@@ -1,6 +1,0 @@
-handlers:
-
-- url: /internal/task/metrics/.*
-  script: components.metrics.wsgi.APP
-  secure: always
-  login: admin
