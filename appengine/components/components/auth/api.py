@@ -100,12 +100,19 @@ class AuthorizationError(Error):
 SecretKey = collections.namedtuple('SecretKey', ['name', 'scope'])
 
 
-# The chunk of AuthGroup used by AuthDB, preprocessed for faster membership
-# checks. We keep it in AuthDB in place of AuthGroup to reduce RAM usage.
-GroupEssence = collections.namedtuple('GroupEssence', [
+# The representation of AuthGroup used by AuthDB, preprocessed for faster
+# membership checks. We keep it in AuthDB in place of AuthGroup to reduce RAM
+# usage.
+CachedGroup = collections.namedtuple('CachedGroup', [
   'members',  # == set(m.to_bytes() for m in auth_group.members)
-  'globs',    # == auth_group.globs
-  'nested',   # == auth_group.nested
+  'globs',
+  'nested',
+  'description',
+  'owners',
+  'created_ts',
+  'created_by',
+  'modified_ts',
+  'modified_by',
 ])
 
 
@@ -155,10 +162,16 @@ class AuthDB(object):
     # entities to reduce memory usage.
     self.groups = {}
     for entity in (groups or []):
-      self.groups[entity.key.string_id()] = GroupEssence(
+      self.groups[entity.key.string_id()] = CachedGroup(
           members=frozenset(m.to_bytes() for m in entity.members),
           globs=entity.globs or (),
-          nested=entity.nested or ())
+          nested=entity.nested or (),
+          description=entity.description,
+          owners=entity.owners,
+          created_ts=entity.created_ts,
+          created_by=entity.created_by,
+          modified_ts=entity.modified_ts,
+          modified_by=entity.modified_by)
 
   def is_group_member(self, group_name, identity):
     """Returns True if |identity| belongs to group |group_name|.
@@ -183,8 +196,8 @@ class AuthDB(object):
         return True
 
       # An unknown group is empty.
-      group_essence = self.groups.get(group_name)
-      if not group_essence:
+      group_obj = self.groups.get(group_name)
+      if not group_obj:
         logging.warning(
             'Querying unknown group: %s via %s', group_name, current)
         return False
@@ -206,18 +219,43 @@ class AuthDB(object):
         # Note that we don't include nested groups in GroupEssense.members sets
         # because it blows up memory usage pretty bad. We don't have very deep
         # nesting graphs, so checking nested groups separately is OK.
-        if ident_as_bytes in group_essence.members:
+        if ident_as_bytes in group_obj.members:
           return True
 
-        if any(glob.match(identity) for glob in group_essence.globs):
+        if any(glob.match(identity) for glob in group_obj.globs):
           return True
 
-        return any(is_member(nested) for nested in group_essence.nested)
+        return any(is_member(nested) for nested in group_obj.nested)
       finally:
         current.pop()
         visited.add(group_name)
 
     return is_member(group_name)
+
+  def get_group(self, group_name):
+    """Returns AuthGroup entity reconstructing it from the cache.
+
+    It slightly differs from the original entity:
+      - 'members' list is always sorted.
+      - 'auth_db_rev' and 'auth_db_prev_rev' are not set.
+
+    Returns:
+      AuthGroup object or None if no such group.
+    """
+    g = self.groups.get(group_name)
+    if not g:
+      return None
+    return model.AuthGroup(
+        key=model.group_key(group_name),
+        members=[model.Identity.from_bytes(m) for m in sorted(g.members)],
+        globs=list(g.globs),
+        nested=list(g.nested),
+        description=g.description,
+        owners=g.owners,
+        created_ts=g.created_ts,
+        created_by=g.created_by,
+        modified_ts=g.modified_ts,
+        modified_by=g.modified_by)
 
   def list_group(self, group_name, recursive=True):
     """Returns a set of all identities in a group.
@@ -230,10 +268,10 @@ class AuthDB(object):
       Set of Identity objects. Unknown groups are considered empty.
     """
     if not recursive:
-      group_essence = self.groups.get(group_name)
-      if not group_essence:
+      group_obj = self.groups.get(group_name)
+      if not group_obj:
         return set()
-      return set(model.Identity.from_bytes(m) for m in group_essence.members)
+      return set(model.Identity.from_bytes(m) for m in group_obj.members)
 
     # Set of groups already added to 'listing'.
     visited = set()
@@ -244,16 +282,16 @@ class AuthDB(object):
 
     def visit_group(group_name):
       # An unknown group is empty.
-      group_essence = self.groups.get(group_name)
-      if not group_essence:
+      group_obj = self.groups.get(group_name)
+      if not group_obj:
         return
 
       if group_name in visited:
         return
       visited.add(group_name)
 
-      listing.update(group_essence.members)
-      for nested in group_essence.nested:
+      listing.update(group_obj.members)
+      for nested in group_obj.nested:
         visit_group(nested)
 
     visit_group(group_name)

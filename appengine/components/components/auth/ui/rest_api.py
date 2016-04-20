@@ -105,6 +105,12 @@ def set_config_locked(locked_callback):
   _is_config_locked_cb = locked_callback
 
 
+def _is_no_cache(request):
+  """Returns True if the request should skip the cache."""
+  cache_control = request.headers.get('Cache-Control') or ''
+  return 'no-cache' in cache_control or 'max-age=0' in cache_control
+
+
 class EntityOperationError(Exception):
   """Raised by do_* methods in EntityHandlerBase to indicate a conflict."""
   def __init__(self, message, details=None):
@@ -159,6 +165,16 @@ class EntityHandlerBase(handler.ApiHandler):
     return entity.to_serializable_dict(with_id_as='name')
 
   @classmethod
+  def do_get(cls, name, request):  # pylint: disable=unused-argument
+    """Returns an entity given its name or None if no such entity.
+
+    Args:
+      name: name of the entity to fetch (use get_entity_key to convert to key).
+      request: webapp2.Request object.
+    """
+    return cls.get_entity_key(name).get()
+
+  @classmethod
   def can_create(cls):
     """True if caller is allowed to create a new entity."""
     return api.is_admin()
@@ -206,7 +222,7 @@ class EntityHandlerBase(handler.ApiHandler):
   def get(self, name):
     """Fetches entity give its name."""
     self.check_preconditions()
-    obj = self.get_entity_key(name).get()
+    obj = self.do_get(name, self.request)
     if not obj:
       self.abort_with_error(404, text='No such %s' % self.entity_kind_title)
     self.send_response(
@@ -614,6 +630,15 @@ class GroupHandler(EntityHandlerBase):
     g['caller_can_modify'] = caller_can_modify(g)
     return g
 
+  @classmethod
+  def do_get(cls, name, request):
+    # Use in-memory cache by default. It can be slightly stale, but serving from
+    # it is extra fast (0 RPCs). Use datastore if explicitly asked to bypass
+    # the cache. Direct datastore reads are used mostly by admin UI.
+    if _is_no_cache(request):
+      return super(GroupHandler, cls).do_get(name, request)
+    return api.get_request_auth_db().get_group(name)
+
   # Same as in the base class, repeated here just for clarity.
   @classmethod
   def can_create(cls):
@@ -924,10 +949,9 @@ class OAuthConfigHandler(handler.ApiHandler):
     client_id = None
     client_secret = None
     additional_ids = None
-    cache_control = self.request.headers.get('Cache-Control')
 
     # Use most up-to-date data in datastore if requested. Used by management UI.
-    if cache_control in ('no-cache', 'max-age=0'):
+    if _is_no_cache(self.request):
       global_config = model.root_key().get()
       client_id = global_config.oauth_client_id
       client_secret = global_config.oauth_client_secret

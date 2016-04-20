@@ -196,7 +196,9 @@ exports.groups = function() {
 
 // Fetches detailed information about a group.
 exports.groupRead = function(name) {
-  return call('GET', '/auth/api/v1/groups/' + name);
+  return call(
+      'GET', '/auth/api/v1/groups/' + name,
+      null, {'Cache-Control': 'no-cache'});
 };
 
 

@@ -7,6 +7,7 @@
 # pylint: disable=W0212,W0612,W0613
 
 
+import datetime
 import Queue
 import sys
 import threading
@@ -30,6 +31,41 @@ class AuthDBTest(test_case.TestCase):
     super(AuthDBTest, self).setUp()
     self.mock(api.logging, 'warning', lambda *_args: None)
     self.mock(api.logging, 'error', lambda *_args: None)
+
+  def test_get_group(self):
+    g = model.AuthGroup(
+      key=model.group_key('group'),
+      members=[
+        model.Identity.from_bytes('user:b@example.com'),
+        model.Identity.from_bytes('user:a@example.com'),
+      ],
+      globs=[model.IdentityGlob.from_bytes('user:*')],
+      nested=['blah'],
+      created_by=model.Identity.from_bytes('user:x@example.com'),
+      created_ts=datetime.datetime(2014, 1, 2, 3, 4, 5),
+      modified_by=model.Identity.from_bytes('user:y@example.com'),
+      modified_ts=datetime.datetime(2015, 1, 2, 3, 4, 5))
+
+    db = api.AuthDB(groups=[g])
+
+    # Unknown group.
+    self.assertIsNone(db.get_group('blah'))
+
+    # Known group.
+    from_cache = db.get_group('group')
+    self.assertEqual(from_cache.key, g.key)
+
+    # Members list is sorted.
+    self.assertEqual(from_cache.members, [
+      model.Identity.from_bytes('user:a@example.com'),
+      model.Identity.from_bytes('user:b@example.com'),
+    ])
+
+    # Fields that are know to be different.
+    exclude = ['members', 'auth_db_rev', 'auth_db_prev_rev']
+    self.assertEqual(
+        from_cache.to_dict(exclude=exclude),
+        g.to_dict(exclude=exclude))
 
   def test_is_group_member(self):
     # Test identity.

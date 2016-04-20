@@ -643,6 +643,29 @@ class GroupHandlerTest(RestAPITestCase):
         'Sun, 13 Mar 2011 07:06:40 -0000',
         headers['Last-Modified'])
 
+  def test_get_is_using_cache(self):
+    # Hit the cache first to warm it up.
+    make_group('a group')
+    status, _, _ = self.get(path='/auth/api/v1/groups/a%20group')
+    self.assertEqual(200, status)
+
+    # Modify the group.
+    make_group(
+        name='a group',
+        members=[model.Identity.from_bytes('user:joe@example.com')])
+
+    # Still serving the cached group.
+    status, body, _ = self.get(path='/auth/api/v1/groups/a%20group')
+    self.assertEqual(200, status)
+    self.assertEqual(body['group']['members'], [])
+
+    # Serving up-to-date group if asked to bypass the cache.
+    status, body, _ = self.get(
+        path='/auth/api/v1/groups/a%20group',
+        headers={'Cache-Control': 'no-cache'})
+    self.assertEqual(200, status)
+    self.assertEqual(body['group']['members'], ['user:joe@example.com'])
+
   def test_get_requires_admin_or_access(self):
     make_group('a group')
 
