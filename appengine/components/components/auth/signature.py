@@ -9,7 +9,6 @@ functions, and thus private keys are managed by GAE.
 """
 
 import base64
-import hashlib
 import json
 import logging
 
@@ -43,7 +42,16 @@ class CertificateError(Exception):
 @utils.cache_with_expiration(3600)
 def get_own_public_certificates():
   """Returns jsonish object with public certificates of current service."""
-  certs = app_identity.get_public_certificates(deadline=0.5)
+  attempt = 0
+  while True:
+    attempt += 1
+    try:
+      certs = app_identity.get_public_certificates(deadline=1.5)
+      break
+    except apiproxy_errors.DeadlineExceededError as e:
+      logging.warning('%s', e)
+      if attempt == 3:
+        raise
   return {
     'certificates': [
       {
@@ -87,7 +95,7 @@ def get_service_public_certificates(service_url):
           method='GET',
           headers={'X-URLFetch-Service-Id': utils.get_urlfetch_service_id()},
           follow_redirects=False,
-          deadline=2,
+          deadline=5,
           validate_certificate=True)
     except (apiproxy_errors.DeadlineExceededError, urlfetch.Error) as e:
       # Transient network error or URL fetch service RPC deadline.
