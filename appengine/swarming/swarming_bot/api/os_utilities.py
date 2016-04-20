@@ -840,7 +840,7 @@ def get_state_all_devices_android(devices):
       u'ip': device.GetIPs(),
       u'max_uid': device.GetLastUID(),
       u'other_packages': platforms.android.get_unknown_apps(device),
-      u'serial': device.serial,
+      u'port_path': device.port_path,
       u'state': u'available',
       u'temp': device.GetTemperatures(),
       u'uptime': device.GetUptime(),
@@ -848,7 +848,7 @@ def get_state_all_devices_android(devices):
 
   start = time.time()
   state[u'devices'] = {
-    device.port_path: out
+    device.serial: out
     for device, out in zip(devices, parallel.pmap(fn, devices))
   }
   logging.info(
