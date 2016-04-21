@@ -88,12 +88,12 @@ class TestTaskRunnerBase(net_utils.TestCase):
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         self.get_check_first(cost_usd),
-        {},
+        {'ok': True},
       ),
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         self.get_check_final(**kwargs),
-        {},
+        {'ok': True},
       ),
     ]
 
@@ -428,7 +428,7 @@ class TestTaskRunner(TestTaskRunnerBase):
             'task_id': 23,
           },
         },
-        {},
+        {'ok': True},
       ),
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
@@ -441,12 +441,12 @@ class TestTaskRunner(TestTaskRunnerBase):
             'task_id': 23,
           },
         },
-        {},
+        {'ok': True},
       ),
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         check_final,
-        {},
+        {'ok': True},
       ),
     ]
     self.expected_requests(requests)
@@ -800,12 +800,12 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         self.get_check_first(0.),
-        {},
+        {'ok': True},
       ),
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         check_final,
-        {},
+        {'ok': True},
       ),
     ]
     self.expected_requests(requests)
@@ -919,12 +919,12 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         self.get_check_first(0.),
-        {},
+        {'ok': True},
       ),
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         check_final,
-        {},
+        {'ok': True},
       ),
     ]
     self.expected_requests(requests)

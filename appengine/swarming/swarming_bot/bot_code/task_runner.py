@@ -225,9 +225,9 @@ def post_update(swarming_server, params, exit_code, stdout, output_chunk_start):
       swarming_server+'/swarming/api/v1/bot/task_update/%s' % params['task_id'],
       data=params)
   logging.debug('post_update() = %s', resp)
-  if resp.get('error'):
+  if not resp or resp.get('error'):
     # Abandon it. This will force a process exit.
-    raise ValueError(resp.get('error'))
+    raise ValueError(resp.get('error') if resp else 'Failed to contact server')
 
 
 def should_post_update(stdout, now, last_packet):

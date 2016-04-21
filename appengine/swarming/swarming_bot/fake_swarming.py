@@ -55,7 +55,7 @@ class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
     if self.path.startswith('/swarming/api/v1/bot/task_update/'):
       task_id = self.path[len('/swarming/api/v1/bot/task_update/'):]
       self.server.server.task_update(task_id, data)
-      return self._send_json({})
+      return self._send_json({'ok': True})
 
     self.server.testcase.fail(self.path)
     self.send_response(500)
