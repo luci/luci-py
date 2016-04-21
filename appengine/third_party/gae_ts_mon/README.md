@@ -59,7 +59,7 @@
     `app-id@appspot.gserviceaccount.com`.  Or search the default module's logs
     for `"Initializing with service account"`.  Add it as a "Publisher" of the
     "monacq" PubSub topic in the
-    [chrome-infra-mon-pubsub project](https://pantheon.corp.google.com/project/chrome-infra-mon-pubsub/cloudpubsub/topicList)
+    [chrome-infra-mon-pubsub project](https://console.developers.google.com/project/chrome-infra-mon-pubsub/cloudpubsub/topicList)
     by selecting it from the list and clicking "Permissions". If you see an
     error "You do not have viewing permissions for the selected resource.", then
     please ask pgervais@chromium.org (AMER) or sergiyb@chromium.org (EMEA) to do
