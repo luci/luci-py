@@ -374,7 +374,8 @@ class TaskRequestApiTest(TestCase):
           _gen_request(
               properties=dict(dimensions={u'id': u'b', u'a:': u'b'})), True)
     task_request.make_request(
-        _gen_request(properties=dict(dimensions={u'id': u'b'})), True)
+        _gen_request(
+            properties=dict(dimensions={u'id': u'b', u'a.': u'b'})), True)
 
     with self.assertRaises(TypeError):
       task_request.make_request(

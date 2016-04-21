@@ -68,7 +68,7 @@ MAXIMUM_PRIORITY = 255
 
 
 # Enforced on both task request and bots.
-DIMENSION_KEY_RE = ur'^[a-zA-Z\-\_]+$'
+DIMENSION_KEY_RE = ur'^[a-zA-Z\-\_\.]+$'
 
 
 # One day in seconds. Add 10s to account for small jitter.
