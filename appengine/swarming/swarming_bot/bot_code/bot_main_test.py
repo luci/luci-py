@@ -86,6 +86,8 @@ class TestBotMain(net_utils.TestCase):
     dimensions.discard('hidpi')
     dimensions.discard('zone')  # Only set on GCE bots.
     expected = {'cores', 'cpu', 'gpu', 'id', 'machine_type', 'os', 'pool'}
+    if sys.platform == 'darwin':
+      expected.add('xcode_version')
     self.assertEqual(expected, dimensions)
 
   def test_get_dimensions_load_test(self):
@@ -96,7 +98,7 @@ class TestBotMain(net_utils.TestCase):
     self.assertEqual('123', bot_main.generate_version())
 
   def test_get_state(self):
-    self.mock(time, 'time', lambda: 126.0)
+    self.mock(time, 'time', lambda: 1460000000.0)
     expected = os_utilities.get_state()
     expected['sleep_streak'] = 12
     # During the execution of this test case, the free disk space could have

@@ -74,6 +74,8 @@ class TestOsUtilities(auto_stub.TestCase):
     # Only set on Mac.
     actual.discard(u'hidpi')
     expected = {u'cores', u'cpu', u'gpu', u'id', u'os', u'pool'}
+    if sys.platform == 'darwin':
+      expected.add(u'xcode_version')
     self.assertEqual(expected, actual)
 
   def test_get_state(self):
@@ -88,6 +90,7 @@ class TestOsUtilities(auto_stub.TestCase):
       expected.add(u'cygwin')
     if sys.platform == 'darwin':
       expected.add(u'model')
+      expected.add(u'xcode')
     if sys.platform == 'win32':
       expected.add(u'integrity')
     self.assertEqual(expected, set(actual))
