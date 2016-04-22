@@ -98,7 +98,7 @@ class TestBotMain(net_utils.TestCase):
     self.assertEqual('123', bot_main.generate_version())
 
   def test_get_state(self):
-    self.mock(time, 'time', lambda: 1460000000.0)
+    self.mock(time, 'time', lambda: 1470000000.0)
     expected = os_utilities.get_state()
     expected['sleep_streak'] = 12
     # During the execution of this test case, the free disk space could have
