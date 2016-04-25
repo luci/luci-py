@@ -134,6 +134,12 @@ def get_cpuinfo():
 def get_gpu():
   """Returns video device as listed by 'lspci'. See get_gpu().
   """
+  try:
+    with open('/proc/driver/nvidia/version', 'rb') as f:
+      version = f.readlines()[0]
+  except (IOError, OSError):
+    version = None
+
   pci_devices = _lspci()
   if not pci_devices:
     # It normally happens on Google Compute Engine as lspci is not installed by
@@ -154,6 +160,8 @@ def get_gpu():
       dimensions.add(unicode(ven_id))
       dimensions.add(u'%s:%s' % (ven_id, device.group(2)))
       state.add(u'%s %s' % (vendor.group(1), device.group(1)))
+  if version:
+    state.add('Version: %s' % version)
   return sorted(dimensions), sorted(state)
 
 

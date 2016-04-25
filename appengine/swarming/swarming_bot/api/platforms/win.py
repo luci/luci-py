@@ -255,6 +255,8 @@ def get_gpu():
     match = re.search(r'DEV_([0-9A-F]{4})', pnp_string)
     if match:
       dev_id = match.group(1).lower()
+    if device.DriverVersion:
+      state.add('Version: %s' % device.DriverVersion)
     dimensions.add(unicode(ven_id))
     dimensions.add(u'%s:%s' % (ven_id, dev_id))
   return sorted(dimensions), sorted(state)

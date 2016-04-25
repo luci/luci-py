@@ -216,6 +216,9 @@ def get_gpu():
     dimensions.add(unicode(ven_id))
     dimensions.add(u'%s:%s' % (ven_id, dev_id))
 
+    if 'spdisplays_gmux-version' in card:
+      state.add('Version: %s' % card['spdisplays_gmux-version'])
+
     # VMWare doesn't set it.
     if 'sppci_model' in card:
       state.add(unicode(card['sppci_model']))
