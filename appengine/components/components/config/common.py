@@ -109,3 +109,9 @@ def _convert_config(content, dest_type):
 @utils.cache
 def self_config_set():
   return 'services/%s' % app_identity.get_application_id()
+
+
+def config_service_hostname():
+  """Returns hostname of the config service, or None."""
+  settings = ConfigSettings.cached()
+  return settings and settings.service_hostname or None

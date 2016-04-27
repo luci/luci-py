@@ -120,6 +120,8 @@ class Provider(object):
   def get_async(self, config_set, path, revision=None, store_last_good=None):
     """Returns tuple (revision, content).
 
+    If not found, returns (None, None).
+
     See api.get_async for more info.
     """
     assert config_set

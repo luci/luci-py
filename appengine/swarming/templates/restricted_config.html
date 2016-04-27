@@ -1,54 +1,43 @@
 {% set title = 'Swarming global config' %}
 {% extends "swarming/base.html" %}
 
-{% block headers %}
-<script>
-function onclick_ts_mon() {
-  document.getElementById("enable_ts_monitoring_hidden").disabled =
-    document.getElementById("enable_ts_monitoring").checked;
-  }
-</script>
-{% endblock %}
-
 {% block body %}
 <h1>Server global config</h1>
-
-Last updated by:
-<strong>{% if cfg.updated_by %}{{cfg.updated_by.to_bytes()}}{% else%}N/A{%endif%}
-  </strong>.<br>
-Last updated on:
-<strong>{{cfg.updated_ts|datetimeformat}}</strong>.<br>
-
-{% if note %}
-<span style="color: red; font-style: italic">{{note}}</span><p>
+{% if not config_service_url %}
+  Config service URL is not configured for this instance of swarming.
+  Configure it using
+  <a href="/_ah/api/explorer#p/config/v1/config.settings">configuration api<a>.
+  Using default values.
+{% else %}
+  This config is distributed by
+  <a href="{{config_service_url}}">luci-config</a>.
+  {% if not rev %}
+    Config file was not imported. Using default values.
+  {% else %}
+    Using revision <a href="{{rev_url}}">{{rev}}</a>.
+  {% endif %}
 {% endif %}
 
-<form method="post" action="{{path}}">
-  <h2>General</h2>
-  <p>
-  Google Analytics ID:
-  <input name="google_analytics" value="{{cfg.google_analytics}}"/>
-  </p>
+<h2>General</h2>
+<p>
+Google Analytics ID:
+<input value="{{cfg.google_analytics}}" disabled/>
+</p>
 
-  <p>
-  Enable timeseries monitoring: <input id="enable_ts_monitoring" type="checkbox" name="enable_ts_monitoring" value="True" onclick="onclick_ts_mon()" {% if cfg.enable_ts_monitoring %}checked{% endif %}>
-   <input id="enable_ts_monitoring_hidden" type="hidden" name="enable_ts_monitoring" value="False">
-  </p>
+<p>
+Enable timeseries monitoring:
+<input id="enable_ts_monitoring" type="checkbox" name="enable_ts_monitoring"
+       value="True" disabled
+       {% if cfg.enable_ts_monitoring %}checked{% endif %}>
+</p>
 
-  <h2>Bots</h2>
-  Delay in seconds before a bot is considered dead after it stops pinging:
-  <input name="bot_death_timeout_secs" value="{{cfg.bot_death_timeout_secs}}"/>
-  <br>
+<h2>Bots</h2>
+Delay in seconds before a bot is considered dead after it stops pinging:
+<input value="{{cfg.bot_death_timeout_secs}}" disabled/>
+<br>
 
-  <h2>Tasks</h2>
-  Max age in seconds for task reuse:
-  <input name="reusable_task_age_secs" value="{{cfg.reusable_task_age_secs}}"/>
-  <br>
+<h2>Tasks</h2>
+Max age in seconds for task reuse:
+<input value="{{cfg.reusable_task_age_secs}}" disabled/>
 
-  <br>
-  <input type="hidden" name="keyid" value="{{cfg.key.integer_id()}}" />
-  <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
-  <input type="submit" value="Update" />
-  <br>
-</form>
 {% endblock %}

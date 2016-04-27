@@ -402,7 +402,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     cfg = config.settings()
     cfg.reusable_task_age_secs = 10
-    cfg.store()
+    self.mock(config, 'settings', lambda: cfg)
 
     # First task is idempotent.
     self._task_ran_successfully()
@@ -413,9 +413,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
 
     # Now any of the 2 tasks could be reused. Assert the right one (the most
     # recent) is reused.
-    cfg = config.settings()
     cfg.reusable_task_age_secs = 100
-    cfg.store()
 
     # Third task is deduped against second task. That ensures ordering works
     # correctly.

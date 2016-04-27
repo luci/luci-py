@@ -1,0 +1,20 @@
+// Copyright 2016 The LUCI Authors. All rights reserved.
+// Use of this source code is governed by the Apache v2.0 license that can be
+// found in the LICENSE file.
+
+syntax = "proto2";
+
+// Schema for settings.cfg service config file in luci-config.
+message SettingsCfg {
+    // id to inject into pages if applicable.
+    optional string google_analytics = 1;
+
+    // The number of seconds an old task can be deduped from.
+    optional int32 reusable_task_age_secs = 2;
+
+    // The amount of time that has to pass before a machine is considered dead.
+    optional int32 bot_death_timeout_secs = 3;
+
+    // Enable ts_mon based monitoring.
+    optional bool enable_ts_monitoring = 4;
+}

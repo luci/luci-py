@@ -38,8 +38,12 @@ def create_application():
   # Local import, because it instantiates the mapreduce app.
   from mapreduce import main
   gae_ts_mon.initialize(main.APP, is_enabled_fn=is_enabled_callback)
-  # App that serves new endpoints API.
-  api = endpoints.api_server([handlers_endpoints.swarming_api])
+  api = endpoints.api_server([
+    handlers_endpoints.swarming_api,
+    # components.config endpoints for validation and configuring of luci-config
+    # service URL.
+    config.ConfigApi,
+  ])
   ts_mon_metrics.initialize()
   return frontend_app, api, main.APP
 

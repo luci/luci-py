@@ -55,48 +55,9 @@ class RestrictedConfigHandler(auth.AuthenticatingHandler):
   @auth.autologin
   @auth.require(acl.is_admin)
   def get(self):
-    self.common(None)
-
-  @staticmethod
-  def cast_to_type(param_name, value):
-    def to_bool(value):
-      if type(value) is bool:
-        return value
-      return {'True': True, 'False': False}.get(value, False)
-
-    cast = {
-        'bot_death_timeout_secs': int,
-        'enable_ts_monitoring': to_bool,
-        'reusable_task_age_secs': int,
-    }.get(param_name, str)
-    return cast(value)
-
-  @auth.require(acl.is_admin)
-  def post(self):
-    # Convert MultiDict into a dict.
-    params = {
-      k: self.cast_to_type(k, self.request.params.getone(k))
-      for k in self.request.params
-      if k not in ('keyid', 'xsrf_token')
-    }
-    cfg = config.settings(fresh=True)
-    keyid = int(self.request.get('keyid', '0'))
-    if cfg.key.integer_id() != keyid:
-      self.common('Update conflict %s != %s' % (cfg.key.integer_id(), keyid))
-      return
-    cfg.populate(**params)
-    cfg.store()
-    self.common('Settings updated')
-
-  def common(self, note):
-    params = {
-      'cfg': config.settings(fresh=True),
-      'note': note,
-      'path': self.request.path,
-      'xsrf_token': self.generate_xsrf_token(),
-    }
-    self.response.write(
-        template.render('swarming/restricted_config.html', params))
+    # Template parameters schema matches settings_info() return value.
+    self.response.write(template.render(
+        'swarming/restricted_config.html', config.settings_info()))
 
 
 class UploadBotConfigHandler(auth.AuthenticatingHandler):

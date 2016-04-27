@@ -80,6 +80,7 @@ def get_async(
 
   Returns:
     Tuple (revision, config), where config is converted to |dest_type|.
+    If not found, returns (None, None).
 
   Raises:
     NotImplementedError if |dest_type| is not supported.
