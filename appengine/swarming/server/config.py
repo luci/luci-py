@@ -106,6 +106,7 @@ def settings_info():
   }
 
 
+@utils.cache_with_expiration(60)
 def settings():
   """Loads settings from an NDB-based cache or a default one if not present."""
   return _get_settings()[1]
