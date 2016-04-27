@@ -140,8 +140,7 @@ def compute_template_checksum(template_cfg):
         }
         for i in sorted(template_cfg.service_accounts[1:], key=lambda i: i.name)
     ])
-  return hashlib.sha1(
-      json.dumps(identifying_properties, sort_keys=True)).hexdigest()
+  return utilities.compute_checksum(identifying_properties)
 
 
 def ensure_instance_group_manager_matches(manager_cfg, instance_group_manager):

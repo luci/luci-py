@@ -10,12 +10,15 @@ import webapp2
 
 from components import decorators
 
+import catalog
 import cleanup
 import config
 import instance_group_managers
 import instance_templates
 import instances
+import metadata
 import parse
+import pubsub
 
 
 class ConfigImportHandler(webapp2.RequestHandler):
@@ -50,6 +53,14 @@ class EntityCleanupHandler(webapp2.RequestHandler):
     cleanup.cleanup_instance_templates()
 
 
+class InstanceCatalogHandler(webapp2.RequestHandler):
+  """Worker for cataloging instances."""
+
+  @decorators.require_cronjob
+  def get(self):
+    catalog.schedule_catalog()
+
+
 class InstanceFetchHandler(webapp2.RequestHandler):
   """Worker for fetching instances."""
 
@@ -74,6 +85,30 @@ class InstanceGroupManagerDeletionHandler(webapp2.RequestHandler):
     instance_group_managers.schedule_deletion()
 
 
+class InstanceMetadataOperationsCheckHandler(webapp2.RequestHandler):
+  """Worker for checking instance metadata operations."""
+
+  @decorators.require_cronjob
+  def get(self):
+    metadata.schedule_metadata_operations_check()
+
+
+class InstanceMetadataUpdatesHandler(webapp2.RequestHandler):
+  """Worker for updating instance metadata."""
+
+  @decorators.require_cronjob
+  def get(self):
+    metadata.schedule_metadata_updates()
+
+
+class InstanceMetadataUpdatesCompressionHandler(webapp2.RequestHandler):
+  """Worker for compressing pending metadata updates."""
+
+  @decorators.require_cronjob
+  def get(self):
+    metadata.schedule_metadata_compressions()
+
+
 class InstanceTemplateCreationHandler(webapp2.RequestHandler):
   """Worker for creating instance templates."""
 
@@ -90,8 +125,21 @@ class InstanceTemplateDeletionHandler(webapp2.RequestHandler):
     instance_templates.schedule_deletion()
 
 
+class PubSubMessageProcessHandler(webapp2.RequestHandler):
+  """Worker for processing Pub/Sub messages."""
+
+  @decorators.require_cronjob
+  def get(self):
+    pubsub.schedule_poll()
+
+
 def create_cron_app():
   return webapp2.WSGIApplication([
+      ('/internal/cron/catalog-instances', InstanceCatalogHandler),
+      ('/internal/cron/check-instance-metadata-operations',
+       InstanceMetadataOperationsCheckHandler),
+      ('/internal/cron/compress-instance-metadata-updates',
+       InstanceMetadataUpdatesCompressionHandler),
       ('/internal/cron/cleanup-entities', EntityCleanupHandler),
       ('/internal/cron/create-instance-group-managers',
        InstanceGroupManagerCreationHandler),
@@ -104,4 +152,7 @@ def create_cron_app():
       ('/internal/cron/fetch-instances', InstanceFetchHandler),
       ('/internal/cron/import-config', ConfigImportHandler),
       ('/internal/cron/process-config', ConfigProcessHandler),
+      ('/internal/cron/process-pubsub-messages', PubSubMessageProcessHandler),
+      ('/internal/cron/update-instance-metadata',
+       InstanceMetadataUpdatesHandler),
   ])

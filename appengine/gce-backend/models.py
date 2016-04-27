@@ -9,17 +9,22 @@ from google.appengine.ext.ndb import msgprop
 
 from components.machine_provider import rpc_messages
 
+import utilities
+
 
 class MetadataUpdate(ndb.Model):
   """A pending metadata update.
 
   Standalone instances should not be present in the datastore.
   """
+  # Checksum for this metadata.
+  checksum = ndb.ComputedProperty(
+      lambda self: utilities.compute_checksum(self.metadata))
   # Metadata to modify. Keys present will overwrite existing metadata.
   # Use null values to delete keys.
   metadata = ndb.JsonProperty()
-  # Pending operation to apply this metadata update.
-  operation = ndb.StringProperty(indexed=False)
+  # URL for the pending operation to apply this metadata update.
+  url = ndb.StringProperty(indexed=False)
 
 
 class ServiceAccount(ndb.Model):

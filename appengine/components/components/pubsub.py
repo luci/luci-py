@@ -96,6 +96,21 @@ def _validate_name(name):
       bool(_NAME_RE.match(name)))
 
 
+def _call_async(method, endpoint, payload=None):
+  """Makes HTTP request to Pub/Sub service.
+
+  Args:
+    method: HTTP verb, such as 'GET' or 'PUT'.
+    endpoint: URL of the endpoint, relative to pubsub.googleapis.com/v1/.
+    payload: Body of the request to send as JSON.
+  """
+  return net.json_request_async(
+      url='https://pubsub.googleapis.com/v1/' + endpoint,
+      method=method,
+      payload=payload,
+      scopes=['https://www.googleapis.com/auth/pubsub'])
+
+
 def _call(method, endpoint, payload=None, accepted_http_statuses=None):
   """Makes HTTP request to Pub/Sub service.
 
@@ -109,11 +124,7 @@ def _call(method, endpoint, payload=None, accepted_http_statuses=None):
     Error or TransientError.
   """
   try:
-    return net.json_request(
-        url='https://pubsub.googleapis.com/v1/' + endpoint,
-        method=method,
-        payload=payload,
-        scopes=['https://www.googleapis.com/auth/pubsub'])
+    return _call_async(method, endpoint, payload=payload).get_result()
   except net.Error as e:
     if accepted_http_statuses and e.status_code in accepted_http_statuses:
       return None
@@ -188,6 +199,38 @@ def publish(topic, message, attributes):
     Error or TransientError.
   """
   publish_multi(topic, {message: attributes})
+
+
+def ack_async(subscription, *ack_ids):
+  """Acknowledges receipt of messages.
+
+  Args:
+    subscription: Full name of the subscription:
+    *ack_ids: List of IDs of messages to ack.
+  """
+  return _call_async(
+      'POST', '%s:acknowledge' % subscription, payload={'ackIds': ack_ids})
+
+
+def ack(*args, **kwargs):
+  return ack_async(*args, **kwargs).get_result()
+
+
+def pull(subscription, max_messages=100):
+  """Polls a pull subscription for messages.
+
+  Args:
+    subscription: Full name of the subscription.
+    max_messages: Maximum number of messages to return.
+  """
+  return _call(
+      'POST',
+      '%s:pull' % subscription,
+      payload={
+          'maxMessages': max_messages,
+          'returnImmediately': True,
+      },
+  )
 
 
 def get_subscription(subscription):

@@ -7,12 +7,10 @@
 from components import utils
 
 import handlers_cron
-import handlers_pubsub
 import handlers_queues
 
 
 utils.set_task_queue_module('default')
 
 cron_app = handlers_cron.create_cron_app()
-pubsub_app = handlers_pubsub.create_pubsub_app()
 queues_app = handlers_queues.create_queues_app()

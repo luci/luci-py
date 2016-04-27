@@ -9,6 +9,8 @@ import unittest
 from test_support import test_env
 test_env.setup_test_env()
 
+from google.appengine.ext import ndb
+
 from components import net
 from components import pubsub
 from test_support import test_case
@@ -30,8 +32,10 @@ class PubSubTest(test_case.TestCase):
       self.assertEqual(expected, request)
       if isinstance(response, net.Error):
         raise response
-      return response
-    self.mock(net, 'json_request', mocked_request)
+      future = ndb.Future()
+      future.set_result(response)
+      return future
+    self.mock(net, 'json_request_async', mocked_request)
     return requests
 
   def test_validate_name(self):

@@ -33,6 +33,26 @@ class MachineProviderConfiguration(config.GlobalConfig):
     self.instance_url = 'https://machine-provider.appspot.com'
 
 
+def add_machine(dimensions, policies):
+  """Add a machine to the Machine Provider's Catalog.
+
+  Args:
+    dimensions: Dimensions for this machine.
+    policies: Policies governing this machine.
+  """
+  logging.info('Sending add_machine request')
+  return net.json_request(
+      '%s/_ah/api/catalog/v1/add_machine' %
+          MachineProviderConfiguration.get_instance_url(),
+      method='POST',
+      payload=utils.to_json_encodable({
+          'dimensions': dimensions,
+          'policies': policies,
+      }),
+      scopes=MACHINE_PROVIDER_SCOPES,
+  )
+
+
 def add_machines(requests):
   """Add machines to the Machine Provider's Catalog.
 

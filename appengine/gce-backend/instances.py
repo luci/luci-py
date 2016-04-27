@@ -37,6 +37,66 @@ def get_instance_key(base_name, revision, zone, instance_name):
   )
 
 
+@ndb.transactional_tasklet
+def mark_for_deletion(key):
+  """Marks the given instance for deletion.
+
+  Args:
+    key: ndb.Key for a models.Instance entity.
+  """
+  entity = yield key.get_async()
+  if not entity:
+    logging.warning('Instance does not exist: %s', key)
+    return
+
+  if not entity.pending_deletion:
+    entity.pending_deletion = True
+    yield entity.put_async()
+
+
+@ndb.transactional_tasklet
+def add_subscription_metadata(key, subscription_project, subscription):
+  """Queues the addition of subscription metadata.
+
+  Args:
+    key: ndb.Key for a models.Instance entity.
+    subscription_project: Project containing the Pub/Sub subscription.
+    subscription: Name of the Pub/Sub subscription that Machine Provider will
+      communicate with the instance on.
+  """
+  entity = yield key.get_async()
+  if not entity:
+    logging.warning('Instance does not exist: %s', key)
+    return
+
+  parent = yield key.parent().get_async()
+  if not parent:
+    logging.warning('InstanceGroupManager does not exist: %s', key.parent())
+    return
+
+  grandparent = yield parent.key.parent().get_async()
+  if not grandparent:
+    logging.warning(
+        'InstanceTemplateRevision does not exist: %s', parent.key.parent())
+    return
+
+  if not grandparent.service_accounts:
+    logging.warning(
+        'InstanceTemplateRevision service account unspecified: %s',
+        parent.key.parent(),
+    )
+    return
+
+  entity.pending_metadata_updates.append(models.MetadataUpdate(
+      metadata={
+          'pubsub_service_account': grandparent.service_accounts[0].name,
+          'pubsub_subscription': subscription,
+          'pubsub_subscription_project': subscription_project,
+      },
+  ))
+  yield entity.put_async()
+
+
 def fetch(key):
   """Gets instances created by the given instance group manager.
 
@@ -114,8 +174,10 @@ def add_instances(key, keys):
 
   instances = set(entity.instances)
   instances.update(keys)
-  entity.instances = sorted(instances)
-  entity.put()
+
+  if len(instances) != entity.current_size:
+    entity.instances = sorted(instances)
+    entity.put()
 
 
 def ensure_entities_exist(key, max_concurrent=50):

@@ -4,6 +4,9 @@
 
 """Utilities for GCE Backend."""
 
+import hashlib
+import json
+
 from google.appengine.ext import ndb
 
 
@@ -25,3 +28,8 @@ def batch_process_async(items, f, max_concurrent=50):
     futures = [future for future in futures if not future.done()]
   if futures:
     ndb.Future.wait_all(futures)
+
+
+def compute_checksum(json_encodable):
+  """Computes a checksum from a JSON-encodable dict or list."""
+  return hashlib.sha1(json.dumps(json_encodable, sort_keys=True)).hexdigest()

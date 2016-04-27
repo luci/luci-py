@@ -481,6 +481,10 @@ class ZoneOperation(object):
     return self._info['status'] == 'DONE'
 
   @property
+  def url(self):
+    return self._info['selfLink']
+
+  @property
   def error(self):
     """Error message on error or None on success or if not yet done."""
     errors = self._info.get('error', {}).get('errors')

@@ -1,6 +1,21 @@
 # Do not retry task queues that are triggered by cron jobs.
 # If they fail, cron will schedule a retry later.
 queue:
+ - name: catalog-instance
+   rate: 1/s
+   retry_parameters:
+     task_retry_limit: 0
+
+ - name: check-instance-metadata-operation
+   rate: 1/s
+   retry_parameters:
+     task_retry_limit: 0
+
+ - name: compress-instance-metadata-updates
+   rate: 1/s
+   retry_parameters:
+     task_retry_limit: 0
+
  - name: create-instance-group-manager
    rate: 1/s
    retry_parameters:
@@ -22,6 +37,16 @@ queue:
      task_retry_limit: 0
 
  - name: fetch-instances
+   rate: 1/s
+   retry_parameters:
+     task_retry_limit: 0
+
+ - name: process-pubsub-messages
+   rate: 1/s
+   retry_parameters:
+     task_retry_limit: 0
+
+ - name: update-instance-metadata
    rate: 1/s
    retry_parameters:
      task_retry_limit: 0
