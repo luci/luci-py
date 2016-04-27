@@ -148,6 +148,9 @@ class TasksApiTest(BaseTest):
         priority=200,
         properties=swarming_rpcs.TaskProperties(
             command=['rm', '-rf', '/'],
+            packages=[
+              swarming_rpcs.CipdPackage(package_name='rm', version='latest'),
+            ],
             dimensions=[
               swarming_rpcs.StringPair(key='pool', value='default'),
             ],
@@ -170,6 +173,10 @@ class TasksApiTest(BaseTest):
         u'priority': u'200',
         u'properties': {
           u'command': [u'rm', u'-rf', u'/'],
+          u'packages': [{
+            u'package_name': u'rm',
+            u'version': u'latest',
+          }],
           u'dimensions': [
             {u'key': u'pool', u'value': u'default'},
           ],
@@ -224,8 +231,13 @@ class TasksApiTest(BaseTest):
               swarming_rpcs.StringPair(key='pool', value='default'),
             ],
             execution_timeout_secs=3600,
+            idempotent=True,
             io_timeout_secs=1200,
-            idempotent=True),
+            packages=[
+              swarming_rpcs.CipdPackage(
+                  package_name='rm',
+                  version=test_env_handlers.PINNED_PACKAGE_VERSION),
+            ]),
         tags=['foo:bar'],
         user='joe@localhost')
     expected = {
@@ -245,6 +257,10 @@ class TasksApiTest(BaseTest):
           u'grace_period_secs': u'30',
           u'idempotent': True,
           u'io_timeout_secs': u'1200',
+          u'packages': [{
+            u'package_name': u'rm',
+            u'version': test_env_handlers.PINNED_PACKAGE_VERSION,
+          }],
         },
         u'tags': [
           u'foo:bar',
@@ -372,6 +388,10 @@ class TasksApiTest(BaseTest):
             u'grace_period_secs': u'30',
             u'idempotent': True,
             u'io_timeout_secs': u'1200',
+            u'packages': [{
+              u'package_name': u'rm',
+              u'version': test_env_handlers.PINNED_PACKAGE_VERSION,
+            }],
           },
           u'tags': [
             u'foo:bar',
@@ -398,6 +418,10 @@ class TasksApiTest(BaseTest):
             u'grace_period_secs': u'30',
             u'idempotent': True,
             u'io_timeout_secs': u'1200',
+            u'packages': [{
+              u'package_name': u'rm',
+              u'version': test_env_handlers.PINNED_PACKAGE_VERSION,
+            }],
           },
           u'tags': [
             u'commit:post',
@@ -1027,6 +1051,10 @@ class TaskApiTest(BaseTest):
         u'grace_period_secs': u'30',
         u'idempotent': False,
         u'io_timeout_secs': u'1200',
+        u'packages': [{
+          u'package_name': u'rm',
+          u'version': test_env_handlers.PINNED_PACKAGE_VERSION,
+        }],
       },
       u'tags': [
         u'os:Amiga',

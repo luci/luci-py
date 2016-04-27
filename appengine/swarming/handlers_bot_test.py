@@ -255,6 +255,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'host': u'http://localhost:8080',
         u'inputs_ref': None,
         u'io_timeout': 1200,
+        u'packages': [{
+          u'package_name': u'rm',
+          u'version': test_env_handlers.PINNED_PACKAGE_VERSION,
+        }],
         u'task_id': task_id,
       },
     }
@@ -316,6 +320,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
           u'namespace': u'default-gzip',
         },
         u'io_timeout': 1200,
+        u'packages': [{
+          u'package_name': u'rm',
+          u'version': test_env_handlers.PINNED_PACKAGE_VERSION,
+        }],
         u'task_id': task_id,
       },
     }
@@ -433,6 +441,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
           u'namespace': u'default-gzip',
         },
         u'io_timeout': 1200,
+        u'packages': [{
+          u'package_name': u'rm',
+          u'version': test_env_handlers.PINNED_PACKAGE_VERSION,
+        }],
         u'task_id': task_id,
       },
     }

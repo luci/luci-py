@@ -392,6 +392,13 @@ class BotPollHandler(_BotBaseHandler):
         'host': utils.get_versioned_hosturl(),
         'io_timeout': request.properties.io_timeout_secs,
         'inputs_ref': request.properties.inputs_ref,
+        'packages': [
+          {
+            'package_name': p.package_name,
+            'version': p.version,
+          }
+          for p in request.properties.packages
+        ],
         'task_id': task_pack.pack_run_result_key(run_result_key),
       },
     }

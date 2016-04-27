@@ -118,7 +118,10 @@ def task_request_to_rpc(entity):
       command=cmd,
       dimensions=_string_pairs_from_dict(props.dimensions),
       env=_string_pairs_from_dict(props.env),
-      inputs_ref=inputs_ref)
+      inputs_ref=inputs_ref,
+      packages=[
+        _ndb_to_rpc(swarming_rpcs.CipdPackage, p) for p in props.packages
+      ])
 
   return _ndb_to_rpc(
       swarming_rpcs.TaskRequest,
@@ -145,7 +148,10 @@ def new_task_request_from_rpc(msg, now):
       commands=None,
       dimensions={i.key: i.value for i in props.dimensions},
       env={i.key: i.value for i in props.env},
-      inputs_ref=inputs_ref)
+      inputs_ref=inputs_ref,
+      packages=[
+        _rpc_to_ndb(task_request.CipdPackage, p) for p in props.packages
+      ])
 
   return _rpc_to_ndb(
       task_request.TaskRequest,

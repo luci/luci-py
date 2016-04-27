@@ -27,10 +27,23 @@ from server import task_request
 # pylint: disable=W0212
 
 
+PINNED_PACKAGE_VERSION = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+
+
+def mkreq(req):
+  return task_request.make_request(req, True)
+
+
 def _gen_request(properties=None, **kwargs):
   """Creates a TaskRequest."""
+  properties = properties or {}
+  packages = properties.pop('packages', [{
+    'package_name': 'rm',
+    'version': PINNED_PACKAGE_VERSION,
+  }])
   props = {
     'command': [u'command1', u'arg1'],
+    'packages': [task_request.CipdPackage(**p) for p in packages],
     'dimensions': {
       u'OS': u'Windows-3.1.1',
       u'hostname': u'localhost',
@@ -42,7 +55,7 @@ def _gen_request(properties=None, **kwargs):
     'idempotent': False,
     'io_timeout_secs': None,
   }
-  props.update(properties or {})
+  props.update(properties)
   now = utils.utcnow()
   args = {
     'created_ts': now,
@@ -176,12 +189,11 @@ class TaskRequestApiTest(TestCase):
 
   def test_make_request(self):
     # Compare with test_make_request_clone().
-    parent = task_request.make_request(_gen_request(), True)
+    parent = mkreq(_gen_request())
     # Hack: Would need to know about TaskResultSummary.
     parent_id = task_pack.pack_request_key(parent.key) + '1'
-    r = _gen_request(
-        properties=dict(idempotent=True), parent_task_id=parent_id)
-    request = task_request.make_request(r, True)
+    r = _gen_request(properties=dict(idempotent=True), parent_task_id=parent_id)
+    request = mkreq(r)
     expected_properties = {
       'command': [u'command1', u'arg1'],
       'dimensions': {
@@ -196,6 +208,7 @@ class TaskRequestApiTest(TestCase):
       'idempotent': True,
       'inputs_ref': None,
       'io_timeout_secs': None,
+      'packages': [{'package_name': 'rm', 'version': PINNED_PACKAGE_VERSION}],
     }
     expected_request = {
       'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
@@ -205,7 +218,7 @@ class TaskRequestApiTest(TestCase):
       'properties': expected_properties,
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
-      'properties_hash': 'a406d174c469cb2ef6f56a49c3df0de0ae3db369',
+      'properties_hash': '83b350298f05eff6072d54d2c6f031d06cc30449',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'tags': [
@@ -225,22 +238,18 @@ class TaskRequestApiTest(TestCase):
     self.assertEqual(30, request.expiration_secs)
 
   def test_make_request_isolated(self):
-    parent = task_request.make_request(
-        _gen_request(
-            properties={
-              'command': [],
-              'inputs_ref': {
-                'isolated': '0123456789012345678901234567890123456789',
-                'isolatedserver': 'http://localhost:1',
-                'namespace': 'default-gzip',
-              },
-            }),
-        True)
+    parent = mkreq(_gen_request(properties={
+      'command': [],
+      'inputs_ref': {
+        'isolated': '0123456789012345678901234567890123456789',
+        'isolatedserver': 'http://localhost:1',
+        'namespace': 'default-gzip',
+      },
+    }))
     # Hack: Would need to know about TaskResultSummary.
     parent_id = task_pack.pack_request_key(parent.key) + '1'
-    request = task_request.make_request(
-        _gen_request(properties={'idempotent':True}, parent_task_id=parent_id),
-        True)
+    request = mkreq(_gen_request(
+        properties={'idempotent':True}, parent_task_id=parent_id))
     expected_properties = {
       'command': [u'command1', u'arg1'],
       'dimensions': {
@@ -255,6 +264,7 @@ class TaskRequestApiTest(TestCase):
       'idempotent': True,
       'inputs_ref': None,
       'io_timeout_secs': None,
+      'packages': [{'package_name': 'rm', 'version': PINNED_PACKAGE_VERSION}],
     }
     expected_request = {
       'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
@@ -264,7 +274,7 @@ class TaskRequestApiTest(TestCase):
       'properties': expected_properties,
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
-      'properties_hash': 'a406d174c469cb2ef6f56a49c3df0de0ae3db369',
+      'properties_hash': '83b350298f05eff6072d54d2c6f031d06cc30449',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'tags': [
@@ -285,11 +295,10 @@ class TaskRequestApiTest(TestCase):
     self.assertEqual(30, request.expiration_secs)
 
   def test_make_request_parent(self):
-    parent = task_request.make_request(_gen_request(), True)
+    parent = mkreq(_gen_request())
     # Hack: Would need to know about TaskResultSummary.
     parent_id = task_pack.pack_request_key(parent.key) + '1'
-    child = task_request.make_request(
-        _gen_request(parent_task_id=parent_id), True)
+    child = mkreq(_gen_request(parent_task_id=parent_id))
     self.assertEqual(parent_id, child.parent_task_id)
 
   def test_make_request_invalid_parent_id(self):
@@ -298,31 +307,27 @@ class TaskRequestApiTest(TestCase):
       _gen_request(parent_task_id='1d69b9f088008810')
 
   def test_make_request_idempotent(self):
-    request = task_request.make_request(
-        _gen_request(properties=dict(idempotent=True)), True)
+    request = mkreq(_gen_request(properties=dict(idempotent=True)))
     as_dict = request.to_dict()
     self.assertEqual(True, as_dict['properties']['idempotent'])
     # Intentionally hard code the hash value since it has to be deterministic.
     # Other unit tests should use the calculated value.
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        'a406d174c469cb2ef6f56a49c3df0de0ae3db369', as_dict['properties_hash'])
+        '83b350298f05eff6072d54d2c6f031d06cc30449', as_dict['properties_hash'])
 
   def test_duped(self):
     # Two TestRequest with the same properties.
-    request_1 = task_request.make_request(
-        _gen_request(properties=dict(idempotent=True)), True)
+    request_1 = mkreq(_gen_request(properties=dict(idempotent=True)))
     now = utils.utcnow()
-    request_2 = task_request.make_request(
-        _gen_request(
-            name='Other',
-            user='Other',
-            priority=201,
-            created_ts=now,
-            expiration_ts=now + datetime.timedelta(seconds=129),
-            tags=['tag:2'],
-            properties=dict(idempotent=True)),
-        True)
+    request_2 = mkreq(_gen_request(
+        name='Other',
+        user='Other',
+        priority=201,
+        created_ts=now,
+        expiration_ts=now + datetime.timedelta(seconds=129),
+        tags=['tag:2'],
+        properties=dict(idempotent=True)))
     self.assertEqual(
         request_1.properties.properties_hash,
         request_2.properties.properties_hash)
@@ -330,127 +335,112 @@ class TaskRequestApiTest(TestCase):
 
   def test_different(self):
     # Two TestRequest with different properties.
-    request_1 = task_request.make_request(
-        _gen_request(
-          properties=dict(execution_timeout_secs=30, idempotent=True)), True)
-    request_2 = task_request.make_request(
-        _gen_request(
-          properties=dict(execution_timeout_secs=129, idempotent=True)), True)
+    request_1 = mkreq(_gen_request(
+        properties=dict(execution_timeout_secs=30, idempotent=True)))
+    request_2 = mkreq(_gen_request(
+        properties=dict(execution_timeout_secs=129, idempotent=True)))
     self.assertNotEqual(
         request_1.properties.properties_hash,
         request_2.properties.properties_hash)
 
   def test_bad_values(self):
     with self.assertRaises(AssertionError):
-      task_request.make_request(None, True)
+      mkreq(None)
     with self.assertRaises(AssertionError):
-      task_request.make_request({}, True)
+      mkreq({})
     with self.assertRaises(AttributeError):
-      task_request.make_request(_gen_request(properties={'foo': 'bar'}), True)
-    task_request.make_request(_gen_request(), True)
+      mkreq(_gen_request(properties={'foo': 'bar'}))
+    mkreq(_gen_request())
 
     with self.assertRaises(datastore_errors.BadValueError):
-      task_request.make_request(
-          _gen_request(properties=dict(command=[])), True)
+      mkreq(_gen_request(properties=dict(command=[])))
     with self.assertRaises(datastore_errors.BadValueError):
-      task_request.make_request(
-          _gen_request(properties=dict(command={'a': 'b'})), True)
+      mkreq(_gen_request(properties=dict(command={'a': 'b'})))
     with self.assertRaises(datastore_errors.BadValueError):
-      task_request.make_request(
-          _gen_request(properties=dict(command='python')), True)
-    task_request.make_request(
-        _gen_request(properties=dict(command=['python'])), True)
-    task_request.make_request(
-        _gen_request(properties=dict(command=[u'python'])), True)
+      mkreq(_gen_request(properties=dict(command='python')))
+    mkreq(_gen_request(properties=dict(command=['python'])))
+    mkreq(_gen_request(properties=dict(command=[u'python'])))
+
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkreq(_gen_request(properties=dict(packages=[{}])))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkreq(_gen_request(properties=dict(packages=[dict(package_name='rm')])))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkreq(_gen_request(properties=dict(
+          packages=[{'package_name': 'infra|rm', 'version': 'latest'}])))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkreq(_gen_request(properties=dict(
+        packages=[
+            {'package_name': 'rm', 'version': 'latest'},
+            {'package_name': 'rm', 'version': 'canary'},
+        ])))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkreq(_gen_request(properties=dict(
+        idempotent=True,
+        packages=[{'package_name': 'rm', 'version': 'latest'}])))
+    mkreq(_gen_request(properties=dict(
+      packages=[{'package_name': 'rm', 'version': 'latest'}])))
 
     with self.assertRaises(TypeError):
-      task_request.make_request(
-          _gen_request(properties=dict(dimensions=[])), True)
+      mkreq(_gen_request(properties=dict(dimensions=[])))
     with self.assertRaises(datastore_errors.BadValueError):
-      task_request.make_request(
-          _gen_request(properties=dict(dimensions={})), True)
+      mkreq(_gen_request(properties=dict(dimensions={})))
     with self.assertRaises(datastore_errors.BadValueError):
-      task_request.make_request(
-          _gen_request(
-              properties=dict(dimensions={u'id': u'b', u'a:': u'b'})), True)
-    task_request.make_request(
-        _gen_request(
-            properties=dict(dimensions={u'id': u'b', u'a.': u'b'})), True)
+      mkreq(_gen_request(
+          properties=dict(dimensions={u'id': u'b', u'a:': u'b'})))
+    mkreq(_gen_request(
+        properties=dict(dimensions={u'id': u'b', u'a.': u'b'})))
 
     with self.assertRaises(TypeError):
-      task_request.make_request(
-          _gen_request(properties=dict(env=[])), True)
+      mkreq(_gen_request(properties=dict(env=[])))
     with self.assertRaises(TypeError):
-      task_request.make_request(
-          _gen_request(properties=dict(env={u'a': 1})), True)
-    task_request.make_request(_gen_request(properties=dict(env={})), True)
+      mkreq(_gen_request(properties=dict(env={u'a': 1})))
+    mkreq(_gen_request(properties=dict(env={})))
 
     with self.assertRaises(datastore_errors.BadValueError):
-      task_request.make_request(
-          _gen_request(priority=task_request.MAXIMUM_PRIORITY+1), True)
-    task_request.make_request(
-        _gen_request(priority=task_request.MAXIMUM_PRIORITY), True)
+      mkreq(_gen_request(priority=task_request.MAXIMUM_PRIORITY+1))
+    mkreq(_gen_request(priority=task_request.MAXIMUM_PRIORITY))
 
     with self.assertRaises(datastore_errors.BadValueError):
-      task_request.make_request(
-          _gen_request(
-              properties=dict(
-                  execution_timeout_secs=task_request._ONE_DAY_SECS+1)),
-              True)
-    task_request.make_request(
-        _gen_request(
-            properties=dict(execution_timeout_secs=task_request._ONE_DAY_SECS)),
-        True)
+      mkreq(_gen_request(
+          properties=dict(execution_timeout_secs=task_request._ONE_DAY_SECS+1)))
+    mkreq(_gen_request(
+        properties=dict(execution_timeout_secs=task_request._ONE_DAY_SECS)))
 
     now = utils.utcnow()
     with self.assertRaises(datastore_errors.BadValueError):
-      task_request.make_request(
-          _gen_request(
-              created_ts=now,
-              expiration_ts=
-                  now+datetime.timedelta(
-                      seconds=task_request._MIN_TIMEOUT_SECS-1)),
-          True)
+      mkreq(_gen_request(
+          created_ts=now,
+          expiration_ts=now + datetime.timedelta(
+              seconds=task_request._MIN_TIMEOUT_SECS-1)))
     with self.assertRaises(datastore_errors.BadValueError):
-      task_request.make_request(
-          _gen_request(
-              created_ts=now,
-              expiration_ts=
-                  now+datetime.timedelta(
-                      seconds=task_request._SEVEN_DAYS_SECS+1)),
-          True)
-    task_request.make_request(
-        _gen_request(
-              created_ts=now,
-              expiration_ts=
-                  now+datetime.timedelta(
-                      seconds=task_request._MIN_TIMEOUT_SECS)),
-        True)
-    task_request.make_request(
-        _gen_request(
-              created_ts=now,
-              expiration_ts=
-                  now+datetime.timedelta(
-                      seconds=task_request._SEVEN_DAYS_SECS)),
-        True)
+      mkreq(_gen_request(
+          created_ts=now,
+          expiration_ts=
+              now+datetime.timedelta(seconds=task_request._SEVEN_DAYS_SECS+1)))
+    mkreq(_gen_request(
+        created_ts=now,
+        expiration_ts=
+            now+datetime.timedelta(seconds=task_request._MIN_TIMEOUT_SECS)))
+    mkreq(_gen_request(
+        created_ts=now,
+        expiration_ts=
+            now + datetime.timedelta(seconds=task_request._SEVEN_DAYS_SECS)))
 
     # Try with isolated/isolatedserver/namespace.
     with self.assertRaises(datastore_errors.BadValueError):
-      task_request.make_request(
-          _gen_request(properties=dict(
-              command=['see', 'spot', 'run'],
-              inputs_ref=task_request.FilesRef())),
-          True)
+      mkreq(_gen_request(properties=dict(
+          command=['see', 'spot', 'run'],
+          inputs_ref=task_request.FilesRef())))
 
   def test_make_request_clone(self):
     # Compare with test_make_request().
-    parent = task_request.make_request(_gen_request(), True)
+    parent = mkreq(_gen_request())
     # Hack: Would need to know about TaskResultSummary.
     parent_id = task_pack.pack_request_key(parent.key) + '1'
     data = _gen_request(
         properties=dict(idempotent=True), parent_task_id=parent_id)
-    request = task_request.make_request_clone(
-        task_request.make_request(data, True))
+    request = task_request.make_request_clone(mkreq(data))
     # Differences from make_request() are:
     # - idempotent was reset to False.
     # - parent_task_id was reset to None.
@@ -468,6 +458,7 @@ class TaskRequestApiTest(TestCase):
       'idempotent': False,
       'inputs_ref': None,
       'io_timeout_secs': None,
+      'packages': [{'package_name': 'rm', 'version': PINNED_PACKAGE_VERSION}],
     }
     # Differences from make_request() are:
     # - parent_task_id was reset to None.

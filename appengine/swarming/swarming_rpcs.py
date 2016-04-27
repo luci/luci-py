@@ -82,6 +82,14 @@ class FilesRef(messages.Message):
   namespace = messages.StringField(3)
 
 
+class CipdPackage(messages.Message):
+  """A CIPD package to install in $CIPD_PATH and $PATH before task execution."""
+  # Full CIPD package name, e.g. "infra/tools/authutil/linux-amd64"
+  package_name = messages.StringField(1)
+  # Instance ID, tag or ref, e.g. "latest".
+  version = messages.StringField(2)
+
+
 class TaskProperties(messages.Message):
   """Important metadata about a particular task."""
   command = messages.StringField(1, repeated=True)
@@ -93,6 +101,7 @@ class TaskProperties(messages.Message):
   idempotent = messages.BooleanField(7)
   inputs_ref = messages.MessageField(FilesRef, 8)
   io_timeout_secs = messages.IntegerField(9)
+  packages = messages.MessageField(CipdPackage, 10, repeated=True)
 
 
 class NewTaskRequest(messages.Message):

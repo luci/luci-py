@@ -32,6 +32,9 @@ from server import large
 from server import stats
 
 
+PINNED_PACKAGE_VERSION = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+
+
 class AppTestBase(test_case.TestCase):
   APP_DIR = test_env.APP_DIR
 
@@ -216,6 +219,10 @@ class AppTestBase(test_case.TestCase):
   def _client_create_task(self, properties=None, **kwargs):
     """Creates an isolated command TaskRequest via the Cloud Endpoints API."""
     params = {
+      'packages': [{
+        'package_name': 'rm',
+        'version': PINNED_PACKAGE_VERSION,
+      }],
       'dimensions': [
         {'key': 'os', 'value': 'Amiga'},
         {'key': 'pool', 'value': 'default'},

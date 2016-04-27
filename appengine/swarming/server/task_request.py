@@ -61,6 +61,7 @@ from components import datastore_utils
 from components import pubsub
 from components import utils
 from server import task_pack
+import cipd
 
 
 # Maximum acceptable priority value, which is effectively the lowest priority.
@@ -203,6 +204,20 @@ def _validate_tags(prop, value):
         '%s must be key:value form, not %s' % (prop._name, value))
 
 
+def _validate_package_name(prop, value):
+  """Validates a CIPD package name."""
+  if not cipd.is_valid_package_name(value):
+    raise datastore_errors.BadValueError(
+      '%s must be a valid CIPD package name "%s"' % (prop._name, value))
+
+
+def _validate_package_version(prop, value):
+  """Validates a CIPD package version."""
+  if not cipd.is_valid_version(value):
+    raise datastore_errors.BadValueError(
+      '%s must be a valid package version "%s"' % (prop._name, value))
+
+
 ### Models.
 
 
@@ -221,6 +236,24 @@ class FilesRef(ndb.Model):
     if not self.isolated or not self.isolatedserver or not self.namespace:
       raise datastore_errors.BadValueError(
           'isolated requires server and namespace')
+
+
+class CipdPackage(ndb.Model):
+  """A CIPD package to install in $CIPD_PATH and $PATH before task execution.
+
+  A part of TaskProperties.
+  """
+  package_name = ndb.StringProperty(
+      indexed=False, validator=_validate_package_name)
+  version = ndb.StringProperty(
+      indexed=False, validator=_validate_package_version)
+
+  def _pre_put_hook(self):
+    super(CipdPackage, self)._pre_put_hook()
+    if not self.package_name:
+      raise datastore_errors.BadValueError('CIPD package name is required')
+    if not self.version:
+      raise datastore_errors.BadValueError('CIPD package version is required')
 
 
 class TaskProperties(ndb.Model):
@@ -250,6 +283,10 @@ class TaskProperties(ndb.Model):
 
   # File inputs of the task. Only inputs_ref or command&data can be specified.
   inputs_ref = ndb.LocalStructuredProperty(FilesRef)
+
+  # A list of CIPD packages to install $CIPD_PATH and $PATH before task
+  # execution.
+  packages = ndb.LocalStructuredProperty(CipdPackage, repeated=True)
 
   # Filter to use to determine the required properties on the bot to run on. For
   # example, Windows or hostname. Encoded as json. Optional but highly
@@ -332,6 +369,23 @@ class TaskProperties(ndb.Model):
         raise datastore_errors.BadValueError('extra_args require inputs_ref')
       if self.inputs_ref:
         self.inputs_ref._pre_put_hook()
+
+      package_names = set()
+      for p in self.packages:
+        p._pre_put_hook()
+        if p.package_name in package_names:
+          raise datastore_errors.BadValueError(
+              'package %s is specified more than once' % p.package_name)
+        package_names.add(p.package_name)
+      self.packages.sort(key=lambda p: p.package_name)
+
+      if self.idempotent:
+        pinned = lambda p: cipd.is_pinned_version(p.version)
+        if self.packages and any(not pinned(p) for p in self.packages):
+          raise datastore_errors.BadValueError(
+            'an idempotent task cannot have unpinned packages; '
+            'use instance IDs or tags as package versions')
+
 
 
 class TaskRequest(ndb.Model):
@@ -565,7 +619,7 @@ def make_request(request, is_bot_or_admin):
 
   If parent_task_id is set, properties for the parent are used:
   - priority: defaults to parent.priority - 1
-  - user: overriden by parent.user
+  - user: overridden by parent.user
 
   """
   assert request.__class__ is TaskRequest
