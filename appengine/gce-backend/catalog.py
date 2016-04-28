@@ -14,6 +14,7 @@ from components import gce
 from components import machine_provider
 from components import utils
 
+import instance_group_managers
 import models
 import pubsub
 
@@ -71,19 +72,20 @@ def extract_dimensions(instance, instance_template_revision):
 
 
 @ndb.transactional
-def set_cataloged(key):
-  """Sets the given instance as cataloged.
+def set_cataloged(key, cataloged):
+  """Sets the cataloged field of the given instance.
 
   Args:
     key: ndb.Key for a models.Instance entity.
+    cataloged: True or False.
   """
   entity = key.get()
   if not entity:
     logging.warning('Instance does not exist: %s', instance)
     return
 
-  if not entity.cataloged:
-    entity.cataloged = True
+  if entity.cataloged != cataloged:
+    entity.cataloged = cataloged
     entity.put()
 
 
@@ -129,7 +131,7 @@ def catalog(key):
   )
 
   if response.get('error') and response['error'] != 'HOSTNAME_REUSE':
-    # Ignore duplicate requests.
+    # Assume HOSTNAME_REUSE implies a duplicate request.
     logging.warning(
         'Error adding Instance to catalog: %s\nError: %s',
         key,
@@ -137,7 +139,7 @@ def catalog(key):
     )
     return
 
-  set_cataloged(key)
+  set_cataloged(key, True)
 
 
 def schedule_catalog():
@@ -165,3 +167,50 @@ def schedule_catalog():
                   ):
                     logging.warning(
                         'Failed to enqueue task for Instance: %s', instance.key)
+
+
+def remove(key):
+  """Removes the given instance from the catalog.
+
+  Args:
+    key: ndb.Key for a models.Instance entity.
+  """
+  entity = key.get()
+  if not entity:
+    logging.warning('Instance does not exist: %s', key)
+    return
+
+  if not entity.cataloged:
+    return
+
+  response = machine_provider.delete_machine({'hostname': key.id()})
+  if response.get('error') and response['error'] != 'ENTRY_NOT_FOUND':
+    # Assume ENTRY_NOT_FOUND implies a duplicate request.
+    logging.warning(
+        'Error removing Instance from catalog: %s\nError: %s',
+        key,
+        response['error'],
+    )
+    return
+
+  set_cataloged(key, False)
+
+
+def schedule_removal():
+  """Enqueues tasks to remove drained instances from the catalog."""
+  for instance_group_manager_key in (
+      instance_group_managers.get_drained_instance_group_managers()):
+    instance_group_manager = instance_group_manager_key.get()
+    if instance_group_manager:
+      for instance_key in instance_group_manager.instances:
+        instance = instance_key.get()
+        if instance and instance.cataloged:
+          if not utils.enqueue_task(
+              '/internal/queues/remove-cataloged-instance',
+              'remove-cataloged-instance',
+              params={
+                  'key': instance.key.urlsafe(),
+              },
+          ):
+            logging.warning(
+                'Failed to enqueue task for Instance: %s', instance.key)

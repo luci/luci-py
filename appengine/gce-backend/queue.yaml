@@ -11,6 +11,16 @@ queue:
    retry_parameters:
      task_retry_limit: 0
 
+ - name: cleanup-deleted-instance
+   rate: 1/s
+   retry_parameters:
+     task_retry_limit: 0
+
+ - name: cleanup-drained-instance
+   rate: 1/s
+   retry_parameters:
+     task_retry_limit: 0
+
  - name: compress-instance-metadata-updates
    rate: 1/s
    retry_parameters:
@@ -26,7 +36,17 @@ queue:
    retry_parameters:
      task_retry_limit: 0
 
+ - name: delete-drained-instance
+   rate: 1/s
+   retry_parameters:
+     task_retry_limit: 0
+
  - name: delete-instance-group-manager
+   rate: 1/s
+   retry_parameters:
+     task_retry_limit: 0
+
+ - name: delete-instance-pending-deletion
    rate: 1/s
    retry_parameters:
      task_retry_limit: 0
@@ -42,6 +62,16 @@ queue:
      task_retry_limit: 0
 
  - name: process-pubsub-messages
+   rate: 1/s
+   retry_parameters:
+     task_retry_limit: 0
+
+ - name: remove-cataloged-instance
+   rate: 1/s
+   retry_parameters:
+     task_retry_limit: 0
+
+ - name: resize-instance-group
    rate: 1/s
    retry_parameters:
      task_retry_limit: 0

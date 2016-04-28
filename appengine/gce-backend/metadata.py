@@ -4,6 +4,7 @@
 
 """Utilities for operating on instance metadata."""
 
+import json
 import logging
 
 from google.appengine.ext import ndb
@@ -117,8 +118,8 @@ def schedule_metadata_compressions():
   for instance in models.Instance.query():
     if instance.pending_metadata_updates:
       if not utils.enqueue_task(
-          '/internal/queues/compress-instance-metadata',
-          'compress-instance-metadata',
+          '/internal/queues/compress-instance-metadata-updates',
+          'compress-instance-metadata-updates',
           params={
               'key': instance.key.urlsafe(),
           },

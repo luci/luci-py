@@ -21,6 +21,14 @@ import parse
 import pubsub
 
 
+class CatalogedInstanceRemovalHandler(webapp2.RequestHandler):
+  """Worker for removing cataloged instances."""
+
+  @decorators.require_cronjob
+  def get(self):
+    catalog.schedule_removal()
+
+
 class ConfigImportHandler(webapp2.RequestHandler):
   """Worker for importing the config."""
 
@@ -43,11 +51,21 @@ class ConfigProcessHandler(webapp2.RequestHandler):
     )
 
 
+class DrainedInstancesDeletionHandler(webapp2.RequestHandler):
+  """Worker for deleting drained instances."""
+
+  @decorators.require_cronjob
+  def get(self):
+    instances.schedule_drained_deletion()
+
+
 class EntityCleanupHandler(webapp2.RequestHandler):
   """Worker for cleaning up datastore entities."""
 
   @decorators.require_cronjob
   def get(self):
+    cleanup.schedule_deleted_instance_cleanup()
+    cleanup.schedule_drained_instance_cleanup()
     cleanup.cleanup_instance_group_managers()
     cleanup.cleanup_instance_template_revisions()
     cleanup.cleanup_instance_templates()
@@ -59,6 +77,14 @@ class InstanceCatalogHandler(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
     catalog.schedule_catalog()
+
+
+class InstanceDeletionHandler(webapp2.RequestHandler):
+  """Worker for deleting instances."""
+
+  @decorators.require_cronjob
+  def get(self):
+    instances.schedule_deletion()
 
 
 class InstanceFetchHandler(webapp2.RequestHandler):
@@ -85,12 +111,28 @@ class InstanceGroupManagerDeletionHandler(webapp2.RequestHandler):
     instance_group_managers.schedule_deletion()
 
 
+class InstanceGroupResizeHandler(webapp2.RequestHandler):
+  """Worker for resizing managed instance groups."""
+
+  @decorators.require_cronjob
+  def get(self):
+    instance_group_managers.schedule_resize()
+
+
 class InstanceMetadataOperationsCheckHandler(webapp2.RequestHandler):
   """Worker for checking instance metadata operations."""
 
   @decorators.require_cronjob
   def get(self):
     metadata.schedule_metadata_operations_check()
+
+
+class InstanceMetadataUpdatesCompressionHandler(webapp2.RequestHandler):
+  """Worker for compressing pending metadata updates."""
+
+  @decorators.require_cronjob
+  def get(self):
+    metadata.schedule_metadata_compressions()
 
 
 class InstanceMetadataUpdatesHandler(webapp2.RequestHandler):
@@ -101,12 +143,12 @@ class InstanceMetadataUpdatesHandler(webapp2.RequestHandler):
     metadata.schedule_metadata_updates()
 
 
-class InstanceMetadataUpdatesCompressionHandler(webapp2.RequestHandler):
-  """Worker for compressing pending metadata updates."""
+class InstancesPendingDeletionDeletionHandler(webapp2.RequestHandler):
+  """Worker for deleting instances pending deletion."""
 
   @decorators.require_cronjob
   def get(self):
-    metadata.schedule_metadata_compressions()
+    instances.schedule_pending_deletion()
 
 
 class InstanceTemplateCreationHandler(webapp2.RequestHandler):
@@ -145,14 +187,22 @@ def create_cron_app():
        InstanceGroupManagerCreationHandler),
       ('/internal/cron/create-instance-templates',
        InstanceTemplateCreationHandler),
+      ('/internal/cron/delete-drained-instances',
+       DrainedInstancesDeletionHandler),
       ('/internal/cron/delete-instance-group-managers',
        InstanceGroupManagerDeletionHandler),
+      ('/internal/cron/delete-instances-pending-deletion',
+       InstancesPendingDeletionDeletionHandler),
       ('/internal/cron/delete-instance-templates',
        InstanceTemplateDeletionHandler),
+      ('/internal/cron/delete-instances', InstanceDeletionHandler),
       ('/internal/cron/fetch-instances', InstanceFetchHandler),
       ('/internal/cron/import-config', ConfigImportHandler),
       ('/internal/cron/process-config', ConfigProcessHandler),
       ('/internal/cron/process-pubsub-messages', PubSubMessageProcessHandler),
+      ('/internal/cron/remove-cataloged-instances',
+       CatalogedInstanceRemovalHandler),
+      ('/internal/cron/resize-instance-groups', InstanceGroupResizeHandler),
       ('/internal/cron/update-instance-metadata',
        InstanceMetadataUpdatesHandler),
   ])

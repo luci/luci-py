@@ -69,6 +69,24 @@ def add_machines(requests):
  )
 
 
+def delete_machine(dimensions):
+  """Deletes a machine from the Machine Provider's Catalog.
+
+  Args:
+    dimensions: Dimensions for the machine.
+  """
+  logging.info('Sending delete_machine request')
+  return net.json_request(
+      '%s/_ah/api/catalog/v1/delete_machine' %
+          MachineProviderConfiguration.get_instance_url(),
+      method='POST',
+      payload=utils.to_json_encodable({
+          'dimensions': dimensions,
+      }),
+      scopes=MACHINE_PROVIDER_SCOPES,
+  )
+
+
 def lease_machines(requests):
   """Lease machines from the Machine Provider.
 

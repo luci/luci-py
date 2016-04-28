@@ -265,11 +265,63 @@ def schedule_deletion():
     entity = key.get()
     if entity and entity.url and not entity.instances:
       if not utils.enqueue_task(
-          '/internal/queues/delete-instance-group-managers',
-          'delete-instance-group-managers',
+          '/internal/queues/delete-instance-group-manager',
+          'delete-instance-group-manager',
           params={
               'key': key.urlsafe(),
           },
       ):
         logging.warning(
           'Failed to enqueue task for InstanceGroupManager: %s', key)
+
+
+def resize(key):
+  """Resizes the given instance group manager.
+
+  Args:
+    key: ndb.Key for a models.InstanceGroupManager entity.
+  """
+  entity = key.get()
+  if not entity:
+    logging.warning('InstanceGroupManager does not exist: %s', key)
+    return
+
+  if not entity.url:
+    logging.warning('InstanceGroupManager URL unspecified: %s', key)
+
+  parent = key.parent().get()
+  if not parent:
+    logging.warning('InstanceTemplateRevision does not exist: %s', key)
+    return
+
+  if not parent.project:
+    logging.warning('InstanceTemplateRevision project unspecified: %s', key)
+    return
+
+  # For now, just ensure a minimum size.
+  if entity.current_size >= entity.minimum_size:
+    return
+
+  api = gce.Project(parent.project)
+  api.resize_managed_instance_group(
+      get_name(entity), key.id(), entity.minimum_size)
+
+
+def schedule_resize():
+  """Enqueues tasks to resize instance group managers."""
+  for instance_template in models.InstanceTemplate.query():
+    if instance_template.active:
+      instance_template_revision = instance_template.active.get()
+      if instance_template_revision:
+        for instance_group_manager_key in instance_template_revision.active:
+          if not utils.enqueue_task(
+              '/internal/queues/resize-instance-group',
+              'resize-instance-group',
+              params={
+                  'key': instance_group_manager_key.urlsafe(),
+              },
+          ):
+            logging.warning(
+                'Failed to enqueue task for InstanceGroupManager: %s',
+                instance_group_manager_key,
+            )

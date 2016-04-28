@@ -5,19 +5,25 @@ cron:
 - url: /internal/cron/check-instance-metadata-operations
   schedule: every 1 minutes
 
-- url: /internal/cron/compress-instance-metadata-updates
+- url: /internal/cron/cleanup-entities
   schedule: every 1 minutes
 
-- url: /internal/cron/cleanup-entities
+- url: /internal/cron/compress-instance-metadata-updates
   schedule: every 1 minutes
 
 - url: /internal/cron/create-instance-group-managers
   schedule: every 1 minutes
 
+- url: /internal/cron/create-instance-templates
+  schedule: every 1 minutes
+
+- url: /internal/cron/delete-drained-instances
+  schedule: every 1 minutes
+
 - url: /internal/cron/delete-instance-group-managers
   schedule: every 1 minutes
 
-- url: /internal/cron/create-instance-templates
+- url: /internal/cron/delete-instances-pending-deletion
   schedule: every 1 minutes
 
 - url: /internal/cron/delete-instance-templates
@@ -33,6 +39,12 @@ cron:
   schedule: every 1 minutes
 
 - url: /internal/cron/process-pubsub-messages
+  schedule: every 1 minutes
+
+- url: /internal/cron/remove-cataloged-instances
+  schedule: every 1 minutes
+
+- url: /internal/cron/resize-instance-groups
   schedule: every 1 minutes
 
 - url: /internal/cron/update-instance-metadata

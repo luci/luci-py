@@ -4,6 +4,7 @@
 
 """Utilities for operating on instances."""
 
+import json
 import logging
 
 from google.appengine.ext import ndb
@@ -220,3 +221,150 @@ def schedule_fetch():
             'Failed to enqueue task for InstanceGroupManager: %s',
             instance_group_manager.key,
         )
+
+
+def _delete(instance_template_revision, instance_group_manager, instance):
+  """Deletes the given instance.
+
+  Args:
+    instance_template_revision: models.InstanceTemplateRevision.
+    instance_group_manager: models.InstanceGroupManager.
+    instance: models.Instance
+  """
+  api = gce.Project(instance_template_revision.project)
+  try:
+    result = api.delete_instances(
+        instance_group_managers.get_name(instance_group_manager),
+        instance_group_manager.key.id(),
+        [instance.url],
+    )
+    if result['status'] != 'DONE':
+      logging.warning(
+          'Instance group manager operation failed: %s\n%s',
+          parent.key,
+          json.dumps(result, indent=2),
+      )
+  except net.Error as e:
+    if e.status_code != 400:
+      # If the instance isn't found, assume it's already deleted.
+      raise
+
+
+def delete_pending(key):
+  """Deletes the given instance pending deletion.
+
+  Args:
+    key: ndb.Key for a models.Instance entity.
+  """
+  entity = key.get()
+  if not entity:
+    return
+
+  if not entity.pending_deletion:
+    logging.warning('Instance not pending deletion: %s', key)
+    return
+
+  if not entity.url:
+    logging.warning('Instance URL unspecified: %s', key)
+    return
+
+  parent = key.parent().get()
+  if not parent:
+    logging.warning('InstanceGroupManager does not exist: %s', key.parent())
+    return
+
+  grandparent = parent.key.parent().get()
+  if not grandparent:
+    logging.warning(
+        'InstanceTemplateRevision does not exist: %s', parent.key.parent())
+    return
+
+  if not grandparent.project:
+    logging.warning(
+        'InstanceTemplateRevision project unspecified: %s', grandparent.key)
+    return
+
+  _delete(grandparent, parent, entity)
+
+
+def schedule_pending_deletion():
+  """Enqueues tasks to delete instances."""
+  for instance in models.Instance.query():
+    if instance.pending_deletion:
+      if not utils.enqueue_task(
+          '/internal/queues/delete-instance-pending-deletion',
+          'delete-instance-pending-deletion',
+          params={
+              'key': instance.key.urlsafe(),
+          },
+      ):
+        logging.warning('Failed to enqueue task for Instance: %s', instance.key)
+
+
+def delete_drained(key):
+  """Deletes the given drained instance.
+
+  Args:
+    key: ndb.Key for a models.Instance entity.
+  """
+  entity = key.get()
+  if not entity:
+    logging.warning('Instance does not exist: %s', key)
+    return
+
+  if entity.cataloged:
+    logging.warning('Instance is cataloged: %s', key)
+    return
+
+  if not entity.url:
+    logging.warning('Instance URL unspecified: %s', key)
+    return
+
+  parent = key.parent().get()
+  if not parent:
+    logging.warning('InstanceGroupManager does not exist: %s', key.parent())
+    return
+
+  grandparent = parent.key.parent().get()
+  if not grandparent:
+    logging.warning(
+        'InstanceTemplateRevision does not exist: %s', parent.key.parent())
+    return
+
+  if not grandparent.project:
+    logging.warning(
+        'InstanceTemplateRevision project unspecified: %s', grandparent.key)
+    return
+
+  root = grandparent.key.parent().get()
+  if not root:
+    logging.warning(
+        'InstanceTemplate does not exist: %s', grandparent.key.parent())
+    return
+
+  if parent.key not in grandparent.drained:
+    if grandparent.key not in root.drained:
+      logging.warning('Instance is not drained: %s', key)
+      return
+
+  _delete(grandparent, parent, entity)
+
+
+def schedule_drained_deletion():
+  """Enqueues tasks to delete drained instances."""
+  for instance_group_manager_key in (
+      instance_group_managers.get_drained_instance_group_managers()):
+    instance_group_manager = instance_group_manager_key.get()
+    if instance_group_manager:
+      for instance_key in instance_group_manager.instances:
+        instance = instance_key.get()
+        if instance and not instance.cataloged:
+          if not utils.enqueue_task(
+              '/internal/queues/delete-drained-instance',
+              'delete-drained-instance',
+              params={
+                  'key': instance.key.urlsafe(),
+              },
+          ):
+            logging.warning(
+              'Failed to enqueue task for Instance: %s', instance.key)

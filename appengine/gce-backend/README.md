@@ -117,6 +117,32 @@ the status of the operation. If succeeded, active\_metadata\_update is cleared,
 otherwise only the url is cleared and the operation is moved to the front of
 the pending\_metadata\_updates.
 
+delete-instances-pending-deletion
+---------------------------------
+
+Deletes GCE instances for each models.Instance with pending\_deletion set.
+
+
+resize-instance-groups
+----------------------
+
+Embiggens a GCE managed instance group whose size has fallen below the minimum
+configured size.
+
+
+remove-cataloged-instances
+--------------------------
+
+Removes each models.Instance from the Machine Provider catalog that wasn't
+created from an instance template currently referenced in the config.
+
+delete-drained-instances
+------------------------
+
+Deletes GCE instances for each models.Instance that was removed from the
+Machine Provider catalog for being created from an instance template not
+currently referenced in the config.
+
 delete-instance-group-managers
 ------------------------------
 
@@ -126,11 +152,10 @@ instances created from them.
 delete-instance-templates
 -------------------------
 
-Delets GCE instance templates that aren't found in the config and have no
+Deletes GCE instance templates that aren't found in the config and have no
 instance group managers configured to use them.
 
 cleanup-entities
 ----------------
 
-Deletes models.InstanceTemplates which aren't referenced at all anymore. This
-includes references in the datastore as well as references in the config.
+Deletes entities that are no longer needed.
