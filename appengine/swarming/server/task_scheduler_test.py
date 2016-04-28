@@ -397,7 +397,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertNotEqual(None, task_to_run.TaskToRun.query().get().queue_number)
 
   def test_task_idempotent_variable(self):
-    # Test the edge case where GlobalConfig.reusable_task_age_secs is being
+    # Test the edge case where config.settings().reusable_task_age_secs is being
     # modified. This ensure TaskResultSummary.order(TRS.key) works.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     cfg = config.settings()
