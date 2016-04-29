@@ -169,8 +169,9 @@ TaskId = endpoints.ResourceContainer(
 
 
 TaskIdWithPerf = endpoints.ResourceContainer(
-    swarming_rpcs.PerformanceStatsRequest,
-    task_id=messages.StringField(1, required=True))
+    message_types.VoidMessage,
+    task_id=messages.StringField(1, required=True),
+    include_performance_stats=messages.BooleanField(2, default=False))
 
 
 @swarming_api.api_class(resource_name='task', path='task')

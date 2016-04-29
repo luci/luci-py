@@ -171,12 +171,6 @@ class TasksCountRequest(messages.Message):
   tags = messages.StringField(6, repeated=True)
 
 
-class PerformanceStatsRequest(messages.Message):
-  # Only applicable when fetching results. This incurs more DB operations and
-  # more data is returned so this is a bit slower.
-  include_performance_stats = messages.BooleanField(1, default=False)
-
-
 ### Task-Related Responses
 
 
