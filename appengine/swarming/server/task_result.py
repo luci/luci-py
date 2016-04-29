@@ -247,8 +247,8 @@ class TaskOutputChunk(ndb.Model):
     return self.key.integer_id() - 1
 
 
-class IsolatedOperation(ndb.Model):
-  """Statistics for an isolated operation.
+class OperationStats(ndb.Model):
+  """Statistics for an operation.
 
   This entity is not stored in the DB. It is only embedded in PerformanceStats.
   """
@@ -290,9 +290,9 @@ class PerformanceStats(ndb.Model):
   # isolated_download.duration and isolated_upload.duration.
   bot_overhead = ndb.FloatProperty(indexed=False)
   # Runtime dependencies download operation before the task.
-  isolated_download = ndb.LocalStructuredProperty(IsolatedOperation)
+  isolated_download = ndb.LocalStructuredProperty(OperationStats)
   # Results uploading operation after the task.
-  isolated_upload = ndb.LocalStructuredProperty(IsolatedOperation)
+  isolated_upload = ndb.LocalStructuredProperty(OperationStats)
 
   @property
   def is_valid(self):
@@ -444,8 +444,8 @@ class _TaskResultCommon(ndb.Model):
       self._performance_stats_cache = (
           (key.get() if key else None) or
           PerformanceStats(
-              isolated_download=IsolatedOperation(),
-              isolated_upload=IsolatedOperation()))
+              isolated_download=OperationStats(),
+              isolated_upload=OperationStats()))
     return self._performance_stats_cache
 
   @property

@@ -174,7 +174,7 @@ class TasksCountRequest(messages.Message):
 ### Task-Related Responses
 
 
-class IsolatedOperation(messages.Message):
+class OperationStats(messages.Message):
   duration = messages.FloatField(1)
   initial_number_items = messages.IntegerField(2)
   initial_size = messages.IntegerField(3)
@@ -187,8 +187,8 @@ class IsolatedOperation(messages.Message):
 
 class PerformanceStats(messages.Message):
   bot_overhead = messages.FloatField(1)
-  isolated_download = messages.MessageField(IsolatedOperation, 2)
-  isolated_upload = messages.MessageField(IsolatedOperation, 3)
+  isolated_download = messages.MessageField(OperationStats, 2)
+  isolated_upload = messages.MessageField(OperationStats, 3)
 
 
 class CancelResponse(messages.Message):

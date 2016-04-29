@@ -313,10 +313,10 @@ class TaskResultApiTest(TestCase):
     task_result.PerformanceStats(
         key=task_pack.run_result_key_to_performance_stats_key(run_result.key),
         bot_overhead=0.1,
-        isolated_download=task_result.IsolatedOperation(
+        isolated_download=task_result.OperationStats(
             duration=0.05, initial_number_items=10, initial_size=10000,
             items_cold='foo', items_hot='bar'),
-        isolated_upload=task_result.IsolatedOperation(
+        isolated_upload=task_result.OperationStats(
             duration=0.01, items_cold='foo')).put()
     ndb.transaction(lambda: ndb.put_multi(run_result.append_output('foo', 0)))
     result_summary.set_from_run_result(run_result, request)

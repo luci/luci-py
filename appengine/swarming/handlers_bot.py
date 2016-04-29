@@ -524,13 +524,13 @@ class BotTaskUpdateHandler(auth.ApiHandler):
       upload = isolated_stats['upload']
       performance_stats = task_result.PerformanceStats(
           bot_overhead=bot_overhead,
-          isolated_download=task_result.IsolatedOperation(
+          isolated_download=task_result.OperationStats(
               duration=download['duration'],
               initial_number_items=download['initial_number_items'],
               initial_size=download['initial_size'],
               items_cold=base64.b64decode(download['items_cold']),
               items_hot=base64.b64decode(download['items_hot'])),
-          isolated_upload=task_result.IsolatedOperation(
+          isolated_upload=task_result.OperationStats(
               duration=upload['duration'],
               items_cold=base64.b64decode(upload['items_cold']),
               items_hot=base64.b64decode(upload['items_hot'])))

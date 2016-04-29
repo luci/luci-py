@@ -176,10 +176,10 @@ def task_result_to_rpc(entity, send_stats):
           swarming_rpcs.PerformanceStats,
           entity.performance_stats,
           isolated_download=_ndb_to_rpc(
-              swarming_rpcs.IsolatedOperation,
+              swarming_rpcs.OperationStats,
               entity.performance_stats.isolated_download),
           isolated_upload=_ndb_to_rpc(
-              swarming_rpcs.IsolatedOperation,
+              swarming_rpcs.OperationStats,
               entity.performance_stats.isolated_upload))
   kwargs = {
     'bot_dimensions': _string_list_pairs_from_dict(entity.bot_dimensions or {}),
