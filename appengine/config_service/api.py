@@ -410,7 +410,7 @@ def get_projects():
   return result
 
 
-@utils.memcache('ref_names', ['project_id'], time=5*60)  # 5 min.
+@utils.memcache('ref_names', ['project_id'], time=60)  # 1 min.
 def get_ref_names(project_id):
   """Returns list of ref names for a project. Caches results."""
   assert project_id
@@ -455,7 +455,7 @@ def get_config_multi(scope, path, hashes_only):
             config['revision'],
             path)
     try:
-      memcache.add(cache_key, configs, time=10*60)
+      memcache.add(cache_key, configs, time=60)
     except ValueError:
       logging.exception('%s:%s configs are too big for memcache', scope, path)
 
