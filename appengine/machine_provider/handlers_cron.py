@@ -356,6 +356,11 @@ def create_subscription(machine_key):
     logging.warning('CatalogMachineEntry no longer new:\n%s', machine)
     return
 
+  if not machine.policies.machine_service_account:
+    logging.warning(
+        'CatalogMachineEntry has no machine service account:\n%s', machine)
+    return
+
   if machine.pubsub_subscription:
     logging.info('CatalogMachineEntry already subscribed:\n%s', machine)
     return
