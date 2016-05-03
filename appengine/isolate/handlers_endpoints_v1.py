@@ -500,6 +500,8 @@ class IsolateService(remote.Service):
   @staticmethod
   def should_push_to_gs(digest):
     """True to direct client to upload given EntryInfo directly to GS."""
+    if utils.is_local_dev_server():
+      return False
     # Relatively small *.isolated files go through app engine to cache them.
     if digest.is_isolated and digest.size <= model.MAX_MEMCACHE_ISOLATED:
       return False

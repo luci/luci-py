@@ -136,6 +136,8 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
         extra_environ={'REMOTE_ADDR': self.source_ip})
     # add a private key; signing depends on config.settings()
     make_private_key()
+    # Remove the check for dev server in should_push_to_gs().
+    self.mock(utils, 'is_local_dev_server', lambda: False)
 
   @staticmethod
   def message_to_dict(message):
