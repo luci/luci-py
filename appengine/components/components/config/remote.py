@@ -64,6 +64,9 @@ class Provider(object):
         raise ndb.Return(None)
       logging.warning('404 response: %s', ex.response)
       raise
+    except net.Error as ex:
+      logging.warning('%s response: %s', ex.status_code, ex.response)
+      raise
 
   @ndb.tasklet
   def get_config_by_hash_async(self, content_hash):
