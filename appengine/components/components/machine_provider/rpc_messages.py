@@ -68,6 +68,8 @@ class CatalogManipulationRequestError(messages.Enum):
   INVALID_PROJECT = 7
   # Didn't specify a Cloud Pub/Sub topic.
   UNSPECIFIED_TOPIC = 8
+  # Attempted to delete a leased machine.
+  LEASED = 9
 
 
 class CatalogManipulationResponse(messages.Message):

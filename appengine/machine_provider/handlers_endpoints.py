@@ -208,6 +208,12 @@ class CatalogEndpoints(remote.Service):
           error=rpc_messages.CatalogManipulationRequestError.ENTRY_NOT_FOUND,
           machine_deletion_request=request,
       )
+    if entry.lease_id:
+      logging.warning('Attempting to delete leased machine: %s', entry)
+      return rpc_messages.CatalogManipulationResponse(
+          error=rpc_messages.CatalogManipulationRequestError.LEASED,
+          machine_deletion_request=request,
+      )
     entry.key.delete()
     return rpc_messages.CatalogManipulationResponse(
         machine_deletion_request=request,
