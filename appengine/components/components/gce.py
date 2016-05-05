@@ -256,6 +256,7 @@ class Project(object):
             'properties': {
                 'disks': [
                   {
+                      'autoDelete': True,
                       'boot': True,
                       'initializeParams': {
                           'diskSizeGb': disk_size_gb,
