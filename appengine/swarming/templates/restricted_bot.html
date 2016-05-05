@@ -34,9 +34,10 @@
     background-color: #ffffee;
   }
 
-  .dead_bot {
+  .dead_bot,.quarantined_bot {
     background-color: #ffdddd;
   }
+
 </style>
 {% endblock %}
 
@@ -82,7 +83,7 @@
       </tr>
       <tr title="Bot's state is informative only.">
         <td>State</td>
-        <td>{{bot_view.render_dict(bot.state)}}</td>
+        <td {% if bot.quarantined %}class="quarantined_bot"{% endif %}>{{bot_view.render_dict(bot.state)}}</td>
       </tr>
       <tr title="Version is based on the content of swarming_bot.zip which is the swarming bot code.">
         <td>Version</td>
