@@ -389,7 +389,7 @@ def parse(template_cfgs, manager_cfgs, max_concurrent=50, max_concurrent_igm=5):
   def f(template_cfg):
     return ensure_entities_exist(
         template_cfg,
-        manager_cfg_map.get(template_cfg.base_name),
+        manager_cfg_map.get(template_cfg.base_name, []),
         max_concurrent=max_concurrent_igm,
     )
 
