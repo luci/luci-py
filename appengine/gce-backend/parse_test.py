@@ -15,6 +15,7 @@ from google.appengine.ext import ndb
 from components import datastore_utils
 from test_support import test_case
 
+import instance_templates
 import models
 import parse
 from proto import config_pb2
@@ -466,7 +467,65 @@ class EnsureInstanceTemplateRevisionActiveTest(test_case.TestCase):
     self.assertEqual(instance_template.drained[0].id(), 'fake-key')
 
 
-class EnsureInstanceGroupManagerExists(test_case.TestCase):
+class EnsureInstanceTemplateRevisionDrainedTest(test_case.TestCase):
+  """Tests for parse.ensure_instance_template_revision_drained."""
+
+  def test_entity_not_found(self):
+    """Ensures nothing happens when the InstanceTemplate doesn't exist."""
+    key = ndb.Key(models.InstanceTemplate, 'fake-key')
+    parse.ensure_instance_template_revision_drained(key).wait()
+    self.failIf(key.get())
+
+  def test_nothing_active(self):
+    """Ensures nothing happens when nothing is active."""
+    key = models.InstanceTemplate(
+        key=instance_templates.get_instance_template_key('base-name'),
+    ).put()
+
+    parse.ensure_instance_template_revision_drained(key).wait()
+    self.failIf(key.get().active)
+    self.failIf(key.get().drained)
+
+  def test_already_drained(self):
+    """Ensures nothing happens when the InstanceTemplateRevision is drained."""
+    key = instance_templates.get_instance_template_revision_key(
+        'base-name',
+        'revision',
+    )
+    models.InstanceTemplate(
+        key=key.parent(),
+        drained=[
+            key,
+        ],
+    ).put()
+    expected_drained = [
+        key,
+    ]
+
+    parse.ensure_instance_template_revision_drained(key.parent()).wait()
+    self.failIf(key.parent().get().active)
+    self.assertEqual(key.parent().get().drained, expected_drained)
+
+  def test_drains(self):
+    """Ensures active InstanceTemplateRevision is drained."""
+    key = instance_templates.get_instance_template_revision_key(
+        'base-name',
+        'revision',
+    )
+    models.InstanceTemplate(
+        key=key.parent(),
+        active=key,
+    ).put()
+    expected_drained = [
+        key,
+    ]
+
+    parse.ensure_instance_template_revision_drained(key.parent()).wait()
+    self.failIf(key.parent().get().active)
+    self.assertEqual(key.parent().get().drained, expected_drained)
+
+
+class EnsureInstanceGroupManagerExistsTest(test_case.TestCase):
   """Tests for parse.ensure_instance_group_manager_exists."""
 
   def test_creates_new_entity(self):

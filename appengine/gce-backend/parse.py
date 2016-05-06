@@ -270,6 +270,29 @@ def ensure_instance_template_revision_active(template_cfg, instance_template):
 
 
 @ndb.transactional_tasklet
+def ensure_instance_template_revision_drained(instance_template_key):
+  """Ensures any active InstanceTemplateRevision is drained.
+
+  Args:
+    instance_template_key: ndb.Key for a models.InstanceTemplateRevision.
+  """
+  instance_template = instance_template_key.get()
+  if not instance_template:
+    logging.warning(
+        'InstanceTemplate does not exist: %s', instance_template_key)
+    return
+
+  if not instance_template.active:
+    return
+
+  logging.info(
+      'Draining InstanceTemplateRevision: %s', instance_template.active)
+  instance_template.drained.append(instance_template.active)
+  instance_template.active = None
+  instance_template.put()
+
+
+@ndb.transactional_tasklet
 def ensure_instance_group_manager_exists(template_cfg, manager_cfg):
   """Ensures an InstanceGroupManager exists for the given config.
 
@@ -363,14 +386,14 @@ def ensure_entities_exist(template_cfg, manager_cfgs, max_concurrent=50):
 
 
 def parse(template_cfgs, manager_cfgs, max_concurrent=50, max_concurrent_igm=5):
-  """Ensures entities exist for the given config.
+  """Ensures entities exist for and match the given config.
 
   Ensures the existence of the root InstanceTemplate, the active
   InstanceTemplateRevision, and the active InstanceGroupManagers.
 
   Args:
     template_cfgs: List of
-      proto.config_pb2.InstanceTemplateConfig.InstanceTemplate.
+      proto.config_pb2.InstanceTemplateConfig.InstanceTemplates.
     manager_cfgs: List of
       proto.config_pb2.InstanceGroupManagerConfig.InstanceGroupManagers.
     max_concurrent: Maximum number to create concurrently.
@@ -378,9 +401,6 @@ def parse(template_cfgs, manager_cfgs, max_concurrent=50, max_concurrent_igm=5):
       concurrently for each InstanceTemplate/InstanceTemplateRevision. The
       actual maximum number of concurrent entities being created will be
       max_concurrent * max_concurrent_igm.
-
-  Returns:
-    ndb.Key for the root models.InstanceTemplate entity.
   """
   manager_cfg_map = collections.defaultdict(list)
   for manager_cfg in manager_cfgs:
@@ -394,3 +414,18 @@ def parse(template_cfgs, manager_cfgs, max_concurrent=50, max_concurrent_igm=5):
     )
 
   utilities.batch_process_async(template_cfgs, f, max_concurrent=max_concurrent)
+
+  # Now go over every InstanceTemplate not mentioned anymore in the config and
+  # mark its active InstanceTemplateRevision as drained.
+  template_names = set(template_cfg.base_name for template_cfg in template_cfgs)
+  instance_template_keys = []
+  for instance_template in models.InstanceTemplate.query().fetch():
+    if instance_template.key.id() not in template_names:
+      if instance_template.active:
+        instance_template_keys.append(instance_template.key)
+
+  utilities.batch_process_async(
+      instance_template_keys,
+      ensure_instance_template_revision_drained,
+      max_concurrent=max_concurrent,
+  )
