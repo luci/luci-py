@@ -741,10 +741,14 @@ class BotApiTest(test_env_handlers.AppTestBase):
       raise NewError('Sorry!')
     self.mock(ndb, 'put_multi', r)
     params = {
+      'bot_overhead': 0.,
       'cost_usd': 0.1,
       'duration': 0.1,
       'exit_code': 0,
       'id': 'bot1',
+      'isolated_stats': {
+        'download': {},
+      },
       'output': base64.b64encode('result string'),
       'output_chunk_start': 0,
       'task_id': task_id,

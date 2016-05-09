@@ -520,20 +520,24 @@ class BotTaskUpdateHandler(auth.ApiHandler):
     run_result_key = task_pack.unpack_run_result_key(task_id)
     performance_stats = None
     if isolated_stats:
-      download = isolated_stats['download']
-      upload = isolated_stats['upload']
+      download = isolated_stats.get('download') or {}
+      upload = isolated_stats.get('upload') or {}
+      def unpack_base64(d, k):
+        x = d.get(k)
+        if x:
+          return base64.b64decode(x)
       performance_stats = task_result.PerformanceStats(
           bot_overhead=bot_overhead,
           isolated_download=task_result.OperationStats(
-              duration=download['duration'],
-              initial_number_items=download['initial_number_items'],
-              initial_size=download['initial_size'],
-              items_cold=base64.b64decode(download['items_cold']),
-              items_hot=base64.b64decode(download['items_hot'])),
+              duration=download.get('duration'),
+              initial_number_items=download.get('initial_number_items'),
+              initial_size=download.get('initial_size'),
+              items_cold=unpack_base64(download, 'items_cold'),
+              items_hot=unpack_base64(download, 'items_hot')),
           isolated_upload=task_result.OperationStats(
-              duration=upload['duration'],
-              items_cold=base64.b64decode(upload['items_cold']),
-              items_hot=base64.b64decode(upload['items_hot'])))
+              duration=upload.get('duration'),
+              items_cold=unpack_base64(upload, 'items_cold'),
+              items_hot=unpack_base64(upload, 'items_hot')))
 
     if output is not None:
       try:
