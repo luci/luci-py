@@ -103,6 +103,9 @@ class MachineReclaimer(webapp2.RequestHandler):
 
     Params:
       hostname: Hostname of the machine being reclaimed.
+      machine_project: Project that the machine communication topic is contained
+        in.
+      machine_topic: Topic that the machine communication should occur on.
       policies: JSON-encoded string representation of the
         rpc_messages.Policies governing this machine.
       request_json: JSON-encoded string representation of the
@@ -111,12 +114,18 @@ class MachineReclaimer(webapp2.RequestHandler):
         rpc_messages.LeaseResponse being delivered.
     """
     hostname = self.request.get('hostname')
+    machine_project = self.request.get('machine_project')
+    machine_topic = self.request.get('machine_topic')
     policies = json.loads(self.request.get('policies'))
     request = json.loads(self.request.get('request_json'))
     response = json.loads(self.request.get('response_json'))
 
     maybe_notify_backend('RECLAIMED', hostname, policies)
     maybe_notify_lessee(request, response)
+
+    # Inform the machine.
+    pubsub.publish(
+        pubsub.full_topic_name(machine_project, machine_topic), 'RECLAIMED', {})
 
 
 @ndb.transactional

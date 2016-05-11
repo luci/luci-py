@@ -256,9 +256,21 @@ def main():
 
         pubsub.acknowledge(subscription, project, ack_ids)
         subprocess.check_call(['/sbin/shutdown', '-r', 'now'])
+
       elif message == 'LEASED' and attributes.get('lease_expiration_ts'):
         with open(LEASE_EXPIRATION_FILE, 'w') as f:
           f.write(attributes['lease_expiration_ts'])
+
+      elif message == 'RECLAIMED':
+        if os.path.exists(SWARMING_BOT_ZIP):
+          # Delete just the zip, not the whole directory so logs are kept.
+          os.remove(SWARMING_BOT_ZIP)
+
+        if os.path.exists(SWARMING_UPSTART_CONFIG_DEST):
+          os.remove(SWARMING_UPSTART_CONFIG_DEST)
+
+        pubsub.acknowledge(subscription, project, ack_ids)
+        subprocess.check_call(['/sbin/shutdown', '-r', 'now'])
 
     if ack_ids:
       pubsub.acknowledge(subscription, project, ack_ids)

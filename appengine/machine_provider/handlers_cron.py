@@ -253,6 +253,8 @@ def reclaim_machine(machine_key, reclamation_ts):
 
   params = {
       'hostname': hostname,
+      'machine_project': machine.pubsub_topic_project,
+      'machine_topic': machine.pubsub_topic,
       'policies': protojson.encode_message(machine.policies),
       'request_json': protojson.encode_message(lease.request),
       'response_json': protojson.encode_message(lease.response),
