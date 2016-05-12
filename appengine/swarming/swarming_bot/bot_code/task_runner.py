@@ -343,7 +343,7 @@ def run_command(
       params['hard_timeout'] = False
       post_update(swarming_server, params, 1, stdout, 0)
       return {
-        u'exit_code': -1,
+        u'exit_code': 1,
         u'hard_timeout': False,
         u'io_timeout': False,
         u'must_signal_internal_failure': None,
