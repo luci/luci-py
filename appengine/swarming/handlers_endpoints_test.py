@@ -136,6 +136,10 @@ class ServerApiTest(BaseTest):
 class TasksApiTest(BaseTest):
   api_service_cls = handlers_endpoints.SwarmingTasksService
 
+  def setUp(self):
+    super(TasksApiTest, self).setUp()
+    utils.clear_cache(config.settings)
+
   def test_new_ok_raw(self):
     """Asserts that new generates appropriate metadata."""
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -488,6 +492,72 @@ class TasksApiTest(BaseTest):
           u'inputs_ref': {
             'isolated': '1'*40,
             'isolatedserver': 'http://localhost:1',
+            'namespace': 'default-gzip',
+          },
+          u'io_timeout_secs': u'30',
+        },
+        u'tags': [
+          u'foo:bar',
+          u'pool:default',
+          u'priority:200',
+          u'user:joe@localhost',
+        ],
+        u'user': u'joe@localhost',
+      },
+      u'task_id': u'5cee488008810',
+    }
+    response = self.call_api('new', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+
+  def test_new_ok_isolated_with_defaults(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+    str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
+
+    cfg = config.settings()
+    cfg.isolate.default_server = 'https://isolateserver.appspot.com'
+    cfg.isolate.default_namespace = 'default-gzip'
+    self.mock(config, 'settings', lambda: cfg)
+
+    request = swarming_rpcs.NewTaskRequest(
+        expiration_secs=30,
+        name='job1',
+        priority=200,
+        properties=swarming_rpcs.TaskProperties(
+            dimensions=[
+              swarming_rpcs.StringPair(key='pool', value='default'),
+              swarming_rpcs.StringPair(key='foo', value='bar'),
+            ],
+            env=[
+              swarming_rpcs.StringPair(key='PATH', value='/'),
+            ],
+            execution_timeout_secs=30,
+            inputs_ref=swarming_rpcs.FilesRef(isolated='1'*40),
+            io_timeout_secs=30),
+        tags=['foo:bar'],
+        user='joe@localhost')
+    expected = {
+      u'request': {
+        u'authenticated': u'user:user@example.com',
+        u'created_ts': str_now,
+        u'expiration_secs': u'30',
+        u'name': u'job1',
+        u'priority': u'200',
+        u'properties': {
+          u'dimensions': [
+            {u'key': u'foo', u'value': u'bar'},
+            {u'key': u'pool', u'value': u'default'},
+          ],
+          u'env': [
+            {u'key': u'PATH', u'value': u'/'},
+          ],
+          u'execution_timeout_secs': u'30',
+          u'grace_period_secs': u'30',
+          u'idempotent': False,
+          u'inputs_ref': {
+            'isolated': '1'*40,
+            'isolatedserver': 'https://isolateserver.appspot.com',
             'namespace': 'default-gzip',
           },
           u'io_timeout_secs': u'30',

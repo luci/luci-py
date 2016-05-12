@@ -267,6 +267,22 @@ class SwarmingTasksService(remote.Service):
     in the task request.
     """
     logging.info('%s', request)
+
+    if not request.properties:
+      raise endpoints.BadRequestException('properties are required')
+
+    # Apply isolate defaults.
+    cfg = config.settings()
+    if cfg.isolate.default_server and cfg.isolate.default_namespace:
+      request.properties.inputs_ref = (
+          request.properties.inputs_ref or swarming_rpcs.FilesRef())
+      request.properties.inputs_ref.isolatedserver = (
+          request.properties.inputs_ref.isolatedserver or
+          cfg.isolate.default_server)
+      request.properties.inputs_ref.namespace = (
+          request.properties.inputs_ref.namespace or
+          cfg.isolate.default_namespace)
+
     try:
       request = message_conversion.new_task_request_from_rpc(
           request, utils.utcnow())

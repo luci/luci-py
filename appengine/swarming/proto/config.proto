@@ -17,4 +17,19 @@ message SettingsCfg {
 
     // Enable ts_mon based monitoring.
     optional bool enable_ts_monitoring = 4;
+
+    // Configuration for swarming-isolate integration.
+    optional IsolateSettings isolate = 5;
+}
+
+// Configuration for swarming-isolate integration.
+message IsolateSettings {
+    // URL of the default isolate server to use if it is not specified in a
+    // task. Must start with "https://" or "http://".
+    // e.g. "https://isolateserver.appspot.com"
+    optional string default_server = 1;
+
+    // Default namespace to use if it is not specified in a task,
+    // e.g. "default-gzip"
+    optional string default_namespace = 2;
 }

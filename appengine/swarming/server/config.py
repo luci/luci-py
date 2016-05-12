@@ -14,11 +14,26 @@ from components import utils
 from components.config import validation
 
 from proto import config_pb2
+from server import task_request
+
 
 SETTINGS_CFG_FILENAME = 'settings.cfg'
+SECONDS_IN_YEAR = 60 * 60 * 24 * 365
 
 
 ConfigApi = config.ConfigApi
+
+
+def validate_isolate_settings(cfg, ctx):
+  if bool(cfg.default_server) != bool(cfg.default_namespace):
+    ctx.error(
+        'either specify both default_server and default_namespace or none')
+  elif cfg.default_server:
+    if not cfg.default_server.startswith(('https://', 'http://')):
+      ctx.error('default_server must start with "https://" or "http://"')
+
+    if not task_request.NAMESPACE_RE.match(cfg.default_namespace):
+      ctx.error('invalid namespace "%s"', cfg.default_namespace)
 
 
 @validation.self_rule(SETTINGS_CFG_FILENAME, config_pb2.SettingsCfg)
@@ -27,13 +42,17 @@ def validate_settings(cfg, ctx):
   def within_year(value):
     if value < 0:
       ctx.error('cannot be negative')
-    elif value > 60 * 60 * 24 * 365:
+    elif value > SECONDS_IN_YEAR:
       ctx.error('cannot be more than a year')
 
   with ctx.prefix('bot_death_timeout_secs '):
     within_year(cfg.bot_death_timeout_secs)
   with ctx.prefix('reusable_task_age_secs '):
     within_year(cfg.reusable_task_age_secs)
+
+  if cfg.HasField('isolate'):
+    with ctx.prefix('isolate: '):
+      validate_isolate_settings(cfg.isolate, ctx)
 
 
 @utils.memcache('config:get_configs_url', time=60)
