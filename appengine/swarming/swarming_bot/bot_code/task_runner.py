@@ -80,15 +80,28 @@ def get_run_isolated():
 def get_isolated_cmd(
     work_dir, task_details, isolated_result, min_free_space):
   """Returns the command to call run_isolated. Mocked in tests."""
+  assert (bool(task_details.command) !=
+          bool(task_details.isolated and task_details.isolated.get('input')))
   bot_dir = os.path.dirname(work_dir)
   if os.path.isfile(isolated_result):
     os.remove(isolated_result)
   cmd = get_run_isolated()
+
+  if task_details.isolated:
+    cmd.extend(
+        [
+          '-I', task_details.isolated['server'].encode('utf-8'),
+          '--namespace', task_details.isolated['namespace'].encode('utf-8'),
+        ])
+    isolated_input = task_details.isolated.get('input')
+    if isolated_input:
+      cmd.extend(
+          [
+            '--isolated', isolated_input,
+          ])
+
   cmd.extend(
       [
-        '--isolated', task_details.inputs_ref['isolated'].encode('utf-8'),
-        '--namespace', task_details.inputs_ref['namespace'].encode('utf-8'),
-        '-I', task_details.inputs_ref['isolatedserver'].encode('utf-8'),
         '--json', isolated_result,
         '--log-file', os.path.join(bot_dir, 'logs', 'run_isolated.log'),
         '--cache', os.path.join(bot_dir, 'cache'),
@@ -109,17 +122,7 @@ def get_isolated_cmd(
 
 class TaskDetails(object):
   def __init__(self, data):
-    """Loads the raw data.
-
-    It is expected to have at least:
-     - bot_id
-     - command as a list of str
-     - data as a list of urls
-     - env as a dict
-     - hard_timeout
-     - io_timeout
-     - task_id
-    """
+    """Loads the raw data from a manifest file specified by --in-file."""
     logging.info('TaskDetails(%s)', data)
     if not isinstance(data, dict):
       raise ValueError('Expected dict, got %r' % data)
@@ -127,11 +130,11 @@ class TaskDetails(object):
     # Get all the data first so it fails early if the task details is invalid.
     self.bot_id = data['bot_id']
 
-    # Raw command. Only self.command or self.inputs_ref can be set.
+    # Raw command. Only self.command or self.isolated.input can be set.
     self.command = data['command'] or []
 
     # Isolated command. Is a serialized version of task_request.FilesRef.
-    self.inputs_ref = data['inputs_ref']
+    self.isolated = data['isolated']
     self.extra_args = data['extra_args']
 
     self.env = {
@@ -326,6 +329,7 @@ def run_command(
     logging.info('cmd=%s', cmd)
     logging.info('env=%s', env)
     try:
+      assert cmd and all(isinstance(a, basestring) for a in cmd)
       proc = subprocess42.Popen(
           cmd,
           env=env,

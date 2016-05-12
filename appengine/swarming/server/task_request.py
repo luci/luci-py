@@ -223,6 +223,12 @@ def _validate_package_version(prop, value):
 
 class FilesRef(ndb.Model):
   """Defines a data tree reference, normally a reference to a .isolated file."""
+
+  # TODO(maruel): make this class have one responsibility. Currently it is used
+  # in two modes:
+  # - a reference to a tree, as class docstring says.
+  # - input/output settings in TaskProperties.
+
   # The hash of an isolated archive.
   isolated = ndb.StringProperty(validator=_validate_isolated, indexed=False)
   # The hostname of the isolated server to use.
@@ -233,9 +239,9 @@ class FilesRef(ndb.Model):
 
   def _pre_put_hook(self):
     super(FilesRef, self)._pre_put_hook()
-    if not self.isolated or not self.isolatedserver or not self.namespace:
+    if not self.isolatedserver or not self.namespace:
       raise datastore_errors.BadValueError(
-          'isolated requires server and namespace')
+          'isolate server and namespace are required')
 
 
 class CipdPackage(ndb.Model):
@@ -266,9 +272,16 @@ class TaskProperties(ndb.Model):
   This model is immutable.
 
   New-style TaskProperties supports invocation of run_isolated. When this
-  behavior is desired, the member .inputs_ref must be suppled. .extra_args can
-  be supplied to pass extraneous arguments.
+  behavior is desired, the member .inputs_ref with an .isolated field value must
+  be supplied. .extra_args can be supplied to pass extraneous arguments.
   """
+
+  # TODO(maruel): convert inputs_ref and _TaskResultCommon.outputs_ref as:
+  # - input = String which is the isolated input, if any
+  # - isolated_server = <server, metadata e.g. namespace> which is a
+  #   simplified version of FilesRef
+  # - _TaskResultCommon.output = String which is isolated output, if any.
+
   # Hashing algorithm used to hash TaskProperties to create its key.
   HASHING_ALGO = hashlib.sha1
 
@@ -276,12 +289,18 @@ class TaskProperties(ndb.Model):
   # TODO(maruel): Remove after 2016-06-01.
   commands = datastore_utils.DeterministicJsonProperty(
       json_type=list, indexed=False)
-  # Command to run. This is only relevant when self._inputs_ref is None. This is
-  # what is called 'raw commands', in the sense that no inputs files are
+  # Command to run. This is only relevant when self.inputs_ref.isolated is None.
+  # This is what is called 'raw commands', in the sense that no inputs files are
   # declared.
   command = ndb.StringProperty(repeated=True, indexed=False)
 
-  # File inputs of the task. Only inputs_ref or command&data can be specified.
+  # Isolate server, namespace and input isolate hash.
+  #
+  # Despite its name, contains isolate server URL and namespace for isolated
+  # output too. See TODO at the top of this class.
+  # May be non-None even if task input is not isolated.
+  #
+  # Only inputs_ref.isolated or command can be specified.
   inputs_ref = ndb.LocalStructuredProperty(FilesRef)
 
   # A list of CIPD packages to install $CIPD_PATH and $PATH before task
@@ -304,7 +323,7 @@ class TaskProperties(ndb.Model):
       validator=_validate_timeout, required=True, indexed=False)
 
   # Extra arguments to supply to the command `python run_isolated ...`. Can only
-  # be set if inputs_ref is set.
+  # be set if inputs_ref.isolated is set.
   extra_args = ndb.StringProperty(repeated=True, indexed=False)
 
   # Grace period is the time between signaling the task it timed out and killing
@@ -330,7 +349,7 @@ class TaskProperties(ndb.Model):
         not self.commands and
         not self.command and
         self.dimensions.keys() == [u'id'] and
-        not self.inputs_ref and
+        not (self.inputs_ref and self.inputs_ref.isolated) and
         not self.env and
         not self.execution_timeout_secs and
         not self.extra_args and
@@ -363,10 +382,13 @@ class TaskProperties(ndb.Model):
         raise datastore_errors.BadValueError(
             'commands is not supported anymore')
     if not self.is_terminate:
-      if bool(self.command) == bool(self.inputs_ref):
-        raise datastore_errors.BadValueError('use one of command or inputs_ref')
-      if self.extra_args and not self.inputs_ref:
-        raise datastore_errors.BadValueError('extra_args require inputs_ref')
+      isolated_input = self.inputs_ref and self.inputs_ref.isolated
+      if bool(self.command) == bool(isolated_input):
+        raise datastore_errors.BadValueError(
+            'use one of command or inputs_ref.isolated')
+      if self.extra_args and not isolated_input:
+        raise datastore_errors.BadValueError(
+            'extra_args require inputs_ref.isolated')
       if self.inputs_ref:
         self.inputs_ref._pre_put_hook()
 
@@ -385,7 +407,6 @@ class TaskProperties(ndb.Model):
           raise datastore_errors.BadValueError(
             'an idempotent task cannot have unpinned packages; '
             'use instance IDs or tags as package versions')
-
 
 
 class TaskRequest(ndb.Model):

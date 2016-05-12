@@ -391,7 +391,11 @@ class BotPollHandler(_BotBaseHandler):
         'hard_timeout': request.properties.execution_timeout_secs,
         'host': utils.get_versioned_hosturl(),
         'io_timeout': request.properties.io_timeout_secs,
-        'inputs_ref': request.properties.inputs_ref,
+        'isolated': {
+          'input': request.properties.inputs_ref.isolated,
+          'namespace': request.properties.inputs_ref.namespace,
+          'server': request.properties.inputs_ref.isolatedserver,
+        } if request.properties.inputs_ref else None,
         'packages': [
           {
             'package_name': p.package_name,

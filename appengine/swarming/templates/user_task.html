@@ -219,7 +219,7 @@
           <td>Idempotent</td>
           <td>{{request.properties.idempotent}}</td>
         </tr>
-        {% if request.properties.inputs_ref %}
+        {% if request.properties.inputs_ref and request.properties.inputs_ref.isolated %}
           <tr title="Inputs files">
             <td>Isolated inputs</td>
             <td>
@@ -492,7 +492,7 @@
 <br>
 <div class=highlight_section>
 <h2>Help</h2>
-{% if request.properties.inputs_ref %}
+{% if request.properties.inputs_ref and request.properties.inputs_ref.isolated %}
 <div>Download inputs files into directory <i>foo</i>:</div>
 <div class=code>  python isolateserver.py download -I {{request.properties.inputs_ref.isolatedserver}} --namespace {{request.properties.inputs_ref.namespace}} -s {{request.properties.inputs_ref.isolated}} --target foo</div>
 <br>

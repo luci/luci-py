@@ -253,7 +253,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'grace_period': 30,
         u'hard_timeout': 3600,
         u'host': u'http://localhost:8080',
-        u'inputs_ref': None,
+        u'isolated': None,
         u'io_timeout': 1200,
         u'packages': [{
           u'package_name': u'rm',
@@ -314,9 +314,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'hard_timeout': 3600,
         u'grace_period': 30,
         u'host': u'http://localhost:8080',
-        u'inputs_ref': {
-          u'isolated': u'0123456789012345678901234567890123456789',
-          u'isolatedserver': u'http://localhost:1',
+        u'isolated': {
+          u'input': u'0123456789012345678901234567890123456789',
+          u'server': u'http://localhost:1',
           u'namespace': u'default-gzip',
         },
         u'io_timeout': 1200,
@@ -435,9 +435,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'hard_timeout': 3600,
         u'grace_period': 30,
         u'host': u'http://localhost:8080',
-        u'inputs_ref': {
-          u'isolated': u'0123456789012345678901234567890123456789',
-          u'isolatedserver': u'http://localhost:1',
+        u'isolated': {
+          u'input': u'0123456789012345678901234567890123456789',
+          u'server': u'http://localhost:1',
           u'namespace': u'default-gzip',
         },
         u'io_timeout': 1200,

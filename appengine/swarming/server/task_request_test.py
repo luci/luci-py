@@ -41,6 +41,10 @@ def _gen_request(properties=None, **kwargs):
     'package_name': 'rm',
     'version': PINNED_PACKAGE_VERSION,
   }])
+  inputs_ref = properties.pop('inputs_ref', {
+    'isolatedserver': 'https://isolateserver.appspot.com',
+    'namespace': 'default-gzip',
+  })
   props = {
     'command': [u'command1', u'arg1'],
     'packages': [task_request.CipdPackage(**p) for p in packages],
@@ -53,6 +57,7 @@ def _gen_request(properties=None, **kwargs):
     'execution_timeout_secs': 30,
     'grace_period_secs': 30,
     'idempotent': False,
+    'inputs_ref': inputs_ref,
     'io_timeout_secs': None,
   }
   props.update(properties)
@@ -206,7 +211,11 @@ class TaskRequestApiTest(TestCase):
       'execution_timeout_secs': 30,
       'grace_period_secs': 30,
       'idempotent': True,
-      'inputs_ref': None,
+      'inputs_ref': {
+        'isolated': None,
+        'isolatedserver': 'https://isolateserver.appspot.com',
+        'namespace': 'default-gzip',
+      },
       'io_timeout_secs': None,
       'packages': [{'package_name': 'rm', 'version': PINNED_PACKAGE_VERSION}],
     }
@@ -218,7 +227,7 @@ class TaskRequestApiTest(TestCase):
       'properties': expected_properties,
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
-      'properties_hash': '83b350298f05eff6072d54d2c6f031d06cc30449',
+      'properties_hash': 'c3e067b4e232be5478e7147bb1f0506477444014',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'tags': [
@@ -262,7 +271,11 @@ class TaskRequestApiTest(TestCase):
       'execution_timeout_secs': 30,
       'grace_period_secs': 30,
       'idempotent': True,
-      'inputs_ref': None,
+      'inputs_ref': {
+        'isolated': None,
+        'isolatedserver': 'https://isolateserver.appspot.com',
+        'namespace': 'default-gzip',
+      },
       'io_timeout_secs': None,
       'packages': [{'package_name': 'rm', 'version': PINNED_PACKAGE_VERSION}],
     }
@@ -274,7 +287,7 @@ class TaskRequestApiTest(TestCase):
       'properties': expected_properties,
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
-      'properties_hash': '83b350298f05eff6072d54d2c6f031d06cc30449',
+      'properties_hash': 'c3e067b4e232be5478e7147bb1f0506477444014',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'tags': [
@@ -314,7 +327,7 @@ class TaskRequestApiTest(TestCase):
     # Other unit tests should use the calculated value.
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        '83b350298f05eff6072d54d2c6f031d06cc30449', as_dict['properties_hash'])
+        'c3e067b4e232be5478e7147bb1f0506477444014', as_dict['properties_hash'])
 
   def test_duped(self):
     # Two TestRequest with the same properties.
@@ -429,9 +442,22 @@ class TaskRequestApiTest(TestCase):
 
     # Try with isolated/isolatedserver/namespace.
     with self.assertRaises(datastore_errors.BadValueError):
+      # Both command and inputs_ref.isolated.
       mkreq(_gen_request(properties=dict(
           command=['see', 'spot', 'run'],
-          inputs_ref=task_request.FilesRef())))
+          inputs_ref=task_request.FilesRef(
+              isolated='deadbeef',
+              isolatedserver='http://localhost:1',
+              namespace='default-gzip'))))
+    with self.assertRaises(datastore_errors.BadValueError):
+      # inputs_ref without server/namespace.
+      mkreq(_gen_request(properties=dict(inputs_ref=task_request.FilesRef())))
+    mkreq(_gen_request(properties=dict(
+        command=[],
+        inputs_ref=task_request.FilesRef(
+            isolated='deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+            isolatedserver='http://localhost:1',
+            namespace='default-gzip'))))
 
   def test_make_request_clone(self):
     # Compare with test_make_request().
@@ -456,7 +482,11 @@ class TaskRequestApiTest(TestCase):
       'extra_args': [],
       'grace_period_secs': 30,
       'idempotent': False,
-      'inputs_ref': None,
+      'inputs_ref': {
+        'isolated': None,
+        'isolatedserver': 'https://isolateserver.appspot.com',
+        'namespace': 'default-gzip',
+      },
       'io_timeout_secs': None,
       'packages': [{'package_name': 'rm', 'version': PINNED_PACKAGE_VERSION}],
     }

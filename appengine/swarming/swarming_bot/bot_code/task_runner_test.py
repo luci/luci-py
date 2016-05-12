@@ -38,17 +38,18 @@ sys.path.insert(0, os.path.join(CLIENT_DIR, 'tests'))
 import isolateserver_mock
 
 
-def get_manifest(script=None, inputs_ref=None, **kwargs):
+def get_manifest(script=None, isolated=None, **kwargs):
+  isolated_input = isolated and isolated.get('input')
   out = {
     'bot_id': 'localhost',
     'command':
-        [sys.executable, '-u', '-c', script] if not inputs_ref else None,
+        [sys.executable, '-u', '-c', script] if not isolated_input else None,
     'env': {},
     'extra_args': [],
     'grace_period': 30.,
     'hard_timeout': 10.,
-    'inputs_ref': inputs_ref,
     'io_timeout': 10.,
+    'isolated': isolated,
     'task_id': 23,
   }
   out.update(kwargs)
@@ -182,8 +183,8 @@ class TestTaskRunner(TestTaskRunnerBase):
         'extra_args': [],
         'grace_period': 30.,
         'hard_timeout': 10,
-        'inputs_ref': None,
         'io_timeout': 11,
+        'isolated': None,
         'task_id': 23,
       }
       json.dump(data, f)
@@ -234,9 +235,9 @@ class TestTaskRunner(TestTaskRunnerBase):
         'grace_period': 30.,
         'hard_timeout': 10,
         'io_timeout': 11,
-        'inputs_ref': {
-          'isolated': '123',
-          'isolatedserver': 'http://localhost:1',
+        'isolated': {
+          'input': '123',
+          'server': 'http://localhost:1',
           'namespace': 'default-gzip',
         },
         'task_id': 23,
@@ -277,9 +278,9 @@ class TestTaskRunner(TestTaskRunnerBase):
           u'isolatedserver': u'http://localhost:1',
           u'namespace': u'default-gzip',
         })
-    task_details = self.get_task_details(inputs_ref={
-      'isolated': '123',
-      'isolatedserver': 'localhost:1',
+    task_details = self.get_task_details(isolated={
+      'input': '123',
+      'server': 'localhost:1',
       'namespace': 'default-gzip',
     }, extra_args=['foo', 'bar'])
     # Mock running run_isolated with a script.
@@ -349,8 +350,8 @@ class TestTaskRunner(TestTaskRunnerBase):
           'extra_args': [],
           'grace_period': 30.,
           'hard_timeout': 6,
-          'inputs_ref': None,
           'io_timeout': 6,
+          'isolated': None,
           'task_id': 23,
         })
     expected = {
@@ -458,8 +459,8 @@ class TestTaskRunner(TestTaskRunnerBase):
           'extra_args': [],
           'grace_period': 30.,
           'hard_timeout': 60,
-          'inputs_ref': None,
           'io_timeout': 60,
+          'isolated': None,
           'task_id': 23,
         })
     expected = {
@@ -823,10 +824,10 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       })
       isolated_digest = server.add_content_compressed('default-gzip', isolated)
       manifest = get_manifest(
-          inputs_ref={
-            'isolated': isolated_digest,
+          isolated={
+            'input': isolated_digest,
             'namespace': 'default-gzip',
-            'isolatedserver': server.url,
+            'server': server.url,
           })
       expected = {
         u'exit_code': 0,
@@ -945,10 +946,10 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       isolated_digest = server.add_content_compressed('default-gzip', isolated)
       try:
         manifest = get_manifest(
-            inputs_ref={
-              'isolated': isolated_digest,
+            isolated={
+              'input': isolated_digest,
               'namespace': 'default-gzip',
-              'isolatedserver': server.url,
+              'server': server.url,
             },
             # TODO(maruel): A bit cheezy, we'd want the I/O timeout to be just
             # enough to have the time for the PID to be printed but not more.
