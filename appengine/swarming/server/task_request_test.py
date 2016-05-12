@@ -452,6 +452,13 @@ class TaskRequestApiTest(TestCase):
     with self.assertRaises(datastore_errors.BadValueError):
       # inputs_ref without server/namespace.
       mkreq(_gen_request(properties=dict(inputs_ref=task_request.FilesRef())))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkreq(_gen_request(properties=dict(
+          command=[],
+          inputs_ref=task_request.FilesRef(
+              isolatedserver='https://isolateserver.appspot.com',
+              namespace='default-gzip^^^',
+          ))))
     mkreq(_gen_request(properties=dict(
         command=[],
         inputs_ref=task_request.FilesRef(

@@ -94,7 +94,7 @@ _BEGINING_OF_THE_WORLD = datetime.datetime(2010, 1, 1, 0, 0, 0, 0)
 
 # Used for isolated files.
 _HASH_CHARS = frozenset('0123456789abcdef')
-_NAMESPACE_RE = re.compile(r'[a-z0-9A-Z\-._]+')
+_NAMESPACE_RE = re.compile(r'^[a-z0-9A-Z\-._]+$')
 
 
 ### Properties validators must come before the models.
