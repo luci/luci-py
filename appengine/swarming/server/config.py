@@ -96,10 +96,9 @@ def _get_settings():
         SETTINGS_CFG_FILENAME, config_pb2.SettingsCfg, store_last_good=True)
   except config.CannotLoadConfigError as ex:
     logging.info('Could not load settings.cfg: %s; using defaults', ex)
-  if not cfg:
-    cfg = config_pb2.SettingsCfg(
-        reusable_task_age_secs=7*24*60*60,
-        bot_death_timeout_secs=10*60)
+  cfg = cfg or config_pb2.SettingsCfg()
+  cfg.reusable_task_age_secs = cfg.reusable_task_age_secs or 7*24*60*60
+  cfg.bot_death_timeout_secs = cfg.bot_death_timeout_secs or 10*60
   return rev, cfg
 
 
