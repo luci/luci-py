@@ -151,10 +151,18 @@ class TasksApiTest(BaseTest):
         name='job1',
         priority=200,
         properties=swarming_rpcs.TaskProperties(
+            cipd_input=swarming_rpcs.CipdInput(
+                client_package=swarming_rpcs.CipdPackage(
+                    package_name='infra/tools/cipd/${platform}',
+                    version='git_revision:deadbeef',
+                ),
+                packages=[
+                  swarming_rpcs.CipdPackage(
+                      package_name='rm', version='latest'),
+                ],
+                server='https://chrome-infra-packages.appspot.com',
+            ),
             command=['rm', '-rf', '/'],
-            packages=[
-              swarming_rpcs.CipdPackage(package_name='rm', version='latest'),
-            ],
             dimensions=[
               swarming_rpcs.StringPair(key='pool', value='default'),
             ],
@@ -176,11 +184,18 @@ class TasksApiTest(BaseTest):
         u'name': u'job1',
         u'priority': u'200',
         u'properties': {
+          u'cipd_input': {
+            u'client_package': {
+              u'package_name': u'infra/tools/cipd/${platform}',
+              u'version': u'git_revision:deadbeef',
+            },
+            u'packages': [{
+              u'package_name': u'rm',
+              u'version': u'latest',
+            }],
+            u'server': u'https://chrome-infra-packages.appspot.com',
+          },
           u'command': [u'rm', u'-rf', u'/'],
-          u'packages': [{
-            u'package_name': u'rm',
-            u'version': u'latest',
-          }],
           u'dimensions': [
             {u'key': u'pool', u'value': u'default'},
           ],
@@ -230,18 +245,25 @@ class TasksApiTest(BaseTest):
         priority=200,
         properties=swarming_rpcs.TaskProperties(
             command=['python', 'run_test.py'],
+            cipd_input=swarming_rpcs.CipdInput(
+                client_package=swarming_rpcs.CipdPackage(
+                    package_name='infra/tools/cipd/${platform}',
+                    version='git_revision:deadbeef',
+                ),
+                packages=[
+                  swarming_rpcs.CipdPackage(
+                      package_name='rm',
+                      version='git_revision:deadbeef'),
+                ],
+                server='https://chrome-infra-packages.appspot.com',
+            ),
             dimensions=[
               swarming_rpcs.StringPair(key='os', value='Amiga'),
               swarming_rpcs.StringPair(key='pool', value='default'),
             ],
             execution_timeout_secs=3600,
             idempotent=True,
-            io_timeout_secs=1200,
-            packages=[
-              swarming_rpcs.CipdPackage(
-                  package_name='rm',
-                  version=test_env_handlers.PINNED_PACKAGE_VERSION),
-            ]),
+            io_timeout_secs=1200),
         tags=['foo:bar'],
         user='joe@localhost')
     expected = {
@@ -252,6 +274,17 @@ class TasksApiTest(BaseTest):
         u'name': u'job1',
         u'priority': u'200',
         u'properties': {
+          u'cipd_input': {
+            u'client_package': {
+              u'package_name': u'infra/tools/cipd/${platform}',
+              u'version': u'git_revision:deadbeef',
+            },
+            u'packages': [{
+              u'package_name': u'rm',
+              u'version': 'git_revision:deadbeef',
+            }],
+            u'server': u'https://chrome-infra-packages.appspot.com',
+          },
           u'command': [u'python', u'run_test.py'],
           u'dimensions': [
             {u'key': u'os', u'value': u'Amiga'},
@@ -261,10 +294,6 @@ class TasksApiTest(BaseTest):
           u'grace_period_secs': u'30',
           u'idempotent': True,
           u'io_timeout_secs': u'1200',
-          u'packages': [{
-            u'package_name': u'rm',
-            u'version': test_env_handlers.PINNED_PACKAGE_VERSION,
-          }],
         },
         u'tags': [
           u'foo:bar',
@@ -383,6 +412,17 @@ class TasksApiTest(BaseTest):
           u'name': u'job1',
           u'priority': u'200',
           u'properties': {
+            u'cipd_input': {
+              u'client_package': {
+                u'package_name': u'infra/tools/cipd/${platform}',
+                u'version': u'git_revision:deadbeef',
+              },
+              u'packages': [{
+                u'package_name': u'rm',
+                u'version': 'git_revision:deadbeef',
+              }],
+              u'server': u'https://chrome-infra-packages.appspot.com',
+            },
             u'command': [u'python', u'run_test.py'],
             u'dimensions': [
               {u'key': u'os', u'value': u'Amiga'},
@@ -392,10 +432,6 @@ class TasksApiTest(BaseTest):
             u'grace_period_secs': u'30',
             u'idempotent': True,
             u'io_timeout_secs': u'1200',
-            u'packages': [{
-              u'package_name': u'rm',
-              u'version': test_env_handlers.PINNED_PACKAGE_VERSION,
-            }],
           },
           u'tags': [
             u'foo:bar',
@@ -413,6 +449,17 @@ class TasksApiTest(BaseTest):
           u'name': u'task',
           u'priority': u'10',
           u'properties': {
+            u'cipd_input': {
+              u'client_package': {
+                u'package_name': u'infra/tools/cipd/${platform}',
+                u'version': u'git_revision:deadbeef',
+              },
+              u'packages': [{
+                u'package_name': u'rm',
+                u'version': 'git_revision:deadbeef',
+              }],
+              u'server': u'https://chrome-infra-packages.appspot.com',
+            },
             u'command': [u'python', u'run_test.py'],
             u'dimensions': [
               {u'key': u'os', u'value': u'Amiga'},
@@ -422,10 +469,6 @@ class TasksApiTest(BaseTest):
             u'grace_period_secs': u'30',
             u'idempotent': True,
             u'io_timeout_secs': u'1200',
-            u'packages': [{
-              u'package_name': u'rm',
-              u'version': test_env_handlers.PINNED_PACKAGE_VERSION,
-            }],
           },
           u'tags': [
             u'commit:post',
@@ -562,6 +605,92 @@ class TasksApiTest(BaseTest):
           },
           u'io_timeout_secs': u'30',
         },
+        u'tags': [
+          u'foo:bar',
+          u'pool:default',
+          u'priority:200',
+          u'user:joe@localhost',
+        ],
+        u'user': u'joe@localhost',
+      },
+      u'task_id': u'5cee488008810',
+    }
+    response = self.call_api('new', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+
+  def test_new_cipd_packages_with_defaults(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+    str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
+
+    # Define settings on the server.
+    cfg = config.settings()
+    cfg.cipd.default_client_package.package_name = (
+        'infra/tools/cipd/${platform}')
+    cfg.cipd.default_client_package.version = 'git_revision:deadbeef'
+    cfg.cipd.default_server = 'https://chrome-infra-packages.appspot.com'
+    self.mock(config, 'settings', lambda: cfg)
+
+    request = swarming_rpcs.NewTaskRequest(
+        expiration_secs=30,
+        name='job1',
+        priority=200,
+        properties=swarming_rpcs.TaskProperties(
+            cipd_input=swarming_rpcs.CipdInput(
+                packages=[
+                  swarming_rpcs.CipdPackage(
+                      package_name='rm',
+                      version='latest'),
+                ],
+            ),
+            command=['rm', '-rf', '/'],
+            dimensions=[
+              swarming_rpcs.StringPair(key='pool', value='default'),
+            ],
+            env=[
+              swarming_rpcs.StringPair(key='PATH', value='/'),
+            ],
+            execution_timeout_secs=30,
+            io_timeout_secs=30),
+        tags=['foo:bar'],
+        user='joe@localhost',
+        pubsub_topic='projects/abc/topics/def',
+        pubsub_auth_token='secret that must not be shown',
+        pubsub_userdata='userdata')
+    expected = {
+      u'request': {
+        u'authenticated': u'user:user@example.com',
+        u'created_ts': str_now,
+        u'expiration_secs': u'30',
+        u'name': u'job1',
+        u'priority': u'200',
+        u'properties': {
+          u'cipd_input': {
+            u'client_package': {
+              u'package_name': u'infra/tools/cipd/${platform}',
+              u'version': u'git_revision:deadbeef',
+            },
+            u'packages': [{
+              u'package_name': u'rm',
+              u'version': u'latest',
+            }],
+            u'server': u'https://chrome-infra-packages.appspot.com',
+          },
+          u'command': [u'rm', u'-rf', u'/'],
+          u'dimensions': [
+            {u'key': u'pool', u'value': u'default'},
+          ],
+          u'env': [
+            {u'key': u'PATH', u'value': u'/'},
+          ],
+          u'execution_timeout_secs': u'30',
+          u'grace_period_secs': u'30',
+          u'idempotent': False,
+          u'io_timeout_secs': u'30',
+        },
+        u'pubsub_topic': u'projects/abc/topics/def',
+        u'pubsub_userdata': u'userdata',
         u'tags': [
           u'foo:bar',
           u'pool:default',
@@ -1112,6 +1241,17 @@ class TaskApiTest(BaseTest):
       u'name': u'hi',
       u'priority': u'10',
       u'properties': {
+        u'cipd_input': {
+          u'client_package': {
+            u'package_name': u'infra/tools/cipd/${platform}',
+            u'version': u'git_revision:deadbeef',
+          },
+          u'packages': [{
+            u'package_name': u'rm',
+            u'version': 'git_revision:deadbeef',
+          }],
+          u'server': u'https://chrome-infra-packages.appspot.com',
+        },
         u'command': [u'python', u'run_test.py'],
         u'dimensions': [
           {u'key': u'os', u'value': u'Amiga'},
@@ -1121,10 +1261,6 @@ class TaskApiTest(BaseTest):
         u'grace_period_secs': u'30',
         u'idempotent': False,
         u'io_timeout_secs': u'1200',
-        u'packages': [{
-          u'package_name': u'rm',
-          u'version': test_env_handlers.PINNED_PACKAGE_VERSION,
-        }],
       },
       u'tags': [
         u'os:Amiga',

@@ -21,42 +21,101 @@ from server import config
 
 
 class ConfigTest(test_case.TestCase):
-  def test_validate_isolate_settings(self):
-    def validate(**cfg):
-      cfg = config_pb2.IsolateSettings(**cfg)
-      ctx = validation.Context.raise_on_error()
-      config.validate_isolate_settings(cfg, ctx)
+  def validator_test(self, validator, cfg, messages):
+    ctx = validation.Context()
+    validator(cfg, ctx)
+    self.assertEquals(ctx.result().messages, [
+      validation.Message(severity=logging.ERROR, text=m)
+      for m in messages
+    ])
 
-    with self.assertRaises(ValueError):
-      # No namespace.
-      validate(default_server='https://isolateserver.appspot.com')
-    with self.assertRaises(ValueError):
-      # Not a URL.
-      validate(
-          default_server='isolateserver.appspot.com',
-          default_namespace='abc'
-      )
-    validate(
-        default_server='https://isolateserver.appspot.com',
-        default_namespace='default-gzip'
-    )
-    validate()
+  def test_validate_isolate_settings(self):
+    self.validator_test(
+        config.validate_isolate_settings,
+        config_pb2.IsolateSettings(
+            default_server='https://isolateserver.appspot.com'),
+        [
+          ('either specify both default_server and default_namespace or '
+           'none'),
+        ])
+
+    self.validator_test(
+        config.validate_isolate_settings,
+        config_pb2.IsolateSettings(
+            default_server='isolateserver.appspot.com',
+            default_namespace='abc',
+        ),
+        [
+          'default_server must start with "https://" or "http://"',
+        ])
+
+    self.validator_test(
+        config.validate_isolate_settings,
+        config_pb2.IsolateSettings(
+          default_server='https://isolateserver.appspot.com',
+          default_namespace='abc',
+        ),
+        [])
+
+    self.validator_test(
+        config.validate_isolate_settings,
+        config_pb2.IsolateSettings(),
+        [])
+
+  def test_validate_cipd_settings(self):
+    self.validator_test(
+        config.validate_cipd_settings,
+        config_pb2.CipdSettings(),
+        [
+          'default_server is not set',
+          'default_client_package: invalid package_name ""',
+          'default_client_package: invalid version ""',
+        ])
+
+    self.validator_test(
+        config.validate_cipd_settings,
+        config_pb2.CipdSettings(
+            default_server='chrome-infra-packages.appspot.com',
+            default_client_package=config_pb2.CipdPackage(
+                package_name='infra/tools/cipd/windows-i386',
+                version='git_revision:deadbeef'),
+            ),
+        [
+          'default_server must start with "https://" or "http://"',
+        ])
+
+    self.validator_test(
+        config.validate_cipd_settings,
+        config_pb2.CipdSettings(
+            default_server='https://chrome-infra-packages.appspot.com',
+            default_client_package=config_pb2.CipdPackage(
+                package_name='infra/tools/cipd/${platform}',
+                version='git_revision:deadbeef'),
+            ),
+        [])
 
   def test_validate_settings(self):
-    def validate(**cfg):
-      cfg = config_pb2.SettingsCfg(**cfg)
-      ctx = validation.Context.raise_on_error()
-      config.validate_settings(cfg, ctx)
+    self.validator_test(
+        config.validate_settings,
+        config_pb2.SettingsCfg(
+            bot_death_timeout_secs=-1,
+            reusable_task_age_secs=-1),
+      [
+        'bot_death_timeout_secs cannot be negative',
+        'reusable_task_age_secs cannot be negative',
+      ])
 
-    with self.assertRaises(ValueError):
-      validate(bot_death_timeout_secs=-1)
-    with self.assertRaises(ValueError):
-      validate(bot_death_timeout_secs=config.SECONDS_IN_YEAR + 1)
-    with self.assertRaises(ValueError):
-      validate(reusable_task_age_secs=-1)
-    with self.assertRaises(ValueError):
-      validate(reusable_task_age_secs=config.SECONDS_IN_YEAR + 1)
-    validate()
+    self.validator_test(
+        config.validate_settings,
+        config_pb2.SettingsCfg(
+            bot_death_timeout_secs=config.SECONDS_IN_YEAR + 1,
+            reusable_task_age_secs=config.SECONDS_IN_YEAR + 1),
+      [
+        'bot_death_timeout_secs cannot be more than a year',
+        'reusable_task_age_secs cannot be more than a year',
+      ])
+
+    self.validator_test(config.validate_settings, config_pb2.SettingsCfg(), [])
 
 
 if __name__ == '__main__':

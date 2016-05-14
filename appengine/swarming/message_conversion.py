@@ -102,10 +102,27 @@ def bot_event_to_rpc(entity):
 def task_request_to_rpc(entity):
   """"Returns a swarming_rpcs.TaskRequest from a task_request.TaskRequest."""
   assert entity.__class__ is task_request.TaskRequest
+  cipd_input = None
+  if entity.properties.cipd_input:
+    client_package = None
+    if entity.properties.cipd_input.client_package:
+      client_package = _ndb_to_rpc(
+          swarming_rpcs.CipdPackage,
+          entity.properties.cipd_input.client_package)
+    cipd_input = _ndb_to_rpc(
+        swarming_rpcs.CipdInput,
+        entity.properties.cipd_input,
+        client_package=client_package,
+        packages=[
+          _ndb_to_rpc(swarming_rpcs.CipdPackage, p)
+          for p in entity.properties.cipd_input.packages
+        ])
+
   inputs_ref = None
   if entity.properties.inputs_ref:
     inputs_ref = _ndb_to_rpc(
         swarming_rpcs.FilesRef, entity.properties.inputs_ref)
+
   props = entity.properties
   cmd = None
   if props.commands:
@@ -115,13 +132,11 @@ def task_request_to_rpc(entity):
   properties = _ndb_to_rpc(
       swarming_rpcs.TaskProperties,
       props,
+      cipd_input=cipd_input,
       command=cmd,
       dimensions=_string_pairs_from_dict(props.dimensions),
       env=_string_pairs_from_dict(props.env),
-      inputs_ref=inputs_ref,
-      packages=[
-        _ndb_to_rpc(swarming_rpcs.CipdPackage, p) for p in props.packages
-      ])
+      inputs_ref=inputs_ref)
 
   return _ndb_to_rpc(
       swarming_rpcs.TaskRequest,
@@ -136,22 +151,37 @@ def new_task_request_from_rpc(msg, now):
   props = msg.properties
   if not props:
     raise ValueError('properties is required')
+
+  cipd_input = None
+  if props.cipd_input:
+    client_package = None
+    if props.cipd_input.client_package:
+      client_package = _rpc_to_ndb(
+          task_request.CipdPackage, props.cipd_input.client_package)
+    cipd_input = _rpc_to_ndb(
+        task_request.CipdInput,
+        props.cipd_input,
+        client_package=client_package,
+        packages=[
+          _rpc_to_ndb(task_request.CipdPackage, p)
+          for p in props.cipd_input.packages
+        ])
+
   inputs_ref = None
   if props.inputs_ref:
     inputs_ref = _rpc_to_ndb(task_request.FilesRef, props.inputs_ref)
+
   properties = _rpc_to_ndb(
       task_request.TaskProperties,
       props,
+      cipd_input=cipd_input,
       # Passing command=None is supported at API level but not at NDB level.
       command=props.command or [],
       # Legacy, ignored.
       commands=None,
       dimensions={i.key: i.value for i in props.dimensions},
       env={i.key: i.value for i in props.env},
-      inputs_ref=inputs_ref,
-      packages=[
-        _rpc_to_ndb(task_request.CipdPackage, p) for p in props.packages
-      ])
+      inputs_ref=inputs_ref)
 
   return _rpc_to_ndb(
       task_request.TaskRequest,

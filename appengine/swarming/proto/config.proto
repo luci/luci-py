@@ -20,16 +20,42 @@ message SettingsCfg {
 
     // Configuration for swarming-isolate integration.
     optional IsolateSettings isolate = 5;
+
+    // Configuration for swarming-cipd integration.
+    optional CipdSettings cipd = 6;
 }
 
 // Configuration for swarming-isolate integration.
 message IsolateSettings {
     // URL of the default isolate server to use if it is not specified in a
-    // task. Must start with "https://" or "http://".
+    // task. Must start with "https://" or "http://",
     // e.g. "https://isolateserver.appspot.com"
     optional string default_server = 1;
 
     // Default namespace to use if it is not specified in a task,
     // e.g. "default-gzip"
     optional string default_namespace = 2;
+}
+
+// A CIPD package.
+message CipdPackage {
+    // A template of a full CIPD package name, e.g.
+    // "infra/tools/cipd/${platform}"
+    // See also cipd.ALL_PARAMS.
+    optional string package_name = 1;
+
+    // Valid package version for all packages matched by package name.
+    optional string version = 2;
+}
+
+// Settings for Swarming-CIPD integration.
+message CipdSettings {
+    // URL of the default CIPD server to use if it is not specified in a task.
+    // Must start with "https://" or "http://",
+    // e.g. "https://chrome-infra-packages.appspot.com".
+    optional string default_server = 1;
+
+    // Package of the default CIPD client to use if it is not specified in a
+    // task.
+    optional CipdPackage default_client_package = 2;
 }

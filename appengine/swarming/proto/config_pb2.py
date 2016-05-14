@@ -13,7 +13,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='config.proto',
   package='',
-  serialized_pb='\n\x0c\x63onfig.proto\"\xa8\x01\n\x0bSettingsCfg\x12\x18\n\x10google_analytics\x18\x01 \x01(\t\x12\x1e\n\x16reusable_task_age_secs\x18\x02 \x01(\x05\x12\x1e\n\x16\x62ot_death_timeout_secs\x18\x03 \x01(\x05\x12\x1c\n\x14\x65nable_ts_monitoring\x18\x04 \x01(\x08\x12!\n\x07isolate\x18\x05 \x01(\x0b\x32\x10.IsolateSettings\"D\n\x0fIsolateSettings\x12\x16\n\x0e\x64\x65\x66\x61ult_server\x18\x01 \x01(\t\x12\x19\n\x11\x64\x65\x66\x61ult_namespace\x18\x02 \x01(\t')
+  serialized_pb='\n\x0c\x63onfig.proto\"\xc5\x01\n\x0bSettingsCfg\x12\x18\n\x10google_analytics\x18\x01 \x01(\t\x12\x1e\n\x16reusable_task_age_secs\x18\x02 \x01(\x05\x12\x1e\n\x16\x62ot_death_timeout_secs\x18\x03 \x01(\x05\x12\x1c\n\x14\x65nable_ts_monitoring\x18\x04 \x01(\x08\x12!\n\x07isolate\x18\x05 \x01(\x0b\x32\x10.IsolateSettings\x12\x1b\n\x04\x63ipd\x18\x06 \x01(\x0b\x32\r.CipdSettings\"D\n\x0fIsolateSettings\x12\x16\n\x0e\x64\x65\x66\x61ult_server\x18\x01 \x01(\t\x12\x19\n\x11\x64\x65\x66\x61ult_namespace\x18\x02 \x01(\t\"4\n\x0b\x43ipdPackage\x12\x14\n\x0cpackage_name\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t\"T\n\x0c\x43ipdSettings\x12\x16\n\x0e\x64\x65\x66\x61ult_server\x18\x01 \x01(\t\x12,\n\x16\x64\x65\x66\x61ult_client_package\x18\x02 \x01(\x0b\x32\x0c.CipdPackage')
 
 
 
@@ -60,6 +60,13 @@ _SETTINGSCFG = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='cipd', full_name='SettingsCfg.cipd', index=5,
+      number=6, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -70,7 +77,7 @@ _SETTINGSCFG = _descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=17,
-  serialized_end=185,
+  serialized_end=214,
 )
 
 
@@ -104,13 +111,87 @@ _ISOLATESETTINGS = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=187,
-  serialized_end=255,
+  serialized_start=216,
+  serialized_end=284,
+)
+
+
+_CIPDPACKAGE = _descriptor.Descriptor(
+  name='CipdPackage',
+  full_name='CipdPackage',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='package_name', full_name='CipdPackage.package_name', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='version', full_name='CipdPackage.version', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=286,
+  serialized_end=338,
+)
+
+
+_CIPDSETTINGS = _descriptor.Descriptor(
+  name='CipdSettings',
+  full_name='CipdSettings',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='default_server', full_name='CipdSettings.default_server', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='default_client_package', full_name='CipdSettings.default_client_package', index=1,
+      number=2, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=340,
+  serialized_end=424,
 )
 
 _SETTINGSCFG.fields_by_name['isolate'].message_type = _ISOLATESETTINGS
+_SETTINGSCFG.fields_by_name['cipd'].message_type = _CIPDSETTINGS
+_CIPDSETTINGS.fields_by_name['default_client_package'].message_type = _CIPDPACKAGE
 DESCRIPTOR.message_types_by_name['SettingsCfg'] = _SETTINGSCFG
 DESCRIPTOR.message_types_by_name['IsolateSettings'] = _ISOLATESETTINGS
+DESCRIPTOR.message_types_by_name['CipdPackage'] = _CIPDPACKAGE
+DESCRIPTOR.message_types_by_name['CipdSettings'] = _CIPDSETTINGS
 
 class SettingsCfg(_message.Message):
   __metaclass__ = _reflection.GeneratedProtocolMessageType
@@ -123,6 +204,18 @@ class IsolateSettings(_message.Message):
   DESCRIPTOR = _ISOLATESETTINGS
 
   # @@protoc_insertion_point(class_scope:IsolateSettings)
+
+class CipdPackage(_message.Message):
+  __metaclass__ = _reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _CIPDPACKAGE
+
+  # @@protoc_insertion_point(class_scope:CipdPackage)
+
+class CipdSettings(_message.Message):
+  __metaclass__ = _reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _CIPDSETTINGS
+
+  # @@protoc_insertion_point(class_scope:CipdSettings)
 
 
 # @@protoc_insertion_point(module_scope)

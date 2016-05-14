@@ -48,7 +48,6 @@ separate entity to clearly declare the boundary for task request deduplication.
 
 import datetime
 import hashlib
-import logging
 import random
 import re
 import urlparse
@@ -60,6 +59,8 @@ from components import auth
 from components import datastore_utils
 from components import pubsub
 from components import utils
+
+from server import config
 from server import task_pack
 import cipd
 
@@ -94,7 +95,6 @@ _BEGINING_OF_THE_WORLD = datetime.datetime(2010, 1, 1, 0, 0, 0, 0)
 
 # Used for isolated files.
 _HASH_CHARS = frozenset('0123456789abcdef')
-NAMESPACE_RE = re.compile(r'^[a-z0-9A-Z\-._]+$')
 
 
 ### Properties validators must come before the models.
@@ -107,7 +107,7 @@ def _validate_isolated(prop, value):
           '%s must be lowercase hex of length 40, not %s' % (prop._name, value))
 
 
-def _validate_hostname(prop, value):
+def _validate_url(prop, value):
   # pylint: disable=unused-argument
   if value:
     # It must be https://*.appspot.com or https?://*
@@ -125,7 +125,7 @@ def _validate_hostname(prop, value):
 
 
 def _validate_namespace(prop, value):
-  if not NAMESPACE_RE.match(value):
+  if not config.NAMESPACE_RE.match(value):
     raise datastore_errors.BadValueError('malformed %s' % prop._name)
 
 
@@ -204,18 +204,19 @@ def _validate_tags(prop, value):
         '%s must be key:value form, not %s' % (prop._name, value))
 
 
-def _validate_package_name(prop, value):
-  """Validates a CIPD package name."""
-  if not cipd.is_valid_package_name(value):
+def _validate_package_name_template(prop, value):
+  """Validates a CIPD package name template."""
+  if not cipd.is_valid_package_name_template(value):
     raise datastore_errors.BadValueError(
-      '%s must be a valid CIPD package name "%s"' % (prop._name, value))
+        '%s must be a valid CIPD package name template "%s"' % (
+              prop._name, value))
 
 
 def _validate_package_version(prop, value):
   """Validates a CIPD package version."""
   if not cipd.is_valid_version(value):
     raise datastore_errors.BadValueError(
-      '%s must be a valid package version "%s"' % (prop._name, value))
+        '%s must be a valid package version "%s"' % (prop._name, value))
 
 
 ### Models.
@@ -233,7 +234,7 @@ class FilesRef(ndb.Model):
   isolated = ndb.StringProperty(validator=_validate_isolated, indexed=False)
   # The hostname of the isolated server to use.
   isolatedserver = ndb.StringProperty(
-      validator=_validate_hostname, indexed=False)
+      validator=_validate_url, indexed=False)
   # Namespace on the isolate server.
   namespace = ndb.StringProperty(validator=_validate_namespace, indexed=False)
 
@@ -249,8 +250,12 @@ class CipdPackage(ndb.Model):
 
   A part of TaskProperties.
   """
+  # Package name template. May use cipd.ALL_PARAMS.
+  # Most users will specify ${platform} parameter.
   package_name = ndb.StringProperty(
-      indexed=False, validator=_validate_package_name)
+      indexed=False, validator=_validate_package_name_template)
+  # Package version that is valid for all packages matched by package_name.
+  # Most users will specify tags.
   version = ndb.StringProperty(
       indexed=False, validator=_validate_package_version)
 
@@ -260,6 +265,42 @@ class CipdPackage(ndb.Model):
       raise datastore_errors.BadValueError('CIPD package name is required')
     if not self.version:
       raise datastore_errors.BadValueError('CIPD package version is required')
+
+
+class CipdInput(ndb.Model):
+  """Specifies which CIPD client and packages to install, from which server.
+
+  A part of TaskProperties.
+  """
+  # URL of the CIPD server. Must start with "https://" or "http://".
+  server = ndb.StringProperty(indexed=False, validator=_validate_url)
+
+  # CIPD package of CIPD client to use.
+  # client_package.version is required.
+  client_package = ndb.LocalStructuredProperty(CipdPackage)
+
+  # List of packages to install in $CIPD_PATH prior task execution.
+  packages = ndb.LocalStructuredProperty(CipdPackage, repeated=True)
+
+  def _pre_put_hook(self):
+    if not self.server:
+      raise datastore_errors.BadValueError('cipd server is required')
+    if not self.client_package:
+      raise datastore_errors.BadValueError('client_package is required')
+    self.client_package._pre_put_hook()
+
+    if not self.packages:
+      raise datastore_errors.BadValueError(
+          'cipd_input cannot have an empty package list')
+
+    package_names = set()
+    for p in self.packages:
+      p._pre_put_hook()
+      if p.package_name in package_names:
+        raise datastore_errors.BadValueError(
+           'package %s is specified more than once' % p.package_name)
+      package_names.add(p.package_name)
+    self.packages.sort(key=lambda p: p.package_name)
 
 
 class TaskProperties(ndb.Model):
@@ -303,9 +344,8 @@ class TaskProperties(ndb.Model):
   # Only inputs_ref.isolated or command can be specified.
   inputs_ref = ndb.LocalStructuredProperty(FilesRef)
 
-  # A list of CIPD packages to install $CIPD_PATH and $PATH before task
-  # execution.
-  packages = ndb.LocalStructuredProperty(CipdPackage, repeated=True)
+  # CIPD packages to install.
+  cipd_input = ndb.LocalStructuredProperty(CipdInput)
 
   # Filter to use to determine the required properties on the bot to run on. For
   # example, Windows or hostname. Encoded as json. Optional but highly
@@ -392,22 +432,15 @@ class TaskProperties(ndb.Model):
       if self.inputs_ref:
         self.inputs_ref._pre_put_hook()
 
-      package_names = set()
-      for p in self.packages:
-        p._pre_put_hook()
-        if p.package_name in package_names:
-          raise datastore_errors.BadValueError(
-              'package %s is specified more than once' % p.package_name)
-        package_names.add(p.package_name)
-      self.packages.sort(key=lambda p: p.package_name)
-
-      if self.idempotent:
-        pinned = lambda p: cipd.is_pinned_version(p.version)
-        if self.packages and any(not pinned(p) for p in self.packages):
-          raise datastore_errors.BadValueError(
-            'an idempotent task cannot have unpinned packages; '
-            'use instance IDs or tags as package versions')
-
+      if self.cipd_input:
+        self.cipd_input._pre_put_hook()
+        if self.idempotent:
+          pinned = lambda p: cipd.is_pinned_version(p.version)
+          assert self.cipd_input.packages  # checked by cipd_input._pre_put_hook
+          if any(not pinned(p) for p in self.cipd_input.packages):
+            raise datastore_errors.BadValueError(
+                'an idempotent task cannot have unpinned packages; '
+                'use tags or instance IDs as package versions')
 
 class TaskRequest(ndb.Model):
   """Contains a user request.

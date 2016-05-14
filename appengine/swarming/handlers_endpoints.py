@@ -77,6 +77,33 @@ def get_result_entity(task_id):
   return get_or_raise(key)
 
 
+def apply_property_defaults(properties):
+  """Fills ndb task properties with default values read from server settings."""
+  cfg = config.settings()
+  if not cfg:
+    return
+
+  cfg = config.settings()
+  if cfg.isolate.default_server and cfg.isolate.default_namespace:
+    properties.inputs_ref = properties.inputs_ref or task_request.FilesRef()
+    properties.inputs_ref.isolatedserver = (
+        properties.inputs_ref.isolatedserver or cfg.isolate.default_server)
+    properties.inputs_ref.namespace = (
+        properties.inputs_ref.namespace or cfg.isolate.default_namespace)
+
+  if cfg.HasField('cipd') and properties.cipd_input:
+    properties.cipd_input.server = (
+        properties.cipd_input.server or cfg.cipd.default_server)
+    properties.cipd_input.client_package = (
+        properties.cipd_input.client_package or task_request.CipdPackage())
+    properties.cipd_input.client_package.package_name = (
+        properties.cipd_input.client_package.package_name or
+        cfg.cipd.default_client_package.package_name)
+    properties.cipd_input.client_package.version = (
+        properties.cipd_input.client_package.version or
+        cfg.cipd.default_client_package.version)
+
+
 ### API
 
 
@@ -268,24 +295,10 @@ class SwarmingTasksService(remote.Service):
     """
     logging.info('%s', request)
 
-    if not request.properties:
-      raise endpoints.BadRequestException('properties are required')
-
-    # Apply isolate defaults.
-    cfg = config.settings()
-    if cfg.isolate.default_server and cfg.isolate.default_namespace:
-      request.properties.inputs_ref = (
-          request.properties.inputs_ref or swarming_rpcs.FilesRef())
-      request.properties.inputs_ref.isolatedserver = (
-          request.properties.inputs_ref.isolatedserver or
-          cfg.isolate.default_server)
-      request.properties.inputs_ref.namespace = (
-          request.properties.inputs_ref.namespace or
-          cfg.isolate.default_namespace)
-
     try:
       request = message_conversion.new_task_request_from_rpc(
           request, utils.utcnow())
+      apply_property_defaults(request.properties)
       posted_request = task_request.make_request(request, acl.is_bot_or_admin())
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)

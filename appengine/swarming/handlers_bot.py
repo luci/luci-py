@@ -383,6 +383,14 @@ class BotPollHandler(_BotBaseHandler):
       'cmd': 'run',
       'manifest': {
         'bot_id': bot_id,
+        'cipd_input': {
+          'client_package': (
+              request.properties.cipd_input.client_package.to_dict()),
+          'packages': [
+            p.to_dict() for p in request.properties.cipd_input.packages
+          ],
+          'server': request.properties.cipd_input.server,
+        } if request.properties.cipd_input else None,
         'command': cmd,
         'dimensions': request.properties.dimensions,
         'env': request.properties.env,
@@ -396,13 +404,6 @@ class BotPollHandler(_BotBaseHandler):
           'namespace': request.properties.inputs_ref.namespace,
           'server': request.properties.inputs_ref.isolatedserver,
         } if request.properties.inputs_ref else None,
-        'packages': [
-          {
-            'package_name': p.package_name,
-            'version': p.version,
-          }
-          for p in request.properties.packages
-        ],
         'task_id': task_pack.pack_run_result_key(run_result_key),
       },
     }

@@ -39,6 +39,7 @@ from . import validation_context
 
 __all__ = [
   'Context',
+  'Message',
   'RuleSet',
   'is_defined_for',
   'is_valid',
@@ -48,6 +49,9 @@ __all__ = [
   'self_rule',
   'validate',
 ]
+
+
+Message = validation_context.Message
 
 
 class Context(validation_context.Context):

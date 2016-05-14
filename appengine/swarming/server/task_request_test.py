@@ -5,7 +5,6 @@
 
 import datetime
 import logging
-import os
 import random
 import sys
 import unittest
@@ -27,9 +26,6 @@ from server import task_request
 # pylint: disable=W0212
 
 
-PINNED_PACKAGE_VERSION = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
-
-
 def mkreq(req):
   return task_request.make_request(req, True)
 
@@ -37,17 +33,35 @@ def mkreq(req):
 def _gen_request(properties=None, **kwargs):
   """Creates a TaskRequest."""
   properties = properties or {}
-  packages = properties.pop('packages', [{
-    'package_name': 'rm',
-    'version': PINNED_PACKAGE_VERSION,
-  }])
+
+  def merge(override, defaults):
+    if override is None:
+      return None
+    result = defaults.copy()
+    result.update(override)
+    return result
+
+  cipd_input = properties.pop('cipd_input', {})
+  cipd_input = merge(cipd_input, {
+    'client_package': merge(cipd_input.pop('client_package', {}), {
+      'package_name': 'infra/tools/cipd/${platform}',
+      'version': 'git_revision:deadbeef',
+    }),
+    'packages': [{
+      'package_name': 'rm',
+      'version': 'git_revision:deadbeef',
+    }],
+    'server': 'https://chrome-infra-packages.appspot.com'
+  })
+
   inputs_ref = properties.pop('inputs_ref', {
     'isolatedserver': 'https://isolateserver.appspot.com',
     'namespace': 'default-gzip',
   })
-  props = {
+
+  properties = merge(properties, {
+    'cipd_input': cipd_input,
     'command': [u'command1', u'arg1'],
-    'packages': [task_request.CipdPackage(**p) for p in packages],
     'dimensions': {
       u'OS': u'Windows-3.1.1',
       u'hostname': u'localhost',
@@ -59,19 +73,19 @@ def _gen_request(properties=None, **kwargs):
     'idempotent': False,
     'inputs_ref': inputs_ref,
     'io_timeout_secs': None,
-  }
-  props.update(properties)
+  })
   now = utils.utcnow()
   args = {
     'created_ts': now,
     'name': 'Request name',
     'priority': 50,
-    'properties': task_request.TaskProperties(**props),
+    'properties': properties,
     'expiration_ts': now + datetime.timedelta(seconds=30),
     'tags': [u'tag:1'],
     'user': 'Jesus',
   }
   args.update(kwargs)
+  # Note that ndb model constructor accepts dicts for structured properties.
   return task_request.TaskRequest(**args)
 
 
@@ -200,6 +214,17 @@ class TaskRequestApiTest(TestCase):
     r = _gen_request(properties=dict(idempotent=True), parent_task_id=parent_id)
     request = mkreq(r)
     expected_properties = {
+      'cipd_input': {
+        'client_package': {
+          'package_name': 'infra/tools/cipd/${platform}',
+          'version': 'git_revision:deadbeef',
+        },
+        'packages': [{
+          'package_name': 'rm',
+          'version': 'git_revision:deadbeef',
+        }],
+        'server': 'https://chrome-infra-packages.appspot.com'
+      },
       'command': [u'command1', u'arg1'],
       'dimensions': {
         u'OS': u'Windows-3.1.1',
@@ -217,7 +242,6 @@ class TaskRequestApiTest(TestCase):
         'namespace': 'default-gzip',
       },
       'io_timeout_secs': None,
-      'packages': [{'package_name': 'rm', 'version': PINNED_PACKAGE_VERSION}],
     }
     expected_request = {
       'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
@@ -227,7 +251,7 @@ class TaskRequestApiTest(TestCase):
       'properties': expected_properties,
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
-      'properties_hash': 'c3e067b4e232be5478e7147bb1f0506477444014',
+      'properties_hash': 'c07adb3b577d51169036f29e44764a5ddf132228',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'tags': [
@@ -260,6 +284,17 @@ class TaskRequestApiTest(TestCase):
     request = mkreq(_gen_request(
         properties={'idempotent':True}, parent_task_id=parent_id))
     expected_properties = {
+      'cipd_input': {
+        'client_package': {
+          'package_name': 'infra/tools/cipd/${platform}',
+          'version': 'git_revision:deadbeef',
+        },
+        'packages': [{
+          'package_name': 'rm',
+          'version': 'git_revision:deadbeef',
+        }],
+        'server': 'https://chrome-infra-packages.appspot.com'
+      },
       'command': [u'command1', u'arg1'],
       'dimensions': {
         u'OS': u'Windows-3.1.1',
@@ -277,7 +312,6 @@ class TaskRequestApiTest(TestCase):
         'namespace': 'default-gzip',
       },
       'io_timeout_secs': None,
-      'packages': [{'package_name': 'rm', 'version': PINNED_PACKAGE_VERSION}],
     }
     expected_request = {
       'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
@@ -287,7 +321,7 @@ class TaskRequestApiTest(TestCase):
       'properties': expected_properties,
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
-      'properties_hash': 'c3e067b4e232be5478e7147bb1f0506477444014',
+      'properties_hash': 'c07adb3b577d51169036f29e44764a5ddf132228',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'tags': [
@@ -327,7 +361,7 @@ class TaskRequestApiTest(TestCase):
     # Other unit tests should use the calculated value.
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        'c3e067b4e232be5478e7147bb1f0506477444014', as_dict['properties_hash'])
+        'c07adb3b577d51169036f29e44764a5ddf132228', as_dict['properties_hash'])
 
   def test_duped(self):
     # Two TestRequest with the same properties.
@@ -374,25 +408,39 @@ class TaskRequestApiTest(TestCase):
     mkreq(_gen_request(properties=dict(command=['python'])))
     mkreq(_gen_request(properties=dict(command=[u'python'])))
 
+    def mkcipdreq(idempotent=False, **cipd_input):
+      mkreq(_gen_request(
+          properties=dict(idempotent=idempotent, cipd_input=cipd_input)))
+
     with self.assertRaises(datastore_errors.BadValueError):
-      mkreq(_gen_request(properties=dict(packages=[{}])))
+      mkcipdreq(packages=[{}])
     with self.assertRaises(datastore_errors.BadValueError):
-      mkreq(_gen_request(properties=dict(packages=[dict(package_name='rm')])))
+      mkcipdreq(packages=[dict(package_name='rm')])
     with self.assertRaises(datastore_errors.BadValueError):
-      mkreq(_gen_request(properties=dict(
-          packages=[{'package_name': 'infra|rm', 'version': 'latest'}])))
+      mkcipdreq(packages=[{'package_name': 'infra|rm', 'version': 'latest'}])
     with self.assertRaises(datastore_errors.BadValueError):
-      mkreq(_gen_request(properties=dict(
-        packages=[
-            {'package_name': 'rm', 'version': 'latest'},
-            {'package_name': 'rm', 'version': 'canary'},
-        ])))
+      mkcipdreq(packages=[
+        dict(package_name='rm', version='latest'),
+        dict(package_name='rm', version='canary'),
+      ])
     with self.assertRaises(datastore_errors.BadValueError):
-      mkreq(_gen_request(properties=dict(
-        idempotent=True,
-        packages=[{'package_name': 'rm', 'version': 'latest'}])))
-    mkreq(_gen_request(properties=dict(
-      packages=[{'package_name': 'rm', 'version': 'latest'}])))
+      mkcipdreq(
+          idempotent=True,
+          packages=[dict(package_name='rm', version='latest')])
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkcipdreq(server='abc')
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkcipdreq(client_package=dict(package_name='--bad package--'))
+    mkcipdreq()
+    mkcipdreq(packages=[dict(package_name='rm', version='latest')])
+    mkcipdreq(
+        client_package=dict(
+            package_name='infra/tools/cipd/${platform}',
+            version='git_revision:daedbeef',
+        ),
+        packages=[dict(package_name='rm', version='latest')],
+        server='https://chrome-infra-packages.appspot.com',
+    )
 
     with self.assertRaises(TypeError):
       mkreq(_gen_request(properties=dict(dimensions=[])))
@@ -478,6 +526,17 @@ class TaskRequestApiTest(TestCase):
     # - idempotent was reset to False.
     # - parent_task_id was reset to None.
     expected_properties = {
+      'cipd_input': {
+        'client_package': {
+          'package_name': 'infra/tools/cipd/${platform}',
+          'version': 'git_revision:deadbeef',
+        },
+        'packages': [{
+          'package_name': 'rm',
+          'version': 'git_revision:deadbeef',
+        }],
+        'server': 'https://chrome-infra-packages.appspot.com'
+      },
       'command': [u'command1', u'arg1'],
       'dimensions': {
         u'OS': u'Windows-3.1.1',
@@ -495,7 +554,6 @@ class TaskRequestApiTest(TestCase):
         'namespace': 'default-gzip',
       },
       'io_timeout_secs': None,
-      'packages': [{'package_name': 'rm', 'version': PINNED_PACKAGE_VERSION}],
     }
     # Differences from make_request() are:
     # - parent_task_id was reset to None.

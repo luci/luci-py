@@ -32,9 +32,6 @@ from server import large
 from server import stats
 
 
-PINNED_PACKAGE_VERSION = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
-
-
 class AppTestBase(test_case.TestCase):
   APP_DIR = test_env.APP_DIR
 
@@ -218,11 +215,18 @@ class AppTestBase(test_case.TestCase):
 
   def _client_create_task(self, properties=None, **kwargs):
     """Creates an isolated command TaskRequest via the Cloud Endpoints API."""
-    params = {
-      'packages': [{
-        'package_name': 'rm',
-        'version': PINNED_PACKAGE_VERSION,
-      }],
+    props = {
+      'cipd_input': {
+        'client_package': {
+          'package_name': 'infra/tools/cipd/${platform}',
+          'version': 'git_revision:deadbeef',
+        },
+        'packages': [{
+          'package_name': 'rm',
+          'version': 'git_revision:deadbeef',
+        }],
+        'server': 'https://chrome-infra-packages.appspot.com',
+      },
       'dimensions': [
         {'key': 'os', 'value': 'Amiga'},
         {'key': 'pool', 'value': 'default'},
@@ -231,18 +235,20 @@ class AppTestBase(test_case.TestCase):
       'execution_timeout_secs': 3600,
       'io_timeout_secs': 1200,
     }
-    params.update(properties or {})
-    props = swarming_rpcs.TaskProperties(**params)
+    props.update(properties or {})
 
     params = {
       'expiration_secs': 24*60*60,
       'name': 'hi',
       'priority': 10,
+      'properties': props,
       'tags': [],
       'user': 'joe@localhost',
     }
     params.update(kwargs)
-    request = swarming_rpcs.TaskRequest(properties=props, **params)
+
+    # Note that protorpc message constructor accepts dicts for submessages.
+    request = swarming_rpcs.TaskRequest(**params)
     response = self.endpoint_call(
         handlers_endpoints.SwarmingTasksService, 'new', request)
     return response, response['task_id']

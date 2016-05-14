@@ -84,14 +84,37 @@ class FilesRef(messages.Message):
 
 class CipdPackage(messages.Message):
   """A CIPD package to install in $CIPD_PATH and $PATH before task execution."""
-  # Full CIPD package name, e.g. "infra/tools/authutil/linux-amd64"
+  # A template of a full CIPD package name, e.g.
+  # "infra/tools/authutil/${platform}"
+  # See also cipd.ALL_PARAMS.
   package_name = messages.StringField(1)
-  # Instance ID, tag or ref, e.g. "latest".
+  # Valid package version for all packages matched by package name.
   version = messages.StringField(2)
+
+
+class CipdInput(messages.Message):
+  """Defines CIPD packages to install in $CIPD_PATH.
+
+  A command may use $CIPD_PATH in its arguments. It will be expanded to the path
+  of the CIPD site root.
+  """
+  # URL of the CIPD server. Must start with "https://" or "http://".
+  # This field or its subfields are optional if default cipd client is defined
+  # in the server config.
+  server = messages.StringField(1)
+
+  # CIPD package of CIPD client to use.
+  # client_package.version is required.
+  # This field is optional is default value is defined in the server config.
+  client_package = messages.MessageField(CipdPackage, 2)
+
+  # List of CIPD packages to install in $CIPD_PATH prior task execution.
+  packages = messages.MessageField(CipdPackage, 3, repeated=True)
 
 
 class TaskProperties(messages.Message):
   """Important metadata about a particular task."""
+  cipd_input = messages.MessageField(CipdInput, 10)
   command = messages.StringField(1, repeated=True)
   dimensions = messages.MessageField(StringPair, 2, repeated=True)
   env = messages.MessageField(StringPair, 3, repeated=True)
@@ -101,7 +124,6 @@ class TaskProperties(messages.Message):
   idempotent = messages.BooleanField(7)
   inputs_ref = messages.MessageField(FilesRef, 8)
   io_timeout_secs = messages.IntegerField(9)
-  packages = messages.MessageField(CipdPackage, 10, repeated=True)
 
 
 class NewTaskRequest(messages.Message):

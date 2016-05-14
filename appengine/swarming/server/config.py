@@ -6,6 +6,7 @@
 
 import logging
 import posixpath
+import re
 
 from components import config
 from components import gitiles
@@ -14,14 +15,22 @@ from components import utils
 from components.config import validation
 
 from proto import config_pb2
-from server import task_request
 
+import cipd
 
 SETTINGS_CFG_FILENAME = 'settings.cfg'
 SECONDS_IN_YEAR = 60 * 60 * 24 * 365
+NAMESPACE_RE = re.compile(r'^[a-z0-9A-Z\-._]+$')
 
 
 ConfigApi = config.ConfigApi
+
+
+def validate_url(value, ctx):
+  if not value:
+    ctx.error('is not set')
+  elif not value.startswith(('https://', 'http://')):
+    ctx.error('must start with "https://" or "http://"')
 
 
 def validate_isolate_settings(cfg, ctx):
@@ -29,11 +38,28 @@ def validate_isolate_settings(cfg, ctx):
     ctx.error(
         'either specify both default_server and default_namespace or none')
   elif cfg.default_server:
-    if not cfg.default_server.startswith(('https://', 'http://')):
-      ctx.error('default_server must start with "https://" or "http://"')
+    with ctx.prefix('default_server '):
+      validate_url(cfg.default_server, ctx)
 
-    if not task_request.NAMESPACE_RE.match(cfg.default_namespace):
+    if not NAMESPACE_RE.match(cfg.default_namespace):
       ctx.error('invalid namespace "%s"', cfg.default_namespace)
+
+
+def validate_cipd_package(cfg, ctx):
+  if not cipd.is_valid_package_name_template(cfg.package_name):
+    ctx.error('invalid package_name "%s"', cfg.package_name)
+  if not cipd.is_valid_version(cfg.version):
+    ctx.error('invalid version "%s"', cfg.version)
+
+
+def validate_cipd_settings(cfg, ctx=None):
+  """Validates CipdSettings message stored in settings.cfg."""
+  ctx = ctx or validation.Context.raise_on_error()
+  with ctx.prefix('default_server '):
+    validate_url(cfg.default_server, ctx)
+
+  with ctx.prefix('default_client_package: '):
+    validate_cipd_package(cfg.default_client_package, ctx)
 
 
 @validation.self_rule(SETTINGS_CFG_FILENAME, config_pb2.SettingsCfg)
@@ -53,6 +79,10 @@ def validate_settings(cfg, ctx):
   if cfg.HasField('isolate'):
     with ctx.prefix('isolate: '):
       validate_isolate_settings(cfg.isolate, ctx)
+
+  if cfg.HasField('cipd'):
+    with ctx.prefix('cipd: '):
+      validate_cipd_settings(cfg.cipd, ctx)
 
 
 @utils.memcache('config:get_configs_url', time=60)
