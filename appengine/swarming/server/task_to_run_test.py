@@ -649,6 +649,28 @@ class TaskToRunApiTest(TestCase):
     ]
     self.assertEqual(expected, actual)
 
+  def test_yield_next_available_task_to_run_task_terminate(self):
+    request_dimensions = {
+      u'id': u'fake-id',
+    }
+    task = _gen_new_task_to_run(
+        priority=0,
+        properties=dict(
+            command=[], dimensions=request_dimensions, execution_timeout_secs=0,
+            grace_period_secs=0))
+    self.assertTrue(task.key.parent().get().properties.is_terminate)
+    # Bot declares exactly same dimensions so it matches.
+    bot_dimensions = request_dimensions
+    actual = _yield_next_available_task_to_dispatch(bot_dimensions, 0)
+    expected = [
+      {
+        'dimensions_hash': _hash_dimensions(request_dimensions),
+        'expiration_ts': self.expiration_ts,
+        'queue_number': '0x0004eef40bd85346',
+      },
+    ]
+    self.assertEqual(expected, actual)
+
   def test_yield_expired_task_to_run(self):
     now = utils.utcnow()
     _gen_new_task_to_run(

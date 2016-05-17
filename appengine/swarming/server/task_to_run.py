@@ -412,7 +412,10 @@ def yield_next_available_task_to_dispatch(bot_dimensions, deadline):
       # well. grace_period_secs is given by run_isolated to the task execution
       # process, by task_runner to run_isolated, and by bot_main to the
       # task_runner. Lastly, add a few seconds to account for any overhead.
-      if deadline is not None:
+      #
+      # Give an exemption to the special terminate task because it doesn't
+      # actually run anything.
+      if deadline is not None and not request.properties.is_terminate:
         if not request.properties.execution_timeout_secs:
           # Task never times out, so it cannot be accepted.
           too_long += 1
