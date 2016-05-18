@@ -69,6 +69,9 @@ from components import utils
 from server import bot_management
 
 
+PUBSUB_TOPIC = 'machine-provider'
+
+
 class MachineLease(ndb.Model):
   """A lease request for a machine from the Machine Provider.
 
@@ -112,7 +115,7 @@ class MachineType(ndb.Model):
   # Last request number used.
   request_count = ndb.IntegerProperty(default=0, required=True)
   # Request ID base string.
-  request_id_base = ndb.StringProperty(indexed=False, required=True)
+  request_id_base = ndb.StringProperty(indexed=False)
   # Target number of machines of this type to have leased at once.
   target_size = ndb.IntegerProperty(indexed=False, required=True)
 
@@ -182,7 +185,7 @@ def _clear_bots_pending_deletion(machine_type_key, hostnames):
 
 
 @ndb.transactional
-def generate_lease_requests(machine_type_key, swarming_server):
+def generate_lease_requests(machine_type_key, app_id, swarming_server):
   """Generates lease requests.
 
   The list includes new requests to lease machines up to the targeted
@@ -191,6 +194,7 @@ def generate_lease_requests(machine_type_key, swarming_server):
 
   Args:
     machine_type_key: ndb.Key for a MachineType instance.
+    app_id: ID of the application the requests originate from.
     swarming_server: URL for the Swarming server to connect to.
 
   Returns:
@@ -203,7 +207,7 @@ def generate_lease_requests(machine_type_key, swarming_server):
 
   expired_requests = _clean_up_expired_leases(machine_type)
   lease_requests = _generate_lease_request_status_updates(
-      machine_type, swarming_server)
+      machine_type, app_id, swarming_server)
 
   if not machine_type.enabled:
     logging.warning('MachineType is not enabled: %s\n', machine_type.key.id())
@@ -218,7 +222,7 @@ def generate_lease_requests(machine_type_key, swarming_server):
     return lease_requests
 
   new_requests = _generate_lease_requests_for_new_machines(
-      machine_type, swarming_server)
+      machine_type, app_id, swarming_server)
 
   if new_requests or expired_requests:
     machine_type.put()
@@ -259,11 +263,13 @@ def _clean_up_expired_leases(machine_type):
   return expired
 
 
-def _generate_lease_request_status_updates(machine_type, swarming_server):
+def _generate_lease_request_status_updates(
+    machine_type, app_id, swarming_server):
   """Generates status update requests for pending lease requests.
 
   Args:
     machine_type: MachineType instance.
+    app_id: ID of the application the requests originate from.
     swarming_server: URL for the Swarming server to connect to.
 
   Returns:
@@ -278,12 +284,15 @@ def _generate_lease_request_status_updates(machine_type, swarming_server):
           duration=machine_type.lease_duration_secs,
           on_lease=machine_provider.Instruction(
               swarming_server=swarming_server),
+          pubsub_project=app_id,
+          pubsub_topic=PUBSUB_TOPIC,
           request_id=request.client_request_id,
       ))
   return lease_requests
 
 
-def _generate_lease_requests_for_new_machines(machine_type, swarming_server):
+def _generate_lease_requests_for_new_machines(
+    machine_type, app_id, swarming_server):
   """Generates requests to lease machines up to the target.
 
   Extends machine_type.leases by the number of new lease requests generated,
@@ -291,6 +300,7 @@ def _generate_lease_requests_for_new_machines(machine_type, swarming_server):
 
   Args:
     machine_type: MachineType instance.
+    app_id: ID of the application the requests originate from.
     swarming_server: URL for the Swarming server to connect to.
 
   Returns:
@@ -300,11 +310,13 @@ def _generate_lease_requests_for_new_machines(machine_type, swarming_server):
   request_number = machine_type.request_count
   for _ in xrange(machine_type.target_size - machine_type.current_size):
     request_number += 1
-    request_id = '%s-%d' % (machine_type.request_id_base, request_number)
+    request_id = '%s-%d' % (machine_type.key.id(), request_number)
     lease_requests.append(machine_provider.LeaseRequest(
         dimensions=machine_type.mp_dimensions,
         duration=machine_type.lease_duration_secs,
         on_lease=machine_provider.Instruction(swarming_server=swarming_server),
+        pubsub_project=app_id,
+        pubsub_topic=PUBSUB_TOPIC,
         request_id=request_id,
     ))
     machine_type.leases.append(MachineLease(client_request_id=request_id))

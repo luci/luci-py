@@ -60,11 +60,12 @@ class CronMachineProviderBotHandler(webapp2.RequestHandler):
 
   @decorators.require_cronjob
   def get(self):
+    app_id = app_identity.get_application_id()
     swarming_server = 'https://%s' % app_identity.get_default_version_hostname()
     for machine_type_key in lease_management.MachineType.query().fetch(
         keys_only=True):
       lease_requests = lease_management.generate_lease_requests(
-          machine_type_key, swarming_server)
+          machine_type_key, app_id, swarming_server)
       if lease_requests:
         responses = machine_provider.lease_machines(lease_requests)
         lease_management.update_leases(machine_type_key, responses)

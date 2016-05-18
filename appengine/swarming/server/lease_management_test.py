@@ -135,7 +135,7 @@ class GenerateLeaseRequestsTest(test_case.TestCase):
     )
 
     requests = lease_management.generate_lease_requests(
-        machine_type.key, 'https://example.com')
+        machine_type.key, 'example', 'https://example.com')
     self.failIf(requests)
 
   def test_machine_type_not_enabled(self):
@@ -158,7 +158,7 @@ class GenerateLeaseRequestsTest(test_case.TestCase):
     machine_type.put()
 
     requests = lease_management.generate_lease_requests(
-        machine_type.key, 'https://example.com')
+        machine_type.key, 'example', 'https://example.com')
     self.assertEqual(len(requests), 1)
     self.assertEqual(requests[0].request_id, 'fake-id-1')
 
@@ -174,7 +174,7 @@ class GenerateLeaseRequestsTest(test_case.TestCase):
     machine_type.put()
 
     requests = lease_management.generate_lease_requests(
-        machine_type.key, 'https://example.com')
+        machine_type.key, 'example', 'https://example.com')
     updated_machine_type = machine_type.key.get()
     self.assertEqual(len(requests), 1)
     self.assertEqual(len(updated_machine_type.leases), 1)
@@ -282,7 +282,7 @@ class GenerateLeaseRequestStatusUpdatesTest(test_case.TestCase):
     )
 
     requests = lease_management._generate_lease_request_status_updates(
-        machine_type, 'https://example.com')
+        machine_type, 'example', 'https://example.com')
     self.failIf(requests)
 
   def test_machine_type_none_pending(self):
@@ -303,7 +303,7 @@ class GenerateLeaseRequestStatusUpdatesTest(test_case.TestCase):
     )
 
     requests = lease_management._generate_lease_request_status_updates(
-        machine_type, 'https://example.com')
+        machine_type, 'example', 'https://example.com')
     self.failIf(requests)
 
   def test_machine_type_one_pending(self):
@@ -333,7 +333,7 @@ class GenerateLeaseRequestStatusUpdatesTest(test_case.TestCase):
     )
 
     requests = lease_management._generate_lease_request_status_updates(
-        machine_type, 'https://example.com')
+        machine_type, 'example', 'https://example.com')
     self.assertEqual(len(requests), 1)
     self.assertEqual(requests[0].request_id, 'fake-id-3')
 
@@ -362,7 +362,7 @@ class GenerateLeaseRequestsForNewMachinesTest(test_case.TestCase):
     )
 
     requests = lease_management._generate_lease_requests_for_new_machines(
-        machine_type, 'https://example.com')
+        machine_type, 'example', 'https://example.com')
     self.failIf(requests)
 
   def test_need_one(self):
@@ -376,7 +376,7 @@ class GenerateLeaseRequestsForNewMachinesTest(test_case.TestCase):
     )
 
     requests = lease_management._generate_lease_requests_for_new_machines(
-        machine_type, 'https://example.com')
+        machine_type, 'example', 'https://example.com')
     self.assertEqual(len(requests), 1)
 
   def test_ensure_correct_request_ids(self):
@@ -391,7 +391,7 @@ class GenerateLeaseRequestsForNewMachinesTest(test_case.TestCase):
     )
 
     requests = lease_management._generate_lease_requests_for_new_machines(
-        machine_type, 'https://example.com')
+        machine_type, 'example', 'https://example.com')
     self.assertEqual(len(requests), 2)
     request_ids = sorted(request.request_id for request in requests)
     self.assertEqual(request_ids[0], 'ensure-correct-request-ids-3')
