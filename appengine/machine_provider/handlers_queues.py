@@ -52,6 +52,7 @@ def maybe_notify_lessee(request, response):
         pubsub.full_topic_name(
             request['pubsub_project'], request['pubsub_topic']),
         json.dumps(response),
+        {},
     )
 
 
