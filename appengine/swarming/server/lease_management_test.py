@@ -45,7 +45,6 @@ class CleanUpBotsTest(test_case.TestCase):
   def test_none_pending_deletion(self):
     machine_type = lease_management.MachineType(
         id='none-pending-deletion',
-        request_id_base='none-pending-deletion',
         target_size=2,
     )
     machine_type.put()
@@ -62,7 +61,6 @@ class CleanUpBotsTest(test_case.TestCase):
     machine_type = lease_management.MachineType(
         id='few-pending-deletion',
         pending_deletion=bot_ids,
-        request_id_base='few-pending-deletion',
         target_size=2,
     )
     machine_type.put()
@@ -90,7 +88,6 @@ class ClearBotsPendingDeletionTest(test_case.TestCase):
   def test_machine_type_none_pending_deletion(self):
     machine_type = lease_management.MachineType(
         id='none-pending-deletion',
-        request_id_base='none-pending-deletion',
         target_size=2,
     )
     machine_type.put()
@@ -103,7 +100,6 @@ class ClearBotsPendingDeletionTest(test_case.TestCase):
     machine_type = lease_management.MachineType(
         id='pending-deletion',
         pending_deletion=['fake-bot-1', 'fake-bot-2'],
-        request_id_base='pending-deletion',
         target_size=2,
     )
     machine_type.put()
@@ -130,7 +126,6 @@ class GenerateLeaseRequestsTest(test_case.TestCase):
         mp_dimensions=machine_provider.Dimensions(
             os_family=machine_provider.OSFamily.LINUX,
         ),
-        request_id_base='not-found',
         target_size=2,
     )
 
@@ -152,7 +147,6 @@ class GenerateLeaseRequestsTest(test_case.TestCase):
             os_family=machine_provider.OSFamily.LINUX,
         ),
         request_count=1,
-        request_id_base='not-found',
         target_size=2,
     )
     machine_type.put()
@@ -168,7 +162,6 @@ class GenerateLeaseRequestsTest(test_case.TestCase):
       mp_dimensions=machine_provider.Dimensions(
           os_family=machine_provider.OSFamily.LINUX,
       ),
-      request_id_base='need-one',
       target_size=1,
     )
     machine_type.put()
@@ -193,7 +186,6 @@ class CleanUpExpiredLeasesTest(test_case.TestCase):
         mp_dimensions=machine_provider.Dimensions(
             os_family=machine_provider.OSFamily.LINUX,
         ),
-        request_id_base='no-leases',
         target_size=2,
     )
 
@@ -221,7 +213,6 @@ class CleanUpExpiredLeasesTest(test_case.TestCase):
         mp_dimensions=machine_provider.Dimensions(
             os_family=machine_provider.OSFamily.LINUX,
         ),
-        request_id_base='no-leases',
         target_size=2,
     )
 
@@ -251,7 +242,6 @@ class CleanUpExpiredLeasesTest(test_case.TestCase):
         pending_deletion=[
           'fake-host-3',
         ],
-        request_id_base='no-leases',
         target_size=2,
     )
 
@@ -277,7 +267,6 @@ class GenerateLeaseRequestStatusUpdatesTest(test_case.TestCase):
         mp_dimensions=machine_provider.Dimensions(
             os_family=machine_provider.OSFamily.LINUX,
         ),
-        request_id_base='no-leases',
         target_size=2,
     )
 
@@ -298,7 +287,6 @@ class GenerateLeaseRequestStatusUpdatesTest(test_case.TestCase):
         mp_dimensions=machine_provider.Dimensions(
             os_family=machine_provider.OSFamily.LINUX,
         ),
-        request_id_base='none-pending',
         target_size=2,
     )
 
@@ -328,7 +316,6 @@ class GenerateLeaseRequestStatusUpdatesTest(test_case.TestCase):
         mp_dimensions=machine_provider.Dimensions(
             os_family=machine_provider.OSFamily.LINUX,
         ),
-        request_id_base='one-pending',
         target_size=2,
     )
 
@@ -357,7 +344,6 @@ class GenerateLeaseRequestsForNewMachinesTest(test_case.TestCase):
         mp_dimensions=machine_provider.Dimensions(
             os_family=machine_provider.OSFamily.LINUX,
         ),
-        request_id_base='at-capacity',
         target_size=2,
     )
 
@@ -371,7 +357,6 @@ class GenerateLeaseRequestsForNewMachinesTest(test_case.TestCase):
       mp_dimensions=machine_provider.Dimensions(
           os_family=machine_provider.OSFamily.LINUX,
       ),
-      request_id_base='need-one',
       target_size=1,
     )
 
@@ -386,7 +371,6 @@ class GenerateLeaseRequestsForNewMachinesTest(test_case.TestCase):
           os_family=machine_provider.OSFamily.LINUX,
       ),
       request_count=2,
-      request_id_base='ensure-correct-request-ids',
       target_size=2,
     )
 
@@ -411,7 +395,6 @@ class UpdateLeasesTest(test_case.TestCase):
       mp_dimensions=machine_provider.Dimensions(
           os_family=machine_provider.OSFamily.LINUX,
       ),
-      request_id_base='fulfilled',
       target_size=2,
     )
     machine_type.put()
@@ -455,7 +438,6 @@ class UpdateLeasesTest(test_case.TestCase):
       mp_dimensions=machine_provider.Dimensions(
           os_family=machine_provider.OSFamily.LINUX,
       ),
-      request_id_base='denied',
       target_size=2,
     )
     machine_type.put()
@@ -486,7 +468,6 @@ class UpdateLeasesTest(test_case.TestCase):
       mp_dimensions=machine_provider.Dimensions(
           os_family=machine_provider.OSFamily.LINUX,
       ),
-      request_id_base='untriaged',
       target_size=2,
     )
     machine_type.put()
@@ -517,7 +498,6 @@ class UpdateLeasesTest(test_case.TestCase):
       mp_dimensions=machine_provider.Dimensions(
           os_family=machine_provider.OSFamily.LINUX,
       ),
-      request_id_base='untriaged',
       target_size=2,
     )
     machine_type.put()
@@ -545,7 +525,6 @@ class UpdateLeasesTest(test_case.TestCase):
       mp_dimensions=machine_provider.Dimensions(
           os_family=machine_provider.OSFamily.LINUX,
       ),
-      request_id_base='errors',
       target_size=2,
     )
     machine_type.put()

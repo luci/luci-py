@@ -58,18 +58,26 @@ update_lease takes the RPC result and updates the pending request entries.
 TODO(smut): Consider request count overflow.
 """
 
+import base64
 import datetime
+import json
 import logging
 
 from google.appengine.ext import ndb
 from google.appengine.ext.ndb import msgprop
 
 from components import machine_provider
+from components import pubsub
 from components import utils
 from server import bot_management
 
 
+# Name of the topic the Machine Provider is authorized to publish
+# lease information to.
 PUBSUB_TOPIC = 'machine-provider'
+
+# Name of the pull subscription to the Machine Provider topic.
+PUBSUB_SUBSCRIPTION = 'machine-provider'
 
 
 class MachineLease(ndb.Model):
@@ -114,8 +122,6 @@ class MachineType(ndb.Model):
   pending_deletion = ndb.StringProperty(indexed=False, repeated=True)
   # Last request number used.
   request_count = ndb.IntegerProperty(default=0, required=True)
-  # Request ID base string.
-  request_id_base = ndb.StringProperty(indexed=False)
   # Target number of machines of this type to have leased at once.
   target_size = ndb.IntegerProperty(indexed=False, required=True)
 
@@ -397,3 +403,60 @@ def update_leases(machine_type_key, responses):
   machine_type.leases = sorted(
       lease_request_map.values(), key=lambda lease: lease.client_request_id)
   machine_type.put()
+
+
+@ndb.tasklet
+def process_message(message, subscription):
+  """Processes a Pub/Sub message from the Machine Provider.
+
+  Args:
+    message: A message dict as returned by pubsub.pull.
+    subscription: Full name of the subscription the message was received on.
+  """
+  now = utils.utcnow()
+
+  try:
+    data = base64.b64decode(message.get('message', {}).get('data', ''))
+    lease_response = json.loads(data)
+    # Machine Provider sends a response including lease_expiration_ts. If
+    # lease_expiration_ts is not in the future and there is no more hostname
+    # associated with the response then this is a reclamation message.
+    lease_expiration_ts = datetime.datetime.utcfromtimestamp(
+        int(lease_response['lease_expiration_ts']))
+    if lease_expiration_ts <= now and not lease_response.get('hostname'):
+      # We used request IDs of the form MachineType.key.id()-<integer>.
+      # Extract the ID for the MachineType from the request ID.
+      machine_type_id = lease_response['client_request_id'].rsplit('-', 1)[0]
+      logging.info('Lease ID %s is expired\nMachineType: %s',
+                   lease_response['client_request_id'],
+                   MachineType.get_by_id(machine_type_id))
+  except (TypeError, ValueError):
+    logging.error('Received unexpected Pub/Sub message:\n%s',
+                  json.dumps(message, indent=2))
+
+  yield pubsub.ack_async(subscription, message['ackId'])
+
+
+def process_pubsub(app_id):
+  """Processes Pub/Sub messages from the Machine Provider, if there are any.
+
+  Args:
+    app_id: ID of the application where the Pub/Sub subscription exists.
+  """
+  MAX_IN_FLIGHT = 50
+  subscription = pubsub.full_subscription_name(app_id, PUBSUB_SUBSCRIPTION)
+  response = pubsub.pull(subscription)
+
+  futures = []
+  messages = response.get('receivedMessages', [])
+  while messages:
+    num_futures = len(futures)
+    if num_futures < MAX_IN_FLIGHT:
+      futures.extend(
+          process_message(message, subscription)
+          for message in messages[:MAX_IN_FLIGHT - num_futures])
+      messages = messages[MAX_IN_FLIGHT - num_futures:]
+    ndb.Future.wait_any(futures)
+    futures = [future for future in futures if not future.done()]
+  if futures:
+    ndb.Future.wait_all(futures)

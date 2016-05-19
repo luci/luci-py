@@ -79,6 +79,18 @@ class CronMachineProviderCleanUpHandler(webapp2.RequestHandler):
     lease_management.clean_up_bots()
 
 
+class CronMachineProviderPubSubHandler(webapp2.RequestHandler):
+  """Listens for Pub/Sub communication from Machine Provider."""
+
+  @decorators.require_cronjob
+  def get(self):
+    taskqueue.add(
+        method='POST', url='/internal/taskqueue/pubsub/machine_provider',
+        queue_name='machine-provider-pubsub')
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    self.response.out.write('Success.')
+
+
 class TaskCleanupDataHandler(webapp2.RequestHandler):
   """Deletes orphaned blobs."""
 
@@ -88,6 +100,15 @@ class TaskCleanupDataHandler(webapp2.RequestHandler):
     # TODO(maruel): Clean up old TaskRequest after a cut-off date.
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
+
+
+class TaskMachineProviderPubSubHandler(webapp2.RequestHandler):
+  """Handles Pub/Sub messages from the Machine Provider."""
+
+  @decorators.require_taskqueue('machine-provider-pubsub')
+  def post(self):
+    app_id = app_identity.get_application_id()
+    lease_management.process_pubsub(app_id)
 
 
 class TaskSendPubSubMessage(webapp2.RequestHandler):
@@ -130,10 +151,14 @@ def get_routes():
     ('/internal/cron/machine_provider', CronMachineProviderBotHandler),
     ('/internal/cron/machine_provider_cleanup',
         CronMachineProviderCleanUpHandler),
+    ('/internal/cron/machine_provider_pubsub',
+        CronMachineProviderPubSubHandler),
 
     # Task queues.
     ('/internal/taskqueue/cleanup_data', TaskCleanupDataHandler),
     (r'/internal/taskqueue/pubsub/<task_id:[0-9a-f]+>', TaskSendPubSubMessage),
+    ('/internal/taskqueue/pubsub/machine_provider',
+        TaskMachineProviderPubSubHandler),
 
     # Mapreduce related urls.
     (r'/internal/taskqueue/mapreduce/launch/<job_id:[^\/]+>',

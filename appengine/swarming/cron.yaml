@@ -26,6 +26,10 @@ cron:
   url: /internal/cron/machine_provider_cleanup
   schedule: every 5 minutes
 
+- description: Enqueue task to handle Pub/Sub messages from Machine Provider.
+  url: /internal/cron/machine_provider_pubsub
+  schedule: every 1 minutes
+
 ### ereporter2
 
 - description: ereporter2 cleanup
