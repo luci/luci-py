@@ -13,13 +13,11 @@ import logging
 import endpoints
 
 from protorpc import message_types
-from protorpc import remote
 from protorpc import util
 
 from . import api
 from . import config
 from . import delegation
-from . import host_token
 from . import ipaddr
 from . import model
 
@@ -251,13 +249,6 @@ def initialize_request_auth(remote_address, headers):
       if current_user is not None:
         raise api.AuthenticationError('Unsupported authentication method')
       identity = model.Anonymous
-
-  # Extract caller host name from host token header, if present and valid.
-  host_tok = headers.get(host_token.HTTP_HEADER)
-  if host_tok:
-    validated_host = host_token.validate_host_token(host_tok)
-    if validated_host:
-      auth_context.peer_host = validated_host
 
   # Verify IP is whitelisted and authenticate requests from bots. It raises
   # AuthorizationError if IP is not allowed.

@@ -23,7 +23,6 @@ from . import acl
 from .. import api
 from .. import change_log
 from .. import handler
-from .. import host_token
 from .. import ipaddr
 from .. import model
 from .. import replication
@@ -48,7 +47,6 @@ def get_rest_api_routes():
     webapp2.Route('/auth/api/v1/change_log', ChangeLogHandler),
     webapp2.Route('/auth/api/v1/groups', GroupsHandler),
     webapp2.Route('/auth/api/v1/groups/<name:%s>' % group_re, GroupHandler),
-    webapp2.Route('/auth/api/v1/host_token', HostTokenHandler),
     webapp2.Route('/auth/api/v1/internal/replication', ReplicationHandler),
     webapp2.Route('/auth/api/v1/ip_whitelists', IPWhitelistsHandler),
     webapp2.Route(
@@ -440,7 +438,6 @@ class SelfHandler(handler.ApiHandler):
   @api.public
   def get(self):
     self.send_response({
-      'host': api.get_peer_host(),
       'identity': api.get_current_identity().to_bytes(),
       'ip': ipaddr.ip_to_string(api.get_peer_ip()),
     })
@@ -729,49 +726,6 @@ class GroupHandler(EntityHandlerBase):
                   ', '.join(grs)),
           details={'groups': grs})
     entity.key.delete()
-
-
-class HostTokenHandler(handler.ApiHandler):
-  """Creates host tokens to put into X-Host-Token-V1 hander.
-
-  See host_token.py for more info.
-
-  Expected request format:
-  {
-    'host': 'host name to make a token for as string',
-    'expiration_sec': <token lifetime in seconds as integer>
-  }
-
-  Response format:
-  {
-    'host_token': <base64 urlsafe host token>
-  }
-  """
-
-  @forbid_api_on_replica
-  @api.require(host_token.can_create_host_token)
-  def post(self):
-    body = self.parse_body()
-
-    # Validate 'host'.
-    if 'host' not in body:
-      self.abort_with_error(400, text='Missing required \'host\' key')
-    host = body['host']
-    if not host_token.is_valid_host(host):
-      self.abort_with_error(400, text='Invalid \'host\' value')
-
-    # Validate 'expiration_sec'.
-    if 'expiration_sec' not in body:
-      self.abort_with_error(400, text='Missing required \'expiration_sec\' key')
-    expiration_sec = body['expiration_sec']
-    if not isinstance(expiration_sec, (int, long, float)):
-      self.abort_with_error(400, text='\'expiration_sec\' should be number')
-    expiration_sec = int(expiration_sec)
-    if expiration_sec < 0:
-      self.abort_with_error(400, text='\'expiration_sec\' can\'t be negative')
-
-    token = host_token.create_host_token(host, expiration_sec)
-    self.send_response({'host_token': token}, http_code=201)
 
 
 class ReplicationHandler(handler.AuthenticatingHandler):

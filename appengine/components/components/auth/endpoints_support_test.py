@@ -18,7 +18,6 @@ from components import utils
 from components.auth import api
 from components.auth import delegation
 from components.auth import endpoints_support
-from components.auth import host_token
 from components.auth import ipaddr
 from components.auth import model
 from components.auth.proto import delegation_pb2
@@ -83,12 +82,6 @@ class EndpointsAuthTest(test_case.TestCase):
     """IP address is stored in auth context."""
     self.call('1.2.3.4', 'user@example.com')
     self.assertEqual(ipaddr.ip_from_string('1.2.3.4'), api.get_peer_ip())
-
-  def test_get_peer_host(self):
-    """Validates caller host (from X-Host-Token) is stored in auth context."""
-    tok = host_token.create_host_token('host-name.domain')
-    self.call('127.0.0.1', 'user@example.com', headers={'X-Host-Token-V1': tok})
-    self.assertEqual('host-name.domain', api.get_peer_host())
 
   def test_delegation_token(self):
     def call(tok=None):

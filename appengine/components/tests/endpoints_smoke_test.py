@@ -46,7 +46,6 @@ class CloudEndpointsSmokeTest(unittest.TestCase):
   def test_smoke(self):
     self.check_who_anonymous()
     self.check_who_authenticated()
-    self.check_host_token()
     self.check_forbidden()
 
   def check_who_anonymous(self):
@@ -65,20 +64,6 @@ class CloudEndpointsSmokeTest(unittest.TestCase):
     response = self.app.client.json_request(
         '/_ah/api/testing_service/v1/forbidden')
     self.assertEqual(403, response.http_code)
-
-  def check_host_token(self):
-    # Create token first.
-    response = self.app.client.json_request(
-        '/_ah/api/testing_service/v1/create_host_token', {'host': 'host-name'})
-    self.assertEqual(200, response.http_code)
-    token = response.body.get('host_token')
-    self.assertTrue(token)
-
-    # Verify it is usable.
-    response = self.app.client.json_request(
-        '/_ah/api/testing_service/v1/who', headers={'X-Host-Token-V1': token})
-    self.assertEqual(200, response.http_code)
-    self.assertEqual('host-name', response.body.get('host'))
 
 
 if __name__ == '__main__':

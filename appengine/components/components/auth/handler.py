@@ -21,7 +21,6 @@ from components import utils
 from . import api
 from . import config
 from . import delegation
-from . import host_token
 from . import ipaddr
 from . import model
 from . import openid
@@ -147,13 +146,6 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     # is used.
     using_headers_auth = method_func in (
         oauth_authentication, service_to_service_authentication)
-
-    # Extract caller host name from host token header, if present and valid.
-    host_tok = self.request.headers.get(host_token.HTTP_HEADER)
-    if host_tok:
-      validated_host = host_token.validate_host_token(host_tok)
-      if validated_host:
-        auth_context.peer_host = validated_host
 
     # Verify IP is whitelisted and authenticate requests from bots.
     assert self.request.remote_addr

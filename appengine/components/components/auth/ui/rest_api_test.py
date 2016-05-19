@@ -22,7 +22,6 @@ from google.appengine.ext import ndb
 from components import utils
 from components.auth import api
 from components.auth import handler
-from components.auth import host_token
 from components.auth import model
 from components.auth import version
 from components.auth.ui import acl
@@ -457,7 +456,6 @@ class SelfHandlerTest(RestAPITestCase):
         extra_environ={'REMOTE_ADDR': '1.2.3.4'})
     self.assertEqual(200, status)
     self.assertEqual({
-      'host': None,
       'identity': 'anonymous:anonymous',
       'ip': '1.2.3.4',
     }, body)
@@ -470,23 +468,7 @@ class SelfHandlerTest(RestAPITestCase):
         extra_environ={'REMOTE_ADDR': '1.2.3.4'})
     self.assertEqual(200, status)
     self.assertEqual({
-      'host': None,
       'identity': 'user:joe@example.com',
-      'ip': '1.2.3.4',
-    }, body)
-
-  def test_host_token(self):
-    # 'create_host_token' call bootstraps 'host_token' secret key internally,
-    # and it bumps AuthDB revision.
-    self.expect_auth_db_rev_change()
-    status, body, _ = self.get(
-        '/auth/api/v1/accounts/self',
-        extra_environ={'REMOTE_ADDR': '1.2.3.4'},
-        headers={'X-Host-Token-V1': host_token.create_host_token('host-name')})
-    self.assertEqual(200, status)
-    self.assertEqual({
-      'host': 'host-name',
-      'identity': 'anonymous:anonymous',
       'ip': '1.2.3.4',
     }, body)
 
@@ -1379,65 +1361,6 @@ class IPWhitelistsHandlerTest(RestAPITestCase):
           },
         ],
       }, body)
-
-
-class HostTokenHandlerTest(RestAPITestCase):
-  """Tests for POST /auth/api/v1/host_token."""
-
-  def setUp(self):
-    super(HostTokenHandlerTest, self).setUp()
-    self.mock(host_token, 'create_host_token', lambda *_: 'hosttoken')
-    self.mock_is_admin(True)
-
-  def call(self, host, expiration_sec, expect_errors=False):
-    body = {}
-    if host is not None:
-      body['host'] = host
-    if expiration_sec is not None:
-      body['expiration_sec'] = expiration_sec
-    status, response, _ = self.post(
-        path='/auth/api/v1/host_token',
-        body=body,
-        expect_xsrf_token_check=True,
-        expect_errors=expect_errors)
-    return status, response
-
-  def test_works(self):
-    status, response = self.call('host-name', 120)
-    self.assertEqual(201, status)
-    self.assertEqual({'host_token': 'hosttoken'}, response)
-
-  def test_works_with_float_expiration_time(self):
-    status, response = self.call('host-name', 120.5)
-    self.assertEqual(201, status)
-    self.assertEqual({'host_token': 'hosttoken'}, response)
-
-  def test_missing_host(self):
-    status, response = self.call(None, 120, expect_errors=True)
-    self.assertEqual(400, status)
-    self.assertEqual({'text': 'Missing required \'host\' key'}, response)
-
-  def test_bad_host(self):
-    status, response = self.call('not a host', 120, expect_errors=True)
-    self.assertEqual(400, status)
-    self.assertEqual({'text': 'Invalid \'host\' value'}, response)
-
-  def test_missing_expiration(self):
-    status, response = self.call('host-name', None, expect_errors=True)
-    self.assertEqual(400, status)
-    self.assertEqual(
-        {'text': 'Missing required \'expiration_sec\' key'}, response)
-
-  def test_bad_expiration_not_number(self):
-    status, response = self.call('host-name', 'not a num', expect_errors=True)
-    self.assertEqual(400, status)
-    self.assertEqual({'text': '\'expiration_sec\' should be number'}, response)
-
-  def test_bad_expiration_negative(self):
-    status, response = self.call('host-name', -1, expect_errors=True)
-    self.assertEqual(400, status)
-    self.assertEqual(
-        {'text': '\'expiration_sec\' can\'t be negative'}, response)
 
 
 class IPWhitelistHandlerTest(RestAPITestCase):

@@ -15,9 +15,6 @@ import unittest
 from test_support import test_env
 test_env.setup_test_env()
 
-from google.appengine.api import oauth
-from google.appengine.api import users
-
 import webapp2
 import webtest
 
@@ -25,7 +22,6 @@ from components import utils
 from components.auth import api
 from components.auth import delegation
 from components.auth import handler
-from components.auth import host_token
 from components.auth import ipaddr
 from components.auth import model
 from components.auth.proto import delegation_pb2
@@ -385,32 +381,6 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     app = self.make_test_app('/request', Handler)
     response = app.get('/request', extra_environ={'REMOTE_ADDR': '192.1.2.3'})
     self.assertEqual('192.1.2.3', response.body)
-
-  def test_get_peer_host(self):
-    class Handler(handler.AuthenticatingHandler):
-      @api.public
-      def get(self):
-        self.response.write(api.get_peer_host() or '<none>')
-
-    app = self.make_test_app('/request', Handler)
-    def call(headers):
-      api.reset_local_state()
-      return app.get('/request', headers=headers).body
-
-    # Good token.
-    token = host_token.create_host_token('HOST.domain.com')
-    self.assertEqual('host.domain.com', call({'X-Host-Token-V1': token}))
-
-    # Missing or invalid tokens.
-    self.assertEqual('<none>', call({}))
-    self.assertEqual('<none>', call({'X-Host-Token-V1': 'broken'}))
-
-    # Expired token.
-    origin = datetime.datetime(2014, 1, 1, 1, 1, 1)
-    self.mock_now(origin)
-    token = host_token.create_host_token('HOST.domain.com', expiration_sec=60)
-    self.mock_now(origin, 61)
-    self.assertEqual('<none>', call({'X-Host-Token-V1': token}))
 
   def test_delegation_token(self):
     peer_ident = model.Identity.from_bytes('user:peer@a.com')

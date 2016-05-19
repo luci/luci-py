@@ -26,7 +26,6 @@ utils.fix_protobuf_package()
 from api import *
 from delegation import *
 from handler import *
-from host_token import *
 from ipaddr import *
 from model import *
 from service_account import *

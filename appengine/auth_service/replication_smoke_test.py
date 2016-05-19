@@ -61,7 +61,6 @@ class ReplicationTest(unittest.TestCase):
     self.check_group_replication()
     self.check_ip_whitelist_replication()
     self.check_snapshot_endpoint()
-    self.check_host_token_usage()
     self.check_delegation_token_usage()
 
   def link_replica_to_primary(self):
@@ -167,14 +166,16 @@ class ReplicationTest(unittest.TestCase):
 
     # Read it back from primary to grab created_ts and modified_ts.
     response = self.auth_service.client.json_request(
-        '/auth/api/v1/groups/some-group')
+        '/auth/api/v1/groups/some-group',
+        headers={'Cache-Control': 'no-cache'})
     self.assertEqual(200, response.http_code)
     group = response.body
 
     # Ensure replica got the update.
     self.wait_for_sync()
     response = self.replica.client.json_request(
-        '/auth/api/v1/groups/some-group')
+        '/auth/api/v1/groups/some-group',
+        headers={'Cache-Control': 'no-cache'})
     self.assertEqual(200, response.http_code)
     self.assertEqual(group, response.body)
 
@@ -195,14 +196,16 @@ class ReplicationTest(unittest.TestCase):
 
     # Read it back from primary to grab created_ts and modified_ts.
     response = self.auth_service.client.json_request(
-        '/auth/api/v1/groups/some-group')
+        '/auth/api/v1/groups/some-group',
+        headers={'Cache-Control': 'no-cache'})
     self.assertEqual(200, response.http_code)
     group = response.body
 
     # Ensure replica got the update.
     self.wait_for_sync()
     response = self.replica.client.json_request(
-        '/auth/api/v1/groups/some-group')
+        '/auth/api/v1/groups/some-group',
+        headers={'Cache-Control': 'no-cache'})
     self.assertEqual(200, response.http_code)
     self.assertEqual(group, response.body)
 
@@ -216,7 +219,8 @@ class ReplicationTest(unittest.TestCase):
     # Ensure replica got the update.
     self.wait_for_sync()
     response = self.replica.client.json_request(
-        '/auth/api/v1/groups/some-group')
+        '/auth/api/v1/groups/some-group',
+        headers={'Cache-Control': 'no-cache'})
     self.assertEqual(404, response.http_code)
 
   def check_ip_whitelist_replication(self):
@@ -239,26 +243,6 @@ class ReplicationTest(unittest.TestCase):
     deflated = base64.b64decode(latest['deflated_body'])
     self.assertEqual(
         latest['sha256'], hashlib.sha256(zlib.decompress(deflated)).hexdigest())
-
-  def check_host_token_usage(self):
-    logging.info('Generating host token in primary')
-    response = self.auth_service.client.json_request(
-        resource='/auth/api/v1/host_token',
-        body={'host': 'some-host-name.domain.com', 'expiration_sec': 3600},
-        headers={'X-XSRF-Token': self.auth_service.client.xsrf_token})
-    self.assertEqual(201, response.http_code)
-    host_token = response.body['host_token']
-
-    # Wait for replica to get bootstrapped secret key used to create host token.
-    self.wait_for_sync()
-
-    # Ensure replica understands X-Host-Token-V1 header.
-    logging.info('Sending host token to replica')
-    response = self.replica.client.json_request(
-        resource='/auth/api/v1/accounts/self',
-        headers={'X-Host-Token-V1': host_token})
-    self.assertEqual(200, response.http_code)
-    self.assertEqual('some-host-name.domain.com', response.body.get('host'))
 
   def check_delegation_token_usage(self):
     logging.info('Generating delegation token for test@example.com')

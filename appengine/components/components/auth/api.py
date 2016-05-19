@@ -40,7 +40,6 @@ __all__ = [
   'Error',
   'get_current_identity',
   'get_peer_identity',
-  'get_peer_host',
   'get_peer_ip',
   'get_process_cache_expiration_sec',
   'get_secret',
@@ -502,7 +501,6 @@ class RequestCache(object):
   def __init__(self):
     self._auth_db = None
     self._current_identity = None
-    self._peer_host = None
     self._peer_identity = None
     self._peer_ip = None
 
@@ -527,17 +525,6 @@ class RequestCache(object):
     assert current_identity
     assert not self._current_identity
     self._current_identity = current_identity
-
-  @property
-  def peer_host(self):
-    return self._peer_host
-
-  @peer_host.setter
-  def peer_host(self, peer_host):
-    """Called for requests that provide valid X-Host-Token header."""
-    assert peer_host
-    assert not self._peer_host
-    self._peer_host = peer_host
 
   @property
   def peer_identity(self):
@@ -569,7 +556,6 @@ class RequestCache(object):
     """Helps GC to collect garbage faster."""
     self._auth_db = None
     self._current_identity = None
-    self._peer_host = None
     self._peer_identity = None
     self._peer_ip = None
 
@@ -826,11 +812,6 @@ def get_peer_identity():
     * For Cloud Endpoints see endpoints_support.py.
   """
   return get_request_cache().peer_identity
-
-
-def get_peer_host():
-  """Returns hostname extracted from X-Host-Token header or None if missing."""
-  return get_request_cache().peer_host
 
 
 def get_peer_ip():
