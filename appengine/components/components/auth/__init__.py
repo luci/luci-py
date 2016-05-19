@@ -27,6 +27,7 @@ from api import *
 from delegation import *
 from handler import *
 from ipaddr import *
+from machine_auth import *
 from model import *
 from service_account import *
 from signature import *

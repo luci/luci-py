@@ -8,21 +8,18 @@ import base64
 import json
 import logging
 import re
-import textwrap
 
 import webob
 import webapp2
 
 from google.appengine.api import app_identity
-from google.appengine.api import datastore_errors
-from google.appengine.datastore import datastore_query
 from google.appengine import runtime
-from google.appengine.ext import ndb
 
 from components import auth
 from components import ereporter2
 from components import utils
 from server import acl
+from server import bot_auth
 from server import bot_code
 from server import bot_management
 from server import stats
@@ -94,7 +91,38 @@ def has_missing_keys(minimum_keys, actual_keys, name):
     return 'Unexpected %s%s; did you make a typo?' % (name, msg_missing)
 
 
-class BootstrapHandler(auth.AuthenticatingHandler):
+class _BotApiHandler(auth.ApiHandler):
+  """Like ApiHandler, but also implements machine authentication."""
+
+  # Bots are passing credentials through special headers (not cookies), no need
+  # for XSRF tokens.
+  xsrf_token_enforce_on = ()
+
+  @classmethod
+  def get_auth_methods(cls, conf):
+    return [auth.machine_authentication, auth.oauth_authentication]
+
+
+class _BotAuthenticatingHandler(auth.AuthenticatingHandler):
+  """Like AuthenticatingHandler, but also implements machine authentication.
+
+  Unlike _BotApiHandler handlers, _BotAuthenticatingHandler handler don't check
+  dimensions or bot_id, since they are not yet known when this handler is
+  called. They merely check that the bot credentials are known to the server.
+
+  _BotAuthenticatingHandler is used during bot bootstrap and self-update.
+  """
+
+  # Bots are passing credentials through special headers (not cookies), no need
+  # for XSRF tokens.
+  xsrf_token_enforce_on = ()
+
+  @classmethod
+  def get_auth_methods(cls, conf):
+    return [auth.machine_authentication, auth.oauth_authentication]
+
+
+class BootstrapHandler(_BotAuthenticatingHandler):
   """Returns python code to run to bootstrap a swarming bot."""
 
   @auth.require(acl.is_bot)
@@ -106,7 +134,7 @@ class BootstrapHandler(auth.AuthenticatingHandler):
         bot_code.get_bootstrap(self.request.host_url).content)
 
 
-class BotCodeHandler(auth.AuthenticatingHandler):
+class BotCodeHandler(_BotAuthenticatingHandler):
   """Returns a zip file with all the files required by a bot.
 
   Optionally specify the hash version to download. If so, the returned data is
@@ -131,7 +159,7 @@ class BotCodeHandler(auth.AuthenticatingHandler):
         bot_code.get_swarming_bot_zip(self.request.host_url))
 
 
-class _BotBaseHandler(auth.ApiHandler):
+class _BotBaseHandler(_BotApiHandler):
   """
   Request body is a JSON dict:
     {
@@ -143,9 +171,6 @@ class _BotBaseHandler(auth.ApiHandler):
 
   EXPECTED_KEYS = {u'dimensions', u'state', u'version'}
   REQUIRED_STATE_KEYS = {u'running_time', u'sleep_streak'}
-
-  # TODO(vadimsh): Remove once bots use X-Whitelisted-Bot-Id or OAuth.
-  xsrf_token_enforce_on = ()
 
   def _process(self):
     """Returns True if the bot has invalid parameter and should be automatically
@@ -167,6 +192,14 @@ class _BotBaseHandler(auth.ApiHandler):
       if (isinstance(dimension_id, list) and len(dimension_id) == 1
           and isinstance(dimension_id[0], unicode)):
         bot_id = dimensions['id'][0]
+
+    # Make sure bot self-reported ID matches the authentication token.
+    bot_auth.validate_bot_id(bot_id)
+
+    # Inject server-defined (and thus trusted) dimensions. Specifically ignore
+    # dimensions with same key that bot reports (override them), they cannot be
+    # trusted.
+    dimensions.update(bot_auth.fetch_trusted_dimensions(bot_id))
 
     # The bot may decide to "self-quarantine" itself. Accept both via
     # dimensions or via state. See bot_management._BotCommon.quarantined for
@@ -235,12 +268,12 @@ class _BotBaseHandler(auth.ApiHandler):
 
 
 class BotHandshakeHandler(_BotBaseHandler):
-  """First request to be called to get initial data like XSRF token.
+  """First request to be called to get initial data like bot code version.
 
-  The bot is server-controled so the server doesn't have to support multiple API
-  version. When running a task, the bot sync the the version specific URL. Once
-  abot finished its currently running task, it'll be immediately be upgraded
-  after on its next poll.
+  The bot is server-controlled so the server doesn't have to support multiple
+  API version. When running a task, the bot sync the the version specific URL.
+  Once a bot finishes its currently running task, it'll be immediately upgraded
+  on its next poll.
 
   This endpoint does not return commands to the bot, for example to upgrade
   itself. It'll be told so when it does its first poll.
@@ -469,7 +502,7 @@ class BotEventHandler(_BotBaseHandler):
     self.send_response({})
 
 
-class BotTaskUpdateHandler(auth.ApiHandler):
+class BotTaskUpdateHandler(_BotApiHandler):
   """Receives updates from a Bot for a task.
 
   The handler verifies packets are processed in order and will refuse
@@ -481,9 +514,6 @@ class BotTaskUpdateHandler(auth.ApiHandler):
     u'output_chunk_start', u'outputs_ref', u'task_id',
   }
   REQUIRED_KEYS = {u'id', u'task_id'}
-
-  # TODO(vadimsh): Remove once bots use X-Whitelisted-Bot-Id or OAuth.
-  xsrf_token_enforce_on = ()
 
   @auth.require(acl.is_bot)
   def post(self, task_id=None):
@@ -499,6 +529,9 @@ class BotTaskUpdateHandler(auth.ApiHandler):
     bot_id = request['id']
     cost_usd = request['cost_usd']
     task_id = request['task_id']
+
+    # Make sure bot self-reported ID matches the authentication token.
+    bot_auth.validate_bot_id(bot_id)
 
     bot_overhead = request.get('bot_overhead')
     duration = request.get('duration')
@@ -606,7 +639,7 @@ class BotTaskUpdateHandler(auth.ApiHandler):
     self.send_response({'ok': True})
 
 
-class BotTaskErrorHandler(auth.ApiHandler):
+class BotTaskErrorHandler(_BotApiHandler):
   """It is a specialized version of ereporter2's /ereporter2/api/v1/on_error
   that also attaches a task id to it.
 
@@ -616,15 +649,15 @@ class BotTaskErrorHandler(auth.ApiHandler):
 
   EXPECTED_KEYS = {u'id', u'message', u'task_id'}
 
-  # TODO(vadimsh): Remove once bots use X-Whitelisted-Bot-Id or OAuth.
-  xsrf_token_enforce_on = ()
-
   @auth.require(acl.is_bot)
   def post(self, task_id=None):
     request = self.parse_body()
     bot_id = request.get('id')
     task_id = request.get('task_id', '')
     message = request.get('message', 'unknown')
+
+    # Make sure bot self-reported ID matches the authentication token.
+    bot_auth.validate_bot_id(bot_id)
 
     bot_management.bot_event(
         event_type='task_error', bot_id=bot_id,

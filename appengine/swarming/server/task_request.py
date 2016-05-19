@@ -666,7 +666,7 @@ def validate_request_key(request_key):
             root_entity_shard_id))
 
 
-def make_request(request, is_bot_or_admin):
+def make_request(request, allow_high_priority):
   """Registers the request in the DB.
 
   Fills up some values.
@@ -691,7 +691,7 @@ def make_request(request, is_bot_or_admin):
     request.user = parent.user
 
   # If the priority is below 100, make sure the user has right to do so.
-  if request.priority < 100 and not is_bot_or_admin:
+  if request.priority < 100 and not allow_high_priority:
     # Silently drop the priority of normal users.
     request.priority = 100
 

@@ -7,12 +7,16 @@
 from components import auth
 from components import utils
 
+from server import bot_auth
+
 
 # Names of groups.
 # See https://code.google.com/p/swarming/wiki/SwarmingAccessGroups for each
 # level.
+#
+# TODO(vadimsh): Move them to the config.
 ADMINS_GROUP = 'swarming-admins'
-BOTS_GROUP = 'swarming-bots'
+BOTS_GROUP = bot_auth.BOTS_GROUP
 PRIVILEGED_USERS_GROUP = 'swarming-privileged-users'
 USERS_GROUP = 'swarming-users'
 
@@ -22,7 +26,7 @@ def is_admin():
 
 
 def is_bot():
-  return auth.is_group_member(BOTS_GROUP) or is_admin()
+  return bot_auth.is_known_bot() or is_admin()
 
 
 def is_privileged_user():
@@ -34,15 +38,21 @@ def is_user():
 
 
 def is_bot_or_user():
+  # TODO(vadimsh): Get rid of this. Swarming jobs will use service accounts
+  # associated with the job when calling Swarming, not the machine ID itself.
   return is_bot() or is_user()
 
 
 def is_bot_or_privileged_user():
+  # TODO(vadimsh): Get rid of this. Swarming jobs will use service accounts
+  # associated with the job when calling Swarming, not the machine ID itself.
   return is_bot() or is_privileged_user()
 
 
 def is_bot_or_admin():
   """Returns True if current user can execute user-side and bot-side calls."""
+  # TODO(vadimsh): Get rid of this. Swarming jobs will use service accounts
+  # associated with the job when calling Swarming, not the machine ID itself.
   return is_bot() or is_admin()
 
 
@@ -54,8 +64,6 @@ def get_user_type():
     return 'privileged user'
   if is_user():
     return 'user'
-  if is_bot():
-    return 'bot'
   return 'unknown user'
 
 

@@ -329,53 +329,34 @@ class AuthDBTest(test_case.TestCase):
     # Should not raise: IP is whitelisted.
     ident = model.Identity(model.IDENTITY_USER, 'a@example.com')
     result = self.make_auth_db_with_ip_whitelist().verify_ip_whitelisted(
-        ident, ipaddr.ip_from_string('127.0.0.1'), {})
+        ident, ipaddr.ip_from_string('127.0.0.1'))
     self.assertEqual(ident, result)
 
   def test_verify_ip_whitelisted_not_whitelisted(self):
     with self.assertRaises(api.AuthorizationError):
       self.make_auth_db_with_ip_whitelist().verify_ip_whitelisted(
           model.Identity(model.IDENTITY_USER, 'a@example.com'),
-          ipaddr.ip_from_string('192.168.0.100'), {})
+          ipaddr.ip_from_string('192.168.0.100'))
 
   def test_verify_ip_whitelisted_bot(self):
     # Should convert Anonymous to bot, 192.168.1.1 is in 'bots' whitelist.
     result = self.make_auth_db_with_ip_whitelist().verify_ip_whitelisted(
-        model.Anonymous, ipaddr.ip_from_string('192.168.1.1'), {})
+        model.Anonymous, ipaddr.ip_from_string('192.168.1.1'))
     self.assertEqual(
         model.Identity(model.IDENTITY_BOT, 'whitelisted-ip'), result)
 
   def test_verify_ip_whitelisted_bot_ipv6_loopback(self):
     # Should convert Anonymous as bot, 192.168.1.1 is in 'bots' whitelist.
     result = self.make_auth_db_with_ip_whitelist().verify_ip_whitelisted(
-        model.Anonymous, ipaddr.ip_from_string('::1'), {})
+        model.Anonymous, ipaddr.ip_from_string('::1'))
     self.assertEqual(
         model.Identity(model.IDENTITY_BOT, 'whitelisted-ip'), result)
-
-  def test_verify_ip_whitelisted_bot_with_x_header(self):
-    # Should convert Anonymous to bot, 192.168.1.1 is in 'bots' whitelist.
-    headers = {
-      'X-Whitelisted-Bot-Id': 'bot-id',
-    }
-    result = self.make_auth_db_with_ip_whitelist().verify_ip_whitelisted(
-        model.Anonymous, ipaddr.ip_from_string('192.168.1.1'), headers)
-    self.assertEqual(model.Identity(model.IDENTITY_BOT, 'bot-id'), result)
-
-  def test_verify_ip_whitelisted_not_bot_with_x_header(self):
-    # X-Whitelisted-Bot-Id is forbidden for non-bots.
-    ident = model.Identity(model.IDENTITY_USER, 'a@example.com')
-    headers = {
-      'X-Whitelisted-Bot-Id': 'bot-id',
-    }
-    with self.assertRaises(api.AuthorizationError):
-      self.make_auth_db_with_ip_whitelist().verify_ip_whitelisted(
-          ident, ipaddr.ip_from_string('127.0.0.1'), headers)
 
   def test_verify_ip_whitelisted_not_assigned(self):
     # Should not raise: whitelist is not required for another_user@example.com.
     ident = model.Identity(model.IDENTITY_USER, 'another_user@example.com')
     result = self.make_auth_db_with_ip_whitelist().verify_ip_whitelisted(
-        ident, ipaddr.ip_from_string('192.168.0.100'), {})
+        ident, ipaddr.ip_from_string('192.168.0.100'))
     self.assertEqual(ident, result)
 
   def test_verify_ip_whitelisted_missing_whitelist(self):
@@ -391,7 +372,7 @@ class AuthDBTest(test_case.TestCase):
     with self.assertRaises(api.AuthorizationError):
       auth_db.verify_ip_whitelisted(
           model.Identity(model.IDENTITY_USER, 'a@example.com'),
-          ipaddr.ip_from_string('127.0.0.1'), {})
+          ipaddr.ip_from_string('127.0.0.1'))
 
 
 class TestAuthDBCache(test_case.TestCase):

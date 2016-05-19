@@ -153,8 +153,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     auth_context.peer_ip = ip
     try:
       # 'verify_ip_whitelisted' may change identity for bots, store new one.
-      auth_context.peer_identity = api.verify_ip_whitelisted(
-          identity, ip, self.request.headers)
+      auth_context.peer_identity = api.verify_ip_whitelisted(identity, ip)
     except api.AuthorizationError as err:
       self.authorization_error(err)
       return

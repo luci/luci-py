@@ -716,7 +716,6 @@ class RootHandler(auth.AuthenticatingHandler):
     params = {
       'host_url': self.request.host_url,
       'is_admin': acl.is_admin(),
-      'is_bot': acl.is_bot(),
       'is_privileged_user': acl.is_privileged_user(),
       'is_user': acl.is_user(),
       'mapreduce_jobs': [],
