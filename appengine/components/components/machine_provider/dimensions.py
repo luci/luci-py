@@ -11,6 +11,7 @@ class Backend(messages.Enum):
   """Lists valid backends."""
   DUMMY = 0
   GCE = 1
+  VSPHERE = 2
 
 
 class OSFamily(messages.Enum):
