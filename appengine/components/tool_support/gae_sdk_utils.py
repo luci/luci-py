@@ -366,6 +366,8 @@ class Application(object):
     except KeyError as e:
       raise ValueError('Unknown module: %s' % e)
     if reg_modules:
+      # Always make 'default' the first module to be uploaded.
+      reg_modules.sort(key=lambda x: '' if x == 'default' else x)
       self.run_appcfg(
           ['update'] + [m.path for m in reg_modules] + ['--version', version])
     # Go modules have to be deployed one at a time, based on docs.
