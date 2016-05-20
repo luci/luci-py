@@ -3,6 +3,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import collections
 import sys
 import unittest
 
@@ -21,7 +22,44 @@ except ImportError:
   has_pycrypto = False
 
 
+FetchResult = collections.namedtuple('FetchResult', ['status_code', 'content'])
+
+
+FAKE_SERVICE_ACCOUNT_CERTS = """
+{
+ "faffca3b64d5bb61da829ace9aed119dceb2f63c": "abc",
+ "cba74246d54580c5ee7a6a778c997a7cb1abc918": "def"
+}
+"""
+
 class SignatureTest(test_case.TestCase):
+  def test_get_service_account_certificates(self):
+    def do_fetch(url, **_kwargs):
+      self.assertEqual(
+        url,
+        'https://www.googleapis.com/robot/v1/metadata/x509/'
+        '123%40appspot.gserviceaccount.com')
+      return FetchResult(200, FAKE_SERVICE_ACCOUNT_CERTS)
+    self.mock(signature.urlfetch, 'fetch', do_fetch)
+
+    certs = signature.get_service_account_certificates(
+        '123@appspot.gserviceaccount.com')
+    certs.pop('timestamp')
+    self.assertEqual(certs, {'certificates': [
+      {
+        'key_name': u'cba74246d54580c5ee7a6a778c997a7cb1abc918',
+        'x509_certificate_pem': u'def',
+      },
+      {
+        'key_name': u'faffca3b64d5bb61da829ace9aed119dceb2f63c',
+        'x509_certificate_pem': u'abc',
+      },
+    ]})
+    self.assertEqual(
+        signature.get_x509_certificate_by_name(
+            certs, 'cba74246d54580c5ee7a6a778c997a7cb1abc918'),
+        'def')
+
   def test_get_x509_certificate_by_name_ok(self):
     certs = signature.get_own_public_certificates()
     self.assertTrue(certs)

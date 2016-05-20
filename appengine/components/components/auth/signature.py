@@ -11,6 +11,7 @@ functions, and thus private keys are managed by GAE.
 import base64
 import json
 import logging
+import urllib
 
 from google.appengine.api import app_identity
 from google.appengine.api import memcache
@@ -26,6 +27,7 @@ __all__ = [
   'check_signature',
   'get_own_public_certificates',
   'get_service_public_certificates',
+  'get_service_account_certificates',
   'get_x509_certificate_by_name',
   'sign_blob',
 ]
@@ -114,6 +116,71 @@ def get_service_public_certificates(service_url):
   # All attempts failed, give up.
   msg = 'Failed to grab public certs from %s (HTTP code %s)' % (
       service_url, result.status_code if result else '???')
+  raise CertificateError(msg, transient=True)
+
+
+def get_service_account_certificates(service_account_email):
+  """Returns jsonish object with public certificates of a service account.
+
+  Works only for Google Cloud Platform service accounts.
+
+  Returned object is similar to what get_service_public_certificates returns
+  and can be passed to get_x509_certificate_by_name.
+
+  Raises CertificateError on errors.
+  """
+  cache_key = 'service_account_certs:%s' % service_account_email
+  certs = memcache.get(cache_key)
+  if certs:
+    return certs
+
+  url = 'https://www.googleapis.com/robot/v1/metadata/x509/'
+  url += urllib.quote_plus(service_account_email)
+
+  # Retry code is adapted from components/net.py. net.py can't be used directly
+  # since it depends on components.auth (and dependency cycles between
+  # components are bad).
+  attempt = 0
+  result = None
+  while attempt < 4:
+    if attempt:
+      logging.info('Retrying...')
+    attempt += 1
+    logging.info('GET %s', url)
+    try:
+      result = urlfetch.fetch(
+          url=url,
+          method='GET',
+          follow_redirects=False,
+          deadline=5,
+          validate_certificate=True)
+    except (apiproxy_errors.DeadlineExceededError, urlfetch.Error) as e:
+      # Transient network error or URL fetch service RPC deadline.
+      logging.warning('GET %s failed: %s', url, e)
+      continue
+    # It MUST return 200 on success, it can't return 403, 404 or >=500.
+    if result.status_code != 200:
+      logging.warning(
+          'GET %s failed, HTTP %d: %r', url, result.status_code, result.content)
+      continue
+    # Success. Convert to the format used by get_x509_certificate_by_name().
+    response = json.loads(result.content)
+    certs = {
+      'certificates': [
+        {
+          'key_name': key_name,
+          'x509_certificate_pem': pem,
+        }
+        for key_name, pem in sorted(response.iteritems())
+      ],
+      'timestamp': utils.datetime_to_timestamp(utils.utcnow()),
+    }
+    memcache.set(cache_key, certs, time=3600)
+    return certs
+
+  # All attempts failed, give up.
+  msg = 'Failed to grab service account certs for %s (HTTP code %s)' % (
+      service_account_email, result.status_code if result else '???')
   raise CertificateError(msg, transient=True)
 
 
