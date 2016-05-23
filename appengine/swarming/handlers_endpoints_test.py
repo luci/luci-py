@@ -1393,18 +1393,15 @@ class BotApiTest(BaseTest):
 
     self.set_as_bot()
     self.client_create_task_raw()
-    token, _ = self.get_bot_token()
     res = self.bot_poll()
-    self.bot_complete_task(token, task_id=res['manifest']['task_id'])
+    self.bot_complete_task(task_id=res['manifest']['task_id'])
 
     now_1 = self.mock_now(now, 1)
     now_1_str = unicode(now_1.strftime(self.DATETIME_FORMAT))
     self.mock(random, 'getrandbits', lambda _: 0x55)
     self.client_create_task_raw(name='philbert')
-    token, _ = self.get_bot_token()
     res = self.bot_poll()
-    self.bot_complete_task(
-        token, exit_code=1, task_id=res['manifest']['task_id'])
+    self.bot_complete_task(exit_code=1, task_id=res['manifest']['task_id'])
 
     start = (
         utils.datetime_to_timestamp(now + datetime.timedelta(seconds=0.5)) /
@@ -1478,15 +1475,15 @@ class BotApiTest(BaseTest):
 
     self.set_as_bot()
     self.client_create_task_raw()
-    token, params = self.get_bot_token()
+    params = self.do_handshake()
     res = self.bot_poll()
     now_60 = self.mock_now(now, 60)
     str_now_60 = unicode(now_60.strftime(self.DATETIME_NO_MICRO))
-    self.bot_complete_task(token, task_id=res['manifest']['task_id'])
+    self.bot_complete_task(task_id=res['manifest']['task_id'])
 
     params['event'] = 'bot_rebooting'
     params['message'] = 'for the best'
-    response = self.post_with_token('/swarming/api/v1/bot/event', params, token)
+    response = self.post_json('/swarming/api/v1/bot/event', params)
     self.assertEqual({}, response)
 
     start = utils.datetime_to_timestamp(now) / 1000000.

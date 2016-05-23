@@ -22,7 +22,6 @@ from google.appengine.ext import deferred
 import handlers_frontend
 from components import template
 from server import bot_management
-from server import config
 
 
 class AppTestBase(test_env_handlers.AppTestBase):
@@ -191,9 +190,9 @@ class FrontendTest(AppTestBase):
     self.app.get('/user/task/%s' % task_id, status=200)
 
     self.set_as_bot()
-    token, _ = self.get_bot_token()
+    self.do_handshake()
     reaped = self.bot_poll()
-    self.bot_complete_task(token, task_id=reaped['manifest']['task_id'])
+    self.bot_complete_task(task_id=reaped['manifest']['task_id'])
     # Add unicode chars.
 
     # This can only work once a bot reaped the task.
@@ -276,9 +275,8 @@ class FrontendTest(AppTestBase):
     self.set_as_privileged_user()
     self.client_create_task_raw()
     self.set_as_bot()
-    token, _ = self.get_bot_token()
     reaped = self.bot_poll()
-    self.bot_complete_task(token, task_id=reaped['manifest']['task_id'])
+    self.bot_complete_task(task_id=reaped['manifest']['task_id'])
     self.set_as_privileged_user()
     self.app.get('/user/tasks?task_tag=yo:dawg', status=200)
     for sort, state in self._sort_state_product():

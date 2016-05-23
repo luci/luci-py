@@ -28,7 +28,6 @@ from components import ereporter2
 from components import utils
 from server import bot_archive
 from server import bot_management
-from server import task_result
 
 
 DATETIME_FORMAT = u'%Y-%m-%dT%H:%M:%S'
@@ -59,7 +58,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
       self.assertEqual('bot', source)
       errors.append(message)
     self.mock(ereporter2, 'log_request', add_error)
-    headers = {'X-XSRF-Token-Request': '1'}
     params = {
       'dimensions': {
         'id': ['id1'],
@@ -69,11 +67,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
       'version': '1',
     }
     response = self.app.post_json(
-        '/swarming/api/v1/bot/handshake', headers=headers, params=params).json
+        '/swarming/api/v1/bot/handshake', params=params).json
     self.assertEqual(
-        [u'bot_version', u'expiration_sec', u'server_version', u'xsrf_token'],
+        [u'bot_version', u'server_version'],
         sorted(response))
-    self.assertTrue(response['xsrf_token'])
     self.assertEqual(40, len(response['bot_version']))
     self.assertEqual(u'v1a', response['server_version'])
     self.assertEqual([], errors)
@@ -85,13 +82,11 @@ class BotApiTest(test_env_handlers.AppTestBase):
       self.assertEqual('bot', source)
       errors.append(message)
     self.mock(ereporter2, 'log_request', add_error)
-    headers = {'X-XSRF-Token-Request': '1'}
     response = self.app.post_json(
-        '/swarming/api/v1/bot/handshake', headers=headers, params={}).json
+        '/swarming/api/v1/bot/handshake', params={}).json
     self.assertEqual(
-        [u'bot_version', u'expiration_sec', u'server_version', u'xsrf_token'],
+        [u'bot_version', u'server_version'],
         sorted(response))
-    self.assertTrue(response['xsrf_token'])
     self.assertEqual(40, len(response['bot_version']))
     self.assertEqual(u'v1a', response['server_version'])
     expected = [
@@ -108,7 +103,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
       self.assertEqual('bot', source)
       errors.append(message)
     self.mock(ereporter2, 'log_request', add_error)
-    headers = {'X-XSRF-Token-Request': '1'}
     params = {
       # Works with unknown items but logs an error. This permits catching typos.
       'foo': 1,
@@ -123,11 +117,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
       'version': '123',
     }
     response = self.app.post_json(
-        '/swarming/api/v1/bot/handshake', headers=headers, params=params).json
+        '/swarming/api/v1/bot/handshake', params=params).json
     self.assertEqual(
-        [u'bot_version', u'expiration_sec',u'server_version', u'xsrf_token'],
+        [u'bot_version', u'server_version'],
         sorted(response))
-    self.assertTrue(response['xsrf_token'])
     self.assertEqual(40, len(response['bot_version']))
     self.assertEqual(u'v1a', response['server_version'])
     expected = [
@@ -145,10 +138,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
       self.assertEqual('bot', source)
       errors.append(message)
     self.mock(ereporter2, 'log_request', add_error)
-    token, params = self.get_bot_token()
+    params = self.do_handshake()
     params.pop('dimensions')
     params.pop('state')
-    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
     expected = {
       u'cmd': u'sleep',
       u'quarantined': True,
@@ -163,10 +156,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, errors)
 
   def test_poll_bad_version(self):
-    token, params = self.get_bot_token()
+    params = self.do_handshake()
     old_version = params['version']
     params['version'] = 'badversion'
-    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
     expected = {
       u'cmd': u'update',
       u'version': old_version,
@@ -175,8 +168,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
   def test_poll_sleep(self):
     # A bot polls, gets nothing.
-    token, params = self.get_bot_token()
-    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    params = self.do_handshake()
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
     self.assertTrue(response.pop(u'duration'))
     expected = {
       u'cmd': u'sleep',
@@ -186,7 +179,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
     # Sleep again
     params['state']['sleep_streak'] += 1
-    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
     self.assertTrue(response.pop(u'duration'))
     expected = {
       u'cmd': u'sleep',
@@ -195,10 +188,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, response)
 
   def test_poll_update(self):
-    token, params = self.get_bot_token()
+    params = self.do_handshake()
     old_version = params['version']
     params['version'] = 'badversion'
-    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
     expected = {
       u'cmd': u'update',
       u'version': old_version,
@@ -217,8 +210,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
       return True, 'Mocked restart message'
     self.mock(bot_management, 'should_restart_bot', mock_should_restart_bot)
 
-    token, params = self.get_bot_token()
-    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    params = self.do_handshake()
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
     expected = {
       u'cmd': u'restart',
       u'message': 'Mocked restart message',
@@ -232,13 +225,13 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.mock_now(now)
     str_now = unicode(now.strftime(DATETIME_FORMAT))
     # A bot polls, gets a task, updates it, completes it.
-    token, params = self.get_bot_token()
+    params = self.do_handshake()
     # Enqueue a task.
     _, task_id = self.client_create_task_raw()
     self.assertEqual('0', task_id[-1])
     # Convert TaskResultSummary reference to TaskRunResult.
     task_id = task_id[:-1] + '1'
-    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
     expected = {
       u'cmd': u'run',
       u'manifest': {
@@ -300,13 +293,13 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.mock_now(now)
     str_now = unicode(now.strftime(DATETIME_FORMAT))
     # A bot polls, gets a task, updates it, completes it.
-    token, params = self.get_bot_token()
+    params = self.do_handshake()
     # Enqueue a task.
     _, task_id = self.client_create_task_isolated()
     self.assertEqual('0', task_id[-1])
     # Convert TaskResultSummary reference to TaskRunResult.
     task_id = task_id[:-1] + '1'
-    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
     expected = {
       u'cmd': u'run',
       u'manifest': {
@@ -373,8 +366,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       },
       'task_id': task_id,
     }
-    response = self.post_with_token(
-        '/swarming/api/v1/bot/task_update', params, token)
+    response = self.post_json('/swarming/api/v1/bot/task_update', params)
     self.assertEqual({u'ok': True}, response)
 
     response = self.client_get_results(task_id)
@@ -412,9 +404,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
     # Make sure there's a task that we don't get.
     _, task_id = self.client_create_task_raw()
     self.assertEqual('0', task_id[-1])
-    token, params = self.get_bot_token()
+    params = self.do_handshake()
     params['state']['lease_expiration_ts'] = 0
-    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
     expected = {
       u'cmd': u'sleep',
       u'quarantined': False,
@@ -429,10 +421,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.mock_now(now)
     _, task_id = self.client_create_task_isolated()
     self.assertEqual('0', task_id[-1])
-    token, params = self.get_bot_token()
+    params = self.do_handshake()
     params['state']['lease_expiration_ts'] = (
         int(utils.time_time()) + 3600 + 1200 + 3 * 30 + 10 + 1)
-    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
     # Convert TaskResultSummary reference to TaskRunResult.
     task_id = task_id[:-1] + '1'
     expected = {
@@ -479,8 +471,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.mock(
         ereporter2, 'log_request',
         lambda *args, **kwargs: errors.append((args, kwargs)))
-    token, params = self.get_bot_token()
-    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    params = self.do_handshake()
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
     self.assertTrue(response.pop(u'duration'))
     expected = {
       u'cmd': u'sleep',
@@ -529,7 +521,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
     # A bot error currently does not result in permanent quarantine. It will
     # eventually.
-    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
     self.assertTrue(response.pop(u'duration'))
     expected = {
       u'cmd': u'sleep',
@@ -545,8 +537,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.mock(
         ereporter2, 'log_request',
         lambda *args, **kwargs: errors.append((args, kwargs)))
-    token, params = self.get_bot_token()
-    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    params = self.do_handshake()
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
     self.assertTrue(response.pop(u'duration'))
     expected = {
       u'cmd': u'sleep',
@@ -555,16 +547,15 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, response)
 
     # The bot fails somehow.
-    token, params2 = self.get_bot_token()
+    params2 = self.do_handshake()
     params2['event'] = 'bot_error'
     params2['message'] = 'for the worst'
-    response = self.post_with_token(
-        '/swarming/api/v1/bot/event', params2, token)
+    response = self.post_json('/swarming/api/v1/bot/event', params2)
     self.assertEqual({}, response)
 
     # A bot error currently does not result in permanent quarantine. It will
     # eventually.
-    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
     self.assertTrue(response.pop(u'duration'))
     expected = {
       u'cmd': u'sleep',
@@ -584,10 +575,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
-    token, params = self.get_bot_token()
+    params = self.do_handshake()
     params['event'] = 'bot_rebooting'
     params['message'] = 'for the best'
-    response = self.post_with_token('/swarming/api/v1/bot/event', params, token)
+    response = self.post_json('/swarming/api/v1/bot/event', params)
     self.assertEqual({}, response)
 
     # TODO(maruel): Replace with client api to query last BotEvent.
@@ -641,7 +632,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     str_now = unicode(now.strftime(DATETIME_FORMAT))
-    token, params = self.get_bot_token()
+    params = self.do_handshake()
     self.client_create_task_raw(
         properties=dict(command=['python', 'runtest.py']))
 
@@ -683,18 +674,16 @@ class BotApiTest(test_env_handlers.AppTestBase):
       return out
 
     def _cycle(params, expected):
-      response = self.post_with_token(
-          '/swarming/api/v1/bot/task_update', params, token)
+      response = self.post_json('/swarming/api/v1/bot/task_update', params)
       self.assertEqual({u'ok': True}, response)
       response = self.client_get_results(task_id)
       self.assertEqual(expected, response)
 
     # 1. Initial task update with no data.
-    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
     task_id = response['manifest']['task_id']
     params = _params()
-    response = self.post_with_token(
-        '/swarming/api/v1/bot/task_update', params, token)
+    response = self.post_json('/swarming/api/v1/bot/task_update', params)
     self.assertEqual({u'ok': True}, response)
     response = self.client_get_results(task_id)
     self.assertEqual(_expected(), response)
@@ -725,9 +714,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.client_create_task_raw(
         properties=dict(command=['python', 'runtest.py']))
 
-    token, params = self.get_bot_token()
-    response = self.post_with_token(
-        '/swarming/api/v1/bot/poll', params, token)
+    params = self.do_handshake()
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
     task_id = response['manifest']['task_id']
 
     def r(*_):
@@ -742,17 +730,16 @@ class BotApiTest(test_env_handlers.AppTestBase):
       'output_chunk_start': 0,
       'task_id': task_id,
     }
-    response = self.post_with_token(
-        '/swarming/api/v1/bot/task_update', params, token, status=500)
+    response = self.post_json(
+        '/swarming/api/v1/bot/task_update', params, status=500)
     self.assertEqual({u'error': u'Failed to update, please retry'}, response)
 
   def test_task_update_failure(self):
     self.client_create_task_raw(
         properties=dict(command=['python', 'runtest.py']))
 
-    token, params = self.get_bot_token()
-    response = self.post_with_token(
-        '/swarming/api/v1/bot/poll', params, token)
+    params = self.do_handshake()
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
     task_id = response['manifest']['task_id']
 
     class NewError(Exception):
@@ -774,8 +761,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
       'output_chunk_start': 0,
       'task_id': task_id,
     }
-    response = self.post_with_token(
-        '/swarming/api/v1/bot/task_update', params, token, status=500)
+    response = self.post_json(
+        '/swarming/api/v1/bot/task_update', params, status=500)
     self.assertEqual({u'error': u'Sorry!'}, response)
 
   def test_task_failure(self):
@@ -783,10 +770,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     str_now = unicode(now.strftime(DATETIME_FORMAT))
-    token, params = self.get_bot_token()
+    params = self.do_handshake()
     self.client_create_task_raw()
-    response = self.post_with_token(
-        '/swarming/api/v1/bot/poll', params, token)
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
     task_id = response['manifest']['task_id']
 
     params = {
@@ -798,8 +784,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       'output_chunk_start': 0,
       'task_id': task_id,
     }
-    response = self.post_with_token(
-        '/swarming/api/v1/bot/task_update', params, token)
+    self.post_json('/swarming/api/v1/bot/task_update', params)
     response = self.client_get_results(task_id)
     expected = {
       u'bot_dimensions': [
@@ -836,10 +821,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.mock(
         ereporter2, 'log_request',
         lambda *args, **kwargs: errors.append((args, kwargs)))
-    token, params = self.get_bot_token()
+    params = self.do_handshake()
     self.client_create_task_raw()
-    response = self.post_with_token(
-        '/swarming/api/v1/bot/poll', params, token)
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
     task_id = response['manifest']['task_id']
 
     # Let's say it failed to start task_runner because the new bot code is
@@ -850,8 +834,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       'message': 'Oh',
       'task_id': task_id,
     }
-    response = self.post_with_token(
-        '/swarming/api/v1/bot/task_error', params, token)
+    self.post_json('/swarming/api/v1/bot/task_error', params)
 
     response = self.client_get_results(task_id)
     expected = {

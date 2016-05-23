@@ -12,10 +12,6 @@ import os
 import test_env
 test_env.setup_test_env()
 
-from google.appengine.api import users
-from google.appengine.ext import ndb
-
-import endpoints
 from protorpc.remote import protojson
 import webtest
 
@@ -128,16 +124,17 @@ class AppTestBase(test_case.TestCase):
         headers={'X-XSRF-Token-Request': '1'}).json
     return resp['xsrf_token'].encode('ascii')
 
-  def post_with_token(self, url, params, token, **kwargs):
-    """Does an HTTP POST with a JSON API and a XSRF token."""
-    return self.app.post_json(
-        url, params=params, headers={'X-XSRF-Token': token}, **kwargs).json
+  def post_json(self, url, params, **kwargs):
+    """Does an HTTP POST with a JSON API and return JSON response."""
+    return self.app.post_json(url, params=params, **kwargs).json
 
   # Bot
 
-  def get_bot_token(self, bot='bot1'):
-    """Gets the XSRF token for bot after handshake."""
-    headers = {'X-XSRF-Token-Request': '1'}
+  def do_handshake(self, bot='bot1'):
+    """Performs bot handshake, returns data to be sent to bot handlers.
+
+    Also populates self.bot_version.
+    """
     params = {
       'dimensions': {
         'id': [bot],
@@ -153,19 +150,17 @@ class AppTestBase(test_case.TestCase):
     }
     response = self.app.post_json(
         '/swarming/api/v1/bot/handshake',
-        headers=headers,
         params=params).json
-    token = response['xsrf_token'].encode('ascii')
     self.bot_version = response['bot_version']
     params['version'] = self.bot_version
-    return token, params
+    return params
 
   def bot_poll(self, bot='bot1'):
     """Simulates a bot that polls for task."""
-    token, params = self.get_bot_token(bot)
-    return self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    params = self.do_handshake(bot)
+    return self.post_json('/swarming/api/v1/bot/poll', params)
 
-  def bot_complete_task(self, token, **kwargs):
+  def bot_complete_task(self, **kwargs):
     # Emulate an isolated task.
     params = {
       'cost_usd': 0.1,
@@ -196,15 +191,13 @@ class AppTestBase(test_case.TestCase):
         params['isolated_stats'][k][j] = base64.b64encode(
             large.pack(params['isolated_stats'][k][j]))
     params.update(kwargs)
-    response = self.post_with_token(
-        '/swarming/api/v1/bot/task_update', params, token)
+    response = self.post_json('/swarming/api/v1/bot/task_update', params)
     self.assertEqual({u'ok': True}, response)
 
   def bot_run_task(self):
-    token, _ = self.get_bot_token()
     res = self.bot_poll()
     task_id = res['manifest']['task_id']
-    self.bot_complete_task(token, task_id=task_id)
+    self.bot_complete_task(task_id=task_id)
     return task_id
 
   # Client

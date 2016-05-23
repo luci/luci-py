@@ -296,13 +296,8 @@ class BotHandshakeHandler(_BotBaseHandler):
         task_id='', task_name=None, message=quarantined_msg)
 
     data = {
-      # This access token will be used to validate each subsequent request.
       'bot_version': bot_code.get_bot_version(self.request.host_url),
-      # TODO(maruel): Remove this once all the bots have been updated.
-      'expiration_sec': auth.handler.XSRFToken.expiration_sec,
       'server_version': utils.get_app_version(),
-      # TODO(maruel): Remove this once all the bots have been updated.
-      'xsrf_token': self.generate_xsrf_token(),
     }
     self.send_response(data)
 
