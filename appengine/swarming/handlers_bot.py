@@ -538,18 +538,6 @@ class BotTaskUpdateHandler(_BotApiHandler):
     output_chunk_start = request.get('output_chunk_start')
     outputs_ref = request.get('outputs_ref')
 
-    if bool(isolated_stats) != (bot_overhead is not None):
-      ereporter2.log_request(
-          request=self.request,
-          source='server',
-          category='task_failure',
-          message='Failed to update task: %s' % task_id)
-      self.abort_with_error(
-          400,
-          error='Both bot_overhead and isolated_stats must be set '
-                'simultaneously\nbot_overhead: %s\nisolated_stats: %s' %
-                (bot_overhead, isolated_stats))
-
     run_result_key = task_pack.unpack_run_result_key(task_id)
     performance_stats = None
     if isolated_stats:
