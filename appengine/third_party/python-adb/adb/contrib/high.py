@@ -802,9 +802,12 @@ class HighDevice(object):
         # It's up!
         break
 
-      assert (out ==
+      # Accepts an empty string too, which has been observed only on Android 4.4
+      # (Kitkat) but not on later versions.
+      assert out in (
           'Error: Could not access the Package Manager.  Is the system '
-          'running?\n'), out
+          'running?\n',
+          ''), out
       time.sleep(0.1)
 
     return True
