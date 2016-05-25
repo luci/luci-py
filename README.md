@@ -47,6 +47,7 @@ A complete CI toolkit:
 ## Contributing
 
 *   Sign the [Google CLA](https://cla.developers.google.com/clas).
+*   See the [coding style](CODING_STYLE.md).
 *   Make sure your `user.email` and `user.name` are configured in `git config`.
 
 Run the following to setup the code review tool and create your first review:
