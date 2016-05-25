@@ -1,8 +1,52 @@
-Authentication Service
-----------------------
+# Authentication Service
 
 An AppEngine service used to import and manage ACL groups. It is to be used in
 conjunction with the [auth component](../components/components/auth) to embed
 replicated DB.
 
+The authentication server provides a central control panel to declare every ACL
+group and the whitelisted IPs. For example, which user has administrative
+access, which can request tasks, which IP addresses can host bots, etc.
+
+Each service have the authencation component embedded and will use the
+standalone version by default. Using a central authentication service permits
+not having to duplicate the ACLs, which is useful for larger scale
+installations. For one-off experimentation, this is not strictly necessary.
+
 [Documentation](doc/)
+
+
+## Setting up
+
+*   Visit http://console.cloud.google.com and create a project. Replace
+    `<appid>` below with your project id.
+*   Visit Google Cloud Console, IAM & Admin, click Add Member and add someone
+    else so you can safely be hit by a bus.
+*   Upload the code with: `./tools/gae upl -x -A <appid>`
+*   Visit Google Cloud Console, API Manager, Credentials, OAuth consent screen:
+    *   Type something in 'Product name shown to users'.
+*   Visit Google Cloud Console, API Manager, Credentials, click Create
+    credentials:
+    *   Choose "_OAuth2 client ID_".
+    *   Choose "_Web application_", use name "_service_", use "Authorized
+        redirect URIs", "_https://\<appid\>.appspot.com/auth/openid/callback_",
+        click Create.
+    *   Visit https://\<appid\>.appspot.com/_ah/api/explorer, click "auth API",
+        click "auth.configure_openid":
+        *   Set client_id and client_secret, use for request_uri
+            "_https://\<appid\>.appspot.com/auth/openid/callback_".
+    *   TODO(vadimsh): Make UI to simplify this flow, e.g. visit
+        https://\<appid\>.appspot.com/auth/oauth_config and add the service
+        private data.
+*   Visit https://\<appid\>.appspot.com/auth/bootstrap and click Proceed.
+
+
+### Linking isolate or swarming to auth_service
+
+*   Make sure your app is fully working.
+*   Visit https://\<authid\>.appspot.com where authid is the auth_service
+    instance to link with.
+*   Type your \<appid\> in GAE application id and click Generate linking URL.
+*   Click the link in the UI.
+*   Click the red Switch button, understanding that any previous ACL
+    configuration on this instance is lost.

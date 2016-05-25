@@ -1,43 +1,53 @@
 # LUCI
 
 LUCI is an ensemble of services that work together to run large scale CI
-(continuous integration) infrastructure. It is used by the [Chromium
-project](http://www.chromium.org).
-
-See the [wiki](https://github.com/luci/luci-py/wiki) for more details.
+(continuous integration) infrastructure to get results in *O(1)*. It is used by
+the [Chromium project](http://www.chromium.org).
 
 See [appengine/](appengine) for the services provided.
 
 
-Installing
-----------
+## Overview
 
-1. Install [Google AppEngine SDK](https://cloud.google.com/appengine/downloads).
-2. git clone https://github.com/luci/luci-py
+A complete CI toolkit:
+
+*   Strict separation between *task distribution* and *file distribution*.
+    *   Swarming distributes tasks across an army (thousands) of Swarming bots.
+    *   Isolate server distributes 10s of thousands of files _per task_.
+*   Federated authentication and ACL.
+*   git based configuration data propagation.
+*   Automatic Google Compute Engine VM recycling.
+*   Windows, OSX and Linux (Ubuntu), used with Android, iOS, ChromeOS.
+*   Written in python 2.7 along [Go](https://github.com/luci/luci-go) tools.
+*   Used by the Chromium infrastructure and other teams.
 
 
-Code layout
------------
+## Installing
 
-  * [/appengine/...](appengine) contains
+1.  Install [Google AppEngine
+    SDK](https://cloud.google.com/appengine/downloads).
+2.  git clone https://github.com/luci/luci-py
+
+
+## Code layout
+
+*   [/appengine/...](appengine) contains
     [AppEngine](https://cloud.google.com/appengine/docs/python/) server
     code.
-  * [/client/...](client) contains all client code.
-  * [/infra/config/...](infra/config) contains metadata to run the commit queue.
+*   [/client/...](client) contains all client code.
+*   [/infra/config/...](infra/config) contains metadata to run the commit queue.
 
 
-Versioning
-----------
+## Versioning
 
-  * Branch `master` constains the latest code.
-  * Branch `stable` contains the stable code.
+*   Branch `master` constains the latest code.
+*   Branch `stable` contains the stable code.
 
 
-Contributing
-------------
+## Contributing
 
-  * Sign the [Google CLA](https://cla.developers.google.com/clas).
-  * Make sure your `user.email` and `user.name` are configured in `git config`.
+*   Sign the [Google CLA](https://cla.developers.google.com/clas).
+*   Make sure your `user.email` and `user.name` are configured in `git config`.
 
 Run the following to setup the code review tool and create your first review:
 
@@ -58,7 +68,6 @@ Run the following to setup the code review tool and create your first review:
 Use `git cl help` and `git cl help <cmd>` for more details.
 
 
-License
--------
+## License
 
 This project is licensed under Apache v2.0 license. See LICENSE for details.

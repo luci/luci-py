@@ -2,39 +2,61 @@
 
 ## Introduction
 
-This is the list of the access control groups.
+This is the list of the access control groups. By default in a fresh instance
+all groups are empty and no one can do anything. Add relevant users and IPs in
+the following groups. Make sure that users that have access to the swarming
+server also have equivalent access to the isolate server.
 
 
-### swarming-users
+## Format
 
-Members of this group can:
-  - Trigger a task.
-  - Query tasks the user triggered and get results.
-  - List the tasks they triggered.
-  - Cancel their own tasks.
+You can refer to the whitelisted IPs using `bots:*` in one of the group. You can
+refer to user accounts with `user@example.org` and can refer to all users in a
+domain with `*@chromium.org`.
 
-Members has limited visibility over the whole system.
+
+## Groups
 
 
 ### swarming-bots
 
 Members of this group can:
-  - Run swarming_bot.zip successfully to run a bot locally. VMs that runs the
-    bot code must be in this group via IP whitelisting.
-  - Trigger tasks and get results.
+
+*   Run swarming_bot.zip successfully to run a bot locally. VMs that run the bot
+    code must be in this group via IP whitelisting.
+*   Trigger tasks and get results.
+
+Make sure members of this group are also member of _isolate-access_.
+
+
+### swarming-users
+
+Members of this group can:
+
+*   Trigger a task.
+*   Query tasks the user triggered and get results.
+*   List the tasks they triggered.
+*   Cancel their own tasks.
+
+Members has limited visibility over the whole system, cannot view other user
+tasks or bots.
+
+Make sure members of this group are also member of _isolate-access_.
 
 
 ### swarming-privileged-users
 
-Members of this group can do everything that swarming-users can do plus:
-  - See other people's tasks.
-  - See all the bots connected.
+Members of this group can do everything that _swarming-users_ can do plus:
+
+*   See other people's tasks.
+*   See all the bots connected.
 
 
 ### swarming-admins
 
-Members of this group can do everything that swarming-privileged-users can do
+Members of this group can do everything that _swarming-privileged-users_ can do
 plus:
-  - Cancel anyone's task.
-  - Delete bots.
-  - Update bootstrap.py and bot_config.py.
+
+*   Cancel anyone's task.
+*   Delete bots.
+*   Update _bootstrap.py_ and _bot_config.py_.
