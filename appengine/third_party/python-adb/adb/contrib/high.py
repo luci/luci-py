@@ -551,10 +551,23 @@ class HighDevice(object):
     assert speed in self.cache.available_frequencies, (
         speed, self.cache.available_frequencies)
     success = self.SetCPUScalingGovernor('userspace')
+
+    # This works on Nexus 10 but not on Nexus 5. Need to investigate more. In
+    # the meantime, simply try one after the other.
     if not self.PushContent(
         '%d\n' % speed,
         '/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed'):
-      return False
+      _LOG.info(
+          '%s.SetCPUSpeed(): Failed to push %d in %s',
+          self.port_path, speed, path)
+      # Fallback via shell.
+      _, exit_code = self.Shell('echo "%d" > %s' % (speed, path))
+      if exit_code != 0:
+        _LOG.warning(
+            '%s.SetCPUSpeed(): Writing %d failed',
+            self.port_path, speed)
+        return False
+
     # Get it back to confirm.
     val = self.PullContent(
         '/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed')
