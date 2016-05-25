@@ -318,21 +318,14 @@ class Project(object):
     Returns:
       JSON describing the result of the operation.
     """
-    try:
-      resp = self.call_api(
-          '/zones/%s/instanceGroupManagers/%s/deleteInstances' % (
-              zone,
-              manager,
-          ),
-          method='POST',
-          payload={'instances': instance_urls},
-      )
-    except net.Error as e:
-      if e.status_code == 400:
-        resp = json.loads(e.response)
-      else:
-        raise
-    return resp
+    return self.call_api(
+        '/zones/%s/instanceGroupManagers/%s/deleteInstances' % (
+            zone,
+            manager,
+        ),
+        method='POST',
+        payload={'instances': instance_urls},
+    )
 
   def get_instances_in_instance_group(
       self, name, zone, max_results=None, page_token=None):
