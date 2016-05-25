@@ -538,27 +538,40 @@ class BotTaskUpdateHandler(_BotApiHandler):
     output_chunk_start = request.get('output_chunk_start')
     outputs_ref = request.get('outputs_ref')
 
+    if isolated_stats and bot_overhead is None:
+      ereporter2.log_request(
+          request=self.request,
+          source='server',
+          category='task_failure',
+          message='Failed to update task: %s' % task_id)
+      self.abort_with_error(
+          400,
+          error='isolated_stats requires bot_overhead to be set'
+                '\nbot_overhead: %s\nisolated_stats: %s' %
+                (bot_overhead, isolated_stats))
+
     run_result_key = task_pack.unpack_run_result_key(task_id)
     performance_stats = None
-    if isolated_stats:
-      download = isolated_stats.get('download') or {}
-      upload = isolated_stats.get('upload') or {}
-      def unpack_base64(d, k):
-        x = d.get(k)
-        if x:
-          return base64.b64decode(x)
+    if bot_overhead:
       performance_stats = task_result.PerformanceStats(
-          bot_overhead=bot_overhead,
-          isolated_download=task_result.OperationStats(
-              duration=download.get('duration'),
-              initial_number_items=download.get('initial_number_items'),
-              initial_size=download.get('initial_size'),
-              items_cold=unpack_base64(download, 'items_cold'),
-              items_hot=unpack_base64(download, 'items_hot')),
-          isolated_upload=task_result.OperationStats(
-              duration=upload.get('duration'),
-              items_cold=unpack_base64(upload, 'items_cold'),
-              items_hot=unpack_base64(upload, 'items_hot')))
+          bot_overhead=bot_overhead)
+      if isolated_stats:
+        download = isolated_stats.get('download') or {}
+        upload = isolated_stats.get('upload') or {}
+        def unpack_base64(d, k):
+          x = d.get(k)
+          if x:
+            return base64.b64decode(x)
+        performance_stats.isolated_download = task_result.OperationStats(
+            duration=download.get('duration'),
+            initial_number_items=download.get('initial_number_items'),
+            initial_size=download.get('initial_size'),
+            items_cold=unpack_base64(download, 'items_cold'),
+            items_hot=unpack_base64(download, 'items_hot'))
+        performance_stats.isolated_upload = task_result.OperationStats(
+            duration=upload.get('duration'),
+            items_cold=unpack_base64(upload, 'items_cold'),
+            items_hot=unpack_base64(upload, 'items_hot'))
 
     if output is not None:
       try:
