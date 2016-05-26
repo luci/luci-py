@@ -7,7 +7,7 @@ As an user:
   - [Magic values](Magic-Values.md); special environment variable, dimensions,
     etc.
   - [User guide](User-Guide.md)
-  - [Bot sizing](Bot-Sizing.md)
+  - [Running a Swarming Bot](Bot.md)
 
 Deep down:
 
