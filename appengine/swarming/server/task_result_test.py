@@ -518,10 +518,6 @@ class TaskResultApiTest(TestCase):
     with self.assertRaises(datastore_errors.BadValueError):
       task_result.PerformanceStats().put()
 
-  def test_get_tasks(self):
-    # Indirectly tested by both frontend and API.
-    pass
-
   def test_get_result_summaries_query(self):
     # Indirectly tested by API.
     pass

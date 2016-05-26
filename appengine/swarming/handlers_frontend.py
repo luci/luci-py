@@ -17,7 +17,6 @@ import re
 import webapp2
 
 from google.appengine import runtime
-from google.appengine.api import search
 from google.appengine.api import users
 from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
@@ -27,6 +26,7 @@ import handlers_backend
 import mapreduce_jobs
 import template
 from components import auth
+from components import datastore_utils
 from components import utils
 from server import acl
 from server import bot_code
@@ -412,16 +412,10 @@ class TasksHandler(auth.AuthenticatingHandler):
   @auth.autologin
   @auth.require(acl.is_user)
   def get(self):
-    """Handles both ndb.Query searches and search.Index().search() queries.
-
-    If |task_name| is set or not affects the meaning of |cursor|. When set, the
-    cursor is for search.Index, otherwise the cursor is for a ndb.Query.
-    """
     cursor_str = self.request.get('cursor')
     limit = int(self.request.get('limit', 100))
     sort = self.request.get('sort', self.SORT_CHOICES[0][0])
     state = self.request.get('state', self.STATE_CHOICES[0][0][0])
-    task_name = self.request.get('task_name', '').strip()
     counts = self.request.get('counts', '').strip()
     task_tags = [
       line for line in self.request.get('task_tag', '').splitlines() if line
@@ -445,10 +439,13 @@ class TasksHandler(auth.AuthenticatingHandler):
     if counts == 'true':
       counts_future = self._get_counts_future(now)
 
-    # This call is synchronous.
     try:
-      tasks, cursor_str, sort, state = task_result.get_tasks(
-          limit, cursor_str, sort, state, task_tags, task_name)
+      if task_tags:
+        # Enforce created_ts when tags are used.
+        sort = 'created_ts'
+      query = task_result.get_result_summaries_query(
+          None, None, sort, state, task_tags)
+      tasks, cursor_str = datastore_utils.fetch_page(query, limit, cursor_str)
 
       # Prefetch the TaskRequest all at once, so that ndb's in-process cache has
       # it instead of fetching them one at a time indirectly when using
@@ -458,7 +455,7 @@ class TasksHandler(auth.AuthenticatingHandler):
       # Evaluate the counts to print the filtering columns with the associated
       # numbers.
       state_choices = self._get_state_choices(counts_future)
-    except (search.QueryError, ValueError) as e:
+    except ValueError as e:
       self.abort(400, str(e))
 
     def safe_sum(items):
@@ -514,7 +511,6 @@ class TasksHandler(auth.AuthenticatingHandler):
       'sort_choices': self.SORT_CHOICES,
       'state': state,
       'state_choices': state_choices,
-      'task_name': task_name,
       'task_tag': '\n'.join(task_tags),
       'tasks': tasks,
       'total_cost_usd': total_cost_usd,

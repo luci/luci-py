@@ -36,7 +36,6 @@ class AppTestBase(test_case.TestCase):
     self.bot_version = None
     self.source_ip = '192.168.2.2'
     self.testbed.init_user_stub()
-    self.testbed.init_search_stub()
 
     gae_ts_mon.reset_for_unittest(disable=True)
 

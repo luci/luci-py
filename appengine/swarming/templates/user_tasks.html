@@ -141,7 +141,6 @@
       <td>State (total last 24h)</td>
       <td></td>
       <td>Search by tag</td>
-      <td>Search by task name</td>
     </tr>
   </thead>
   <tbody>
@@ -182,16 +181,6 @@
           <input type="submit" value="Search">
         </div>
       </td>
-      <td>
-        <div title="Task name uses whole word search ONLY. Using it resets sort to 'Created' and the task state filter to 'All'.">
-          Task name<br>
-          (whole word only)
-          <br>
-          <input type="text" name="task_name" value="{{task_name}}">
-          <br>
-          <input type="submit" value="Search">
-        </div>
-      </td>
     </tr>
   <tbody>
 </table>
@@ -214,8 +203,6 @@
 <p>
 {% if task_tag %}
   <a href="/user/tasks?limit={{limit}}&state={{state}}&task_tag={{task_tag|urlencode}}&cursor={{cursor|urlencode}}">Next page</a>
-{% elif task_name %}
-  <a href="/user/tasks?limit={{limit}}&state={{state}}&task_name={{task_name|urlencode}}&cursor={{cursor|urlencode}}">Next page</a>
 {% else %}
   <a href="/user/tasks?limit={{limit}}&state={{state}}&sort={{sort}}&cursor={{cursor|urlencode}}">Next page</a>
 {% endif %}

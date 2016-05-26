@@ -261,15 +261,6 @@ class FrontendTest(AppTestBase):
     self.app.get('/user/tasks?sort=foo', status=400)
     self.app.get('/user/tasks?state=foo', status=400)
 
-  def test_task_search_task_name(self):
-    # Try all the combinations of task queries to ensure the index exist.
-    self.set_as_privileged_user()
-    self.client_create_task_raw()
-    self.app.get('/user/tasks?task_name=hi', status=200)
-    for sort, state in self._sort_state_product():
-      url = '/user/tasks?sort=%s&state=%s' % (sort, state)
-      self.app.get(url + '&task_name=hi', status=200)
-
   def test_task_search_task_tag(self):
     # Try all the combinations of task queries to ensure the index exist.
     self.set_as_privileged_user()

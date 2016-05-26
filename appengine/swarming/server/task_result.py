@@ -63,7 +63,6 @@ import logging
 import random
 
 from google.appengine.api import datastore_errors
-from google.appengine.api import search
 from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
 
@@ -1047,65 +1046,6 @@ def _filter_query(cls, query, start, end, sort, state):
   raise ValueError('Invalid state')
 
 
-def _search_by_name(word, cursor_str, limit):
-  """Returns TaskResultSummary in -created_ts order containing the word."""
-  cursor = search.Cursor(web_safe_string=cursor_str, per_result=True)
-  index = search.Index(name='requests')
-
-  def item_to_id(item):
-    for field in item.fields:
-      if field.name == 'id':
-        return field.value
-
-  # The code is structured to handle incomplete entities but still return
-  # 'limit' items. This is done by fetching a few more entities than necessary,
-  # then keeping track of the cursor per item so the right cursor can be
-  # returned.
-  opts = search.QueryOptions(limit=limit + 5, cursor=cursor)
-  results = index.search(search.Query('name:%s' % word, options=opts))
-  result_summary_keys = []
-  cursors = []
-  for item in results.results:
-    value = item_to_id(item)
-    if value:
-      result_summary_keys.append(task_pack.unpack_result_summary_key(value))
-      cursors.append(item.cursor)
-
-  # Handle None result value. See make_request() for details about how this can
-  # happen.
-  tasks = []
-  cursor = None
-  for task, c in zip(ndb.get_multi(result_summary_keys), cursors):
-    if task:
-      cursor = c
-      tasks.append(task)
-      if len(tasks) == limit:
-        # Drop the rest.
-        break
-  else:
-    if len(cursors) == limit + 5:
-      while len(tasks) < limit:
-        # Go into the slow path, seems like we got a lot of corrupted items.
-        opts = search.QueryOptions(limit=limit-len(tasks) + 5, cursor=cursor)
-        results = index.search(search.Query('name:%s' % word, options=opts))
-        if not results.results:
-          # Nothing else.
-          cursor = None
-          break
-        for item in results.results:
-          value = item_to_id(item)
-          if value:
-            cursor = item.cursor
-            task = task_pack.unpack_result_summary_key(value).get()
-            if task:
-              tasks.append(task)
-              if len(tasks) == limit:
-                break
-
-  cursor_str = cursor.web_safe_string if cursor else None
-  return tasks, cursor_str
-
-
 ### Public API.
 
 
@@ -1160,40 +1100,6 @@ def yield_run_result_keys_with_dead_bot():
   deadline = utils.utcnow() - BOT_PING_TOLERANCE
   q = TaskRunResult.query().filter(TaskRunResult.modified_ts < deadline)
   return q.filter(TaskRunResult.state == State.RUNNING).iter(keys_only=True)
-
-
-def get_tasks(limit, cursor_str, sort, state, tags, task_name):
-  """Returns TaskResultSummary entities for this query.
-
-  This function is synchronous.
-
-  Arguments:
-    limit: Maximum number of items to return.
-    cursor_str: query-dependent string encoded cursor to continue a previous
-        search.
-    sort: Order to use. Must default to 'created_ts' to use the default.
-    state: State to filter on.
-    tags: List of search for one or multiple task tags.
-    task_name: search for task name whole word.
-
-  Returns:
-    tuple(list of tasks, str encoded cursor, updated sort, updated state)
-  """
-  if task_name:
-    # Task name based word based search. Override the flags.
-    sort = 'created_ts'
-    state = 'all'
-    tasks, cursor_str = _search_by_name(task_name, cursor_str, limit)
-  else:
-    # Normal listing.
-    if tags:
-      # Add TaskResultSummary indexes if desired.
-      sort = 'created_ts'
-    query = get_result_summaries_query(None, None, sort, state, tags)
-    tasks, cursor_str = datastore_utils.fetch_page(
-        query, limit, cursor_str)
-
-  return tasks, cursor_str, sort, state
 
 
 def get_run_results_query(start, end, sort, state, bot_id):

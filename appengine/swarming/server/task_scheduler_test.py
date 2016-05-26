@@ -15,7 +15,6 @@ import test_env
 test_env.setup_test_env()
 
 from google.appengine.api import datastore_errors
-from google.appengine.api import search
 from google.appengine.ext import deferred
 from google.appengine.ext import ndb
 
@@ -100,8 +99,6 @@ class TaskSchedulerApiTest(test_case.TestCase):
 
   def setUp(self):
     super(TaskSchedulerApiTest, self).setUp()
-    self.testbed.init_search_stub()
-
     self.now = datetime.datetime(2014, 1, 2, 3, 4, 5, 6)
     self.mock_now(self.now)
     self.app = webtest.TestApp(
@@ -1633,97 +1630,6 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(
         (['1d69b9f088008811'], 0, 0),
         task_scheduler.cron_handle_bot_died('f.local'))
-
-  def test_search_by_name(self):
-    # This is awkward but it's because _search_by_name() depends on
-    # functionality saved by task_scheduler. (There's a layering issue).
-    data = _gen_request(
-        properties={
-          'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
-        })
-    request = task_request.make_request(data, True)
-    result_summary = task_scheduler.schedule_request(request)
-
-    # Assert that search is not case-sensitive by using unexpected casing.
-    actual, _cursor = task_result._search_by_name('requEST', None, 10)
-    self.assertEqual([result_summary], actual)
-    actual, _cursor = task_result._search_by_name('name', None, 10)
-    self.assertEqual([result_summary], actual)
-
-  def test_search_by_name_failures(self):
-    data = _gen_request(
-        properties={
-          'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
-        })
-    request = task_request.make_request(data, True)
-    result_summary = task_scheduler.schedule_request(request)
-
-    actual, _cursor = task_result._search_by_name('foo', None, 10)
-    self.assertEqual([], actual)
-    # Partial match doesn't work.
-    actual, _cursor = task_result._search_by_name('nam', None, 10)
-    self.assertEqual([], actual)
-
-  def test_search_by_name_broken_tasks(self):
-    # Create tasks where task_scheduler.schedule_request() fails in the middle.
-    # This is done by mocking the functions to fail every SKIP call and running
-    # it in a loop.
-    class RandomFailure(Exception):
-      pass
-
-    # First call fails ndb.put_multi(), second call fails search.Index.put(),
-    # third call work.
-    index = [0]
-    SKIP = 3
-    def put_multi(*args, **kwargs):
-      callers = [i[3] for i in inspect.stack()]
-      self.assertTrue(
-          'make_request' in callers or 'schedule_request' in callers, callers)
-      if (index[0] % SKIP) == 1:
-        raise RandomFailure()
-      return old_put_multi(*args, **kwargs)
-
-    def put_async(*args, **kwargs):
-      callers = [i[3] for i in inspect.stack()]
-      self.assertIn('schedule_request', callers)
-      out = ndb.Future()
-      if (index[0] % SKIP) == 2:
-        out.set_exception(search.Error())
-      else:
-        out.set_result(old_put_async(*args, **kwargs).get_result())
-      return out
-
-    old_put_multi = self.mock(ndb, 'put_multi', put_multi)
-    old_put_async = self.mock(search.Index, 'put_async', put_async)
-
-    saved = []
-
-    for i in xrange(100):
-      index[0] = i
-      data = _gen_request(
-          name='Request %d' % i,
-          properties={
-            'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
-          })
-      try:
-        request = task_request.make_request(data, True)
-        result_summary = task_scheduler.schedule_request(request)
-        saved.append(result_summary)
-      except RandomFailure:
-        pass
-
-    self.assertEqual(67, len(saved))
-    self.assertEqual(100, task_request.TaskRequest.query().count())
-    self.assertEqual(67, task_result.TaskResultSummary.query().count())
-
-    # Now the DB is full of half-corrupted entities.
-    cursor = None
-    actual, cursor = task_result._search_by_name('Request', cursor, 31)
-    self.assertEqual(31, len(actual))
-    actual, cursor = task_result._search_by_name('Request', cursor, 31)
-    self.assertEqual(3, len(actual))
-    actual, cursor = task_result._search_by_name('Request', cursor, 31)
-    self.assertEqual(0, len(actual))
 
 
 if __name__ == '__main__':

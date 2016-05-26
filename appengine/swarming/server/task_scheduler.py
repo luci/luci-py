@@ -14,7 +14,6 @@ import math
 import random
 
 from google.appengine.api import datastore_errors
-from google.appengine.api import search
 from google.appengine.ext import ndb
 from google.appengine.runtime import apiproxy_errors
 
@@ -411,21 +410,6 @@ def schedule_request(request):
   task = task_to_run.new_task_to_run(request)
   result_summary = task_result.new_result_summary(request)
 
-  # Do not specify a doc_id, as they are guaranteed to be monotonically
-  # increasing and searches are done in reverse order, which fits exactly the
-  # created_ts ordering. This is useful because DateField is precise to the date
-  # (!) and NumberField is signed 32 bits so the best it could do with EPOCH is
-  # second resolution up to year 2038.
-  index = search.Index(name='requests')
-  packed = task_pack.pack_result_summary_key(result_summary.key)
-  doc = search.Document(
-      fields=[
-        search.TextField(name='name', value=request.name),
-        search.AtomField(name='id', value=packed),
-      ])
-  # Even if it fails here, we're still fine, as the task is not "alive" yet.
-  search_future = index.put_async([doc])
-
   now = utils.utcnow()
 
   if dupe_future:
@@ -482,12 +466,6 @@ def schedule_request(request):
   futures = [datastore_utils.transaction_async(run)]
   if parent_task_keys:
     futures.append(datastore_utils.transaction_async(run_parent))
-
-  try:
-    search_future.get_result()
-  except search.Error:
-    # Do not abort the task, for now search is best effort.
-    logging.exception('Put failed')
 
   for future in futures:
     # Check for failures, it would raise in this case, aborting the call.
