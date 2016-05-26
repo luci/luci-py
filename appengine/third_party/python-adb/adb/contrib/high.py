@@ -146,7 +146,7 @@ def _InitCache(device):
         '/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors')
     if out:
       available_governors = sorted(i for i in out.split())
-      assert set(available_governors).issubset(
+      assert set(available_governors).intersect(
           KNOWN_CPU_SCALING_GOVERNOR_VALUES), available_governors
 
     available_frequencies = device.PullContent(
