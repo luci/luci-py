@@ -202,15 +202,15 @@ def task_result_to_rpc(entity, send_stats):
       if entity.outputs_ref else None)
   performance_stats = None
   if send_stats and entity.performance_stats.is_valid:
+      def stats(entity):
+        if entity:
+          return _ndb_to_rpc(swarming_rpcs.OperationStats, entity)
+
       performance_stats = _ndb_to_rpc(
           swarming_rpcs.PerformanceStats,
           entity.performance_stats,
-          isolated_download=_ndb_to_rpc(
-              swarming_rpcs.OperationStats,
-              entity.performance_stats.isolated_download),
-          isolated_upload=_ndb_to_rpc(
-              swarming_rpcs.OperationStats,
-              entity.performance_stats.isolated_upload))
+          isolated_download=stats(entity.performance_stats.isolated_download),
+          isolated_upload=stats(entity.performance_stats.isolated_upload))
   kwargs = {
     'bot_dimensions': _string_list_pairs_from_dict(entity.bot_dimensions or {}),
     'performance_stats': performance_stats,

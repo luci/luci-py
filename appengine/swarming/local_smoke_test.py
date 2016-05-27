@@ -529,6 +529,13 @@ class Test(unittest.TestCase):
         for j in ('items_cold', 'items_hot'):
           result['performance_stats'][k][j] = large.unpack(
               base64.b64decode(result['performance_stats'][k].get(j, '')))
+    else:
+      perf_stats = result.get('performance_stats')
+      if perf_stats:
+        # Ignore bot_overhead, everything else should be empty.
+        perf_stats.pop('bot_overhead', None)
+        self.assertFalse(perf_stats)
+
     bot_version = result.pop('bot_version')
     self.assertTrue(bot_version)
     self.assertLess(0, result.pop('costs_usd'))
