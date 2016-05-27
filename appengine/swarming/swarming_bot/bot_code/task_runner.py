@@ -114,8 +114,11 @@ def get_isolated_cmd(
     cmd.extend(('--hard-timeout', str(task_details.hard_timeout)))
   if task_details.grace_period:
     cmd.extend(('--grace-period', str(task_details.grace_period)))
-  if task_details.extra_args:
-    cmd.append('--')
+
+  cmd.append('--')
+  if task_details.command:
+    cmd.extend(task_details.command)
+  elif task_details.extra_args:
     cmd.extend(task_details.extra_args)
   return cmd
 
@@ -299,21 +302,15 @@ def run_command(
   }
   post_update(swarming_server, params, None, '', 0)
 
-  if task_details.command:
-    # Raw command.
-    cmd = task_details.command
-    isolated_result = None
-  else:
-    # Isolated task.
-    isolated_result = os.path.join(work_dir, 'isolated_result.json')
-    cmd = get_isolated_cmd(
-        work_dir, task_details, isolated_result, min_free_space)
-    # Hard timeout enforcement is deferred to run_isolated. Grace is doubled to
-    # give one 'grace_period' slot to the child process and one slot to upload
-    # the results back.
-    task_details.hard_timeout = 0
-    if task_details.grace_period:
-      task_details.grace_period *= 2
+  isolated_result = os.path.join(work_dir, 'isolated_result.json')
+  cmd = get_isolated_cmd(
+      work_dir, task_details, isolated_result, min_free_space)
+  # Hard timeout enforcement is deferred to run_isolated. Grace is doubled to
+  # give one 'grace_period' slot to the child process and one slot to upload
+  # the results back.
+  task_details.hard_timeout = 0
+  if task_details.grace_period:
+    task_details.grace_period *= 2
 
   try:
     # TODO(maruel): Support both channels independently and display stderr in
@@ -357,7 +354,6 @@ def run_command(
     output_chunk_start = 0
     stdout = ''
     exit_code = None
-    had_hard_timeout = False
     had_io_timeout = False
     must_signal_internal_failure = None
     kill_sent = False
@@ -392,12 +388,6 @@ def run_command(
             logging.warning('I/O timeout; sending SIGTERM')
             proc.terminate()
             timed_out = monotonic_time()
-          elif (task_details.hard_timeout and
-              now - start > task_details.hard_timeout):
-            had_hard_timeout = True
-            logging.warning('Hard timeout; sending SIGTERM')
-            proc.terminate()
-            timed_out = monotonic_time()
         else:
           # During grace period.
           if not kill_sent and now >= timed_out + task_details.grace_period:
@@ -421,7 +411,6 @@ def run_command(
           proc, task_details.grace_period, 'signal %d' % e.signal)
     except (IOError, OSError):
       # Something wrong happened, try to kill the child process.
-      had_hard_timeout = True
       exit_code = kill_and_wait(
           proc, task_details.grace_period, 'exception %s' % e)
 
@@ -431,64 +420,66 @@ def run_command(
     params['cost_usd'] = cost_usd_hour * (now - task_start) / 60. / 60.
     params['duration'] = now - start
     params['io_timeout'] = had_io_timeout
-    params['hard_timeout'] = had_hard_timeout
-    if isolated_result:
-      try:
-        if ((had_io_timeout or had_hard_timeout) and
-            not os.path.isfile(isolated_result)):
-          # It's possible that run_isolated failed to quit quickly enough; it
-          # could be because there was too much data to upload back or something
-          # else. Do not create an internal error, just send back the (partial)
-          # view as task_runner saw it, for example the real exit_code is
-          # unknown.
-          logging.warning('TIMED_OUT and there\'s no result file')
+    had_hard_timeout = False
+    try:
+      if not os.path.isfile(isolated_result):
+        # It's possible if
+        # - run_isolated.py did not start
+        # - run_isolated.py started, but arguments were invalid
+        # - host in a situation unable to fork
+        # - grand child process outliving the child process deleting everything
+        #   it can
+        # Do not create an internal error, just send back the (partial)
+        # view as task_runner saw it, for example the real exit_code is
+        # unknown.
+        logging.warning('there\'s no result file')
+        if exit_code is None:
           exit_code = -1
-        else:
-          # See run_isolated.py for the format.
-          with open(isolated_result, 'rb') as f:
-            run_isolated_result = json.load(f)
-          logging.debug('run_isolated:\n%s', run_isolated_result)
-          # TODO(maruel): Grab statistics (cache hit rate, data downloaded,
-          # mapping time, etc) from run_isolated and push them to the server.
-          if run_isolated_result['outputs_ref']:
-            params['outputs_ref'] = run_isolated_result['outputs_ref']
-          had_hard_timeout = (
-              had_hard_timeout or run_isolated_result['had_hard_timeout'])
-          params['hard_timeout'] = had_hard_timeout
-          if not had_io_timeout and not had_hard_timeout:
-            if run_isolated_result['internal_failure']:
-              must_signal_internal_failure = (
-                  run_isolated_result['internal_failure'])
-              logging.error('%s', must_signal_internal_failure)
-            elif exit_code:
-              # TODO(maruel): Grab stdout from run_isolated.
-              must_signal_internal_failure = (
-                  'run_isolated internal failure %d' % exit_code)
-              logging.error('%s', must_signal_internal_failure)
-          exit_code = run_isolated_result['exit_code']
-          if run_isolated_result.get('duration') is not None:
-            # Calculate the real task duration as measured by run_isolated and
-            # calculate the remaining overhead.
-            params['bot_overhead'] = params['duration']
-            params['duration'] = run_isolated_result['duration']
-            params['bot_overhead'] -= params['duration']
-            params['bot_overhead'] -= run_isolated_result.get(
-                'download', {}).get('duration', 0)
-            params['bot_overhead'] -= run_isolated_result.get(
-                'upload', {}).get('duration', 0)
-            if params['bot_overhead'] < 0:
-              params['bot_overhead'] = 0
-          stats = run_isolated_result.get('stats')
-          if stats:
-            params['isolated_stats'] = stats
-      except (IOError, OSError, ValueError) as e:
-        logging.error('Swallowing error: %s', e)
-        if not must_signal_internal_failure:
-          must_signal_internal_failure = str(e)
+      else:
+        # See run_isolated.py for the format.
+        with open(isolated_result, 'rb') as f:
+          run_isolated_result = json.load(f)
+        logging.debug('run_isolated:\n%s', run_isolated_result)
+        # TODO(maruel): Grab statistics (cache hit rate, data downloaded,
+        # mapping time, etc) from run_isolated and push them to the server.
+        if run_isolated_result['outputs_ref']:
+          params['outputs_ref'] = run_isolated_result['outputs_ref']
+        had_hard_timeout = run_isolated_result['had_hard_timeout']
+        if not had_io_timeout and not had_hard_timeout:
+          if run_isolated_result['internal_failure']:
+            must_signal_internal_failure = (
+                run_isolated_result['internal_failure'])
+            logging.error('%s', must_signal_internal_failure)
+          elif exit_code:
+            # TODO(maruel): Grab stdout from run_isolated.
+            must_signal_internal_failure = (
+                'run_isolated internal failure %d' % exit_code)
+            logging.error('%s', must_signal_internal_failure)
+        exit_code = run_isolated_result['exit_code']
+        if run_isolated_result.get('duration') is not None:
+          # Calculate the real task duration as measured by run_isolated and
+          # calculate the remaining overhead.
+          params['bot_overhead'] = params['duration']
+          params['duration'] = run_isolated_result['duration']
+          params['bot_overhead'] -= params['duration']
+          params['bot_overhead'] -= run_isolated_result.get(
+              'download', {}).get('duration', 0)
+          params['bot_overhead'] -= run_isolated_result.get(
+              'upload', {}).get('duration', 0)
+          if params['bot_overhead'] < 0:
+            params['bot_overhead'] = 0
+        stats = run_isolated_result.get('stats')
+        if stats:
+          params['isolated_stats'] = stats
+    except (IOError, OSError, ValueError) as e:
+      logging.error('Swallowing error: %s', e)
+      if not must_signal_internal_failure:
+        must_signal_internal_failure = str(e)
     # TODO(maruel): Send the internal failure here instead of sending it through
     # bot_main, this causes a race condition.
     if exit_code is None:
       exit_code = -1
+    params['hard_timeout'] = had_hard_timeout
     post_update(swarming_server, params, exit_code, stdout, output_chunk_start)
     return {
       u'exit_code': exit_code,
@@ -498,11 +489,10 @@ def run_command(
       u'version': OUT_VERSION,
     }
   finally:
-    if isolated_result:
-      try:
-        os.remove(isolated_result)
-      except OSError:
-        pass
+    try:
+      os.remove(isolated_result)
+    except OSError:
+      pass
 
 
 def main(args):

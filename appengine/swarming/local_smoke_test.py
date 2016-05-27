@@ -14,6 +14,7 @@ import json
 import glob
 import logging
 import os
+import re
 import signal
 import socket
 import sys
@@ -274,17 +275,13 @@ class Test(unittest.TestCase):
 
   def test_invalid_command(self):
     args = ['-T', 'invalid', '--', 'unknown_invalid_command']
-    err = (
-      '[Error 2] The system cannot find the file specified'
-      if sys.platform == 'win32' else '[Errno 2] No such file or directory')
     summary = self.gen_expected(
         name=u'invalid',
         exit_codes=[1],
         failure=True,
-        outputs=[
-          u'Command "unknown_invalid_command" failed to start.\n'
-          u'Error: %s' % err,
-        ])
+        outputs=re.compile(
+            u'^<The executable does not exist or a dependent library is '
+            u'missing>'))
     self.assertOneTask(args, summary, {})
 
   def test_hard_timeout(self):
@@ -517,6 +514,7 @@ class Test(unittest.TestCase):
     self.assertEqual(1, len(result['shards']))
     self.assertTrue(result['shards'][0])
     result = result['shards'][0].copy()
+    self.assertFalse(result.get('abandoned_ts'))
     # These are not deterministic (or I'm too lazy to calculate the value).
     if expected.get('performance_stats'):
       self.assertLess(
@@ -530,7 +528,7 @@ class Test(unittest.TestCase):
           result['performance_stats'][k][j] = large.unpack(
               base64.b64decode(result['performance_stats'][k].get(j, '')))
     else:
-      perf_stats = result.get('performance_stats')
+      perf_stats = result.pop('performance_stats', None)
       if perf_stats:
         # Ignore bot_overhead, everything else should be empty.
         perf_stats.pop('bot_overhead', None)
@@ -545,6 +543,14 @@ class Test(unittest.TestCase):
     self.assertTrue(result.pop('id'))
     self.assertTrue(result.pop('modified_ts'))
     self.assertTrue(result.pop('started_ts'))
+
+    if getattr(expected.get('outputs'), 'match', None):
+      expected_outputs = expected.pop('outputs')
+      outputs = '\n'.join(result.pop('outputs'))
+      self.assertTrue(
+          expected_outputs.match(outputs),
+          '%s does not match %s' % (outputs, expected_outputs.pattern))
+
     self.assertEqual(expected, result)
     return bot_version
 

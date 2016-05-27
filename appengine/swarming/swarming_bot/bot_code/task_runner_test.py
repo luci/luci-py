@@ -8,8 +8,8 @@ import base64
 import json
 import logging
 import os
+import re
 import signal
-import shutil
 import sys
 import tempfile
 import time
@@ -121,20 +121,24 @@ class TestTaskRunner(TestTaskRunnerBase):
     super(TestTaskRunner, self).setUp()
     self.mock(time, 'time', lambda: 1000000000.)
 
-  def get_check_final(self, exit_code=0, output='hi\n', outputs_ref=None):
+  def get_check_final(self, exit_code=0, output_re=r'^hi\n$', outputs_ref=None):
     def check_final(kwargs):
-      # It makes the diffing easier.
+      # Ignore these values.
+      kwargs['data'].pop('bot_overhead', None)
+      kwargs['data'].pop('duration', None)
+
+      output = ''
       if 'output' in kwargs['data']:
-        kwargs['data']['output'] = base64.b64decode(kwargs['data']['output'])
+        output = base64.b64decode(kwargs['data'].pop('output'))
+      self.assertTrue(re.match(output_re, output))
+
       expected = {
         'data': {
           'cost_usd': 10.,
-          'duration': 0.,
           'exit_code': exit_code,
           'hard_timeout': False,
           'id': 'localhost',
           'io_timeout': False,
-          'output': output,
           'output_chunk_start': 0,
           'task_id': 23,
         },
@@ -328,17 +332,14 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.assertEqual(expected, self._run_command(task_details))
 
   def test_run_command_os_error(self):
-    # This runs the command for real.
-    # OS specific error, fix expectation for other OSes.
-    output = (
-      'Command "executable_that_shouldnt_be_on_your_system '
-      'thus_raising_OSError" failed to start.\n'
-      'Error: [Error 2] The system cannot find the file specified'
-      ) if sys.platform == 'win32' else (
-      'Command "executable_that_shouldnt_be_on_your_system '
-      'thus_raising_OSError" failed to start.\n'
-      'Error: [Errno 2] No such file or directory')
-    self.requests(cost_usd=10., exit_code=1, output=output)
+    self.requests(
+        cost_usd=10.,
+        exit_code=1,
+        output_re=(
+            # This is a beginning of run_isolate.py's output if binary is not
+            # found.
+            r'^<The executable does not exist or a dependent library is '
+            r'missing>'))
     task_details = task_runner.TaskDetails(
         {
           'bot_id': 'localhost',
@@ -367,8 +368,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     # Method should have "self" as first argument - pylint: disable=E0213
     class Popen(object):
       """Mocks the process so we can control how data is returned."""
-      def __init__(self2, cmd, cwd, env, stdout, stderr, stdin, detached):
-        self.assertEqual(task_details.command, cmd)
+      def __init__(self2, _cmd, cwd, env, stdout, stderr, stdin, detached):
         self.assertEqual(self.work_dir, cwd)
         expected_env = os.environ.copy()
         expected_env['foo'] = 'bar'
@@ -568,16 +568,21 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
 
   def get_check_final(
       self, hard_timeout=False, io_timeout=False, exit_code=None,
-      output='hi\n'):
+      output_re='^hi\n$'):
     def check_final(kwargs):
+      kwargs['data'].pop('bot_overhead', None)
       if hard_timeout or io_timeout:
         self.assertLess(self.SHORT_TIME_OUT, kwargs['data'].pop('cost_usd'))
         self.assertLess(self.SHORT_TIME_OUT, kwargs['data'].pop('duration'))
       else:
         self.assertLess(0., kwargs['data'].pop('cost_usd'))
         self.assertLess(0., kwargs['data'].pop('duration'))
-      # It makes the diffing easier.
-      kwargs['data']['output'] = base64.b64decode(kwargs['data']['output'])
+
+      output = ''
+      if 'output' in kwargs['data']:
+        output = base64.b64decode(kwargs['data'].pop('output'))
+      self.assertTrue(re.match(output_re, output))
+
       self.assertEqual(
           {
             'data': {
@@ -585,7 +590,6 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
               'hard_timeout': hard_timeout,
               'id': 'localhost',
               'io_timeout': io_timeout,
-              'output': output,
               'output_chunk_start': 0,
               'task_id': 23,
             },
@@ -623,7 +627,9 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       u'must_signal_internal_failure': None,
       u'version': task_runner.OUT_VERSION,
     }
-    self.assertEqual(expected, self._run_command(task_details))
+    actual = self._run_command(task_details)
+    actual.pop('bot_overhead', None)
+    self.assertEqual(expected, actual)
 
   def test_io(self):
     # Actually 0xc000013a
@@ -644,7 +650,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     self.requests(
         hard_timeout=True,
         exit_code=0,
-        output='hi\ngot signal %d\nbye\n' % task_runner.SIG_BREAK_OR_TERM)
+        output_re='^hi\ngot signal %d\nbye\n$' % task_runner.SIG_BREAK_OR_TERM)
     task_details = self.get_task_details(
         self.SCRIPT_SIGNAL, hard_timeout=self.SHORT_TIME_OUT)
     # Returns 0 because the process cleaned up itself.
@@ -660,7 +666,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
   def test_io_signal(self):
     self.requests(
         io_timeout=True, exit_code=0,
-        output='hi\ngot signal %d\nbye\n' % task_runner.SIG_BREAK_OR_TERM)
+        output_re='^hi\ngot signal %d\nbye\n$' % task_runner.SIG_BREAK_OR_TERM)
     task_details = self.get_task_details(
         self.SCRIPT_SIGNAL, io_timeout=self.SHORT_TIME_OUT)
     # Returns 0 because the process cleaned up itself.
@@ -709,7 +715,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     exit_code = 1 if sys.platform == 'win32' else -signal.SIGKILL
     self.requests(
         hard_timeout=True, exit_code=exit_code,
-        output='hi\ngot signal %d\nbye\n' % task_runner.SIG_BREAK_OR_TERM)
+        output_re='^hi\ngot signal %d\nbye\n$' % task_runner.SIG_BREAK_OR_TERM)
     task_details = self.get_task_details(
         self.SCRIPT_SIGNAL_HANG, hard_timeout=self.SHORT_TIME_OUT,
         grace_period=self.SHORT_TIME_OUT)
@@ -727,7 +733,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     exit_code = 1 if sys.platform == 'win32' else -signal.SIGKILL
     self.requests(
         io_timeout=True, exit_code=exit_code,
-        output='hi\ngot signal %d\nbye\n' % task_runner.SIG_BREAK_OR_TERM)
+        output_re='^hi\ngot signal %d\nbye\n$' % task_runner.SIG_BREAK_OR_TERM)
     task_details = self.get_task_details(
         self.SCRIPT_SIGNAL_HANG, io_timeout=self.SHORT_TIME_OUT,
         grace_period=self.SHORT_TIME_OUT)
@@ -1039,13 +1045,6 @@ class TaskRunnerSmoke(unittest.TestCase):
     task_runner_log = os.path.join(self.root_dir, 'logs', 'task_runner.log')
     with open(task_runner_log, 'rb') as f:
       logging.info('task_runner.log:\n---\n%s---', f.read())
-    expected = {
-      u'exit_code': 0,
-      u'hard_timeout': False,
-      u'io_timeout': False,
-      u'must_signal_internal_failure': None,
-      u'version': task_runner.OUT_VERSION,
-    }
     self.assertEqual([], self._server.get_events())
     tasks = self._server.get_tasks()
     for task in tasks.itervalues():
@@ -1074,6 +1073,7 @@ class TaskRunnerSmoke(unittest.TestCase):
       '4e019f31778ba7191f965469dc673280386bbd60-cacert.pem',
       'work',
       'logs',
+      'isolated',
       # TODO(maruel): Move inside work.
       'task_runner_in.json',
       'task_runner_out.json',
