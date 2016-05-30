@@ -496,6 +496,7 @@ def run_command(
 
 
 def main(args):
+  subprocess42.inhibit_os_error_reporting()
   parser = optparse.OptionParser(description=sys.modules[__name__].__doc__)
   parser.add_option('--in-file', help='Name of the request file')
   parser.add_option(

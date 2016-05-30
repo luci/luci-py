@@ -707,6 +707,7 @@ def get_config():
 
 
 def main(args):
+  subprocess42.inhibit_os_error_reporting()
   # Add SWARMING_HEADLESS into environ so subcommands know that they are running
   # in a headless (non-interactive) mode.
   os.environ['SWARMING_HEADLESS'] = '1'
