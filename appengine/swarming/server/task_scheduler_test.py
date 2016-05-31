@@ -1148,7 +1148,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     pub_sub_calls = self.mock_pub_sub()
     request = task_request.make_request(data, True)
     result_summary = task_scheduler.schedule_request(request)
-    ok, was_running = task_scheduler.cancel_task(result_summary.key)
+    ok, was_running = task_scheduler.cancel_task(request, result_summary.key)
     self.assertEqual(True, ok)
     self.assertEqual(False, was_running)
     result_summary = result_summary.key.get()
@@ -1166,7 +1166,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     result_summary = task_scheduler.schedule_request(request)
     reaped_request, run_result = task_scheduler.bot_reap_task(
         {'OS': 'Windows-3.1.1', u'pool': u'default'}, 'localhost', 'abc', None)
-    ok, was_running = task_scheduler.cancel_task(result_summary.key)
+    ok, was_running = task_scheduler.cancel_task(request, result_summary.key)
     self.assertEqual(False, ok)
     self.assertEqual(True, was_running)
     result_summary = result_summary.key.get()

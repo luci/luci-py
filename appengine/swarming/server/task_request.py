@@ -62,6 +62,7 @@ from components import utils
 
 from server import config
 from server import task_pack
+import acl
 import cipd
 
 
@@ -510,6 +511,15 @@ class TaskRequest(ndb.Model):
   def expiration_secs(self):
     """Reconstructs this value from expiration_ts and created_ts. Integer."""
     return int((self.expiration_ts - self.created_ts).total_seconds())
+
+  def has_access(self):
+    """Returns true if the user has access to this request.
+
+    Warning: This function looks at the current Authentication context.
+    """
+    return (
+        acl.is_privileged_user() or
+        self.authenticated == auth.get_current_identity())
 
   def to_dict(self):
     """Converts properties_hash to hex so it is json serializable."""

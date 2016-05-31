@@ -284,7 +284,7 @@ class FrontendTest(AppTestBase):
 
     xsrf_token = self.get_xsrf_token()
     self.app.post(
-        '/user/tasks/cancel', {'task_id': task_id, 'xsrf_token': xsrf_token})
+        '/user/task/%s/cancel' % task_id, {'xsrf_token': xsrf_token})
 
     # Ensure there's no task available anymore by polling.
     self.set_as_bot()

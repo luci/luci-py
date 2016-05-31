@@ -21,6 +21,7 @@ from components import datastore_utils
 from components import pubsub
 from components import utils
 import ts_mon_metrics
+from server import acl
 from server import config
 from server import stats
 from server import task_pack
@@ -750,15 +751,21 @@ def bot_kill_task(run_result_key, bot_id):
   return msg
 
 
-def cancel_task(result_summary_key):
-  """Cancels a task if possible."""
-  request = task_pack.result_summary_key_to_request_key(
-      result_summary_key).get()
+def cancel_task(request, result_key):
+  """Cancels a task if possible.
+
+  Ensures that the associated TaskToRun is canceled and updates the
+  TaskResultSummary/TaskRunResult accordingly.
+
+  Warning: ACL check must have been done before.
+  """
   to_run_key = task_to_run.request_to_task_to_run_key(request)
+  if result_key.kind() == 'TaskRunResult':
+    result_key = task_pack.run_result_key_to_result_summary_key(result_key)
   now = utils.utcnow()
 
   def run():
-    to_run, result_summary = ndb.get_multi((to_run_key, result_summary_key))
+    to_run, result_summary = ndb.get_multi((to_run_key, result_key))
     was_running = result_summary.state == task_result.State.RUNNING
     if not result_summary.can_be_canceled:
       return False, was_running
@@ -777,7 +784,7 @@ def cancel_task(result_summary_key):
   try:
     ok, was_running = datastore_utils.transaction(run)
   except datastore_utils.CommitError as e:
-    packed = task_pack.pack_result_summary_key(result_summary_key)
+    packed = task_pack.pack_result_summary_key(result_key)
     return 'Failed killing task %s: %s' % (packed, e)
   # Add it to the negative cache.
   task_to_run.set_lookup_cache(to_run_key, False)

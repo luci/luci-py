@@ -48,8 +48,6 @@ SortOptions = collections.namedtuple('SortOptions', ['key', 'name'])
 
 ### is_admin pages.
 
-# TODO(maruel): Sort the handlers once they got their final name.
-
 
 class RestrictedConfigHandler(auth.AuthenticatingHandler):
   @auth.autologin
@@ -552,16 +550,21 @@ class TasksHandler(auth.AuthenticatingHandler):
     return state_choices
 
 
-class TaskHandler(auth.AuthenticatingHandler):
-  """Show the full text of a task request.
+class BaseTaskHandler(auth.AuthenticatingHandler):
+  """Handler that acts on a single task.
 
-  This handler supports both TaskResultSummary (ends with 0) or TaskRunResult
-  (ends with 1 or 2).
+  Ensures that the user has access to the task.
   """
+  def get_request_and_result(self, task_id):
+    """Retrieves the TaskRequest for 'task_id' and enforces the ACL.
 
-  @auth.autologin
-  @auth.require(acl.is_user)
-  def get(self, task_id):
+    Supports both TaskResultSummary (ends with 0) or TaskRunResult (ends with 1
+    or 2).
+
+    Returns:
+      tuple(TaskRequest, result): result can be either for a TaskRunResult or a
+                                  TaskResultSummay.
+    """
     try:
       key = task_pack.unpack_result_summary_key(task_id)
       request_key = task_pack.result_summary_key_to_request_key(key)
@@ -572,18 +575,21 @@ class TaskHandler(auth.AuthenticatingHandler):
             task_pack.run_result_key_to_result_summary_key(key))
       except (NotImplementedError, ValueError):
         self.abort(404, 'Invalid key format.')
+    request, result = ndb.get_multi((request_key, key))
+    if not request or not result:
+      self.abort(404, '%s not found.' % key.id())
+    if not request.has_access:
+      self.abort(403, '%s is not accessible.' % key.id())
+    return request, result
 
-    # 'result' can be either a TaskRunResult or TaskResultSummary.
-    result_future = key.get_async()
-    request_future = request_key.get_async()
-    result = result_future.get_result()
-    if not result:
-      self.abort(404, 'Invalid key.')
 
-    if not acl.is_privileged_user():
-      self.abort(403, 'Implement access control based on the user')
+class TaskHandler(BaseTaskHandler):
+  """Show the full text of a task request and its result."""
 
-    request = request_future.get_result()
+  @auth.autologin
+  @auth.require(acl.is_user)
+  def get(self, task_id):
+    request, result = self.get_request_and_result(task_id)
     parent_task_future = None
     if request.parent_task_id:
       parent_key = task_pack.unpack_run_result_key(request.parent_task_id)
@@ -647,57 +653,34 @@ class TaskHandler(auth.AuthenticatingHandler):
     self.response.write(template.render('swarming/user_task.html', params))
 
 
-class TaskCancelHandler(auth.AuthenticatingHandler):
-  """Cancel a task.
+class TaskCancelHandler(BaseTaskHandler):
+  """Cancel a task."""
 
-  Ensures that the associated TaskToRun is canceled and update the
-  TaskResultSummary accordingly.
-  """
-
-  @auth.require(acl.is_privileged_user)
-  def post(self):
-    key_id = self.request.get('task_id', '')
-    try:
-      key = task_pack.unpack_result_summary_key(key_id)
-    except ValueError:
-      self.abort_with_error(400, error='Invalid key')
-    redirect_to = self.request.get('redirect_to', '')
-
-    task_scheduler.cancel_task(key)
-    if redirect_to == 'listing':
+  @auth.require(acl.is_user)
+  def post(self, task_id):
+    request, result = self.get_request_and_result(task_id)
+    if not task_scheduler.cancel_task(request, result.key)[0]:
+      self.abort(400, 'Task cancelation error')
+    # The cancel button appears at both the /tasks and /task pages. Redirect to
+    # the right place.
+    if self.request.get('redirect_to', '') == 'listing':
       self.redirect('/user/tasks')
     else:
-      self.redirect('/user/task/%s' % key_id)
+      self.redirect('/user/task/%s' % task_id)
 
 
-class TaskRetryHandler(auth.AuthenticatingHandler):
+class TaskRetryHandler(BaseTaskHandler):
   """Retries the same task but with new metadata.
 
-  Retrying a task forcibly make it not idempotent so the task is inconditionally
+  Retrying a task forcibly make it not idempotent so the task is unconditionally
   scheduled.
-
-  This handler supports both TaskResultSummary (ends with 0) or TaskRunResult
-  (ends with 1 or 2).
   """
 
-  @auth.require(acl.is_privileged_user)
+  @auth.require(acl.is_user)
   def post(self, task_id):
-    try:
-      key = task_pack.unpack_result_summary_key(task_id)
-      request_key = task_pack.result_summary_key_to_request_key(key)
-    except ValueError:
-      try:
-        key = task_pack.unpack_run_result_key(task_id)
-        request_key = task_pack.result_summary_key_to_request_key(
-            task_pack.run_result_key_to_result_summary_key(key))
-      except (NotImplementedError, ValueError):
-        self.abort(404, 'Invalid key format.')
-
+    original_request, _ = self.get_request_and_result(task_id)
     # Retrying a task is essentially reusing the same task request as the
     # original one, but with new parameters.
-    original_request = request_key.get()
-    if not original_request:
-      self.abort(404, 'Invalid request key.')
     new_request = task_request.make_request_clone(original_request)
     result_summary = task_scheduler.schedule_request(new_request)
     self.redirect('/user/task/%s' % result_summary.task_id)
@@ -754,8 +737,8 @@ def create_application(debug):
       # User pages.
       ('/user/tasks', TasksHandler),
       ('/user/task/<task_id:[0-9a-fA-F]+>', TaskHandler),
+      ('/user/task/<task_id:[0-9a-fA-F]+>/cancel', TaskCancelHandler),
       ('/user/task/<task_id:[0-9a-fA-F]+>/retry', TaskRetryHandler),
-      ('/user/tasks/cancel', TaskCancelHandler),
 
       # Privileged user pages.
       ('/restricted/bots', BotsListHandler),

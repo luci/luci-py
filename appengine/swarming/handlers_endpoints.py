@@ -46,21 +46,31 @@ def _decode_field(self, field, value):
 protojson.ProtoJson.decode_field = _decode_field
 
 
-def get_result_key(task_id):
-  """Provides the key corresponding to a task ID."""
-  key = None
-  summary_key = None
+def get_request_and_result(task_id):
+  """Provides the key and TaskRequest corresponding to a task ID.
+
+  Enforces the ACL for users. Allows bots all access for the moment.
+
+  Returns:
+    tuple(TaskRequest, result): result can be either for a TaskRunResult or a
+                                TaskResultSummay.
+  """
   try:
     key = task_pack.unpack_result_summary_key(task_id)
-    summary_key = key
+    request_key = task_pack.result_summary_key_to_request_key(key)
   except ValueError:
     try:
       key = task_pack.unpack_run_result_key(task_id)
-      summary_key = task_pack.run_result_key_to_result_summary_key(key)
-    except ValueError:
-      raise endpoints.BadRequestException(
-          'Task ID %s produces an invalid key.' % task_id)
-  return key, summary_key
+      request_key = task_pack.result_summary_key_to_request_key(
+          task_pack.run_result_key_to_result_summary_key(key))
+    except (NotImplementedError, ValueError):
+      raise endpoints.BadRequestException('%s is an invalid key.' % task_id)
+  request, result = ndb.get_multi((request_key, key))
+  if not request or not result:
+    raise endpoints.NotFoundException('%s not found.' % key.id())
+  if not acl.is_bot() and not request.has_access:
+    raise endpoints.ForbiddenException('%s is not accessible.' % key.id())
+  return request, result
 
 
 def get_or_raise(key):
@@ -69,12 +79,6 @@ def get_or_raise(key):
   if not result:
     raise endpoints.NotFoundException('%s not found.' % key.id())
   return result
-
-
-def get_result_entity(task_id):
-  """Returns the entity (TaskResultSummary or TaskRunResult) for a given ID."""
-  key, _ = get_result_key(task_id)
-  return get_or_raise(key)
 
 
 def apply_property_defaults(properties):
@@ -221,10 +225,7 @@ class SwarmingTaskService(remote.Service):
     A summary ID ends with '0', a run ID ends with '1' or '2'.
     """
     logging.info('%s', request)
-    key, _, = get_result_key(request.task_id)
-    result = key.get()
-    if not result:
-      raise endpoints.NotFoundException('%s not found.' % key.id())
+    _, result = get_request_and_result(request.task_id)
     return message_conversion.task_result_to_rpc(
         result, request.include_performance_stats)
 
@@ -238,24 +239,23 @@ class SwarmingTaskService(remote.Service):
   def request(self, request):
     """Returns the task request corresponding to a task ID."""
     logging.info('%s', request)
-    _, summary_key = get_result_key(request.task_id)
-    request_key = task_pack.result_summary_key_to_request_key(summary_key)
-    return message_conversion.task_request_to_rpc(get_or_raise(request_key))
+    request_obj, _ = get_request_and_result(request.task_id)
+    return message_conversion.task_request_to_rpc(request_obj)
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       TaskId, swarming_rpcs.CancelResponse,
       name='cancel',
       path='{task_id}/cancel')
-  @auth.require(acl.is_admin)
+  @auth.require(acl.is_bot_or_user)
   def cancel(self, request):
     """Cancels a task.
 
     If a bot was running the task, the bot will forcibly cancel the task.
     """
     logging.info('%s', request)
-    summary_key = task_pack.unpack_result_summary_key(request.task_id)
-    ok, was_running = task_scheduler.cancel_task(summary_key)
+    request_obj, result = get_request_and_result(request.task_id)
+    ok, was_running = task_scheduler.cancel_task(request_obj, result.key)
     return swarming_rpcs.CancelResponse(ok=ok, was_running=was_running)
 
   @gae_ts_mon.instrument_endpoint()
@@ -272,7 +272,7 @@ class SwarmingTaskService(remote.Service):
     # TODO(maruel): Send as raw content instead of encoded. This is not
     # supported by cloud endpoints.
     logging.info('%s', request)
-    result = get_result_entity(request.task_id)
+    _, result = get_request_and_result(request.task_id)
     output = result.get_output()
     if output:
       output = output.decode('utf-8', 'replace')
