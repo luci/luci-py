@@ -399,6 +399,10 @@ class HighDevice(object):
   def is_valid(self):
     return self._device.is_valid
 
+  @property
+  def failure(self):
+    return self._device.failure
+
   def Close(self):
     self._device.Close()
 
@@ -554,9 +558,8 @@ class HighDevice(object):
 
     # This works on Nexus 10 but not on Nexus 5. Need to investigate more. In
     # the meantime, simply try one after the other.
-    if not self.PushContent(
-        '%d\n' % speed,
-        '/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed'):
+    path = '/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed'
+    if not self.PushContent('%d\n' % speed, path):
       _LOG.info(
           '%s.SetCPUSpeed(): Failed to push %d in %s',
           self.port_path, speed, path)
@@ -569,8 +572,7 @@ class HighDevice(object):
         return False
 
     # Get it back to confirm.
-    val = self.PullContent(
-        '/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed')
+    val = self.PullContent(path)
     return success and (val or '').strip() == str(speed)
 
   def GetTemperatures(self):

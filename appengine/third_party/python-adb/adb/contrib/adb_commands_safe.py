@@ -130,6 +130,7 @@ class AdbCommandsSafe(object):
     # State.
     self._adb_cmd = None
     self._serial = None
+    self._failure = None
     self._handle = handle
     self._port_path = '/'.join(str(p) for p in port_path) if port_path else None
 
@@ -171,6 +172,10 @@ class AdbCommandsSafe(object):
   @property
   def is_valid(self):
     return bool(self._adb_cmd)
+
+  @property
+  def failure(self):
+    return self._failure
 
   @property
   def max_packet_size(self):
@@ -773,12 +778,16 @@ class AdbCommandsSafe(object):
           self._adb_cmd = adb_commands.AdbCommands.Connect(
               self._handle, banner=self._banner, rsa_keys=self._rsa_keys,
               auth_timeout_ms=self._auth_timeout_ms)
+          self._failure = None if self._adb_cmd else 'unknown'
           break
         except usb_exceptions.DeviceAuthError as e:
+          self._failure = 'unauthorized'
           _LOG.warning('AUTH FAILURE: %s: %s', self.port_path, e)
         except usb_exceptions.LibusbWrappingError as e:
+          self._failure = 'usb_failure'
           _LOG.warning('I/O FAILURE: %s: %s', self.port_path, e)
         except adb_protocol.InvalidResponseError as e:
+          self._failure = 'protocol_fault'
           _LOG.warning('SYNC FAILURE: %s: %s', self.port_path, e)
         finally:
           # Do not leak the USB handle when we can't talk to the device.
