@@ -100,7 +100,7 @@ class _BotApiHandler(auth.ApiHandler):
 
   @classmethod
   def get_auth_methods(cls, conf):
-    return [auth.machine_authentication, auth.oauth_authentication]
+    return [auth.optional_machine_authentication, auth.oauth_authentication]
 
 
 class _BotAuthenticatingHandler(auth.AuthenticatingHandler):
@@ -119,7 +119,7 @@ class _BotAuthenticatingHandler(auth.AuthenticatingHandler):
 
   @classmethod
   def get_auth_methods(cls, conf):
-    return [auth.machine_authentication, auth.oauth_authentication]
+    return [auth.optional_machine_authentication, auth.oauth_authentication]
 
 
 class BootstrapHandler(_BotAuthenticatingHandler):

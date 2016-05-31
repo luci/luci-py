@@ -18,10 +18,65 @@ service.
 See:
   * https://github.com/luci/luci-go/tree/master/appengine/cmd/tokenserver
   * https://github.com/luci/luci-go/tree/master/client/cmd/luci_machine_tokend
+  * https://github.com/luci/luci-go/tree/master/server/auth/machine
 """
 
+import base64
+import logging
+import random
+import threading
 
-def machine_authentication(request):  # pylint: disable=unused-argument
+from google.protobuf import message
+
+from components import utils
+
+from . import api
+from . import model
+from . import signature
+from .proto import machine_token_pb2
+
+
+# Part of public API of 'auth' component, exposed by this module.
+__all__ = [
+  'BadTokenError',
+  'TransientError',
+  'machine_authentication',
+  'optional_machine_authentication',
+]
+
+
+# HTTP header that carries the machine token.
+MACHINE_TOKEN_HEADER = 'X-Luci-Machine-Token'
+
+# Name of a group with trusted token servers. This group should contain service
+# account emails of token servers we trust.
+TOKEN_SERVERS_GROUP = 'auth-token-servers'
+
+# How much clock difference we tolerate.
+ALLOWED_CLOCK_DRIFT_SEC = 10
+
+# For how long to cache the certificates of the token server in the memory.
+CERTS_CACHE_EXP_SEC = 60 * 60
+
+
+class BadTokenError(api.AuthenticationError):
+  """Raised if the supplied machine token is not valid.
+
+  See app logs for more details.
+  """
+
+  def __init__(self):
+    super(BadTokenError, self).__init__('Bad machine token')
+
+
+class TransientError(Exception):
+  """Raised on transient errors.
+
+  Supposed to trigger HTTP 500 response.
+  """
+
+
+def machine_authentication(request):
   """Implementation of the machine authentication.
 
   See components.auth.handler.AuthenticatingHandler.get_auth_methods for details
@@ -36,9 +91,138 @@ def machine_authentication(request):  # pylint: disable=unused-argument
     applicable).
 
   Raises:
-    auth.AuthenticationError is machine token header is present, but the token
-    is invalid.
+    BadTokenError (which is api.AuthenticationError) if machine token header is
+    present, but the token is invalid. We also log the error details, but return
+    only generic error message to the user.
   """
-  # TODO(vadimsh): Implement. For now just do nothing, so that components.auth
-  # falls back to IP-whitelist based authentication.
-  return None
+  token = request.headers.get(MACHINE_TOKEN_HEADER)
+  if not token:
+    return None
+
+  # Deserialize both envelope and the body.
+  try:
+    token = b64_decode(token)
+  except TypeError as exc:
+    log_error(request, None, exc, 'Failed to decode base64')
+    raise BadTokenError()
+
+  try:
+    envelope = machine_token_pb2.MachineTokenEnvelope()
+    envelope.MergeFromString(token)
+    body = machine_token_pb2.MachineTokenBody()
+    body.MergeFromString(envelope.token_body)
+  except message.DecodeError as exc:
+    log_error(request, None, exc, 'Failed to deserialize the token')
+    raise BadTokenError()
+
+  # Construct an identity of a token server that signed the token to check that
+  # it belongs to "auth-token-servers" group.
+  try:
+    signer_service_account = model.Identity.from_bytes('user:' + body.issued_by)
+  except ValueError as exc:
+    log_error(request, body, exc, 'Bad issued_by field - %s', body.issued_by)
+    raise BadTokenError()
+
+  # Reject tokens from unknown token servers right away.
+  if not api.is_group_member(TOKEN_SERVERS_GROUP, signer_service_account):
+    log_error(request, body, None, 'Unknown token issuer - %s', body.issued_by)
+    raise BadTokenError()
+
+  # Check the expiration time before doing any heavier checks.
+  now = utils.time_time()
+  if now < body.issued_at - ALLOWED_CLOCK_DRIFT_SEC:
+    log_error(request, body, None, 'The token is not yet valid')
+    raise BadTokenError()
+  if now > body.issued_at + body.lifetime + ALLOWED_CLOCK_DRIFT_SEC:
+    log_error(request, body, None, 'The token has expired')
+    raise BadTokenError()
+
+  # Check the token was actually signed by the server.
+  try:
+    certs = get_service_account_certificates(body.issued_by, now)
+    cert = signature.get_x509_certificate_by_name(certs, envelope.key_id)
+    is_valid_sig = signature.check_signature(
+        blob=envelope.token_body,
+        x509_certificate_pem=cert,
+        signature=envelope.rsa_sha256)
+    if not is_valid_sig:
+      log_error(request, body, None, 'Bad signature')
+      raise BadTokenError()
+  except signature.CertificateError as exc:
+    if exc.transient:
+      raise TransientError(str(exc))
+    log_error(
+        request, body, exc, 'Unexpected error when checking the signature')
+    raise BadTokenError()
+
+  # The token is valid. Construct the bot identity.
+  try:
+    return model.Identity.from_bytes('bot:' + body.machine_fqdn)
+  except ValueError as exc:
+    log_error(request, body, exc, 'Bad machine_fqdn - %s', body.machine_fqdn)
+    raise BadTokenError()
+
+
+def optional_machine_authentication(request):
+  """It's like machine_authentication except it ignores broken tokens.
+
+  Usable during development and initial roll out when machine tokens may not
+  be working all the time.
+  """
+  try:
+    return machine_authentication(request)
+  except BadTokenError:
+    return None # error details are already logged
+
+
+def b64_decode(data):
+  """Decodes standard unpadded base64 encoded string."""
+  mod = len(data) % 4
+  if mod:
+    data += '=' * (4 - mod)
+  return base64.b64decode(data)
+
+
+def log_error(request, token_body, exc, msg, *args):
+  """Logs details about the request and the token, along with error message."""
+  lines = [('machine_auth: ' + msg) % args]
+  if exc:
+    lines.append('  exception: %s (%s)' % (exc, exc.__class__.__name__))
+  if request:
+    lines.append('  remote_addr: %s' % request.remote_addr)
+  if token_body:
+    lines.extend([
+      '  machine_fqdn: %s' % token_body.machine_fqdn,
+      '  issued_by: %s' % token_body.issued_by,
+      '  issued_at: %s' % token_body.issued_at,
+      '  now: %s' % int(utils.time_time()), # for comparison with issued_at
+      '  lifetime: %s' % token_body.lifetime,
+      '  ca_id: %s' % token_body.ca_id,
+      '  cert_sn: %s' % token_body.cert_sn,
+    ])
+  logging.warning('\n'.join(lines))
+
+
+_certs_cache = {} # email => (certs, expiration time)
+_certs_cache_lock = threading.Lock()
+
+
+def get_service_account_certificates(email, now):
+  """Fetches service account certificates, caching them in local memory.
+
+  Caches certificates in local instance memory. Randomize time a little bit when
+  checking for expiration, so that concurrent requests do not all go refresh the
+  cache simultaneously.
+  """
+  randomized_now = now + 0.1 * CERTS_CACHE_EXP_SEC * random.random()
+  with _certs_cache_lock:
+    if email in _certs_cache:
+      certs, exp = _certs_cache[email]
+      if exp > randomized_now:
+        return certs
+  # Fetch outside the lock. Multiple concurrent fetches are possible, but it's
+  # not a big deal. The last one wins.
+  certs = signature.get_service_account_certificates(email)
+  with _certs_cache_lock:
+    _certs_cache[email] = (certs, now + CERTS_CACHE_EXP_SEC)
+  return certs
