@@ -830,8 +830,8 @@ def get_state_all_devices_android(devices):
     u'product.cpu.abi')
 
   def fn(device):
-    if not device.is_valid:
-      return {u'state': 'unauthenticated'}
+    if not device.is_valid or device.failure:
+      return {u'state': device.failure or 'unavailable'}
     properties = device.cache.build_props
     if not properties:
       return {u'state': 'unavailable'}
