@@ -63,7 +63,7 @@ def get_request_and_result(task_id):
       key = task_pack.unpack_run_result_key(task_id)
       request_key = task_pack.result_summary_key_to_request_key(
           task_pack.run_result_key_to_result_summary_key(key))
-    except (NotImplementedError, ValueError):
+    except ValueError:
       raise endpoints.BadRequestException('%s is an invalid key.' % task_id)
   request, result = ndb.get_multi((request_key, key))
   if not request or not result:

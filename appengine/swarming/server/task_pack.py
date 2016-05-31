@@ -65,9 +65,7 @@ def result_summary_key_to_run_result_key(result_summary_key, try_number):
   if try_number < 1:
     raise ValueError('Try number(%d) must be above 0' % try_number)
   if try_number > 2:
-    # https://code.google.com/p/swarming/issues/detail?id=108
-    raise NotImplementedError(
-        'Try number(%d) > 2 is not yet implemented' % try_number)
+    raise ValueError('Try number(%d) > 2 is not supported' % try_number)
   return ndb.Key('TaskRunResult', try_number, parent=result_summary_key)
 
 

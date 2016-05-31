@@ -98,7 +98,7 @@ class TaskPackApiTest(test_case.TestCase):
 
     with self.assertRaises(ValueError):
       task_pack.result_summary_key_to_run_result_key(result_summary_key, 0)
-    with self.assertRaises(NotImplementedError):
+    with self.assertRaises(ValueError):
       task_pack.result_summary_key_to_run_result_key(result_summary_key, 3)
 
   def test_run_result_key_to_performance_stats_key(self):
@@ -187,7 +187,7 @@ class TaskPackApiTest(test_case.TestCase):
       task_pack.unpack_run_result_key('g')
     with self.assertRaises(ValueError):
       task_pack.unpack_run_result_key('bb80200')
-    with self.assertRaises(NotImplementedError):
+    with self.assertRaises(ValueError):
       task_pack.unpack_run_result_key('bb80203')
 
 

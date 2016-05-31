@@ -573,7 +573,7 @@ class BaseTaskHandler(auth.AuthenticatingHandler):
         key = task_pack.unpack_run_result_key(task_id)
         request_key = task_pack.result_summary_key_to_request_key(
             task_pack.run_result_key_to_result_summary_key(key))
-      except (NotImplementedError, ValueError):
+      except ValueError:
         self.abort(404, 'Invalid key format.')
     request, result = ndb.get_multi((request_key, key))
     if not request or not result:
