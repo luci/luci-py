@@ -12,13 +12,21 @@
         of `plugdev` so it can open USB ports.
     *   python [libusb1](https://pypi.python.org/pypi/libusb1) is installed.
 *   GNU/linux and OSX
-    *   Must have passwordless `sudo reboot` enabled, otherwise the bot will hang
-        when trying to reboot the host.
+    *   Must have passwordless `sudo reboot` enabled, otherwise the bot will
+        hang when trying to reboot the host.
 
         Add the following line in `/etc/sudoers`
         where `swarming` is the account in which the swarming bot runs in:
 
             swarming ALL=NOPASSWD:/sbin/shutdown -r now
+
+*   iOS
+    *   Xcode must be installed and the EULA accepted. It can be automated with:
+
+            sudo xcodebuild -license accept
+
+    *   Install (compile) [libmobiledevice](http://www.libimobiledevice.org/)
+        and both `ideviceinfo` and `idevice_id` must be in `PATH`.
 
 
 ## Recommendataions
@@ -48,6 +56,8 @@
 
             swarming ALL=NOPASSWD:/usr/sbin/dtrace
             swarming ALL=NOPASSWD:/usr/bin/powermetrics
+*   Testing involving hardware audio requires a 3.5mm dongle to be plugged in
+    the audio port.
 
 
 ### Auto-starting on Debian
