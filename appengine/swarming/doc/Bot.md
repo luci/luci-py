@@ -12,7 +12,7 @@
         of `plugdev` so it can open USB ports.
     *   python [libusb1](https://pypi.python.org/pypi/libusb1) is installed.
 *   GNU/linux and OSX
-    *   Must have passwordless sudo reboot enabled, Otherwise the bot will hang
+    *   Must have passwordless `sudo reboot` enabled, otherwise the bot will hang
         when trying to reboot the host.
 
         Add the following line in `/etc/sudoers`
@@ -39,11 +39,11 @@
     *   Windows: `setup_auto_startup_win()`
 *   Android
     *   Android devices should be rooted so efficient power management can be
-        used. This can greatly improve throughput by accelerating cool down
+        used. This can greatly improve throughput by accelerating cooling down
         during downtimes.
 *   OSX
     *   Enable dtrace and powermetrics if desired for testing purpose. Warning:
-        enabling dtrace effectively give control over the host. Add the
+        enabling dtrace effectively gives control over the host. Add the
         following to `/etc/sudoers`:
 
             swarming ALL=NOPASSWD:/usr/sbin/dtrace
