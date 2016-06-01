@@ -391,6 +391,8 @@ def run_bot(arg_error):
           consecutive_sleeps = 0
         else:
           consecutive_sleeps += 1
+        # After every poll, clean up the cache.
+        clean_isolated_cache(botobj)
       except Exception as e:
         logging.exception('poll_server failed')
         msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
