@@ -391,8 +391,6 @@ def run_bot(arg_error):
           consecutive_sleeps = 0
         else:
           consecutive_sleeps += 1
-        # After every poll, clean up the cache.
-        clean_isolated_cache(botobj)
       except Exception as e:
         logging.exception('poll_server failed')
         msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
@@ -447,6 +445,8 @@ def poll_server(botobj, quit_bit):
     if run_manifest(botobj, resp['manifest'], start):
       # Completed a task successfully so update swarming_bot.zip if necessary.
       update_lkgbc(botobj)
+    # Clean up cache after a task
+    clean_isolated_cache(botobj)
     # TODO(maruel): Handle the case where quit_bit.is_set() happens here. This
     # is concerning as this means a signal (often SIGTERM) was received while
     # running the task. Make sure the host is properly restarting.

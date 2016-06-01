@@ -260,9 +260,12 @@ class TestBotMain(net_utils.TestCase):
 
   def test_poll_server_run(self):
     manifest = []
+    clean = []
     bit = threading.Event()
     self.mock(bit, 'wait', self.fail)
     self.mock(bot_main, 'run_manifest', lambda *args: manifest.append(args))
+    self.mock(bot_main, 'clean_isolated_cache',
+              lambda *args: clean.append(args))
     self.mock(bot_main, 'update_bot', self.fail)
 
     self.expected_requests(
@@ -279,6 +282,8 @@ class TestBotMain(net_utils.TestCase):
     self.assertTrue(bot_main.poll_server(self.bot, bit))
     expected = [(self.bot, {'foo': 'bar'}, time.time())]
     self.assertEqual(expected, manifest)
+    expected = [(self.bot,)]
+    self.assertEqual(expected, clean)
 
   def test_poll_server_update(self):
     update = []
