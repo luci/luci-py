@@ -99,6 +99,9 @@ def lease_machine(machine_key, lease):
   if lease.response.state != rpc_messages.LeaseRequestState.UNTRIAGED:
     logging.warning('LeaseRequest no longer untriaged:\n%s', lease)
     return False
+  if not machine.pubsub_subscription:
+    logging.warning('CatalogMachineEntry not subscribed to Pub/Sub yet')
+    return False
 
   logging.info('Leasing CatalogMachineEntry:\n%s', machine)
   lease.leased_ts = utils.utcnow()
@@ -367,33 +370,27 @@ def create_subscription(machine_key):
     logging.info('CatalogMachineEntry already subscribed:\n%s', machine)
     return
 
-  machine.pubsub_subscription = 'subscription-%s' % machine.key.id()
-  machine.pubsub_topic = 'topic-%s' % machine.key.id()
-
   params = {
       'backend_project': machine.policies.backend_project,
       'backend_topic': machine.policies.backend_topic,
       'hostname': machine.dimensions.hostname,
       'machine_id': machine.key.id(),
       'machine_service_account': machine.policies.machine_service_account,
-      'machine_subscription': machine.pubsub_subscription,
+      'machine_subscription': 'subscription-%s' % machine.key.id(),
       'machine_subscription_project': machine.pubsub_subscription_project,
-      'machine_topic': machine.pubsub_topic,
+      'machine_topic': 'topic-%s' % machine.key.id(),
       'machine_topic_project': machine.pubsub_topic_project,
   }
   backend_attributes = {}
   for attribute in machine.policies.backend_attributes:
     backend_attributes[attribute.key] = attribute.value
   params['backend_attributes'] = utils.encode_to_json(backend_attributes)
-  if utils.enqueue_task(
+  if not utils.enqueue_task(
       '/internal/queues/subscribe-machine',
       'subscribe-machine',
       params=params,
       transactional=True,
   ):
-    machine.state = models.CatalogMachineEntryStates.SUBSCRIBING
-    machine.put()
-  else:
     raise TaskEnqueuingError('subscribe-machine')
 
 

@@ -130,18 +130,22 @@ class MachineReclaimer(webapp2.RequestHandler):
 
 
 @ndb.transactional
-def set_available(machine_key):
+def set_available(machine_key, topic, subscription):
   """Sets a machine as AVAILABLE.
 
   Args:
     machine_key: ndb.Key for a models.CatalogMachineEntry instance.
+    topic: Name of the Pub/Sub topic for communicating with this machine.
+    subscription: Name of the Pub/Sub subscription created for this machine.
   """
   machine = machine_key.get()
   if not machine:
     logging.error('CatalogMachineEntry does not exist: %s', machine_key)
     return
 
-  if machine.state == models.CatalogMachineEntryStates.SUBSCRIBING:
+  if machine.state == models.CatalogMachineEntryStates.NEW:
+    machine.pubsub_subscription = subscription
+    machine.pubsub_topic = topic
     machine.state = models.CatalogMachineEntryStates.AVAILABLE
     machine.put()
   elif machine.state == models.CatalogMachineEntryStates.AVAILABLE:
@@ -190,7 +194,6 @@ class MachineSubscriber(webapp2.RequestHandler):
     topic = pubsub.full_topic_name(machine_topic_project, machine_topic)
     subscription = pubsub.full_subscription_name(
         machine_subscription_project, machine_subscription)
-    pubsub.ensure_subscription_deleted(subscription)
     pubsub.ensure_subscription_exists(subscription, topic)
 
     with pubsub.iam_policy(subscription) as policy:
@@ -212,7 +215,11 @@ class MachineSubscriber(webapp2.RequestHandler):
           attributes,
     )
 
-    set_available(ndb.Key(models.CatalogMachineEntry, machine_id))
+    set_available(
+        ndb.Key(models.CatalogMachineEntry, machine_id),
+        machine_topic,
+        machine_subscription,
+    )
 
 
 def create_queues_app():

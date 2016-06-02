@@ -165,7 +165,7 @@ class CatalogCapacityEntry(CatalogEntry):
       yield capacity
 
 
-CatalogMachineEntryStates = Enum(['AVAILABLE', 'LEASED', 'NEW', 'SUBSCRIBING'])
+CatalogMachineEntryStates = Enum(['AVAILABLE', 'LEASED', 'NEW'])
 
 
 class CatalogMachineEntry(CatalogEntry):
