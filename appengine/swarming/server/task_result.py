@@ -440,11 +440,10 @@ class _TaskResultCommon(ndb.Model):
     if not hasattr(self, '_performance_stats_cache'):
       key = None if self.deduped_from else self.performance_stats_key
       # pylint: disable=attribute-defined-outside-init
-      self._performance_stats_cache = (
-          (key.get() if key else None) or
-          PerformanceStats(
-              isolated_download=OperationStats(),
-              isolated_upload=OperationStats()))
+      stats = (key.get() if key else None) or PerformanceStats()
+      stats.isolated_download = stats.isolated_download or OperationStats()
+      stats.isolated_upload = stats.isolated_upload or OperationStats()
+      self._performance_stats_cache = stats
     return self._performance_stats_cache
 
   @property

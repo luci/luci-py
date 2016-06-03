@@ -532,6 +532,8 @@ class Test(unittest.TestCase):
       if perf_stats:
         # Ignore bot_overhead, everything else should be empty.
         perf_stats.pop('bot_overhead', None)
+        self.assertFalse(perf_stats.pop('isolated_download', None))
+        self.assertFalse(perf_stats.pop('isolated_upload', None))
         self.assertFalse(perf_stats)
 
     bot_version = result.pop('bot_version')
