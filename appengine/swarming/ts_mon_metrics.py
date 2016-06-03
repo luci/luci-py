@@ -4,6 +4,7 @@
 
 """Timeseries metrics."""
 
+from collections import defaultdict
 import itertools
 
 from google.appengine.ext import ndb
@@ -64,6 +65,16 @@ tasks_expired = gae_ts_mon.CounterMetric(
 jobs_status = gae_ts_mon.StringMetric(
     'jobs/status',
     description='Status of an active job.')
+
+# Global metric. Metric fields:
+# - project_id: e.g. 'chromium'
+# - subproject_id: e.g. 'blink'. Set to empty string if not used.
+# - spec_name: name of a job specification, e.g. '<master>:<builder>:<test>'
+#     for buildbot jobs.
+# - status: 'pending' or 'running'.
+jobs_active = gae_ts_mon.GaugeMetric(
+    'jobs/active',
+    description='Number of running, pending or otherwise active jobs.')
 
 
 # Global metric. Metric fields: executor_id (bot id).
@@ -140,11 +151,19 @@ def _set_jobs_metrics():
                task_result.State.PENDING: 'pending'}
   query_iter = task_result.get_result_summaries_query(
       None, None, 'created_ts', 'pending_running', None).iter()
+  jobs_counts = defaultdict(lambda: 0)
   while (yield query_iter.has_next_async()):
     summary = query_iter.next()
     status = state_map.get(summary.state, '')
     fields = extract_job_fields(summary.tags, summary.bot_id or '')
-    jobs_status.set(status, target_fields=TARGET_FIELDS, fields=fields)
+    if summary.bot_id:
+      jobs_status.set(status, target_fields=TARGET_FIELDS, fields=fields)
+    fields.pop('executor_id')
+    fields['status'] = status
+    jobs_counts[tuple(sorted(fields.iteritems()))] += 1
+
+  for key, count in jobs_counts.iteritems():
+    jobs_active.set(count, target_fields=TARGET_FIELDS, fields=dict(key))
 
 
 @ndb.tasklet

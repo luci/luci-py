@@ -141,6 +141,12 @@ class TestMetrics(test_case.TestCase):
     summary_pending.bot_id = 'test_bot2'
     summary_pending.put()
 
+    summary_pending = _gen_task_result_summary(self.now, 3, tags=tags)
+    summary_pending.state = task_result.State.PENDING
+    summary_pending.modified_ts = self.now
+    summary_pending.bot_id = ''
+    summary_pending.put()
+
     _gen_bot_info('bot_ready', self.now).put()
     _gen_bot_info('bot_running', self.now, task_id='deadbeef').put()
     _gen_bot_info('bot_quarantined', self.now, quarantined=True).put()
@@ -164,6 +170,13 @@ class TestMetrics(test_case.TestCase):
         fields=jobs_fields, target_fields=ts_mon_metrics.TARGET_FIELDS))
     jobs_fields.update({'executor_id': 'test_bot2'})
     self.assertEqual('pending', ts_mon_metrics.jobs_status.get(
+        fields=jobs_fields, target_fields=ts_mon_metrics.TARGET_FIELDS))
+    del jobs_fields['executor_id']
+    jobs_fields.update({'status': 'running'})
+    self.assertEqual(1, ts_mon_metrics.jobs_active.get(
+        fields=jobs_fields, target_fields=ts_mon_metrics.TARGET_FIELDS))
+    jobs_fields.update({'status': 'pending'})
+    self.assertEqual(2, ts_mon_metrics.jobs_active.get(
         fields=jobs_fields, target_fields=ts_mon_metrics.TARGET_FIELDS))
 
     for bot_id, status in bots_expected.iteritems():
