@@ -29,6 +29,7 @@ def apply_metadata_update(items, metadata):
   Returns:
     A list of {'key': ..., 'value': ...} dicts.
   """
+  metadata = metadata.copy()
   result = []
 
   # Update existing metadata.
