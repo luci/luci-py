@@ -95,6 +95,24 @@ class LeaseRequestFulfiller(webapp2.RequestHandler):
         pubsub.full_topic_name(machine_project, machine_topic), messages)
 
 
+@ndb.transactional(xg=True)
+def reclaim(machine_key):
+  """Reclaims a machine.
+
+  Args:
+    machine_key: ndb.Key for a models.CatalogMachineEntry.
+  """
+  machine = machine_key.get()
+  if not machine:
+    return
+
+  lease = models.LeaseRequest.get_by_id(machine.lease_id)
+  lease.machine_id = None
+  lease.response.hostname = None
+  machine.key.delete()
+  lease.put()
+
+
 class MachineReclaimer(webapp2.RequestHandler):
   """Worker for reclaiming machines."""
 
@@ -104,9 +122,14 @@ class MachineReclaimer(webapp2.RequestHandler):
 
     Params:
       hostname: Hostname of the machine being reclaimed.
-      machine_project: Project that the machine communication topic is contained
-        in.
+      machine_key: URL-safe ndb.Key for a models.CatalogMachineEntry.
+      machine_subscription: Subscription created for the machine to listen
+        for instructions on.
+      machine_subscription_project: Project that the machine subscription is
+        contained in.
       machine_topic: Topic that the machine communication should occur on.
+      machine_topic_project: Project that the machine communication topic is
+        contained in.
       policies: JSON-encoded string representation of the
         rpc_messages.Policies governing this machine.
       request_json: JSON-encoded string representation of the
@@ -115,18 +138,29 @@ class MachineReclaimer(webapp2.RequestHandler):
         rpc_messages.LeaseResponse being delivered.
     """
     hostname = self.request.get('hostname')
-    machine_project = self.request.get('machine_project')
+    machine_key = ndb.Key(urlsafe=self.request.get('machine_key'))
+    machine_subscription = self.request.get('machine_subscription')
+    machine_subscription_project = self.request.get(
+        'machine_subscription_project')
     machine_topic = self.request.get('machine_topic')
+    machine_topic_project = self.request.get('machine_topic_project')
     policies = json.loads(self.request.get('policies'))
     request = json.loads(self.request.get('request_json'))
     response = json.loads(self.request.get('response_json'))
 
+    assert machine_key.kind() == 'CatalogMachineEntry', machine_key
+
     maybe_notify_backend('RECLAIMED', hostname, policies)
     maybe_notify_lessee(request, response)
 
-    # Inform the machine.
-    pubsub.publish(
-        pubsub.full_topic_name(machine_project, machine_topic), 'RECLAIMED', {})
+    # Delete machine Pub/Sub channel.
+    pubsub.ensure_subscription_deleted(
+        pubsub.full_subscription_name(
+            machine_subscription_project, machine_subscription))
+    pubsub.ensure_topic_deleted(
+        pubsub.full_topic_name(machine_topic_project, machine_topic))
+
+    reclaim(machine_key)
 
 
 @ndb.transactional

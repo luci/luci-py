@@ -297,6 +297,19 @@ def ensure_subscription_exists(
   _with_existing_topic(topic, create_subscription)
 
 
+def ensure_topic_deleted(topic):
+  """Deletes a topic if it exists.
+
+  Args:
+    topic: Full name of the topic.
+
+  Raises:
+    Error or TransientError.
+  """
+  assert validate_full_name(topic, 'topics'), topic
+  _call('DELETE', topic, accepted_http_statuses=[404])
+
+
 def ensure_subscription_deleted(subscription):
   """Deletes a subscription if it exists.
 

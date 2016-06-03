@@ -210,6 +210,10 @@ def reclaim_machine(machine_key, reclamation_ts):
     True if the machine was reclaimed, else False.
   """
   machine = machine_key.get()
+  if not machine:
+    logging.warning('CatalogMachineEntry not found: %s', machine_key)
+    return
+
   logging.info('Attempting to reclaim CatalogMachineEntry:\n%s', machine)
 
   if machine.lease_expiration_ts is None:
@@ -225,39 +229,15 @@ def reclaim_machine(machine_key, reclamation_ts):
   logging.info('Reclaiming CatalogMachineEntry:\n%s', machine)
   lease = models.LeaseRequest.get_by_id(machine.lease_id)
   hostname = lease.response.hostname
-  lease.machine_id = None
   lease.response.hostname = None
-  machine.lease_id = None
-  machine.lease_expiration_ts = None
-
-  policy = machine.policies.on_reclamation
-  if policy == rpc_messages.MachineReclamationPolicy.DELETE:
-    logging.info('Executing MachineReclamationPolicy: DELETE')
-    lease.put()
-    machine.key.delete()
-  else:
-    if policy == rpc_messages.MachineReclamationPolicy.MAKE_AVAILABLE:
-      logging.info('Executing MachineReclamationPolicy: MAKE_AVAILABLE')
-      machine.state = models.CatalogMachineEntryStates.AVAILABLE
-    else:
-      if policy != rpc_messages.MachineReclamationPolicy.RECLAIM:
-        # Something is awry. Log an error, but still reclaim the machine.
-        # Fall back on the RECLAIM policy because it notifies the backend and
-        # prevents the machine from being leased out again, but keeps it in
-        # the Catalog in case we want to examine it further.
-        logging.error(
-            'Unexpected MachineReclamationPolicy: %s\nDefaulting to RECLAIM',
-            policy,
-        )
-      else:
-        logging.info('Executing MachineReclamationPolicy: RECLAIM')
-      machine.state = models.CatalogMachineEntryStates.RECLAIMED
-    ndb.put_multi([lease, machine])
 
   params = {
       'hostname': hostname,
-      'machine_project': machine.pubsub_topic_project,
+      'machine_key': machine.key.urlsafe(),
+      'machine_subscription': machine.pubsub_subscription,
+      'machine_subscription_project': machine.pubsub_subscription_project,
       'machine_topic': machine.pubsub_topic,
+      'machine_topic_project': machine.pubsub_topic_project,
       'policies': protojson.encode_message(machine.policies),
       'request_json': protojson.encode_message(lease.request),
       'response_json': protojson.encode_message(lease.response),
