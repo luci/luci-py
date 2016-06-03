@@ -468,9 +468,9 @@ def run_command(
               'upload', {}).get('duration', 0)
           if params['bot_overhead'] < 0:
             params['bot_overhead'] = 0
-        stats = run_isolated_result.get('stats')
-        if stats:
-          params['isolated_stats'] = stats
+        isolated_stats = run_isolated_result.get('stats', {}).get('isolated')
+        if isolated_stats:
+          params['isolated_stats'] = isolated_stats
     except (IOError, OSError, ValueError) as e:
       logging.error('Swallowing error: %s', e)
       if not must_signal_internal_failure:
