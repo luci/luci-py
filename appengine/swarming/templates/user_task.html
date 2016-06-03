@@ -467,7 +467,7 @@
       {% if task.performance_stats.is_valid %}
         <tr title="Size of the bot cache before this task started. This cache permits to reduce the amount of items downloaded.">
           <td>Initial bot cache</td>
-          <td>{{task.performance_stats.isolated_download.initial_size|filesizeformat}} total; {{task.performance_stats.isolated_download.initial_number_items}} items</td>
+          <td>{{task.performance_stats.isolated_download.initial_size or 0|filesizeformat}} total; {{task.performance_stats.isolated_download.initial_number_items or 0}} items</td>
         </tr>
         <tr title="Items found in the cache so the bot didn't have to download these before starting the task. This means these items are used by multiple tasks.">
           <td>Task inputs: Hot items</td>
