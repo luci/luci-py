@@ -36,6 +36,10 @@ always set:
   - `SWARMING_HEADLESS=1` is always set.
   - `SWARMING_BOT_ID` is set to the bot id.
 
+The following environment variables may be set to alter bot behavior:
+
+  - `SWARMING_EXTERNAL_BOT_SETUP=1` disables bot_config.setup_bot hook.
+
 
 ### dimensions
 

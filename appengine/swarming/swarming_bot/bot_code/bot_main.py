@@ -20,7 +20,6 @@ import logging
 import optparse
 import os
 import shutil
-import signal
 import sys
 import tempfile
 import threading
@@ -145,10 +144,18 @@ def call_hook(botobj, name, *args):
 def setup_bot(skip_reboot):
   """Calls bot_config.setup_bot() to have the bot self-configure itself.
 
-  Reboot the host if bot_config.setup_bot() returns False, unless skip_reboot is
-  also true.
+  Reboots the host if bot_config.setup_bot() returns False, unless skip_reboot
+  is also true.
+
+  Does nothing if SWARMING_EXTERNAL_BOT_SETUP env var is set to 1. It is set in
+  case bot's autostart configuration is managed elsewhere, and we don't want
+  the bot itself to interfere.
   """
   if _in_load_test_mode():
+    return
+
+  if os.environ.get('SWARMING_EXTERNAL_BOT_SETUP') == '1':
+    logging.info('Skipping setup_bot, SWARMING_EXTERNAL_BOT_SETUP is set')
     return
 
   botobj = get_bot()

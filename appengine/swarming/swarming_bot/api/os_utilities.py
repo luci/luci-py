@@ -13,10 +13,8 @@ This file serves as an API to bot_config.py. bot_config.py can be replaced on
 the server to allow additional server-specific functionality.
 """
 
-import ctypes
 import getpass
 import glob
-import hashlib
 import json
 import locale
 import logging
@@ -27,7 +25,6 @@ import platform
 import re
 import signal
 import socket
-import string
 import subprocess
 import sys
 import tempfile
@@ -1165,7 +1162,7 @@ def setup_auto_startup_autostart_desktop_linux(command, name='swarming'):
     os.makedirs(basedir)
   filepath = os.path.join(basedir, '%s.desktop' % name)
   return _write(
-      filepath, platforms.linux.generate_autostart_destkop(command, name))
+      filepath, platforms.linux.generate_autostart_desktop(command, name))
 
 
 def restart(message=None, timeout=None):

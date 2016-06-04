@@ -293,7 +293,7 @@ exit 0
     }
 
 
-def generate_autostart_destkop(command, name):
+def generate_autostart_desktop(command, name):
   """Returns a valid .desktop for use with Swarming bot.
 
   http://standards.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html
