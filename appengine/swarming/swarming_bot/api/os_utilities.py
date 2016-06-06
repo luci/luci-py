@@ -787,7 +787,7 @@ def get_dimensions_all_devices_android(devices):
       dimensions[dim] = sorted(dimensions[dim])
   nb_android = len(dimensions[u'android'])
   dimensions[u'android_devices'] = map(
-      str, range(nb_android, max(0, nb_android-2), -1))
+      str, range(nb_android, max(0, nb_android-4), -1))
 
   # TODO(maruel): Add back once dimensions limit is figured out and there's a
   # need.
