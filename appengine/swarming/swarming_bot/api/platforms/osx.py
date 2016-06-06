@@ -311,8 +311,8 @@ def generate_launchd_plist(command, cwd, plistname):
     '<dict>',
     '  <key>PATH</key>',
     # TODO(maruel): Makes it configurable if necessary.
-    '  <string>/opt/local/bin:/opt/local/sbin:/usr/local/sbin:/usr/local/bin'
-      ':/usr/sbin:/usr/bin:/sbin:/bin</string>',
+    '  <string>/opt/local/bin:/opt/local/sbin:/usr/local/sbin'
+    ':/usr/local/git/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin</string>',
     '</dict>',
 
     '<key>SoftResourceLimits</key>',
