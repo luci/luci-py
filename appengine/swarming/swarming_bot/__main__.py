@@ -143,6 +143,13 @@ def CMDstart_bot(args):
   logging.info(
       'importing bot_main: %s, %s', THIS_FILE, zip_package.generate_version())
   from bot_code import bot_main
+  adb_logger = logging.getLogger('adb')
+  logging_utils.prepare_logging(os.path.join('logs', 'adb.log'),
+                                adb_logger)
+  adb_logger.setLevel(logging.DEBUG)
+  for child in ('high', 'low', 'usb', 'cmd'):
+    adb_logger.getChild(child).setLevel(logging.DEBUG)
+  adb_logger.propagate = False
   result = bot_main.main(args)
   logging.info('bot_main exit code: %d', result)
   return result
