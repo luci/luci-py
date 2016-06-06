@@ -554,26 +554,32 @@ class HighDevice(object):
       return False
     assert speed in self.cache.available_frequencies, (
         speed, self.cache.available_frequencies)
-    success = self.SetCPUScalingGovernor('userspace')
+    if not self.SetCPUScalingGovernor('userspace'):
+      return False
 
     # This works on Nexus 10 but not on Nexus 5. Need to investigate more. In
     # the meantime, simply try one after the other.
     path = '/sys/devices/system/cpu/cpu0/cpufreq/scaling_setspeed'
-    if not self.PushContent('%d\n' % speed, path):
-      _LOG.info(
-          '%s.SetCPUSpeed(): Failed to push %d in %s',
-          self.port_path, speed, path)
-      # Fallback via shell.
-      _, exit_code = self.Shell('echo "%d" > %s' % (speed, path))
-      if exit_code != 0:
-        _LOG.warning(
-            '%s.SetCPUSpeed(): Writing %d failed',
-            self.port_path, speed)
-        return False
+    if self.PushContent('%d\n' % speed, path):
+      # Get it back to confirm.
+      val = self.PullContent(path)
+      if (val or '').strip() == str(speed):
+        return True
+
+    _LOG.info(
+        '%s.SetCPUSpeed(): Failed to push %d in %s',
+        self.port_path, speed, path)
+    # Fallback via shell.
+    _, exit_code = self.Shell('echo "%d" > %s' % (speed, path))
+    if exit_code != 0:
+      _LOG.warning(
+          '%s.SetCPUSpeed(): Writing %d failed',
+          self.port_path, speed)
+      return False
 
     # Get it back to confirm.
     val = self.PullContent(path)
-    return success and (val or '').strip() == str(speed)
+    return (val or '').strip() == str(speed)
 
   def GetTemperatures(self):
     """Returns the device's temperatures if available as a dict."""
