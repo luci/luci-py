@@ -28,7 +28,6 @@ def get_user_type():
     return 'admin'
   if isolate_readable():
     return 'user'
-  return 'unknown user'
 
 
 def bootstrap():

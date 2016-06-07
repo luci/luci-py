@@ -26,17 +26,8 @@ that can be found in the LICENSE file. -->
 </head>
 <body>
   <div class="top_right_links">
-    {% if nickname is defined %}
-      {% if nickname %}
-        {{ nickname }}
-      {% else %}
-        <a href="{{signin_link|safe }}">Sign in</a>
-      {% endif %}
-      <br>
-    {% endif %}
-    {% if now is defined %}
-      {{now|datetimeformat}}<br>
-    {% endif %}
+    <a href="{{signin_link|safe }}">{{nickname}}</a><br>
+    {{now|datetimeformat}}<br>
     {% block floating %}
     {% endblock %}
   </div>

@@ -64,7 +64,6 @@ def get_user_type():
     return 'privileged user'
   if is_user():
     return 'user'
-  return 'unknown user'
 
 
 def bootstrap_dev_server_acls():

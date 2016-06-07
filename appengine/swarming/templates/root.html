@@ -54,10 +54,10 @@
     </div>
     <p>
 
-    {% if not nickname %}
-    Please <a href="{{signin_link|safe}}">sign in</a> for more access.
-    {% else %}
+    {% if user_type %}
     As a {{user_type}}, you are entitled to see these pages:
+    {% else %}
+    Please <a href="{{signin_link|safe}}">sign in</a> for more access.
     {% endif %}
 
     <h3>Service Status</h3>

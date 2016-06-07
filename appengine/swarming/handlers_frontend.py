@@ -643,7 +643,6 @@ class TaskHandler(BaseTaskHandler):
       'full_appid': os.environ['APPLICATION_ID'],
       'host_url': self.request.host_url,
       'is_running': result.state == task_result.State.RUNNING,
-      'now': utils.utcnow(),
       'parent_task': parent_task,
       'previous_task': previous_task,
       'request': request,

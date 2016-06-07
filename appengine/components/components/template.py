@@ -185,8 +185,11 @@ def _get_defaults():
   """Returns parameters used by most templates/base.html."""
   account = users.get_current_user()
   return {
-    'nickname': account.email() if account else None,
-    'signin_link': users.create_login_url('/') if not account else None,
+    'nickname': account.email() if account else 'Sign in',
+    'now': utils.utcnow(),
+    # Hack to enable multi-login.
+    'signin_link': users.create_login_url('/').replace(
+        '/accounts/ServiceLogin', '/a/SelectSession', 1),
   }
 
 
