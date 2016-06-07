@@ -40,7 +40,7 @@ def get_dimensions(bot):
   See https://code.google.com/p/swarming/wiki/SwarmingMagicValues.
 
   Arguments:
-  - botobj: bot.Bot instance or None.
+  - bot: bot.Bot instance or None.
   """
   return os_utilities.get_dimensions()
 
@@ -58,9 +58,32 @@ def get_state(bot):
   See https://code.google.com/p/swarming/wiki/SwarmingMagicValues.
 
   Arguments:
-  - botobj: bot.Bot instance or None.
+  - bot: bot.Bot instance or None.
   """
   return os_utilities.get_state()
+
+
+def get_authentication_headers(bot):
+  """Returns authentication headers and their expiration time.
+
+  The returned headers will be passed with each HTTP request to the Swarming
+  server (and only Swarming server). The bot will use the returned headers until
+  they are close to expiration (usually 6 min, see AUTH_HEADERS_EXPIRATION_SEC
+  in remote_client.py), and then it'll attempt to refresh them by calling
+  get_authentication_headers again.
+
+  Can be used to implement per-bot authentication. If no headers are returned,
+  the server will use only IP whitelist for bot authentication.
+
+  May be called by different threads, but never concurrently.
+
+  Arguments:
+  - bot: bot.Bot instance.
+
+  Returns:
+    Tuple (dict with headers or None, unix timestamp of when they expire).
+  """
+  return (None, None)
 
 
 ### Hooks

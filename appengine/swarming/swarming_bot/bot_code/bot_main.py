@@ -27,7 +27,10 @@ import time
 import traceback
 import zipfile
 
+import bot_auth
 import common
+import file_refresher
+import remote_client
 import singleton
 from api import bot
 from api import os_utilities
@@ -177,6 +180,19 @@ def setup_bot(skip_reboot):
     botobj.restart('Starting new swarming bot: %s' % THIS_FILE)
 
 
+def get_authentication_headers(botobj):
+  """Calls bot_config.get_authentication_headers() if it is defined.
+
+  Doesn't catch exceptions.
+  """
+  if _in_load_test_mode():
+    return (None, None)
+  logging.info('get_authentication_headers()')
+  from config import bot_config
+  func = getattr(bot_config, 'get_authentication_headers', None)
+  return func(botobj) if func else (None, None)
+
+
 ### end of bot_config handler part.
 
 
@@ -235,8 +251,8 @@ def post_error_task(botobj, error, task_id):
     'message': error,
     'task_id': task_id,
   }
-  return net.url_read_json(
-      botobj.server + '/swarming/api/v1/bot/task_error/%s' % task_id, data=data)
+  return botobj.remote.url_read_json(
+      '/swarming/api/v1/bot/task_error/%s' % task_id, data=data)
 
 
 def on_shutdown_hook(b):
@@ -263,19 +279,30 @@ def get_bot():
   config = get_config()
   assert not config['server'].endswith('/'), config
 
-  # Create a temporary object to call the hooks.
+  # Use temporary Bot object to call get_attributes. Attributes are needed to
+  # construct the "real" bot.Bot.
+  attributes = get_attributes(
+    bot.Bot(
+      remote_client.RemoteClient(config['server'], None),
+      attributes,
+      config['server'],
+      config['server_version'],
+      os.path.dirname(THIS_FILE),
+      on_shutdown_hook))
+
+  # Make remote client callback use the returned bot object. We assume here
+  # RemoteClient doesn't call its callback in the constructor (since 'botobj' is
+  # undefined during the construction).
   botobj = bot.Bot(
+      remote_client.RemoteClient(
+          config['server'],
+          lambda: get_authentication_headers(botobj)),
       attributes,
       config['server'],
       config['server_version'],
       os.path.dirname(THIS_FILE),
       on_shutdown_hook)
-  return bot.Bot(
-      get_attributes(botobj),
-      config['server'],
-      config['server_version'],
-      os.path.dirname(THIS_FILE),
-      on_shutdown_hook)
+  return botobj
 
 
 def clean_isolated_cache(botobj):
@@ -342,16 +369,24 @@ def run_bot(arg_error):
       # clause is kept there "just in case".
       logging.exception('server_ping threw')
 
+    # Next we make sure the bot can make authenticated calls by grabbing
+    # the auth headers, retrying on errors a bunch of times. We don't give up
+    # if it fails though (maybe the bot will "fix itself" later).
+    botobj = get_bot()
+    try:
+      botobj.remote.initialize(quit_bit)
+    except remote_client.InitializationError as exc:
+      botobj.post_error('failed to grab auth headers: %s' % exc.last_error)
+      logging.error('Can\'t grab auth headers, continuing anyway...')
+
     if quit_bit.is_set():
       logging.info('Early quit 1')
       return 0
 
     # If this fails, there's hardly anything that can be done, the bot can't
     # even get to the point to be able to self-update.
-    botobj = get_bot()
-    resp = net.url_read_json(
-        botobj.server + '/swarming/api/v1/bot/handshake',
-        data=botobj._attributes)
+    resp = botobj.remote.url_read_json(
+        '/swarming/api/v1/bot/handshake', data=botobj._attributes)
     if not resp:
       logging.error('Failed to contact for handshake')
     else:
@@ -418,8 +453,8 @@ def poll_server(botobj, quit_bit):
   """
   # Access to a protected member _XXX of a client class - pylint: disable=W0212
   start = time.time()
-  resp = net.url_read_json(
-     botobj.server + '/swarming/api/v1/bot/poll', data=botobj._attributes)
+  resp = botobj.remote.url_read_json(
+      '/swarming/api/v1/bot/poll', data=botobj._attributes)
   if not resp:
     return False
   logging.debug('Server response:\n%s', resp)
@@ -443,8 +478,8 @@ def poll_server(botobj, quit_bit):
       'output_chunk_start': 0,
       'task_id': resp['task_id'],
     }
-    net.url_read_json(
-        botobj.server + '/swarming/api/v1/bot/task_update/%s' % resp['task_id'],
+    botobj.remote.url_read_json(
+        '/swarming/api/v1/bot/task_update/%s' % resp['task_id'],
         data=params)
     return False
 
@@ -503,6 +538,7 @@ def run_manifest(botobj, manifest, start):
   failure = False
   internal_failure = False
   msg = None
+  auth_params_dumper = None
   work_dir = os.path.join(botobj.base_dir, 'work')
   try:
     try:
@@ -530,6 +566,21 @@ def run_manifest(botobj, manifest, start):
     task_result_file = os.path.join(work_dir, 'task_runner_out.json')
     if os.path.exists(task_result_file):
       os.remove(task_result_file)
+
+    # Start a thread that periodically puts authentication headers and other
+    # authentication related information to a file on disk. task_runner and its
+    # subprocesses read it from there before making authenticated HTTP calls.
+    auth_params_file = os.path.join(work_dir, 'bot_auth_params.json')
+    if botobj.remote.uses_auth:
+      env['SWARMING_AUTH_PARAMS'] = str(auth_params_file)
+      auth_params_dumper = file_refresher.FileRefresherThread(
+          auth_params_file, lambda: bot_auth.prepare_auth_params_json(botobj))
+      auth_params_dumper.start()
+    else:
+      env.pop('SWARMING_AUTH_PARAMS', None)
+      if os.path.exists(auth_params_file):
+        os.remove(auth_params_file)
+
     command = [
       sys.executable, THIS_FILE, 'task_runner',
       '--swarming-server', url,
@@ -541,6 +592,7 @@ def run_manifest(botobj, manifest, start):
       '--min-free-space', str(get_min_free_space()),
     ]
     logging.debug('Running command: %s', command)
+
     # Put the output file into the current working directory, which should be
     # the one containing swarming_bot.zip.
     log_path = os.path.join(botobj.base_dir, 'logs', 'task_runner_stdout.log')
@@ -601,6 +653,8 @@ def run_manifest(botobj, manifest, start):
         e, traceback.format_exc()[-2048:])
     internal_failure = True
   finally:
+    if auth_params_dumper:
+      auth_params_dumper.stop()
     if internal_failure:
       post_error_task(botobj, msg, task_id)
     call_hook(
@@ -631,12 +685,12 @@ def update_bot(botobj, version):
   new_zip = os.path.join(os.path.dirname(THIS_FILE), new_zip)
 
   # Download as a new file.
-  url = botobj.server + '/swarming/api/v1/bot/bot_code/%s' % version
-  if not net.url_retrieve(new_zip, url):
+  url_path = '/swarming/api/v1/bot/bot_code/%s' % version
+  if not botobj.remote.url_retrieve(new_zip, url_path):
     # It can happen when a server is rapidly updated multiple times in a row.
     botobj.post_error(
         'Unable to download %s from %s; first tried version %s' %
-        (new_zip, url, version))
+        (new_zip, botobj.server + url_path, version))
     # Poll again, this may work next time. To prevent busy-loop, sleep a little.
     time.sleep(2)
     return
@@ -751,6 +805,6 @@ def main(args):
   try:
     return run_bot(error)
   finally:
-    call_hook(bot.Bot(None, None, None, os.path.dirname(THIS_FILE), None),
+    call_hook(bot.Bot(None, None, None, None, os.path.dirname(THIS_FILE), None),
               'on_bot_shutdown')
     logging.info('main() returning')

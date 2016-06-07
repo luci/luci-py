@@ -21,13 +21,11 @@ test_env_bot_code.setup_test_env()
 # Creates a server mock for functions in net.py.
 import net_utils
 
-from api import os_utilities
 from depot_tools import fix_encoding
 from utils import file_path
 from utils import large
 from utils import logging_utils
 from utils import subprocess42
-from utils import tools
 import fake_swarming
 import task_runner
 
@@ -71,6 +69,12 @@ class TestTaskRunnerBase(net_utils.TestCase):
         task_runner, 'get_run_isolated',
         lambda: [sys.executable, os.path.join(CLIENT_DIR, 'run_isolated.py')])
 
+    # In case this test itself is running one Swarming, clear the bots
+    # environment.
+    os.environ.pop('SWARMING_BOT_ID', None)
+    os.environ.pop('SWARMING_TASK_ID', None)
+    os.environ.pop('SWARMING_AUTH_PARAMS', None)
+
   def tearDown(self):
     os.chdir(test_env_bot_code.BOT_DIR)
     try:
@@ -84,16 +88,16 @@ class TestTaskRunnerBase(net_utils.TestCase):
   def get_task_details(cls, *args, **kwargs):
     return task_runner.TaskDetails(get_manifest(*args, **kwargs))
 
-  def gen_requests(self, cost_usd=0., **kwargs):
+  def gen_requests(self, cost_usd=0., auth_headers=None, **kwargs):
     return [
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
-        self.get_check_first(cost_usd),
+        self.get_check_first(cost_usd, auth_headers=auth_headers),
         {'ok': True},
       ),
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
-        self.get_check_final(**kwargs),
+        self.get_check_final(auth_headers=auth_headers, **kwargs),
         {'ok': True},
       ),
     ]
@@ -102,7 +106,7 @@ class TestTaskRunnerBase(net_utils.TestCase):
     """Generates the expected HTTP requests for a task run."""
     self.expected_requests(self.gen_requests(**kwargs))
 
-  def get_check_first(self, cost_usd):
+  def get_check_first(self, cost_usd, auth_headers=None):
     def check_first(kwargs):
       self.assertLessEqual(cost_usd, kwargs['data'].pop('cost_usd'))
       self.assertEqual(
@@ -111,6 +115,8 @@ class TestTaskRunnerBase(net_utils.TestCase):
             'id': 'localhost',
             'task_id': 23,
           },
+          'follow_redirects': False,
+          'headers': auth_headers or {},
         },
         kwargs)
     return check_first
@@ -121,7 +127,9 @@ class TestTaskRunner(TestTaskRunnerBase):
     super(TestTaskRunner, self).setUp()
     self.mock(time, 'time', lambda: 1000000000.)
 
-  def get_check_final(self, exit_code=0, output_re=r'^hi\n$', outputs_ref=None):
+  def get_check_final(
+      self, exit_code=0, output_re=r'^hi\n$', outputs_ref=None,
+      auth_headers=None):
     def check_final(kwargs):
       # Ignore these values.
       kwargs['data'].pop('bot_overhead', None)
@@ -142,6 +150,8 @@ class TestTaskRunner(TestTaskRunnerBase):
           'output_chunk_start': 0,
           'task_id': 23,
         },
+        'follow_redirects': False,
+        'headers': auth_headers or {},
       }
       if outputs_ref:
         expected['data']['outputs_ref'] = outputs_ref
@@ -159,13 +169,13 @@ class TestTaskRunner(TestTaskRunnerBase):
     server = 'https://localhost:1'
 
     def run_command(
-        swarming_server, task_details, work_dir, cost_usd_hour, start,
-        min_free_space):
+        swarming_server, task_details, work_dir,
+        cost_usd_hour, start, min_free_space):
       self.assertEqual(server, swarming_server)
+      self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       # Necessary for OSX.
       self.assertEqual(
           os.path.realpath(self.work_dir), os.path.realpath(work_dir))
-      self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
       self.assertEqual(1, min_free_space)
@@ -210,13 +220,13 @@ class TestTaskRunner(TestTaskRunnerBase):
     server = 'https://localhost:1'
 
     def run_command(
-        swarming_server, task_details, work_dir, cost_usd_hour, start,
-        min_free_space):
+        swarming_server, task_details, work_dir,
+        cost_usd_hour, start, min_free_space):
       self.assertEqual(server, swarming_server)
+      self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       # Necessary for OSX.
       self.assertEqual(
           os.path.realpath(self.work_dir), os.path.realpath(work_dir))
-      self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
       self.assertEqual(1, min_free_space)
@@ -263,6 +273,24 @@ class TestTaskRunner(TestTaskRunnerBase):
   def test_run_command_raw(self):
     # This runs the command for real.
     self.requests(cost_usd=1, exit_code=0)
+    task_details = self.get_task_details('print(\'hi\')')
+    expected = {
+      u'exit_code': 0,
+      u'hard_timeout': False,
+      u'io_timeout': False,
+      u'must_signal_internal_failure': None,
+      u'version': task_runner.OUT_VERSION,
+    }
+    self.assertEqual(expected, self._run_command(task_details))
+
+  def test_run_command_raw_with_auth(self):
+    auth_params_file = os.path.join(self.root_dir, 'auth_params.json')
+    with open(auth_params_file, 'wb') as f:
+      json.dump({'swarming_http_headers': {'A': 'a'}}, f)
+    os.environ['SWARMING_AUTH_PARAMS'] = auth_params_file
+
+    # This runs the command for real.
+    self.requests(cost_usd=1, exit_code=0, auth_headers={'A': 'a'})
     task_details = self.get_task_details('print(\'hi\')')
     expected = {
       u'exit_code': 0,
@@ -416,6 +444,8 @@ class TestTaskRunner(TestTaskRunnerBase):
               'output_chunk_start': 100002*4,
               'task_id': 23,
             },
+            'follow_redirects': False,
+            'headers': {},
           },
           kwargs)
 
@@ -428,6 +458,8 @@ class TestTaskRunner(TestTaskRunnerBase):
             'id': 'localhost',
             'task_id': 23,
           },
+          'follow_redirects': False,
+          'headers': {},
         },
         {'ok': True},
       ),
@@ -441,6 +473,8 @@ class TestTaskRunner(TestTaskRunnerBase):
             'output_chunk_start': 0,
             'task_id': 23,
           },
+          'follow_redirects': False,
+          'headers': {},
         },
         {'ok': True},
       ),
@@ -474,8 +508,8 @@ class TestTaskRunner(TestTaskRunnerBase):
 
   def test_main(self):
     def load_and_run(
-        manifest, swarming_server, cost_usd_hour, start, json_file,
-        min_free_space):
+        manifest, swarming_server, cost_usd_hour, start,
+        json_file, min_free_space):
       self.assertEqual('foo', manifest)
       self.assertEqual('http://localhost', swarming_server)
       self.assertEqual(3600., cost_usd_hour)
@@ -496,8 +530,8 @@ class TestTaskRunner(TestTaskRunnerBase):
 
   def test_main_reboot(self):
     def load_and_run(
-        manifest, swarming_server, cost_usd_hour, start, json_file,
-        min_free_space):
+        manifest, swarming_server, cost_usd_hour, start,
+        json_file, min_free_space):
       self.assertEqual('foo', manifest)
       self.assertEqual('http://localhost', swarming_server)
       self.assertEqual(3600., cost_usd_hour)
@@ -568,7 +602,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
 
   def get_check_final(
       self, hard_timeout=False, io_timeout=False, exit_code=None,
-      output_re='^hi\n$'):
+      output_re='^hi\n$', auth_headers=None):
     def check_final(kwargs):
       kwargs['data'].pop('bot_overhead', None)
       if hard_timeout or io_timeout:
@@ -593,6 +627,8 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
               'output_chunk_start': 0,
               'task_id': 23,
             },
+            'follow_redirects': False,
+            'headers': auth_headers or {},
           },
           kwargs)
     return check_final
@@ -801,6 +837,8 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
               'output_chunk_start': 0,
               'task_id': 23,
             },
+            'follow_redirects': False,
+            'headers': {},
           },
           kwargs)
     requests = [
@@ -920,6 +958,8 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
               'output_chunk_start': 0,
               'task_id': 23,
             },
+            'follow_redirects': False,
+            'headers': {},
           },
           kwargs)
     requests = [

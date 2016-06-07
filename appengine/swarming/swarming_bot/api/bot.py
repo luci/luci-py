@@ -10,7 +10,6 @@ import threading
 import time
 
 import os_utilities
-from utils import net
 from utils import zip_package
 
 THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
@@ -20,11 +19,13 @@ THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
 
 class Bot(object):
   def __init__(
-      self, attributes, server, server_version, base_dir, shutdown_hook):
+      self, remote, attributes, server, server_version, base_dir,
+      shutdown_hook):
     # Do not expose attributes  for now, as attributes may be refactored.
     assert server is None or not server.endswith('/'), server
     self._attributes = attributes
     self._base_dir = base_dir
+    self._remote = remote
     self._server = server
     self._server_version = server_version
     self._shutdown_hook = shutdown_hook
@@ -55,6 +56,14 @@ class Bot(object):
   def id(self):
     """Returns the bot's ID."""
     return self.dimensions.get('id', ['unknown'])[0]
+
+  @property
+  def remote(self):
+    """RemoteClient to talk to the server.
+
+    Should not be normally used by bot_config.py for now.
+    """
+    return self._remote
 
   @property
   def server(self):
@@ -96,7 +105,7 @@ class Bot(object):
     data = self._attributes.copy()
     data['event'] = event_type
     data['message'] = message
-    net.url_read_json(self.server + '/swarming/api/v1/bot/event', data=data)
+    self._remote.url_read_json('/swarming/api/v1/bot/event', data=data)
 
   def post_error(self, message):
     """Posts given string as a failure.

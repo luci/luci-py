@@ -6,7 +6,6 @@
 import json
 import logging
 import os
-import shutil
 import sys
 import tempfile
 import threading
@@ -21,6 +20,7 @@ test_env_bot_code.setup_test_env()
 import net_utils
 
 import bot_main
+import remote_client
 from api import bot
 from api import os_utilities
 from depot_tools import fix_encoding
@@ -59,9 +59,7 @@ class TestBotMain(net_utils.TestCase):
       'version': '123',
     }
     self.mock(zip_package, 'generate_version', lambda: '123')
-    self.bot = bot.Bot(
-        self.attributes, 'https://localhost:1', 'version1', self.root_dir,
-        self.fail)
+    self.bot = self.make_bot()
     self.mock(self.bot, 'post_error', self.fail)
     self.mock(self.bot, 'restart', self.fail)
     self.mock(subprocess42, 'call', self.fail)
@@ -80,6 +78,12 @@ class TestBotMain(net_utils.TestCase):
     os.chdir(self.old_cwd)
     file_path.rmtree(self.root_dir)
     super(TestBotMain, self).tearDown()
+
+  def make_bot(self, auth_headers_cb=None):
+    return bot.Bot(
+        remote_client.RemoteClient('https://localhost:1', auth_headers_cb),
+        self.attributes, 'https://localhost:1', 'version1',
+        self.root_dir, self.fail)
 
   def test_get_dimensions(self):
     dimensions = set(bot_main.get_dimensions(None))
@@ -163,6 +167,9 @@ class TestBotMain(net_utils.TestCase):
                 'message': 'error',
                 'task_id': 23,
               },
+              'follow_redirects': False,
+              'headers': {},
+              'timeout': remote_client.NET_CONNECTION_TIMEOUT_SEC,
             },
             {'resp': 1},
           ),
@@ -227,7 +234,12 @@ class TestBotMain(net_utils.TestCase):
           ),
           (
             'https://localhost:1/swarming/api/v1/bot/handshake',
-            {'data': self.attributes},
+            {
+              'data': self.attributes,
+              'follow_redirects': False,
+              'headers': {},
+              'timeout': remote_client.NET_CONNECTION_TIMEOUT_SEC,
+            },
             {'bot_version': '123', 'server': self.url, 'server_version': 1},
           ),
         ])
@@ -248,7 +260,40 @@ class TestBotMain(net_utils.TestCase):
         [
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
-            {'data': self.attributes},
+            {
+              'data': self.attributes,
+              'follow_redirects': False,
+              'headers': {},
+              'timeout': remote_client.NET_CONNECTION_TIMEOUT_SEC,
+            },
+            {
+              'cmd': 'sleep',
+              'duration': 1.24,
+            },
+          ),
+        ])
+    self.assertFalse(bot_main.poll_server(self.bot, bit))
+    self.assertEqual([1.24], slept)
+
+  def test_poll_server_sleep_with_auth(self):
+    slept = []
+    bit = threading.Event()
+    self.mock(bit, 'wait', slept.append)
+    self.mock(bot_main, 'run_manifest', self.fail)
+    self.mock(bot_main, 'update_bot', self.fail)
+
+    self.bot = self.make_bot(lambda: ({'A': 'a'}, time.time() + 3600))
+
+    self.expected_requests(
+        [
+          (
+            'https://localhost:1/swarming/api/v1/bot/poll',
+            {
+              'data': self.attributes,
+              'follow_redirects': False,
+              'headers': {'A': 'a'},
+              'timeout': remote_client.NET_CONNECTION_TIMEOUT_SEC,
+            },
             {
               'cmd': 'sleep',
               'duration': 1.24,
@@ -272,7 +317,12 @@ class TestBotMain(net_utils.TestCase):
         [
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
-            {'data': self.bot._attributes},
+            {
+              'data': self.bot._attributes,
+              'follow_redirects': False,
+              'headers': {},
+              'timeout': remote_client.NET_CONNECTION_TIMEOUT_SEC,
+            },
             {
               'cmd': 'run',
               'manifest': {'foo': 'bar'},
@@ -296,7 +346,12 @@ class TestBotMain(net_utils.TestCase):
         [
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
-            {'data': self.attributes},
+            {
+              'data': self.attributes,
+              'follow_redirects': False,
+              'headers': {},
+              'timeout': remote_client.NET_CONNECTION_TIMEOUT_SEC,
+            },
             {
               'cmd': 'update',
               'version': '123',
@@ -318,7 +373,12 @@ class TestBotMain(net_utils.TestCase):
         [
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
-            {'data': self.attributes},
+            {
+              'data': self.attributes,
+              'follow_redirects': False,
+              'headers': {},
+              'timeout': remote_client.NET_CONNECTION_TIMEOUT_SEC,
+            },
             {
               'cmd': 'restart',
               'message': 'Please die now',
@@ -342,6 +402,9 @@ class TestBotMain(net_utils.TestCase):
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
               'data': self.attributes,
+              'follow_redirects': False,
+              'headers': {},
+              'timeout': remote_client.NET_CONNECTION_TIMEOUT_SEC,
             },
             {
               'cmd': 'restart',
@@ -351,7 +414,9 @@ class TestBotMain(net_utils.TestCase):
         ])
     self.assertTrue(bot_main.poll_server(self.bot, bit))
 
-  def _mock_popen(self, returncode=0, exit_code=0, url='https://localhost:1'):
+  def _mock_popen(
+      self, returncode=0, exit_code=0, url='https://localhost:1',
+      auth_params_json=None):
     result = {
       'exit_code': exit_code,
       'must_signal_internal_failure': None,
@@ -384,6 +449,13 @@ class TestBotMain(net_utils.TestCase):
         self.assertEqual(subprocess42.STDOUT, stderr)
         self.assertEqual(subprocess42.PIPE, stdin)
         self.assertEqual(sys.platform != 'win32', close_fds)
+        if auth_params_json is not None:
+          auth_params_file = os.path.join(
+              self.root_dir, 'work', 'bot_auth_params.json')
+          self.assertEqual(auth_params_file, env.get('SWARMING_AUTH_PARAMS'))
+          with open(auth_params_file, 'rb') as f:
+            actual_auth_params = json.load(f)
+          self.assertEqual(auth_params_json, actual_auth_params)
 
       def wait(self2, timeout=None): # pylint: disable=unused-argument
         self2.returncode = returncode
@@ -406,6 +478,35 @@ class TestBotMain(net_utils.TestCase):
         self.assertEqual(result, summary)
     self.mock(bot_main, 'call_hook', call_hook)
     result = self._mock_popen(url='https://localhost:3')
+
+    manifest = {
+      'command': ['echo', 'hi'],
+      'dimensions': {'os': 'Amiga', 'pool': 'default'},
+      'grace_period': 30,
+      'hard_timeout': 60,
+      'host': 'https://localhost:3',
+      'task_id': '24',
+    }
+    self.assertEqual(self.root_dir, self.bot.base_dir)
+    bot_main.run_manifest(self.bot, manifest, time.time())
+
+  def test_run_manifest_with_auth(self):
+    self.bot = self.make_bot(
+        auth_headers_cb=lambda: ({'A': 'a'}, time.time() + 3600))
+
+    self.mock(bot_main, 'post_error_task', lambda *args: self.fail(args))
+    def call_hook(botobj, name, *args):
+      if name == 'on_after_task':
+        failure, internal_failure, dimensions, summary = args
+        self.assertEqual(self.attributes['dimensions'], botobj.dimensions)
+        self.assertEqual(False, failure)
+        self.assertEqual(False, internal_failure)
+        self.assertEqual({'os': 'Amiga', 'pool': 'default'}, dimensions)
+        self.assertEqual(result, summary)
+    self.mock(bot_main, 'call_hook', call_hook)
+    result = self._mock_popen(
+        url='https://localhost:3',
+        auth_params_json={'swarming_http_headers': {'A': 'a'}})
 
     manifest = {
       'command': ['echo', 'hi'],
@@ -505,10 +606,12 @@ class TestBotMain(net_utils.TestCase):
     new_zip = os.path.join(self.root_dir, 'swarming_bot.2.zip')
     # This is necessary otherwise zipfile will crash.
     self.mock(time, 'time', lambda: 1400000000)
-    def url_retrieve(f, url):
+    def url_retrieve(f, url, headers=None, timeout=None):
       self.assertEqual(
           'https://localhost:1/swarming/api/v1/bot/bot_code/123', url)
       self.assertEqual(new_zip, f)
+      self.assertEqual({}, headers)
+      self.assertEqual(remote_client.NET_CONNECTION_TIMEOUT_SEC, timeout)
       # Create a valid zip that runs properly.
       with zipfile.ZipFile(f, 'w') as z:
         z.writestr('__main__.py', 'print("hi")')
