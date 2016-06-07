@@ -50,6 +50,7 @@ def mark_for_deletion(key):
     logging.warning('Instance does not exist: %s', key)
     return
 
+  logging.info('Marking Instance for deletion: %s', key)
   if not entity.pending_deletion:
     entity.pending_deletion = True
     yield entity.put_async()
@@ -153,6 +154,7 @@ def ensure_entity_exists(key, url):
     key: ndb.Key for a models.Instance entity.
     url: URL for the instance.
   """
+  logging.info('Ensuring Instance entity exists: %s', key)
   entity = yield key.get_async()
   if entity:
     return
@@ -161,8 +163,8 @@ def ensure_entity_exists(key, url):
 
 
 @ndb.transactional
-def add_instances(key, keys):
-  """Adds the given Instances to the given InstanceGroupManager.
+def set_instances(key, keys):
+  """Associates the given Instances with the given InstanceGroupManager.
 
   Args:
     key: ndb.Key for a models.InstanceGroupManager entity.
@@ -173,11 +175,9 @@ def add_instances(key, keys):
     logging.warning('InstanceGroupManager does not exist: %s', key)
     return
 
-  instances = set(entity.instances)
-  instances.update(keys)
-
-  if len(instances) != entity.current_size:
-    entity.instances = sorted(instances)
+  instances = sorted(keys)
+  if sorted(entity.instances) != instances:
+    entity.instances = instances
     entity.put()
 
 
@@ -203,7 +203,7 @@ def ensure_entities_exist(key, max_concurrent=50):
       max_concurrent=max_concurrent,
   )
 
-  add_instances(key, keys.values())
+  set_instances(key, keys.values())
 
 
 def schedule_fetch():
@@ -368,3 +368,17 @@ def schedule_drained_deletion():
           ):
             logging.warning(
               'Failed to enqueue task for Instance: %s', instance.key)
+
+
+def find_orphaned_instances():
+  """Lists instances not referenced by their instance group manager."""
+  total = 0
+  orphaned = 0
+  for instance in models.Instance.query():
+    total += 1
+    instance_group_manager = instance.key.parent().get()
+    if instance_group_manager:
+      if instance.key not in instance_group_manager.instances:
+        logging.warning('Found orphaned Instance: %s', instance.key)
+        orphaned += 1
+  logging.info('Orphaned Instances: %s/%s', orphaned, total)

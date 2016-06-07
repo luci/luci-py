@@ -2,13 +2,7 @@ cron:
 - url: /internal/cron/catalog-instances
   schedule: every 1 minutes
 
-- url: /internal/cron/check-instance-metadata-operations
-  schedule: every 1 minutes
-
 - url: /internal/cron/cleanup-entities
-  schedule: every 1 minutes
-
-- url: /internal/cron/compress-instance-metadata-updates
   schedule: every 1 minutes
 
 - url: /internal/cron/create-instance-group-managers
@@ -32,6 +26,9 @@ cron:
 - url: /internal/cron/fetch-instances
   schedule: every 1 minutes
 
+- url: /internal/cron/find-orphaned-instances
+  schedule: every 1 minutes
+
 - url: /internal/cron/import-config
   schedule: every 1 minutes synchronized
 
@@ -47,5 +44,5 @@ cron:
 - url: /internal/cron/resize-instance-groups
   schedule: every 1 minutes
 
-- url: /internal/cron/update-instance-metadata
+- url: /internal/cron/schedule-metadata-tasks
   schedule: every 1 minutes

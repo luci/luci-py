@@ -119,30 +119,6 @@ class InstanceGroupResizeHandler(webapp2.RequestHandler):
     instance_group_managers.schedule_resize()
 
 
-class InstanceMetadataOperationsCheckHandler(webapp2.RequestHandler):
-  """Worker for checking instance metadata operations."""
-
-  @decorators.require_cronjob
-  def get(self):
-    metadata.schedule_metadata_operations_check()
-
-
-class InstanceMetadataUpdatesCompressionHandler(webapp2.RequestHandler):
-  """Worker for compressing pending metadata updates."""
-
-  @decorators.require_cronjob
-  def get(self):
-    metadata.schedule_metadata_compressions()
-
-
-class InstanceMetadataUpdatesHandler(webapp2.RequestHandler):
-  """Worker for updating instance metadata."""
-
-  @decorators.require_cronjob
-  def get(self):
-    metadata.schedule_metadata_updates()
-
-
 class InstancesPendingDeletionDeletionHandler(webapp2.RequestHandler):
   """Worker for deleting instances pending deletion."""
 
@@ -167,6 +143,22 @@ class InstanceTemplateDeletionHandler(webapp2.RequestHandler):
     instance_templates.schedule_deletion()
 
 
+class MetadataTaskScheduleHandler(webapp2.RequestHandler):
+  """Worker for scheduling metadata tasks."""
+
+  @decorators.require_cronjob
+  def get(self):
+    metadata.schedule_metadata_tasks()
+
+
+class OrphanedInstanceFindHandler(webapp2.RequestHandler):
+  """Worker for finding orphaned instances."""
+
+  @decorators.require_cronjob
+  def get(self):
+    instances.find_orphaned_instances()
+
+
 class PubSubMessageProcessHandler(webapp2.RequestHandler):
   """Worker for processing Pub/Sub messages."""
 
@@ -178,10 +170,6 @@ class PubSubMessageProcessHandler(webapp2.RequestHandler):
 def create_cron_app():
   return webapp2.WSGIApplication([
       ('/internal/cron/catalog-instances', InstanceCatalogHandler),
-      ('/internal/cron/check-instance-metadata-operations',
-       InstanceMetadataOperationsCheckHandler),
-      ('/internal/cron/compress-instance-metadata-updates',
-       InstanceMetadataUpdatesCompressionHandler),
       ('/internal/cron/cleanup-entities', EntityCleanupHandler),
       ('/internal/cron/create-instance-group-managers',
        InstanceGroupManagerCreationHandler),
@@ -197,12 +185,12 @@ def create_cron_app():
        InstanceTemplateDeletionHandler),
       ('/internal/cron/delete-instances', InstanceDeletionHandler),
       ('/internal/cron/fetch-instances', InstanceFetchHandler),
+      ('/internal/cron/find-orphaned-instances', OrphanedInstanceFindHandler),
       ('/internal/cron/import-config', ConfigImportHandler),
       ('/internal/cron/process-config', ConfigProcessHandler),
       ('/internal/cron/process-pubsub-messages', PubSubMessageProcessHandler),
       ('/internal/cron/remove-cataloged-instances',
        CatalogedInstanceRemovalHandler),
       ('/internal/cron/resize-instance-groups', InstanceGroupResizeHandler),
-      ('/internal/cron/update-instance-metadata',
-       InstanceMetadataUpdatesHandler),
+      ('/internal/cron/schedule-metadata-tasks', MetadataTaskScheduleHandler),
   ])

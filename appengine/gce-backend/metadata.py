@@ -114,20 +114,6 @@ def compress(key):
   compress_pending_metadata_updates(key)
 
 
-def schedule_metadata_compressions():
-  """Enqueues tasks to compress instance metadata."""
-  for instance in models.Instance.query():
-    if instance.pending_metadata_updates:
-      if not utils.enqueue_task(
-          '/internal/queues/compress-instance-metadata-updates',
-          'compress-instance-metadata-updates',
-          params={
-              'key': instance.key.urlsafe(),
-          },
-      ):
-        logging.warning('Failed to enqueue task for Instance: %s', instance.key)
-
-
 @ndb.transactional
 def associate_metadata_operation(key, checksum, url):
   """Associates the metadata operation with the active metadata update.
@@ -209,22 +195,6 @@ def update(key):
       utilities.compute_checksum(entity.active_metadata_update.metadata),
       operation.url,
   )
-
-
-def schedule_metadata_updates():
-  """Enqueues tasks to update instance metadata."""
-  for instance in models.Instance.query():
-    if instance.active_metadata_update:
-      if not instance.active_metadata_update.url:
-        if not utils.enqueue_task(
-            '/internal/queues/update-instance-metadata',
-            'update-instance-metadata',
-            params={
-                'key': instance.key.urlsafe(),
-            },
-        ):
-          logging.warning(
-            'Failed to enqueue task for Instance: %s', instance.key)
 
 
 @ndb.transactional
@@ -319,15 +289,28 @@ def check(key):
     clear_active_metadata_update(key, entity.active_metadata_update.url)
 
 
-def schedule_metadata_operations_check():
-  """Enqueues tasks to check on metadata operations."""
+def schedule_metadata_tasks():
+  """Enqueues tasks relating to metadata updates."""
+  # Some metadata tasks will abort if higher precedence tasks are in
+  # progress. Avoid scheduling these tasks. The priority here is to
+  # get the result of an in-progress metadata operation if one exists.
   for instance in models.Instance.query():
-    if instance.active_metadata_update and instance.active_metadata_update.url:
-      if not utils.enqueue_task(
-          '/internal/queues/check-instance-metadata-operation',
-          'check-instance-metadata-operation',
-          params={
-              'key': instance.key.urlsafe(),
-          },
-      ):
-        logging.warning('Failed to enqueue task for Instance: %s', instance.key)
+    queue = None
+    if instance.active_metadata_update:
+      if instance.active_metadata_update.url:
+        # Enqueue task to check the in-progress metadata operation.
+        queue = 'check-instance-metadata-operation'
+      else:
+        # Enqueue task to start a metadata operation.
+        queue = 'update-instance-metadata'
+    elif instance.pending_metadata_updates:
+      # Enqueue task to compress a list of desired metadata updates.
+      queue = 'compress-instance-metadata-updates'
+    if queue and not utils.enqueue_task(
+        '/internal/queues/%s' % queue,
+        queue,
+        params={
+            'key': instance.key.urlsafe(),
+        },
+    ):
+      logging.warning('Failed to enqueue task for Instance: %s', instance.key)

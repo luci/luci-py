@@ -88,6 +88,12 @@ a models.Instance for each one. Waits for the instance group manager to exist
 before attempting to fetch the list of instances.
 
 
+## find-orphaned-instances
+
+Lists models.Instance entities which refer to instances no longer returned by
+the GCE API in fetch-instances.
+
+
 ## catalog-instances
 
 Adds instances to the Machine Provider catalog. Any instance not cataloged and
@@ -101,26 +107,15 @@ subscription for new messages regarding machines and operates accordingly. If
 a machine is SUBSCRIBED, schedules an operation to update its metadata with the
 subscription details. If a machine is RECLAIMED, sets it to pending deletion.
 
-
-## compress-instance-metadata-updates
-
-Compresses all pending\_metadata\_updates for a models.Instance into one single
-update and sets it as the active\_metadata\_update if there isn't already one.
-
-
-## update-instance-metadata
-
-Looks for an active\_metadata\_update in a models.Instance and creates the GCE
-zone operation to apply it. Updates models.Instance.active\_metadata\_update
-with the URL of the scheduled operation.
-
-
-## check-instance-metadata-operations
+## schedule-metadata-tasks
 
 Looks for an active\_metadata\_update with a url in a models.Instance and checks
 the status of the operation. If succeeded, active\_metadata\_update is cleared,
 otherwise only the url is cleared and the operation is moved to the front of
-the pending\_metadata\_updates.
+the pending\_metadata\_updates. If there is an active\_metadata\_update without
+a url, creates the GCE zone operation to apply the metadata update. If there is
+no active\_metadata\_update, compresses all pending\_metadata\_updates into a
+single metadata update and sets it as the active\_metadata\_update.
 
 
 ## delete-instances-pending-deletion

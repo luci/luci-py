@@ -47,13 +47,15 @@ def _delete_instance(instance_key, instance_group_manager):
     instance_key: ndb.Key for a models.Instance entity.
     instance_group_manager: models.InstanceGroupManager.
   """
+  logging.info('Deleting Instance: %s', instance_key)
   assert ndb.in_transaction()
+  instance_key.delete()
   for i, key in enumerate(instance_group_manager.instances):
     if key.id() == instance_key.id():
       instance_group_manager.instances.pop(i)
       instance_group_manager.put()
-      key.delete()
       return
+  logging.warning('Instance not found: %s', instance_key)
 
 
 @ndb.transactional
