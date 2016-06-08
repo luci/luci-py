@@ -43,9 +43,9 @@ handlers:
     Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
     X-Frame-Options: deny
 
-- url: /elements/([^/]+\-build)\.(html|js)
-  static_files: elements/\1.\2
-  upload: elements/([^/]+\-build)\.(html|js)
+- url: /elements/polymer05/([^/]+\-build)\.(html|js)
+  static_files: elements05/\1.\2
+  upload: elements05/([^/]+\-build)\.(html|js)
   secure: always
   http_headers:
     # TODO(maruel): Unsure about polymer if it is inline-style free.

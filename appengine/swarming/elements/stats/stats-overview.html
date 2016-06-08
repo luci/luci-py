@@ -1,0 +1,95 @@
+<!--
+# Copyright 2016 The LUCI Authors. All rights reserved.
+# Use of this source code is governed by the Apache v2.0 license that can be
+# found in the LICENSE file.
+-->
+
+<link rel="import" href="../bower_components/polymer/polymer.html">
+<link rel="import" href="../bower_components/iron-ajax/iron-ajax.html">
+<link rel="import" href="../bower_components/iron-flex-layout/iron-flex-layout-classes.html">
+
+<link rel="import" href="load-charts-api.html">
+<link rel="import" href="partial-line-chart.html">
+
+<dom-module id="stats-overview">
+  <style include="iron-flex iron-flex-alignment iron-positioning">
+
+  </style>
+
+  <template>
+    <iron-ajax
+      auto url="/swarming/api/v1/stats/summary/minutes"
+      headers="[[headers]]"
+      params="[[params]]"
+      handle-as="json"
+      last-response="{{response}}">
+    </iron-ajax>
+
+    <load-charts-api loaded="{{charts_api_loaded}}"></load-charts-api>
+
+    <div class="vertical layout charts">
+
+    <!-- These arrays are JSON, so they must use double quotes-->
+      <partial-line-chart
+        all_data="{{data_table}}"
+        resolution="minutes"
+        names='["bots_active","tasks_active","tasks_bot_died","tasks_request_expired"]'
+        title="Shards Activity">
+      </partial-line-chart>
+
+      <partial-line-chart
+        all_data="{{data_table}}"
+        resolution="minutes"
+        names='["tasks_avg_pending_secs","tasks_total_runtime_secs","tasks_avg_runtime_secs"]'
+        title="Times">
+      </partial-line-chart>
+
+      <partial-line-chart
+        all_data="{{data_table}}"
+        resolution="minutes"
+        names='["http_requests","http_failures"]'
+        title="Requests">
+      </partial-line-chart>
+
+    </div>
+  </template>
+  <script>
+    Polymer({
+      is: 'stats-overview',
+      properties: {
+        // input
+
+        //output
+        data_table: {
+          type: Object,
+          computed: "_extractData(response,charts_api_loaded)",
+          notify: true,
+        },
+
+        //private
+        charts_api_loaded: {
+          type: Boolean,
+        },
+        _headers: {
+          type: Object,
+          value: {
+            "x-datasource-auth": "a",
+          },
+        },
+        params: {
+          type: Object,
+          value: {
+            duration: 20,
+          },
+        },
+        response: {
+          type: Object,
+        },
+      },
+
+      _extractData: function (_response, ready) {
+        return _response.table;
+      },
+    });
+  </script>
+</dom-module>
