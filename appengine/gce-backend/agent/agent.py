@@ -248,10 +248,13 @@ def main():
           # Delete just the zip, not the whole directory so logs are kept.
           os.remove(SWARMING_BOT_ZIP)
 
-        bot_code = urllib2.urlopen(urlparse.urljoin(
-            attributes.get('swarming_server'), 'bot_code'))
+        http = AuthorizedHTTPRequest(service_account=service_account)
+        _, bot_code = http.request(
+            urlparse.urljoin(attributes['swarming_server'], 'bot_code'),
+            method='GET',
+        )
         with open(SWARMING_BOT_ZIP, 'w') as fd:
-          shutil.copyfileobj(bot_code, fd)
+          fd.write(bot_code)
         os.chown(SWARMING_BOT_ZIP, chrome_bot.pw_uid, chrome_bot.pw_gid)
 
         pubsub.acknowledge(subscription, project, ack_ids)
