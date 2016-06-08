@@ -106,11 +106,12 @@ class _BotApiHandler(auth.ApiHandler):
 class _BotAuthenticatingHandler(auth.AuthenticatingHandler):
   """Like AuthenticatingHandler, but also implements machine authentication.
 
-  Unlike _BotApiHandler handlers, _BotAuthenticatingHandler handler don't check
-  dimensions or bot_id, since they are not yet known when this handler is
-  called. They merely check that the bot credentials are known to the server.
+  Handlers inheriting this class are used during bot bootstrap and self-update.
 
-  _BotAuthenticatingHandler is used during bot bootstrap and self-update.
+  Unlike _BotApiHandler handlers, _BotAuthenticatingHandler handlers don't check
+  dimensions or bot_id, since they are not yet known when these handlers are
+  called. They merely check that the bot credentials are known to the server, or
+  the endpoint is being used by an account authorized to do bot bootstrap.
   """
 
   # Bots are passing credentials through special headers (not cookies), no need
@@ -121,17 +122,43 @@ class _BotAuthenticatingHandler(auth.AuthenticatingHandler):
   def get_auth_methods(cls, conf):
     return [auth.optional_machine_authentication, auth.oauth_authentication]
 
+  def check_bot_code_access(self, generate_token=False):
+    """Raises AuthorizationError if caller is not authorized to access bot code.
+
+    Three variants here:
+      1. A valid bootstrap token is passed as '?tok=...' parameter.
+      2. A bot is using it's own machine credentials.
+      3. An user, allowed to do a bootstrap, is using their credentials.
+
+    In later two cases we optionally generate and return a new bootstrap token,
+    that can be used to authorize /bot_code calls.
+    """
+    existing_token = self.request.get('tok')
+    if existing_token:
+      payload = bot_code.validate_bootstrap_token(existing_token)
+      if payload is None:
+        raise auth.AuthorizationError('Invalid bootstrap token')
+      logging.info('Using bootstrap token %r', payload)
+      return existing_token
+    if not acl.is_bot() and not acl.is_bootstrapper():
+      raise auth.AuthorizationError('Not allowed to access the bot code')
+    return bot_code.generate_bootstrap_token() if generate_token else None
+
 
 class BootstrapHandler(_BotAuthenticatingHandler):
   """Returns python code to run to bootstrap a swarming bot."""
 
-  @auth.require(acl.is_bot)
+  @auth.public  # auth inside check_bot_code_access()
   def get(self):
+    # We must pass a bootstrap token (generating it, if necessary) to
+    # get_bootstrap(...), since bootstrap.py uses tokens exclusively (it can't
+    # transparently pass OAuth headers to /bot_code).
+    bootstrap_token = self.check_bot_code_access(generate_token=True)
     self.response.headers['Content-Type'] = 'text/x-python'
     self.response.headers['Content-Disposition'] = (
         'attachment; filename="swarming_bot_bootstrap.py"')
     self.response.out.write(
-        bot_code.get_bootstrap(self.request.host_url).content)
+        bot_code.get_bootstrap(self.request.host_url, bootstrap_token).content)
 
 
 class BotCodeHandler(_BotAuthenticatingHandler):
@@ -141,8 +168,9 @@ class BotCodeHandler(_BotAuthenticatingHandler):
   cacheable.
   """
 
-  @auth.require(acl.is_bot)
+  @auth.public  # auth inside check_bot_code_access()
   def get(self, version=None):
+    self.check_bot_code_access()
     if version:
       expected = bot_code.get_bot_version(self.request.host_url)
       if version != expected:

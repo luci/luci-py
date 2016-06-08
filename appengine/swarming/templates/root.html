@@ -79,21 +79,25 @@
     </ul>
 
     <h3>Running a bot</h3>
-      To bootstrap a bot, run one of these:
+      {% if is_bootstrapper %}
+      To bootstrap a bot, run one of these (all links are valid for 1 hour):
+      {% else %}
+      To bootstrap a bot, an admin can run one of these:
+      {% endif %}
       <ol>
         <li>
           <strong> TL;DR; </strong>
-<div class="command">python -c "import urllib; exec urllib.urlopen('{{host_url}}/bootstrap').read()"</div>
+<pre class="command">python -c "import urllib; exec urllib.urlopen('{{host_url}}/bootstrap?tok={{bootstrap_token}}').read()"</pre>
         </li>
         <li>
           Escaped version to pass as a ssh argument:
-<div class="command">'python -c "import urllib; exec urllib.urlopen('"'{{host_url}}/bootstrap'"').read()"'</div>
+<pre class="command">'python -c "import urllib; exec urllib.urlopen('"'{{host_url}}/bootstrap?tok={{bootstrap_token}}'"').read()"'</pre>
         </li>
         <li>
           Manually:
-<div class="command" style="margin-bottom:0">mkdir bot; cd bot
-rm swarming_bot.zip; curl -sSLOJ {{host_url}}/bot_code
-python swarming_bot.zip</div>
+<pre class="command" style="margin-bottom:0">mkdir bot; cd bot
+rm -f swarming_bot.zip; curl -sSLOJ {{host_url}}/bot_code?tok={{bootstrap_token}}
+python swarming_bot.zip</pre>
         </li>
       </ol>
     </li>

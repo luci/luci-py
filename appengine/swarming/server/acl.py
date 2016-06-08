@@ -19,6 +19,7 @@ ADMINS_GROUP = 'swarming-admins'
 BOTS_GROUP = bot_auth.BOTS_GROUP
 PRIVILEGED_USERS_GROUP = 'swarming-privileged-users'
 USERS_GROUP = 'swarming-users'
+BOT_BOOTSTRAP_GROUP = 'swarming-bot-bootstrap'
 
 
 def is_admin():
@@ -56,6 +57,11 @@ def is_bot_or_admin():
   return is_bot() or is_admin()
 
 
+def is_bootstrapper():
+  """Returns True if current user have access to bot code (for bootstrap)."""
+  return is_admin() or auth.is_group_member(BOT_BOOTSTRAP_GROUP)
+
+
 def get_user_type():
   """Returns a string describing the current access control for the user."""
   if is_admin():
@@ -75,6 +81,7 @@ def bootstrap_dev_server_acls():
   bots = auth.bootstrap_loopback_ips()
   auth.bootstrap_group(BOTS_GROUP, bots, 'Swarming bots')
   auth.bootstrap_group(USERS_GROUP, bots, 'Swarming users')
+  auth.bootstrap_group(BOT_BOOTSTRAP_GROUP, bots, 'Bot bootstrap')
 
   # Add a swarming admin. smoke-test@example.com is used in
   # server_smoke_test.py

@@ -5,7 +5,6 @@
 """This module defines Swarming Server endpoints handlers."""
 
 import datetime
-import json
 import logging
 
 from google.appengine.api import datastore_errors
@@ -142,7 +141,7 @@ class SwarmingServerService(remote.Service):
   @auth.require(acl.is_bot_or_user)
   def get_bootstrap(self, request):
     """Retrieves the current or a previous version of bootstrap.py."""
-    obj = bot_code.get_bootstrap('', request.version)
+    obj = bot_code.get_bootstrap('', '', request.version)
     if not obj:
       return swarming_rpcs.FileContent()
     return swarming_rpcs.FileContent(

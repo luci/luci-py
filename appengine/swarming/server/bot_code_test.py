@@ -81,6 +81,11 @@ class BotManagementTest(test_case.TestCase):
     finally:
       file_path.rmtree(temp_dir)
 
+  def test_bootstrap_token(self):
+    tok = bot_code.generate_bootstrap_token()
+    self.assertEqual(
+        {'for': 'user:joe@localhost'}, bot_code.validate_bootstrap_token(tok))
+
 
 if __name__ == '__main__':
   fix_encoding.fix_encoding()

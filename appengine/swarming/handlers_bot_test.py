@@ -28,6 +28,7 @@ from components import ereporter2
 from components import utils
 from server import bot_archive
 from server import bot_management
+from server import bot_code
 
 
 DATETIME_FORMAT = u'%Y-%m-%dT%H:%M:%S'
@@ -870,12 +871,21 @@ class BotApiTest(test_env_handlers.AppTestBase):
     ]
     self.assertEqual(expected, [e[1] for e in errors])
 
-  def test_bot_code(self):
+  def test_bot_code_as_bot(self):
     code = self.app.get('/bot_code')
     expected = {'config/bot_config.py', 'config/config.json'}.union(
         bot_archive.FILES)
     with zipfile.ZipFile(StringIO.StringIO(code.body), 'r') as z:
       self.assertEqual(expected, set(z.namelist()))
+
+  def test_bot_code_without_token(self):
+    self.set_as_anonymous()
+    self.app.get('/bot_code', status=403)
+
+  def test_bot_code_with_token(self):
+    self.set_as_anonymous()
+    tok = bot_code.generate_bootstrap_token()
+    self.app.get('/bot_code?tok=%s' % tok, status=200)
 
 
 if __name__ == '__main__':

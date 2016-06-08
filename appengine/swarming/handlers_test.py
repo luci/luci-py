@@ -21,6 +21,7 @@ from google.appengine.ext import deferred
 
 import handlers_frontend
 from components import template
+from server import bot_code
 from server import bot_management
 
 
@@ -356,15 +357,19 @@ class FrontendAdminTest(AppTestBase):
   # Admin-specific management pages.
   def test_bootstrap_default(self):
     self.set_as_bot()
+    self.mock(bot_code, 'generate_bootstrap_token', lambda: 'bootstrap-token')
     actual = self.app.get('/bootstrap').body
     path = os.path.join(self.APP_DIR, 'swarming_bot', 'config', 'bootstrap.py')
     with open(path, 'rb') as f:
       expected = f.read()
-    header = 'host_url = \'http://localhost\'\n'
+    header = (
+        'host_url = \'http://localhost\'\n'
+        'bootstrap_token = \'bootstrap-token\'\n')
     self.assertEqual(header + expected, actual)
 
   def test_bootstrap_custom(self):
     self.set_as_admin()
+    self.mock(bot_code, 'generate_bootstrap_token', lambda: 'bootstrap-token')
     xsrf_token = self.get_xsrf_token()
     self.app.get('/restricted/upload/bootstrap')
     response = self.app.post(
@@ -381,7 +386,10 @@ class FrontendAdminTest(AppTestBase):
     self.assertIn(u'script_bodé'.encode('utf-8'), response.body)
 
     actual = self.app.get('/bootstrap').body
-    expected = u'host_url = \'http://localhost\'\nscript_bodé'.encode('utf-8')
+    header = (
+        u'host_url = \'http://localhost\'\n'
+        u'bootstrap_token = \'bootstrap-token\'\n')
+    expected =  (header + u'script_bodé').encode('utf-8')
     self.assertEqual(expected, actual)
 
 

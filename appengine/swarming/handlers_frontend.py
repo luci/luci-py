@@ -12,11 +12,9 @@ import collections
 import datetime
 import itertools
 import os
-import re
 
 import webapp2
 
-from google.appengine import runtime
 from google.appengine.api import users
 from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
@@ -696,6 +694,8 @@ class RootHandler(auth.AuthenticatingHandler):
       'is_admin': acl.is_admin(),
       'is_privileged_user': acl.is_privileged_user(),
       'is_user': acl.is_user(),
+      'is_bootstrapper': acl.is_bootstrapper(),
+      'bootstrap_token': '...',
       'mapreduce_jobs': [],
       'user_type': acl.get_user_type(),
     }
@@ -705,6 +705,8 @@ class RootHandler(auth.AuthenticatingHandler):
         for job_id, job_def in mapreduce_jobs.MAPREDUCE_JOBS.iteritems()
       ]
       params['xsrf_token'] = self.generate_xsrf_token()
+    if acl.is_bootstrapper():
+      params['bootstrap_token'] = bot_code.generate_bootstrap_token()
     self.response.write(template.render('swarming/root.html', params))
 
 
