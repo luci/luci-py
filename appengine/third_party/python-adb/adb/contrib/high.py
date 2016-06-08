@@ -156,14 +156,14 @@ def _InitCache(device):
           int(i) for i in available_frequencies.strip().split())
     else:
       # It's possibly an older kernel. In that case, query the min/max instead.
-      cpuinfo_min_freq = device.PullContent(
-          '/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq')
-      cpuinfo_max_freq = device.PullContent(
-          '/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq')
-      if cpuinfo_min_freq and cpuinfo_max_freq:
+      scaling_min_freq = device.PullContent(
+          '/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq')
+      scaling_max_freq = device.PullContent(
+          '/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq')
+      if scaling_min_freq and scaling_max_freq:
         # In practice there's more CPU speeds than this but there's no way (?)
         # to query this information.
-        available_frequencies = [int(cpuinfo_min_freq), int(cpuinfo_max_freq)]
+        available_frequencies = [int(scaling_min_freq), int(scaling_max_freq)]
 
     cache = DeviceCache(
         properties, external_storage_path, has_su,
@@ -193,12 +193,12 @@ KNOWN_CPU_SCALING_GOVERNOR_VALUES = (
     # there isn't much load.
     'ondemand',
     # performance locks the CPU frequency at its maximum supported frequency; it
-    # is the equivalent of userspace at cpuinfo_max_freq. On a ARM based device
+    # is the equivalent of userspace at scaling_max_freq. On a ARM based device
     # without active cooling, this means that eventually the CPU will hit
     # temperature based throttling.
     'performance',
     # powersave locks the CPU frequency to its lowest supported frequency; it is
-    # the equivalent of userspace at cpuinfo_min_freq.
+    # the equivalent of userspace at scaling_min_freq.
     'powersave',
     # userspace overrides the scaling governor with an user defined constant
     # frequency.
@@ -444,12 +444,12 @@ class HighDevice(object):
   def Root(self):
     return self._device.Root()
 
-  def Shell(self, cmd):
+  def Shell(self, cmd, timeout_ms=None):
     """Automatically uses WrappedShell() when necessary."""
     if self._device.IsShellOk(cmd):
-      return self._device.Shell(cmd)
+      return self._device.Shell(cmd, timeout_ms=timeout_ms)
     else:
-      return self.WrappedShell([cmd])
+      return self.WrappedShell([cmd], timeout_ms=timeout_ms)
 
   def ShellRaw(self, cmd):
     return self._device.ShellRaw(cmd)
@@ -729,7 +729,9 @@ class HighDevice(object):
 
   def GetPackages(self):
     """Returns the list of packages installed."""
-    out, _ = self.Shell('pm list packages')
+    # pm can be very slow at times. Use a longer timeout to prevent
+    # confusing a long-running command with an interrupted connection.
+    out, _ = self.Shell('pm list packages', timeout_ms=30000)
     if not out:
       return None
     return [l.split(':', 1)[1] for l in out.strip().splitlines() if ':' in l]
@@ -818,7 +820,9 @@ class HighDevice(object):
             'time',
             self.port_path)
         return False
-      out, _ = self.Shell('pm path')
+      # pm can be very slow at times. Use a longer timeout to prevent
+      # confusing a long-running command with an interrupted connection.
+      out, _ = self.Shell('pm path', timeout_ms=30000)
       if out == 'Error: no package specified\n':
         # It's up!
         break
@@ -880,7 +884,7 @@ class HighDevice(object):
       if self.PushContent(content, name):
         return name
 
-  def WrappedShell(self, commands):
+  def WrappedShell(self, commands, timeout_ms=None):
     """Creates a temporary shell script, runs it then return the data.
 
     This is needed when:
@@ -899,7 +903,8 @@ class HighDevice(object):
       if not outfile:
         return False
       try:
-        _, exit_code = self.Shell('sh %s &> %s' % (script, outfile))
+        _, exit_code = self.Shell('sh %s &> %s' % (script, outfile),
+                                  timeout_ms=timeout_ms)
         out = self.PullContent(outfile)
         return out, exit_code
       finally:

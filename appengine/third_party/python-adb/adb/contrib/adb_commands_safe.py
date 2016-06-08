@@ -382,7 +382,7 @@ class AdbCommandsSafe(object):
             break
     return False
 
-  def Shell(self, cmd):
+  def Shell(self, cmd, timeout_ms=None):
     """Runs a command on an Android device while swallowing exceptions.
 
     Traps all kinds of USB errors so callers do not have to handle this.
@@ -395,7 +395,7 @@ class AdbCommandsSafe(object):
     if self._adb_cmd:
       for _ in self._Loop():
         try:
-          return self.ShellRaw(cmd)
+          return self.ShellRaw(cmd, timeout_ms=timeout_ms)
         except self._ERRORS as e:
           if not self._Reset('(%s): %s', cmd, e):
             break
@@ -413,7 +413,7 @@ class AdbCommandsSafe(object):
     # Has to keep one byte for trailing nul byte.
     return cmd_size < pkt_size
 
-  def ShellRaw(self, cmd):
+  def ShellRaw(self, cmd, timeout_ms=None):
     """Runs a command on an Android device.
 
     It is expected that the user quote cmd properly.
@@ -433,8 +433,10 @@ class AdbCommandsSafe(object):
     # The adb protocol doesn't return the exit code, so embed it inside the
     # command.
     assert self.IsShellOk(cmd), 'Command is too long: %r' % cmd
-    out = self._adb_cmd.Shell(cmd + self._SHELL_SUFFIX).decode(
-        'utf-8', 'replace')
+    timeout_ms = max(timeout_ms, self._default_timeout_ms)
+    out = self._adb_cmd.Shell(
+        cmd + self._SHELL_SUFFIX,
+        timeout_ms=timeout_ms).decode('utf-8', 'replace')
     # Protect against & or other bash conditional execution that wouldn't make
     # the 'echo $?' command to run.
     if not out:

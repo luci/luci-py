@@ -175,7 +175,6 @@ class _AdbMessage(object):
 
   def Write(self, usb, timeout_ms=None):
     """Send this message over USB."""
-    timeout_ms = usb.Timeout(timeout_ms)
     # We can't merge these 2 writes, the device wouldn't be able to read the
     # packet.
     try:
@@ -190,7 +189,6 @@ class _AdbMessage(object):
 
     Returns None if it failed to read the header with a ReadFailedError.
     """
-    timeout_ms = usb.Timeout(timeout_ms)
     packet = usb.BulkRead(24, timeout_ms)
     hdr = _AdbMessageHeader.Unpack(packet)
     if hdr.data_length:
@@ -228,9 +226,10 @@ class _AdbMessage(object):
 class _AdbConnection(object):
   """One logical ADB connection to a service."""
   class _MessageQueue(object):
-    def __init__(self, manager):
+    def __init__(self, manager, timeout_ms=None):
       self._queue = Queue.Queue()
       self._manager = manager
+      self._timeout_ms = timeout_ms
 
     def __iter__(self):
       return self
@@ -241,7 +240,7 @@ class _AdbConnection(object):
           i = self._queue.get_nowait()
         except Queue.Empty:
           # Will reentrantly call self._Add() via parent._OnRead()
-          if not self._manager.ReadAndDispatch():
+          if not self._manager.ReadAndDispatch(timeout_ms=self._timeout_ms):
             # Failed to read from the device, the connection likely dropped.
             raise StopIteration()
           continue
@@ -255,14 +254,14 @@ class _AdbConnection(object):
     def _Close(self):
       self._queue.put(StopIteration())
 
-  def __init__(self, manager, local_id, service_name):
+  def __init__(self, manager, local_id, service_name, timeout_ms=None):
     # ID as given by the remote device.
     self.remote_id = 0
     # Service requested on the remote device.
     self.service_name = service_name
     # Self assigned local ID.
     self._local_id = local_id
-    self._yielder = self._MessageQueue(manager)
+    self._yielder = self._MessageQueue(manager, timeout_ms=timeout_ms)
     self._manager = manager
 
   @property
@@ -423,7 +422,7 @@ class AdbConnectionManager(object):
       next_id = self._next_local_id
       self._next_local_id += 1
 
-    conn = _AdbConnection(self, next_id, destination)
+    conn = _AdbConnection(self, next_id, destination, timeout_ms=timeout_ms)
     conn._Write('OPEN', destination + '\0')
     with self._lock:
       self._connections[conn.local_id] = conn
