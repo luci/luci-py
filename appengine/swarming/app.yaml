@@ -44,8 +44,8 @@ handlers:
     X-Frame-Options: deny
 
 - url: /elements/polymer05/([^/]+\-build)\.(html|js)
-  static_files: elements05/\1.\2
-  upload: elements05/([^/]+\-build)\.(html|js)
+  static_files: elements/polymer05/\1.\2
+  upload: elements/polymer05/([^/]+\-build)\.(html|js)
   secure: always
   http_headers:
     # TODO(maruel): Unsure about polymer if it is inline-style free.
