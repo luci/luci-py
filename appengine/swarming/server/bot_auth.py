@@ -8,7 +8,10 @@ It is fetched from the config service. Functions here are used by bot API
 handlers in handlers_bot.py.
 """
 
+import logging
+
 from components import auth
+from components import utils
 
 
 # TODO(vadimsh): Get rid of this in favor of swarming config stored
@@ -29,7 +32,7 @@ def is_known_bot():
 
 
 
-def validate_bot_id(bot_id):  # pylint: disable=unused-argument
+def validate_bot_id(bot_id):
   """Verifies ID the bot reports matches the credentials being used.
 
   Expected to be called in a context of some bot API request handler.
@@ -41,6 +44,10 @@ def validate_bot_id(bot_id):  # pylint: disable=unused-argument
   # For example, if the bot is using machine tokens, we check that
   # bot_id == hostname specified in the token. If the bot is using IP
   # whitelist, we check that its bot_id is allowed to use IP whitelist, etc.
+  if utils.is_canary():
+    logging.debug(
+        'bot_id: "%s", peer_ident: "%s"', bot_id,
+        auth.get_peer_identity().to_bytes())
 
 
 def fetch_trusted_dimensions(bot_id):  # pylint: disable=unused-argument
