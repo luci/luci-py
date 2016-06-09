@@ -46,6 +46,7 @@ FILES = (
     'bot_code/singleton.py',
     'bot_code/task_runner.py',
     'client/auth.py',
+    'client/cipd.py',
     'client/isolated_format.py',
     'client/isolateserver.py',
     'client/run_isolated.py',

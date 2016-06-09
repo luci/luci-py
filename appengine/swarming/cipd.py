@@ -23,7 +23,8 @@ TAG_MAX_LEN = 400
 # The values of the parameters are computed on the bot.
 #
 # Platform parameter value is "<os>-<arch>" string, where
-# os can be "linux", "mac" or "windows" and arch can be "386", "amd64" or "arm".
+# os can be "linux", "mac" or "windows" and arch can be "386", "amd64" or
+# "armv6l".
 PARAM_PLATFORM = '${platform}'
 # OS version parameter defines major and minor version of the OS distribution.
 # It is useful if package depends on .dll/.so libraries provided by the OS.
