@@ -416,7 +416,7 @@ class UpdateLeasesTest(test_case.TestCase):
         ),
     ]))
 
-    lease_management.update_leases(machine_type.key, responses)
+    lease_management.update_leases(machine_type.key, responses['responses'])
     updated_machine_type = machine_type.key.get()
     self.assertEqual(len(updated_machine_type.leases), 2)
     self.failUnless(updated_machine_type.leases[0].hostname)
@@ -450,7 +450,7 @@ class UpdateLeasesTest(test_case.TestCase):
         ),
     ]))
 
-    lease_management.update_leases(machine_type.key, responses)
+    lease_management.update_leases(machine_type.key, responses['responses'])
     updated_machine_type = machine_type.key.get()
     self.assertEqual(len(updated_machine_type.leases), 1)
     self.assertEqual(
@@ -480,7 +480,7 @@ class UpdateLeasesTest(test_case.TestCase):
         ),
     ]))
 
-    lease_management.update_leases(machine_type.key, responses)
+    lease_management.update_leases(machine_type.key, responses['responses'])
     updated_machine_type = machine_type.key.get()
     self.assertEqual(len(updated_machine_type.leases), 1)
     self.assertEqual(
@@ -510,7 +510,7 @@ class UpdateLeasesTest(test_case.TestCase):
         ),
     ]))
 
-    lease_management.update_leases(machine_type.key, responses)
+    lease_management.update_leases(machine_type.key, responses['responses'])
     updated_machine_type = machine_type.key.get()
     self.failIf(updated_machine_type.leases)
 
@@ -544,7 +544,7 @@ class UpdateLeasesTest(test_case.TestCase):
         ),
     ]))
 
-    lease_management.update_leases(machine_type.key, responses)
+    lease_management.update_leases(machine_type.key, responses['responses'])
     updated_machine_type = machine_type.key.get()
     self.assertEqual(len(updated_machine_type.leases), 2)
     request_ids = sorted(

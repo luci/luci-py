@@ -346,7 +346,7 @@ def update_leases(machine_type_key, responses):
   lease_request_map = {
       request.client_request_id: request for request in machine_type.leases
   }
-  for response in responses.get('responses', []):
+  for response in responses:
     request_id = response['client_request_id']
     request = lease_request_map.get(request_id)
     if not request:
