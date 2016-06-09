@@ -649,8 +649,46 @@ class HighDevice(object):
       out[key] = int(props[key]) if key in props else None
     return out
 
+  def GetMemInfo(self):
+    """Returns used, free, and total ram."""
+    props = {}
+    out = self.PullContent('/proc/meminfo')
+    if not out:
+      return props
+
+    def parse_memline(key, res):
+      if line.startswith('%s:' % key):
+        parts = line.split()
+        if len(parts) == 3 and parts[2] == 'kB':
+          props[res] = int(parts[1])
+
+    for line in out.splitlines():
+      parse_memline('MemTotal', 'total')
+      parse_memline('MemFree', 'free')
+      parse_memline('Buffers', 'buffers')
+      parse_memline('Cached', 'cached')
+
+    if ('total' in props and
+        'free' in props and
+        'buffers' in props and
+        'cached' in props):
+      props['avail'] = props['free'] + props['cached'] + props['buffers']
+      props['used'] = props['total'] - props['avail']
+
+    return props
+
+  def GetProcessCount(self):
+    """Returns the number of total processes on the device."""
+    out, exit_code = self.Shell('ps')
+    if exit_code != 0:
+      return None
+    if not out.startswith('USER'):
+      return None
+
+    return out.count('\n') - 1
+
   def GetDisk(self):
-    """Returns details about the battery's state."""
+    """Returns details about the device's disks."""
     props = {}
     out = self.Dumpsys('diskstats')
     if not out:
