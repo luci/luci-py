@@ -328,9 +328,8 @@ class AuthDBTest(test_case.TestCase):
   def test_verify_ip_whitelisted_ok(self):
     # Should not raise: IP is whitelisted.
     ident = model.Identity(model.IDENTITY_USER, 'a@example.com')
-    result = self.make_auth_db_with_ip_whitelist().verify_ip_whitelisted(
+    self.make_auth_db_with_ip_whitelist().verify_ip_whitelisted(
         ident, ipaddr.ip_from_string('127.0.0.1'))
-    self.assertEqual(ident, result)
 
   def test_verify_ip_whitelisted_not_whitelisted(self):
     with self.assertRaises(api.AuthorizationError):
@@ -338,26 +337,11 @@ class AuthDBTest(test_case.TestCase):
           model.Identity(model.IDENTITY_USER, 'a@example.com'),
           ipaddr.ip_from_string('192.168.0.100'))
 
-  def test_verify_ip_whitelisted_bot(self):
-    # Should convert Anonymous to bot, 192.168.1.1 is in 'bots' whitelist.
-    result = self.make_auth_db_with_ip_whitelist().verify_ip_whitelisted(
-        model.Anonymous, ipaddr.ip_from_string('192.168.1.1'))
-    self.assertEqual(
-        model.Identity(model.IDENTITY_BOT, 'whitelisted-ip'), result)
-
-  def test_verify_ip_whitelisted_bot_ipv6_loopback(self):
-    # Should convert Anonymous as bot, 192.168.1.1 is in 'bots' whitelist.
-    result = self.make_auth_db_with_ip_whitelist().verify_ip_whitelisted(
-        model.Anonymous, ipaddr.ip_from_string('::1'))
-    self.assertEqual(
-        model.Identity(model.IDENTITY_BOT, 'whitelisted-ip'), result)
-
   def test_verify_ip_whitelisted_not_assigned(self):
     # Should not raise: whitelist is not required for another_user@example.com.
     ident = model.Identity(model.IDENTITY_USER, 'another_user@example.com')
-    result = self.make_auth_db_with_ip_whitelist().verify_ip_whitelisted(
+    self.make_auth_db_with_ip_whitelist().verify_ip_whitelisted(
         ident, ipaddr.ip_from_string('192.168.0.100'))
-    self.assertEqual(ident, result)
 
   def test_verify_ip_whitelisted_missing_whitelist(self):
     auth_db = api.AuthDB(

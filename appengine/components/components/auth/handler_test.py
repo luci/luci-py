@@ -6,7 +6,6 @@
 # Disable 'Unused variable', 'Unused argument' and 'Method could be a function'.
 # pylint: disable=W0612,W0613,R0201
 
-import datetime
 import json
 import os
 import sys
@@ -112,6 +111,23 @@ class AuthenticatingHandlerTest(test_case.TestCase):
 
     self.assertEqual('bot:whitelisted-ip', call('192.168.1.100'))
     self.assertEqual('anonymous:anonymous', call('127.0.0.1'))
+
+  def test_ip_whitelist_bot_disabled(self):
+    """Same as test_ip_whitelist_bot, but IP whitelist auth is disabled."""
+    model.bootstrap_ip_whitelist('bots', ['192.168.1.100/32'])
+
+    class Handler(handler.AuthenticatingHandler):
+      use_bots_ip_whitelist = False
+      @api.public
+      def get(self):
+        self.response.write(api.get_current_identity().to_bytes())
+
+    app = self.make_test_app('/request', Handler)
+    def call(ip):
+      api.reset_local_state()
+      return app.get('/request', extra_environ={'REMOTE_ADDR': ip}).body
+
+    self.assertEqual('anonymous:anonymous', call('192.168.1.100'))
 
   def test_ip_whitelist(self):
     """Per-account IP whitelist works."""

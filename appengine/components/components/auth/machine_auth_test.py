@@ -167,6 +167,13 @@ class MachineAuthTest(test_case.TestCase):
       self.call(body)
     self.assertTrue(self.has_log('Bad machine_fqdn'))
 
+  def test_forbidden_bot_id(self):
+    body = self.good_body()
+    body.machine_fqdn = 'whitelisted-ip'
+    with self.assertRaises(machine_auth.BadTokenError):
+      self.call(body)
+    self.assertTrue(self.has_log('is forbidden'))
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

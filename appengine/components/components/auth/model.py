@@ -102,6 +102,7 @@ __all__ = [
   'IdentityGlob',
   'IdentityProperty',
   'ip_whitelist_key',
+  'IP_WHITELISTED_BOT_ID',
   'is_empty_group',
   'is_external_group_name',
   'is_primary',
@@ -248,6 +249,17 @@ class Identity(
 
 # Predefined Anonymous identity.
 Anonymous = Identity(IDENTITY_ANONYMOUS, 'anonymous')
+
+
+# Identity assigned to callers that make unauthenticated calls from IPs
+# belonging to 'bots' IP whitelist. Note that same bot may appear to use
+# different IP addresses (happens with some NATs), thus we can't put IP
+# address into the bot identity string and instead hardcode some arbitrary
+# name (defined here).
+#
+# TODO(vadimsh): Get rid of this. Blocked on Swarming and Isolate switching
+# to service accounts.
+IP_WHITELISTED_BOT_ID = Identity(IDENTITY_BOT, 'whitelisted-ip')
 
 
 class IdentityProperty(datastore_utils.BytesSerializableProperty):

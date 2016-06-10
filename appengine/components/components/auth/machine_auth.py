@@ -157,10 +157,19 @@ def machine_authentication(request):
 
   # The token is valid. Construct the bot identity.
   try:
-    return model.Identity.from_bytes('bot:' + body.machine_fqdn)
+    ident = model.Identity.from_bytes('bot:' + body.machine_fqdn)
   except ValueError as exc:
     log_error(request, body, exc, 'Bad machine_fqdn - %s', body.machine_fqdn)
     raise BadTokenError()
+
+  # Unfortunately 'bot:*' identity namespace is shared between token-based
+  # identities and old IP-whitelist based identity. They shouldn't intersect,
+  # but better to enforce this.
+  if ident == model.IP_WHITELISTED_BOT_ID:
+    log_error(request, body, None, 'Bot ID %s is forbidden', ident.to_bytes())
+    raise BadTokenError()
+
+  return ident
 
 
 def optional_machine_authentication(request):

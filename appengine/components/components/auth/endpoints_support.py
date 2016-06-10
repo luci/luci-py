@@ -250,16 +250,25 @@ def initialize_request_auth(remote_address, headers):
         raise api.AuthenticationError('Unsupported authentication method')
       identity = model.Anonymous
 
-  # Verify IP is whitelisted and authenticate requests from bots. It raises
-  # AuthorizationError if IP is not allowed.
-  assert identity is not None
   assert remote_address
   ip = ipaddr.ip_from_string(remote_address)
-  auth_context.peer_ip = ip
 
-  # verify_ip_whitelisted may change identity for bots, store new one.
-  identity = api.verify_ip_whitelisted(identity, ip)
+  # Hack to allow pure IP-whitelist based authentication for bots, until they
+  # are switched to use something better.
+  #
+  # TODO(vadimsh): Get rid of this. Blocked on Swarming and Isolate switching
+  # to service accounts.
+  assert identity is not None
+  if (identity.is_anonymous and
+      api.is_in_ip_whitelist(model.BOTS_IP_WHITELIST, ip)):
+    identity = model.IP_WHITELISTED_BOT_ID
+
+  auth_context.peer_ip = ip
   auth_context.peer_identity = identity
+
+  # Verify the caller is allowed to make calls from the given IP. It raises
+  # AuthorizationError if IP is not allowed.
+  api.verify_ip_whitelisted(identity, ip)
 
   # Parse delegation token, if given, to deduce end-user identity.
   delegation_tok = headers.get(delegation.HTTP_HEADER)

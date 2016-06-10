@@ -33,9 +33,9 @@ from . import model
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
-  'autologin',
   'AuthenticationError',
   'AuthorizationError',
+  'autologin',
   'disable_process_cache',
   'Error',
   'get_current_identity',
@@ -45,6 +45,7 @@ __all__ = [
   'get_secret',
   'is_admin',
   'is_group_member',
+  'is_in_ip_whitelist',
   'list_group',
   'public',
   'require',
@@ -317,48 +318,49 @@ class AuthDB(object):
     entity = self.secrets[secret_key.scope][secret_key.name]
     return list(entity.values)
 
-  def verify_ip_whitelisted(self, identity, ip):
-    """Verifies IP is in a whitelist assigned to Identity or in bots whitelist.
+  def is_in_ip_whitelist(self, whitelist_name, ip):
+    """Returns True if the given IP belongs to the given IP whitelist.
 
-    Returns new bot Identity if request was authenticated as coming from
-    IP whitelisted bot, or |identity| otherwise.
+    Missing IP whitelists are considered empty.
+
+    Args:
+      whitelist_name: name of the IP whitelist (e.g. 'bots').
+      ip: instance of ipaddr.IP.
+    """
+    whitelist = self.ip_whitelists.get(whitelist_name)
+    if not whitelist:
+      logging.error('Unknown IP whitelist: %s', whitelist_name)
+      return False
+    return whitelist.is_ip_whitelisted(ip)
+
+  def verify_ip_whitelisted(self, identity, ip):
+    """Verifies IP is in a whitelist assigned to the Identity.
+
+    This check is used to restrict some callers to particular IP subnets as
+    additional security measure.
 
     Raises AuthorizationError if identity has an IP whitelist assigned and given
     IP address doesn't belong to it.
+
+    Args:
+      identity: caller's identity.
+      ip: instance of ipaddr.IP.
     """
     assert isinstance(identity, model.Identity), identity
 
-    # Check bots whitelist to authenticate anonymous request as coming from bot.
-    if identity.is_anonymous:
-      whitelist = self.ip_whitelists.get(model.BOTS_IP_WHITELIST)
-      if whitelist and whitelist.is_ip_whitelisted(ip):
-        # TODO(vadimsh): It is temporary bandaid until bots start using machine
-        # tokens.
-        bot_id = 'whitelisted-ip'
-        return model.Identity(model.IDENTITY_BOT, bot_id)
-
-    # Find IP whitelist name in the assignment entity (if any).
     for assignment in self.ip_whitelist_assignments.assignments:
       if assignment.identity == identity:
-        whitelist_id = assignment.ip_whitelist
+        whitelist_name = assignment.ip_whitelist
         break
     else:
-      return identity
+      return
 
-    # IP whitelist MUST be there. But if it's missing, choose a safer
-    # alternative: reject the request.
-    whitelist = self.ip_whitelists.get(whitelist_id)
-    if not whitelist:
-      logging.error('Unknown IP whitelist: %s', whitelist_id)
-      raise AuthorizationError('IP is not whitelisted')
-
-    if not whitelist.is_ip_whitelisted(ip):
+    if not self.is_in_ip_whitelist(whitelist_name, ip):
+      ip_as_str = ipaddr.ip_to_string(ip)
       logging.error(
           'IP is not whitelisted.\nIdentity: %s\nIP: %s\nWhitelist: %s',
-          identity.to_bytes(), ipaddr.ip_to_string(ip), whitelist_id)
-      raise AuthorizationError('IP is not whitelisted')
-
-    return identity
+          identity.to_bytes(), ip_as_str, whitelist_name)
+      raise AuthorizationError('IP %s is not whitelisted' % ip_as_str)
 
   def is_allowed_oauth_client_id(self, client_id):
     """True if given OAuth2 client_id can be used to authenticate the user."""
@@ -840,16 +842,30 @@ def get_secret(secret_key):
   return get_request_cache().auth_db.get_secret(secret_key)
 
 
-def verify_ip_whitelisted(identity, ip):
-  """Verifies IP is in a whitelist assigned to Identity or in bots whitelist.
+def is_in_ip_whitelist(whitelist_name, ip):
+  """Returns True if the given IP belongs to the given IP whitelist.
 
-  Returns new bot Identity if request was authenticated as coming from
-  IP whitelisted bot, or |identity| otherwise.
+  Args:
+    whitelist_name: name of the IP whitelist (e.g. 'bots').
+    ip: instance of ipaddr.IP.
+  """
+  return get_request_cache().auth_db.is_in_ip_whitelist(whitelist_name, ip)
+
+
+def verify_ip_whitelisted(identity, ip):
+  """Verifies IP is in a whitelist assigned to the Identity.
+
+  This check is used to restrict some callers to particular IP subnets as
+  additional security measure.
 
   Raises AuthorizationError if identity has an IP whitelist assigned and given
   IP address doesn't belong to it.
+
+  Args:
+    identity: caller's identity.
+    ip: instance of ipaddr.IP.
   """
-  return get_request_cache().auth_db.verify_ip_whitelisted(identity, ip)
+  get_request_cache().auth_db.verify_ip_whitelisted(identity, ip)
 
 
 def public(func):
