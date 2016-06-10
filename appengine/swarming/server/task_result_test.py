@@ -370,6 +370,13 @@ class TaskResultApiTest(TestCase):
         'items_cold': 'foo',
         'items_hot': None,
       },
+      'package_installation': {
+        'duration': None,
+        'initial_number_items': None,
+        'initial_size': None,
+        'items_cold': None,
+        'items_hot': None,
+      },
     }
     self.assertEqual(expected, result_summary.performance_stats.to_dict())
     self.assertEqual('foo', result_summary.get_output())

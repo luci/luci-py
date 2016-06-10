@@ -103,11 +103,23 @@ def get_isolated_cmd(
             '--isolated', isolated_input,
           ])
 
+  if task_details.cipd_input and task_details.cipd_input.get('packages'):
+    to_pkg = lambda p: '%s:%s' % (p['package_name'], p['version'])
+    cmd.extend(
+        [
+          '--cipd-cache', os.path.join(bot_dir, 'cipd_cache'),
+          '--cipd-client-package',
+          to_pkg(task_details.cipd_input.get('client_package')),
+          '--cipd-server', task_details.cipd_input.get('server'),
+        ])
+    for p in task_details.cipd_input['packages']:
+      cmd.extend(['--cipd-package', to_pkg(p)])
+
   cmd.extend(
       [
         '--json', isolated_result,
         '--log-file', os.path.join(bot_dir, 'logs', 'run_isolated.log'),
-        '--cache', os.path.join(bot_dir, 'cache'),
+        '--cache', os.path.join(bot_dir, 'isolated_cache'),
         '--root-dir', os.path.join(work_dir, 'isolated'),
       ])
   if min_free_space:
@@ -142,6 +154,8 @@ class TaskDetails(object):
     # Isolated command. Is a serialized version of task_request.FilesRef.
     self.isolated = data['isolated']
     self.extra_args = data['extra_args']
+
+    self.cipd_input = data.get('cipd_input')
 
     self.env = {
       k.encode('utf-8'): v.encode('utf-8') for k, v in data['env'].iteritems()
@@ -517,11 +531,16 @@ def run_command(
               'download', {}).get('duration', 0)
           params['bot_overhead'] -= run_isolated_result.get(
               'upload', {}).get('duration', 0)
+          params['bot_overhead'] -= run_isolated_result.get(
+              'cipd', {}).get('duration', 0)
           if params['bot_overhead'] < 0:
             params['bot_overhead'] = 0
         isolated_stats = run_isolated_result.get('stats', {}).get('isolated')
         if isolated_stats:
           params['isolated_stats'] = isolated_stats
+        cipd_stats = run_isolated_result.get('stats', {}).get('cipd')
+        if cipd_stats:
+          params['cipd_stats'] = cipd_stats
     except (IOError, OSError, ValueError) as e:
       logging.error('Swallowing error: %s', e)
       if not must_signal_internal_failure:

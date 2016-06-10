@@ -260,6 +260,9 @@ class CipdPackage(ndb.Model):
   version = ndb.StringProperty(
       indexed=False, validator=_validate_package_version)
 
+  def __str__(self):
+    return '%s:%s' % (self.package_name, self.version)
+
   def _pre_put_hook(self):
     super(CipdPackage, self)._pre_put_hook()
     if not self.package_name:

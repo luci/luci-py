@@ -219,6 +219,20 @@
           <td>Idempotent</td>
           <td>{{request.properties.idempotent}}</td>
         </tr>
+        {% if request.properties.cipd_input %}
+          <tr title="CIPD server">
+            <td>CIPD server</td>
+            <td>{{request.properties.cipd_input.server}}</td>
+          </tr>
+          <tr title="CIPD client">
+            <td>CIPD client</td>
+            <td>{{request.properties.cipd_input.client_package}}</td>
+          </tr>
+          <tr title="CIPD pacakges">
+            <td>CIPD packages</td>
+            <td>{{request.properties.cipd_input.packages|join('<br>'|safe)}}</td>
+          </tr>
+        {% endif %}
         {% if request.properties.inputs_ref and request.properties.inputs_ref.isolated %}
           <tr title="Inputs files">
             <td>Isolated inputs</td>
@@ -430,6 +444,10 @@
         <td>{{task.duration_now(now)|timedeltaformat(include_ms=True)}}</td>
       </tr>
       {% if task.performance_stats_key %}
+        <tr title="Overhead from installing CIPD packages">
+          <td>Overhead CIPD packages</td>
+          <td>{{task.overhead_package_installation|timedeltaformat(include_ms=True)}}</td>
+        </tr>
         <tr title="Overhead from installing isolated inputs">
           <td>Overhead isolated inputs</td>
           <td>{{task.overhead_isolated_inputs|timedeltaformat(include_ms=True)}}</td>

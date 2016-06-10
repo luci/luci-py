@@ -285,9 +285,12 @@ class PerformanceStats(ndb.Model):
   This entity only exist for isolated tasks. For "raw command task", this entity
   is not stored, since there's nothing to note.
   """
-  # Miscellaneous overhead in second, in addition to the overhead from
-  # isolated_download.duration and isolated_upload.duration.
+  # Miscellaneous overhead in seconds, in addition to the overhead from
+  # package_installation.duration, isolated_download.duration and
+  # isolated_upload.duration
   bot_overhead = ndb.FloatProperty(indexed=False)
+  # Results installing CIPD packages before the task.
+  package_installation = ndb.LocalStructuredProperty(OperationStats)
   # Runtime dependencies download operation before the task.
   isolated_download = ndb.LocalStructuredProperty(OperationStats)
   # Results uploading operation after the task.
@@ -443,8 +446,17 @@ class _TaskResultCommon(ndb.Model):
       stats = (key.get() if key else None) or PerformanceStats()
       stats.isolated_download = stats.isolated_download or OperationStats()
       stats.isolated_upload = stats.isolated_upload or OperationStats()
+      stats.package_installation = (
+          stats.package_installation or OperationStats())
       self._performance_stats_cache = stats
     return self._performance_stats_cache
+
+  @property
+  def overhead_package_installation(self):
+    """Returns the overhead from package installation in timedelta."""
+    perf = self.performance_stats
+    if perf.package_installation.duration is not None:
+      return datetime.timedelta(seconds=perf.package_installation.duration)
 
   @property
   def overhead_isolated_inputs(self):

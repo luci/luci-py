@@ -532,7 +532,7 @@ class BotTaskUpdateHandler(_BotApiHandler):
   out-of-order packets.
   """
   ACCEPTED_KEYS = {
-    u'bot_overhead', u'cost_usd', u'duration', u'exit_code',
+    u'bot_overhead', u'cipd_stats', u'cost_usd', u'duration', u'exit_code',
     u'hard_timeout', u'id', u'io_timeout', u'isolated_stats', u'output',
     u'output_chunk_start', u'outputs_ref', u'task_id',
   }
@@ -562,11 +562,12 @@ class BotTaskUpdateHandler(_BotApiHandler):
     hard_timeout = request.get('hard_timeout')
     io_timeout = request.get('io_timeout')
     isolated_stats = request.get('isolated_stats')
+    cipd_stats = request.get('cipd_stats')
     output = request.get('output')
     output_chunk_start = request.get('output_chunk_start')
     outputs_ref = request.get('outputs_ref')
 
-    if isolated_stats and bot_overhead is None:
+    if (isolated_stats or cipd_stats) and bot_overhead is None:
       ereporter2.log_request(
           request=self.request,
           source='server',
@@ -574,8 +575,8 @@ class BotTaskUpdateHandler(_BotApiHandler):
           message='Failed to update task: %s' % task_id)
       self.abort_with_error(
           400,
-          error='isolated_stats requires bot_overhead to be set'
-                '\nbot_overhead: %s\nisolated_stats: %s' %
+          error='isolated_stats and cipd_stats require bot_overhead to be set'
+                '\nbot_overhead: %s\nisolate_stats: %s' %
                 (bot_overhead, isolated_stats))
 
     run_result_key = task_pack.unpack_run_result_key(task_id)
@@ -600,6 +601,9 @@ class BotTaskUpdateHandler(_BotApiHandler):
             duration=upload.get('duration'),
             items_cold=unpack_base64(upload, 'items_cold'),
             items_hot=unpack_base64(upload, 'items_hot'))
+      if cipd_stats:
+        performance_stats.package_installation = task_result.OperationStats(
+            duration=cipd_stats.get('duration'))
 
     if output is not None:
       try:
