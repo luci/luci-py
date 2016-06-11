@@ -29,6 +29,7 @@ from api import os_utilities
 
 
 def get_dimensions(bot):
+  # pylint: disable=line-too-long
   """Returns dict with the bot's dimensions.
 
   The dimensions are what are used to select the bot that can run each task.
@@ -37,7 +38,7 @@ def get_dimensions(bot):
   os_utilities.get_dimensions(). If you want something more special, specify it
   in your bot_config.py and override the item 'id'.
 
-  See https://code.google.com/p/swarming/wiki/SwarmingMagicValues.
+  See https://github.com/luci/luci-py/tree/master/appengine/swarming/doc/Magic-Values.md.
 
   Arguments:
   - bot: bot.Bot instance or None.
@@ -46,6 +47,7 @@ def get_dimensions(bot):
 
 
 def get_state(bot):
+  # pylint: disable=line-too-long
   """Returns dict with a state of the bot reported to the server with each poll.
 
   It is only for dynamic state that changes while bot is running for information
@@ -55,7 +57,7 @@ def get_state(bot):
   'dimensions' for that), but it can use it for maintenance and bookkeeping
   tasks.
 
-  See https://code.google.com/p/swarming/wiki/SwarmingMagicValues.
+  See https://github.com/luci/luci-py/tree/master/appengine/swarming/doc/Magic-Values.md.
 
   Arguments:
   - bot: bot.Bot instance or None.
@@ -111,7 +113,7 @@ def on_bot_startup(bot):
   pass
 
 
-def on_before_task(bot):
+def on_before_task(bot, bot_file=None):
   """Hook function called before running a task.
 
   It shouldn't do much, since it can't cancel the task so it shouldn't do
@@ -119,6 +121,11 @@ def on_before_task(bot):
 
   Arguments:
   - bot: bot.Bot instance.
+  - bot_file: Path to file to write information about the state of the bot.
+              This file can be used to pass certain info about the bot
+              to tasks, such as which connected android devices to run on. See
+              https://github.com/luci/luci-py/tree/master/appengine/swarming/doc/Magic-Values.md#run_isolated
+              TODO(bpastene): Remove default value None.
   """
   pass
 

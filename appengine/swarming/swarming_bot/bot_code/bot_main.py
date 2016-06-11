@@ -562,7 +562,10 @@ def run_manifest(botobj, manifest, start):
     task_in_file = os.path.join(work_dir, 'task_runner_in.json')
     with open(task_in_file, 'wb') as f:
       f.write(json.dumps(manifest))
-    call_hook(botobj, 'on_before_task')
+    handle, bot_file = tempfile.mkstemp(
+        prefix='bot_file', suffix='.json', dir=work_dir)
+    os.close(handle)
+    call_hook(botobj, 'on_before_task', bot_file)
     task_result_file = os.path.join(work_dir, 'task_runner_out.json')
     if os.path.exists(task_result_file):
       os.remove(task_result_file)
@@ -590,6 +593,7 @@ def run_manifest(botobj, manifest, start):
       # Include the time taken to poll the task in the cost.
       '--start', str(start),
       '--min-free-space', str(get_min_free_space()),
+      '--bot-file', bot_file,
     ]
     logging.debug('Running command: %s', command)
 

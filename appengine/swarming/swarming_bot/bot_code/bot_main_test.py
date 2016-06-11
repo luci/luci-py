@@ -441,6 +441,9 @@ class TestBotMain(net_utils.TestCase):
             (os_utilities.get_min_free_space(bot_main.THIS_FILE) + 250.) *
             1024 * 1024)),
         ]
+        self.assertEqual(cmd[-2], '--bot-file')
+        self.assertTrue(cmd[-1].endswith('.json'))
+        cmd = cmd[:-2]
         self.assertEqual(expected, cmd)
         self.assertEqual(True, detached)
         self.assertEqual(self.bot.base_dir, cwd)

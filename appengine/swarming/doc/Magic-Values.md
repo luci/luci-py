@@ -17,13 +17,18 @@ dimensions and state values have special meaning.
 
 ## run_isolated
 
-`run_isolated.py/.zip` understands the following. This value should be set in
+`run_isolated.py/.zip` understands the following. These values should be set in
 the `command` section of the .isolate file.
 
   - `${ISOLATED_OUTDIR}`: If found on command line argument, replaced by the
     temporary directory that is uploaded back to the server after the task
     execution. This causes `run_isolated` to print a `[run_isolated_out_hack]`
     statement after the task.
+  -  ${SWARMING_BOT_FILE} : If found on command line argument, replaced by a
+    file written to by the swarming bot's on_before_task() hook in the swarming
+    server's custom bot_config.py. This is used by a swarming bot to communicate
+    state of the bot to tasks. It is also packaged into the task's
+    ISOLATED_OUTDIR after execution.
 
 
 ## Swarming

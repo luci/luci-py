@@ -81,7 +81,7 @@ def get_run_isolated():
 
 
 def get_isolated_cmd(
-    work_dir, task_details, isolated_result, min_free_space):
+    work_dir, task_details, isolated_result, min_free_space, bot_file):
   """Returns the command to call run_isolated. Mocked in tests."""
   assert (bool(task_details.command) !=
           bool(task_details.isolated and task_details.isolated.get('input')))
@@ -124,6 +124,8 @@ def get_isolated_cmd(
       ])
   if min_free_space:
     cmd.extend(('--min-free-space', str(min_free_space)))
+  if bot_file:
+    cmd.extend(('--bot-file', bot_file))
 
   if task_details.hard_timeout:
     cmd.extend(('--hard-timeout', str(task_details.hard_timeout)))
@@ -174,7 +176,8 @@ class MustExit(Exception):
 
 
 def load_and_run(
-    in_file, swarming_server, cost_usd_hour, start, out_file, min_free_space):
+    in_file, swarming_server, cost_usd_hour, start, out_file, min_free_space,
+    bot_file):
   """Loads the task's metadata and execute it.
 
   This may throw all sorts of exceptions in case of failure. It's up to the
@@ -200,7 +203,7 @@ def load_and_run(
 
       task_result = run_command(
           swarming_server, task_details, work_dir,
-          cost_usd_hour, start, min_free_space)
+          cost_usd_hour, start, min_free_space, bot_file)
   except MustExit as e:
     # This normally means run_command() didn't get the chance to run, as it
     # itself trap MustExit and will report accordingly. In this case, we want
@@ -328,7 +331,7 @@ def start_reading_headers(auth_params_file):
 
 def run_command(
     swarming_server, task_details, work_dir, cost_usd_hour,
-    task_start, min_free_space):
+    task_start, min_free_space, bot_file):
   """Runs a command and sends packets to the server to stream results back.
 
   Implements both I/O and hard timeouts. Sends the packets numbered, so the
@@ -367,7 +370,7 @@ def run_command(
 
   isolated_result = os.path.join(work_dir, 'isolated_result.json')
   cmd = get_isolated_cmd(
-      work_dir, task_details, isolated_result, min_free_space)
+      work_dir, task_details, isolated_result, min_free_space, bot_file)
   # Hard timeout enforcement is deferred to run_isolated. Grace is doubled to
   # give one 'grace_period' slot to the child process and one slot to upload
   # the results back.
@@ -582,6 +585,8 @@ def main(args):
   parser.add_option(
       '--min-free-space', type='int',
       help='Value to send down to run_isolated')
+  parser.add_option(
+      '--bot-file', help='Path to a file describing the state of the host.')
 
   options, args = parser.parse_args(args)
   if not options.in_file or not options.out_file or args:
@@ -597,7 +602,8 @@ def main(args):
   try:
     load_and_run(
         options.in_file, options.swarming_server, options.cost_usd_hour,
-        options.start, options.out_file, options.min_free_space)
+        options.start, options.out_file, options.min_free_space,
+        options.bot_file)
     return 0
   finally:
     logging.info('quitting')
