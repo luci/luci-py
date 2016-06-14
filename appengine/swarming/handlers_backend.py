@@ -15,6 +15,7 @@ from google.appengine.api import taskqueue
 import mapreduce_jobs
 from components import decorators
 from components import machine_provider
+from server import config
 from server import lease_management
 from server import stats
 from server import task_scheduler
@@ -62,6 +63,9 @@ class CronMachineProviderBotHandler(webapp2.RequestHandler):
   def get(self):
     BATCH_SIZE = 50
 
+    if not config.settings().mp.enabled:
+      return
+
     app_id = app_identity.get_application_id()
     swarming_server = 'https://%s' % app_identity.get_default_version_hostname()
     for machine_type_key in lease_management.MachineType.query().fetch(
@@ -82,6 +86,9 @@ class CronMachineProviderCleanUpHandler(webapp2.RequestHandler):
 
   @decorators.require_cronjob
   def get(self):
+    if not config.settings().mp.enabled:
+      return
+
     lease_management.clean_up_bots()
 
 
@@ -90,6 +97,9 @@ class CronMachineProviderPubSubHandler(webapp2.RequestHandler):
 
   @decorators.require_cronjob
   def get(self):
+    if not config.settings().mp.enabled:
+      return
+
     taskqueue.add(
         method='POST', url='/internal/taskqueue/pubsub/machine_provider',
         queue_name='machine-provider-pubsub')

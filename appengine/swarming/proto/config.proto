@@ -23,6 +23,9 @@ message SettingsCfg {
 
     // Configuration for swarming-cipd integration.
     optional CipdSettings cipd = 6;
+
+    // Configuration for swarming-mp integration.
+    optional MachineProviderSettings mp = 7;
 }
 
 // Configuration for swarming-isolate integration.
@@ -58,4 +61,11 @@ message CipdSettings {
     // Package of the default CIPD client to use if it is not specified in a
     // task.
     optional CipdPackage default_client_package = 2;
+}
+
+
+// Settings for Swarming-MP integration.
+message MachineProviderSettings {
+    // Whether or not Swarming-MP integration is enabled.
+    optional bool enabled = 1;
 }
