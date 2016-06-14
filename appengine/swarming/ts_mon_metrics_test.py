@@ -57,7 +57,7 @@ def _gen_bot_info(key_id, last_seen_ts, **kwargs):
     },
   }
   args.update(**kwargs)
-  args['dimensions_flat'] = bot_management._dimensions_to_flat(
+  args['dimensions_flat'] = bot_management.dimensions_to_flat(
       args.pop('dimensions'))
   return bot_management.BotInfo(**args)
 

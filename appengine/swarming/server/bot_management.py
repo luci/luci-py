@@ -212,16 +212,16 @@ class BotSettings(ndb.Model):
 ### Private APIs.
 
 
-def _dimensions_to_flat(dimensions):
+### Public APIs.
+
+
+def dimensions_to_flat(dimensions):
   out = []
   for k, values in dimensions.iteritems():
     for v in values:
       out.append('%s:%s' % (k, v))
   out.sort()
   return out
-
-
-### Public APIs.
 
 
 def get_root_key(bot_id):
@@ -279,7 +279,7 @@ def bot_event(
   bot_info.last_seen_ts = utils.utcnow()
   bot_info.external_ip = external_ip
   if dimensions:
-    bot_info.dimensions_flat = _dimensions_to_flat(dimensions)
+    bot_info.dimensions_flat = dimensions_to_flat(dimensions)
   if state:
     bot_info.state = state
   if quarantined is not None:

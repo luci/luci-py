@@ -291,7 +291,8 @@ class BotHandler(auth.AuthenticatingHandler):
       # deleted. For example, it could be an auto-scaled bot.
       bot = bot_management.BotInfo(
           key=bot_management.get_info_key(bot_id),
-          dimensions=events[0].dimensions,
+          dimensions_flat=bot_management.dimensions_to_flat(
+              events[0].dimensions),
           state=events[0].state,
           external_ip=events[0].external_ip,
           version=events[0].version,

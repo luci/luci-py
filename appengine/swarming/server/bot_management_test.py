@@ -30,6 +30,10 @@ class BotManagementTest(test_case.TestCase):
     missing = expected - actual
     self.assertFalse(missing)
 
+  def test_dimensions_to_flat(self):
+    self.assertEqual(
+        ['a:b', 'c:d'], bot_management.dimensions_to_flat({'a': 'b', 'c': 'd'}))
+
   def test_bot_event(self):
     # connected.
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
