@@ -11,7 +11,7 @@ handlers in handlers_bot.py.
 import logging
 
 from components import auth
-from components import utils
+from components.auth import ipaddr
 
 
 # TODO(vadimsh): Get rid of this in favor of swarming config stored
@@ -19,44 +19,49 @@ from components import utils
 BOTS_GROUP = 'swarming-bots'
 
 
-def is_known_bot():
-  """Returns True if the current caller is mentioned in the swarming config.
-
-  Expected to be called in a context of some bot API request handler.
-
-  Other bots are considered unauthorized to access the Swarming server.
-  """
-  # TODO(vadimsh): Check that bot credentials are whitelisted in the server-side
-  # bot config (same one that specifies trusted dimensions).
+def is_ip_whitelisted_machine():
+  """Returns True if the call is made from IP whitelisted machine."""
+  # TODO(vadimsh): Get rid of this. It's blocked on fixing /bot_code calls in
+  # bootstrap code everywhere to use service accounts and switching all Swarming
+  # Tasks API calls made from bots to use proper authentication.
   return auth.is_group_member(BOTS_GROUP)
 
 
+def is_authenticated_bot(bot_id):
+  """Returns True if bot with given ID is using correct credentials.
 
-def validate_bot_id(bot_id):
-  """Verifies ID the bot reports matches the credentials being used.
+  Expected to be called in a context of a handler of a request coming from the
+  bot with given ID.
+  """
+  try:
+    validate_bot_id_and_fetch_config(bot_id)
+    return True
+  except auth.AuthorizationError:
+    return False
 
-  Expected to be called in a context of some bot API request handler.
 
-  Raises auth.AuthenticationError if bot_id is not correct.
+def validate_bot_id_and_fetch_config(bot_id):
+  """Verifies ID reported by a bot matches the credentials being used.
+
+  Expected to be called in a context of some bot API request handler. Uses
+  bots.cfg config to look up what credentials are expected to be used by the bot
+  with given ID.
+
+  Raises auth.AuthorizationError if bot_id is unknown or bot is using invalid
+  credentials.
+
+  On success returns the configuration for this bot, as defined in bots.cfg
   """
   # TODO(vadimsh): Check swarming server configuration to decide whether the
   # supplied bot_id is allowed to be used with the supplied credentials.
   # For example, if the bot is using machine tokens, we check that
   # bot_id == hostname specified in the token. If the bot is using IP
   # whitelist, we check that its bot_id is allowed to use IP whitelist, etc.
-  if utils.is_canary():
-    logging.debug(
-        'bot_id: "%s", peer_ident: "%s"', bot_id,
-        auth.get_peer_identity().to_bytes())
-
-
-def fetch_trusted_dimensions(bot_id):  # pylint: disable=unused-argument
-  """Returns a dict with bot dimensions, fetching them from the config.
-
-  Expected to be called in a context of some bot API request handler.
-
-  Dimensions returned here override corresponding dimensions reported by the
-  bot itself (if any), that's why they are trusted: bot can't "spoof" them.
-  """
-  # TODO(vadimsh): Implement.
-  return {}
+  if not auth.is_group_member(BOTS_GROUP):
+    logging.error(
+        'Unauthorized bot request\n'
+        'bot_id: "%s", peer_ident: "%s", peer_ip: "%s"',
+        bot_id, auth.get_peer_identity().to_bytes(),
+        ipaddr.ip_to_string(auth.get_peer_ip()))
+    raise auth.AuthorizationError('Not allowed')
+  return None

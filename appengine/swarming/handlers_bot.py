@@ -122,16 +122,17 @@ class _BotAuthenticatingHandler(auth.AuthenticatingHandler):
   def get_auth_methods(cls, conf):
     return [auth.optional_machine_authentication, auth.oauth_authentication]
 
-  def check_bot_code_access(self, generate_token=False):
+  def check_bot_code_access(self, bot_id, generate_token):
     """Raises AuthorizationError if caller is not authorized to access bot code.
 
-    Three variants here:
+    Four variants here:
       1. A valid bootstrap token is passed as '?tok=...' parameter.
-      2. A bot is using it's own machine credentials.
-      3. An user, allowed to do a bootstrap, is using their credentials.
+      2. An user, allowed to do a bootstrap, is using their credentials.
+      3. An IP whitelisted machine is making this call.
+      4. A bot (with given bot_id) is using it's own machine credentials.
 
-    In later two cases we optionally generate and return a new bootstrap token,
-    that can be used to authorize /bot_code calls.
+    In later three cases we optionally generate and return a new bootstrap
+    token, that can be used to authorize /bot_code calls.
     """
     existing_token = self.request.get('tok')
     if existing_token:
@@ -140,8 +141,14 @@ class _BotAuthenticatingHandler(auth.AuthenticatingHandler):
         raise auth.AuthorizationError('Invalid bootstrap token')
       logging.info('Using bootstrap token %r', payload)
       return existing_token
-    if not acl.is_bot() and not acl.is_bootstrapper():
+
+    # TODO(vadimsh): Remove is_ip_whitelisted_machine check once all bots are
+    # using auth for bootstrap and updating.
+    if (not acl.is_bootstrapper() and
+        not bot_auth.is_ip_whitelisted_machine() and
+        not (bot_id and bot_auth.is_authenticated_bot(bot_id))):
       raise auth.AuthorizationError('Not allowed to access the bot code')
+
     return bot_code.generate_bootstrap_token() if generate_token else None
 
 
@@ -153,7 +160,8 @@ class BootstrapHandler(_BotAuthenticatingHandler):
     # We must pass a bootstrap token (generating it, if necessary) to
     # get_bootstrap(...), since bootstrap.py uses tokens exclusively (it can't
     # transparently pass OAuth headers to /bot_code).
-    bootstrap_token = self.check_bot_code_access(generate_token=True)
+    bootstrap_token = self.check_bot_code_access(
+        bot_id=None, generate_token=True)
     self.response.headers['Content-Type'] = 'text/x-python'
     self.response.headers['Content-Disposition'] = (
         'attachment; filename="swarming_bot_bootstrap.py"')
@@ -170,7 +178,8 @@ class BotCodeHandler(_BotAuthenticatingHandler):
 
   @auth.public  # auth inside check_bot_code_access()
   def get(self, version=None):
-    self.check_bot_code_access()
+    self.check_bot_code_access(
+        bot_id=self.request.get('bot_id'), generate_token=False)
     if version:
       expected = bot_code.get_bot_version(self.request.host_url)
       if version != expected:
@@ -208,6 +217,9 @@ class _BotBaseHandler(_BotApiHandler):
 
     Returns:
       tuple(request, bot_id, version, state, dimensions, quarantined_msg)
+
+    Raises:
+      auth.AuthorizationError if bot's credentials are invalid.
     """
     request = self.parse_body()
     version = request.get('version', None)
@@ -221,13 +233,12 @@ class _BotBaseHandler(_BotApiHandler):
           and isinstance(dimension_id[0], unicode)):
         bot_id = dimensions['id'][0]
 
-    # Make sure bot self-reported ID matches the authentication token.
-    bot_auth.validate_bot_id(bot_id)
+    # Make sure bot self-reported ID matches the authentication token. Raises
+    # auth.AuthorizationError if not.
+    bot_auth.validate_bot_id_and_fetch_config(bot_id)
 
-    # Inject server-defined (and thus trusted) dimensions. Specifically ignore
-    # dimensions with same key that bot reports (override them), they cannot be
-    # trusted.
-    dimensions.update(bot_auth.fetch_trusted_dimensions(bot_id))
+    # TODO(vadimsh): Use return value of validate_bot_id_and_fetch_config to
+    # inject server-defined dimensions.
 
     # The bot may decide to "self-quarantine" itself. Accept both via
     # dimensions or via state. See bot_management._BotCommon.quarantined for
@@ -313,7 +324,7 @@ class BotHandshakeHandler(_BotBaseHandler):
     }
   """
 
-  @auth.require(acl.is_bot)
+  @auth.public  # auth happens in self._process()
   def post(self):
     (_request, bot_id, version, state,
         dimensions, quarantined_msg) = self._process()
@@ -340,7 +351,7 @@ class BotPollHandler(_BotBaseHandler):
   assigned anymore.
   """
 
-  @auth.require(acl.is_bot)
+  @auth.public  # auth happens in self._process()
   def post(self):
     """Handles a polling request.
 
@@ -501,7 +512,7 @@ class BotEventHandler(_BotBaseHandler):
 
   EXPECTED_KEYS = _BotBaseHandler.EXPECTED_KEYS | {u'event', u'message'}
 
-  @auth.require(acl.is_bot)
+  @auth.public  # auth happens in self._process()
   def post(self):
     (request, bot_id, version, state,
         dimensions, quarantined_msg) = self._process()
@@ -538,7 +549,7 @@ class BotTaskUpdateHandler(_BotApiHandler):
   }
   REQUIRED_KEYS = {u'id', u'task_id'}
 
-  @auth.require(acl.is_bot)
+  @auth.public  # auth happens in bot_auth.validate_bot_id_and_fetch_config()
   def post(self, task_id=None):
     # Unlike handshake and poll, we do not accept invalid keys here. This code
     # path is much more strict.
@@ -550,13 +561,14 @@ class BotTaskUpdateHandler(_BotApiHandler):
       self.abort_with_error(400, error=msg)
 
     bot_id = request['id']
-    cost_usd = request['cost_usd']
     task_id = request['task_id']
 
-    # Make sure bot self-reported ID matches the authentication token.
-    bot_auth.validate_bot_id(bot_id)
+    # Make sure bot self-reported ID matches the authentication token. Raises
+    # auth.AuthorizationError if not.
+    bot_auth.validate_bot_id_and_fetch_config(bot_id)
 
     bot_overhead = request.get('bot_overhead')
+    cost_usd = request.get('cost_usd', 0)
     duration = request.get('duration')
     exit_code = request.get('exit_code')
     hard_timeout = request.get('hard_timeout')
@@ -677,15 +689,16 @@ class BotTaskErrorHandler(_BotApiHandler):
 
   EXPECTED_KEYS = {u'id', u'message', u'task_id'}
 
-  @auth.require(acl.is_bot)
+  @auth.public  # auth happens in bot_auth.validate_bot_id_and_fetch_config
   def post(self, task_id=None):
     request = self.parse_body()
     bot_id = request.get('id')
     task_id = request.get('task_id', '')
     message = request.get('message', 'unknown')
 
-    # Make sure bot self-reported ID matches the authentication token.
-    bot_auth.validate_bot_id(bot_id)
+    # Make sure bot self-reported ID matches the authentication token. Raises
+    # auth.AuthorizationError if not.
+    bot_auth.validate_bot_id_and_fetch_config(bot_id)
 
     bot_management.bot_event(
         event_type='task_error', bot_id=bot_id,

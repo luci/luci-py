@@ -611,7 +611,8 @@ class TestBotMain(net_utils.TestCase):
     self.mock(time, 'time', lambda: 1400000000)
     def url_retrieve(f, url, headers=None, timeout=None):
       self.assertEqual(
-          'https://localhost:1/swarming/api/v1/bot/bot_code/123', url)
+          'https://localhost:1/swarming/api/v1/bot/bot_code'
+          '/123?bot_id=localhost', url)
       self.assertEqual(new_zip, f)
       self.assertEqual({}, headers)
       self.assertEqual(remote_client.NET_CONNECTION_TIMEOUT_SEC, timeout)

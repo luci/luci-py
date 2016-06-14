@@ -25,6 +25,7 @@ import tempfile
 import threading
 import time
 import traceback
+import urllib
 import zipfile
 
 import bot_auth
@@ -689,7 +690,8 @@ def update_bot(botobj, version):
   new_zip = os.path.join(os.path.dirname(THIS_FILE), new_zip)
 
   # Download as a new file.
-  url_path = '/swarming/api/v1/bot/bot_code/%s' % version
+  url_path = '/swarming/api/v1/bot/bot_code/%s?bot_id=%s' % (
+      version, urllib.quote_plus(botobj.id))
   if not botobj.remote.url_retrieve(new_zip, url_path):
     # It can happen when a server is rapidly updated multiple times in a row.
     botobj.post_error(

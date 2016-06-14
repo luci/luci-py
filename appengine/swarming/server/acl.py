@@ -26,16 +26,23 @@ def is_admin():
   return auth.is_group_member(ADMINS_GROUP) or auth.is_admin()
 
 
-def is_bot():
-  return bot_auth.is_known_bot() or is_admin()
-
-
 def is_privileged_user():
   return auth.is_group_member(PRIVILEGED_USERS_GROUP) or is_admin()
 
 
 def is_user():
   return auth.is_group_member(USERS_GROUP) or is_privileged_user()
+
+
+def is_bootstrapper():
+  """Returns True if current user have access to bot code (for bootstrap)."""
+  return is_admin() or auth.is_group_member(BOT_BOOTSTRAP_GROUP)
+
+
+def is_bot():
+  # TODO(vadimsh): Get rid of this. Swarming jobs will use service accounts
+  # associated with the job when calling Swarming, not the machine IP.
+  return bot_auth.is_ip_whitelisted_machine() or is_admin()
 
 
 def is_bot_or_user():
@@ -55,11 +62,6 @@ def is_bot_or_admin():
   # TODO(vadimsh): Get rid of this. Swarming jobs will use service accounts
   # associated with the job when calling Swarming, not the machine ID itself.
   return is_bot() or is_admin()
-
-
-def is_bootstrapper():
-  """Returns True if current user have access to bot code (for bootstrap)."""
-  return is_admin() or auth.is_group_member(BOT_BOOTSTRAP_GROUP)
 
 
 def get_user_type():

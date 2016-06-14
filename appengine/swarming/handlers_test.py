@@ -5,6 +5,7 @@
 # that can be found in the LICENSE file.
 
 import itertools
+import json
 import logging
 import os
 import re
@@ -139,7 +140,14 @@ class FrontendTest(AppTestBase):
       if path[-1] == '$':
         path = path[:-1]
 
-      response = getattr(self.app, method.lower())(path, expect_errors=True)
+      headers = {}
+      body = ''
+      if method == 'POST' and path.startswith('/swarming/api/v1/bot/'):
+        headers = {'Content-Type': 'application/json'}
+        body = json.dumps({'id': 'bot-id', 'task_id': 'task_id'})
+
+      response = getattr(self.app, method.lower())(
+          path, body, expect_errors=True, headers=headers)
       message = ('%s handler is not protected: %s, '
                  'returned %s' % (method, path, response))
       self.assertIn(response.status_int, (302, 403, 405), msg=message)
@@ -323,9 +331,12 @@ class FrontendTest(AppTestBase):
     # Create a task, create 2 bots, one with a task assigned, the other without.
     self.set_as_admin()
     self.client_create_task_raw()
+
+    self.set_as_bot()
     self.bot_poll('bot1')
     self.bot_poll('bot2')
 
+    self.set_as_admin()
     response = self.app.get('/restricted/bots', status=200)
     next_page_re = re.compile(r'<a\s+href="(.+?)">Next page</a>')
     self.assertFalse(next_page_re.search(response.body))
