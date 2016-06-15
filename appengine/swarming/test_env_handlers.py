@@ -191,7 +191,7 @@ class AppTestBase(test_case.TestCase):
             large.pack(params['isolated_stats'][k][j]))
     params.update(kwargs)
     response = self.post_json('/swarming/api/v1/bot/task_update', params)
-    self.assertEqual({u'ok': True}, response)
+    self.assertEqual({u'must_stop': False, u'ok': True}, response)
 
   def bot_run_task(self):
     res = self.bot_poll()

@@ -568,6 +568,8 @@ def bot_update_task(
   assert output is None or isinstance(output, str)
   if cost_usd is not None and cost_usd < 0.:
     raise ValueError('cost_usd must be None or greater or equal than 0')
+  if duration is not None and duration < 0.:
+    raise ValueError('duration must be None or greater or equal than 0')
   if (duration is None) != (exit_code is None):
     raise ValueError(
         'had unexpected duration; expected iff a command completes\n'

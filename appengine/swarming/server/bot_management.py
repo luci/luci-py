@@ -77,7 +77,8 @@ class _BotCommon(ndb.Model):
   # - BotSettings.quarantined was set at that moment.
   quarantined = ndb.BooleanProperty(default=False)
 
-  # Affected by event_type == 'request_task', 'task_completed', 'task_error'.
+  # Affected by event_type == 'request_task', 'task_canceled', 'task_completed',
+  # 'task_error'.
   task_id = ndb.StringProperty(indexed=False)
 
   @property
@@ -186,8 +187,7 @@ class BotEvent(_BotCommon):
   ts = ndb.DateTimeProperty(auto_now_add=True)
   event_type = ndb.StringProperty(choices=ALLOWED_EVENTS)
 
-  # event_type == 'bot_error', 'request_restart', 'bot_rebooting' or
-  # 'bot_shutdown'.
+  # event_type == 'bot_error', 'request_restart', 'bot_rebooting', etc.
   message = ndb.TextProperty()
 
   @property
@@ -310,7 +310,7 @@ def bot_event(
       version=bot_info.version,
       **kwargs)
 
-  if event_type in ('task_completed', 'task_error'):
+  if event_type in ('task_canceled', 'task_completed', 'task_error'):
     # Special case to keep the task_id in the event but not in the summary.
     bot_info.task_id = ''
 

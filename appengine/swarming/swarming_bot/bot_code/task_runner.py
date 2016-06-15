@@ -239,6 +239,9 @@ def post_update(
     stdout: Incremental output since last call, if any.
     output_chunk_start: Total number of stdout previously sent, for coherency
         with the server.
+
+  Returns:
+    False if the task should stop.
   """
   params = params.copy()
   if exit_code is not None:
@@ -259,6 +262,7 @@ def post_update(
   if not resp or resp.get('error'):
     # Abandon it. This will force a process exit.
     raise ValueError(resp.get('error') if resp else 'Failed to contact server')
+  return not resp.get('must_stop', False)
 
 
 def should_post_update(stdout, now, last_packet):
@@ -366,7 +370,15 @@ def run_command(
     'id': task_details.bot_id,
     'task_id': task_details.task_id,
   }
-  post_update(swarming_server, headers_cb(), params, None, '', 0)
+  if not post_update(swarming_server, headers_cb(), params, None, '', 0):
+    # Don't even bother, the task was already canceled.
+    return {
+      u'exit_code': -1,
+      u'hard_timeout': False,
+      u'io_timeout': False,
+      u'must_signal_internal_failure': None,
+      u'version': OUT_VERSION,
+    }
 
   isolated_result = os.path.join(work_dir, 'isolated_result.json')
   cmd = get_isolated_cmd(
@@ -408,6 +420,7 @@ def run_command(
       params['duration'] = now - start
       params['io_timeout'] = False
       params['hard_timeout'] = False
+      # Ignore server reply to stop.
       post_update(swarming_server, headers_cb(), params, 1, stdout, 0)
       return {
         u'exit_code': 1,
@@ -440,9 +453,15 @@ def run_command(
           last_packet = monotonic_time()
           params['cost_usd'] = (
               cost_usd_hour * (last_packet - task_start) / 60. / 60.)
-          post_update(
-              swarming_server, headers_cb(), params, None,
-              stdout, output_chunk_start)
+          if not post_update(
+              swarming_server, headers_cb(), params, None, stdout,
+              output_chunk_start):
+            # Server is telling us to stop. Normally task cancelation.
+            if not kill_sent:
+              logging.warning('Server induced stop; sending SIGKILL')
+              proc.kill()
+              kill_sent = True
+
           output_chunk_start += len(stdout)
           stdout = ''
 
@@ -553,6 +572,7 @@ def run_command(
     if exit_code is None:
       exit_code = -1
     params['hard_timeout'] = had_hard_timeout
+    # Ignore server reply to stop.
     post_update(
         swarming_server, headers_cb(), params, exit_code,
         stdout, output_chunk_start)

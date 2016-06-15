@@ -368,7 +368,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       'task_id': task_id,
     }
     response = self.post_json('/swarming/api/v1/bot/task_update', params)
-    self.assertEqual({u'ok': True}, response)
+    self.assertEqual({u'must_stop': False, u'ok': True}, response)
 
     response = self.client_get_results(task_id)
     expected = {
@@ -674,30 +674,29 @@ class BotApiTest(test_env_handlers.AppTestBase):
       out.update((unicode(k), v) for k, v in kwargs.iteritems())
       return out
 
-    def _cycle(params, expected):
+    def _cycle(params, expected, must_stop):
       response = self.post_json('/swarming/api/v1/bot/task_update', params)
-      self.assertEqual({u'ok': True}, response)
-      response = self.client_get_results(task_id)
-      self.assertEqual(expected, response)
+      self.assertEqual({u'must_stop': must_stop, u'ok': True}, response)
+      self.assertEqual(expected, self.client_get_results(task_id))
 
     # 1. Initial task update with no data.
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     task_id = response['manifest']['task_id']
     params = _params()
     response = self.post_json('/swarming/api/v1/bot/task_update', params)
-    self.assertEqual({u'ok': True}, response)
+    self.assertEqual({u'must_stop': False, u'ok': True}, response)
     response = self.client_get_results(task_id)
     self.assertEqual(_expected(), response)
 
     # 2. Task update with some output.
     params = _params(output=base64.b64encode('Oh '))
     expected = _expected()
-    _cycle(params, expected)
+    _cycle(params, expected, False)
 
     # 3. Task update with some more output.
     params = _params(output=base64.b64encode('hi'), output_chunk_start=3)
     expected = _expected()
-    _cycle(params, expected)
+    _cycle(params, expected, False)
 
     # 4. Task update with completion of the command.
     params = _params(
@@ -708,7 +707,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         exit_code=u'23',
         failure=True,
         state=u'COMPLETED')
-    _cycle(params, expected)
+    _cycle(params, expected, False)
 
   def test_task_update_db_failure(self):
     # The error is caught in task_scheduler.bot_update_task().

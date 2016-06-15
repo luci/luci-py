@@ -650,6 +650,8 @@ class BotTaskUpdateHandler(_BotApiHandler):
 
       if state in (task_result.State.COMPLETED, task_result.State.TIMED_OUT):
         action = 'task_completed'
+      elif state == task_result.State.CANCELED:
+        action = 'task_canceled'
       else:
         assert state in (
             task_result.State.BOT_DIED, task_result.State.RUNNING), state
@@ -670,13 +672,8 @@ class BotTaskUpdateHandler(_BotApiHandler):
     except Exception as e:
       logging.exception('Internal error: %s', e)
       self.abort_with_error(500, error=str(e))
-
-    # TODO(maruel): When a task is canceled, reply with 'DIE' so that the bot
-    # reboots itself to abort the task abruptly. It is useful when a task hangs
-    # and the timeout was set too long or the task was superseded by a newer
-    # task with more recent executable (e.g. a new Try Server job on a newer
-    # patchset on Rietveld).
-    self.send_response({'ok': True})
+    self.send_response(
+        {'must_stop': state == task_result.State.CANCELED, 'ok': True})
 
 
 class BotTaskErrorHandler(_BotApiHandler):

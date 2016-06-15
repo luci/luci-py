@@ -1042,6 +1042,79 @@ class TaskApiTest(BaseTest):
     ]
     self.assertEqual(expected, notifies)
 
+  def test_task_canceled(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+    str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
+    params = self.do_handshake()
+    _, task_id = self.client_create_task_raw(
+        properties=dict(command=['python', 'runtest.py']))
+
+    data = self.post_json('/swarming/api/v1/bot/poll', params)
+    run_id = data['manifest']['task_id']
+    def _params(**kwargs):
+      out = {
+        'cost_usd': 0.1,
+        'duration': None,
+        'exit_code': None,
+        'id': 'bot1',
+        'output': None,
+        'output_chunk_start': 0,
+        'task_id': run_id,
+      }
+      out.update(**kwargs)
+      return out
+
+    def _expected(**kwargs):
+      out = {
+        u'bot_dimensions': [
+          {u'key': u'id', u'value': [u'bot1']},
+          {u'key': u'os', u'value': [u'Amiga']},
+          {u'key': u'pool', u'value': [u'default']},
+        ],
+        u'bot_id': u'bot1',
+        u'bot_version': self.bot_version,
+        u'costs_usd': [0.1],
+        u'created_ts': str_now,
+        u'failure': False,
+        u'internal_failure': False,
+        u'modified_ts': str_now,
+        u'name': u'hi',
+        u'server_versions': [u'v1a'],
+        u'started_ts': str_now,
+        u'state': u'RUNNING',
+        u'tags': [
+          u'os:Amiga',
+          u'pool:default',
+          u'priority:10',
+          u'user:joe@localhost',
+        ],
+        u'task_id': task_id,
+        u'try_number': u'1',
+        u'user': u'joe@localhost',
+      }
+      out.update((unicode(k), v) for k, v in kwargs.iteritems())
+      return out
+
+    def _cycle(params, expected, must_stop):
+      response = self.post_json('/swarming/api/v1/bot/task_update', params)
+      self.assertEqual({u'must_stop': must_stop, u'ok': True}, response)
+      self.assertEqual(expected, self.client_get_results(task_id))
+
+    params = _params(output=base64.b64encode('Oh '))
+    expected = _expected()
+    _cycle(params, expected, False)
+
+    # Canceling a running task is currently not supported.
+    expected = {u'ok': False, u'was_running': True}
+    response = self.call_api('cancel', body={'task_id': task_id})
+    self.assertEqual(expected, response.json)
+
+    params = _params(output=base64.b64encode('hi'), output_chunk_start=3)
+    expected = _expected()
+    _cycle(params, expected, False)
+
   def test_result_unknown(self):
     """Asserts that result raises 404 for unknown task IDs."""
     with self.call_should_fail('404'):

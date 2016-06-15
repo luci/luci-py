@@ -93,12 +93,12 @@ class TestTaskRunnerBase(net_utils.TestCase):
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         self.get_check_first(cost_usd, auth_headers=auth_headers),
-        {'ok': True},
+        {'must_stop': False, 'ok': True},
       ),
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         self.get_check_final(auth_headers=auth_headers, **kwargs),
-        {'ok': True},
+        {'must_stop': False, 'ok': True},
       ),
     ]
 
@@ -465,7 +465,7 @@ class TestTaskRunner(TestTaskRunnerBase):
           'follow_redirects': False,
           'headers': {},
         },
-        {'ok': True},
+        {'must_stop': False, 'ok': True},
       ),
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
@@ -480,12 +480,12 @@ class TestTaskRunner(TestTaskRunnerBase):
           'follow_redirects': False,
           'headers': {},
         },
-        {'ok': True},
+        {'must_stop': False, 'ok': True},
       ),
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         check_final,
-        {'ok': True},
+        {'must_stop': False, 'ok': True},
       ),
     ]
     self.expected_requests(requests)
@@ -507,6 +507,26 @@ class TestTaskRunner(TestTaskRunnerBase):
       u'io_timeout': False,
       u'must_signal_internal_failure': None,
       u'version': task_runner.OUT_VERSION,
+    }
+    self.assertEqual(expected, self._run_command(task_details))
+
+  def test_run_command_canceled(self):
+    # This runs the command for real.
+    requests = [
+      (
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
+        self.get_check_first(1),
+        {u'must_stop': True, u'ok': True},
+      ),
+    ]
+    self.expected_requests(requests)
+    task_details = self.get_task_details('print(\'hi\')')
+    expected = {
+      u'exit_code': -1,
+      u'hard_timeout': False,
+      u'io_timeout': False,
+      u'must_signal_internal_failure': None,
+      u'version': 3,
     }
     self.assertEqual(expected, self._run_command(task_details))
 
@@ -855,12 +875,12 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         self.get_check_first(0.),
-        {'ok': True},
+        {'must_stop': False, 'ok': True},
       ),
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         check_final,
-        {'ok': True},
+        {'must_stop': False, 'ok': True},
       ),
     ]
     self.expected_requests(requests)
@@ -976,12 +996,12 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         self.get_check_first(0.),
-        {'ok': True},
+        {'must_stop': False, 'ok': True},
       ),
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         check_final,
-        {'ok': True},
+        {'must_stop': False, 'ok': True},
       ),
     ]
     self.expected_requests(requests)
