@@ -69,6 +69,10 @@
     margin-top: 10px;
     margin-bottom: 5px;
   }
+
+  .package-list {
+    margin-left: 1em;
+  }
 </style>
 {% endblock %}
 
@@ -230,7 +234,14 @@
           </tr>
           <tr title="CIPD pacakges">
             <td>CIPD packages</td>
-            <td>{{request.properties.cipd_input.packages|join('<br>'|safe)}}</td>
+            <td>
+              {% for path, packages in request.properties.cipd_input.packages_grouped_by_path() %}
+                <div>{{ path or '.'}}/</div>
+                <div class="package-list">
+                  {{packages|join('<br>'|safe)}}
+                </div>
+              {% endfor %}
+            </td>
           </tr>
         {% endif %}
         {% if request.properties.inputs_ref and request.properties.inputs_ref.isolated %}

@@ -154,14 +154,12 @@ class TasksApiTest(BaseTest):
             cipd_input=swarming_rpcs.CipdInput(
                 client_package=swarming_rpcs.CipdPackage(
                     package_name='infra/tools/cipd/${platform}',
-                    version='git_revision:deadbeef',
-                ),
+                    version='git_revision:deadbeef'),
                 packages=[
                   swarming_rpcs.CipdPackage(
                       package_name='rm', version='latest'),
                 ],
-                server='https://chrome-infra-packages.appspot.com',
-            ),
+                server='https://chrome-infra-packages.appspot.com'),
             command=['rm', '-rf', '/'],
             dimensions=[
               swarming_rpcs.StringPair(key='pool', value='default'),
@@ -248,15 +246,14 @@ class TasksApiTest(BaseTest):
             cipd_input=swarming_rpcs.CipdInput(
                 client_package=swarming_rpcs.CipdPackage(
                     package_name='infra/tools/cipd/${platform}',
-                    version='git_revision:deadbeef',
-                ),
+                    version='git_revision:deadbeef'),
                 packages=[
                   swarming_rpcs.CipdPackage(
                       package_name='rm',
+                      path='bin',
                       version='git_revision:deadbeef'),
                 ],
-                server='https://chrome-infra-packages.appspot.com',
-            ),
+                server='https://chrome-infra-packages.appspot.com'),
             dimensions=[
               swarming_rpcs.StringPair(key='os', value='Amiga'),
               swarming_rpcs.StringPair(key='pool', value='default'),
@@ -281,7 +278,8 @@ class TasksApiTest(BaseTest):
             },
             u'packages': [{
               u'package_name': u'rm',
-              u'version': 'git_revision:deadbeef',
+              u'path': u'bin',
+              u'version': u'git_revision:deadbeef',
             }],
             u'server': u'https://chrome-infra-packages.appspot.com',
           },
@@ -419,7 +417,8 @@ class TasksApiTest(BaseTest):
               },
               u'packages': [{
                 u'package_name': u'rm',
-                u'version': 'git_revision:deadbeef',
+                u'path': u'bin',
+                u'version': u'git_revision:deadbeef',
               }],
               u'server': u'https://chrome-infra-packages.appspot.com',
             },
@@ -456,7 +455,8 @@ class TasksApiTest(BaseTest):
               },
               u'packages': [{
                 u'package_name': u'rm',
-                u'version': 'git_revision:deadbeef',
+                u'path': u'bin',
+                u'version': u'git_revision:deadbeef',
               }],
               u'server': u'https://chrome-infra-packages.appspot.com',
             },
@@ -618,7 +618,7 @@ class TasksApiTest(BaseTest):
     response = self.call_api('new', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
 
-  def test_new_cipd_packages_with_defaults(self):
+  def test_new_cipd_package_with_defaults(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
@@ -1321,6 +1321,7 @@ class TaskApiTest(BaseTest):
           },
           u'packages': [{
             u'package_name': u'rm',
+            u'path': u'bin',
             u'version': 'git_revision:deadbeef',
           }],
           u'server': u'https://chrome-infra-packages.appspot.com',

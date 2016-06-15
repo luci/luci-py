@@ -90,6 +90,11 @@ class CipdPackage(messages.Message):
   package_name = messages.StringField(1)
   # Valid package version for all packages matched by package name.
   version = messages.StringField(2)
+  # Path to dir, relative to the root dir, where to install the package.
+  # If empty, the package will be installed a the root of the mapped directory.
+  # If file names in the package and in the isolate clash, it will cause a
+  # failure.
+  path = messages.StringField(3)
 
 
 class CipdInput(messages.Message):
@@ -106,6 +111,7 @@ class CipdInput(messages.Message):
   # CIPD package of CIPD client to use.
   # client_package.version is required.
   # This field is optional is default value is defined in the server config.
+  # client_package.path must be empty.
   client_package = messages.MessageField(CipdPackage, 2)
 
   # List of CIPD packages to install in $CIPD_PATH prior task execution.

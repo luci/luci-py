@@ -46,6 +46,7 @@ separate entity to clearly declare the boundary for task request deduplication.
 """
 
 
+import collections
 import datetime
 import hashlib
 import random
@@ -220,6 +221,23 @@ def _validate_package_version(prop, value):
         '%s must be a valid package version "%s"' % (prop._name, value))
 
 
+def _validate_package_path(_prop, path):
+  """Validates a CIPD installation path."""
+  if not path:
+    raise datastore_errors.BadValueError(
+        'CIPD package path is required. Use "." to install to run dir.')
+  if '\\' in path:
+    raise datastore_errors.BadValueError(
+        'CIPD package path cannot contain \\. On Windows forward-slashes '
+        'will be replaced with back-slashes.')
+  if '..' in path.split('/'):
+    raise datastore_errors.BadValueError(
+        'CIPD package path cannot contain "..".')
+  if path.startswith('/'):
+    raise datastore_errors.BadValueError(
+        'CIPD package path cannot start with "/".')
+
+
 ### Models.
 
 
@@ -259,6 +277,9 @@ class CipdPackage(ndb.Model):
   # Most users will specify tags.
   version = ndb.StringProperty(
       indexed=False, validator=_validate_package_version)
+  # Path to dir, relative to the run dir, where to install the package.
+  # If empty, the package will be installed in run dir.
+  path = ndb.StringProperty(indexed=False, validator=_validate_package_path)
 
   def __str__(self):
     return '%s:%s' % (self.package_name, self.version)
@@ -281,6 +302,7 @@ class CipdInput(ndb.Model):
 
   # CIPD package of CIPD client to use.
   # client_package.version is required.
+  # client_package.path must be None.
   client_package = ndb.LocalStructuredProperty(CipdPackage)
 
   # List of packages to install in $CIPD_PATH prior task execution.
@@ -291,6 +313,8 @@ class CipdInput(ndb.Model):
       raise datastore_errors.BadValueError('cipd server is required')
     if not self.client_package:
       raise datastore_errors.BadValueError('client_package is required')
+    if self.client_package.path:
+      raise datastore_errors.BadValueError('client_package.path must be unset')
     self.client_package._pre_put_hook()
 
     if not self.packages:
@@ -305,6 +329,15 @@ class CipdInput(ndb.Model):
            'package %s is specified more than once' % p.package_name)
       package_names.add(p.package_name)
     self.packages.sort(key=lambda p: p.package_name)
+
+  def packages_grouped_by_path(self):
+    """Returns sorted [(path), [package]) list. Used by user_task.html."""
+    packages = collections.defaultdict(list)
+    for p in self.packages:
+      packages[p.path].append(p)
+    for pkgs in packages.itervalues():
+      pkgs.sort()
+    return sorted(packages.iteritems())
 
 
 class TaskProperties(ndb.Model):

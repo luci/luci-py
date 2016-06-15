@@ -215,6 +215,7 @@ class AppTestBase(test_case.TestCase):
         },
         'packages': [{
           'package_name': 'rm',
+          'path': 'bin',
           'version': 'git_revision:deadbeef',
         }],
         'server': 'https://chrome-infra-packages.appspot.com',

@@ -23,6 +23,7 @@ import signal
 import sys
 import time
 
+from utils import file_path
 from utils import net
 from utils import on_error
 from utils import subprocess42
@@ -81,7 +82,8 @@ def get_run_isolated():
 
 
 def get_isolated_cmd(
-    work_dir, task_details, isolated_result, min_free_space, bot_file):
+    work_dir, task_details, isolated_result, bot_file, package_list,
+    min_free_space):
   """Returns the command to call run_isolated. Mocked in tests."""
   assert (bool(task_details.command) !=
           bool(task_details.isolated and task_details.isolated.get('input')))
@@ -104,16 +106,23 @@ def get_isolated_cmd(
           ])
 
   if task_details.cipd_input and task_details.cipd_input.get('packages'):
-    to_pkg = lambda p: '%s:%s' % (p['package_name'], p['version'])
+    package_json = {
+      # cipd_input and run_isolated.py use the same format for 'packages'
+      # property. It is a list of package JSON objects.
+      'packages': task_details.cipd_input['packages'],
+    }
+    with open(package_list, 'wb') as f:
+      json.dump(package_json, f)
     cmd.extend(
         [
           '--cipd-cache', os.path.join(bot_dir, 'cipd_cache'),
           '--cipd-client-package',
-          to_pkg(task_details.cipd_input.get('client_package')),
+          task_details.cipd_input['client_package']['package_name'],
+          '--cipd-client-version',
+          task_details.cipd_input['client_package']['version'],
+          '--cipd-package-list', package_list,
           '--cipd-server', task_details.cipd_input.get('server'),
         ])
-    for p in task_details.cipd_input['packages']:
-      cmd.extend(['--cipd-package', to_pkg(p)])
 
   cmd.extend(
       [
@@ -381,8 +390,10 @@ def run_command(
     }
 
   isolated_result = os.path.join(work_dir, 'isolated_result.json')
+  package_list = os.path.join(work_dir, 'package_list.json')
   cmd = get_isolated_cmd(
-      work_dir, task_details, isolated_result, min_free_space, bot_file)
+      work_dir, task_details, isolated_result, bot_file, package_list,
+      min_free_space)
   # Hard timeout enforcement is deferred to run_isolated. Grace is doubled to
   # give one 'grace_period' slot to the child process and one slot to upload
   # the results back.
@@ -584,10 +595,8 @@ def run_command(
       u'version': OUT_VERSION,
     }
   finally:
-    try:
-      os.remove(isolated_result)
-    except OSError:
-      pass
+    file_path.try_remove(unicode(isolated_result))
+    file_path.try_remove(unicode(package_list))
     stop_headers_reader()
 
 

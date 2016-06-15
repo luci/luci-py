@@ -239,14 +239,16 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'bot_id': u'bot1',
         u'cipd_input': {
           u'client_package': {
-            u'package_name': 'infra/tools/cipd/${platform}',
-            u'version': 'git_revision:deadbeef',
+            u'package_name': u'infra/tools/cipd/${platform}',
+            u'path': None,
+            u'version': u'git_revision:deadbeef',
           },
           u'packages': [{
             u'package_name': u'rm',
-            u'version': 'git_revision:deadbeef',
+            u'path': u'bin',
+            u'version': u'git_revision:deadbeef',
           }],
-          u'server': 'https://chrome-infra-packages.appspot.com',
+          u'server': u'https://chrome-infra-packages.appspot.com',
         },
         u'command': [u'python', u'run_test.py'],
         u'dimensions': {
@@ -307,14 +309,16 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'bot_id': u'bot1',
         u'cipd_input': {
           u'client_package': {
-            u'package_name': 'infra/tools/cipd/${platform}',
-            u'version': 'git_revision:deadbeef',
+            u'package_name': u'infra/tools/cipd/${platform}',
+            u'path': None,
+            u'version': u'git_revision:deadbeef',
           },
           u'packages': [{
             u'package_name': u'rm',
-            u'version': 'git_revision:deadbeef',
+            u'path': u'bin',
+            u'version': u'git_revision:deadbeef',
           }],
-          u'server': 'https://chrome-infra-packages.appspot.com',
+          u'server': u'https://chrome-infra-packages.appspot.com',
         },
         u'command': None,
         u'dimensions': {
@@ -434,14 +438,16 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'bot_id': u'bot1',
         u'cipd_input': {
           u'client_package': {
-            u'package_name': 'infra/tools/cipd/${platform}',
-            u'version': 'git_revision:deadbeef',
+            u'package_name': u'infra/tools/cipd/${platform}',
+            u'path': None,
+            u'version': u'git_revision:deadbeef',
           },
           u'packages': [{
             u'package_name': u'rm',
-            u'version': 'git_revision:deadbeef',
+            u'path': u'bin',
+            u'version': u'git_revision:deadbeef',
           }],
-          u'server': 'https://chrome-infra-packages.appspot.com',
+          u'server': u'https://chrome-infra-packages.appspot.com',
         },
         u'command': None,
         u'dimensions': {
