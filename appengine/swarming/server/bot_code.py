@@ -235,5 +235,5 @@ def validate_bootstrap_token(tok):
   try:
     return BootstrapToken.validate(tok, message=None)
   except auth.InvalidTokenError as exc:
-    logging.error('Failed to validate bootstrap token: %s', exc)
+    logging.warning('Failed to validate bootstrap token: %s', exc)
     return None
