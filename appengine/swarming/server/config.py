@@ -117,15 +117,10 @@ def _get_settings():
 
   The config is cached in the datastore.
   """
-  rev = None
-  cfg = None
-  try:
-    # store_last_good=True tells config component to update the config file
-    # in a cron job. Here we just read from datastore.
-    rev, cfg = config.get_self_config(
-        SETTINGS_CFG_FILENAME, config_pb2.SettingsCfg, store_last_good=True)
-  except config.CannotLoadConfigError as ex:
-    logging.info('Could not load settings.cfg: %s; using defaults', ex)
+  # store_last_good=True tells config component to update the config file
+  # in a cron job. Here we just read from the datastore.
+  rev, cfg = config.get_self_config(
+      SETTINGS_CFG_FILENAME, config_pb2.SettingsCfg, store_last_good=True)
   cfg = cfg or config_pb2.SettingsCfg()
   cfg.reusable_task_age_secs = cfg.reusable_task_age_secs or 7*24*60*60
   cfg.bot_death_timeout_secs = cfg.bot_death_timeout_secs or 10*60

@@ -6,13 +6,11 @@
 
 import base64
 import datetime
-import json
 import logging
 import urllib
 
 from google.appengine.ext import ndb
 
-from components import auth
 from components import net
 from components import utils
 

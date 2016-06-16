@@ -45,7 +45,7 @@ class Provider(object):
         SEPARATOR,
         path.replace('/', os.path.sep))
     filename = os.path.abspath(filename)
-    assert filename.startswith(self.root)
+    assert filename.startswith(os.path.abspath(self.root)), filename
     content = None
     if os.path.exists(filename):
       with open(filename, 'r') as f:

@@ -33,14 +33,6 @@ Project = collections.namedtuple('Project', [
 ])
 
 
-class Error(Exception):
-  """Config component-related error."""
-
-
-class CannotLoadConfigError(Error):
-  """A config could not be loaded."""
-
-
 @ndb.tasklet
 def _get_config_provider_async():  # pragma: no cover
   """Returns a config provider to load configs.
@@ -65,7 +57,8 @@ def get_async(
   not updated anymore. If the Cron job receives an invalid config, it is
   ignored, so get_async with store_last_good=True is guaranteed to always return
   valid configs as long as validation code is not changed in a non-backward
-  compatible way.
+  compatible way. If a config was requested with store_last_good=True for the
+  first time, (None, None) is returned.
 
   Args:
     config_set (str): config set to read a config from.
@@ -98,19 +91,9 @@ def get_async(
           'store_last_good parameter cannot be set to True if revision is '
           'specified')
 
-  try:
-    provider = yield _get_config_provider_async()
-    revision, config = yield provider.get_async(
-        config_set, path, revision=revision, store_last_good=store_last_good)
-  except Exception as ex:
-    raise CannotLoadConfigError(
-        'Could not load config %s:%s, revision %r: %s' % (
-            config_set,
-            path,
-            revision,
-            ex,
-        )), None, sys.exc_info()[2]
-
+  provider = yield _get_config_provider_async()
+  revision, config = yield provider.get_async(
+      config_set, path, revision=revision, store_last_good=store_last_good)
   raise ndb.Return((revision, common._convert_config(config, dest_type)))
 
 
