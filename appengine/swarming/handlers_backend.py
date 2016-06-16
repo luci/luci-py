@@ -64,14 +64,17 @@ class CronMachineProviderBotHandler(webapp2.RequestHandler):
     BATCH_SIZE = 50
 
     if not config.settings().mp.enabled:
+      logging.info('MP support is disabled')
       return
 
     app_id = app_identity.get_application_id()
     swarming_server = 'https://%s' % app_identity.get_default_version_hostname()
+    found = 0
     for machine_type_key in lease_management.MachineType.query().fetch(
         keys_only=True):
       lease_requests = lease_management.generate_lease_requests(
           machine_type_key, app_id, swarming_server)
+      found += len(lease_requests)
       responses = []
       while lease_requests:
         response = machine_provider.lease_machines(lease_requests[:BATCH_SIZE])
@@ -79,6 +82,7 @@ class CronMachineProviderBotHandler(webapp2.RequestHandler):
         lease_requests = lease_requests[BATCH_SIZE:]
       if responses:
         lease_management.update_leases(machine_type_key, responses)
+    logging.info('Updated %d', found)
 
 
 class CronMachineProviderCleanUpHandler(webapp2.RequestHandler):
@@ -87,6 +91,7 @@ class CronMachineProviderCleanUpHandler(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
     if not config.settings().mp.enabled:
+      logging.info('MP support is disabled')
       return
 
     lease_management.clean_up_bots()
@@ -98,6 +103,7 @@ class CronMachineProviderPubSubHandler(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
     if not config.settings().mp.enabled:
+      logging.info('MP support is disabled')
       return
 
     taskqueue.add(

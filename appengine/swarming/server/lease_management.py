@@ -446,6 +446,7 @@ def process_pubsub(app_id):
   MAX_IN_FLIGHT = 50
   subscription = pubsub.full_subscription_name(app_id, PUBSUB_SUBSCRIPTION)
   response = pubsub.pull(subscription)
+  logging.info('%s', response)
 
   futures = []
   messages = response.get('receivedMessages', [])
