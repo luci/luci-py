@@ -271,8 +271,11 @@ class IsolateService(remote.Service):
     content = None
     key = None
     offset = request.offset
-
-    # try the memcache
+    if not request.digest:
+      raise endpoints.BadRequestException('digest is required.')
+    if not request.namespace:
+      raise endpoints.BadRequestException('namespace is required.')
+    # Try memcache.
     memcache_entry = memcache.get(
         request.digest, namespace='table_%s' % request.namespace.namespace)
     if memcache_entry is not None:
