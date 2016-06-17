@@ -58,7 +58,7 @@ THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
 SINGLETON = singleton.Singleton(os.path.dirname(THIS_FILE))
 
 
-# White list of files that can be present in the bot's directory. Anything else
+# Whitelist of files that can be present in the bot's directory. Anything else
 # will be forcibly deleted on startup! Note that 'work' is not in this list, as
 # we want it to be deleted on startup.
 # See
@@ -331,16 +331,17 @@ def cleanup_bot_directory(botobj):
   this bot to self-quarantine. Do only this when running from the zip.
   """
   for i in os.listdir(botobj.base_dir):
-    if not any(fnmatch.fnmatch(i, w) for w in WHITELIST):
-      try:
-        p = os.path.join(botobj.base_dir, i)
-        if os.path.isdir(p):
-          file_path.rmtree(p)
-        else:
-          file_path.remove(p)
-      except Exception as e:
-        botobj.post_error(
-            'Failed to remove %s from bot\'s directory: %s' % (i, e))
+    if any(fnmatch.fnmatch(i, w) for w in WHITELIST):
+      continue
+    try:
+      p = os.path.join(botobj.base_dir, i)
+      if os.path.isdir(p):
+        file_path.rmtree(p)
+      else:
+        file_path.remove(p)
+    except (IOError, OSError) as e:
+      botobj.post_error(
+          'Failed to remove %s from bot\'s directory: %s' % (i, e))
 
 
 def clean_isolated_cache(botobj):
