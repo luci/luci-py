@@ -13,18 +13,7 @@ import logging
 from components import auth
 from components.auth import ipaddr
 
-
-# TODO(vadimsh): Get rid of this in favor of swarming config stored
-# in luci-config.
-BOTS_GROUP = 'swarming-bots'
-
-
-def is_ip_whitelisted_machine():
-  """Returns True if the call is made from IP whitelisted machine."""
-  # TODO(vadimsh): Get rid of this. It's blocked on fixing /bot_code calls in
-  # bootstrap code everywhere to use service accounts and switching all Swarming
-  # Tasks API calls made from bots to use proper authentication.
-  return auth.is_group_member(BOTS_GROUP)
+from server import acl
 
 
 def is_authenticated_bot(bot_id):
@@ -57,7 +46,7 @@ def validate_bot_id_and_fetch_config(bot_id):
   # For example, if the bot is using machine tokens, we check that
   # bot_id == hostname specified in the token. If the bot is using IP
   # whitelist, we check that its bot_id is allowed to use IP whitelist, etc.
-  if not auth.is_group_member(BOTS_GROUP):
+  if not acl.is_ip_whitelisted_machine():
     logging.error(
         'Unauthorized bot request\n'
         'bot_id: "%s", peer_ident: "%s", peer_ip: "%s"',

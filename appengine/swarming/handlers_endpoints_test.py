@@ -1047,10 +1047,11 @@ class TaskApiTest(BaseTest):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
-    params = self.do_handshake()
     _, task_id = self.client_create_task_raw(
         properties=dict(command=['python', 'runtest.py']))
 
+    self.set_as_bot()
+    params = self.do_handshake()
     data = self.post_json('/swarming/api/v1/bot/poll', params)
     run_id = data['manifest']['task_id']
     def _params(**kwargs):

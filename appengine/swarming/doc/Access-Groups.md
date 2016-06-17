@@ -18,17 +18,6 @@ domain with `*@chromium.org`.
 ## Groups
 
 
-### swarming-bots
-
-Members of this group can:
-
-*   Run swarming_bot.zip successfully to run a bot locally. VMs that run the bot
-    code must be in this group via IP whitelisting.
-*   Trigger tasks and get results.
-
-Make sure members of this group are also member of _isolate-access_.
-
-
 ### swarming-users
 
 Members of this group can:

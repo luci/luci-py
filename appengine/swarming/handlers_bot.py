@@ -145,7 +145,7 @@ class _BotAuthenticatingHandler(auth.AuthenticatingHandler):
     # TODO(vadimsh): Remove is_ip_whitelisted_machine check once all bots are
     # using auth for bootstrap and updating.
     if (not acl.is_bootstrapper() and
-        not bot_auth.is_ip_whitelisted_machine() and
+        not acl.is_ip_whitelisted_machine() and
         not (bot_id and bot_auth.is_authenticated_bot(bot_id))):
       raise auth.AuthorizationError('Not allowed to access the bot code')
 

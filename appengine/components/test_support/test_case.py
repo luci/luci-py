@@ -164,12 +164,12 @@ class TestCase(auto_stub.TestCase):
 
 class Endpoints(object):
   """Handles endpoints API calls."""
-  def __init__(self, api_service_cls):
+  def __init__(self, api_service_cls, source_ip='127.0.0.1'):
     super(Endpoints, self).__init__()
     self._api_service_cls = api_service_cls
     self._api_app = webtest.TestApp(
         endpoints.api_server([self._api_service_cls], restricted=False),
-        extra_environ={'REMOTE_ADDR': '127.0.0.1'})
+        extra_environ={'REMOTE_ADDR': source_ip})
 
   def call_api(self, method, body=None, status=200):
     """Calls endpoints API method identified by its name."""

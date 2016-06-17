@@ -7,8 +7,6 @@
 from components import auth
 from components import utils
 
-from server import bot_auth
-
 
 # Names of groups.
 # See https://code.google.com/p/swarming/wiki/SwarmingAccessGroups for each
@@ -16,7 +14,6 @@ from server import bot_auth
 #
 # TODO(vadimsh): Move them to the config.
 ADMINS_GROUP = 'swarming-admins'
-BOTS_GROUP = bot_auth.BOTS_GROUP
 PRIVILEGED_USERS_GROUP = 'swarming-privileged-users'
 USERS_GROUP = 'swarming-users'
 BOT_BOOTSTRAP_GROUP = 'swarming-bot-bootstrap'
@@ -39,10 +36,18 @@ def is_bootstrapper():
   return is_admin() or auth.is_group_member(BOT_BOOTSTRAP_GROUP)
 
 
+def is_ip_whitelisted_machine():
+  """Returns True if the call is made from IP whitelisted machine."""
+  # TODO(vadimsh): Get rid of this. It's blocked on fixing /bot_code calls in
+  # bootstrap code everywhere to use service accounts and switching all Swarming
+  # Tasks API calls made from bots to use proper authentication.
+  return auth.is_in_ip_whitelist(auth.BOTS_IP_WHITELIST, auth.get_peer_ip())
+
+
 def is_bot():
   # TODO(vadimsh): Get rid of this. Swarming jobs will use service accounts
   # associated with the job when calling Swarming, not the machine IP.
-  return bot_auth.is_ip_whitelisted_machine() or is_admin()
+  return is_ip_whitelisted_machine() or is_admin()
 
 
 def is_bot_or_user():
@@ -81,7 +86,6 @@ def bootstrap_dev_server_acls():
     return
 
   bots = auth.bootstrap_loopback_ips()
-  auth.bootstrap_group(BOTS_GROUP, bots, 'Swarming bots')
   auth.bootstrap_group(USERS_GROUP, bots, 'Swarming users')
   auth.bootstrap_group(BOT_BOOTSTRAP_GROUP, bots, 'Bot bootstrap')
 

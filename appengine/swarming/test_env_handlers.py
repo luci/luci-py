@@ -61,9 +61,6 @@ class AppTestBase(test_case.TestCase):
     auth.bootstrap_group(
         acl.USERS_GROUP,
         [auth.Identity(auth.IDENTITY_USER, 'user@example.com')])
-    auth.bootstrap_group(
-        acl.BOTS_GROUP,
-        [auth.Identity(auth.IDENTITY_BOT, self.source_ip)])
 
     self.mock(stats_framework, 'add_entry', self._parse_line)
 
@@ -111,8 +108,7 @@ class AppTestBase(test_case.TestCase):
     self.set_as_anonymous()
     auth.bootstrap_ip_whitelist(auth.BOTS_IP_WHITELIST, [self.source_ip])
     auth_testing.reset_local_state()
-    auth_testing.mock_get_current_identity(
-        self, auth.Identity.from_bytes('bot:' + self.source_ip))
+    auth_testing.mock_get_current_identity(self, auth.IP_WHITELISTED_BOT_ID)
 
   # Web or generic
 
@@ -202,8 +198,10 @@ class AppTestBase(test_case.TestCase):
   # Client
 
   def endpoint_call(self, service, name, args):
-    body = json.loads(protojson.encode_message(args))
-    return test_case.Endpoints(service).call_api(name, body=body).json
+    srv = test_case.Endpoints(service, source_ip=self.source_ip)
+    if not isinstance(args, dict):
+      args = json.loads(protojson.encode_message(args))
+    return srv.call_api(name, body=args).json
 
   def _client_create_task(self, properties=None, **kwargs):
     """Creates an isolated command TaskRequest via the Cloud Endpoints API."""
@@ -262,5 +260,5 @@ class AppTestBase(test_case.TestCase):
     return self._client_create_task(properties, **kwargs)
 
   def client_get_results(self, task_id):
-    api = test_case.Endpoints(handlers_endpoints.SwarmingTaskService)
-    return api.call_api('result', body={'task_id': task_id}).json
+    return self.endpoint_call(
+        handlers_endpoints.SwarmingTaskService, 'result', {'task_id': task_id})
