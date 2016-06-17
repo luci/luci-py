@@ -492,7 +492,7 @@ class HighDevice(object):
     if not self.cache.available_governors:
       return False
     if governor not in self.cache.available_governors:
-      if governor == 'powersave':
+      if governor == 'powersave' and self.cache.available_frequencies:
         return self.SetCPUSpeed(self.cache.available_frequencies[0])
       if governor == 'ondemand':
         governor = 'interactive'
