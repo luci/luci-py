@@ -542,6 +542,9 @@ def get_uptime():
     return platforms.osx.get_uptime()
   if sys.platform == 'win32':
     return platforms.win.get_uptime()
+  if sys.platform == 'cygwin':
+    # Not important.
+    return 0.
   return platforms.linux.get_uptime()
 
 
