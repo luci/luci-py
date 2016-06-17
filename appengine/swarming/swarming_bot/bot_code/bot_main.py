@@ -15,6 +15,7 @@ server-provided bot_config.py. This permits safe load testing.
 """
 
 import contextlib
+import fnmatch
 import json
 import logging
 import optparse
@@ -56,6 +57,23 @@ THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
 # The singleton, initially unset.
 SINGLETON = singleton.Singleton(os.path.dirname(THIS_FILE))
 
+
+# White list of files that can be present in the bot's directory. Anything else
+# will be forcibly deleted on startup! Note that 'work' is not in this list, as
+# we want it to be deleted on startup.
+# See
+# https://github.com/luci/luci-py/tree/master/appengine/swarming/doc/LifeOfABot.md
+# for more details.
+WHITELIST = (
+  '*-cacert.pem',
+  'cipd_cache',
+  'isolated_cache',
+  'logs',
+  'swarming.lck',
+  'swarming_bot.1.zip',
+  'swarming_bot.2.zip',
+  'swarming_bot.zip',
+)
 
 ### bot_config handler part.
 
@@ -306,6 +324,25 @@ def get_bot():
   return botobj
 
 
+def cleanup_bot_directory(botobj):
+  """Delete anything not expected in the swarming bot directory.
+
+  This helps with stale work directory or any unexpected junk that could cause
+  this bot to self-quarantine. Do only this when running from the zip.
+  """
+  for i in os.listdir(botobj.base_dir):
+    if not any(fnmatch.fnmatch(i, w) for w in WHITELIST):
+      try:
+        p = os.path.join(botobj.base_dir, i)
+        if os.path.isdir(p):
+          file_path.rmtree(p)
+        else:
+          file_path.remove(p)
+      except Exception as e:
+        botobj.post_error(
+            'Failed to remove %s from bot\'s directory: %s' % (i, e))
+
+
 def clean_isolated_cache(botobj):
   """Asks run_isolated to clean its cache.
 
@@ -321,7 +358,7 @@ def clean_isolated_cache(botobj):
     sys.executable, THIS_FILE, 'run_isolated',
     '--clean',
     '--log-file', os.path.join(bot_dir, 'logs', 'run_isolated.log'),
-    '--cache', os.path.join(bot_dir, 'cache'),
+    '--cache', os.path.join(bot_dir, 'isolated_cache'),
     '--min-free-space', str(get_min_free_space()),
   ]
   logging.info('Running: %s', cmd)
@@ -404,6 +441,7 @@ def run_bot(arg_error):
       logging.info('Early quit 2')
       return 0
 
+    cleanup_bot_directory(botobj)
     clean_isolated_cache(botobj)
 
     call_hook(botobj, 'on_bot_startup')
@@ -414,15 +452,6 @@ def run_bot(arg_error):
 
     # This environment variable is accessible to the tasks executed by this bot.
     os.environ['SWARMING_BOT_ID'] = botobj.id.encode('utf-8')
-
-    # Remove the 'work' directory if present, as not removing it may cause the
-    # bot to stay quarantined and not be able to get out of this state.
-    work_dir = os.path.join(botobj.base_dir, 'work')
-    try:
-      if os.path.isdir(work_dir):
-        file_path.rmtree(work_dir)
-    except Exception as e:
-      botobj.post_error('Failed to remove work: %s' % e)
 
     consecutive_sleeps = 0
     while not quit_bit.is_set():

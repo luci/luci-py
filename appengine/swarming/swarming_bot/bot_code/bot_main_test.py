@@ -72,6 +72,8 @@ class TestBotMain(net_utils.TestCase):
     self.mock(
         bot_main, 'THIS_FILE',
         os.path.join(test_env_bot_code.BOT_DIR, 'swarming_bot.zip'))
+    # Need to disable this otherwise it'd kill the current checkout.
+    self.mock(bot_main, 'cleanup_bot_directory', lambda _: None)
 
   def tearDown(self):
     os.environ.pop('SWARMING_BOT_ID', None)

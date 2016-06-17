@@ -341,14 +341,27 @@ reports.
 
 ## Bot Directory layout
 
-  - The base directory containing swarming_bot.zip doesn't contain much files.
-  - `cache/` is the run_isolated cache. Deleting it causes the next task to
-    download all the files instead of reusing whatever was previously
+The base directory containing swarming_bot.zip doesn't contains a limited number
+of files and directories, **EVERYTHING NOT LISTED THERE IS DELETED ON STARTUP**:
+
+  - `*-cacert.pem` are certificate files to verify the SSL certificates. Sadly
+    the python libraries used enforce the program to write this file to disk.
+  - `cipd_cache/` is a version cache for CIPD packages.
+  - `isolated_cache/` is the run_isolated cache. Deleting it causes the next
+    task to download all the files instead of reusing whatever was previously
     downloaded.
   - `logs/` is the logs for all the processes. Deleting it is fine, the
     directory will be recreated.
+  - `swarming.lck` is a lock file to prevent the bot from starting twice on the
+    same host. If you want to run multiple bots on a single host, use multiple
+    directories.
+  - `swarming_bot.zip` is the _LKGBC_ (Last Known Good Bot Code), it is reset
+    after an upgrade and a successful task execution.
+  - `swarming_bot.1.zip` and `swarming_bot.2.zip` are the two 'partitions' used
+    when the bot is running and self-updating.
   - `work/` is the temporary working directory created for each task then
-    deleted. By definition it only exists for the lifetime of a single task.
+    deleted. By definition it only exists for the lifetime of a single task, so
+    it is deleted on bot startup if found.
 
 
 ### logs/
