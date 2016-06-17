@@ -121,7 +121,6 @@ The root is a dictionary with the following keys:
     provide the command. In practice, this is used to reduce `.isolated` file
     size by moving rarely changed test data files in a separate `.isolated`
     file.
-  - `os`: required OS to run the executable, currently 'linux', 'mac' or 'win'.
   - `read_only`: boolean to specify if all the files should be read-only. This
     will be eventually enforced.
   - `relative_cwd`: relative directory inside the temporary directory tree when
