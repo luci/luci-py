@@ -141,6 +141,7 @@ def get_isolated_cmd(
   if task_details.grace_period:
     cmd.extend(('--grace-period', str(task_details.grace_period)))
 
+  # TODO(nodir): Pass the command line arguments via a response file.
   cmd.append('--')
   if task_details.command:
     cmd.extend(task_details.command)
@@ -413,6 +414,7 @@ def run_command(
         else:
           env[key] = value
     logging.info('cmd=%s', cmd)
+    logging.info('cwd=%s', work_dir)
     logging.info('env=%s', env)
     try:
       assert cmd and all(isinstance(a, basestring) for a in cmd)
@@ -483,19 +485,23 @@ def run_command(
           if (task_details.io_timeout and
               now - last_io > task_details.io_timeout):
             had_io_timeout = True
-            logging.warning('I/O timeout; sending SIGTERM')
+            logging.warning(
+                'I/O timeout is %.3fs; no update for %.3fs sending SIGTERM',
+                task_details.io_timeout, now - last_io)
             proc.terminate()
             timed_out = monotonic_time()
         else:
           # During grace period.
-          if not kill_sent and now >= timed_out + task_details.grace_period:
+          if not kill_sent and now - timed_out >= task_details.grace_period:
             # Now kill for real. The user can distinguish between the following
             # states:
             # - signal but process exited within grace period,
             #   (hard_|io_)_timed_out will be set but the process exit code will
             #   be script provided.
             # - processed exited late, exit code will be -9 on posix.
-            logging.warning('Grace exhausted; sending SIGKILL')
+            logging.warning(
+                'Grace of %.3fs exhausted at %.3fs; sending SIGKILL',
+                task_details.grace_period, now - timed_out)
             proc.kill()
             kill_sent = True
       logging.info('Waiting for proces exit')

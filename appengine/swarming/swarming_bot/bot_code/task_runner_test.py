@@ -63,11 +63,11 @@ class TestTaskRunnerBase(net_utils.TestCase):
     os.chdir(self.root_dir)
     os.mkdir(self.work_dir)
     # Create the logs directory so run_isolated.py can put its log there.
-    os.mkdir(os.path.join(self.root_dir, 'logs'))
-
-    self.mock(
-        task_runner, 'get_run_isolated',
-        lambda: [sys.executable, os.path.join(CLIENT_DIR, 'run_isolated.py')])
+    self._logs = os.path.join(self.root_dir, 'logs')
+    os.mkdir(self._logs)
+    def _get_run_isolated():
+      return [sys.executable, os.path.join(CLIENT_DIR, 'run_isolated.py')]
+    self.mock(task_runner, 'get_run_isolated', _get_run_isolated)
 
     # In case this test itself is running one Swarming, clear the bots
     # environment.
@@ -78,6 +78,10 @@ class TestTaskRunnerBase(net_utils.TestCase):
   def tearDown(self):
     os.chdir(test_env_bot_code.BOT_DIR)
     try:
+      logging.debug(self._logs)
+      for i in os.listdir(self._logs):
+        with open(os.path.join(self._logs, i), 'rb') as f:
+          logging.debug('%s:\n%s', i, ''.join('  ' + line for line in f))
       file_path.rmtree(self.root_dir)
     except OSError:
       print >> sys.stderr, 'Failed to delete %s' % self.root_dir
@@ -585,8 +589,9 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
   # implementation detail check.
   # These test cases run the command for real.
 
-  # TODO(maruel): Calculate this value automatically through iteration?
-  SHORT_TIME_OUT = 0.3
+  # TODO(maruel): Calculate this value automatically through iteration? This is
+  # really bad and prone to flakiness.
+  SHORT_TIME_OUT = 1.
 
   # Here's a simple script that handles signals properly. Sadly SIGBREAK is not
   # defined on posix.
@@ -635,16 +640,18 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     def check_final(kwargs):
       kwargs['data'].pop('bot_overhead', None)
       if hard_timeout or io_timeout:
-        self.assertLess(self.SHORT_TIME_OUT, kwargs['data'].pop('cost_usd'))
-        self.assertLess(self.SHORT_TIME_OUT, kwargs['data'].pop('duration'))
+        self.assertLess(
+            self.SHORT_TIME_OUT, kwargs['data'].pop('cost_usd', None))
+        self.assertLess(
+            self.SHORT_TIME_OUT, kwargs['data'].pop('duration', None))
       else:
-        self.assertLess(0., kwargs['data'].pop('cost_usd'))
-        self.assertLess(0., kwargs['data'].pop('duration'))
+        self.assertLess(0., kwargs['data'].pop('cost_usd', None))
+        self.assertLess(0., kwargs['data'].pop('duration', None))
 
       output = ''
       if 'output' in kwargs['data']:
         output = base64.b64decode(kwargs['data'].pop('output'))
-      self.assertTrue(re.match(output_re, output))
+      self.assertTrue(re.match(output_re, output), (kwargs, output))
 
       self.assertEqual(
           {
