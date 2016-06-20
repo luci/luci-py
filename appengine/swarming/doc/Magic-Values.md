@@ -27,8 +27,7 @@ the `command` section of the .isolate file.
   -  ${SWARMING_BOT_FILE} : If found on command line argument, replaced by a
     file written to by the swarming bot's on_before_task() hook in the swarming
     server's custom bot_config.py. This is used by a swarming bot to communicate
-    state of the bot to tasks. It is also packaged into the task's
-    ISOLATED_OUTDIR after execution.
+    state of the bot to tasks.
 
 
 ## Swarming
