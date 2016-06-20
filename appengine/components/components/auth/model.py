@@ -1216,18 +1216,17 @@ def bootstrap_ip_whitelist_assignment(identity, ip_whitelist, comment=''):
 
 
 def fetch_ip_whitelists():
-  """Fetches AuthIPWhitelistAssignments and relevant AuthIPWhitelist entities.
+  """Fetches AuthIPWhitelistAssignments and all AuthIPWhitelist entities.
 
   Returns:
     (AuthIPWhitelistAssignments, list of AuthIPWhitelist).
   """
+  assign_fut = ip_whitelist_assignments_key().get_async()
+  whitelists_fut = AuthIPWhitelist.query(ancestor=root_key()).fetch_async()
+
   assignments = (
-      ip_whitelist_assignments_key().get() or
+      assign_fut.get_result() or
       AuthIPWhitelistAssignments(key=ip_whitelist_assignments_key()))
 
-  names = set(a.ip_whitelist for a in assignments.assignments)
-  names.add(BOTS_IP_WHITELIST)
-
-  whitelists = ndb.get_multi(ip_whitelist_key(n) for n in names)
-  whitelists = sorted(filter(None, whitelists), key=lambda x: x.key.id())
+  whitelists = sorted(whitelists_fut.get_result(), key=lambda x: x.key.id())
   return assignments, whitelists
