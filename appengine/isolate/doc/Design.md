@@ -115,7 +115,7 @@ The root is a dictionary with the following keys:
     `h` or `l` must be present. `m` must be present only on POSIX systems.
     - `h`: file content's SHA-1
     - `l`: link destination iff a symlink
-    - `m`: posix file mode iff on posix
+    - `m`: POSIX file mode (required on POSIX, ignored on non-POSIX).
     - `s`: file size iff not a symlink
   - `includes`: references another `.isolated` file for additional files or to
     provide the command. In practice, this is used to reduce `.isolated` file
