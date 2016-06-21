@@ -334,7 +334,7 @@ def cleanup_bot_directory(botobj):
     if any(fnmatch.fnmatch(i, w) for w in WHITELIST):
       continue
     try:
-      p = os.path.join(botobj.base_dir, i)
+      p = unicode(os.path.join(botobj.base_dir, i))
       if os.path.isdir(p):
         file_path.rmtree(p)
       else:
