@@ -29,8 +29,7 @@ def is_gce():
   return bool(get_metadata())
 
 
-@tools.cached
-def get_metadata():
+def get_metadata_uncached():
   """Returns the GCE metadata as a dict.
 
   Refs:
@@ -50,6 +49,12 @@ def get_metadata():
   except IOError as e:
     logging.info('GCE metadata not available: %s', e)
     return None
+
+
+@tools.cached
+def get_metadata():
+  """Cached version of get_metadata_uncached()"""
+  return get_metadata_uncached()
 
 
 def oauth2_access_token(account='default'):
