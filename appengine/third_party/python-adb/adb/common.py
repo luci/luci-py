@@ -63,7 +63,7 @@ class Handle(object):
     self._timeout_ms = timeout_ms or DEFAULT_TIMEOUT_MS
 
   def Timeout(self, timeout_ms):
-    return max(timeout_ms, self._timeout_ms)
+    return timeout_ms if timeout_ms is not None else self._timeout_ms
 
   # TODO(bpastene) Remove all dependencies on a non UsbHandle needing port_path
   @property
