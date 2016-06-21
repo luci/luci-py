@@ -62,7 +62,7 @@ _DEFAULT_BOT_GROUPS = _BotGroups(
     default_group=BotGroupConfig(
         require_luci_machine_token=False,
         require_service_account=None,
-        ip_whitelist='bots',
+        ip_whitelist=auth.BOTS_IP_WHITELIST,
         owners=(),
         dimensions={}))
 
