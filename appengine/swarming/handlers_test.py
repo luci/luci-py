@@ -403,7 +403,6 @@ class FrontendAdminTest(AppTestBase):
     expected =  (header + u'script_bodé').encode('utf-8')
     self.assertEqual(expected, actual)
 
-
   def test_upload_bot_config(self):
     self.set_as_admin()
     xsrf_token = self.get_xsrf_token()
@@ -425,6 +424,17 @@ class FrontendAdminTest(AppTestBase):
   def test_config(self):
     self.set_as_admin()
     self.app.get('/restricted/config')
+
+  def test_cancel_pending(self):
+    self.set_as_admin()
+    _, _ = self.client_create_task_raw()
+    xsrf_token = self.get_xsrf_token()
+    self.app.get('/restricted/cancel_pending', status=405)
+    response = self.app.post(
+        '/restricted/cancel_pending?xsrf_token=%s' % xsrf_token)
+    self.assertEqual(
+        'Canceled 1 tasks.\n0 tasks were running.\nSuccess',
+        response.body)
 
 
 class BackendTest(AppTestBase):

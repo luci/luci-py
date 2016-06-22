@@ -1109,7 +1109,7 @@ def yield_run_result_keys_with_dead_bot():
   """
   # If a bot didn't ping recently, it is considered dead.
   deadline = utils.utcnow() - BOT_PING_TOLERANCE
-  q = TaskRunResult.query().filter(TaskRunResult.modified_ts < deadline)
+  q = TaskRunResult.query(TaskRunResult.modified_ts < deadline)
   return q.filter(TaskRunResult.state == State.RUNNING).iter(keys_only=True)
 
 

@@ -457,6 +457,6 @@ def yield_next_available_task_to_dispatch(bot_dimensions, deadline):
 def yield_expired_task_to_run():
   """Yields all the expired TaskToRun still marked as available."""
   now = utils.utcnow()
-  for task in TaskToRun.query().filter(TaskToRun.queue_number > 0):
+  for task in TaskToRun.query(TaskToRun.queue_number > 0):
     if task.expiration_ts < now:
       yield task
