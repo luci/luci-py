@@ -291,45 +291,50 @@ def _extract_exceptions_from_logs(start_time, end_time, module_versions):
   if start_time and end_time and start_time >= end_time:
     raise webob.exc.HTTPBadRequest(
         'Invalid range, start_time must be before end_time.')
-  for entry in logservice.fetch(
-      start_time=start_time or None,
-      end_time=end_time or None,
-      minimum_log_level=logservice.LOG_LEVEL_ERROR,
-      include_incomplete=True,
-      include_app_logs=True,
-      module_versions=module_versions):
-    # Merge all error messages. The main reason to do this is that sometimes
-    # a single logging.error() 'Traceback' is split on each line as an
-    # individual log_line entry.
-    msgs = []
-    log_time = None
-    for log_line in entry.app_logs:
-      # TODO(maruel): Specifically handle:
-      # 'Request was aborted after waiting too long to attempt to service your
-      # request.'
-      # For an unknown reason, it is logged at level info (!?)
-      if log_line.level < logservice.LOG_LEVEL_ERROR:
-        continue
-      msg = log_line.message.strip('\n')
-      if not msg.strip():
-        continue
-      # The message here is assumed to be utf-8 encoded but that is not
-      # guaranteed. The dashboard does prints out utf-8 log entries properly.
-      try:
-        msg = msg.decode('utf-8')
-      except UnicodeDecodeError:
-        msg = msg.decode('ascii', 'replace')
-      msgs.append(msg)
-      log_time = log_time or log_line.time
+  try:
+    for entry in logservice.fetch(
+        start_time=start_time or None,
+        end_time=end_time or None,
+        minimum_log_level=logservice.LOG_LEVEL_ERROR,
+        include_incomplete=True,
+        include_app_logs=True,
+        module_versions=module_versions):
+      # Merge all error messages. The main reason to do this is that sometimes
+      # a single logging.error() 'Traceback' is split on each line as an
+      # individual log_line entry.
+      msgs = []
+      log_time = None
+      for log_line in entry.app_logs:
+        # TODO(maruel): Specifically handle:
+        # 'Request was aborted after waiting too long to attempt to service your
+        # request.'
+        # For an unknown reason, it is logged at level info (!?)
+        if log_line.level < logservice.LOG_LEVEL_ERROR:
+          continue
+        msg = log_line.message.strip('\n')
+        if not msg.strip():
+          continue
+        # The message here is assumed to be utf-8 encoded but that is not
+        # guaranteed. The dashboard does prints out utf-8 log entries properly.
+        try:
+          msg = msg.decode('utf-8')
+        except UnicodeDecodeError:
+          msg = msg.decode('ascii', 'replace')
+        msgs.append(msg)
+        log_time = log_time or log_line.time
 
-    yield _ErrorRecord(
-        entry.request_id,
-        entry.start_time, log_time, entry.latency, entry.mcycles,
-        entry.ip, entry.nickname, entry.referrer, entry.user_agent,
-        entry.host, entry.resource, entry.method, entry.task_queue_name,
-        entry.was_loading_request, entry.version_id, entry.module_id,
-        entry.url_map_entry, entry.app_engine_release, entry.instance_key,
-        entry.status, '\n'.join(msgs))
+      yield _ErrorRecord(
+          entry.request_id,
+          entry.start_time, log_time, entry.latency, entry.mcycles,
+          entry.ip, entry.nickname, entry.referrer, entry.user_agent,
+          entry.host, entry.resource, entry.method, entry.task_queue_name,
+          entry.was_loading_request, entry.version_id, entry.module_id,
+          entry.url_map_entry, entry.app_engine_release, entry.instance_key,
+          entry.status, '\n'.join(msgs))
+  except logservice.Error as e:
+    # It's not worth generating an error log when logservice is temporarily
+    # down. Retrying is not worth either.
+    logging.warning('Failed to scrape log:\n%s', e)
 
 
 def _should_ignore_error_category(monitoring, error_category):
