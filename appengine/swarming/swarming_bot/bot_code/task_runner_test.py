@@ -342,8 +342,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       'sys.stdout.write(\'hi\\n\')')
     self.mock(
         task_runner, 'get_isolated_cmd',
-        lambda _work_dir, _details, isolated_result, bot_file, pkg_list,
-               min_free_space:
+        lambda _work_dir, _details, isolated_result, bot_file, min_free_space:
           [sys.executable, '-u', '-c', SCRIPT_ISOLATED, isolated_result])
     expected = {
       u'exit_code': 0,
