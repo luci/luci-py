@@ -324,6 +324,9 @@ class CipdInput(ndb.Model):
     package_names = set()
     for p in self.packages:
       p._pre_put_hook()
+      if not p.path:
+        raise datastore_errors.BadValueError(
+            'package %s:%s: path is required' % (p.package_name, p.version))
       if p.package_name in package_names:
         raise datastore_errors.BadValueError(
            'package %s is specified more than once' % p.package_name)

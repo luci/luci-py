@@ -420,30 +420,33 @@ class TaskRequestApiTest(TestCase):
     with self.assertRaises(datastore_errors.BadValueError):
       mkcipdreq(packages=[{}])
     with self.assertRaises(datastore_errors.BadValueError):
-      mkcipdreq(packages=[dict(package_name='rm')])
+      mkcipdreq(packages=[
+        dict(package_name='infra|rm', path='.', version='latest')])
     with self.assertRaises(datastore_errors.BadValueError):
-      mkcipdreq(packages=[{'package_name': 'infra|rm', 'version': 'latest'}])
+      mkcipdreq(packages=[dict(package_name='rm', path='.')])
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkcipdreq(packages=[dict(package_name='rm', version='latest')])
     with self.assertRaises(datastore_errors.BadValueError):
       mkcipdreq(packages=[
-        dict(package_name='rm', version='latest'),
-        dict(package_name='rm', version='canary'),
+        dict(package_name='rm', path='.', version='latest'),
+        dict(package_name='rm', path='.', version='canary'),
       ])
     with self.assertRaises(datastore_errors.BadValueError):
       mkcipdreq(
           idempotent=True,
-          packages=[dict(package_name='rm', version='latest')])
+          packages=[dict(package_name='rm', path='.', version='latest')])
     with self.assertRaises(datastore_errors.BadValueError):
       mkcipdreq(server='abc')
     with self.assertRaises(datastore_errors.BadValueError):
       mkcipdreq(client_package=dict(package_name='--bad package--'))
     mkcipdreq()
-    mkcipdreq(packages=[dict(package_name='rm', version='latest')])
+    mkcipdreq(packages=[dict(package_name='rm', path='.', version='latest')])
     mkcipdreq(
         client_package=dict(
             package_name='infra/tools/cipd/${platform}',
             version='git_revision:daedbeef',
         ),
-        packages=[dict(package_name='rm', version='latest')],
+        packages=[dict(package_name='rm', path='.', version='latest')],
         server='https://chrome-infra-packages.appspot.com',
     )
 

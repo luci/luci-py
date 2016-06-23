@@ -157,7 +157,7 @@ class TasksApiTest(BaseTest):
                     version='git_revision:deadbeef'),
                 packages=[
                   swarming_rpcs.CipdPackage(
-                      package_name='rm', version='latest'),
+                      package_name='rm', path='.', version='latest'),
                 ],
                 server='https://chrome-infra-packages.appspot.com'),
             command=['rm', '-rf', '/'],
@@ -189,6 +189,7 @@ class TasksApiTest(BaseTest):
             },
             u'packages': [{
               u'package_name': u'rm',
+              u'path': u'.',
               u'version': u'latest',
             }],
             u'server': u'https://chrome-infra-packages.appspot.com',
@@ -641,6 +642,7 @@ class TasksApiTest(BaseTest):
                 packages=[
                   swarming_rpcs.CipdPackage(
                       package_name='rm',
+                      path='.',
                       version='latest'),
                 ],
             ),
@@ -673,6 +675,7 @@ class TasksApiTest(BaseTest):
             },
             u'packages': [{
               u'package_name': u'rm',
+              u'path': u'.',
               u'version': u'latest',
             }],
             u'server': u'https://chrome-infra-packages.appspot.com',
