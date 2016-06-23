@@ -154,11 +154,12 @@ def ensure_entity_exists(key, url):
     key: ndb.Key for a models.Instance entity.
     url: URL for the instance.
   """
-  logging.info('Ensuring Instance entity exists: %s', key)
   entity = yield key.get_async()
   if entity:
+    logging.info('Instance entity already exists: %s', key)
     return
 
+  logging.info('Creating Instance entity: %s', key)
   yield models.Instance(key=key, url=url).put_async()
 
 

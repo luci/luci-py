@@ -67,6 +67,7 @@ def delete_instance_pending_deletion(key):
   """
   entity = key.get()
   if not entity:
+    logging.info('Instance does not exist: %s', key)
     return
 
   if not entity.pending_deletion:

@@ -125,6 +125,7 @@ def catalog(key):
     )
     return
 
+  logging.info('Cataloging Instance: %s', key)
   response = machine_provider.add_machine(
       extract_dimensions(entity, grandparent),
       get_policies(key, grandparent.service_accounts[0].name),

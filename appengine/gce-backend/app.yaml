@@ -5,6 +5,9 @@ runtime: python27
 threadsafe: true
 api_version: 1
 
+automatic_scaling:
+  min_idle_instances: 1
+
 handlers:
 - url: /internal/cron/.*
   login: admin
