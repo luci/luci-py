@@ -75,8 +75,8 @@ class TestMetrics(test_case.TestCase):
     dimensions = {
         'os': ['Linux', 'Ubuntu'],
         'cpu': ['x86-64'],
+        'id': ['bot_name'],  # This should be excluded from the pool name.
     }
-    dimensions.update({k: 'ignored' for k in ts_mon_metrics.IGNORED_DIMENSIONS})
     expected = 'cpu:x86-64|os:Linux|os:Ubuntu'
     self.assertEqual(expected, ts_mon_metrics.pool_from_dimensions(dimensions))
 
@@ -88,9 +88,11 @@ class TestMetrics(test_case.TestCase):
         'buildername:test_builder',
         'name:some_tests',
     ]
+    bot_id = 'test_bot'
     fields = {
         'project_id': 'test_project',
         'subproject_id': 'test_subproject',
+        'executor_id': bot_id,
         'spec_name': 'test_master:test_builder:some_tests',
     }
     summary = _gen_task_result_summary(self.now, 1, tags=tags)
@@ -100,19 +102,19 @@ class TestMetrics(test_case.TestCase):
 
     fields['result'] = 'success'
     self.assertIsNone(ts_mon_metrics.jobs_completed.get(fields=fields))
-    ts_mon_metrics.update_jobs_completed_metrics(summary)
+    ts_mon_metrics.update_jobs_completed_metrics(summary, bot_id)
     self.assertEqual(1, ts_mon_metrics.jobs_completed.get(fields=fields))
 
     summary.exit_code = 1 # sets failure = True.
     fields['result'] = 'failure'
     self.assertIsNone(ts_mon_metrics.jobs_completed.get(fields=fields))
-    ts_mon_metrics.update_jobs_completed_metrics(summary)
+    ts_mon_metrics.update_jobs_completed_metrics(summary, bot_id)
     self.assertEqual(1, ts_mon_metrics.jobs_completed.get(fields=fields))
 
     summary.internal_failure = True
     fields['result'] = 'infra-failure'
     self.assertIsNone(ts_mon_metrics.jobs_completed.get(fields=fields))
-    ts_mon_metrics.update_jobs_completed_metrics(summary)
+    ts_mon_metrics.update_jobs_completed_metrics(summary, bot_id)
     self.assertEqual(1, ts_mon_metrics.jobs_completed.get(fields=fields))
 
   def test_initialize(self):
@@ -161,32 +163,32 @@ class TestMetrics(test_case.TestCase):
     jobs_fields = {
         'project_id': 'test_project',
         'subproject_id': 'test_subproject',
+        'executor_id': 'test_bot1',
         'spec_name': 'test_master:test_builder:some_tests',
     }
-    jobs_target_fields = dict(ts_mon_metrics.TARGET_FIELDS)
-    jobs_target_fields['hostname'] = 'autogen:test_bot1'
-
-    self.assertTrue(ts_mon_metrics.jobs_running.get(
-        fields=jobs_fields, target_fields=jobs_target_fields))
-    jobs_target_fields['hostname'] = 'autogen:test_bot2'
-    self.assertFalse(ts_mon_metrics.jobs_running.get(
-        fields=jobs_fields, target_fields=jobs_target_fields))
-    jobs_fields['status'] = 'running'
+    self.assertEqual('running', ts_mon_metrics.jobs_status.get(
+        fields=jobs_fields, target_fields=ts_mon_metrics.TARGET_FIELDS))
+    jobs_fields.update({'executor_id': 'test_bot2'})
+    self.assertEqual('pending', ts_mon_metrics.jobs_status.get(
+        fields=jobs_fields, target_fields=ts_mon_metrics.TARGET_FIELDS))
+    del jobs_fields['executor_id']
+    jobs_fields.update({'status': 'running'})
     self.assertEqual(1, ts_mon_metrics.jobs_active.get(
         fields=jobs_fields, target_fields=ts_mon_metrics.TARGET_FIELDS))
-    jobs_fields['status'] = 'pending'
+    jobs_fields.update({'status': 'pending'})
     self.assertEqual(2, ts_mon_metrics.jobs_active.get(
         fields=jobs_fields, target_fields=ts_mon_metrics.TARGET_FIELDS))
 
     for bot_id, status in bots_expected.iteritems():
-      target_fields = dict(ts_mon_metrics.TARGET_FIELDS)
-      target_fields['hostname'] = 'autogen:' + bot_id
-      self.assertEqual(status, ts_mon_metrics.executors_status.get(
-          target_fields=target_fields))
+      self.assertEqual(status,
+                       ts_mon_metrics.executors_status.get(
+                           fields={'executor_id': bot_id},
+                           target_fields=ts_mon_metrics.TARGET_FIELDS))
 
       self.assertEqual('bot_id:%s|os:Linux|os:Ubuntu' % bot_id,
                        ts_mon_metrics.executors_pool.get(
-                           target_fields=target_fields))
+                           fields={'executor_id': bot_id},
+                           target_fields=ts_mon_metrics.TARGET_FIELDS))
 
 
 if __name__ == '__main__':
