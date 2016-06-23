@@ -22,6 +22,7 @@ from server import acl
 from server import bot_auth
 from server import bot_code
 from server import bot_management
+from server import config
 from server import stats
 from server import task_pack
 from server import task_request
@@ -361,6 +362,13 @@ class BotPollHandler(_BotBaseHandler):
 
     It makes recovery of the fleet in case of catastrophic failure much easier.
     """
+    if config.settings().force_bots_to_sleep_and_not_run_task:
+      # Ignore everything, just sleep. Tell the bot it is quarantined to inform
+      # it that it won't be running anything anyway. Use a large streak so it
+      # will sleep for 60s.
+      self._cmd_sleep(1000, True)
+      return
+
     (_request, bot_id, version, state,
         dimensions, quarantined_msg) = self._process()
     sleep_streak = state.get('sleep_streak', 0)
