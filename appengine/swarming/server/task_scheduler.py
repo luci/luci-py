@@ -694,7 +694,7 @@ def bot_update_task(
     return None
   _update_stats(run_result, bot_id, request, task_completed)
   if task_completed:
-    ts_mon_metrics.update_jobs_completed_metrics(smry, bot_id)
+    ts_mon_metrics.update_jobs_completed_metrics(smry)
   return run_result.state
 
 

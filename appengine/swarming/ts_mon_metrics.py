@@ -15,6 +15,8 @@ import gae_ts_mon
 from server import bot_management
 from server import task_result
 
+IGNORED_DIMENSIONS = ('id', 'android_devices')
+
 # Override default target fields for app-global metrics.
 TARGET_FIELDS = {
     'job_name':  '',  # module name
@@ -31,7 +33,6 @@ _bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.05,
 # Both have the following metric fields:
 # - project_id: e.g. 'chromium'
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
-# - executor_id: name of the bot that executed a job, e.g. 'swarm42-m4'
 # - spec_name: name of a job specification, e.g. '<master>:<builder>:<test>'
 #     for buildbot jobs.
 # - result: one of 'success', 'failure', or 'infra-failure'.
@@ -57,14 +58,16 @@ tasks_expired = gae_ts_mon.CounterMetric(
 # Global metric. Metric fields:
 # - project_id: e.g. 'chromium'
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
-# - executor_id: name of the bot that executes a job, or empty string.
 # - spec_name: name of a job specification, e.g. '<master>:<builder>:<test>'
 #     for buildbot jobs.
+# Override target field:
+# - hostname: 'autogen:<executor_id>': name of the bot that executed a job,
+#     or an empty string. e.g. 'autogen:swarm42-m4'.
 # Value should be 'pending' or 'running'. Completed / canceled jobs should not
 # send this metric.
-jobs_status = gae_ts_mon.StringMetric(
-    'jobs/status',
-    description='Status of an active job.')
+jobs_running = gae_ts_mon.BooleanMetric(
+    'jobs/running',
+    description='Presence metric for a running job.')
 
 # Global metric. Metric fields:
 # - project_id: e.g. 'chromium'
@@ -77,14 +80,14 @@ jobs_active = gae_ts_mon.GaugeMetric(
     description='Number of running, pending or otherwise active jobs.')
 
 
-# Global metric. Metric fields: executor_id (bot id).
+# Global metric. Target field: hostname = 'autogen:<executor_id>' (bot id).
 executors_pool = gae_ts_mon.StringMetric(
     'executors/pool',
     description='Pool name for a given job executor.')
 
 
-# Global metric. Metric fields:
-# - executor_id (bot id).
+# Global metric. Target fields:
+# - hostname = 'autogen:<executor_id>' (bot id).
 # Status value must be 'ready', 'running', or anything else, possibly
 # swarming-specific, when it cannot run a job. E.g. 'quarantined' or
 # 'dead'.
@@ -94,24 +97,18 @@ executors_status = gae_ts_mon.StringMetric(
 
 
 def pool_from_dimensions(dimensions):
-  """Return a canonical string of flattened dimensions.
-
-  Exclude the 'id' dimension, as it would put each bot in its own pool.
-  """
+  """Return a canonical string of flattened dimensions."""
   iterables = (map(lambda x: '%s:%s' % (key, x), values)
                for key, values in dimensions.iteritems()
-               if key != 'id')
+               if key not in IGNORED_DIMENSIONS)
   return '|'.join(sorted(itertools.chain(*iterables)))
 
 
-def extract_job_fields(tags, bot_id=None):
+def extract_job_fields(tags):
   """Extracts common job's metric fields from TaskResultSummary.
 
   Args:
     tags (list of str): list of 'key:value' strings.
-    bot_id (str or None): when present, adds 'executor_id' as a field.
-      Note, that a metric always has to have the same set of fields. So
-      bot_id must always be present or absent for each particular metric.
   """
   tags_dict = {}
   for tag in tags:
@@ -128,13 +125,11 @@ def extract_job_fields(tags, bot_id=None):
                                  tags_dict.get('buildername', ''),
                                  tags_dict.get('name', '')),
   }
-  if bot_id is not None:
-    fields.update({'executor_id': bot_id})
   return fields
 
 
-def update_jobs_completed_metrics(task_result_summary, bot_id):
-  fields = extract_job_fields(task_result_summary.tags, bot_id)
+def update_jobs_completed_metrics(task_result_summary):
+  fields = extract_job_fields(task_result_summary.tags)
   if task_result_summary.internal_failure:
     fields['result'] = 'infra-failure'
   elif task_result_summary.failure:
@@ -155,10 +150,12 @@ def _set_jobs_metrics():
   while (yield query_iter.has_next_async()):
     summary = query_iter.next()
     status = state_map.get(summary.state, '')
-    fields = extract_job_fields(summary.tags, summary.bot_id or '')
+    fields = extract_job_fields(summary.tags)
+    target_fields = dict(TARGET_FIELDS)
     if summary.bot_id:
-      jobs_status.set(status, target_fields=TARGET_FIELDS, fields=fields)
-    fields.pop('executor_id')
+      target_fields['hostname'] = 'autogen:' + summary.bot_id
+    if summary.bot_id and status == 'running':
+      jobs_running.set(True, target_fields=target_fields, fields=fields)
     fields['status'] = status
     jobs_counts[tuple(sorted(fields.iteritems()))] += 1
 
@@ -179,13 +176,13 @@ def _set_executors_metrics(now):
     elif bot_info.is_dead(now):
       status = 'dead'
 
-    executors_status.set(
-        status, target_fields=TARGET_FIELDS,
-        fields={'executor_id': bot_info.id})
+    target_fields = dict(TARGET_FIELDS)
+    target_fields['hostname'] = 'autogen:' + bot_info.id
+
+    executors_status.set(status, target_fields=target_fields)
     executors_pool.set(
         pool_from_dimensions(bot_info.dimensions),
-        target_fields=TARGET_FIELDS,
-        fields={'executor_id': bot_info.id})
+        target_fields=target_fields)
 
 
 @ndb.tasklet
@@ -201,5 +198,5 @@ def _set_global_metrics(now=None):
 
 def initialize():
   gae_ts_mon.register_global_metrics(
-      [jobs_status, executors_pool, executors_status])
+      [jobs_running, executors_pool, executors_status])
   gae_ts_mon.register_global_metrics_callback('callback', _set_global_metrics)
