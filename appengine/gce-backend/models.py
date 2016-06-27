@@ -49,6 +49,10 @@ class Instance(ndb.Model):
   active_metadata_update = ndb.LocalStructuredProperty(MetadataUpdate)
   # Whether or not this instance is cataloged in the Machine Provider.
   cataloged = ndb.BooleanProperty(indexed=True)
+  # Whether or not this instance has been deleted.
+  deleted = ndb.BooleanProperty(indexed=True)
+  # Last modification to this entity.
+  last_updated = ndb.DateTimeProperty(auto_now=True, indexed=True)
   # Whether or not this instance is pending deletion.
   pending_deletion = ndb.BooleanProperty(indexed=True)
   # Pending metadata operations.

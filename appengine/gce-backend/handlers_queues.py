@@ -36,6 +36,21 @@ class CatalogedInstanceRemovalHandler(webapp2.RequestHandler):
     catalog.remove(key)
 
 
+class DeletedInstanceCheckHandler(webapp2.RequestHandler):
+  """Worker for checking for deleted instances."""
+
+  @decorators.require_taskqueue('check-deleted-instance')
+  def post(self):
+    """Checks whether an instance has been deleted.
+
+    Params:
+      key: URL-safe key for a models.Instance.
+    """
+    key = ndb.Key(urlsafe=self.request.get('key'))
+    assert key.kind() == 'Instance', key
+    cleanup.check_deleted_instance(key)
+
+
 class DeletedInstanceCleanupHandler(webapp2.RequestHandler):
   """Worker for cleaning up deleted instances."""
 
@@ -258,6 +273,8 @@ class PubSubMessageProcessHandler(webapp2.RequestHandler):
 def create_queues_app():
   return webapp2.WSGIApplication([
       ('/internal/queues/catalog-instance', InstanceCatalogHandler),
+      ('/internal/queues/check-deleted-instance',
+       DeletedInstanceCheckHandler),
       ('/internal/queues/check-instance-metadata-operation',
        InstanceMetadataOperationCheckHandler),
       ('/internal/queues/cleanup-deleted-instance',

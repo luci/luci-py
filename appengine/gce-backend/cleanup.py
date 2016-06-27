@@ -4,6 +4,7 @@
 
 """Utilities for cleaning up GCE Backend."""
 
+import datetime
 import logging
 
 from google.appengine.ext import ndb
@@ -40,27 +41,35 @@ def exists(instance_url):
     raise
 
 
-def _delete_instance(instance_key, instance_group_manager):
-  """Attempts to delete the given Instance.
+def _set_instance_deleted(instance_key, instance_group_manager):
+  """Sets the given Instance as deleted.
 
   Args:
     instance_key: ndb.Key for a models.Instance entity.
     instance_group_manager: models.InstanceGroupManager.
   """
-  logging.info('Deleting Instance: %s', instance_key)
   assert ndb.in_transaction()
-  instance_key.delete()
+
+  instance = instance_key.get()
+  if instance:
+    logging.info('Setting Instance as deleted: %s', instance.key)
+    instance.deleted = True
+    instance.put()
+  else:
+    logging.warning('Instance not found: %s', instance_key)
+
   for i, key in enumerate(instance_group_manager.instances):
     if key.id() == instance_key.id():
       instance_group_manager.instances.pop(i)
       instance_group_manager.put()
       return
-  logging.warning('Instance not found: %s', instance_key)
+  logging.warning(
+      'Instance not found in InstanceGroupManager: %s', instance_key)
 
 
 @ndb.transactional
-def delete_instance_pending_deletion(key):
-  """Attempts to delete the given Instance pending deletion.
+def set_instance_deleted(key):
+  """Attempts to set the given Instance as deleted.
 
   Args:
     key: ndb.Key for a models.Instance entity.
@@ -79,7 +88,7 @@ def delete_instance_pending_deletion(key):
     logging.warning('InstanceGroupManager does not exist: %s', key.parent())
     return
 
-  _delete_instance(key, parent)
+  _set_instance_deleted(key, parent)
 
 
 @ndb.transactional
@@ -120,7 +129,7 @@ def delete_drained_instance(key):
       logging.warning('Instance is not drained: %s', key)
       return
 
-  _delete_instance(key, parent)
+  _set_instance_deleted(key, parent)
 
 
 @ndb.transactional_tasklet
@@ -249,8 +258,8 @@ def cleanup_instance_templates(max_concurrent=50):
   )
 
 
-def cleanup_deleted_instance(key):
-  """Deletes the given Instance.
+def check_deleted_instance(key):
+  """Marks the given Instance as deleted if it refers to a deleted GCE instance.
 
   Args:
     key: ndb.Key for a models.Instance entity.
@@ -269,13 +278,57 @@ def cleanup_deleted_instance(key):
 
   if not exists(entity.url):
     # When the instance isn't found, assume it's deleted.
-    delete_instance_pending_deletion(key)
+    set_instance_deleted(key)
+
+
+def schedule_deleted_instance_check():
+  """Enqueues tasks to check for deleted instances."""
+  for instance in models.Instance.query():
+    if instance.pending_deletion and not instance.deleted:
+      if not utils.enqueue_task(
+          '/internal/queues/check-deleted-instance',
+          'check-deleted-instance',
+          params={
+              'key': instance.key.urlsafe(),
+          },
+      ):
+        logging.warning('Failed to enqueue task for Instance: %s', instance.key)
+
+
+@ndb.transactional
+def cleanup_deleted_instance(key):
+  """Deletes the given Instance.
+
+  Args:
+    key: ndb.Key for a models.Instance entity.
+  """
+  entity = key.get()
+  if not entity:
+    return
+
+  if not entity.deleted:
+    logging.warning('Instance not deleted: %s', key)
+    return
+
+  logging.info('Deleting Instance entity: %s', key)
+  key.delete()
 
 
 def schedule_deleted_instance_cleanup():
   """Enqueues tasks to clean up deleted instances."""
+  # Only delete entities for instances which were marked as deleted >10 minutes
+  # ago. This is because there can be a race condition with the task queue that
+  # detects new instances. At the start of the queue it may detect an instance
+  # which gets deleted before it finishes, and at the end of the queue it may
+  # incorrectly create an entity for that deleted instance. Since task queues
+  # can take at most 10 minutes, we can avoid the race condition by deleting
+  # only those entities referring to instances which were detected as having
+  # been deleted >10 minutes ago. Here we use 20 minutes for safety.
+  THRESHOLD = 60 * 20
+  now = utils.utcnow()
+
   for instance in models.Instance.query():
-    if instance.pending_deletion:
+    if instance.deleted and (now - instance.last_updated).seconds > THRESHOLD:
       if not utils.enqueue_task(
           '/internal/queues/cleanup-deleted-instance',
           'cleanup-deleted-instance',

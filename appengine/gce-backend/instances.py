@@ -291,7 +291,7 @@ def delete_pending(key):
 def schedule_pending_deletion():
   """Enqueues tasks to delete instances."""
   for instance in models.Instance.query():
-    if instance.pending_deletion:
+    if instance.pending_deletion and not instance.deleted:
       if not utils.enqueue_task(
           '/internal/queues/delete-instance-pending-deletion',
           'delete-instance-pending-deletion',

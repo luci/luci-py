@@ -64,6 +64,7 @@ class EntityCleanupHandler(webapp2.RequestHandler):
 
   @decorators.require_cronjob
   def get(self):
+    cleanup.schedule_deleted_instance_check()
     cleanup.schedule_deleted_instance_cleanup()
     cleanup.schedule_drained_instance_cleanup()
     cleanup.cleanup_instance_group_managers()
