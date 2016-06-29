@@ -134,10 +134,12 @@ def create(key):
 
   api = gce.Project(parent.project)
   try:
+    # Create the instance group manager with 0 instances. The resize cron job
+    # will adjust this later.
     result = api.create_instance_group_manager(
         get_name(entity),
         parent.url,
-        entity.minimum_size,
+        0,
         entity.key.id(),
         base_name=get_base_name(entity),
     )
@@ -281,6 +283,12 @@ def resize(key):
   Args:
     key: ndb.Key for a models.InstanceGroupManager entity.
   """
+  # To avoid a massive resize, impose a limit on how much larger we can
+  # resize the instance group. Repeated calls will eventually allow the
+  # instance group to reach its target size. Cron timing together with
+  # this limit controls the rate at which instances are created.
+  RESIZE_LIMIT = 100
+
   entity = key.get()
   if not entity:
     logging.warning('InstanceGroupManager does not exist: %s', key)
@@ -298,13 +306,17 @@ def resize(key):
     logging.warning('InstanceTemplateRevision project unspecified: %s', key)
     return
 
-  # For now, just ensure a minimum size.
-  if entity.current_size >= entity.minimum_size:
+  api = gce.Project(parent.project)
+  response = api.get_instance_group_manager(get_name(entity), key.id())
+
+  # Try to reach the target size, but avoid increasing the number of
+  # instances by more than the resize limit. For now, the target size
+  # is just the minimum size.
+  target_size = min(entity.minimum_size, response['targetSize'] + RESIZE_LIMIT)
+  if response['targetSize'] >= target_size:
     return
 
-  api = gce.Project(parent.project)
-  api.resize_managed_instance_group(
-      get_name(entity), key.id(), entity.minimum_size)
+  api.resize_managed_instance_group(response['name'], key.id(), target_size)
 
 
 def schedule_resize():
