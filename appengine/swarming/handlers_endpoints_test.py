@@ -1361,12 +1361,14 @@ class BotsApiTest(BaseTest):
     now_str = unicode(now.strftime(self.DATETIME_FORMAT))
     self.mock_now(now)
     bot_management.bot_event(
-        event_type='bot_connected', bot_id='id1', external_ip='8.8.4.4',
+        event_type='bot_connected', bot_id='id1',
+        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
         dimensions={'foo': ['bar'], 'id': ['id1']}, state={'ram': 65},
         version='123456789', quarantined=False, task_id=None, task_name=None)
     expected = {
       u'items': [
         {
+          u'authenticated_as': u'bot:whitelisted-ip',
           u'bot_id': u'id1',
           u'dimensions': [
             {u'key': u'foo', u'value': [u'bar']},
@@ -1412,11 +1414,13 @@ class BotApiTest(BaseTest):
     self.mock_now(now)
     now_str = unicode(now.strftime(self.DATETIME_FORMAT))
     bot_management.bot_event(
-        event_type='bot_connected', bot_id='id1', external_ip='8.8.4.4',
+        event_type='bot_connected', bot_id='id1',
+        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
         dimensions={'foo': ['bar'], 'id': ['id1']}, state={'ram': 65},
         version='123456789', quarantined=False, task_id=None, task_name=None)
 
     expected = {
+      u'authenticated_as': u'bot:whitelisted-ip',
       u'bot_id': u'id1',
       u'dimensions': [
         {u'key': u'foo', u'value': [u'bar']},
@@ -1451,7 +1455,8 @@ class BotApiTest(BaseTest):
       'str': u'uni',
     }
     bot_management.bot_event(
-        event_type='bot_connected', bot_id='id1', external_ip='8.8.4.4',
+        event_type='bot_connected', bot_id='id1',
+        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
         dimensions={'foo': ['bar'], 'id': ['id1']}, state=state,
         version='123456789', quarantined=False, task_id=None, task_name=None)
 
@@ -1584,6 +1589,7 @@ class BotApiTest(BaseTest):
     expected = {
       u'items': [
         {
+          u'authenticated_as': u'bot:whitelisted-ip',
           u'dimensions': dimensions,
           u'event_type': u'bot_rebooting',
           u'external_ip': unicode(self.source_ip),
@@ -1594,6 +1600,7 @@ class BotApiTest(BaseTest):
           u'version': unicode(self.bot_version),
         },
         {
+          u'authenticated_as': u'bot:whitelisted-ip',
           u'dimensions': dimensions,
           u'event_type': u'task_completed',
           u'external_ip': unicode(self.source_ip),
@@ -1604,6 +1611,7 @@ class BotApiTest(BaseTest):
           u'version': unicode(self.bot_version),
         },
         {
+          u'authenticated_as': u'bot:whitelisted-ip',
           u'dimensions': dimensions,
           u'event_type': u'request_task',
           u'external_ip': unicode(self.source_ip),
@@ -1614,6 +1622,7 @@ class BotApiTest(BaseTest):
           u'version': unicode(self.bot_version),
         },
         {
+          u'authenticated_as': u'bot:whitelisted-ip',
           u'dimensions': dimensions,
           u'event_type': u'bot_connected',
           u'external_ip': unicode(self.source_ip),
@@ -1623,6 +1632,7 @@ class BotApiTest(BaseTest):
           u'version': u'123',
         },
         {
+          u'authenticated_as': u'bot:whitelisted-ip',
           u'dimensions': dimensions,
           u'event_type': u'bot_connected',
           u'external_ip': unicode(self.source_ip),

@@ -324,6 +324,7 @@ class BotHandler(auth.AuthenticatingHandler):
               events[0].dimensions),
           state=events[0].state,
           external_ip=events[0].external_ip,
+          authenticated_as=events[0].authenticated_as,
           version=events[0].version,
           quarantined=events[0].quarantined,
           task_id=events[0].task_id,

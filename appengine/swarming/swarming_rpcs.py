@@ -354,15 +354,16 @@ class BotInfo(messages.Message):
   bot_id = messages.StringField(1)
   dimensions = messages.MessageField(StringListPair, 2, repeated=True)
   external_ip = messages.StringField(3)
-  first_seen_ts = message_types.DateTimeField(4)
-  is_dead = messages.BooleanField(5)
-  last_seen_ts = message_types.DateTimeField(6)
-  quarantined = messages.BooleanField(7)
-  task_id = messages.StringField(8)
-  task_name = messages.StringField(9)
-  version = messages.StringField(10)
+  authenticated_as = messages.StringField(4)
+  first_seen_ts = message_types.DateTimeField(5)
+  is_dead = messages.BooleanField(6)
+  last_seen_ts = message_types.DateTimeField(7)
+  quarantined = messages.BooleanField(8)
+  task_id = messages.StringField(9)
+  task_name = messages.StringField(10)
+  version = messages.StringField(11)
   # Encoded as json since it's an arbitrary dict.
-  state = messages.StringField(11)
+  state = messages.StringField(12)
 
 
 class BotList(messages.Message):
@@ -386,12 +387,14 @@ class BotEvent(messages.Message):
   state = messages.StringField(5)
   # IP address as seen by the HTTP handler.
   external_ip = messages.StringField(6)
+  # Bot identity as seen by the HTTP handler.
+  authenticated_as = messages.StringField(7)
   # Version of swarming_bot.zip the bot is currently running.
-  version = messages.StringField(7)
+  version = messages.StringField(8)
   # If True, the bot is not accepting task.
-  quarantined = messages.BooleanField(8)
+  quarantined = messages.BooleanField(9)
   # Affected by event_type == 'request_task', 'task_completed', 'task_error'.
-  task_id = messages.StringField(9)
+  task_id = messages.StringField(10)
 
 
 class BotEvents(messages.Message):

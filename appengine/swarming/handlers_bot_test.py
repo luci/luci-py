@@ -593,6 +593,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         e.to_dict() for e in bot_management.get_events_query('bot1', True)]
     expected = [
       {
+        'authenticated_as': u'bot:whitelisted-ip',
         'dimensions': {
           u'id': [u'bot1'],
           u'os': [u'Amiga'],
@@ -612,6 +613,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'version': self.bot_version,
       },
       {
+        'authenticated_as': u'bot:whitelisted-ip',
         'dimensions': {
           u'id': [u'bot1'],
           u'os': [u'Amiga'],

@@ -331,7 +331,9 @@ class BotHandshakeHandler(_BotBaseHandler):
         dimensions, quarantined_msg) = self._process()
     bot_management.bot_event(
         event_type='bot_connected', bot_id=bot_id,
-        external_ip=self.request.remote_addr, dimensions=dimensions,
+        external_ip=self.request.remote_addr,
+        authenticated_as=auth.get_peer_identity().to_bytes(),
+        dimensions=dimensions,
         state=state, version=version, quarantined=bool(quarantined_msg),
         task_id='', task_name=None, message=quarantined_msg)
 
@@ -382,7 +384,9 @@ class BotPollHandler(_BotBaseHandler):
     def bot_event(event_type, task_id=None, task_name=None):
       bot_management.bot_event(
           event_type=event_type, bot_id=bot_id,
-          external_ip=self.request.remote_addr, dimensions=dimensions,
+          external_ip=self.request.remote_addr,
+          authenticated_as=auth.get_peer_identity().to_bytes(),
+          dimensions=dimensions,
           state=state, version=version, quarantined=quarantined,
           task_id=task_id, task_name=task_name, message=quarantined_msg)
 
@@ -530,6 +534,7 @@ class BotEventHandler(_BotBaseHandler):
     message = request.get('message')
     bot_management.bot_event(
         event_type=event, bot_id=bot_id, external_ip=self.request.remote_addr,
+        authenticated_as=auth.get_peer_identity().to_bytes(),
         dimensions=dimensions, state=state, version=version,
         quarantined=bool(quarantined_msg), task_id=None, task_name=None,
         message=message)
@@ -666,7 +671,9 @@ class BotTaskUpdateHandler(_BotApiHandler):
         action = 'task_update'
       bot_management.bot_event(
           event_type=action, bot_id=bot_id,
-          external_ip=self.request.remote_addr, dimensions=None, state=None,
+          external_ip=self.request.remote_addr,
+          authenticated_as=auth.get_peer_identity().to_bytes(),
+          dimensions=None, state=None,
           version=None, quarantined=None, task_id=task_id, task_name=None)
     except ValueError as e:
       ereporter2.log_request(
@@ -707,7 +714,9 @@ class BotTaskErrorHandler(_BotApiHandler):
 
     bot_management.bot_event(
         event_type='task_error', bot_id=bot_id,
-        external_ip=self.request.remote_addr, dimensions=None, state=None,
+        external_ip=self.request.remote_addr,
+        authenticated_as=auth.get_peer_identity().to_bytes(),
+        dimensions=None, state=None,
         version=None, quarantined=None, task_id=task_id, task_name=None,
         message=message)
     line = (

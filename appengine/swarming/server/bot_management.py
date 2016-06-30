@@ -28,7 +28,6 @@
   entities which are generated from data provided by the bot itself.
 """
 
-import datetime
 import hashlib
 
 from google.appengine.ext import ndb
@@ -64,6 +63,9 @@ class _BotCommon(ndb.Model):
 
   # IP address as seen by the HTTP handler.
   external_ip = ndb.StringProperty(indexed=False)
+
+  # Bot identity as seen by the HTTP handler.
+  authenticated_as = ndb.StringProperty(indexed=False)
 
   # Version of swarming_bot.zip the bot is currently running.
   version = ndb.StringProperty(default='', indexed=False)
@@ -251,14 +253,15 @@ def get_settings_key(bot_id):
 
 
 def bot_event(
-    event_type, bot_id, external_ip, dimensions, state, version, quarantined,
-    task_id, task_name, **kwargs):
+    event_type, bot_id, external_ip, authenticated_as, dimensions, state,
+    version, quarantined, task_id, task_name, **kwargs):
   """Records when a bot has queried for work.
 
   Arguments:
   - event: event type.
   - bot_id: bot id.
   - external_ip: IP address as seen by the HTTP handler.
+  - authenticated_as: bot identity as seen by the HTTP handler.
   - dimensions: Bot's dimensions as self-reported. If not provided, keep
         previous value.
   - state: ephemeral state of the bot. It is expected to change constantly. If
@@ -278,6 +281,7 @@ def bot_event(
   bot_info = info_key.get() or BotInfo(key=info_key)
   bot_info.last_seen_ts = utils.utcnow()
   bot_info.external_ip = external_ip
+  bot_info.authenticated_as = authenticated_as
   if dimensions:
     bot_info.dimensions_flat = dimensions_to_flat(dimensions)
   if state:
@@ -303,6 +307,7 @@ def bot_event(
       parent=get_root_key(bot_id),
       event_type=event_type,
       external_ip=external_ip,
+      authenticated_as=authenticated_as,
       dimensions_flat=bot_info.dimensions_flat,
       quarantined=bot_info.quarantined,
       state=bot_info.state,

@@ -6,7 +6,6 @@
 import datetime
 import hashlib
 import logging
-import os
 import sys
 import unittest
 
@@ -39,12 +38,14 @@ class BotManagementTest(test_case.TestCase):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
     bot_management.bot_event(
-        event_type='bot_connected', bot_id='id1', external_ip='8.8.4.4',
+        event_type='bot_connected', bot_id='id1',
+        external_ip='8.8.4.4', authenticated_as='bot:id1.domain',
         dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
         version=hashlib.sha1().hexdigest(), quarantined=False, task_id=None,
         task_name=None)
 
     expected = {
+      'authenticated_as': 'bot:id1.domain',
       'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
       'external_ip': u'8.8.4.4',
       'first_seen_ts': now,
@@ -63,21 +64,23 @@ class BotManagementTest(test_case.TestCase):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
     bot_management.bot_event(
-        event_type='bot_connected', bot_id='id1', external_ip='8.8.4.4',
+        event_type='bot_connected', bot_id='id1',
+        external_ip='8.8.4.4', authenticated_as='bot:id1.domain',
         dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
         version=hashlib.sha1().hexdigest(), quarantined=False, task_id=None,
         task_name=None)
     expected = [
       {
-      'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
-      'event_type': u'bot_connected',
-      'external_ip': u'8.8.4.4',
-      'message': None,
-      'quarantined': False,
-      'state': {u'ram': 65},
-      'task_id': None,
-      'ts': now,
-      'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',
+        'authenticated_as': 'bot:id1.domain',
+        'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
+        'event_type': u'bot_connected',
+        'external_ip': u'8.8.4.4',
+        'message': None,
+        'quarantined': False,
+        'state': {u'ram': 65},
+        'task_id': None,
+        'ts': now,
+        'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',
       },
     ]
     self.assertEqual(
@@ -88,13 +91,15 @@ class BotManagementTest(test_case.TestCase):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
     bot_management.bot_event(
-        event_type='request_sleep', bot_id='id1', external_ip='8.8.4.4',
+        event_type='request_sleep', bot_id='id1',
+        external_ip='8.8.4.4', authenticated_as='bot:id1.domain',
         dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
         version=hashlib.sha1().hexdigest(), quarantined=True, task_id=None,
         task_name=None)
 
     # Assert that BotInfo was updated too.
     expected = {
+      'authenticated_as': 'bot:id1.domain',
       'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
       'external_ip': u'8.8.4.4',
       'first_seen_ts': now,
@@ -117,12 +122,14 @@ class BotManagementTest(test_case.TestCase):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
     bot_management.bot_event(
-        event_type='request_task', bot_id='id1', external_ip='8.8.4.4',
+        event_type='request_task', bot_id='id1',
+        external_ip='8.8.4.4', authenticated_as='bot:id1.domain',
         dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
         version=hashlib.sha1().hexdigest(), quarantined=False, task_id='12311',
         task_name='yo')
 
     expected = {
+      'authenticated_as': 'bot:id1.domain',
       'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
       'external_ip': u'8.8.4.4',
       'first_seen_ts': now,
@@ -140,6 +147,7 @@ class BotManagementTest(test_case.TestCase):
 
     expected = [
       {
+        'authenticated_as': 'bot:id1.domain',
         'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
         'event_type': u'request_task',
         'external_ip': u'8.8.4.4',
