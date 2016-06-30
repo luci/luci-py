@@ -243,7 +243,8 @@ class _BotBaseHandler(_BotApiHandler):
     # bot_group_cfg would unconditionally override bot-provided ones.
     if bot_group_cfg:
       for dim_key, from_cfg in bot_group_cfg.dimensions.iteritems():
-        from_bot = dimensions.get(dim_key)
+        from_bot = sorted(dimensions.get(dim_key) or [])
+        from_cfg = sorted(from_cfg)
         if from_bot != from_cfg:
           logging.error(
               'Dimensions in bots.cfg doesn\'t match ones provided by the bot\n'
