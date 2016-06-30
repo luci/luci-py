@@ -236,10 +236,19 @@ class _BotBaseHandler(_BotApiHandler):
 
     # Make sure bot self-reported ID matches the authentication token. Raises
     # auth.AuthorizationError if not.
-    bot_auth.validate_bot_id_and_fetch_config(bot_id)
+    bot_group_cfg = bot_auth.validate_bot_id_and_fetch_config(bot_id)
 
-    # TODO(vadimsh): Use return value of validate_bot_id_and_fetch_config to
-    # inject server-defined dimensions.
+    # TODO(vadimsh): This is running in "check they match" mode. Once we verify
+    # everything is configured correctly, the server side dimensions from
+    # bot_group_cfg would unconditionally override bot-provided ones.
+    if bot_group_cfg:
+      for dim_key, from_cfg in bot_group_cfg.dimensions.iteritems():
+        from_bot = dimensions.get(dim_key)
+        if from_bot != from_cfg:
+          logging.error(
+              'Dimensions in bots.cfg doesn\'t match ones provided by the bot\n'
+              'bot_id: "%s", key: "%s", from_bot: %s, from_cfg: %s',
+              bot_id, dim_key, from_bot, from_cfg)
 
     # The bot may decide to "self-quarantine" itself. Accept both via
     # dimensions or via state. See bot_management._BotCommon.quarantined for
