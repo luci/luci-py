@@ -6,6 +6,7 @@
 
 import json
 import logging
+import socket
 import threading
 import time
 import urllib2
@@ -24,13 +25,25 @@ _CACHED_OAUTH2_TOKEN_LOCK = threading.Lock()
 ## Public API.
 
 
+@tools.cached
 def is_gce():
   """Returns True if running on Google Compute Engine."""
-  return bool(get_metadata())
+  # Attempting to hit the metadata server is unreliable since it sometimes
+  # doesn't respond. Resolving DNS name is more stable, since it actually just
+  # looks into /etc/hosts file (at least on Linux).
+  #
+  # See also https://github.com/GoogleCloudPlatform/gcloud-golang/issues/194.
+  try:
+    # 169.254.169.254 is the documented metadata server IP address.
+    return socket.gethostbyname('metadata.google.internal') == '169.254.169.254'
+  except socket.error:
+    return False
 
 
 def get_metadata_uncached():
   """Returns the GCE metadata as a dict.
+
+  Returns None if not running on GCE or if metadata server is unreachable.
 
   Refs:
     https://cloud.google.com/compute/docs/metadata
@@ -41,20 +54,56 @@ def get_metadata_uncached():
       http://metadata.google.internal/computeMetadata/v1/?recursive=true \
       -H "Metadata-Flavor: Google" | python -m json.tool | less
   """
+  if not is_gce():
+    logging.info('GCE metadata is not available: not on GCE')
+    return None
   url = 'http://metadata.google.internal/computeMetadata/v1/?recursive=true'
   headers = {'Metadata-Flavor': 'Google'}
-  try:
-    return json.load(
-        urllib2.urlopen(urllib2.Request(url, headers=headers), timeout=5))
-  except IOError as e:
-    logging.info('GCE metadata not available: %s', e)
-    return None
+  for i in xrange(0, 10):
+    if i:
+      time.sleep(5)
+    try:
+      return json.load(
+          urllib2.urlopen(urllib2.Request(url, headers=headers), timeout=10))
+    except IOError as e:
+      logging.warning('Failed to grab GCE metadata: %s', e)
+  return None
 
 
-@tools.cached
+# One-tuple that contains cached metadata, as returned by get_metadata.
+_CACHED_METADATA = None
+
+
+def wait_for_metadata(quit_bit):
+  """Spins until GCE metadata server responds.
+
+  Precaches value of 'get_metadata'.
+
+  Args:
+    quit_bit: its 'is_set' method is used to break from the loop earlier.
+  """
+  global _CACHED_METADATA
+  if not is_gce():
+    return
+  while not quit_bit.is_set():
+    meta = get_metadata_uncached()
+    if meta is not None:
+      _CACHED_METADATA = (meta,)
+      break
+
+
 def get_metadata():
   """Cached version of get_metadata_uncached()"""
-  return get_metadata_uncached()
+  global _CACHED_METADATA
+  if _CACHED_METADATA is not None:
+    return _CACHED_METADATA[0]
+  meta = get_metadata_uncached()
+  # Don't cache 'None' reply on GCE. It is wrong. Better to try to grab the
+  # right one next time.
+  if meta is not None or not is_gce():
+    _CACHED_METADATA = (meta,)
+    return meta
+  return None
 
 
 def oauth2_access_token(account='default'):

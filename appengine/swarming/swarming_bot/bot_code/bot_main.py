@@ -36,6 +36,7 @@ import remote_client
 import singleton
 from api import bot
 from api import os_utilities
+from api import platforms
 from utils import file_path
 from utils import net
 from utils import on_error
@@ -408,6 +409,15 @@ def run_bot(arg_error):
       # clause is kept there "just in case".
       logging.exception('server_ping threw')
 
+    # If we are on GCE, we want to make sure GCE metadata server responds, since
+    # we use the metadata to derive bot ID, dimensions and state.
+    if platforms.is_gce():
+      logging.info('Running on GCE, waiting for the metadata server')
+      platforms.gce.wait_for_metadata(quit_bit)
+      if quit_bit.is_set():
+        logging.info('Early quit 1')
+        return 0
+
     # Next we make sure the bot can make authenticated calls by grabbing
     # the auth headers, retrying on errors a bunch of times. We don't give up
     # if it fails though (maybe the bot will "fix itself" later).
@@ -419,7 +429,7 @@ def run_bot(arg_error):
       logging.error('Can\'t grab auth headers, continuing anyway...')
 
     if quit_bit.is_set():
-      logging.info('Early quit 1')
+      logging.info('Early quit 2')
       return 0
 
     call_hook(botobj, 'on_bot_startup')
@@ -433,7 +443,7 @@ def run_bot(arg_error):
     botobj.update_state(get_state(botobj, 0))
 
     if quit_bit.is_set():
-      logging.info('Early quit 2')
+      logging.info('Early quit 3')
       return 0
 
     # If this fails, there's hardly anything that can be done, the bot can't
@@ -453,14 +463,14 @@ def run_bot(arg_error):
       botobj.post_error('Bootstrapping error: %s' % arg_error)
 
     if quit_bit.is_set():
-      logging.info('Early quit 3')
+      logging.info('Early quit 4')
       return 0
 
     cleanup_bot_directory(botobj)
     clean_isolated_cache(botobj)
 
     if quit_bit.is_set():
-      logging.info('Early quit 4')
+      logging.info('Early quit 5')
       return 0
 
     # This environment variable is accessible to the tasks executed by this bot.
