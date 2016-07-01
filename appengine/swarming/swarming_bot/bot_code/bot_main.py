@@ -321,6 +321,12 @@ def get_bot():
       config['server_version'],
       os.path.dirname(THIS_FILE),
       on_shutdown_hook)
+
+  # Initial 'attributes' passed to bot.Bot above were constructed for 'fake'
+  # bot ID ('none'). Refresh them to match the real bot ID, now that we have
+  # fully functional bot.Bot object.
+  botobj.update_dimensions(get_dimensions(botobj))
+  botobj.update_state(get_state(botobj, 0))
   return botobj
 
 
