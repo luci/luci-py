@@ -321,12 +321,6 @@ def get_bot():
       config['server_version'],
       os.path.dirname(THIS_FILE),
       on_shutdown_hook)
-
-  # Initial 'attributes' passed to bot.Bot above were constructed for 'fake'
-  # bot ID ('none'). Refresh them to match the real bot ID, now that we have
-  # fully functional bot.Bot object.
-  botobj.update_dimensions(get_dimensions(botobj))
-  botobj.update_state(get_state(botobj, 0))
   return botobj
 
 
@@ -428,6 +422,20 @@ def run_bot(arg_error):
       logging.info('Early quit 1')
       return 0
 
+    call_hook(botobj, 'on_bot_startup')
+
+    # Initial attributes passed to bot.Bot in get_bot above were constructed for
+    # 'fake' bot ID ('none'). Refresh them to match the real bot ID, now that we
+    # have fully initialize bot.Bot object. Note that 'get_dimensions' and
+    # 'get_state' may depend on actions done by 'on_bot_startup' hook, that's
+    # why we do it here and not in 'get_bot'.
+    botobj.update_dimensions(get_dimensions(botobj))
+    botobj.update_state(get_state(botobj, 0))
+
+    if quit_bit.is_set():
+      logging.info('Early quit 2')
+      return 0
+
     # If this fails, there's hardly anything that can be done, the bot can't
     # even get to the point to be able to self-update.
     resp = botobj.remote.url_read_json(
@@ -445,16 +453,14 @@ def run_bot(arg_error):
       botobj.post_error('Bootstrapping error: %s' % arg_error)
 
     if quit_bit.is_set():
-      logging.info('Early quit 2')
+      logging.info('Early quit 3')
       return 0
 
     cleanup_bot_directory(botobj)
     clean_isolated_cache(botobj)
 
-    call_hook(botobj, 'on_bot_startup')
-
     if quit_bit.is_set():
-      logging.info('Early quit 3')
+      logging.info('Early quit 4')
       return 0
 
     # This environment variable is accessible to the tasks executed by this bot.
