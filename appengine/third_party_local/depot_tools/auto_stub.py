@@ -7,6 +7,7 @@ __version__ = '1.0'
 import collections
 import inspect
 import unittest
+import sys
 
 
 class AutoStubMixIn(object):
@@ -70,4 +71,7 @@ class TestCase(unittest.TestCase, AutoStubMixIn):
 
   def has_failed(self):
     """Returns True if the test has failed."""
-    return not self._resultForDoCleanups.wasSuccessful()
+    if self._resultForDoCleanups:
+      return not self._resultForDoCleanups.wasSuccessful()
+    ex, _, _, = sys.exc_info()
+    return bool(ex)

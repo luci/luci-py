@@ -12,7 +12,7 @@ ROOT_DIR = os.path.dirname(
 _INITIALIZED = False
 
 
-def setup_test_env():
+def setup_test_env(app_id='sample-app'):
   """Sets up App Engine/Django test environment."""
   global _INITIALIZED
   if _INITIALIZED:
@@ -25,4 +25,4 @@ def setup_test_env():
 
   from tool_support import gae_sdk_utils
   gae_sdk_utils.setup_gae_env()
-  gae_sdk_utils.setup_env(None, 'sample-app', 'v1a', None)
+  gae_sdk_utils.setup_env(None, app_id, 'v1a', None)

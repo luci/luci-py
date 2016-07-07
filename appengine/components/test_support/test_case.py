@@ -5,17 +5,20 @@
 import base64
 import contextlib
 import datetime
+import json
 import logging
 import time
 import urllib
 
 import endpoints
+import webapp2
 import webtest
 
 from google.appengine.datastore import datastore_stub_util
 from google.appengine.ext import ndb
 from google.appengine.ext import testbed
 
+from components import endpoints_webapp2
 from components import utils
 from depot_tools import auto_stub
 
@@ -236,3 +239,59 @@ class EndpointsTestCase(TestCase):
       pass
     finally:
       self.expected_fail_status = None
+
+
+class Webapp2EndpointsTestCase(TestCase):
+  """Base class for a test case that tests Webapp2 Cloud Endpoints Service.
+
+  Webapp2 handlers for such service can be derived using endpoints_webapp2.
+
+  Usage is same as EndpointsTestCase, except call_should_fail is not supported
+  and status parameter in call_api should be used instead.
+  """
+  # Should be set in subclasses to a subclass of remote.Service.
+  api_service_cls = None
+  _app = None
+
+  def setUp(self):
+    super(Webapp2EndpointsTestCase, self).setUp()
+    self._app = webtest.TestApp(
+        webapp2.WSGIApplication(
+            endpoints_webapp2.api_routes(self.api_service_cls),
+            debug=True),
+        extra_environ={'REMOTE_ADDR': '127.0.0.1'})
+
+  def call_api(self, method_name, body=None, status=200):
+    body = body or {}
+    method = getattr(self.api_service_cls, method_name)
+
+    container = endpoints.ResourceContainer.get_request_message(method.remote)
+    method_path = method.method_info.get_path(self.api_service_cls.api_info)
+    url_params = {}
+
+    if isinstance(container, endpoints.ResourceContainer):
+      # If request is a resource container, some data passed in body should be
+      # moved to URL.
+      body = body.copy()
+      for f in container.parameters_message_class.all_fields():
+        if f.name not in body:
+          continue
+        value = body.pop(f.name)
+        path_param = '{%s}' % f.name
+        if path_param in method_path:
+          method_path = method_path.replace(path_param, str(value))
+        else:
+          url_params[f.name] = value
+
+    url = '/api/%s/%s/%s?%s' % (
+        self.api_service_cls.api_info.name,
+        self.api_service_cls.api_info.version,
+        method_path,
+        urllib.urlencode(url_params, doseq=True)
+    )
+
+    return self._app.request(
+        url,
+        method=method.method_info.http_method,
+        body=json.dumps(body),
+        status=status)
