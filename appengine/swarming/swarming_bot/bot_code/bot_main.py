@@ -611,6 +611,7 @@ def run_manifest(botobj, manifest, start):
     # Windows in particular does not tolerate unicode strings in environment
     # variables.
     env['SWARMING_TASK_ID'] = task_id.encode('ascii')
+    env['SWARMING_SERVER'] = botobj.server.encode('ascii')
 
     task_in_file = os.path.join(work_dir, 'task_runner_in.json')
     with open(task_in_file, 'wb') as f:
