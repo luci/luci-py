@@ -46,6 +46,11 @@ jobs_durations = gae_ts_mon.CumulativeDistributionMetric(
     description='Cycle times of completed jobs, in seconds.')
 
 
+jobs_pending_durations = gae_ts_mon.NonCumulativeDistributionMetric(
+    'jobs/pending_durations', bucketer=_bucketer,
+    description='Pending times of active jobs, in seconds.')
+
+
 # Swarming-specific metric. Metric fields:
 # - project_id: e.g. 'chromium'
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
@@ -141,12 +146,14 @@ def update_jobs_completed_metrics(task_result_summary):
 
 
 @ndb.tasklet
-def _set_jobs_metrics():
+def _set_jobs_metrics(now):
   state_map = {task_result.State.RUNNING: 'running',
                task_result.State.PENDING: 'pending'}
   query_iter = task_result.get_result_summaries_query(
       None, None, 'created_ts', 'pending_running', None).iter()
   jobs_counts = defaultdict(lambda: 0)
+  jobs_pending_distributions = defaultdict(
+      lambda: gae_ts_mon.Distribution(_bucketer))
   while (yield query_iter.has_next_async()):
     summary = query_iter.next()
     status = state_map.get(summary.state, '')
@@ -157,10 +164,21 @@ def _set_jobs_metrics():
     if summary.bot_id and status == 'running':
       jobs_running.set(True, target_fields=target_fields, fields=fields)
     fields['status'] = status
-    jobs_counts[tuple(sorted(fields.iteritems()))] += 1
+
+    key = tuple(sorted(fields.iteritems()))
+
+    jobs_counts[key] += 1
+
+    pending_duration = summary.pending_now(now)
+    if pending_duration is not None:
+      jobs_pending_distributions[key].add(pending_duration.total_seconds())
 
   for key, count in jobs_counts.iteritems():
     jobs_active.set(count, target_fields=TARGET_FIELDS, fields=dict(key))
+
+  for key, distribution in jobs_pending_distributions.iteritems():
+    jobs_pending_durations.set(
+        distribution, target_fields=TARGET_FIELDS, fields=dict(key))
 
 
 @ndb.tasklet
@@ -187,7 +205,7 @@ def _set_executors_metrics(now):
 
 @ndb.tasklet
 def _set_global_metrics_async(now):
-  yield _set_executors_metrics(now), _set_jobs_metrics()
+  yield _set_executors_metrics(now), _set_jobs_metrics(now)
 
 
 def _set_global_metrics(now=None):

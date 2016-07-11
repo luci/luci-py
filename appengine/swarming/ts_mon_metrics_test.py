@@ -133,13 +133,15 @@ class TestMetrics(test_case.TestCase):
     summary_running.bot_id = 'test_bot1'
     summary_running.put()
 
-    summary_pending = _gen_task_result_summary(self.now, 2, tags=tags)
+    summary_pending = _gen_task_result_summary(
+        self.now - datetime.timedelta(minutes=5), 2, tags=tags)
     summary_pending.state = task_result.State.PENDING
     summary_pending.modified_ts = self.now
     summary_pending.bot_id = 'test_bot2'
     summary_pending.put()
 
-    summary_pending = _gen_task_result_summary(self.now, 3, tags=tags)
+    summary_pending = _gen_task_result_summary(
+        self.now - datetime.timedelta(minutes=10), 3, tags=tags)
     summary_pending.state = task_result.State.PENDING
     summary_pending.modified_ts = self.now
     summary_pending.bot_id = ''
@@ -177,6 +179,9 @@ class TestMetrics(test_case.TestCase):
     jobs_fields['status'] = 'pending'
     self.assertEqual(2, ts_mon_metrics.jobs_active.get(
         fields=jobs_fields, target_fields=ts_mon_metrics.TARGET_FIELDS))
+
+    self.assertEqual(900, ts_mon_metrics.jobs_pending_durations.get(
+        fields=jobs_fields, target_fields=ts_mon_metrics.TARGET_FIELDS).sum)
 
     for bot_id, status in bots_expected.iteritems():
       target_fields = dict(ts_mon_metrics.TARGET_FIELDS)
