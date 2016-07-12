@@ -107,10 +107,6 @@ def path_handler(api_class, api_method, service_path):
   return Handler
 
 
-def path_template_to_webapp2(template):
-  return template
-
-
 def api_routes(api_class, base_path=None):
   base_path = base_path or '/api/%s/%s' % (
       api_class.api_info.name,
