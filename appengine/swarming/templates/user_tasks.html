@@ -247,7 +247,15 @@
             {{bot_view.pending_star(task)}}{{task.pending_now(now)|timedeltaformat}}
           </td>
           <td>
-            {{bot_view.running_star(task)}}{{task.duration_now(now)|timedeltaformat}}
+            {{bot_view.running_star(task)}}
+            {% if task.deduped_from %}
+              <span title="Duration of the original task. This task wasn't actually run as it was deduped."
+                style="color:green">
+                {{task.duration_now(now)|timedeltaformat}}
+              </span>
+            {% else %}
+              {{task.duration_now(now)|timedeltaformat}}
+            {% endif %}
           </td>
           <td>
             {% if task.cost_usd %}
