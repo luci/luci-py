@@ -247,20 +247,24 @@ def delete_entry_and_gs_entry(keys_to_delete):
     # Note: this is worst case O(n²) but will scale better than that. The goal
     # is to delete files as soon as possible.
     for f in futures.keys():
-      try:
-        if f.done():
+      if f.done():
+        k = futures.pop(f)
+        try:
+          f.get_result()
           # This is synchronous.
-          gcs.delete_file(bucket, futures.pop(f), ignore_missing=True)
-      except Exception as exc:
-        break
+          gcs.delete_file(bucket, k, ignore_missing=True)
+        except Exception as exc:
+          break
     if exc:
       break
 
   while futures:
+    f = ndb.Future.wait_any(futures)
+    k = futures.pop(f)
     try:
-      f = ndb.Future.wait_any(futures)
+      f.get_result()
       # This is synchronous.
-      gcs.delete_file(bucket, futures.pop(f), ignore_missing=True)
+      gcs.delete_file(bucket, k, ignore_missing=True)
     except Exception as exc:
       continue
 
