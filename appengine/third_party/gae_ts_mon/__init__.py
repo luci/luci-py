@@ -22,9 +22,7 @@ sys.path.insert(0, protobuf_dir)
 
 # Pretend that we are the infra_libs.ts_mon package, so users can use the same
 # import lines in gae and non-gae code.
-try:
-  import infra_libs
-except ImportError:
+if 'infra_libs' not in sys.modules:  # pragma: no cover
   sys.modules['infra_libs'] = imp.new_module('infra_libs')
 
 sys.modules['infra_libs'].ts_mon = sys.modules[__package__]
@@ -35,6 +33,7 @@ import infra_libs.ts_mon.httplib2_utils
 sys.modules['infra_libs'].httplib2_utils = infra_libs.ts_mon.httplib2_utils
 sys.modules['infra_libs.httplib2_utils'] = infra_libs.ts_mon.httplib2_utils
 
+from infra_libs.ts_mon.config import DjangoMiddleware
 from infra_libs.ts_mon.config import initialize
 from infra_libs.ts_mon.config import instrument_endpoint
 from infra_libs.ts_mon.config import reset_for_unittest

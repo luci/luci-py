@@ -31,6 +31,7 @@ from infra_libs.ts_mon.common import http_metrics
 from infra_libs.ts_mon.common import interface
 from infra_libs.ts_mon.common import metric_store
 from infra_libs.ts_mon.common import monitors
+from infra_libs.ts_mon.common import standard_metrics
 from infra_libs.ts_mon.common import targets
 
 
@@ -75,6 +76,10 @@ def flush_metrics_if_needed(time_now):
 
 def _flush_metrics(time_now):
   """Return True if metrics were actually sent."""
+  if interface.state.target is None:
+    # ts_mon is not configured.
+    return False
+
   datetime_now = datetime.datetime.utcfromtimestamp(time_now)
   entity = shared.get_instance_entity()
   if entity.task_num < 0:
@@ -188,6 +193,8 @@ def initialize(app=None, is_enabled_fn=None, cron_module='default',
   shared.register_global_metrics_callback(
       shared.INTERNAL_CALLBACK_NAME, _internal_callback)
 
+  standard_metrics.init()
+
   logging.info('Initialized ts_mon with service_name=%s, job_name=%s, '
                'hostname=%s', service_name, job_name, hostname)
 
@@ -281,6 +288,69 @@ def instrument_endpoint(time_fn=time.time):
             endpoint_name, response_status, elapsed_ms)
     return decorated
   return decorator
+
+
+class DjangoMiddleware(object):
+  STATE_ATTR = 'ts_mon_state'
+
+  def __init__(self, time_fn=time.time):
+    self._time_fn = time_fn
+
+  def _callable_name(self, fn):
+    if hasattr(fn, 'im_class') and hasattr(fn, 'im_func'):  # Bound method.
+      return '.'.join([
+          fn.im_class.__module__,
+          fn.im_class.__name__,
+          fn.im_func.func_name])
+    if hasattr(fn, '__name__'):  # Function.
+      return fn.__module__ + '.' + fn.__name__
+    return '<unknown>'  # pragma: no cover
+
+  def process_view(self, request, view_func, view_args, view_kwargs):
+    interface.state.store.initialize_context()
+
+    time_now = self._time_fn()
+    state = {
+        'flush_thread': None,
+        'name': self._callable_name(view_func),
+        'start_time': time_now,
+    }
+
+    if need_to_flush_metrics(time_now):
+      thread = threading.Thread(target=_flush_metrics, args=(time_now,))
+      thread.start()
+      state['flush_thread'] = thread
+
+    setattr(request, self.STATE_ATTR, state)
+    return None
+
+  def process_response(self, request, response):
+    try:
+      state = getattr(request, self.STATE_ATTR)
+    except AttributeError:
+      return response
+
+    if state['flush_thread'] is not None:
+      state['flush_thread'].join()
+
+    duration_secs = self._time_fn() - state['start_time']
+
+    request_size = 0
+    if hasattr(request, 'body'):
+      request_size = len(request.body)
+
+    response_size = 0
+    if hasattr(response, 'content'):
+      response_size = len(response.content)
+
+    http_metrics.update_http_server_metrics(
+        state['name'],
+        response.status_code,
+        duration_secs * 1000,
+        request_size=request_size,
+        response_size=response_size,
+        user_agent=request.META.get('HTTP_USER_AGENT', None))
+    return response
 
 
 def reset_for_unittest(disable=False):

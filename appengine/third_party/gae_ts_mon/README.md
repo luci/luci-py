@@ -62,8 +62,8 @@
     [chrome-infra-mon-pubsub project](https://console.developers.google.com/project/chrome-infra-mon-pubsub/cloudpubsub/topicList)
     by selecting it from the list and clicking "Permissions". If you see an
     error "You do not have viewing permissions for the selected resource.", then
-    please ask pgervais@chromium.org (AMER) or sergiyb@chromium.org (EMEA) to do
-    it for you.
+    please ask sergeyberezin@chromium.org (AMER) or sergiyb@chromium.org (EMEA)
+    to do it for you.
 
 1.  You also need to enable the Google Cloud Pub/Sub API for your project if
     it's not enabled already.
