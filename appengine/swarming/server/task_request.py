@@ -486,12 +486,8 @@ class TaskRequest(ndb.Model):
   """Contains a user request.
 
   Key id is a decreasing integer based on time since utils.EPOCH plus some
-  randomness on lower order bits. See _new_request_key() for the complete gory
+  randomness on lower order bits. See new_request_key() for the complete gory
   details.
-
-  There is also "old style keys" which inherit from a fake root entity
-  TaskRequestShard.
-  TODO(maruel): Remove support 2015-10-01 once entities are deleted.
 
   This model is immutable.
   """
@@ -594,14 +590,11 @@ class TaskRequest(ndb.Model):
       raise datastore_errors.BadValueError(
           'pubsub_userdata requires pubsub_topic')
 
-    self.tags.append('priority:%s' % self.priority)
-    self.tags.append('user:%s' % self.user)
-    for key, value in self.properties.dimensions.iteritems():
-      self.tags.append('%s:%s' % (key, value))
-    self.tags = sorted(set(self.tags))
+
+### Public API.
 
 
-def _new_request_key():
+def new_request_key():
   """Returns a valid ndb.Key for this entity.
 
   Task id is a 64 bits integer represented as a string to the user:
@@ -631,25 +624,10 @@ def _new_request_key():
   return convert_to_request_key(utils.utcnow(), suffix)
 
 
-def _put_request(request):
-  """Puts the new TaskRequest in the DB.
-
-  Returns:
-    ndb.Key of the new entity. Returns None if failed, which should be surfaced
-    to the user.
-  """
-  assert not request.key
-  request.key = _new_request_key()
-  return datastore_utils.insert(request, _new_request_key)
-
-
-### Public API.
-
-
 def request_key_to_datetime(request_key):
   """Converts a TaskRequest.key to datetime.
 
-  See _new_request_key() for more details.
+  See new_request_key() for more details.
   """
   if request_key.kind() != 'TaskRequest':
     raise ValueError('Expected key to TaskRequest, got %s' % request_key.kind())
@@ -715,17 +693,17 @@ def validate_request_key(request_key):
             root_entity_shard_id))
 
 
-def make_request(request, allow_high_priority):
-  """Registers the request in the DB.
+def init_new_request(request, allow_high_priority):
+  """Initializes a new TaskRequest but doesn't store it.
 
-  Fills up some values.
+  Fills up some values and does minimal checks.
 
   If parent_task_id is set, properties for the parent are used:
   - priority: defaults to parent.priority - 1
   - user: overridden by parent.user
 
   """
-  assert request.__class__ is TaskRequest
+  assert request.__class__ is TaskRequest, request
   if request.parent_task_id:
     run_result_key = task_pack.unpack_run_result_key(request.parent_task_id)
     result_summary_key = task_pack.run_result_key_to_result_summary_key(
@@ -750,12 +728,16 @@ def make_request(request, allow_high_priority):
     request.properties.grace_period_secs = 30
   if request.properties.idempotent is None:
     request.properties.idempotent = False
-  _put_request(request)
-  return request
+
+  request.tags.append('priority:%s' % request.priority)
+  request.tags.append('user:%s' % request.user)
+  for key, value in request.properties.dimensions.iteritems():
+    request.tags.append('%s:%s' % (key, value))
+  request.tags = sorted(set(request.tags))
 
 
-def make_request_clone(original_request):
-  """Makes a new TaskRequest from a previous one.
+def new_request_clone(original_request, allow_high_priority):
+  """Creates a new TaskRequest as a copy of another one but doesn't store it.
 
   Used by "Retry task" UI button.
 
@@ -767,6 +749,7 @@ def make_request_clone(original_request):
   - Strip any tag starting with 'user:'.
   - Override request's user with the credentials of the currently logged in
     user.
+  - Do not inherit pubsub parameter.
 
   Returns:
     The newly created TaskRequest.
@@ -791,9 +774,7 @@ def make_request_clone(original_request):
     raise ValueError('a request can only be cloned by a user, not a bot')
   username = username[len(prefix):]
   tags = set(t for t in original_request.tags if not t.startswith('user:'))
-  # Note: specifically do not inherit pubsub parameters.
   request = TaskRequest(
-      authenticated=user,
       created_ts=now,
       expiration_ts=expiration_ts,
       name=name,
@@ -802,7 +783,7 @@ def make_request_clone(original_request):
       properties=properties,
       tags=tags,
       user=username)
-  _put_request(request)
+  init_new_request(request, allow_high_priority)
   return request
 
 

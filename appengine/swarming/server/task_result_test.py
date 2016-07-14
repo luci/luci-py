@@ -56,6 +56,15 @@ def _gen_request(properties=None, **kwargs):
   return task_request.TaskRequest(**args)
 
 
+def mkreq(req):
+  # This function fits the old style where TaskRequest was stored first, before
+  # TaskToRun and TaskResultSummary.
+  task_request.init_new_request(req, True)
+  req.key = task_request.new_request_key()
+  req.put()
+  return req
+
+
 def _safe_cmp(a, b):
   # cmp(datetime.datetime.utcnow(), None) throws TypeError. Workaround.
   return cmp(utils.encode_to_json(a), utils.encode_to_json(b))
@@ -134,7 +143,7 @@ class TaskResultApiTest(TestCase):
     self.assertEqual('Deduped', task_result.state_to_string(f))
 
   def test_new_result_summary(self):
-    request = task_request.make_request(_gen_request(), True)
+    request = mkreq(_gen_request())
     actual = task_result.new_result_summary(request)
     expected = {
       'abandoned_ts': None,
@@ -183,7 +192,7 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(expected, actual.key.get().children_task_ids)
 
   def test_new_run_result(self):
-    request = task_request.make_request(_gen_request(), True)
+    request = mkreq(_gen_request())
     actual = task_result.new_run_result(
         request, 1, 'localhost', 'abc',
         {'id': ['localhost'], 'foo': ['bar', 'biz']})
@@ -215,7 +224,7 @@ class TaskResultApiTest(TestCase):
     # Creates a TaskRequest, along its TaskResultSummary and TaskToRun. Have a
     # bot reap the task, and complete the task. Ensure the resulting
     # TaskResultSummary and TaskRunResult are properly updated.
-    request = task_request.make_request(_gen_request(), True)
+    request = mkreq(_gen_request())
     result_summary = task_result.new_result_summary(request)
     to_run = task_to_run.new_task_to_run(request)
     result_summary.modified_ts = utils.utcnow()
@@ -402,7 +411,7 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(complete_ts, run_result.ended_ts)
 
   def test_yield_run_result_keys_with_dead_bot(self):
-    request = task_request.make_request(_gen_request(), True)
+    request = mkreq(_gen_request())
     result_summary = task_result.new_result_summary(request)
     result_summary.modified_ts = utils.utcnow()
     ndb.transaction(result_summary.put)
@@ -422,7 +431,7 @@ class TaskResultApiTest(TestCase):
         list(task_result.yield_run_result_keys_with_dead_bot()))
 
   def test_set_from_run_result(self):
-    request = task_request.make_request(_gen_request(), True)
+    request = mkreq(_gen_request())
     result_summary = task_result.new_result_summary(request)
     run_result = task_result.new_run_result(request, 1, 'localhost', 'abc', {})
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
@@ -437,7 +446,7 @@ class TaskResultApiTest(TestCase):
     self.assertFalse(result_summary.need_update_from_run_result(run_result))
 
   def test_set_from_run_result_two_server_versions(self):
-    request = task_request.make_request(_gen_request(), True)
+    request = mkreq(_gen_request())
     result_summary = task_result.new_result_summary(request)
     run_result = task_result.new_run_result(request, 1, 'localhost', 'abc', {})
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
@@ -459,7 +468,7 @@ class TaskResultApiTest(TestCase):
         ['v1a', 'new-version'], result_summary.key.get().server_versions)
 
   def test_set_from_run_result_two_tries(self):
-    request = task_request.make_request(_gen_request(), True)
+    request = mkreq(_gen_request())
     result_summary = task_result.new_result_summary(request)
     run_result_1 = task_result.new_run_result(
         request, 1, 'localhost', 'abc', {})
@@ -504,7 +513,7 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(None, run_result.duration_now(utils.utcnow()))
 
   def test_run_result_timeout(self):
-    request = task_request.make_request(_gen_request(), True)
+    request = mkreq(_gen_request())
     result_summary = task_result.new_result_summary(request)
     result_summary.modified_ts = utils.utcnow()
     ndb.transaction(result_summary.put)
@@ -537,7 +546,7 @@ class TaskResultApiTest(TestCase):
 class TestOutput(TestCase):
   def setUp(self):
     super(TestOutput, self).setUp()
-    request = task_request.make_request(_gen_request(), True)
+    request = mkreq(_gen_request())
     result_summary = task_result.new_result_summary(request)
     result_summary.modified_ts = utils.utcnow()
     ndb.transaction(result_summary.put)

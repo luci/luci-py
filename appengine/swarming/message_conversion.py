@@ -188,7 +188,7 @@ def new_task_request_from_rpc(msg, now):
       msg,
       created_ts=now,
       expiration_ts=now+datetime.timedelta(seconds=msg.expiration_secs),
-      # It is set in task_request.make_request().
+      # It is set in task_request.init_new_request().
       authenticated=None,
       properties=properties)
 

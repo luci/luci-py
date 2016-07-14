@@ -22,6 +22,14 @@ from test_support import test_case
 class EntityX(ndb.Model):
   a = ndb.IntegerProperty()
 
+  def _pre_put_hook(self):
+    super(EntityX, self)._pre_put_hook()
+
+
+class EntityY(ndb.Model):
+  def _pre_put_hook(self):
+    super(EntityY, self)._pre_put_hook()
+
 
 class MonotonicTest(test_case.TestCase):
   def setUp(self):
@@ -30,9 +38,12 @@ class MonotonicTest(test_case.TestCase):
 
   def test_insert(self):
     data = EntityX(id=1, parent=self.parent)
+    called = []
+    self.mock(EntityX, '_pre_put_hook', lambda _: called.append(1))
     actual = monotonic.insert(data, None)
     expected = ndb.Key('EntityX', 1, parent=self.parent)
     self.assertEqual(expected, actual)
+    self.assertEqual([1], called)
 
   def test_insert_already_present(self):
     EntityX(id=1, parent=self.parent).put()
@@ -42,17 +53,26 @@ class MonotonicTest(test_case.TestCase):
 
   def test_insert_new_key(self):
     data = EntityX(id=1, parent=self.parent)
-    actual = monotonic.insert(data, self.fail)
+    extra = EntityY(id=1, parent=data.key)
+    # Make sure the _pre_put_hook functions are called.
+    called = []
+    self.mock(EntityX, '_pre_put_hook', lambda _: called.append(1))
+    self.mock(EntityY, '_pre_put_hook', lambda _: called.append(2))
+    actual = monotonic.insert(data, self.fail, extra=[extra])
     expected = ndb.Key('EntityX', 1, parent=self.parent)
     self.assertEqual(expected, actual)
+    self.assertEqual([1, 2], called)
 
   def test_insert_new_key_already_present(self):
     EntityX(id=1, parent=self.parent).put()
     data = EntityX(id=1, parent=self.parent)
+    called = []
+    self.mock(EntityX, '_pre_put_hook', lambda _: called.append(1))
     new_key = ndb.Key('EntityX', 2, parent=self.parent)
-    actual = monotonic.insert(data, lambda: new_key)
+    actual = monotonic.insert(data, lambda: called.append(2) or new_key)
     expected = ndb.Key('EntityX', 2, parent=self.parent)
     self.assertEqual(expected, actual)
+    self.assertEqual([2, 1], called)
 
   def test_insert_new_key_already_present_twice(self):
     EntityX(id=1, parent=self.parent).put()

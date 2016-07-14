@@ -709,7 +709,8 @@ class TaskRetryHandler(BaseTaskHandler):
     original_request, _ = self.get_request_and_result(task_id)
     # Retrying a task is essentially reusing the same task request as the
     # original one, but with new parameters.
-    new_request = task_request.make_request_clone(original_request)
+    new_request = task_request.new_request_clone(
+        original_request, allow_high_priority=acl.is_admin())
     result_summary = task_scheduler.schedule_request(new_request)
     self.redirect('/user/task/%s' % result_summary.task_id)
 

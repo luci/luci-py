@@ -27,7 +27,12 @@ from server import task_request
 
 
 def mkreq(req):
-  return task_request.make_request(req, True)
+  # This function fits the old style where TaskRequest was stored first, before
+  # TaskToRun and TaskResultSummary.
+  task_request.init_new_request(req, True)
+  req.key = task_request.new_request_key()
+  req.put()
+  return req
 
 
 def _gen_request(properties=None, **kwargs):
@@ -101,66 +106,6 @@ class TestCase(test_case.TestCase):
 
 
 class TaskRequestPrivateTest(TestCase):
-  def test_new_request_key(self):
-    for _ in xrange(3):
-      delta = utils.utcnow() - task_request._BEGINING_OF_THE_WORLD
-      now = int(round(delta.total_seconds() * 1000.))
-      key = task_request._new_request_key()
-      # Remove the XOR.
-      key_id = key.integer_id() ^ task_pack.TASK_REQUEST_KEY_ID_MASK
-      timestamp = key_id >> 20
-      randomness = (key_id >> 4) & 0xFFFF
-      version = key_id & 0xF
-      self.assertLess(abs(timestamp - now), 1000)
-      self.assertEqual(1, version)
-      if randomness:
-        break
-    else:
-      self.fail('Failed to find randomness')
-
-  def test_new_request_key_zero(self):
-    def getrandbits(i):
-      self.assertEqual(i, 16)
-      return 0x7766
-    self.mock(random, 'getrandbits', getrandbits)
-    self.mock_now(task_request._BEGINING_OF_THE_WORLD)
-    key = task_request._new_request_key()
-    # Remove the XOR.
-    key_id = key.integer_id() ^ task_pack.TASK_REQUEST_KEY_ID_MASK
-    #   00000000000 7766 1
-    #     ^          ^   ^
-    #     |          |   |
-    #  since 2010    | schema version
-    #                |
-    #               rand
-    self.assertEqual('0x0000000000077661', '0x%016x' % key_id)
-
-  def test_new_request_key_end(self):
-    def getrandbits(i):
-      self.assertEqual(i, 16)
-      return 0x7766
-    self.mock(random, 'getrandbits', getrandbits)
-    days_until_end_of_the_world = 2**43 / 24. / 60. / 60. / 1000.
-    num_days = int(days_until_end_of_the_world)
-    # Remove 1ms to not overflow.
-    num_seconds = (
-        (days_until_end_of_the_world - num_days) * 24. * 60. * 60. - 0.001)
-    self.assertEqual(101806, num_days)
-    self.assertEqual(278, int(num_days / 365.3))
-    now = (task_request._BEGINING_OF_THE_WORLD +
-        datetime.timedelta(days=num_days, seconds=num_seconds))
-    self.mock_now(now)
-    key = task_request._new_request_key()
-    # Remove the XOR.
-    key_id = key.integer_id() ^ task_pack.TASK_REQUEST_KEY_ID_MASK
-    #   7ffffffffff 7766 1
-    #     ^          ^   ^
-    #     |          |   |
-    #  since 2010    | schema version
-    #                |
-    #               rand
-    self.assertEqual('0x7ffffffffff77661', '0x%016x' % key_id)
-
   def test_validate_task_run_id(self):
     self.assertEqual(
         '1d69b9f088008811',
@@ -193,6 +138,66 @@ class TaskRequestApiTest(TestCase):
         i[5:] for i in dir(self) if i.startswith('test_'))
     self.assertFalse(missing)
 
+  def test_new_request_key(self):
+    for _ in xrange(3):
+      delta = utils.utcnow() - task_request._BEGINING_OF_THE_WORLD
+      now = int(round(delta.total_seconds() * 1000.))
+      key = task_request.new_request_key()
+      # Remove the XOR.
+      key_id = key.integer_id() ^ task_pack.TASK_REQUEST_KEY_ID_MASK
+      timestamp = key_id >> 20
+      randomness = (key_id >> 4) & 0xFFFF
+      version = key_id & 0xF
+      self.assertLess(abs(timestamp - now), 1000)
+      self.assertEqual(1, version)
+      if randomness:
+        break
+    else:
+      self.fail('Failed to find randomness')
+
+  def test_new_request_key_zero(self):
+    def getrandbits(i):
+      self.assertEqual(i, 16)
+      return 0x7766
+    self.mock(random, 'getrandbits', getrandbits)
+    self.mock_now(task_request._BEGINING_OF_THE_WORLD)
+    key = task_request.new_request_key()
+    # Remove the XOR.
+    key_id = key.integer_id() ^ task_pack.TASK_REQUEST_KEY_ID_MASK
+    #   00000000000 7766 1
+    #     ^          ^   ^
+    #     |          |   |
+    #  since 2010    | schema version
+    #                |
+    #               rand
+    self.assertEqual('0x0000000000077661', '0x%016x' % key_id)
+
+  def test_new_request_key_end(self):
+    def getrandbits(i):
+      self.assertEqual(i, 16)
+      return 0x7766
+    self.mock(random, 'getrandbits', getrandbits)
+    days_until_end_of_the_world = 2**43 / 24. / 60. / 60. / 1000.
+    num_days = int(days_until_end_of_the_world)
+    # Remove 1ms to not overflow.
+    num_seconds = (
+        (days_until_end_of_the_world - num_days) * 24. * 60. * 60. - 0.001)
+    self.assertEqual(101806, num_days)
+    self.assertEqual(278, int(num_days / 365.3))
+    now = (task_request._BEGINING_OF_THE_WORLD +
+        datetime.timedelta(days=num_days, seconds=num_seconds))
+    self.mock_now(now)
+    key = task_request.new_request_key()
+    # Remove the XOR.
+    key_id = key.integer_id() ^ task_pack.TASK_REQUEST_KEY_ID_MASK
+    #   7ffffffffff 7766 1
+    #     ^          ^   ^
+    #     |          |   |
+    #  since 2010    | schema version
+    #                |
+    #               rand
+    self.assertEqual('0x7ffffffffff77661', '0x%016x' % key_id)
+
   def test_validate_request_key(self):
     task_request.validate_request_key(task_pack.unpack_request_key('10'))
     task_request.validate_request_key(
@@ -207,8 +212,8 @@ class TaskRequestApiTest(TestCase):
           'TaskRequest', 0x100)
       task_request.validate_request_key(key)
 
-  def test_make_request(self):
-    # Compare with test_make_request_clone().
+  def test_init_new_request(self):
+    # Compare with test_new_request_clone().
     parent = mkreq(_gen_request())
     # Hack: Would need to know about TaskResultSummary.
     parent_id = task_pack.pack_request_key(parent.key) + '1'
@@ -273,7 +278,7 @@ class TaskRequestApiTest(TestCase):
     self.assertEqual(expected_request, actual)
     self.assertEqual(30, request.expiration_secs)
 
-  def test_make_request_isolated(self):
+  def test_init_new_request_isolated(self):
     parent = mkreq(_gen_request(properties={
       'command': [],
       'inputs_ref': {
@@ -346,19 +351,19 @@ class TaskRequestApiTest(TestCase):
     self.assertEqual(expected_request, actual)
     self.assertEqual(30, request.expiration_secs)
 
-  def test_make_request_parent(self):
+  def test_init_new_request_parent(self):
     parent = mkreq(_gen_request())
     # Hack: Would need to know about TaskResultSummary.
     parent_id = task_pack.pack_request_key(parent.key) + '1'
     child = mkreq(_gen_request(parent_task_id=parent_id))
     self.assertEqual(parent_id, child.parent_task_id)
 
-  def test_make_request_invalid_parent_id(self):
+  def test_init_new_request_invalid_parent_id(self):
     # Must ends with '1' or '2', not '0'
     with self.assertRaises(ValueError):
       _gen_request(parent_task_id='1d69b9f088008810')
 
-  def test_make_request_idempotent(self):
+  def test_init_new_request_idempotent(self):
     request = mkreq(_gen_request(properties=dict(idempotent=True)))
     as_dict = request.to_dict()
     self.assertEqual(True, as_dict['properties']['idempotent'])
@@ -522,15 +527,17 @@ class TaskRequestApiTest(TestCase):
             isolatedserver='http://localhost:1',
             namespace='default-gzip'))))
 
-  def test_make_request_clone(self):
-    # Compare with test_make_request().
+  def test_new_request_clone(self):
+    # Compare with test_init_new_request().
     parent = mkreq(_gen_request())
     # Hack: Would need to know about TaskResultSummary.
     parent_id = task_pack.pack_request_key(parent.key) + '1'
     data = _gen_request(
         properties=dict(idempotent=True), parent_task_id=parent_id)
-    request = task_request.make_request_clone(mkreq(data))
-    # Differences from make_request() are:
+    request = task_request.new_request_clone(mkreq(data), True)
+    request.key = task_request.new_request_key()
+    request.put()
+    # Differences from init_new_request() are:
     # - idempotent was reset to False.
     # - parent_task_id was reset to None.
     expected_properties = {
@@ -565,7 +572,7 @@ class TaskRequestApiTest(TestCase):
       },
       'io_timeout_secs': None,
     }
-    # Differences from make_request() are:
+    # Differences from new_request() are:
     # - parent_task_id was reset to None.
     # - tag 'user:' was replaced
     # - user was replaced.

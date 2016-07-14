@@ -374,71 +374,93 @@ def exponential_backoff(attempt_num):
 def schedule_request(request):
   """Creates and stores all the entities to schedule a new task request.
 
-  The number of entities created is 3: TaskRequest, TaskResultSummary and
-  TaskToRun.
+  The number of entities created is 3: TaskRequest, TaskToRun and
+  TaskResultSummary.
 
-  The TaskRequest is saved first as a DB transaction, then TaskResultSummary and
-  TaskToRun are saved as a single DB RPC. The Search index is also updated
-  in-between.
+  All 3 entities in the same entity group (TaskReqest, TaskToRun,
+  TaskResultSummary) are saved as a DB transaction.
 
   Arguments:
-  - request: is in the TaskRequest entity saved in the DB.
+  - request: TaskRequest entity to be saved in the DB. It's key must not be set
+             and the entity must not be saved in the DB yet.
 
   Returns:
     TaskResultSummary. TaskToRun is not returned.
   """
-  dupe_future = None
+  assert isinstance(request, task_request.TaskRequest), request
+  assert not request.key, request.key
+
+  now = utils.utcnow()
+  request.key = task_request.new_request_key()
+  task = task_to_run.new_task_to_run(request)
+  result_summary = task_result.new_result_summary(request)
+  result_summary.modified_ts = now
+
+  def get_new_keys():
+    # Warning: this assumes knowledge about the hierarchy of each entity.
+    key = task_request.new_request_key()
+    task.key.parent = key
+    old = result_summary.task_id
+    result_summary.parent = key
+    logging.info('%s conflicted, using %s', old, result_summary.task_id)
+    return key
+
+  stored = False
   if request.properties.idempotent:
     # Find a previously run task that is also idempotent and completed. Start a
     # query to fetch items that can be used to dedupe the task. See the comment
     # for this property for more details.
     #
     # Do not use "cls.created_ts > oldest" here because this would require a
-    # composite index. It's unnecessary because TaskRequest.key is mostly
-    # equivalent to decreasing TaskRequest.created_ts, ordering by key works as
-    # well and doesn't require a composite index.
+    # composite index. It's unnecessary because TaskRequest.key is equivalent to
+    # decreasing TaskRequest.created_ts, ordering by key works as well and
+    # doesn't require a composite index.
     cls = task_result.TaskResultSummary
     h = request.properties.properties_hash
-    dupe_future = cls.query(cls.properties_hash==h).order(cls.key).get_async()
 
-  # At this point, the request is now in the DB but not yet in a mode where it
-  # can be triggered or visible. Index it right away so it is searchable. If any
-  # of remaining calls in this function fail, the TaskRequest and Search
-  # Document will simply point to an incomplete task, which will be ignored.
-  #
-  # Creates the entities TaskToRun and TaskResultSummary but do not save them
-  # yet. TaskRunResult will be created once a bot starts it.
-  task = task_to_run.new_task_to_run(request)
-  result_summary = task_result.new_result_summary(request)
+    # TODO(maruel): Make a reverse map on successful task completion so this
+    # becomes a simple ndb.get().
+    dupe_summary = cls.query(cls.properties_hash==h).order(cls.key).get()
+    if dupe_summary:
+      # Refuse tasks older than X days. This is due to the isolate server
+      # dropping files.
+      # TODO(maruel): The value should be calculated from the isolate server
+      # setting and be unbounded when no isolated input was used.
+      oldest = now - datetime.timedelta(
+          seconds=config.settings().reusable_task_age_secs)
+      if dupe_summary and dupe_summary.created_ts > oldest:
+        # Setting task.queue_number to None removes it from the scheduling.
+        task.queue_number = None
+        _copy_summary(
+            dupe_summary, result_summary,
+            ('created_ts', 'modified_ts', 'name', 'user', 'tags'))
+        # Zap irrelevant properties. PerformanceStats is also not copied over,
+        # since it's not relevant.
+        result_summary.properties_hash = None
+        result_summary.try_number = 0
+        result_summary.cost_saved_usd = result_summary.cost_usd
+        # Only zap after.
+        result_summary.costs_usd = []
+        result_summary.deduped_from = task_pack.pack_run_result_key(
+            dupe_summary.run_result_key)
+        # In this code path, there's not much to do as the task will not be run,
+        # previous results are returned. We still need to store all the entities
+        # correctly.
+        datastore_utils.insert(
+            request, get_new_keys, extra=[task, result_summary])
+        logging.debug(
+            'New request %s reusing %s', result_summary.task_id,
+            dupe_summary.task_id)
+        stored = True
 
-  now = utils.utcnow()
-
-  if dupe_future:
-    # Reuse the results!
-    dupe_summary = dupe_future.get_result()
-    # Refuse tasks older than X days. This is due to the isolate server dropping
-    # files. https://code.google.com/p/swarming/issues/detail?id=197
-    oldest = now - datetime.timedelta(
-        seconds=config.settings().reusable_task_age_secs)
-    if dupe_summary and dupe_summary.created_ts > oldest:
-      # If there's a bug, commenting out this block is sufficient to disable the
-      # functionality.
-      # Setting task.queue_number to None removes it from the scheduling.
-      task.queue_number = None
-      _copy_summary(
-          dupe_summary, result_summary, ('created_ts', 'name', 'user', 'tags'))
-      # Zap irrelevant properties. PerformanceStats is also not copied over,
-      # since it's not relevant.
-      result_summary.properties_hash = None
-      result_summary.try_number = 0
-      result_summary.cost_saved_usd = result_summary.cost_usd
-      # Only zap after.
-      result_summary.costs_usd = []
-      result_summary.deduped_from = task_pack.pack_run_result_key(
-          dupe_summary.run_result_key)
+  if not stored:
+    # Storing these entities makes this task live. It is important at this point
+    # that the HTTP handler returns as fast as possible, otherwise the task will
+    # be run but the client will not know about it.
+    datastore_utils.insert(request, get_new_keys, extra=[task, result_summary])
+    logging.debug('New request %s', result_summary.task_id)
 
   # Get parent task details if applicable.
-  parent_task_keys = None
   if request.parent_task_id:
     parent_run_key = task_pack.unpack_run_result_key(request.parent_task_id)
     parent_task_keys = [
@@ -446,31 +468,20 @@ def schedule_request(request):
       task_pack.run_result_key_to_result_summary_key(parent_run_key),
     ]
 
-  result_summary.modified_ts = now
+    def run_parent():
+      # This one is slower.
+      items = ndb.get_multi(parent_task_keys)
+      k = result_summary.task_id
+      for item in items:
+        item.children_task_ids.append(k)
+        item.modified_ts = now
+      ndb.put_multi(items)
 
-  # Storing these entities makes this task live. It is important at this point
-  # that the HTTP handler returns as fast as possible, otherwise the task will
-  # be run but the client will not know about it.
-  def run():
-    ndb.put_multi([result_summary, task])
-
-  def run_parent():
-    # This one is slower.
-    items = ndb.get_multi(parent_task_keys)
-    k = result_summary.task_id
-    for item in items:
-      item.children_task_ids.append(k)
-      item.modified_ts = now
-    ndb.put_multi(items)
-
-  # Raising will abort to the caller.
-  futures = [datastore_utils.transaction_async(run)]
-  if parent_task_keys:
-    futures.append(datastore_utils.transaction_async(run_parent))
-
-  for future in futures:
-    # Check for failures, it would raise in this case, aborting the call.
-    future.get_result()
+    # Raising will abort to the caller. There's a risk that for tasks with
+    # parent tasks, the task will be lost due to this transaction.
+    # TODO(maruel): An option is to update the parent task as part of a cron
+    # job, which would remove this code from the critical path.
+    datastore_utils.transaction(run_parent)
 
   stats.add_task_entry(
       'task_enqueued', result_summary.key,

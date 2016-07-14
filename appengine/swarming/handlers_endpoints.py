@@ -298,11 +298,11 @@ class SwarmingTasksService(remote.Service):
       request = message_conversion.new_task_request_from_rpc(
           request, utils.utcnow())
       apply_property_defaults(request.properties)
-      posted_request = task_request.make_request(request, acl.is_bot_or_admin())
+      task_request.init_new_request(request, acl.is_bot_or_admin())
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
 
-    result_summary = task_scheduler.schedule_request(posted_request)
+    result_summary = task_scheduler.schedule_request(request)
 
     previous_result = None
     if result_summary.deduped_from:
@@ -310,7 +310,7 @@ class SwarmingTasksService(remote.Service):
           result_summary, False)
 
     return swarming_rpcs.TaskRequestMetadata(
-        request=message_conversion.task_request_to_rpc(posted_request),
+        request=message_conversion.task_request_to_rpc(request),
         task_id=task_pack.pack_result_summary_key(result_summary.key),
         task_result=previous_result)
 
@@ -555,11 +555,11 @@ class SwarmingBotService(remote.Service):
           tags=['terminate:1'],
           user=auth.get_current_identity().to_bytes())
       assert request.properties.is_terminate
-      posted_request = task_request.make_request(request, acl.is_bot_or_admin())
+      task_request.init_new_request(request, acl.is_bot_or_admin())
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
 
-    result_summary = task_scheduler.schedule_request(posted_request)
+    result_summary = task_scheduler.schedule_request(request)
     return swarming_rpcs.TerminateResponse(
         task_id=task_pack.pack_result_summary_key(result_summary.key))
 

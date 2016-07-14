@@ -52,6 +52,15 @@ def _gen_request(properties=None, **kwargs):
   return task_request.TaskRequest(**args)
 
 
+def mkreq(req):
+  # This function fits the old style where TaskRequest was stored first, before
+  # TaskToRun and TaskResultSummary.
+  task_request.init_new_request(req, True)
+  req.key = task_request.new_request_key()
+  req.put()
+  return req
+
+
 def _task_to_run_to_dict(i):
   """Converts the queue_number to hex for easier testing."""
   out = i.to_dict()
@@ -71,7 +80,7 @@ def _yield_next_available_task_to_dispatch(bot_dimensions, deadline):
 
 def _gen_new_task_to_run(**kwargs):
   """Returns a TaskToRun saved in the DB."""
-  request = task_request.make_request(_gen_request(**kwargs), True)
+  request = mkreq(_gen_request(**kwargs))
   to_run = task_to_run.new_task_to_run(request)
   to_run.put()
   return to_run
@@ -267,21 +276,21 @@ class TaskToRunApiTest(TestCase):
     self.assertFalse(missing)
 
   def test_task_to_run_key_to_request_key(self):
-    request = task_request.make_request(_gen_request(), True)
+    request = mkreq(_gen_request())
     task_key = task_to_run.request_to_task_to_run_key(request)
     actual = task_to_run.task_to_run_key_to_request_key(task_key)
     self.assertEqual(request.key, actual)
 
   def test_request_to_task_to_run_key(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
-    request = task_request.make_request(_gen_request(), True)
+    request = mkreq(_gen_request())
     # Ensures that the hash value is constant for the same input.
     self.assertEqual(
         ndb.Key('TaskRequest', 0x7e296460f77ff77e, 'TaskToRun', 3420117132),
         task_to_run.request_to_task_to_run_key(request))
 
   def test_validate_to_run_key(self):
-    request = task_request.make_request(_gen_request(), True)
+    request = mkreq(_gen_request())
     task_key = task_to_run.request_to_task_to_run_key(request)
     task_to_run.validate_to_run_key(task_key)
     with self.assertRaises(ValueError):
@@ -326,7 +335,7 @@ class TaskToRunApiTest(TestCase):
         priority=20,
         created_ts=now,
         expiration_ts=now+datetime.timedelta(seconds=31))
-    task_to_run.new_task_to_run(task_request.make_request(data, True)).put()
+    task_to_run.new_task_to_run(mkreq(data)).put()
 
     # Create a second with higher priority.
     self.mock(random, 'getrandbits', lambda _: 0x23)
@@ -340,7 +349,7 @@ class TaskToRunApiTest(TestCase):
         priority=10,
         created_ts=now,
         expiration_ts=now+datetime.timedelta(seconds=31))
-    task_to_run.new_task_to_run(task_request.make_request(data, True)).put()
+    task_to_run.new_task_to_run(mkreq(data)).put()
 
     expected = [
       {
