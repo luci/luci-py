@@ -553,6 +553,7 @@ def run_command(
                 'run_isolated internal failure %d' % exit_code)
             logging.error('%s', must_signal_internal_failure)
         exit_code = run_isolated_result['exit_code']
+        params['bot_overhead'] = 0.
         if run_isolated_result.get('duration') is not None:
           # Calculate the real task duration as measured by run_isolated and
           # calculate the remaining overhead.

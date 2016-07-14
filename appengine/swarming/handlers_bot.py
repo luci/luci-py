@@ -616,7 +616,7 @@ class BotTaskUpdateHandler(_BotApiHandler):
 
     run_result_key = task_pack.unpack_run_result_key(task_id)
     performance_stats = None
-    if bot_overhead:
+    if bot_overhead is not None:
       performance_stats = task_result.PerformanceStats(
           bot_overhead=bot_overhead)
       if isolated_stats:
