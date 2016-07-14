@@ -59,7 +59,7 @@ class TestTaskRunnerBase(net_utils.TestCase):
     super(TestTaskRunnerBase, self).setUp()
     self.root_dir = tempfile.mkdtemp(prefix='task_runner')
     logging.info('Temp: %s', self.root_dir)
-    self.work_dir = os.path.join(self.root_dir, 'work')
+    self.work_dir = os.path.join(self.root_dir, 'w')
     os.chdir(self.root_dir)
     os.mkdir(self.work_dir)
     # Create the logs directory so run_isolated.py can put its log there.
@@ -208,7 +208,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       }
       json.dump(data, f)
 
-    out_file = os.path.join(self.root_dir, 'work', 'task_runner_out.json')
+    out_file = os.path.join(self.root_dir, 'w', 'task_runner_out.json')
     task_runner.load_and_run(
         manifest, server, 3600., time.time(), out_file, 1, '/path/to/file')
     expected = {
@@ -265,7 +265,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       }
       json.dump(data, f)
 
-    out_file = os.path.join(self.root_dir, 'work', 'task_runner_out.json')
+    out_file = os.path.join(self.root_dir, 'w', 'task_runner_out.json')
     task_runner.load_and_run(
         manifest, server, 3600., time.time(), out_file, 1, '/path/to/file')
     expected = {
@@ -1086,16 +1086,19 @@ class TaskRunnerSmoke(unittest.TestCase):
     # STATUS_ENTRYPOINT_NOT_FOUND=0xc0000139. Python sees it as -1073741510.
     exit_code = -1073741510 if sys.platform == 'win32' else -signal.SIGTERM
 
-    os.mkdir(os.path.join(self.root_dir, 'work'))
-    signal_file = os.path.join(self.root_dir, 'work', 'signal')
+    os.mkdir(os.path.join(self.root_dir, 'w'))
+    signal_file = os.path.join(self.root_dir, 'w', 'signal')
     open(signal_file, 'wb').close()
+
+    # As done by bot_main.py.
     manifest = get_manifest(
         script='import os,time;os.remove(%r);time.sleep(60)' % signal_file,
         hard_timeout=60., io_timeout=60.)
-    task_in_file = os.path.join(self.root_dir, 'task_runner_in.json')
-    task_result_file = os.path.join(self.root_dir, 'task_runner_out.json')
+    task_in_file = os.path.join(self.root_dir, 'w', 'task_runner_in.json')
+    task_result_file = os.path.join(self.root_dir, 'w', 'task_runner_out.json')
     with open(task_in_file, 'wb') as f:
       json.dump(manifest, f)
+
     bot = os.path.join(self.root_dir, 'swarming_bot.1.zip')
     code, _ = fake_swarming.gen_zip(self._server.url)
     with open(bot, 'wb') as f:
@@ -1148,12 +1151,9 @@ class TaskRunnerSmoke(unittest.TestCase):
     expected = {
       'swarming_bot.1.zip',
       '4e019f31778ba7191f965469dc673280386bbd60-cacert.pem',
-      'work',
+      'w',
+      'isolated_cache',
       'logs',
-      'isolated',
-      # TODO(maruel): Move inside work.
-      'task_runner_in.json',
-      'task_runner_out.json',
     }
     self.assertEqual(expected, set(os.listdir(self.root_dir)))
     expected = {

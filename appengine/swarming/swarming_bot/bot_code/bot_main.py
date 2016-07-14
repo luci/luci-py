@@ -60,8 +60,8 @@ SINGLETON = singleton.Singleton(os.path.dirname(THIS_FILE))
 
 
 # Whitelist of files that can be present in the bot's directory. Anything else
-# will be forcibly deleted on startup! Note that 'work' is not in this list, as
-# we want it to be deleted on startup.
+# will be forcibly deleted on startup! Note that 'w' (work) is not in this list,
+# as we want it to be deleted on startup.
 # See
 # https://github.com/luci/luci-py/tree/master/appengine/swarming/doc/LifeOfABot.md
 # for more details.
@@ -592,18 +592,19 @@ def run_manifest(botobj, manifest, start):
   internal_failure = False
   msg = None
   auth_params_dumper = None
-  work_dir = os.path.join(botobj.base_dir, 'work')
+  # Use 'w' instead of 'work' because path length is precious on Windows.
+  work_dir = os.path.join(botobj.base_dir, 'w')
   try:
     try:
       if os.path.isdir(work_dir):
         file_path.rmtree(work_dir)
     except OSError:
-      # If a previous task created an undeleteable file/directory inside 'work',
+      # If a previous task created an undeleteable file/directory inside 'w',
       # make sure that following tasks are not affected. This is done by working
       # around the undeleteable directory by creating a temporary directory
       # instead. This is not normal behavior. The bot will report a failure on
       # start.
-      work_dir = tempfile.mkdtemp(dir=botobj.base_dir, prefix='work')
+      work_dir = tempfile.mkdtemp(dir=botobj.base_dir, prefix='w')
     else:
       os.makedirs(work_dir)
 

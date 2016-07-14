@@ -124,7 +124,7 @@ def get_isolated_cmd(
         '--json', isolated_result,
         '--log-file', os.path.join(bot_dir, 'logs', 'run_isolated.log'),
         '--cache', os.path.join(bot_dir, 'isolated_cache'),
-        '--root-dir', os.path.join(work_dir, 'isolated'),
+        '--root-dir', work_dir,
       ])
   if min_free_space:
     cmd.extend(('--min-free-space', str(min_free_space)))
@@ -223,8 +223,8 @@ def load_and_run(
         u'version': OUT_VERSION,
       }
   finally:
-    # We've found tests to delete 'work' when quitting, causing an exception
-    # here. Try to recreate the directory if necessary.
+    # We've found tests to delete the working directory work_dir when quitting,
+    # causing an exception here. Try to recreate the directory if necessary.
     if not os.path.isdir(work_dir):
       os.mkdir(work_dir)
     with open(out_file, 'wb') as f:

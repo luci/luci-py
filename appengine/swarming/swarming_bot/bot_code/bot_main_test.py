@@ -430,12 +430,12 @@ class TestBotMain(net_utils.TestCase):
           self2, cmd, detached, cwd, env, stdout, stderr, stdin, close_fds):
         self2.returncode = None
         self2._out_file = os.path.join(
-            self.root_dir, 'work', 'task_runner_out.json')
+            self.root_dir, 'w', 'task_runner_out.json')
         expected = [
           sys.executable, bot_main.THIS_FILE, 'task_runner',
           '--swarming-server', url,
           '--in-file',
-          os.path.join(self.root_dir, 'work', 'task_runner_in.json'),
+          os.path.join(self.root_dir, 'w', 'task_runner_in.json'),
           '--out-file', self2._out_file,
           '--cost-usd-hour', '3600.0', '--start', '100.0',
           '--min-free-space',
@@ -456,7 +456,7 @@ class TestBotMain(net_utils.TestCase):
         self.assertEqual(sys.platform != 'win32', close_fds)
         if auth_params_json is not None:
           auth_params_file = os.path.join(
-              self.root_dir, 'work', 'bot_auth_params.json')
+              self.root_dir, 'w', 'bot_auth_params.json')
           self.assertEqual(auth_params_file, env.get('SWARMING_AUTH_PARAMS'))
           with open(auth_params_file, 'rb') as f:
             actual_auth_params = json.load(f)
