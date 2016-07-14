@@ -751,7 +751,8 @@ class AdbCommandsSafe(object):
     _LOG.debug('%s._Connect(%s)', self.port_path, use_serial)
     if self._handle:
       assert self._handle.is_open
-      for _ in self._Loop():
+      # Ensure at least two loops if an I/O timeout occurs.
+      for _ in self._Loop(timeout=2*self._lost_timeout_ms):
         # On the first access with an open handle, try to set self._serial to
         # the serial number of the device. This means communicating to the USB
         # device, so it may throw.
@@ -788,6 +789,7 @@ class AdbCommandsSafe(object):
         except usb_exceptions.LibusbWrappingError as e:
           self._failure = 'usb_failure'
           _LOG.warning('I/O FAILURE: %s: %s', self.port_path, e)
+          self._handle.Reset()
         except adb_protocol.InvalidResponseError as e:
           self._failure = 'protocol_fault'
           _LOG.warning('SYNC FAILURE: %s: %s', self.port_path, e)

@@ -84,6 +84,9 @@ class Handle(object):
   def Close(self):
     raise NotImplementedError()
 
+  def Reset(self):
+    raise NotImplementedError()
+
   def BulkWrite(self, data, timeout_ms=None):
     raise NotImplementedError()
 
@@ -228,6 +231,15 @@ class UsbHandle(Handle):
       self._write_endpoint = None
       self._interface_number = None
       self._max_read_packet_len = None
+
+  def Reset(self):
+    if self._handle is None:
+      return
+    try:
+      self._handle.resetDevice()
+    except libusb1.USBError as e:
+      _LOG.error('Could not reset device %s: %s', self.port_path_str, e)
+      self.Close()
 
   def FlushBuffers(self):
     while True:
