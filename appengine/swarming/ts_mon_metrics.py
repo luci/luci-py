@@ -142,7 +142,8 @@ def update_jobs_completed_metrics(task_result_summary):
   else:
     fields['result'] = 'success'
   jobs_completed.increment(fields=fields)
-  jobs_durations.add(task_result_summary.duration, fields=fields)
+  if task_result_summary.duration is not None:
+    jobs_durations.add(task_result_summary.duration, fields=fields)
 
 
 @ndb.tasklet
