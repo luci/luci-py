@@ -112,6 +112,41 @@ class RestrictedConfigHandler(auth.AuthenticatingHandler):
         template.render('isolate/restricted_config.html', params))
 
 
+class RestrictedPurgeHandler(auth.AuthenticatingHandler):
+  @auth.autologin
+  @auth.require(auth.is_admin)
+  def get(self):
+    params = {
+      'digest': '',
+      'message': '',
+      'namespace': '',
+      'xsrf_token': self.generate_xsrf_token(),
+    }
+    self.response.write(
+        template.render('isolate/restricted_purge.html', params))
+
+  @auth.require(auth.is_admin)
+  def post(self):
+    namespace = self.request.get('namespace')
+    digest = self.request.get('digest')
+    params = {
+      'digest': digest,
+      'message': '',
+      'namespace': namespace,
+      'xsrf_token': self.generate_xsrf_token(),
+    }
+    try:
+      key = model.get_entry_key(namespace, digest)
+    except ValueError as e:
+      params['message'] = 'Invalid entry: %s' % e
+      key = None
+    if key:
+      model.delete_entry_and_gs_entry([key])
+      params['message'] = 'Done'
+    self.response.write(
+        template.render('isolate/restricted_purge.html', params))
+
+
 ### Mapreduce related handlers
 
 
@@ -323,6 +358,7 @@ def get_routes():
   return [
       # Administrative urls.
       webapp2.Route(r'/restricted/config', RestrictedConfigHandler),
+      webapp2.Route(r'/restricted/purge', RestrictedPurgeHandler),
 
       # Mapreduce related urls.
       webapp2.Route(
