@@ -63,7 +63,7 @@ class SimpleMainTest(TestCase):
     self.assertAlmostEqual(
         actual[u'state'].pop(u'cost_usd_hour'),
         expected[u'state'].pop(u'cost_usd_hour'),
-        places=6)
+        places=5)
     self.assertEqual(expected, actual)
 
   def test_version(self):
