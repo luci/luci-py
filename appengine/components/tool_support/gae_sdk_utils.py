@@ -575,7 +575,7 @@ def process_sdk_options(parser, options, app_dir):
     parser.error(str(e))
 
 
-def confirm(text, app, version, modules=None):
+def confirm(text, app, version, modules=None, default_yes=False):
   """Asks a user to confirm the action related to GAE app.
 
   Args:
@@ -592,7 +592,10 @@ def confirm(text, app, version, modules=None):
   print('  App ID:    %s' % app.app_id)
   print('  Version:   %s' % version)
   print('  Modules:   %s' % ', '.join(modules or app.modules))
-  return raw_input('Continue? [y/N] ') in ('y', 'Y')
+  if default_yes:
+    return raw_input('Continue? [Y/n] ') not in ('n', 'N')
+  else:
+    return raw_input('Continue? [y/N] ') in ('y', 'Y')
 
 
 def is_oauth_token_cached():

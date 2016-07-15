@@ -312,7 +312,7 @@ def CMDupload(parser, args):
   if not options.force:
     approved = gae_sdk_utils.confirm(
         'Upload new version, update indexes, queues and cron jobs?',
-        app, version, modules)
+        app, version, modules, default_yes=True)
     if not approved:
       print('Aborted.')
       return 1
