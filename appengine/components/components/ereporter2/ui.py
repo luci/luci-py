@@ -92,7 +92,6 @@ def _email_html(to, subject, body):
 def _get_template_env(start_time, end_time, module_versions):
   """Generates commonly used jinja2 template variables."""
   return {
-    'app_id': app_identity.get_application_id(),
     'end': end_time,
     'module_versions': module_versions or [],
     'start': start_time or 0,

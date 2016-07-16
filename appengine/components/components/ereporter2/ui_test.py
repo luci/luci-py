@@ -144,7 +144,6 @@ class Ereporter2Test(test_case.TestCase):
   def test_get_template_env(self):
     env = ui._get_template_env(10, 20, [('foo', 'bar')])
     expected = {
-      'app_id': 'sample-app',
       'end': 20,
       'module_versions': [('foo', 'bar')],
       'start': 10,

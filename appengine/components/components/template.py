@@ -13,6 +13,7 @@ utils.import_jinja2()
 
 import jinja2
 
+from google.appengine.api import app_identity
 from google.appengine.api import users
 
 from components import natsort
@@ -143,6 +144,8 @@ def bootstrap(paths, global_env=None, filters=None):
 
   if global_env:
     _GLOBAL_ENV.update(global_env)
+  # These are immutable.
+  _GLOBAL_ENV.setdefault('app_id', app_identity.get_application_id())
   _GLOBAL_ENV.setdefault('app_version', utils.get_app_version())
   _GLOBAL_ENV.setdefault('app_revision_url', utils.get_app_revision_url())
 
@@ -202,5 +205,4 @@ def render(name, params=None):
   """
   data = _get_defaults()
   data.update(params or {})
-  data.setdefault('now', utils.utcnow())
   return get_jinja_env().get_template(name).render(data)
