@@ -65,11 +65,12 @@ SINGLETON = singleton.Singleton(os.path.dirname(THIS_FILE))
 # See
 # https://github.com/luci/luci-py/tree/master/appengine/swarming/doc/LifeOfABot.md
 # for more details.
-WHITELIST = (
+PASSLIST = (
   '*-cacert.pem',
   'cipd_cache',
   'isolated_cache',
   'logs',
+  'README',
   'swarming.lck',
   'swarming_bot.1.zip',
   'swarming_bot.2.zip',
@@ -332,7 +333,7 @@ def cleanup_bot_directory(botobj):
   this bot to self-quarantine. Do only this when running from the zip.
   """
   for i in os.listdir(botobj.base_dir):
-    if any(fnmatch.fnmatch(i, w) for w in WHITELIST):
+    if any(fnmatch.fnmatch(i, w) for w in PASSLIST):
       continue
     try:
       p = unicode(os.path.join(botobj.base_dir, i))

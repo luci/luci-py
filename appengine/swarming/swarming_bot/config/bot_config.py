@@ -23,6 +23,8 @@ This file contains unicode to confirm UTF-8 encoded file is well supported.
 Here's a pile of poo: 💩
 """
 
+import os
+
 from api import os_utilities
 
 # Unused argument 'bot' - pylint: disable=W0613
@@ -41,7 +43,7 @@ def get_dimensions(bot):
   See https://github.com/luci/luci-py/tree/master/appengine/swarming/doc/Magic-Values.md.
 
   Arguments:
-  - bot: bot.Bot instance or None.
+  - bot: bot.Bot instance or None. See ../api/bot.py.
   """
   return os_utilities.get_dimensions()
 
@@ -60,7 +62,7 @@ def get_state(bot):
   See https://github.com/luci/luci-py/tree/master/appengine/swarming/doc/Magic-Values.md.
 
   Arguments:
-  - bot: bot.Bot instance or None.
+  - bot: bot.Bot instance or None. See ../api/bot.py.
   """
   return os_utilities.get_state()
 
@@ -80,7 +82,7 @@ def get_authentication_headers(bot):
   May be called by different threads, but never concurrently.
 
   Arguments:
-  - bot: bot.Bot instance.
+  - bot: bot.Bot instance. See ../api/bot.py.
 
   Returns:
     Tuple (dict with headers or None, unix timestamp of when they expire).
@@ -97,7 +99,7 @@ def on_bot_shutdown(bot):
   It's a good time to do other kinds of cleanup.
 
   Arguments:
-  - bot: bot.Bot instance.
+  - bot: bot.Bot instance. See ../api/bot.py.
   """
   pass
 
@@ -108,7 +110,7 @@ def on_bot_startup(bot):
   It's a good time to do some cleanup before starting to poll for tasks.
 
   Arguments:
-  - bot: bot.Bot instance.
+  - bot: bot.Bot instance. See ../api/bot.py.
   """
   pass
 
@@ -120,7 +122,7 @@ def on_before_task(bot, bot_file=None):
   anything too fancy.
 
   Arguments:
-  - bot: bot.Bot instance.
+  - bot: bot.Bot instance. See ../api/bot.py.
   - bot_file: Path to file to write information about the state of the bot.
               This file can be used to pass certain info about the bot
               to tasks, such as which connected android devices to run on. See
@@ -139,7 +141,7 @@ def on_after_task(bot, failure, internal_failure, dimensions, summary):
   failure.
 
   Arguments:
-  - bot: bot.Bot instance.
+  - bot: bot.Bot instance. See ../api/bot.py.
   - failure: bool, True if the task failed.
   - internal_failure: bool, True if an internal failure happened.
   - dimensions: dict, Dimensions requested as part of the task.
@@ -161,7 +163,20 @@ def setup_bot(bot):
   Returns True if it's fine to start the bot right away. Otherwise, the calling
   script should exit.
 
+  This is an excellent place to drop a README file in the bot directory, to give
+  more information about the purpose of this bot.
+
   Example: making this script starts automatically on user login via
   os_utilities.set_auto_startup_win() or os_utilities.set_auto_startup_osx().
   """
-  return True
+  with open(os.path.join(bot.base_dir, 'README'), 'wb') as f:
+    f.write(
+"""This directory contains a Swarming bot.
+
+Swarming source code is hosted at https://github.com/luci/luci-py.
+
+The bot was generated from the server %s. To get the bot's attributes, run:
+
+  python swarming_bot.zip attributes
+""" % bot.server)
+    return True
