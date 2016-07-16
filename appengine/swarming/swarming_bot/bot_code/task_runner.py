@@ -121,6 +121,8 @@ def get_isolated_cmd(
 
   cmd.extend(
       [
+        # Cleanup has been run at bot startup in bot_main.py.
+        '--no-clean',
         '--json', isolated_result,
         '--log-file', os.path.join(bot_dir, 'logs', 'run_isolated.log'),
         '--cache', os.path.join(bot_dir, 'isolated_cache'),
