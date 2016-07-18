@@ -188,13 +188,8 @@ def CMDshell(parser, args):
     from google.appengine.ext.remote_api import remote_api_stub
     try:
       print('Connecting...')
-      remote_api_stub.ConfigureRemoteApi(
-          None,
-          '/_ah/remote_api',
-          gae_sdk_utils.get_authentication_function(),
-          options.host,
-          save_cookies=True,
-          secure=True)
+      remote_api_stub.ConfigureRemoteApiForOAuth(
+          options.host, '/_ah/remote_api')
     except urllib2.URLError:
       print >> sys.stderr, 'Failed to access %s' % options.host
       return 1
