@@ -477,11 +477,11 @@ class _TaskResultCommon(ndb.Model):
     """Returns the overhead from server<->bot communication in timedelta."""
     perf = self.performance_stats
     if perf.bot_overhead is not None:
-      duration = self.duration + perf.bot_overhead
-      duration += (perf.isolated_download.duration or 0)
-      duration += (perf.isolated_upload.duration or 0)
+      duration = (self.duration or 0.) + (perf.bot_overhead or 0.)
+      duration += (perf.isolated_download.duration or 0.)
+      duration += (perf.isolated_upload.duration or 0.)
       out = (
-          self.duration_as_seen_by_server -
+          (self.duration_as_seen_by_server or datetime.timedelta()) -
           datetime.timedelta(seconds=duration))
       if out.total_seconds() >= 0:
         return out
