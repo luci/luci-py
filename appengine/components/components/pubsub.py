@@ -201,11 +201,29 @@ def publish(topic, message, attributes):
   publish_multi(topic, {message: attributes})
 
 
+def modify_ack_deadline_async(subscription, deadline, *ack_ids):
+  """Modifies acknowledgement deadline of messages.
+
+  Args:
+    subcription: Full name of the subscription.
+    deadline: New deadline (in seconds).
+    *ack_ids: List of IDs of messages to extend the ack deadline of.
+  """
+  return _call_async(
+      'POST',
+      '%s:modifyAckDeadline' % subscription,
+      payload={
+          'ackDeadlineSeconds': deadline,
+          'ackIds': ack_ids,
+      },
+  )
+
+
 def ack_async(subscription, *ack_ids):
   """Acknowledges receipt of messages.
 
   Args:
-    subscription: Full name of the subscription:
+    subscription: Full name of the subscription.
     *ack_ids: List of IDs of messages to ack.
   """
   return _call_async(

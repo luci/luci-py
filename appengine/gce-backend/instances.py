@@ -38,13 +38,15 @@ def get_instance_key(base_name, revision, zone, instance_name):
   )
 
 
-@ndb.transactional_tasklet
+@ndb.tasklet
 def mark_for_deletion(key):
   """Marks the given instance for deletion.
 
   Args:
     key: ndb.Key for a models.Instance entity.
   """
+  assert ndb.in_transaction()
+
   entity = yield key.get_async()
   if not entity:
     logging.warning('Instance does not exist: %s', key)
@@ -56,7 +58,7 @@ def mark_for_deletion(key):
     yield entity.put_async()
 
 
-@ndb.transactional_tasklet
+@ndb.tasklet
 def add_subscription_metadata(key, subscription_project, subscription):
   """Queues the addition of subscription metadata.
 
@@ -66,6 +68,8 @@ def add_subscription_metadata(key, subscription_project, subscription):
     subscription: Name of the Pub/Sub subscription that Machine Provider will
       communicate with the instance on.
   """
+  assert ndb.in_transaction()
+
   entity = yield key.get_async()
   if not entity:
     logging.warning('Instance does not exist: %s', key)
@@ -89,6 +93,7 @@ def add_subscription_metadata(key, subscription_project, subscription):
     )
     return
 
+  logging.info('Instance Pub/Sub subscription received: %s', key)
   entity.pending_metadata_updates.append(models.MetadataUpdate(
       metadata={
           'pubsub_service_account': grandparent.service_accounts[0].name,
