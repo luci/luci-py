@@ -123,6 +123,8 @@ def get_isolated_cmd(
       [
         # Cleanup has been run at bot startup in bot_main.py.
         '--no-clean',
+        # https://github.com/luci/luci-py/issues/270
+        #'--use-symlinks',
         '--json', isolated_result,
         '--log-file', os.path.join(bot_dir, 'logs', 'run_isolated.log'),
         '--cache', os.path.join(bot_dir, 'isolated_cache'),
