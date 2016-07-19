@@ -20,7 +20,6 @@ from protorpc.remote import protojson
 import webapp2
 import webtest
 
-from components import auth
 from components import ereporter2
 from components import utils
 
@@ -49,7 +48,6 @@ class BaseTest(test_env_handlers.AppTestBase, test_case.EndpointsTestCase):
   def setUp(self):
     test_case.EndpointsTestCase.setUp(self)
     super(BaseTest, self).setUp()
-    self.mock(auth, 'is_group_member', lambda *_args, **_kwargs: True)
     # handlers_bot is necessary to create fake tasks.
     self.app = webtest.TestApp(
         webapp2.WSGIApplication(handlers_bot.get_routes(), debug=True),
@@ -73,6 +71,8 @@ class ServerApiTest(BaseTest):
     self.assertEqual({'server_version': utils.get_app_version()}, response.json)
 
   def _test_file(self, name):
+    self.set_as_admin()
+
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     path = os.path.join(self.APP_DIR, 'swarming_bot', 'config', name + '.py')
@@ -87,7 +87,7 @@ class ServerApiTest(BaseTest):
     expected = {
       u'version': u'0',
       u'when': u'2010-01-02T03:04:05',
-      u'who': u'user:user@example.com',
+      u'who': u'user:admin@example.com',
     }
     response = self.call_api('put_' + name, {'content': u'hi ☀!'})
     self.assertEqual(expected, response.json)
@@ -96,7 +96,7 @@ class ServerApiTest(BaseTest):
       u'content': u'hi \u2600!',
       u'version': u'0',
       u'when': u'2010-01-02T03:04:05',
-      u'who': u'user:user@example.com',
+      u'who': u'user:admin@example.com',
     }
     self.assertEqual(expected, self.call_api('get_' + name).json)
 
@@ -104,7 +104,7 @@ class ServerApiTest(BaseTest):
     expected = {
       u'version': u'1',
       u'when': u'2010-01-02T03:05:05',
-      u'who': u'user:user@example.com',
+      u'who': u'user:admin@example.com',
     }
     response = self.call_api('put_' + name, {'content': u'hi ♕!'})
     self.assertEqual(expected, response.json)
@@ -113,7 +113,7 @@ class ServerApiTest(BaseTest):
       u'content': u'hi ♕!',
       u'version': u'1',
       u'when': u'2010-01-02T03:05:05',
-      u'who': u'user:user@example.com',
+      u'who': u'user:admin@example.com',
     }
     self.assertEqual(expected, self.call_api('get_' + name).json)
 
@@ -121,7 +121,7 @@ class ServerApiTest(BaseTest):
       u'content': u'hi ☀!',
       u'version': u'0',
       u'when': u'2010-01-02T03:04:05',
-      u'who': u'user:user@example.com',
+      u'who': u'user:admin@example.com',
     }
     response = self.call_api('get_' + name, {'version': '0'})
     self.assertEqual(expected, response.json)
@@ -378,6 +378,8 @@ class TasksApiTest(BaseTest):
       ],
       u'now': str_now_30,
     }
+
+    self.set_as_privileged_user()
     self.assertEqual(
         expected,
         self.call_api('list', body=message_to_dict(request)).json)
@@ -447,7 +449,7 @@ class TasksApiTest(BaseTest):
           u'created_ts': str_now,
           u'expiration_secs': u'86400',
           u'name': u'task',
-          u'priority': u'10',
+          u'priority': u'100',
           u'properties': {
             u'cipd_input': {
               u'client_package': {
@@ -476,7 +478,7 @@ class TasksApiTest(BaseTest):
             u'os:Amiga',
             u'os:Win',
             u'pool:default',
-            u'priority:10',
+            u'priority:100',
             u'project:yay',
             u'user:joe@localhost',
           ],
@@ -763,8 +765,7 @@ class TasksApiTest(BaseTest):
         end=end, start=start, tags=['commit:pre'],
         sort=swarming_rpcs.TaskSort.MODIFIED_TS,
         state=swarming_rpcs.TaskState.COMPLETED_SUCCESS)
-    with self.call_should_fail('400'):
-      self.call_api('list', body=message_to_dict(request))
+    self.call_api('list', body=message_to_dict(request), status=400)
 
   def test_count_indexes(self):
     # Asserts that no combination crashes.
@@ -914,7 +915,7 @@ class TasksApiTest(BaseTest):
         u'os:Amiga',
         u'os:Win',
         u'pool:default',
-        u'priority:10',
+        u'priority:100',
         u'project:yay',
         u'user:jack@localhost',
       ],
@@ -963,7 +964,7 @@ class TasksApiTest(BaseTest):
         u'os:Amiga',
         u'os:Win',
         u'pool:default',
-        u'priority:10',
+        u'priority:100',
         u'project:yay',
         u'user:joe@localhost',
       ],
@@ -999,12 +1000,11 @@ class TaskApiTest(BaseTest):
       return True
     self.mock(utils, 'enqueue_task', enqueue_task_mock)
 
-    # create and cancel a task
+    # Create and cancel a task as a non-privileged user.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
-    self.set_as_admin()
     _, task_id = self.client_create_task_raw(
         pubsub_topic='projects/abc/topics/def',
         pubsub_userdata='blah')
@@ -1024,7 +1024,7 @@ class TaskApiTest(BaseTest):
       u'tags': [
         u'os:Amiga',
         u'pool:default',
-        u'priority:10',
+        u'priority:100',
         u'user:joe@localhost',
       ],
       u'task_id': task_id,
@@ -1044,6 +1044,28 @@ class TaskApiTest(BaseTest):
       },
     ]
     self.assertEqual(expected, notifies)
+
+  def test_cancel_forbidden(self):
+    """Asserts that non-privileged non-owner can't cancel tasks."""
+    # catch PubSub notification
+    notifies = []
+    def enqueue_task_mock(**kwargs):
+      notifies.append(kwargs)
+      return True
+    self.mock(utils, 'enqueue_task', enqueue_task_mock)
+
+    # Create a task as an admin.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+    self.set_as_admin()
+    _, task_id = self.client_create_task_raw(
+        pubsub_topic='projects/abc/topics/def',
+        pubsub_userdata='blah')
+
+    # Attempt to cancel as non-privileged user -> HTTP 403.
+    self.set_as_user()
+    self.call_api('cancel', body={'task_id': task_id}, status=403)
 
   def test_task_canceled(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -1091,7 +1113,7 @@ class TaskApiTest(BaseTest):
         u'tags': [
           u'os:Amiga',
           u'pool:default',
-          u'priority:10',
+          u'priority:100',
           u'user:joe@localhost',
         ],
         u'task_id': task_id,
@@ -1111,18 +1133,19 @@ class TaskApiTest(BaseTest):
     _cycle(params, expected, False)
 
     # Canceling a running task is currently not supported.
+    self.set_as_user()
     expected = {u'ok': False, u'was_running': True}
     response = self.call_api('cancel', body={'task_id': task_id})
     self.assertEqual(expected, response.json)
 
+    self.set_as_bot()
     params = _params(output=base64.b64encode('hi'), output_chunk_start=3)
     expected = _expected()
     _cycle(params, expected, False)
 
   def test_result_unknown(self):
     """Asserts that result raises 404 for unknown task IDs."""
-    with self.call_should_fail('404'):
-      _ = self.call_api('result', body={'task_id': '12300'})
+    self.call_api('result', body={'task_id': '12300'}, status=404)
 
   def test_result_ok(self):
     """Asserts that result produces a result entity."""
@@ -1144,7 +1167,7 @@ class TaskApiTest(BaseTest):
       u'tags': [
         u'os:Amiga',
         u'pool:default',
-        u'priority:10',
+        u'priority:100',
         u'user:joe@localhost',
       ],
       u'task_id': u'5cee488008810',
@@ -1154,12 +1177,12 @@ class TaskApiTest(BaseTest):
 
     # no bot started: running task
     run_id = task_id[:-1] + '1'
-    with self.call_should_fail('404'):
-      _ = self.call_api('result', body={'task_id': run_id})
+    self.call_api('result', body={'task_id': run_id}, status=404)
 
     # run as bot
     self.set_as_bot()
     self.bot_poll('bot1')
+
     self.set_as_user()
     response = self.call_api('result', body={'task_id': run_id})
     expected = {
@@ -1193,6 +1216,7 @@ class TaskApiTest(BaseTest):
     self.set_as_bot()
     task_id = self.bot_run_task()
     # First ask without perf metadata.
+    self.set_as_user()
     response = self.call_api('result', body={'task_id': task_id})
     expected = {
       u'bot_dimensions': [
@@ -1265,15 +1289,13 @@ class TaskApiTest(BaseTest):
     self.assertEqual({}, response.json)
 
     run_id = task_id[:-1] + '1'
-    with self.call_should_fail('404'):
-      _ = self.call_api('stdout', body={'task_id': run_id})
+    self.call_api('stdout', body={'task_id': run_id}, status=404)
 
   def test_result_run_not_found(self):
     """Asserts that getting results from incipient tasks raises 404."""
     _, task_id = self.client_create_task_raw()
     run_id = task_id[:-1] + '1'
-    with self.call_should_fail('404'):
-      _ = self.call_api('stdout', body={'task_id': run_id})
+    self.call_api('stdout', body={'task_id': run_id}, status=404)
 
   def test_task_deduped(self):
     """Asserts that task deduplication works as expected."""
@@ -1301,22 +1323,20 @@ class TaskApiTest(BaseTest):
 
   def test_request_unknown(self):
     """Asserts that 404 is raised for unknown tasks."""
-    with self.call_should_fail('404'):
-      _ = self.call_api('request', body={'task_id': '12300'})
+    self.call_api('request', body={'task_id': '12300'}, status=404)
 
   def test_request_ok(self):
     """Asserts that request produces a task request."""
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
     _, task_id = self.client_create_task_raw()
-    self.set_as_bot()
     response = self.call_api('request', body={'task_id': task_id})
     expected = {
       u'authenticated': u'user:user@example.com',
       u'created_ts': unicode(now.strftime(self.DATETIME_FORMAT)),
       u'expiration_secs': unicode(24 * 60 * 60),
       u'name': u'hi',
-      u'priority': u'10',
+      u'priority': u'100',
       u'properties': {
         u'cipd_input': {
           u'client_package': {
@@ -1326,7 +1346,7 @@ class TaskApiTest(BaseTest):
           u'packages': [{
             u'package_name': u'rm',
             u'path': u'bin',
-            u'version': 'git_revision:deadbeef',
+            u'version': u'git_revision:deadbeef',
           }],
           u'server': u'https://chrome-infra-packages.appspot.com',
         },
@@ -1343,7 +1363,7 @@ class TaskApiTest(BaseTest):
       u'tags': [
         u'os:Amiga',
         u'pool:default',
-        u'priority:10',
+        u'priority:100',
         u'user:joe@localhost',
       ],
       u'user': u'joe@localhost',
@@ -1400,8 +1420,7 @@ class BotsApiTest(BaseTest):
     self.assertEqual(expected, response.json)
 
     request = swarming_rpcs.BotsRequest(dimensions=['bad'])
-    with self.call_should_fail('400'):
-      self.call_api('list', body=message_to_dict(request))
+    self.call_api('list', body=message_to_dict(request), status=400)
 
 
 class BotApiTest(BaseTest):
@@ -1439,8 +1458,8 @@ class BotApiTest(BaseTest):
 
   def test_get_no_bot(self):
     """Asserts that get raises 404 when no bot is found."""
-    with self.call_should_fail('404'):
-      self.call_api('get', body={'bot_id': 'not_a_bot'})
+    self.set_as_admin()
+    self.call_api('get', body={'bot_id': 'not_a_bot'}, status=404)
 
   def test_delete_ok(self):
     """Assert that delete finds and deletes a bot."""
@@ -1465,8 +1484,7 @@ class BotApiTest(BaseTest):
     self.assertEqual({u'deleted': True}, response.json)
 
     # is it gone?
-    with self.call_should_fail('404'):
-      self.call_api('delete', body={'bot_id': 'id1'})
+    self.call_api('delete', body={'bot_id': 'id1'}, status=404)
 
   def test_tasks_ok(self):
     """Asserts that tasks produces bot information."""

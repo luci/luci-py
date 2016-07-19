@@ -547,8 +547,13 @@ class TaskRequest(ndb.Model):
     """Reconstructs this value from expiration_ts and created_ts. Integer."""
     return int((self.expiration_ts - self.created_ts).total_seconds())
 
+  @property
   def has_access(self):
-    """Returns true if the user has access to this request.
+    """Returns True if the current user has read-write access to this request.
+
+    This is used for:
+      * Read access: ability to read the task info and logs.
+      * Write access: ability to cancel the task.
 
     Warning: This function looks at the current Authentication context.
     """
