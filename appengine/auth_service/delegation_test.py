@@ -15,7 +15,10 @@ test_env.setup_test_env()
 import webapp2
 import webtest
 
+from google.appengine.ext import ndb
+
 from components import auth
+from components import utils
 from components.auth import delegation as auth_delegation
 from components.auth import handler
 from components.auth.proto import delegation_pb2
@@ -36,7 +39,7 @@ class HandlersTest(test_case.TestCase):
     super(HandlersTest, self).setUp()
     self.app = webtest.TestApp(
         webapp2.WSGIApplication(delegation.get_rest_api_routes(), debug=True),
-        extra_environ={'REMOTE_ADDR': '127.0.0.1'})
+        extra_environ={'REMOTE_ADDR': '127.1.2.3'})
     # Don't bother with XSRF tokens in unit tests.
     self.mock(
         delegation.CreateDelegationTokenHandler, 'xsrf_token_enforce_on', [])
@@ -71,10 +74,25 @@ class HandlersTest(test_case.TestCase):
     self.assertFalse(t.audience)
     self.assertEqual(t.services, ['*'])
     self.assertFalse(t.HasField('impersonator_id'))
+    self.assertTrue(t.subtoken_id is not None)
+
+    # Entity is created.
+    key = ndb.Key(delegation.AuthDelegationSubtoken, t.subtoken_id)
+    ent = key.get()
+    self.assertTrue(ent)
+    self.assertTrue(ent.subtoken)
+    self.assertEqual('127.1.2.3', ent.caller_ip)
+    self.assertEqual('v1a', ent.auth_service_version)
+    self.assertEqual('user:a@a.com', ent.issuer_id)
+    self.assertEqual(
+        t.creation_time*1e6, utils.datetime_to_timestamp(ent.creation_time))
+    self.assertEqual('', ent.impersonator_id)
 
   def test_with_impersonation(self):
     # This function is tested separately below.
-    self.mock(delegation, 'check_can_create_token', lambda *_, **__: None)
+    self.mock(
+        delegation, 'check_can_create_token',
+        lambda *_, **__: delegation.DEFAULT_RULE)
 
     resp = self.create_token({
       'audience': ['user:b@a.com'],
@@ -147,7 +165,9 @@ class CheckCanCreateTokenTest(test_case.TestCase):
         lambda: config_pb2.DelegationConfig(rules=self.rules))
 
   def add_rule(self, **kwargs):
-    self.rules.append(config_pb2.DelegationConfig.Rule(**kwargs))
+    r = config_pb2.DelegationConfig.Rule(**kwargs)
+    self.rules.append(r)
+    return r
 
   def test_get_delegation_rule(self):
     self.add_rule(
@@ -189,11 +209,12 @@ class CheckCanCreateTokenTest(test_case.TestCase):
     return delegation_pb2.Subtoken(**kwargs)
 
   def test_validity_duration(self):
-    self.add_rule(
+    rule = self.add_rule(
         user_id=['*'], target_service=['*'], max_validity_duration=300)
 
     tok = self.make_subtoken(issuer_id='user:a@a.com', validity_duration=300)
-    delegation.check_can_create_token('user:a@a.com', tok)
+    r = delegation.check_can_create_token('user:a@a.com', tok)
+    self.assertEqual(rule, r)
 
     with self.assertRaises(auth.AuthorizationError):
       tok = self.make_subtoken(issuer_id='user:a@a.com', validity_duration=400)
@@ -202,7 +223,8 @@ class CheckCanCreateTokenTest(test_case.TestCase):
   def test_impersonation_disallowed_by_default(self):
     # Making delegation token.
     tok = self.make_subtoken(issuer_id='user:a@a.com', validity_duration=300)
-    delegation.check_can_create_token('user:a@a.com', tok)
+    r = delegation.check_can_create_token('user:a@a.com', tok)
+    self.assertEqual(delegation.DEFAULT_RULE, r)
 
     # Making impersonation token.
     with self.assertRaises(auth.AuthorizationError):
@@ -210,7 +232,7 @@ class CheckCanCreateTokenTest(test_case.TestCase):
       delegation.check_can_create_token('user:not-a@a.com', tok)
 
   def test_allowed_to_impersonate(self):
-    self.add_rule(
+    rule = self.add_rule(
         user_id=['user:a@a.com'],
         target_service=['*'],
         max_validity_duration=300,
@@ -225,15 +247,18 @@ class CheckCanCreateTokenTest(test_case.TestCase):
 
     tok = self.make_subtoken(
         issuer_id='user:directly@a.com', validity_duration=300)
-    delegation.check_can_create_token('user:a@a.com', tok)
+    r = delegation.check_can_create_token('user:a@a.com', tok)
+    self.assertEqual(rule, r)
 
     tok = self.make_subtoken(
         issuer_id='user:someone@viaglob.com', validity_duration=300)
-    delegation.check_can_create_token('user:a@a.com', tok)
+    r = delegation.check_can_create_token('user:a@a.com', tok)
+    self.assertEqual(rule, r)
 
     tok = self.make_subtoken(
         issuer_id='user:in-group@a.com', validity_duration=300)
-    delegation.check_can_create_token('user:a@a.com', tok)
+    r = delegation.check_can_create_token('user:a@a.com', tok)
+    self.assertEqual(rule, r)
 
     # Trying to impersonate someone not allowed.
     with self.assertRaises(auth.AuthorizationError):

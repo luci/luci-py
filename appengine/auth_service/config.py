@@ -22,7 +22,6 @@ changes as well as removes a need to write some UI for them.
 
 import collections
 import logging
-import os
 import posixpath
 
 from google import protobuf
@@ -43,6 +42,10 @@ import importer
 
 # Config file revision number and where it came from.
 Revision = collections.namedtuple('Revision', ['revision', 'url'])
+
+
+class CannotLoadConfigError(Exception):
+  """Raised when fetching configs if they are missing or invalid."""
 
 
 def is_remote_configured():
@@ -104,7 +107,7 @@ def refetch_config(force=False):
   # Grab and validate all new configs in parallel.
   try:
     configs = _fetch_configs(_CONFIG_SCHEMAS)
-  except config.CannotLoadConfigError as exc:
+  except CannotLoadConfigError as exc:
     logging.error('Failed to fetch configs\n%s', exc)
     return
 
@@ -534,11 +537,11 @@ def _fetch_configs(paths):
   for path, future in zip(paths, futures):
     rev, conf = future.get_result()
     if conf is None:
-      raise config.CannotLoadConfigError('Config %s is missing' % path)
+      raise CannotLoadConfigError('Config %s is missing' % path)
     try:
       validation.validate(config.self_config_set(), path, conf)
     except ValueError as exc:
-      raise config.CannotLoadConfigError(
+      raise CannotLoadConfigError(
           'Config %s at rev %s failed to pass validation: %s' %
           (path, rev, exc))
     out[path] = (Revision(rev, _gitiles_url(configs_url, rev, path)), conf)

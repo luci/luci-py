@@ -68,9 +68,10 @@ message Subtoken {
   // How long the token is considered valid (in seconds). Required.
   optional int32 validity_duration = 3;
 
-  // The token is no longer valid if at least one of these IDs is revoked.
-  // TODO(vadimsh): Implement.
-  // repeated uint64 revocation_id = 4;
+  // Identifier of this subtoken.
+  //
+  // Used for logging and tracking purposes.
+  optional int64 subtoken_id = 4;
 
   // To WHOM the authority is delegated. Each item can be an identity string
   // (e.g. "user:<email>") or a "group:<name>" string. "Any bearer can use

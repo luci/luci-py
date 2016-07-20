@@ -441,7 +441,7 @@ class ConfigTest(test_case.TestCase):
       raise ndb.Return(('imports_cfg_rev', 'bad config'))
     self.mock(config_component, 'get_self_config_async', get_self_config_mock)
     self.mock(config, '_get_configs_url', lambda: 'http://url')
-    with self.assertRaises(config_component.CannotLoadConfigError):
+    with self.assertRaises(config.CannotLoadConfigError):
       config._fetch_configs(['imports.cfg'])
 
   def test_gitiles_url(self):
