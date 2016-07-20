@@ -309,11 +309,18 @@ def resize(key):
   api = gce.Project(parent.project)
   response = api.get_instance_group_manager(get_name(entity), key.id())
 
+  # Find out how many VMs are idle (i.e. not currently being created
+  # or deleted). This helps avoid doing too many VM actions simultaneously.
+  current_size = response.get('currentActions', {}).get('none')
+  if current_size is None:
+    logging.error('Unexpected response: %s', json.dumps(response, indent=2))
+    return
+
   # Try to reach the target size, but avoid increasing the number of
   # instances by more than the resize limit. For now, the target size
   # is just the minimum size.
-  target_size = min(entity.minimum_size, response['targetSize'] + RESIZE_LIMIT)
-  if response['targetSize'] >= target_size:
+  target_size = min(entity.minimum_size, current_size + RESIZE_LIMIT)
+  if current_size >= target_size:
     return
 
   api.resize_managed_instance_group(response['name'], key.id(), target_size)
