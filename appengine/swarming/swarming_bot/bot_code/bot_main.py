@@ -429,6 +429,9 @@ def run_bot(arg_error):
       botobj.post_error('failed to grab auth headers: %s' % exc.last_error)
       logging.error('Can\'t grab auth headers, continuing anyway...')
 
+    if arg_error:
+      botobj.post_error('Bootstrapping error: %s' % arg_error)
+
     if quit_bit.is_set():
       logging.info('Early quit 2')
       return 0
@@ -447,21 +450,26 @@ def run_bot(arg_error):
       logging.info('Early quit 3')
       return 0
 
-    # If this fails, there's hardly anything that can be done, the bot can't
-    # even get to the point to be able to self-update.
-    resp = botobj.remote.url_read_json(
-        '/swarming/api/v1/bot/handshake', data=botobj._attributes)
-    if not resp:
-      logging.error('Failed to contact for handshake')
-    else:
-      logging.info('Connected to %s', resp.get('server_version'))
-      if resp.get('bot_version') != botobj._attributes['version']:
-        logging.warning(
-            'Found out we\'ll need to update: server said %s; we\'re %s',
-            resp.get('bot_version'), botobj._attributes['version'])
-
-    if arg_error:
-      botobj.post_error('Bootstrapping error: %s' % arg_error)
+    # This is the first authenticated request to the server. If the bot is
+    # misconfigured, the request may fail with HTTP 401 or HTTP 403. Instead of
+    # dying right away, spin in a loop, hoping the bot will "fix itself"
+    # eventually. Authentication errors in /handshake are logged on the server
+    # and generate error reports, so bots stuck in this state are discoverable.
+    sleep_time = 5
+    while not quit_bit.is_set():
+      resp = botobj.remote.url_read_json(
+          '/swarming/api/v1/bot/handshake', data=botobj._attributes)
+      if resp:
+        logging.info('Connected to %s', resp.get('server_version'))
+        if resp.get('bot_version') != botobj._attributes['version']:
+          logging.warning(
+              'Found out we\'ll need to update: server said %s; we\'re %s',
+              resp.get('bot_version'), botobj._attributes['version'])
+        break
+      logging.error(
+          'Failed to contact for handshake, retrying in %d sec...', sleep_time)
+      quit_bit.wait(sleep_time)
+      sleep_time = min(300, sleep_time * 2)
 
     if quit_bit.is_set():
       logging.info('Early quit 4')

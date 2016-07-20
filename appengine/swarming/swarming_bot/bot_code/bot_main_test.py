@@ -34,6 +34,14 @@ from utils import zip_package
 # Access to a protected member XX of a client class - pylint: disable=W0212
 
 
+class FakeThreadingEvent(object):
+  def is_set(self):
+    return False
+
+  def wait(self, timeout=None):
+    pass
+
+
 class TestBotMain(net_utils.TestCase):
   maxDiff = 2000
 
@@ -180,6 +188,8 @@ class TestBotMain(net_utils.TestCase):
     self.assertEqual({'resp': 1}, bot_main.post_error_task(botobj, 'error', 23))
 
   def test_run_bot(self):
+    self.mock(threading, 'Event', FakeThreadingEvent)
+
     # Test the run_bot() loop. Does not use self.bot.
     self.mock(time, 'time', lambda: 126.0)
     class Foo(Exception):
@@ -233,6 +243,16 @@ class TestBotMain(net_utils.TestCase):
           (
             'https://localhost:1/swarming/api/v1/bot/server_ping',
             {}, 'foo', None,
+          ),
+          (
+            'https://localhost:1/swarming/api/v1/bot/handshake',
+            {
+              'data': self.attributes,
+              'follow_redirects': False,
+              'headers': {},
+              'timeout': remote_client.NET_CONNECTION_TIMEOUT_SEC,
+            },
+            None, # fails, gets retried
           ),
           (
             'https://localhost:1/swarming/api/v1/bot/handshake',
