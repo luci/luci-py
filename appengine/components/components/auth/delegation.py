@@ -435,9 +435,7 @@ def delegate_async(
 
   # Validate auth_service_url.
   if auth_service_url is None:
-    repl_state = model.get_replication_state()
-    if repl_state:
-      auth_service_url = repl_state.primary_url
+    auth_service_url = api.get_request_auth_db().primary_url
     if not auth_service_url:
       raise ValueError(
           'auth_service_url is unspecified and this is not a replica')

@@ -534,6 +534,9 @@ class AuthGlobalConfig(ndb.Model, AuthVersionedEntityMixin):
    * AuthReplicationState
    * AuthSecret
   """
+  # Disable useless in-process per-request cache.
+  _use_cache = False
+
   # OAuth2 client_id to use to mint new OAuth2 tokens.
   oauth_client_id = ndb.StringProperty(indexed=False, default='')
   # OAuth2 client secret. Not so secret really, since it's passed to clients.
@@ -553,6 +556,9 @@ class AuthReplicationState(ndb.Model, datastore_utils.SerializableModelMixin):
   changes to AuthDB are made, Replica updates it whenever it receives a push
   from Primary.
   """
+  # Disable useless in-process per-request cache.
+  _use_cache = False
+
   # How to convert this entity to or from serializable dict.
   serializable_properties = {
     'primary_id': datastore_utils.READABLE,
@@ -753,6 +759,9 @@ class AuthGroup(
   Primary service holds authoritative list of Groups, that gets replicated to
   all Replicas.
   """
+  # Disable useless in-process per-request cache.
+  _use_cache = False
+
   # How to convert this entity to or from serializable dict.
   serializable_properties = {
     'members': datastore_utils.READABLE | datastore_utils.WRITABLE,
@@ -968,6 +977,9 @@ class AuthSecret(ndb.Model):
   validate existing tokens. That way secret can be rotated without invalidating
   any existing outstanding tokens.
   """
+  # Disable useless in-process per-request cache.
+  _use_cache = False
+
   # Last several values of a secret, with current value in front.
   values = ndb.BlobProperty(repeated=True, indexed=False)
 
@@ -1030,6 +1042,9 @@ class AuthIPWhitelistAssignments(ndb.Model, AuthVersionedEntityMixin):
 
   See AuthIPWhitelist for more info about IP whitelists.
   """
+  # Disable useless in-process per-request cache.
+  _use_cache = False
+
   class Assignment(ndb.Model):
     # Identity name to limit by IP whitelist. Unique key in 'assignments' list.
     identity = IdentityProperty()
@@ -1064,6 +1079,9 @@ class AuthIPWhitelist(
   such machines doesn't have to have any additional credentials attached.
   Requests will be authenticated as coming from identity 'bot:<IP address>'.
   """
+  # Disable useless in-process per-request cache.
+  _use_cache = False
+
   # How to convert this entity to or from serializable dict.
   serializable_properties = {
     'subnets': datastore_utils.READABLE | datastore_utils.WRITABLE,

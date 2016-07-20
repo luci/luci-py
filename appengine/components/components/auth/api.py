@@ -128,6 +128,7 @@ class AuthDB(object):
 
   def __init__(
       self,
+      replication_state=None,
       global_config=None,
       groups=None,
       secrets=None,
@@ -136,6 +137,7 @@ class AuthDB(object):
       entity_group_version=None):
     """
     Args:
+      replication_state: instance of AuthReplicationState entity.
       global_config: instance of AuthGlobalConfig entity.
       groups: list of AuthGroup entities.
       secrets: list of AuthSecret entities ('local' and 'global' in same list).
@@ -144,6 +146,7 @@ class AuthDB(object):
       entity_group_version: version of AuthGlobalConfig entity group at the
           moment when entities were fetched from it.
     """
+    self.replication_state = replication_state or model.AuthReplicationState()
     self.global_config = global_config or model.AuthGlobalConfig()
     self.secrets = {'local': {}, 'global': {}}
     self.ip_whitelists = {e.key.string_id(): e for e in (ip_whitelists or [])}
@@ -172,6 +175,21 @@ class AuthDB(object):
           created_by=entity.created_by,
           modified_ts=entity.modified_ts,
           modified_by=entity.modified_by)
+
+  @property
+  def auth_db_rev(self):
+    """Returns the revision number of groups database."""
+    return self.replication_state.auth_db_rev
+
+  @property
+  def primary_id(self):
+    """For services in Replica mode, GAE application ID of Primary."""
+    return self.replication_state.primary_id
+
+  @property
+  def primary_url(self):
+    """For services in Replica mode, root URL of Primary, i.e https://<host>."""
+    return self.replication_state.primary_url
 
   def is_group_member(self, group_name, identity):
     """Returns True if |identity| belongs to group |group_name|.
@@ -637,6 +655,7 @@ def fetch_auth_db(known_version=None):
     # memcache 'get'.
 
     # Fetch all stuff in parallel. Fetch ALL groups and ALL secrets.
+    replication_state_future = model.replication_state_key().get_async()
     global_config_future = root_key.get_async()
     groups_future = model.AuthGroup.query(ancestor=root_key).fetch_async()
     secrets_future = model.AuthSecret.query(ancestor=root_key).fetch_async()
@@ -648,6 +667,7 @@ def fetch_auth_db(known_version=None):
     # internally and respects transactions. So all data fetched here does indeed
     # correspond to |current_version|.
     return AuthDB(
+        replication_state=replication_state_future.get_result(),
         global_config=global_config_future.get_result(),
         groups=groups_future.get_result(),
         secrets=secrets_future.get_result(),
@@ -698,6 +718,7 @@ def get_process_auth_db():
       config.ensure_configured()
       _auth_db = fetch_auth_db()
       _auth_db_expiration = time.time() + _process_cache_expiration_sec
+      logging.info('Fetched AuthDB at rev %d', _auth_db.auth_db_rev)
       return _auth_db
 
     # We have a cached copy and it has expired. Maybe some thread is already
@@ -725,6 +746,10 @@ def get_process_auth_db():
     if fresh_copy is None:
       # No changes, entity group versions match, reuse same object.
       fresh_copy = known_auth_db
+    else:
+      logging.info(
+          'Updated cached AuthDB: rev %d->%d',
+          known_auth_db.auth_db_rev, fresh_copy.auth_db_rev)
   except Exception:
     # Failed. Be sure to allow other threads to try the fetch. Meanwhile log the
     # exception and return a stale copy of AuthDB. Better than nothing.
