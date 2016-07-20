@@ -80,20 +80,24 @@
             <td>{{current_version[:8]}}</td>
           </tr>
           <tr>
-            <td>Number of bots alive</td>
+            <td>Bots alive</td>
             <td>{{num_bots_alive}}</td>
           </tr>
           <tr>
-            <td>Number of busy bots</td>
+            <td>Bots running a task</td>
             <td>{{num_bots_busy}}</td>
           </tr>
           <tr>
-            <td>Number of bots dead</td>
+            <td>Bots dead</td>
             <td>{{num_bots_dead}}</td>
           </tr>
           <tr>
-            <td>Number of bots quarantined</td>
+            <td>Bots quarantined</td>
             <td>{{num_bots_quarantined}}</td>
+          </tr>
+          <tr>
+            <td>Bots shown below</td>
+            <td>{{bots|length}}</td>
           </tr>
         </tbody>
       </table>
