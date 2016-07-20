@@ -22,6 +22,7 @@ import os
 import signal
 import sys
 import time
+import traceback
 
 from utils import file_path
 from utils import net
@@ -581,7 +582,8 @@ def run_command(
     except (IOError, OSError, ValueError) as e:
       logging.error('Swallowing error: %s', e)
       if not must_signal_internal_failure:
-        must_signal_internal_failure = str(e)
+        must_signal_internal_failure = '%s\n%s' % (
+            e, traceback.format_exc()[-2048:])
     # TODO(maruel): Send the internal failure here instead of sending it through
     # bot_main, this causes a race condition.
     if exit_code is None:

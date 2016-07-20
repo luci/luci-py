@@ -338,13 +338,18 @@ class FrontendTest(AppTestBase):
     self.set_as_bot()
     self.bot_poll('bot1')
     self.bot_poll('bot2')
+    params = self.do_handshake('bot2')
+    params['event'] = 'bot_log'
+    params['message'] = 'for the best'
+    self.assertEqual({}, self.post_json('/swarming/api/v1/bot/event', params))
 
     self.set_as_admin()
     response = self.app.get('/restricted/bots', status=200)
     next_page_re = re.compile(r'<a\s+href="(.+?)">Next page</a>')
     self.assertFalse(next_page_re.search(response.body))
     self.app.get('/restricted/bot/bot1', status=200)
-    self.app.get('/restricted/bot/bot2', status=200)
+    response = self.app.get('/restricted/bot/bot2', status=200)
+    self.assertIn('for the best', response.body)
 
     response = self.app.get('/restricted/bots?limit=1', status=200)
     url = next_page_re.search(response.body).group(1)

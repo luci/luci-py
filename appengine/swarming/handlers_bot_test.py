@@ -572,7 +572,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     expected = [
       {
         'message':
-            u'Bot: https://None/restricted/bot/bot1\nBot error:\nfor the worst',
+          u'bot1: for the worst\n\nhttps://None/restricted/bot/bot1',
         'source': 'bot',
       },
     ]
@@ -583,10 +583,14 @@ class BotApiTest(test_env_handlers.AppTestBase):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     params = self.do_handshake()
-    params['event'] = 'bot_rebooting'
-    params['message'] = 'for the best'
-    response = self.post_json('/swarming/api/v1/bot/event', params)
-    self.assertEqual({}, response)
+    for e in handlers_bot.BotEventHandler.ALLOWED_EVENTS:
+      if e == 'bot_error':
+        # This one is tested specifically since it also logs an error message.
+        continue
+      params['event'] = e
+      params['message'] = 'for the best'
+      response = self.post_json('/swarming/api/v1/bot/event', params)
+      self.assertEqual({}, response)
 
     # TODO(maruel): Replace with client api to query last BotEvent.
     actual = [
@@ -599,7 +603,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
           u'os': [u'Amiga'],
           u'pool': [u'default'],
         },
-        'event_type': u'bot_rebooting',
+        'event_type': unicode(e),
         'external_ip': u'192.168.2.2',
         'message': u'for the best',
         'quarantined': False,
@@ -611,7 +615,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'task_id': u'',
         'ts': now,
         'version': self.bot_version,
-      },
+      } for e in reversed(handlers_bot.BotEventHandler.ALLOWED_EVENTS)
+      if e != 'bot_error'
+    ]
+    expected.append(
       {
         'authenticated_as': u'bot:whitelisted-ip',
         'dimensions': {
@@ -631,8 +638,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'task_id': u'',
         'ts': now,
         'version': u'123',
-      },
-    ]
+      })
+
     self.assertEqual(expected, actual)
 
   def test_task_complete(self):

@@ -534,14 +534,18 @@ class BotEventHandler(_BotBaseHandler):
 
   EXPECTED_KEYS = _BotBaseHandler.EXPECTED_KEYS | {u'event', u'message'}
 
+  ALLOWED_EVENTS = ('bot_error', 'bot_log', 'bot_rebooting', 'bot_shutdown')
+
   @auth.public  # auth happens in self._process()
   def post(self):
     (request, bot_id, version, state,
         dimensions, quarantined_msg) = self._process()
     event = request.get('event')
-    if event not in ('bot_error', 'bot_rebooting', 'bot_shutdown'):
+    if event not in self.ALLOWED_EVENTS:
       self.abort_with_error(400, error='Unsupported event type')
     message = request.get('message')
+    # Record the event in a BotEvent entity so it can be listed on the bot's
+    # page.
     bot_management.bot_event(
         event_type=event, bot_id=bot_id, external_ip=self.request.remote_addr,
         authenticated_as=auth.get_peer_identity().to_bytes(),
@@ -550,11 +554,15 @@ class BotEventHandler(_BotBaseHandler):
         message=message)
 
     if event == 'bot_error':
+      # Also logs this to ereporter2, so it will be listed in the server's
+      # hourly ereporter2 report. THIS IS NOISY so it should only be done with
+      # issues requiring action. In this case, include again the bot's URL since
+      # there's no context in the report. Redundantly include the bot id so
+      # messages are bucketted by bot.
       line = (
-          'Bot: https://%s/restricted/bot/%s\n'
-          'Bot error:\n'
-          '%s') % (
-          app_identity.get_default_version_hostname(), bot_id, message)
+          '%s: %s\n'
+          '\nhttps://%s/restricted/bot/%s') % (
+          bot_id, message, app_identity.get_default_version_hostname(), bot_id)
       ereporter2.log_request(self.request, source='bot', message=line)
     self.send_response({})
 

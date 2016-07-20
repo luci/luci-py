@@ -62,12 +62,14 @@ def log(**kwargs):
     error = models.Error(identity=identity, **kwargs)
     error.put()
     key_id = error.key.integer_id()
+    # The format of the message is important here. The first line is used to
+    # generate a signature, so it must be unique for each category of errors.
     logging.error(
-        'Got a %s error\nhttps://%s/restricted/ereporter2/errors/%s\n%s',
+        '%s\n\nSource: %s\nhttps://%s/restricted/ereporter2/errors/%s',
+        error.message,
         error.source,
         app_identity.get_default_version_hostname(),
-        key_id,
-        error.message)
+        key_id)
     return key_id
   except (datastore_errors.BadValueError, TypeError) as e:
     stack = formatter._reformat_stack(traceback.format_exc())
