@@ -101,7 +101,7 @@ class _BotApiHandler(auth.ApiHandler):
 
   @classmethod
   def get_auth_methods(cls, conf):
-    return [auth.optional_machine_authentication, auth.oauth_authentication]
+    return [auth.machine_authentication, auth.oauth_authentication]
 
 
 class _BotAuthenticatingHandler(auth.AuthenticatingHandler):
@@ -121,7 +121,7 @@ class _BotAuthenticatingHandler(auth.AuthenticatingHandler):
 
   @classmethod
   def get_auth_methods(cls, conf):
-    return [auth.optional_machine_authentication, auth.oauth_authentication]
+    return [auth.machine_authentication, auth.oauth_authentication]
 
   def check_bot_code_access(self, bot_id, generate_token):
     """Raises AuthorizationError if caller is not authorized to access bot code.
@@ -241,15 +241,14 @@ class _BotBaseHandler(_BotApiHandler):
     # TODO(vadimsh): This is running in "check they match" mode. Once we verify
     # everything is configured correctly, the server side dimensions from
     # bot_group_cfg would unconditionally override bot-provided ones.
-    if bot_group_cfg:
-      for dim_key, from_cfg in bot_group_cfg.dimensions.iteritems():
-        from_bot = sorted(dimensions.get(dim_key) or [])
-        from_cfg = sorted(from_cfg)
-        if from_bot != from_cfg:
-          logging.error(
-              'Dimensions in bots.cfg doesn\'t match ones provided by the bot\n'
-              'bot_id: "%s", key: "%s", from_bot: %s, from_cfg: %s',
-              bot_id, dim_key, from_bot, from_cfg)
+    for dim_key, from_cfg in bot_group_cfg.dimensions.iteritems():
+      from_bot = sorted(dimensions.get(dim_key) or [])
+      from_cfg = sorted(from_cfg)
+      if from_bot != from_cfg:
+        logging.error(
+            'Dimensions in bots.cfg doesn\'t match ones provided by the bot\n'
+            'bot_id: "%s", key: "%s", from_bot: %s, from_cfg: %s',
+            bot_id, dim_key, from_bot, from_cfg)
 
     # The bot may decide to "self-quarantine" itself. Accept both via
     # dimensions or via state. See bot_management._BotCommon.quarantined for

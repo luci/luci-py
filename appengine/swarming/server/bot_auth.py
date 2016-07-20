@@ -13,7 +13,6 @@ import logging
 from components import auth
 from components.auth import ipaddr
 
-from server import acl
 from server import bot_groups_config
 
 
@@ -43,26 +42,11 @@ def validate_bot_id_and_fetch_config(bot_id):
   On success returns the configuration for this bot (BotGroupConfig tuple), as
   defined in bots.cfg
   """
-  # Keep existing IP whitelist check as main authorization step, but run new
-  # logic after it in "dry run" mode (logs the error instead of failing
-  # request). It would allow us to find and fix all misconfigured bots before
-  # enabling new logic for real.
-  if not acl.is_ip_whitelisted_machine():
-    logging.error(
-        'Unauthorized bot request\n'
-        'bot_id: "%s", peer_ident: "%s", peer_ip: "%s"',
-        bot_id, auth.get_peer_identity().to_bytes(),
-        ipaddr.ip_to_string(auth.get_peer_ip()))
-    raise auth.AuthorizationError('Not IP whitelisted')
-
-  # TODO(vadimsh): Convert all "return None" below to raising AuthorizationError
-  # once we are confident all bots are correctly configured.
-
   cfg = bot_groups_config.get_bot_group_config(bot_id)
   if not cfg:
     logging.error(
         'bot_auth: unknown bot_id, not in the config\nbot_id: "%s"', bot_id)
-    return None
+    raise auth.AuthorizationError('Unknown bot ID, not in config')
 
   peer_ident = auth.get_peer_identity()
   if cfg.require_luci_machine_token:
@@ -71,7 +55,7 @@ def validate_bot_id_and_fetch_config(bot_id):
           'bot_auth: bot ID doesn\'t match the machine token used\n'
           'bot_id: "%s", peer_ident: "%s"',
           bot_id, peer_ident.to_bytes())
-      return None
+      raise auth.AuthorizationError('Bot ID doesn\'t match the token used')
   elif cfg.require_service_account:
     expected_id = auth.Identity(auth.IDENTITY_USER, cfg.require_service_account)
     if peer_ident != expected_id:
@@ -79,13 +63,13 @@ def validate_bot_id_and_fetch_config(bot_id):
           'bot_auth: bot is not using expected service account\n'
           'bot_id: "%s", expected_id: "%s", peer_ident: "%s"',
           bot_id, expected_id.to_bytes(), peer_ident.to_bytes())
-      return None
+      raise auth.AuthorizationError('bot is not using expected service account')
   elif not cfg.ip_whitelist:
     # This branch should not be hit for validated configs.
     logging.error(
         'bot_auth: invalid bot group config, no auth method defined\n'
         'bot_id: "%s"', bot_id)
-    return None
+    raise auth.AuthorizationError('Invalid bot group config')
 
   # Check that IP whitelist applies (in addition to credentials).
   if cfg.ip_whitelist:
@@ -95,7 +79,7 @@ def validate_bot_id_and_fetch_config(bot_id):
           'bot_auth: bot IP is not whitelisted\n'
           'bot_id: "%s", peer_ip: "%s", ip_whitelist: "%s"',
           bot_id, ipaddr.ip_to_string(ip), cfg.ip_whitelist)
-      return None
+      raise auth.AuthorizationError('Not IP whitelisted')
 
   return cfg
 
