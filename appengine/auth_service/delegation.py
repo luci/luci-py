@@ -61,7 +61,11 @@ class CreateDelegationTokenHandler(auth.ApiHandler):
     # impersonating them). Only a privileged set of callers can do that.
     # If impersonation is allowed, token's issuer_id field will contain whatever
     # is in 'impersonate' field. See DelegationConfig in proto/config.proto.
-    'impersonate': 'user:abc@example.com'
+    'impersonate': 'user:abc@example.com',
+
+    # Optional reason why the token is created. Used only for logging purposes,
+    # will be indexed. Should be a short identifier-like string.
+    'intent': 'for-doing-stuff'
   }
 
   Response is:
@@ -83,7 +87,11 @@ class CreateDelegationTokenHandler(auth.ApiHandler):
 
     # Convert request body to proto (with validation). Verify IP format.
     try:
-      subtoken = subtoken_from_jsonish(self.parse_body())
+      body = self.parse_body()
+      subtoken = subtoken_from_jsonish(body)
+      intent = body.get('intent') or ''
+      if not isinstance(intent, basestring):
+        raise TypeError('"intent" must be string')
     except (TypeError, ValueError) as exc:
       self.abort_with_error(400, text=str(exc))
 
@@ -104,7 +112,8 @@ class CreateDelegationTokenHandler(auth.ApiHandler):
     rule = check_can_create_token(user_id, subtoken)
 
     # Register the token in the datastore, generate its ID.
-    subtoken.subtoken_id = register_subtoken(subtoken, rule, auth.get_peer_ip())
+    subtoken.subtoken_id = register_subtoken(
+        subtoken, rule, intent, auth.get_peer_ip())
 
     # Create and sign the token.
     try:
@@ -302,6 +311,8 @@ class AuthDelegationSubtoken(ndb.Model):
   subtoken = ndb.BlobProperty()
   # Serialized config_pb2.DelegationConfig.Rule that allowed this token.
   rule = ndb.BlobProperty()
+  # Intent supplied when creating the token.
+  intent = ndb.StringProperty()
   # IP address the minting request came from.
   caller_ip = ndb.StringProperty()
   # Version of the auth_service that created the subtoken.
@@ -319,11 +330,12 @@ class AuthDelegationSubtoken(ndb.Model):
   impersonator_id = ndb.StringProperty()
 
 
-def register_subtoken(subtoken, rule, caller_ip):
+def register_subtoken(subtoken, rule, intent, caller_ip):
   """Creates new AuthDelegationSubtoken entity in the datastore, returns its ID.
 
   Args:
     subtoken: delegation_pb2.Subtoken describing the token.
+    intent: intent supplied when creating the token.
     rule: config_pb2.DelegationConfig.Rule that allows the operation
     caller_ip: ipaddr.IP of the caller.
 
@@ -333,6 +345,7 @@ def register_subtoken(subtoken, rule, caller_ip):
   entity = AuthDelegationSubtoken(
       subtoken=subtoken.SerializeToString(),
       rule=rule.SerializeToString(),
+      intent=intent,
       caller_ip=ipaddr.ip_to_string(caller_ip),
       auth_service_version=utils.get_app_version(),
       issuer_id=subtoken.issuer_id,
