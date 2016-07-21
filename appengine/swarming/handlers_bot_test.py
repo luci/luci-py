@@ -572,7 +572,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     expected = [
       {
         'message':
-          u'bot1: for the worst\n\nhttps://None/restricted/bot/bot1',
+          u'for the worst\n\nhttps://None/restricted/bot/bot1',
         'source': 'bot',
       },
     ]

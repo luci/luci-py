@@ -559,9 +559,9 @@ class BotEventHandler(_BotBaseHandler):
       # there's no context in the report. Redundantly include the bot id so
       # messages are bucketted by bot.
       line = (
-          '%s: %s\n'
+          '%s\n'
           '\nhttps://%s/restricted/bot/%s') % (
-          bot_id, message, app_identity.get_default_version_hostname(), bot_id)
+          message, app_identity.get_default_version_hostname(), bot_id)
       ereporter2.log_request(self.request, source='bot', message=line)
     self.send_response({})
 
