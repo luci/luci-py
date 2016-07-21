@@ -4,6 +4,7 @@
 
 """POSIX specific utility functions."""
 
+import os
 import subprocess
 import sys
 
@@ -28,10 +29,24 @@ def _run_df():
 
 
 def get_disks_info():
-  """Returns disks info on all mount point in Mb."""
+  """Returns disks info on all mount point in Mb.
+
+  This returns the free space as visible by the current user. On some systems,
+  there's a percentage of the free space on the partition that is only
+  accessible as the root user.
+  """
+  def get_free_space_mb(path):
+    f = os.statvfs(path)  # pylint: disable=E1101
+    return round(float(f.f_bfree * f.f_frsize) / 1024. / 1024., 1)
+
   return {
     items[5]: {
-      u'free_mb': round(float(items[3]) / 1024., 1),
+      # Do not use the value reported by 'df' since it includes all the free
+      # space, including the free space reserved by root. Since the Swarming bot
+      # is likely not running as root, it present an inflated value of what is
+      # usable.
+      #u'free_mb': round(float(items[3]) / 1024., 1),
+      u'free_mb': get_free_space_mb(items[5]),
       u'size_mb': round(float(items[1]) / 1024., 1),
     }
     for items in _run_df()

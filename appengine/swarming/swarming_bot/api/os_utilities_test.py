@@ -4,6 +4,7 @@
 # that can be found in the LICENSE file.
 
 import logging
+import math
 import os
 import re
 import subprocess
@@ -15,6 +16,7 @@ import test_env_api
 test_env_api.setup_test_env()
 
 from depot_tools import auto_stub
+from utils import file_path
 
 import os_utilities
 
@@ -60,7 +62,17 @@ class TestOsUtilities(auto_stub.TestCase):
     self.assertGreater(os_utilities.get_physical_ram(), 0)
 
   def test_get_disks_info(self):
-    self.assertGreater(len(os_utilities.get_disks_info()), 0)
+    info = os_utilities.get_disks_info()
+    self.assertGreater(len(info), 0)
+    root_path = u'C:\\' if sys.platform == 'win32' else u'/'
+    root = info[root_path]
+    # Round the same way.
+    free_disk = round(
+        float(file_path.get_free_space(root_path)) / 1024. / 1024., 1)
+    delta = math.fabs(free_disk - root['free_mb'])
+    # Check that they are mostly equal. There can be some gitter as there is
+    # disk I/O during the two calls.
+    self.assertLess(delta, 2., (delta, free_disk, root['free_mb']))
 
   def test_get_gpu(self):
     actual = os_utilities.get_gpu()
