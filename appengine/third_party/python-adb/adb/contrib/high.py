@@ -392,6 +392,10 @@ class HighDevice(object):
     return self._device.port_path
 
   @property
+  def sysfs_port_path(self):
+    return self._device.sysfs_port_path
+
+  @property
   def serial(self):
     return self._device.serial
 

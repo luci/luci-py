@@ -123,6 +123,7 @@ class UsbHandle(Handle):
     self._setting = setting
     self._device = device
     self._usb_info = usb_info or ''
+    self._sysfs_port_path = ''
 
     # State.
     self._handle = None
@@ -211,6 +212,14 @@ class UsbHandle(Handle):
   @property
   def port_path_str(self):
     return '/'.join(str(p) for p in self.port_path)
+
+  @property
+  def sysfs_port_path(self):
+    if not self._sysfs_port_path:
+      self._sysfs_port_path = '%s-%s' % (
+          self._device.getBusNumber(),
+          '.'.join(str(p) for p in self._device.getPortNumberList()))
+    return self._sysfs_port_path
 
   def Close(self):
     port_path = self.port_path

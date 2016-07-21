@@ -215,7 +215,11 @@ class FileSyncConnection(object):
   def _ReadBuffered(self, size):
     # Ensure recv buffer has enough data.
     while len(self.recv_buffer) < size:
-      _, data = self.adb.ReadUntil('WRTE')
+      try:
+        _, data = self.adb.ReadUntil('WRTE')
+      except adb_protocol.InvalidResponseError as e:
+        raise usb_exceptions.AdbCommandFailureException(
+          'Command failed: %s' % e)
       self.recv_buffer += data
 
     result = self.recv_buffer[:size]
@@ -228,7 +232,7 @@ class FileSyncConnection(object):
     command_id = adb_protocol.Wire2ID(header[0])
     if command_id not in cls._VALID_IDS:
       raise usb_exceptions.AdbCommandFailureException(
-          'Command failed; incorrect header: %s', header)
+          'Command failed; incorrect header: %s' % header)
     if command_id not in expected_ids:
       if command_id == 'FAIL':
         raise usb_exceptions.AdbCommandFailureException('Command failed.')

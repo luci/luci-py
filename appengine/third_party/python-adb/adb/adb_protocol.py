@@ -349,7 +349,10 @@ class _AdbConnection(object):
     self._Write('WRTE', data)
 
   def ReadUntil(self, _):
-    return 'WRTE', self._yielder.next()
+    try:
+      return 'WRTE', self._yielder.next()
+    except StopIteration:
+      raise InvalidResponseError('Never got \'WRTE\'', '<N/A>')
 
 
 class AdbConnectionManager(object):
