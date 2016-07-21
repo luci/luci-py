@@ -18,6 +18,7 @@ from protorpc import remote
 
 from components import auth
 from components import datastore_utils
+from components import endpoints_webapp2
 from components import utils
 
 import message_conversion
@@ -633,3 +634,15 @@ class SwarmingBotsService(remote.Service):
         death_timeout=config.settings().bot_death_timeout_secs,
         items=[message_conversion.bot_info_to_rpc(bot, now) for bot in bots],
         now=now)
+
+
+def get_routes():
+  return (
+    endpoints_webapp2.api_routes(SwarmingServerService) +
+    endpoints_webapp2.api_routes(SwarmingTaskService) +
+    endpoints_webapp2.api_routes(SwarmingTasksService) +
+    endpoints_webapp2.api_routes(SwarmingBotService) +
+    endpoints_webapp2.api_routes(SwarmingBotsService) +
+    # components.config endpoints for validation and configuring of luci-config
+    # service URL.
+    endpoints_webapp2.api_routes(config.ConfigApi))

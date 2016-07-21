@@ -110,6 +110,7 @@ class FrontendTest(AppTestBase):
     public_urls = frozenset([
       '/',
       '/_ah/warmup',
+      '/api/config/v1/validate',
       '/auth',
       '/ereporter2/api/v1/on_error',
       '/stats',

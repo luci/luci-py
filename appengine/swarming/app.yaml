@@ -55,6 +55,10 @@ handlers:
     Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
     X-Frame-Options: deny
 
+- url: /api/.*
+  script: main.app
+  secure: always
+
 - url: /(user|restricted)(|/.*)
   script: main.app
   secure: always

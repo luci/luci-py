@@ -25,6 +25,7 @@ from protorpc import messages
 from protorpc import remote
 
 from components import auth
+from components import endpoints_webapp2
 from components import utils
 
 import acl
@@ -539,3 +540,7 @@ class IsolateService(remote.Service):
       payload = ''.join(
           binascii.unhexlify(digest.digest) for digest in collection.items)
       return utils.enqueue_task(url, 'tag', payload=payload)
+
+
+def get_routes():
+  return endpoints_webapp2.api_routes(IsolateService)

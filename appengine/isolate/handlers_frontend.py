@@ -16,6 +16,7 @@ from google.appengine.api import users
 import acl
 import config
 import gcs
+import handlers_endpoints_v1
 import mapreduce_jobs
 import model
 import stats
@@ -355,7 +356,7 @@ class EmailHandler(webapp2.RequestHandler):
 
 
 def get_routes():
-  return [
+  routes = [
       # Administrative urls.
       webapp2.Route(r'/restricted/config', RestrictedConfigHandler),
       webapp2.Route(r'/restricted/purge', RestrictedPurgeHandler),
@@ -378,6 +379,8 @@ def get_routes():
       webapp2.Route(r'/_ah/mail/<to:.+>', EmailHandler),
       webapp2.Route(r'/_ah/warmup', WarmupHandler),
   ]
+  routes.extend(handlers_endpoints_v1.get_routes())
+  return routes
 
 
 def create_application(debug):

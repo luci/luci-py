@@ -22,6 +22,7 @@ from google.appengine.ext import ndb
 
 import handlers_bot
 import handlers_backend
+import handlers_endpoints
 import mapreduce_jobs
 import template
 from components import auth
@@ -804,8 +805,7 @@ def create_application(debug):
   if utils.is_local_dev_server():
     acl.bootstrap_dev_server_acls()
 
-  # TODO(maruel): Split backend into a separate module. For now add routes here.
   routes.extend(handlers_backend.get_routes())
   routes.extend(handlers_bot.get_routes())
-
+  routes.extend(handlers_endpoints.get_routes())
   return webapp2.WSGIApplication(routes, debug=debug)

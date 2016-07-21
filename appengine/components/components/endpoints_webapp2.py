@@ -112,7 +112,7 @@ def api_routes(api_class, base_path=None):
       api_class.api_info.name,
       api_class.api_info.version)
   routes = []
-  for m in api_class.all_remote_methods().itervalues():
+  for _, m in sorted(api_class.all_remote_methods().iteritems()):
     info = m.method_info
 
     method_path = info.get_path(api_class.api_info)
