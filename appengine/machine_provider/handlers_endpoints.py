@@ -9,6 +9,7 @@ import json
 import logging
 
 import endpoints
+
 from google.appengine import runtime
 from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
@@ -16,6 +17,8 @@ from google.appengine.ext import ndb
 
 from protorpc import protobuf
 from protorpc import remote
+
+import gae_ts_mon
 
 from components import auth
 from components import pubsub
@@ -68,6 +71,7 @@ class CatalogEndpoints(remote.Service):
       logging.warning('Hostname unspecified')
       return rpc_messages.CatalogManipulationRequestError.UNSPECIFIED_HOSTNAME
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       rpc_messages.CatalogMachineAdditionRequest,
       rpc_messages.CatalogManipulationResponse,
@@ -121,6 +125,7 @@ class CatalogEndpoints(remote.Service):
             error=error, machine_addition_request=request)
     return self._add_machine(request)
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       rpc_messages.CatalogMachineBatchAdditionRequest,
       rpc_messages.CatalogBatchManipulationResponse,
@@ -177,6 +182,7 @@ class CatalogEndpoints(remote.Service):
         machine_addition_request=request,
     )
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       rpc_messages.CatalogMachineDeletionRequest,
       rpc_messages.CatalogManipulationResponse,
@@ -219,6 +225,7 @@ class CatalogEndpoints(remote.Service):
         machine_deletion_request=request,
     )
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       rpc_messages.CatalogCapacityModificationRequest,
       rpc_messages.CatalogManipulationResponse,
@@ -256,6 +263,7 @@ class CatalogEndpoints(remote.Service):
 class MachineProviderEndpoints(remote.Service):
   """Implements cloud endpoints for the Machine Provider."""
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       rpc_messages.BatchedLeaseRequest,
       rpc_messages.BatchedLeaseResponse,
@@ -308,6 +316,7 @@ class MachineProviderEndpoints(remote.Service):
           ))
     return rpc_messages.BatchedLeaseResponse(responses=responses)
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(rpc_messages.LeaseRequest, rpc_messages.LeaseResponse)
   @auth.require(acl.can_issue_lease_requests)
   def lease(self, request):
@@ -400,6 +409,7 @@ class MachineProviderEndpoints(remote.Service):
       logging.info('Sending LeaseResponse:\n%s', response)
       return response
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       rpc_messages.BatchedLeaseReleaseRequest,
       rpc_messages.BatchedLeaseReleaseResponse,
@@ -457,6 +467,7 @@ class MachineProviderEndpoints(remote.Service):
           ))
     return rpc_messages.BatchedLeaseReleaseResponse(responses=responses)
 
+  @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       rpc_messages.LeaseReleaseRequest, rpc_messages.LeaseReleaseResponse)
   @auth.require(acl.can_issue_lease_requests)

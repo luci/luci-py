@@ -17,6 +17,7 @@ from components import decorators
 from components import utils
 from components.machine_provider import rpc_messages
 
+import metrics
 import models
 
 
@@ -178,7 +179,6 @@ class LeaseRequestProcessor(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
     for lease in models.LeaseRequest.query_untriaged():
-      logging.info('Processing untriaged LeaseRequest:\n%s', lease)
       filters = get_dimension_filters(lease.request)
       fulfilled = False
 
@@ -186,6 +186,7 @@ class LeaseRequestProcessor(webapp2.RequestHandler):
       for machine_key in models.CatalogMachineEntry.query_available(*filters):
         if lease_machine(machine_key, lease):
           fulfilled = True
+          metrics.lease_requests_fulfilled.increment()
           break
 
       if fulfilled:
