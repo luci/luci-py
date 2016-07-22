@@ -65,6 +65,19 @@ def decode_message(remote_method_info, request):
   return msg
 
 
+def add_cors_headers(headers):
+  headers['Access-Control-Allow-Origin'] = '*'
+  headers['Access-Control-Allow-Headers'] = (
+    'Origin, Authorization, Content-Type, Accept')
+  headers['Access-Control-Allow-Methods'] = (
+    'DELETE, GET, OPTIONS, POST, PUT')
+
+
+class CorsHandler(webapp2.RequestHandler):
+  def options(self):
+    add_cors_headers(self.response.headers)
+
+
 def path_handler(api_class, api_method, service_path):
   """Returns a webapp2.RequestHandler subclass for the API methods."""
   # Why return a class? Because webapp2 explicitly checks if handler that we
@@ -72,6 +85,8 @@ def path_handler(api_class, api_method, service_path):
 
   class Handler(webapp2.RequestHandler):
     def dispatch(self):
+      add_cors_headers(self.response.headers)
+
       api = api_class()
       api.initialize_request_state(remote.HttpRequestState(
           remote_host=None,
@@ -112,6 +127,7 @@ def api_routes(api_class, base_path=None):
       api_class.api_info.name,
       api_class.api_info.version)
   routes = []
+  templates = set()
   for _, m in sorted(api_class.all_remote_methods().iteritems()):
     info = m.method_info
 
@@ -121,8 +137,9 @@ def api_routes(api_class, base_path=None):
 
     http_method = info.http_method.upper() or 'POST'
 
-    routes.append(webapp2.Route(
-        template,
-        path_handler(api_class, m, base_path),
-        methods=[http_method]))
+    handler = path_handler(api_class, m, base_path)
+    routes.append(webapp2.Route(template, handler, methods=[http_method]))
+    templates.add(template)
+  for t in sorted(templates):
+    routes.append(webapp2.Route(t, CorsHandler, methods=['OPTIONS']))
   return routes
