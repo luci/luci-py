@@ -442,6 +442,17 @@ class TcpHandle(Handle):
     finally:
       self._connection = None
 
+  def Reset(self, new_endpoint=None):
+    self.Close()
+    if new_endpoint:
+      if ':' in new_endpoint:
+        (self._host, self._port) = new_endpoint.split(':')
+      else:
+        self._host = new_endpoint
+        self._port = 5555
+    self._serial_number = '%s:%s' % (self._host, self._port)
+    self.Open()
+
   def BulkWrite(self, data, timeout_ms=None):
     try:
       self._connection.settimeout(self.Timeout(timeout_ms) / 1000.0)

@@ -327,7 +327,7 @@ class AdbCommandsSafe(object):
             break
     return False
 
-  def Reboot(self):
+  def Reboot(self, wait=True):
     """Reboots the device. Waits for it to be rebooted but not fully
     operational.
 
@@ -340,6 +340,9 @@ class AdbCommandsSafe(object):
     Returns True on success.
     """
     if self._adb_cmd:
+      if not wait:
+        return self._Reboot()
+
       # Get previous uptime to ensure the phone actually rebooted.
       previous_uptime = self.GetUptime()
       if not previous_uptime:
@@ -386,6 +389,26 @@ class AdbCommandsSafe(object):
           if not self._Reset('(): %s', e):
             break
     return False
+
+  def ResetHandle(self, new_endpoint=None):
+    """Resets the handle used to communicate to the device.
+
+    For USB connections, it resets the usb device. For TCP connections,
+    it closes and reopens the TCP connection.
+
+    Args:
+      new_endpoint: If a TCP device, this will be used as the new endpoint in
+                    the TCP connection.
+    Returns:
+      True on success.
+    """
+    if self._adb_cmd:
+      self._adb_cmd.Close()
+      self._adb_cmd = None
+    if new_endpoint:
+      self._serial = None
+    self._handle.Reset(new_endpoint=new_endpoint)
+    return self._Connect(False)
 
   def Shell(self, cmd, timeout_ms=None):
     """Runs a command on an Android device while swallowing exceptions.

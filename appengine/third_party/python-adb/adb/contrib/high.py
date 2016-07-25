@@ -432,15 +432,18 @@ class HighDevice(object):
   def PushContent(self, *args, **kwargs):
     return self._device.PushContent(*args, **kwargs)
 
-  def Reboot(self):
+  def Reboot(self, wait=True):
     """Reboots the phone then Waits for the device to come back.
 
     adbd running on the phone will likely not be in Root(), so the caller should
     call Root() right afterward if desired.
     """
-    if not self._device.Reboot():
+    if not self._device.Reboot(wait=wait):
       return False
-    return self.WaitUntilFullyBooted()
+    return self.WaitUntilFullyBooted() if wait else True
+
+  def Reset(self, new_endpoint=None):
+    self._device.ResetHandle(new_endpoint=new_endpoint)
 
   def Remount(self):
     return self._device.Remount()
@@ -864,17 +867,19 @@ class HighDevice(object):
         return False
       # pm can be very slow at times. Use a longer timeout to prevent
       # confusing a long-running command with an interrupted connection.
-      out, _ = self.Shell('pm path', timeout_ms=30000)
+      out, exit_code = self.Shell('pm path', timeout_ms=30000)
       if out == 'Error: no package specified\n':
         # It's up!
         break
 
       # Accepts an empty string too, which has been observed only on Android 4.4
       # (Kitkat) but not on later versions.
-      assert out in (
+      if out not in (
           'Error: Could not access the Package Manager.  Is the system '
           'running?\n',
-          ''), out
+          ''):
+        logging.warning(
+            'Unexpected reply from pm path (%d): %r', exit_code, out)
       time.sleep(0.1)
 
     return True
