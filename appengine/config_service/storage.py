@@ -6,6 +6,7 @@
 
 import hashlib
 import logging
+import urlparse
 
 from google.appengine.api import app_identity
 from google.appengine.ext import ndb
@@ -177,7 +178,7 @@ def get_latest_multi_async(config_sets, path, hashes_only=False):
 
   Returns:
     A a list of dicts with keys 'config_set', 'revision', 'content_hash' and
-    'content'. Content is not available if |hashes_only| is True.
+    'content', 'url'. Content is not available if |hashes_only| is True.
   """
   assert path
   assert not path.startswith('/')
@@ -191,24 +192,34 @@ def get_latest_multi_async(config_sets, path, hashes_only=False):
     for cs in config_set_entities
   ]
   file_entities = yield ndb.get_multi_async(file_keys)
-  file_entities = filter(None, file_entities)
 
-  results = [
-    {
-      'config_set': f.key.parent().parent().id(),
-      'revision': f.key.parent().id(),
-      'content_hash': f.content_hash,
-      'content': (
-          None if hashes_only else ndb.Key(Blob, f.content_hash).get_async()),
-    }
-    for f in file_entities
-  ]
-
+  blob_futures = {}
   if not hashes_only:
-    for r in results:
-      blob = yield r['content']
-      r['content'] = blob.content if blob else None
+    blob_futures = {
+      f.content_hash: ndb.Key(Blob, f.content_hash).get_async()
+      for f in file_entities
+      if f
+    }
+    yield blob_futures.values()
 
+  results = []
+  for cs, f in zip(config_set_entities, file_entities):
+    if not f:
+      continue
+    url = None
+    if cs.latest_revision_url:
+      base = cs.latest_revision_url
+      if not base.endswith('/'):
+        base += '/'
+      url = urlparse.urljoin(base, path)
+    blob_fut = blob_futures.get(f.content_hash)
+    results.append({
+      'config_set': f.key.parent().parent().id(),
+      'content': blob_fut.get_result().content if blob_fut else None,
+      'content_hash': f.content_hash,
+      'revision': f.key.parent().id(),
+      'url': url,
+    })
   raise ndb.Return(results)
 
 

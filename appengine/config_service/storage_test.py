@@ -3,6 +3,8 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import datetime
+
 from test_env import future
 import test_env
 test_env.setup_test_env()
@@ -19,7 +21,14 @@ class StorageTestCase(test_case.TestCase):
 
   def put_file(self, config_set, revision, path, content):
     confg_set_key = storage.ConfigSet(
-        id=config_set, latest_revision=revision, location='http://x.com').put()
+        id=config_set,
+        location='https://x.com',
+
+        latest_revision=revision,
+        latest_revision_url='https://x.com/+/%s' % revision,
+        latest_revision_time=datetime.datetime(2016, 1, 1),
+        latest_revision_committer_email='john@example.com',
+    ).put()
     rev_key = storage.Revision(id=revision, parent=confg_set_key).put()
 
     content_hash = storage.compute_hash(content)
@@ -58,12 +67,14 @@ class StorageTestCase(test_case.TestCase):
         'revision': 'deadbeef',
         'content_hash': 'v1:551f4d3376caed56a600e02dfaa733b68898dc2b',
         'content': 'fooo',
+        'url': 'https://x.com/+/deadbeef/a.cfg',
       },
       {
         'config_set': 'bar',
         'revision': 'beefdead',
         'content_hash': 'v1:f89094690273aed90f20da47629315b54e494eb8',
         'content': 'barr',
+        'url': 'https://x.com/+/beefdead/a.cfg',
       },
     ]
     actual = storage.get_latest_multi_async(
@@ -77,19 +88,38 @@ class StorageTestCase(test_case.TestCase):
     expected = [
       {
         'config_set': 'foo',
-        'revision': 'deadbeef',
-        'content_hash': 'v1:551f4d3376caed56a600e02dfaa733b68898dc2b',
         'content': None,
+        'content_hash': 'v1:551f4d3376caed56a600e02dfaa733b68898dc2b',
+        'revision': 'deadbeef',
+        'url': 'https://x.com/+/deadbeef/a.cfg',
       },
       {
         'config_set': 'bar',
-        'revision': 'beefdead',
-        'content_hash': 'v1:f89094690273aed90f20da47629315b54e494eb8',
         'content': None,
+        'content_hash': 'v1:f89094690273aed90f20da47629315b54e494eb8',
+        'revision': 'beefdead',
+        'url': 'https://x.com/+/beefdead/a.cfg',
       },
     ]
     actual = storage.get_latest_multi_async(
         ['foo', 'bar'], 'a.cfg', hashes_only=True).get_result()
+    self.assertEqual(expected, actual)
+
+  def test_get_latest_multi_file_missing(self):
+    self.put_file('foo', 'deadbeef', 'a.cfg', 'fooo')
+    self.put_file('bar', 'beefdead', 'b.cfg', 'barr')
+
+    expected = [
+      {
+        'config_set': 'bar',
+        'content': 'barr',
+        'content_hash': 'v1:f89094690273aed90f20da47629315b54e494eb8',
+        'revision': 'beefdead',
+        'url': 'https://x.com/+/beefdead/b.cfg',
+      },
+    ]
+    actual = storage.get_latest_multi_async(
+        ['foo', 'bar'], 'b.cfg').get_result()
     self.assertEqual(expected, actual)
 
   def test_get_latest_non_existing_config_set(self):

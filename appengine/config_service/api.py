@@ -94,6 +94,7 @@ class GetConfigMultiResponseMessage(messages.Message):
     content_hash = messages.StringField(3, required=True)
     # None if request.hash_only is True
     content = messages.BytesField(4)
+    url = messages.StringField(5)
   configs = messages.MessageField(ConfigEntry, 1, repeated=True)
 
 
@@ -441,7 +442,7 @@ def get_config_multi(scope, path, hashes_only):
   """
   assert scope in ('projects', 'refs'), scope
   cache_key = (
-    '%s%s:%s' % (scope, ',hashes_only' if hashes_only else '', path))
+    'v2/%s%s:%s' % (scope, ',hashes_only' if hashes_only else '', path))
   configs = memcache.get(cache_key)
   if configs is None:
     configs = storage.get_latest_multi_async(
@@ -470,6 +471,7 @@ def get_config_multi(scope, path, hashes_only):
         revision=config['revision'],
         content_hash=config['content_hash'],
         content=config.get('content'),
+        url=config.get('url'),
     ))
   return res
 
