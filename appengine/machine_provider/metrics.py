@@ -7,7 +7,19 @@
 import gae_ts_mon
 
 
+lease_requests_deduped = gae_ts_mon.CounterMetric(
+    'machine_provider/lease_requests/deduped',
+    description='Number of lease requests deduplicated.',
+)
+
+
 lease_requests_fulfilled = gae_ts_mon.CounterMetric(
-    'lease_requests/fulfilled',
+    'machine_provider/lease_requests/fulfilled',
     description='Number of lease requests fulfilled.',
+)
+
+
+lease_requests_received = gae_ts_mon.CounterMetric(
+    'machine_provider/lease_requests/received',
+    description='Number of lease requests received.',
 )

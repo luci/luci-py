@@ -26,6 +26,7 @@ from components import utils
 from components.machine_provider import rpc_messages
 
 import acl
+import metrics
 import models
 
 
@@ -335,6 +336,7 @@ class MachineProviderEndpoints(remote.Service):
 
   def _lease(self, request, user, request_hash):
     """Handles an incoming LeaseRequest."""
+    metrics.lease_requests_received.increment()
     if request.pubsub_topic:
       if not pubsub.validate_topic(request.pubsub_topic):
         logging.warning(
@@ -377,6 +379,7 @@ class MachineProviderEndpoints(remote.Service):
     if duplicate:
       # Found a duplicate request ID from the same user. Attempt deduplication.
       if deduplication_checksum == duplicate.deduplication_checksum:
+        metrics.lease_requests_deduped.increment()
         # The LeaseRequest RPC we just received matches the original.
         # We're safe to dedupe.
         logging.info(
