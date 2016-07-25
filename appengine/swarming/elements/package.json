@@ -1,0 +1,13 @@
+{
+  "name": "luci",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Luci Swarming",
+  "author": "",
+  "license": "LICENSE",
+  "devDependencies": {
+    "vulcanize": "~1.14.8",
+    "sinon": "1.17.2",
+    "http-server": "~0.9.0"
+  }
+}

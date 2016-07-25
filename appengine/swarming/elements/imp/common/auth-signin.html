@@ -1,0 +1,128 @@
+<!--
+  Copyright 2016 The LUCI Authors. All rights reserved.
+  Use of this source code is governed under the Apache License, Version 2.0
+  that can be found in the LICENSE file.
+
+  The `auth-signin` element displays sign-in/sign-out button, user email and
+  avatar.
+  It has a google-signin/google-signin-aware element under the hood that handles
+  the actual OAuth logic.
+
+  Usage:
+
+    <auth-signin></auth-signin>
+
+  Properties:
+    authHeaders: Object, Use this in iron-ajax to set oauth2 headers.
+    authResponse: Object, The raw gapi.auth2.AuthResponse object.
+    clientId: String, The client id to authenticate
+    profile: Object, Read Only, The email address and imageurl of the logged in user.
+    signedIn: Boolean, Read Only, if the user is logged in.
+
+  Methods:
+    signIn(): Signs the user in by popping up the authorization dialog.
+    signOut(): Signs the user out.
+
+  Events:
+    auth-signin: Fired when the oauth handshake has completed and a user has logged in.
+-->
+
+<link rel="import" href="../../bower_components/google-signin/google-signin-aware.html">
+<link rel="import" href="../../bower_components/polymer/polymer.html">
+
+
+<dom-module id="auth-signin">
+  <template>
+    <style>
+      #avatar {
+        border-radius: 5px;
+      }
+      #signinContainer {
+        margin-top: 14px;
+      }
+    </style>
+
+    <google-signin-aware id="aware"
+      client-id="[[clientId]]"
+      scopes="email"
+      on-google-signin-aware-success="_onSignin"
+      on-google-signin-aware-signed-out="_onSignout">
+    </google-signin-aware>
+
+    <template is="dom-if" if="[[!signedIn]]">
+      <div id="signinContainer">
+        <a on-tap="signIn" href="#">Sign in</a>
+      </div>
+    </template>
+
+    <template is="dom-if" if="[[signedIn]]">
+      <img id="avatar" src="[[profile.imageUrl]]" width="30" height="30">
+      <span>[[profile.email]]</span>
+      <span>|</span>
+      <a on-tap="signOut" href="#">Sign out</a>
+    </template>
+  </template>
+  <script>
+    'use strict';
+    Polymer({
+      is: 'auth-signin',
+      properties: {
+        authHeaders: {
+          type: Object,
+          computed: "_makeHeader(authResponse)",
+          notify: true,
+        },
+        authResponse: {
+          type: Object,
+          notify: true,
+        },
+        clientId: {
+          type: String,
+        },
+        profile: {
+          type: Object,
+          readOnly: true
+        },
+        signedIn: {
+          type: Boolean,
+          readOnly: true,
+          value: false
+        }
+      },
+
+      _onSignin: function(e) {
+        this._setSignedIn(true);
+        var user = gapi.auth2.getAuthInstance().currentUser.get();
+        var profile = user.getBasicProfile();
+        this._setProfile({
+          email: profile.getEmail(),
+          imageUrl: profile.getImageUrl()
+        });
+        this.set("authResponse", user.getAuthResponse());
+        this.fire("auth-signin");
+      },
+
+      _onSignout: function(e) {
+        this._setSignedIn(false);
+        this._setProfile(null);
+      },
+
+      _makeHeader: function(authResponse) {
+        if (!authResponse) {
+          return {};
+        }
+        return {
+          "authorization": authResponse.token_type + " " + authResponse.access_token
+        };
+      },
+
+      signIn: function() {
+        this.$.aware.signIn();
+      },
+
+      signOut: function() {
+        this.$.aware.signOut();
+      }
+    });
+  </script>
+</dom-module>

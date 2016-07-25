@@ -11,11 +11,12 @@
     "tests"
   ],
   "dependencies": {
-    "google-apis": "GoogleWebComponents/google-apis#~1.1.0",
-    "google-chart": "GoogleWebComponents/google-chart#~1.0.0",
+    "google-web-components": "GoogleWebComponents/google-web-components#^1.1.0",
     "iron-elements": "PolymerElements/iron-elements#~1.0.0",
-    "iron-flex-layout": "PolymerElements/iron-flex-layout#^1.3.0",
     "paper-elements": "PolymerElements/paper-elements#~1.0.0",
     "polymer": "Polymer/polymer#^1.0.0"
+  },
+  "resolutions": {
+    "firebase": "^2.3.1"
   }
 }
