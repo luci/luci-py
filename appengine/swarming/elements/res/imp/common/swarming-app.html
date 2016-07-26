@@ -1,0 +1,107 @@
+<!--
+  Copyright 2016 The LUCI Authors. All rights reserved.
+  Use of this source code is governed under the Apache License, Version 2.0
+  that can be found in the LICENSE file.
+
+  This in an HTML Import-able file that contains the definition
+  of the following elements:
+
+    <swarming-app>
+
+  Usage:
+
+    <swarming-app></swarming-app>
+
+  Properties:
+    auth_headers: Object, Use this in iron-ajax to set oauth2 headers.
+    busy: Boolean, If the busy spinner should be active.
+    name: String, the name of the app to be displayed.
+
+  Methods:
+    None.
+
+  Events:
+    None.
+-->
+
+<link rel="import" href="/res/imp/bower_components/app-layout/app-layout.html">
+<link rel="import" href="/res/imp/bower_components/paper-spinner/paper-spinner-lite.html">
+<link rel="import" href="/res/imp/bower_components/iron-flex-layout/iron-flex-layout-classes.html">
+
+<link rel="import" href="/res/imp/common/auth-signin.html">
+
+<dom-module id="swarming-app">
+  <template>
+    <style include="iron-flex">
+      :host {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+      }
+
+      app-toolbar {
+        background-color: #4285f4;
+        color: #fff;
+      }
+
+      app-toolbar a {
+        color: #fff;
+      }
+      .left {
+        margin-right:15px;
+      }
+      .right {
+        margin-left:15px;
+      }
+      .main-content {
+        padding: 3px;
+      }
+
+      paper-spinner-lite {
+        --paper-spinner-color: var(--google-yellow-500);
+      }
+    </style>
+    <app-header-layout>
+      <app-header fixed>
+        <app-toolbar>
+          <div class="title left">[[name]]</div>
+          <paper-spinner-lite class="left" active="[[busy]]"></paper-spinner-lite>
+
+          <a class="left" href="/newui/">Home</a>
+          <a class="left" href="/newui/botlist">Bot List</a>
+          <div class="flex"></div>
+          <!-- TODO(kjlubick) Remove this hard-coded client-id.-->
+          <auth-signin
+              class="right"
+              client-id="20770472288-t5smpbpjptka4nd888fv0ctd23ftba2o.apps.googleusercontent.com"
+              auth-headers="{{auth_headers}}">
+          </auth-signin>
+        </app-toolbar>
+      </app-header>
+      <div class="main-content">
+        <content></content>
+      </div>
+    </app-header-layout>
+
+  </template>
+  <script>
+    Polymer({
+      is: 'swarming-app',
+      properties: {
+        auth_headers: {
+          type: Object,
+          notify: true,
+        },
+        busy: {
+          type: Boolean,
+        },
+        name: {
+          type: String,
+        },
+      },
+
+    });
+  </script>
+</dom-module>

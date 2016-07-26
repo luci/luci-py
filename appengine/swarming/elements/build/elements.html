@@ -1,5 +1,13 @@
 <!DOCTYPE html><html><head><!--
 @license
+Copyright (c) 2016 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+--><!--
+@license
 Copyright (c) 2015 The Polymer Project Authors. All rights reserved.
 This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
 The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
@@ -14,27 +22,10 @@ The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
 The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
 Code distributed by Google as part of the polymer project is also
 subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
--->
-  <title>Many World, wow such hello</title>
-  <meta charset="utf-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-  <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1, user-scalable=yes">
-
-  <script>/**
- * @license
- * Copyright (c) 2014 The Polymer Project Authors. All rights reserved.
- * This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
- * The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
- * The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
- * Code distributed by Google as part of the polymer project is also
- * subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
- */
-// @version 0.7.22
-!function(){window.WebComponents=window.WebComponents||{flags:{}};var e="webcomponents-lite.js",t=document.querySelector('script[src*="'+e+'"]'),n={};if(!n.noOpts){if(location.search.slice(1).split("&").forEach(function(e){var t,o=e.split("=");o[0]&&(t=o[0].match(/wc-(.+)/))&&(n[t[1]]=o[1]||!0)}),t)for(var o,r=0;o=t.attributes[r];r++)"src"!==o.name&&(n[o.name]=o.value||!0);if(n.log&&n.log.split){var i=n.log.split(",");n.log={},i.forEach(function(e){n.log[e]=!0})}else n.log={}}n.register&&(window.CustomElements=window.CustomElements||{flags:{}},window.CustomElements.flags.register=n.register),WebComponents.flags=n}(),function(e){"use strict";function t(e){return void 0!==h[e]}function n(){s.call(this),this._isInvalid=!0}function o(e){return""==e&&n.call(this),e.toLowerCase()}function r(e){var t=e.charCodeAt(0);return t>32&&127>t&&-1==[34,35,60,62,63,96].indexOf(t)?e:encodeURIComponent(e)}function i(e){var t=e.charCodeAt(0);return t>32&&127>t&&-1==[34,35,60,62,96].indexOf(t)?e:encodeURIComponent(e)}function a(e,a,s){function c(e){g.push(e)}var d=a||"scheme start",l=0,u="",w=!1,_=!1,g=[];e:for(;(e[l-1]!=p||0==l)&&!this._isInvalid;){var b=e[l];switch(d){case"scheme start":if(!b||!m.test(b)){if(a){c("Invalid scheme.");break e}u="",d="no scheme";continue}u+=b.toLowerCase(),d="scheme";break;case"scheme":if(b&&v.test(b))u+=b.toLowerCase();else{if(":"!=b){if(a){if(p==b)break e;c("Code point not allowed in scheme: "+b);break e}u="",l=0,d="no scheme";continue}if(this._scheme=u,u="",a)break e;t(this._scheme)&&(this._isRelative=!0),d="file"==this._scheme?"relative":this._isRelative&&s&&s._scheme==this._scheme?"relative or authority":this._isRelative?"authority first slash":"scheme data"}break;case"scheme data":"?"==b?(this._query="?",d="query"):"#"==b?(this._fragment="#",d="fragment"):p!=b&&"	"!=b&&"\n"!=b&&"\r"!=b&&(this._schemeData+=r(b));break;case"no scheme":if(s&&t(s._scheme)){d="relative";continue}c("Missing scheme."),n.call(this);break;case"relative or authority":if("/"!=b||"/"!=e[l+1]){c("Expected /, got: "+b),d="relative";continue}d="authority ignore slashes";break;case"relative":if(this._isRelative=!0,"file"!=this._scheme&&(this._scheme=s._scheme),p==b){this._host=s._host,this._port=s._port,this._path=s._path.slice(),this._query=s._query,this._username=s._username,this._password=s._password;break e}if("/"==b||"\\"==b)"\\"==b&&c("\\ is an invalid code point."),d="relative slash";else if("?"==b)this._host=s._host,this._port=s._port,this._path=s._path.slice(),this._query="?",this._username=s._username,this._password=s._password,d="query";else{if("#"!=b){var y=e[l+1],E=e[l+2];("file"!=this._scheme||!m.test(b)||":"!=y&&"|"!=y||p!=E&&"/"!=E&&"\\"!=E&&"?"!=E&&"#"!=E)&&(this._host=s._host,this._port=s._port,this._username=s._username,this._password=s._password,this._path=s._path.slice(),this._path.pop()),d="relative path";continue}this._host=s._host,this._port=s._port,this._path=s._path.slice(),this._query=s._query,this._fragment="#",this._username=s._username,this._password=s._password,d="fragment"}break;case"relative slash":if("/"!=b&&"\\"!=b){"file"!=this._scheme&&(this._host=s._host,this._port=s._port,this._username=s._username,this._password=s._password),d="relative path";continue}"\\"==b&&c("\\ is an invalid code point."),d="file"==this._scheme?"file host":"authority ignore slashes";break;case"authority first slash":if("/"!=b){c("Expected '/', got: "+b),d="authority ignore slashes";continue}d="authority second slash";break;case"authority second slash":if(d="authority ignore slashes","/"!=b){c("Expected '/', got: "+b);continue}break;case"authority ignore slashes":if("/"!=b&&"\\"!=b){d="authority";continue}c("Expected authority, got: "+b);break;case"authority":if("@"==b){w&&(c("@ already seen."),u+="%40"),w=!0;for(var L=0;L<u.length;L++){var N=u[L];if("	"!=N&&"\n"!=N&&"\r"!=N)if(":"!=N||null!==this._password){var M=r(N);null!==this._password?this._password+=M:this._username+=M}else this._password="";else c("Invalid whitespace in authority.")}u=""}else{if(p==b||"/"==b||"\\"==b||"?"==b||"#"==b){l-=u.length,u="",d="host";continue}u+=b}break;case"file host":if(p==b||"/"==b||"\\"==b||"?"==b||"#"==b){2!=u.length||!m.test(u[0])||":"!=u[1]&&"|"!=u[1]?0==u.length?d="relative path start":(this._host=o.call(this,u),u="",d="relative path start"):d="relative path";continue}"	"==b||"\n"==b||"\r"==b?c("Invalid whitespace in file host."):u+=b;break;case"host":case"hostname":if(":"!=b||_){if(p==b||"/"==b||"\\"==b||"?"==b||"#"==b){if(this._host=o.call(this,u),u="",d="relative path start",a)break e;continue}"	"!=b&&"\n"!=b&&"\r"!=b?("["==b?_=!0:"]"==b&&(_=!1),u+=b):c("Invalid code point in host/hostname: "+b)}else if(this._host=o.call(this,u),u="",d="port","hostname"==a)break e;break;case"port":if(/[0-9]/.test(b))u+=b;else{if(p==b||"/"==b||"\\"==b||"?"==b||"#"==b||a){if(""!=u){var T=parseInt(u,10);T!=h[this._scheme]&&(this._port=T+""),u=""}if(a)break e;d="relative path start";continue}"	"==b||"\n"==b||"\r"==b?c("Invalid code point in port: "+b):n.call(this)}break;case"relative path start":if("\\"==b&&c("'\\' not allowed in path."),d="relative path","/"!=b&&"\\"!=b)continue;break;case"relative path":if(p!=b&&"/"!=b&&"\\"!=b&&(a||"?"!=b&&"#"!=b))"	"!=b&&"\n"!=b&&"\r"!=b&&(u+=r(b));else{"\\"==b&&c("\\ not allowed in relative path.");var O;(O=f[u.toLowerCase()])&&(u=O),".."==u?(this._path.pop(),"/"!=b&&"\\"!=b&&this._path.push("")):"."==u&&"/"!=b&&"\\"!=b?this._path.push(""):"."!=u&&("file"==this._scheme&&0==this._path.length&&2==u.length&&m.test(u[0])&&"|"==u[1]&&(u=u[0]+":"),this._path.push(u)),u="","?"==b?(this._query="?",d="query"):"#"==b&&(this._fragment="#",d="fragment")}break;case"query":a||"#"!=b?p!=b&&"	"!=b&&"\n"!=b&&"\r"!=b&&(this._query+=i(b)):(this._fragment="#",d="fragment");break;case"fragment":p!=b&&"	"!=b&&"\n"!=b&&"\r"!=b&&(this._fragment+=b)}l++}}function s(){this._scheme="",this._schemeData="",this._username="",this._password=null,this._host="",this._port="",this._path=[],this._query="",this._fragment="",this._isInvalid=!1,this._isRelative=!1}function c(e,t){void 0===t||t instanceof c||(t=new c(String(t))),this._url=e,s.call(this);var n=e.replace(/^[ \t\r\n\f]+|[ \t\r\n\f]+$/g,"");a.call(this,n,null,t)}var d=!1;if(!e.forceJURL)try{var l=new URL("b","http://a");l.pathname="c%20d",d="http://a/c%20d"===l.href}catch(u){}if(!d){var h=Object.create(null);h.ftp=21,h.file=0,h.gopher=70,h.http=80,h.https=443,h.ws=80,h.wss=443;var f=Object.create(null);f["%2e"]=".",f[".%2e"]="..",f["%2e."]="..",f["%2e%2e"]="..";var p=void 0,m=/[a-zA-Z]/,v=/[a-zA-Z0-9\+\-\.]/;c.prototype={toString:function(){return this.href},get href(){if(this._isInvalid)return this._url;var e="";return""==this._username&&null==this._password||(e=this._username+(null!=this._password?":"+this._password:"")+"@"),this.protocol+(this._isRelative?"//"+e+this.host:"")+this.pathname+this._query+this._fragment},set href(e){s.call(this),a.call(this,e)},get protocol(){return this._scheme+":"},set protocol(e){this._isInvalid||a.call(this,e+":","scheme start")},get host(){return this._isInvalid?"":this._port?this._host+":"+this._port:this._host},set host(e){!this._isInvalid&&this._isRelative&&a.call(this,e,"host")},get hostname(){return this._host},set hostname(e){!this._isInvalid&&this._isRelative&&a.call(this,e,"hostname")},get port(){return this._port},set port(e){!this._isInvalid&&this._isRelative&&a.call(this,e,"port")},get pathname(){return this._isInvalid?"":this._isRelative?"/"+this._path.join("/"):this._schemeData},set pathname(e){!this._isInvalid&&this._isRelative&&(this._path=[],a.call(this,e,"relative path start"))},get search(){return this._isInvalid||!this._query||"?"==this._query?"":this._query},set search(e){!this._isInvalid&&this._isRelative&&(this._query="?","?"==e[0]&&(e=e.slice(1)),a.call(this,e,"query"))},get hash(){return this._isInvalid||!this._fragment||"#"==this._fragment?"":this._fragment},set hash(e){this._isInvalid||(this._fragment="#","#"==e[0]&&(e=e.slice(1)),a.call(this,e,"fragment"))},get origin(){var e;if(this._isInvalid||!this._scheme)return"";switch(this._scheme){case"data":case"file":case"javascript":case"mailto":return"null"}return e=this.host,e?this._scheme+"://"+e:""}};var w=e.URL;w&&(c.createObjectURL=function(e){return w.createObjectURL.apply(w,arguments)},c.revokeObjectURL=function(e){w.revokeObjectURL(e)}),e.URL=c}}(self),"undefined"==typeof WeakMap&&!function(){var e=Object.defineProperty,t=Date.now()%1e9,n=function(){this.name="__st"+(1e9*Math.random()>>>0)+(t++ +"__")};n.prototype={set:function(t,n){var o=t[this.name];return o&&o[0]===t?o[1]=n:e(t,this.name,{value:[t,n],writable:!0}),this},get:function(e){var t;return(t=e[this.name])&&t[0]===e?t[1]:void 0},"delete":function(e){var t=e[this.name];return t&&t[0]===e?(t[0]=t[1]=void 0,!0):!1},has:function(e){var t=e[this.name];return t?t[0]===e:!1}},window.WeakMap=n}(),function(e){function t(e){b.push(e),g||(g=!0,m(o))}function n(e){return window.ShadowDOMPolyfill&&window.ShadowDOMPolyfill.wrapIfNeeded(e)||e}function o(){g=!1;var e=b;b=[],e.sort(function(e,t){return e.uid_-t.uid_});var t=!1;e.forEach(function(e){var n=e.takeRecords();r(e),n.length&&(e.callback_(n,e),t=!0)}),t&&o()}function r(e){e.nodes_.forEach(function(t){var n=v.get(t);n&&n.forEach(function(t){t.observer===e&&t.removeTransientObservers()})})}function i(e,t){for(var n=e;n;n=n.parentNode){var o=v.get(n);if(o)for(var r=0;r<o.length;r++){var i=o[r],a=i.options;if(n===e||a.subtree){var s=t(a);s&&i.enqueue(s)}}}}function a(e){this.callback_=e,this.nodes_=[],this.records_=[],this.uid_=++y}function s(e,t){this.type=e,this.target=t,this.addedNodes=[],this.removedNodes=[],this.previousSibling=null,this.nextSibling=null,this.attributeName=null,this.attributeNamespace=null,this.oldValue=null}function c(e){var t=new s(e.type,e.target);return t.addedNodes=e.addedNodes.slice(),t.removedNodes=e.removedNodes.slice(),t.previousSibling=e.previousSibling,t.nextSibling=e.nextSibling,t.attributeName=e.attributeName,t.attributeNamespace=e.attributeNamespace,t.oldValue=e.oldValue,t}function d(e,t){return E=new s(e,t)}function l(e){return L?L:(L=c(E),L.oldValue=e,L)}function u(){E=L=void 0}function h(e){return e===L||e===E}function f(e,t){return e===t?e:L&&h(e)?L:null}function p(e,t,n){this.observer=e,this.target=t,this.options=n,this.transientObservedNodes=[]}if(!e.JsMutationObserver){var m,v=new WeakMap;if(/Trident|Edge/.test(navigator.userAgent))m=setTimeout;else if(window.setImmediate)m=window.setImmediate;else{var w=[],_=String(Math.random());window.addEventListener("message",function(e){if(e.data===_){var t=w;w=[],t.forEach(function(e){e()})}}),m=function(e){w.push(e),window.postMessage(_,"*")}}var g=!1,b=[],y=0;a.prototype={observe:function(e,t){if(e=n(e),!t.childList&&!t.attributes&&!t.characterData||t.attributeOldValue&&!t.attributes||t.attributeFilter&&t.attributeFilter.length&&!t.attributes||t.characterDataOldValue&&!t.characterData)throw new SyntaxError;var o=v.get(e);o||v.set(e,o=[]);for(var r,i=0;i<o.length;i++)if(o[i].observer===this){r=o[i],r.removeListeners(),r.options=t;break}r||(r=new p(this,e,t),o.push(r),this.nodes_.push(e)),r.addListeners()},disconnect:function(){this.nodes_.forEach(function(e){for(var t=v.get(e),n=0;n<t.length;n++){var o=t[n];if(o.observer===this){o.removeListeners(),t.splice(n,1);break}}},this),this.records_=[]},takeRecords:function(){var e=this.records_;return this.records_=[],e}};var E,L;p.prototype={enqueue:function(e){var n=this.observer.records_,o=n.length;if(n.length>0){var r=n[o-1],i=f(r,e);if(i)return void(n[o-1]=i)}else t(this.observer);n[o]=e},addListeners:function(){this.addListeners_(this.target)},addListeners_:function(e){var t=this.options;t.attributes&&e.addEventListener("DOMAttrModified",this,!0),t.characterData&&e.addEventListener("DOMCharacterDataModified",this,!0),t.childList&&e.addEventListener("DOMNodeInserted",this,!0),(t.childList||t.subtree)&&e.addEventListener("DOMNodeRemoved",this,!0)},removeListeners:function(){this.removeListeners_(this.target)},removeListeners_:function(e){var t=this.options;t.attributes&&e.removeEventListener("DOMAttrModified",this,!0),t.characterData&&e.removeEventListener("DOMCharacterDataModified",this,!0),t.childList&&e.removeEventListener("DOMNodeInserted",this,!0),(t.childList||t.subtree)&&e.removeEventListener("DOMNodeRemoved",this,!0)},addTransientObserver:function(e){if(e!==this.target){this.addListeners_(e),this.transientObservedNodes.push(e);var t=v.get(e);t||v.set(e,t=[]),t.push(this)}},removeTransientObservers:function(){var e=this.transientObservedNodes;this.transientObservedNodes=[],e.forEach(function(e){this.removeListeners_(e);for(var t=v.get(e),n=0;n<t.length;n++)if(t[n]===this){t.splice(n,1);break}},this)},handleEvent:function(e){switch(e.stopImmediatePropagation(),e.type){case"DOMAttrModified":var t=e.attrName,n=e.relatedNode.namespaceURI,o=e.target,r=new d("attributes",o);r.attributeName=t,r.attributeNamespace=n;var a=e.attrChange===MutationEvent.ADDITION?null:e.prevValue;i(o,function(e){return!e.attributes||e.attributeFilter&&e.attributeFilter.length&&-1===e.attributeFilter.indexOf(t)&&-1===e.attributeFilter.indexOf(n)?void 0:e.attributeOldValue?l(a):r});break;case"DOMCharacterDataModified":var o=e.target,r=d("characterData",o),a=e.prevValue;i(o,function(e){return e.characterData?e.characterDataOldValue?l(a):r:void 0});break;case"DOMNodeRemoved":this.addTransientObserver(e.target);case"DOMNodeInserted":var s,c,h=e.target;"DOMNodeInserted"===e.type?(s=[h],c=[]):(s=[],c=[h]);var f=h.previousSibling,p=h.nextSibling,r=d("childList",e.target.parentNode);r.addedNodes=s,r.removedNodes=c,r.previousSibling=f,r.nextSibling=p,i(e.relatedNode,function(e){return e.childList?r:void 0})}u()}},e.JsMutationObserver=a,e.MutationObserver||(e.MutationObserver=a,a._isPolyfilled=!0)}}(self),function(){function e(e){switch(e){case"&":return"&amp;";case"<":return"&lt;";case">":return"&gt;";case" ":return"&nbsp;"}}function t(t){return t.replace(u,e)}var n="undefined"==typeof HTMLTemplateElement;/Trident/.test(navigator.userAgent)&&!function(){var e=document.importNode;document.importNode=function(){var t=e.apply(document,arguments);if(t.nodeType===Node.DOCUMENT_FRAGMENT_NODE){var n=document.createDocumentFragment();return n.appendChild(t),n}return t}}();var o=function(){if(!n){var e=document.createElement("template"),t=document.createElement("template");t.content.appendChild(document.createElement("div")),e.content.appendChild(t);var o=e.cloneNode(!0);return 0===o.content.childNodes.length||0===o.content.firstChild.content.childNodes.length}}(),r="template",i=function(){};if(n){var a=document.implementation.createHTMLDocument("template"),s=!0,c=document.createElement("style");c.textContent=r+"{display:none;}";var d=document.head;d.insertBefore(c,d.firstElementChild),i.prototype=Object.create(HTMLElement.prototype),i.decorate=function(e){if(!e.content){e.content=a.createDocumentFragment();for(var n;n=e.firstChild;)e.content.appendChild(n);if(e.cloneNode=function(e){return i.cloneNode(this,e)},s)try{Object.defineProperty(e,"innerHTML",{get:function(){for(var e="",n=this.content.firstChild;n;n=n.nextSibling)e+=n.outerHTML||t(n.data);return e},set:function(e){for(a.body.innerHTML=e,i.bootstrap(a);this.content.firstChild;)this.content.removeChild(this.content.firstChild);for(;a.body.firstChild;)this.content.appendChild(a.body.firstChild)},configurable:!0})}catch(o){s=!1}i.bootstrap(e.content)}},i.bootstrap=function(e){for(var t,n=e.querySelectorAll(r),o=0,a=n.length;a>o&&(t=n[o]);o++)i.decorate(t)},document.addEventListener("DOMContentLoaded",function(){i.bootstrap(document)});var l=document.createElement;document.createElement=function(){"use strict";var e=l.apply(document,arguments);return"template"===e.localName&&i.decorate(e),e};var u=/[&\u00A0<>]/g}if(n||o){var h=Node.prototype.cloneNode;i.cloneNode=function(e,t){var n=h.call(e,!1);return this.decorate&&this.decorate(n),t&&(n.content.appendChild(h.call(e.content,!0)),this.fixClonedDom(n.content,e.content)),n},i.fixClonedDom=function(e,t){if(t.querySelectorAll)for(var n,o,i=t.querySelectorAll(r),a=e.querySelectorAll(r),s=0,c=a.length;c>s;s++)o=i[s],n=a[s],this.decorate&&this.decorate(o),n.parentNode.replaceChild(o.cloneNode(!0),n)};var f=document.importNode;Node.prototype.cloneNode=function(e){var t=h.call(this,e);return e&&i.fixClonedDom(t,this),t},document.importNode=function(e,t){if(e.localName===r)return i.cloneNode(e,t);var n=f.call(document,e,t);return t&&i.fixClonedDom(n,e),n},o&&(HTMLTemplateElement.prototype.cloneNode=function(e){return i.cloneNode(this,e)})}n&&(window.HTMLTemplateElement=i)}(),function(e){"use strict";if(!window.performance){var t=Date.now();window.performance={now:function(){return Date.now()-t}}}window.requestAnimationFrame||(window.requestAnimationFrame=function(){var e=window.webkitRequestAnimationFrame||window.mozRequestAnimationFrame;return e?function(t){return e(function(){t(performance.now())})}:function(e){return window.setTimeout(e,1e3/60)}}()),window.cancelAnimationFrame||(window.cancelAnimationFrame=function(){return window.webkitCancelAnimationFrame||window.mozCancelAnimationFrame||function(e){clearTimeout(e)}}());var n=function(){var e=document.createEvent("Event");return e.initEvent("foo",!0,!0),e.preventDefault(),e.defaultPrevented}();if(!n){var o=Event.prototype.preventDefault;Event.prototype.preventDefault=function(){this.cancelable&&(o.call(this),Object.defineProperty(this,"defaultPrevented",{get:function(){return!0},configurable:!0}))}}var r=/Trident/.test(navigator.userAgent);if((!window.CustomEvent||r&&"function"!=typeof window.CustomEvent)&&(window.CustomEvent=function(e,t){t=t||{};var n=document.createEvent("CustomEvent");return n.initCustomEvent(e,Boolean(t.bubbles),Boolean(t.cancelable),t.detail),n},window.CustomEvent.prototype=window.Event.prototype),!window.Event||r&&"function"!=typeof window.Event){var i=window.Event;window.Event=function(e,t){t=t||{};var n=document.createEvent("Event");return n.initEvent(e,Boolean(t.bubbles),Boolean(t.cancelable)),n},window.Event.prototype=i.prototype}}(window.WebComponents),window.HTMLImports=window.HTMLImports||{flags:{}},function(e){function t(e,t){t=t||p,o(function(){i(e,t)},t)}function n(e){return"complete"===e.readyState||e.readyState===w}function o(e,t){if(n(t))e&&e();else{var r=function(){"complete"!==t.readyState&&t.readyState!==w||(t.removeEventListener(_,r),o(e,t))};t.addEventListener(_,r)}}function r(e){e.target.__loaded=!0}function i(e,t){function n(){c==d&&e&&e({allImports:s,loadedImports:l,errorImports:u})}function o(e){r(e),l.push(this),c++,n()}function i(e){u.push(this),c++,n()}var s=t.querySelectorAll("link[rel=import]"),c=0,d=s.length,l=[],u=[];if(d)for(var h,f=0;d>f&&(h=s[f]);f++)a(h)?(l.push(this),c++,n()):(h.addEventListener("load",o),h.addEventListener("error",i));else n()}function a(e){return u?e.__loaded||e["import"]&&"loading"!==e["import"].readyState:e.__importParsed}function s(e){for(var t,n=0,o=e.length;o>n&&(t=e[n]);n++)c(t)&&d(t)}function c(e){return"link"===e.localName&&"import"===e.rel}function d(e){var t=e["import"];t?r({target:e}):(e.addEventListener("load",r),e.addEventListener("error",r))}var l="import",u=Boolean(l in document.createElement("link")),h=Boolean(window.ShadowDOMPolyfill),f=function(e){return h?window.ShadowDOMPolyfill.wrapIfNeeded(e):e},p=f(document),m={get:function(){var e=window.HTMLImports.currentScript||document.currentScript||("complete"!==document.readyState?document.scripts[document.scripts.length-1]:null);return f(e)},configurable:!0};Object.defineProperty(document,"_currentScript",m),Object.defineProperty(p,"_currentScript",m);var v=/Trident/.test(navigator.userAgent),w=v?"complete":"interactive",_="readystatechange";u&&(new MutationObserver(function(e){for(var t,n=0,o=e.length;o>n&&(t=e[n]);n++)t.addedNodes&&s(t.addedNodes)}).observe(document.head,{childList:!0}),function(){if("loading"===document.readyState)for(var e,t=document.querySelectorAll("link[rel=import]"),n=0,o=t.length;o>n&&(e=t[n]);n++)d(e)}()),t(function(e){window.HTMLImports.ready=!0,window.HTMLImports.readyTime=(new Date).getTime();var t=p.createEvent("CustomEvent");t.initCustomEvent("HTMLImportsLoaded",!0,!0,e),p.dispatchEvent(t)}),e.IMPORT_LINK_TYPE=l,e.useNative=u,e.rootDocument=p,e.whenReady=t,e.isIE=v}(window.HTMLImports),function(e){var t=[],n=function(e){t.push(e)},o=function(){t.forEach(function(t){t(e)})};e.addModule=n,e.initializeModules=o}(window.HTMLImports),window.HTMLImports.addModule(function(e){var t=/(url\()([^)]*)(\))/g,n=/(@import[\s]+(?!url\())([^;]*)(;)/g,o={resolveUrlsInStyle:function(e,t){var n=e.ownerDocument,o=n.createElement("a");return e.textContent=this.resolveUrlsInCssText(e.textContent,t,o),e},resolveUrlsInCssText:function(e,o,r){var i=this.replaceUrls(e,r,o,t);return i=this.replaceUrls(i,r,o,n)},replaceUrls:function(e,t,n,o){return e.replace(o,function(e,o,r,i){var a=r.replace(/["']/g,"");return n&&(a=new URL(a,n).href),t.href=a,a=t.href,o+"'"+a+"'"+i})}};e.path=o}),window.HTMLImports.addModule(function(e){var t={async:!0,ok:function(e){return e.status>=200&&e.status<300||304===e.status||0===e.status},load:function(n,o,r){var i=new XMLHttpRequest;return(e.flags.debug||e.flags.bust)&&(n+="?"+Math.random()),i.open("GET",n,t.async),i.addEventListener("readystatechange",function(e){if(4===i.readyState){var n=null;try{var a=i.getResponseHeader("Location");a&&(n="/"===a.substr(0,1)?location.origin+a:a)}catch(e){console.error(e.message)}o.call(r,!t.ok(i)&&i,i.response||i.responseText,n)}}),i.send(),i},loadDocument:function(e,t,n){this.load(e,t,n).responseType="document"}};e.xhr=t}),window.HTMLImports.addModule(function(e){var t=e.xhr,n=e.flags,o=function(e,t){this.cache={},this.onload=e,this.oncomplete=t,this.inflight=0,this.pending={}};o.prototype={addNodes:function(e){this.inflight+=e.length;for(var t,n=0,o=e.length;o>n&&(t=e[n]);n++)this.require(t);this.checkDone()},addNode:function(e){this.inflight++,this.require(e),this.checkDone()},require:function(e){var t=e.src||e.href;e.__nodeUrl=t,this.dedupe(t,e)||this.fetch(t,e)},dedupe:function(e,t){if(this.pending[e])return this.pending[e].push(t),!0;return this.cache[e]?(this.onload(e,t,this.cache[e]),this.tail(),!0):(this.pending[e]=[t],!1)},fetch:function(e,o){if(n.load&&console.log("fetch",e,o),e)if(e.match(/^data:/)){var r=e.split(","),i=r[0],a=r[1];a=i.indexOf(";base64")>-1?atob(a):decodeURIComponent(a),setTimeout(function(){this.receive(e,o,null,a)}.bind(this),0)}else{var s=function(t,n,r){this.receive(e,o,t,n,r)}.bind(this);t.load(e,s)}else setTimeout(function(){this.receive(e,o,{error:"href must be specified"},null)}.bind(this),0)},receive:function(e,t,n,o,r){this.cache[e]=o;for(var i,a=this.pending[e],s=0,c=a.length;c>s&&(i=a[s]);s++)this.onload(e,i,o,n,r),this.tail();this.pending[e]=null},tail:function(){--this.inflight,this.checkDone()},checkDone:function(){this.inflight||this.oncomplete()}},e.Loader=o}),window.HTMLImports.addModule(function(e){var t=function(e){this.addCallback=e,this.mo=new MutationObserver(this.handler.bind(this))};t.prototype={handler:function(e){for(var t,n=0,o=e.length;o>n&&(t=e[n]);n++)"childList"===t.type&&t.addedNodes.length&&this.addedNodes(t.addedNodes)},addedNodes:function(e){this.addCallback&&this.addCallback(e);for(var t,n=0,o=e.length;o>n&&(t=e[n]);n++)t.children&&t.children.length&&this.addedNodes(t.children)},observe:function(e){this.mo.observe(e,{childList:!0,subtree:!0})}},e.Observer=t}),window.HTMLImports.addModule(function(e){function t(e){return"link"===e.localName&&e.rel===l}function n(e){var t=o(e);return"data:text/javascript;charset=utf-8,"+encodeURIComponent(t)}function o(e){return e.textContent+r(e)}function r(e){var t=e.ownerDocument;t.__importedScripts=t.__importedScripts||0;var n=e.ownerDocument.baseURI,o=t.__importedScripts?"-"+t.__importedScripts:"";return t.__importedScripts++,"\n//# sourceURL="+n+o+".js\n"}function i(e){var t=e.ownerDocument.createElement("style");return t.textContent=e.textContent,a.resolveUrlsInStyle(t),t}var a=e.path,s=e.rootDocument,c=e.flags,d=e.isIE,l=e.IMPORT_LINK_TYPE,u="link[rel="+l+"]",h={documentSelectors:u,importsSelectors:[u,"link[rel=stylesheet]:not([type])","style:not([type])","script:not([type])",'script[type="application/javascript"]','script[type="text/javascript"]'].join(","),map:{link:"parseLink",script:"parseScript",style:"parseStyle"},dynamicElements:[],parseNext:function(){var e=this.nextToParse();e&&this.parse(e)},parse:function(e){if(this.isParsed(e))return void(c.parse&&console.log("[%s] is already parsed",e.localName));var t=this[this.map[e.localName]];t&&(this.markParsing(e),t.call(this,e))},parseDynamic:function(e,t){this.dynamicElements.push(e),t||this.parseNext()},markParsing:function(e){c.parse&&console.log("parsing",e),this.parsingElement=e},markParsingComplete:function(e){e.__importParsed=!0,this.markDynamicParsingComplete(e),e.__importElement&&(e.__importElement.__importParsed=!0,this.markDynamicParsingComplete(e.__importElement)),this.parsingElement=null,c.parse&&console.log("completed",e)},markDynamicParsingComplete:function(e){var t=this.dynamicElements.indexOf(e);t>=0&&this.dynamicElements.splice(t,1)},parseImport:function(e){if(e["import"]=e.__doc,window.HTMLImports.__importsParsingHook&&window.HTMLImports.__importsParsingHook(e),e["import"]&&(e["import"].__importParsed=!0),this.markParsingComplete(e),e.__resource&&!e.__error?e.dispatchEvent(new CustomEvent("load",{bubbles:!1})):e.dispatchEvent(new CustomEvent("error",{bubbles:!1})),e.__pending)for(var t;e.__pending.length;)t=e.__pending.shift(),t&&t({target:e});this.parseNext()},parseLink:function(e){t(e)?this.parseImport(e):(e.href=e.href,this.parseGeneric(e))},parseStyle:function(e){var t=e;e=i(e),t.__appliedElement=e,e.__importElement=t,this.parseGeneric(e)},parseGeneric:function(e){this.trackElement(e),this.addElementToDocument(e)},rootImportForElement:function(e){for(var t=e;t.ownerDocument.__importLink;)t=t.ownerDocument.__importLink;return t},addElementToDocument:function(e){var t=this.rootImportForElement(e.__importElement||e);t.parentNode.insertBefore(e,t)},trackElement:function(e,t){var n=this,o=function(r){e.removeEventListener("load",o),e.removeEventListener("error",o),t&&t(r),n.markParsingComplete(e),n.parseNext()};if(e.addEventListener("load",o),e.addEventListener("error",o),d&&"style"===e.localName){var r=!1;if(-1==e.textContent.indexOf("@import"))r=!0;else if(e.sheet){r=!0;for(var i,a=e.sheet.cssRules,s=a?a.length:0,c=0;s>c&&(i=a[c]);c++)i.type===CSSRule.IMPORT_RULE&&(r=r&&Boolean(i.styleSheet))}r&&setTimeout(function(){e.dispatchEvent(new CustomEvent("load",{bubbles:!1}))})}},parseScript:function(t){var o=document.createElement("script");o.__importElement=t,o.src=t.src?t.src:n(t),e.currentScript=t,this.trackElement(o,function(t){o.parentNode&&o.parentNode.removeChild(o),e.currentScript=null}),this.addElementToDocument(o)},nextToParse:function(){return this._mayParse=[],!this.parsingElement&&(this.nextToParseInDoc(s)||this.nextToParseDynamic())},nextToParseInDoc:function(e,n){if(e&&this._mayParse.indexOf(e)<0){this._mayParse.push(e);for(var o,r=e.querySelectorAll(this.parseSelectorsForNode(e)),i=0,a=r.length;a>i&&(o=r[i]);i++)if(!this.isParsed(o))return this.hasResource(o)?t(o)?this.nextToParseInDoc(o.__doc,o):o:void 0}return n},nextToParseDynamic:function(){return this.dynamicElements[0]},parseSelectorsForNode:function(e){var t=e.ownerDocument||e;return t===s?this.documentSelectors:this.importsSelectors},isParsed:function(e){return e.__importParsed},needsDynamicParsing:function(e){return this.dynamicElements.indexOf(e)>=0},hasResource:function(e){return!t(e)||void 0!==e.__doc}};e.parser=h,e.IMPORT_SELECTOR=u}),window.HTMLImports.addModule(function(e){function t(e){return n(e,a)}function n(e,t){return"link"===e.localName&&e.getAttribute("rel")===t}function o(e){return!!Object.getOwnPropertyDescriptor(e,"baseURI")}function r(e,t){var n=document.implementation.createHTMLDocument(a);n._URL=t;var r=n.createElement("base");r.setAttribute("href",t),n.baseURI||o(n)||Object.defineProperty(n,"baseURI",{value:t});var i=n.createElement("meta");return i.setAttribute("charset","utf-8"),n.head.appendChild(i),n.head.appendChild(r),n.body.innerHTML=e,window.HTMLTemplateElement&&HTMLTemplateElement.bootstrap&&HTMLTemplateElement.bootstrap(n),n}var i=e.flags,a=e.IMPORT_LINK_TYPE,s=e.IMPORT_SELECTOR,c=e.rootDocument,d=e.Loader,l=e.Observer,u=e.parser,h={documents:{},documentPreloadSelectors:s,importsPreloadSelectors:[s].join(","),loadNode:function(e){f.addNode(e)},loadSubtree:function(e){var t=this.marshalNodes(e);f.addNodes(t)},marshalNodes:function(e){return e.querySelectorAll(this.loadSelectorsForNode(e))},loadSelectorsForNode:function(e){var t=e.ownerDocument||e;return t===c?this.documentPreloadSelectors:this.importsPreloadSelectors},loaded:function(e,n,o,a,s){if(i.load&&console.log("loaded",e,n),n.__resource=o,n.__error=a,t(n)){var c=this.documents[e];void 0===c&&(c=a?null:r(o,s||e),c&&(c.__importLink=n,this.bootDocument(c)),this.documents[e]=c),n.__doc=c}u.parseNext()},bootDocument:function(e){this.loadSubtree(e),this.observer.observe(e),u.parseNext()},loadedAll:function(){u.parseNext()}},f=new d(h.loaded.bind(h),h.loadedAll.bind(h));if(h.observer=new l,!document.baseURI){var p={get:function(){var e=document.querySelector("base");return e?e.href:window.location.href},configurable:!0};Object.defineProperty(document,"baseURI",p),Object.defineProperty(c,"baseURI",p)}e.importer=h,e.importLoader=f}),window.HTMLImports.addModule(function(e){var t=e.parser,n=e.importer,o={added:function(e){for(var o,r,i,a,s=0,c=e.length;c>s&&(a=e[s]);s++)o||(o=a.ownerDocument,r=t.isParsed(o)),i=this.shouldLoadNode(a),i&&n.loadNode(a),this.shouldParseNode(a)&&r&&t.parseDynamic(a,i)},shouldLoadNode:function(e){return 1===e.nodeType&&r.call(e,n.loadSelectorsForNode(e))},shouldParseNode:function(e){return 1===e.nodeType&&r.call(e,t.parseSelectorsForNode(e))}};n.observer.addCallback=o.added.bind(o);var r=HTMLElement.prototype.matches||HTMLElement.prototype.matchesSelector||HTMLElement.prototype.webkitMatchesSelector||HTMLElement.prototype.mozMatchesSelector||HTMLElement.prototype.msMatchesSelector}),function(e){function t(){window.HTMLImports.importer.bootDocument(o)}var n=e.initializeModules;e.isIE;if(!e.useNative){n();var o=e.rootDocument;"complete"===document.readyState||"interactive"===document.readyState&&!window.attachEvent?t():document.addEventListener("DOMContentLoaded",t)}}(window.HTMLImports),window.CustomElements=window.CustomElements||{flags:{}},function(e){var t=e.flags,n=[],o=function(e){n.push(e)},r=function(){n.forEach(function(t){t(e)})};e.addModule=o,e.initializeModules=r,e.hasNative=Boolean(document.registerElement),e.isIE=/Trident/.test(navigator.userAgent),e.useNative=!t.register&&e.hasNative&&!window.ShadowDOMPolyfill&&(!window.HTMLImports||window.HTMLImports.useNative)}(window.CustomElements),window.CustomElements.addModule(function(e){function t(e,t){n(e,function(e){return t(e)?!0:void o(e,t)}),o(e,t)}function n(e,t,o){var r=e.firstElementChild;if(!r)for(r=e.firstChild;r&&r.nodeType!==Node.ELEMENT_NODE;)r=r.nextSibling;for(;r;)t(r,o)!==!0&&n(r,t,o),r=r.nextElementSibling;return null}function o(e,n){for(var o=e.shadowRoot;o;)t(o,n),o=o.olderShadowRoot}function r(e,t){i(e,t,[])}function i(e,t,n){if(e=window.wrap(e),!(n.indexOf(e)>=0)){n.push(e);for(var o,r=e.querySelectorAll("link[rel="+a+"]"),s=0,c=r.length;c>s&&(o=r[s]);s++)o["import"]&&i(o["import"],t,n);t(e)}}var a=window.HTMLImports?window.HTMLImports.IMPORT_LINK_TYPE:"none";e.forDocumentTree=r,e.forSubtree=t}),window.CustomElements.addModule(function(e){function t(e,t){return n(e,t)||o(e,t)}function n(t,n){return e.upgrade(t,n)?!0:void(n&&a(t))}function o(e,t){g(e,function(e){return n(e,t)?!0:void 0})}function r(e){L.push(e),E||(E=!0,setTimeout(i))}function i(){E=!1;for(var e,t=L,n=0,o=t.length;o>n&&(e=t[n]);n++)e();L=[]}function a(e){y?r(function(){s(e)}):s(e)}function s(e){
-e.__upgraded__&&!e.__attached&&(e.__attached=!0,e.attachedCallback&&e.attachedCallback())}function c(e){d(e),g(e,function(e){d(e)})}function d(e){y?r(function(){l(e)}):l(e)}function l(e){e.__upgraded__&&e.__attached&&(e.__attached=!1,e.detachedCallback&&e.detachedCallback())}function u(e){for(var t=e,n=window.wrap(document);t;){if(t==n)return!0;t=t.parentNode||t.nodeType===Node.DOCUMENT_FRAGMENT_NODE&&t.host}}function h(e){if(e.shadowRoot&&!e.shadowRoot.__watched){_.dom&&console.log("watching shadow-root for: ",e.localName);for(var t=e.shadowRoot;t;)m(t),t=t.olderShadowRoot}}function f(e,n){if(_.dom){var o=n[0];if(o&&"childList"===o.type&&o.addedNodes&&o.addedNodes){for(var r=o.addedNodes[0];r&&r!==document&&!r.host;)r=r.parentNode;var i=r&&(r.URL||r._URL||r.host&&r.host.localName)||"";i=i.split("/?").shift().split("/").pop()}console.group("mutations (%d) [%s]",n.length,i||"")}var a=u(e);n.forEach(function(e){"childList"===e.type&&(N(e.addedNodes,function(e){e.localName&&t(e,a)}),N(e.removedNodes,function(e){e.localName&&c(e)}))}),_.dom&&console.groupEnd()}function p(e){for(e=window.wrap(e),e||(e=window.wrap(document));e.parentNode;)e=e.parentNode;var t=e.__observer;t&&(f(e,t.takeRecords()),i())}function m(e){if(!e.__observer){var t=new MutationObserver(f.bind(this,e));t.observe(e,{childList:!0,subtree:!0}),e.__observer=t}}function v(e){e=window.wrap(e),_.dom&&console.group("upgradeDocument: ",e.baseURI.split("/").pop());var n=e===window.wrap(document);t(e,n),m(e),_.dom&&console.groupEnd()}function w(e){b(e,v)}var _=e.flags,g=e.forSubtree,b=e.forDocumentTree,y=window.MutationObserver._isPolyfilled&&_["throttle-attached"];e.hasPolyfillMutations=y,e.hasThrottledAttached=y;var E=!1,L=[],N=Array.prototype.forEach.call.bind(Array.prototype.forEach),M=Element.prototype.createShadowRoot;M&&(Element.prototype.createShadowRoot=function(){var e=M.call(this);return window.CustomElements.watchShadow(this),e}),e.watchShadow=h,e.upgradeDocumentTree=w,e.upgradeDocument=v,e.upgradeSubtree=o,e.upgradeAll=t,e.attached=a,e.takeRecords=p}),window.CustomElements.addModule(function(e){function t(t,o){if("template"===t.localName&&window.HTMLTemplateElement&&HTMLTemplateElement.decorate&&HTMLTemplateElement.decorate(t),!t.__upgraded__&&t.nodeType===Node.ELEMENT_NODE){var r=t.getAttribute("is"),i=e.getRegisteredDefinition(t.localName)||e.getRegisteredDefinition(r);if(i&&(r&&i.tag==t.localName||!r&&!i["extends"]))return n(t,i,o)}}function n(t,n,r){return a.upgrade&&console.group("upgrade:",t.localName),n.is&&t.setAttribute("is",n.is),o(t,n),t.__upgraded__=!0,i(t),r&&e.attached(t),e.upgradeSubtree(t,r),a.upgrade&&console.groupEnd(),t}function o(e,t){Object.__proto__?e.__proto__=t.prototype:(r(e,t.prototype,t["native"]),e.__proto__=t.prototype)}function r(e,t,n){for(var o={},r=t;r!==n&&r!==HTMLElement.prototype;){for(var i,a=Object.getOwnPropertyNames(r),s=0;i=a[s];s++)o[i]||(Object.defineProperty(e,i,Object.getOwnPropertyDescriptor(r,i)),o[i]=1);r=Object.getPrototypeOf(r)}}function i(e){e.createdCallback&&e.createdCallback()}var a=e.flags;e.upgrade=t,e.upgradeWithDefinition=n,e.implementPrototype=o}),window.CustomElements.addModule(function(e){function t(t,o){var c=o||{};if(!t)throw new Error("document.registerElement: first argument `name` must not be empty");if(t.indexOf("-")<0)throw new Error("document.registerElement: first argument ('name') must contain a dash ('-'). Argument provided was '"+String(t)+"'.");if(r(t))throw new Error("Failed to execute 'registerElement' on 'Document': Registration failed for type '"+String(t)+"'. The type name is invalid.");if(d(t))throw new Error("DuplicateDefinitionError: a type with name '"+String(t)+"' is already registered");return c.prototype||(c.prototype=Object.create(HTMLElement.prototype)),c.__name=t.toLowerCase(),c["extends"]&&(c["extends"]=c["extends"].toLowerCase()),c.lifecycle=c.lifecycle||{},c.ancestry=i(c["extends"]),a(c),s(c),n(c.prototype),l(c.__name,c),c.ctor=u(c),c.ctor.prototype=c.prototype,c.prototype.constructor=c.ctor,e.ready&&v(document),c.ctor}function n(e){if(!e.setAttribute._polyfilled){var t=e.setAttribute;e.setAttribute=function(e,n){o.call(this,e,n,t)};var n=e.removeAttribute;e.removeAttribute=function(e){o.call(this,e,null,n)},e.setAttribute._polyfilled=!0}}function o(e,t,n){e=e.toLowerCase();var o=this.getAttribute(e);n.apply(this,arguments);var r=this.getAttribute(e);this.attributeChangedCallback&&r!==o&&this.attributeChangedCallback(e,o,r)}function r(e){for(var t=0;t<y.length;t++)if(e===y[t])return!0}function i(e){var t=d(e);return t?i(t["extends"]).concat([t]):[]}function a(e){for(var t,n=e["extends"],o=0;t=e.ancestry[o];o++)n=t.is&&t.tag;e.tag=n||e.__name,n&&(e.is=e.__name)}function s(e){if(!Object.__proto__){var t=HTMLElement.prototype;if(e.is){var n=document.createElement(e.tag);t=Object.getPrototypeOf(n)}for(var o,r=e.prototype,i=!1;r;)r==t&&(i=!0),o=Object.getPrototypeOf(r),o&&(r.__proto__=o),r=o;i||console.warn(e.tag+" prototype not found in prototype chain for "+e.is),e["native"]=t}}function c(e){return _(N(e.tag),e)}function d(e){return e?E[e.toLowerCase()]:void 0}function l(e,t){E[e]=t}function u(e){return function(){return c(e)}}function h(e,t,n){return e===L?f(t,n):M(e,t)}function f(e,t){e&&(e=e.toLowerCase()),t&&(t=t.toLowerCase());var n=d(t||e);if(n){if(e==n.tag&&t==n.is)return new n.ctor;if(!t&&!n.is)return new n.ctor}var o;return t?(o=f(e),o.setAttribute("is",t),o):(o=N(e),e.indexOf("-")>=0&&g(o,HTMLElement),o)}function p(e,t){var n=e[t];e[t]=function(){var e=n.apply(this,arguments);return w(e),e}}var m,v=(e.isIE,e.upgradeDocumentTree),w=e.upgradeAll,_=e.upgradeWithDefinition,g=e.implementPrototype,b=e.useNative,y=["annotation-xml","color-profile","font-face","font-face-src","font-face-uri","font-face-format","font-face-name","missing-glyph"],E={},L="http://www.w3.org/1999/xhtml",N=document.createElement.bind(document),M=document.createElementNS.bind(document);m=Object.__proto__||b?function(e,t){return e instanceof t}:function(e,t){if(e instanceof t)return!0;for(var n=e;n;){if(n===t.prototype)return!0;n=n.__proto__}return!1},p(Node.prototype,"cloneNode"),p(document,"importNode"),document.registerElement=t,document.createElement=f,document.createElementNS=h,e.registry=E,e["instanceof"]=m,e.reservedTagList=y,e.getRegisteredDefinition=d,document.register=document.registerElement}),function(e){function t(){i(window.wrap(document)),window.CustomElements.ready=!0;var e=window.requestAnimationFrame||function(e){setTimeout(e,16)};e(function(){setTimeout(function(){window.CustomElements.readyTime=Date.now(),window.HTMLImports&&(window.CustomElements.elapsed=window.CustomElements.readyTime-window.HTMLImports.readyTime),document.dispatchEvent(new CustomEvent("WebComponentsReady",{bubbles:!0}))})})}var n=e.useNative,o=e.initializeModules;e.isIE;if(n){var r=function(){};e.watchShadow=r,e.upgrade=r,e.upgradeAll=r,e.upgradeDocumentTree=r,e.upgradeSubtree=r,e.takeRecords=r,e["instanceof"]=function(e,t){return e instanceof t}}else o();var i=e.upgradeDocumentTree,a=e.upgradeDocument;if(window.wrap||(window.ShadowDOMPolyfill?(window.wrap=window.ShadowDOMPolyfill.wrapIfNeeded,window.unwrap=window.ShadowDOMPolyfill.unwrapIfNeeded):window.wrap=window.unwrap=function(e){return e}),window.HTMLImports&&(window.HTMLImports.__importsParsingHook=function(e){e["import"]&&a(wrap(e["import"]))}),"complete"===document.readyState||e.flags.eager)t();else if("interactive"!==document.readyState||window.attachEvent||window.HTMLImports&&!window.HTMLImports.ready){var s=window.HTMLImports&&!window.HTMLImports.ready?"HTMLImportsLoaded":"DOMContentLoaded";window.addEventListener(s,t)}else t()}(window.CustomElements),function(e){var t=document.createElement("style");t.textContent="body {transition: opacity ease-in 0.2s; } \nbody[unresolved] {opacity: 0; display: block; overflow: hidden; position: relative; } \n";var n=document.querySelector("head");n.insertBefore(t,n.firstChild)}(window.WebComponents);</script>
-  </head>
-
-<body><div hidden="" by-vulcanize=""><script>(function () {
+--><meta charset="UTF-8">
+    
+    
+    </head><body><div hidden="" by-vulcanize=""><script>(function () {
 function resolve() {
 document.body.removeAttribute('unresolved');
 }
@@ -9159,6 +9150,4237 @@ if (!window.Promise) {
 
 
 <script>
+  Polymer.AppLayout = Polymer.AppLayout || {};
+
+  Polymer.AppLayout._scrollEffects = Polymer.AppLayout._scrollEffects || {};
+
+  Polymer.AppLayout.scrollTimingFunction = function easeOutQuad(t, b, c, d) {
+    t /= d;
+    return -c * t*(t-2) + b;
+  };
+
+  /**
+   * Registers a scroll effect to be used in elements that implement the
+   * `Polymer.AppScrollEffectsBehavior` behavior.
+   *
+   * @param {string} effectName The effect name.
+   * @param {Object} effectDef The effect definition.
+   */
+  Polymer.AppLayout.registerEffect = function registerEffect(effectName, effectDef) {
+    if (Polymer.AppLayout._scrollEffects[effectName] != null) {
+      throw new Error('effect `'+ effectName + '` is already registered.');
+    }
+    Polymer.AppLayout._scrollEffects[effectName] = effectDef;
+  };
+
+  /**
+   * Scrolls to a particular set of coordinates in a scroll target.
+   * If the scroll target is not defined, then it would use the main document as the target.
+   *
+   * To scroll in a smooth fashion, you can set the option `behavior: 'smooth'`. e.g.
+   *
+   * ```js
+   * Polymer.AppLayout.scroll({top: 0, behavior: 'smooth'});
+   * ```
+   *
+   * To scroll in a silent mode, without notifying scroll changes to any app-layout elements,
+   * you can set the option `behavior: 'silent'`. This is particularly useful we you are using
+   * `app-header` and you desire to scroll to the top of a scrolling region without running
+   * scroll effects. e.g.
+   *
+   * ```js
+   * Polymer.AppLayout.scroll({top: 0, behavior: 'silent'});
+   * ```
+   *
+   * @param {Object} options {top: Number, left: Number, behavior: String(smooth | silent)}
+   */
+  Polymer.AppLayout.scroll = function scroll(options) {
+    options = options || {};
+
+    var docEl = document.documentElement;
+    var target = options.target || docEl;
+    var hasNativeScrollBehavior = 'scrollBehavior' in target.style && target.scroll;
+    var scrollClassName = 'app-layout-silent-scroll';
+    var scrollTop = options.top || 0;
+    var scrollLeft = options.left || 0;
+    var scrollTo = target === docEl ? window.scrollTo :
+      function scrollTo(scrollLeft, scrollTop) {
+        target.scrollLeft = scrollLeft;
+        target.scrollTop = scrollTop;
+      };
+
+    if (options.behavior === 'smooth') {
+
+      if (hasNativeScrollBehavior) {
+
+        target.scroll(options);
+
+      } else {
+
+        var timingFn = Polymer.AppLayout.scrollTimingFunction;
+        var startTime = Date.now();
+        var currentScrollTop = target === docEl ? window.pageYOffset : target.scrollTop;
+        var currentScrollLeft = target === docEl ? window.pageXOffset : target.scrollLeft;
+        var deltaScrollTop = scrollTop - currentScrollTop;
+        var deltaScrollLeft = scrollLeft - currentScrollLeft;
+        var duration = 300;
+        var updateFrame = (function updateFrame() {
+          var now = Date.now();
+          var elapsedTime = now - startTime;
+
+          if (elapsedTime < duration) {
+            scrollTo(timingFn(elapsedTime, currentScrollLeft, deltaScrollLeft, duration),
+                timingFn(elapsedTime, currentScrollTop, deltaScrollTop, duration));
+            requestAnimationFrame(updateFrame);
+          } else {
+            scrollTo(scrollLeft, scrollTop);
+          }
+        }).bind(this);
+        
+        updateFrame();
+      }
+
+    } else if (options.behavior === 'silent') {
+
+      docEl.classList.add(scrollClassName);
+
+      // Browsers keep the scroll momentum even if the bottom of the scrolling content
+      // was reached. This means that calling scroll({top: 0, behavior: 'silent'}) when
+      // the momentum is still going will result in more scroll events and thus scroll effects.
+      // This seems to only apply when using document scrolling.
+      // Therefore, when should we remove the class from the document element?
+
+      clearInterval(Polymer.AppLayout._scrollTimer);
+
+      Polymer.AppLayout._scrollTimer = setTimeout(function() {
+        docEl.classList.remove(scrollClassName);
+        Polymer.AppLayout._scrollTimer = null;
+      }, 100);
+
+      scrollTo(scrollLeft, scrollTop);
+
+    } else {
+
+      scrollTo(scrollLeft, scrollTop);
+
+    }
+  };
+
+</script>
+
+
+<style>
+  /* IE 10 support for HTML5 hidden attr */
+  [hidden] {
+    display: none !important;
+  }
+</style>
+
+<style is="custom-style">
+  :root {
+
+    --layout: {
+      display: -ms-flexbox;
+      display: -webkit-flex;
+      display: flex;
+    };
+
+    --layout-inline: {
+      display: -ms-inline-flexbox;
+      display: -webkit-inline-flex;
+      display: inline-flex;
+    };
+
+    --layout-horizontal: {
+      @apply(--layout);
+
+      -ms-flex-direction: row;
+      -webkit-flex-direction: row;
+      flex-direction: row;
+    };
+
+    --layout-horizontal-reverse: {
+      @apply(--layout);
+
+      -ms-flex-direction: row-reverse;
+      -webkit-flex-direction: row-reverse;
+      flex-direction: row-reverse;
+    };
+
+    --layout-vertical: {
+      @apply(--layout);
+
+      -ms-flex-direction: column;
+      -webkit-flex-direction: column;
+      flex-direction: column;
+    };
+
+    --layout-vertical-reverse: {
+      @apply(--layout);
+
+      -ms-flex-direction: column-reverse;
+      -webkit-flex-direction: column-reverse;
+      flex-direction: column-reverse;
+    };
+
+    --layout-wrap: {
+      -ms-flex-wrap: wrap;
+      -webkit-flex-wrap: wrap;
+      flex-wrap: wrap;
+    };
+
+    --layout-wrap-reverse: {
+      -ms-flex-wrap: wrap-reverse;
+      -webkit-flex-wrap: wrap-reverse;
+      flex-wrap: wrap-reverse;
+    };
+
+    --layout-flex-auto: {
+      -ms-flex: 1 1 auto;
+      -webkit-flex: 1 1 auto;
+      flex: 1 1 auto;
+    };
+
+    --layout-flex-none: {
+      -ms-flex: none;
+      -webkit-flex: none;
+      flex: none;
+    };
+
+    --layout-flex: {
+      -ms-flex: 1 1 0.000000001px;
+      -webkit-flex: 1;
+      flex: 1;
+      -webkit-flex-basis: 0.000000001px;
+      flex-basis: 0.000000001px;
+    };
+
+    --layout-flex-2: {
+      -ms-flex: 2;
+      -webkit-flex: 2;
+      flex: 2;
+    };
+
+    --layout-flex-3: {
+      -ms-flex: 3;
+      -webkit-flex: 3;
+      flex: 3;
+    };
+
+    --layout-flex-4: {
+      -ms-flex: 4;
+      -webkit-flex: 4;
+      flex: 4;
+    };
+
+    --layout-flex-5: {
+      -ms-flex: 5;
+      -webkit-flex: 5;
+      flex: 5;
+    };
+
+    --layout-flex-6: {
+      -ms-flex: 6;
+      -webkit-flex: 6;
+      flex: 6;
+    };
+
+    --layout-flex-7: {
+      -ms-flex: 7;
+      -webkit-flex: 7;
+      flex: 7;
+    };
+
+    --layout-flex-8: {
+      -ms-flex: 8;
+      -webkit-flex: 8;
+      flex: 8;
+    };
+
+    --layout-flex-9: {
+      -ms-flex: 9;
+      -webkit-flex: 9;
+      flex: 9;
+    };
+
+    --layout-flex-10: {
+      -ms-flex: 10;
+      -webkit-flex: 10;
+      flex: 10;
+    };
+
+    --layout-flex-11: {
+      -ms-flex: 11;
+      -webkit-flex: 11;
+      flex: 11;
+    };
+
+    --layout-flex-12: {
+      -ms-flex: 12;
+      -webkit-flex: 12;
+      flex: 12;
+    };
+
+    /* alignment in cross axis */
+
+    --layout-start: {
+      -ms-flex-align: start;
+      -webkit-align-items: flex-start;
+      align-items: flex-start;
+    };
+
+    --layout-center: {
+      -ms-flex-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+    };
+
+    --layout-end: {
+      -ms-flex-align: end;
+      -webkit-align-items: flex-end;
+      align-items: flex-end;
+    };
+
+    --layout-baseline: {
+      -ms-flex-align: baseline;
+      -webkit-align-items: baseline;
+      align-items: baseline;
+    };
+
+    /* alignment in main axis */
+
+    --layout-start-justified: {
+      -ms-flex-pack: start;
+      -webkit-justify-content: flex-start;
+      justify-content: flex-start;
+    };
+
+    --layout-center-justified: {
+      -ms-flex-pack: center;
+      -webkit-justify-content: center;
+      justify-content: center;
+    };
+
+    --layout-end-justified: {
+      -ms-flex-pack: end;
+      -webkit-justify-content: flex-end;
+      justify-content: flex-end;
+    };
+
+    --layout-around-justified: {
+      -ms-flex-pack: distribute;
+      -webkit-justify-content: space-around;
+      justify-content: space-around;
+    };
+
+    --layout-justified: {
+      -ms-flex-pack: justify;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+    };
+
+    --layout-center-center: {
+      @apply(--layout-center);
+      @apply(--layout-center-justified);
+    };
+
+    /* self alignment */
+
+    --layout-self-start: {
+      -ms-align-self: flex-start;
+      -webkit-align-self: flex-start;
+      align-self: flex-start;
+    };
+
+    --layout-self-center: {
+      -ms-align-self: center;
+      -webkit-align-self: center;
+      align-self: center;
+    };
+
+    --layout-self-end: {
+      -ms-align-self: flex-end;
+      -webkit-align-self: flex-end;
+      align-self: flex-end;
+    };
+
+    --layout-self-stretch: {
+      -ms-align-self: stretch;
+      -webkit-align-self: stretch;
+      align-self: stretch;
+    };
+
+    --layout-self-baseline: {
+      -ms-align-self: baseline;
+      -webkit-align-self: baseline;
+      align-self: baseline;
+    };
+
+    /* multi-line alignment in main axis */
+
+    --layout-start-aligned: {
+      -ms-flex-line-pack: start;  /* IE10 */
+      -ms-align-content: flex-start;
+      -webkit-align-content: flex-start;
+      align-content: flex-start;
+    };
+
+    --layout-end-aligned: {
+      -ms-flex-line-pack: end;  /* IE10 */
+      -ms-align-content: flex-end;
+      -webkit-align-content: flex-end;
+      align-content: flex-end;
+    };
+
+    --layout-center-aligned: {
+      -ms-flex-line-pack: center;  /* IE10 */
+      -ms-align-content: center;
+      -webkit-align-content: center;
+      align-content: center;
+    };
+
+    --layout-between-aligned: {
+      -ms-flex-line-pack: justify;  /* IE10 */
+      -ms-align-content: space-between;
+      -webkit-align-content: space-between;
+      align-content: space-between;
+    };
+
+    --layout-around-aligned: {
+      -ms-flex-line-pack: distribute;  /* IE10 */
+      -ms-align-content: space-around;
+      -webkit-align-content: space-around;
+      align-content: space-around;
+    };
+
+    /*******************************
+              Other Layout
+    *******************************/
+
+    --layout-block: {
+      display: block;
+    };
+
+    --layout-invisible: {
+      visibility: hidden !important;
+    };
+
+    --layout-relative: {
+      position: relative;
+    };
+
+    --layout-fit: {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+    };
+
+    --layout-scroll: {
+      -webkit-overflow-scrolling: touch;
+      overflow: auto;
+    };
+
+    --layout-fullbleed: {
+      margin: 0;
+      height: 100vh;
+    };
+
+    /* fixed position */
+
+    --layout-fixed-top: {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+    };
+
+    --layout-fixed-right: {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+    };
+
+    --layout-fixed-bottom: {
+      position: fixed;
+      right: 0;
+      bottom: 0;
+      left: 0;
+    };
+
+    --layout-fixed-left: {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+    };
+
+  }
+
+</style>
+
+
+<dom-module id="app-drawer" assetpath="/res/imp/bower_components/app-layout/app-drawer/">
+  <template>
+    <style>
+      :host {
+        position: fixed;
+        top: -120px;
+        right: 0;
+        bottom: -120px;
+        left: 0;
+
+        visibility: hidden;
+
+        transition: visibility 0.2s ease;
+      }
+
+      :host([opened]) {
+        visibility: visible;
+      }
+
+      :host([persistent]) {
+        width: var(--app-drawer-width, 256px);
+      }
+
+      :host([persistent][position=left]) {
+        right: auto;
+      }
+
+      :host([persistent][position=right]) {
+        left: auto;
+      }
+
+      #contentContainer {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+
+        width: var(--app-drawer-width, 256px);
+        padding: 120px 0;
+
+        transition: 0.2s ease;
+        transition-property: -webkit-transform;
+        transition-property: transform;
+        -webkit-transform: translate3d(-100%, 0, 0);
+        transform: translate3d(-100%, 0, 0);
+
+        background-color: #FFF;
+
+        @apply(--app-drawer-content-container);
+      }
+
+      :host([position=right]) > #contentContainer {
+        right: 0;
+        left: auto;
+
+        -webkit-transform: translate3d(100%, 0, 0);
+        transform: translate3d(100%, 0, 0);
+      }
+
+      :host([swipe-open]) > #contentContainer::after {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 100%;
+
+        visibility: visible;
+
+        width: 20px;
+
+        content: '';
+      }
+
+      :host([swipe-open][position=right]) > #contentContainer::after {
+        right: 100%;
+        left: auto;
+      }
+
+      :host([opened]) > #contentContainer {
+        -webkit-transform: translate3d(0, 0, 0);
+        transform: translate3d(0, 0, 0);
+      }
+
+      #scrim {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+
+        transition: opacity 0.2s ease;
+        -webkit-transform: translateZ(0);
+        transform:  translateZ(0);
+
+        opacity: 0;
+        background: var(--app-drawer-scrim-background, rgba(0, 0, 0, 0.5));
+      }
+
+      :host([opened]) > #scrim {
+        opacity: 1;
+      }
+
+      :host([opened][persistent]) > #scrim {
+        visibility: hidden;
+        /**
+         * NOTE(keanulee): Keep both opacity: 0 and visibility: hidden to prevent the
+         * scrim from showing when toggling between closed and opened/persistent.
+         */
+
+        opacity: 0;
+      }
+    </style>
+
+    <div id="scrim" on-tap="close"></div>
+
+    <div id="contentContainer">
+      <content></content>
+    </div>
+  </template>
+
+  <script>
+
+    Polymer({
+      is: 'app-drawer',
+
+      properties: {
+        /**
+         * The opened state of the drawer.
+         */
+        opened: {
+          type: Boolean,
+          value: false,
+          notify: true,
+          reflectToAttribute: true
+        },
+
+        /**
+         * The drawer does not have a scrim and cannot be swiped close.
+         */
+        persistent: {
+          type: Boolean,
+          value: false,
+          reflectToAttribute: true
+        },
+
+        /**
+         * The alignment of the drawer on the screen ('left', 'right', 'start' or 'end').
+         * 'start' computes to left and 'end' to right in LTR layout and vice versa in RTL
+         * layout.
+         */
+        align: {
+          type: String,
+          value: 'left'
+        },
+
+        /**
+         * The computed, read-only position of the drawer on the screen ('left' or 'right').
+         */
+        position: {
+          type: String,
+          readOnly: true,
+          reflectToAttribute: true
+        },
+
+        /**
+         * Create an area at the edge of the screen to swipe open the drawer.
+         */
+        swipeOpen: {
+          type: Boolean,
+          value: false,
+          reflectToAttribute: true
+        },
+
+        /**
+         * Trap keyboard focus when the drawer is opened and not persistent.
+         */
+        noFocusTrap: {
+          type: Boolean,
+          value: false
+        }
+      },
+
+      observers: [
+        'resetLayout(position, isAttached)',
+        '_resetPosition(align, isAttached)'
+      ],
+
+      _translateOffset: 0,
+
+      _trackDetails: null,
+
+      _drawerState: 0,
+
+      _boundEscKeydownHandler: null,
+
+      _firstTabStop: null,
+
+      _lastTabStop: null,
+
+      ready: function() {
+        // Only transition the drawer after its first render (e.g. app-drawer-layout
+        // may need to set the initial opened state which should not be transitioned).
+        this._setTransitionDuration('0s');
+      },
+
+      attached: function() {
+        // Only transition the drawer after its first render (e.g. app-drawer-layout
+        // may need to set the initial opened state which should not be transitioned).
+        Polymer.RenderStatus.afterNextRender(this, function() {
+          this._setTransitionDuration('');
+          this._boundEscKeydownHandler = this._escKeydownHandler.bind(this);
+          this._resetDrawerState();
+
+          this.addEventListener('transitionend', this._transitionend.bind(this));
+          this.addEventListener('keydown', this._tabKeydownHandler.bind(this))
+
+          // Only listen for horizontal track so you can vertically scroll inside the drawer.
+          this.listen(this, 'track', '_track');
+          this.setScrollDirection('y');
+        });
+      },
+
+      detached: function() {
+        document.removeEventListener('keydown', this._boundEscKeydownHandler);
+      },
+
+      /**
+       * Opens the drawer.
+       */
+      open: function() {
+        this.opened = true;
+      },
+
+      /**
+       * Closes the drawer.
+       */
+      close: function() {
+        this.opened = false;
+      },
+
+      /**
+       * Toggles the drawer open and close.
+       */
+      toggle: function() {
+        this.opened = !this.opened;
+      },
+
+      /**
+       * Gets the width of the drawer.
+       *
+       * @return {number} The width of the drawer in pixels.
+       */
+      getWidth: function() {
+        return this.$.contentContainer.offsetWidth;
+      },
+
+      /**
+       * Resets the layout. The event fired is used by app-drawer-layout to position the
+       * content.
+       *
+       * @method resetLayout
+       */
+      resetLayout: function() {
+        this.fire('app-drawer-reset-layout');
+      },
+
+      _isRTL: function() {
+        return window.getComputedStyle(this).direction === 'rtl';
+      },
+
+      _resetPosition: function() {
+        switch (this.align) {
+          case 'start':
+            this._setPosition(this._isRTL() ? 'right' : 'left');
+            return;
+          case 'end':
+            this._setPosition(this._isRTL() ? 'left' : 'right');
+            return;
+        }
+        this._setPosition(this.align);
+      },
+
+      _escKeydownHandler: function(event) {
+        var ESC_KEYCODE = 27;
+        if (event.keyCode === ESC_KEYCODE) {
+          // Prevent any side effects if app-drawer closes.
+          event.preventDefault();
+          this.close();
+        }
+      },
+
+      _track: function(event) {
+        if (this.persistent) {
+          return;
+        }
+
+        // Disable user selection on desktop.
+        event.preventDefault();
+
+        switch (event.detail.state) {
+          case 'start':
+            this._trackStart(event);
+            break;
+          case 'track':
+            this._trackMove(event);
+            break;
+          case 'end':
+            this._trackEnd(event);
+            break;
+        }
+      },
+
+      _trackStart: function(event) {
+        this._drawerState = this._DRAWER_STATE.TRACKING;
+
+        // Disable transitions since style attributes will reflect user track events.
+        this._setTransitionDuration('0s');
+        this.style.visibility = 'visible';
+
+        var rect = this.$.contentContainer.getBoundingClientRect();
+        if (this.position === 'left') {
+          this._translateOffset = rect.left;
+        } else {
+          this._translateOffset = rect.right - window.innerWidth;
+        }
+
+        this._trackDetails = [];
+      },
+
+      _trackMove: function(event) {
+        this._translateDrawer(event.detail.dx + this._translateOffset);
+
+        // Use Date.now() since event.timeStamp is inconsistent across browsers (e.g. most
+        // browsers use milliseconds but FF 44 uses microseconds).
+        this._trackDetails.push({
+          dx: event.detail.dx,
+          timeStamp: Date.now()
+        });
+      },
+
+      _trackEnd: function(event) {
+        var x = event.detail.dx + this._translateOffset;
+        var drawerWidth = this.getWidth();
+        var isPositionLeft = this.position === 'left';
+        var isInEndState = isPositionLeft ? (x >= 0 || x <= -drawerWidth) :
+          (x <= 0 || x >= drawerWidth);
+
+        if (!isInEndState) {
+          // No longer need the track events after this method returns - allow them to be GC'd.
+          var trackDetails = this._trackDetails;
+          this._trackDetails = null;
+
+          this._flingDrawer(event, trackDetails);
+          if (this._drawerState === this._DRAWER_STATE.FLINGING) {
+            return;
+          }
+        }
+
+        // If the drawer is not flinging, toggle the opened state based on the position of
+        // the drawer.
+        var halfWidth = drawerWidth / 2;
+        if (event.detail.dx < -halfWidth) {
+          this.opened = this.position === 'right';
+        } else if (event.detail.dx > halfWidth) {
+          this.opened = this.position === 'left';
+        }
+
+        // Trigger app-drawer-transitioned now since there will be no transitionend event.
+        if (isInEndState) {
+          this._resetDrawerState();
+        }
+
+        this._setTransitionDuration('');
+        this._resetDrawerTranslate();
+        this.style.visibility = '';
+      },
+
+      _calculateVelocity: function(event, trackDetails) {
+        // Find the oldest track event that is within 100ms using binary search.
+        var now = Date.now();
+        var timeLowerBound = now - 100;
+        var trackDetail;
+        var min = 0;
+        var max = trackDetails.length - 1;
+
+        while (min <= max) {
+          // Floor of average of min and max.
+          var mid = (min + max) >> 1;
+          var d = trackDetails[mid];
+          if (d.timeStamp >= timeLowerBound) {
+            trackDetail = d;
+            max = mid - 1;
+          } else {
+            min = mid + 1;
+          }
+        }
+
+        if (trackDetail) {
+          var dx = event.detail.dx - trackDetail.dx;
+          var dt = (now - trackDetail.timeStamp) || 1;
+          return dx / dt;
+        }
+        return 0;
+      },
+
+      _flingDrawer: function(event, trackDetails) {
+        var velocity = this._calculateVelocity(event, trackDetails);
+
+        // Do not fling if velocity is not above a threshold.
+        if (Math.abs(velocity) < this._MIN_FLING_THRESHOLD) {
+          return;
+        }
+
+        this._drawerState = this._DRAWER_STATE.FLINGING;
+
+        var x = event.detail.dx + this._translateOffset;
+        var drawerWidth = this.getWidth();
+        var isPositionLeft = this.position === 'left';
+        var isVelocityPositive = velocity > 0;
+        var isClosingLeft = !isVelocityPositive && isPositionLeft;
+        var isClosingRight = isVelocityPositive && !isPositionLeft;
+        var dx;
+        if (isClosingLeft) {
+          dx = -(x + drawerWidth);
+        } else if (isClosingRight) {
+          dx = (drawerWidth - x);
+        } else {
+          dx = -x;
+        }
+
+        // Enforce a minimum transition velocity to make the drawer feel snappy.
+        if (isVelocityPositive) {
+          velocity = Math.max(velocity, this._MIN_TRANSITION_VELOCITY);
+          this.opened = this.position === 'left';
+        } else {
+          velocity = Math.min(velocity, -this._MIN_TRANSITION_VELOCITY);
+          this.opened = this.position === 'right';
+        }
+
+        // Calculate the amount of time needed to finish the transition based on the
+        // initial slope of the timing function.
+        this._setTransitionDuration((this._FLING_INITIAL_SLOPE * dx / velocity) + 'ms');
+        this._setTransitionTimingFunction(this._FLING_TIMING_FUNCTION);
+
+        this._resetDrawerTranslate();
+      },
+
+      _transitionend: function(event) {
+        // contentContainer will transition on opened state changed, and scrim will
+        // transition on persistent state changed when opened - these are the
+        // transitions we are interested in.
+        var target = Polymer.dom(event).rootTarget;
+        if (target === this.$.contentContainer || target === this.$.scrim) {
+
+          // If the drawer was flinging, we need to reset the style attributes.
+          if (this._drawerState === this._DRAWER_STATE.FLINGING) {
+            this._setTransitionDuration('');
+            this._setTransitionTimingFunction('');
+            this.style.visibility = '';
+          }
+
+          this._resetDrawerState();
+        }
+      },
+
+      _setTransitionDuration: function(duration) {
+        this.$.contentContainer.style.transitionDuration = duration;
+        this.$.scrim.style.transitionDuration = duration;
+      },
+
+      _setTransitionTimingFunction: function(timingFunction) {
+        this.$.contentContainer.style.transitionTimingFunction = timingFunction;
+        this.$.scrim.style.transitionTimingFunction = timingFunction;
+      },
+
+      _translateDrawer: function(x) {
+        var drawerWidth = this.getWidth();
+
+        if (this.position === 'left') {
+          x = Math.max(-drawerWidth, Math.min(x, 0));
+          this.$.scrim.style.opacity = 1 + x / drawerWidth;
+        } else {
+          x = Math.max(0, Math.min(x, drawerWidth));
+          this.$.scrim.style.opacity = 1 - x / drawerWidth;
+        }
+
+        this.translate3d(x + 'px', '0', '0', this.$.contentContainer);
+      },
+
+      _resetDrawerTranslate: function() {
+        this.$.scrim.style.opacity = '';
+        this.transform('', this.$.contentContainer);
+      },
+
+      _resetDrawerState: function() {
+        var oldState = this._drawerState;
+        if (this.opened) {
+          this._drawerState = this.persistent ?
+            this._DRAWER_STATE.OPENED_PERSISTENT : this._DRAWER_STATE.OPENED;
+        } else {
+          this._drawerState = this._DRAWER_STATE.CLOSED;
+        }
+
+        if (oldState !== this._drawerState) {
+          if (this._drawerState === this._DRAWER_STATE.OPENED) {
+            this._setKeyboardFocusTrap();
+            document.addEventListener('keydown', this._boundEscKeydownHandler);
+            document.body.style.overflow = 'hidden';
+          } else {
+            document.removeEventListener('keydown', this._boundEscKeydownHandler);
+            document.body.style.overflow = '';
+          }
+
+          // Don't fire the event on initial load.
+          if (oldState !== this._DRAWER_STATE.INIT) {
+            this.fire('app-drawer-transitioned');
+          }
+        }
+      },
+
+      _setKeyboardFocusTrap: function() {
+        if (this.noFocusTrap) {
+          return;
+        }
+
+        // NOTE: Unless we use /deep/ (which we shouldn't since it's deprecated), this will
+        // not select focusable elements inside shadow roots.
+        var focusableElementsSelector = [
+            'a[href]:not([tabindex="-1"])',
+            'area[href]:not([tabindex="-1"])',
+            'input:not([disabled]):not([tabindex="-1"])',
+            'select:not([disabled]):not([tabindex="-1"])',
+            'textarea:not([disabled]):not([tabindex="-1"])',
+            'button:not([disabled]):not([tabindex="-1"])',
+            'iframe:not([tabindex="-1"])',
+            '[tabindex]:not([tabindex="-1"])',
+            '[contentEditable=true]:not([tabindex="-1"])'
+          ].join(',');
+        var focusableElements = Polymer.dom(this).querySelectorAll(focusableElementsSelector);
+
+        if (focusableElements.length > 0) {
+          this._firstTabStop = focusableElements[0];
+          this._lastTabStop = focusableElements[focusableElements.length - 1];
+        } else {
+          // Reset saved tab stops when there are no focusable elements in the drawer.
+          this._firstTabStop = null;
+          this._lastTabStop = null;
+        }
+
+        // Focus on app-drawer if it has non-zero tabindex. Otherwise, focus the first focusable
+        // element in the drawer, if it exists. Use the tabindex attribute since the this.tabIndex
+        // property in IE/Edge returns 0 (instead of -1) when the attribute is not set.
+        var tabindex = this.getAttribute('tabindex');
+        if (tabindex && parseInt(tabindex, 10) > -1) {
+          this.focus();
+        } else if (this._firstTabStop) {
+          this._firstTabStop.focus();
+        }
+      },
+
+      _tabKeydownHandler: function(event) {
+        if (this.noFocusTrap) {
+          return;
+        }
+
+        var TAB_KEYCODE = 9;
+        if (this._drawerState === this._DRAWER_STATE.OPENED && event.keyCode === TAB_KEYCODE) {
+          if (event.shiftKey) {
+            if (this._firstTabStop && Polymer.dom(event).localTarget === this._firstTabStop) {
+              event.preventDefault();
+              this._lastTabStop.focus();
+            }
+          } else {
+            if (this._lastTabStop && Polymer.dom(event).localTarget === this._lastTabStop) {
+              event.preventDefault();
+              this._firstTabStop.focus();
+            }
+          }
+        }
+      },
+
+      _MIN_FLING_THRESHOLD: 0.2,
+
+      _MIN_TRANSITION_VELOCITY: 1.2,
+
+      _FLING_TIMING_FUNCTION: 'cubic-bezier(0.667, 1, 0.667, 1)',
+
+      _FLING_INITIAL_SLOPE: 1.5,
+
+      _DRAWER_STATE: {
+        INIT: 0,
+        OPENED: 1,
+        OPENED_PERSISTENT: 2,
+        CLOSED: 3,
+        TRACKING: 4,
+        FLINGING: 5
+      }
+
+      /**
+       * Fired when the layout of app-drawer has changed.
+       *
+       * @event app-drawer-reset-layout
+       */
+
+      /**
+       * Fired when app-drawer has finished transitioning.
+       *
+       * @event app-drawer-transitioned
+       */
+    });
+  </script>
+</dom-module>
+
+
+<script>
+
+  Polymer({
+
+    is: 'iron-media-query',
+
+    properties: {
+
+      /**
+       * The Boolean return value of the media query.
+       */
+      queryMatches: {
+        type: Boolean,
+        value: false,
+        readOnly: true,
+        notify: true
+      },
+
+      /**
+       * The CSS media query to evaluate.
+       */
+      query: {
+        type: String,
+        observer: 'queryChanged'
+      },
+
+      /**
+       * If true, the query attribute is assumed to be a complete media query
+       * string rather than a single media feature.
+       */
+      full: {
+        type: Boolean,
+        value: false
+      },
+
+      /**
+       * @type {function(MediaQueryList)}
+       */
+      _boundMQHandler: {
+        value: function() {
+          return this.queryHandler.bind(this);
+        }
+      },
+
+      /**
+       * @type {MediaQueryList}
+       */
+      _mq: {
+        value: null
+      }
+    },
+
+    attached: function() {
+      this.style.display = 'none';
+      this.queryChanged();
+    },
+
+    detached: function() {
+      this._remove();
+    },
+
+    _add: function() {
+      if (this._mq) {
+        this._mq.addListener(this._boundMQHandler);
+      }
+    },
+
+    _remove: function() {
+      if (this._mq) {
+        this._mq.removeListener(this._boundMQHandler);
+      }
+      this._mq = null;
+    },
+
+    queryChanged: function() {
+      this._remove();
+      var query = this.query;
+      if (!query) {
+        return;
+      }
+      if (!this.full && query[0] !== '(') {
+        query = '(' + query + ')';
+      }
+      this._mq = window.matchMedia(query);
+      this._add();
+      this.queryHandler(this._mq);
+    },
+
+    queryHandler: function(mq) {
+      this._setQueryMatches(mq.matches);
+    }
+
+  });
+
+</script>
+<script>
+  /**
+   * `IronResizableBehavior` is a behavior that can be used in Polymer elements to
+   * coordinate the flow of resize events between "resizers" (elements that control the
+   * size or hidden state of their children) and "resizables" (elements that need to be
+   * notified when they are resized or un-hidden by their parents in order to take
+   * action on their new measurements).
+   * 
+   * Elements that perform measurement should add the `IronResizableBehavior` behavior to
+   * their element definition and listen for the `iron-resize` event on themselves.
+   * This event will be fired when they become showing after having been hidden,
+   * when they are resized explicitly by another resizable, or when the window has been
+   * resized.
+   * 
+   * Note, the `iron-resize` event is non-bubbling.
+   *
+   * @polymerBehavior Polymer.IronResizableBehavior
+   * @demo demo/index.html
+   **/
+  Polymer.IronResizableBehavior = {
+    properties: {
+      /**
+       * The closest ancestor element that implements `IronResizableBehavior`.
+       */
+      _parentResizable: {
+        type: Object,
+        observer: '_parentResizableChanged'
+      },
+
+      /**
+       * True if this element is currently notifying its descedant elements of
+       * resize.
+       */
+      _notifyingDescendant: {
+        type: Boolean,
+        value: false
+      }
+    },
+
+    listeners: {
+      'iron-request-resize-notifications': '_onIronRequestResizeNotifications'
+    },
+
+    created: function() {
+      // We don't really need property effects on these, and also we want them
+      // to be created before the `_parentResizable` observer fires:
+      this._interestedResizables = [];
+      this._boundNotifyResize = this.notifyResize.bind(this);
+    },
+
+    attached: function() {
+      this.fire('iron-request-resize-notifications', null, {
+        node: this,
+        bubbles: true,
+        cancelable: true
+      });
+
+      if (!this._parentResizable) {
+        window.addEventListener('resize', this._boundNotifyResize);
+        this.notifyResize();
+      }
+    },
+
+    detached: function() {
+      if (this._parentResizable) {
+        this._parentResizable.stopResizeNotificationsFor(this);
+      } else {
+        window.removeEventListener('resize', this._boundNotifyResize);
+      }
+
+      this._parentResizable = null;
+    },
+
+    /**
+     * Can be called to manually notify a resizable and its descendant
+     * resizables of a resize change.
+     */
+    notifyResize: function() {
+      if (!this.isAttached) {
+        return;
+      }
+
+      this._interestedResizables.forEach(function(resizable) {
+        if (this.resizerShouldNotify(resizable)) {
+          this._notifyDescendant(resizable);
+        }
+      }, this);
+
+      this._fireResize();
+    },
+
+    /**
+     * Used to assign the closest resizable ancestor to this resizable
+     * if the ancestor detects a request for notifications.
+     */
+    assignParentResizable: function(parentResizable) {
+      this._parentResizable = parentResizable;
+    },
+
+    /**
+     * Used to remove a resizable descendant from the list of descendants
+     * that should be notified of a resize change.
+     */
+    stopResizeNotificationsFor: function(target) {
+      var index = this._interestedResizables.indexOf(target);
+
+      if (index > -1) {
+        this._interestedResizables.splice(index, 1);
+        this.unlisten(target, 'iron-resize', '_onDescendantIronResize');
+      }
+    },
+
+    /**
+     * This method can be overridden to filter nested elements that should or
+     * should not be notified by the current element. Return true if an element
+     * should be notified, or false if it should not be notified.
+     *
+     * @param {HTMLElement} element A candidate descendant element that
+     * implements `IronResizableBehavior`.
+     * @return {boolean} True if the `element` should be notified of resize.
+     */
+    resizerShouldNotify: function(element) { return true; },
+
+    _onDescendantIronResize: function(event) {
+      if (this._notifyingDescendant) {
+        event.stopPropagation();
+        return;
+      }
+
+      // NOTE(cdata): In ShadowDOM, event retargetting makes echoing of the
+      // otherwise non-bubbling event "just work." We do it manually here for
+      // the case where Polymer is not using shadow roots for whatever reason:
+      if (!Polymer.Settings.useShadow) {
+        this._fireResize();
+      }
+    },
+
+    _fireResize: function() {
+      this.fire('iron-resize', null, {
+        node: this,
+        bubbles: false
+      });
+    },
+
+    _onIronRequestResizeNotifications: function(event) {
+      var target = event.path ? event.path[0] : event.target;
+
+      if (target === this) {
+        return;
+      }
+
+      if (this._interestedResizables.indexOf(target) === -1) {
+        this._interestedResizables.push(target);
+        this.listen(target, 'iron-resize', '_onDescendantIronResize');
+      }
+
+      target.assignParentResizable(this);
+      this._notifyDescendant(target);
+
+      event.stopPropagation();
+    },
+
+    _parentResizableChanged: function(parentResizable) {
+      if (parentResizable) {
+        window.removeEventListener('resize', this._boundNotifyResize);
+      }
+    },
+
+    _notifyDescendant: function(descendant) {
+      // NOTE(cdata): In IE10, attached is fired on children first, so it's
+      // important not to notify them if the parent is not attached yet (or
+      // else they will get redundantly notified when the parent attaches).
+      if (!this.isAttached) {
+        return;
+      }
+
+      this._notifyingDescendant = true;
+      descendant.notifyResize();
+      this._notifyingDescendant = false;
+    }
+  };
+</script>
+
+
+
+<dom-module id="app-drawer-layout" assetpath="/res/imp/bower_components/app-layout/app-drawer-layout/">
+  <template>
+    <style>
+      :host {
+        display: block;
+      }
+
+      :host([fullbleed]) {
+        @apply(--layout-fit);
+      }
+
+      #contentContainer {
+        position: relative;
+
+        height: 100%;
+
+        transition: var(--app-drawer-layout-content-transition, none);
+      }
+
+      #contentContainer:not(.narrow) > ::content [drawer-toggle] {
+        display: none;
+      }
+    </style>
+
+    <div id="contentContainer">
+      <content select=":not(app-drawer)"></content>
+    </div>
+
+    <content id="drawerContent" select="app-drawer"></content>
+
+    <iron-media-query query="[[_computeMediaQuery(forceNarrow, responsiveWidth)]]" on-query-matches-changed="_onQueryMatchesChanged"></iron-media-query>
+  </template>
+
+  <script>
+    Polymer({
+      is: 'app-drawer-layout',
+
+      behaviors: [
+        Polymer.IronResizableBehavior
+      ],
+
+      properties: {
+        /**
+         * If true, ignore `responsiveWidth` setting and force the narrow layout.
+         */
+        forceNarrow: {
+          type: Boolean,
+          value: false
+        },
+
+        /**
+         * If the viewport's width is smaller than this value, the panel will change to narrow
+         * layout. In the mode the drawer will be closed.
+         */
+        responsiveWidth: {
+          type: String,
+          value: '640px'
+        },
+
+        /**
+         * Returns true if it is in narrow layout. This is useful if you need to show/hide
+         * elements based on the layout.
+         */
+        narrow: {
+          type: Boolean,
+          readOnly: true,
+          notify: true
+        }
+      },
+
+      listeners: {
+        'tap': '_tapHandler',
+        'app-drawer-reset-layout': 'resetLayout'
+      },
+
+      observers: [
+        'resetLayout(narrow, isAttached)'
+      ],
+
+      /**
+       * A reference to the app-drawer element.
+       *
+       * @property drawer
+       */
+      get drawer() {
+        return Polymer.dom(this.$.drawerContent).getDistributedNodes()[0];
+      },
+
+      _tapHandler: function(e) {
+        var target = Polymer.dom(e).localTarget;
+        if (target && target.hasAttribute('drawer-toggle')) {
+          this.drawer.toggle();
+        }
+      },
+
+      resetLayout: function() {
+        this.debounce('_resetLayout', function() {
+          var drawer = this.drawer;
+          var contentContainer = this.$.contentContainer;
+
+          if (this.narrow) {
+            drawer.opened = drawer.persistent = false;
+            contentContainer.classList.add('narrow');
+
+            contentContainer.style.marginLeft = '';
+            contentContainer.style.marginRight = '';
+          } else {
+            drawer.opened = drawer.persistent = true;
+            contentContainer.classList.remove('narrow');
+
+            var drawerWidth = this.drawer.getWidth();
+            if (drawer.position == 'right') {
+              contentContainer.style.marginLeft = '';
+              contentContainer.style.marginRight = drawerWidth + 'px';
+            } else {
+              contentContainer.style.marginLeft = drawerWidth + 'px';
+              contentContainer.style.marginRight = '';
+            }
+          }
+
+          this.notifyResize();
+        });
+      },
+
+      _onQueryMatchesChanged: function(event) {
+        this._setNarrow(event.detail.value);
+      },
+
+      _computeMediaQuery: function(forceNarrow, responsiveWidth) {
+        return forceNarrow ? '(min-width: 0px)' : '(max-width: ' + responsiveWidth + ')';
+      }
+    });
+  </script>
+</dom-module>
+
+
+<dom-module id="app-grid-style" assetpath="/res/imp/bower_components/app-layout/app-grid/">
+  <template>
+    <style>
+
+      :host {
+        /**
+         * The width for the expandible item is:
+         * ((100% - subPixelAdjustment) / columns * itemColumns - gutter * (columns - itemColumns)
+         *
+         * - subPixelAdjustment: 0.1px (Required for IE 11)
+         * - gutter: var(--app-grid-gutter)
+         * - columns: var(--app-grid-columns)
+         * - itemColumn: var(--app-grid-expandible-item-columns)
+         */
+        --app-grid-expandible-item: {
+          -webkit-flex-basis: calc((100% - 0.1px) / var(--app-grid-columns, 1) * var(--app-grid-expandible-item-columns, 1) - (var(--app-grid-gutter, 0px) * (var(--app-grid-columns, 1) - var(--app-grid-expandible-item-columns, 1)))) !important;
+          flex-basis: calc((100% - 0.1px) / var(--app-grid-columns, 1) * var(--app-grid-expandible-item-columns, 1) - (var(--app-grid-gutter, 0px) * (var(--app-grid-columns, 1) - var(--app-grid-expandible-item-columns, 1)))) !important;
+          max-width: calc((100% - 0.1px) / var(--app-grid-columns, 1) * var(--app-grid-expandible-item-columns, 1) - (var(--app-grid-gutter, 0px) * (var(--app-grid-columns, 1) - var(--app-grid-expandible-item-columns, 1)))) !important;
+
+        };
+      }
+
+      .app-grid {
+        display: -ms-flexbox;
+        display: -webkit-flex;
+        display: flex;
+
+        -ms-flex-direction: row;
+        -webkit-flex-direction: row;
+        flex-direction: row;
+
+        -ms-flex-wrap: wrap;
+        -webkit-flex-wrap: wrap;
+        flex-wrap: wrap;
+
+        margin-top: var(--app-grid-gutter, 0px);
+        margin-left: var(--app-grid-gutter, 0px);
+      }
+
+      .app-grid > * {
+        /* Required for IE 10 */
+        -ms-flex: 1 1 100%;
+        -webkit-flex: 1;
+        flex: 1;
+
+        /* The width for an item is: (100% - subPixelAdjustment - gutter * columns) / columns */
+        -webkit-flex-basis: calc((100% - 0.1px - (var(--app-grid-gutter, 0px) * var(--app-grid-columns, 1))) / var(--app-grid-columns, 1));
+        flex-basis: calc((100% - 0.1px - (var(--app-grid-gutter, 0px) * var(--app-grid-columns, 1))) / var(--app-grid-columns, 1));
+
+        max-width: calc((100% - 0.1px - (var(--app-grid-gutter, 0px) * var(--app-grid-columns, 1))) / var(--app-grid-columns, 1));
+        margin-bottom: var(--app-grid-gutter, 0px);
+        margin-right: var(--app-grid-gutter, 0px);
+        height: var(--app-grid-item-height);
+        box-sizing: border-box;
+      }
+
+      .app-grid[has-aspect-ratio] > * {
+        position: relative;
+      }
+
+      .app-grid[has-aspect-ratio] > *::before {
+        display: block;
+        content: "";
+        padding-top: var(--app-grid-item-height, 100%);
+      }
+
+      .app-grid[has-aspect-ratio] > * > * {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+      }
+
+    </style>
+  </template>
+</dom-module>
+<script>
+
+  /**
+   * `Polymer.IronScrollTargetBehavior` allows an element to respond to scroll events from a
+   * designated scroll target.
+   *
+   * Elements that consume this behavior can override the `_scrollHandler`
+   * method to add logic on the scroll event.
+   *
+   * @demo demo/scrolling-region.html Scrolling Region
+   * @demo demo/document.html Document Element
+   * @polymerBehavior
+   */
+  Polymer.IronScrollTargetBehavior = {
+
+    properties: {
+
+      /**
+       * Specifies the element that will handle the scroll event
+       * on the behalf of the current element. This is typically a reference to an element,
+       * but there are a few more posibilities:
+       *
+       * ### Elements id
+       *
+       *```html
+       * <div id="scrollable-element" style="overflow: auto;">
+       *  <x-element scroll-target="scrollable-element">
+       *    <!-- Content-->
+       *  </x-element>
+       * </div>
+       *```
+       * In this case, the `scrollTarget` will point to the outer div element. 
+       *
+       * ### Document scrolling
+       *
+       * For document scrolling, you can use the reserved word `document`:
+       *
+       *```html
+       * <x-element scroll-target="document">
+       *   <!-- Content -->
+       * </x-element>
+       *```
+       *
+       * ### Elements reference
+       *
+       *```js
+       * appHeader.scrollTarget = document.querySelector('#scrollable-element');
+       *```
+       * 
+       * @type {HTMLElement}
+       */
+      scrollTarget: {
+        type: HTMLElement,
+        value: function() {
+          return this._defaultScrollTarget;
+        }
+      }
+    },
+
+    observers: [
+      '_scrollTargetChanged(scrollTarget, isAttached)'
+    ],
+
+    _scrollTargetChanged: function(scrollTarget, isAttached) {
+      var eventTarget;
+
+      if (this._oldScrollTarget) {
+        eventTarget = this._oldScrollTarget === this._doc ? window : this._oldScrollTarget;
+        eventTarget.removeEventListener('scroll', this._boundScrollHandler);
+        this._oldScrollTarget = null;
+      }
+
+      if (!isAttached) {
+        return;
+      }
+      // Support element id references
+      if (scrollTarget === 'document') {
+
+        this.scrollTarget = this._doc;
+
+      } else if (typeof scrollTarget === 'string') {
+
+        this.scrollTarget = this.domHost ? this.domHost.$[scrollTarget] :
+            Polymer.dom(this.ownerDocument).querySelector('#' + scrollTarget);
+
+      } else if (this._isValidScrollTarget()) {
+
+        eventTarget = scrollTarget === this._doc ? window : scrollTarget;
+        this._boundScrollHandler = this._boundScrollHandler || this._scrollHandler.bind(this);
+        this._oldScrollTarget = scrollTarget;
+
+        eventTarget.addEventListener('scroll', this._boundScrollHandler);
+      }
+    },
+
+    /**
+     * Runs on every scroll event. Consumer of this behavior may override this method.
+     *
+     * @protected
+     */
+    _scrollHandler: function scrollHandler() {},
+
+    /**
+     * The default scroll target. Consumers of this behavior may want to customize
+     * the default scroll target.
+     *
+     * @type {Element}
+     */
+    get _defaultScrollTarget() {
+      return this._doc;
+    },
+
+    /**
+     * Shortcut for the document element
+     *
+     * @type {Element}
+     */
+    get _doc() {
+      return this.ownerDocument.documentElement;
+    },
+
+    /**
+     * Gets the number of pixels that the content of an element is scrolled upward.
+     *
+     * @type {number}
+     */
+    get _scrollTop() {
+      if (this._isValidScrollTarget()) {
+        return this.scrollTarget === this._doc ? window.pageYOffset : this.scrollTarget.scrollTop;
+      }
+      return 0;
+    },
+
+    /**
+     * Gets the number of pixels that the content of an element is scrolled to the left.
+     *
+     * @type {number}
+     */
+    get _scrollLeft() {
+      if (this._isValidScrollTarget()) {
+        return this.scrollTarget === this._doc ? window.pageXOffset : this.scrollTarget.scrollLeft;
+      }
+      return 0;
+    },
+
+    /**
+     * Sets the number of pixels that the content of an element is scrolled upward.
+     *
+     * @type {number}
+     */
+    set _scrollTop(top) {
+      if (this.scrollTarget === this._doc) {
+        window.scrollTo(window.pageXOffset, top);
+      } else if (this._isValidScrollTarget()) {
+        this.scrollTarget.scrollTop = top;
+      }
+    },
+
+    /**
+     * Sets the number of pixels that the content of an element is scrolled to the left.
+     *
+     * @type {number}
+     */
+    set _scrollLeft(left) {
+      if (this.scrollTarget === this._doc) {
+        window.scrollTo(left, window.pageYOffset);
+      } else if (this._isValidScrollTarget()) {
+        this.scrollTarget.scrollLeft = left;
+      }
+    },
+
+    /**
+     * Scrolls the content to a particular place.
+     *
+     * @method scroll
+     * @param {number} left The left position
+     * @param {number} top The top position
+     */
+    scroll: function(left, top) {
+       if (this.scrollTarget === this._doc) {
+        window.scrollTo(left, top);
+      } else if (this._isValidScrollTarget()) {
+        this.scrollTarget.scrollLeft = left;
+        this.scrollTarget.scrollTop = top;
+      }
+    },
+
+    /**
+     * Gets the width of the scroll target.
+     *
+     * @type {number}
+     */
+    get _scrollTargetWidth() {
+      if (this._isValidScrollTarget()) {
+        return this.scrollTarget === this._doc ? window.innerWidth : this.scrollTarget.offsetWidth;
+      }
+      return 0;
+    },
+
+    /**
+     * Gets the height of the scroll target.
+     *
+     * @type {number}
+     */
+    get _scrollTargetHeight() {
+      if (this._isValidScrollTarget()) {
+        return this.scrollTarget === this._doc ? window.innerHeight : this.scrollTarget.offsetHeight;
+      }
+      return 0;
+    },
+
+    /**
+     * Returns true if the scroll target is a valid HTMLElement.
+     *
+     * @return {boolean}
+     */
+    _isValidScrollTarget: function() {
+      return this.scrollTarget instanceof HTMLElement;
+    }
+  };
+
+</script>
+<script>
+  /**
+   * `Polymer.AppScrollEffectsBehavior` provides an interface that allows an element to use scrolls effects.
+   *
+   * ### Importing the app-layout effects
+   *
+   * app-layout provides a set of scroll effects that can be used by explicitly importing
+   * `app-scroll-effects.html`:
+   *
+   * ```html
+   * <link rel="import" href="/bower_components/app-layout/app-scroll-effects/app-scroll-effects.html">
+   * ```
+   *
+   * The scroll effects can also be used by individually importing
+   * `app-layout/app-scroll-effects/effects/[effectName].html`. For example:
+   *
+   * ```html
+   *  <link rel="import" href="/bower_components/app-layout/app-scroll-effects/effects/waterfall.html">
+   * ```
+   *
+   * ### Consuming effects
+   *
+   * Effects can be consumed via the `effects` property. For example:
+   *
+   * ```html
+   * <app-header effects="waterfall"></app-header>
+   * ```
+   *
+   * ### Creating scroll effects
+   *
+   * You may want to create a custom scroll effect if you need to modify the CSS of an element
+   * based on the scroll position.
+   *
+   * A scroll effect definition is an object with `setUp()`, `tearDown()` and `run()` functions.
+   * 
+   * To register the effect, you can use `Polymer.AppLayout.registerEffect(effectName, effectDef)`
+   * For example, let's define an effect that resizes the header's logo:
+   *
+   * ```js
+   * Polymer.AppLayout.registerEffect('resizable-logo', {
+   *   setUp: function(config) {
+   *     // the effect's config is passed to the setUp.
+   *     this._fxResizeLogo = { logo: Polymer.dom(this).querySelector('[logo]') };
+   *   },
+   *
+   *   run: function(progress) {
+   *      // the progress of the effect
+   *      this.transform('scale3d(' + progress + ', '+ progress +', 1)',  this._fxResizeLogo.logo);
+   *   },
+   *
+   *   tearDown: function() {
+   *      // clean up and reset of states
+   *      delete this._fxResizeLogo;
+   *   }
+   * });
+   * ```
+   * Now, you can consume the effect:
+   *
+   * ```html
+   * <app-header id="appHeader" effects="resizable-logo">
+   *   <img logo src="logo.svg">
+   * </app-header>
+   * ```
+   *
+   * ### Imperative API
+   *
+   * ```js
+   * var logoEffect = appHeader.createEffect('resizable-logo', effectConfig);
+   * // run the effect: logoEffect.run(progress);
+   * // tear down the effect: logoEffect.tearDown();
+   * ```
+   *
+   * ### Configuring effects
+   *
+   * For effects installed via the `effects` property, their configuration can be set
+   * via the `effectsConfig` property. For example:
+   *
+   * ```html
+   * <app-header effects="waterfall"
+   *   effects-config='{"waterfall": {"startsAt": 0, "endsAt": 0.5}}'>
+   * </app-header>
+   * ```
+   *
+   * All effects have a `startsAt` and `endsAt` config property. They specify at what
+   * point the effect should start and end. This value goes from 0 to 1 inclusive.
+   *
+   * @polymerBehavior
+   */
+  Polymer.AppScrollEffectsBehavior = [
+    Polymer.IronScrollTargetBehavior,
+   {
+
+    properties: {
+
+      /**
+       * A space-separated list of the effects names that will be triggered when the user scrolls.
+       * e.g. `waterfall parallax-background` installs the `waterfall` and `parallax-background`.
+       */
+      effects: {
+        type: String
+      },
+
+      /**
+       * An object that configurates the effects installed via the `effects` property. e.g.
+       * ```js
+       *  element.effectsConfig = {
+       *   "blend-background": {
+       *     "startsAt": 0.5
+       *   }
+       * };
+       * ```
+       * Every effect has at least two config properties: `startsAt` and `endsAt`.
+       * These properties indicate when the event should start and end respectively
+       * and relative to the overall element progress. So for example, if `blend-background`
+       * starts at `0.5`, the effect will only start once the current element reaches 0.5
+       * of its progress. In this context, the progress is a value in the range of `[0, 1]`
+       * that indicates where this element is on the screen relative to the viewport.
+       */
+      effectsConfig: {
+        type: Object,
+        value: function() {
+          return {};
+        }
+      },
+
+      /**
+       * Disables CSS transitions and scroll effects on the element.
+       */
+      disabled: {
+        type: Boolean,
+        reflectToAttribute: true,
+        value: false
+      }
+    },
+
+    observers: [
+      '_effectsChanged(effects, effectsConfig, isAttached)'
+    ],
+
+    /**
+     * Updates the scroll state. This method should be overridden
+     * by the consumer of this behavior.
+     *
+     * @method _updateScrollState
+     */
+    _updateScrollState: function() {},
+
+    /**
+     * Returns true if the current element is on the screen.
+     * That is, visible in the current viewport. This method should be
+     * overridden by the consumer of this behavior.
+     *
+     * @method isOnScreen
+     * @return {boolean}
+     */
+    isOnScreen: function() {
+      return false;
+    },
+
+    /**
+     * Returns true if there's content below the current element. This method
+     * should be overridden by the consumer of this behavior.
+     *
+     * @method isContentBelow
+     * @return {boolean}
+     */
+    isContentBelow: function() {
+      return false;
+    },
+
+    /**
+     * List of effects handlers that will take place during scroll.
+     *
+     * @type {Array<Function>}
+     */
+    _effectsRunFn: null,
+
+    /**
+     * List of the effects definitions installed via the `effects` property.
+     *
+     * @type {Array<Object>}
+     */
+    _effects: null,
+
+    /**
+     * The clamped value of `_scrollTop`.
+     * @type number
+     */
+    get _clampedScrollTop() {
+      return Math.max(0, this._scrollTop);
+    },
+
+    detached: function() {
+      this._tearDownEffects();
+    },
+
+    /**
+     * Creates an effect object from an effect's name that can be used to run
+     * effects programmatically.
+     *
+     * @method createEffect
+     * @param {string} effectName The effect's name registered via `Polymer.AppLayout.registerEffect`.
+     * @param {Object=} effectConfig The effect config object. (Optional)
+     * @return {Object} An effect object with the following functions:
+     *
+     *  * `effect.setUp()`, Sets up the requirements for the effect.
+     *       This function is called automatically before the `effect` function returns.
+     *  * `effect.run(progress, y)`, Runs the effect given a `progress`.
+     *  * `effect.tearDown()`, Cleans up any DOM nodes or element references used by the effect.
+     *
+     * Example:
+     * ```js
+     * var parallax = element.createEffect('parallax-background');
+     * // runs the effect
+     * parallax.run(0.5, 0);
+     * ```
+     */
+    createEffect: function(effectName, effectConfig) {
+      var effectDef = Polymer.AppLayout._scrollEffects[effectName];
+      if (!effectDef) {
+        throw new ReferenceError(this._getUndefinedMsg(effectName));
+      }
+      var prop = this._boundEffect(effectDef, effectConfig || {});
+      prop.setUp();
+      return prop;
+    },
+
+    /**
+     * Called when `effects` or `effectsConfig` changes.
+     */
+    _effectsChanged: function(effects, effectsConfig, isAttached) {
+      this._tearDownEffects();
+
+      if (effects === '' || !isAttached) {
+        return;
+      }
+      effects.split(' ').forEach(function(effectName) {
+        var effectDef;
+        if (effectName !== '') {
+          if ((effectDef = Polymer.AppLayout._scrollEffects[effectName])) {
+            this._effects.push(this._boundEffect(effectDef, effectsConfig[effectName]));
+          } else {
+            this._warn(this._logf('_effectsChanged', this._getUndefinedMsg(effectName)));
+          }
+        }
+      }, this);
+
+      this._setUpEffect();
+    },
+
+    /**
+     * Forces layout
+     */
+    _layoutIfDirty: function() {
+      return this.offsetWidth;
+    },
+
+    /**
+     * Returns an effect object bound to the current context.
+     *
+     * @param {Object} effectDef
+     * @param {Object=} effectsConfig The effect config object if the effect accepts config values. (Optional)
+     */
+    _boundEffect: function(effectDef, effectsConfig) {
+      effectsConfig = effectsConfig || {};
+      var startsAt = parseFloat(effectsConfig.startsAt || 0);
+      var endsAt = parseFloat(effectsConfig.endsAt || 1);
+      var deltaS = endsAt - startsAt;
+      var noop = Function();
+      // fast path if possible
+      var runFn = (startsAt === 0 && endsAt === 1) ? effectDef.run :
+        function(progress, y) {
+          effectDef.run.call(this,
+              Math.max(0, (progress - startsAt) / deltaS), y);
+        };
+      return {
+        setUp: effectDef.setUp ? effectDef.setUp.bind(this, effectsConfig) : noop,
+        run: effectDef.run ? runFn.bind(this) : noop,
+        tearDown: effectDef.tearDown ? effectDef.tearDown.bind(this) : noop
+      };
+    },
+
+    /**
+     * Sets up the effects.
+     */
+    _setUpEffect: function() {
+      if (this.isAttached && this._effects) {
+        this._effectsRunFn = [];
+        this._effects.forEach(function(effectDef) {
+          // install the effect only if no error was reported
+          if (effectDef.setUp() !== false) {
+            this._effectsRunFn.push(effectDef.run);
+          }
+        }, this);
+      }
+    },
+
+    /**
+     * Tears down the effects.
+     */
+    _tearDownEffects: function() {
+      if (this._effects) {
+        this._effects.forEach(function(effectDef) {
+          effectDef.tearDown();
+        });
+      }
+      this._effectsRunFn = [];
+      this._effects = [];
+    },
+
+    /**
+     * Runs the effects.
+     *
+     * @param {number} p The progress
+     * @param {number} y The top position of the current element relative to the viewport.
+     */
+    _runEffects: function(p, y) {
+      if (this._effectsRunFn) {
+        this._effectsRunFn.forEach(function(run) {
+          run(p, y);
+        });
+      }
+    },
+
+    /**
+     * Overrides the `_scrollHandler`.
+     */
+    _scrollHandler: function() {
+      if (!this.disabled) {
+        this._updateScrollState(this._clampedScrollTop);
+      }
+    },
+    
+    /**
+     * Override this method to return a reference to a node in the local DOM.
+     * The node is consumed by a scroll effect.
+     *
+     * @param {string} id The id for the node.
+     */
+    _getDOMRef: function(id) {
+      this._warn(this._logf('_getDOMRef', '`'+ id +'` is undefined'));
+    },
+
+    _getUndefinedMsg: function(effectName) {
+      return 'Scroll effect `' + effectName + '` is undefined. ' +
+          'Did you forget to import app-layout/app-scroll-effects/effects/' + effectName + '.html ?';
+    }
+
+  }];
+
+</script>
+
+
+<dom-module id="app-header" assetpath="/res/imp/bower_components/app-layout/app-header/">
+  <template>
+    <style>
+      :host {
+        position: relative;
+        display: block;
+        transition-timing-function: linear;
+        transition-property: -webkit-transform;
+        transition-property: transform;
+      }
+
+      :host::after {
+        position: absolute;
+        right: 0px;
+        bottom: -5px;
+        left: 0px;
+        width: 100%;
+        height: 5px;
+        content: "";
+        transition: opacity 0.4s;
+        pointer-events: none;
+        opacity: 0;
+        box-shadow: inset 0px 5px 6px -3px rgba(0, 0, 0, 0.4);
+        will-change: opacity;
+        @apply(--app-header-shadow);
+      }
+
+      :host([shadow])::after {
+        opacity: 1;
+      }
+
+      #contentContainer > ::content [condensed-title] {
+        -webkit-transform-origin: left top;
+        transform-origin: left top;
+        white-space: nowrap;
+        opacity: 0;
+      }
+
+      #contentContainer > ::content [main-title] {
+        -webkit-transform-origin: left top;
+        transform-origin: left top;
+        white-space: nowrap;
+      }
+
+      #background {
+        @apply(--layout-fit);
+        overflow: hidden;
+      }
+
+      #backgroundFrontLayer,
+      #backgroundRearLayer {
+        @apply(--layout-fit);
+        height: 100%;
+        pointer-events: none;
+        background-size: cover;
+      }
+
+      #backgroundFrontLayer {
+        @apply(--app-header-background-front-layer);
+      }
+
+      #backgroundRearLayer {
+        opacity: 0;
+        @apply(--app-header-background-rear-layer);
+      }
+
+      #contentContainer {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+
+      :host([disabled]),
+      :host([disabled])::after,
+      :host([disabled]) #backgroundFrontLayer,
+      :host([disabled]) #backgroundRearLayer,
+      :host([disabled]) ::content > app-toolbar:first-of-type,
+      :host([disabled]) ::content > [sticky],
+      /* Silent scrolling should not run CSS transitions */
+      :host-context(.app-layout-silent-scroll),
+      :host-context(.app-layout-silent-scroll)::after,
+      :host-context(.app-layout-silent-scroll) #backgroundFrontLayer,
+      :host-context(.app-layout-silent-scroll) #backgroundRearLayer,
+      :host-context(.app-layout-silent-scroll) ::content > app-toolbar:first-of-type,
+      :host-context(.app-layout-silent-scroll) ::content > [sticky] {
+        transition: none !important;
+      }
+    </style>
+    <div id="contentContainer">
+      <content id="content"></content>
+    </div>
+  </template>
+
+  <script>
+    Polymer({
+      is: 'app-header',
+
+      behaviors: [
+        Polymer.AppScrollEffectsBehavior,
+        Polymer.IronResizableBehavior
+      ],
+
+      properties: {
+        /**
+         * If true, the header will automatically collapse when scrolling down.
+         * That is, the `sticky` element remains visible when the header is fully condensed
+         * whereas the rest of the elements will collapse below `sticky` element.
+         *
+         * By default, the `sticky` element is the first toolbar in the light DOM:
+         *
+         *```html
+         * <app-header condenses>
+         *   <app-toolbar>This toolbar remains on top</app-toolbar>
+         *   <app-toolbar></app-toolbar>
+         *   <app-toolbar></app-toolbar>
+         * </app-header>
+         * ```
+         *
+         * Additionally, you can specify which toolbar or element remains visible in condensed mode
+         * by adding the `sticky` attribute to that element. For example: if we want the last
+         * toolbar to remain visible, we can add the `sticky` attribute to it.
+         *
+         *```html
+         * <app-header condenses>
+         *   <app-toolbar></app-toolbar>
+         *   <app-toolbar></app-toolbar>
+         *   <app-toolbar sticky>This toolbar remains on top</app-toolbar>
+         * </app-header>
+         * ```
+         *
+         * Note the `sticky` element must be a direct child of `app-header`.
+         */
+        condenses: {
+          type: Boolean,
+          value: false
+        },
+
+        /**
+         * Mantains the header fixed at the top so it never moves away.
+         */
+        fixed: {
+          type: Boolean,
+          value: false
+        },
+
+        /**
+         * Slides back the header when scrolling back up.
+         */
+        reveals: {
+          type: Boolean,
+          value: false
+        },
+
+        /**
+         * Displays a shadow below the header.
+         */
+        shadow: {
+          type: Boolean,
+          reflectToAttribute: true,
+          value: false
+        }
+      },
+
+      observers: [
+        'resetLayout(isAttached, condenses, fixed)'
+      ],
+
+      listeners: {
+        'iron-resize': '_resizeHandler'
+      },
+
+      /**
+       * A cached offsetHeight of the current element.
+       *
+       * @type {number}
+       */
+      _height: 0,
+
+      /**
+       * The distance in pixels the header will be translated to when scrolling.
+       *
+       * @type {number}
+       */
+      _dHeight: 0,
+
+      /**
+       * The offsetTop of `_stickyEl`
+       *
+       * @type {number}
+       */
+      _stickyElTop: 0,
+
+      /**
+       * The element that remains visible when the header condenses.
+       *
+       * @type {HTMLElement}
+       */
+      _stickyEl: null,
+
+      /**
+       * The header's top value used for the `transformY`
+       *
+       * @type {number}
+       */
+      _top: 0,
+
+      /**
+       * The current scroll progress.
+       *
+       * @type {number}
+       */
+      _progress: 0,
+
+      _wasScrollingDown: false,
+      _initScrollTop: 0,
+      _initTimestamp: 0,
+      _lastTimestamp: 0,
+      _lastScrollTop: 0,
+
+      /**
+       * The distance the header is allowed to move away.
+       *
+       * @type {number}
+       */
+      get _maxHeaderTop() {
+        return this.fixed ? this._dHeight : this._height + 5;
+      },
+
+      /**
+       * Returns a reference to the sticky element.
+       *
+       * @return {HTMLElement}?
+       */
+      _getStickyEl: function() {
+        /** @type {HTMLElement} */
+        var stickyEl;
+        var nodes = Polymer.dom(this.$.content).getDistributedNodes();
+
+        for (var i = 0; i < nodes.length; i++) {
+          if (nodes[i].nodeType === Node.ELEMENT_NODE) {
+            var node = /** @type {HTMLElement} */ (nodes[i]);
+            if (node.hasAttribute('sticky')) {
+              stickyEl = node;
+              break;
+            } else if (!stickyEl) {
+              stickyEl = node;
+            }
+          }
+        }
+        return stickyEl;
+      },
+
+      /**
+       * Resets the layout. If you changed the size of app-header via CSS
+       * you can notify the changes by either firing the `iron-resize` event
+       * or calling `resetLayout` directly.
+       *
+       * @method resetLayout
+       */
+      resetLayout: function() {
+        this.fire('app-header-reset-layout');
+
+        this.debounce('_resetLayout', function() {
+          // noop if the header isn't visible
+          if (this.offsetWidth === 0 && this.offsetHeight === 0) {
+            return;
+          }
+
+          var scrollTop = this._clampedScrollTop;
+          var firstSetup = this._height === 0 || scrollTop === 0;
+          var currentDisabled = this.disabled;
+
+          this._height = this.offsetHeight;
+          this._stickyEl = this._getStickyEl();
+          this.disabled = true;
+
+          // prepare for measurement
+          if  (!firstSetup) {
+            this._updateScrollState(0, true);
+          }
+
+          if (this._mayMove()) {
+            this._dHeight = this._stickyEl ? this._height - this._stickyEl.offsetHeight : 0;
+          } else {
+            this._dHeight = 0;
+          }
+
+          this._stickyElTop = this._stickyEl ? this._stickyEl.offsetTop : 0;
+          this._setUpEffect();
+
+          if (firstSetup) {
+            this._updateScrollState(scrollTop, true);
+          } else {
+            this._updateScrollState(this._lastScrollTop, true);
+            this._layoutIfDirty();
+          }
+          // restore no transition
+          this.disabled = currentDisabled;
+        });
+      },
+
+      /**
+       * Updates the scroll state.
+       *
+       * @param {number} scrollTop
+       * @param {boolean=} forceUpdate (default: false)
+       */
+      _updateScrollState: function(scrollTop, forceUpdate) {
+        if (this._height === 0) {
+          return;
+        }
+
+        var progress = 0;
+        var top = 0;
+        var lastTop = this._top;
+        var lastScrollTop = this._lastScrollTop;
+        var maxHeaderTop = this._maxHeaderTop;
+        var dScrollTop = scrollTop - this._lastScrollTop;
+        var absDScrollTop = Math.abs(dScrollTop);
+        var isScrollingDown = scrollTop > this._lastScrollTop;
+        var now = Date.now();
+
+        if (this._mayMove()) {
+          top = this._clamp(this.reveals ? lastTop + dScrollTop : scrollTop, 0, maxHeaderTop);
+        }
+
+        if (scrollTop >= this._dHeight) {
+          top = this.condenses && !this.fixed ? Math.max(this._dHeight, top) : top;
+          this.style.transitionDuration = '0ms';
+        }
+
+        if (this.reveals && !this.disabled && absDScrollTop < 100) {
+          // set the initial scroll position
+          if (now - this._initTimestamp > 300 || this._wasScrollingDown !== isScrollingDown) {
+            this._initScrollTop = scrollTop;
+            this._initTimestamp = now;
+          }
+
+          if (scrollTop >= maxHeaderTop) {
+            // check if the header is allowed to snap
+            if (Math.abs(this._initScrollTop - scrollTop) > 30 || absDScrollTop > 10) {
+              if (isScrollingDown && scrollTop >= maxHeaderTop) {
+                top = maxHeaderTop;
+              } else if (!isScrollingDown && scrollTop >= this._dHeight) {
+                top = this.condenses && !this.fixed ? this._dHeight : 0;
+              }
+              var scrollVelocity = dScrollTop / (now - this._lastTimestamp);
+              this.style.transitionDuration = this._clamp((top - lastTop) / scrollVelocity, 0, 300) + 'ms';
+            } else {
+              top = this._top;
+            }
+          }
+        }
+
+        if (this._dHeight === 0) {
+          progress = scrollTop > 0 ? 1 : 0;
+        } else {
+          progress = top / this._dHeight;
+        }
+
+        if (!forceUpdate) {
+          this._lastScrollTop = scrollTop;
+          this._top = top;
+          this._wasScrollingDown = isScrollingDown;
+          this._lastTimestamp = now;
+        }
+
+        if (forceUpdate || progress !== this._progress || lastTop !== top || scrollTop === 0) {
+          this._progress = progress;
+          this._runEffects(progress, top);
+          this._transformHeader(top);
+        }
+      },
+
+      /**
+       * Returns true if the current header is allowed to move as the user scrolls.
+       *
+       * @return {boolean}
+       */
+      _mayMove: function() {
+        return this.condenses || !this.fixed;
+      },
+
+      /**
+       * Returns true if the current header will condense based on the size of the header
+       * and the `consenses` property.
+       *
+       * @return {boolean}
+       */
+      willCondense: function() {
+        return this._dHeight > 0 && this.condenses;
+      },
+
+      /**
+       * Returns true if the current element is on the screen.
+       * That is, visible in the current viewport.
+       *
+       * @method isOnScreen
+       * @return {boolean}
+       */
+      isOnScreen: function() {
+        return this._height !== 0 && this._top < this._height;
+      },
+
+      /**
+       * Returns true if there's content below the current element.
+       *
+       * @method isContentBelow
+       * @return {boolean}
+       */
+      isContentBelow: function() {
+        if (this._top === 0) {
+          return this._clampedScrollTop > 0;
+        }
+        return this._clampedScrollTop - this._maxHeaderTop >= 0;
+      },
+
+      /**
+       * Transforms the header.
+       *
+       * @param {number} y
+       */
+      _transformHeader: function(y) {
+        this.translate3d(0, (-y) + 'px', 0);
+        if (this._stickyEl && this.condenses && y >= this._stickyElTop) {
+          this.translate3d(0, (Math.min(y, this._dHeight) - this._stickyElTop) + 'px', 0,
+              this._stickyEl);
+        }
+      },
+
+      _resizeHandler: function() {
+        this.resetLayout();
+      },
+
+      _clamp: function(v, min, max) {
+        return Math.min(max, Math.max(min, v));
+      },
+
+      _ensureBgContainers: function() {
+        if (!this._bgContainer) {
+          this._bgContainer = document.createElement('div');
+          this._bgContainer.id = 'background';
+
+          this._bgRear = document.createElement('div');
+          this._bgRear.id = 'backgroundRearLayer';
+          this._bgContainer.appendChild(this._bgRear);
+
+          this._bgFront = document.createElement('div');
+          this._bgFront.id = 'backgroundFrontLayer';
+          this._bgContainer.appendChild(this._bgFront);
+
+          Polymer.dom(this.root).insertBefore(this._bgContainer, this.$.contentContainer);
+        }
+      },
+
+      _getDOMRef: function(id) {
+        switch (id) {
+          case 'backgroundFrontLayer':
+            this._ensureBgContainers();
+            return this._bgFront;
+          case 'backgroundRearLayer':
+            this._ensureBgContainers();
+            return this._bgRear;
+          case 'background':
+            this._ensureBgContainers();
+            return this._bgContainer;
+          case 'mainTitle':
+            return Polymer.dom(this).querySelector('[main-title]');
+          case 'condensedTitle':
+            return Polymer.dom(this).querySelector('[condensed-title]');
+        }
+        return null;
+      },
+
+      /**
+       * Returns an object containing the progress value of the scroll effects
+       * and the top position of the header.
+       *
+       * @method getScrollState
+       * @return {Object}
+       */
+      getScrollState: function() {
+        return { progress: this._progress, top: this._top };
+      }
+
+      /**
+       * Fires when the layout of `app-header` changed.
+       *
+       * @event app-header-reset-layout
+       */
+    });
+  </script>
+</dom-module>
+
+
+<dom-module id="app-header-layout" assetpath="/res/imp/bower_components/app-layout/app-header-layout/">
+  <template>
+    <style>
+      :host {
+        display: block;
+        /**
+         * Force app-header-layout to have its own stacking context so that its parent can
+         * control the stacking of it relative to other elements (e.g. app-drawer-layout).
+         * This could be done using `isolation: isolate`, but that's not well supported
+         * across browsers.
+         */
+        position: relative;
+        z-index: 0;
+      }
+
+      :host > ::content > app-header {
+        @apply(--layout-fixed-top);
+        z-index: 1;
+      }
+
+      :host([has-scrolling-region]) {
+        height: 100%;
+      }
+
+      :host([has-scrolling-region]) > ::content > app-header {
+        position: absolute;
+      }
+
+      :host([has-scrolling-region]) > #contentContainer {
+        @apply(--layout-fit);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      :host([fullbleed]) {
+        @apply(--layout-vertical);
+        @apply(--layout-fit);
+      }
+
+      :host([fullbleed]) > #contentContainer {
+        @apply(--layout-vertical);
+        @apply(--layout-flex);
+      }
+
+      #contentContainer {
+        /* Create a stacking context here so that all children appear below the header. */
+        position: relative;
+        z-index: 0;
+      }
+
+    </style>
+
+    <content id="header" select="app-header"></content>
+
+    <div id="contentContainer">
+      <content></content>
+    </div>
+
+  </template>
+
+  <script>
+    Polymer({
+      is: 'app-header-layout',
+
+      behaviors: [
+        Polymer.IronResizableBehavior
+      ],
+
+      properties: {
+        /**
+         * If true, the current element will have its own scrolling region.
+         * Otherwise, it will use the document scroll to control the header.
+         */
+        hasScrollingRegion: {
+          type: Boolean,
+          value: false,
+          reflectToAttribute: true
+        }
+      },
+
+      listeners: {
+        'iron-resize': '_resizeHandler',
+        'app-header-reset-layout': 'resetLayout'
+      },
+
+      observers: [
+        'resetLayout(isAttached, hasScrollingRegion)'
+      ],
+
+      /**
+       * A reference to the app-header element.
+       *
+       * @property header
+       */
+      get header() {
+        return Polymer.dom(this.$.header).getDistributedNodes()[0];
+      },
+
+      /**
+       * Resets the layout. This method is automatically called when the element is attached
+       * to the DOM.
+       *
+       * @method resetLayout
+       */
+      resetLayout: function() {
+        this._updateScroller();
+        this.debounce('_resetLayout', this._updateContentPosition);
+      },
+
+      _updateContentPosition: function() {
+        var header = this.header;
+        if (!this.isAttached || !header) {
+          return;
+        }
+        // Get header height here so that style reads are batched together before style writes
+        // (i.e. getBoundingClientRect() below).
+        var headerHeight = header.offsetHeight;
+        // Update the header position.
+        if (!this.hasScrollingRegion) {
+          var rect = this.getBoundingClientRect();
+          var rightOffset = document.documentElement.clientWidth - rect.right;
+          header.style.left = rect.left + 'px';
+          header.style.right = rightOffset + 'px';
+        } else {
+          header.style.left = '';
+          header.style.right = '';
+        }
+        // Update the content container position.
+        var containerStyle = this.$.contentContainer.style;
+        if (header.fixed && !header.willCondense() && this.hasScrollingRegion) {
+          // If the header size does not change and we're using a scrolling region, exclude
+          // the header area from the scrolling region so that the header doesn't overlap
+          // the scrollbar.
+          containerStyle.marginTop = headerHeight + 'px';
+          containerStyle.paddingTop = '';
+        } else {
+          containerStyle.paddingTop = headerHeight + 'px';
+          containerStyle.marginTop = '';
+        }
+      },
+
+      _updateScroller: function() {
+        if (!this.isAttached) {
+          return;
+        }
+        var header = this.header;
+        if (header) {
+          header.scrollTarget = this.hasScrollingRegion ?
+              this.$.contentContainer : this.ownerDocument.documentElement;
+        }
+      },
+
+      _resizeHandler: function() {
+        this.resetLayout();
+      }
+    });
+  </script>
+</dom-module>
+
+
+<dom-module id="app-scrollpos-control" assetpath="/res/imp/bower_components/app-layout/app-scrollpos-control/">
+  <script>
+    Polymer({
+      is: 'app-scrollpos-control',
+
+      behaviors: [
+        Polymer.IronScrollTargetBehavior
+      ],
+
+      properties: {
+        /**
+         * The selected page.
+         */
+        selected: {
+          type: String,
+          observer: '_selectedChanged'
+        },
+
+        /**
+         * Reset the scroll position to 0.
+         */
+        reset: {
+          type: Boolean,
+          value: false
+        }
+      },
+
+      observers: [
+        '_updateScrollPos(selected, reset)'
+      ],
+
+      created: function() {
+        this._scrollposMap = {};
+      },
+
+      _selectedChanged: function(selected, old) {
+        if (old != null) {
+          this._scrollposMap[old] = {x: this._scrollLeft, y: this._scrollTop};
+        }
+      },
+
+      _updateScrollPos: function(selected, reset) {
+        this.debounce('_updateScrollPos', function() {
+          var pos = this._scrollposMap[this.selected];
+          if (pos != null && !this.reset) {
+            this.scroll(pos.x, pos.y);
+          } else {
+            this.scroll(0, 0);
+          }
+        });
+      }
+    });
+  </script>
+</dom-module>
+
+
+<dom-module id="app-toolbar" assetpath="/res/imp/bower_components/app-layout/app-toolbar/">
+  <template>
+    <style>
+      :host {
+        position: relative;
+
+        @apply(--layout-horizontal);
+        @apply(--layout-center);
+
+        height: 64px;
+        padding: 0 16px;
+
+        pointer-events: none;
+
+        font-size: var(--app-toolbar-font-size, 20px);
+      }
+
+      :host > ::content > * {
+        pointer-events: auto;
+      }
+
+      :host > ::content > paper-icon-button {
+        /* paper-icon-button/issues/33 */
+        font-size: 0;
+      }
+
+      :host > ::content > [main-title],
+      :host > ::content > [condensed-title] {
+        pointer-events: none;
+        @apply(--layout-flex);
+      }
+
+      :host > ::content > [bottom-item] {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+      }
+
+      :host > ::content > [top-item] {
+        position: absolute;
+        top: 0;
+        right: 0;
+        left: 0;
+      }
+
+      :host > ::content > [spacer] {
+        margin-left: 64px;
+      }
+    </style>
+
+    <content></content>
+  </template>
+
+  <script>
+    Polymer({
+      is: 'app-toolbar'
+    });
+  </script>
+</dom-module>
+
+
+<dom-module id="app-box" assetpath="/res/imp/bower_components/app-layout/app-box/">
+  <template>
+    <style>
+      :host {
+        position: relative;
+
+        display: block;
+      }
+
+      #background {
+        @apply(--layout-fit);
+
+        overflow: hidden;
+
+        height: 100%;
+      }
+
+      #backgroundFrontLayer {
+        min-height: 100%;
+
+        pointer-events: none;
+
+        background-size: cover;
+
+        @apply(--app-box-background-front-layer);
+      }
+
+      #contentContainer {
+        position: relative;
+
+        width: 100%;
+        height: 100%;
+      }
+
+      :host([disabled]),
+      :host([disabled]) #backgroundFrontLayer {
+        transition: none !important;
+      }
+    </style>
+
+    <div id="background">
+      <div id="backgroundFrontLayer">
+        <content select="[background]"></content>
+      </div>
+    </div>
+    <div id="contentContainer">
+      <content id="content"></content>
+    </div>
+  </template>
+
+  <script>
+    Polymer({
+      is: 'app-box',
+
+      behaviors: [
+        Polymer.AppScrollEffectsBehavior,
+        Polymer.IronResizableBehavior
+      ],
+
+      listeners: {
+        'iron-resize': '_resizeHandler'
+      },
+
+      /**
+       * The current scroll progress.
+       *
+       * @type {number}
+       */
+      _progress: 0,
+
+      attached: function() {
+        this.resetLayout();
+      },
+
+      /**
+       * Resets the layout. This method is automatically called when the element is attached to the DOM.
+       *
+       * @method resetLayout
+       */
+      resetLayout: function() {
+        this.debounce('_resetLayout', function() {
+          // noop if the box isn't in the rendered tree
+          if (this.offsetWidth === 0 && this.offsetHeight === 0) {
+            return;
+          }
+
+          var scrollTop = this._clampedScrollTop;
+          var savedDisabled = this.disabled;
+
+          this.disabled = true;
+          this._elementTop = this._getElementTop();
+          this._elementHeight = this.offsetHeight;
+          this._cachedScrollTargetHeight = this._scrollTargetHeight;
+          this._setUpEffect();
+          this._updateScrollState(scrollTop);
+          this.disabled = savedDisabled;
+        }, 1);
+      },
+
+      _getElementTop: function() {
+        var currentNode = this;
+        var top = 0;
+
+        while (currentNode && currentNode !== this.scrollTarget) {
+          top += currentNode.offsetTop;
+          currentNode = currentNode.offsetParent;
+        }
+        return top;
+      },
+
+      _updateScrollState: function(scrollTop) {
+        if (this.isOnScreen()) {
+          var viewportTop = this._elementTop - scrollTop;
+          this._progress = 1 - (viewportTop + this._elementHeight) / this._cachedScrollTargetHeight;
+          this._runEffects(this._progress, scrollTop);
+        }
+      },
+
+      /**
+       * Returns true if this app-box is on the screen.
+       * That is, visible in the current viewport.
+       *
+       * @method isOnScreen
+       * @return {boolean}
+       */
+      isOnScreen: function() {
+        return this._elementTop < this._scrollTop + this._cachedScrollTargetHeight
+            && this._elementTop + this._elementHeight > this._scrollTop;
+      },
+
+      _resizeHandler: function() {
+        this.resetLayout();
+      },
+
+      _getDOMRef: function(id) {
+        if (id === 'background') {
+          return this.$.background;
+        }
+        if (id === 'backgroundFrontLayer') {
+          return this.$.backgroundFrontLayer;
+        }
+      },
+
+      /**
+       * Returns an object containing the progress value of the scroll effects.
+       *
+       * @method getScrollState
+       * @return {Object}
+       */
+      getScrollState: function() {
+        return { progress: this._progress };
+      }
+    });
+  </script>
+</dom-module>
+<style is="custom-style">
+
+  :root {
+
+    /* Material Design color palette for Google products */
+
+    --google-red-100: #f4c7c3;
+    --google-red-300: #e67c73;
+    --google-red-500: #db4437;
+    --google-red-700: #c53929;
+
+    --google-blue-100: #c6dafc;
+    --google-blue-300: #7baaf7;
+    --google-blue-500: #4285f4;
+    --google-blue-700: #3367d6;
+
+    --google-green-100: #b7e1cd;
+    --google-green-300: #57bb8a;
+    --google-green-500: #0f9d58;
+    --google-green-700: #0b8043;
+
+    --google-yellow-100: #fce8b2;
+    --google-yellow-300: #f7cb4d;
+    --google-yellow-500: #f4b400;
+    --google-yellow-700: #f09300;
+
+    --google-grey-100: #f5f5f5;
+    --google-grey-300: #e0e0e0;
+    --google-grey-500: #9e9e9e;
+    --google-grey-700: #616161;
+    
+    /* Material Design color palette from online spec document */
+
+    --paper-red-50: #ffebee;
+    --paper-red-100: #ffcdd2;
+    --paper-red-200: #ef9a9a;
+    --paper-red-300: #e57373;
+    --paper-red-400: #ef5350;
+    --paper-red-500: #f44336;
+    --paper-red-600: #e53935;
+    --paper-red-700: #d32f2f;
+    --paper-red-800: #c62828;
+    --paper-red-900: #b71c1c;
+    --paper-red-a100: #ff8a80;
+    --paper-red-a200: #ff5252;
+    --paper-red-a400: #ff1744;
+    --paper-red-a700: #d50000;
+ 
+    --paper-pink-50: #fce4ec;
+    --paper-pink-100: #f8bbd0;
+    --paper-pink-200: #f48fb1;
+    --paper-pink-300: #f06292;
+    --paper-pink-400: #ec407a;
+    --paper-pink-500: #e91e63;
+    --paper-pink-600: #d81b60;
+    --paper-pink-700: #c2185b;
+    --paper-pink-800: #ad1457;
+    --paper-pink-900: #880e4f;
+    --paper-pink-a100: #ff80ab;
+    --paper-pink-a200: #ff4081;
+    --paper-pink-a400: #f50057;
+    --paper-pink-a700: #c51162;
+ 
+    --paper-purple-50: #f3e5f5;
+    --paper-purple-100: #e1bee7;
+    --paper-purple-200: #ce93d8;
+    --paper-purple-300: #ba68c8;
+    --paper-purple-400: #ab47bc;
+    --paper-purple-500: #9c27b0;
+    --paper-purple-600: #8e24aa;
+    --paper-purple-700: #7b1fa2;
+    --paper-purple-800: #6a1b9a;
+    --paper-purple-900: #4a148c;
+    --paper-purple-a100: #ea80fc;
+    --paper-purple-a200: #e040fb;
+    --paper-purple-a400: #d500f9;
+    --paper-purple-a700: #aa00ff;
+ 
+    --paper-deep-purple-50: #ede7f6;
+    --paper-deep-purple-100: #d1c4e9;
+    --paper-deep-purple-200: #b39ddb;
+    --paper-deep-purple-300: #9575cd;
+    --paper-deep-purple-400: #7e57c2;
+    --paper-deep-purple-500: #673ab7;
+    --paper-deep-purple-600: #5e35b1;
+    --paper-deep-purple-700: #512da8;
+    --paper-deep-purple-800: #4527a0;
+    --paper-deep-purple-900: #311b92;
+    --paper-deep-purple-a100: #b388ff;
+    --paper-deep-purple-a200: #7c4dff;
+    --paper-deep-purple-a400: #651fff;
+    --paper-deep-purple-a700: #6200ea;
+ 
+    --paper-indigo-50: #e8eaf6;
+    --paper-indigo-100: #c5cae9;
+    --paper-indigo-200: #9fa8da;
+    --paper-indigo-300: #7986cb;
+    --paper-indigo-400: #5c6bc0;
+    --paper-indigo-500: #3f51b5;
+    --paper-indigo-600: #3949ab;
+    --paper-indigo-700: #303f9f;
+    --paper-indigo-800: #283593;
+    --paper-indigo-900: #1a237e;
+    --paper-indigo-a100: #8c9eff;
+    --paper-indigo-a200: #536dfe;
+    --paper-indigo-a400: #3d5afe;
+    --paper-indigo-a700: #304ffe;
+ 
+    --paper-blue-50: #e3f2fd;
+    --paper-blue-100: #bbdefb;
+    --paper-blue-200: #90caf9;
+    --paper-blue-300: #64b5f6;
+    --paper-blue-400: #42a5f5;
+    --paper-blue-500: #2196f3;
+    --paper-blue-600: #1e88e5;
+    --paper-blue-700: #1976d2;
+    --paper-blue-800: #1565c0;
+    --paper-blue-900: #0d47a1;
+    --paper-blue-a100: #82b1ff;
+    --paper-blue-a200: #448aff;
+    --paper-blue-a400: #2979ff;
+    --paper-blue-a700: #2962ff;
+ 
+    --paper-light-blue-50: #e1f5fe;
+    --paper-light-blue-100: #b3e5fc;
+    --paper-light-blue-200: #81d4fa;
+    --paper-light-blue-300: #4fc3f7;
+    --paper-light-blue-400: #29b6f6;
+    --paper-light-blue-500: #03a9f4;
+    --paper-light-blue-600: #039be5;
+    --paper-light-blue-700: #0288d1;
+    --paper-light-blue-800: #0277bd;
+    --paper-light-blue-900: #01579b;
+    --paper-light-blue-a100: #80d8ff;
+    --paper-light-blue-a200: #40c4ff;
+    --paper-light-blue-a400: #00b0ff;
+    --paper-light-blue-a700: #0091ea;
+ 
+    --paper-cyan-50: #e0f7fa;
+    --paper-cyan-100: #b2ebf2;
+    --paper-cyan-200: #80deea;
+    --paper-cyan-300: #4dd0e1;
+    --paper-cyan-400: #26c6da;
+    --paper-cyan-500: #00bcd4;
+    --paper-cyan-600: #00acc1;
+    --paper-cyan-700: #0097a7;
+    --paper-cyan-800: #00838f;
+    --paper-cyan-900: #006064;
+    --paper-cyan-a100: #84ffff;
+    --paper-cyan-a200: #18ffff;
+    --paper-cyan-a400: #00e5ff;
+    --paper-cyan-a700: #00b8d4;
+ 
+    --paper-teal-50: #e0f2f1;
+    --paper-teal-100: #b2dfdb;
+    --paper-teal-200: #80cbc4;
+    --paper-teal-300: #4db6ac;
+    --paper-teal-400: #26a69a;
+    --paper-teal-500: #009688;
+    --paper-teal-600: #00897b;
+    --paper-teal-700: #00796b;
+    --paper-teal-800: #00695c;
+    --paper-teal-900: #004d40;
+    --paper-teal-a100: #a7ffeb;
+    --paper-teal-a200: #64ffda;
+    --paper-teal-a400: #1de9b6;
+    --paper-teal-a700: #00bfa5;
+ 
+    --paper-green-50: #e8f5e9;
+    --paper-green-100: #c8e6c9;
+    --paper-green-200: #a5d6a7;
+    --paper-green-300: #81c784;
+    --paper-green-400: #66bb6a;
+    --paper-green-500: #4caf50;
+    --paper-green-600: #43a047;
+    --paper-green-700: #388e3c;
+    --paper-green-800: #2e7d32;
+    --paper-green-900: #1b5e20;
+    --paper-green-a100: #b9f6ca;
+    --paper-green-a200: #69f0ae;
+    --paper-green-a400: #00e676;
+    --paper-green-a700: #00c853;
+ 
+    --paper-light-green-50: #f1f8e9;
+    --paper-light-green-100: #dcedc8;
+    --paper-light-green-200: #c5e1a5;
+    --paper-light-green-300: #aed581;
+    --paper-light-green-400: #9ccc65;
+    --paper-light-green-500: #8bc34a;
+    --paper-light-green-600: #7cb342;
+    --paper-light-green-700: #689f38;
+    --paper-light-green-800: #558b2f;
+    --paper-light-green-900: #33691e;
+    --paper-light-green-a100: #ccff90;
+    --paper-light-green-a200: #b2ff59;
+    --paper-light-green-a400: #76ff03;
+    --paper-light-green-a700: #64dd17;
+ 
+    --paper-lime-50: #f9fbe7;
+    --paper-lime-100: #f0f4c3;
+    --paper-lime-200: #e6ee9c;
+    --paper-lime-300: #dce775;
+    --paper-lime-400: #d4e157;
+    --paper-lime-500: #cddc39;
+    --paper-lime-600: #c0ca33;
+    --paper-lime-700: #afb42b;
+    --paper-lime-800: #9e9d24;
+    --paper-lime-900: #827717;
+    --paper-lime-a100: #f4ff81;
+    --paper-lime-a200: #eeff41;
+    --paper-lime-a400: #c6ff00;
+    --paper-lime-a700: #aeea00;
+ 
+    --paper-yellow-50: #fffde7;
+    --paper-yellow-100: #fff9c4;
+    --paper-yellow-200: #fff59d;
+    --paper-yellow-300: #fff176;
+    --paper-yellow-400: #ffee58;
+    --paper-yellow-500: #ffeb3b;
+    --paper-yellow-600: #fdd835;
+    --paper-yellow-700: #fbc02d;
+    --paper-yellow-800: #f9a825;
+    --paper-yellow-900: #f57f17;
+    --paper-yellow-a100: #ffff8d;
+    --paper-yellow-a200: #ffff00;
+    --paper-yellow-a400: #ffea00;
+    --paper-yellow-a700: #ffd600;
+ 
+    --paper-amber-50: #fff8e1;
+    --paper-amber-100: #ffecb3;
+    --paper-amber-200: #ffe082;
+    --paper-amber-300: #ffd54f;
+    --paper-amber-400: #ffca28;
+    --paper-amber-500: #ffc107;
+    --paper-amber-600: #ffb300;
+    --paper-amber-700: #ffa000;
+    --paper-amber-800: #ff8f00;
+    --paper-amber-900: #ff6f00;
+    --paper-amber-a100: #ffe57f;
+    --paper-amber-a200: #ffd740;
+    --paper-amber-a400: #ffc400;
+    --paper-amber-a700: #ffab00;
+ 
+    --paper-orange-50: #fff3e0;
+    --paper-orange-100: #ffe0b2;
+    --paper-orange-200: #ffcc80;
+    --paper-orange-300: #ffb74d;
+    --paper-orange-400: #ffa726;
+    --paper-orange-500: #ff9800;
+    --paper-orange-600: #fb8c00;
+    --paper-orange-700: #f57c00;
+    --paper-orange-800: #ef6c00;
+    --paper-orange-900: #e65100;
+    --paper-orange-a100: #ffd180;
+    --paper-orange-a200: #ffab40;
+    --paper-orange-a400: #ff9100;
+    --paper-orange-a700: #ff6500;
+ 
+    --paper-deep-orange-50: #fbe9e7;
+    --paper-deep-orange-100: #ffccbc;
+    --paper-deep-orange-200: #ffab91;
+    --paper-deep-orange-300: #ff8a65;
+    --paper-deep-orange-400: #ff7043;
+    --paper-deep-orange-500: #ff5722;
+    --paper-deep-orange-600: #f4511e;
+    --paper-deep-orange-700: #e64a19;
+    --paper-deep-orange-800: #d84315;
+    --paper-deep-orange-900: #bf360c;
+    --paper-deep-orange-a100: #ff9e80;
+    --paper-deep-orange-a200: #ff6e40;
+    --paper-deep-orange-a400: #ff3d00;
+    --paper-deep-orange-a700: #dd2c00;
+ 
+    --paper-brown-50: #efebe9;
+    --paper-brown-100: #d7ccc8;
+    --paper-brown-200: #bcaaa4;
+    --paper-brown-300: #a1887f;
+    --paper-brown-400: #8d6e63;
+    --paper-brown-500: #795548;
+    --paper-brown-600: #6d4c41;
+    --paper-brown-700: #5d4037;
+    --paper-brown-800: #4e342e;
+    --paper-brown-900: #3e2723;
+ 
+    --paper-grey-50: #fafafa;
+    --paper-grey-100: #f5f5f5;
+    --paper-grey-200: #eeeeee;
+    --paper-grey-300: #e0e0e0;
+    --paper-grey-400: #bdbdbd;
+    --paper-grey-500: #9e9e9e;
+    --paper-grey-600: #757575;
+    --paper-grey-700: #616161;
+    --paper-grey-800: #424242;
+    --paper-grey-900: #212121;
+ 
+    --paper-blue-grey-50: #eceff1;
+    --paper-blue-grey-100: #cfd8dc;
+    --paper-blue-grey-200: #b0bec5;
+    --paper-blue-grey-300: #90a4ae;
+    --paper-blue-grey-400: #78909c;
+    --paper-blue-grey-500: #607d8b;
+    --paper-blue-grey-600: #546e7a;
+    --paper-blue-grey-700: #455a64;
+    --paper-blue-grey-800: #37474f;
+    --paper-blue-grey-900: #263238;
+
+    /* opacity for dark text on a light background */
+    --dark-divider-opacity: 0.12;
+    --dark-disabled-opacity: 0.38; /* or hint text or icon */
+    --dark-secondary-opacity: 0.54;
+    --dark-primary-opacity: 0.87;
+
+    /* opacity for light text on a dark background */
+    --light-divider-opacity: 0.12;
+    --light-disabled-opacity: 0.3; /* or hint text or icon */
+    --light-secondary-opacity: 0.7;
+    --light-primary-opacity: 1.0;
+
+  }
+
+</style>
+<script>
+
+  /** @polymerBehavior */
+  Polymer.PaperSpinnerBehavior = {
+
+    listeners: {
+      'animationend': '__reset',
+      'webkitAnimationEnd': '__reset'
+    },
+
+    properties: {
+      /**
+       * Displays the spinner.
+       */
+      active: {
+        type: Boolean,
+        value: false,
+        reflectToAttribute: true,
+        observer: '__activeChanged'
+      },
+
+      /**
+       * Alternative text content for accessibility support.
+       * If alt is present, it will add an aria-label whose content matches alt when active.
+       * If alt is not present, it will default to 'loading' as the alt value.
+       */
+      alt: {
+        type: String,
+        value: 'loading',
+        observer: '__altChanged'
+      },
+
+      __coolingDown: {
+        type: Boolean,
+        value: false
+      }
+    },
+
+    __computeContainerClasses: function(active, coolingDown) {
+      return [
+        active || coolingDown ? 'active' : '',
+        coolingDown ? 'cooldown' : ''
+      ].join(' ');
+    },
+
+    __activeChanged: function(active, old) {
+      this.__setAriaHidden(!active);
+      this.__coolingDown = !active && old;
+    },
+
+    __altChanged: function(alt) {
+      // user-provided `aria-label` takes precedence over prototype default
+      if (alt === this.getPropertyInfo('alt').value) {
+        this.alt = this.getAttribute('aria-label') || alt;
+      } else {
+        this.__setAriaHidden(alt==='');
+        this.setAttribute('aria-label', alt);
+      }
+    },
+
+    __setAriaHidden: function(hidden) {
+      var attr = 'aria-hidden';
+      if (hidden) {
+        this.setAttribute(attr, 'true');
+      } else {
+        this.removeAttribute(attr);
+      }
+    },
+
+    __reset: function() {
+      this.active = false;
+      this.__coolingDown = false;
+    }
+  };
+</script>
+<dom-module id="paper-spinner-styles" assetpath="/res/imp/bower_components/paper-spinner/">
+  <template>
+    <style>
+      /*
+      /**************************/
+      /* STYLES FOR THE SPINNER */
+      /**************************/
+
+      /*
+       * Constants:
+       *      ARCSIZE     = 270 degrees (amount of circle the arc takes up)
+       *      ARCTIME     = 1333ms (time it takes to expand and contract arc)
+       *      ARCSTARTROT = 216 degrees (how much the start location of the arc
+       *                                should rotate each time, 216 gives us a
+       *                                5 pointed star shape (it's 360/5 * 3).
+       *                                For a 7 pointed star, we might do
+       *                                360/7 * 3 = 154.286)
+       *      SHRINK_TIME = 400ms
+       */
+
+      :host {
+        display: inline-block;
+        position: relative;
+        width: 28px;
+        height: 28px;
+
+        /* 360 * ARCTIME / (ARCSTARTROT + (360-ARCSIZE)) */
+        --paper-spinner-container-rotation-duration: 1568ms;
+
+        /* ARCTIME */
+        --paper-spinner-expand-contract-duration: 1333ms;
+
+        /* 4 * ARCTIME */
+        --paper-spinner-full-cycle-duration: 5332ms;
+
+        /* SHRINK_TIME */
+        --paper-spinner-cooldown-duration: 400ms;
+      }
+
+      #spinnerContainer {
+        width: 100%;
+        height: 100%;
+
+        /* The spinner does not have any contents that would have to be
+         * flipped if the direction changes. Always use ltr so that the
+         * style works out correctly in both cases. */
+        direction: ltr;
+      }
+
+      #spinnerContainer.active {
+        -webkit-animation: container-rotate var(--paper-spinner-container-rotation-duration) linear infinite;
+        animation: container-rotate var(--paper-spinner-container-rotation-duration) linear infinite;
+      }
+
+      @-webkit-keyframes container-rotate {
+        to { -webkit-transform: rotate(360deg) }
+      }
+
+      @keyframes container-rotate {
+        to { transform: rotate(360deg) }
+      }
+
+      .spinner-layer {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        white-space: nowrap;
+        border-color: var(--paper-spinner-color, --google-blue-500);
+      }
+
+      .layer-1 {
+        border-color: var(--paper-spinner-layer-1-color, --google-blue-500);
+      }
+
+      .layer-2 {
+        border-color: var(--paper-spinner-layer-2-color, --google-red-500);
+      }
+
+      .layer-3 {
+        border-color: var(--paper-spinner-layer-3-color, --google-yellow-500);
+      }
+
+      .layer-4 {
+        border-color: var(--paper-spinner-layer-4-color, --google-green-500);
+      }
+
+      /**
+       * IMPORTANT NOTE ABOUT CSS ANIMATION PROPERTIES (keanulee):
+       *
+       * iOS Safari (tested on iOS 8.1) does not handle animation-delay very well - it doesn't
+       * guarantee that the animation will start _exactly_ after that value. So we avoid using
+       * animation-delay and instead set custom keyframes for each color (as layer-2undant as it
+       * seems).
+       */
+      .active .spinner-layer {
+        -webkit-animation-name: fill-unfill-rotate;
+        -webkit-animation-duration: var(--paper-spinner-full-cycle-duration);
+        -webkit-animation-timing-function: cubic-bezier(0.4, 0.0, 0.2, 1);
+        -webkit-animation-iteration-count: infinite;
+        animation-name: fill-unfill-rotate;
+        animation-duration: var(--paper-spinner-full-cycle-duration);
+        animation-timing-function: cubic-bezier(0.4, 0.0, 0.2, 1);
+        animation-iteration-count: infinite;
+        opacity: 1;
+      }
+
+      .active .spinner-layer.layer-1 {
+        -webkit-animation-name: fill-unfill-rotate, layer-1-fade-in-out;
+        animation-name: fill-unfill-rotate, layer-1-fade-in-out;
+      }
+
+      .active .spinner-layer.layer-2 {
+        -webkit-animation-name: fill-unfill-rotate, layer-2-fade-in-out;
+        animation-name: fill-unfill-rotate, layer-2-fade-in-out;
+      }
+
+      .active .spinner-layer.layer-3 {
+        -webkit-animation-name: fill-unfill-rotate, layer-3-fade-in-out;
+        animation-name: fill-unfill-rotate, layer-3-fade-in-out;
+      }
+
+      .active .spinner-layer.layer-4 {
+        -webkit-animation-name: fill-unfill-rotate, layer-4-fade-in-out;
+        animation-name: fill-unfill-rotate, layer-4-fade-in-out;
+      }
+
+      @-webkit-keyframes fill-unfill-rotate {
+        12.5% { -webkit-transform: rotate(135deg) } /* 0.5 * ARCSIZE */
+        25%   { -webkit-transform: rotate(270deg) } /* 1   * ARCSIZE */
+        37.5% { -webkit-transform: rotate(405deg) } /* 1.5 * ARCSIZE */
+        50%   { -webkit-transform: rotate(540deg) } /* 2   * ARCSIZE */
+        62.5% { -webkit-transform: rotate(675deg) } /* 2.5 * ARCSIZE */
+        75%   { -webkit-transform: rotate(810deg) } /* 3   * ARCSIZE */
+        87.5% { -webkit-transform: rotate(945deg) } /* 3.5 * ARCSIZE */
+        to    { -webkit-transform: rotate(1080deg) } /* 4   * ARCSIZE */
+      }
+
+      @keyframes fill-unfill-rotate {
+        12.5% { transform: rotate(135deg) } /* 0.5 * ARCSIZE */
+        25%   { transform: rotate(270deg) } /* 1   * ARCSIZE */
+        37.5% { transform: rotate(405deg) } /* 1.5 * ARCSIZE */
+        50%   { transform: rotate(540deg) } /* 2   * ARCSIZE */
+        62.5% { transform: rotate(675deg) } /* 2.5 * ARCSIZE */
+        75%   { transform: rotate(810deg) } /* 3   * ARCSIZE */
+        87.5% { transform: rotate(945deg) } /* 3.5 * ARCSIZE */
+        to    { transform: rotate(1080deg) } /* 4   * ARCSIZE */
+      }
+
+      @-webkit-keyframes layer-1-fade-in-out {
+        0% { opacity: 1 }
+        25% { opacity: 1 }
+        26% { opacity: 0 }
+        89% { opacity: 0 }
+        90% { opacity: 1 }
+        to { opacity: 1 }
+      }
+
+      @keyframes layer-1-fade-in-out {
+        0% { opacity: 1 }
+        25% { opacity: 1 }
+        26% { opacity: 0 }
+        89% { opacity: 0 }
+        90% { opacity: 1 }
+        to { opacity: 1 }
+      }
+
+      @-webkit-keyframes layer-2-fade-in-out {
+        0% { opacity: 0 }
+        15% { opacity: 0 }
+        25% { opacity: 1 }
+        50% { opacity: 1 }
+        51% { opacity: 0 }
+        to { opacity: 0 }
+      }
+
+      @keyframes layer-2-fade-in-out {
+        0% { opacity: 0 }
+        15% { opacity: 0 }
+        25% { opacity: 1 }
+        50% { opacity: 1 }
+        51% { opacity: 0 }
+        to { opacity: 0 }
+      }
+
+      @-webkit-keyframes layer-3-fade-in-out {
+        0% { opacity: 0 }
+        40% { opacity: 0 }
+        50% { opacity: 1 }
+        75% { opacity: 1 }
+        76% { opacity: 0 }
+        to { opacity: 0 }
+      }
+
+      @keyframes layer-3-fade-in-out {
+        0% { opacity: 0 }
+        40% { opacity: 0 }
+        50% { opacity: 1 }
+        75% { opacity: 1 }
+        76% { opacity: 0 }
+        to { opacity: 0 }
+      }
+
+      @-webkit-keyframes layer-4-fade-in-out {
+        0% { opacity: 0 }
+        65% { opacity: 0 }
+        75% { opacity: 1 }
+        90% { opacity: 1 }
+        to { opacity: 0 }
+      }
+
+      @keyframes layer-4-fade-in-out {
+        0% { opacity: 0 }
+        65% { opacity: 0 }
+        75% { opacity: 1 }
+        90% { opacity: 1 }
+        to { opacity: 0 }
+      }
+
+      .circle-clipper {
+        display: inline-block;
+        position: relative;
+        width: 50%;
+        height: 100%;
+        overflow: hidden;
+        border-color: inherit;
+      }
+
+      /**
+       * Patch the gap that appear between the two adjacent div.circle-clipper while the
+       * spinner is rotating (appears on Chrome 50, Safari 9.1.1, and Edge).
+       */
+      .spinner-layer::after {
+        left: 45%;
+        width: 10%;
+        border-top-style: solid;
+      }
+
+      .spinner-layer::after,
+      .circle-clipper::after {
+        content: '';
+        box-sizing: border-box;
+        position: absolute;
+        top: 0;
+        border-width: var(--paper-spinner-stroke-width, 3px);
+        border-color: inherit;
+        border-radius: 50%;
+      }
+
+      .circle-clipper::after {
+        bottom: 0;
+        width: 200%;
+        border-style: solid;
+        border-bottom-color: transparent !important;
+      }
+
+      .circle-clipper.left::after {
+        left: 0;
+        border-right-color: transparent !important;
+        -webkit-transform: rotate(129deg);
+        transform: rotate(129deg);
+      }
+
+      .circle-clipper.right::after {
+        left: -100%;
+        border-left-color: transparent !important;
+        -webkit-transform: rotate(-129deg);
+        transform: rotate(-129deg);
+      }
+
+      .active .gap-patch::after,
+      .active .circle-clipper::after {
+        -webkit-animation-duration: var(--paper-spinner-expand-contract-duration);
+        -webkit-animation-timing-function: cubic-bezier(0.4, 0.0, 0.2, 1);
+        -webkit-animation-iteration-count: infinite;
+        animation-duration: var(--paper-spinner-expand-contract-duration);
+        animation-timing-function: cubic-bezier(0.4, 0.0, 0.2, 1);
+        animation-iteration-count: infinite;
+      }
+
+      .active .circle-clipper.left::after {
+        -webkit-animation-name: left-spin;
+        animation-name: left-spin;
+      }
+
+      .active .circle-clipper.right::after {
+        -webkit-animation-name: right-spin;
+        animation-name: right-spin;
+      }
+
+      @-webkit-keyframes left-spin {
+        0% { -webkit-transform: rotate(130deg) }
+        50% { -webkit-transform: rotate(-5deg) }
+        to { -webkit-transform: rotate(130deg) }
+      }
+
+      @keyframes left-spin {
+        0% { transform: rotate(130deg) }
+        50% { transform: rotate(-5deg) }
+        to { transform: rotate(130deg) }
+      }
+
+      @-webkit-keyframes right-spin {
+        0% { -webkit-transform: rotate(-130deg) }
+        50% { -webkit-transform: rotate(5deg) }
+        to { -webkit-transform: rotate(-130deg) }
+      }
+
+      @keyframes right-spin {
+        0% { transform: rotate(-130deg) }
+        50% { transform: rotate(5deg) }
+        to { transform: rotate(-130deg) }
+      }
+
+      #spinnerContainer.cooldown {
+        -webkit-animation: container-rotate var(--paper-spinner-container-rotation-duration) linear infinite, fade-out var(--paper-spinner-cooldown-duration) cubic-bezier(0.4, 0.0, 0.2, 1);
+        animation: container-rotate var(--paper-spinner-container-rotation-duration) linear infinite, fade-out var(--paper-spinner-cooldown-duration) cubic-bezier(0.4, 0.0, 0.2, 1);
+      }
+
+      @-webkit-keyframes fade-out {
+        0% { opacity: 1 }
+        to { opacity: 0 }
+      }
+
+      @keyframes fade-out {
+        0% { opacity: 1 }
+        to { opacity: 0 }
+      }
+    </style>
+  </template>
+</dom-module>
+
+
+<dom-module id="paper-spinner-lite" assetpath="/res/imp/bower_components/paper-spinner/">
+  <template strip-whitespace="">
+    <style include="paper-spinner-styles"></style>
+
+    <div id="spinnerContainer" class-name="[[__computeContainerClasses(active, __coolingDown)]]">
+      <div class="spinner-layer">
+        <div class="circle-clipper left"></div>
+        <div class="circle-clipper right"></div>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    Polymer({
+      is: 'paper-spinner-lite',
+
+      behaviors: [
+        Polymer.PaperSpinnerBehavior
+      ]
+    });
+  </script>
+</dom-module>
+
+<dom-module id="iron-flex" assetpath="/res/imp/bower_components/iron-flex-layout/">
+  <template>
+    <style>
+      .layout.horizontal,
+      .layout.vertical {
+        display: -ms-flexbox;
+        display: -webkit-flex;
+        display: flex;
+      }
+
+      .layout.inline {
+        display: -ms-inline-flexbox;
+        display: -webkit-inline-flex;
+        display: inline-flex;
+      }
+
+      .layout.horizontal {
+        -ms-flex-direction: row;
+        -webkit-flex-direction: row;
+        flex-direction: row;
+      }
+
+      .layout.vertical {
+        -ms-flex-direction: column;
+        -webkit-flex-direction: column;
+        flex-direction: column;
+      }
+
+      .layout.wrap {
+        -ms-flex-wrap: wrap;
+        -webkit-flex-wrap: wrap;
+        flex-wrap: wrap;
+      }
+
+      .layout.center,
+      .layout.center-center {
+        -ms-flex-align: center;
+        -webkit-align-items: center;
+        align-items: center;
+      }
+
+      .layout.center-justified,
+      .layout.center-center {
+        -ms-flex-pack: center;
+        -webkit-justify-content: center;
+        justify-content: center;
+      }
+
+      .flex {
+        -ms-flex: 1 1 0.000000001px;
+        -webkit-flex: 1;
+        flex: 1;
+        -webkit-flex-basis: 0.000000001px;
+        flex-basis: 0.000000001px;
+      }
+
+      .flex-auto {
+        -ms-flex: 1 1 auto;
+        -webkit-flex: 1 1 auto;
+        flex: 1 1 auto;
+      }
+
+      .flex-none {
+        -ms-flex: none;
+        -webkit-flex: none;
+        flex: none;
+      }
+    </style>
+  </template>
+</dom-module>
+
+
+<dom-module id="iron-flex-reverse" assetpath="/res/imp/bower_components/iron-flex-layout/">
+  <template>
+    <style>
+      .layout.horizontal-reverse,
+      .layout.vertical-reverse {
+        display: -ms-flexbox;
+        display: -webkit-flex;
+        display: flex;
+      }
+
+      .layout.horizontal-reverse {
+        -ms-flex-direction: row-reverse;
+        -webkit-flex-direction: row-reverse;
+        flex-direction: row-reverse;
+      }
+
+      .layout.vertical-reverse {
+        -ms-flex-direction: column-reverse;
+        -webkit-flex-direction: column-reverse;
+        flex-direction: column-reverse;
+      }
+
+      .layout.wrap-reverse {
+        -ms-flex-wrap: wrap-reverse;
+        -webkit-flex-wrap: wrap-reverse;
+        flex-wrap: wrap-reverse;
+      }
+    </style>
+  </template>
+</dom-module>
+
+
+<dom-module id="iron-flex-alignment" assetpath="/res/imp/bower_components/iron-flex-layout/">
+  <template>
+    <style>
+      /**
+       * Alignment in cross axis.
+       */
+      .layout.start {
+        -ms-flex-align: start;
+        -webkit-align-items: flex-start;
+        align-items: flex-start;
+      }
+
+      .layout.center,
+      .layout.center-center {
+        -ms-flex-align: center;
+        -webkit-align-items: center;
+        align-items: center;
+      }
+
+      .layout.end {
+        -ms-flex-align: end;
+        -webkit-align-items: flex-end;
+        align-items: flex-end;
+      }
+
+      .layout.baseline {
+        -ms-flex-align: baseline;
+        -webkit-align-items: baseline;
+        align-items: baseline;
+      }
+
+      /**
+       * Alignment in main axis.
+       */
+      .layout.start-justified {
+        -ms-flex-pack: start;
+        -webkit-justify-content: flex-start;
+        justify-content: flex-start;
+      }
+
+      .layout.center-justified,
+      .layout.center-center {
+        -ms-flex-pack: center;
+        -webkit-justify-content: center;
+        justify-content: center;
+      }
+
+      .layout.end-justified {
+        -ms-flex-pack: end;
+        -webkit-justify-content: flex-end;
+        justify-content: flex-end;
+      }
+
+      .layout.around-justified {
+        -ms-flex-pack: distribute;
+        -webkit-justify-content: space-around;
+        justify-content: space-around;
+      }
+
+      .layout.justified {
+        -ms-flex-pack: justify;
+        -webkit-justify-content: space-between;
+        justify-content: space-between;
+      }
+
+      /**
+       * Self alignment.
+       */
+      .self-start {
+        -ms-align-self: flex-start;
+        -webkit-align-self: flex-start;
+        align-self: flex-start;
+      }
+
+      .self-center {
+        -ms-align-self: center;
+        -webkit-align-self: center;
+        align-self: center;
+      }
+
+      .self-end {
+        -ms-align-self: flex-end;
+        -webkit-align-self: flex-end;
+        align-self: flex-end;
+      }
+
+      .self-stretch {
+        -ms-align-self: stretch;
+        -webkit-align-self: stretch;
+        align-self: stretch;
+      }
+
+      .self-baseline {
+        -ms-align-self: baseline;
+        -webkit-align-self: baseline;
+        align-self: baseline;
+      };
+
+      /**
+       * multi-line alignment in main axis.
+       */
+      .layout.start-aligned {
+        -ms-flex-line-pack: start;  /* IE10 */
+        -ms-align-content: flex-start;
+        -webkit-align-content: flex-start;
+        align-content: flex-start;
+      }
+
+      .layout.end-aligned {
+        -ms-flex-line-pack: end;  /* IE10 */
+        -ms-align-content: flex-end;
+        -webkit-align-content: flex-end;
+        align-content: flex-end;
+      }
+
+      .layout.center-aligned {
+        -ms-flex-line-pack: center;  /* IE10 */
+        -ms-align-content: center;
+        -webkit-align-content: center;
+        align-content: center;
+      }
+
+      .layout.between-aligned {
+        -ms-flex-line-pack: justify;  /* IE10 */
+        -ms-align-content: space-between;
+        -webkit-align-content: space-between;
+        align-content: space-between;
+      }
+
+      .layout.around-aligned {
+        -ms-flex-line-pack: distribute;  /* IE10 */
+        -ms-align-content: space-around;
+        -webkit-align-content: space-around;
+        align-content: space-around;
+      }
+    </style>
+  </template>
+</dom-module>
+
+<dom-module id="iron-flex-factors" assetpath="/res/imp/bower_components/iron-flex-layout/">
+  <template>
+    <style>
+      .flex,
+      .flex-1 {
+        -ms-flex: 1 1 0.000000001px;
+        -webkit-flex: 1;
+        flex: 1;
+        -webkit-flex-basis: 0.000000001px;
+        flex-basis: 0.000000001px;
+      }
+
+      .flex-2 {
+        -ms-flex: 2;
+        -webkit-flex: 2;
+        flex: 2;
+      }
+
+      .flex-3 {
+        -ms-flex: 3;
+        -webkit-flex: 3;
+        flex: 3;
+      }
+
+      .flex-4 {
+        -ms-flex: 4;
+        -webkit-flex: 4;
+        flex: 4;
+      }
+
+      .flex-5 {
+        -ms-flex: 5;
+        -webkit-flex: 5;
+        flex: 5;
+      }
+
+      .flex-6 {
+        -ms-flex: 6;
+        -webkit-flex: 6;
+        flex: 6;
+      }
+
+      .flex-7 {
+        -ms-flex: 7;
+        -webkit-flex: 7;
+        flex: 7;
+      }
+
+      .flex-8 {
+        -ms-flex: 8;
+        -webkit-flex: 8;
+        flex: 8;
+      }
+
+      .flex-9 {
+        -ms-flex: 9;
+        -webkit-flex: 9;
+        flex: 9;
+      }
+
+      .flex-10 {
+        -ms-flex: 10;
+        -webkit-flex: 10;
+        flex: 10;
+      }
+
+      .flex-11 {
+        -ms-flex: 11;
+        -webkit-flex: 11;
+        flex: 11;
+      }
+
+      .flex-12 {
+        -ms-flex: 12;
+        -webkit-flex: 12;
+        flex: 12;
+      }
+    </style>
+  </template>
+</dom-module>
+
+
+<dom-module id="iron-positioning" assetpath="/res/imp/bower_components/iron-flex-layout/">
+  <template>
+    <style>
+      .block {
+        display: block;
+      }
+
+      /* IE 10 support for HTML5 hidden attr */
+      [hidden] {
+        display: none !important;
+      }
+
+      .invisible {
+        visibility: hidden !important;
+      }
+
+      .relative {
+        position: relative;
+      }
+
+      .fit {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+      }
+
+      body.fullbleed {
+        margin: 0;
+        height: 100vh;
+      }
+
+      .scroll {
+        -webkit-overflow-scrolling: touch;
+        overflow: auto;
+      }
+
+      /* fixed position */
+      .fixed-bottom,
+      .fixed-left,
+      .fixed-right,
+      .fixed-top {
+        position: fixed;
+      }
+
+      .fixed-top {
+        top: 0;
+        left: 0;
+        right: 0;
+      }
+
+      .fixed-right {
+        top: 0;
+        right: 0;
+        bottom: 0;
+      }
+
+      .fixed-bottom {
+        right: 0;
+        bottom: 0;
+        left: 0;
+      }
+
+      .fixed-left {
+        top: 0;
+        bottom: 0;
+        left: 0;
+      }
+    </style>
+  </template>
+</dom-module>
+<script>
 (function() {
   "use strict";
   /**
@@ -10220,14 +14442,17 @@ You can bind to `isAuthorized` property to monitor authorization state.
     });
   })();
 </script>
-<dom-module id="auth-signin" assetpath="imp/common/">
+<dom-module id="auth-signin" assetpath="/res/imp/common/">
   <template>
     <style>
       #avatar {
         border-radius: 5px;
       }
-      #signinContainer {
-        margin-top: 14px;
+      a {
+        color: white;
+      }
+      .center {
+        vertical-align: middle;
       }
     </style>
 
@@ -10241,10 +14466,10 @@ You can bind to `isAuthorized` property to monitor authorization state.
     </template>
 
     <template is="dom-if" if="[[signedIn]]">
-      <img id="avatar" src="[[profile.imageUrl]]" width="30" height="30">
-      <span>[[profile.email]]</span>
-      <span>|</span>
-      <a on-tap="signOut" href="#">Sign out</a>
+      <img class="center" id="avatar" src="[[profile.imageUrl]]" width="30" height="30">
+      <span class="center">[[profile.email]]</span>
+      <span class="center">|</span>
+      <a class="center" on-tap="signOut" href="#">Sign out</a>
     </template>
   </template>
   <script>
@@ -10310,7 +14535,78 @@ You can bind to `isAuthorized` property to monitor authorization state.
       }
     });
   </script>
-</dom-module><dom-module id="swarming-index" assetpath="imp/index/">
+</dom-module><dom-module id="swarming-app" assetpath="/res/imp/common/">
+  <template>
+    <style include="iron-flex">
+      :host {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+      }
+
+      app-toolbar {
+        background-color: #4285f4;
+        color: #fff;
+      }
+
+      app-toolbar a {
+        color: #fff;
+      }
+      .left {
+        margin-right:15px;
+      }
+      .right {
+        margin-left:15px;
+      }
+      .main-content {
+        padding: 3px;
+      }
+
+      paper-spinner-lite {
+        --paper-spinner-color: var(--google-yellow-500);
+      }
+    </style>
+    <app-header-layout>
+      <app-header fixed="">
+        <app-toolbar>
+          <div class="title left">[[name]]</div>
+          <paper-spinner-lite class="left" active="[[busy]]"></paper-spinner-lite>
+
+          <a class="left" href="/newui/">Home</a>
+          <a class="left" href="/newui/botlist">Bot List</a>
+          <div class="flex"></div>
+          
+          <auth-signin class="right" client-id="20770472288-t5smpbpjptka4nd888fv0ctd23ftba2o.apps.googleusercontent.com" auth-headers="{{auth_headers}}">
+          </auth-signin>
+        </app-toolbar>
+      </app-header>
+      <div class="main-content">
+        <content></content>
+      </div>
+    </app-header-layout>
+
+  </template>
+  <script>
+    Polymer({
+      is: 'swarming-app',
+      properties: {
+        auth_headers: {
+          type: Object,
+          notify: true,
+        },
+        busy: {
+          type: Boolean,
+        },
+        name: {
+          type: String,
+        },
+      },
+
+    });
+  </script>
+</dom-module><dom-module id="swarming-index" assetpath="/res/imp/index/">
   <template>
     <style>
       :host {
@@ -10318,31 +14614,37 @@ You can bind to `isAuthorized` property to monitor authorization state.
       }
     </style>
 
-    <h1>HELLO WORLD</h1><h1>
+    <swarming-app auth_headers="{{auth_headers}}" name="Swarming" busy="[[busy]]">
 
-    
-    <auth-signin auth-headers="{{auth}}" client-id="20770472288-t5smpbpjptka4nd888fv0ctd23ftba2o.apps.googleusercontent.com" on-auth-signin="signIn">
-    </auth-signin>
+      <iron-ajax id="request" url="/_ah/api/swarming/v1/server/details" headers="[[auth_headers]]" handle-as="json" last-response="{{serverDetails}}" loading="{{busy}}">
+      </iron-ajax>
 
-    <iron-ajax id="request" url="/_ah/api/swarming/v1/server/details" headers="[[auth]]" handle-as="json" on-response="handleResponse">
-    </iron-ajax>
+      <h1>HELLO WORLD</h1>
 
-  </h1></template>
+      <div>Server Version: [[serverDetails.server_version]]</div>
+
+    </swarming-app>
+
+  </template>
   <script>
     Polymer({
       is: 'swarming-index',
+
+      properties: {
+        auth_headers: {
+          type: Object,
+          observer: "signIn",
+        },
+
+        serverDetails: {
+          type: String,
+        }
+      },
 
       signIn: function(){
         this.$.request.generateRequest();
       },
 
-      handleResponse: function(a,b){
-        console.log(this.$.request.lastResponse);
-      }
     });
   </script>
-</dom-module></div>
-  <swarming-index></swarming-index>
-
-
-</body></html>
+</dom-module></div></body></html>

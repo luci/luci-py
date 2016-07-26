@@ -5,10 +5,10 @@ To clean and build the pages for deploying, run
     npm install   # Need to only run once to set up dev dependencies.
     make vulcanize
 
-This combines all of the elements needed to display the page into several "single-page" apps, like
-the bot-list.
-These are checked into version control so that they may be easily redeployed w/o having to rebuild
-the pages if there were no changes.
+This combines all of the elements needed to display the page into several
+"single-page" apps, like the bot-list.
+These are checked into version control so that they may be easily redeployed w/o
+having to rebuild the pages if there were no changes.
 
 
 To do a full clean rebuild, run
@@ -16,10 +16,23 @@ To do a full clean rebuild, run
     make clean_vulcanize
 
 
-To access the demo pages on localhost:8080, run
+To vulcanize and run appengine locally, run
 
-    make && make run
+    make local_deploy
 
+
+To run appengine locally without vulcanizing (preferred debugging mode), run
+
+    make debug_local_deploy
+
+
+To access the demo pages on localhost:9050, run
+
+    make run
+
+
+Prerequisites
+=============
 
 You will need to install node.js, npm, and bower, for example:
 

@@ -72,16 +72,24 @@ handlers:
 
 # TODO(kjlubick): Consider moving elements/ to frontend/ so it is a bit more clear what the folder is about.
 - url: /newui/
-  static_files: elements/build/index-build.html
-  upload: elements/build/index-build.html
+  static_files: elements/index.html
+  upload: elements/index.html
   secure: always
   http_headers:
     Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
     X-Frame-Options: deny
 
 - url: /newui/(.+)
-  static_files: elements/build/\1-build.html
-  upload: elements/build/([^/]+)-build.html
+  static_files: elements/\1-index.html
+  upload: elements/([^/]+)-index.html
+  secure: always
+  http_headers:
+    Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+    X-Frame-Options: deny
+
+- url: /res/(.+)
+  static_files: elements/build/\1
+  upload: elements/build/(.+)
   secure: always
   http_headers:
     Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"

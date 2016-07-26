@@ -10,16 +10,38 @@ default:
 # Run a local HTTP server for the demo pages.
 .PHONY: run
 run: default
-	node_modules/.bin/http-server -p 8080 -a 127.0.0.1
+	-wget -nc --output-document=./imp/botlist/bot-list-demo.json https://storage.googleapis.com/luci-demo-data/swarming/bot-list-demo.json
+
+	node_modules/.bin/http-server -p 9050 -a 127.0.0.1
 
 
 .PHONY: vulcanize
-vulcanize:
-	./node_modules/.bin/vulcanize --inline-css=true --inline-scripts=true --strip-comments=true --out-html=./build/index-build.html index.html
-	./node_modules/.bin/vulcanize --inline-css=true --inline-scripts=true --strip-comments=true --out-html=./build/botlist-build.html botlist.html
+vulcanize: default
+	rm -rf ./build/*
+	mkdir ./build/js
+	./node_modules/.bin/vulcanize --inline-css=true --inline-scripts=true --strip-comments=true --abspath=./ --out-html=./build/elements.html elements.html
+	cp ./res/imp/bower_components/webcomponentsjs/webcomponents-lite.min.js ./build/js/webcomponents-lite.min.js
 
-.PHONY: clean_vulcanize
-clean_vulcanize: default
-	rm -f ./build/*build.html
-	./node_modules/.bin/vulcanize --inline-css=true --inline-scripts=true --strip-comments=true --out-html=./build/index-build.html index.html
-	./node_modules/.bin/vulcanize --inline-css=true --inline-scripts=true --strip-comments=true --out-html=./build/botlist-build.html botlist.html
+.PHONY: debug_build
+debug_build: default
+	rm -rf ./build/*
+	mkdir ./build/js
+	cp elements.html ./build/elements.html
+	cp ./res/imp/bower_components/webcomponentsjs/webcomponents-lite.min.js ./build/js/webcomponents-lite.min.js
+	ln --symbolic ../res/imp/ ./build/
+
+.PHONY: dev_deploy
+dev_deploy: vulcanize
+	../tools/gae upl -A chromium-swarm-dev
+
+.PHONY: deploy
+deploy: vulcanize
+	../tools/gae upl -A chromium-swarm
+
+.PHONY: local_deploy
+local_deploy: vulcanize
+	../tools/start_servers.py
+
+.PHONY: debug_local_deploy
+debug_local_deploy: debug_build
+	../tools/start_servers.py

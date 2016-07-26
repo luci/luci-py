@@ -1,0 +1,81 @@
+<!--
+  Copyright 2016 The LUCI Authors. All rights reserved.
+  Use of this source code is governed under the Apache License, Version 2.0
+  that can be found in the LICENSE file.
+
+  This in an HTML Import-able file that contains the definition
+  of the following elements:
+
+    <swarming-index>
+
+    Swarming Index is the landing page for the Swarming UI.
+    It will have links to all other pages and a high-level overview of the fleet.
+
+  Usage:
+
+    <swarming-index></swarming-index>
+
+  Properties:
+    None.  This is a top-level element.
+
+  Methods:
+    None.
+
+  Events:
+    None.
+-->
+
+<link rel="import" href="/res/imp/bower_components/iron-ajax/iron-ajax.html">
+
+<link rel="import" href="/res/imp/common/swarming-app.html">
+
+<dom-module id="swarming-index">
+  <template>
+    <style>
+      :host {
+        display: block;
+      }
+    </style>
+
+    <swarming-app
+      auth_headers="{{auth_headers}}"
+      name="Swarming"
+      busy="[[busy]]">
+
+      <iron-ajax id="request"
+        url="/_ah/api/swarming/v1/server/details"
+        headers="[[auth_headers]]"
+        handle-as="json"
+        last-response="{{serverDetails}}"
+        loading="{{busy}}">
+      </iron-ajax>
+
+      <h1>HELLO WORLD</h1>
+
+      <div>Server Version: [[serverDetails.server_version]]</div>
+
+    </swarming-app>
+
+  </template>
+  <script>
+    Polymer({
+      is: 'swarming-index',
+
+      properties: {
+        auth_headers: {
+          type: Object,
+          observer: "signIn",
+        },
+
+        serverDetails: {
+          type: String,
+        }
+      },
+
+      signIn: function(){
+        this.$.request.generateRequest();
+      },
+
+    });
+  </script>
+</dom-module>
