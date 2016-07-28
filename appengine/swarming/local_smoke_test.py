@@ -57,21 +57,21 @@ ISOLATE_HELLO_WORLD = {
 }
 
 RESULT_HEY_ISOLATED_OUT = {
-  u'isolated': u'f10f4c42b38ca01726610f9575ba695468c32108',
+  u'isolated': u'b12052452e7246af8bcf135afc8f0b1a883df43c',
   u'isolatedserver': u'http://localhost:10050',
   u'namespace': u'default-gzip',
   u'view_url':
     u'http://localhost:10050/browse?namespace=default-gzip'
-    '&hash=f10f4c42b38ca01726610f9575ba695468c32108',
+    '&hash=b12052452e7246af8bcf135afc8f0b1a883df43c',
 }
 
 RESULT_HEY_OUTPUTS_REF = {
-  u'isolated': u'f10f4c42b38ca01726610f9575ba695468c32108',
+  u'isolated': u'b12052452e7246af8bcf135afc8f0b1a883df43c',
   u'isolatedserver': u'http://localhost:10050',
   u'namespace': u'default-gzip',
   u'view_url':
     u'http://localhost:10050/browse?namespace=default-gzip'
-    '&hash=f10f4c42b38ca01726610f9575ba695468c32108',
+    '&hash=b12052452e7246af8bcf135afc8f0b1a883df43c',
 }
 
 

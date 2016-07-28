@@ -117,6 +117,7 @@ The root is a dictionary with the following keys:
     - `l`: link destination iff a symlink
     - `m`: POSIX file mode (required on POSIX, ignored on non-POSIX).
     - `s`: file size iff not a symlink
+    - `t`: type of the file iff not the default of `basic`
   - `includes`: references another `.isolated` file for additional files or to
     provide the command. In practice, this is used to reduce `.isolated` file
     size by moving rarely changed test data files in a separate `.isolated`
@@ -128,6 +129,14 @@ The root is a dictionary with the following keys:
   - `version`: version of the file format. Increment the minor version for non
     breaking changes and the major version if code written for a previous
     version shouldn't be able to parse it.
+
+
+##### File types
+
+There are two file types;
+  - `basic`: All normal files, the default type.
+  - `ar`: An [ar](https://en.wikipedia.org/wiki/Ar_(Unix)) archive containing a
+    large number of small files.
 
 
 #### Arbitrary split vs recursive trees
