@@ -518,6 +518,8 @@ def poll_server(botobj, quit_bit):
   resp = botobj.remote.url_read_json(
       '/swarming/api/v1/bot/poll', data=botobj._attributes)
   if not resp:
+    # Back off on failure.
+    time.sleep(max(1, min(60, botobj.state.get('sleep_streak', 10) * 2)))
     return False
   logging.debug('Server response:\n%s', resp)
 
