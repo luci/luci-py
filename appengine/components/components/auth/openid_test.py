@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# coding: utf-8
 # Copyright 2015 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -59,6 +60,7 @@ class OpenIDTest(test_case.TestCase):
     self.assertEqual(
         'https://blah.com/auth?'
         'client_id=abc&'
+        'prompt=select_account&'
         'redirect_uri=http%3A%2F%2Flocal%2Fredirect&'
         'response_type=code&'
         'scope=openid+email+profile&'
@@ -101,18 +103,34 @@ class OpenIDTest(test_case.TestCase):
     user_info = openid.handle_authorization_code(conf, 'codez')
     self.assertEqual({'email': 'def@example.com', 'sub': '123'}, user_info)
 
-  def test_normalize_dest_url(self):
-    self.assertEqual(
-        '/abc/def',
-        openid.normalize_dest_url('http://local', 'http://local/abc/def'))
-    self.assertEqual(
-        '/abc/def', openid.normalize_dest_url('http://local', '/abc/def'))
-    with self.assertRaises(ValueError):
-      openid.normalize_dest_url('http://local', None)
-    with self.assertRaises(ValueError):
-      openid.normalize_dest_url('http://local', 'http://another/abc/def')
-    with self.assertRaises(ValueError):
-      openid.normalize_dest_url('http://local', 'abc/def')
+  def test_normalize_dest_url_ok(self):
+    cases = [
+      ('/', '/'),
+      ('/?asd=def#blah', '/?asd=def#blah'),
+      ('/abc/def', '/abc/def'),
+      ('/blah//abc///def/', '/blah/abc/def/'),
+      ('/blah/..//./abc/', '/abc/'),
+      ('/abc/%2F/def', '/abc/%2F/def'),
+      (u'/💩', '/\xf0\x9f\x92\xa9')
+    ]
+    for arg, expected in cases:
+      self.assertEqual(expected, openid.normalize_dest_url('http://local', arg))
+
+  def test_normalize_dest_url_errors(self):
+    errors = [
+      None,
+      '',
+      'http://another/abc/def',
+      'abc/def',
+      '//host.example.com',
+    ]
+    for arg in errors:
+      try:
+        openid.normalize_dest_url('http://local', arg)
+      except ValueError:
+        pass
+      else:
+        self.fail('Didn\'t raise ValueError while checking %r' % arg)
 
   def test_create_login_url(self):
     class R(object):

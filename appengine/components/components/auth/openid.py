@@ -9,7 +9,6 @@ At least Google's implementation.
 See https://developers.google.com/identity/protocols/OpenIDConnect.
 """
 
-import collections
 import datetime
 import json
 import logging
@@ -133,6 +132,7 @@ def generate_authentication_uri(conf, state):
   """
   params = {
     'client_id': conf.client_id,
+    'prompt': 'select_account',
     'response_type': 'code',
     'scope': 'openid email profile',
     'redirect_uri': conf.redirect_uri,
@@ -359,7 +359,7 @@ class CallbackHandler(webapp2.RequestHandler):
       self.abort(400, detail='Missing "code" parameter')
     state = self.request.get('state')
     if not state:
-      self.abort(400, detai='Missing "state" parameter')
+      self.abort(400, detail='Missing "state" parameter')
     try:
       state = validate_state(state)
     except OpenIDError as e:
@@ -543,17 +543,57 @@ def normalize_dest_url(host_url, dest_url):
 
   Passes path-only URLs through unchanged. Raises ValueError if URL point to
   other hostname or can not be used in create_*_url.
+
+  Accepts 'str' or 'unicode' strings. If 'str' is passed, assumes utf-8
+  encoding.
+
+  Args:
+    host_url: root URL of the server (with scheme).
+    dest_url: URL to redirect to.
+
+  Returned URL is unquoted utf-8 string.
   """
+  if isinstance(host_url, str):
+    host_url = host_url.decode('utf-8')
+  if isinstance(dest_url, str):
+    dest_url = dest_url.decode('utf-8')
+
   if not dest_url:
     raise ValueError('Destination URL must be provided')
+
+  # Strip host url right away. Proceed with the validation.
   assert host_url[-1] != '/', host_url
   if dest_url.startswith(host_url + '/'):
-    return dest_url[len(host_url):]
-  if dest_url[0] != '/':
+    dest_url = dest_url[len(host_url):]
+
+  # The path should be relative and start with '/'.
+  parsed = urlparse.urlsplit(dest_url)
+  if parsed.scheme or parsed.netloc:
+    raise ValueError('Invalid destination URL (%r)' % dest_url)
+  if parsed.path[0] != '/':
     raise ValueError(
-        'Destination URL (%s) must be relative to the current host (%s)' %
+        'Destination URL (%r) must be relative to the current host (%r)' %
         (dest_url, host_url))
-  return dest_url
+
+  # Get rid of '//', '.', '..' in the path.
+  normalized = []
+  chunks = parsed.path.split('/')
+  for i, part in enumerate(chunks):
+    # Keep leading and trailing '/'.
+    if not part and (i == 0 or i == len(chunks) - 1):
+      normalized.append(part)
+      continue
+    if part == '..':
+      if normalized:
+        normalized.pop()
+    elif part and part != '.':
+      normalized.append(part)
+  path = '/'.join(normalized)
+
+  # Assemble back the full URL. Keep only path, query and fragment.
+  sanitized = urlparse.urlunsplit(('', '', path, parsed.query, parsed.fragment))
+  assert isinstance(sanitized, unicode)
+  return sanitized.encode('utf-8')
 
 
 def get_current_user(request):
