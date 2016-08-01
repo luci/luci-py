@@ -374,6 +374,15 @@ class BotList(messages.Message):
   death_timeout = messages.IntegerField(4)
 
 
+class BotsCount(messages.Message):
+  """Returns the count, as requested."""
+  now = message_types.DateTimeField(1)
+  count = messages.IntegerField(2)
+  quarantined = messages.IntegerField(3)
+  dead = messages.IntegerField(4)
+  busy = messages.IntegerField(5)
+
+
 class BotEvent(messages.Message):
   # Timestamp of this event.
   ts = message_types.DateTimeField(1)

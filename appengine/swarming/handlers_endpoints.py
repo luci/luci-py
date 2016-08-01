@@ -635,6 +635,36 @@ class SwarmingBotsService(remote.Service):
         items=[message_conversion.bot_info_to_rpc(bot, now) for bot in bots],
         now=now)
 
+  @gae_ts_mon.instrument_endpoint()
+  @auth.endpoints_method(
+      swarming_rpcs.BotsRequest, swarming_rpcs.BotsCount,
+      http_method='GET')
+  @auth.require(acl.is_privileged_user)
+  def count(self, request):
+    """Counts number of bots with given dimensions."""
+    logging.info('%s', request)
+    now = utils.utcnow()
+    q = bot_management.BotInfo.query().order()
+    for d in request.dimensions:
+      parts = d.split(':', 1)
+      if len(parts) != 2 or any(i.strip() != i or not i for i in parts):
+        raise endpoints.BadRequestException('Invalid dimensions: %s' % d)
+      q = q.filter(bot_management.BotInfo.dimensions_flat == d)
+    f_count = q.count_async()
+    dt = datetime.timedelta(seconds=config.settings().bot_death_timeout_secs)
+    timeout = now - dt
+    f_dead = q.filter(
+        bot_management.BotInfo.last_seen_ts < timeout).count_async()
+    f_quarantined = q.filter(
+        bot_management.BotInfo.quarantined == True).count_async()
+    f_busy = q.filter(bot_management.BotInfo.is_busy == True).count_async()
+    return swarming_rpcs.BotsCount(
+        count=f_count.get_result(),
+        quarantined=f_quarantined.get_result(),
+        dead=f_dead.get_result(),
+        busy=f_busy.get_result(),
+        now=now)
+
 
 def get_routes():
   return (
