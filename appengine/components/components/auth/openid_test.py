@@ -106,6 +106,7 @@ class OpenIDTest(test_case.TestCase):
   def test_normalize_dest_url_ok(self):
     cases = [
       ('/', '/'),
+      ('///', '/'),
       ('/?asd=def#blah', '/?asd=def#blah'),
       ('/abc/def', '/abc/def'),
       ('/blah//abc///def/', '/blah/abc/def/'),
@@ -120,6 +121,9 @@ class OpenIDTest(test_case.TestCase):
     errors = [
       None,
       '',
+      '//',
+      '://',
+      ':',
       'http://another/abc/def',
       'abc/def',
       '//host.example.com',

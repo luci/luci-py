@@ -568,7 +568,7 @@ def normalize_dest_url(host_url, dest_url):
 
   # The path should be relative and start with '/'.
   parsed = urlparse.urlsplit(dest_url)
-  if parsed.scheme or parsed.netloc:
+  if parsed.scheme or parsed.netloc or not parsed.path:
     raise ValueError('Invalid destination URL (%r)' % dest_url)
   if parsed.path[0] != '/':
     raise ValueError(
