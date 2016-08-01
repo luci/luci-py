@@ -1,0 +1,435 @@
+<!--
+  Copyright 2016 The LUCI Authors. All rights reserved.
+  Use of this source code is governed under the Apache License, Version 2.0
+  that can be found in the LICENSE file.
+
+  This in an HTML Import-able file that contains the definition
+  of the following elements:
+
+    <bot-list>
+
+  bot-list creats a dynamic table for viewing swarming bots.  Columns can be
+  dynamically filtered and it supports client-side filtering.
+
+  Properties:
+    None.  This is a top-level element.
+
+  Methods:
+    None.
+
+  Events:
+    None.
+-->
+
+<link rel="import" href="/res/imp/bower_components/iron-flex-layout/iron-flex-layout-classes.html">
+<link rel="import" href="/res/imp/bower_components/polymer/polymer.html">
+
+<link rel="import" href="/res/imp/common/sort-toggle.html">
+<link rel="import" href="/res/imp/common/swarming-app.html">
+
+<link rel="import" href="bot-filters.html">
+<link rel="import" href="bot-list-data.html">
+<link rel="import" href="bot-list-shared.html">
+
+
+<dom-module id="bot-list">
+  <template>
+    <style include="iron-flex iron-flex-alignment iron-positioning swarming-app-style">
+      bot-filters {
+        margin-bottom: 5px;
+      }
+      .bot {
+        margin:5px;
+        max-width:400px;
+        min-height:100px;
+        min-width:300px;
+      }
+      table {
+        border-collapse: collapse;
+        margin-left: 5px;
+      }
+      td, th {
+        border: 1px solid #DDD;
+        padding: 5px;
+      }
+
+      .quarantined, .bad-device {
+        background-color: #ffdddd;
+      }
+      .dead {
+        background-color: #cccccc;
+      }
+
+      th {
+        position: relative;
+      }
+      sort-toggle {
+        position: absolute;
+        right: 0;
+        top: 0.4em;
+      }
+      .bot-list th > span {
+        /* Leave space for sort-toggle*/
+        padding-right: 30px;
+      }
+    </style>
+
+    <swarming-app
+      auth_headers="{{auth_headers}}"
+      busy="[[busy]]"
+      name="Swarming Bot List">
+
+      <bot-filters
+        primary_map="[[primary_map]]"
+        primary_arr="[[primary_arr]]"
+
+        columns="{{columns}}"
+        filter="{{filter}}"
+        verbose="{{verbose}}">
+      </bot-filters>
+
+      <bot-list-data
+        auth_headers="[[auth_headers]]"
+
+        bots="{{bots}}"
+        busy="{{busy}}"
+        primary_map="{{primary_map}}"
+        primary_arr="{{primary_arr}}">
+      </bot-list-data>
+
+      <table class="bot-list">
+        <thead on-sort_change="sortChange">
+        <!-- To allow for dynamic columns without having a lot of copy-pasted
+        code, we break columns up into "special" and "plain" columns. Special
+        columns require some sort of HTML output (e.g. anchor tags) and plain
+        columns just output text.  The plain columns use Polymer functions to
+        insert their text [_header(), _column(), _deviceColumn()].  Polymer
+        functions do not allow HTML (to avoid XSS), so special columns, like id
+        and task are inserted in a fixed order.
+        -->
+          <th>
+            <span>Bot Id</span>
+            <sort-toggle
+                name="id"
+                current="[[sort]]">
+            </sort-toggle>
+          </th>
+          <!-- This wonky syntax is the proper way to listen to changes on an
+          array (we are listening to all subproperties). The element returned is
+          not of much use, so we'll ignore it in _hide() and use this.columns.
+          -->
+          <th hidden$="[[_hide('task', columns.*)]]">
+            <span>Current Task</span>
+            <sort-toggle
+                name="task"
+                current="[[sort]]">
+            </sort-toggle>
+          </th>
+
+          <template is="dom-repeat"
+                items="[[plain_columns]]"
+                as="c">
+            <th hidden$="[[_hide(c)]]">
+              <span>[[_header(c)]]</span>
+              <sort-toggle
+                  name="[[c]]"
+                  current="[[sort]]">
+              </sort-toggle>
+            </th>
+          </template>
+        </thead>
+        <tbody>
+          <template id="bot_table" is="dom-repeat"
+                items="[[bots]]"
+                as="bot"
+                initial-count=50
+                filter="_filterBotTable">
+
+            <tr class$="[[_botClass(bot)]]">
+              <td>
+                <a class="center"
+                   href$="[[_botLink(bot.bot_id)]]"
+                   target="_blank">
+                   [[bot.bot_id]]
+                </a>
+              </td>
+              <td hidden$="[[_hide('task', columns.*)]]">
+                <a href$="[[_taskLink(bot)]]">[[_taskId(bot)]]</a>
+              </td>
+
+              <template is="dom-repeat"
+                    items="[[plain_columns]]"
+                    as="c">
+                <td hidden$="[[_hide(c)]]">
+                  [[_column(c, bot, verbose)]]
+                </td>
+              </template>
+
+            </tr>
+            <template is="dom-repeat"
+                  items="[[_devices(bot)]]"
+                  as="device">
+              <tr hidden$="[[_hide('devices', columns.*)]]"
+                  class$="[[_deviceClass(device)]]">
+                <td></td>
+                <td hidden$="[[_hide('task', columns.*)]]"></td>
+                <template is="dom-repeat"
+                      items="[[plain_columns]]"
+                      as="c">
+                  <td hidden$="[[_hide(c)]]">
+                    [[_deviceColumn(c, device, verbose)]]
+                  </td>
+                </template>
+              </tr>
+            </template> <!--devices repeat-->
+          </template> <!--bot-table repeat-->
+        </tbody>
+      </table>
+
+    </swarming-app>
+
+  </template>
+  <script>
+  (function(){
+    var special_columns = ["id", "task"];
+
+    var headerMap = {
+      // "id" and "task" are special, so they don't go here and have their
+      // headers hard-coded below.
+      "cores": "Cores",
+      "cpu": "CPU",
+      "devices": "Devices",
+      "gpu": "GPU",
+      "os": "OS",
+      "pool": "Pool",
+      "status": "Status",
+    };
+
+    // This maps column name to a function that will return the content for a
+    // given bot. These functions are bound to this element, and have access
+    // to all functions defined here and in bot-list-shared.
+    var columnMap = {
+      cores: function(bot){
+        var cores =  this._cores(bot);
+        if (this.verbose){
+          return cores.join(" | ");
+        }
+        return cores[0];
+      },
+      cpu: function(bot){
+        var cpus = this._dimension(bot, 'cpu') || ['Unknown'];
+        if (this.verbose){
+          return cpus.join(" | ");
+        }
+        return cpus[0];
+      },
+      devices: function(bot){
+        return this._devices(bot).length + " devices attached";
+      },
+      gpu: function(bot){
+        var gpus = this._dimension(bot, 'gpu')
+        if (!gpus) {
+          return "none";
+        }
+        var verbose = []
+        var named = [];
+        // non-verbose mode has only the top level GPU info "e.g. NVidia"
+        // which is found by looking for gpu ids w/o a colon.
+        gpus.forEach(function(g){
+          var alias = this._gpuAlias(g);
+          if (alias === "UNKNOWN") {
+            verbose.push(g);
+            if (g.indexOf(":") === -1) {
+              named.push(g);
+            }
+            return;
+          }
+          verbose.push(this._applyAlias(g, alias));
+          if (g.indexOf(":") === -1) {
+            named.push(this._applyAlias(g, alias));
+          }
+        }.bind(this))
+        if (this.verbose) {
+          return verbose.join(" | ");
+        }
+        return named.join(" | ");
+      },
+      id: function(bot) {
+        return bot.bot_id;
+      },
+      os: function(bot) {
+        var os = this._dimension(bot, 'os') || ['Unknown'];
+        if (this.verbose){
+          return os.join(" | ");
+        }
+        return os[0];
+      },
+      pool: function(bot) {
+        var pool = this._dimension(bot, 'pool') || ['Unknown'];
+        return pool.join(" | ");
+      },
+      status: function(bot) {
+        // If a bot is both dead and quarantined, show the deadness over the
+        // quarentinedness.
+        if (bot.is_dead) {
+          return "Dead: " + bot.is_dead;
+        }
+        if (bot.quarantined) {
+          return "Quarantined: " + bot.quarantined;
+        }
+        return "Alive";
+      },
+      task: function(bot){
+        return this._taskId(bot);
+      },
+    };
+
+    Polymer({
+      is: 'bot-list',
+      behaviors: [SwarmingBehaviors.BotListBehavior],
+
+      properties: {
+
+        columns: {
+          type: Array,
+        },
+        // Should have a property "filter" which is a function.
+        filter: {
+          type: Object,
+        },
+
+        plain_columns: {
+          type: Array,
+          computed: "_stripSpecial(columns.*)",
+        },
+
+        // sort is an Object {name:String, direction:String}.
+        sort: {
+          type: Object,
+        },
+
+        verbose: {
+          type: Boolean,
+        }
+      },
+
+      observers: [
+        '_reRender(filter.*)',
+        '_checkSorts(columns.*)'
+      ],
+
+      _botClass: function(bot) {
+        if (bot.is_dead) {
+          return "dead";
+        }
+        if (bot.quarantined) {
+          return "quarantined";
+        }
+        return "";
+      },
+
+      _botLink: function(id) {
+        // TODO(kjlubick) Make this point to /newui/ when appropriate.
+        return "/restricted/bot/"+id;
+      },
+
+      // _checkSorts makes sure that if a column has been removed, the related
+      // sort is also removed.
+      _checkSorts: function() {
+        if (!this.sort) {
+          return;
+        }
+        this._reRender();
+      },
+
+      _column: function(col, bot) {
+        return columnMap[col].bind(this)(bot);
+      },
+
+      _deviceColumn: function(col, device) {
+        if (col === "devices") {
+          var str = this._androidAlias(device);
+          if (device.okay) {
+            str = this._applyAlias(this._deviceType(device), str);
+          }
+          str += " S/N:";
+          str += device.serial;
+          return str;
+        }
+        if (col === "status") {
+          return device.state;
+        }
+        return "";
+      },
+
+      _deviceClass: function(device) {
+        if (!device.okay) {
+          return "bad-device";
+        }
+        return "";
+      },
+
+      _filterBotTable: function(bot) {
+        if (!this.filter || !this.filter.filter) {
+          return true;
+        }
+        return this.filter.filter.bind(this)(bot);
+      },
+
+      _header: function(col){
+        return headerMap[col];
+      },
+
+      _hide: function(col) {
+        return this.columns.indexOf(col) === -1;
+      },
+
+      _reRender: function(filter, sort) {
+        this.$.bot_table.render();
+      },
+
+      _sortBotTable: function(botA, botB) {
+        if (!this.sort) {
+          return 0;
+        }
+        var dir = 1;
+        if (this.sort.direction === "desc") {
+          dir = -1;
+        }
+        var botACol = this._column(this.sort.name, botA);
+        var botBCol = this._column(this.sort.name, botB);
+
+        return dir * swarming.naturalCompare(botACol, botBCol);
+      },
+
+      sortChange: function(e) {
+        // The event we get from sort-toggle tells us the name of what needs
+        // to be sorting and how to sort it.
+        if (!(e && e.detail && e.detail.name)) {
+          return;
+        }
+        this.set("sort", e.detail);
+        swarming.stableSort(this.bots, this._sortBotTable.bind(this));
+        this._reRender();
+      },
+
+      // _stripSpecial removes the special columns and sorts the remaining
+      // columns so they always appear in the same order, regardless of
+      // the order they are added.
+      _stripSpecial: function(){
+        return this.columns.filter(function(c){
+          return special_columns.indexOf(c) === -1;
+        }).sort();
+      },
+
+      _taskLink: function(data) {
+        if (data && data.task_id) {
+          return "/user/task/" + data.task_id;
+        }
+        return undefined;
+      }
+
+    });
+  })();
+  </script>
+</dom-module>

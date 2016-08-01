@@ -1,0 +1,174 @@
+<!--
+  Copyright 2016 The LUCI Authors. All rights reserved.
+  Use of this source code is governed under the Apache License, Version 2.0
+  that can be found in the LICENSE file.
+
+  This in an HTML Import-able file that contains the definition
+  of the following elements:
+
+    <bot-list-data>
+
+  This makes calls authenticated with Oauth 2 to the swarming apis.  It parses
+  that data into usable data structures.
+
+  Usage:
+
+    <bot-list-data></bot-list-data>
+
+  Properties:
+    // inputs
+    auth_headers: Object, the OAuth2 header to include in the request.  This
+        should come from swarming-app.
+    // outputs
+    bots: Array<Object>, all bots returned by the botlist.
+    busy: Boolean, if the ajax request is in flight.
+    primary_map: Object, a mapping of primary keys to secondary items.
+        The primary keys are things that can be columns or sorted by.  The
+        primary values (aka the secondary items) are things that can be filtered
+        on. Primary consists of dimensions and state.  Secondary contains the
+        values primary things can be.
+    primary_arr: Array<String>, the display order of the primary keys.
+        This is dimensions, then bot properties, then elements from bot.state.
+
+  Methods:
+    signIn(): Force a signin of the user using OAuth.  This happens
+        automatically when auth_headers is set.
+
+  Events:
+    None.
+-->
+
+<link rel="import" href="/res/imp/bower_components/iron-ajax/iron-ajax.html">
+
+<link rel="import" href="bot-list-shared.html">
+
+<dom-module id="bot-list-data">
+  <template>
+    <iron-ajax id="request"
+       url="/_ah/api/swarming/v1/bots/list"
+       headers="[[auth_headers]]"
+       handle-as="json"
+       last-response="{{_data}}"
+       loading="{{busy}}">
+    </iron-ajax>
+  </template>
+  <script>
+  (function(){
+    // TODO(kjlubick): Add more of these as well as things from state
+    // i.e. disk space remaining.
+    var DIMENSIONS = ["cores", "cpu", "id", "os", "pool"];
+     // "gpu" and "devices" are added separately because we need to
+     // deal with aliases.
+    var BOT_PROPERTIES = ["gpu", "devices", "task", "status"];
+    Polymer({
+      is: 'bot-list-data',
+      properties: {
+        // inputs
+        auth_headers: {
+          type: Object,
+          observer: "signIn",
+        },
+
+        //outputs
+        bots: {
+          type: Array,
+          computed: "_bots(_data)",
+          notify: true,
+        },
+        busy: {
+          type: Boolean,
+          notify: true,
+        },
+        primary_map: {
+          type:Object,
+          computed: "_primaryMap(bots)",
+          notify: true,
+        },
+        primary_arr: {
+          type:Array,
+          value: function() {
+            return DIMENSIONS.concat(BOT_PROPERTIES);
+          },
+          notify: true,
+        },
+
+        // private
+        _data: {
+          type: Object,
+        },
+      },
+      behaviors: [SwarmingBehaviors.BotListBehavior],
+
+      signIn: function(){
+        this.$.request.generateRequest();
+      },
+
+      _bots: function(){
+        if (!this._data || !this._data.items) {
+          return [];
+        }
+        this._data.items.forEach(function(o){
+          o.state = JSON.parse(o.state);
+        });
+        return this._data.items;
+      },
+
+      _primaryMap: function(bots){
+        // map will keep track of dimensions that we have seen at least once.
+        // This will then basically get turned into an array to be used for
+        // filtering.
+        var map = {};
+        DIMENSIONS.forEach(function(p){
+          map[p] = {};
+        });
+        map["devices"] = {};
+        map["gpu"] = {};
+        bots.forEach(function(b){
+          DIMENSIONS.forEach(function(d){
+            var dims = this._dimension(b, d) || [];
+            dims.forEach(function(e){
+              map[d][e] = true;
+            });
+          }.bind(this));
+
+          // Add Android devices and their aliases
+          this._devices(b).forEach(function(d){
+            var dt = this._deviceType(d);
+            var alias = this._androidAlias(d);
+            if (dt !== "unknown") {
+              dt = this._applyAlias(dt,alias);
+            }
+            map["devices"][dt] = true;
+          }.bind(this));
+          map["devices"]["none"] = true;
+
+          // Add GPUs and their aliases
+          var gpus = this._dimension(b, "gpu") || [];
+          gpus.forEach(function(g){
+            var alias = this._gpuAlias(g);
+            if (alias !== "UNKNOWN") {
+              map["gpu"][this._applyAlias(g, alias)] = true;
+            } else {
+              map["gpu"][g] = true;
+            }
+
+          }.bind(this));
+        }.bind(this));
+
+        // Turn the Map<Object,Map<Boolean>> into a Map<Object,Array<String>>
+        // with all of the secondary elements sorted appropriately.
+        var pMap = {};
+        for (key in map){
+          pMap[key] = Object.keys(map[key]).sort(swarming.naturalCompare);
+        }
+
+        // Create custom filter options
+        pMap["task"] = ["busy", "idle"];
+        pMap["status"] = ["available", "dead", "quarantined"];
+        return pMap;
+      },
+
+    });
+  })();
+  </script>
+</dom-module>
