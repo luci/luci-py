@@ -10,14 +10,17 @@ import gae_ts_mon
 
 import handlers_cron
 import handlers_endpoints
+import handlers_frontend
 import handlers_queues
 
 
 utils.set_task_queue_module('default')
 
-endpoints_app = handlers_endpoints.create_endpoints_app()
 cron_app = handlers_cron.create_cron_app()
+endpoints_app = handlers_endpoints.create_endpoints_app()
+frontend_app = handlers_frontend.create_frontend_app()
 queue_app = handlers_queues.create_queues_app()
 
 gae_ts_mon.initialize(app=cron_app)
+gae_ts_mon.initialize(app=frontend_app)
 gae_ts_mon.initialize(app=queue_app)

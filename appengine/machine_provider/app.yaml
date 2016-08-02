@@ -17,6 +17,12 @@ handlers:
   login: admin
   script: main.queue_app
   secure: always
+- url: /static/
+  secure: always
+  static_dir: static
+- url: /.*
+  script: main.frontend_app
+  secure: always
 
 includes:
 - components/auth

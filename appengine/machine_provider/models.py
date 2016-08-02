@@ -39,6 +39,8 @@ class LeaseRequest(ndb.Model):
   # Checksum of the rpc_messages.LeaseRequest instance. Used to compare incoming
   # LeaseRequets for deduplication.
   deduplication_checksum = ndb.StringProperty(required=True, indexed=False)
+  # DateTime indicating the last modification time.
+  last_modified_ts = ndb.DateTimeProperty(auto_now=True)
   # ID of the CatalogMachineEntry provided for this lease.
   machine_id = ndb.StringProperty()
   # auth.model.Identity of the issuer of the original request.
@@ -103,6 +105,8 @@ class CatalogEntry(ndb.Model):
           field.name for field in rpc_messages.Dimensions.all_fields()
       ],
   )
+  # DateTime indicating the last modified time.
+  last_modified_ts = ndb.DateTimeProperty(auto_now=True)
 
 
 class CatalogCapacityEntry(CatalogEntry):
@@ -190,6 +194,9 @@ class CatalogMachineEntry(CatalogEntry):
   pubsub_topic = ndb.StringProperty(indexed=False)
   # Project the Cloud Pub/Sub topic exists in.
   pubsub_topic_project = ndb.StringProperty(indexed=False)
+  # Determines sorted order relative to other CatalogMachineEntries.
+  sort_ordering = ndb.ComputedProperty(lambda self: '%s:%s' % (
+      self.dimensions.backend, self.dimensions.hostname))
   # Element of CatalogMachineEntryStates giving the state of this entry.
   state = ndb.StringProperty(
       choices=CatalogMachineEntryStates,

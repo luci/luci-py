@@ -1,0 +1,16 @@
+{% extends "templates/base.html" %}
+{% block content %}
+<div class="notice">
+  Machine Provider is an open-source provider of VMs and a part of <a href="https://github.com/luci/luci-py">LUCI</a>.
+</div>
+<h2>Pages</h2>
+<ul>
+{% if is_admin %}
+  <li><a href="/leases">Lease Requests</a></a></li>
+  <li><a href="/catalog">Machine Catalog</a></li>
+  <li><a href="/_ah/api/explorer">Endpoints</a></li>
+{% else %}
+  <li>Currently, pages are only visible to admins. Are you signed in?</li>
+{% endif %}
+</ul>
+{% endblock %}
