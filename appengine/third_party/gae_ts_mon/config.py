@@ -115,7 +115,7 @@ def _shutdown_hook(time_fn=time.time):
     logging.warning('Shutdown hook: deleting %s, metrics were NOT flushed.',
                     shared.instance_key_id())
   with shared.instance_namespace_context():
-    ndb.Key('Instance', shared.instance_key_id()).delete()
+    ndb.Key(shared.Instance._get_kind(), shared.instance_key_id()).delete()
 
 
 def _internal_callback():

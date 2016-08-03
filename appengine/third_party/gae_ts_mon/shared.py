@@ -90,6 +90,11 @@ class Instance(ndb.Model):
   Each instance "owns" an entity with the key <instance-id>.<version>.<module>.
   `task_num` is a mapping assigned by a cron job to the instance; -1=undefined.
   """
+
+  @classmethod
+  def _get_kind(cls):
+    return 'TSMonInstance'
+
   task_num = ndb.IntegerProperty(default=-1)
   last_updated = ndb.DateTimeProperty(auto_now_add=True)
 

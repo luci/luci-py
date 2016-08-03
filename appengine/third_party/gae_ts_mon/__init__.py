@@ -33,10 +33,10 @@ import infra_libs.ts_mon.httplib2_utils
 sys.modules['infra_libs'].httplib2_utils = infra_libs.ts_mon.httplib2_utils
 sys.modules['infra_libs.httplib2_utils'] = infra_libs.ts_mon.httplib2_utils
 
-from infra_libs.ts_mon.config import DjangoMiddleware
-from infra_libs.ts_mon.config import initialize
-from infra_libs.ts_mon.config import instrument_endpoint
-from infra_libs.ts_mon.config import reset_for_unittest
+from config import DjangoMiddleware
+from config import initialize
+from config import instrument_endpoint
+from config import reset_for_unittest
 from infra_libs.ts_mon.handlers import app
 from infra_libs.ts_mon.shared import register_global_metrics
 from infra_libs.ts_mon.shared import register_global_metrics_callback
