@@ -755,6 +755,12 @@ class AdbCommandsSafe(object):
           # Do not kill adb, it just means the USB host is likely resetting and
           # the device is temporarily unavailable. We can't use
           # handle.serial_number since this communicates with the device.
+        except common.usb1.USBErrorNotFound as e:
+          _LOG.warning(
+              '%s._OpenHandle(): USBErrorNotFound: %s', self.port_path, e)
+          # Do not kill adb, it just means the USB host is likely resetting (?)
+          # and the device is temporarily unavailable. We can't use
+          # handle.serial_number since this communicates with the device.
         except common.usb1.USBErrorBusy as e:
           _LOG.warning('%s._OpenHandle(): USBErrorBusy: %s', self.port_path, e)
           KillADB()
