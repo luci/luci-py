@@ -132,7 +132,16 @@
       },
 
       _not: function(a) {
-        return a;
+        return !a;
+      },
+
+      _or: function() {
+        var result = false;
+        // can't use .foreach, as arguments isn't really a function.
+        for (var i = 0; i < arguments.length; i++) {
+          result = result || arguments[i];
+        }
+        return result;
       },
 
       _taskId: function(bot) {

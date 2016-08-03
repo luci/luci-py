@@ -30,13 +30,14 @@
 <link rel="import" href="bot-filters.html">
 <link rel="import" href="bot-list-data.html">
 <link rel="import" href="bot-list-shared.html">
-
+<link rel="import" href="bot-list-summary.html">
 
 <dom-module id="bot-list">
   <template>
     <style include="iron-flex iron-flex-alignment iron-positioning swarming-app-style">
-      bot-filters {
-        margin-bottom: 5px;
+      bot-filters, bot-list-summary {
+        margin-bottom: 8px;
+        margin-right: 10px;
       }
       .bot {
         margin:5px;
@@ -75,116 +76,134 @@
     </style>
 
     <swarming-app
-      auth_headers="{{auth_headers}}"
-      busy="[[busy]]"
+      auth_headers="{{_auth_headers}}"
+      signed_in="{{_signed_in}}"
+
+      busy="[[_busy]]"
       name="Swarming Bot List">
 
-      <bot-filters
-        primary_map="[[primary_map]]"
-        primary_arr="[[primary_arr]]"
+      <h2 hidden$="[[_signed_in]]">You must sign in to see anything useful.</h2>
 
-        columns="{{columns}}"
-        filter="{{filter}}"
-        verbose="{{verbose}}">
-      </bot-filters>
+      <div hidden$="[[_not(_signed_in)]]">
 
-      <bot-list-data
-        auth_headers="[[auth_headers]]"
+        <div class="horizontal layout">
 
-        bots="{{bots}}"
-        busy="{{busy}}"
-        primary_map="{{primary_map}}"
-        primary_arr="{{primary_arr}}">
-      </bot-list-data>
+          <bot-filters
+            primary_map="[[_primary_map]]"
+            primary_arr="[[_primary_arr]]"
 
-      <table class="bot-list">
-        <thead on-sort_change="sortChange">
-        <!-- To allow for dynamic columns without having a lot of copy-pasted
-        code, we break columns up into "special" and "plain" columns. Special
-        columns require some sort of HTML output (e.g. anchor tags) and plain
-        columns just output text.  The plain columns use Polymer functions to
-        insert their text [_header(), _column(), _deviceColumn()].  Polymer
-        functions do not allow HTML (to avoid XSS), so special columns, like id
-        and task are inserted in a fixed order.
-        -->
-          <th>
-            <span>Bot Id</span>
-            <sort-toggle
-                name="id"
-                current="[[sort]]">
-            </sort-toggle>
-          </th>
-          <!-- This wonky syntax is the proper way to listen to changes on an
-          array (we are listening to all subproperties). The element returned is
-          not of much use, so we'll ignore it in _hide() and use this.columns.
+            columns="{{_columns}}"
+            filter="{{_filter}}"
+            verbose="{{_verbose}}">
+          </bot-filters>
+
+          <bot-list-summary
+            fleet="[[_fleet]]"
+            filtered_bots="[[_filteredSortedBots]]">
+          </bot-list-summary>
+
+        </div>
+
+        <bot-list-data
+          auth_headers="[[_auth_headers]]"
+
+          bots="{{_bots}}"
+          busy="{{_busy}}"
+          fleet="{{_fleet}}"
+          primary_map="{{_primary_map}}"
+          primary_arr="{{_primary_arr}}">
+        </bot-list-data>
+
+        <table class="bot-list">
+          <thead on-sort_change="_sortChange">
+          <!-- To allow for dynamic columns without having a lot of copy-pasted
+          code, we break columns up into "special" and "plain" columns. Special
+          columns require some sort of HTML output (e.g. anchor tags) and plain
+          columns just output text.  The plain columns use Polymer functions to
+          insert their text [_header(), _column(), _deviceColumn()].  Polymer
+          functions do not allow HTML (to avoid XSS), so special columns, like id
+          and task are inserted in a fixed order.
           -->
-          <th hidden$="[[_hide('task', columns.*)]]">
-            <span>Current Task</span>
-            <sort-toggle
-                name="task"
-                current="[[sort]]">
-            </sort-toggle>
-          </th>
-
-          <template is="dom-repeat"
-                items="[[plain_columns]]"
-                as="c">
-            <th hidden$="[[_hide(c)]]">
-              <span>[[_header(c)]]</span>
-              <sort-toggle
-                  name="[[c]]"
-                  current="[[sort]]">
-              </sort-toggle>
-            </th>
-          </template>
-        </thead>
-        <tbody>
-          <template id="bot_table" is="dom-repeat"
-                items="[[bots]]"
-                as="bot"
-                initial-count=50
-                filter="_filterBotTable">
-
-            <tr class$="[[_botClass(bot)]]">
-              <td>
-                <a class="center"
-                   href$="[[_botLink(bot.bot_id)]]"
-                   target="_blank">
-                   [[bot.bot_id]]
-                </a>
-              </td>
-              <td hidden$="[[_hide('task', columns.*)]]">
-                <a href$="[[_taskLink(bot)]]">[[_taskId(bot)]]</a>
-              </td>
+            <tr>
+              <th>
+                <span>Bot Id</span>
+                <sort-toggle
+                    name="id"
+                    current="[[_sort]]">
+                </sort-toggle>
+              </th>
+              <!-- This wonky syntax is the proper way to listen to changes on an
+              array (we are listening to all subproperties). The element returned is
+              not of much use, so we'll ignore it in _hide() and use this._columns.
+              -->
+              <th hidden$="[[_hide('task', _columns.*)]]">
+                <span>Current Task</span>
+                <sort-toggle
+                    name="task"
+                    current="[[_sort]]">
+                </sort-toggle>
+              </th>
 
               <template is="dom-repeat"
-                    items="[[plain_columns]]"
+                    items="[[_plain_columns]]"
                     as="c">
-                <td hidden$="[[_hide(c)]]">
-                  [[_column(c, bot, verbose)]]
-                </td>
+                <th hidden$="[[_hide(c)]]">
+                  <span>[[_header(c)]]</span>
+                  <sort-toggle
+                      name="[[c]]"
+                      current="[[_sort]]">
+                  </sort-toggle>
+                </th>
               </template>
-
             </tr>
-            <template is="dom-repeat"
-                  items="[[_devices(bot)]]"
-                  as="device">
-              <tr hidden$="[[_hide('devices', columns.*)]]"
-                  class$="[[_deviceClass(device)]]">
-                <td></td>
-                <td hidden$="[[_hide('task', columns.*)]]"></td>
+          </thead>
+          <tbody>
+            <template id="bot_table" is="dom-repeat"
+                  items="[[_filteredSortedBots]]"
+                  as="bot"
+                  initial-count=50>
+
+              <tr class$="[[_botClass(bot)]]">
+                <td>
+                  <a class="center"
+                     href$="[[_botLink(bot.bot_id)]]"
+                     target="_blank">
+                     [[bot.bot_id]]
+                  </a>
+                </td>
+                <td hidden$="[[_hide('task', _columns.*)]]">
+                  <a href$="[[_taskLink(bot)]]">[[_taskId(bot)]]</a>
+                </td>
+
                 <template is="dom-repeat"
-                      items="[[plain_columns]]"
+                      items="[[_plain_columns]]"
                       as="c">
                   <td hidden$="[[_hide(c)]]">
-                    [[_deviceColumn(c, device, verbose)]]
+                    [[_column(c, bot, _verbose)]]
                   </td>
                 </template>
+
               </tr>
-            </template> <!--devices repeat-->
-          </template> <!--bot-table repeat-->
-        </tbody>
-      </table>
+              <template is="dom-repeat"
+                    items="[[_devices(bot)]]"
+                    as="device">
+                <tr hidden$="[[_hide('devices', _columns.*)]]"
+                    class$="[[_deviceClass(device)]]">
+                  <td></td>
+                  <td hidden$="[[_hide('task', _columns.*)]]"></td>
+                  <template is="dom-repeat"
+                        items="[[_plain_columns]]"
+                        as="c">
+                    <td hidden$="[[_hide(c)]]">
+                      [[_deviceColumn(c, device, _verbose)]]
+                    </td>
+                  </template>
+                </tr>
+              </template> <!--devices repeat-->
+            </template> <!--bot-table repeat-->
+          </tbody>
+        </table>
+      </div>
 
     </swarming-app>
 
@@ -211,14 +230,14 @@
     var columnMap = {
       cores: function(bot){
         var cores =  this._cores(bot);
-        if (this.verbose){
+        if (this._verbose){
           return cores.join(" | ");
         }
         return cores[0];
       },
       cpu: function(bot){
         var cpus = this._dimension(bot, 'cpu') || ['Unknown'];
-        if (this.verbose){
+        if (this._verbose){
           return cpus.join(" | ");
         }
         return cpus[0];
@@ -249,7 +268,7 @@
             named.push(this._applyAlias(g, alias));
           }
         }.bind(this))
-        if (this.verbose) {
+        if (this._verbose) {
           return verbose.join(" | ");
         }
         return named.join(" | ");
@@ -259,7 +278,7 @@
       },
       os: function(bot) {
         var os = this._dimension(bot, 'os') || ['Unknown'];
-        if (this.verbose){
+        if (this._verbose){
           return os.join(" | ");
         }
         return os[0];
@@ -290,33 +309,46 @@
 
       properties: {
 
-        columns: {
+        _bots: {
           type: Array,
         },
-        // Should have a property "filter" which is a function.
-        filter: {
-          type: Object,
-        },
 
-        plain_columns: {
+        _columns: {
           type: Array,
-          computed: "_stripSpecial(columns.*)",
         },
 
-        // sort is an Object {name:String, direction:String}.
-        sort: {
+        _filter: {
+          type: Function,
+          value: function() {
+            return true;
+          },
+        },
+
+        _filteredSortedBots: {
+          type: Array,
+          computed: "_filterAndSort(_bots,_filter.*,_sort.*)"
+        },
+
+        _plain_columns: {
+          type: Array,
+          computed: "_stripSpecial(_columns.*)",
+        },
+
+        // _sort is an Object {name:String, direction:String}.
+        _sort: {
           type: Object,
+          value: function() {
+            return {
+              name: "id",
+              direction: "asc",
+            };
+          }
         },
 
-        verbose: {
+        _verbose: {
           type: Boolean,
         }
       },
-
-      observers: [
-        '_reRender(filter.*)',
-        '_checkSorts(columns.*)'
-      ],
 
       _botClass: function(bot) {
         if (bot.is_dead) {
@@ -333,14 +365,6 @@
         return "/restricted/bot/"+id;
       },
 
-      // _checkSorts makes sure that if a column has been removed, the related
-      // sort is also removed.
-      _checkSorts: function() {
-        if (!this.sort) {
-          return;
-        }
-        this._reRender();
-      },
 
       _column: function(col, bot) {
         return columnMap[col].bind(this)(bot);
@@ -369,11 +393,17 @@
         return "";
       },
 
-      _filterBotTable: function(bot) {
-        if (!this.filter || !this.filter.filter) {
-          return true;
+      _filterAndSort: function(a,b,c) {
+        // We intentionally sort this._bots (and not a copy) to allow users to
+        // "chain" sorts, that is, sort by one thing and then another, and
+        // have both orderings properly impact the list.
+        swarming.stableSort(this._bots, this._sortBotTable.bind(this));
+        var bots = this._bots;
+        if (this._filter) {
+          bots = bots.filter(this._filter.bind(this));
         }
-        return this.filter.filter.bind(this)(bot);
+
+        return bots;
       },
 
       _header: function(col){
@@ -381,7 +411,7 @@
       },
 
       _hide: function(col) {
-        return this.columns.indexOf(col) === -1;
+        return this._columns.indexOf(col) === -1;
       },
 
       _reRender: function(filter, sort) {
@@ -389,35 +419,34 @@
       },
 
       _sortBotTable: function(botA, botB) {
-        if (!this.sort) {
+        if (!this._sort) {
           return 0;
         }
         var dir = 1;
-        if (this.sort.direction === "desc") {
+        if (this._sort.direction === "desc") {
           dir = -1;
         }
-        var botACol = this._column(this.sort.name, botA);
-        var botBCol = this._column(this.sort.name, botB);
+        var botACol = this._column(this._sort.name, botA);
+        var botBCol = this._column(this._sort.name, botB);
 
         return dir * swarming.naturalCompare(botACol, botBCol);
       },
 
-      sortChange: function(e) {
+      _sortChange: function(e) {
         // The event we get from sort-toggle tells us the name of what needs
         // to be sorting and how to sort it.
         if (!(e && e.detail && e.detail.name)) {
           return;
         }
-        this.set("sort", e.detail);
-        swarming.stableSort(this.bots, this._sortBotTable.bind(this));
-        this._reRender();
+        // should trigger __filterAndSort
+        this.set("_sort", e.detail);
       },
 
       // _stripSpecial removes the special columns and sorts the remaining
       // columns so they always appear in the same order, regardless of
       // the order they are added.
       _stripSpecial: function(){
-        return this.columns.filter(function(c){
+        return this._columns.filter(function(c){
           return special_columns.indexOf(c) === -1;
         }).sort();
       },

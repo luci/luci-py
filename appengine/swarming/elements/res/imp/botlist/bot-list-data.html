@@ -20,8 +20,19 @@
     auth_headers: Object, the OAuth2 header to include in the request.  This
         should come from swarming-app.
     // outputs
-    bots: Array<Object>, all bots returned by the botlist.
-    busy: Boolean, if the ajax request is in flight.
+    bots: Array<Object>, all bots returned by the botlist.  This is an Object
+        with at least the following structure:
+      dimensions: Array<Object>: Has key:String and value:Array<String>
+      task_id: String
+      external_ip: String
+      is_dead: Object: Is usually Boolean, but could be message string
+      quarantined: Object: Is usually Boolean, but could be message string
+      bot_id: String
+      state: String, Stringified JSON that has many pieces of information, like
+                devices, disk space, temperature, etc.
+    busy: Boolean, if any ajax requests are in flight.
+    fleet: Object, counts of all bots in the fleet.  Contains "alive", "busy",
+        "idle", "dead", and "quarantined".
     primary_map: Object, a mapping of primary keys to secondary items.
         The primary keys are things that can be columns or sorted by.  The
         primary values (aka the secondary items) are things that can be filtered
@@ -44,12 +55,20 @@
 
 <dom-module id="bot-list-data">
   <template>
-    <iron-ajax id="request"
+    <iron-ajax id="botlist"
        url="/_ah/api/swarming/v1/bots/list"
        headers="[[auth_headers]]"
        handle-as="json"
-       last-response="{{_data}}"
-       loading="{{busy}}">
+       last-response="{{_list}}"
+       loading="{{_busy1}}">
+    </iron-ajax>
+
+    <iron-ajax id="fleet"
+       url="/_ah/api/swarming/v1/bots/count"
+       headers="[[auth_headers]]"
+       handle-as="json"
+       last-response="{{_count}}"
+       loading="{{_busy2}}">
     </iron-ajax>
   </template>
   <script>
@@ -62,6 +81,9 @@
     var BOT_PROPERTIES = ["gpu", "devices", "task", "status"];
     Polymer({
       is: 'bot-list-data',
+
+      behaviors: [SwarmingBehaviors.BotListBehavior],
+
       properties: {
         // inputs
         auth_headers: {
@@ -72,11 +94,17 @@
         //outputs
         bots: {
           type: Array,
-          computed: "_bots(_data)",
+          computed: "_bots(_list)",
           notify: true,
         },
         busy: {
           type: Boolean,
+          computed: "_or(_busy1,_busy2)",
+          notify: true,
+        },
+        fleet: {
+          type: Object,
+          computed: "_fleet(_count)",
           notify: true,
         },
         primary_map: {
@@ -93,24 +121,41 @@
         },
 
         // private
-        _data: {
+        _count: {
+          type: Object,
+        },
+        _list: {
           type: Object,
         },
       },
-      behaviors: [SwarmingBehaviors.BotListBehavior],
 
       signIn: function(){
-        this.$.request.generateRequest();
+        this.$.botlist.generateRequest();
+        this.$.fleet.generateRequest();
       },
 
       _bots: function(){
-        if (!this._data || !this._data.items) {
+        if (!this._list || !this._list.items) {
           return [];
         }
-        this._data.items.forEach(function(o){
+        this._list.items.forEach(function(o){
           o.state = JSON.parse(o.state);
         });
-        return this._data.items;
+        return this._list.items;
+      },
+
+      _fleet: function() {
+        if (!this._count) {
+          return {};
+        }
+        return {
+          alive: this._count.count || -1,
+          busy: this._count.busy || -1,
+          idle: this._count.count && this._count.busy &&
+              this._count.count - this._count.busy,
+          dead: this._count.dead || -1,
+          quarantined: this._count.quarantined || -1,
+        }
       },
 
       _primaryMap: function(bots){

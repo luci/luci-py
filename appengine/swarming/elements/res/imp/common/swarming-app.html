@@ -86,7 +86,8 @@
           <auth-signin
               class="right"
               client-id="20770472288-t5smpbpjptka4nd888fv0ctd23ftba2o.apps.googleusercontent.com"
-              auth-headers="{{auth_headers}}">
+              auth-headers="{{auth_headers}}"
+              signed-in="{{signed_in}}">
           </auth-signin>
         </app-toolbar>
       </app-header>
@@ -104,6 +105,12 @@
           type: Object,
           notify: true,
         },
+        signed_in: {
+          type: Boolean,
+          value: false,
+          notify:true,
+        },
+
         busy: {
           type: Boolean,
         },

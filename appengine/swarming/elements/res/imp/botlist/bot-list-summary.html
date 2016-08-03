@@ -1,0 +1,166 @@
+<!--
+  This in an HTML Import-able file that contains the definition
+  of the following elements:
+
+    <bot-list-summary>
+
+
+  Usage:
+
+    <bot-list-summary></bot-list-summary>
+
+    This element summarizes and displays the results of the current query.
+
+  Properties:
+    filtered_bots: Array<Object>, The bot list that is currently being shown
+        (after filtering). The alive, dead, etc bots in this will be counted up
+        for the summary.  See bot-list-data for a description of this data type.
+    fleet: Object, counts of all bots in the fleet.  Contains "alive", "busy",
+        "idle", "dead", and "quarantined".
+  Methods:
+    None.
+
+  Events:
+    None.
+-->
+
+
+<link rel="import" href="/res/imp/common/swarming-app.html">
+
+<link rel="import" href="bot-list-shared.html">
+
+<dom-module id="bot-list-summary">
+  <template>
+    <style include="swarming-app-style">
+      :host {
+        display: block;
+        border-left: 1px solid black;
+        padding: 5px 5px;
+        font-family: sans-serif;
+      }
+      .header {
+        font-size: 1.2em;
+        font-weight: bold;
+      }
+      .right {
+        text-align: right;
+      }
+      .left {
+        text-align: left;
+      }
+    </style>
+
+    <div class="header">Fleet</div>
+    <!-- TODO(kjlubick) Once url params have been implemented, have these
+    properly link to the botlist with the given features preloaded.-->
+    <table>
+      <tr>
+        <td class="right"><a href="/newui/botlist?alive">Alive</a>:</td>
+        <td class="left">[[fleet.alive]]</td>
+      </tr>
+      <tr>
+        <td class="right"><a href="/newui/botlist?busy">Busy</a>:</td>
+        <td class="left">[[fleet.busy]]</td>
+      </tr>
+      <tr>
+        <td class="right"><a href="/newui/botlist?idle">Idle</a>:</td>
+        <td class="left">[[fleet.idle]]</td>
+      </tr>
+      <tr>
+        <td class="right"><a href="/newui/botlist?dead">Dead</a>:</td>
+        <td class="left">[[fleet.dead]]</td>
+      </tr>
+      <tr>
+        <td class="right"><a href="/newui/botlist?quaren">Quarantined</a>:</td>
+        <td class="left">[[fleet.quarantined]]</td>
+      </tr>
+    </table>
+
+    <div class="header">Displayed</div>
+    <table>
+      <tr>
+        <td class="right"><a href="/newui/botlist?alive2">Alive</a>:</td>
+        <td class="left">[[_currently_showing.alive]]</td>
+      </tr>
+      <tr>
+        <td class="right"><a href="/newui/botlist?busy2">Busy</a>:</td>
+        <td class="left">[[_currently_showing.busy]]</td>
+      </tr>
+      <tr>
+        <td class="right"><a href="/newui/botlist?idle2">Idle</a>:</td>
+        <td class="left">[[_currently_showing.idle]]</td>
+      </tr>
+      <tr>
+        <td class="right"><a href="/newui/botlist?dead2">Dead</a>:</td>
+        <td class="left">[[_currently_showing.dead]]</td>
+      </tr>
+      <tr>
+        <td class="right"><a href="/newui/botlist?quaren2">Quarantined</a>:</td>
+        <td class="left">[[_currently_showing.quarantined]]</td>
+      </tr>
+    </table>
+
+  </template>
+  <script>
+    Polymer({
+      is: 'bot-list-summary',
+
+      behaviors: [SwarmingBehaviors.BotListBehavior],
+
+      properties: {
+        filtered_bots: {
+          type: Array,
+        },
+        fleet: {
+          type: Object,
+        },
+
+        _currently_showing: {
+          type: Object,
+          value: function() {
+            return {
+              alive:  -1,
+              busy:  -1,
+              idle: -1,
+              dead: -1,
+              quarantined: -1,
+            };
+          },
+        },
+      },
+
+      // Do this because Array changes in Polymer don't always trigger normal
+      // property observers
+      observers: ["_recount(filtered_bots.*)"],
+
+      _recount: function() {
+        var curr = {
+          alive: 0,
+          busy: 0,
+          idle: 0,
+          dead: 0,
+          quarantined: 0,
+        };
+        if (!this.filtered_bots) {
+          return curr;
+        }
+        this.filtered_bots.forEach(function(bot) {
+          if (this._taskId(bot) === "idle") {
+            curr.idle++;
+          } else {
+            curr.busy++;
+          }
+          if (bot.quarantined) {
+            curr.quarantined++;
+          }
+          if (bot.is_dead) {
+            curr.dead++;
+          } else {
+            curr.alive++;
+          }
+        }.bind(this));
+        this.set("_currently_showing", curr);
+      }
+    });
+  </script>
+</dom-module>

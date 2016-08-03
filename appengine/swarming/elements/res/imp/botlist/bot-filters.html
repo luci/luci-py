@@ -441,25 +441,23 @@
           arr.push(param);
           filterGroups[primary] = arr;
         });
-        return {
-          filter: function(bot){
-            var retVal = true;
-            // Look up all the primary keys we are filter by, then look up how
-            // to filter (in filterMap) and apply the filter for each filter
-            // option.
-            for (primary in filterGroups){
-              var params = filterGroups[primary];
-              var filter = filterMap[primary];
-              var groupResult = false;
-              if (filter) {
-                params.forEach(function(param){
-                  groupResult = groupResult || filter.bind(this)(bot,param);
-                }.bind(this));
-              }
-              retVal = retVal && groupResult;
+        return function(bot){
+          var retVal = true;
+          // Look up all the primary keys we are filter by, then look up how
+          // to filter (in filterMap) and apply the filter for each filter
+          // option.
+          for (primary in filterGroups){
+            var params = filterGroups[primary];
+            var filter = filterMap[primary];
+            var groupResult = false;
+            if (filter) {
+              params.forEach(function(param){
+                groupResult = groupResult || filter.bind(this)(bot,param);
+              }.bind(this));
             }
-            return retVal;
+            retVal = retVal && groupResult;
           }
+          return retVal;
         }
       },
 

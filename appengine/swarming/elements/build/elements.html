@@ -14496,7 +14496,8 @@ You can bind to `isAuthorized` property to monitor authorization state.
         signedIn: {
           type: Boolean,
           readOnly: true,
-          value: false
+          value: false,
+          notify: true,
         }
       },
 
@@ -14509,6 +14510,7 @@ You can bind to `isAuthorized` property to monitor authorization state.
           imageUrl: profile.getImageUrl()
         });
         this.set("authResponse", user.getAuthResponse());
+        this._setSignedIn(true);
         this.fire("auth-signin");
       },
 
@@ -14582,7 +14584,7 @@ You can bind to `isAuthorized` property to monitor authorization state.
           <a class="left" href="/newui/botlist">Bot List</a>
           <div class="flex"></div>
           
-          <auth-signin class="right" client-id="20770472288-t5smpbpjptka4nd888fv0ctd23ftba2o.apps.googleusercontent.com" auth-headers="{{auth_headers}}">
+          <auth-signin class="right" client-id="20770472288-t5smpbpjptka4nd888fv0ctd23ftba2o.apps.googleusercontent.com" auth-headers="{{auth_headers}}" signed-in="{{signed_in}}">
           </auth-signin>
         </app-toolbar>
       </app-header>
@@ -14600,6 +14602,12 @@ You can bind to `isAuthorized` property to monitor authorization state.
           type: Object,
           notify: true,
         },
+        signed_in: {
+          type: Boolean,
+          value: false,
+          notify:true,
+        },
+
         busy: {
           type: Boolean,
         },
@@ -15582,6 +15590,7 @@ You can bind to `isAuthorized` property to monitor authorization state.
   <script>
     Polymer({
       is: "sort-toggle",
+
       properties: {
         current: {
           type: Object,
@@ -15626,7 +15635,6 @@ You can bind to `isAuthorized` property to monitor authorization state.
         } else {
           this.set("direction", "");
         }
-
       },
     });
   </script>
@@ -20919,25 +20927,23 @@ is separate from validation, and `allowed-pattern` does not affect how the input
           arr.push(param);
           filterGroups[primary] = arr;
         });
-        return {
-          filter: function(bot){
-            var retVal = true;
-            // Look up all the primary keys we are filter by, then look up how
-            // to filter (in filterMap) and apply the filter for each filter
-            // option.
-            for (primary in filterGroups){
-              var params = filterGroups[primary];
-              var filter = filterMap[primary];
-              var groupResult = false;
-              if (filter) {
-                params.forEach(function(param){
-                  groupResult = groupResult || filter.bind(this)(bot,param);
-                }.bind(this));
-              }
-              retVal = retVal && groupResult;
+        return function(bot){
+          var retVal = true;
+          // Look up all the primary keys we are filter by, then look up how
+          // to filter (in filterMap) and apply the filter for each filter
+          // option.
+          for (primary in filterGroups){
+            var params = filterGroups[primary];
+            var filter = filterMap[primary];
+            var groupResult = false;
+            if (filter) {
+              params.forEach(function(param){
+                groupResult = groupResult || filter.bind(this)(bot,param);
+              }.bind(this));
             }
-            return retVal;
+            retVal = retVal && groupResult;
           }
+          return retVal;
         }
       },
 
@@ -21151,7 +21157,16 @@ is separate from validation, and `allowed-pattern` does not affect how the input
       },
 
       _not: function(a) {
-        return a;
+        return !a;
+      },
+
+      _or: function() {
+        var result = false;
+        // can't use .foreach, as arguments isn't really a function.
+        for (var i = 0; i < arguments.length; i++) {
+          result = result || arguments[i];
+        }
+        return result;
       },
 
       _taskId: function(bot) {
@@ -21175,7 +21190,10 @@ is separate from validation, and `allowed-pattern` does not affect how the input
 </script>
 <dom-module id="bot-list-data" assetpath="/res/imp/botlist/">
   <template>
-    <iron-ajax id="request" url="/_ah/api/swarming/v1/bots/list" headers="[[auth_headers]]" handle-as="json" last-response="{{_data}}" loading="{{busy}}">
+    <iron-ajax id="botlist" url="/_ah/api/swarming/v1/bots/list" headers="[[auth_headers]]" handle-as="json" last-response="{{_list}}" loading="{{_busy1}}">
+    </iron-ajax>
+
+    <iron-ajax id="fleet" url="/_ah/api/swarming/v1/bots/count" headers="[[auth_headers]]" handle-as="json" last-response="{{_count}}" loading="{{_busy2}}">
     </iron-ajax>
   </template>
   <script>
@@ -21188,6 +21206,9 @@ is separate from validation, and `allowed-pattern` does not affect how the input
     var BOT_PROPERTIES = ["gpu", "devices", "task", "status"];
     Polymer({
       is: 'bot-list-data',
+
+      behaviors: [SwarmingBehaviors.BotListBehavior],
+
       properties: {
         // inputs
         auth_headers: {
@@ -21198,11 +21219,17 @@ is separate from validation, and `allowed-pattern` does not affect how the input
         //outputs
         bots: {
           type: Array,
-          computed: "_bots(_data)",
+          computed: "_bots(_list)",
           notify: true,
         },
         busy: {
           type: Boolean,
+          computed: "_or(_busy1,_busy2)",
+          notify: true,
+        },
+        fleet: {
+          type: Object,
+          computed: "_fleet(_count)",
           notify: true,
         },
         primary_map: {
@@ -21219,24 +21246,41 @@ is separate from validation, and `allowed-pattern` does not affect how the input
         },
 
         // private
-        _data: {
+        _count: {
+          type: Object,
+        },
+        _list: {
           type: Object,
         },
       },
-      behaviors: [SwarmingBehaviors.BotListBehavior],
 
       signIn: function(){
-        this.$.request.generateRequest();
+        this.$.botlist.generateRequest();
+        this.$.fleet.generateRequest();
       },
 
       _bots: function(){
-        if (!this._data || !this._data.items) {
+        if (!this._list || !this._list.items) {
           return [];
         }
-        this._data.items.forEach(function(o){
+        this._list.items.forEach(function(o){
           o.state = JSON.parse(o.state);
         });
-        return this._data.items;
+        return this._list.items;
+      },
+
+      _fleet: function() {
+        if (!this._count) {
+          return {};
+        }
+        return {
+          alive: this._count.count || -1,
+          busy: this._count.busy || -1,
+          idle: this._count.count && this._count.busy &&
+              this._count.count - this._count.busy,
+          dead: this._count.dead || -1,
+          quarantined: this._count.quarantined || -1,
+        }
       },
 
       _primaryMap: function(bots){
@@ -21297,11 +21341,145 @@ is separate from validation, and `allowed-pattern` does not affect how the input
     });
   })();
   </script>
+</dom-module><dom-module id="bot-list-summary" assetpath="/res/imp/botlist/">
+  <template>
+    <style include="swarming-app-style">
+      :host {
+        display: block;
+        border-left: 1px solid black;
+        padding: 5px 5px;
+        font-family: sans-serif;
+      }
+      .header {
+        font-size: 1.2em;
+        font-weight: bold;
+      }
+      .right {
+        text-align: right;
+      }
+      .left {
+        text-align: left;
+      }
+    </style>
+
+    <div class="header">Fleet</div>
+    
+    <table>
+      <tbody><tr>
+        <td class="right"><a href="/newui/botlist?alive">Alive</a>:</td>
+        <td class="left">[[fleet.alive]]</td>
+      </tr>
+      <tr>
+        <td class="right"><a href="/newui/botlist?busy">Busy</a>:</td>
+        <td class="left">[[fleet.busy]]</td>
+      </tr>
+      <tr>
+        <td class="right"><a href="/newui/botlist?idle">Idle</a>:</td>
+        <td class="left">[[fleet.idle]]</td>
+      </tr>
+      <tr>
+        <td class="right"><a href="/newui/botlist?dead">Dead</a>:</td>
+        <td class="left">[[fleet.dead]]</td>
+      </tr>
+      <tr>
+        <td class="right"><a href="/newui/botlist?quaren">Quarantined</a>:</td>
+        <td class="left">[[fleet.quarantined]]</td>
+      </tr>
+    </tbody></table>
+
+    <div class="header">Displayed</div>
+    <table>
+      <tbody><tr>
+        <td class="right"><a href="/newui/botlist?alive2">Alive</a>:</td>
+        <td class="left">[[_currently_showing.alive]]</td>
+      </tr>
+      <tr>
+        <td class="right"><a href="/newui/botlist?busy2">Busy</a>:</td>
+        <td class="left">[[_currently_showing.busy]]</td>
+      </tr>
+      <tr>
+        <td class="right"><a href="/newui/botlist?idle2">Idle</a>:</td>
+        <td class="left">[[_currently_showing.idle]]</td>
+      </tr>
+      <tr>
+        <td class="right"><a href="/newui/botlist?dead2">Dead</a>:</td>
+        <td class="left">[[_currently_showing.dead]]</td>
+      </tr>
+      <tr>
+        <td class="right"><a href="/newui/botlist?quaren2">Quarantined</a>:</td>
+        <td class="left">[[_currently_showing.quarantined]]</td>
+      </tr>
+    </tbody></table>
+
+  </template>
+  <script>
+    Polymer({
+      is: 'bot-list-summary',
+
+      behaviors: [SwarmingBehaviors.BotListBehavior],
+
+      properties: {
+        filtered_bots: {
+          type: Array,
+        },
+        fleet: {
+          type: Object,
+        },
+
+        _currently_showing: {
+          type: Object,
+          value: function() {
+            return {
+              alive:  -1,
+              busy:  -1,
+              idle: -1,
+              dead: -1,
+              quarantined: -1,
+            };
+          },
+        },
+      },
+
+      // Do this because Array changes in Polymer don't always trigger normal
+      // property observers
+      observers: ["_recount(filtered_bots.*)"],
+
+      _recount: function() {
+        var curr = {
+          alive: 0,
+          busy: 0,
+          idle: 0,
+          dead: 0,
+          quarantined: 0,
+        };
+        if (!this.filtered_bots) {
+          return curr;
+        }
+        this.filtered_bots.forEach(function(bot) {
+          if (this._taskId(bot) === "idle") {
+            curr.idle++;
+          } else {
+            curr.busy++;
+          }
+          if (bot.quarantined) {
+            curr.quarantined++;
+          }
+          if (bot.is_dead) {
+            curr.dead++;
+          } else {
+            curr.alive++;
+          }
+        }.bind(this));
+        this.set("_currently_showing", curr);
+      }
+    });
+  </script>
 </dom-module><dom-module id="bot-list" assetpath="/res/imp/botlist/">
   <template>
     <style include="iron-flex iron-flex-alignment iron-positioning swarming-app-style">
-      bot-filters {
-        margin-bottom: 5px;
+      bot-filters, bot-list-summary {
+        margin-bottom: 8px;
+        margin-right: 10px;
       }
       .bot {
         margin:5px;
@@ -21339,71 +21517,85 @@ is separate from validation, and `allowed-pattern` does not affect how the input
       }
     </style>
 
-    <swarming-app auth_headers="{{auth_headers}}" busy="[[busy]]" name="Swarming Bot List">
+    <swarming-app auth_headers="{{_auth_headers}}" signed_in="{{_signed_in}}" busy="[[_busy]]" name="Swarming Bot List">
 
-      <bot-filters primary_map="[[primary_map]]" primary_arr="[[primary_arr]]" columns="{{columns}}" filter="{{filter}}" verbose="{{verbose}}">
-      </bot-filters>
+      <h2 hidden$="[[_signed_in]]">You must sign in to see anything useful.</h2>
 
-      <bot-list-data auth_headers="[[auth_headers]]" bots="{{bots}}" busy="{{busy}}" primary_map="{{primary_map}}" primary_arr="{{primary_arr}}">
-      </bot-list-data>
+      <div hidden$="[[_not(_signed_in)]]">
 
-      <table class="bot-list">
-        <thead on-sort_change="sortChange">
-        
-          <tr><th>
-            <span>Bot Id</span>
-            <sort-toggle name="id" current="[[sort]]">
-            </sort-toggle>
-          </th>
+        <div class="horizontal layout">
+
+          <bot-filters primary_map="[[_primary_map]]" primary_arr="[[_primary_arr]]" columns="{{_columns}}" filter="{{_filter}}" verbose="{{_verbose}}">
+          </bot-filters>
+
+          <bot-list-summary fleet="[[_fleet]]" filtered_bots="[[_filteredSortedBots]]">
+          </bot-list-summary>
+
+        </div>
+
+        <bot-list-data auth_headers="[[_auth_headers]]" bots="{{_bots}}" busy="{{_busy}}" fleet="{{_fleet}}" primary_map="{{_primary_map}}" primary_arr="{{_primary_arr}}">
+        </bot-list-data>
+
+        <table class="bot-list">
+          <thead on-sort_change="_sortChange">
           
-          <th hidden$="[[_hide('task', columns.*)]]">
-            <span>Current Task</span>
-            <sort-toggle name="task" current="[[sort]]">
-            </sort-toggle>
-          </th>
+            <tr>
+              <th>
+                <span>Bot Id</span>
+                <sort-toggle name="id" current="[[_sort]]">
+                </sort-toggle>
+              </th>
+              
+              <th hidden$="[[_hide('task', _columns.*)]]">
+                <span>Current Task</span>
+                <sort-toggle name="task" current="[[_sort]]">
+                </sort-toggle>
+              </th>
 
-          <template is="dom-repeat" items="[[plain_columns]]" as="c">
-            <th hidden$="[[_hide(c)]]">
-              <span>[[_header(c)]]</span>
-              <sort-toggle name="[[c]]" current="[[sort]]">
-              </sort-toggle>
-            </th>
-          </template>
-        </tr></thead>
-        <tbody>
-          <template id="bot_table" is="dom-repeat" items="[[bots]]" as="bot" initial-count="50" filter="_filterBotTable">
-
-            <tr class$="[[_botClass(bot)]]">
-              <td>
-                <a class="center" href$="[[_botLink(bot.bot_id)]]" target="_blank">
-                   [[bot.bot_id]]
-                </a>
-              </td>
-              <td hidden$="[[_hide('task', columns.*)]]">
-                <a href$="[[_taskLink(bot)]]">[[_taskId(bot)]]</a>
-              </td>
-
-              <template is="dom-repeat" items="[[plain_columns]]" as="c">
-                <td hidden$="[[_hide(c)]]">
-                  [[_column(c, bot, verbose)]]
-                </td>
+              <template is="dom-repeat" items="[[_plain_columns]]" as="c">
+                <th hidden$="[[_hide(c)]]">
+                  <span>[[_header(c)]]</span>
+                  <sort-toggle name="[[c]]" current="[[_sort]]">
+                  </sort-toggle>
+                </th>
               </template>
-
             </tr>
-            <template is="dom-repeat" items="[[_devices(bot)]]" as="device">
-              <tr hidden$="[[_hide('devices', columns.*)]]" class$="[[_deviceClass(device)]]">
-                <td></td>
-                <td hidden$="[[_hide('task', columns.*)]]"></td>
-                <template is="dom-repeat" items="[[plain_columns]]" as="c">
+          </thead>
+          <tbody>
+            <template id="bot_table" is="dom-repeat" items="[[_filteredSortedBots]]" as="bot" initial-count="50">
+
+              <tr class$="[[_botClass(bot)]]">
+                <td>
+                  <a class="center" href$="[[_botLink(bot.bot_id)]]" target="_blank">
+                     [[bot.bot_id]]
+                  </a>
+                </td>
+                <td hidden$="[[_hide('task', _columns.*)]]">
+                  <a href$="[[_taskLink(bot)]]">[[_taskId(bot)]]</a>
+                </td>
+
+                <template is="dom-repeat" items="[[_plain_columns]]" as="c">
                   <td hidden$="[[_hide(c)]]">
-                    [[_deviceColumn(c, device, verbose)]]
+                    [[_column(c, bot, _verbose)]]
                   </td>
                 </template>
+
               </tr>
+              <template is="dom-repeat" items="[[_devices(bot)]]" as="device">
+                <tr hidden$="[[_hide('devices', _columns.*)]]" class$="[[_deviceClass(device)]]">
+                  <td></td>
+                  <td hidden$="[[_hide('task', _columns.*)]]"></td>
+                  <template is="dom-repeat" items="[[_plain_columns]]" as="c">
+                    <td hidden$="[[_hide(c)]]">
+                      [[_deviceColumn(c, device, _verbose)]]
+                    </td>
+                  </template>
+                </tr>
+              </template> 
             </template> 
-          </template> 
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
 
     </swarming-app>
 
@@ -21430,14 +21622,14 @@ is separate from validation, and `allowed-pattern` does not affect how the input
     var columnMap = {
       cores: function(bot){
         var cores =  this._cores(bot);
-        if (this.verbose){
+        if (this._verbose){
           return cores.join(" | ");
         }
         return cores[0];
       },
       cpu: function(bot){
         var cpus = this._dimension(bot, 'cpu') || ['Unknown'];
-        if (this.verbose){
+        if (this._verbose){
           return cpus.join(" | ");
         }
         return cpus[0];
@@ -21468,7 +21660,7 @@ is separate from validation, and `allowed-pattern` does not affect how the input
             named.push(this._applyAlias(g, alias));
           }
         }.bind(this))
-        if (this.verbose) {
+        if (this._verbose) {
           return verbose.join(" | ");
         }
         return named.join(" | ");
@@ -21478,7 +21670,7 @@ is separate from validation, and `allowed-pattern` does not affect how the input
       },
       os: function(bot) {
         var os = this._dimension(bot, 'os') || ['Unknown'];
-        if (this.verbose){
+        if (this._verbose){
           return os.join(" | ");
         }
         return os[0];
@@ -21509,33 +21701,46 @@ is separate from validation, and `allowed-pattern` does not affect how the input
 
       properties: {
 
-        columns: {
+        _bots: {
           type: Array,
         },
-        // Should have a property "filter" which is a function.
-        filter: {
-          type: Object,
-        },
 
-        plain_columns: {
+        _columns: {
           type: Array,
-          computed: "_stripSpecial(columns.*)",
         },
 
-        // sort is an Object {name:String, direction:String}.
-        sort: {
+        _filter: {
+          type: Function,
+          value: function() {
+            return true;
+          },
+        },
+
+        _filteredSortedBots: {
+          type: Array,
+          computed: "_filterAndSort(_bots,_filter.*,_sort.*)"
+        },
+
+        _plain_columns: {
+          type: Array,
+          computed: "_stripSpecial(_columns.*)",
+        },
+
+        // _sort is an Object {name:String, direction:String}.
+        _sort: {
           type: Object,
+          value: function() {
+            return {
+              name: "id",
+              direction: "asc",
+            };
+          }
         },
 
-        verbose: {
+        _verbose: {
           type: Boolean,
         }
       },
-
-      observers: [
-        '_reRender(filter.*)',
-        '_checkSorts(columns.*)'
-      ],
 
       _botClass: function(bot) {
         if (bot.is_dead) {
@@ -21552,14 +21757,6 @@ is separate from validation, and `allowed-pattern` does not affect how the input
         return "/restricted/bot/"+id;
       },
 
-      // _checkSorts makes sure that if a column has been removed, the related
-      // sort is also removed.
-      _checkSorts: function() {
-        if (!this.sort) {
-          return;
-        }
-        this._reRender();
-      },
 
       _column: function(col, bot) {
         return columnMap[col].bind(this)(bot);
@@ -21588,11 +21785,17 @@ is separate from validation, and `allowed-pattern` does not affect how the input
         return "";
       },
 
-      _filterBotTable: function(bot) {
-        if (!this.filter || !this.filter.filter) {
-          return true;
+      _filterAndSort: function(a,b,c) {
+        // We intentionally sort this._bots (and not a copy) to allow users to
+        // "chain" sorts, that is, sort by one thing and then another, and
+        // have both orderings properly impact the list.
+        swarming.stableSort(this._bots, this._sortBotTable.bind(this));
+        var bots = this._bots;
+        if (this._filter) {
+          bots = bots.filter(this._filter.bind(this));
         }
-        return this.filter.filter.bind(this)(bot);
+
+        return bots;
       },
 
       _header: function(col){
@@ -21600,7 +21803,7 @@ is separate from validation, and `allowed-pattern` does not affect how the input
       },
 
       _hide: function(col) {
-        return this.columns.indexOf(col) === -1;
+        return this._columns.indexOf(col) === -1;
       },
 
       _reRender: function(filter, sort) {
@@ -21608,35 +21811,34 @@ is separate from validation, and `allowed-pattern` does not affect how the input
       },
 
       _sortBotTable: function(botA, botB) {
-        if (!this.sort) {
+        if (!this._sort) {
           return 0;
         }
         var dir = 1;
-        if (this.sort.direction === "desc") {
+        if (this._sort.direction === "desc") {
           dir = -1;
         }
-        var botACol = this._column(this.sort.name, botA);
-        var botBCol = this._column(this.sort.name, botB);
+        var botACol = this._column(this._sort.name, botA);
+        var botBCol = this._column(this._sort.name, botB);
 
         return dir * swarming.naturalCompare(botACol, botBCol);
       },
 
-      sortChange: function(e) {
+      _sortChange: function(e) {
         // The event we get from sort-toggle tells us the name of what needs
         // to be sorting and how to sort it.
         if (!(e && e.detail && e.detail.name)) {
           return;
         }
-        this.set("sort", e.detail);
-        swarming.stableSort(this.bots, this._sortBotTable.bind(this));
-        this._reRender();
+        // should trigger __filterAndSort
+        this.set("_sort", e.detail);
       },
 
       // _stripSpecial removes the special columns and sorts the remaining
       // columns so they always appear in the same order, regardless of
       // the order they are added.
       _stripSpecial: function(){
-        return this.columns.filter(function(c){
+        return this._columns.filter(function(c){
           return special_columns.indexOf(c) === -1;
         }).sort();
       },

@@ -89,7 +89,8 @@
         signedIn: {
           type: Boolean,
           readOnly: true,
-          value: false
+          value: false,
+          notify: true,
         }
       },
 
@@ -102,6 +103,7 @@
           imageUrl: profile.getImageUrl()
         });
         this.set("authResponse", user.getAuthResponse());
+        this._setSignedIn(true);
         this.fire("auth-signin");
       },
 
