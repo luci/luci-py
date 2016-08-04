@@ -23,6 +23,7 @@ handlers:
 
 includes:
 - components/auth
+- gae_ts_mon
 
 libraries:
 - name: endpoints

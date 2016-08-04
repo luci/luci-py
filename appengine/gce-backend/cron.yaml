@@ -46,3 +46,6 @@ cron:
 
 - url: /internal/cron/schedule-metadata-tasks
   schedule: every 1 minutes
+
+- url: /internal/cron/ts_mon/send
+  schedule: every 1 minutes

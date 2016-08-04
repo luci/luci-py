@@ -13,6 +13,8 @@ utils.fix_protobuf_package()
 from google import protobuf
 from google.appengine.ext import ndb
 
+import metrics
+
 from components import config
 from components import datastore_utils
 
@@ -60,16 +62,28 @@ def update_config():
       revision=revision,
   )
 
+  # Validity of each config.
+  configs = {
+      'managers.cfg': True,
+      'templates.cfg': True,
+  }
+
   context = config.validation_context.Context.logging()
   validate_template_config(template_config, context)
   if context.result().has_errors:
     logging.error('Not updating configuration due to errors in templates.cfg')
-    return
+    configs['templates.cfg'] = False
 
   context = config.validation_context.Context.logging()
   validate_manager_config(manager_config, context)
   if context.result().has_errors:
     logging.error('Not updating configuration due to errors in managers.cfg')
+    configs['managers.cfg'] = False
+
+  for config_name, valid in configs.iteritems():
+    metrics.config_valid.set(valid, fields={'config': config_name})
+
+  if not all(configs.values()):
     return
 
   stored_config = Configuration.fetch()

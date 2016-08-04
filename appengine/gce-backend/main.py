@@ -6,6 +6,8 @@
 
 from components import utils
 
+import gae_ts_mon
+
 import handlers_cron
 import handlers_queues
 
@@ -14,3 +16,6 @@ utils.set_task_queue_module('default')
 
 cron_app = handlers_cron.create_cron_app()
 queues_app = handlers_queues.create_queues_app()
+
+gae_ts_mon.initialize(app=cron_app)
+gae_ts_mon.initialize(app=queues_app)
