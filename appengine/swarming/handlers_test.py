@@ -4,6 +4,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import datetime
 import itertools
 import json
 import logging
@@ -478,6 +479,35 @@ class BackendTest(AppTestBase):
           response.body)
     # The actual number doesn't matter, just make sure they are unqueued.
     self.execute_tasks()
+
+
+  def testCronBotsAggregateTask(self):
+    # Tests that the aggregation works
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+
+    bot_management.bot_event(
+        event_type='bot_connected', bot_id='id1',
+        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
+        dimensions={'foo': ['beta'], 'id': ['id1']}, state={'ram': 65},
+        version='123456789', quarantined=False, task_id=None, task_name=None)
+    bot_management.bot_event(
+        event_type='bot_connected', bot_id='id2',
+        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
+        dimensions={'foo': ['alpha'], 'id': ['id2']}, state={'ram': 65},
+        version='123456789', quarantined=True, task_id='987', task_name=None)
+
+    self.app.get('/internal/cron/aggregate_bots_dimensions',
+        headers={'X-AppEngine-Cron': 'true'}, status=200)
+    actual = bot_management.DimensionAggregation.KEY.get()
+    expected = bot_management.DimensionAggregation(
+        key=bot_management.DimensionAggregation.KEY,
+        dimensions=[
+            bot_management.DimensionValues(
+                dimension='foo', values=['alpha', 'beta'])
+        ],
+        ts=now)
+    self.assertEqual(expected, actual)
 
   def testCronTriggerTask(self):
     triggers = (

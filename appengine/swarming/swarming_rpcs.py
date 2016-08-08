@@ -383,6 +383,13 @@ class BotsCount(messages.Message):
   busy = messages.IntegerField(5)
 
 
+class BotsDimensions(messages.Message):
+  """Returns all the dimensions and dimension possibilities in the fleet."""
+  bots_dimensions = messages.MessageField(StringListPair, 1, repeated=True)
+  # Time at which this summary was calculated.
+  ts = message_types.DateTimeField(2)
+
+
 class BotEvent(messages.Message):
   # Timestamp of this event.
   ts = message_types.DateTimeField(1)

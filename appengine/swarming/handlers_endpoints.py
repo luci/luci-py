@@ -644,7 +644,7 @@ class SwarmingBotsService(remote.Service):
     """Counts number of bots with given dimensions."""
     logging.info('%s', request)
     now = utils.utcnow()
-    q = bot_management.BotInfo.query().order()
+    q = bot_management.BotInfo.query()
     for d in request.dimensions:
       parts = d.split(':', 1)
       if len(parts) != 2 or any(i.strip() != i or not i for i in parts):
@@ -664,6 +664,20 @@ class SwarmingBotsService(remote.Service):
         dead=f_dead.get_result(),
         busy=f_busy.get_result(),
         now=now)
+
+  @gae_ts_mon.instrument_endpoint()
+  @auth.endpoints_method(
+      message_types.VoidMessage, swarming_rpcs.BotsDimensions,
+      http_method='GET')
+  @auth.require(acl.is_privileged_user)
+  def dimensions(self, _request):
+    """Returns the cached set of dimensions currently in use in the fleet."""
+    dims = bot_management.DimensionAggregation.KEY.get()
+    fd = [
+      swarming_rpcs.StringListPair(key=d.dimension, value=d.values)
+      for d in dims.dimensions
+    ]
+    return swarming_rpcs.BotsDimensions(bots_dimensions=fd, ts=dims.ts)
 
 
 def get_routes():

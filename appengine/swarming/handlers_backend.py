@@ -12,9 +12,12 @@ from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.appengine.api import taskqueue
 
+from components import utils
+
 import mapreduce_jobs
 from components import decorators
 from components import machine_provider
+from server import bot_management
 from server import config
 from server import lease_management
 from server import stats
@@ -97,6 +100,30 @@ class CronMachineProviderCleanUpHandler(webapp2.RequestHandler):
     lease_management.clean_up_bots()
 
 
+class CronBotsDimensionAggregationHandler(webapp2.RequestHandler):
+  """Aggregates all bots dimensions (except id) in the fleet."""
+
+  @decorators.require_cronjob
+  def get(self):
+    seen = {}
+    now = utils.utcnow()
+    for b in bot_management.BotInfo.query():
+      for i in b.dimensions_flat:
+        k, v = i.split(':', 1)
+        if k != 'id':
+          seen.setdefault(k, set()).add(v)
+    dims = [
+      bot_management.DimensionValues(dimension=k,values=sorted(values))
+      for k, values in sorted(seen.iteritems())
+    ]
+
+    logging.info('Saw dimensions %s', dims)
+    bot_management.DimensionAggregation(
+        key=bot_management.DimensionAggregation.KEY,
+        dimensions=dims,
+        ts=now).put()
+
+
 class CronMachineProviderPubSubHandler(webapp2.RequestHandler):
   """Listens for Pub/Sub communication from Machine Provider."""
 
@@ -170,6 +197,8 @@ def get_routes():
 
     ('/internal/cron/stats/update', stats.InternalStatsUpdateHandler),
     ('/internal/cron/trigger_cleanup_data', CronTriggerCleanupDataHandler),
+    ('/internal/cron/aggregate_bots_dimensions',
+        CronBotsDimensionAggregationHandler),
     ('/internal/cron/machine_provider', CronMachineProviderBotHandler),
     ('/internal/cron/machine_provider_cleanup',
         CronMachineProviderCleanUpHandler),

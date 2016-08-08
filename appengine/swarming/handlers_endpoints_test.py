@@ -1491,6 +1491,39 @@ class BotsApiTest(BaseTest):
     request = swarming_rpcs.BotsRequest(dimensions=['bad'])
     self.call_api('count', body=message_to_dict(request), status=400)
 
+  def test_dimensions_ok(self):
+    """Asserts that BotsDimensions is returned with the right data."""
+    self.set_as_privileged_user()
+    now = datetime.datetime(2009, 1, 2, 3, 4, 5, 6)
+    self.mock_now(now)
+
+    bot_management.DimensionAggregation(
+        key=bot_management.DimensionAggregation.KEY,
+        dimensions=[
+            bot_management.DimensionValues(
+              dimension='foo', values=['alpha', 'beta']),
+            bot_management.DimensionValues(
+              dimension='bar', values=['gamma', 'delta', 'epsilon']),
+        ],
+        ts=now).put()
+
+    expected = {
+      u'bots_dimensions': [
+        {
+          u'key': 'foo',
+          u'value': [u'alpha', u'beta'],
+        },
+        {
+          u'key': 'bar',
+          u'value': [u'gamma', u'delta', u'epsilon'],
+        },
+      ],
+      u'ts': unicode(now.strftime(self.DATETIME_FORMAT)),
+    }
+
+    self.assertEqual(expected, self.call_api('dimensions', body={}).json)
+
+
 class BotApiTest(BaseTest):
   api_service_cls = handlers_endpoints.SwarmingBotService
 

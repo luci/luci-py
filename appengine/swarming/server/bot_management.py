@@ -211,6 +211,21 @@ class BotSettings(ndb.Model):
   quarantined = ndb.BooleanProperty()
 
 
+class DimensionValues(ndb.Model):
+  dimension = ndb.StringProperty()
+  values = ndb.StringProperty(repeated=True)
+
+
+class DimensionAggregation(ndb.Model):
+  """Has all dimensions that are currently in use."""
+  dimensions = ndb.LocalStructuredProperty(DimensionValues, repeated=True)
+
+  ts = ndb.DateTimeProperty()
+
+  # We only store one of these entities. Use this key to refer to any instance.
+  KEY = ndb.Key('DimensionAggregation', 'current')
+
+
 ### Private APIs.
 
 
