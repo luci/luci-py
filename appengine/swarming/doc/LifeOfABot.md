@@ -178,7 +178,7 @@ are classified by a few categories via their prefix:
 
    - `on_*` are hooks that are called on events based on the task with obvious
      names: `on_bot_startup`, `on_bot_shutdown`, `on_before_task`,
-     `on_after_task`.
+     `on_after_task`, `on_bot_idle`.
    - `get_*` are functions that returns the bot's self-defined identity. These
      are reported to the server and fall in two categories: `get_dimensions`
      which returns the properties that are used as part of the task scheduler

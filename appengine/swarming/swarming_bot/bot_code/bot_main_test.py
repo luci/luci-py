@@ -195,7 +195,7 @@ class TestBotMain(net_utils.TestCase):
     class Foo(Exception):
       pass
 
-    def poll_server(botobj, _):
+    def poll_server(botobj, _quit_bit, _last_action):
       sleep_streak = botobj.state['sleep_streak']
       self.assertEqual(self.url, botobj.server)
       if sleep_streak == 5:
@@ -277,6 +277,9 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bit, 'wait', slept.append)
     self.mock(bot_main, 'run_manifest', self.fail)
     self.mock(bot_main, 'update_bot', self.fail)
+    from config import bot_config
+    called = []
+    self.mock(bot_config, 'on_bot_idle', lambda _bot, _s: called.append(1))
 
     self.expected_requests(
         [
@@ -294,8 +297,9 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertFalse(bot_main.poll_server(self.bot, bit))
+    self.assertFalse(bot_main.poll_server(self.bot, bit, 2))
     self.assertEqual([1.24], slept)
+    self.assertEqual([1], called)
 
   def test_poll_server_sleep_with_auth(self):
     slept = []
@@ -322,7 +326,7 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertFalse(bot_main.poll_server(self.bot, bit))
+    self.assertFalse(bot_main.poll_server(self.bot, bit, 0))
     self.assertEqual([1.24], slept)
 
   def test_poll_server_run(self):
@@ -351,7 +355,7 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertTrue(bot_main.poll_server(self.bot, bit))
+    self.assertTrue(bot_main.poll_server(self.bot, bit, 0))
     expected = [(self.bot, {'foo': 'bar'}, time.time())]
     self.assertEqual(expected, manifest)
     expected = [(self.bot,)]
@@ -380,7 +384,7 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertTrue(bot_main.poll_server(self.bot, bit))
+    self.assertTrue(bot_main.poll_server(self.bot, bit, 0))
     self.assertEqual([(self.bot, '123')], update)
 
   def test_poll_server_restart(self):
@@ -407,7 +411,7 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertTrue(bot_main.poll_server(self.bot, bit))
+    self.assertTrue(bot_main.poll_server(self.bot, bit, 0))
     self.assertEqual([('Please die now',)], restart)
 
   def test_poll_server_restart_load_test(self):
@@ -434,7 +438,7 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertTrue(bot_main.poll_server(self.bot, bit))
+    self.assertTrue(bot_main.poll_server(self.bot, bit, 0))
 
   def _mock_popen(
       self, returncode=0, exit_code=0, url='https://localhost:1',

@@ -486,12 +486,14 @@ def run_bot(arg_error):
     os.environ['SWARMING_BOT_ID'] = botobj.id.encode('utf-8')
 
     consecutive_sleeps = 0
+    last_action = time.time()
     while not quit_bit.is_set():
       try:
         botobj.update_dimensions(get_dimensions(botobj))
         botobj.update_state(get_state(botobj, consecutive_sleeps))
-        did_something = poll_server(botobj, quit_bit)
+        did_something = poll_server(botobj, quit_bit, last_action)
         if did_something:
+          last_action = time.time()
           consecutive_sleeps = 0
         else:
           consecutive_sleeps += 1
@@ -508,7 +510,7 @@ def run_bot(arg_error):
   return 0
 
 
-def poll_server(botobj, quit_bit):
+def poll_server(botobj, quit_bit, last_action):
   """Polls the server to run one loop.
 
   Returns True if executed some action, False if server asked the bot to sleep.
@@ -525,6 +527,7 @@ def poll_server(botobj, quit_bit):
 
   cmd = resp['cmd']
   if cmd == 'sleep':
+    call_hook(botobj, 'on_bot_idle', max(0, time.time() - last_action))
     quit_bit.wait(resp['duration'])
     return False
 

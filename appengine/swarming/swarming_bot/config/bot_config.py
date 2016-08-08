@@ -154,6 +154,30 @@ def on_after_task(bot, failure, internal_failure, dimensions, summary):
   #  bot.restart('Internal failure')
 
 
+def on_bot_idle(bot, since_last_action):
+  """Hook function called once when the bot has been idle; when it has no
+  command to execute.
+
+  This is an excellent place to put device in 'cool down' mode or any
+  "pre-warming" kind of stuff that could take several seconds to do, that would
+  not be appropriate to do in on_after_task(). It could be worth waiting for
+  `since_last_action` to be several seconds before doing a more lengthy
+  operation.
+
+  This function is called repeatedly until an action is taken (a task, updating,
+  etc).
+
+  This is a good place to do "auto reboot" for hardware based bots that are
+  rebooted periodically.
+
+  Arguments:
+  - bot: bot.Bot instance. See ../api/bot.py.
+  - since_last_action: time in second since last action; e.g. amount of time the
+                       bot has been idle.
+  """
+  pass
+
+
 ### Setup
 
 
