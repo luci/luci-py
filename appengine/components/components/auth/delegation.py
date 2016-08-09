@@ -47,6 +47,8 @@ __all__ = [
 MAX_TOKEN_SIZE = 8 * 1024
 
 # Maximum allowed length of token chain.
+#
+# TODO(vadimsh): Remove.
 MAX_SUBTOKEN_LIST_LEN = 8
 
 # How much clock drift between machines we can tolerate, in seconds.
@@ -186,7 +188,7 @@ def deserialize_token(blob):
     blob = blob.encode('ascii', 'ignore')
   try:
     as_bytes = tokens.base64_decode(blob)
-  except ValueError as exc:
+  except (TypeError, ValueError) as exc:
     raise BadTokenError('Not base64: %s' % exc)
   if len(as_bytes) > MAX_TOKEN_SIZE:
     raise BadTokenError('Unexpectedly huge token (%d bytes)' % len(as_bytes))
@@ -196,47 +198,47 @@ def deserialize_token(blob):
     raise BadTokenError('Bad proto: %s' % exc)
 
 
-def seal_token(subtokens):
-  """Serializes SubtokenList and signs it using current service's key.
-
-  The list must have at least one entry (it is asserted).
+def seal_token(subtoken, use_deprecated_scheme=True):
+  """Serializes Subtoken and signs it using current service's key.
 
   Args:
-    subtokens: delegation_pb2.SubtokenList message.
-
-  Raises:
-    BadTokenError if token list is too long or empty.
+    subtoken: delegation_pb2.Subtoken message.
+    use_deprecated_scheme: if True, will use serialized_subtoken_list.
 
   Returns:
     delegation_pb2.DelegationToken message ready for serialization.
   """
-  assert isinstance(subtokens, delegation_pb2.SubtokenList)
-  toks = subtokens.subtokens
-  if not toks:
-    raise BadTokenError('Subtoken list is empty')
-  if len(toks) > MAX_SUBTOKEN_LIST_LEN:
-    raise BadTokenError(
-        'Subtoken list is too long (%d tokens, max is %d)' %
-        (len(toks), MAX_SUBTOKEN_LIST_LEN))
-  serialized = subtokens.SerializeToString()
+  assert isinstance(subtoken, delegation_pb2.Subtoken)
+  tok = delegation_pb2.DelegationToken()
+
+  # TODO(vadimsh): Stop using serialized_subtoken_list once all services are
+  # updated to understand 'serialized_subtoken' field.
+  if use_deprecated_scheme:
+    subtokens = delegation_pb2.SubtokenList(subtokens=[subtoken])
+    serialized = subtokens.SerializeToString()
+    tok.serialized_subtoken_list = serialized
+  else:
+    serialized = subtoken.SerializeToString()
+    tok.serialized_subtoken = serialized
+
   signing_key_id, pkcs1_sha256_sig = signature.sign_blob(serialized, 0.5)
-  return delegation_pb2.DelegationToken(
-      serialized_subtoken_list=serialized,
-      signer_id=model.get_service_self_identity().to_bytes(),
-      signing_key_id=signing_key_id,
-      pkcs1_sha256_sig=pkcs1_sha256_sig)
+
+  tok.signer_id = model.get_service_self_identity().to_bytes()
+  tok.signing_key_id = signing_key_id
+  tok.pkcs1_sha256_sig = pkcs1_sha256_sig
+  return tok
 
 
 def unseal_token(tok):
-  """Checks the signature of DelegationToken and deserializes subtoken list.
+  """Checks the signature of DelegationToken and deserializes the subtoken.
 
-  Does not check subtokens themselves.
+  Does not check the subtoken itself.
 
   Args:
     tok: delegation_pb2.DelegationToken message.
 
   Returns:
-    delegation_pb2.SubtokenList message (with at least one entry).
+    delegation_pb2.Subtoken message.
 
   Raises:
     BadTokenError:
@@ -246,6 +248,61 @@ def unseal_token(tok):
         On transient errors, that may go away on the next call: for example if
         the signer public key can't be fetched.
   """
+  # Check all required fields are set.
+  assert isinstance(tok, delegation_pb2.DelegationToken)
+
+  # Deprecated code path. To be removed.
+  if tok.serialized_subtoken_list:
+    subtoken_list = _unseal_deprecated_token(tok)
+    if len(subtoken_list.subtokens) != 1:
+      raise BadTokenError('Bad serialized_subtoken_list: expecting one entry')
+    return subtoken_list.subtokens[0]
+
+  if not tok.serialized_subtoken:
+    raise BadTokenError('serialized_subtoken is missing')
+  if not tok.signer_id:
+    raise BadTokenError('signer_id is missing')
+  if not tok.signing_key_id:
+    raise BadTokenError('signing_key_id is missing')
+  if not tok.pkcs1_sha256_sig:
+    raise BadTokenError('pkcs1_sha256_sig is missing')
+
+  # Make sure signer_id looks like model.Identity.
+  try:
+    model.Identity.from_bytes(tok.signer_id)
+  except ValueError as exc:
+    raise BadTokenError('signer_id is not a valid identity: %s' % exc)
+
+  # Validate the signature.
+  checker = get_signature_checker()
+  if not checker.is_trusted_signer(tok.signer_id):
+    raise BadTokenError('Unknown signer: "%s"' % tok.signer_id)
+  try:
+    cert = checker.get_x509_certificate_pem(tok.signer_id, tok.signing_key_id)
+    is_valid_sig = signature.check_signature(
+        blob=tok.serialized_subtoken,
+        x509_certificate_pem=cert,
+        signature=tok.pkcs1_sha256_sig)
+  except signature.CertificateError as exc:
+    if exc.transient:
+      raise TransientError(str(exc))
+    raise BadTokenError(
+        'Bad certificate (signer_id == %s, signing_key_id == %s): %s' % (
+        tok.signer_id, tok.signing_key_id, exc))
+  if not is_valid_sig:
+    raise BadTokenError(
+        'Invalid signature (signer_id == %s, signing_key_id == %s)' % (
+        tok.signer_id, tok.signing_key_id))
+
+  # The signature is correct, deserialize the subtoken.
+  try:
+    return delegation_pb2.Subtoken.FromString(tok.serialized_subtoken)
+  except message.DecodeError as exc:
+    raise BadTokenError('Bad serialized_subtoken: %s' % exc)
+
+
+# TODO(vadimsh): Remove once all services are updated to use the new scheme.
+def _unseal_deprecated_token(tok):
   # Check all required fields are set.
   assert isinstance(tok, delegation_pb2.DelegationToken)
   if not tok.serialized_subtoken_list:
@@ -293,6 +350,15 @@ def unseal_token(tok):
     raise BadTokenError('Bad serialized_subtoken_list: empty')
   if len(toks.subtokens) > MAX_SUBTOKEN_LIST_LEN:
     raise BadTokenError('Bad serialized_subtoken_list: too many subtokens')
+
+  # In deprecated tokens empty 'audience' and 'services' lists mean '*'. Adjust
+  # them to have '*', as required by the new scheme.
+  for tok in toks.subtokens:
+    if not tok.audience:
+      tok.audience.append('*')
+    if not tok.services:
+      tok.services.append('*')
+
   return toks
 
 
@@ -368,16 +434,14 @@ def delegate_async(
 
   An RPC. Memcaches the token.
 
-  Does not support delegation of a delegation token.
-
   Args:
     audience (list of (str or Identity)): to WHOM caller's identity is
-      delegated; a list of identities or groups.
+      delegated; a list of identities, groups or symbol '*' (which means ANY).
       If None (default), the token can be used by anyone.
       Example: ['user:def@example.com', 'group:abcdef']
     services (list of (str or Identity)): WHERE token is accepted.
       If None (default), the token is accepted everywhere.
-      Each list element must be an identity of 'service' kind.
+      Each list element must be an identity of 'service' kind, or symbol '*'.
       Example: ['service:gae-app1', 'service:gae-app2']
     min_validity_duration_sec (int): minimally acceptable lifetime of the token.
       If there's existing token cached locally that have TTL
@@ -403,23 +467,35 @@ def delegate_async(
     DelegationTokenCreationError if could not create a token.
     DelegationAuthorizationError on HTTP 403 response from auth service.
   """
-  # Validate audience.
-  audience = audience or []
-  for a in audience:
-    assert isinstance(a, (basestring, model.Identity)), a
-    if isinstance(a, basestring) and not a.startswith('group:'):
-      model.Identity.from_bytes(a)  # May raise ValueError.
+  assert audience is None or isinstance(audience, list), audience
+  assert services is None or isinstance(services, list), services
+
   id_to_str = lambda i: i.to_bytes() if isinstance(i, model.Identity) else i
-  audience = map(id_to_str, audience)
+
+  # Validate audience.
+  if audience is None or '*' in audience:
+    audience = ['*']
+  else:
+    if not audience:
+      raise ValueError('audience can\'t be empty')
+    for a in audience:
+      assert isinstance(a, (basestring, model.Identity)), a
+      if isinstance(a, basestring) and not a.startswith('group:'):
+        model.Identity.from_bytes(a)  # May raise ValueError.
+    audience = sorted(map(id_to_str, audience))
 
   # Validate services.
-  services = services or []
-  for s in services:
-    if isinstance(s, basestring):
-      s = model.Identity.from_bytes(s)
-    assert isinstance(s, model.Identity), s
-    assert s.kind == model.IDENTITY_SERVICE, s
-  services = map(id_to_str, services)
+  if services is None or '*' in services:
+    services = ['*']
+  else:
+    if not services:
+      raise ValueError('services can\'t be empty')
+    for s in services:
+      if isinstance(s, basestring):
+        s = model.Identity.from_bytes(s)
+      assert isinstance(s, model.Identity), s
+      assert s.kind == model.IDENTITY_SERVICE, s
+    services = sorted(map(id_to_str, services))
 
   # Validate validity durations.
   assert isinstance(min_validity_duration_sec, int), min_validity_duration_sec
@@ -499,44 +575,32 @@ def delegate(**kwargs):
 ## Token validation.
 
 
-def check_subtoken_list(subtokens, peer_identity):
-  """Validates the chain of delegation subtokens, extracts original issuer_id.
+def check_subtoken(subtoken, peer_identity):
+  """Validates the delegation subtoken, extracts original issuer_id.
 
   Args:
-    subtokens: instance of delegation_pb2.SubtokenList with at least one token.
-    peer_identity: identity of whoever tries to use this token chain.
+    subtoken: instance of delegation_pb2.Subtoken.
+    peer_identity: identity of whoever tries to use this token.
 
   Returns:
-    Delegated Identity extracted from the token chain (if it is valid).
+    Delegated Identity extracted from the token (if it is valid).
 
   Raises:
-    BadTokenError if token chain is invalid or not usable by peer_identity.
+    BadTokenError if the token is invalid or not usable by peer_identity.
   """
-  assert isinstance(subtokens, delegation_pb2.SubtokenList)
-  toks = subtokens.subtokens
-  if not toks:
-    raise BadTokenError('Subtoken list is empty')
-  if len(toks) > MAX_SUBTOKEN_LIST_LEN:
-    raise BadTokenError(
-        'Subtoken list is too long (%d tokens, max is %d)' %
-        (len(toks), MAX_SUBTOKEN_LIST_LEN))
+  assert isinstance(subtoken, delegation_pb2.Subtoken)
 
   # Do fast failing checks before heavy ones.
-  now = int(utils.time_time())
-  service_id = model.get_service_self_identity().to_bytes()
-  for tok in toks:
-    check_subtoken_expiration(tok, now)
-    check_subtoken_services(tok, service_id)
+  service_id = model.get_service_self_identity()
+  check_subtoken_expiration(subtoken, int(utils.time_time()))
+  check_subtoken_services(subtoken, service_id.to_bytes())
 
-  # Figure out delegated identity by following delegation chain.
-  current_identity = peer_identity
-  for tok in reversed(toks):
-    check_subtoken_audience(tok, current_identity)
-    try:
-      current_identity = model.Identity.from_bytes(tok.issuer_id)
-    except ValueError as exc:
-      raise BadTokenError('Invalid issuer_id: %s' % exc)
-  return current_identity
+  # Verify caller can use the token, figure out a delegated identity.
+  check_subtoken_audience(subtoken, peer_identity)
+  try:
+    return model.Identity.from_bytes(subtoken.issuer_id)
+  except ValueError as exc:
+    raise BadTokenError('Invalid issuer_id: %s' % exc)
 
 
 def check_subtoken_expiration(subtoken, now):
@@ -573,8 +637,9 @@ def check_subtoken_services(subtoken, service_id):
   Raises:
     BadTokenError if token is not intended for the current service.
   """
-  # Empty services field -> allow all.
-  if subtoken.services and service_id not in subtoken.services:
+  if not subtoken.services:
+    raise BadTokenError('The token\'s services list is empty')
+  if '*' not in subtoken.services and service_id not in subtoken.services:
     raise BadTokenError('The token is not intended for %s' % service_id)
 
 
@@ -588,8 +653,11 @@ def check_subtoken_audience(subtoken, current_identity):
   Raises:
     BadTokenError if token is not allowed to be used by current_identity.
   """
-  # Empty audience field -> allow all.
+  # No audience at all -> forbid.
   if not subtoken.audience:
+    raise BadTokenError('The token\'s audience field is empty')
+  # '*' in audience -> allow all.
+  if '*' in subtoken.audience:
     return
   # Try to find a direct hit first, to avoid calling expensive is_group_member.
   ident_as_bytes = current_identity.to_bytes()
@@ -622,5 +690,5 @@ def check_delegation_token(token, peer_identity):
     BadTokenError if token is invalid.
     TransientError if token can't be verified due to transient errors.
   """
-  subtokens = unseal_token(deserialize_token(token))
-  return check_subtoken_list(subtokens, peer_identity)
+  subtoken = unseal_token(deserialize_token(token))
+  return check_subtoken(subtoken, peer_identity)

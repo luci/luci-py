@@ -422,13 +422,13 @@ class AuthenticatingHandlerTest(test_case.TestCase):
         {u'cur_id': u'user:peer@a.com', u'peer_id': u'user:peer@a.com'}, call())
 
     # TODO(vadimsh): Mint token via some high-level function call.
-    subtokens = delegation_pb2.SubtokenList(subtokens=[
-        delegation_pb2.Subtoken(
-            issuer_id='user:delegated@a.com',
-            creation_time=int(utils.time_time()),
-            validity_duration=3600),
-    ])
-    tok = delegation.serialize_token(delegation.seal_token(subtokens))
+    subtoken = delegation_pb2.Subtoken(
+        issuer_id='user:delegated@a.com',
+        audience=['*'],
+        services=['*'],
+        creation_time=int(utils.time_time()),
+        validity_duration=3600)
+    tok = delegation.serialize_token(delegation.seal_token(subtoken))
 
     # With valid delegation token.
     self.assertEqual(

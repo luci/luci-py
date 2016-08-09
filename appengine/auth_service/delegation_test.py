@@ -30,8 +30,7 @@ import delegation
 
 
 def decode_token(token):
-  return auth_delegation.unseal_token(
-      auth_delegation.deserialize_token(token))
+  return auth_delegation.unseal_token(auth_delegation.deserialize_token(token))
 
 
 class HandlersTest(test_case.TestCase):
@@ -65,14 +64,12 @@ class HandlersTest(test_case.TestCase):
     self.assertEqual(resp.status_code, 201)
     self.assertEqual(3600, resp.json_body['validity_duration'])
 
-    subtokens = decode_token(resp.json_body['delegation_token'])
-    self.assertEqual(1, len(subtokens.subtokens))
-    t = subtokens.subtokens[0]
+    t = decode_token(resp.json_body['delegation_token'])
     self.assertEqual('user:a@a.com', t.issuer_id)
     self.assertTrue(t.creation_time >= time.time() - 30)
     self.assertEqual(3600, t.validity_duration)
-    self.assertFalse(t.audience)
-    self.assertEqual(t.services, [])
+    self.assertEqual(t.audience, ['*'])
+    self.assertEqual(t.services, ['*'])
     self.assertFalse(t.HasField('impersonator_id'))
     self.assertTrue(t.subtoken_id is not None)
 
@@ -104,9 +101,7 @@ class HandlersTest(test_case.TestCase):
     self.assertEqual(resp.status_code, 201)
     self.assertEqual(12345, resp.json_body['validity_duration'])
 
-    subtokens = decode_token(resp.json_body['delegation_token'])
-    self.assertEqual(1, len(subtokens.subtokens))
-    t = subtokens.subtokens[0]
+    t = decode_token(resp.json_body['delegation_token'])
     self.assertEqual('user:c@a.com', t.issuer_id)
     self.assertTrue(t.creation_time >= time.time() - 30)
     self.assertEqual(12345, t.validity_duration)

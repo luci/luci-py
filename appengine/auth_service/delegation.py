@@ -122,9 +122,7 @@ class CreateDelegationTokenHandler(auth.ApiHandler):
 
     # Create and sign the token.
     try:
-      token = delegation.serialize_token(
-          delegation.seal_token(
-              delegation_pb2.SubtokenList(subtokens=[subtoken])))
+      token = delegation.serialize_token(delegation.seal_token(subtoken))
     except delegation.BadTokenError as exc:
       # This happens if resulting token is too large.
       self.abort_with_error(400, text=str(exc))
