@@ -122,7 +122,7 @@ class HandlersTest(test_case.TestCase):
   def test_audience_validation(self):
     def call(aud):
       return self.create_token({'audience': aud}, 'user:a@a.com').status_code
-    self.assertEqual(201, call(['group:abc', 'user:abc@a.com']))
+    self.assertEqual(201, call(['group:group', 'user:abc@a.com']))
     self.assertEqual(201, call([]))
     self.assertEqual(400, call('not a list'))
     self.assertEqual(400, call([123]))
@@ -170,8 +170,12 @@ class CheckCanCreateTokenTest(test_case.TestCase):
     return r
 
   def test_get_delegation_rule(self):
+    self.mock(
+        auth, 'is_group_member',
+        lambda g, m: g == 'gr' and m.to_bytes() == 'service:g')
+
     self.add_rule(
-        user_id=['service:a'],
+        user_id=['service:a', 'group:gr'],
         target_service=['service:b'],
         max_validity_duration=1)
     self.add_rule(
@@ -197,6 +201,7 @@ class CheckCanCreateTokenTest(test_case.TestCase):
           expected_max_validity_duration, rule.max_validity_duration)
 
     test(1, 'service:a', ['service:b'])
+    test(1, 'service:g', ['service:b'])
     test(2, 'service:a', ['service:x'])
     test(2, 'service:a', ['service:c'])
     test(3, 'service:x', ['service:c'])

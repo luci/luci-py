@@ -149,7 +149,7 @@ def subtoken_from_jsonish(d):
       if not isinstance(e, basestring):
         raise ValueError('"audience" must be a list of strings')
       if e.startswith('group:'):
-        if not auth.is_valid_group_name(e.lstrip('group:')):
+        if not auth.is_valid_group_name(e[len('group:'):]):
           raise ValueError('Invalid group name in "audience": %s' % e)
       else:
         try:
@@ -219,9 +219,10 @@ def get_delegation_rule(user_id, services):
   Returns:
     config_pb2.DelegationConfig.Rule if found, DEFAULT_RULE if not.
   """
+  ident = auth.Identity.from_bytes(user_id)
   services_set = set(services)
   for r in config.get_delegation_config().rules:
-    if '*' in r.user_id or user_id in r.user_id:
+    if any(is_identity_in_principal_set(ident, p) for p in r.user_id):
       if ('*' in r.target_service or
           '*' in services or
           services_set.issubset(r.target_service)):
@@ -235,15 +236,19 @@ def is_identity_in_principal_set(ident, principals):
   Args:
     ident: auth.Identity instance.
     principals: string, one of 'group:<name>', identity glob string ('user:*'),
-        or just a single identity ('user:abc@example.com').
+        a single identity ('user:abc@example.com'), or '*' (which stands for
+        'everyone', including anonymous).
 
   Returns:
     True or False. Also returns False if 'principals' is in unrecognized format.
   """
   try:
+    # Everyone?
+    if principals == '*':
+      return True
     # Group?
     if principals.startswith('group:'):
-      return auth.is_group_member(principals.lstrip('group:'), ident)
+      return auth.is_group_member(principals[len('group:'):], ident)
     # Glob?
     if '*' in principals:
       return auth.IdentityGlob.from_bytes(principals).match(ident)
