@@ -4,13 +4,20 @@
 
 import endpoints
 import httplib
+import json
+import logging
 import posixpath
+import urlparse
 
 from endpoints import protojson
+from google.appengine.api import memcache
+from google.appengine.api import modules
 from protorpc import message_types
 from protorpc import messages
 from protorpc import remote
 import webapp2
+
+from components import net
 
 
 PROTOCOL = protojson.EndpointsProtoJson()
@@ -143,3 +150,55 @@ def api_routes(api_class, base_path=None):
   for t in sorted(templates):
     routes.append(webapp2.Route(t, CorsHandler, methods=['OPTIONS']))
   return routes
+
+
+class DiscoveryHandler(webapp2.RequestHandler):
+  """Returns a discovery document for a service.
+
+  Piggy-backs on real Cloud Endpoints discovery service, requires it.
+  """
+
+  def get_doc(self, service, version):
+    cache_key = 'discovery_doc/%s/%s/%s' % (
+      modules.get_current_version_name(), service, version)
+    cached = memcache.get(cache_key)
+    if cached:
+      return cached[0]
+
+    logging.info('Fetching actual discovery document')
+
+    doc_url = '%s://%s/_ah/api/discovery/v1/apis/%s/%s/rest' % (
+      self.request.scheme,  # Needed for local devserver.
+      self.request.host,
+      service,
+      version)
+    try:
+      doc = net.json_request(url=doc_url, deadline=45)
+      logging.info('Fetched actual discovery document')
+    except net.NotFoundError:
+      doc = None
+
+    if doc:
+      for key in ('baseUrl', 'basePath', 'rootUrl'):
+        url = urlparse.urlparse(doc.get(key))
+        if url.path.startswith('/_ah/'):
+          url = url._replace(path=url.path[len('/_ah'):])
+        doc[key] = urlparse.urlunparse(url)
+
+      if 'batchPath' in doc:
+        del doc['batchPath']
+
+    memcache.add(cache_key, (doc,))
+    return doc
+
+  def get(self, service, version):
+    doc = self.get_doc(service, version)
+    if not doc:
+      self.abort(404, 'Not found')
+    self.response.headers['Content-Type'] = 'application/json'
+    json.dump(doc, self.response, separators=(',', ':'))
+
+
+def discovery_service_route():
+  return webapp2.Route(
+      '/api/discovery/v1/apis/<service>/<version>/rest', DiscoveryHandler)

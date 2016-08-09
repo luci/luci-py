@@ -60,6 +60,14 @@ def is_transient_error(response, url):
   return False
 
 
+def _error_class_for_status(status_code):
+  if status_code == 404:
+    return NotFoundError
+  if status_code in (401, 403):
+    return AuthError
+  return Error
+
+
 @ndb.tasklet
 def request_async(
     url,
@@ -124,6 +132,7 @@ def request_async(
 
   attempt = 0
   response = None
+  last_status_code = None
   while attempt < max_attempts:
     if attempt:
       logging.info('Retrying...')
@@ -143,6 +152,8 @@ def request_async(
       logging.warning('%s %s failed: %s', method, url, e)
       continue
 
+    last_status_code = response.status_code
+
     # Transient error on the other side.
     if is_transient_error(response, url):
       logging.warning(
@@ -155,12 +166,7 @@ def request_async(
       logging.warning(
           '%s %s failed with HTTP %d: %r',
           method, url, response.status_code, response.content)
-      cls = Error
-      if response.status_code == 404:
-        cls = NotFoundError
-      elif response.status_code in (401, 403):
-        cls = AuthError
-      raise cls(
+      raise _error_class_for_status(response.status_code)(
           'Failed to call %s: HTTP %d' % (url, response.status_code),
           response.status_code, response.content)
 
@@ -169,7 +175,7 @@ def request_async(
       logging.warning('Response size: %.1f KiB', len(response.content) / 1024.0)
     raise ndb.Return(response.content)
 
-  raise Error(
+  raise _error_class_for_status(last_status_code)(
       'Failed to call %s after %d attempts' % (url, max_attempts),
       response.status_code if response else None,
       response.content if response else None)
