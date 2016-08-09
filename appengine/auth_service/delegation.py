@@ -156,13 +156,18 @@ def subtoken_from_jsonish(d):
       if e.startswith('group:'):
         if not auth.is_valid_group_name(e[len('group:'):]):
           raise ValueError('Invalid group name in "audience": %s' % e)
-      else:
+      elif e != '*':
         try:
           auth.Identity.from_bytes(e)
         except ValueError as exc:
           raise ValueError(
               'Invalid identity name "%s" in "audience": %s' % (e, exc))
       msg.audience.append(str(e))
+    # TODO(vadimsh): Treat '*' as if an empty list have been passed. This is
+    # a temporary measure until all services switch to the new protocol and can
+    # validate tokens with '*' in them.
+    if '*' in msg.audience:
+      msg.audience[:] = []
 
   # 'services' is an optional list of identity names.
   if 'services' in d:
@@ -172,12 +177,18 @@ def subtoken_from_jsonish(d):
     for e in services:
       if not isinstance(e, basestring):
         raise ValueError('"services" must be a list of strings')
-      try:
-        auth.Identity.from_bytes(e)
-      except ValueError as exc:
-        raise ValueError(
-            'Invalid identity name "%s" in "services": %s' % (e, exc))
+      if e != '*':
+        try:
+          auth.Identity.from_bytes(e)
+        except ValueError as exc:
+          raise ValueError(
+              'Invalid identity name "%s" in "services": %s' % (e, exc))
       msg.services.append(str(e))
+    # TODO(vadimsh): Treat '*' as if an empty list have been passed. This is
+    # a temporary measure until all services switch to the new protocol and can
+    # validate tokens with '*' in them.
+    if '*' in msg.services:
+      msg.services[:] = []
 
   # 'validity_duration' is optional positive number within some defined bounds.
   if 'validity_duration' in d:
