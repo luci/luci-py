@@ -26,6 +26,8 @@
 
     // outputs
     columns: Array<String>, the columns that should be displayed.
+    dimensions: Array<String>, dimensions formatted like "dim:value", to be
+        used to filter server-side.
     filter: Object, an object {filter:Function} where filter will take one param
         (bot) and return a Boolean if it should be displayed given the
         current filters.
@@ -45,6 +47,7 @@
 <link rel="import" href="/res/imp/bower_components/paper-icon-button/paper-icon-button.html">
 <link rel="import" href="/res/imp/bower_components/paper-input/paper-input.html">
 
+<link rel="import" href="bot-list-shared.html">
 
 <dom-module id="bot-filters">
   <template>
@@ -206,50 +209,51 @@
   </template>
   <script>
   (function(){
-    var FILTER_SEP = " | ";
+    var FILTER_SEP = ":";
     // filterMap is a map of primary -> function.  The function returns a
     // boolean "does the bot (first arg) match the second argument".  These
     // functions will have "this" be the botlist, and will have access to all
     // functions defined in bot-list and bot-list-shared.
     var filterMap = {
-      cores: function(bot, cores){
-        var o = this._cores(bot);
+      android_devices: function(bot, num) {
+        var o = this._attribute(bot, "android_devices", "0");
+        return o.indexOf(num) !== -1;
+      },
+      cores: function(bot, cores) {
+        var o = this._attribute(bot, "cores");
         return o.indexOf(cores) !== -1;
       },
-      cpu: function(bot, cpu){
-        var o = this._dimension(bot, "cpu") || ["none"];
+      cpu: function(bot, cpu) {
+        var o = this._attribute(bot, "cpu");
         return o.indexOf(cpu) !== -1;
       },
-      devices: function(bot, device){
-        if (device === "none") {
-          return this._devices(bot).length === 0;
-        }
-        // extract the deviceType, if it is not "unknown".
-        device = this._unalias(device);
-        var found = false;
-        this._devices(bot).forEach(function(d) {
-          if (this._deviceType(d) === device) {
-            found = true;
-          }
-        }.bind(this));
-        return found;
+      device_os: function(bot, os) {
+        var o = this._attribute(bot, "device_os", "none");
+        return o.indexOf(os) !== -1;
       },
-      gpu: function(bot, gpu){
-        var o = this._dimension(bot, "gpu") || ["none"];
+      device_type: function(bot, dt) {
+        var o = this._attribute(bot, "device_type", "none");
+        return o.indexOf(this._unalias(dt)) !== -1;
+      },
+      disk_space: function(bot, space) {
+        return true;
+      },
+      gpu: function(bot, gpu) {
+        var o = this._attribute(bot, "gpu", "none");
         return o.indexOf(this._unalias(gpu)) !== -1;
       },
       id: function(bot, id) {
-        return bot.bot_id === id;
+        return true;
       },
-      os: function(bot, os){
-        var o = this._dimension(bot, "os") || ["Unknown"];
+      os: function(bot, os) {
+        var o = this._attribute(bot, "os");
         return o.indexOf(os) !== -1;
       },
-      pool: function(bot, pool){
-        var o = this._dimension(bot, "pool") || ["Unknown"];
+      pool: function(bot, pool) {
+        var o = this._attribute(bot, "pool");
         return o.indexOf(pool) !== -1;
       },
-      status: function(bot, status){
+      status: function(bot, status) {
         if (status === "quarantined") {
           return bot.quarantined;
         } else if (status === "dead") {
@@ -302,6 +306,9 @@
 
     Polymer({
       is: "bot-filters",
+
+      behaviors: [SwarmingBehaviors.BotListBehavior],
+
       properties: {
         // input
         primary_map: {
@@ -319,6 +326,11 @@
             // there on reload.
             return ["id","os","task","status"];
           },
+          notify: true,
+        },
+        dimensions: {
+          type: Array,
+          computed: "_extractDimensions(DIMENSIONS.*,_filters.*)",
           notify: true,
         },
         filter: {
@@ -545,6 +557,19 @@
         }
         return item.substring(match.idx + match.part.length);
       },
+
+      _extractDimensions: function() {
+        var dims = []
+        this._filters.forEach(function(f) {
+          var split = f.split(FILTER_SEP, 1)
+          var col = split[0];
+          if (this.DIMENSIONS.indexOf(col) !== -1) {
+            var rest = f.substring(col.length + FILTER_SEP.length);
+            dims.push(col + FILTER_SEP + this._unalias(rest))
+          };
+        }.bind(this));
+        return dims;
+      }
 
     });
   })();

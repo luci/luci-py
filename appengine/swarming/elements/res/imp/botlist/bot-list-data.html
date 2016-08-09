@@ -58,9 +58,18 @@
     <iron-ajax id="botlist"
        url="/_ah/api/swarming/v1/bots/list"
        headers="[[auth_headers]]"
+       params="[[_botlistParams(dimensions.*)]]"
        handle-as="json"
        last-response="{{_list}}"
        loading="{{_busy1}}">
+    </iron-ajax>
+
+    <iron-ajax id="dimensions"
+       url="/_ah/api/swarming/v1/bots/dimensions"
+       headers="[[auth_headers]]"
+       handle-as="json"
+       last-response="{{_dimensions}}"
+       loading="{{_busy2}}">
     </iron-ajax>
 
     <iron-ajax id="fleet"
@@ -68,17 +77,12 @@
        headers="[[auth_headers]]"
        handle-as="json"
        last-response="{{_count}}"
-       loading="{{_busy2}}">
+       loading="{{_busy3}}">
     </iron-ajax>
   </template>
   <script>
   (function(){
-    // TODO(kjlubick): Add more of these as well as things from state
-    // i.e. disk space remaining.
-    var DIMENSIONS = ["cores", "cpu", "id", "os", "pool"];
-     // "gpu" and "devices" are added separately because we need to
-     // deal with aliases.
-    var BOT_PROPERTIES = ["gpu", "devices", "task", "status"];
+
     Polymer({
       is: 'bot-list-data',
 
@@ -90,6 +94,9 @@
           type: Object,
           observer: "signIn",
         },
+        dimensions: {
+          type: Array,
+        },
 
         //outputs
         bots: {
@@ -99,7 +106,7 @@
         },
         busy: {
           type: Boolean,
-          computed: "_or(_busy1,_busy2)",
+          computed: "_or(_busy1,_busy2,_busy3)",
           notify: true,
         },
         fleet: {
@@ -109,19 +116,21 @@
         },
         primary_map: {
           type:Object,
-          computed: "_primaryMap(bots)",
+          computed: "_primaryMap(_dimensions)",
           notify: true,
         },
         primary_arr: {
-          type:Array,
-          value: function() {
-            return DIMENSIONS.concat(BOT_PROPERTIES);
-          },
+          type: Array,
+          // DIMENSIONS and BOT_PROPERTIES are inherited from BotListBehavior
+          computed: "_primaryArr(DIMENSIONS, BOT_PROPERTIES)",
           notify: true,
         },
 
         // private
         _count: {
+          type: Object,
+        },
+        _dimensions: {
           type: Object,
         },
         _list: {
@@ -130,16 +139,45 @@
       },
 
       signIn: function(){
-        this.$.botlist.generateRequest();
-        this.$.fleet.generateRequest();
+        this.$.botlist.auto = true;
+        this.$.dimensions.auto = true;
+        this.$.fleet.auto = true;
+      },
+
+      _botlistParams: function() {
+        if (!this.dimensions) {
+          return {};
+        }
+        return {
+          dimensions: this.dimensions,
+        };
       },
 
       _bots: function(){
         if (!this._list || !this._list.items) {
           return [];
         }
-        this._list.items.forEach(function(o){
-          o.state = JSON.parse(o.state);
+        // Do any preprocessing here
+        this._list.items.forEach(function(bot){
+          // Parse the state, which is a JSON string.  This contains a lot of
+          // interesting information like details about the devices attached.
+          bot.state = JSON.parse(bot.state);
+          // get the disks in an easier to deal with format, sorted by size.
+          var disks = bot.state["disks"];
+          var keys = Object.keys(disks);
+          if (!keys || !keys.length) {
+            bot.disks = [{"id": "unknown", "mb": 0}];
+          } else {
+            bot.disks = [];
+            for (var i = 0; i < keys.length; i++) {
+              bot.disks.push({"id":keys[i], "mb":disks[keys[i]].free_mb});
+            }
+            // Sort these so the biggest disk comes first.
+            bot.disks.sort(function(a, b) {
+              return b.mb - a.mb;
+            });
+          }
+
         });
         return this._list.items;
       },
@@ -158,58 +196,62 @@
         }
       },
 
-      _primaryMap: function(bots){
+      _primaryArr: function(dimensions, properties) {
+        return dimensions.concat(properties);
+      },
+
+      _primaryMap: function(dimensions){
         // map will keep track of dimensions that we have seen at least once.
         // This will then basically get turned into an array to be used for
         // filtering.
-        var map = {};
-        DIMENSIONS.forEach(function(p){
-          map[p] = {};
-        });
-        map["devices"] = {};
-        map["gpu"] = {};
-        bots.forEach(function(b){
-          DIMENSIONS.forEach(function(d){
-            var dims = this._dimension(b, d) || [];
-            dims.forEach(function(e){
-              map[d][e] = true;
-            });
-          }.bind(this));
+        dimensions = dimensions.bots_dimensions;
 
-          // Add Android devices and their aliases
-          this._devices(b).forEach(function(d){
-            var dt = this._deviceType(d);
-            var alias = this._androidAlias(d);
-            if (dt !== "unknown") {
-              dt = this._applyAlias(dt,alias);
-            }
-            map["devices"][dt] = true;
-          }.bind(this));
-          map["devices"]["none"] = true;
-
-          // Add GPUs and their aliases
-          var gpus = this._dimension(b, "gpu") || [];
-          gpus.forEach(function(g){
-            var alias = this._gpuAlias(g);
-            if (alias !== "UNKNOWN") {
-              map["gpu"][this._applyAlias(g, alias)] = true;
-            } else {
-              map["gpu"][g] = true;
-            }
-
-          }.bind(this));
+        var pMap = {};
+        dimensions.forEach(function(d){
+          if (this.DIMENSIONS_WITH_ALIASES.indexOf(d.key) === -1) {
+            // value is an array of all seen values for the dimension d.key
+            pMap[d.key] = d.value;
+          } else if (d.key === "gpu") {
+            var gpus = [];
+            d.value.forEach(function(g){
+              var alias = this._gpuAlias(g);
+              if (alias !== "unknown") {
+                gpus.push(this._applyAlias(g, alias));
+              } else {
+                gpus.push(g);
+              }
+            }.bind(this));
+            pMap["gpu"] = gpus;
+          } else if (d.key === "device_type") {
+            var devs = [];
+            d.value.forEach(function(dt){
+              var alias = this._androidAlias(dt);
+              if (alias !== "unknown") {
+                devs.push(this._applyAlias(dt, alias));
+              } else {
+                devs.push(dt);
+              }
+            }.bind(this));
+            pMap["device_type"] = devs;
+          } else {
+            console.log("Unknown alias type: ", d);
+          }
         }.bind(this));
 
-        // Turn the Map<Object,Map<Boolean>> into a Map<Object,Array<String>>
-        // with all of the secondary elements sorted appropriately.
-        var pMap = {};
-        for (key in map){
-          pMap[key] = Object.keys(map[key]).sort(swarming.naturalCompare);
-        }
+        // Add some options that might not show up.
+        pMap["android_devices"].push("0");
+        pMap["device_os"].push("none");
+        pMap["device_type"].push("none");
+
+        pMap["id"] = [];
 
         // Create custom filter options
+        pMap["disk_space"] = [];
         pMap["task"] = ["busy", "idle"];
         pMap["status"] = ["available", "dead", "quarantined"];
+
+        // No need to sort any of this, bot-filters sorts secondary items
+        // automatically, especially when the user types a query.
         return pMap;
       },
 

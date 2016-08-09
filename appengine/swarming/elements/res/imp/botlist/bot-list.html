@@ -93,6 +93,7 @@
             primary_arr="[[_primary_arr]]"
 
             columns="{{_columns}}"
+            dimensions="{{_dimensions}}"
             filter="{{_filter}}"
             verbose="{{_verbose}}">
           </bot-filters>
@@ -106,6 +107,7 @@
 
         <bot-list-data
           auth_headers="[[_auth_headers]]"
+          dimensions="[[_dimensions]]"
 
           bots="{{_bots}}"
           busy="{{_busy}}"
@@ -187,7 +189,7 @@
               <template is="dom-repeat"
                     items="[[_devices(bot)]]"
                     as="device">
-                <tr hidden$="[[_hide('devices', _columns.*)]]"
+                <tr hidden$="[[_hide('android_devices', _columns.*)]]"
                     class$="[[_deviceClass(device)]]">
                   <td></td>
                   <td hidden$="[[_hide('task', _columns.*)]]"></td>
@@ -215,9 +217,12 @@
     var headerMap = {
       // "id" and "task" are special, so they don't go here and have their
       // headers hard-coded below.
+      "android_devices": "Android Devices",
       "cores": "Cores",
       "cpu": "CPU",
-      "devices": "Devices",
+      "device_os": "Device OS",
+      "device_type": "Device Type",
+      "disk_space": "Free Space (MB)",
       "gpu": "GPU",
       "os": "OS",
       "pool": "Pool",
@@ -228,35 +233,62 @@
     // given bot. These functions are bound to this element, and have access
     // to all functions defined here and in bot-list-shared.
     var columnMap = {
+      android_devices: function(bot) {
+        var devs = this._attribute(bot, "android_devices", "0");
+        if (this._verbose) {
+          return devs.join(" | ") + " devices available";
+        }
+        // max() works on strings as long as they can be coerced to Number.
+        return Math.max(...devs) + " devices available";
+      },
       cores: function(bot){
-        var cores =  this._cores(bot);
+        var cores = this._attribute(bot, "cores");
         if (this._verbose){
           return cores.join(" | ");
         }
         return cores[0];
       },
       cpu: function(bot){
-        var cpus = this._dimension(bot, 'cpu') || ['Unknown'];
+        var cpus = this._attribute(bot, "cpu");
         if (this._verbose){
           return cpus.join(" | ");
         }
         return cpus[0];
       },
-      devices: function(bot){
-        return this._devices(bot).length + " devices attached";
+      device_os: function(bot){
+        var os = this._attribute(bot, "device_os", "none");
+        if (this._verbose) {
+          return os.join(" | ");
+        }
+        return os[0];
+      },
+      device_type: function(bot){
+        var dt = this._attribute(bot, "device_type", "none");
+        if (this._verbose) {
+          return dt.join(" | ");
+        }
+        return dt[0];
+      },
+      disk_space: function(bot) {
+        var aliased = [];
+        bot.disks.forEach(function(disk){
+          var alias = swarming.humanBytes(disk.mb, swarming.MB);
+          aliased.push(this._applyAlias(disk.mb, disk.id + " "+ alias));
+        }.bind(this));
+        if (this._verbose) {
+          return aliased.join(" | ");
+        }
+        return aliased[0];
       },
       gpu: function(bot){
-        var gpus = this._dimension(bot, 'gpu')
-        if (!gpus) {
-          return "none";
-        }
+        var gpus = this._attribute(bot, "gpu", "none")
         var verbose = []
         var named = [];
         // non-verbose mode has only the top level GPU info "e.g. NVidia"
         // which is found by looking for gpu ids w/o a colon.
         gpus.forEach(function(g){
           var alias = this._gpuAlias(g);
-          if (alias === "UNKNOWN") {
+          if (alias === "unknown") {
             verbose.push(g);
             if (g.indexOf(":") === -1) {
               named.push(g);
@@ -277,29 +309,71 @@
         return bot.bot_id;
       },
       os: function(bot) {
-        var os = this._dimension(bot, 'os') || ['Unknown'];
+        var os = this._attribute(bot, "os");
         if (this._verbose){
           return os.join(" | ");
         }
         return os[0];
       },
       pool: function(bot) {
-        var pool = this._dimension(bot, 'pool') || ['Unknown'];
+        var pool = this._attribute(bot, "pool");
         return pool.join(" | ");
       },
       status: function(bot) {
         // If a bot is both dead and quarantined, show the deadness over the
         // quarentinedness.
         if (bot.is_dead) {
-          return "Dead: " + bot.is_dead;
+          return "Dead.  Last seen " + swarming.diffDate(bot.last_seen_ts) +
+              " ago";
         }
         if (bot.quarantined) {
-          return "Quarantined: " + bot.quarantined;
+          return "Quarantined: " + this._attribute(bot, "quarantined");
         }
         return "Alive";
       },
       task: function(bot){
         return this._taskId(bot);
+      },
+    };
+
+    var deviceColumnMap = {
+      android_devices: function(device) {
+        var str = this._androidAliasDevice(device);
+        if (device.okay) {
+          str = this._applyAlias(this._deviceType(device), str);
+        }
+        str += " S/N:";
+        str += device.serial;
+        return str;
+      },
+      device_os: function(device) {
+        if (device.build) {
+          return device.build["build.id"];
+        }
+        return "unknown";
+      },
+      status: function(device) {
+        return device.state;
+      }
+    }
+
+    // specialSort defines any custom sorting rules. By default, a
+    // naturalCompare of the column content is done.
+    var specialSort = {
+      device_type: function(dir, botA, botB) {
+        // We sort on the number of attached devices. Note that this
+        // may not be the same as android_devices, because _devices().length
+        // counts all devices plugged into the bot, whereas android_devices
+        // counts just devices ready for work.
+        var botACol = this._devices(botA).length;
+        var botBCol = this._devices(botB).length;
+        return dir * swarming.naturalCompare(botACol, botBCol);
+      },
+      disk_space: function(dir, botA, botB) {
+        // We sort based on the raw number of MB of the first disk.
+        var botACol = botA.disks[0].mb;
+        var botBCol = botB.disks[0].mb;;
+        return dir * swarming.naturalCompare(botACol, botBCol);
       },
     };
 
@@ -370,20 +444,19 @@
         return columnMap[col].bind(this)(bot);
       },
 
+      _androidAliasDevice: function(device) {
+        if (device.notReady) {
+          return UNAUTHENTICATED.toUpperCase();
+        }
+        return this._androidAlias(this._deviceType(device));
+      },
+
       _deviceColumn: function(col, device) {
-        if (col === "devices") {
-          var str = this._androidAlias(device);
-          if (device.okay) {
-            str = this._applyAlias(this._deviceType(device), str);
-          }
-          str += " S/N:";
-          str += device.serial;
-          return str;
+        var f = deviceColumnMap[col];
+        if (!f || !device) {
+          return "";
         }
-        if (col === "status") {
-          return device.state;
-        }
-        return "";
+        return f.bind(this)(device);
       },
 
       _deviceClass: function(device) {
@@ -426,6 +499,11 @@
         if (this._sort.direction === "desc") {
           dir = -1;
         }
+        var sort = specialSort[this._sort.name];
+        if (sort) {
+          return sort.bind(this)(dir, botA, botB);
+        }
+        // Default to a natural compare of the columns.
         var botACol = this._column(this._sort.name, botA);
         var botBCol = this._column(this._sort.name, botB);
 

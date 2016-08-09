@@ -17,6 +17,7 @@
     var ANDROID_ALIASES = {
       "bullhead": "Nexus 5X",
       "flo": "Nexus 7",
+      "flounder": "Nexus 9",
       "hammerhead": "Nexus 5",
       "mako": "Nexus 4",
       "shamu": "Nexus 6",
@@ -28,11 +29,13 @@
 
     var UNAUTHENTICATED = "unauthenticated";
     var AVAILABLE = "available";
+    var UNKNOWN = "unknown";
 
     var GPU_ALIASES = {
       "1002": "AMD",
       "1002:6779": "AMD Radeon HD 6450/7450/8450",
       "1002:6821": "AMD Radeon HD 8870M",
+      "1002:9830": "AMD Radeon HD 8400",
       "102b":      "Matrox",
       "102b:0522": "Matrox MGA G200e",
       "102b:0532": "Matrox MGA G200eW",
@@ -58,16 +61,32 @@
     // This behavior wraps up all the shared bot-list functionality.
     SwarmingBehaviors.BotListBehavior = {
 
-      _androidAlias: function(device) {
-        if (device.notReady) {
-          return UNAUTHENTICATED.toUpperCase();
-        }
-        var t = this._deviceType(device);
-        var a = ANDROID_ALIASES[t];
-        if (!a) {
-          return "UNKNOWN";
-        }
-        return a;
+      properties: {
+        // TODO(kjlubick): Add more of these things from state, as they
+        // needed/useful/requested.
+        DIMENSIONS: {
+          type: Array,
+          value: function(){
+            return ["android_devices", "cores", "cpu", "device_type",
+                "device_os", "gpu", "id", "os", "pool"];
+          },
+        },
+        DIMENSIONS_WITH_ALIASES: {
+          type: Array,
+          value: function(){
+            return ["device_type", "gpu"];
+          },
+        },
+        BOT_PROPERTIES: {
+          type: Array,
+          value: function() {
+            return ["disk_space", "task", "status"];
+          }
+        },
+      },
+
+      _androidAlias: function(dt) {
+        return ANDROID_ALIASES[dt] || UNKNOWN;
       },
 
       // _applyAlias is the consistent way to modify a string to show its alias.
@@ -75,15 +94,12 @@
         return alias +" ("+orig+")";
       },
 
-      _cores: function(bot) {
-        // For whatever reason, sometimes cores are in dimensions and sometimes
-        // they are in state, but never both.
-        var c = (bot && bot.state && bot.state.cores);
-        if (c && c.length > 0) {
-          return c;
-        }
-        c = this._dimension(bot, "cores") || ["Unknown"];
-        return c;
+      // _attribute looks first in dimension and then in state for the
+      // specified attribute. This will always return an array. If there is
+      // no matching attribute, ["unknown"] will be returned.
+      _attribute: function(bot, attr, none) {
+        none = none || UNKNOWN;
+        return this._dimension(bot, attr) || this._state(bot, attr) || [none];
       },
 
       _devices: function(bot) {
@@ -102,15 +118,15 @@
       // _deviceType returns the codename of a given Android device.
       _deviceType: function(device) {
         if (!device || !device.build) {
-          return "unknown";
+          return UNKNOWN;
         }
         var t = device.build["build.product"] || device.build["product.board"] ||
-                device.build["product.device"] || "unknown";
+                device.build["product.device"] || UNKNOWN;
         return t.toLowerCase();
       },
 
       // _dimension returns the given dimension of a bot. If it is defined, it
-      // is typically an array of strings.
+      // is an array of strings.
       _dimension: function(bot, dim) {
         if (!bot || !bot.dimensions || !dim) {
           return undefined;
@@ -124,11 +140,7 @@
       },
 
       _gpuAlias: function(gpu) {
-        var a = GPU_ALIASES[gpu];
-        if (!a) {
-          return "UNKNOWN";
-        }
-        return a;
+        return GPU_ALIASES[gpu] || UNKNOWN;
       },
 
       _not: function(a) {
@@ -142,6 +154,20 @@
           result = result || arguments[i];
         }
         return result;
+      },
+
+      // _state returns the requested attribute from a bot's state.
+      // For consistency with _dimension, if the attribute is not an array,
+      // it is put as the only element in an array.
+      _state: function(bot, attr) {
+        if (!bot || !bot.state || !bot.state[attr]) {
+          return undefined
+        }
+        var state = bot.state[attr];
+        if (Array.isArray(state)) {
+          return state;
+        }
+        return [state];
       },
 
       _taskId: function(bot) {
