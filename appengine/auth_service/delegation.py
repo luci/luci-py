@@ -111,6 +111,11 @@ class CreateDelegationTokenHandler(auth.ApiHandler):
     # Check ACL (raises auth.AuthorizationError on errors).
     rule = check_can_create_token(user_id, subtoken)
 
+    # "All services" is represented as an empty list in the encoded token.
+    # TODO(vadimsh): Use '*' in proto message too.
+    if '*' in subtoken.services:
+      subtoken.services[:] = []
+
     # Register the token in the datastore, generate its ID.
     subtoken.subtoken_id = register_subtoken(
         subtoken, rule, intent, auth.get_peer_ip())
