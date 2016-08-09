@@ -143,42 +143,53 @@ def refetch_config(force=False):
 
 @validation.self_rule('delegation.cfg', config_pb2.DelegationConfig)
 def validate_delegation_config(conf, ctx):
-  # Helper to valid a required list of identifies (or '*').
-  def validate_ident_list(name, lst):
+  def validate_service_list(name, lst):
     if not lst:
       ctx.error('missing %s field', name)
       return
     for uid in lst:
-      if uid != '*':
-        try:
-          model.Identity.from_bytes(uid)
-        except ValueError as exc:
-          ctx.error('bad identity string "%s" in %s: %s', uid, name, exc)
+      if uid == '*':
+        continue
+      try:
+        ident = model.Identity.from_bytes(uid)
+        if ident.kind != 'service':
+          ctx.error('%s: expecting "service:" identity, got "%s"', name, uid)
+      except ValueError as exc:
+        ctx.error('%s: bad identity string "%s": %s', name, uid, exc)
     if '*' in lst and len(lst) != 1:
       ctx.warning('redundant entries in %s, it has "*"" already', name)
 
+  def validate_principal_list(name, lst, required=False):
+    if required and not lst:
+      ctx.error('missing %s field', name)
+      return
+    for p in lst:
+      if p == '*':
+        continue
+      if p.startswith('group:'):
+        group = p[len('group:'):]
+        if not model.is_valid_group_name(group):
+          ctx.error('%s: not a valid group name: %s', name, group)
+        continue
+      if '*' in p:
+        try:
+          model.IdentityGlob.from_bytes(p)
+        except ValueError as exc:
+          ctx.error('%s: not a valid identity glob "%s": %s', name, p, exc)
+        continue
+      try:
+        model.Identity.from_bytes(p)
+      except ValueError as exc:
+        ctx.error('%s: not a valid identity "%s": %s', name, p, exc)
+
   for idx, r in enumerate(conf.rules):
     with ctx.prefix('rules #%d: ', idx):
-      validate_ident_list('user_id', r.user_id)
-      validate_ident_list('target_service', r.target_service)
+      validate_service_list('target_service', r.target_service)
+      validate_principal_list('user_id', r.user_id, required=True)
+      validate_principal_list(
+          'allowed_to_impersonate', r.allowed_to_impersonate)
       if r.max_validity_duration <= 0:
         ctx.error('max_validity_duration must be a positive integer')
-      for s in r.allowed_to_impersonate:
-        if s.startswith('group:'):
-          name = s[len('group:'):]
-          if not model.is_valid_group_name(name):
-            ctx.error('not a valid group name: %s', name)
-          continue
-        if '*' in s:
-          try:
-            model.IdentityGlob.from_bytes(s)
-          except ValueError as exc:
-            ctx.error('not a valid identity glob "%s": %s', s, exc)
-          continue
-        try:
-          model.Identity.from_bytes(s)
-        except ValueError as exc:
-          ctx.error('not a valid identity "%s": %s', s, exc)
 
 
 # TODO(vadimsh): Below use validation context for real (e.g. emit multiple

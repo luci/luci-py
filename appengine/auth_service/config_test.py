@@ -463,7 +463,7 @@ class ConfigTest(test_case.TestCase):
     # Good one.
     msg = self.call_validate_delegation_config(
         config_pb2.DelegationConfig.Rule(
-            user_id=['service:abc'],
+            user_id=['service:abc', 'group:group'],
             target_service=['service:def'],
             max_validity_duration=3600,
             allowed_to_impersonate=['user:a@a.com', 'bot:*', 'group:abc']))
@@ -486,19 +486,9 @@ class ConfigTest(test_case.TestCase):
             max_validity_duration=3600,
             allowed_to_impersonate=['user:a@a.com', 'bot:*', 'group:abc']))
     self.assertEqual([
-      'rules #0: bad identity string "wat" in user_id: '
+      'rules #0: user_id: not a valid identity "wat": '
       'Missing \':\' separator in Identity string'
     ], msg)
-
-    # Star + redundant entries.
-    msg = self.call_validate_delegation_config(
-        config_pb2.DelegationConfig.Rule(
-            user_id=['*', 'user:a@a.com'],
-            target_service=['service:def'],
-            max_validity_duration=3600,
-            allowed_to_impersonate=['user:a@a.com', 'bot:*', 'group:abc']))
-    self.assertEqual(
-        ['rules #0: redundant entries in user_id, it has "*"" already'], msg)
 
   def test_validate_delegation_config_target_service(self):
     # Empty target_service list.
@@ -517,7 +507,7 @@ class ConfigTest(test_case.TestCase):
             max_validity_duration=3600,
             allowed_to_impersonate=['user:a@a.com', 'bot:*', 'group:abc']))
     self.assertEqual([
-      'rules #0: bad identity string "wat" in target_service: '
+      'rules #0: target_service: bad identity string "wat": '
       'Missing \':\' separator in Identity string'
     ], msg)
 
@@ -557,19 +547,15 @@ class ConfigTest(test_case.TestCase):
     self.assertEqual([], call('service:abc'))
     # Bad cases.
     self.assertEqual(
-        ['rules #0: not a valid group name: bad\\name'],
+        ['rules #0: allowed_to_impersonate: not a valid group name: bad\\name'],
         call('group:bad\\name'))
     self.assertEqual([
-      'rules #0: not a valid identity glob "hmm:*": '
+      'rules #0: allowed_to_impersonate: not a valid identity glob "hmm:*": '
       'Invalid Identity kind: hmm'
     ], call('hmm:*'))
     self.assertEqual([
-      'rules #0: not a valid identity glob "*": Missing \':\' '
-      'separator in IdentityGlob string'
-    ], call('*'))
-    self.assertEqual([
-      'rules #0: not a valid identity "a@a.com": Missing \':\' '
-      'separator in Identity string'
+      'rules #0: allowed_to_impersonate: not a valid identity "a@a.com": '
+      'Missing \':\' separator in Identity string'
     ], call('a@a.com'))
 
   def test_update_service_config(self):
