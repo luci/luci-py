@@ -26,6 +26,7 @@ from components import utils
 from components.machine_provider import rpc_messages
 
 import acl
+import config
 import metrics
 import models
 
@@ -529,4 +530,8 @@ class MachineProviderEndpoints(remote.Service):
 
 
 def create_endpoints_app():
-  return endpoints.api_server([CatalogEndpoints, MachineProviderEndpoints])
+  return endpoints.api_server([
+    CatalogEndpoints,
+    MachineProviderEndpoints,
+    config.ConfigApi,
+  ])

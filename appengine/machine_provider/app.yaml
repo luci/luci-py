@@ -26,6 +26,7 @@ handlers:
 
 includes:
 - components/auth
+- components/config
 - gae_ts_mon
 
 libraries:

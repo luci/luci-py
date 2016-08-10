@@ -8,19 +8,29 @@ from components import utils
 
 import gae_ts_mon
 
+import config
 import handlers_cron
 import handlers_endpoints
 import handlers_frontend
 import handlers_queues
 
 
-utils.set_task_queue_module('default')
+def is_enabled_callback():
+  return config.settings().enable_ts_monitoring
 
-cron_app = handlers_cron.create_cron_app()
-endpoints_app = handlers_endpoints.create_endpoints_app()
-frontend_app = handlers_frontend.create_frontend_app()
-queue_app = handlers_queues.create_queues_app()
 
-gae_ts_mon.initialize(app=cron_app)
-gae_ts_mon.initialize(app=frontend_app)
-gae_ts_mon.initialize(app=queue_app)
+def main():
+  utils.set_task_queue_module('default')
+  apps = (
+    handlers_endpoints.create_endpoints_app(),
+    handlers_cron.create_cron_app(),
+    handlers_frontend.create_frontend_app(),
+    handlers_queues.create_queues_app(),
+  )
+  for app in apps[1:]:
+    # Not callable on endpoints app
+    gae_ts_mon.initialize(app=app, is_enabled_fn=is_enabled_callback)
+  return apps
+
+
+endpoints_app, cron_app, frontend_app, queue_app = main()
