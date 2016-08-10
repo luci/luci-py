@@ -48,6 +48,21 @@ class StringListPair(messages.Message):
   value = messages.StringField(2, repeated=True)
 
 
+class ThreeStateBool(messages.Enum):
+  FALSE = 1
+  TRUE = 2
+  NONE = 3
+
+
+def to_bool(three_state):
+  if three_state in (None, True, False):
+    return three_state
+  if three_state == ThreeStateBool.FALSE:
+    return False
+  if three_state == ThreeStateBool.TRUE:
+    return True
+
+
 ### Server related.
 
 
@@ -308,6 +323,15 @@ class BotsRequest(messages.Message):
   # Must be a list of 'key:value' strings to filter the returned list of bots
   # on.
   dimensions = messages.StringField(3, repeated=True)
+  quarantined = messages.EnumField(ThreeStateBool, 4, default='NONE')
+  is_dead = messages.EnumField(ThreeStateBool, 5, default='NONE')
+
+
+class BotsCountRequest(messages.Message):
+  """Information needed to request bot counts."""
+  # Must be a list of 'key:value' strings to filter the returned list of bots
+  # on.
+  dimensions = messages.StringField(1, repeated=True)
 
 
 class BotEventsRequest(messages.Message):

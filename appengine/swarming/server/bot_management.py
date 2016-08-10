@@ -28,6 +28,7 @@
   entities which are generated from data provided by the bot itself.
 """
 
+import datetime
 import hashlib
 
 from google.appengine.ext import ndb
@@ -265,6 +266,30 @@ def get_events_query(bot_id, order):
 def get_settings_key(bot_id):
   """Returns the BotSettings ndb.Key for a known bot."""
   return ndb.Key(BotSettings, 'settings', parent=get_root_key(bot_id))
+
+
+def filter_dimensions(q, dimensions):
+  """Filters a ndb.Query for BotInfo based on dimensions in the request."""
+  for d in dimensions:
+    parts = d.split(':', 1)
+    if len(parts) != 2 or any(i.strip() != i or not i for i in parts):
+      raise ValueError('Invalid dimensions')
+    q = q.filter(BotInfo.dimensions_flat == d)
+  return q
+
+
+def filter_availability(q, quarantined, is_dead, now):
+  """Filters a ndb.Query for BotInfo based on quarantined/is_dead."""
+  if quarantined is not None:
+    q = q.filter(BotInfo.quarantined == quarantined)
+
+  dt = datetime.timedelta(seconds=config.settings().bot_death_timeout_secs)
+  timeout = now - dt
+  if is_dead:
+    q = q.filter(BotInfo.last_seen_ts < timeout)
+  elif is_dead is not None:
+    q = q.filter(BotInfo.last_seen_ts > timeout)
+  return q
 
 
 def bot_event(

@@ -608,6 +608,7 @@ class SwarmingBotService(remote.Service):
 @swarming_api.api_class(resource_name='bots', path='bots')
 class SwarmingBotsService(remote.Service):
   """Bots-related API."""
+
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
       swarming_rpcs.BotsRequest, swarming_rpcs.BotList,
@@ -620,14 +621,15 @@ class SwarmingBotsService(remote.Service):
     """
     logging.info('%s', request)
     now = utils.utcnow()
-    q = bot_management.BotInfo.query().order(bot_management.BotInfo.key)
-    for d in request.dimensions:
-      if not ':' in d:
-        raise endpoints.BadRequestException('Invalid dimensions')
-      parts = d.split(':', 1)
-      if len(parts) != 2 or any(i.strip() != i or not i for i in parts):
-        raise endpoints.BadRequestException('Invalid dimensions')
-      q = q.filter(bot_management.BotInfo.dimensions_flat == d)
+    q = bot_management.BotInfo.query()
+    try:
+      q = bot_management.filter_dimensions(q, request.dimensions)
+      q = bot_management.filter_availability(
+          q, swarming_rpcs.to_bool(request.quarantined),
+          swarming_rpcs.to_bool(request.is_dead), now)
+    except ValueError as e:
+      raise endpoints.BadRequestException('%s' % e)
+
     bots, cursor = datastore_utils.fetch_page(q, request.limit, request.cursor)
     return swarming_rpcs.BotList(
         cursor=cursor,
@@ -645,18 +647,16 @@ class SwarmingBotsService(remote.Service):
     logging.info('%s', request)
     now = utils.utcnow()
     q = bot_management.BotInfo.query()
-    for d in request.dimensions:
-      parts = d.split(':', 1)
-      if len(parts) != 2 or any(i.strip() != i or not i for i in parts):
-        raise endpoints.BadRequestException('Invalid dimensions: %s' % d)
-      q = q.filter(bot_management.BotInfo.dimensions_flat == d)
+    try:
+      q = bot_management.filter_dimensions(q, request.dimensions)
+    except ValueError as e:
+      raise endpoints.BadRequestException(str(e))
+
     f_count = q.count_async()
-    dt = datetime.timedelta(seconds=config.settings().bot_death_timeout_secs)
-    timeout = now - dt
-    f_dead = q.filter(
-        bot_management.BotInfo.last_seen_ts < timeout).count_async()
-    f_quarantined = q.filter(
-        bot_management.BotInfo.quarantined == True).count_async()
+    f_dead = (bot_management.filter_availability(q, None, True, now)
+        .count_async())
+    f_quarantined = (bot_management.filter_availability(q, True, None, now)
+        .count_async())
     f_busy = q.filter(bot_management.BotInfo.is_busy == True).count_async()
     return swarming_rpcs.BotsCount(
         count=f_count.get_result(),
@@ -664,6 +664,7 @@ class SwarmingBotsService(remote.Service):
         dead=f_dead.get_result(),
         busy=f_busy.get_result(),
         now=now)
+
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(

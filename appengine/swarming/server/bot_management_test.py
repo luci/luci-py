@@ -230,6 +230,12 @@ class BotManagementTest(test_case.TestCase):
         bot_management.BotRoot, 'foo', bot_management.BotSettings, 'settings')
     self.assertEqual(expected, bot_management.get_settings_key('foo'))
 
+  def test_filter_dimensions(self):
+    pass # Tested in handlers_endpoints_test
+
+  def test_filter_availability(self):
+    pass # Tested in handlers_endpoints_test
+
 if __name__ == '__main__':
   logging.basicConfig(
       level=logging.DEBUG if '-v' in sys.argv else logging.ERROR)

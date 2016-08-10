@@ -1377,6 +1377,16 @@ class BotsApiTest(BaseTest):
   def test_list_ok(self):
     """Asserts that BotInfo is returned for the appropriate set of bots."""
     self.set_as_privileged_user()
+    then = datetime.datetime(2009, 1, 2, 3, 4, 5, 6)
+    then_str = unicode(then.strftime(self.DATETIME_FORMAT))
+    self.mock_now(then)
+    # Add three bot events, corresponding to one dead bot, one quarantined bot,
+    # and one good bot
+    bot_management.bot_event(
+        event_type='bot_connected', bot_id='id3',
+        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
+        dimensions={'foo': ['bar'], 'id': ['id3']}, state={'ram': 65},
+        version='123456789', quarantined=False, task_id=None, task_name=None)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     now_str = unicode(now.strftime(self.DATETIME_FORMAT))
     self.mock_now(now)
@@ -1385,40 +1395,146 @@ class BotsApiTest(BaseTest):
         external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
         dimensions={'foo': ['bar'], 'id': ['id1']}, state={'ram': 65},
         version='123456789', quarantined=False, task_id=None, task_name=None)
-    expected = {
-      u'items': [
-        {
-          u'authenticated_as': u'bot:whitelisted-ip',
-          u'bot_id': u'id1',
-          u'dimensions': [
-            {u'key': u'foo', u'value': [u'bar']},
-            {u'key': u'id', u'value': [u'id1']},
-          ],
-          u'external_ip': u'8.8.4.4',
-          u'first_seen_ts': now_str,
-          u'is_dead': False,
-          u'last_seen_ts': now_str,
-          u'quarantined': False,
-          u'state': u'{"ram":65}',
-          u'version': u'123456789',
-        },
+    bot_management.bot_event(
+        event_type='bot_connected', bot_id='id2',
+        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
+        dimensions={'foo': ['bar'], 'id': ['id2']}, state={'ram': 65},
+        version='123456789', quarantined=True, task_id=None, task_name=None)
+    bot1 = {
+      u'authenticated_as': u'bot:whitelisted-ip',
+      u'bot_id': u'id1',
+      u'dimensions': [
+        {u'key': u'foo', u'value': [u'bar']},
+        {u'key': u'id', u'value': [u'id1']},
       ],
+      u'external_ip': u'8.8.4.4',
+      u'first_seen_ts': now_str,
+      u'is_dead': False,
+      u'last_seen_ts': now_str,
+      u'quarantined': False,
+      u'state': u'{"ram":65}',
+      u'version': u'123456789',
+    }
+    bot2 = {
+      u'authenticated_as': u'bot:whitelisted-ip',
+      u'bot_id': u'id2',
+      u'dimensions': [
+        {u'key': u'foo', u'value': [u'bar']},
+        {u'key': u'id', u'value': [u'id2']},
+      ],
+      u'external_ip': u'8.8.4.4',
+      u'first_seen_ts': now_str,
+      u'is_dead': False,
+      u'last_seen_ts': now_str,
+      u'quarantined': True,
+      u'state': u'{"ram":65}',
+      u'version': u'123456789',
+    }
+    bot3 = {
+      u'authenticated_as': u'bot:whitelisted-ip',
+      u'bot_id': u'id3',
+      u'dimensions': [
+        {u'key': u'foo', u'value': [u'bar']},
+        {u'key': u'id', u'value': [u'id3']},
+      ],
+      u'external_ip': u'8.8.4.4',
+      u'first_seen_ts': then_str,
+      u'is_dead': True,
+      u'last_seen_ts': then_str,
+      u'quarantined': False,
+      u'state': u'{"ram":65}',
+      u'version': u'123456789',
+    }
+    expected = {
+      u'items': [bot1, bot2, bot3],
       u'death_timeout': unicode(config.settings().bot_death_timeout_secs),
       u'now': unicode(now.strftime(self.DATETIME_FORMAT)),
     }
+    # All bots should be returned with no params
     request = swarming_rpcs.BotsRequest()
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
-
+    # All bots should be returned if we don't care about quarantined
+    request = swarming_rpcs.BotsRequest(
+        quarantined=swarming_rpcs.ThreeStateBool.NONE)
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+    # All bots should be returned if we don't care about is_dead
+    request = swarming_rpcs.BotsRequest(
+        is_dead=swarming_rpcs.ThreeStateBool.NONE)
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+    # Only bot1 corresponds to these two dimensions
+    expected[u'items']=[bot1]
     request = swarming_rpcs.BotsRequest(dimensions=['foo:bar', 'id:id1'])
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
-
+    # Only bot1 corresponds to being not dead and not quarantined and
+    # this dimension
+    request = swarming_rpcs.BotsRequest(
+      dimensions=['foo:bar'],
+      quarantined=swarming_rpcs.ThreeStateBool.FALSE,
+      is_dead=swarming_rpcs.ThreeStateBool.FALSE)
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+    # exclude bot2 only, which is quarantined
+    expected[u'items']=[bot1, bot3]
+    request = swarming_rpcs.BotsRequest(
+        quarantined=swarming_rpcs.ThreeStateBool.FALSE)
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+    # exclude bot3 only, which is dead
+    expected[u'items']=[bot1, bot2]
+    request = swarming_rpcs.BotsRequest(
+        is_dead=swarming_rpcs.ThreeStateBool.FALSE)
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+    # only bot2 is quarantined
+    expected[u'items']=[bot2]
+    request = swarming_rpcs.BotsRequest(
+        quarantined=swarming_rpcs.ThreeStateBool.TRUE)
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+    # quarantined:true can be paired with other dimensions and still work
+    request = swarming_rpcs.BotsRequest(
+        quarantined=swarming_rpcs.ThreeStateBool.TRUE, dimensions=['foo:bar'])
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+    # only bot3 is dead
+    expected[u'items']=[bot3]
+    request = swarming_rpcs.BotsRequest(
+        is_dead=swarming_rpcs.ThreeStateBool.TRUE)
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+    # is_dead:true can be paired with other dimensions and still work
+    request = swarming_rpcs.BotsRequest(
+        is_dead=swarming_rpcs.ThreeStateBool.TRUE, dimensions=['foo:bar'])
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+    # not:existing is a dimension that doesn't exist, nothing returned.
     request = swarming_rpcs.BotsRequest(dimensions=['not:existing'])
     response = self.call_api('list', body=message_to_dict(request))
     del expected[u'items']
     self.assertEqual(expected, response.json)
-
+    # quarantined:true can be paired with other non-existing dimensions and
+    # still work
+    request = swarming_rpcs.BotsRequest(
+        quarantined=swarming_rpcs.ThreeStateBool.TRUE, dimensions=['not:exist'])
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+    # is_dead:true can be paired with other non-existing dimensions and
+    # still work
+    request = swarming_rpcs.BotsRequest(
+        is_dead=swarming_rpcs.ThreeStateBool.TRUE, dimensions=['not:exist'])
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+    # No bot is both dead and quarantined
+    request = swarming_rpcs.BotsRequest(
+        is_dead=swarming_rpcs.ThreeStateBool.TRUE,
+        quarantined=swarming_rpcs.ThreeStateBool.TRUE)
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+    # A bad request returns 400
     request = swarming_rpcs.BotsRequest(dimensions=['bad'])
     self.call_api('list', body=message_to_dict(request), status=400)
 
@@ -1437,12 +1553,12 @@ class BotsApiTest(BaseTest):
         event_type='bot_connected', bot_id='id1',
         external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
         dimensions={'foo': ['bar'], 'id': ['id1']}, state={'ram': 65},
-        version='123456789', quarantined=False, task_id=None, task_name=None)
+        version='123456789', quarantined=False, task_id='987', task_name=None)
     bot_management.bot_event(
         event_type='bot_connected', bot_id='id2',
         external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
         dimensions={'foo': ['bar'], 'id': ['id2']}, state={'ram': 65},
-        version='123456789', quarantined=True, task_id='987', task_name=None)
+        version='123456789', quarantined=True, task_id=None, task_name=None)
     expected = {
       u'count': u'3',
       u'quarantined': u'2',
@@ -1458,26 +1574,25 @@ class BotsApiTest(BaseTest):
       u'count': u'1',
       u'quarantined': u'0',
       u'dead': u'0',
-      u'busy': u'0',
+      u'busy': u'1',
       u'now': unicode(now.strftime(self.DATETIME_FORMAT)),
     }
-    request = swarming_rpcs.BotsRequest(dimensions=['foo:bar', 'id:id1'])
+    request = swarming_rpcs.BotsCountRequest(dimensions=['foo:bar', 'id:id1'])
     response = self.call_api('count', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
 
     expected[u'quarantined'] = u'1'
-    expected[u'busy'] = u'1'
-    request = swarming_rpcs.BotsRequest(dimensions=['foo:bar', 'id:id2'])
+    expected[u'busy'] = u'0'
+    request = swarming_rpcs.BotsCountRequest(dimensions=['foo:bar', 'id:id2'])
     response = self.call_api('count', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
 
     expected[u'dead'] = u'1'
-    expected[u'busy'] = u'0'
-    request = swarming_rpcs.BotsRequest(dimensions=['foo:bar', 'id:id3'])
+    request = swarming_rpcs.BotsCountRequest(dimensions=['foo:bar', 'id:id3'])
     response = self.call_api('count', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
 
-    request = swarming_rpcs.BotsRequest(dimensions=['not:existing'])
+    request = swarming_rpcs.BotsCountRequest(dimensions=['not:existing'])
     response = self.call_api('count', body=message_to_dict(request))
     expected = {
       u'count': u'0',
@@ -1488,7 +1603,7 @@ class BotsApiTest(BaseTest):
     }
     self.assertEqual(expected, response.json)
 
-    request = swarming_rpcs.BotsRequest(dimensions=['bad'])
+    request = swarming_rpcs.BotsCountRequest(dimensions=['bad'])
     self.call_api('count', body=message_to_dict(request), status=400)
 
   def test_dimensions_ok(self):

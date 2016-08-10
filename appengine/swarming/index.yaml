@@ -27,6 +27,17 @@ indexes:
   - name: quarantined
     direction: desc
 
+- kind: BotInfo
+  properties:
+  - name: quarantined
+  - name: last_seen_ts
+
+- kind: BotInfo
+  properties:
+  - name: dimensions_flat
+  - name: last_seen_ts
+  - name: quarantined
+
 - kind: TaskResultSummary
   properties:
   - name: failure
