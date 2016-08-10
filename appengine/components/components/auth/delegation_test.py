@@ -204,24 +204,12 @@ class ValidationTest(test_case.TestCase):
 
 
 class FullRoundtripTest(test_case.TestCase):
-  def test_deprecated_tokens_work(self):
-    # Subtoken proto.
-    tok = fake_subtoken_proto(
-        'user:initial@a.com', audience=['user:final@a.com'])
-    # Sign, serialize.
-    blob = delegation.serialize_token(delegation.seal_token(tok))
-    # Deserialize, check sig, validate.
-    make_id = model.Identity.from_bytes
-    ident = delegation.check_delegation_token(blob, make_id('user:final@a.com'))
-    self.assertEqual(make_id('user:initial@a.com'), ident)
-
   def test_works(self):
     # Subtoken proto.
     tok = fake_subtoken_proto(
         'user:initial@a.com', audience=['user:final@a.com'])
     # Sign, serialize.
-    blob = delegation.serialize_token(
-        delegation.seal_token(tok, use_deprecated_scheme=False))
+    blob = delegation.serialize_token(delegation.seal_token(tok))
     # Deserialize, check sig, validate.
     make_id = model.Identity.from_bytes
     ident = delegation.check_delegation_token(blob, make_id('user:final@a.com'))

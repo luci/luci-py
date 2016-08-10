@@ -60,7 +60,10 @@ class HandlersTest(test_case.TestCase):
         expect_errors=True)
 
   def test_default_works(self):
-    resp = self.create_token({}, 'user:a@a.com')
+    resp = self.create_token({
+      'audience': ['*'],
+      'services': ['*'],
+    }, 'user:a@a.com')
     self.assertEqual(resp.status_code, 201)
     self.assertEqual(3600, resp.json_body['validity_duration'])
 
@@ -117,9 +120,13 @@ class HandlersTest(test_case.TestCase):
 
   def test_audience_validation(self):
     def call(aud):
-      return self.create_token({'audience': aud}, 'user:a@a.com').status_code
+      return self.create_token({
+        'audience': aud,
+        'services': ['*'],
+      }, 'user:a@a.com').status_code
     self.assertEqual(201, call(['group:group', 'user:abc@a.com']))
-    self.assertEqual(201, call([]))
+    self.assertEqual(201, call(['*']))
+    self.assertEqual(400, call([]))
     self.assertEqual(400, call('not a list'))
     self.assertEqual(400, call([123]))
     self.assertEqual(400, call(['group:bad#group']))
@@ -127,9 +134,13 @@ class HandlersTest(test_case.TestCase):
 
   def test_services_validation(self):
     def call(srv):
-      return self.create_token({'services': srv}, 'user:a@a.com').status_code
+      return self.create_token({
+        'audience': ['*'],
+        'services': srv,
+      }, 'user:a@a.com').status_code
     self.assertEqual(201, call(['service:abc', 'user:abc@a.com']))
-    self.assertEqual(201, call([]))
+    self.assertEqual(201, call(['*']))
+    self.assertEqual(400, call([]))
     self.assertEqual(400, call('not a list'))
     self.assertEqual(400, call([123]))
     self.assertEqual(400, call(['group:not-an-id']))
@@ -137,8 +148,11 @@ class HandlersTest(test_case.TestCase):
 
   def test_validity_duration_validation(self):
     def call(dur):
-      return self.create_token(
-          {'validity_duration': dur}, 'user:a@a.com').status_code
+      return self.create_token({
+        'audience': ['*'],
+        'services': ['*'],
+        'validity_duration': dur,
+      }, 'user:a@a.com').status_code
     self.assertEqual(201, call(3600))
     self.assertEqual(400, call('not a number'))
     self.assertEqual(400, call(-1000))
@@ -147,7 +161,11 @@ class HandlersTest(test_case.TestCase):
 
   def test_impersonate_validation(self):
     def call(imp):
-      return self.create_token({'impersonate': imp}, 'user:a@a.com').status_code
+      return self.create_token({
+        'audience': ['*'],
+        'services': ['*'],
+        'impersonate': imp,
+      }, 'user:a@a.com').status_code
     self.assertEqual(201, call('user:a@a.com'))
     self.assertEqual(400, call('a@a.com'))
 

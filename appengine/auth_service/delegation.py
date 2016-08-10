@@ -46,12 +46,22 @@ class CreateDelegationTokenHandler(auth.ApiHandler):
 
   The POST request body describes who delegates what authority to whom where:
   {
-    # To WHOM caller's identity is delegated (or "to anyone who has the token"
-    # if empty). List of identities or groups. Default: any bearer.
+    # To WHOM the authority is delegated.
+    #
+    # Each item can be an identity string (e.g. "user:<email>"),
+    # a "group:<name>" string, or special '*' string which means "Any bearer can
+    # use the token".
+    #
+    # Required.
     'audience': ['user:def@example.com', 'group:abcdef'],
 
-    # WHERE token is accepted (or "everywhere" if empty). List of identities.
-    # Default: any service.
+    # WHERE the token is valid.
+    #
+    # List of services (specified as service identities, e.g. "service:app-id")
+    # that should accept this token. May also contain special '*' string, which
+    # means "All services".
+    #
+    # Required.
     'services': ['service:gae-app1', 'service:gae-app2'],
 
     # How long the token is valid after creation (in seconds). Default is 1h.
@@ -105,16 +115,11 @@ class CreateDelegationTokenHandler(auth.ApiHandler):
     subtoken.creation_time = int(utils.time_time())
     if not subtoken.validity_duration:
       subtoken.validity_duration = DEF_VALIDITY_DURATION_SEC
-    if not subtoken.services or '*' in subtoken.services:
+    if '*' in subtoken.services:
       subtoken.services[:] = get_default_allowed_services(user_id)
 
     # Check ACL (raises auth.AuthorizationError on errors).
     rule = check_can_create_token(user_id, subtoken)
-
-    # "All services" is represented as an empty list in the encoded token.
-    # TODO(vadimsh): Use '*' in proto message too.
-    if '*' in subtoken.services:
-      subtoken.services[:] = []
 
     # Register the token in the datastore, generate its ID.
     subtoken.subtoken_id = register_subtoken(
@@ -143,14 +148,14 @@ def subtoken_from_jsonish(d):
   """
   msg = delegation_pb2.Subtoken()
 
-  # 'audience' is an optional list of 'group:...' or identity names.
+  # 'audience' is a required list of 'group:...', identity names or '*'.
   if 'audience' in d:
     aud = d['audience']
     if not isinstance(aud, list):
-      raise ValueError('"audience" must be a list of strings')
+      raise ValueError('"audience" must be a non-empty list of strings')
     for e in aud:
       if not isinstance(e, basestring):
-        raise ValueError('"audience" must be a list of strings')
+        raise ValueError('"audience" must be a non-empty list of strings')
       if e.startswith('group:'):
         if not auth.is_valid_group_name(e[len('group:'):]):
           raise ValueError('Invalid group name in "audience": %s' % e)
@@ -161,20 +166,20 @@ def subtoken_from_jsonish(d):
           raise ValueError(
               'Invalid identity name "%s" in "audience": %s' % (e, exc))
       msg.audience.append(str(e))
-    # TODO(vadimsh): Treat '*' as if an empty list have been passed. This is
-    # a temporary measure until all services switch to the new protocol and can
-    # validate tokens with '*' in them.
     if '*' in msg.audience:
-      msg.audience[:] = []
+      msg.audience[:] = ['*']
 
-  # 'services' is an optional list of identity names.
+  if not msg.audience:
+    raise ValueError('"audience" must be a non-empty list of strings')
+
+  # 'services' is a required list of identity names.
   if 'services' in d:
     services = d['services']
     if not isinstance(services, list):
-      raise ValueError('"services" must be a list of strings')
+      raise ValueError('"services" must be a non-empty list of strings')
     for e in services:
       if not isinstance(e, basestring):
-        raise ValueError('"services" must be a list of strings')
+        raise ValueError('"services" must be a non-empty list of strings')
       if e != '*':
         try:
           auth.Identity.from_bytes(e)
@@ -182,11 +187,11 @@ def subtoken_from_jsonish(d):
           raise ValueError(
               'Invalid identity name "%s" in "services": %s' % (e, exc))
       msg.services.append(str(e))
-    # TODO(vadimsh): Treat '*' as if an empty list have been passed. This is
-    # a temporary measure until all services switch to the new protocol and can
-    # validate tokens with '*' in them.
     if '*' in msg.services:
-      msg.services[:] = []
+      msg.services[:] = ['*']
+
+  if not msg.services:
+    raise ValueError('"services" must be a non-empty list of strings')
 
   # 'validity_duration' is optional positive number within some defined bounds.
   if 'validity_duration' in d:
@@ -369,7 +374,7 @@ def register_subtoken(subtoken, rule, intent, caller_ip):
       auth_service_version=utils.get_app_version(),
       issuer_id=subtoken.issuer_id,
       creation_time=utils.timestamp_to_datetime(subtoken.creation_time*1e6),
-      services=list(subtoken.services or ['*']),
+      services=list(subtoken.services),
       impersonator_id=subtoken.impersonator_id)
   entity.put(use_cache=False, use_memcache=False)
   subtoken_id = entity.key.integer_id()

@@ -46,11 +46,6 @@ __all__ = [
 # Tokens that are larger than this (before base64 encoding) are rejected.
 MAX_TOKEN_SIZE = 8 * 1024
 
-# Maximum allowed length of token chain.
-#
-# TODO(vadimsh): Remove.
-MAX_SUBTOKEN_LIST_LEN = 8
-
 # How much clock drift between machines we can tolerate, in seconds.
 ALLOWED_CLOCK_DRIFT_SEC = 30
 
@@ -198,35 +193,23 @@ def deserialize_token(blob):
     raise BadTokenError('Bad proto: %s' % exc)
 
 
-def seal_token(subtoken, use_deprecated_scheme=True):
+def seal_token(subtoken):
   """Serializes Subtoken and signs it using current service's key.
 
   Args:
     subtoken: delegation_pb2.Subtoken message.
-    use_deprecated_scheme: if True, will use serialized_subtoken_list.
 
   Returns:
     delegation_pb2.DelegationToken message ready for serialization.
   """
   assert isinstance(subtoken, delegation_pb2.Subtoken)
-  tok = delegation_pb2.DelegationToken()
-
-  # TODO(vadimsh): Stop using serialized_subtoken_list once all services are
-  # updated to understand 'serialized_subtoken' field.
-  if use_deprecated_scheme:
-    subtokens = delegation_pb2.SubtokenList(subtokens=[subtoken])
-    serialized = subtokens.SerializeToString()
-    tok.serialized_subtoken_list = serialized
-  else:
-    serialized = subtoken.SerializeToString()
-    tok.serialized_subtoken = serialized
-
+  serialized = subtoken.SerializeToString()
   signing_key_id, pkcs1_sha256_sig = signature.sign_blob(serialized, 0.5)
-
-  tok.signer_id = model.get_service_self_identity().to_bytes()
-  tok.signing_key_id = signing_key_id
-  tok.pkcs1_sha256_sig = pkcs1_sha256_sig
-  return tok
+  return delegation_pb2.DelegationToken(
+      serialized_subtoken=serialized,
+      signer_id=model.get_service_self_identity().to_bytes(),
+      signing_key_id=signing_key_id,
+      pkcs1_sha256_sig=pkcs1_sha256_sig)
 
 
 def unseal_token(tok):
@@ -250,13 +233,6 @@ def unseal_token(tok):
   """
   # Check all required fields are set.
   assert isinstance(tok, delegation_pb2.DelegationToken)
-
-  # Deprecated code path. To be removed.
-  if tok.serialized_subtoken_list:
-    subtoken_list = _unseal_deprecated_token(tok)
-    if len(subtoken_list.subtokens) != 1:
-      raise BadTokenError('Bad serialized_subtoken_list: expecting one entry')
-    return subtoken_list.subtokens[0]
 
   if not tok.serialized_subtoken:
     raise BadTokenError('serialized_subtoken is missing')
@@ -299,67 +275,6 @@ def unseal_token(tok):
     return delegation_pb2.Subtoken.FromString(tok.serialized_subtoken)
   except message.DecodeError as exc:
     raise BadTokenError('Bad serialized_subtoken: %s' % exc)
-
-
-# TODO(vadimsh): Remove once all services are updated to use the new scheme.
-def _unseal_deprecated_token(tok):
-  # Check all required fields are set.
-  assert isinstance(tok, delegation_pb2.DelegationToken)
-  if not tok.serialized_subtoken_list:
-    raise BadTokenError('serialized_subtoken_list is missing')
-  if not tok.signer_id:
-    raise BadTokenError('signer_id is missing')
-  if not tok.signing_key_id:
-    raise BadTokenError('signing_key_id is missing')
-  if not tok.pkcs1_sha256_sig:
-    raise BadTokenError('pkcs1_sha256_sig is missing')
-
-  # Make sure signer_id looks like model.Identity.
-  try:
-    model.Identity.from_bytes(tok.signer_id)
-  except ValueError as exc:
-    raise BadTokenError('signer_id is not a valid identity: %s' % exc)
-
-  # Validate the signature.
-  checker = get_signature_checker()
-  if not checker.is_trusted_signer(tok.signer_id):
-    raise BadTokenError('Unknown signer: "%s"' % tok.signer_id)
-  try:
-    cert = checker.get_x509_certificate_pem(tok.signer_id, tok.signing_key_id)
-    is_valid_sig = signature.check_signature(
-        blob=tok.serialized_subtoken_list,
-        x509_certificate_pem=cert,
-        signature=tok.pkcs1_sha256_sig)
-  except signature.CertificateError as exc:
-    if exc.transient:
-      raise TransientError(str(exc))
-    raise BadTokenError(
-        'Bad certificate (signer_id == %s, signing_key_id == %s): %s' % (
-        tok.signer_id, tok.signing_key_id, exc))
-  if not is_valid_sig:
-    raise BadTokenError(
-        'Invalid signature (signer_id == %s, signing_key_id == %s)' % (
-        tok.signer_id, tok.signing_key_id))
-
-  # The signature is correct, deserialize subtoken list.
-  try:
-    toks = delegation_pb2.SubtokenList.FromString(tok.serialized_subtoken_list)
-  except message.DecodeError as exc:
-    raise BadTokenError('Bad serialized_subtoken_list: %s' % exc)
-  if not toks.subtokens:
-    raise BadTokenError('Bad serialized_subtoken_list: empty')
-  if len(toks.subtokens) > MAX_SUBTOKEN_LIST_LEN:
-    raise BadTokenError('Bad serialized_subtoken_list: too many subtokens')
-
-  # In deprecated tokens empty 'audience' and 'services' lists mean '*'. Adjust
-  # them to have '*', as required by the new scheme.
-  for tok in toks.subtokens:
-    if not tok.audience:
-      tok.audience.append('*')
-    if not tok.services:
-      tok.services.append('*')
-
-  return toks
 
 
 ## Token creation.

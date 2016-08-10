@@ -9,12 +9,9 @@ package components.auth.proto.delegation;
 //
 // This message is just an envelope that carries the serialized Subtoken message
 // and its signature.
+//
+// Reserved IDs: 1.
 message DelegationToken {
-  // Serialized SubtokenList message with at least one subtoken.
-  //
-  // DEPRECATED. Replaced by 'serialized_subtoken'. Only one of the two is set.
-  optional bytes serialized_subtoken_list = 1;
-
   // Identity of a service that signed this token (e.g. 'service:app-id').
   //
   // Will be queries (via SSL) for the public key to use for signature
@@ -34,10 +31,7 @@ message DelegationToken {
   // Required.
   optional string signing_key_id = 3;
 
-  // The signature: PKCS1_v1_5+SHA256(<blob>, signing_key_id).
-  //
-  // <blob> is either serialized_subtoken_list (if it is set) or
-  // serialized_subtoken.
+  // The signature: PKCS1_v1_5+SHA256(serialized_subtoken, signing_key_id).
   //
   // Required.
   optional bytes pkcs1_sha256_sig = 4;
@@ -46,14 +40,6 @@ message DelegationToken {
   //
   // Required.
   optional bytes serialized_subtoken = 5;
-}
-
-
-// List of tokens, to be serialized, signed and put into DelegationToken.
-//
-// DEPRECATED.
-message SubtokenList {
-  repeated Subtoken subtokens = 1;
 }
 
 
@@ -80,6 +66,8 @@ message Subtoken {
   // Identifier of this subtoken.
   //
   // Used for logging and tracking purposes.
+  //
+  // Required.
   optional int64 subtoken_id = 4;
 
   // To WHOM the authority is delegated.
@@ -87,16 +75,16 @@ message Subtoken {
   // Each item can be an identity string (e.g. "user:<email>"), a "group:<name>"
   // string, or special '*' string which means "Any bearer can use the token".
   //
-  // Currently an empty list is equivalent to ['*']. This is DEPRECATED.
+  // Required.
   repeated string audience = 5;
 
   // WHERE the token is valid.
   //
   // List of services (specified as service identities, e.g. "service:app-id")
-  // that should accept this token. May also contain '*' item, which means
-  // "All services".
+  // that should accept this token. May also contain special '*' string, which
+  // means "All services".
   //
-  // Currently an empty list is equivalent to ['*']. This is DEPRECATED.
+  // Required.
   repeated string services = 6;
 
   // If this token was minted on some else's behalf (i.e. issuer_id field was
