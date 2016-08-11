@@ -479,6 +479,7 @@ def delegate_async(
     yield ctx.memcache_add(
         cache_key, token, time=actual_validity_duration_sec - 10)
 
+  logging.debug('Got delegation token: subtoken_id=%s', res.get('subtoken_id'))
   raise ndb.Return(token)
 
 
@@ -594,6 +595,8 @@ def check_subtoken_audience(subtoken, current_identity):
 def check_delegation_token(token, peer_identity):
   """Decodes the token, checks its validity, extracts delegated Identity.
 
+  Logs details about the token.
+
   Args:
     token: blob with base64 encoded delegation token.
     peer_identity: Identity of whoever tries to wield the token.
@@ -606,4 +609,8 @@ def check_delegation_token(token, peer_identity):
     TransientError if token can't be verified due to transient errors.
   """
   subtoken = unseal_token(deserialize_token(token))
-  return check_subtoken(subtoken, peer_identity)
+  ident = check_subtoken(subtoken, peer_identity)
+  logging.debug(
+      'Using delegation token: subtoken_id=%s, issuer_id=%s',
+      subtoken.subtoken_id, ident.to_bytes())
+  return ident

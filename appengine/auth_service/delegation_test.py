@@ -66,6 +66,7 @@ class HandlersTest(test_case.TestCase):
     }, 'user:a@a.com')
     self.assertEqual(resp.status_code, 201)
     self.assertEqual(3600, resp.json_body['validity_duration'])
+    self.assertEqual('1', resp.json_body['subtoken_id'])
 
     t = decode_token(resp.json_body['delegation_token'])
     self.assertEqual('user:a@a.com', t.issuer_id)

@@ -81,6 +81,7 @@ class CreateDelegationTokenHandler(auth.ApiHandler):
   Response is:
   {
     'delegation_token': '<urlsafe base64 encoded blob with delegation token>',
+    'subtoken_id': '<int64>', # as string
     'validity_duration': 3600
   }
   """
@@ -135,6 +136,7 @@ class CreateDelegationTokenHandler(auth.ApiHandler):
     self.send_response(
         response={
           'delegation_token': token,
+          'subtoken_id': str(subtoken.subtoken_id),
           'validity_duration': subtoken.validity_duration,
         },
         http_code=201)
