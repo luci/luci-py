@@ -9,13 +9,21 @@ from components import utils
 import gae_ts_mon
 
 import handlers_cron
+import handlers_endpoints
 import handlers_queues
 
 
-utils.set_task_queue_module('default')
+def main():
+  utils.set_task_queue_module('default')
+  apps = (
+    handlers_endpoints.create_endpoints_app(),
+    handlers_cron.create_cron_app(),
+    handlers_queues.create_queues_app(),
+  )
+  for app in apps[1:]:
+    # Not callable on endpoints app
+    gae_ts_mon.initialize(app=app)
+  return apps
 
-cron_app = handlers_cron.create_cron_app()
-queues_app = handlers_queues.create_queues_app()
 
-gae_ts_mon.initialize(app=cron_app)
-gae_ts_mon.initialize(app=queues_app)
+endpoints_app, cron_app, queues_app = main()
