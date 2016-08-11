@@ -82,10 +82,9 @@
           <a class="left" href="/newui/">Home</a>
           <a class="left" href="/newui/botlist">Bot List</a>
           <div class="flex"></div>
-          <!-- TODO(kjlubick) Remove this hard-coded client-id.-->
           <auth-signin
               class="right"
-              client-id="20770472288-t5smpbpjptka4nd888fv0ctd23ftba2o.apps.googleusercontent.com"
+              client-id="[[client_id]]"
               auth-headers="{{auth_headers}}"
               signed-in="{{signed_in}}">
           </auth-signin>
@@ -101,6 +100,9 @@
     Polymer({
       is: 'swarming-app',
       properties: {
+        client_id: {
+          type: String,
+        },
         auth_headers: {
           type: Object,
           notify: true,

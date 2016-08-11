@@ -11,8 +11,10 @@
   bot-list creats a dynamic table for viewing swarming bots.  Columns can be
   dynamically filtered and it supports client-side filtering.
 
+  This is a top-level element.
+
   Properties:
-    None.  This is a top-level element.
+    client_id: String, will be set by server-side template evaluation.
 
   Methods:
     None.
@@ -76,6 +78,7 @@
     </style>
 
     <swarming-app
+      client_id="[[client_id]]"
       auth_headers="{{_auth_headers}}"
       signed_in="{{_signed_in}}"
 
@@ -382,6 +385,10 @@
       behaviors: [SwarmingBehaviors.BotListBehavior],
 
       properties: {
+
+        client_id: {
+          type: String,
+        },
 
         _bots: {
           type: Array,

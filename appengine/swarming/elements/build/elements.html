@@ -14583,8 +14583,7 @@ You can bind to `isAuthorized` property to monitor authorization state.
           <a class="left" href="/newui/">Home</a>
           <a class="left" href="/newui/botlist">Bot List</a>
           <div class="flex"></div>
-          
-          <auth-signin class="right" client-id="20770472288-t5smpbpjptka4nd888fv0ctd23ftba2o.apps.googleusercontent.com" auth-headers="{{auth_headers}}" signed-in="{{signed_in}}">
+          <auth-signin class="right" client-id="[[client_id]]" auth-headers="{{auth_headers}}" signed-in="{{signed_in}}">
           </auth-signin>
         </app-toolbar>
       </app-header>
@@ -14598,6 +14597,9 @@ You can bind to `isAuthorized` property to monitor authorization state.
     Polymer({
       is: 'swarming-app',
       properties: {
+        client_id: {
+          type: String,
+        },
         auth_headers: {
           type: Object,
           notify: true,
@@ -14636,7 +14638,7 @@ You can bind to `isAuthorized` property to monitor authorization state.
 
     </style>
 
-    <swarming-app auth_headers="{{auth_headers}}" name="Swarming" busy="[[busy]]">
+    <swarming-app client_id="[[client_id]]" auth_headers="{{auth_headers}}" name="Swarming" busy="[[busy]]">
 
       <iron-ajax id="request" url="/_ah/api/swarming/v1/server/details" headers="[[auth_headers]]" handle-as="json" last-response="{{serverDetails}}" loading="{{busy}}">
       </iron-ajax>
@@ -14653,6 +14655,10 @@ You can bind to `isAuthorized` property to monitor authorization state.
       is: 'swarming-index',
 
       properties: {
+        client_id: {
+          type: String,
+        },
+
         auth_headers: {
           type: Object,
           observer: "signIn",
@@ -21601,7 +21607,7 @@ is separate from validation, and `allowed-pattern` does not affect how the input
       }
     </style>
 
-    <swarming-app auth_headers="{{_auth_headers}}" signed_in="{{_signed_in}}" busy="[[_busy]]" name="Swarming Bot List">
+    <swarming-app client_id="[[client_id]]" auth_headers="{{_auth_headers}}" signed_in="{{_signed_in}}" busy="[[_busy]]" name="Swarming Bot List">
 
       <h2 hidden$="[[_signed_in]]">You must sign in to see anything useful.</h2>
 
@@ -21856,6 +21862,10 @@ is separate from validation, and `allowed-pattern` does not affect how the input
       behaviors: [SwarmingBehaviors.BotListBehavior],
 
       properties: {
+
+        client_id: {
+          type: String,
+        },
 
         _bots: {
           type: Array,

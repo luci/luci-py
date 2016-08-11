@@ -15,8 +15,10 @@
 
     <swarming-index></swarming-index>
 
+  This is a top-level element.
+
   Properties:
-    None.  This is a top-level element.
+    client_id: String, will be set by server-side template evaluation.
 
   Methods:
     None.
@@ -36,6 +38,7 @@
     </style>
 
     <swarming-app
+      client_id="[[client_id]]"
       auth_headers="{{auth_headers}}"
       name="Swarming"
       busy="[[busy]]">
@@ -60,6 +63,10 @@
       is: 'swarming-index',
 
       properties: {
+        client_id: {
+          type: String,
+        },
+
         auth_headers: {
           type: Object,
           observer: "signIn",

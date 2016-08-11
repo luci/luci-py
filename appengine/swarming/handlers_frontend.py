@@ -744,6 +744,19 @@ class RootHandler(auth.AuthenticatingHandler):
     self.response.write(template.render('swarming/root.html', params))
 
 
+class UIHandler(auth.AuthenticatingHandler):
+  @auth.public
+  def get(self, page):
+    if not page:
+      page = "swarming"
+
+    params = {
+      'client_id': config.settings().ui_client_id,
+    }
+    self.response.write(template.render(
+        'swarming/public_%s_index.html' % page, params))
+
+
 class WarmupHandler(webapp2.RequestHandler):
   def get(self):
     auth.warmup()
@@ -768,6 +781,7 @@ def create_application(debug):
       # Public pages.
       ('/', RootHandler),
       ('/stats', stats_gviz.StatsSummaryHandler),
+      ('/newui/<page:[a-z]*>', UIHandler),
 
       # User pages.
       ('/user/tasks', TasksHandler),
