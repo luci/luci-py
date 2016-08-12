@@ -17,6 +17,7 @@
 
   Properties:
     // inputs
+    dimensions: Array<String>, of all valid dimensions.
     primary_map: Object, a mapping of primary keys to secondary items.
         The primary keys are things that can be columns or sorted by.  The
         primary values (aka the secondary items) are things that can be filtered
@@ -26,8 +27,16 @@
 
     // outputs
     columns: Array<String>, the columns that should be displayed.
-    dimensions: Array<String>, dimensions formatted like "dim:value", to be
-        used to filter server-side.
+    query_params: Object, The query params that will filter the query
+        server-side.  This can have dimensions:Array<String>, quarantined:String
+        and is_dead: String. For example:
+        {
+          "dimensions": ["pool:Skia", "device_type:Sprout"],
+          "quarantined": "FALSE",  // optional
+          "is_dead": "TRUE",       // optional
+        }
+        For a full list of dimensions in the fleet, see the API call:
+        https://[swarming_url]/_ah/api/swarming/v1/bots/dimensions
     filter: Object, an object {filter:Function} where filter will take one param
         (bot) and return a Boolean if it should be displayed given the
         current filters.
@@ -46,6 +55,8 @@
 <link rel="import" href="/res/imp/bower_components/paper-checkbox/paper-checkbox.html">
 <link rel="import" href="/res/imp/bower_components/paper-icon-button/paper-icon-button.html">
 <link rel="import" href="/res/imp/bower_components/paper-input/paper-input.html">
+
+<link rel="import" href="/res/imp/common/url-param.html">
 
 <link rel="import" href="bot-list-shared.html">
 
@@ -134,6 +145,27 @@
       }
     </style>
 
+    <url-param name="filters"
+      value="{{_filters}}"
+      default_values="[]"
+      multi>
+    </url-param>
+    <url-param name="columns"
+      value="{{columns}}"
+      default_values='["id","os","task","status"]'
+      multi>
+    </url-param>
+    <url-param name="query"
+     value="{{_query}}">
+    </url-param>
+    <url-param name="verbose"
+      value="{{verbose}}">
+    </url-param>
+    <url-param name="limit"
+      default_value="200"
+      value="{{limit}}">
+    </url-param>
+
     <div class="container horizontal layout">
     <!--
     A common pattern below is to do something like
@@ -146,12 +178,14 @@
       <div class="narrow-down-selector">
         <div>
           <paper-input id="filter"
-          label="Search columns and filters"
-          placeholder="gpu nvidia"
-          value="{{_query}}"></paper-input>
+            label="Search columns and filters"
+            placeholder="gpu nvidia"
+            value="{{_query}}">
+          </paper-input>
         </div>
 
-        <div class="selector side-by-side">
+        <div class="selector side-by-side"
+            title="This shows all bot dimension names and other interesting bot properties. Mark the check box to add as a column. Select the row to see filter options.">
           <iron-selector attr-for-selected="label" selected="{{_primarySelected}}">
             <template is="dom-repeat" items="[[_primaryItems]]" as="item">
               <div class="selectable item horizontal layout" label="[[item]]">
@@ -169,7 +203,8 @@
           </iron-selector>
         </div>
 
-        <div class="selector side-by-side">
+        <div class="selector side-by-side"
+            title="These are all options (if any) that the bot list can be filtered on.">
           <template is="dom-repeat" id="secondaryList"
               items="[[_secondaryItems]]" as="item">
             <div class="item horizontal layout" label="[[item]]">
@@ -186,7 +221,9 @@
           </template>
         </div>
 
-        <div class="selector side-by-side">
+        <div class="selector side-by-side"
+            title="These filters are AND'd together and applied to all bots in
+the fleet.">
           <template is="dom-repeat" items="[[_filters]]" as="fil">
             <div class="item horizontal layout" label="[[fil]]">
               <span>[[fil]]</span>
@@ -201,7 +238,17 @@
           </template>
         </div>
 
+        <div class="side-by-side">
         <paper-checkbox checked="{{verbose}}">Verbose Entries</paper-checkbox>
+          <paper-input id="limit"
+            label="Limit Results"
+            auto-validate
+            min="0"
+            max="1000"
+            pattern="[0-9]+"
+            value="{{limit}}">
+          </paper-input>
+        </div>
       </div>
 
     </div>
@@ -213,19 +260,12 @@
     // filterMap is a map of primary -> function.  The function returns a
     // boolean "does the bot (first arg) match the second argument".  These
     // functions will have "this" be the botlist, and will have access to all
-    // functions defined in bot-list and bot-list-shared.
+    // functions defined in bot-list and bot-list-shared.  If there is not
+    // one provided, a default will be used, see _makeFilter().
     var filterMap = {
       android_devices: function(bot, num) {
         var o = this._attribute(bot, "android_devices", "0");
         return o.indexOf(num) !== -1;
-      },
-      cores: function(bot, cores) {
-        var o = this._attribute(bot, "cores");
-        return o.indexOf(cores) !== -1;
-      },
-      cpu: function(bot, cpu) {
-        var o = this._attribute(bot, "cpu");
-        return o.indexOf(cpu) !== -1;
       },
       device_os: function(bot, os) {
         var o = this._attribute(bot, "device_os", "none");
@@ -245,21 +285,13 @@
       id: function(bot, id) {
         return true;
       },
-      os: function(bot, os) {
-        var o = this._attribute(bot, "os");
-        return o.indexOf(os) !== -1;
-      },
-      pool: function(bot, pool) {
-        var o = this._attribute(bot, "pool");
-        return o.indexOf(pool) !== -1;
-      },
       status: function(bot, status) {
         if (status === "quarantined") {
           return bot.quarantined;
         } else if (status === "dead") {
           return bot.is_dead;
         } else {
-          // Status must be "available".
+          // Status must be "alive".
           return !bot.quarantined && !bot.is_dead;
         }
       },
@@ -317,39 +349,36 @@
         primary_arr: {
           type: Array,
         },
+        dimensions: {
+          type: Array,
+        },
 
         // output
         columns: {
           type: Array,
-          value: function() {
-            // TODO(kjlubick) back these up to URL params and load them from
-            // there on reload.
-            return ["id","os","task","status"];
-          },
-          notify: true,
-        },
-        dimensions: {
-          type: Array,
-          computed: "_extractDimensions(DIMENSIONS.*,_filters.*)",
           notify: true,
         },
         filter: {
-          type: Object,
+          type: Function,
           computed: "_makeFilter(_filters.*)",
+          notify: true,
+        },
+        query_params: {
+          type: Object,
+          computed: "_extractQueryParams(dimensions.*,_filters.*, limit)",
           notify: true,
         },
         verbose: {
           type: Boolean,
-          value: false,
           notify: true,
         },
 
         // private
         _filters: {
           type:Array,
-          value: function() {
-            return [];
-          }
+        },
+        _limit: {
+          type: Number,
         },
         _primaryItems: {
           type: Array,
@@ -362,7 +391,6 @@
         // query is treated as a space separated list.
         _query: {
           type:String,
-          value: "",
         },
         _secondaryItems: {
           type: Array,
@@ -438,8 +466,7 @@
       },
 
       _makeFilter: function() {
-        // The filters belonging to the same primary key will be or'd together.
-        // Those groups will be and'd together.
+        // All filters will be AND'd together.
         // filterGroups will be a map of primary (i.e. column) -> array of
         // options that should be filtered to.
         // e.g. "os" -> ["Windows", "Linux"]
@@ -461,13 +488,17 @@
           for (primary in filterGroups){
             var params = filterGroups[primary];
             var filter = filterMap[primary];
-            var groupResult = false;
+            if (!filter) {
+              filter = function(bot, c) {
+                var o = this._attribute(bot, primary);
+                return o.indexOf(c) !== -1;
+              }.bind(this);
+            }
             if (filter) {
               params.forEach(function(param){
-                groupResult = groupResult || filter.bind(this)(bot,param);
+                retVal = retVal && filter.bind(this)(bot,param);
               }.bind(this));
             }
-            retVal = retVal && groupResult;
           }
           return retVal;
         }
@@ -558,17 +589,40 @@
         return item.substring(match.idx + match.part.length);
       },
 
-      _extractDimensions: function() {
-        var dims = []
+      _extractQueryParams: function() {
+        var params = {};
+        var dims = [];
         this._filters.forEach(function(f) {
           var split = f.split(FILTER_SEP, 1)
           var col = split[0];
-          if (this.DIMENSIONS.indexOf(col) !== -1) {
+          if (this.dimensions.indexOf(col) !== -1) {
             var rest = f.substring(col.length + FILTER_SEP.length);
             dims.push(col + FILTER_SEP + this._unalias(rest))
-          };
+          } else if (col === "status") {
+            var rest = f.substring(col.length + FILTER_SEP.length);
+            if (rest === "alive") {
+              params["is_dead"] = "FALSE";
+              params["quarantined"] = "FALSE";
+            } else if (rest === "quarantined") {
+              params["quarantined"] = "TRUE";
+            } else if (rest === "dead") {
+              params["is_dead"] = "TRUE";
+            }
+          }
         }.bind(this));
-        return dims;
+        params["dimensions"] = dims;
+        var lim = Math.floor(this.limit)
+        if (Number.isInteger(lim)) {
+          // Clamp the limit
+          lim = Math.max(lim, 1);
+          lim = Math.min(1000, lim);
+          params["limit"] = lim;
+          // not !-- because limit could be "900"
+          if (this.limit != lim) {
+            this.set("limit", lim);
+          }
+        }
+        return params;
       }
 
     });

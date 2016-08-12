@@ -628,7 +628,7 @@ class SwarmingBotsService(remote.Service):
           q, swarming_rpcs.to_bool(request.quarantined),
           swarming_rpcs.to_bool(request.is_dead), now)
     except ValueError as e:
-      raise endpoints.BadRequestException('%s' % e)
+      raise endpoints.BadRequestException(str(e))
 
     bots, cursor = datastore_utils.fetch_page(q, request.limit, request.cursor)
     return swarming_rpcs.BotList(

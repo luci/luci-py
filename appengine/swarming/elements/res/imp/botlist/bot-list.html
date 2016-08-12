@@ -28,6 +28,7 @@
 
 <link rel="import" href="/res/imp/common/sort-toggle.html">
 <link rel="import" href="/res/imp/common/swarming-app.html">
+<link rel="import" href="/res/imp/common/url-param.html">
 
 <link rel="import" href="bot-filters.html">
 <link rel="import" href="bot-list-data.html">
@@ -77,6 +78,11 @@
       }
     </style>
 
+    <url-param name="sort"
+      value="{{_sortstr}}"
+      default_value="id:asc">
+    </url-param>
+
     <swarming-app
       client_id="[[client_id]]"
       auth_headers="{{_auth_headers}}"
@@ -92,28 +98,33 @@
         <div class="horizontal layout">
 
           <bot-filters
+            dimensions="[[_dimensions]]"
             primary_map="[[_primary_map]]"
             primary_arr="[[_primary_arr]]"
 
             columns="{{_columns}}"
-            dimensions="{{_dimensions}}"
+            query_params="{{_query_params}}"
             filter="{{_filter}}"
             verbose="{{_verbose}}">
           </bot-filters>
 
           <bot-list-summary
+            columns="[[_columns]]"
             fleet="[[_fleet]]"
-            filtered_bots="[[_filteredSortedBots]]">
+            filtered_bots="[[_filteredSortedBots]]"
+            sort="[[_sortstr]]"
+            verbose="[[_verbose]]">
           </bot-list-summary>
 
         </div>
 
         <bot-list-data
           auth_headers="[[_auth_headers]]"
-          dimensions="[[_dimensions]]"
+          query_params="[[_query_params]]"
 
           bots="{{_bots}}"
           busy="{{_busy}}"
+          dimensions="{{_dimensions}}"
           fleet="{{_fleet}}"
           primary_map="{{_primary_map}}"
           primary_arr="{{_primary_arr}}">
@@ -223,6 +234,7 @@
       "android_devices": "Android Devices",
       "cores": "Cores",
       "cpu": "CPU",
+      "device": "Non-android Device",
       "device_os": "Device OS",
       "device_type": "Device Type",
       "disk_space": "Free Space (MB)",
@@ -230,11 +242,13 @@
       "os": "OS",
       "pool": "Pool",
       "status": "Status",
+      "xcode_version": "XCode Version",
     };
 
     // This maps column name to a function that will return the content for a
     // given bot. These functions are bound to this element, and have access
-    // to all functions defined here and in bot-list-shared.
+    // to all functions defined here and in bot-list-shared. If a column
+    // is not listed here, a sane default will be used (see _column()).
     var columnMap = {
       android_devices: function(bot) {
         var devs = this._attribute(bot, "android_devices", "0");
@@ -244,38 +258,19 @@
         // max() works on strings as long as they can be coerced to Number.
         return Math.max(...devs) + " devices available";
       },
-      cores: function(bot){
-        var cores = this._attribute(bot, "cores");
-        if (this._verbose){
-          return cores.join(" | ");
-        }
-        return cores[0];
-      },
-      cpu: function(bot){
-        var cpus = this._attribute(bot, "cpu");
-        if (this._verbose){
-          return cpus.join(" | ");
-        }
-        return cpus[0];
-      },
-      device_os: function(bot){
-        var os = this._attribute(bot, "device_os", "none");
-        if (this._verbose) {
-          return os.join(" | ");
-        }
-        return os[0];
-      },
-      device_type: function(bot){
+      device_type: function(bot) {
         var dt = this._attribute(bot, "device_type", "none");
-        if (this._verbose) {
-          return dt.join(" | ");
+        dt = dt[0];
+        var alias = this._androidAlias(dt);
+        if (alias === "unknown") {
+          return dt;
         }
-        return dt[0];
+        return this._applyAlias(dt, alias);
       },
       disk_space: function(bot) {
         var aliased = [];
         bot.disks.forEach(function(disk){
-          var alias = swarming.humanBytes(disk.mb, swarming.MB);
+          var alias = sk.human.bytes(disk.mb, swarming.MB);
           aliased.push(this._applyAlias(disk.mb, disk.id + " "+ alias));
         }.bind(this));
         if (this._verbose) {
@@ -311,13 +306,6 @@
       id: function(bot) {
         return bot.bot_id;
       },
-      os: function(bot) {
-        var os = this._attribute(bot, "os");
-        if (this._verbose){
-          return os.join(" | ");
-        }
-        return os[0];
-      },
       pool: function(bot) {
         var pool = this._attribute(bot, "pool");
         return pool.join(" | ");
@@ -326,7 +314,7 @@
         // If a bot is both dead and quarantined, show the deadness over the
         // quarentinedness.
         if (bot.is_dead) {
-          return "Dead.  Last seen " + swarming.diffDate(bot.last_seen_ts) +
+          return "Dead.  Last seen " + sk.human.diffDate(bot.last_seen_ts) +
               " ago";
         }
         if (bot.quarantined) {
@@ -363,7 +351,7 @@
     // specialSort defines any custom sorting rules. By default, a
     // naturalCompare of the column content is done.
     var specialSort = {
-      device_type: function(dir, botA, botB) {
+      android_devices: function(dir, botA, botB) {
         // We sort on the number of attached devices. Note that this
         // may not be the same as android_devices, because _devices().length
         // counts all devices plugged into the bot, whereas android_devices
@@ -418,12 +406,7 @@
         // _sort is an Object {name:String, direction:String}.
         _sort: {
           type: Object,
-          value: function() {
-            return {
-              name: "id",
-              direction: "asc",
-            };
-          }
+          computed: "_makeObject(_sortstr)",
         },
 
         _verbose: {
@@ -448,7 +431,17 @@
 
 
       _column: function(col, bot) {
-        return columnMap[col].bind(this)(bot);
+        var f = columnMap[col];
+        if (!f) {
+          f = function(bot) {
+            var c = this._attribute(bot, col, "none");
+            if (this._verbose) {
+              return c.join(" | ");
+            }
+            return c[0];
+          }
+        }
+        return f.bind(this)(bot);
       },
 
       _androidAliasDevice: function(device) {
@@ -487,11 +480,26 @@
       },
 
       _header: function(col){
-        return headerMap[col];
+        return headerMap[col] || col;
       },
 
       _hide: function(col) {
         return this._columns.indexOf(col) === -1;
+      },
+
+      _makeObject: function(sortstr){
+        if (!sortstr) {
+          return undefined;
+        }
+        var pieces = sortstr.split(":");
+        if (pieces.length != 2) {
+          // fail safe
+          return {name: "id", direction:"desc"};
+        }
+        return {
+          name: pieces[0],
+          direction: pieces[1],
+        }
       },
 
       _reRender: function(filter, sort) {
@@ -523,8 +531,8 @@
         if (!(e && e.detail && e.detail.name)) {
           return;
         }
-        // should trigger __filterAndSort
-        this.set("_sort", e.detail);
+        // should trigger the computation of _sort and __filterAndSort
+        this.set("_sortstr", e.detail.name +":"+e.detail.direction);
       },
 
       // _stripSpecial removes the special columns and sorts the remaining

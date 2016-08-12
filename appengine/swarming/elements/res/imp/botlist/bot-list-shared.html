@@ -16,11 +16,17 @@
   (function(){
     var ANDROID_ALIASES = {
       "bullhead": "Nexus 5X",
-      "flo": "Nexus 7",
+      "flo": "Nexus 7 (2013)",
       "flounder": "Nexus 9",
+      "foster": "NVIDIA Shield",
+      "fugu": "Nexus Player",
+      "grouper": "Nexus 7 (2012)",
       "hammerhead": "Nexus 5",
+      "m0": "Galaxy S3",
       "mako": "Nexus 4",
+      "manta": "Nexus 10",
       "shamu": "Nexus 6",
+      "sprout": "Android One",
     };
     // Taken from http://developer.android.com/reference/android/os/BatteryManager.html
     var BATTERY_HEALTH_UNKNOWN = 1;
@@ -35,12 +41,14 @@
       "1002": "AMD",
       "1002:6779": "AMD Radeon HD 6450/7450/8450",
       "1002:6821": "AMD Radeon HD 8870M",
+      "1002:683d": "AMD Radeon HD 7770/8760",
       "1002:9830": "AMD Radeon HD 8400",
       "102b":      "Matrox",
       "102b:0522": "Matrox MGA G200e",
       "102b:0532": "Matrox MGA G200eW",
       "102b:0534": "Matrox G200eR2",
       "10de":      "NVIDIA",
+      "10de:08a4": "NVIDIA GeForce 320M",
       "10de:08aa": "NVIDIA GeForce 320M",
       "10de:0fe9": "NVIDIA GeForce GT 750M Mac Edition",
       "10de:104a": "NVIDIA GeForce GT 610",
@@ -48,9 +56,11 @@
       "10de:1244": "NVIDIA GeForce GTX 550 Ti",
       "10de:1401": "NVIDIA GeForce GTX 960",
       "8086":      "Intel",
+      "8086:0412": "Intel Haswell Integrated",
       "8086:041a": "Intel Xeon Integrated",
       "8086:0a2e": "Intel Haswell Integrated",
       "8086:0d26": "Intel Crystal Well Integrated",
+      "8086:22b1": "Intel Braswell Integrated",
     }
 
     // For consistency, all aliases are displayed like:
@@ -62,15 +72,6 @@
     SwarmingBehaviors.BotListBehavior = {
 
       properties: {
-        // TODO(kjlubick): Add more of these things from state, as they
-        // needed/useful/requested.
-        DIMENSIONS: {
-          type: Array,
-          value: function(){
-            return ["android_devices", "cores", "cpu", "device_type",
-                "device_os", "gpu", "id", "os", "pool"];
-          },
-        },
         DIMENSIONS_WITH_ALIASES: {
           type: Array,
           value: function(){
@@ -80,6 +81,8 @@
         BOT_PROPERTIES: {
           type: Array,
           value: function() {
+            // TODO(kjlubick): Add more of these things from state, as they
+            // needed/useful/requested.
             return ["disk_space", "task", "status"];
           }
         },
@@ -110,6 +113,9 @@
           var o = d[key];
           o.serial = key;
           o.okay = (o.state === AVAILABLE);
+          // It is easier to assume all devices on a bot are of the same type
+          // than to pick through the (incomplete) device state and find it.
+          o.device_type = this._attribute(bot, "device_type")[0];
           devices.push(o);
         }
         return devices;
@@ -117,12 +123,7 @@
 
       // _deviceType returns the codename of a given Android device.
       _deviceType: function(device) {
-        if (!device || !device.build) {
-          return UNKNOWN;
-        }
-        var t = device.build["build.product"] || device.build["product.board"] ||
-                device.build["product.device"] || UNKNOWN;
-        return t.toLowerCase();
+        return device.device_type.toLowerCase();
       },
 
       // _dimension returns the given dimension of a bot. If it is defined, it

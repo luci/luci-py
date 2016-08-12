@@ -19,6 +19,16 @@
     // inputs
     auth_headers: Object, the OAuth2 header to include in the request.  This
         should come from swarming-app.
+    query_params: Object, The query params that will filter the query
+        server-side.  This can have dimensions:Array<String>, quarantined:String
+        and is_dead: String. For example:
+        {
+          "dimensions": ["pool:Skia", "device_type:Sprout"],
+          "quarantined": "FALSE",  // optional
+          "is_dead": "TRUE",       // optional
+        }
+        For a full list of dimensions in the fleet, see the API call:
+        https://[swarming_url]/_ah/api/swarming/v1/bots/dimensions
     // outputs
     bots: Array<Object>, all bots returned by the botlist.  This is an Object
         with at least the following structure:
@@ -31,6 +41,7 @@
       state: String, Stringified JSON that has many pieces of information, like
                 devices, disk space, temperature, etc.
     busy: Boolean, if any ajax requests are in flight.
+    dimensions: Array<String>, of all valid dimensions.
     fleet: Object, counts of all bots in the fleet.  Contains "alive", "busy",
         "idle", "dead", and "quarantined".
     primary_map: Object, a mapping of primary keys to secondary items.
@@ -58,7 +69,7 @@
     <iron-ajax id="botlist"
        url="/_ah/api/swarming/v1/bots/list"
        headers="[[auth_headers]]"
-       params="[[_botlistParams(dimensions.*)]]"
+       params="[[query_params]]"
        handle-as="json"
        last-response="{{_list}}"
        loading="{{_busy1}}">
@@ -82,6 +93,7 @@
   </template>
   <script>
   (function(){
+    var BLACKLIST_DIMENSIONS = ["quarantined", "error"];
 
     Polymer({
       is: 'bot-list-data',
@@ -94,8 +106,8 @@
           type: Object,
           observer: "signIn",
         },
-        dimensions: {
-          type: Array,
+        query_params: {
+          type: Object,
         },
 
         //outputs
@@ -107,6 +119,11 @@
         busy: {
           type: Boolean,
           computed: "_or(_busy1,_busy2,_busy3)",
+          notify: true,
+        },
+        dimensions: {
+          type: Array,
+          computed: "_makeArray(_dimensions)",
           notify: true,
         },
         fleet: {
@@ -121,8 +138,8 @@
         },
         primary_arr: {
           type: Array,
-          // DIMENSIONS and BOT_PROPERTIES are inherited from BotListBehavior
-          computed: "_primaryArr(DIMENSIONS, BOT_PROPERTIES)",
+          //BOT_PROPERTIES is inherited from BotListBehavior
+          computed: "_primaryArr(dimensions, BOT_PROPERTIES)",
           notify: true,
         },
 
@@ -139,18 +156,13 @@
       },
 
       signIn: function(){
+        // Auto on iron-ajax means to automatically re-make the request if
+        // the url or the query params change.  Auto does not trigger if the
+        // [auth] headers change, so we wait until the user is signed in
+        // before making any requests.
         this.$.botlist.auto = true;
         this.$.dimensions.auto = true;
         this.$.fleet.auto = true;
-      },
-
-      _botlistParams: function() {
-        if (!this.dimensions) {
-          return {};
-        }
-        return {
-          dimensions: this.dimensions,
-        };
       },
 
       _bots: function(){
@@ -187,13 +199,27 @@
           return {};
         }
         return {
-          alive: this._count.count || -1,
+          all: this._count.count || -1,
+          alive: (this._count.count - this._count.dead) || -1,
           busy: this._count.busy || -1,
-          idle: this._count.count && this._count.busy &&
-              this._count.count - this._count.busy,
+          idle: (this._count.count - this._count.busy) || -1,
           dead: this._count.dead || -1,
           quarantined: this._count.quarantined || -1,
         }
+      },
+
+      _makeArray: function(dimObj) {
+        if (!dimObj || !dimObj.bots_dimensions) {
+          return [];
+        }
+        var dims = [];
+        dimObj.bots_dimensions.forEach(function(d){
+          if (BLACKLIST_DIMENSIONS.indexOf(d.key) === -1) {
+            dims.push(d.key);
+          }
+        });
+        dims.sort();
+        return dims;
       },
 
       _primaryArr: function(dimensions, properties) {
@@ -201,9 +227,9 @@
       },
 
       _primaryMap: function(dimensions){
-        // map will keep track of dimensions that we have seen at least once.
-        // This will then basically get turned into an array to be used for
-        // filtering.
+        // pMap will have a list of columns to available values (primary key
+        // to secondary values). This includes bot dimensions, but also
+        // includes state like disk_space, quarantined, busy, etc.
         dimensions = dimensions.bots_dimensions;
 
         var pMap = {};
@@ -248,7 +274,7 @@
         // Create custom filter options
         pMap["disk_space"] = [];
         pMap["task"] = ["busy", "idle"];
-        pMap["status"] = ["available", "dead", "quarantined"];
+        pMap["status"] = ["alive", "dead", "quarantined"];
 
         // No need to sort any of this, bot-filters sorts secondary items
         // automatically, especially when the user types a query.

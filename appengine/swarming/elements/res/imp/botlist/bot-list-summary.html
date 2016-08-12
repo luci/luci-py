@@ -51,27 +51,41 @@
     </style>
 
     <div class="header">Fleet</div>
-    <!-- TODO(kjlubick) Once url params have been implemented, have these
-    properly link to the botlist with the given features preloaded.-->
     <table>
       <tr>
-        <td class="right"><a href="/newui/botlist?alive">Alive</a>:</td>
+        <td class="right">
+          <a href$="[[_makeURL('','',columns.*,filtered_bots.*,sort,verbose)]]">All</a>:
+        </td>
+        <td class="left">[[fleet.all]]</td>
+      </tr>
+      <tr>
+        <td class="right">
+          <a href$="[[_makeURL('alive','',columns.*,filtered_bots.*,sort,verbose)]]">Alive</a>:
+        </td>
         <td class="left">[[fleet.alive]]</td>
       </tr>
       <tr>
-        <td class="right"><a href="/newui/botlist?busy">Busy</a>:</td>
+        <td class="right">
+          <a href$="[[_makeURL('busy','',columns.*,filtered_bots.*,sort,verbose)]]">Busy</a>:
+        </td>
         <td class="left">[[fleet.busy]]</td>
       </tr>
       <tr>
-        <td class="right"><a href="/newui/botlist?idle">Idle</a>:</td>
+        <td class="right">
+          <a href$="[[_makeURL('idle','',columns.*,filtered_bots.*,sort,verbose)]]">Idle</a>:
+        </td>
         <td class="left">[[fleet.idle]]</td>
       </tr>
       <tr>
-        <td class="right"><a href="/newui/botlist?dead">Dead</a>:</td>
+        <td class="right">
+          <a href$="[[_makeURL('dead','',columns.*,filtered_bots.*,sort,verbose)]]">Dead</a>:
+        </td>
         <td class="left">[[fleet.dead]]</td>
       </tr>
       <tr>
-        <td class="right"><a href="/newui/botlist?quaren">Quarantined</a>:</td>
+        <td class="right">
+          <a href$="[[_makeURL('quarantined','',columns.*,filtered_bots.*,sort,verbose)]]">Quarantined</a>:
+        </td>
         <td class="left">[[fleet.quarantined]]</td>
       </tr>
     </table>
@@ -79,23 +93,39 @@
     <div class="header">Displayed</div>
     <table>
       <tr>
-        <td class="right"><a href="/newui/botlist?alive2">Alive</a>:</td>
+        <td class="right">
+          All:
+        </td>
+        <td class="left">[[_currently_showing.all]]</td>
+      </tr>
+      <tr>
+        <td class="right">
+          <a href$="[[_makeURL('alive','true',columns.*,filtered_bots.*,sort,verbose)]]">Alive</a>:
+        </td>
         <td class="left">[[_currently_showing.alive]]</td>
       </tr>
       <tr>
-        <td class="right"><a href="/newui/botlist?busy2">Busy</a>:</td>
+        <td class="right">
+          <a href$="[[_makeURL('busy','true',columns.*,filtered_bots.*,sort,verbose)]]">Busy</a>:
+        </td>
         <td class="left">[[_currently_showing.busy]]</td>
       </tr>
       <tr>
-        <td class="right"><a href="/newui/botlist?idle2">Idle</a>:</td>
+        <td class="right">
+          <a href$="[[_makeURL('idle','true',columns.*,filtered_bots.*,sort,verbose)]]">Idle</a>:
+        </td>
         <td class="left">[[_currently_showing.idle]]</td>
       </tr>
       <tr>
-        <td class="right"><a href="/newui/botlist?dead2">Dead</a>:</td>
+        <td class="right">
+          <a href$="[[_makeURL('dead','true',columns.*,filtered_bots.*,sort,verbose)]]">Dead</a>:
+        </td>
         <td class="left">[[_currently_showing.dead]]</td>
       </tr>
       <tr>
-        <td class="right"><a href="/newui/botlist?quaren2">Quarantined</a>:</td>
+        <td class="right">
+          <a href$="[[_makeURL('quarantined','true',columns.*,filtered_bots.*,sort,verbose)]]">Quarantined</a>:
+        </td>
         <td class="left">[[_currently_showing.quarantined]]</td>
       </tr>
     </table>
@@ -108,17 +138,27 @@
       behaviors: [SwarmingBehaviors.BotListBehavior],
 
       properties: {
+        columns: {
+          type: Array,
+        },
         filtered_bots: {
           type: Array,
         },
         fleet: {
           type: Object,
         },
+        sort: {
+          type: String,
+        },
+        verbose: {
+          type: Boolean,
+        },
 
         _currently_showing: {
           type: Object,
           value: function() {
             return {
+              all: -1,
               alive:  -1,
               busy:  -1,
               idle: -1,
@@ -133,8 +173,42 @@
       // property observers
       observers: ["_recount(filtered_bots.*)"],
 
+      _getFilterStr: function(filter) {
+        if (!filter) {
+          return "";
+        }
+        if (filter === "alive" || filter === "dead" ||
+            filter === "quarantined") {
+          return "status:" + filter;
+        } else {
+          return "task:" + filter;
+        }
+      },
+
+      _makeURL: function(filter, preserveOthers) {
+        if (preserveOthers) {
+          var fstr = encodeURIComponent(this._getFilterStr(filter));
+          if (window.location.href.indexOf(fstr) === -1) {
+            return window.location.href + "&filters=" + fstr;
+          }
+          // The filter is already on the list.
+          return undefined;
+        }
+        var params = {
+          sort: [this.sort],
+          columns: this.columns,
+          verbose: [this.verbose],
+        }
+        if (filter) {
+          params["filters"] = [this._getFilterStr(filter)];
+        }
+
+        return window.location.href.split('?')[0] + '?' + sk.query.fromParamSet(params);
+      },
+
       _recount: function() {
         var curr = {
+          all: 0,
           alive: 0,
           busy: 0,
           idle: 0,
@@ -158,6 +232,7 @@
           } else {
             curr.alive++;
           }
+          curr.all++;
         }.bind(this));
         this.set("_currently_showing", curr);
       }
