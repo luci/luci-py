@@ -423,6 +423,20 @@ class SwarmingTasksService(remote.Service):
         request.state.name.lower(),
         request.tags)
 
+  @gae_ts_mon.instrument_endpoint()
+  @auth.endpoints_method(
+      message_types.VoidMessage, swarming_rpcs.TasksTags,
+      http_method='GET')
+  @auth.require(acl.is_privileged_user)
+  def tags(self, _request):
+    """Returns the cached set of tags currently seen in the fleet."""
+    tags = task_result.TagAggregation.KEY.get()
+    ft = [
+      swarming_rpcs.StringListPair(key=t.tag, value=t.values)
+      for t in tags.tags
+    ]
+    return swarming_rpcs.TasksTags(tasks_tags=ft, ts=tags.ts)
+
 
 BotId = endpoints.ResourceContainer(
     message_types.VoidMessage,

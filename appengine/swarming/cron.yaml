@@ -30,6 +30,10 @@ cron:
   url: /internal/cron/aggregate_bots_dimensions
   schedule: every 5 minutes
 
+- description: Aggregate all tasks tags for easier sorting.
+  url: /internal/cron/aggregate_tasks_tags
+  schedule: every 1 hours
+
 - description: Enqueue task to handle Pub/Sub messages from Machine Provider.
   url: /internal/cron/machine_provider_pubsub
   schedule: every 1 minutes

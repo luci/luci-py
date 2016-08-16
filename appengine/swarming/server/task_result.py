@@ -849,6 +849,21 @@ class TaskResultSummary(_TaskResultCommon):
     return out
 
 
+class TagValues(ndb.Model):
+  tag = ndb.StringProperty()
+  values = ndb.StringProperty(repeated=True)
+
+
+class TagAggregation(ndb.Model):
+  """Has all dimensions that are currently in use."""
+  tags = ndb.LocalStructuredProperty(TagValues, repeated=True)
+
+  ts = ndb.DateTimeProperty()
+
+  # We only store one of these entities. Use this key to refer to any instance.
+  KEY = ndb.Key('TagAggregation', 'current')
+
+
 ### Private stuff.
 
 

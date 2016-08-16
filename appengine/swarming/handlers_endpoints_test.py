@@ -858,6 +858,35 @@ class TasksApiTest(BaseTest):
                 expected = {u'now': str_now_120}
                 self.assertEqual(expected, result)
 
+  def test_tags_ok(self):
+    """Asserts that TasksTags is returned with the right data."""
+    self.set_as_privileged_user()
+    now = datetime.datetime(2009, 1, 2, 3, 4, 5, 6)
+    self.mock_now(now)
+    task_result.TagAggregation(
+        key=task_result.TagAggregation.KEY,
+        tags=[
+            task_result.TagValues(
+                tag='foo', values=['alpha', 'beta']),
+            task_result.TagValues(
+                tag='bar', values=['gamma', 'delta', 'epsilon']),
+        ],
+        ts=now).put()
+    expected = {
+      u'tasks_tags': [
+        {
+          u'key': 'foo',
+          u'value': [u'alpha', u'beta'],
+        },
+        {
+          u'key': 'bar',
+          u'value': [u'gamma', u'delta', u'epsilon'],
+        },
+      ],
+      u'ts': unicode(now.strftime(self.DATETIME_FORMAT)),
+    }
+    self.assertEqual(expected, self.call_api('tags', body={}).json)
+
   def _gen_two_tasks(self):
     # first request
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)

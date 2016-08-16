@@ -25,7 +25,7 @@ import handlers_frontend
 from components import template
 from server import bot_code
 from server import bot_management
-
+from server import task_result
 
 class AppTestBase(test_env_handlers.AppTestBase):
   def setUp(self):
@@ -480,7 +480,6 @@ class BackendTest(AppTestBase):
     # The actual number doesn't matter, just make sure they are unqueued.
     self.execute_tasks()
 
-
   def testCronBotsAggregateTask(self):
     # Tests that the aggregation works
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
@@ -505,6 +504,32 @@ class BackendTest(AppTestBase):
         dimensions=[
             bot_management.DimensionValues(
                 dimension='foo', values=['alpha', 'beta'])
+        ],
+        ts=now)
+    self.assertEqual(expected, actual)
+
+  def testCronTagsAggregateTask(self):
+    self.set_as_admin()
+    now = datetime.datetime(2011, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+
+    self.client_create_task_raw(tags=['alpha:beta', 'gamma:delta'])
+    self.client_create_task_raw(tags=['alpha:epsilon', 'zeta:theta'])
+
+    self.app.get('/internal/cron/aggregate_tasks_tags',
+        headers={'X-AppEngine-Cron': 'true'}, status=200)
+    actual = task_result.TagAggregation.KEY.get()
+    expected = task_result.TagAggregation(
+        key=task_result.TagAggregation.KEY,
+        tags=[
+            task_result.TagValues(tag='alpha', values=['beta', 'epsilon']),
+            task_result.TagValues(tag='gamma', values=['delta']),
+            task_result.TagValues(tag='os', values=['Amiga']),
+            task_result.TagValues(tag='pool', values=['default']),
+            task_result.TagValues(tag='priority', values=['10']),
+            task_result.TagValues(tag='user', values=['joe@localhost']),
+            task_result.TagValues(tag='zeta', values=['theta']),
+
         ],
         ts=now)
     self.assertEqual(expected, actual)
