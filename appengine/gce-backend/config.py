@@ -17,6 +17,7 @@ import metrics
 
 from components import config
 from components import datastore_utils
+from components import utils
 from components.config import validation
 
 from proto import config_pb2
@@ -24,6 +25,7 @@ from proto import config_pb2
 
 TEMPLATES_CFG_FILENAME = 'templates.cfg'
 MANAGERS_CFG_FILENAME = 'managers.cfg'
+SETTINGS_CFG_FILENAME = 'settings.cfg'
 
 
 class Configuration(datastore_utils.config.GlobalConfig):
@@ -140,3 +142,25 @@ def validate_manager_config(config, context):
       zones[manager.template_base_name].add(manager.zone)
 
   metrics.config_valid.set(valid, fields={'config': MANAGERS_CFG_FILENAME})
+
+
+@validation.self_rule(SETTINGS_CFG_FILENAME, config_pb2.SettingsCfg)
+def validate_settings_config(config, context):
+  pass
+
+
+def _get_settings():
+  """Returns (rev, cfg) where cfg is a parsed SettingsCfg message.
+
+  The config is cached in the datastore.
+  """
+  rev, cfg = config.get_self_config(
+      SETTINGS_CFG_FILENAME, config_pb2.SettingsCfg, store_last_good=True)
+  cfg = cfg or config_pb2.SettingsCfg()
+  return rev, cfg
+
+
+@utils.cache_with_expiration(60)
+def settings():
+  """Loads settings from an NDB-based cache or a default one if not present."""
+  return _get_settings()[1]

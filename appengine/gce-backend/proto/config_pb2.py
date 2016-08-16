@@ -13,7 +13,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='config.proto',
   package='gce_backend',
-  serialized_pb='\n\x0c\x63onfig.proto\x12\x0bgce_backend\"\x9d\x03\n\x16InstanceTemplateConfig\x12G\n\ttemplates\x18\x01 \x03(\x0b\x32\x34.gce_backend.InstanceTemplateConfig.InstanceTemplate\x1a\xb9\x02\n\x10InstanceTemplate\x12\x11\n\tbase_name\x18\x01 \x01(\t\x12\x0f\n\x07project\x18\x02 \x01(\t\x12\x12\n\ndimensions\x18\x03 \x03(\t\x12\x12\n\nimage_name\x18\x04 \x01(\t\x12\x14\n\x0c\x64isk_size_gb\x18\x05 \x01(\x05\x12]\n\x10service_accounts\x18\x06 \x03(\x0b\x32\x43.gce_backend.InstanceTemplateConfig.InstanceTemplate.ServiceAccount\x12\x0c\n\x04tags\x18\x07 \x03(\t\x12\x10\n\x08metadata\x18\x08 \x03(\t\x12\x14\n\x0cmachine_type\x18\t \x01(\t\x1a.\n\x0eServiceAccount\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06scopes\x18\x02 \x03(\t\"\xda\x01\n\x1aInstanceGroupManagerConfig\x12N\n\x08managers\x18\x01 \x03(\x0b\x32<.gce_backend.InstanceGroupManagerConfig.InstanceGroupManager\x1al\n\x14InstanceGroupManager\x12\x1a\n\x12template_base_name\x18\x01 \x01(\t\x12\x14\n\x0cminimum_size\x18\x02 \x01(\x05\x12\x14\n\x0cmaximum_size\x18\x03 \x01(\x05\x12\x0c\n\x04zone\x18\x04 \x01(\t')
+  serialized_pb='\n\x0c\x63onfig.proto\x12\x0bgce_backend\"\x9d\x03\n\x16InstanceTemplateConfig\x12G\n\ttemplates\x18\x01 \x03(\x0b\x32\x34.gce_backend.InstanceTemplateConfig.InstanceTemplate\x1a\xb9\x02\n\x10InstanceTemplate\x12\x11\n\tbase_name\x18\x01 \x01(\t\x12\x0f\n\x07project\x18\x02 \x01(\t\x12\x12\n\ndimensions\x18\x03 \x03(\t\x12\x12\n\nimage_name\x18\x04 \x01(\t\x12\x14\n\x0c\x64isk_size_gb\x18\x05 \x01(\x05\x12]\n\x10service_accounts\x18\x06 \x03(\x0b\x32\x43.gce_backend.InstanceTemplateConfig.InstanceTemplate.ServiceAccount\x12\x0c\n\x04tags\x18\x07 \x03(\t\x12\x10\n\x08metadata\x18\x08 \x03(\t\x12\x14\n\x0cmachine_type\x18\t \x01(\t\x1a.\n\x0eServiceAccount\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06scopes\x18\x02 \x03(\t\"\xda\x01\n\x1aInstanceGroupManagerConfig\x12N\n\x08managers\x18\x01 \x03(\x0b\x32<.gce_backend.InstanceGroupManagerConfig.InstanceGroupManager\x1al\n\x14InstanceGroupManager\x12\x1a\n\x12template_base_name\x18\x01 \x01(\t\x12\x14\n\x0cminimum_size\x18\x02 \x01(\x05\x12\x14\n\x0cmaximum_size\x18\x03 \x01(\x05\x12\x0c\n\x04zone\x18\x04 \x01(\t\"+\n\x0bSettingsCfg\x12\x1c\n\x14\x65nable_ts_monitoring\x18\x01 \x01(\x08')
 
 
 
@@ -238,6 +238,34 @@ _INSTANCEGROUPMANAGERCONFIG = _descriptor.Descriptor(
   serialized_end=664,
 )
 
+
+_SETTINGSCFG = _descriptor.Descriptor(
+  name='SettingsCfg',
+  full_name='gce_backend.SettingsCfg',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='enable_ts_monitoring', full_name='gce_backend.SettingsCfg.enable_ts_monitoring', index=0,
+      number=1, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=666,
+  serialized_end=709,
+)
+
 _INSTANCETEMPLATECONFIG_INSTANCETEMPLATE_SERVICEACCOUNT.containing_type = _INSTANCETEMPLATECONFIG_INSTANCETEMPLATE;
 _INSTANCETEMPLATECONFIG_INSTANCETEMPLATE.fields_by_name['service_accounts'].message_type = _INSTANCETEMPLATECONFIG_INSTANCETEMPLATE_SERVICEACCOUNT
 _INSTANCETEMPLATECONFIG_INSTANCETEMPLATE.containing_type = _INSTANCETEMPLATECONFIG;
@@ -246,6 +274,7 @@ _INSTANCEGROUPMANAGERCONFIG_INSTANCEGROUPMANAGER.containing_type = _INSTANCEGROU
 _INSTANCEGROUPMANAGERCONFIG.fields_by_name['managers'].message_type = _INSTANCEGROUPMANAGERCONFIG_INSTANCEGROUPMANAGER
 DESCRIPTOR.message_types_by_name['InstanceTemplateConfig'] = _INSTANCETEMPLATECONFIG
 DESCRIPTOR.message_types_by_name['InstanceGroupManagerConfig'] = _INSTANCEGROUPMANAGERCONFIG
+DESCRIPTOR.message_types_by_name['SettingsCfg'] = _SETTINGSCFG
 
 class InstanceTemplateConfig(_message.Message):
   __metaclass__ = _reflection.GeneratedProtocolMessageType
@@ -276,6 +305,12 @@ class InstanceGroupManagerConfig(_message.Message):
   DESCRIPTOR = _INSTANCEGROUPMANAGERCONFIG
 
   # @@protoc_insertion_point(class_scope:gce_backend.InstanceGroupManagerConfig)
+
+class SettingsCfg(_message.Message):
+  __metaclass__ = _reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _SETTINGSCFG
+
+  # @@protoc_insertion_point(class_scope:gce_backend.SettingsCfg)
 
 
 # @@protoc_insertion_point(module_scope)

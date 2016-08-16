@@ -8,9 +8,14 @@ from components import utils
 
 import gae_ts_mon
 
+import config
 import handlers_cron
 import handlers_endpoints
 import handlers_queues
+
+
+def is_enabled_callback():
+  return config.settings().enable_ts_monitoring
 
 
 def main():
@@ -22,7 +27,7 @@ def main():
   )
   for app in apps[1:]:
     # Not callable on endpoints app
-    gae_ts_mon.initialize(app=app)
+    gae_ts_mon.initialize(app=app, is_enabled_fn=is_enabled_callback)
   return apps
 
 

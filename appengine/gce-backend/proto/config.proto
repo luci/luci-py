@@ -68,3 +68,10 @@ message InstanceGroupManagerConfig {
 
   repeated InstanceGroupManager managers = 1;
 }
+
+
+// GCE Backend Configuration
+message SettingsCfg {
+  // Enable ts_mon based monitoring.
+  optional bool enable_ts_monitoring = 1;
+}
