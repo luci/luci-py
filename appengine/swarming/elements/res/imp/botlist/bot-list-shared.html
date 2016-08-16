@@ -10,9 +10,8 @@
       behaviors: [SwarmingBehaviors.BotListBehavior]
   in the creation of your Polymer element.
 -->
+<link rel="import" href="/res/imp/common/swarming-app.html">
 <script>
-
-  window.SwarmingBehaviors = window.SwarmingBehaviors || {};
   (function(){
     var ANDROID_ALIASES = {
       "bullhead": "Nexus 5X",
@@ -68,8 +67,9 @@
     // This regex matches a string like "ALIAS (ORIG)", with ORIG as group 1.
     var ALIAS_REGEXP = /.+ \((.*)\)/;
 
-    // This behavior wraps up all the shared bot-list functionality.
-    SwarmingBehaviors.BotListBehavior = {
+    // This behavior wraps up all the shared bot-list functionality by
+    // extending SwarmingBehaviors.SwarmingBehavior
+    SwarmingBehaviors.BotListBehavior = [SwarmingBehaviors.SwarmingBehavior, {
 
       properties: {
         DIMENSIONS_WITH_ALIASES: {
@@ -144,19 +144,6 @@
         return GPU_ALIASES[gpu] || UNKNOWN;
       },
 
-      _not: function(a) {
-        return !a;
-      },
-
-      _or: function() {
-        var result = false;
-        // can't use .foreach, as arguments isn't really a function.
-        for (var i = 0; i < arguments.length; i++) {
-          result = result || arguments[i];
-        }
-        return result;
-      },
-
       // _state returns the requested attribute from a bot's state.
       // For consistency with _dimension, if the attribute is not an array,
       // it is put as the only element in an array.
@@ -187,6 +174,6 @@
         }
         return str;
       },
-    }
+    }];
   })()
 </script>

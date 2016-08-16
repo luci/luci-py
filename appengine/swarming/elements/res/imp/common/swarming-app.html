@@ -18,6 +18,17 @@
   <style include="shared-style"> contains styles to be shared among all
       apps, such as colors.
 
+  It contains the definition of the following Behaviors:
+
+    SwarmingBehaviors.SwarmingBehavior
+
+  To use it, include
+      behaviors: [SwarmingBehaviors.SwarmingBehavior]
+  in the creation of any Polymer element.
+
+  SwarmingBehaviors.SwarmingBehavior contains shared functions to ease
+  templating, such as _or() and _not().
+
   Properties:
     auth_headers: Object, Use this in iron-ajax to set oauth2 headers.
     busy: Boolean, If the busy spinner should be active.
@@ -136,3 +147,25 @@
       }
   </style>
 </dom-module>
+
+<script>
+  window.SwarmingBehaviors = window.SwarmingBehaviors || {};
+  (function(){
+    // This behavior wraps up all the shared swarming functionality.
+    SwarmingBehaviors.SwarmingBehavior = {
+
+      _not: function(a) {
+        return !a;
+      },
+
+      _or: function() {
+        var result = false;
+        // can't use .foreach, as arguments isn't really an Array.
+        for (var i = 0; i < arguments.length; i++) {
+          result = result || arguments[i];
+        }
+        return result;
+      },
+    };
+  })();
+</script>

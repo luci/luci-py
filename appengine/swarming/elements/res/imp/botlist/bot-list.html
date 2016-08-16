@@ -26,6 +26,7 @@
 <link rel="import" href="/res/imp/bower_components/iron-flex-layout/iron-flex-layout-classes.html">
 <link rel="import" href="/res/imp/bower_components/polymer/polymer.html">
 
+<link rel="import" href="/res/imp/common/dynamic-table.html">
 <link rel="import" href="/res/imp/common/sort-toggle.html">
 <link rel="import" href="/res/imp/common/swarming-app.html">
 <link rel="import" href="/res/imp/common/url-param.html">
@@ -37,40 +38,16 @@
 
 <dom-module id="bot-list">
   <template>
-    <style include="iron-flex iron-flex-alignment iron-positioning swarming-app-style">
+    <style include="iron-flex iron-flex-alignment iron-positioning swarming-app-style dynamic-table-style">
       bot-filters, bot-list-summary {
         margin-bottom: 8px;
         margin-right: 10px;
       }
-      .bot {
-        margin:5px;
-        max-width:400px;
-        min-height:100px;
-        min-width:300px;
-      }
-      table {
-        border-collapse: collapse;
-        margin-left: 5px;
-      }
-      td, th {
-        border: 1px solid #DDD;
-        padding: 5px;
-      }
-
       .quarantined, .bad-device {
         background-color: #ffdddd;
       }
       .dead {
         background-color: #cccccc;
-      }
-
-      th {
-        position: relative;
-      }
-      sort-toggle {
-        position: absolute;
-        right: 0;
-        top: 0.4em;
       }
       .bot-list th > span {
         /* Leave space for sort-toggle*/
@@ -111,7 +88,7 @@
           <bot-list-summary
             columns="[[_columns]]"
             fleet="[[_fleet]]"
-            filtered_bots="[[_filteredSortedBots]]"
+            filtered_bots="[[_filteredSortedItems]]"
             sort="[[_sortstr]]"
             verbose="[[_verbose]]">
           </bot-list-summary>
@@ -122,7 +99,7 @@
           auth_headers="[[_auth_headers]]"
           query_params="[[_query_params]]"
 
-          bots="{{_bots}}"
+          bots="{{_items}}"
           busy="{{_busy}}"
           dimensions="{{_dimensions}}"
           fleet="{{_fleet}}"
@@ -161,7 +138,7 @@
               </th>
 
               <template is="dom-repeat"
-                    items="[[_plain_columns]]"
+                    items="[[_plainColumns]]"
                     as="c">
                 <th hidden$="[[_hide(c)]]">
                   <span>[[_header(c)]]</span>
@@ -175,7 +152,7 @@
           </thead>
           <tbody>
             <template id="bot_table" is="dom-repeat"
-                  items="[[_filteredSortedBots]]"
+                  items="[[_filteredSortedItems]]"
                   as="bot"
                   initial-count=50>
 
@@ -192,7 +169,7 @@
                 </td>
 
                 <template is="dom-repeat"
-                      items="[[_plain_columns]]"
+                      items="[[_plainColumns]]"
                       as="c">
                   <td hidden$="[[_hide(c)]]">
                     [[_column(c, bot, _verbose)]]
@@ -208,7 +185,7 @@
                   <td></td>
                   <td hidden$="[[_hide('task', _columns.*)]]"></td>
                   <template is="dom-repeat"
-                        items="[[_plain_columns]]"
+                        items="[[_plainColumns]]"
                         as="c">
                     <td hidden$="[[_hide(c)]]">
                       [[_deviceColumn(c, device, _verbose)]]
@@ -226,11 +203,13 @@
   </template>
   <script>
   (function(){
-    var special_columns = ["id", "task"];
+    // see dynamic-table for more information on specialColumns, headerMap,
+    // columnMap, and specialSort
+    var specialColumns = ["id", "task"];
 
     var headerMap = {
-      // "id" and "task" are special, so they don't go here and have their
-      // headers hard-coded below.
+      // "id" and "task" are special, so they don't go here. They have their
+      // headers hard-coded above.
       "android_devices": "Android Devices",
       "cores": "Cores",
       "cpu": "CPU",
@@ -245,10 +224,6 @@
       "xcode_version": "XCode Version",
     };
 
-    // This maps column name to a function that will return the content for a
-    // given bot. These functions are bound to this element, and have access
-    // to all functions defined here and in bot-list-shared. If a column
-    // is not listed here, a sane default will be used (see _column()).
     var columnMap = {
       android_devices: function(bot) {
         var devs = this._attribute(bot, "android_devices", "0");
@@ -348,8 +323,6 @@
       }
     }
 
-    // specialSort defines any custom sorting rules. By default, a
-    // naturalCompare of the column content is done.
     var specialSort = {
       android_devices: function(dir, botA, botB) {
         // We sort on the number of attached devices. Note that this
@@ -370,7 +343,8 @@
 
     Polymer({
       is: 'bot-list',
-      behaviors: [SwarmingBehaviors.BotListBehavior],
+      behaviors: [SwarmingBehaviors.BotListBehavior,
+                  SwarmingBehaviors.DynamicTableBehavior],
 
       properties: {
 
@@ -378,40 +352,34 @@
           type: String,
         },
 
-        _bots: {
-          type: Array,
-        },
-
-        _columns: {
-          type: Array,
-        },
-
-        _filter: {
-          type: Function,
+        // for dynamic table
+        _columnMap: {
+          type: Object,
           value: function() {
-            return true;
+            return columnMap;
+          }
+        },
+        _headerMap: {
+          type: Object,
+          value: function() {
+            return headerMap;
           },
         },
-
-        _filteredSortedBots: {
+        // special columns contain html.  non-special (i.e. normal colunns) just
+        // contain text.
+        _specialColumns: {
           type: Array,
-          computed: "_filterAndSort(_bots,_filter.*,_sort.*)"
+          value: function() {
+            return specialColumns;
+          }
         },
-
-        _plain_columns: {
-          type: Array,
-          computed: "_stripSpecial(_columns.*)",
-        },
-
-        // _sort is an Object {name:String, direction:String}.
-        _sort: {
+        _specialSort: {
           type: Object,
-          computed: "_makeObject(_sortstr)",
+          value: function() {
+            return specialSort;
+          }
         },
 
-        _verbose: {
-          type: Boolean,
-        }
       },
 
       _botClass: function(bot) {
@@ -429,20 +397,6 @@
         return "/restricted/bot/"+id;
       },
 
-
-      _column: function(col, bot) {
-        var f = columnMap[col];
-        if (!f) {
-          f = function(bot) {
-            var c = this._attribute(bot, col, "none");
-            if (this._verbose) {
-              return c.join(" | ");
-            }
-            return c[0];
-          }
-        }
-        return f.bind(this)(bot);
-      },
 
       _androidAliasDevice: function(device) {
         if (device.notReady) {
@@ -464,84 +418,6 @@
           return "bad-device";
         }
         return "";
-      },
-
-      _filterAndSort: function(a,b,c) {
-        // We intentionally sort this._bots (and not a copy) to allow users to
-        // "chain" sorts, that is, sort by one thing and then another, and
-        // have both orderings properly impact the list.
-        swarming.stableSort(this._bots, this._sortBotTable.bind(this));
-        var bots = this._bots;
-        if (this._filter) {
-          bots = bots.filter(this._filter.bind(this));
-        }
-
-        return bots;
-      },
-
-      _header: function(col){
-        return headerMap[col] || col;
-      },
-
-      _hide: function(col) {
-        return this._columns.indexOf(col) === -1;
-      },
-
-      _makeObject: function(sortstr){
-        if (!sortstr) {
-          return undefined;
-        }
-        var pieces = sortstr.split(":");
-        if (pieces.length != 2) {
-          // fail safe
-          return {name: "id", direction:"desc"};
-        }
-        return {
-          name: pieces[0],
-          direction: pieces[1],
-        }
-      },
-
-      _reRender: function(filter, sort) {
-        this.$.bot_table.render();
-      },
-
-      _sortBotTable: function(botA, botB) {
-        if (!this._sort) {
-          return 0;
-        }
-        var dir = 1;
-        if (this._sort.direction === "desc") {
-          dir = -1;
-        }
-        var sort = specialSort[this._sort.name];
-        if (sort) {
-          return sort.bind(this)(dir, botA, botB);
-        }
-        // Default to a natural compare of the columns.
-        var botACol = this._column(this._sort.name, botA);
-        var botBCol = this._column(this._sort.name, botB);
-
-        return dir * swarming.naturalCompare(botACol, botBCol);
-      },
-
-      _sortChange: function(e) {
-        // The event we get from sort-toggle tells us the name of what needs
-        // to be sorting and how to sort it.
-        if (!(e && e.detail && e.detail.name)) {
-          return;
-        }
-        // should trigger the computation of _sort and __filterAndSort
-        this.set("_sortstr", e.detail.name +":"+e.detail.direction);
-      },
-
-      // _stripSpecial removes the special columns and sorts the remaining
-      // columns so they always appear in the same order, regardless of
-      // the order they are added.
-      _stripSpecial: function(){
-        return this._columns.filter(function(c){
-          return special_columns.indexOf(c) === -1;
-        }).sort();
       },
 
       _taskLink: function(data) {
