@@ -106,9 +106,14 @@ def _convert_config(content, dest_type):
 # Rest
 
 
+def _trim_app_id(app_id):
+  """Returns the App ID with the domain prefix removed, if present."""
+  return app_id.split(':')[-1]
+
+
 @utils.cache
 def self_config_set():
-  return 'services/%s' % app_identity.get_application_id()
+  return 'services/%s' % _trim_app_id(app_identity.get_application_id())
 
 
 def config_service_hostname():

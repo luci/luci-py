@@ -29,6 +29,11 @@ cron:
 - url: /internal/cron/find-orphaned-instances
   schedule: every 1 minutes
 
+- description: read luci-config configs
+  # Handled by inclusion of components/config in app.yaml.
+  url: /internal/cron/config/update
+  schedule: every 1 minutes
+
 - url: /internal/cron/import-config
   schedule: every 1 minutes synchronized
 

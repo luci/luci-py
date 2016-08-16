@@ -34,7 +34,7 @@ class ConfigImportHandler(webapp2.RequestHandler):
 
   @decorators.require_cronjob
   def get(self):
-    config.update_config()
+    config.update_template_configs()
 
 
 class ConfigProcessHandler(webapp2.RequestHandler):

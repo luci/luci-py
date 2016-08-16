@@ -20,13 +20,9 @@ eventually consistent, converging on the desired state over multiple calls.
     same name as pubsub.get\_machine\_provider\_subscription(). On the topic,
     authorize the Machine Provider's default service account as a publisher,
     e.g. machine-provider@appspot.gserviceaccount.com.
-*   Store the following three entities in the datastore:
-    *   config.Configuration: Most of this entity will be updated by the app,
-        but the config\_set field needs to be set to the name of the config set
-        to fetch from the config service.
-    *   components.config.common.ConfigSettings: Set service\_hostname to the
-        address of the config service, e.g. luci-config.appspot.com. All others
-        fields are unused.
+*   Use the ConfigApi to set the ConfigSettings datastore entity to the
+    address of the config service, e.g. luci-config.appspot.com.
+*   Store the following entity in the datastore:
     *   components.machine\_provider.utils.MachineProviderConfiguration: Set
         instance\_url to the URL for the Machine Provider service, e.g.
         https://machine-provider.appspot.com.
@@ -47,7 +43,8 @@ service as templates.cfg and managers.cfg respectively.
 
 Responsible for importing the current GCE configuration from the config service.
 When a new config is detected, the local copy of the config in the datastore is
-updated.
+updated. This task ensures that the valid manager and template configurations
+are updated synchronously.
 
 
 ## process-config

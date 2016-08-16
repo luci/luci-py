@@ -23,6 +23,15 @@ class CommonCase(test_case.TestCase):
   def test_convert_empty(self):
     self.assertIsNotNone(common._convert_config('', test_config_pb2.Config))
 
+  def test_trim_app_id(self):
+    trimmed_app_id = 'gce-backend'
+    app_id_external = trimmed_app_id
+    app_id_internal = 'google.com:%s' % trimmed_app_id
+    app_id_empty = ''
+    self.assertEqual(common._trim_app_id(app_id_external), trimmed_app_id)
+    self.assertEqual(common._trim_app_id(app_id_internal), trimmed_app_id)
+    self.assertEqual(common._trim_app_id(app_id_empty), app_id_empty)
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

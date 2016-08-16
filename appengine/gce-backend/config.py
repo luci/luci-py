@@ -17,20 +17,23 @@ import metrics
 
 from components import config
 from components import datastore_utils
+from components.config import validation
 
 from proto import config_pb2
 
 
+TEMPLATES_CFG_FILENAME = 'templates.cfg'
+MANAGERS_CFG_FILENAME = 'managers.cfg'
+
+
 class Configuration(datastore_utils.config.GlobalConfig):
   """Configuration for this service."""
-  # Name of the config set in the config service.
-  config_set = ndb.StringProperty()
   # Text-formatted proto.config_pb2.InstanceTemplateConfig.
-  template_config = ndb.TextProperty()
+  template_config = ndb.TextProperty(default='')
   # Text-formatted proto.config_pb2.InstanceGroupManagerConfig.
-  manager_config = ndb.TextProperty()
+  manager_config = ndb.TextProperty(default='')
   # Revision of the configs.
-  revision = ndb.StringProperty()
+  revision = ndb.StringProperty(default='')
 
   @classmethod
   def load(cls):
@@ -39,80 +42,92 @@ class Configuration(datastore_utils.config.GlobalConfig):
     Returns:
       A 2-tuple of (InstanceTemplateConfig, InstanceGroupManagerConfig).
     """
+    def _adds_cfg_to_message(name, text_cfg, proto_cfg):
+      try:
+        protobuf.text_format.Merge(text_cfg, proto_cfg)
+      except protobuf.text_format.ParseError as ex:
+        logging.error('Invalid %s: %s', name, ex)
+        raise ValueError(ex)
+      return proto_cfg
+
     configuration = cls.cached()
-    template_config = config_pb2.InstanceTemplateConfig()
-    protobuf.text_format.Merge(configuration.template_config, template_config)
-    manager_config = config_pb2.InstanceGroupManagerConfig()
-    protobuf.text_format.Merge(configuration.manager_config, manager_config)
-    return template_config, manager_config
+    template_cfg = _adds_cfg_to_message(
+        'template.cfg', configuration.template_config,
+        config_pb2.InstanceTemplateConfig()
+    )
+    manager_cfg = _adds_cfg_to_message(
+        'manager.cfg', configuration.manager_config,
+        config_pb2.InstanceGroupManagerConfig()
+    )
+    return template_cfg, manager_cfg
 
 
-def update_config():
-  """Updates the local configuration from the config service."""
-  config_set = Configuration.cached().config_set
-  revision, template_config = config.get(
-      config_set,
-      'templates.cfg',
-      dest_type=config_pb2.InstanceTemplateConfig,
-  )
-  _, manager_config = config.get(
-      config_set,
-      'managers.cfg',
-      dest_type=config_pb2.InstanceGroupManagerConfig,
-      revision=revision,
-  )
+def update_template_configs():
+  """Updates the local template configuration from the config service.
 
-  # Validity of each config.
-  configs = {
-      'managers.cfg': True,
-      'templates.cfg': True,
-  }
+  Ensures that all config files are at the same path revision.
+  """
+  template_revision, template_config = config.get_self_config(
+      TEMPLATES_CFG_FILENAME, config_pb2.InstanceTemplateConfig,
+      store_last_good=True)
+  manager_revision, manager_config = config.get_self_config(
+      MANAGERS_CFG_FILENAME, config_pb2.InstanceGroupManagerConfig,
+      store_last_good=True)
 
-  context = config.validation_context.Context.logging()
-  validate_template_config(template_config, context)
-  if context.result().has_errors:
-    logging.error('Not updating configuration due to errors in templates.cfg')
-    configs['templates.cfg'] = False
-
-  context = config.validation_context.Context.logging()
-  validate_manager_config(manager_config, context)
-  if context.result().has_errors:
-    logging.error('Not updating configuration due to errors in managers.cfg')
-    configs['managers.cfg'] = False
-
-  for config_name, valid in configs.iteritems():
-    metrics.config_valid.set(valid, fields={'config': config_name})
-
-  if not all(configs.values()):
+  if template_revision != manager_revision:
+    logging.error('Not updating configuration due to revision mismatch.')
     return
 
-  stored_config = Configuration.fetch()
-  if stored_config.revision != revision:
-    logging.info('Updating configuration to %s', revision)
+  stored_config = Configuration.cached()
+  if stored_config.revision != template_revision:
+    context = config.validation_context.Context.logging()
+    if template_config:
+      validate_template_config(template_config, context)
+    if context.result().has_errors:
+      logging.warning(
+          'Not updating configuration due to errors in templates.cfg')
+      return
+
+    context = config.validation_context.Context.logging()
+    if manager_config:
+      validate_manager_config(manager_config, context)
+    if context.result().has_errors:
+      logging.error('Not updating configuration due to errors in managers.cfg')
+      return
+
+    logging.info('Updating configuration to %s', template_revision)
     stored_config.modify(
-      manager_config=protobuf.text_format.MessageToString(manager_config),
-      revision=revision,
-      template_config=protobuf.text_format.MessageToString(template_config),
+        manager_config = protobuf.text_format.MessageToString(manager_config),
+        revision = template_revision,
+        template_config = protobuf.text_format.MessageToString(template_config),
     )
 
 
+@validation.self_rule(TEMPLATES_CFG_FILENAME, config_pb2.InstanceTemplateConfig)
 def validate_template_config(config, context):
   """Validates an InstanceTemplateConfig instance."""
   # We don't do any GCE-specific validation here. Just require globally
   # unique base name because base name is used as the key in the datastore.
   base_names = set()
+  valid = True
   for template in config.templates:
     if template.base_name in base_names:
       context.error('base_name %s is not globally unique.', template.base_name)
+      valid = False
     else:
       base_names.add(template.base_name)
 
+  metrics.config_valid.set(valid, fields={'config': TEMPLATES_CFG_FILENAME})
 
+
+@validation.self_rule(
+    MANAGERS_CFG_FILENAME, config_pb2.InstanceGroupManagerConfig)
 def validate_manager_config(config, context):
   """Validates an InstanceGroupManagerConfig instance."""
   # We don't do any GCE-specific validation here. Just require per-template
   # unique zone because template+zone is used as a key in the datastore.
   zones = collections.defaultdict(set)
+  valid = True
   for manager in config.managers:
     if manager.zone in zones[manager.template_base_name]:
       context.error(
@@ -120,5 +135,8 @@ def validate_manager_config(config, context):
           manager.zone,
           manager.template_base_name,
       )
+      valid = False
     else:
       zones[manager.template_base_name].add(manager.zone)
+
+  metrics.config_valid.set(valid, fields={'config': MANAGERS_CFG_FILENAME})

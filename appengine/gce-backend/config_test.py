@@ -18,7 +18,7 @@ from proto import config_pb2
 
 
 class UpdateConfigTest(test_case.TestCase):
-  """Tests for config.update_config."""
+  """Tests for config.update_template_configs."""
 
   def tearDown(self, *args, **kwargs):
     """Performs post-test case tear-down."""
@@ -42,20 +42,20 @@ class UpdateConfigTest(test_case.TestCase):
       manager_config: What to return when managers.cfg is requested. Defaults
         to an empty config_pb2.InstanceGroupManagerConfig instance.
     """
-    def get(_, path, **kwargs):
+    def get_self_config(path, _,  **kwargs):
       self.assertIn(path, ('templates.cfg', 'managers.cfg'))
       if path == 'templates.cfg':
         proto = template_config or config_pb2.InstanceTemplateConfig()
       elif path == 'managers.cfg':
         proto = manager_config or config_pb2.InstanceGroupManagerConfig()
       return revision or 'mock-revision', proto
-    self.mock(config.config, 'get', get)
+    self.mock(config.config, 'get_self_config', get_self_config)
 
   def test_empty_configs(self):
     """Ensures empty configs are successfully stored."""
     self.install_mock()
 
-    config.update_config()
+    config.update_template_configs()
     self.failIf(config.Configuration.cached().template_config)
     self.failIf(config.Configuration.cached().manager_config)
     self.assertEqual(config.Configuration.cached().revision, 'mock-revision')
@@ -86,7 +86,7 @@ class UpdateConfigTest(test_case.TestCase):
     )
     self.install_mock(template_config=template_config)
 
-    config.update_config()
+    config.update_template_configs()
     self.failIf(config.Configuration.cached().template_config)
     self.failIf(config.Configuration.cached().manager_config)
     self.failIf(config.Configuration.cached().revision)
@@ -111,7 +111,7 @@ class UpdateConfigTest(test_case.TestCase):
     )
     self.install_mock(manager_config=manager_config)
 
-    config.update_config()
+    config.update_template_configs()
     self.failIf(config.Configuration.cached().template_config)
     self.failUnless(config.Configuration.cached().manager_config)
     self.assertEqual(config.Configuration.cached().revision, 'mock-revision')
@@ -136,19 +136,19 @@ class UpdateConfigTest(test_case.TestCase):
     )
     self.install_mock(manager_config=manager_config)
 
-    config.update_config()
+    config.update_template_configs()
     self.failIf(config.Configuration.cached().template_config)
     self.failIf(config.Configuration.cached().manager_config)
     self.failIf(config.Configuration.cached().revision)
 
-  def test_update_configs(self):
+  def test_update_template_configs(self):
     """Ensures config is updated when revision changes."""
     manager_config = config_pb2.InstanceGroupManagerConfig(
         managers=[config_pb2.InstanceGroupManagerConfig.InstanceGroupManager()],
     )
     self.install_mock(revision='revision-1', manager_config=manager_config)
 
-    config.update_config()
+    config.update_template_configs()
     self.failIf(config.Configuration.cached().template_config)
     self.failUnless(config.Configuration.cached().manager_config)
     self.assertEqual(config.Configuration.cached().revision, 'revision-1')
@@ -158,20 +158,20 @@ class UpdateConfigTest(test_case.TestCase):
     )
     self.install_mock(revision='revision-2', template_config=template_config)
 
-    config.update_config()
+    config.update_template_configs()
     self.failUnless(config.Configuration.cached().template_config)
     self.failIf(config.Configuration.cached().manager_config)
     self.assertEqual(config.Configuration.cached().revision, 'revision-2')
 
 
-  def test_update_configs_same_revision(self):
+  def test_update_template_configs_same_revision(self):
     """Ensures config is not updated when revision doesn't change."""
     manager_config = config_pb2.InstanceGroupManagerConfig(
         managers=[config_pb2.InstanceGroupManagerConfig.InstanceGroupManager()],
     )
     self.install_mock(manager_config=manager_config)
 
-    config.update_config()
+    config.update_template_configs()
     self.failIf(config.Configuration.cached().template_config)
     self.failUnless(config.Configuration.cached().manager_config)
     self.assertEqual(config.Configuration.cached().revision, 'mock-revision')
@@ -181,7 +181,7 @@ class UpdateConfigTest(test_case.TestCase):
     )
     self.install_mock(template_config=template_config)
 
-    config.update_config()
+    config.update_template_configs()
     self.failIf(config.Configuration.cached().template_config)
     self.failUnless(config.Configuration.cached().manager_config)
     self.assertEqual(config.Configuration.cached().revision, 'mock-revision')
