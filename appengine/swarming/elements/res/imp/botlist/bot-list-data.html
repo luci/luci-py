@@ -173,11 +173,12 @@
         this._list.items.forEach(function(bot){
           // Parse the state, which is a JSON string.  This contains a lot of
           // interesting information like details about the devices attached.
+          bot.state = bot.state || "{}";
           bot.state = JSON.parse(bot.state);
           // get the disks in an easier to deal with format, sorted by size.
-          var disks = bot.state["disks"];
+          var disks = bot.state.disks || {};
           var keys = Object.keys(disks);
-          if (!keys || !keys.length) {
+          if (!keys.length) {
             bot.disks = [{"id": "unknown", "mb": 0}];
           } else {
             bot.disks = [];
