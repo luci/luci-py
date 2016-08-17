@@ -128,7 +128,10 @@ def create(key):
     result = api.create_instance_template(
         get_name(entity),
         entity.disk_size_gb,
-        gce.get_image_url(api.project_id, entity.image_name),
+        gce.get_image_url(
+            entity.image_project if entity.image_project else api.project_id,
+            entity.image_name
+        ),
         entity.machine_type,
         gce.get_network_url(api.project_id, 'default'),
         tags=entity.tags,

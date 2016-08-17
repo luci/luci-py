@@ -105,6 +105,8 @@ class InstanceTemplateRevision(ndb.Model):
   drained = ndb.KeyProperty(kind=InstanceGroupManager, repeated=True)
   # Name of the image for instances created from this template.
   image_name = ndb.StringProperty(indexed=False)
+  # Project containing the image specified by image_name.
+  image_project = ndb.StringProperty(indexed=False)
   # GCE machine type for instances created from this template.
   machine_type = ndb.StringProperty(indexed=False)
   # Initial metadata to apply when creating instances from this template.
