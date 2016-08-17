@@ -11,6 +11,7 @@ import gae_ts_mon
 import config
 import handlers_cron
 import handlers_endpoints
+import handlers_frontend
 import handlers_queues
 
 
@@ -22,6 +23,7 @@ def main():
   utils.set_task_queue_module('default')
   apps = (
     handlers_endpoints.create_endpoints_app(),
+    handlers_frontend.create_frontend_app(),
     handlers_cron.create_cron_app(),
     handlers_queues.create_queues_app(),
   )
@@ -31,4 +33,4 @@ def main():
   return apps
 
 
-endpoints_app, cron_app, queues_app = main()
+endpoints_app, frontend_app, cron_app, queues_app = main()

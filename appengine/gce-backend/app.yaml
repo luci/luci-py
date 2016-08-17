@@ -12,6 +12,9 @@ handlers:
 - url: /_ah/spi/.*
   script: main.endpoints_app
   secure: always
+- url: /api/.*
+  script: main.frontend_app
+  secure: always
 - url: /internal/cron/.*
   login: admin
   script: main.cron_app

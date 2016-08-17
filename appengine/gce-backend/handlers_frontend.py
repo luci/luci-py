@@ -2,17 +2,16 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-"""Cloud endpoints for the GCE Backend API."""
+"""Main (frontend) entry point for the GCE Backend service"""
 
 import endpoints
+import webapp2
 
 from components import config
 from components import endpoints_webapp2
 
-
-def get_routes():
-  return endpoints_webapp2.api_routes(config.ConfigApi)
+import handlers_endpoints
 
 
-def create_endpoints_app():
-  return endpoints.api_server([config.ConfigApi])
+def create_frontend_app():
+  return webapp2.WSGIApplication(handlers_endpoints.get_routes())
