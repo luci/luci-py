@@ -13,6 +13,7 @@ import handlers_cron
 import handlers_endpoints
 import handlers_frontend
 import handlers_queues
+import metrics
 
 
 def is_enabled_callback():
@@ -30,6 +31,7 @@ def main():
   for app in apps[1:]:
     # Not callable on endpoints app
     gae_ts_mon.initialize(app=app, is_enabled_fn=is_enabled_callback)
+  metrics.initialize()
   return apps
 
 

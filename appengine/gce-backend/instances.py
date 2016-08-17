@@ -376,8 +376,13 @@ def schedule_drained_deletion():
               'Failed to enqueue task for Instance: %s', instance.key)
 
 
-def find_orphaned_instances():
-  """Lists instances not referenced by their instance group manager."""
+def count_instances():
+  """Counts the number of Instance entities in the datastore.
+
+  Returns:
+    A 2-tuple of (orphaned, total).
+    Orphaned instances are instances no longer referred to by their parent.
+  """
   total = 0
   orphaned = 0
   for instance in models.Instance.query():
@@ -388,3 +393,4 @@ def find_orphaned_instances():
         logging.warning('Found orphaned Instance: %s', instance.key)
         orphaned += 1
   logging.info('Orphaned Instances: %s/%s', orphaned, total)
+  return orphaned, total

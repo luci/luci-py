@@ -85,12 +85,6 @@ a models.Instance for each one. Waits for the instance group manager to exist
 before attempting to fetch the list of instances.
 
 
-## find-orphaned-instances
-
-Lists models.Instance entities which refer to instances no longer returned by
-the GCE API in fetch-instances.
-
-
 ## catalog-instances
 
 Adds instances to the Machine Provider catalog. Any instance not cataloged and

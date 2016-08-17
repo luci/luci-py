@@ -152,14 +152,6 @@ class MetadataTaskScheduleHandler(webapp2.RequestHandler):
     metadata.schedule_metadata_tasks()
 
 
-class OrphanedInstanceFindHandler(webapp2.RequestHandler):
-  """Worker for finding orphaned instances."""
-
-  @decorators.require_cronjob
-  def get(self):
-    instances.find_orphaned_instances()
-
-
 class PubSubMessageProcessHandler(webapp2.RequestHandler):
   """Worker for processing Pub/Sub messages."""
 
@@ -186,7 +178,6 @@ def create_cron_app():
        InstanceTemplateDeletionHandler),
       ('/internal/cron/delete-instances', InstanceDeletionHandler),
       ('/internal/cron/fetch-instances', InstanceFetchHandler),
-      ('/internal/cron/find-orphaned-instances', OrphanedInstanceFindHandler),
       ('/internal/cron/import-config', ConfigImportHandler),
       ('/internal/cron/process-config', ConfigProcessHandler),
       ('/internal/cron/process-pubsub-messages', PubSubMessageProcessHandler),
