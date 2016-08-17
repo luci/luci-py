@@ -95,7 +95,7 @@ class MainTest(TestCase):
     proc = subprocess42.Popen(
         [sys.executable, self._zip_file, 'start_slave'],
         stdout=subprocess42.PIPE,
-        stderr=subprocess42.PIPE,
+        stderr=subprocess42.STDOUT,
         detached=True)
 
     # Wait for the grand-child process to poll the server.
@@ -103,8 +103,10 @@ class MainTest(TestCase):
     self.assertEqual(True, self._server.has_polled.is_set())
     proc.terminate()
     out, _ = proc.communicate()
+    if proc.returncode:
+      print 'ERROR LOG:'
+      print out
     self.assertEqual(0, proc.returncode)
-    self.assertEqual('', out)
     events = self._server.get_events()
     for event in events:
       event.pop('dimensions')

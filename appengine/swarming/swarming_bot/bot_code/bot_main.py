@@ -506,7 +506,6 @@ def run_bot(arg_error):
 
   # Tell the server we are going away.
   botobj.post_event('bot_shutdown', 'Signal was received')
-  botobj.cancel_all_timers()
   return 0
 
 

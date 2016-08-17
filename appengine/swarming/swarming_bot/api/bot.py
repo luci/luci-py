@@ -6,7 +6,6 @@
 
 import logging
 import os
-import threading
 import time
 
 import os_utilities
@@ -21,7 +20,7 @@ class Bot(object):
   def __init__(
       self, remote, attributes, server, server_version, base_dir,
       shutdown_hook):
-    # Do not expose attributes  for now, as attributes may be refactored.
+    # Do not expose attributes for now, as attributes may be refactored.
     assert server is None or not server.endswith('/'), server
     self._attributes = attributes
     self._base_dir = base_dir
@@ -29,9 +28,6 @@ class Bot(object):
     self._server = server
     self._server_version = server_version
     self._shutdown_hook = shutdown_hook
-    self._timers = []
-    self._timers_dying = False
-    self._timers_lock = threading.Lock()
 
   @property
   def base_dir(self):
@@ -128,7 +124,6 @@ class Bot(object):
     quarantined mode.
     """
     self.post_event('bot_rebooting', message)
-    self.cancel_all_timers()
     if self._shutdown_hook:
       try:
         self._shutdown_hook(self)
@@ -148,48 +143,6 @@ class Bot(object):
       while True:
         time.sleep(1)
     self.post_error('Bot is stuck restarting for: %s' % message)
-
-  def call_later(self, delay_sec, callback):
-    """Schedules a function to be called later (if bot is still running).
-
-    All calls are executed in a separate internal thread, be careful with what
-    you call from there (Bot object is generally not thread safe).
-
-    Multiple callbacks can be executed concurrently. It is safe to call
-    'call_later' from the callback.
-    """
-    timer = None
-
-    def call_wrapper():
-      with self._timers_lock:
-        # Canceled already?
-        if timer not in self._timers:
-          return
-        self._timers.remove(timer)
-      try:
-        callback()
-      except Exception:
-        logging.exception('Timer callback failed')
-
-    with self._timers_lock:
-      if not self._timers_dying:
-        timer = threading.Timer(delay_sec, call_wrapper)
-        self._timers.append(timer)
-        timer.daemon = True
-        timer.start()
-
-  def cancel_all_timers(self):
-    """Cancels all pending 'call_later' calls and forbids adding new ones."""
-    timers = None
-    with self._timers_lock:
-      self._timers_dying = True
-      for t in self._timers:
-        t.cancel()
-      timers, self._timers = self._timers, []
-    for t in timers:
-      t.join(timeout=5)
-      if t.isAlive():
-        logging.error('Timer thread did not terminate fast enough: %s', t)
 
   def update_dimensions(self, new_dimensions):
     """Called internally to update Bot.dimensions."""
