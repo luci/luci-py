@@ -14,6 +14,7 @@ from components import datastore_utils
 from components import template
 from components import utils
 
+import handlers_endpoints
 import models
 
 
@@ -82,15 +83,20 @@ class RootHandler(auth.AuthenticatingHandler):
     self.response.write(template.render('templates/root.html', params=params))
 
 
-def create_frontend_app():
-  template.bootstrap({
-      'templates': os.path.join(THIS_DIR, 'templates'),
-  })
-
-  return webapp2.WSGIApplication([
+def get_routes():
+  return [
       webapp2.Route('/', handler=RootHandler),
       webapp2.Route('/catalog', handler=CatalogHandler),
       webapp2.Route('/catalog/<machine_id>', handler=CatalogHandler),
       webapp2.Route('/leases', handler=LeaseRequestHandler),
       webapp2.Route('/leases/<lease_id>', handler=LeaseRequestHandler),
-  ])
+  ]
+
+
+def create_frontend_app():
+  template.bootstrap({
+      'templates': os.path.join(THIS_DIR, 'templates'),
+  })
+  routes = get_routes()
+  routes.extend(handlers_endpoints.get_routes())
+  return webapp2.WSGIApplication(routes)

@@ -21,6 +21,7 @@ from protorpc import remote
 import gae_ts_mon
 
 from components import auth
+from components import endpoints_webapp2
 from components import pubsub
 from components import utils
 from components.machine_provider import rpc_messages
@@ -529,9 +530,13 @@ class MachineProviderEndpoints(remote.Service):
     request.put()
 
 
+def get_routes():
+  return endpoints_webapp2.api_routes(config.ConfigApi)
+
+
 def create_endpoints_app():
   return endpoints.api_server([
-    CatalogEndpoints,
-    MachineProviderEndpoints,
-    config.ConfigApi,
+      CatalogEndpoints,
+      MachineProviderEndpoints,
+      config.ConfigApi,
   ])

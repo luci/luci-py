@@ -20,6 +20,9 @@ handlers:
 - url: /static/
   secure: always
   static_dir: static
+- url: /api/.*
+  script: main.frontend_app
+  secure: always
 - url: /.*
   script: main.frontend_app
   secure: always
