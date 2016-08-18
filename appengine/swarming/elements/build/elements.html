@@ -14646,7 +14646,7 @@ You can bind to `isAuthorized` property to monitor authorization state.
 
       _or: function() {
         var result = false;
-        // can't use .foreach, as arguments isn't really a function.
+        // can't use .foreach, as arguments isn't really an Array.
         for (var i = 0; i < arguments.length; i++) {
           result = result || arguments[i];
         }
@@ -14843,13 +14843,13 @@ You can bind to `isAuthorized` property to monitor authorization state.
           return;
         }
         // should trigger the computation of _sort and __filterAndSort
-        this.set("_sortstr", e.detail.name +":"+e.detail.direction);
+        this.set("_sortstr", e.detail.name + ":" + e.detail.direction);
       },
       // _stripSpecial removes the special columns and sorts the remaining
       // columns so they always appear in the same order, regardless of
       // the order they are added.
       _stripSpecial: function(){
-        return this._columns.filter(function(c){
+        return this._columns.filter(function(c) {
           return this._specialColumns.indexOf(c) === -1;
         }.bind(this)).sort();
       },
@@ -23651,11 +23651,12 @@ the fleet.">
         this._list.items.forEach(function(bot){
           // Parse the state, which is a JSON string.  This contains a lot of
           // interesting information like details about the devices attached.
+          bot.state = bot.state || "{}";
           bot.state = JSON.parse(bot.state);
           // get the disks in an easier to deal with format, sorted by size.
-          var disks = bot.state["disks"];
+          var disks = bot.state.disks || {};
           var keys = Object.keys(disks);
-          if (!keys || !keys.length) {
+          if (!keys.length) {
             bot.disks = [{"id": "unknown", "mb": 0}];
           } else {
             bot.disks = [];
