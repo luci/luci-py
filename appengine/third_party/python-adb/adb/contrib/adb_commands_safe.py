@@ -81,8 +81,12 @@ class AdbCommandsSafe(object):
   # - CommonUsbError means that device I/O failed, e.g. a write or a read call
   #   returned an error.
   # - USBError means that a bus I/O failed, e.g. the device path is not present
-  #   anymore.
-  _ERRORS = (usb_exceptions.CommonUsbError, common.libusb1.USBError)
+  #   anymore. It is sometimes thrown as USBErrorIO.
+  _ERRORS = (
+      usb_exceptions.CommonUsbError,
+      common.usb1.USBError,
+      common.usb1.USBErrorIO,
+    )
 
   _SHELL_SUFFIX = ' ;echo -e "\n$?"'
 
@@ -726,7 +730,7 @@ class AdbCommandsSafe(object):
     def fn(h):
       try:
         return '%s:%s' % (h.port_path, h.serial_number)
-      except common.libusb1.USBError:
+      except common.usb1.USBError:
         return '%s' % (h.port_path,)
     devices = '; '.join(
         fn(h) for h in

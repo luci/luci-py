@@ -65,14 +65,16 @@ Finding a device and gaining exclusive access:
 .. code:: python
 
     import usb1
-    context = usb1.USBContext()
-    handle = context.openByVendorIDAndProductID(
-        VENDOR_ID, PRODUCT_ID,
-        skip_on_error=True,
-    )
-    if handle is None:
-        # Device not present, or user is not allowed to access device.
-    handle.claimInterface(INTERFACE)
+    with usb1.USBContext() as context:
+        handle = context.openByVendorIDAndProductID(
+            VENDOR_ID,
+            PRODUCT_ID,
+            skip_on_error=True,
+        )
+        if handle is None:
+            # Device not present, or user is not allowed to access device.
+        with handle.claimInterface(INTERFACE):
+            # Do stuff with endpoints on claimed interface.
 
 Synchronous I/O:
 
@@ -308,6 +310,37 @@ Fix pydoc appearance of several USBContext methods.
 
 Define exception classes for each error values.
 
+1.4.1
+-----
+
+Fix wheel generation (``python3 setup.py bdist_wheel``).
+
+1.5.0
+-----
+
+controlWrite, bulkWrite and interruptWrite now reject (with TypeError) numeric
+values for ``data`` parameter.
+
+Fix libusb1.REQUEST_TYPE_* names (were TYPE_*). Preserve backward
+compatibility.
+
+Add USBContext.getDeviceIterator method.
+
+Rename USBContext.exit as USBContext.close for consistency with other USB*
+classes. Preserve backward compatibility.
+
+Make USBDeviceHandle.claimInterface a context manager, for easier interface
+releasing.
+
+1.5.1
+-----
+
+Introduce USBPollerThread.stop .
+
+Fix USBDeviceHandle.getSupportedLanguageList bug when running under python 3.
+While fixing this bug it was realised that this method returned ctypes objects.
+This was not intended, and it now returns regular integers.
+
 .. _CPython: http://www.python.org/
 
 .. _pypy: http://pypy.org/
@@ -324,4 +357,4 @@ Define exception classes for each error values.
 
 .. _libusbx: http://libusb.info/
 
-.. _libusb1.0 documentation: http://libusb.sourceforge.net/api-1.0/
+.. _libusb1.0 documentation: http://libusb.org/static/api-1.0/
