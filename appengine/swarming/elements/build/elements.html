@@ -14582,6 +14582,7 @@ You can bind to `isAuthorized` property to monitor authorization state.
 
           <a class="left" href="/newui/">Home</a>
           <a class="left" href="/newui/botlist">Bot List</a>
+          <a class="left" href="/newui/tasklist">Task List</a>
           <div class="flex"></div>
           <auth-signin class="right" client-id="[[client_id]]" auth-headers="{{auth_headers}}" signed-in="{{signed_in}}">
           </auth-signin>
@@ -24044,7 +24045,7 @@ the fleet.">
               <tr class$="[[_botClass(bot)]]">
                 <td>
                   <a class="center" href$="[[_botLink(bot.bot_id)]]" target="_blank">
-                     [[bot.bot_id]]
+                      [[bot.bot_id]]
                   </a>
                 </td>
                 <td hidden$="[[_hide('task', _columns.*)]]">
@@ -24223,37 +24224,26 @@ the fleet.">
                   SwarmingBehaviors.DynamicTableBehavior],
 
       properties: {
-
         client_id: {
           type: String,
         },
 
-        // for dynamic table
+        // For dynamic table.
         _columnMap: {
           type: Object,
-          value: function() {
-            return columnMap;
-          }
+          value: columnMap,
         },
         _headerMap: {
           type: Object,
-          value: function() {
-            return headerMap;
-          },
+          value: headerMap,
         },
-        // special columns contain html.  non-special (i.e. normal colunns) just
-        // contain text.
         _specialColumns: {
           type: Array,
-          value: function() {
-            return specialColumns;
-          }
+          value: specialColumns,
         },
         _specialSort: {
           type: Object,
-          value: function() {
-            return specialSort;
-          }
+          value: specialSort,
         },
 
       },
@@ -24301,6 +24291,249 @@ the fleet.">
           return "/user/task/" + data.task_id;
         }
         return undefined;
+      }
+
+    });
+  })();
+  </script>
+</dom-module><dom-module id="task-filters" assetpath="/res/imp/tasklist/">
+  <template>
+    <style>
+      :host {
+        display: block;
+      }
+    </style>
+
+  </template>
+  <script>
+  (function(){
+    Polymer({
+      is: 'task-filters',
+
+      properties: {
+      // output
+        columns: {
+          type: Array,
+          value: function() {
+            return ["name", "state", "user"];
+          },
+          notify: true,
+        },
+        filter: {
+          type: Function,
+          value: function() {
+            return function(){
+              return true;
+            };
+          },
+          notify: true,
+        },
+        query_params: {
+          type: Object,
+          notify: true,
+        },
+        verbose: {
+          type: Boolean,
+          value: true,
+          notify: true,
+        },
+      }
+    });
+  })();
+  </script>
+</dom-module><dom-module id="task-list-data" assetpath="/res/imp/tasklist/">
+  <template>
+    <iron-ajax id="tasklist" url="/_ah/api/swarming/v1/tasks/list" headers="[[auth_headers]]" params="[[query_params]]" handle-as="json" last-response="{{_list}}" loading="{{_busy1}}">
+    </iron-ajax>
+    
+
+  </template>
+  <script>
+  (function(){
+    Polymer({
+      is: 'task-list-data',
+
+      behaviors: [SwarmingBehaviors.SwarmingBehavior],
+
+      properties: {
+        // inputs
+        auth_headers: {
+          type: Object,
+          observer: "signIn",
+        },
+        query_params: {
+          type: Object,
+        },
+
+        //outputs
+        busy: {
+          type: Boolean,
+          computed: "_or(_busy1)",
+          notify: true,
+        },
+        tasks: {
+          type: Array,
+          computed: "_tasks(_list)",
+          notify: true,
+        }
+      },
+      signIn: function(){
+        // Auto on iron-ajax means to automatically re-make the request if
+        // the url or the query params change.  Auto does not trigger if the
+        // [auth] headers change, so we wait until the user is signed in
+        // before making any requests.
+        this.$.tasklist.auto = true;
+      },
+
+      _tasks: function() {
+        if (!this._list || !this._list.items) {
+          return [];
+        }
+        // Do any preprocessing here
+        return this._list.items;
+      }
+    });
+  })();
+  </script>
+</dom-module>
+<dom-module id="task-list" assetpath="/res/imp/tasklist/">
+  <template>
+    <style include="iron-flex iron-flex-alignment iron-positioning swarming-app-style dynamic-table-style">
+
+      .task-list th > span {
+        /* Leave space for sort-toggle*/
+        padding-right: 30px;
+      }
+    </style>
+
+    <url-param name="sort" value="{{_sortstr}}" default_value="id:asc">
+    </url-param>
+
+    <swarming-app client_id="[[client_id]]" auth_headers="{{_auth_headers}}" signed_in="{{_signed_in}}" busy="[[_busy]]" name="Swarming Task List">
+
+      <h2 hidden$="[[_signed_in]]">You must sign in to see anything useful.</h2>
+
+      <div hidden$="[[_not(_signed_in)]]">
+        <task-list-data auth_headers="[[_auth_headers]]" query_params="[[_query_params]]" tasks="{{_items}}" busy="{{_busy}}">
+        </task-list-data>
+
+        <div class="horizontal layout">
+
+          <task-filters columns="{{_columns}}" query_params="{{_query_params}}" filter="{{_filter}}" verbose="{{_verbose}}">
+          </task-filters>
+
+        </div>
+
+        <table class="task-list">
+          <thead on-sort_change="_sortChange">
+          
+            <tr>
+              <th>
+                <span>Task Name</span>
+                <sort-toggle name="name" current="[[_sort]]">
+                </sort-toggle>
+              </th>
+              
+              <th hidden$="[[_hide('state', _columns.*)]]">
+                <span>Status</span>
+                <sort-toggle name="state" current="[[_sort]]">
+                </sort-toggle>
+              </th>
+
+              <template is="dom-repeat" items="[[_plainColumns]]" as="c">
+                <th hidden$="[[_hide(c)]]">
+                  <span>[[_header(c)]]</span>
+                  <sort-toggle name="[[c]]" current="[[_sort]]">
+                  </sort-toggle>
+                </th>
+              </template>
+            </tr>
+          </thead>
+          <tbody>
+            <template id="tasks_table" is="dom-repeat" items="[[_filteredSortedItems]]" as="task" initial-count="50">
+
+              <tr class$="[[_taskClass(task)]]">
+                <td>
+                  <a class="center" href$="[[_taskLink(task)]]" target="_blank">
+                      [[task.name]]
+                  </a>
+                </td>
+                <td hidden$="[[_hide('state', _columns.*)]]">
+                  [[_column('state', task, _verbose)]]
+                  
+                </td>
+
+                <template is="dom-repeat" items="[[_plainColumns]]" as="c">
+                  <td hidden$="[[_hide(c)]]">
+                    [[_column(c, task, _verbose)]]
+                  </td>
+                </template>
+
+              </tr>
+            </template> 
+          </tbody>
+        </table>
+      </div>
+
+    </swarming-app>
+
+  </template>
+  <script>
+  (function(){
+    var specialColumns = ["name", "state"];
+    var columnMap = {};
+    var headerMap = {
+      "user": "Requesting User",
+    };
+    var specialSort = {};
+
+    Polymer({
+      is: 'task-list',
+      behaviors: [
+          SwarmingBehaviors.SwarmingBehavior,
+          SwarmingBehaviors.DynamicTableBehavior,
+      ],
+
+      properties: {
+        client_id: {
+          type: String,
+        },
+
+        // For dynamic table.
+        _columnMap: {
+          type: Object,
+          value: columnMap,
+        },
+        _headerMap: {
+          type: Object,
+          value: headerMap,
+        },
+        _specialColumns: {
+          type: Array,
+          value: specialColumns,
+        },
+        _specialSort: {
+          type: Object,
+          value: specialSort,
+        },
+      },
+
+      _attribute: function(task, col, def) {
+        var retVal = task[col] || [def];
+        if (!Array.isArray(retVal)) {
+          return [retVal];
+        }
+        return retVal;
+      },
+
+      _taskLink: function(task) {
+        // TODO(kjlubick) Make this point to /newui/ when appropriate.
+        return "/restricted/task/"+task.task_id;
+      },
+
+      _taskClass: function(task) {
+        // TODO(kjlubick): Color tasks?
+        return "";
       }
 
     });

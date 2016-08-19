@@ -1,0 +1,226 @@
+<!--
+  Copyright 2016 The LUCI Authors. All rights reserved.
+  Use of this source code is governed under the Apache License, Version 2.0
+  that can be found in the LICENSE file.
+
+  This in an HTML Import-able file that contains the definition
+  of the following elements:
+
+    <task-list>
+
+  task-list creats a dynamic table for viewing swarming tasks. Columns can be
+  dynamically filtered and it supports client-side filtering.
+
+  This is a top-level element.
+
+  Properties:
+    client_id: String, Oauth 2.0 client id.  It will be set by server-side
+        template evaluation.
+
+  Methods:
+    None.
+
+  Events:
+    None.
+-->
+
+<link rel="import" href="/res/imp/bower_components/iron-flex-layout/iron-flex-layout-classes.html">
+<link rel="import" href="/res/imp/bower_components/polymer/polymer.html">
+
+<link rel="import" href="/res/imp/common/dynamic-table.html">
+<link rel="import" href="/res/imp/common/sort-toggle.html">
+<link rel="import" href="/res/imp/common/swarming-app.html">
+<link rel="import" href="/res/imp/common/url-param.html">
+
+<link rel="import" href="task-filters.html">
+<link rel="import" href="task-list-data.html">
+
+<dom-module id="task-list">
+  <template>
+    <style include="iron-flex iron-flex-alignment iron-positioning swarming-app-style dynamic-table-style">
+
+      .task-list th > span {
+        /* Leave space for sort-toggle*/
+        padding-right: 30px;
+      }
+    </style>
+
+    <url-param name="sort"
+      value="{{_sortstr}}"
+      default_value="id:asc">
+    </url-param>
+
+    <swarming-app
+      client_id="[[client_id]]"
+      auth_headers="{{_auth_headers}}"
+      signed_in="{{_signed_in}}"
+      busy="[[_busy]]"
+      name="Swarming Task List">
+
+      <h2 hidden$="[[_signed_in]]">You must sign in to see anything useful.</h2>
+
+      <div hidden$="[[_not(_signed_in)]]">
+        <task-list-data
+          auth_headers="[[_auth_headers]]"
+          query_params="[[_query_params]]"
+          tasks="{{_items}}"
+          busy="{{_busy}}">
+        </task-list-data>
+
+        <div class="horizontal layout">
+
+          <task-filters
+            columns="{{_columns}}"
+            query_params="{{_query_params}}"
+            filter="{{_filter}}"
+            verbose="{{_verbose}}">
+          </task-filters>
+
+        </div>
+
+        <table class="task-list">
+          <thead on-sort_change="_sortChange">
+          <!-- To allow for dynamic columns without having a lot of copy-pasted
+          code, we break columns up into "special" and "plain" columns. Special
+          columns require some sort of HTML output (e.g. anchor tags) and plain
+          columns just output text.  The plain columns use Polymer functions to
+          insert their text [_header(), _column(), _deviceColumn()].  Polymer
+          functions do not allow HTML (to avoid XSS), so special columns, like id
+          and task are inserted in a fixed order.
+          -->
+            <tr>
+              <th>
+                <span>Task Name</span>
+                <sort-toggle
+                    name="name"
+                    current="[[_sort]]">
+                </sort-toggle>
+              </th>
+              <!-- This wonky syntax is the proper way to listen to changes on an
+              array (we are listening to all subproperties). The element returned is
+              not of much use, so we'll ignore it in _hide() and use this._columns.
+              -->
+              <th hidden$="[[_hide('state', _columns.*)]]">
+                <span>Status</span>
+                <sort-toggle
+                    name="state"
+                    current="[[_sort]]">
+                </sort-toggle>
+              </th>
+
+              <template
+                    is="dom-repeat"
+                    items="[[_plainColumns]]"
+                    as="c">
+                <th hidden$="[[_hide(c)]]">
+                  <span>[[_header(c)]]</span>
+                  <sort-toggle
+                      name="[[c]]"
+                      current="[[_sort]]">
+                  </sort-toggle>
+                </th>
+              </template>
+            </tr>
+          </thead>
+          <tbody>
+            <template
+                id="tasks_table"
+                is="dom-repeat"
+                items="[[_filteredSortedItems]]"
+                as="task"
+                initial-count=50>
+
+              <tr class$="[[_taskClass(task)]]">
+                <td>
+                  <a
+                      class="center"
+                      href$="[[_taskLink(task)]]"
+                      target="_blank">
+                      [[task.name]]
+                  </a>
+                </td>
+                <td hidden$="[[_hide('state', _columns.*)]]">
+                  [[_column('state', task, _verbose)]]
+                  <!-- TODO(kjlubick): Add button to stop pending.-->
+                </td>
+
+                <template
+                    is="dom-repeat"
+                    items="[[_plainColumns]]"
+                    as="c">
+                  <td hidden$="[[_hide(c)]]">
+                    [[_column(c, task, _verbose)]]
+                  </td>
+                </template>
+
+              </tr>
+            </template> <!--tasks_table repeat-->
+          </tbody>
+        </table>
+      </div>
+
+    </swarming-app>
+
+  </template>
+  <script>
+  (function(){
+    var specialColumns = ["name", "state"];
+    var columnMap = {};
+    var headerMap = {
+      "user": "Requesting User",
+    };
+    var specialSort = {};
+
+    Polymer({
+      is: 'task-list',
+      behaviors: [
+          SwarmingBehaviors.SwarmingBehavior,
+          SwarmingBehaviors.DynamicTableBehavior,
+      ],
+
+      properties: {
+        client_id: {
+          type: String,
+        },
+
+        // For dynamic table.
+        _columnMap: {
+          type: Object,
+          value: columnMap,
+        },
+        _headerMap: {
+          type: Object,
+          value: headerMap,
+        },
+        _specialColumns: {
+          type: Array,
+          value: specialColumns,
+        },
+        _specialSort: {
+          type: Object,
+          value: specialSort,
+        },
+      },
+
+      _attribute: function(task, col, def) {
+        var retVal = task[col] || [def];
+        if (!Array.isArray(retVal)) {
+          return [retVal];
+        }
+        return retVal;
+      },
+
+      _taskLink: function(task) {
+        // TODO(kjlubick) Make this point to /newui/ when appropriate.
+        return "/restricted/task/"+task.task_id;
+      },
+
+      _taskClass: function(task) {
+        // TODO(kjlubick): Color tasks?
+        return "";
+      }
+
+    });
+  })();
+  </script>
+</dom-module>

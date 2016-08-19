@@ -1,0 +1,75 @@
+<!--
+  This in an HTML Import-able file that contains the definition
+  of the following elements:
+
+    <task-filters>
+
+  Usage:
+
+    <task-filters></task-filters>
+
+    TODO(kjlubick): Make this not a stub
+
+  Properties:
+    // outputs
+    columns: Array<String>, the columns that should be displayed.
+    query_params: Object, The query params that will filter the query
+        server-side. TODO(kjlubick): Document appropriate content.
+    filter: Object, an object {filter:Function} where filter will take one param
+        (bot) and return a Boolean if it should be displayed given the
+        current filters.
+    verbose: Boolean, if the data displayed should be verbose.
+
+  Methods:
+    None.
+
+  Events:
+    None.
+-->
+
+<dom-module id="task-filters">
+  <template>
+    <style>
+      :host {
+        display: block;
+      }
+    </style>
+
+  </template>
+  <script>
+  (function(){
+    Polymer({
+      is: 'task-filters',
+
+      properties: {
+      // output
+        columns: {
+          type: Array,
+          value: function() {
+            return ["name", "state", "user"];
+          },
+          notify: true,
+        },
+        filter: {
+          type: Function,
+          value: function() {
+            return function(){
+              return true;
+            };
+          },
+          notify: true,
+        },
+        query_params: {
+          type: Object,
+          notify: true,
+        },
+        verbose: {
+          type: Boolean,
+          value: true,
+          notify: true,
+        },
+      }
+    });
+  })();
+  </script>
+</dom-module>

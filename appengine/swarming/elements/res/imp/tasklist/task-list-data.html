@@ -1,0 +1,105 @@
+<!--
+  Copyright 2016 The LUCI Authors. All rights reserved.
+  Use of this source code is governed under the Apache License, Version 2.0
+  that can be found in the LICENSE file.
+
+  This in an HTML Import-able file that contains the definition
+  of the following elements:
+
+    <bot-list-data>
+
+  This makes calls authenticated with Oauth 2 to the swarming apis.  It parses
+  that data into usable data structures.
+
+  Usage:
+
+    <bot-list-data></bot-list-data>
+
+  Properties:
+    // inputs
+    auth_headers: Object, the OAuth2 header to include in the request.  This
+        should come from swarming-app.
+    query_params: Object, The query params that will filter the query
+        server-side.  This can have dimensions:Array<String>, quarantined:String
+        and is_dead: String. For example:
+        {
+          "dimensions": ["pool:Skia", "device_type:sprout"],
+          "quarantined": "FALSE",  // optional
+          "is_dead": "TRUE",       // optional
+        }
+        For a full list of dimensions in the fleet, see the API call:
+        https://[swarming_url]/_ah/api/swarming/v1/bots/dimensions
+    // outputs
+    tasks: Array<Object>, all tasks returned by the server.
+
+  Methods:
+    signIn(): Force a signin of the user using OAuth.  This happens
+        automatically when auth_headers is set.
+
+  Events:
+    None.
+-->
+
+<link rel="import" href="/res/imp/bower_components/iron-ajax/iron-ajax.html">
+
+<dom-module id="task-list-data">
+  <template>
+    <iron-ajax id="tasklist"
+       url="/_ah/api/swarming/v1/tasks/list"
+       headers="[[auth_headers]]"
+       params="[[query_params]]"
+       handle-as="json"
+       last-response="{{_list}}"
+       loading="{{_busy1}}">
+    </iron-ajax>
+    <!-- TODO(kjlubick): Make more requests (like all tags) -->
+
+  </template>
+  <script>
+  (function(){
+    Polymer({
+      is: 'task-list-data',
+
+      behaviors: [SwarmingBehaviors.SwarmingBehavior],
+
+      properties: {
+        // inputs
+        auth_headers: {
+          type: Object,
+          observer: "signIn",
+        },
+        query_params: {
+          type: Object,
+        },
+
+        //outputs
+        busy: {
+          type: Boolean,
+          computed: "_or(_busy1)",
+          notify: true,
+        },
+        tasks: {
+          type: Array,
+          computed: "_tasks(_list)",
+          notify: true,
+        }
+      },
+      signIn: function(){
+        // Auto on iron-ajax means to automatically re-make the request if
+        // the url or the query params change.  Auto does not trigger if the
+        // [auth] headers change, so we wait until the user is signed in
+        // before making any requests.
+        this.$.tasklist.auto = true;
+      },
+
+      _tasks: function() {
+        if (!this._list || !this._list.items) {
+          return [];
+        }
+        // Do any preprocessing here
+        return this._list.items;
+      }
+    });
+  })();
+  </script>
+</dom-module>

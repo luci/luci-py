@@ -14,7 +14,8 @@
   This is a top-level element.
 
   Properties:
-    client_id: String, will be set by server-side template evaluation.
+    client_id: String, Oauth 2.0 client id.  It will be set by server-side
+        template evaluation.
 
   Methods:
     None.
@@ -137,9 +138,10 @@
                 </sort-toggle>
               </th>
 
-              <template is="dom-repeat"
-                    items="[[_plainColumns]]"
-                    as="c">
+              <template
+                  is="dom-repeat"
+                  items="[[_plainColumns]]"
+                  as="c">
                 <th hidden$="[[_hide(c)]]">
                   <span>[[_header(c)]]</span>
                   <sort-toggle
@@ -151,42 +153,49 @@
             </tr>
           </thead>
           <tbody>
-            <template id="bot_table" is="dom-repeat"
-                  items="[[_filteredSortedItems]]"
-                  as="bot"
-                  initial-count=50>
+            <template
+                id="bot_table"
+                is="dom-repeat"
+                items="[[_filteredSortedItems]]"
+                as="bot"
+                initial-count=50>
 
               <tr class$="[[_botClass(bot)]]">
                 <td>
-                  <a class="center"
-                     href$="[[_botLink(bot.bot_id)]]"
-                     target="_blank">
-                     [[bot.bot_id]]
+                  <a
+                      class="center"
+                      href$="[[_botLink(bot.bot_id)]]"
+                      target="_blank">
+                      [[bot.bot_id]]
                   </a>
                 </td>
                 <td hidden$="[[_hide('task', _columns.*)]]">
                   <a href$="[[_taskLink(bot)]]">[[_taskId(bot)]]</a>
                 </td>
 
-                <template is="dom-repeat"
-                      items="[[_plainColumns]]"
-                      as="c">
+                <template
+                    is="dom-repeat"
+                    items="[[_plainColumns]]"
+                    as="c">
                   <td hidden$="[[_hide(c)]]">
                     [[_column(c, bot, _verbose)]]
                   </td>
                 </template>
 
               </tr>
-              <template is="dom-repeat"
-                    items="[[_devices(bot)]]"
-                    as="device">
-                <tr hidden$="[[_hide('android_devices', _columns.*)]]"
+              <template
+                  is="dom-repeat"
+                  items="[[_devices(bot)]]"
+                  as="device">
+                <tr
+                    hidden$="[[_hide('android_devices', _columns.*)]]"
                     class$="[[_deviceClass(device)]]">
                   <td></td>
                   <td hidden$="[[_hide('task', _columns.*)]]"></td>
-                  <template is="dom-repeat"
-                        items="[[_plainColumns]]"
-                        as="c">
+                  <template
+                      is="dom-repeat"
+                      items="[[_plainColumns]]"
+                      as="c">
                     <td hidden$="[[_hide(c)]]">
                       [[_deviceColumn(c, device, _verbose)]]
                     </td>
@@ -347,37 +356,26 @@
                   SwarmingBehaviors.DynamicTableBehavior],
 
       properties: {
-
         client_id: {
           type: String,
         },
 
-        // for dynamic table
+        // For dynamic table.
         _columnMap: {
           type: Object,
-          value: function() {
-            return columnMap;
-          }
+          value: columnMap,
         },
         _headerMap: {
           type: Object,
-          value: function() {
-            return headerMap;
-          },
+          value: headerMap,
         },
-        // special columns contain html.  non-special (i.e. normal colunns) just
-        // contain text.
         _specialColumns: {
           type: Array,
-          value: function() {
-            return specialColumns;
-          }
+          value: specialColumns,
         },
         _specialSort: {
           type: Object,
-          value: function() {
-            return specialSort;
-          }
+          value: specialSort,
         },
 
       },
