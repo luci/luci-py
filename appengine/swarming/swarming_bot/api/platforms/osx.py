@@ -100,7 +100,8 @@ def get_xcode_state():
 
 def get_xcode_versions():
   """Returns a list of Xcode versions installed on this machine."""
-  return sorted(xcode['version'] for xcode in get_xcode_state().itervalues())
+  return sorted(
+      set(xcode['version'] for xcode in get_xcode_state().itervalues()))
 
 
 def get_current_xcode_version():
