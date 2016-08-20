@@ -46,7 +46,7 @@ class ConfigTest(test_case.TestCase):
             default_namespace='abc',
         ),
         [
-          'default_server must start with "https://" or "http://"',
+          'default_server must start with "https://" or "http://localhost"',
         ])
 
     self.validator_test(
@@ -81,7 +81,7 @@ class ConfigTest(test_case.TestCase):
                 version='git_revision:deadbeef'),
             ),
         [
-          'default_server must start with "https://" or "http://"',
+          'default_server must start with "https://" or "http://localhost"',
         ])
 
     self.validator_test(
@@ -116,6 +116,22 @@ class ConfigTest(test_case.TestCase):
       ])
 
     self.validator_test(config.validate_settings, config_pb2.SettingsCfg(), [])
+
+    self.validator_test(
+        config.validate_settings,
+        config_pb2.SettingsCfg(
+            mp=config_pb2.MachineProviderSettings(server='http://url')),
+      [
+        'mp.server must start with "https://" or "http://localhost"',
+      ])
+
+    self.validator_test(
+        config.validate_settings,
+        config_pb2.SettingsCfg(
+            mp=config_pb2.MachineProviderSettings(server='url')),
+      [
+        'mp.server must start with "https://" or "http://localhost"',
+      ])
 
 
 if __name__ == '__main__':

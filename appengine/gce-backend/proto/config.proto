@@ -76,4 +76,6 @@ message InstanceGroupManagerConfig {
 message SettingsCfg {
   // Enable ts_mon based monitoring.
   optional bool enable_ts_monitoring = 1;
+  // URL of the Machine Provider server to use.
+  optional string mp_server = 2;
 }

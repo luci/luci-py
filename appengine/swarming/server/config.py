@@ -29,8 +29,8 @@ ConfigApi = config.ConfigApi
 def validate_url(value, ctx):
   if not value:
     ctx.error('is not set')
-  elif not value.startswith(('https://', 'http://')):
-    ctx.error('must start with "https://" or "http://"')
+  elif not validation.is_valid_secure_url(value):
+    ctx.error('must start with "https://" or "http://localhost"')
 
 
 def validate_isolate_settings(cfg, ctx):
@@ -83,6 +83,10 @@ def validate_settings(cfg, ctx):
   if cfg.HasField('cipd'):
     with ctx.prefix('cipd: '):
       validate_cipd_settings(cfg.cipd, ctx)
+
+  if cfg.HasField('mp') and cfg.mp.HasField('server'):
+    with ctx.prefix('mp.server '):
+      validate_url(cfg.mp.server, ctx)
 
 
 @utils.memcache('config:get_configs_url', time=60)

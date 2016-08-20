@@ -22,10 +22,11 @@ eventually consistent, converging on the desired state over multiple calls.
     e.g. machine-provider@appspot.gserviceaccount.com.
 *   Use the ConfigApi to set the ConfigSettings datastore entity to the
     address of the config service, e.g. luci-config.appspot.com.
-*   Store the following entity in the datastore:
-    *   components.machine\_provider.utils.MachineProviderConfiguration: Set
-        instance\_url to the URL for the Machine Provider service, e.g.
-        https://machine-provider.appspot.com.
+*   Configure the Machine Provider with the
+    [config service](https://github.com/luci/luci-py/blob/master/appengine/gce-backend/proto/config.proto)
+    or the `instance\_url` property of the
+    components.machine\_provider.utils.MachineProviderConfiguration entity in
+    the datastore.
 *   TODO(smut): Simplify the above.
 
 

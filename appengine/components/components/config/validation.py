@@ -100,6 +100,13 @@ def is_valid_ref_name(ref):
   return bool(common.REF_NAME_RGX.match(ref))
 
 
+def is_valid_secure_url(url):
+  if url.startswith('http://'):
+    allowed = ('http://localhost:', 'http://127.0.0.1:', 'http://::1:')
+    return url.startswith(allowed)
+  return url.startswith('https://')
+
+
 ConfigPattern = collections.namedtuple(
     'ConfigPattern',
     [

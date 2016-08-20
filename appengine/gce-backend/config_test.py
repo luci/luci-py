@@ -5,12 +5,15 @@
 
 """Unit tests for config.py."""
 
+import logging
 import unittest
 
 import test_env
 test_env.setup_test_env()
 
 from components import datastore_utils
+from components import machine_provider
+from components.config import validation
 from test_support import test_case
 
 import config
@@ -28,11 +31,20 @@ class UpdateConfigTest(test_case.TestCase):
     # the underlying entity doesn't persist, the cache does.
     config.Configuration.clear_cache()
 
+  def validator_test(self, validator, cfg, messages):
+    ctx = validation.Context()
+    validator(cfg, ctx)
+    self.assertEquals(ctx.result().messages, [
+      validation.Message(severity=logging.ERROR, text=m)
+      for m in messages
+    ])
+
   def install_mock(
       self,
       revision=None,
       template_config=None,
       manager_config=None,
+      settings_config=None,
   ):
     """Installs a mock for config.config.get_self_config.
 
@@ -41,13 +53,17 @@ class UpdateConfigTest(test_case.TestCase):
         to an empty config_pb2.InstanceTemplateConfig instance.
       manager_config: What to return when managers.cfg is requested. Defaults
         to an empty config_pb2.InstanceGroupManagerConfig instance.
+      settings_config: What to return when settings.cfg is requested. Defaults
+        to an empty config_pb2.SettingsCfg instance.
     """
     def get_self_config(path, _,  **kwargs):
-      self.assertIn(path, ('templates.cfg', 'managers.cfg'))
+      self.assertIn(path, ('templates.cfg', 'managers.cfg', 'settings.cfg'))
       if path == 'templates.cfg':
         proto = template_config or config_pb2.InstanceTemplateConfig()
       elif path == 'managers.cfg':
         proto = manager_config or config_pb2.InstanceGroupManagerConfig()
+      elif path == 'settings.cfg':
+        proto = settings_config or config_pb2.SettingsCfg()
       return revision or 'mock-revision', proto
     self.mock(config.config, 'get_self_config', get_self_config)
 
@@ -163,7 +179,6 @@ class UpdateConfigTest(test_case.TestCase):
     self.failIf(config.Configuration.cached().manager_config)
     self.assertEqual(config.Configuration.cached().revision, 'revision-2')
 
-
   def test_update_template_configs_same_revision(self):
     """Ensures config is not updated when revision doesn't change."""
     manager_config = config_pb2.InstanceGroupManagerConfig(
@@ -185,6 +200,37 @@ class UpdateConfigTest(test_case.TestCase):
     self.failIf(config.Configuration.cached().template_config)
     self.failUnless(config.Configuration.cached().manager_config)
     self.assertEqual(config.Configuration.cached().revision, 'mock-revision')
+
+  def test_settings_valid_mp_config(self):
+    """Ensures base MP settings are correctly received if configured."""
+    settings_config = config_pb2.SettingsCfg(mp_server='server')
+    self.install_mock(settings_config=settings_config)
+
+    self.assertEqual(config._get_settings()[1].mp_server, 'server')
+    self.assertEqual(machine_provider.MachineProviderConfiguration.instance_url,
+        'server')
+
+  def test_settings_empty_mp_config(self):
+    """Ensures base MP settings are correctly received if not configured."""
+    settings_config = config_pb2.SettingsCfg()
+    self.install_mock(settings_config=settings_config)
+
+    mpdefault = machine_provider.MachineProviderConfiguration.get_instance_url()
+    self.failIf(config._get_settings()[1].mp_server)
+    self.assertEqual(machine_provider.MachineProviderConfiguration.instance_url,
+        mpdefault)
+
+  def test_validate_settings(self):
+    self.validator_test(config.validate_settings_config,
+        config_pb2.SettingsCfg(), [])
+    self.validator_test(
+        config.validate_settings_config,
+        config_pb2.SettingsCfg(mp_server='http://url'),
+        ['mp_server must start with "https://" or "http://localhost"'])
+    self.validator_test(
+        config.validate_settings_config,
+        config_pb2.SettingsCfg(mp_server='url'),
+        ['mp_server must start with "https://" or "http://localhost"'])
 
 
 if __name__ == '__main__':

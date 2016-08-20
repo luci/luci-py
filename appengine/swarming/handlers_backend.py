@@ -73,6 +73,13 @@ class CronMachineProviderBotHandler(webapp2.RequestHandler):
       logging.info('MP support is disabled')
       return
 
+    if config.settings().mp.server:
+      new_server = config.settings().mp.server
+      current_config = machine_provider.MachineProviderConfiguration().cached()
+      if new_server != current_config.instance_url:
+        logging.info('Updating Machine Provider server to %s', new_server)
+        current_config.modify(instance_url=new_server)
+
     app_id = app_identity.get_application_id()
     swarming_server = 'https://%s' % app_identity.get_default_version_hostname()
     found = 0

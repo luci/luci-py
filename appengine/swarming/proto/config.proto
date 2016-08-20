@@ -80,4 +80,6 @@ message CipdSettings {
 message MachineProviderSettings {
   // Whether or not Swarming-MP integration is enabled.
   optional bool enabled = 1;
+  // URL of the Machine Provider server to use.
+  optional string server = 2;
 }

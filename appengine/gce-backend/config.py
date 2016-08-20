@@ -17,6 +17,7 @@ import metrics
 
 from components import config
 from components import datastore_utils
+from components import machine_provider
 from components import utils
 from components.config import validation
 
@@ -146,7 +147,10 @@ def validate_manager_config(config, context):
 
 @validation.self_rule(SETTINGS_CFG_FILENAME, config_pb2.SettingsCfg)
 def validate_settings_config(config, context):
-  pass
+  if config.HasField('mp_server'):
+    if not validation.is_valid_secure_url(config.mp_server):
+      context.error(
+          'mp_server must start with "https://" or "http://localhost"')
 
 
 def _get_settings():
@@ -157,6 +161,11 @@ def _get_settings():
   rev, cfg = config.get_self_config(
       SETTINGS_CFG_FILENAME, config_pb2.SettingsCfg, store_last_good=True)
   cfg = cfg or config_pb2.SettingsCfg()
+  if cfg.mp_server:
+    current_config = machine_provider.MachineProviderConfiguration.cached()
+    if cfg.mp_server != current_config.instance_url:
+      logging.info('Updating Machine Provider server to %s', cfg.mp_server)
+      current_config.modify(instance_url=cfg.mp_server)
   return rev, cfg
 
 
