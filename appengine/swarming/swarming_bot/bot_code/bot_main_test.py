@@ -23,6 +23,7 @@ import bot_main
 import remote_client
 from api import bot
 from api import os_utilities
+from api.platforms import gce
 from depot_tools import fix_encoding
 from utils import file_path
 from utils import logging_utils
@@ -82,6 +83,10 @@ class TestBotMain(net_utils.TestCase):
         os.path.join(test_env_bot_code.BOT_DIR, 'swarming_bot.zip'))
     # Need to disable this otherwise it'd kill the current checkout.
     self.mock(bot_main, 'cleanup_bot_directory', lambda _: None)
+    # Test results shouldn't depend on where they run. And they should not use
+    # real GCE tokens.
+    self.mock(gce, 'is_gce', lambda: False)
+    self.mock(gce, 'oauth2_access_token', lambda *_args: 'fake-access-token')
 
   def tearDown(self):
     os.environ.pop('SWARMING_BOT_ID', None)
@@ -124,8 +129,8 @@ class TestBotMain(net_utils.TestCase):
       self.assertGreater(disk.pop('free_mb'), 1.)
     self.assertGreater(actual.pop('nb_files_in_temp'), 0)
     self.assertGreater(expected.pop('nb_files_in_temp'), 0)
-    self.assertGreater(actual.pop('uptime'), 0)
-    self.assertGreater(expected.pop('uptime'), 0)
+    self.assertTrue(actual.pop('uptime') != 0)
+    self.assertTrue(expected.pop('uptime') != 0)
     self.assertEqual(sorted(expected.pop('temp', {})),
                      sorted(actual.pop('temp', {})))
     self.assertEqual(expected, actual)

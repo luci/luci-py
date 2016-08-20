@@ -4,6 +4,8 @@
 
 """OS abstraction OS specific utility functions."""
 
+# pylint: disable=unnecessary-lambda
+
 import sys
 
 
@@ -11,7 +13,7 @@ if sys.platform == 'cygwin':
   import gce
   import posix
   import win
-  from gce import is_gce
+  is_gce = lambda: gce.is_gce() # to reuse gce.is_gce mock, if any
 
 if sys.platform == 'darwin':
   import osx
@@ -22,7 +24,7 @@ if sys.platform == 'darwin':
 if sys.platform == 'win32':
   import gce
   import win
-  from gce import is_gce
+  is_gce = lambda: gce.is_gce() # to reuse gce.is_gce mock, if any
 
 
 if sys.platform == 'linux2':
@@ -30,4 +32,4 @@ if sys.platform == 'linux2':
   import gce
   import linux
   import posix
-  from gce import is_gce
+  is_gce = lambda: gce.is_gce() # to reuse gce.is_gce mock, if any

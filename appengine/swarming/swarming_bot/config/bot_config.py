@@ -24,8 +24,10 @@ Here's a pile of poo: 💩
 """
 
 import os
+import time
 
 from api import os_utilities
+from api import platforms
 
 # Unused argument 'bot' - pylint: disable=W0613
 
@@ -79,6 +81,11 @@ def get_authentication_headers(bot):
   Can be used to implement per-bot authentication. If no headers are returned,
   the server will use only IP whitelist for bot authentication.
 
+  On GCE will use OAuth token of the default GCE service account. It should have
+  "User info" API scope enabled (this can be set when starting an instance). The
+  server should be configured (via bots.cfg) to trust this account (see
+  'require_service_account' in bots.proto).
+
   May be called by different threads, but never concurrently.
 
   Arguments:
@@ -87,6 +94,9 @@ def get_authentication_headers(bot):
   Returns:
     Tuple (dict with headers or None, unix timestamp of when they expire).
   """
+  if platforms.is_gce():
+    tok = platforms.gce.oauth2_access_token()
+    return {'Authorization': 'Bearer %s' % tok}, time.time() + 5*60
   return (None, None)
 
 
