@@ -608,6 +608,9 @@ def fix_protobuf_package():
   protobuf_pkg = os.path.join(THIS_DIR, 'third_party', 'protobuf', 'google')
   if protobuf_pkg not in google.__path__:
     google.__path__.append(protobuf_pkg)
+  six_path = os.path.join(THIS_DIR, 'third_party', 'six')
+  if six_path not in sys.path:
+    sys.path.insert(0, six_path)
 
 
 def import_jinja2():
