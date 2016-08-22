@@ -115,6 +115,31 @@ class TestMetrics(test_case.TestCase):
     ts_mon_metrics.update_jobs_completed_metrics(summary)
     self.assertEqual(1, ts_mon_metrics.jobs_completed.get(fields=fields))
 
+  def test_update_jobs_requested_metrics(self):
+    tags = [
+        'project:test_project',
+        'subproject:test_subproject',
+        'master:test_master',
+        'buildername:test_builder',
+        'name:some_tests',
+    ]
+    fields = {
+        'project_id': 'test_project',
+        'subproject_id': 'test_subproject',
+        'spec_name': 'test_master:test_builder:some_tests',
+    }
+    summary = _gen_task_result_summary(self.now, 1, tags=tags)
+
+    fields['deduped'] = True
+    self.assertIsNone(ts_mon_metrics.jobs_requested.get(fields=fields))
+    ts_mon_metrics.update_jobs_requested_metrics(summary, deduped=True)
+    self.assertEqual(1, ts_mon_metrics.jobs_requested.get(fields=fields))
+
+    fields['deduped'] = False
+    self.assertIsNone(ts_mon_metrics.jobs_requested.get(fields=fields))
+    ts_mon_metrics.update_jobs_requested_metrics(summary, deduped=False)
+    self.assertEqual(1, ts_mon_metrics.jobs_requested.get(fields=fields))
+
   def test_initialize(self):
     # Smoke test for syntax errors.
     ts_mon_metrics.initialize()

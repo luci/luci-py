@@ -50,6 +50,16 @@ jobs_pending_durations = gae_ts_mon.NonCumulativeDistributionMetric(
     'jobs/pending_durations', bucketer=_bucketer,
     description='Pending times of active jobs, in seconds.')
 
+# Similar to jobs/completed and jobs/duration, but with a dedup field.
+# - project_id: e.g. 'chromium'
+# - subproject_id: e.g. 'blink'. Set to empty string if not used.
+# - spec_name: name of a job specification, e.g. '<master>:<builder>:<test>'
+#     for buildbot jobs.
+# - deduped: boolean describing whether the job was deduped or not.
+jobs_requested = gae_ts_mon.CounterMetric(
+    'jobs/requested',
+    description='Number of requested jobs over time.')
+
 
 # Swarming-specific metric. Metric fields:
 # - project_id: e.g. 'chromium'
@@ -144,6 +154,12 @@ def update_jobs_completed_metrics(task_result_summary):
   jobs_completed.increment(fields=fields)
   if task_result_summary.duration is not None:
     jobs_durations.add(task_result_summary.duration, fields=fields)
+
+
+def update_jobs_requested_metrics(task_request, deduped):
+  fields = extract_job_fields(task_request.tags)
+  fields['deduped'] = deduped
+  jobs_requested.increment(fields=fields)
 
 
 @ndb.tasklet

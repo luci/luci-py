@@ -405,6 +405,7 @@ def schedule_request(request):
     logging.info('%s conflicted, using %s', old, result_summary.task_id)
     return key
 
+  deduped = False
   stored = False
   if request.properties.idempotent:
     # Find a previously run task that is also idempotent and completed. Start a
@@ -452,6 +453,7 @@ def schedule_request(request):
             'New request %s reusing %s', result_summary.task_id,
             dupe_summary.task_id)
         stored = True
+        deduped = True
 
   if not stored:
     # Storing these entities makes this task live. It is important at this point
@@ -487,6 +489,7 @@ def schedule_request(request):
       'task_enqueued', result_summary.key,
       dimensions=request.properties.dimensions,
       user=request.user)
+  ts_mon_metrics.update_jobs_requested_metrics(result_summary, deduped)
   return result_summary
 
 
