@@ -66,5 +66,9 @@ The following environment variables may be set to alter bot behavior:
   - `periodic_reboot_secs`: when set to a integer, instructs the server to send
     a reboot command after this period. The actual period is fuzzed with a 10%
     delta.
-  - `quarantined`: has the same meaning than in `dimensions`. It's also
+  - `quarantined`: has the same meaning as in `dimensions`. It's also
     supported as a state.
+  - `bot_group_cfg_version`: version identifier of the server defined
+    configuration (extract from bots.cfg), applied to the bot during initial
+    handshake. The server will ask the bot to restart if this configuration
+    changes.

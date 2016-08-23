@@ -197,6 +197,31 @@ class BotCodeHandler(_BotAuthenticatingHandler):
         bot_code.get_swarming_bot_zip(self.request.host_url))
 
 
+class _ProcessResult(object):
+  """Returned by _BotBaseHandler._process."""
+
+  # A dict with parsed JSON request body, as it was received.
+  request = None
+  # Bot identifier, extracted from 'id' dimension.
+  bot_id = None
+  # Version of the bot code, as reported by the bot itself.
+  version = None
+  # Dict with bot state (as reported by the bot).
+  state = None
+  # Dict with bot dimensions (union of bot-reported and server-side ones).
+  dimensions = None
+  # Instance of BotGroupConfig with server-side bot config (from bots.cfg).
+  bot_group_cfg = None
+  # Bot quarantine message (or None if the bot is not in a quarantine).
+  quarantined_msg = None
+
+  def __init__(self, **kwargs):
+    for k, v in kwargs.iteritems():
+      # Typo catching assert, ensure _ProcessResult class has the attribute.
+      assert hasattr(self, k), k
+      setattr(self, k, v)
+
+
 class _BotBaseHandler(_BotApiHandler):
   """
   Request body is a JSON dict:
@@ -217,7 +242,7 @@ class _BotBaseHandler(_BotApiHandler):
     Does one DB synchronous GET.
 
     Returns:
-      tuple(request, bot_id, version, state, dimensions, quarantined_msg)
+      _ProcessResult instance, see its fields for more info.
 
     Raises:
       auth.AuthorizationError if bot's credentials are invalid.
@@ -250,12 +275,22 @@ class _BotBaseHandler(_BotApiHandler):
             'bot_id: "%s", key: "%s", from_bot: %s, from_cfg: %s',
             bot_id, dim_key, from_bot, from_cfg)
 
+    # Fill in all result fields except 'quarantined_msg'.
+    result = _ProcessResult(
+        request=request,
+        bot_id=bot_id,
+        version=version,
+        state=state,
+        dimensions=dimensions,
+        bot_group_cfg=bot_group_cfg)
+
     # The bot may decide to "self-quarantine" itself. Accept both via
     # dimensions or via state. See bot_management._BotCommon.quarantined for
     # more details.
     if (bool(dimensions.get('quarantined')) or
         bool(state.get('quarantined'))):
-      return request, bot_id, version, state, dimensions, 'Bot self-quarantined'
+      result.quarantined_msg = 'Bot self-quarantined'
+      return result
 
     quarantined_msg = None
     # Use a dummy 'for' to be able to break early from the block.
@@ -306,14 +341,16 @@ class _BotBaseHandler(_BotApiHandler):
           app_identity.get_default_version_hostname(), bot_id,
           quarantined_msg)
       ereporter2.log_request(self.request, source='bot', message=line)
-      return request, bot_id, version, state, dimensions, quarantined_msg
+      result.quarantined_msg = quarantined_msg
+      return result
 
     # Look for admin enforced quarantine.
     bot_settings = bot_management.get_settings_key(bot_id).get()
     if bool(bot_settings and bot_settings.quarantined):
-      return request, bot_id, version, state, dimensions, 'Quarantined by admin'
+      result.quarantined_msg = 'Quarantined by admin'
+      return result
 
-    return request, bot_id, version, state, dimensions, None
+    return result
 
 
 class BotHandshakeHandler(_BotBaseHandler):
@@ -331,24 +368,32 @@ class BotHandshakeHandler(_BotBaseHandler):
     {
       "bot_version": <sha-1 of swarming_bot.zip uncompressed content>,
       "server_version": "138-193f1f3",
+      "bot_group_cfg_version": "0123abcdef",
+      "bot_group_cfg": {
+        "dimensions": { <server-defined dimensions> },
+      }
     }
   """
 
   @auth.public  # auth happens in self._process()
   def post(self):
-    (_request, bot_id, version, state,
-        dimensions, quarantined_msg) = self._process()
+    res = self._process()
     bot_management.bot_event(
-        event_type='bot_connected', bot_id=bot_id,
+        event_type='bot_connected', bot_id=res.bot_id,
         external_ip=self.request.remote_addr,
         authenticated_as=auth.get_peer_identity().to_bytes(),
-        dimensions=dimensions,
-        state=state, version=version, quarantined=bool(quarantined_msg),
-        task_id='', task_name=None, message=quarantined_msg)
+        dimensions=res.dimensions, state=res.state,
+        version=res.version, quarantined=bool(res.quarantined_msg),
+        task_id='', task_name=None, message=res.quarantined_msg)
 
     data = {
       'bot_version': bot_code.get_bot_version(self.request.host_url),
       'server_version': utils.get_app_version(),
+      'bot_group_cfg_version': res.bot_group_cfg.version,
+      'bot_group_cfg': {
+        # Let the bot know its server-side dimensions (from bots.cfg file).
+        'dimensions': res.bot_group_cfg.dimensions,
+      },
     }
     self.send_response(data)
 
@@ -380,35 +425,44 @@ class BotPollHandler(_BotBaseHandler):
       self._cmd_sleep(1000, True)
       return
 
-    (_request, bot_id, version, state,
-        dimensions, quarantined_msg) = self._process()
-    sleep_streak = state.get('sleep_streak', 0)
-    quarantined = bool(quarantined_msg)
+    res = self._process()
+    sleep_streak = res.state.get('sleep_streak', 0)
+    quarantined = bool(res.quarantined_msg)
 
     # Note bot existence at two places, one for stats at 1 minute resolution,
     # the other for the list of known bots.
     action = 'bot_inactive' if quarantined else 'bot_active'
-    stats.add_entry(action=action, bot_id=bot_id, dimensions=dimensions)
+    stats.add_entry(action=action, bot_id=res.bot_id, dimensions=res.dimensions)
 
     def bot_event(event_type, task_id=None, task_name=None):
       bot_management.bot_event(
-          event_type=event_type, bot_id=bot_id,
+          event_type=event_type, bot_id=res.bot_id,
           external_ip=self.request.remote_addr,
           authenticated_as=auth.get_peer_identity().to_bytes(),
-          dimensions=dimensions,
-          state=state, version=version, quarantined=quarantined,
-          task_id=task_id, task_name=task_name, message=quarantined_msg)
+          dimensions=res.dimensions, state=res.state,
+          version=res.version, quarantined=quarantined,
+          task_id=task_id, task_name=task_name, message=res.quarantined_msg)
 
     # Bot version is host-specific because the host URL is embedded in
     # swarming_bot.zip
     expected_version = bot_code.get_bot_version(self.request.host_url)
-    if version != expected_version:
+    if res.version != expected_version:
       bot_event('request_update')
       self._cmd_update(expected_version)
       return
     if quarantined:
       bot_event('request_sleep')
       self._cmd_sleep(sleep_streak, quarantined)
+      return
+
+    # If the server-side per-bot config for the bot has changed, we need
+    # to restart this particular bot, so it picks up new config in /handshake.
+    # Do this check only for bots that know about server-side per-bot configs
+    # already (such bots send 'bot_group_cfg_version' state attribute).
+    cur_bot_cfg_ver = res.state.get('bot_group_cfg_version')
+    if cur_bot_cfg_ver and cur_bot_cfg_ver != res.bot_group_cfg.version:
+      bot_event('request_restart')
+      self._cmd_restart('Restarting to pick up new bots.cfg config')
       return
 
     #
@@ -420,7 +474,7 @@ class BotPollHandler(_BotBaseHandler):
     # Bot may need a reboot if it is running for too long. We do not reboot
     # quarantined bots.
     needs_restart, restart_message = bot_management.should_restart_bot(
-        bot_id, state)
+        res.bot_id, res.state)
     if needs_restart:
       bot_event('request_restart')
       self._cmd_restart(restart_message)
@@ -430,7 +484,8 @@ class BotPollHandler(_BotBaseHandler):
     try:
       # This is a fairly complex function call, exceptions are expected.
       request, run_result = task_scheduler.bot_reap_task(
-          dimensions, bot_id, version, state.get('lease_expiration_ts'))
+          res.dimensions, res.bot_id, res.version,
+          res.state.get('lease_expiration_ts'))
       if not request:
         # No task found, tell it to sleep a bit.
         bot_event('request_sleep')
@@ -447,7 +502,7 @@ class BotPollHandler(_BotBaseHandler):
           bot_event(
               'request_task', task_id=run_result.task_id,
               task_name=request.name)
-          self._cmd_run(request, run_result.key, bot_id)
+          self._cmd_run(request, run_result.key, res.bot_id)
       except:
         logging.exception('Dang, exception after reaping')
         raise
@@ -537,19 +592,20 @@ class BotEventHandler(_BotBaseHandler):
 
   @auth.public  # auth happens in self._process()
   def post(self):
-    (request, bot_id, version, state,
-        dimensions, quarantined_msg) = self._process()
-    event = request.get('event')
+    res = self._process()
+    event = res.request.get('event')
     if event not in self.ALLOWED_EVENTS:
       self.abort_with_error(400, error='Unsupported event type')
-    message = request.get('message')
+    message = res.request.get('message')
     # Record the event in a BotEvent entity so it can be listed on the bot's
     # page.
     bot_management.bot_event(
-        event_type=event, bot_id=bot_id, external_ip=self.request.remote_addr,
+        event_type=event, bot_id=res.bot_id,
+        external_ip=self.request.remote_addr,
         authenticated_as=auth.get_peer_identity().to_bytes(),
-        dimensions=dimensions, state=state, version=version,
-        quarantined=bool(quarantined_msg), task_id=None, task_name=None,
+        dimensions=res.dimensions, state=res.state,
+        version=res.version, quarantined=bool(res.quarantined_msg),
+        task_id=None, task_name=None,
         message=message)
 
     if event == 'bot_error':
@@ -561,7 +617,7 @@ class BotEventHandler(_BotBaseHandler):
       line = (
           '%s\n'
           '\nhttps://%s/restricted/bot/%s') % (
-          message, app_identity.get_default_version_hostname(), bot_id)
+          message, app_identity.get_default_version_hostname(), res.bot_id)
       ereporter2.log_request(self.request, source='bot', message=line)
     self.send_response({})
 

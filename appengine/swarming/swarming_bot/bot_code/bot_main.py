@@ -90,7 +90,7 @@ def _in_load_test_mode():
 
 
 def get_dimensions(botobj):
-  """Returns bot_config.py's get_attributes() dict."""
+  """Returns bot_config.py's get_dimensions() dict."""
   # Importing this administrator provided script could have side-effects on
   # startup. That is why it is imported late.
   try:
@@ -234,7 +234,7 @@ def generate_version():
 
 
 def get_attributes(botobj):
-  """Returns the attributes sent to the server.
+  """Returns the attributes sent to the server in /handshake.
 
   Each called function catches all exceptions so the bot doesn't die on startup,
   which is annoying to recover. In that case, we set a special property to catch
@@ -443,8 +443,8 @@ def run_bot(arg_error):
     # have fully initialize bot.Bot object. Note that 'get_dimensions' and
     # 'get_state' may depend on actions done by 'on_bot_startup' hook, that's
     # why we do it here and not in 'get_bot'.
-    botobj.update_dimensions(get_dimensions(botobj))
-    botobj.update_state(get_state(botobj, 0))
+    botobj._update_dimensions(get_dimensions(botobj))
+    botobj._update_state(get_state(botobj, 0))
 
     if quit_bit.is_set():
       logging.info('Early quit 3')
@@ -465,6 +465,14 @@ def run_bot(arg_error):
           logging.warning(
               'Found out we\'ll need to update: server said %s; we\'re %s',
               resp.get('bot_version'), botobj._attributes['version'])
+        # Remember the server-provided per-bot configuration. '/handshake' is
+        # the only place where the server returns it. The bot will be sending
+        # the 'bot_group_cfg_version' back in each /poll (as part of 'state'),
+        # so that the server can instruct the bot to restart itself when
+        # config changes.
+        cfg_version = resp.get('bot_group_cfg_version')
+        if cfg_version:
+          botobj._update_bot_group_cfg(cfg_version, resp.get('bot_group_cfg'))
         break
       logging.error(
           'Failed to contact for handshake, retrying in %d sec...', sleep_time)
@@ -474,6 +482,10 @@ def run_bot(arg_error):
     if quit_bit.is_set():
       logging.info('Early quit 4')
       return 0
+
+    # Let the bot to finish the initialization, now that it knows its server
+    # defined dimensions.
+    call_hook(botobj, 'on_handshake')
 
     cleanup_bot_directory(botobj)
     clean_isolated_cache(botobj)
@@ -489,8 +501,8 @@ def run_bot(arg_error):
     last_action = time.time()
     while not quit_bit.is_set():
       try:
-        botobj.update_dimensions(get_dimensions(botobj))
-        botobj.update_state(get_state(botobj, consecutive_sleeps))
+        botobj._update_dimensions(get_dimensions(botobj))
+        botobj._update_state(get_state(botobj, consecutive_sleeps))
         did_something = poll_server(botobj, quit_bit, last_action)
         if did_something:
           last_action = time.time()

@@ -162,11 +162,21 @@ all changes are not backward or forward, they are content addressed.
 
 ## Configuration
 
-Since configuration is all done on the server, the server need to store all
-the configuration files that may be deployed to the bots. In practice, there is
-only one configuration file that is embedded inside the bot,
-[bot_config.py](../swarming_bot/config/bot_config.py).  This file is then
-injected inside the zip every time a zip is requested.
+There are two places where bots behavior can be tweaked:
+
+   - [bot_config.py](../swarming_bot/config/bot_config.py). It is stored on
+     the server, and injected into the swarming_bot.zip each time a zip is
+     requested. It is a python module that defines hook functions called during
+     various stages of the bot life. It can contain essentially any code, and
+     it is executed only on the bot. See Hooks section below.
+   - `bots.cfg` (with the schema defined by [bots.proto](../proto/bots.proto)).
+     This is purely server side configuration, fetched via luci-config. It
+     describes how server authenticates the bots and what dimensions it
+     forcefully applies to them (based on their id). For example, it allows to
+     partition bots into multiple pools (with different 'pool' dimension) solely
+     based on bot credentials, so no matter what bot itself reports, 'pool'
+     dimension will be enforced by the server. It useful for isolating bots that
+     run less trusted tasks into a dedicated pool.
 
 
 ### Hooks
@@ -176,14 +186,28 @@ callbacks, it is pure executable code without any predefined data form. These
 callbacks are called at specific predefined times during the bot's lifetime and
 are classified by a few categories via their prefix:
 
-*   `on_*` are hooks that are called on events based on the task with obvious
-    names: `on_bot_startup`, `on_bot_shutdown`, `on_before_task`,
-    `on_after_task`, `on_bot_idle`.
-*   `get_*` are functions that returns the bot's self-defined identity. These
-    are reported to the server and fall in two categories: `get_dimensions`
-    which returns the properties that are used as part of the task scheduler
-    bot selection and `get_state` which is purely informational data about the
-    state of the bot.
+*   `on_*` are hooks that are called at different stages of the bot lifecycle:
+    *   `on_bot_startup` is called right after the bot process is started, but
+        before it talks to the server.
+    *   `on_handshake` is called after the bot contacts the server for the first
+        time to grab its server-defined dimensions (from bots.cfg). These
+        dimensions become available to the bot here and all following hooks.
+    *   `on_bot_idle` is regularly called if server reports there are no tasks
+        assigned to the bot.
+    *   `on_before_task` is called right before the bot starts running a task.
+    *   `on_after_task` is called right after the task finishes.
+    *   `on_bot_shutdown` is called before the bot terminates (usually before
+        rebooting).
+*   `get_*` are functions that return the bot's self-defined attributes:
+    *   `get_dimensions` returns the properties that are used as part of the
+        task scheduler bot selection.
+    *   `get_state` returns purely informational data about the state of the
+        bot.
+    *   `get_authentication_headers` returns HTTP headers to use when sending
+        requests to the server. The bot may pick different authentication
+        methods based on where it runs. This should match to what the server
+        expects to see (as defined by bots.cfg, see `require_*` fields in
+        [bots.proto](../proto/bots.proto)).
 *   `setup_bot` is the only hook that is expected to modify its host. It is
     called on the initial startup and just before shutdown, to ensure the bot
     configured the host well so it will return properly upon host restart.

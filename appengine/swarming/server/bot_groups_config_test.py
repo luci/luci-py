@@ -39,21 +39,21 @@ TEST_CONFIG = bots_pb2.BotsCfg(
 )
 
 
-EXPECTED_GROUP_1 = bot_groups_config.BotGroupConfig(
+EXPECTED_GROUP_1 = bot_groups_config._make_bot_group_config(
     require_luci_machine_token=True,
     require_service_account=u'',
     ip_whitelist=u'',
     owners=(u'owner@example.com',),
     dimensions={u'pool': [u'A', u'B'], u'other': [u'D']})
 
-EXPECTED_GROUP_2 = bot_groups_config.BotGroupConfig(
+EXPECTED_GROUP_2 = bot_groups_config._make_bot_group_config(
     require_luci_machine_token=False,
     require_service_account=u'a@example.com',
     ip_whitelist=u'',
     owners=(),
     dimensions={u'pool': []})
 
-EXPECTED_GROUP_3 = bot_groups_config.BotGroupConfig(
+EXPECTED_GROUP_3 = bot_groups_config._make_bot_group_config(
     require_luci_machine_token=False,
     require_service_account=u'',
     ip_whitelist=u'bots',
@@ -80,6 +80,10 @@ class BotGroupsConfigTest(test_case.TestCase):
       return None, cfg
     self.mock(config, 'get_self_config', get_self_config_mock)
     utils.clear_cache(bot_groups_config._fetch_bot_groups)
+
+  def test_version(self):
+    self.assertEqual('hash:4564ed4cc34544', EXPECTED_GROUP_1.version)
+    self.assertEqual('hash:18206c33fffaa8', EXPECTED_GROUP_2.version)
 
   def test_expand_bot_id_expr_success(self):
     def check(expected, expr):

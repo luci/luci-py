@@ -148,6 +148,7 @@ class AppTestBase(test_case.TestCase):
         params=params).json
     self.bot_version = response['bot_version']
     params['version'] = self.bot_version
+    params['state']['bot_group_cfg_version'] = response['bot_group_cfg_version']
     return params
 
   def bot_poll(self, bot='bot1'):

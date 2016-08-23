@@ -62,6 +62,7 @@ class TestBotMain(net_utils.TestCase):
         'pool': ['default'],
       },
       'state': {
+        'bot_group_cfg_version': None,
         'cost_usd_hour': 3600.,
         'sleep_streak': 0,
       },
@@ -216,6 +217,13 @@ class TestBotMain(net_utils.TestCase):
       raise Foo('Necessary to get out of the loop')
     self.mock(bot.Bot, 'post_error', post_error)
 
+    orig = bot_main.get_bot
+    botobj = [None]
+    def get_bot():
+      botobj[0] = orig()
+      return botobj[0]
+    self.mock(bot_main, 'get_bot', get_bot)
+
     self.mock(
         bot_main, 'get_config',
         lambda: {'server': self.url, 'server_version': '1'})
@@ -267,7 +275,15 @@ class TestBotMain(net_utils.TestCase):
               'headers': {},
               'timeout': remote_client.NET_CONNECTION_TIMEOUT_SEC,
             },
-            {'bot_version': '123', 'server': self.url, 'server_version': 1},
+            {
+              'bot_version': '123',
+              'server': self.url,
+              'server_version': 1,
+              'bot_group_cfg_version': 'abc:def',
+              'bot_group_cfg': {
+                'dimensions': {'bot_side': ['A']},
+              },
+            },
           ),
         ])
 
@@ -275,6 +291,13 @@ class TestBotMain(net_utils.TestCase):
       bot_main.run_bot(None)
     self.assertEqual(
         self.attributes['dimensions']['id'][0], os.environ['SWARMING_BOT_ID'])
+
+    self.assertEqual({
+      'bot_side': ['A'],
+      'foo': ['bar'],
+      'id': ['localhost'],
+      'pool': ['default'],
+    }, botobj[0].dimensions)
 
   def test_poll_server_sleep(self):
     slept = []

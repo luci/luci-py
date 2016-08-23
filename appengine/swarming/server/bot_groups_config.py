@@ -5,6 +5,7 @@
 """Functions to fetch and interpret bots.cfg file with list of bot groups."""
 
 import collections
+import hashlib
 import logging
 import re
 
@@ -24,6 +25,9 @@ BOTS_CFG_FILENAME = 'bots.cfg'
 # BotGroup in bots.proto. See comments there. This tuple contains already
 # validated values.
 BotGroupConfig = collections.namedtuple('BotGroupConfig', [
+  # The hash of the rest of the data in this tuple, see _gen_version.
+  'version',
+
   # If True, the bot is expected to authenticate as "bot:<bot-id>.*".
   'require_luci_machine_token',
 
@@ -60,11 +64,38 @@ _DEFAULT_BOT_GROUPS = _BotGroups(
     direct_matches={},
     prefix_matches=[],
     default_group=BotGroupConfig(
+        version='default',
         require_luci_machine_token=False,
         require_service_account=None,
         ip_whitelist=auth.BOTS_IP_WHITELIST,
         owners=(),
         dimensions={}))
+
+
+def _gen_version(fields):
+  """Looks at BotGroupConfig fields and derives a digest that summarizes them.
+
+  This digest is going to be sent to the bot in /handshake, and bot would
+  include it in its state (and thus send it with each /poll). If server detects
+  that the bot is using older version of the config, it would ask the bot
+  to restart.
+
+  Args:
+    fields: dict with BotGroupConfig fields (without 'version').
+
+  Returns:
+    A string that going to be used as 'version' field of BotGroupConfig tuple.
+  """
+  # Just hash JSON representation (with sorted keys). Assumes it is stable
+  # enough. Add a prefix and trim a bit, to clarify that is it not git hash or
+  # anything like that, but just a dumb hash of the actual config.
+  digest = hashlib.sha1(utils.encode_to_json(fields)).hexdigest()
+  return 'hash:' + digest[:14]
+
+
+def _make_bot_group_config(**fields):
+  """Instantiates BotGroupConfig properly deriving 'version' field."""
+  return BotGroupConfig(version=_gen_version(fields), **fields)
 
 
 def get_bot_group_config(bot_id):
@@ -104,12 +135,12 @@ def _bot_group_proto_to_tuple(msg, trusted_dimensions):
 
   auth_cfg = msg.auth or bots_pb2.BotAuth()
 
-  return BotGroupConfig(
-      require_luci_machine_token=auth_cfg.require_luci_machine_token,
-      require_service_account=auth_cfg.require_service_account,
-      ip_whitelist=auth_cfg.ip_whitelist,
-      owners=tuple(msg.owners),
-      dimensions={k: sorted(v) for k, v in dimensions.iteritems()})
+  return _make_bot_group_config(
+    require_luci_machine_token=auth_cfg.require_luci_machine_token,
+    require_service_account=auth_cfg.require_service_account,
+    ip_whitelist=auth_cfg.ip_whitelist,
+    owners=tuple(msg.owners),
+    dimensions={k: sorted(v) for k, v in dimensions.iteritems()})
 
 
 def _expand_bot_id_expr(expr):

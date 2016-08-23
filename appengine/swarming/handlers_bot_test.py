@@ -70,8 +70,15 @@ class BotApiTest(test_env_handlers.AppTestBase):
     response = self.app.post_json(
         '/swarming/api/v1/bot/handshake', params=params).json
     self.assertEqual(
-        [u'bot_version', u'server_version'],
+        [
+          u'bot_group_cfg',
+          u'bot_group_cfg_version',
+          u'bot_version',
+          u'server_version',
+        ],
         sorted(response))
+    self.assertEqual({u'dimensions': {}}, response['bot_group_cfg'])
+    self.assertEqual('default', response['bot_group_cfg_version'])
     self.assertEqual(40, len(response['bot_version']))
     self.assertEqual(u'v1a', response['server_version'])
     self.assertEqual([], errors)
@@ -86,7 +93,12 @@ class BotApiTest(test_env_handlers.AppTestBase):
     response = self.app.post_json(
         '/swarming/api/v1/bot/handshake', params={}).json
     self.assertEqual(
-        [u'bot_version', u'server_version'],
+        [
+          u'bot_group_cfg',
+          u'bot_group_cfg_version',
+          u'bot_version',
+          u'server_version',
+        ],
         sorted(response))
     self.assertEqual(40, len(response['bot_version']))
     self.assertEqual(u'v1a', response['server_version'])
@@ -120,7 +132,12 @@ class BotApiTest(test_env_handlers.AppTestBase):
     response = self.app.post_json(
         '/swarming/api/v1/bot/handshake', params=params).json
     self.assertEqual(
-        [u'bot_version', u'server_version'],
+        [
+          u'bot_group_cfg',
+          u'bot_group_cfg_version',
+          u'bot_version',
+          u'server_version',
+        ],
         sorted(response))
     self.assertEqual(40, len(response['bot_version']))
     self.assertEqual(u'v1a', response['server_version'])
@@ -199,10 +216,21 @@ class BotApiTest(test_env_handlers.AppTestBase):
     }
     self.assertEqual(expected, response)
 
+  def test_poll_bot_group_config_change(self):
+    params = self.do_handshake()
+    params['state']['bot_group_cfg_version'] = 'badversion'
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
+    expected = {
+      u'cmd': u'restart',
+      u'message': u'Restarting to pick up new bots.cfg config',
+    }
+    self.assertEqual(expected, response)
+
   def test_poll_restart(self):
     def mock_should_restart_bot(bot_id, state):
       self.assertEqual('bot1', bot_id)
       expected_state = {
+        'bot_group_cfg_version': 'default',
         'running_time': 1234.0,
         'sleep_streak': 0,
         'started_ts': 1410990411.111,
@@ -608,6 +636,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'message': u'for the best',
         'quarantined': False,
         'state': {
+          u'bot_group_cfg_version': u'default',
           u'running_time': 1234.0,
           u'sleep_streak': 0,
           u'started_ts': 1410990411.111,

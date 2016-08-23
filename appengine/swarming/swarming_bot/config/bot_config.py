@@ -42,6 +42,11 @@ def get_dimensions(bot):
   os_utilities.get_dimensions(). If you want something more special, specify it
   in your bot_config.py and override the item 'id'.
 
+  The dimensions returned here will be joined with server defined dimensions
+  (extracted from bots.cfg config file based on the bot id). Server defined
+  dimensions override the ones provided by the bot. See bot.Bot.dimensions for
+  more information.
+
   See https://github.com/luci/luci-py/tree/master/appengine/swarming/doc/Magic-Values.md.
 
   Arguments:
@@ -115,9 +120,26 @@ def on_bot_shutdown(bot):
 
 
 def on_bot_startup(bot):
-  """Hook function called when the bot starts.
+  """Hook function called when the bot starts, before handshake with the server.
 
-  It's a good time to do some cleanup before starting to poll for tasks.
+  Here the bot may initialize and examine its environment, pick initial state
+  and dimensions to send to the server during the handshake.
+
+  Arguments:
+  - bot: bot.Bot instance. See ../api/bot.py.
+  """
+  pass
+
+
+def on_handshake(bot):
+  """Hook function called when the bot starts, after handshake with the server.
+
+  Here the bot already knows server enforced dimensions (defined in server side
+  bots.cfg file).
+
+  This is called right before starting to poll for tasks. It's a good time to
+  do some final initialization or cleanup that may depend on server provided
+  configuration.
 
   Arguments:
   - bot: bot.Bot instance. See ../api/bot.py.

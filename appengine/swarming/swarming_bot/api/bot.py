@@ -24,8 +24,10 @@ class Bot(object):
     assert server is None or not server.endswith('/'), server
     self._attributes = attributes
     self._base_dir = base_dir
+    self._bot_group_cfg_ver = None
     self._remote = remote
     self._server = server
+    self._server_side_dimensions = {}
     self._server_version = server_version
     self._shutdown_hook = shutdown_hook
 
@@ -45,6 +47,23 @@ class Bot(object):
     Dimensions are relatively static and not expected to change much. They
     should change only when it effectively affects the bot's capacity to execute
     tasks.
+
+    Includes both bot supplied dimensions (as returned by get_dimensions
+    bot_config.py hook) and server defined ones (as obtained during handshake
+    with the server).
+
+    Server defined dimensions are specified in bots.cfg configuration file on
+    the server side. They completely override corresponding bot supplied
+    dimensions.
+
+    For example, if bot_config.get_dimensions() returns "pool:Foo"
+    and bots.cfg defines "pool:Bar", then the bot will have "pool:Bar"
+    dimension. It will NOT be a joined "pool:[Foo,Bar]" dimension.
+
+    That way server can be sure that 'pool' dimension used for the bot is what
+    it should be, even if the bot is misbehaving or maliciously trying to move
+    itself to a different pool. By forcefully overriding dimensions on the
+    server side we can use them as security boundaries.
     """
     return self._attributes.get('dimensions', {}).copy()
 
@@ -84,7 +103,14 @@ class Bot(object):
 
   @property
   def state(self):
-    return self._attributes['state']
+    """Current bot state dict, as sent to the server.
+
+    It is accessible from the UI and usually contains various helpful info about
+    the bot status.
+
+    The state may change often, but it can't be used in scheduling decisions.
+    """
+    return self._attributes.get('state', {}).copy()
 
   @property
   def swarming_bot_zip(self):
@@ -144,10 +170,31 @@ class Bot(object):
         time.sleep(1)
     self.post_error('Bot is stuck restarting for: %s' % message)
 
-  def update_dimensions(self, new_dimensions):
-    """Called internally to update Bot.dimensions."""
-    self._attributes['dimensions'] = new_dimensions
+  def _update_bot_group_cfg(self, cfg_version, cfg):
+    """Called internally to update server-provided per-bot config.
 
-  def update_state(self, new_state):
+    This is called once, right after the handshake and it may modify values of
+    'state' and 'dimensions' (by augmenting them with server-provided details).
+
+    It is done only to make this information available to bot_config.py hooks.
+    The server would still enforce the dimensions with each '/poll' call.
+
+    See docs for '/handshake' call for the format of 'cfg' dict.
+    """
+    self._bot_group_cfg_ver = cfg_version
+    self._server_side_dimensions = (cfg or {}).get('dimensions')
+    # Apply changes to 'self._attributes'.
+    self._update_dimensions(self._attributes.get('dimensions') or {})
+    self._update_state(self._attributes.get('state') or {})
+
+  def _update_dimensions(self, new_dimensions):
+    """Called internally to update Bot.dimensions."""
+    dimensions = new_dimensions.copy()
+    dimensions.update(self._server_side_dimensions)
+    self._attributes['dimensions'] = dimensions
+
+  def _update_state(self, new_state):
     """Called internally to update Bot.state."""
-    self._attributes['state'] = new_state
+    state = new_state.copy()
+    state['bot_group_cfg_version'] = self._bot_group_cfg_ver
+    self._attributes['state'] = state

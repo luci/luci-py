@@ -1844,11 +1844,17 @@ class BotApiTest(BaseTest):
       {u'key': u'os', u'value': [u'Amiga']},
       {u'key': u'pool', u'value': [u'default']},
     ]
-    state = unicode(json.dumps(
-        {'running_time': 1234., 'sleep_streak': 0,
-          'started_ts': 1410990411.111},
-        sort_keys=True,
-        separators=(',',':')))
+    state_dict = {
+      'bot_group_cfg_version': 'default',
+      'running_time': 1234.,
+      'sleep_streak': 0,
+      'started_ts': 1410990411.111,
+    }
+    state = unicode(
+        json.dumps(state_dict, sort_keys=True, separators=(',', ':')))
+    state_dict.pop('bot_group_cfg_version')
+    state_no_cfg_ver = unicode(
+        json.dumps(state_dict, sort_keys=True, separators=(',', ':')))
     expected = {
       u'items': [
         {
@@ -1890,7 +1896,7 @@ class BotApiTest(BaseTest):
           u'event_type': u'bot_connected',
           u'external_ip': unicode(self.source_ip),
           u'quarantined': False,
-          u'state': state,
+          u'state': state_no_cfg_ver,
           u'ts': str_now,
           u'version': u'123',
         },
@@ -1900,7 +1906,7 @@ class BotApiTest(BaseTest):
           u'event_type': u'bot_connected',
           u'external_ip': unicode(self.source_ip),
           u'quarantined': False,
-          u'state': state,
+          u'state': state_no_cfg_ver,
           u'ts': str_now,
           u'version': u'123',
         },
