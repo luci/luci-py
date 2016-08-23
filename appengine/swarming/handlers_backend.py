@@ -135,15 +135,16 @@ class CronBotsDimensionAggregationHandler(webapp2.RequestHandler):
 
 
 class CronTasksTagsAggregationHandler(webapp2.RequestHandler):
-  """Aggregates all task tags from the last 12 hours."""
+  """Aggregates all task tags from the last hour."""
 
   @decorators.require_cronjob
   def get(self):
     seen = {}
     now = utils.utcnow()
     count = 0
-    q = task_result.get_result_summaries_query(
-        now - datetime.timedelta(hours=12), None, 'created_ts', 'all', None)
+    q = task_result.TaskResultSummary.query(
+        task_result.TaskResultSummary.modified_ts >
+        now - datetime.timedelta(hours=1))
     cursor = None
     while True:
       tasks, cursor = datastore_utils.fetch_page(q, 1000, cursor)
@@ -166,7 +167,7 @@ class CronTasksTagsAggregationHandler(webapp2.RequestHandler):
       for k, values in sorted(seen.iteritems()) if values is not None
     ]
 
-    logging.info('From %d tasks, saw tags %s', count, tags)
+    logging.info('From %d tasks, saw %d tags', count, len(tags))
     task_result.TagAggregation(
         key=task_result.TagAggregation.KEY,
         tags=tags,
