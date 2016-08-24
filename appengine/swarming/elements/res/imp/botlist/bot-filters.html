@@ -57,92 +57,15 @@
 <link rel="import" href="/res/imp/bower_components/paper-input/paper-input.html">
 
 <link rel="import" href="/res/imp/common/url-param.html">
+<link rel="import" href="/res/imp/common/query-column-filter-behavior.html">
 
-<link rel="import" href="bot-list-shared.html">
+
+<link rel="import" href="bot-list-shared-behavior.html">
 
 <dom-module id="bot-filters">
   <template>
-    <style is="custom-style" include="iron-flex iron-flex-alignment iron-positioning">
-      :host {
-        display: block;
-        font-family: sans-serif;
-      }
-      #filter {
-        margin:0 5px;
-      }
+    <style is="custom-style" include="iron-flex iron-flex-alignment iron-positioning query-column-filter-style">
 
-      .container {
-        min-height: 120px;
-        width: 100%;
-      }
-
-      .item {
-        border-bottom: 1px solid #EEE;
-        max-width: 250px;
-        min-height: 1.0em;
-        min-width: 100px;
-        padding: 0.1em 0.2em;
-        line-height: 1.5em;
-      }
-
-      .header {
-        height: 2em;
-        padding: .25em;
-        line-height: 2em;
-      }
-
-      .selector {
-        border: 1px solid black;
-        margin: 0 5px;
-        max-height: 200px;
-        min-height: 130px;
-        min-width: 200px;
-        overflow-y: auto;
-        overflow-x: hidden;
-      }
-
-      .selectable {
-        cursor: pointer;
-      }
-
-      .selectable:hover {
-        /* See https://sites.google.com/a/google.com/skia-infrastructure/design-docs/general-design-guidance */
-        background-color: #A6CEE3;
-      }
-
-      .iron-selected {
-        /* See https://sites.google.com/a/google.com/skia-infrastructure/design-docs/general-design-guidance */
-        background-color: #1F78B4;
-        color: white;
-      }
-
-      .icons {
-        cursor:pointer;
-        height:20px;
-        margin:2px;
-        width:20px;
-        flex-shrink: 0;
-      }
-
-      .side-by-side {
-        display: inline-block;
-        vertical-align: top;
-      }
-
-      .bold {
-        font-weight: bold;
-      }
-
-      paper-checkbox {
-        max-height: 2em;
-        margin: 2px;
-        /* See https://sites.google.com/a/google.com/skia-infrastructure/design-docs/general-design-guidance */
-        --paper-checkbox-checked-color: black;
-        --paper-checkbox-checked-ink-color: black;
-        --paper-checkbox-unchecked-color: black;
-        --paper-checkbox-unchecked-ink-color: black;
-        --paper-checkbox-label-color: black;
-      }
     </style>
 
     <url-param name="filters"
@@ -156,7 +79,8 @@
       multi>
     </url-param>
     <url-param name="query"
-     value="{{_query}}">
+     value="{{_query}}"
+     default_value="">
     </url-param>
     <url-param name="verbose"
       value="{{verbose}}">
@@ -256,31 +180,10 @@ the fleet.">
   </template>
   <script>
   (function(){
-    var FILTER_SEP = ":";
-    // filterMap is a map of primary -> function.  The function returns a
-    // boolean "does the bot (first arg) match the second argument".  These
-    // functions will have "this" be the botlist, and will have access to all
-    // functions defined in bot-list and bot-list-shared.  If there is not
-    // one provided, a default will be used, see _makeFilter().
+    // See query-column-filter for more documentation on these properties.
     var filterMap = {
-      android_devices: function(bot, num) {
-        var o = this._attribute(bot, "android_devices", "0");
-        return o.indexOf(num) !== -1;
-      },
-      device_os: function(bot, os) {
-        var o = this._attribute(bot, "device_os", "none");
-        return o.indexOf(os) !== -1;
-      },
-      device_type: function(bot, dt) {
-        var o = this._attribute(bot, "device_type", "none");
-        return o.indexOf(this._unalias(dt)) !== -1;
-      },
       disk_space: function(bot, space) {
         return true;
-      },
-      gpu: function(bot, gpu) {
-        var o = this._attribute(bot, "gpu", "none");
-        return o.indexOf(this._unalias(gpu)) !== -1;
       },
       id: function(bot, id) {
         return true;
@@ -304,63 +207,19 @@ the fleet.">
       }
     };
 
-    // Given a space separated list of queries, matchPartCaseInsensitive
-    // returns an object of any query that matches a part of str, case
-    // insensitive.  The object has an idx (index) and the part that matched.
-    var matchPartCaseInsensitive = function(str, queries) {
-      if (!queries) {
-        return {
-          idx: 0,
-          part: "",
-        };
-      }
-      if (!str) {
-        return {
-          idx: -1,
-        };
-      }
-      queries = queries.trim().toLocaleLowerCase();
-      str = str.toLocaleLowerCase();
-      var xq = queries.split(" ");
-      for (var i = 0; i < xq.length; i++) {
-        var idx = str.indexOf(xq[i]);
-        if (idx !== -1) {
-          return {
-            idx: idx,
-            part: xq[i],
-          };
-        }
-      }
-      return {
-        idx: -1,
-      };
-    };
-
     Polymer({
       is: "bot-filters",
 
-      behaviors: [SwarmingBehaviors.BotListBehavior],
+      behaviors: [
+        SwarmingBehaviors.BotListBehavior,
+        SwarmingBehaviors.QueryColumnFilter,
+      ],
 
       properties: {
-        // input
-        primary_map: {
-          type: Object,
-        },
-        primary_arr: {
-          type: Array,
-        },
-        dimensions: {
-          type: Array,
-        },
-
-        // output
+        // url-param doesn't like columns to be defined in query_column-filter,
+        // so we define it here.
         columns: {
           type: Array,
-          notify: true,
-        },
-        filter: {
-          type: Function,
-          computed: "_makeFilter(_filters.*)",
           notify: true,
         },
         query_params: {
@@ -373,83 +232,17 @@ the fleet.">
           notify: true,
         },
 
-        // private
-        _filters: {
-          type:Array,
-        },
-        _limit: {
-          type: Number,
-        },
-        _primaryItems: {
-          type: Array,
-          computed: "_primary(_query, primary_map, primary_arr, columns.*)",
-        },
-        _primarySelected: {
-          type: String,
-          value: "",
-        },
-        // query is treated as a space separated list.
-        _query: {
-          type:String,
-        },
-        _secondaryItems: {
-          type: Array,
-          computed: "_secondary(_primarySelected, _query, primary_map)",
-        },
-
-      },
-
-      _addFilter: function(e) {
-        // e.model.foo is a way to get access to the "foo" inside a dom-repeat
-        // that had the event (in our case, a tap) acted upon it.  This name,
-        // "foo", is set by the dom-repeat above 'as="foo"'
-        var filterItem = e.model.item;
-        if (this._cantAddFilter(this._primarySelected, filterItem)) {
-          return;
+        // for QueryColumnFilter
+        _filterMap: {
+          type: Object,
+          value: function() {
+            var base = this._commonFilters();
+            for (var attr in filterMap) {
+              base[attr] = filterMap[attr];
+            }
+            return base;
+          },
         }
-        var filter = this._primarySelected + FILTER_SEP + filterItem;
-        this.push("_filters", filter);
-      },
-
-      _removeFilter: function(e){
-        var filter = e.model.fil;
-        if (this._cantRemoveFilter(filter)){
-          return;
-        }
-        var idx = this._filters.indexOf(filter);
-        if (idx !== -1) {
-          this.splice("_filters", idx, 1);
-        }
-      },
-
-      _cantAddFilter: function(primarySelected, filterItem) {
-        // Check that everything is selected and this filter isn't already in
-        // the array.
-        if (!primarySelected || !filterItem) {
-          return true;
-        }
-        var filter = primarySelected + FILTER_SEP + filterItem;
-        return this._filters.indexOf(filter) !== -1;
-      },
-
-      _cantRemoveFilter: function(filter) {
-        return !filter || this._filters.indexOf(filter) === -1;
-      },
-
-      _toggleColumn: function(e) {
-        var col = e.model.item;
-
-        if (this._cantToggleColumn(col)) {
-          return;
-        }
-        if (this._columnState(col)) {
-          var idx = this.columns.indexOf(col);
-          if (idx !== -1) {
-            this.splice("columns", idx, 1);
-          }
-          return;
-        }
-        this.push("columns", col);
       },
 
       _cantToggleColumn: function(col) {
@@ -458,148 +251,17 @@ the fleet.">
         return !col || col === "id" ;
       },
 
-      _columnState: function(col) {
-        if (!col) {
-          return false;
-        }
-        return this.columns.indexOf(col) !== -1;
-      },
-
-      _makeFilter: function() {
-        // All filters will be AND'd together.
-        // filterGroups will be a map of primary (i.e. column) -> array of
-        // options that should be filtered to.
-        // e.g. "os" -> ["Windows", "Linux"]
-        // Since they will be or'd together, order doesn't matter.
-        var filterGroups = {};
-        this._filters.forEach(function(filterString){
-          var idx = filterString.indexOf(FILTER_SEP);
-          var primary = filterString.slice(0, idx);
-          var param = filterString.slice(idx + FILTER_SEP.length);
-          var arr = filterGroups[primary] || [];
-          arr.push(param);
-          filterGroups[primary] = arr;
-        });
-        return function(bot){
-          var retVal = true;
-          // Look up all the primary keys we are filter by, then look up how
-          // to filter (in filterMap) and apply the filter for each filter
-          // option.
-          for (primary in filterGroups){
-            var params = filterGroups[primary];
-            var filter = filterMap[primary];
-            if (!filter) {
-              filter = function(bot, c) {
-                var o = this._attribute(bot, primary);
-                return o.indexOf(c) !== -1;
-              }.bind(this);
-            }
-            if (filter) {
-              params.forEach(function(param){
-                retVal = retVal && filter.bind(this)(bot,param);
-              }.bind(this));
-            }
-          }
-          return retVal;
-        }
-      },
-
-      _primary: function(query, primary_map, primary_arr) {
-        // If the user has typed in a query, only show those primary keys that
-        // partially match the query or that have secondary values which
-        // partially match.
-        var arr = this.primary_arr.filter(function(s){
-          if (matchPartCaseInsensitive(s, query).idx !== -1) {
-            return true;
-          }
-          var opts = primary_map[s];
-          for (var i = 0; i < opts.length; i++) {
-            if (matchPartCaseInsensitive(opts[i], query).idx !== -1) {
-              return true;
-            }
-          }
-          return false;
-        });
-        // Update the selected to be the current one (if it is still with being
-        // shown) or the first match.  This saves the user from having to click
-        // the first result before seeing results.
-        if (query && arr.length > 0 &&
-            arr.indexOf(this._primarySelected) === -1) {
-          this.set("_primarySelected", arr[0]);
-        }
-        return arr;
-      },
-
-      _secondary: function(primarySelected, query, primary_map) {
-        // Changing the secondary list doesn't always trigger a reorder of the
-        // secondary elements.  So, we request it be done asynchronously.
-        requestAnimationFrame(function(){
-          this.$.secondaryList.render();
-        }.bind(this));
-
-        // Only show secondary options when a primary option has been selected.
-        // If the user has typed in a query, show all secondary elements if
-        // their primary element matches.  If it doesn't match the primary
-        // element, only show those secondary elements that do.
-        if (!primarySelected) {
-          return [];
-        }
-        if (matchPartCaseInsensitive(primarySelected, query).idx !== -1) {
-          // Sort the secondaries alphabetically, but prioritize query matches.
-          return primary_map[primarySelected].sort(function(a, b){
-            var aMatch = matchPartCaseInsensitive(a, query).idx !== -1;
-            var bMatch = matchPartCaseInsensitive(b, query).idx !== -1;
-            if (aMatch === bMatch) {
-              return swarming.naturalCompare(a,b);
-            }
-            // true == 1 and false == 0.  So, put the one that matches first.
-            return bMatch - aMatch;
-          });
-        }
-        // Otherwise, filter out those that do not match.
-        return primary_map[primarySelected].filter(function(s) {
-          return matchPartCaseInsensitive(s, query).idx !== -1;
-        });
-      },
-
-      // These three methods (_beforeBold, _bold, _afterBold) bold the first
-      // instance of the filter query, making it easier to see why elements
-      // show up.
-      _beforeBold: function(item, query) {
-        var match = matchPartCaseInsensitive(item, query);
-        if (match.idx === -1) {
-          return item;
-        }
-        return item.substring(0, match.idx);
-      },
-
-      _bold: function(item, query) {
-        var match = matchPartCaseInsensitive(item, query);
-        if (match.idx === -1) {
-          return "";
-        }
-        return item.substring(match.idx, match.idx + match.part.length);
-      },
-
-      _afterBold: function(item, query) {
-        var match = matchPartCaseInsensitive(item, query);
-        if (match.idx === -1) {
-          return "";
-        }
-        return item.substring(match.idx + match.part.length);
-      },
-
       _extractQueryParams: function() {
         var params = {};
         var dims = [];
         this._filters.forEach(function(f) {
-          var split = f.split(FILTER_SEP, 1)
+          var split = f.split(this.FILTER_SEP, 1)
           var col = split[0];
           if (this.dimensions.indexOf(col) !== -1) {
-            var rest = f.substring(col.length + FILTER_SEP.length);
-            dims.push(col + FILTER_SEP + this._unalias(rest))
+            var rest = f.substring(col.length + this.FILTER_SEP.length);
+            dims.push(col + this.FILTER_SEP + swarming.alias.unapply(rest))
           } else if (col === "status") {
-            var rest = f.substring(col.length + FILTER_SEP.length);
+            var rest = f.substring(col.length + this.FILTER_SEP.length);
             if (rest === "alive") {
               params["is_dead"] = "FALSE";
               params["quarantined"] = "FALSE";
@@ -617,7 +279,7 @@ the fleet.">
           lim = Math.max(lim, 1);
           lim = Math.min(1000, lim);
           params["limit"] = lim;
-          // not !-- because limit could be "900"
+          // not !== because limit could be a string, e.g. "900"
           if (this.limit != lim) {
             this.set("limit", lim);
           }

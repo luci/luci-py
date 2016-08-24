@@ -1,0 +1,38 @@
+<!--
+  Copyright 2016 The LUCI Authors. All rights reserved.
+  Use of this source code is governed under the Apache License, Version 2.0
+  that can be found in the LICENSE file.
+
+  It contains the definition of the following Behaviors:
+
+    SwarmingBehaviors.CommonBehavior
+
+  To use it, include
+      behaviors: [SwarmingBehaviors.CommonBehavior]
+  in the creation of any Polymer element.
+
+  SwarmingBehaviors.CommonBehavior contains shared functions to ease
+  templating, such as _or() and _not().
+ -->
+
+<script>
+  window.SwarmingBehaviors = window.SwarmingBehaviors || {};
+  (function(){
+    // This behavior wraps up all the shared swarming functionality.
+    SwarmingBehaviors.CommonBehavior = {
+
+      _not: function(a) {
+        return !a;
+      },
+
+      _or: function() {
+        var result = false;
+        // can't use .foreach, as arguments isn't really an Array.
+        for (var i = 0; i < arguments.length; i++) {
+          result = result || arguments[i];
+        }
+        return result;
+      },
+    };
+  })();
+</script>

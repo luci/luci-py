@@ -47,7 +47,7 @@ this.swarming = this.swarming || function() {
     if (!isNaN(ns)) {
       return ns;
     }
-    return a.localeCompare(b);
+    return String(a).localeCompare(b);
   };
 
   return swarming;

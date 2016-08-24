@@ -62,7 +62,7 @@
 
 <link rel="import" href="/res/imp/bower_components/iron-ajax/iron-ajax.html">
 
-<link rel="import" href="bot-list-shared.html">
+<link rel="import" href="bot-list-shared-behavior.html">
 
 <dom-module id="bot-list-data">
   <template>
@@ -98,7 +98,9 @@
     Polymer({
       is: 'bot-list-data',
 
-      behaviors: [SwarmingBehaviors.BotListBehavior],
+      behaviors: [
+          SwarmingBehaviors.BotListBehavior,
+      ],
 
       properties: {
         // inputs
@@ -132,7 +134,7 @@
           notify: true,
         },
         primary_map: {
-          type:Object,
+          type: Object,
           computed: "_primaryMap(_dimensions)",
           notify: true,
         },
@@ -219,6 +221,7 @@
             dims.push(d.key);
           }
         });
+        dims.push("id");
         dims.sort();
         return dims;
       },
@@ -235,15 +238,15 @@
 
         var pMap = {};
         dimensions.forEach(function(d){
-          if (this.DIMENSIONS_WITH_ALIASES.indexOf(d.key) === -1) {
+          if (swarming.alias.DIMENSIONS_WITH_ALIASES.indexOf(d.key) === -1) {
             // value is an array of all seen values for the dimension d.key
             pMap[d.key] = d.value;
           } else if (d.key === "gpu") {
             var gpus = [];
             d.value.forEach(function(g){
-              var alias = this._gpuAlias(g);
+              var alias = swarming.alias.gpu(g);
               if (alias !== "unknown") {
-                gpus.push(this._applyAlias(g, alias));
+                gpus.push(swarming.alias.apply(g, alias));
               } else {
                 gpus.push(g);
               }
@@ -252,9 +255,9 @@
           } else if (d.key === "device_type") {
             var devs = [];
             d.value.forEach(function(dt){
-              var alias = this._androidAlias(dt);
+              var alias = swarming.alias.android(dt);
               if (alias !== "unknown") {
-                devs.push(this._applyAlias(dt, alias));
+                devs.push(swarming.alias.apply(dt, alias));
               } else {
                 devs.push(dt);
               }
@@ -263,7 +266,7 @@
           } else {
             console.log("Unknown alias type: ", d);
           }
-        }.bind(this));
+        });
 
         // Add some options that might not show up.
         pMap["android_devices"].push("0");

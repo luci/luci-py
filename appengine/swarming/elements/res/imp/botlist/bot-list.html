@@ -27,14 +27,14 @@
 <link rel="import" href="/res/imp/bower_components/iron-flex-layout/iron-flex-layout-classes.html">
 <link rel="import" href="/res/imp/bower_components/polymer/polymer.html">
 
-<link rel="import" href="/res/imp/common/dynamic-table.html">
+<link rel="import" href="/res/imp/common/dynamic-table-behavior.html">
 <link rel="import" href="/res/imp/common/sort-toggle.html">
 <link rel="import" href="/res/imp/common/swarming-app.html">
 <link rel="import" href="/res/imp/common/url-param.html">
 
 <link rel="import" href="bot-filters.html">
 <link rel="import" href="bot-list-data.html">
-<link rel="import" href="bot-list-shared.html">
+<link rel="import" href="bot-list-shared-behavior.html">
 <link rel="import" href="bot-list-summary.html">
 
 <dom-module id="bot-list">
@@ -234,65 +234,19 @@
     };
 
     var columnMap = {
-      android_devices: function(bot) {
-        var devs = this._attribute(bot, "android_devices", "0");
-        if (this._verbose) {
-          return devs.join(" | ") + " devices available";
-        }
-        // max() works on strings as long as they can be coerced to Number.
-        return Math.max(...devs) + " devices available";
-      },
-      device_type: function(bot) {
-        var dt = this._attribute(bot, "device_type", "none");
-        dt = dt[0];
-        var alias = this._androidAlias(dt);
-        if (alias === "unknown") {
-          return dt;
-        }
-        return this._applyAlias(dt, alias);
-      },
       disk_space: function(bot) {
         var aliased = [];
         bot.disks.forEach(function(disk){
           var alias = sk.human.bytes(disk.mb, swarming.MB);
-          aliased.push(this._applyAlias(disk.mb, disk.id + " "+ alias));
+          aliased.push(swarming.alias.apply(disk.mb, disk.id + " "+ alias));
         }.bind(this));
         if (this._verbose) {
           return aliased.join(" | ");
         }
         return aliased[0];
       },
-      gpu: function(bot){
-        var gpus = this._attribute(bot, "gpu", "none")
-        var verbose = []
-        var named = [];
-        // non-verbose mode has only the top level GPU info "e.g. NVidia"
-        // which is found by looking for gpu ids w/o a colon.
-        gpus.forEach(function(g){
-          var alias = this._gpuAlias(g);
-          if (alias === "unknown") {
-            verbose.push(g);
-            if (g.indexOf(":") === -1) {
-              named.push(g);
-            }
-            return;
-          }
-          verbose.push(this._applyAlias(g, alias));
-          if (g.indexOf(":") === -1) {
-            named.push(this._applyAlias(g, alias));
-          }
-        }.bind(this))
-        if (this._verbose) {
-          return verbose.join(" | ");
-        }
-        return named.join(" | ");
-      },
       id: function(bot) {
         return bot.bot_id;
-      },
-      pool: function(bot) {
-        var pool = this._attribute(bot, "pool");
-        return pool.join(" | ");
       },
       status: function(bot) {
         // If a bot is both dead and quarantined, show the deadness over the
@@ -302,7 +256,13 @@
               " ago";
         }
         if (bot.quarantined) {
-          return "Quarantined: " + this._attribute(bot, "quarantined");
+          var msg = this._state(bot, "quarantined")[0];
+          // Sometimes, the quarantined message is actually in "error".  This
+          // happens when the bot code has thrown an exception.
+          if (msg === "unknown" || msg === "true" || msg === true) {
+            msg = this._attribute(bot, "error");
+          }
+          return "Quarantined: " + msg;
         }
         return "Alive";
       },
@@ -315,7 +275,7 @@
       android_devices: function(device) {
         var str = this._androidAliasDevice(device);
         if (device.okay) {
-          str = this._applyAlias(this._deviceType(device), str);
+          str = swarming.alias.apply(this._deviceType(device), str);
         }
         str += " S/N:";
         str += device.serial;
@@ -352,8 +312,13 @@
 
     Polymer({
       is: 'bot-list',
-      behaviors: [SwarmingBehaviors.BotListBehavior,
-                  SwarmingBehaviors.DynamicTableBehavior],
+
+      // The order behaviors are applied in matters - later ones overwrite
+      // attributes of earlier ones
+      behaviors: [
+          SwarmingBehaviors.BotListBehavior,
+          SwarmingBehaviors.DynamicTableBehavior,
+      ],
 
       properties: {
         client_id: {
@@ -363,7 +328,13 @@
         // For dynamic table.
         _columnMap: {
           type: Object,
-          value: columnMap,
+          value: function() {
+            var base = this._commonColumns();
+            for (var attr in columnMap) {
+              base[attr] = columnMap[attr];
+            }
+            return base;
+          },
         },
         _headerMap: {
           type: Object,
@@ -400,7 +371,7 @@
         if (device.notReady) {
           return UNAUTHENTICATED.toUpperCase();
         }
-        return this._androidAlias(this._deviceType(device));
+        return swarming.alias.android(this._deviceType(device));
       },
 
       _deviceColumn: function(col, device) {

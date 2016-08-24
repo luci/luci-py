@@ -14634,28 +14634,6 @@ You can bind to `isAuthorized` property to monitor authorization state.
       }
   </style>
 </dom-module>
-
-<script>
-  window.SwarmingBehaviors = window.SwarmingBehaviors || {};
-  (function(){
-    // This behavior wraps up all the shared swarming functionality.
-    SwarmingBehaviors.SwarmingBehavior = {
-
-      _not: function(a) {
-        return !a;
-      },
-
-      _or: function() {
-        var result = false;
-        // can't use .foreach, as arguments isn't really an Array.
-        for (var i = 0; i < arguments.length; i++) {
-          result = result || arguments[i];
-        }
-        return result;
-      },
-    };
-  })();
-</script>
 <dom-module id="swarming-index" assetpath="/res/imp/index/">
   <template>
     <style include="swarming-app-style">
@@ -14699,7 +14677,28 @@ You can bind to `isAuthorized` property to monitor authorization state.
 
     });
   </script>
-</dom-module><dom-module id="dynamic-table-style" assetpath="/res/imp/common/">
+</dom-module><script>
+  window.SwarmingBehaviors = window.SwarmingBehaviors || {};
+  (function(){
+    // This behavior wraps up all the shared swarming functionality.
+    SwarmingBehaviors.CommonBehavior = {
+
+      _not: function(a) {
+        return !a;
+      },
+
+      _or: function() {
+        var result = false;
+        // can't use .foreach, as arguments isn't really an Array.
+        for (var i = 0; i < arguments.length; i++) {
+          result = result || arguments[i];
+        }
+        return result;
+      },
+    };
+  })();
+</script>
+<dom-module id="dynamic-table-style" assetpath="/res/imp/common/">
   <template>
     <style>
       table {
@@ -14724,10 +14723,9 @@ You can bind to `isAuthorized` property to monitor authorization state.
 </dom-module>
 
 <script>
-  window.SwarmingBehaviors = window.SwarmingBehaviors || {};
   (function(){
     // This behavior wraps up all the shared swarming functionality.
-    SwarmingBehaviors.DynamicTableBehavior = {
+    SwarmingBehaviors.DynamicTableBehavior = [SwarmingBehaviors.CommonBehavior, {
 
       properties: {
 
@@ -14855,7 +14853,61 @@ You can bind to `isAuthorized` property to monitor authorization state.
         }.bind(this)).sort();
       },
 
-    };
+      // Common columns shared between tasklist and botlist
+      _commonColumns: function() {
+        // return a fresh object so all elements have their own copy
+        return {
+          android_devices: function(bot) {
+            var devs = this._attribute(bot, "android_devices", "0");
+            if (this._verbose) {
+              return devs.join(" | ") + " devices available";
+            }
+            // max() works on strings as long as they can be coerced to Number.
+            return Math.max(...devs) + " devices available";
+          },
+          device_type: function(bot) {
+            var dt = this._attribute(bot, "device_type", "none");
+            dt = dt[0];
+            var alias = swarming.alias.android(dt);
+            if (alias === "unknown") {
+              return dt;
+            }
+            return swarming.alias.apply(dt, alias);
+          },
+          gpu: function(bot){
+            var gpus = this._attribute(bot, "gpu", "none");
+            var verbose = []
+            var named = [];
+            // non-verbose mode has only the top level GPU info "e.g. NVidia"
+            // which is found by looking for gpu ids w/o a colon.
+            gpus.forEach(function(g){
+              var alias = swarming.alias.gpu(g);
+              if (alias === "unknown") {
+                verbose.push(g);
+                if (g.indexOf(":") === -1) {
+                  named.push(g);
+                }
+                return;
+              }
+              verbose.push(swarming.alias.apply(g, alias));
+              if (g.indexOf(":") === -1) {
+                named.push(swarming.alias.apply(g, alias));
+              }
+            }.bind(this))
+            if (this._verbose || !named.length) {
+              return verbose.join(" | ");
+            }
+            return named.join(" | ");
+          },
+          pool: function(bot) {
+            var pool = this._attribute(bot, "pool");
+            return pool.join(" | ");
+          },
+        };
+      },
+
+
+    }];
   })();
 </script>
 
@@ -22866,175 +22918,9 @@ is separate from validation, and `allowed-pattern` does not affect how the input
     ]
   });
 </script>
-<script>
-  (function(){
-    var ANDROID_ALIASES = {
-      "bullhead": "Nexus 5X",
-      "flo": "Nexus 7 (2013)",
-      "flounder": "Nexus 9",
-      "foster": "NVIDIA Shield",
-      "fugu": "Nexus Player",
-      "grouper": "Nexus 7 (2012)",
-      "hammerhead": "Nexus 5",
-      "m0": "Galaxy S3",
-      "mako": "Nexus 4",
-      "manta": "Nexus 10",
-      "shamu": "Nexus 6",
-      "sprout": "Android One",
-    };
-    // Taken from http://developer.android.com/reference/android/os/BatteryManager.html
-    var BATTERY_HEALTH_UNKNOWN = 1;
-    var BATTERY_HEALTH_GOOD = 2;
-    var BATTERY_STATUS_CHARGING = 2;
-
-    var UNAUTHENTICATED = "unauthenticated";
-    var AVAILABLE = "available";
-    var UNKNOWN = "unknown";
-
-    var GPU_ALIASES = {
-      "1002": "AMD",
-      "1002:6779": "AMD Radeon HD 6450/7450/8450",
-      "1002:6821": "AMD Radeon HD 8870M",
-      "1002:683d": "AMD Radeon HD 7770/8760",
-      "1002:9830": "AMD Radeon HD 8400",
-      "102b":      "Matrox",
-      "102b:0522": "Matrox MGA G200e",
-      "102b:0532": "Matrox MGA G200eW",
-      "102b:0534": "Matrox G200eR2",
-      "10de":      "NVIDIA",
-      "10de:08a4": "NVIDIA GeForce 320M",
-      "10de:08aa": "NVIDIA GeForce 320M",
-      "10de:0fe9": "NVIDIA GeForce GT 750M Mac Edition",
-      "10de:104a": "NVIDIA GeForce GT 610",
-      "10de:11c0": "NVIDIA GeForce GTX 660",
-      "10de:1244": "NVIDIA GeForce GTX 550 Ti",
-      "10de:1401": "NVIDIA GeForce GTX 960",
-      "8086":      "Intel",
-      "8086:0412": "Intel Haswell Integrated",
-      "8086:041a": "Intel Xeon Integrated",
-      "8086:0a2e": "Intel Haswell Integrated",
-      "8086:0d26": "Intel Crystal Well Integrated",
-      "8086:22b1": "Intel Braswell Integrated",
-    }
-
-    // For consistency, all aliases are displayed like:
-    // Nexus 5X (bullhead)
-    // This regex matches a string like "ALIAS (ORIG)", with ORIG as group 1.
-    var ALIAS_REGEXP = /.+ \((.*)\)/;
-
-    // This behavior wraps up all the shared bot-list functionality by
-    // extending SwarmingBehaviors.SwarmingBehavior
-    SwarmingBehaviors.BotListBehavior = [SwarmingBehaviors.SwarmingBehavior, {
-
-      properties: {
-        DIMENSIONS_WITH_ALIASES: {
-          type: Array,
-          value: function(){
-            return ["device_type", "gpu"];
-          },
-        },
-        BOT_PROPERTIES: {
-          type: Array,
-          value: function() {
-            // TODO(kjlubick): Add more of these things from state, as they
-            // needed/useful/requested.
-            return ["disk_space", "task", "status"];
-          }
-        },
-      },
-
-      _androidAlias: function(dt) {
-        return ANDROID_ALIASES[dt] || UNKNOWN;
-      },
-
-      // _applyAlias is the consistent way to modify a string to show its alias.
-      _applyAlias: function(orig, alias) {
-        return alias +" ("+orig+")";
-      },
-
-      // _attribute looks first in dimension and then in state for the
-      // specified attribute. This will always return an array. If there is
-      // no matching attribute, ["unknown"] will be returned.
-      _attribute: function(bot, attr, none) {
-        none = none || UNKNOWN;
-        return this._dimension(bot, attr) || this._state(bot, attr) || [none];
-      },
-
-      _devices: function(bot) {
-        var devices = [];
-        var d = (bot && bot.state && bot.state.devices) || {};
-        // state.devices is like {Serial:Object}, so we need to keep the serial
-        for (key in d) {
-          var o = d[key];
-          o.serial = key;
-          o.okay = (o.state === AVAILABLE);
-          // It is easier to assume all devices on a bot are of the same type
-          // than to pick through the (incomplete) device state and find it.
-          o.device_type = this._attribute(bot, "device_type")[0];
-          devices.push(o);
-        }
-        return devices;
-      },
-
-      // _deviceType returns the codename of a given Android device.
-      _deviceType: function(device) {
-        return device.device_type.toLowerCase();
-      },
-
-      // _dimension returns the given dimension of a bot. If it is defined, it
-      // is an array of strings.
-      _dimension: function(bot, dim) {
-        if (!bot || !bot.dimensions || !dim) {
-          return undefined;
-        }
-        for (var i = 0; i < bot.dimensions.length; i++) {
-          if (bot.dimensions[i].key === dim) {
-            return bot.dimensions[i].value;
-          }
-        }
-        return undefined;
-      },
-
-      _gpuAlias: function(gpu) {
-        return GPU_ALIASES[gpu] || UNKNOWN;
-      },
-
-      // _state returns the requested attribute from a bot's state.
-      // For consistency with _dimension, if the attribute is not an array,
-      // it is put as the only element in an array.
-      _state: function(bot, attr) {
-        if (!bot || !bot.state || !bot.state[attr]) {
-          return undefined
-        }
-        var state = bot.state[attr];
-        if (Array.isArray(state)) {
-          return state;
-        }
-        return [state];
-      },
-
-      _taskId: function(bot) {
-        if (bot && bot.task_id) {
-          return bot.task_id;
-        }
-        return "idle";
-      },
-
-      // _unalias will return the base dimension/state with its alias removed
-      // if it had one.  This is handy for sorting and filtering.
-      _unalias: function(str) {
-        var match = ALIAS_REGEXP.exec(str);
-        if (match) {
-          return match[1];
-        }
-        return str;
-      },
-    }];
-  })()
-</script>
-<dom-module id="bot-filters" assetpath="/res/imp/botlist/">
+<dom-module id="query-column-filter-style" assetpath="/res/imp/common/">
   <template>
-    <style is="custom-style" include="iron-flex iron-flex-alignment iron-positioning">
+    <style>
       :host {
         display: block;
         font-family: sans-serif;
@@ -23117,124 +23003,11 @@ is separate from validation, and `allowed-pattern` does not affect how the input
       }
     </style>
 
-    <url-param name="filters" value="{{_filters}}" default_values="[]" multi="">
-    </url-param>
-    <url-param name="columns" value="{{columns}}" default_values="[&quot;id&quot;,&quot;os&quot;,&quot;task&quot;,&quot;status&quot;]" multi="">
-    </url-param>
-    <url-param name="query" value="{{_query}}">
-    </url-param>
-    <url-param name="verbose" value="{{verbose}}">
-    </url-param>
-    <url-param name="limit" default_value="200" value="{{limit}}">
-    </url-param>
-
-    <div class="container horizontal layout">
-    
-
-      <div class="narrow-down-selector">
-        <div>
-          <paper-input id="filter" label="Search columns and filters" placeholder="gpu nvidia" value="{{_query}}">
-          </paper-input>
-        </div>
-
-        <div class="selector side-by-side" title="This shows all bot dimension names and other interesting bot properties. Mark the check box to add as a column. Select the row to see filter options.">
-          <iron-selector attr-for-selected="label" selected="{{_primarySelected}}">
-            <template is="dom-repeat" items="[[_primaryItems]]" as="item">
-              <div class="selectable item horizontal layout" label="[[item]]">
-                
-                <span>[[_beforeBold(item,_query)]]<span class="bold">[[_bold(item,_query)]]</span>[[_afterBold(item,_query)]]</span>
-                <span class="flex"></span>
-                <paper-checkbox noink="" disabled$="[[_cantToggleColumn(item)]]" checked="[[_columnState(item,columns.*)]]" on-change="_toggleColumn">
-                </paper-checkbox>
-              </div>
-            </template>
-          </iron-selector>
-        </div>
-
-        <div class="selector side-by-side" title="These are all options (if any) that the bot list can be filtered on.">
-          <template is="dom-repeat" id="secondaryList" items="[[_secondaryItems]]" as="item">
-            <div class="item horizontal layout" label="[[item]]">
-              
-              <span>[[_beforeBold(item,_query)]]<span class="bold">[[_bold(item,_query)]]</span>[[_afterBold(item,_query)]]</span>
-              <span class="flex"></span>
-              <iron-icon class="icons" icon="icons:arrow-forward" hidden="[[_cantAddFilter(_primarySelected,item,_filters.*)]]" on-tap="_addFilter">
-              </iron-icon>
-            </div>
-          </template>
-        </div>
-
-        <div class="selector side-by-side" title="These filters are AND'd together and applied to all bots in
-the fleet.">
-          <template is="dom-repeat" items="[[_filters]]" as="fil">
-            <div class="item horizontal layout" label="[[fil]]">
-              <span>[[fil]]</span>
-              <span class="flex"></span>
-              <iron-icon class="icons" icon="icons:remove-circle-outline" hidden="[[_cantRemoveFilter(fil,_filters.*)]]" on-tap="_removeFilter">
-              </iron-icon>
-            </div>
-          </template>
-        </div>
-
-        <div class="side-by-side">
-        <paper-checkbox checked="{{verbose}}">Verbose Entries</paper-checkbox>
-          <paper-input id="limit" label="Limit Results" auto-validate="" min="0" max="1000" pattern="[0-9]+" value="{{limit}}">
-          </paper-input>
-        </div>
-      </div>
-
-    </div>
-
   </template>
-  <script>
-  (function(){
-    var FILTER_SEP = ":";
-    // filterMap is a map of primary -> function.  The function returns a
-    // boolean "does the bot (first arg) match the second argument".  These
-    // functions will have "this" be the botlist, and will have access to all
-    // functions defined in bot-list and bot-list-shared.  If there is not
-    // one provided, a default will be used, see _makeFilter().
-    var filterMap = {
-      android_devices: function(bot, num) {
-        var o = this._attribute(bot, "android_devices", "0");
-        return o.indexOf(num) !== -1;
-      },
-      device_os: function(bot, os) {
-        var o = this._attribute(bot, "device_os", "none");
-        return o.indexOf(os) !== -1;
-      },
-      device_type: function(bot, dt) {
-        var o = this._attribute(bot, "device_type", "none");
-        return o.indexOf(this._unalias(dt)) !== -1;
-      },
-      disk_space: function(bot, space) {
-        return true;
-      },
-      gpu: function(bot, gpu) {
-        var o = this._attribute(bot, "gpu", "none");
-        return o.indexOf(this._unalias(gpu)) !== -1;
-      },
-      id: function(bot, id) {
-        return true;
-      },
-      status: function(bot, status) {
-        if (status === "quarantined") {
-          return bot.quarantined;
-        } else if (status === "dead") {
-          return bot.is_dead;
-        } else {
-          // Status must be "alive".
-          return !bot.quarantined && !bot.is_dead;
-        }
-      },
-      task: function(bot, task) {
-        if (task === "idle") {
-          return this._taskId(bot) === "idle";
-        }
-        // Task must be "busy".
-        return this._taskId(bot) !== "idle";
-      }
-    };
+</dom-module>
 
+<script>
+  (function(){
     // Given a space separated list of queries, matchPartCaseInsensitive
     // returns an object of any query that matches a part of str, case
     // insensitive.  The object has an idx (index) and the part that matched.
@@ -23267,10 +23040,8 @@ the fleet.">
       };
     };
 
-    Polymer({
-      is: "bot-filters",
-
-      behaviors: [SwarmingBehaviors.BotListBehavior],
+    // Extend the Aliases behavior
+    SwarmingBehaviors.QueryColumnFilter = [SwarmingBehaviors.CommonBehavior, {
 
       properties: {
         // input
@@ -23283,28 +23054,18 @@ the fleet.">
         dimensions: {
           type: Array,
         },
-
         // output
-        columns: {
-          type: Array,
-          notify: true,
-        },
         filter: {
           type: Function,
           computed: "_makeFilter(_filters.*)",
           notify: true,
         },
-        query_params: {
-          type: Object,
-          computed: "_extractQueryParams(dimensions.*,_filters.*, limit)",
-          notify: true,
-        },
-        verbose: {
-          type: Boolean,
-          notify: true,
-        },
 
         // private
+        FILTER_SEP: {
+          type:String,
+          value: ":",
+        },
         _filters: {
           type:Array,
         },
@@ -23327,8 +23088,8 @@ the fleet.">
           type: Array,
           computed: "_secondary(_primarySelected, _query, primary_map)",
         },
-
       },
+
 
       _addFilter: function(e) {
         // e.model.foo is a way to get access to the "foo" inside a dom-repeat
@@ -23338,7 +23099,7 @@ the fleet.">
         if (this._cantAddFilter(this._primarySelected, filterItem)) {
           return;
         }
-        var filter = this._primarySelected + FILTER_SEP + filterItem;
+        var filter = this._primarySelected + this.FILTER_SEP + filterItem;
         this.push("_filters", filter);
       },
 
@@ -23359,41 +23120,12 @@ the fleet.">
         if (!primarySelected || !filterItem) {
           return true;
         }
-        var filter = primarySelected + FILTER_SEP + filterItem;
+        var filter = primarySelected + this.FILTER_SEP + filterItem;
         return this._filters.indexOf(filter) !== -1;
       },
 
       _cantRemoveFilter: function(filter) {
         return !filter || this._filters.indexOf(filter) === -1;
-      },
-
-      _toggleColumn: function(e) {
-        var col = e.model.item;
-
-        if (this._cantToggleColumn(col)) {
-          return;
-        }
-        if (this._columnState(col)) {
-          var idx = this.columns.indexOf(col);
-          if (idx !== -1) {
-            this.splice("columns", idx, 1);
-          }
-          return;
-        }
-        this.push("columns", col);
-      },
-
-      _cantToggleColumn: function(col) {
-        // Don't allow the id column to be removed, as the bot list is basically
-        // meaningless without it.
-        return !col || col === "id" ;
-      },
-
-      _columnState: function(col) {
-        if (!col) {
-          return false;
-        }
-        return this.columns.indexOf(col) !== -1;
       },
 
       _makeFilter: function() {
@@ -23404,13 +23136,14 @@ the fleet.">
         // Since they will be or'd together, order doesn't matter.
         var filterGroups = {};
         this._filters.forEach(function(filterString){
-          var idx = filterString.indexOf(FILTER_SEP);
+          var idx = filterString.indexOf(this.FILTER_SEP);
           var primary = filterString.slice(0, idx);
-          var param = filterString.slice(idx + FILTER_SEP.length);
+          var param = filterString.slice(idx + this.FILTER_SEP.length);
           var arr = filterGroups[primary] || [];
           arr.push(param);
           filterGroups[primary] = arr;
-        });
+        }.bind(this));
+        var filterMap = this._filterMap || {};
         return function(bot){
           var retVal = true;
           // Look up all the primary keys we are filter by, then look up how
@@ -23434,6 +23167,35 @@ the fleet.">
           return retVal;
         }
       },
+
+      _toggleColumn: function(e) {
+        var col = e.model.item;
+
+        if (this._cantToggleColumn(col)) {
+          return;
+        }
+        if (this._columnState(col)) {
+          var idx = this.columns.indexOf(col);
+          if (idx !== -1) {
+            this.splice("columns", idx, 1);
+          }
+          return;
+        }
+        this.push("columns", col);
+      },
+
+      _cantToggleColumn: function(col) {
+        // Clients can override this
+        return false;
+      },
+
+      _columnState: function(col) {
+        if (!col) {
+          return false;
+        }
+        return this.columns.indexOf(col) !== -1;
+      },
+
 
       _primary: function(query, primary_map, primary_arr) {
         // If the user has typed in a query, only show those primary keys that
@@ -23520,17 +23282,283 @@ the fleet.">
         return item.substring(match.idx + match.part.length);
       },
 
+      // Common filters shared between tasklist and botlist
+      _commonFilters: function() {
+        // return a fresh object so all elements have their own copy
+        return {
+          android_devices: function(bot, num) {
+            var o = this._attribute(bot, "android_devices", "0");
+            return o.indexOf(num) !== -1;
+          },
+          device_os: function(bot, os) {
+            var o = this._attribute(bot, "device_os", "none");
+            return o.indexOf(os) !== -1;
+          },
+          device_type: function(bot, dt) {
+            var o = this._attribute(bot, "device_type", "none");
+            return o.indexOf(swarming.alias.unapply(dt)) !== -1;
+          },
+          gpu: function(bot, gpu) {
+            var o = this._attribute(bot, "gpu", "none");
+            return o.indexOf(swarming.alias.unapply(gpu)) !== -1;
+          },
+        };
+      },
+
+    }];
+  })();
+</script>
+<script>
+  (function(){
+    // Taken from http://developer.android.com/reference/android/os/BatteryManager.html
+    var BATTERY_HEALTH_UNKNOWN = 1;
+    var BATTERY_HEALTH_GOOD = 2;
+    var BATTERY_STATUS_CHARGING = 2;
+
+    var UNAUTHENTICATED = "unauthenticated";
+    var AVAILABLE = "available";
+    var UNKNOWN = "unknown";
+
+    // This behavior wraps up all the shared bot-list functionality by
+    // extending SwarmingBehaviors.CommonBehavior
+    SwarmingBehaviors.BotListBehavior = [SwarmingBehaviors.CommonBehavior, {
+
+      properties: {
+        BOT_PROPERTIES: {
+          type: Array,
+          value: function() {
+            // TODO(kjlubick): Add more of these things from state, as they
+            // needed/useful/requested.
+            return ["disk_space", "task", "status"];
+          }
+        },
+      },
+
+      // _attribute looks first in dimension and then in state for the
+      // specified attribute. This will always return an array. If there is
+      // no matching attribute, ["unknown"] will be returned.
+      _attribute: function(bot, attr, none) {
+        none = none || UNKNOWN;
+        return this._dimension(bot, attr) || this._state(bot, attr) || [none];
+      },
+
+      _devices: function(bot) {
+        var devices = [];
+        var d = (bot && bot.state && bot.state.devices) || {};
+        // state.devices is like {Serial:Object}, so we need to keep the serial
+        for (key in d) {
+          var o = d[key];
+          o.serial = key;
+          o.okay = (o.state === AVAILABLE);
+          // It is easier to assume all devices on a bot are of the same type
+          // than to pick through the (incomplete) device state and find it.
+          o.device_type = this._attribute(bot, "device_type")[0];
+          devices.push(o);
+        }
+        return devices;
+      },
+
+      // _deviceType returns the codename of a given Android device.
+      _deviceType: function(device) {
+        return device.device_type.toLowerCase();
+      },
+
+      // _dimension returns the given dimension of a bot. If it is defined, it
+      // is an array of strings.
+      _dimension: function(bot, dim) {
+        if (!bot || !bot.dimensions || !dim) {
+          return undefined;
+        }
+        for (var i = 0; i < bot.dimensions.length; i++) {
+          if (bot.dimensions[i].key === dim) {
+            return bot.dimensions[i].value;
+          }
+        }
+        return undefined;
+      },
+
+      // _state returns the requested attribute from a bot's state.
+      // For consistency with _dimension, if the attribute is not an array,
+      // it is put as the only element in an array.
+      _state: function(bot, attr) {
+        if (!bot || !bot.state || !bot.state[attr]) {
+          return undefined
+        }
+        var state = bot.state[attr];
+        if (Array.isArray(state)) {
+          return state;
+        }
+        return [state];
+      },
+
+      _taskId: function(bot) {
+        if (bot && bot.task_id) {
+          return bot.task_id;
+        }
+        return "idle";
+      },
+
+    }];
+  })()
+</script>
+<dom-module id="bot-filters" assetpath="/res/imp/botlist/">
+  <template>
+    <style is="custom-style" include="iron-flex iron-flex-alignment iron-positioning query-column-filter-style">
+
+    </style>
+
+    <url-param name="filters" value="{{_filters}}" default_values="[]" multi="">
+    </url-param>
+    <url-param name="columns" value="{{columns}}" default_values="[&quot;id&quot;,&quot;os&quot;,&quot;task&quot;,&quot;status&quot;]" multi="">
+    </url-param>
+    <url-param name="query" value="{{_query}}" default_value="">
+    </url-param>
+    <url-param name="verbose" value="{{verbose}}">
+    </url-param>
+    <url-param name="limit" default_value="200" value="{{limit}}">
+    </url-param>
+
+    <div class="container horizontal layout">
+    
+
+      <div class="narrow-down-selector">
+        <div>
+          <paper-input id="filter" label="Search columns and filters" placeholder="gpu nvidia" value="{{_query}}">
+          </paper-input>
+        </div>
+
+        <div class="selector side-by-side" title="This shows all bot dimension names and other interesting bot properties. Mark the check box to add as a column. Select the row to see filter options.">
+          <iron-selector attr-for-selected="label" selected="{{_primarySelected}}">
+            <template is="dom-repeat" items="[[_primaryItems]]" as="item">
+              <div class="selectable item horizontal layout" label="[[item]]">
+                
+                <span>[[_beforeBold(item,_query)]]<span class="bold">[[_bold(item,_query)]]</span>[[_afterBold(item,_query)]]</span>
+                <span class="flex"></span>
+                <paper-checkbox noink="" disabled$="[[_cantToggleColumn(item)]]" checked="[[_columnState(item,columns.*)]]" on-change="_toggleColumn">
+                </paper-checkbox>
+              </div>
+            </template>
+          </iron-selector>
+        </div>
+
+        <div class="selector side-by-side" title="These are all options (if any) that the bot list can be filtered on.">
+          <template is="dom-repeat" id="secondaryList" items="[[_secondaryItems]]" as="item">
+            <div class="item horizontal layout" label="[[item]]">
+              
+              <span>[[_beforeBold(item,_query)]]<span class="bold">[[_bold(item,_query)]]</span>[[_afterBold(item,_query)]]</span>
+              <span class="flex"></span>
+              <iron-icon class="icons" icon="icons:arrow-forward" hidden="[[_cantAddFilter(_primarySelected,item,_filters.*)]]" on-tap="_addFilter">
+              </iron-icon>
+            </div>
+          </template>
+        </div>
+
+        <div class="selector side-by-side" title="These filters are AND'd together and applied to all bots in
+the fleet.">
+          <template is="dom-repeat" items="[[_filters]]" as="fil">
+            <div class="item horizontal layout" label="[[fil]]">
+              <span>[[fil]]</span>
+              <span class="flex"></span>
+              <iron-icon class="icons" icon="icons:remove-circle-outline" hidden="[[_cantRemoveFilter(fil,_filters.*)]]" on-tap="_removeFilter">
+              </iron-icon>
+            </div>
+          </template>
+        </div>
+
+        <div class="side-by-side">
+        <paper-checkbox checked="{{verbose}}">Verbose Entries</paper-checkbox>
+          <paper-input id="limit" label="Limit Results" auto-validate="" min="0" max="1000" pattern="[0-9]+" value="{{limit}}">
+          </paper-input>
+        </div>
+      </div>
+
+    </div>
+
+  </template>
+  <script>
+  (function(){
+    // See query-column-filter for more documentation on these properties.
+    var filterMap = {
+      disk_space: function(bot, space) {
+        return true;
+      },
+      id: function(bot, id) {
+        return true;
+      },
+      status: function(bot, status) {
+        if (status === "quarantined") {
+          return bot.quarantined;
+        } else if (status === "dead") {
+          return bot.is_dead;
+        } else {
+          // Status must be "alive".
+          return !bot.quarantined && !bot.is_dead;
+        }
+      },
+      task: function(bot, task) {
+        if (task === "idle") {
+          return this._taskId(bot) === "idle";
+        }
+        // Task must be "busy".
+        return this._taskId(bot) !== "idle";
+      }
+    };
+
+    Polymer({
+      is: "bot-filters",
+
+      behaviors: [
+        SwarmingBehaviors.BotListBehavior,
+        SwarmingBehaviors.QueryColumnFilter,
+      ],
+
+      properties: {
+        // url-param doesn't like columns to be defined in query_column-filter,
+        // so we define it here.
+        columns: {
+          type: Array,
+          notify: true,
+        },
+        query_params: {
+          type: Object,
+          computed: "_extractQueryParams(dimensions.*,_filters.*, limit)",
+          notify: true,
+        },
+        verbose: {
+          type: Boolean,
+          notify: true,
+        },
+
+        // for QueryColumnFilter
+        _filterMap: {
+          type: Object,
+          value: function() {
+            var base = this._commonFilters();
+            for (var attr in filterMap) {
+              base[attr] = filterMap[attr];
+            }
+            return base;
+          },
+        }
+      },
+
+      _cantToggleColumn: function(col) {
+        // Don't allow the id column to be removed, as the bot list is basically
+        // meaningless without it.
+        return !col || col === "id" ;
+      },
+
       _extractQueryParams: function() {
         var params = {};
         var dims = [];
         this._filters.forEach(function(f) {
-          var split = f.split(FILTER_SEP, 1)
+          var split = f.split(this.FILTER_SEP, 1)
           var col = split[0];
           if (this.dimensions.indexOf(col) !== -1) {
-            var rest = f.substring(col.length + FILTER_SEP.length);
-            dims.push(col + FILTER_SEP + this._unalias(rest))
+            var rest = f.substring(col.length + this.FILTER_SEP.length);
+            dims.push(col + this.FILTER_SEP + swarming.alias.unapply(rest))
           } else if (col === "status") {
-            var rest = f.substring(col.length + FILTER_SEP.length);
+            var rest = f.substring(col.length + this.FILTER_SEP.length);
             if (rest === "alive") {
               params["is_dead"] = "FALSE";
               params["quarantined"] = "FALSE";
@@ -23548,7 +23576,7 @@ the fleet.">
           lim = Math.max(lim, 1);
           lim = Math.min(1000, lim);
           params["limit"] = lim;
-          // not !-- because limit could be "900"
+          // not !== because limit could be a string, e.g. "900"
           if (this.limit != lim) {
             this.set("limit", lim);
           }
@@ -23577,7 +23605,9 @@ the fleet.">
     Polymer({
       is: 'bot-list-data',
 
-      behaviors: [SwarmingBehaviors.BotListBehavior],
+      behaviors: [
+          SwarmingBehaviors.BotListBehavior,
+      ],
 
       properties: {
         // inputs
@@ -23611,7 +23641,7 @@ the fleet.">
           notify: true,
         },
         primary_map: {
-          type:Object,
+          type: Object,
           computed: "_primaryMap(_dimensions)",
           notify: true,
         },
@@ -23698,6 +23728,7 @@ the fleet.">
             dims.push(d.key);
           }
         });
+        dims.push("id");
         dims.sort();
         return dims;
       },
@@ -23714,15 +23745,15 @@ the fleet.">
 
         var pMap = {};
         dimensions.forEach(function(d){
-          if (this.DIMENSIONS_WITH_ALIASES.indexOf(d.key) === -1) {
+          if (swarming.alias.DIMENSIONS_WITH_ALIASES.indexOf(d.key) === -1) {
             // value is an array of all seen values for the dimension d.key
             pMap[d.key] = d.value;
           } else if (d.key === "gpu") {
             var gpus = [];
             d.value.forEach(function(g){
-              var alias = this._gpuAlias(g);
+              var alias = swarming.alias.gpu(g);
               if (alias !== "unknown") {
-                gpus.push(this._applyAlias(g, alias));
+                gpus.push(swarming.alias.apply(g, alias));
               } else {
                 gpus.push(g);
               }
@@ -23731,9 +23762,9 @@ the fleet.">
           } else if (d.key === "device_type") {
             var devs = [];
             d.value.forEach(function(dt){
-              var alias = this._androidAlias(dt);
+              var alias = swarming.alias.android(dt);
               if (alias !== "unknown") {
-                devs.push(this._applyAlias(dt, alias));
+                devs.push(swarming.alias.apply(dt, alias));
               } else {
                 devs.push(dt);
               }
@@ -23742,7 +23773,7 @@ the fleet.">
           } else {
             console.log("Unknown alias type: ", d);
           }
-        }.bind(this));
+        });
 
         // Add some options that might not show up.
         pMap["android_devices"].push("0");
@@ -24102,65 +24133,19 @@ the fleet.">
     };
 
     var columnMap = {
-      android_devices: function(bot) {
-        var devs = this._attribute(bot, "android_devices", "0");
-        if (this._verbose) {
-          return devs.join(" | ") + " devices available";
-        }
-        // max() works on strings as long as they can be coerced to Number.
-        return Math.max(...devs) + " devices available";
-      },
-      device_type: function(bot) {
-        var dt = this._attribute(bot, "device_type", "none");
-        dt = dt[0];
-        var alias = this._androidAlias(dt);
-        if (alias === "unknown") {
-          return dt;
-        }
-        return this._applyAlias(dt, alias);
-      },
       disk_space: function(bot) {
         var aliased = [];
         bot.disks.forEach(function(disk){
           var alias = sk.human.bytes(disk.mb, swarming.MB);
-          aliased.push(this._applyAlias(disk.mb, disk.id + " "+ alias));
+          aliased.push(swarming.alias.apply(disk.mb, disk.id + " "+ alias));
         }.bind(this));
         if (this._verbose) {
           return aliased.join(" | ");
         }
         return aliased[0];
       },
-      gpu: function(bot){
-        var gpus = this._attribute(bot, "gpu", "none")
-        var verbose = []
-        var named = [];
-        // non-verbose mode has only the top level GPU info "e.g. NVidia"
-        // which is found by looking for gpu ids w/o a colon.
-        gpus.forEach(function(g){
-          var alias = this._gpuAlias(g);
-          if (alias === "unknown") {
-            verbose.push(g);
-            if (g.indexOf(":") === -1) {
-              named.push(g);
-            }
-            return;
-          }
-          verbose.push(this._applyAlias(g, alias));
-          if (g.indexOf(":") === -1) {
-            named.push(this._applyAlias(g, alias));
-          }
-        }.bind(this))
-        if (this._verbose) {
-          return verbose.join(" | ");
-        }
-        return named.join(" | ");
-      },
       id: function(bot) {
         return bot.bot_id;
-      },
-      pool: function(bot) {
-        var pool = this._attribute(bot, "pool");
-        return pool.join(" | ");
       },
       status: function(bot) {
         // If a bot is both dead and quarantined, show the deadness over the
@@ -24170,7 +24155,13 @@ the fleet.">
               " ago";
         }
         if (bot.quarantined) {
-          return "Quarantined: " + this._attribute(bot, "quarantined");
+          var msg = this._state(bot, "quarantined")[0];
+          // Sometimes, the quarantined message is actually in "error".  This
+          // happens when the bot code has thrown an exception.
+          if (msg === "unknown" || msg === "true" || msg === true) {
+            msg = this._attribute(bot, "error");
+          }
+          return "Quarantined: " + msg;
         }
         return "Alive";
       },
@@ -24183,7 +24174,7 @@ the fleet.">
       android_devices: function(device) {
         var str = this._androidAliasDevice(device);
         if (device.okay) {
-          str = this._applyAlias(this._deviceType(device), str);
+          str = swarming.alias.apply(this._deviceType(device), str);
         }
         str += " S/N:";
         str += device.serial;
@@ -24220,8 +24211,13 @@ the fleet.">
 
     Polymer({
       is: 'bot-list',
-      behaviors: [SwarmingBehaviors.BotListBehavior,
-                  SwarmingBehaviors.DynamicTableBehavior],
+
+      // The order behaviors are applied in matters - later ones overwrite
+      // attributes of earlier ones
+      behaviors: [
+          SwarmingBehaviors.BotListBehavior,
+          SwarmingBehaviors.DynamicTableBehavior,
+      ],
 
       properties: {
         client_id: {
@@ -24231,7 +24227,13 @@ the fleet.">
         // For dynamic table.
         _columnMap: {
           type: Object,
-          value: columnMap,
+          value: function() {
+            var base = this._commonColumns();
+            for (var attr in columnMap) {
+              base[attr] = columnMap[attr];
+            }
+            return base;
+          },
         },
         _headerMap: {
           type: Object,
@@ -24268,7 +24270,7 @@ the fleet.">
         if (device.notReady) {
           return UNAUTHENTICATED.toUpperCase();
         }
-        return this._androidAlias(this._deviceType(device));
+        return swarming.alias.android(this._deviceType(device));
       },
 
       _deviceColumn: function(col, device) {
@@ -24353,7 +24355,7 @@ the fleet.">
     Polymer({
       is: 'task-list-data',
 
-      behaviors: [SwarmingBehaviors.SwarmingBehavior],
+      behaviors: [SwarmingBehaviors.CommonBehavior],
 
       properties: {
         // inputs
@@ -24490,7 +24492,6 @@ the fleet.">
     Polymer({
       is: 'task-list',
       behaviors: [
-          SwarmingBehaviors.SwarmingBehavior,
           SwarmingBehaviors.DynamicTableBehavior,
       ],
 

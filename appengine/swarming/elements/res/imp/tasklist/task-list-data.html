@@ -41,6 +41,7 @@
 -->
 
 <link rel="import" href="/res/imp/bower_components/iron-ajax/iron-ajax.html">
+<link rel="import" href="/res/imp/common/common-behavior.html">
 
 <dom-module id="task-list-data">
   <template>
@@ -60,7 +61,7 @@
     Polymer({
       is: 'task-list-data',
 
-      behaviors: [SwarmingBehaviors.SwarmingBehavior],
+      behaviors: [SwarmingBehaviors.CommonBehavior],
 
       properties: {
         // inputs

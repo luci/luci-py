@@ -128,3 +128,5 @@ skip_files:
 - ^doc/
 - ^[A-Z]+$
 - ^[A-Z]+\.[a-z]+$
+- elements/node_modules/
+- elements/res/imp/bower_components/

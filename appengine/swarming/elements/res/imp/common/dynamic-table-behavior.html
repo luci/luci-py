@@ -12,7 +12,7 @@
 
   A client should use the provided style set as follows:
 
-    <link rel="import" href="/res/imp/common/dynamic-table.html">
+    <link rel="import" href="/res/imp/common/dynamic-table-behavior.html">
     ...
     <template>
       <style include="dynamic-table-style">
@@ -57,7 +57,7 @@
     _hide(col): Return a boolean based on whether to hide this column.
     _sortChange(event): Update the sorting based on an event created by sort-toggle.
  -->
-
+<link rel="import" href="common-behavior.html">
 <dom-module id="dynamic-table-style">
   <template>
     <style>
@@ -83,10 +83,9 @@
 </dom-module>
 
 <script>
-  window.SwarmingBehaviors = window.SwarmingBehaviors || {};
   (function(){
     // This behavior wraps up all the shared swarming functionality.
-    SwarmingBehaviors.DynamicTableBehavior = {
+    SwarmingBehaviors.DynamicTableBehavior = [SwarmingBehaviors.CommonBehavior, {
 
       properties: {
 
@@ -214,6 +213,60 @@
         }.bind(this)).sort();
       },
 
-    };
+      // Common columns shared between tasklist and botlist
+      _commonColumns: function() {
+        // return a fresh object so all elements have their own copy
+        return {
+          android_devices: function(bot) {
+            var devs = this._attribute(bot, "android_devices", "0");
+            if (this._verbose) {
+              return devs.join(" | ") + " devices available";
+            }
+            // max() works on strings as long as they can be coerced to Number.
+            return Math.max(...devs) + " devices available";
+          },
+          device_type: function(bot) {
+            var dt = this._attribute(bot, "device_type", "none");
+            dt = dt[0];
+            var alias = swarming.alias.android(dt);
+            if (alias === "unknown") {
+              return dt;
+            }
+            return swarming.alias.apply(dt, alias);
+          },
+          gpu: function(bot){
+            var gpus = this._attribute(bot, "gpu", "none");
+            var verbose = []
+            var named = [];
+            // non-verbose mode has only the top level GPU info "e.g. NVidia"
+            // which is found by looking for gpu ids w/o a colon.
+            gpus.forEach(function(g){
+              var alias = swarming.alias.gpu(g);
+              if (alias === "unknown") {
+                verbose.push(g);
+                if (g.indexOf(":") === -1) {
+                  named.push(g);
+                }
+                return;
+              }
+              verbose.push(swarming.alias.apply(g, alias));
+              if (g.indexOf(":") === -1) {
+                named.push(swarming.alias.apply(g, alias));
+              }
+            }.bind(this))
+            if (this._verbose || !named.length) {
+              return verbose.join(" | ");
+            }
+            return named.join(" | ");
+          },
+          pool: function(bot) {
+            var pool = this._attribute(bot, "pool");
+            return pool.join(" | ");
+          },
+        };
+      },
+
+
+    }];
   })();
 </script>

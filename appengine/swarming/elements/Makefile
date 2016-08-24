@@ -22,14 +22,14 @@ vulcanize: default
 	rm -rf ./build/*
 	mkdir ./build/js
 	./node_modules/.bin/vulcanize --inline-css=true --inline-scripts=true --strip-comments=true --abspath=./ --out-html=./build/elements.html elements.html
-	cat ./res/imp/bower_components/webcomponentsjs/webcomponents-lite.min.js ./node_modules/skia-common-js/common.js ./res/js/common.js | ./node_modules/.bin/uglifyjs -o ./build/js/js.js
+	cat ./res/imp/bower_components/webcomponentsjs/webcomponents-lite.min.js ./node_modules/skia-common-js/common.js ./res/js/common.js ./res/js/alias.js | ./node_modules/.bin/uglifyjs -o ./build/js/js.js
 
 .PHONY: debug_build
 debug_build: default
 	rm -rf ./build/*
 	mkdir ./build/js
 	cp elements.html ./build/elements.html
-	cat ./res/imp/bower_components/webcomponentsjs/webcomponents-lite.min.js ./node_modules/skia-common-js/common.js ./res/js/common.js > ./build/js/js.js
+	cat ./res/imp/bower_components/webcomponentsjs/webcomponents-lite.min.js ./node_modules/skia-common-js/common.js ./res/js/common.js ./res/js/alias.js > ./build/js/js.js
 	ln --symbolic ../res/imp/ ./build/
 
 .PHONY: dev_deploy

@@ -27,7 +27,7 @@
 <link rel="import" href="/res/imp/bower_components/iron-flex-layout/iron-flex-layout-classes.html">
 <link rel="import" href="/res/imp/bower_components/polymer/polymer.html">
 
-<link rel="import" href="/res/imp/common/dynamic-table.html">
+<link rel="import" href="/res/imp/common/dynamic-table-behavior.html">
 <link rel="import" href="/res/imp/common/sort-toggle.html">
 <link rel="import" href="/res/imp/common/swarming-app.html">
 <link rel="import" href="/res/imp/common/url-param.html">
@@ -174,7 +174,6 @@
     Polymer({
       is: 'task-list',
       behaviors: [
-          SwarmingBehaviors.SwarmingBehavior,
           SwarmingBehaviors.DynamicTableBehavior,
       ],
 
