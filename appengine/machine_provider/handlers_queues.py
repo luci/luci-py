@@ -15,6 +15,7 @@ from components import net
 from components import pubsub
 from components.machine_provider import rpc_messages
 
+import metrics
 import models
 
 
@@ -27,17 +28,17 @@ def maybe_notify_backend(message, hostname, policies):
     policies: A dict representation of an rpc_messages.Policies instance.
   """
   if policies.get('backend_topic'):
+    topic = pubsub.full_topic_name(
+        policies['backend_project'], policies['backend_topic'])
     attributes = {
         attribute['key']: attribute['value']
         for attribute in policies['backend_attributes']
     }
     attributes['hostname'] = hostname
-    pubsub.publish(
-        pubsub.full_topic_name(
-            policies['backend_project'], policies['backend_topic']),
-        message,
-        attributes,
-    )
+    pubsub.publish(topic, message, attributes)
+    # There are relatively few backends, so it's safe to include the
+    # backend topic/project as the value for the target field.
+    metrics.pubsub_messages_sent.increment(fields={'target': topic})
 
 
 def maybe_notify_lessee(request, response):
@@ -54,6 +55,7 @@ def maybe_notify_lessee(request, response):
         json.dumps(response),
         {},
     )
+    metrics.pubsub_messages_sent.increment(fields={'target': 'lessee'})
 
 
 class LeaseRequestFulfiller(webapp2.RequestHandler):
@@ -93,6 +95,8 @@ class LeaseRequestFulfiller(webapp2.RequestHandler):
       }
     pubsub.publish_multi(
         pubsub.full_topic_name(machine_project, machine_topic), messages)
+    metrics.pubsub_messages_sent.increment_by(
+        len(messages), fields={'target': 'machine'})
 
 
 @ndb.transactional(xg=True)
@@ -161,6 +165,7 @@ class MachineReclaimer(webapp2.RequestHandler):
         pubsub.full_topic_name(machine_topic_project, machine_topic))
 
     reclaim(machine_key)
+    metrics.lease_requests_expired.increment()
 
 
 @ndb.transactional
@@ -237,17 +242,17 @@ class MachineSubscriber(webapp2.RequestHandler):
       )
 
     if backend_topic:
+      topic = pubsub.full_topic_name(backend_project, backend_topic)
       attributes = backend_attributes.copy()
       attributes['hostname'] = hostname
       attributes['subscription'] = machine_subscription
       attributes['subscription_project'] = machine_subscription_project
       attributes['topic'] = machine_topic
       attributes['topic_project'] = machine_topic_project
-      pubsub.publish(
-          pubsub.full_topic_name(backend_project, backend_topic),
-          'SUBSCRIBED',
-          attributes,
-    )
+      pubsub.publish(topic, 'SUBSCRIBED', attributes)
+      # There are relatively few backends, so it's safe to include the
+      # backend topic/project as the value for the target field.
+      metrics.pubsub_messages_sent.increment(fields={'target': topic})
 
     set_available(
         ndb.Key(models.CatalogMachineEntry, machine_id),

@@ -13,6 +13,12 @@ lease_requests_deduped = gae_ts_mon.CounterMetric(
 )
 
 
+lease_requests_expired = gae_ts_mon.CounterMetric(
+    'machine_provider/lease_requests/expired',
+    description='Number of lease requests expired.',
+)
+
+
 lease_requests_fulfilled = gae_ts_mon.CounterMetric(
     'machine_provider/lease_requests/fulfilled',
     description='Number of lease requests fulfilled.',
@@ -22,4 +28,10 @@ lease_requests_fulfilled = gae_ts_mon.CounterMetric(
 lease_requests_received = gae_ts_mon.CounterMetric(
     'machine_provider/lease_requests/received',
     description='Number of lease requests received.',
+)
+
+
+pubsub_messages_sent = gae_ts_mon.CounterMetric(
+    'machine_provider/pubsub_messages/sent',
+    description='Number of Pub/Sub messages sent.',
 )
