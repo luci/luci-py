@@ -263,17 +263,19 @@ class _BotBaseHandler(_BotApiHandler):
     # auth.AuthorizationError if not.
     bot_group_cfg = bot_auth.validate_bot_id_and_fetch_config(bot_id)
 
-    # TODO(vadimsh): This is running in "check they match" mode. Once we verify
-    # everything is configured correctly, the server side dimensions from
-    # bot_group_cfg would unconditionally override bot-provided ones.
+    # The server side dimensions from bot_group_cfg override bot-provided ones.
+    # If both server side config and bot report some dimension, server side
+    # config wins. We still emit an error if bot tries to supply the dimension
+    # and it disagrees with the server defined one.
     for dim_key, from_cfg in bot_group_cfg.dimensions.iteritems():
       from_bot = sorted(dimensions.get(dim_key) or [])
       from_cfg = sorted(from_cfg)
-      if from_bot != from_cfg:
+      if from_bot and from_bot != from_cfg:
         logging.error(
             'Dimensions in bots.cfg doesn\'t match ones provided by the bot\n'
             'bot_id: "%s", key: "%s", from_bot: %s, from_cfg: %s',
             bot_id, dim_key, from_bot, from_cfg)
+      dimensions[dim_key] = from_cfg
 
     # Fill in all result fields except 'quarantined_msg'.
     result = _ProcessResult(

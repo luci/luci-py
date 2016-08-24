@@ -27,8 +27,11 @@ import handlers_bot
 from components import ereporter2
 from components import utils
 from server import bot_archive
-from server import bot_management
+from server import bot_auth
 from server import bot_code
+from server import bot_groups_config
+from server import bot_management
+from server import stats
 
 
 DATETIME_FORMAT = u'%Y-%m-%dT%H:%M:%S'
@@ -316,6 +319,42 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'try_number': u'1',
     }
     self.assertEqual(expected, response)
+
+  def test_poll_confliciting_dimensions(self):
+    params = self.do_handshake()
+    self.assertEqual(params['dimensions']['pool'], ['default'])
+
+    cfg = bot_groups_config.BotGroupConfig(
+        version='default',
+        require_luci_machine_token=False,
+        require_service_account=None,
+        ip_whitelist=None,
+        owners=None,
+        dimensions={u'pool': [u'server-side']})
+    self.mock(bot_auth, 'validate_bot_id_and_fetch_config', lambda _: cfg)
+
+    actions = []
+    self.mock(stats, 'add_entry', lambda **kwargs: actions.append(kwargs))
+
+    # Bot sends 'default' pool, but server config defined it as 'server-side'.
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
+    self.assertTrue(response.pop(u'duration'))
+    expected = {
+      u'cmd': u'sleep',
+      u'quarantined': False,
+    }
+    self.assertEqual(expected, response)
+
+    # 'server-side' was actually used.
+    self.assertEqual([{
+        'action': 'bot_active',
+        'bot_id': u'bot1',
+        'dimensions': {
+            u'id': [u'bot1'],
+            u'os': [u'Amiga'],
+            u'pool': [u'server-side'],
+        },
+    }], actions)
 
   def test_complete_task_isolated(self):
     # Successfully poll a task.
