@@ -85,8 +85,7 @@ class AdbCommandsSafe(object):
   _ERRORS = (
       usb_exceptions.CommonUsbError,
       common.usb1.USBError,
-      common.usb1.USBErrorIO,
-    )
+      common.usb1.USBErrorIO)
 
   _SHELL_SUFFIX = ' ;echo -e "\n$?"'
 
@@ -220,7 +219,7 @@ class AdbCommandsSafe(object):
     # This is an high level functionality but is needed by self.Reboot().
     out = self.PullContent('/proc/uptime')
     if out:
-      return float(out.split()[1])
+      return float(out.split()[0])
     return None
 
   def List(self, destdir):

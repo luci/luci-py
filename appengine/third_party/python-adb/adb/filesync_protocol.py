@@ -207,6 +207,9 @@ class FileSyncConnection(object):
       chunk = self.send_buffer[:self.adb.max_packet_size]
       try:
         self.adb.Write(chunk)
+        # Wait for ack from device, ignoring these for too long causes things
+        # to explode.
+        self.adb.ReadUntil('OKAY')
       except libusb1.USBError as e:
         self.send_buffer = ''
         raise usb_exceptions.WriteFailedError('Could not write %r' % chunk, e)
@@ -216,11 +219,11 @@ class FileSyncConnection(object):
     # Ensure recv buffer has enough data.
     while len(self.recv_buffer) < size:
       try:
-        _, data = self.adb.ReadUntil('WRTE')
+        msg = self.adb.ReadUntil('WRTE')
       except adb_protocol.InvalidResponseError as e:
         raise usb_exceptions.AdbCommandFailureException(
           'Command failed: %s' % e)
-      self.recv_buffer += data
+      self.recv_buffer += msg.data
 
     result = self.recv_buffer[:size]
     self.recv_buffer = self.recv_buffer[size:]

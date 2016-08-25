@@ -249,7 +249,7 @@ class _AdbConnection(object):
         return i
 
     def _Add(self, message):
-      self._queue.put(message.data)
+      self._queue.put(message)
 
     def _Close(self):
       self._queue.put(StopIteration())
@@ -326,6 +326,7 @@ class _AdbConnection(object):
       self._HasClosed()
       return
     if cmd_name == 'OKAY':
+      self._yielder._Add(message)
       return
     if cmd_name == 'WRTE':
       try:
@@ -348,9 +349,12 @@ class _AdbConnection(object):
   def Write(self, data):
     self._Write('WRTE', data)
 
-  def ReadUntil(self, _):
+  def ReadUntil(self, finish_command='WRTE'):
     try:
-      return 'WRTE', self._yielder.next()
+      while True:
+        message = self._yielder.next()
+        if message.header.command_name == finish_command:
+          return message
     except StopIteration:
       raise InvalidResponseError('Never got \'WRTE\'', '<N/A>')
 
@@ -465,7 +469,8 @@ class AdbConnectionManager(object):
     return self.Open('%s:%s' % (service, command), timeout_ms).__iter__()
 
   def Command(self, service, command='', timeout_ms=None):
-    return ''.join(self.StreamingCommand(service, command, timeout_ms))
+    return ''.join(msg.data for msg in self.StreamingCommand(service, command,
+                                                             timeout_ms))
 
   def ReadAndDispatch(self, timeout_ms=None):
     """Receive a response from the device."""
