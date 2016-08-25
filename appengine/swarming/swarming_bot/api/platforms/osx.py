@@ -321,6 +321,12 @@ def generate_launchd_plist(command, cwd, plistname):
     '  <key>NumberOfFiles</key>',
     '  <integer>8000</integer>',
     '</dict>',
+
+    '<key>KeepAlive</key>',
+    '<dict>',
+    '  <key>SuccessfulExit</key>',
+    '  <false/>',
+    '</dict>',
   ]
   entries.append(
       '<key>Program</key><string>%s</string>' % cgi.escape(command[0]))
