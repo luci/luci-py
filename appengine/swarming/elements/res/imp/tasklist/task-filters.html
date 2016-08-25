@@ -8,17 +8,14 @@
 
     <task-filters></task-filters>
 
-    TODO(kjlubick): Make this not a stub
-
   Properties:
     // outputs
     columns: Array<String>, the columns that should be displayed.
     query_params: Object, The query params that will filter the query
-        server-side. TODO(kjlubick): Document appropriate content.
+        server-side. Should be in format of String:Array<String>
     filter: Object, an object {filter:Function} where filter will take one param
         (bot) and return a Boolean if it should be displayed given the
         current filters.
-    verbose: Boolean, if the data displayed should be verbose.
 
   Methods:
     None.
@@ -26,48 +23,213 @@
   Events:
     None.
 -->
+<link rel="import" href="/res/imp/bower_components/iron-flex-layout/iron-flex-layout-classes.html">
+<link rel="import" href="/res/imp/bower_components/iron-icons/iron-icons.html">
+<link rel="import" href="/res/imp/bower_components/iron-selector/iron-selector.html">
+<link rel="import" href="/res/imp/bower_components/paper-icon-button/paper-icon-button.html">
+<link rel="import" href="/res/imp/bower_components/paper-input/paper-input.html">
+
+<link rel="import" href="/res/imp/common/query-column-filter-behavior.html">
+<link rel="import" href="/res/imp/common/url-param.html">
 
 <dom-module id="task-filters">
   <template>
-    <style>
-      :host {
-        display: block;
-      }
+    <style is="custom-style" include="iron-flex iron-flex-alignment iron-positioning query-column-filter-style">
+
     </style>
+
+    <url-param name="filters"
+      value="{{_filters}}"
+      default_values="[]"
+      multi>
+    </url-param>
+    <url-param name="columns"
+      value="{{columns}}"
+      default_values='["name","state","created_ts","user"]'
+      multi>
+    </url-param>
+    <url-param name="query"
+     value="{{_query}}"
+     default_value="">
+    </url-param>
+    <url-param name="limit"
+      default_value="200"
+      value="{{limit}}">
+    </url-param>
+
+    <div class="container horizontal layout">
+    <!--
+    A common pattern below is to do something like
+    checked="[[_columnState(col,columns.*)]]"
+    The last argument here allows this value to change if anything in the
+    columns array is added or removed.  Arrays are weird in Polymer and this is
+    the best way to listen to those changes.
+    -->
+
+      <div class="narrow-down-selector">
+        <div>
+          <paper-input id="filter"
+            label="Search columns and filters"
+            placeholder="gpu nvidia"
+            value="{{_query}}">
+          </paper-input>
+        </div>
+
+        <div class="selector side-by-side"
+            title="This shows all task tags and other interesting task properties. Mark the check box to add as a column. Select the row to see filter options.">
+          <iron-selector attr-for-selected="label" selected="{{_primarySelected}}">
+            <template is="dom-repeat" items="[[_primaryItems]]" as="item">
+              <div class="selectable item horizontal layout" label="[[item]]">
+                <!-- No line break here to avoid awkward spaces-->
+                <span>[[_beforeBold(item,_query)]]<span class="bold">[[_bold(item,_query)]]</span>[[_afterBold(item,_query)]]</span>
+                <span class="flex"></span>
+                <paper-checkbox
+                  noink
+                  disabled$="[[_cantToggleColumn(item)]]"
+                  checked="[[_columnState(item,columns.*)]]"
+                  on-change="_toggleColumn">
+                </paper-checkbox>
+              </div>
+            </template>
+          </iron-selector>
+        </div>
+
+        <div class="selector side-by-side"
+            title="These are all options (if any) that the task list can be filtered on.">
+          <template is="dom-repeat" id="secondaryList"
+              items="[[_secondaryItems]]" as="item">
+            <div class="item horizontal layout" label="[[item]]">
+              <!-- No line break here to avoid awkward spaces-->
+              <span>[[_beforeBold(item,_query)]]<span class="bold">[[_bold(item,_query)]]</span>[[_afterBold(item,_query)]]</span>
+              <span class="flex"></span>
+              <iron-icon
+                  class="icons"
+                  icon="icons:arrow-forward"
+                  hidden="[[_cantAddFilter(_primarySelected,item,_filters.*)]]"
+                  on-tap="_addFilter">
+              </iron-icon>
+            </div>
+          </template>
+        </div>
+
+        <div class="selector side-by-side"
+            title="These tag filters are AND'd together and applied to all tasks.">
+          <template is="dom-repeat" items="[[_filters]]" as="fil">
+            <div class="item horizontal layout" label="[[fil]]">
+              <span>[[fil]]</span>
+              <span class="flex"></span>
+              <iron-icon
+                  class="icons"
+                  icon="icons:remove-circle-outline"
+                  hidden="[[_cantRemoveFilter(fil,_filters.*)]]"
+                  on-tap="_removeFilter">
+              </iron-icon>
+            </div>
+          </template>
+        </div>
+
+        <div class="side-by-side">
+          <paper-input id="limit"
+            label="Limit Results"
+            auto-validate
+            min="0"
+            max="1000"
+            pattern="[0-9]+"
+            value="{{limit}}">
+          </paper-input>
+        </div>
+      </div>
+
+    </div>
 
   </template>
   <script>
   (function(){
+    // see query-column-filter for more documentation on these properties.
+    var filterMap = {
+      state: function(task, s) {
+        var state = this._attribute(task, "state")[0];
+        if (s === state) {
+          return true;
+        }
+        if (s === "PENDING_RUNNING") {
+          return state === "PENDING" || state === "RUNNING";
+        }
+        var failure = this._attribute(task, "failure", false)[0];
+        if (s === "COMPLETED_SUCCESS") {
+          return state === "COMPLETED" && !failure;
+        }
+        if (s === "COMPLETED_FAILURE") {
+          return state === "COMPLETED" && failure;
+        }
+        var tryNum = this._attribute(task, "try_number", "-1")[0];
+        if (s === "DEDUPED") {
+          return state === "COMPLETED" && tryNum === "0";
+        }
+      },
+    };
     Polymer({
       is: 'task-filters',
+
+      behaviors: [SwarmingBehaviors.QueryColumnFilter],
 
       properties: {
       // output
         columns: {
           type: Array,
-          value: function() {
-            return ["name", "state", "user"];
-          },
-          notify: true,
-        },
-        filter: {
-          type: Function,
-          value: function() {
-            return function(){
-              return true;
-            };
-          },
           notify: true,
         },
         query_params: {
           type: Object,
+          computed: "_extractQueryParams(_filters.*, limit)",
           notify: true,
         },
-        verbose: {
-          type: Boolean,
-          value: true,
-          notify: true,
-        },
+
+        // for QueryColumnFilter
+        _filterMap: {
+          type: Object,
+          value: function() {
+            var base = this._commonFilters();
+            for (var attr in filterMap) {
+              base[attr] = filterMap[attr];
+            }
+            return base;
+          },
+        }
+      },
+
+      _cantToggleColumn: function(col) {
+        // Don't allow the name column to be removed, as the task list is
+        // basically meaningless without it.
+        return !col || col === "name" ;
+      },
+
+      _extractQueryParams: function() {
+        var params = {};
+        var tags = [];
+        this._filters.forEach(function(f) {
+          var split = f.split(this.FILTER_SEP, 1)
+          var col = split[0];
+          var rest = f.substring(col.length + this.FILTER_SEP.length);
+          if (col === "state") {
+            params["state"] = [rest];
+          } else {
+            tags.push(col + this.FILTER_SEP + swarming.alias.unapply(rest))
+          }
+        }.bind(this));
+        params["tags"] = tags;
+        var lim = Math.floor(this.limit)
+        if (Number.isInteger(lim)) {
+          // Clamp the limit
+          lim = Math.max(lim, 1);
+          lim = Math.min(1000, lim);
+          params["limit"] = [lim];
+          // not !== because limit could be the string "900"
+          if (this.limit != lim) {
+            this.set("limit", lim);
+          }
+        }
+        return params;
       }
     });
   })();

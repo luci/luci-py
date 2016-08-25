@@ -217,14 +217,6 @@
       _commonColumns: function() {
         // return a fresh object so all elements have their own copy
         return {
-          android_devices: function(bot) {
-            var devs = this._attribute(bot, "android_devices", "0");
-            if (this._verbose) {
-              return devs.join(" | ") + " devices available";
-            }
-            // max() works on strings as long as they can be coerced to Number.
-            return Math.max(...devs) + " devices available";
-          },
           device_type: function(bot) {
             var dt = this._attribute(bot, "device_type", "none");
             dt = dt[0];

@@ -44,24 +44,14 @@
 <link rel="import" href="/res/imp/common/common-behavior.html">
 
 <dom-module id="task-list-data">
-  <template>
-    <iron-ajax id="tasklist"
-       url="/_ah/api/swarming/v1/tasks/list"
-       headers="[[auth_headers]]"
-       params="[[query_params]]"
-       handle-as="json"
-       last-response="{{_list}}"
-       loading="{{_busy1}}">
-    </iron-ajax>
-    <!-- TODO(kjlubick): Make more requests (like all tags) -->
-
-  </template>
   <script>
   (function(){
     Polymer({
       is: 'task-list-data',
 
-      behaviors: [SwarmingBehaviors.CommonBehavior],
+      behaviors: [
+          SwarmingBehaviors.CommonBehavior,
+      ],
 
       properties: {
         // inputs
@@ -71,26 +61,175 @@
         },
         query_params: {
           type: Object,
+          observer: "_request",
         },
 
-        //outputs
+        // outputs
         busy: {
           type: Boolean,
-          computed: "_or(_busy1)",
+          computed: "_or(_busy1,_busy2,_busy3)",
+          notify: true,
+        },
+        primary_map: {
+          type: Object,
+          computed: "_primaryMap(_tags,_dimensions,tasks)",
+          notify: true,
+        },
+        primary_arr: {
+          type: Array,
+          computed: "_primaryArr(primary_map)",
           notify: true,
         },
         tasks: {
           type: Array,
           computed: "_tasks(_list)",
           notify: true,
-        }
+        },
+
+        // private
+         _busy1: {
+          type: Boolean,
+          value: false
+        },
+        _busy2: {
+          type: Boolean,
+          value: false
+        },
+        _busy3: {
+          type: Boolean,
+          value: false
+        },
+        _dimensions: {
+          type: Object,
+        },
+        _list: {
+          type: Object,
+        },
+        _tags: {
+          type: Object,
+        },
       },
+
       signIn: function(){
-        // Auto on iron-ajax means to automatically re-make the request if
-        // the url or the query params change.  Auto does not trigger if the
-        // [auth] headers change, so we wait until the user is signed in
-        // before making any requests.
-        this.$.tasklist.auto = true;
+        this._getJsonAsync("_tags", "/_ah/api/swarming/v1/tasks/tags",
+          "_busy2", this.auth_headers);
+        this._getJsonAsync("_dimensions","/_ah/api/swarming/v1/bots/dimensions",
+          "_busy3", this.auth_headers);
+
+        this._request();
+      },
+
+      _primaryArr: function(map) {
+        var arr = Object.keys(map);
+        arr.sort();
+        return arr;
+      },
+
+      _primaryMap: function(tags, dims, tasks) {
+        tags = (tags && tags.tasks_tags) || [];
+        dims = (dims && dims.bots_dimensions) || [];
+        tasks = tasks || [];
+        var map = {};
+        // We combine all the tags reported by the tags endpoint, all known
+        // dimensions from the dimensions endpoint, and the tags seen in the
+        // returned tasks, just in case they didn't show up in the first two.
+        // This way a user can filter by what the data actually has and can
+        // discover new tags to filter by.
+        tags.forEach(function(t) {
+          if (!map[t.key]) {
+            map[t.key] = {};
+          }
+          var values = t.value || [];
+          values.forEach(function(v) {
+            map[t.key][v] = true;
+          })
+        });
+
+        dims.forEach(function(d) {
+          var vals = d.value;
+          if (!map[d.key]) {
+            map[d.key] = {};
+          }
+          vals.forEach(function(v) {
+            map[d.key][v] = true;
+          })
+        });
+
+        tasks.forEach(function(t) {
+          Object.keys(t.tagMap).forEach(function(k) {
+            var v = t.tagMap[k];
+            if (!map[k]) {
+              map[k] = {};
+            }
+            map[k][v] = true;
+          });
+        });
+
+        // Turn the Map<Object,Map<Boolean>> into a Map<Object,Array<String>>
+        // with all of the aliases applied.
+        var pMap = {};
+        for (key in map) {
+          var values = Object.keys(map[key]);
+          if (swarming.alias.DIMENSIONS_WITH_ALIASES.indexOf(key) === -1) {
+            pMap[key] = values;
+          } else if (key === "gpu") {
+            var gpus = [];
+            values.forEach(function(g){
+              var alias = swarming.alias.gpu(g);
+              if (alias !== "unknown") {
+                gpus.push(swarming.alias.apply(g, alias));
+              } else {
+                gpus.push(g);
+              }
+            }.bind(this));
+            pMap["gpu"] = gpus;
+          } else if (key === "device_type") {
+            var devs = [];
+            values.forEach(function(dt){
+              var alias = swarming.alias.android(dt);
+              if (alias !== "unknown") {
+                devs.push(swarming.alias.apply(dt, alias));
+              } else {
+                devs.push(dt);
+              }
+            }.bind(this));
+            pMap["device_type"] = devs;
+          } else {
+            console.log("Unknown alias type: ", d);
+          }
+        }
+
+        // Add some options that might not show up.
+        pMap["android_devices"].push("0");
+        pMap["device_os"].push("none");
+        pMap["device_type"].push("none");
+        pMap["user"].push("none");
+
+        // Custom filter options
+        pMap["name"] = [];
+        pMap["state"] = ["PENDING", "RUNNING", "PENDING_RUNNING", "COMPLETED",
+            "COMPLETED_SUCCESS","COMPLETED_FAILURE", "EXPIRED", "TIMED_OUT",
+            "BOT_DIED", "CANCELED", "ALL", "DEDUPED"];
+        pMap["abandoned_ts"] = [];
+        pMap["completed_ts"] = [];
+        pMap["costs_usd"] = [];
+        pMap["created_ts"] = [];
+        pMap["deduped_from"] = [];
+        pMap["duration"] = [];
+        pMap["modified_ts"] = [];
+        pMap["server_versions"] = [];
+        pMap["started_ts"] = [];
+
+        return pMap;
+      },
+
+      _request: function() {
+        // wait until the user has logged in before requesting this.
+        if (!this.auth_headers) {
+          return;
+        }
+        this._getJsonAsync("_list", "/_ah/api/swarming/v1/tasks/list",
+          "_busy1", this.auth_headers, this.query_params);
       },
 
       _tasks: function() {
@@ -98,6 +237,16 @@
           return [];
         }
         // Do any preprocessing here
+        this._list.items.forEach(function(t) {
+          var tagMap = {};
+          t.tags.forEach(function(tag) {
+            var split = tag.split(":", 1)
+            var key = split[0];
+            var rest = tag.substring(key.length + 1);
+            tagMap[key] = rest;
+          });
+          t.tagMap = tagMap;
+        });
         return this._list.items;
       }
     });

@@ -14610,6 +14610,16 @@ You can bind to `isAuthorized` property to monitor authorization state.
           value: false,
           notify:true,
         },
+        permissions: {
+          type: Object,
+          value: function() {
+            // TODO(kjlubick): Make this call the whoami endpoint after signing in.
+            return {
+              can_cancel_task: true,
+            }
+          },
+          notify: true,
+        },
 
         busy: {
           type: Boolean,
@@ -14682,6 +14692,38 @@ You can bind to `isAuthorized` property to monitor authorization state.
   (function(){
     // This behavior wraps up all the shared swarming functionality.
     SwarmingBehaviors.CommonBehavior = {
+
+      // _getJsonAsync makes an XHR to a url, parses the response as JSON
+      // and sticks the resulting object into the property with the name given
+      // by "bindTo". If busy is defined, the property with that name will be
+      // set to true while the request is in flight and false afterwards.
+      // request headers (e.g. authentication) and query params will be used if
+      // provided. Query params is an object like {String:Array<String>}. On
+      // error, bindTo will be set to false.  It is not set to undefined
+      // because computed values in Polymer don't fire if a property is
+      // undefined. Clients should check that bindTo is not falsey.
+       _getJsonAsync: function(bindTo, url, busy, headers, params) {
+        if (!bindTo || !url) {
+          console.log("Need at least a polymer element to bind to and a url");
+          return;
+        }
+        if (busy) {
+          this.set(busy, true);
+        }
+        url = url + "?" + sk.query.fromParamSet(params);
+        sk.request("GET", url, "", headers).then(JSON.parse).then(function(json){
+          this.set(bindTo, json);
+          if (busy) {
+            this.set(busy, false);
+          }
+        }.bind(this)).catch(function(reason){
+          console.log("Reason for failure of request to " + url, reason);
+          this.set(bindTo, false);
+          if (busy) {
+            this.set(busy, false);
+          }
+        }.bind(this));
+      },
 
       _not: function(a) {
         return !a;
@@ -14857,14 +14899,6 @@ You can bind to `isAuthorized` property to monitor authorization state.
       _commonColumns: function() {
         // return a fresh object so all elements have their own copy
         return {
-          android_devices: function(bot) {
-            var devs = this._attribute(bot, "android_devices", "0");
-            if (this._verbose) {
-              return devs.join(" | ") + " devices available";
-            }
-            // max() works on strings as long as they can be coerced to Number.
-            return Math.max(...devs) + " devices available";
-          },
           device_type: function(bot) {
             var dt = this._attribute(bot, "device_type", "none");
             dt = dt[0];
@@ -24133,6 +24167,14 @@ the fleet.">
     };
 
     var columnMap = {
+      android_devices: function(bot) {
+        var devs = this._attribute(bot, "android_devices", "0");
+        if (this._verbose) {
+          return devs.join(" | ") + " devices available";
+        }
+        // max() works on strings as long as they can be coerced to Number.
+        return Math.max(...devs) + " devices available";
+      },
       disk_space: function(bot) {
         var aliased = [];
         bot.disks.forEach(function(disk){
@@ -24298,64 +24340,495 @@ the fleet.">
     });
   })();
   </script>
-</dom-module><dom-module id="task-filters" assetpath="/res/imp/tasklist/">
+</dom-module><script>
+  /** @polymerBehavior Polymer.PaperButtonBehavior */
+  Polymer.PaperButtonBehaviorImpl = {
+    properties: {
+      /**
+       * The z-depth of this element, from 0-5. Setting to 0 will remove the
+       * shadow, and each increasing number greater than 0 will be "deeper"
+       * than the last.
+       *
+       * @attribute elevation
+       * @type number
+       * @default 1
+       */
+      elevation: {
+        type: Number,
+        reflectToAttribute: true,
+        readOnly: true
+      }
+    },
+
+    observers: [
+      '_calculateElevation(focused, disabled, active, pressed, receivedFocusFromKeyboard)',
+      '_computeKeyboardClass(receivedFocusFromKeyboard)'
+    ],
+
+    hostAttributes: {
+      role: 'button',
+      tabindex: '0',
+      animated: true
+    },
+
+    _calculateElevation: function() {
+      var e = 1;
+      if (this.disabled) {
+        e = 0;
+      } else if (this.active || this.pressed) {
+        e = 4;
+      } else if (this.receivedFocusFromKeyboard) {
+        e = 3;
+      }
+      this._setElevation(e);
+    },
+
+    _computeKeyboardClass: function(receivedFocusFromKeyboard) {
+      this.toggleClass('keyboard-focus', receivedFocusFromKeyboard);
+    },
+
+    /**
+     * In addition to `IronButtonState` behavior, when space key goes down,
+     * create a ripple down effect.
+     *
+     * @param {!KeyboardEvent} event .
+     */
+    _spaceKeyDownHandler: function(event) {
+      Polymer.IronButtonStateImpl._spaceKeyDownHandler.call(this, event);
+      // Ensure that there is at most one ripple when the space key is held down.
+      if (this.hasRipple() && this.getRipple().ripples.length < 1) {
+        this._ripple.uiDownAction();
+      }
+    },
+
+    /**
+     * In addition to `IronButtonState` behavior, when space key goes up,
+     * create a ripple up effect.
+     *
+     * @param {!KeyboardEvent} event .
+     */
+    _spaceKeyUpHandler: function(event) {
+      Polymer.IronButtonStateImpl._spaceKeyUpHandler.call(this, event);
+      if (this.hasRipple()) {
+        this._ripple.uiUpAction();
+      }
+    }
+  };
+
+  /** @polymerBehavior */
+  Polymer.PaperButtonBehavior = [
+    Polymer.IronButtonState,
+    Polymer.IronControlState,
+    Polymer.PaperRippleBehavior,
+    Polymer.PaperButtonBehaviorImpl
+  ];
+</script>
+<style is="custom-style">
+
+  :root {
+
+    --shadow-transition: {
+      transition: box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    };
+
+    --shadow-none: {
+      box-shadow: none;
+    };
+
+    /* from http://codepen.io/shyndman/pen/c5394ddf2e8b2a5c9185904b57421cdb */
+
+    --shadow-elevation-2dp: {
+      box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14),
+                  0 1px 5px 0 rgba(0, 0, 0, 0.12),
+                  0 3px 1px -2px rgba(0, 0, 0, 0.2);
+    };
+
+    --shadow-elevation-3dp: {
+      box-shadow: 0 3px 4px 0 rgba(0, 0, 0, 0.14),
+                  0 1px 8px 0 rgba(0, 0, 0, 0.12),
+                  0 3px 3px -2px rgba(0, 0, 0, 0.4);
+    };
+
+    --shadow-elevation-4dp: {
+      box-shadow: 0 4px 5px 0 rgba(0, 0, 0, 0.14),
+                  0 1px 10px 0 rgba(0, 0, 0, 0.12),
+                  0 2px 4px -1px rgba(0, 0, 0, 0.4);
+    };
+
+    --shadow-elevation-6dp: {
+      box-shadow: 0 6px 10px 0 rgba(0, 0, 0, 0.14),
+                  0 1px 18px 0 rgba(0, 0, 0, 0.12),
+                  0 3px 5px -1px rgba(0, 0, 0, 0.4);
+    };
+
+    --shadow-elevation-8dp: {
+      box-shadow: 0 8px 10px 1px rgba(0, 0, 0, 0.14),
+                  0 3px 14px 2px rgba(0, 0, 0, 0.12),
+                  0 5px 5px -3px rgba(0, 0, 0, 0.4);
+    };
+
+    --shadow-elevation-12dp: {
+      box-shadow: 0 12px 16px 1px rgba(0, 0, 0, 0.14),
+                  0 4px 22px 3px rgba(0, 0, 0, 0.12),
+                  0 6px 7px -4px rgba(0, 0, 0, 0.4);
+    };
+
+    --shadow-elevation-16dp: {
+      box-shadow: 0 16px 24px 2px rgba(0, 0, 0, 0.14),
+                  0  6px 30px 5px rgba(0, 0, 0, 0.12),
+                  0  8px 10px -5px rgba(0, 0, 0, 0.4);
+    };
+
+  }
+
+</style>
+<dom-module id="paper-material-shared-styles" assetpath="/res/imp/bower_components/paper-material/">
   <template>
     <style>
       :host {
         display: block;
+        position: relative;
+      }
+
+      :host([elevation="1"]) {
+        @apply(--shadow-elevation-2dp);
+      }
+
+      :host([elevation="2"]) {
+        @apply(--shadow-elevation-4dp);
+      }
+
+      :host([elevation="3"]) {
+        @apply(--shadow-elevation-6dp);
+      }
+
+      :host([elevation="4"]) {
+        @apply(--shadow-elevation-8dp);
+      }
+
+      :host([elevation="5"]) {
+        @apply(--shadow-elevation-16dp);
       }
     </style>
+  </template>
+</dom-module>
+
+
+<dom-module id="paper-material" assetpath="/res/imp/bower_components/paper-material/">
+  <template>
+    <style include="paper-material-shared-styles"></style>
+    <style>
+      :host([animated]) {
+        @apply(--shadow-transition);
+      }
+    </style>
+
+    <content></content>
+  </template>
+</dom-module>
+<script>
+  Polymer({
+    is: 'paper-material',
+
+    properties: {
+      /**
+       * The z-depth of this element, from 0-5. Setting to 0 will remove the
+       * shadow, and each increasing number greater than 0 will be "deeper"
+       * than the last.
+       *
+       * @attribute elevation
+       * @type number
+       * @default 1
+       */
+      elevation: {
+        type: Number,
+        reflectToAttribute: true,
+        value: 1
+      },
+
+      /**
+       * Set this to true to animate the shadow when setting a new
+       * `elevation` value.
+       *
+       * @attribute animated
+       * @type boolean
+       * @default false
+       */
+      animated: {
+        type: Boolean,
+        reflectToAttribute: true,
+        value: false
+      }
+    }
+  });
+</script>
+
+
+<dom-module id="paper-button" assetpath="/res/imp/bower_components/paper-button/">
+  <template strip-whitespace="">
+    <style include="paper-material">
+      :host {
+        @apply(--layout-inline);
+        @apply(--layout-center-center);
+        position: relative;
+        box-sizing: border-box;
+        min-width: 5.14em;
+        margin: 0 0.29em;
+        background: transparent;
+        -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+        -webkit-tap-highlight-color: transparent;
+        font: inherit;
+        text-transform: uppercase;
+        outline-width: 0;
+        border-radius: 3px;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        -webkit-user-select: none;
+        user-select: none;
+        cursor: pointer;
+        z-index: 0;
+        padding: 0.7em 0.57em;
+
+        @apply(--paper-font-common-base);
+        @apply(--paper-button);
+      }
+
+      :host([raised].keyboard-focus) {
+        font-weight: bold;
+        @apply(--paper-button-raised-keyboard-focus);
+      }
+
+      :host(:not([raised]).keyboard-focus) {
+        font-weight: bold;
+        @apply(--paper-button-flat-keyboard-focus);
+      }
+
+      :host([disabled]) {
+        background: #eaeaea;
+        color: #a8a8a8;
+        cursor: auto;
+        pointer-events: none;
+
+        @apply(--paper-button-disabled);
+      }
+
+      paper-ripple {
+        color: var(--paper-button-ink-color);
+      }
+    </style>
+
+    <content></content>
+  </template>
+
+  <script>
+    Polymer({
+      is: 'paper-button',
+
+      behaviors: [
+        Polymer.PaperButtonBehavior
+      ],
+
+      properties: {
+        /**
+         * If true, the button should be styled with a shadow.
+         */
+        raised: {
+          type: Boolean,
+          reflectToAttribute: true,
+          value: false,
+          observer: '_calculateElevation'
+        }
+      },
+
+      _calculateElevation: function() {
+        if (!this.raised) {
+          this._setElevation(0);
+        } else {
+          Polymer.PaperButtonBehaviorImpl._calculateElevation.apply(this);
+        }
+      }
+
+      /**
+      Fired when the animation finishes.
+      This is useful if you want to wait until
+      the ripple animation finishes to perform some action.
+
+      @event transitionend
+      Event param: {{node: Object}} detail Contains the animated node.
+      */
+    });
+  </script>
+</dom-module>
+<dom-module id="task-filters" assetpath="/res/imp/tasklist/">
+  <template>
+    <style is="custom-style" include="iron-flex iron-flex-alignment iron-positioning query-column-filter-style">
+
+    </style>
+
+    <url-param name="filters" value="{{_filters}}" default_values="[]" multi="">
+    </url-param>
+    <url-param name="columns" value="{{columns}}" default_values="[&quot;name&quot;,&quot;state&quot;,&quot;created_ts&quot;,&quot;user&quot;]" multi="">
+    </url-param>
+    <url-param name="query" value="{{_query}}" default_value="">
+    </url-param>
+    <url-param name="limit" default_value="200" value="{{limit}}">
+    </url-param>
+
+    <div class="container horizontal layout">
+    
+
+      <div class="narrow-down-selector">
+        <div>
+          <paper-input id="filter" label="Search columns and filters" placeholder="gpu nvidia" value="{{_query}}">
+          </paper-input>
+        </div>
+
+        <div class="selector side-by-side" title="This shows all task tags and other interesting task properties. Mark the check box to add as a column. Select the row to see filter options.">
+          <iron-selector attr-for-selected="label" selected="{{_primarySelected}}">
+            <template is="dom-repeat" items="[[_primaryItems]]" as="item">
+              <div class="selectable item horizontal layout" label="[[item]]">
+                
+                <span>[[_beforeBold(item,_query)]]<span class="bold">[[_bold(item,_query)]]</span>[[_afterBold(item,_query)]]</span>
+                <span class="flex"></span>
+                <paper-checkbox noink="" disabled$="[[_cantToggleColumn(item)]]" checked="[[_columnState(item,columns.*)]]" on-change="_toggleColumn">
+                </paper-checkbox>
+              </div>
+            </template>
+          </iron-selector>
+        </div>
+
+        <div class="selector side-by-side" title="These are all options (if any) that the task list can be filtered on.">
+          <template is="dom-repeat" id="secondaryList" items="[[_secondaryItems]]" as="item">
+            <div class="item horizontal layout" label="[[item]]">
+              
+              <span>[[_beforeBold(item,_query)]]<span class="bold">[[_bold(item,_query)]]</span>[[_afterBold(item,_query)]]</span>
+              <span class="flex"></span>
+              <iron-icon class="icons" icon="icons:arrow-forward" hidden="[[_cantAddFilter(_primarySelected,item,_filters.*)]]" on-tap="_addFilter">
+              </iron-icon>
+            </div>
+          </template>
+        </div>
+
+        <div class="selector side-by-side" title="These tag filters are AND'd together and applied to all tasks.">
+          <template is="dom-repeat" items="[[_filters]]" as="fil">
+            <div class="item horizontal layout" label="[[fil]]">
+              <span>[[fil]]</span>
+              <span class="flex"></span>
+              <iron-icon class="icons" icon="icons:remove-circle-outline" hidden="[[_cantRemoveFilter(fil,_filters.*)]]" on-tap="_removeFilter">
+              </iron-icon>
+            </div>
+          </template>
+        </div>
+
+        <div class="side-by-side">
+          <paper-input id="limit" label="Limit Results" auto-validate="" min="0" max="1000" pattern="[0-9]+" value="{{limit}}">
+          </paper-input>
+        </div>
+      </div>
+
+    </div>
 
   </template>
   <script>
   (function(){
+    // see query-column-filter for more documentation on these properties.
+    var filterMap = {
+      state: function(task, s) {
+        var state = this._attribute(task, "state")[0];
+        if (s === state) {
+          return true;
+        }
+        if (s === "PENDING_RUNNING") {
+          return state === "PENDING" || state === "RUNNING";
+        }
+        var failure = this._attribute(task, "failure", false)[0];
+        if (s === "COMPLETED_SUCCESS") {
+          return state === "COMPLETED" && !failure;
+        }
+        if (s === "COMPLETED_FAILURE") {
+          return state === "COMPLETED" && failure;
+        }
+        var tryNum = this._attribute(task, "try_number", "-1")[0];
+        if (s === "DEDUPED") {
+          return state === "COMPLETED" && tryNum === "0";
+        }
+      },
+    };
     Polymer({
       is: 'task-filters',
+
+      behaviors: [SwarmingBehaviors.QueryColumnFilter],
 
       properties: {
       // output
         columns: {
           type: Array,
-          value: function() {
-            return ["name", "state", "user"];
-          },
-          notify: true,
-        },
-        filter: {
-          type: Function,
-          value: function() {
-            return function(){
-              return true;
-            };
-          },
           notify: true,
         },
         query_params: {
           type: Object,
+          computed: "_extractQueryParams(_filters.*, limit)",
           notify: true,
         },
-        verbose: {
-          type: Boolean,
-          value: true,
-          notify: true,
-        },
+
+        // for QueryColumnFilter
+        _filterMap: {
+          type: Object,
+          value: function() {
+            var base = this._commonFilters();
+            for (var attr in filterMap) {
+              base[attr] = filterMap[attr];
+            }
+            return base;
+          },
+        }
+      },
+
+      _cantToggleColumn: function(col) {
+        // Don't allow the name column to be removed, as the task list is
+        // basically meaningless without it.
+        return !col || col === "name" ;
+      },
+
+      _extractQueryParams: function() {
+        var params = {};
+        var tags = [];
+        this._filters.forEach(function(f) {
+          var split = f.split(this.FILTER_SEP, 1)
+          var col = split[0];
+          var rest = f.substring(col.length + this.FILTER_SEP.length);
+          if (col === "state") {
+            params["state"] = [rest];
+          } else {
+            tags.push(col + this.FILTER_SEP + swarming.alias.unapply(rest))
+          }
+        }.bind(this));
+        params["tags"] = tags;
+        var lim = Math.floor(this.limit)
+        if (Number.isInteger(lim)) {
+          // Clamp the limit
+          lim = Math.max(lim, 1);
+          lim = Math.min(1000, lim);
+          params["limit"] = [lim];
+          // not !== because limit could be the string "900"
+          if (this.limit != lim) {
+            this.set("limit", lim);
+          }
+        }
+        return params;
       }
     });
   })();
   </script>
 </dom-module><dom-module id="task-list-data" assetpath="/res/imp/tasklist/">
-  <template>
-    <iron-ajax id="tasklist" url="/_ah/api/swarming/v1/tasks/list" headers="[[auth_headers]]" params="[[query_params]]" handle-as="json" last-response="{{_list}}" loading="{{_busy1}}">
-    </iron-ajax>
-    
-
-  </template>
   <script>
   (function(){
     Polymer({
       is: 'task-list-data',
 
-      behaviors: [SwarmingBehaviors.CommonBehavior],
+      behaviors: [
+          SwarmingBehaviors.CommonBehavior,
+      ],
 
       properties: {
         // inputs
@@ -24365,26 +24838,175 @@ the fleet.">
         },
         query_params: {
           type: Object,
+          observer: "_request",
         },
 
-        //outputs
+        // outputs
         busy: {
           type: Boolean,
-          computed: "_or(_busy1)",
+          computed: "_or(_busy1,_busy2,_busy3)",
+          notify: true,
+        },
+        primary_map: {
+          type: Object,
+          computed: "_primaryMap(_tags,_dimensions,tasks)",
+          notify: true,
+        },
+        primary_arr: {
+          type: Array,
+          computed: "_primaryArr(primary_map)",
           notify: true,
         },
         tasks: {
           type: Array,
           computed: "_tasks(_list)",
           notify: true,
-        }
+        },
+
+        // private
+         _busy1: {
+          type: Boolean,
+          value: false
+        },
+        _busy2: {
+          type: Boolean,
+          value: false
+        },
+        _busy3: {
+          type: Boolean,
+          value: false
+        },
+        _dimensions: {
+          type: Object,
+        },
+        _list: {
+          type: Object,
+        },
+        _tags: {
+          type: Object,
+        },
       },
+
       signIn: function(){
-        // Auto on iron-ajax means to automatically re-make the request if
-        // the url or the query params change.  Auto does not trigger if the
-        // [auth] headers change, so we wait until the user is signed in
-        // before making any requests.
-        this.$.tasklist.auto = true;
+        this._getJsonAsync("_tags", "/_ah/api/swarming/v1/tasks/tags",
+          "_busy2", this.auth_headers);
+        this._getJsonAsync("_dimensions","/_ah/api/swarming/v1/bots/dimensions",
+          "_busy3", this.auth_headers);
+
+        this._request();
+      },
+
+      _primaryArr: function(map) {
+        var arr = Object.keys(map);
+        arr.sort();
+        return arr;
+      },
+
+      _primaryMap: function(tags, dims, tasks) {
+        tags = (tags && tags.tasks_tags) || [];
+        dims = (dims && dims.bots_dimensions) || [];
+        tasks = tasks || [];
+        var map = {};
+        // We combine all the tags reported by the tags endpoint, all known
+        // dimensions from the dimensions endpoint, and the tags seen in the
+        // returned tasks, just in case they didn't show up in the first two.
+        // This way a user can filter by what the data actually has and can
+        // discover new tags to filter by.
+        tags.forEach(function(t) {
+          if (!map[t.key]) {
+            map[t.key] = {};
+          }
+          var values = t.value || [];
+          values.forEach(function(v) {
+            map[t.key][v] = true;
+          })
+        });
+
+        dims.forEach(function(d) {
+          var vals = d.value;
+          if (!map[d.key]) {
+            map[d.key] = {};
+          }
+          vals.forEach(function(v) {
+            map[d.key][v] = true;
+          })
+        });
+
+        tasks.forEach(function(t) {
+          Object.keys(t.tagMap).forEach(function(k) {
+            var v = t.tagMap[k];
+            if (!map[k]) {
+              map[k] = {};
+            }
+            map[k][v] = true;
+          });
+        });
+
+        // Turn the Map<Object,Map<Boolean>> into a Map<Object,Array<String>>
+        // with all of the aliases applied.
+        var pMap = {};
+        for (key in map) {
+          var values = Object.keys(map[key]);
+          if (swarming.alias.DIMENSIONS_WITH_ALIASES.indexOf(key) === -1) {
+            pMap[key] = values;
+          } else if (key === "gpu") {
+            var gpus = [];
+            values.forEach(function(g){
+              var alias = swarming.alias.gpu(g);
+              if (alias !== "unknown") {
+                gpus.push(swarming.alias.apply(g, alias));
+              } else {
+                gpus.push(g);
+              }
+            }.bind(this));
+            pMap["gpu"] = gpus;
+          } else if (key === "device_type") {
+            var devs = [];
+            values.forEach(function(dt){
+              var alias = swarming.alias.android(dt);
+              if (alias !== "unknown") {
+                devs.push(swarming.alias.apply(dt, alias));
+              } else {
+                devs.push(dt);
+              }
+            }.bind(this));
+            pMap["device_type"] = devs;
+          } else {
+            console.log("Unknown alias type: ", d);
+          }
+        }
+
+        // Add some options that might not show up.
+        pMap["android_devices"].push("0");
+        pMap["device_os"].push("none");
+        pMap["device_type"].push("none");
+        pMap["user"].push("none");
+
+        // Custom filter options
+        pMap["name"] = [];
+        pMap["state"] = ["PENDING", "RUNNING", "PENDING_RUNNING", "COMPLETED",
+            "COMPLETED_SUCCESS","COMPLETED_FAILURE", "EXPIRED", "TIMED_OUT",
+            "BOT_DIED", "CANCELED", "ALL", "DEDUPED"];
+        pMap["abandoned_ts"] = [];
+        pMap["completed_ts"] = [];
+        pMap["costs_usd"] = [];
+        pMap["created_ts"] = [];
+        pMap["deduped_from"] = [];
+        pMap["duration"] = [];
+        pMap["modified_ts"] = [];
+        pMap["server_versions"] = [];
+        pMap["started_ts"] = [];
+
+        return pMap;
+      },
+
+      _request: function() {
+        // wait until the user has logged in before requesting this.
+        if (!this.auth_headers) {
+          return;
+        }
+        this._getJsonAsync("_list", "/_ah/api/swarming/v1/tasks/list",
+          "_busy1", this.auth_headers, this.query_params);
       },
 
       _tasks: function() {
@@ -24392,6 +25014,16 @@ the fleet.">
           return [];
         }
         // Do any preprocessing here
+        this._list.items.forEach(function(t) {
+          var tagMap = {};
+          t.tags.forEach(function(tag) {
+            var split = tag.split(":", 1)
+            var key = split[0];
+            var rest = tag.substring(key.length + 1);
+            tagMap[key] = rest;
+          });
+          t.tagMap = tagMap;
+        });
         return this._list.items;
       }
     });
@@ -24401,27 +25033,46 @@ the fleet.">
 <dom-module id="task-list" assetpath="/res/imp/tasklist/">
   <template>
     <style include="iron-flex iron-flex-alignment iron-positioning swarming-app-style dynamic-table-style">
-
+      task-filters {
+        margin-bottom: 8px;
+        margin-right: 10px;
+      }
       .task-list th > span {
         /* Leave space for sort-toggle*/
         padding-right: 30px;
+      }
+
+      /* These colors are from buildbot */
+      .failed {
+        background-color: #ffdddd;
+      }
+      .died {
+        background-color: #cccccc;
+      }
+      .exception {
+        background-color: #edd2ff;
+      }
+      .pending {
+        background-color: #fffc6c;
       }
     </style>
 
     <url-param name="sort" value="{{_sortstr}}" default_value="id:asc">
     </url-param>
 
-    <swarming-app client_id="[[client_id]]" auth_headers="{{_auth_headers}}" signed_in="{{_signed_in}}" busy="[[_busy]]" name="Swarming Task List">
+    <swarming-app client_id="[[client_id]]" auth_headers="{{_auth_headers}}" permissions="{{_permissions}}" signed_in="{{_signed_in}}" busy="[[_busy]]" name="Swarming Task List">
 
       <h2 hidden$="[[_signed_in]]">You must sign in to see anything useful.</h2>
 
       <div hidden$="[[_not(_signed_in)]]">
-        <task-list-data auth_headers="[[_auth_headers]]" query_params="[[_query_params]]" tasks="{{_items}}" busy="{{_busy}}">
+        <task-list-data auth_headers="[[_auth_headers]]" query_params="[[_query_params]]" tasks="{{_items}}" busy="{{_busy}}" primary_map="{{_primary_map}}" primary_arr="{{_primary_arr}}">
         </task-list-data>
+
+        <paper-toast id="toast"></paper-toast>
 
         <div class="horizontal layout">
 
-          <task-filters columns="{{_columns}}" query_params="{{_query_params}}" filter="{{_filter}}" verbose="{{_verbose}}">
+          <task-filters primary_map="[[_primary_map]]" primary_arr="[[_primary_arr]]" columns="{{_columns}}" query_params="{{_query_params}}" filter="{{_filter}}">
           </task-filters>
 
         </div>
@@ -24437,8 +25088,14 @@ the fleet.">
               </th>
               
               <th hidden$="[[_hide('state', _columns.*)]]">
-                <span>Status</span>
+                <span>State</span>
                 <sort-toggle name="state" current="[[_sort]]">
+                </sort-toggle>
+              </th>
+
+              <th hidden$="[[_hide('deduped_from', _columns.*)]]">
+                <span>Deduped from</span>
+                <sort-toggle name="deduped_from" current="[[_sort]]">
                 </sort-toggle>
               </th>
 
@@ -24456,18 +25113,25 @@ the fleet.">
 
               <tr class$="[[_taskClass(task)]]">
                 <td>
-                  <a class="center" href$="[[_taskLink(task)]]" target="_blank">
+                  <a class="center" href$="[[_taskLink(task.task_id)]]" target="_blank">
                       [[task.name]]
                   </a>
                 </td>
                 <td hidden$="[[_hide('state', _columns.*)]]">
-                  [[_column('state', task, _verbose)]]
-                  
+                  [[_column('state', task)]]
+                  <paper-button raised="" hidden$="[[_cannotCancel(task,_permissions)]]" on-tap="_cancelTask">
+                    Cancel
+                  </paper-button>
+                </td>
+                <td hidden$="[[_hide('deduped_from', _columns.*)]]">
+                  <a class="center" href$="[[_taskLink(task.deduped_from)]]" target="_blank">
+                      [[_column('deduped_from',task)]]
+                  </a>
                 </td>
 
                 <template is="dom-repeat" items="[[_plainColumns]]" as="c">
                   <td hidden$="[[_hide(c)]]">
-                    [[_column(c, task, _verbose)]]
+                    [[_column(c, task)]]
                   </td>
                 </template>
 
@@ -24482,8 +25146,27 @@ the fleet.">
   </template>
   <script>
   (function(){
-    var specialColumns = ["name", "state"];
-    var columnMap = {};
+    var specialColumns = ["deduped_from", "name", "state"];
+    var columnMap = {
+      costs_usd: function(task) {
+        return this._attribute(task, "costs_usd", 0)[0];
+      },
+      state: function(task) {
+        var state = this._attribute(task, "state")[0];
+        if (state === "COMPLETED") {
+
+          if (this._attribute(task, "failure", false)[0]) {
+            return "COMPLETED (FAILURE)";
+          }
+          var tryNum = this._attribute(task, "try_number", "-1")[0];
+          if (tryNum === "0") {
+            return "COMPLETED (DEDUPED)";
+          }
+          return "COMPLETED (SUCCESS)";
+        }
+        return state;
+      },
+    };
     var headerMap = {
       "user": "Requesting User",
     };
@@ -24503,7 +25186,13 @@ the fleet.">
         // For dynamic table.
         _columnMap: {
           type: Object,
-          value: columnMap,
+          value: function() {
+            var base = this._commonColumns();
+            for (var attr in columnMap) {
+              base[attr] = columnMap[attr];
+            }
+            return base;
+          },
         },
         _headerMap: {
           type: Object,
@@ -24520,20 +25209,79 @@ the fleet.">
       },
 
       _attribute: function(task, col, def) {
-        var retVal = task[col] || [def];
+        if (def === undefined) {
+          def = "none";
+        }
+        var retVal = this._tag(task, col) || task[col] || [def];
         if (!Array.isArray(retVal)) {
           return [retVal];
         }
         return retVal;
       },
 
-      _taskLink: function(task) {
+      _cannotCancel: function(task, permissions) {
+        return !(permissions && permissions.can_cancel_task &&
+              this._column("state", task) === "PENDING");
+      },
+
+      _cancelTask: function(e) {
+        var task = e.model.task;
+        if (!task || !task.task_id) {
+          console.log("Missing task info", task);
+          return
+        }
+        var id = task.task_id
+
+        // Keep toast displayed until we hear back from the cancel.
+        this.$.toast.duration = 0;
+        this.$.toast.text="Canceling task " + id;
+        this.$.toast.open();
+        var url = "/_ah/api/swarming/v1/task/" + id +"/cancel";
+        sk.request("POST", url, undefined, this._auth_headers).then(function(response) {
+          this.$.toast.close();
+          this.$.toast.show({
+            text: "Request sent.  Response: "+response,
+            duration: 3000,
+          });
+        }.bind(this)).catch(function(reason) {
+          console.log("Cancellation failed", reason);
+          this.$.toast.close();
+          this.$.toast.show({
+            text: "Request failed.  Reason: "+reason,
+            duration: 3000,
+          });
+        }.bind(this));
+      },
+
+      _tag: function(task, col) {
+        if (!task || !task.tagMap) {
+          return undefined;
+        }
+        return task.tagMap[col];
+      },
+
+      _taskLink: function(taskId) {
+        if (!taskId) {
+          return undefined;
+        }
         // TODO(kjlubick) Make this point to /newui/ when appropriate.
-        return "/restricted/task/"+task.task_id;
+        return "/restricted/task/"+taskId;
       },
 
       _taskClass: function(task) {
-        // TODO(kjlubick): Color tasks?
+        var state = this._column("state", task);
+        if (state === "CANCELED" ||state === "TIMED_OUT" || state === "EXPIRED") {
+          return "exception";
+        }
+        if (state === "BOT_DIED") {
+          return "died";
+        }
+        if (state === "COMPLETED (FAILURE)") {
+          return "failed";
+        }
+        if (state === "RUNNING" || state === "PENDING") {
+          return "pending";
+        }
         return "";
       }
 

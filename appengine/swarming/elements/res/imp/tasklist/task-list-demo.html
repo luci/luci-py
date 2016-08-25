@@ -18,13 +18,17 @@
   <script src="../../../node_modules/sinon/pkg/sinon-1.17.5.js"></script>
   <!-- Makes a var called list-->
   <script type="text/javascript" src="task-list-demo.json"></script>
+  <!-- Makes a var called tags-->
+  <script type="text/javascript" src="task-tags-demo.json"></script>
+  <!-- Makes a var called fleetData-->
+  <script type="text/javascript" src="task-list-fleet-data-demo.json"></script>
 
   <script type="text/javascript" charset="utf-8">
     sinon.format = function(object) {return JSON.stringify(object);}
     sinon.log = function(message) {console.log(message);};
     var server = sinon.fakeServer.create();
     server.autoRespond = true;
-    //server.autoRespondAfter = 2000;
+    server.autoRespondAfter = 1000;
 
     var respond = function(request){
       if (!request.requestHeaders.authorization) {
@@ -40,6 +44,24 @@
     server.respondWith("GET", /^\/api\/swarming\/v1\/tasks\/list.*/, respond);
     server.respondWith("GET", /^\/_ah\/api\/swarming\/v1\/tasks\/list.*/, respond);
 
+    server.respondWith("GET", /^\/_ah\/api\/swarming\/v1\/tasks\/tags/, JSON.stringify(tags));
+    server.respondWith("GET", /^\/api\/swarming\/v1\/tasks\/tags/, JSON.stringify(tags));
+
+    server.respondWith("GET", /^\/_ah\/api\/swarming\/v1\/bots\/dimensions/, JSON.stringify(fleetData));
+    server.respondWith("GET", /^\/api\/swarming\/v1\/bots\/dimensions/, JSON.stringify(fleetData));
+
+    var cancel = function(request) {
+      console.log("Cancelling", request);
+      if (!request.requestHeaders.authorization) {
+        sinon.log("You must be logged in (check your Oauth?)");
+          request.respond(403, {}, "You must be logged in (check your Oauth?)");
+        return;
+      }
+      request.respond(200, {}, "Task has been cancelled");
+    }
+
+    server.respondWith("POST", /^\/_ah\/api\/swarming\/v1\/task\/.+\/cancel/, cancel);
+    server.respondWith("POST", /^\/api\/swarming\/v1\/task\/.+\/cancel/, cancel);
     </script>
 
     <link rel="import" href="task-list.html">

@@ -113,6 +113,16 @@
           value: false,
           notify:true,
         },
+        permissions: {
+          type: Object,
+          value: function() {
+            // TODO(kjlubick): Make this call the whoami endpoint after signing in.
+            return {
+              can_cancel_task: true,
+            }
+          },
+          notify: true,
+        },
 
         busy: {
           type: Boolean,

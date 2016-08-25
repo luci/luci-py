@@ -25,6 +25,8 @@
 -->
 
 <link rel="import" href="/res/imp/bower_components/iron-flex-layout/iron-flex-layout-classes.html">
+<link rel="import" href="/res/imp/bower_components/paper-button/paper-button.html">
+<link rel="import" href="/res/imp/bower_components/paper-toast/paper-toast.html">
 <link rel="import" href="/res/imp/bower_components/polymer/polymer.html">
 
 <link rel="import" href="/res/imp/common/dynamic-table-behavior.html">
@@ -38,21 +40,39 @@
 <dom-module id="task-list">
   <template>
     <style include="iron-flex iron-flex-alignment iron-positioning swarming-app-style dynamic-table-style">
-
+      task-filters {
+        margin-bottom: 8px;
+        margin-right: 10px;
+      }
       .task-list th > span {
         /* Leave space for sort-toggle*/
         padding-right: 30px;
+      }
+
+      /* These colors are from buildbot */
+      .failed {
+        background-color: #ffdddd;
+      }
+      .died {
+        background-color: #cccccc;
+      }
+      .exception {
+        background-color: #edd2ff;
+      }
+      .pending {
+        background-color: #fffc6c;
       }
     </style>
 
     <url-param name="sort"
       value="{{_sortstr}}"
-      default_value="id:asc">
+      default_value="created_ts:desc">
     </url-param>
 
     <swarming-app
       client_id="[[client_id]]"
       auth_headers="{{_auth_headers}}"
+      permissions="{{_permissions}}"
       signed_in="{{_signed_in}}"
       busy="[[_busy]]"
       name="Swarming Task List">
@@ -64,16 +84,21 @@
           auth_headers="[[_auth_headers]]"
           query_params="[[_query_params]]"
           tasks="{{_items}}"
-          busy="{{_busy}}">
+          busy="{{_busy}}"
+          primary_map="{{_primary_map}}"
+          primary_arr="{{_primary_arr}}">
         </task-list-data>
+
+        <paper-toast id="toast"></paper-toast>
 
         <div class="horizontal layout">
 
           <task-filters
+            primary_map="[[_primary_map]]"
+            primary_arr="[[_primary_arr]]"
             columns="{{_columns}}"
             query_params="{{_query_params}}"
-            filter="{{_filter}}"
-            verbose="{{_verbose}}">
+            filter="{{_filter}}">
           </task-filters>
 
         </div>
@@ -101,9 +126,17 @@
               not of much use, so we'll ignore it in _hide() and use this._columns.
               -->
               <th hidden$="[[_hide('state', _columns.*)]]">
-                <span>Status</span>
+                <span>State</span>
                 <sort-toggle
                     name="state"
+                    current="[[_sort]]">
+                </sort-toggle>
+              </th>
+
+              <th hidden$="[[_hide('deduped_from', _columns.*)]]">
+                <span>Deduped from</span>
+                <sort-toggle
+                    name="deduped_from"
                     current="[[_sort]]">
                 </sort-toggle>
               </th>
@@ -134,14 +167,27 @@
                 <td>
                   <a
                       class="center"
-                      href$="[[_taskLink(task)]]"
+                      href$="[[_taskLink(task.task_id)]]"
                       target="_blank">
                       [[task.name]]
                   </a>
                 </td>
                 <td hidden$="[[_hide('state', _columns.*)]]">
-                  [[_column('state', task, _verbose)]]
-                  <!-- TODO(kjlubick): Add button to stop pending.-->
+                  [[_column('state', task)]]
+                  <paper-button
+                      raised
+                      hidden$="[[_cannotCancel(task,_permissions)]]"
+                      on-tap="_cancelTask">
+                    Cancel
+                  </paper-button>
+                </td>
+                <td hidden$="[[_hide('deduped_from', _columns.*)]]">
+                  <a
+                      class="center"
+                      href$="[[_taskLink(task.deduped_from)]]"
+                      target="_blank">
+                      [[_column('deduped_from',task)]]
+                  </a>
                 </td>
 
                 <template
@@ -149,7 +195,7 @@
                     items="[[_plainColumns]]"
                     as="c">
                   <td hidden$="[[_hide(c)]]">
-                    [[_column(c, task, _verbose)]]
+                    [[_column(c, task)]]
                   </td>
                 </template>
 
@@ -164,8 +210,27 @@
   </template>
   <script>
   (function(){
-    var specialColumns = ["name", "state"];
-    var columnMap = {};
+    var specialColumns = ["deduped_from", "name", "state"];
+    var columnMap = {
+      costs_usd: function(task) {
+        return this._attribute(task, "costs_usd", 0)[0];
+      },
+      state: function(task) {
+        var state = this._attribute(task, "state")[0];
+        if (state === "COMPLETED") {
+
+          if (this._attribute(task, "failure", false)[0]) {
+            return "COMPLETED (FAILURE)";
+          }
+          var tryNum = this._attribute(task, "try_number", "-1")[0];
+          if (tryNum === "0") {
+            return "COMPLETED (DEDUPED)";
+          }
+          return "COMPLETED (SUCCESS)";
+        }
+        return state;
+      },
+    };
     var headerMap = {
       "user": "Requesting User",
     };
@@ -185,7 +250,13 @@
         // For dynamic table.
         _columnMap: {
           type: Object,
-          value: columnMap,
+          value: function() {
+            var base = this._commonColumns();
+            for (var attr in columnMap) {
+              base[attr] = columnMap[attr];
+            }
+            return base;
+          },
         },
         _headerMap: {
           type: Object,
@@ -202,20 +273,79 @@
       },
 
       _attribute: function(task, col, def) {
-        var retVal = task[col] || [def];
+        if (def === undefined) {
+          def = "none";
+        }
+        var retVal = this._tag(task, col) || task[col] || [def];
         if (!Array.isArray(retVal)) {
           return [retVal];
         }
         return retVal;
       },
 
-      _taskLink: function(task) {
+      _cannotCancel: function(task, permissions) {
+        return !(permissions && permissions.can_cancel_task &&
+              this._column("state", task) === "PENDING");
+      },
+
+      _cancelTask: function(e) {
+        var task = e.model.task;
+        if (!task || !task.task_id) {
+          console.log("Missing task info", task);
+          return
+        }
+        var id = task.task_id
+
+        // Keep toast displayed until we hear back from the cancel.
+        this.$.toast.duration = 0;
+        this.$.toast.text="Canceling task " + id;
+        this.$.toast.open();
+        var url = "/_ah/api/swarming/v1/task/" + id +"/cancel";
+        sk.request("POST", url, undefined, this._auth_headers).then(function(response) {
+          this.$.toast.close();
+          this.$.toast.show({
+            text: "Request sent.  Response: "+response,
+            duration: 3000,
+          });
+        }.bind(this)).catch(function(reason) {
+          console.log("Cancellation failed", reason);
+          this.$.toast.close();
+          this.$.toast.show({
+            text: "Request failed.  Reason: "+reason,
+            duration: 3000,
+          });
+        }.bind(this));
+      },
+
+      _tag: function(task, col) {
+        if (!task || !task.tagMap) {
+          return undefined;
+        }
+        return task.tagMap[col];
+      },
+
+      _taskLink: function(taskId) {
+        if (!taskId) {
+          return undefined;
+        }
         // TODO(kjlubick) Make this point to /newui/ when appropriate.
-        return "/restricted/task/"+task.task_id;
+        return "/restricted/task/"+taskId;
       },
 
       _taskClass: function(task) {
-        // TODO(kjlubick): Color tasks?
+        var state = this._column("state", task);
+        if (state === "CANCELED" ||state === "TIMED_OUT" || state === "EXPIRED") {
+          return "exception";
+        }
+        if (state === "BOT_DIED") {
+          return "died";
+        }
+        if (state === "COMPLETED (FAILURE)") {
+          return "failed";
+        }
+        if (state === "RUNNING" || state === "PENDING") {
+          return "pending";
+        }
         return "";
       }
 
