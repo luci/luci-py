@@ -60,37 +60,10 @@
     None.
 -->
 
-<link rel="import" href="/res/imp/bower_components/iron-ajax/iron-ajax.html">
-
 <link rel="import" href="bot-list-shared-behavior.html">
 
 <dom-module id="bot-list-data">
-  <template>
-    <iron-ajax id="botlist"
-       url="/_ah/api/swarming/v1/bots/list"
-       headers="[[auth_headers]]"
-       params="[[query_params]]"
-       handle-as="json"
-       last-response="{{_list}}"
-       loading="{{_busy1}}">
-    </iron-ajax>
 
-    <iron-ajax id="dimensions"
-       url="/_ah/api/swarming/v1/bots/dimensions"
-       headers="[[auth_headers]]"
-       handle-as="json"
-       last-response="{{_dimensions}}"
-       loading="{{_busy2}}">
-    </iron-ajax>
-
-    <iron-ajax id="fleet"
-       url="/_ah/api/swarming/v1/bots/count"
-       headers="[[auth_headers]]"
-       handle-as="json"
-       last-response="{{_count}}"
-       loading="{{_busy3}}">
-    </iron-ajax>
-  </template>
   <script>
   (function(){
     var BLACKLIST_DIMENSIONS = ["quarantined", "error"];
@@ -110,6 +83,7 @@
         },
         query_params: {
           type: Object,
+          observer: "_request",
         },
 
         //outputs
@@ -146,6 +120,18 @@
         },
 
         // private
+         _busy1: {
+          type: Boolean,
+          value: false
+        },
+        _busy2: {
+          type: Boolean,
+          value: false
+        },
+        _busy3: {
+          type: Boolean,
+          value: false
+        },
         _count: {
           type: Object,
         },
@@ -158,13 +144,12 @@
       },
 
       signIn: function(){
-        // Auto on iron-ajax means to automatically re-make the request if
-        // the url or the query params change.  Auto does not trigger if the
-        // [auth] headers change, so we wait until the user is signed in
-        // before making any requests.
-        this.$.botlist.auto = true;
-        this.$.dimensions.auto = true;
-        this.$.fleet.auto = true;
+        this._getJsonAsync("_count", "/_ah/api/swarming/v1/bots/count",
+          "_busy2", this.auth_headers);
+        this._getJsonAsync("_dimensions","/_ah/api/swarming/v1/bots/dimensions",
+          "_busy3", this.auth_headers);
+
+        this._request();
       },
 
       _bots: function(){
@@ -283,6 +268,15 @@
         // No need to sort any of this, bot-filters sorts secondary items
         // automatically, especially when the user types a query.
         return pMap;
+      },
+
+      _request: function() {
+        // wait until the user has logged in and the filters have loaded before requesting this to avoid double or even triple requests.
+        if (!this.auth_headers || !this.query_params) {
+          return;
+        }
+        this._getJsonAsync("_list", "/_ah/api/swarming/v1/bots/list",
+          "_busy1", this.auth_headers, this.query_params);
       },
 
     });

@@ -263,12 +263,12 @@ the fleet.">
           } else if (col === "status") {
             var rest = f.substring(col.length + this.FILTER_SEP.length);
             if (rest === "alive") {
-              params["is_dead"] = "FALSE";
-              params["quarantined"] = "FALSE";
+              params["is_dead"] = ["FALSE"];
+              params["quarantined"] = ["FALSE"];
             } else if (rest === "quarantined") {
-              params["quarantined"] = "TRUE";
+              params["quarantined"] = ["TRUE"];
             } else if (rest === "dead") {
-              params["is_dead"] = "TRUE";
+              params["is_dead"] = ["TRUE"];
             }
           }
         }.bind(this));
@@ -278,7 +278,7 @@ the fleet.">
           // Clamp the limit
           lim = Math.max(lim, 1);
           lim = Math.min(1000, lim);
-          params["limit"] = lim;
+          params["limit"] = [lim];
           // not !== because limit could be a string, e.g. "900"
           if (this.limit != lim) {
             this.set("limit", lim);

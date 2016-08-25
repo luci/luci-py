@@ -40,7 +40,6 @@
     None.
 -->
 
-<link rel="import" href="/res/imp/bower_components/iron-ajax/iron-ajax.html">
 <link rel="import" href="/res/imp/common/common-behavior.html">
 
 <dom-module id="task-list-data">
@@ -224,8 +223,8 @@
       },
 
       _request: function() {
-        // wait until the user has logged in before requesting this.
-        if (!this.auth_headers) {
+        // wait until the user has logged in and the filters have loaded before requesting this to avoid double or even triple requests.
+        if (!this.auth_headers || !this.query_params) {
           return;
         }
         this._getJsonAsync("_list", "/_ah/api/swarming/v1/tasks/list",
