@@ -13,11 +13,11 @@
     <auth-signin></auth-signin>
 
   Properties:
-    authHeaders: Object, Use this in iron-ajax to set oauth2 headers.
-    authResponse: Object, The raw gapi.auth2.AuthResponse object.
-    clientId: String, The client id to authenticate
+    auth_headers: Object, Use this as an argument to sk.request to set oauth2 headers.
+    auth_response: Object, The raw gapi.auth2.AuthResponse object.
+    client_id: String, The client id to authenticate
     profile: Object, Read Only, The email address and imageurl of the logged in user.
-    signedIn: Boolean, Read Only, if the user is logged in.
+    signed_in: Boolean, Read Only, if the user is logged in.
 
   Methods:
     signIn(): Signs the user in by popping up the authorization dialog.
@@ -46,19 +46,19 @@
     </style>
 
     <google-signin-aware id="aware"
-      client-id="[[clientId]]"
+      client-id="[[client_id]]"
       scopes="email"
       on-google-signin-aware-success="_onSignin"
       on-google-signin-aware-signed-out="_onSignout">
     </google-signin-aware>
 
-    <template is="dom-if" if="[[!signedIn]]">
+    <template is="dom-if" if="[[!signed_in]]">
       <div id="signinContainer">
         <a on-tap="signIn" href="#">Sign in</a>
       </div>
     </template>
 
-    <template is="dom-if" if="[[signedIn]]">
+    <template is="dom-if" if="[[signed_in]]">
       <img class="center" id="avatar" src="[[profile.imageUrl]]" width="30" height="30">
       <span class="center" >[[profile.email]]</span>
       <span class="center" >|</span>
@@ -70,23 +70,23 @@
     Polymer({
       is: 'auth-signin',
       properties: {
-        authHeaders: {
+        auth_headers: {
           type: Object,
-          computed: "_makeHeader(authResponse)",
+          computed: "_makeHeader(auth_response)",
           notify: true,
         },
-        authResponse: {
+        auth_response: {
           type: Object,
           notify: true,
         },
-        clientId: {
+        client_id: {
           type: String,
         },
         profile: {
           type: Object,
           readOnly: true
         },
-        signedIn: {
+        signed_in: {
           type: Boolean,
           readOnly: true,
           value: false,
@@ -95,29 +95,29 @@
       },
 
       _onSignin: function(e) {
-        this._setSignedIn(true);
+        this._setSigned_in(true);
         var user = gapi.auth2.getAuthInstance().currentUser.get();
         var profile = user.getBasicProfile();
         this._setProfile({
           email: profile.getEmail(),
           imageUrl: profile.getImageUrl()
         });
-        this.set("authResponse", user.getAuthResponse());
-        this._setSignedIn(true);
+        this.set("auth_response", user.getAuthResponse());
+        this._setSigned_in(true);
         this.fire("auth-signin");
       },
 
       _onSignout: function(e) {
-        this._setSignedIn(false);
+        this._setSigned_in(false);
         this._setProfile(null);
       },
 
-      _makeHeader: function(authResponse) {
-        if (!authResponse) {
+      _makeHeader: function(auth_response) {
+        if (!auth_response) {
           return {};
         }
         return {
-          "authorization": authResponse.token_type + " " + authResponse.access_token
+          "authorization": auth_response.token_type + " " + auth_response.access_token
         };
       },
 

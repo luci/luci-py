@@ -62,6 +62,12 @@
 
     server.respondWith("POST", /^\/_ah\/api\/swarming\/v1\/task\/.+\/cancel/, cancel);
     server.respondWith("POST", /^\/api\/swarming\/v1\/task\/.+\/cancel/, cancel);
+
+    var permissions = {
+      cancel_task: true
+    };
+    server.respondWith("GET",  /^\/_ah\/api\/swarming\/v1\/server\/permissions/, JSON.stringify(permissions));
+    server.respondWith("GET", /^\/api\/swarming\/v1\/server\/permissions/, JSON.stringify(permissions));
     </script>
 
     <link rel="import" href="task-list.html">

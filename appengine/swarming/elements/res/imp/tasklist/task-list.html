@@ -284,7 +284,7 @@
       },
 
       _cannotCancel: function(task, permissions) {
-        return !(permissions && permissions.can_cancel_task &&
+        return !(permissions && permissions.cancel_task &&
               this._column("state", task) === "PENDING");
       },
 

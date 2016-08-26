@@ -11,6 +11,9 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
   <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1, user-scalable=yes">
   <script src="../bower_components/webcomponentsjs/webcomponents-lite.js"></script>
+  <script src="../../../node_modules/skia-common-js/common.js"></script>
+  <script src="/res/js/common.js"></script>
+  <script src="/res/js/alias.js"></script>
   <script src="../../../node_modules/sinon/pkg/sinon-1.17.5.js"></script>
 
   <script type="text/javascript" charset="utf-8">
@@ -34,15 +37,23 @@
       request.respond(200, {"Content-Type":"application/json"}, JSON.stringify(details));
     }
 
-    server.respondWith("GET", "/_ah/api/swarming/v1/server/details", respond);
-    server.respondWith("GET", "/api/swarming/v1/server/details", respond);
+    server.respondWith("GET",  /^\/_ah\/api\/swarming\/v1\/server\/details/, respond);
+    server.respondWith("GET", /^\/api\/swarming\/v1\/server\/details/, respond);
+
+    var permissions = {
+      get_bootstrap_token: true
+    };
+    server.respondWith("GET",  /^\/_ah\/api\/swarming\/v1\/server\/permissions/, JSON.stringify(permissions));
+    server.respondWith("GET", /^\/api\/swarming\/v1\/server\/permissions/, JSON.stringify(permissions));
     </script>
 
     <link rel="import" href="swarming-index.html">
 </head>
 <body>
 
-  <swarming-index></swarming-index>
+<swarming-index
+  client_id="20770472288-t5smpbpjptka4nd888fv0ctd23ftba2o.apps.googleusercontent.com">
+</swarming-index>
 
 </body>
 </html>

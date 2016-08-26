@@ -19,10 +19,15 @@
       apps, such as colors.
 
   Properties:
-    auth_headers: Object, Use this in iron-ajax to set oauth2 headers.
     busy: Boolean, If the busy spinner should be active.
+    client_id: String, Oauth 2.0 client id.  It will be set by server-side
+        template evaluation.
     name: String, the name of the app to be displayed.
 
+    auth_headers: Object, Use this as an argument to sk.request to set oauth2 headers.
+    permissions: Object, {String:Boolean} of permissions to perform various
+        behaviors, such as terminate_bot.
+    signed_in: Boolean, if the user is signed in.
   Methods:
     None.
 
@@ -35,6 +40,7 @@
 <link rel="import" href="/res/imp/bower_components/paper-spinner/paper-spinner-lite.html">
 
 <link rel="import" href="auth-signin.html">
+<link rel="import" href="common-behavior.html">
 
 <dom-module id="swarming-app">
   <template>
@@ -77,7 +83,7 @@
       <app-header fixed>
         <app-toolbar>
           <div class="title left">[[name]]</div>
-          <paper-spinner-lite class="left" active="[[busy]]"></paper-spinner-lite>
+          <paper-spinner-lite class="left" active="[[_or(busy,_busy)]]"></paper-spinner-lite>
 
           <a class="left" href="/newui/">Home</a>
           <a class="left" href="/newui/botlist">Bot List</a>
@@ -85,9 +91,9 @@
           <div class="flex"></div>
           <auth-signin
               class="right"
-              client-id="[[client_id]]"
-              auth-headers="{{auth_headers}}"
-              signed-in="{{signed_in}}">
+              client_id="[[client_id]]"
+              auth_headers="{{auth_headers}}"
+              signed_in="{{signed_in}}">
           </auth-signin>
         </app-toolbar>
       </app-header>
@@ -100,36 +106,55 @@
   <script>
     Polymer({
       is: 'swarming-app',
+
+      behaviors: [
+          SwarmingBehaviors.CommonBehavior,
+      ],
+
       properties: {
+        // input
+        busy: {
+          type: Boolean,
+        },
         client_id: {
           type: String,
         },
+        name: {
+          type: String,
+        },
+        // outputs
         auth_headers: {
           type: Object,
           notify: true,
+          observer: "_loadPermissions"
         },
+
+        permissions: {
+          type: Object,
+          value: function() {
+            // If we aren't logged in, default to no permissions.
+            return {};
+          },
+          notify: true,
+        },
+
         signed_in: {
           type: Boolean,
           value: false,
           notify:true,
         },
-        permissions: {
-          type: Object,
-          value: function() {
-            // TODO(kjlubick): Make this call the whoami endpoint after signing in.
-            return {
-              can_cancel_task: true,
-            }
-          },
-          notify: true,
-        },
 
-        busy: {
+        // private
+        _busy: {
           type: Boolean,
-        },
-        name: {
-          type: String,
-        },
+          value: false,
+        }
+
+      },
+
+      _loadPermissions: function() {
+        this._getJsonAsync("permissions", "/_ah/api/swarming/v1/server/permissions",
+          "_busy", this.auth_headers);
       },
 
     });
