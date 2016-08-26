@@ -1,0 +1,13 @@
+Name: gae_event_mon
+Short Name: gae_event_mon
+URL: https://chromium.googlesource.com/infra/infra/+/master/appengine_module/gae_event_mon/
+Version: 1.0.0
+Revision: 40985a170ddba575b3f97690eb940dd73966e964
+License: Chromium License
+
+Description:
+Event monitoring library for Google AppEngine.
+
+Local Modifications:
+- Copied LICENSE from the root of infra.git.
+- Updated symlinks to point to the correct places within luci-py.
