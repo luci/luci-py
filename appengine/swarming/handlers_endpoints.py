@@ -137,6 +137,22 @@ class SwarmingServerService(remote.Service):
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
+      message_types.VoidMessage, swarming_rpcs.ClientPermissions,
+      http_method='GET')
+  @auth.public
+  def permissions(self, _request):
+    """Returns the caller's permissions."""
+    return swarming_rpcs.ClientPermissions(
+        delete_bot = acl.is_admin(),
+        terminate_bot = acl.is_privileged_user(),
+        get_configs = acl.is_user(),
+        put_configs = acl.is_admin(),
+        cancel_task = acl.is_user(),
+        get_bootstrap_token = acl.is_bootstrapper(),
+      )
+
+  @gae_ts_mon.instrument_endpoint()
+  @auth.endpoints_method(
       VersionRequest, swarming_rpcs.FileContent,
       http_method='GET')
   @auth.require(acl.is_bot_or_user)

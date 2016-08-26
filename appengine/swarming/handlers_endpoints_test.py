@@ -70,6 +70,62 @@ class ServerApiTest(BaseTest):
     response = self.call_api('details')
     self.assertEqual({'server_version': utils.get_app_version()}, response.json)
 
+  def test_public_permissions(self):
+    """Asserts that permissions respond correctly to an unauthed user."""
+    self.set_as_anonymous()
+    response = self.call_api('permissions')
+    expected = {
+        u'cancel_task': False,
+        u'terminate_bot': False,
+        u'delete_bot': False,
+        u'get_configs': False,
+        u'put_configs': False,
+        u'get_bootstrap_token': False,
+    }
+    self.assertEqual(expected, response.json)
+
+  def test_user_permissions(self):
+    """Asserts that permissions respond correctly to a basic user."""
+    self.set_as_user()
+    response = self.call_api('permissions')
+    expected = {
+        u'cancel_task': True,
+        u'terminate_bot': False,
+        u'delete_bot': False,
+        u'get_configs': True,
+        u'put_configs': False,
+        u'get_bootstrap_token': False,
+    }
+    self.assertEqual(expected, response.json)
+
+  def test_privileged_user_permissions(self):
+    """Asserts that permissions respond correctly to a privileged user."""
+    self.set_as_privileged_user()
+    response = self.call_api('permissions')
+    expected = {
+        u'cancel_task': True,
+        u'terminate_bot': True,
+        u'delete_bot': False,
+        u'get_configs': True,
+        u'put_configs': False,
+        u'get_bootstrap_token': False,
+    }
+    self.assertEqual(expected, response.json)
+
+  def test_admin_permissions(self):
+    """Asserts that permissions respond correctly to an admin."""
+    self.set_as_admin()
+    response = self.call_api('permissions')
+    expected = {
+        u'cancel_task': True,
+        u'terminate_bot': True,
+        u'delete_bot': True,
+        u'get_configs': True,
+        u'put_configs': True,
+        u'get_bootstrap_token': True,
+    }
+    self.assertEqual(expected, response.json)
+
   def _test_file(self, name):
     self.set_as_admin()
 

@@ -71,6 +71,16 @@ class ServerDetails(messages.Message):
   server_version = messages.StringField(1)
 
 
+class ClientPermissions(messages.Message):
+  """Reports the client's permissions."""
+  delete_bot = messages.BooleanField(1)
+  terminate_bot = messages.BooleanField(2)
+  get_configs = messages.BooleanField(3)
+  put_configs = messages.BooleanField(4)
+  cancel_task = messages.BooleanField(5)
+  get_bootstrap_token = messages.BooleanField(6)
+
+
 class FileContentRequest(messages.Message):
   """Content of a file."""
   content = messages.StringField(1)

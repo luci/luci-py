@@ -115,6 +115,7 @@ class FrontendTest(AppTestBase):
       '/auth',
       '/ereporter2/api/v1/on_error',
       '/stats',
+      '/api/swarming/v1/server/permissions',
       '/swarming/api/v1/client/list',
       '/swarming/api/v1/bot/server_ping',
       '/swarming/api/v1/stats/summary/<resolution:[a-z]+>',
