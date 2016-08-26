@@ -47,7 +47,7 @@ class Digest(messages.Message):
   """ProtoRPC message containing digest information."""
   digest = messages.StringField(1)
   is_isolated = messages.BooleanField(2, default=False)
-  size = messages.IntegerField(3)
+  size = messages.IntegerField(3, default=0)
 
 
 class Namespace(messages.Message):
@@ -466,7 +466,7 @@ class IsolateService(remote.Service):
       if obj and obj.expanded_size != digest.size:
         # It is important to note that when a file is uploaded to GCS,
         # ContentEntry is only stored in the finalize call, which is (supposed)
-        # to be called only after the GCS upload completed successfuly.
+        # to be called only after the GCS upload completed successfully.
         #
         # There is 3 cases:
         # - Race condition flow:
