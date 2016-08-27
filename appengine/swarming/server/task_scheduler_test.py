@@ -4,7 +4,6 @@
 # that can be found in the LICENSE file.
 
 import datetime
-import inspect
 import logging
 import os
 import random
@@ -14,12 +13,12 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
-from google.appengine.api import datastore_errors
 from google.appengine.ext import deferred
 from google.appengine.ext import ndb
 
 import webtest
 
+from components import auth
 from components import auth_testing
 from components import datastore_utils
 from components import pubsub
@@ -35,6 +34,8 @@ from server import task_result
 from server import task_scheduler
 from server import task_to_run
 from server.task_result import State
+
+from proto import config_pb2
 
 
 # pylint: disable=W0212,W0612
@@ -81,14 +82,16 @@ def get_results(request_key):
   return result_summary, q.fetch()
 
 
+def _quick_schedule(dims):
+  """Schedules a task."""
+  request = _gen_request(properties={'dimensions': dims})
+  task_request.init_new_request(request, True)
+  return task_scheduler.schedule_request(request)
+
+
 def _quick_reap():
   """Reaps a task."""
-  request = _gen_request(
-      properties={
-        'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
-      })
-  task_request.init_new_request(request, True)
-  _result_summary = task_scheduler.schedule_request(request)
+  _quick_schedule({u'OS': u'Windows-3.1.1', u'pool': u'default'})
   reaped_request, run_result = task_scheduler.bot_reap_task(
       {'OS': 'Windows-3.1.1', u'pool': u'default'}, 'localhost', 'abc', None)
   return run_result
@@ -815,13 +818,51 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(expected, [t.to_dict() for t in run_results])
 
   def test_schedule_request(self):
-    request = _gen_request(
-        properties={
-          'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
-        })
     # It is tested indirectly in the other functions.
-    task_request.init_new_request(request, True)
-    self.assertTrue(task_scheduler.schedule_request(request))
+    self.assertTrue(
+        _quick_schedule({u'OS': u'Windows-3.1.1', u'pool': u'default'}))
+
+  def mock_dim_acls(self, mapping):
+    self.mock(config, 'settings', lambda: config_pb2.SettingsCfg(
+      dimension_acls=config_pb2.DimensionACLs(entry=[
+        config_pb2.DimensionACLs.Entry(dimension=[d], usable_by=g)
+        for d, g in sorted(mapping.iteritems())
+      ]),
+    ))
+
+  def test_schedule_request_forbidden_dim(self):
+    self.mock_dim_acls({u'pool:bad': u'noone'})
+    _quick_schedule({u'pool': u'good'})
+    with self.assertRaises(auth.AuthorizationError):
+      _quick_schedule({u'pool': u'bad'})
+
+  def test_schedule_request_forbidden_dim_via_star(self):
+    self.mock_dim_acls({u'abc:*': u'noone'})
+    _quick_schedule({u'pool': u'default'})
+    with self.assertRaises(auth.AuthorizationError):
+      _quick_schedule({u'pool': u'default', u'abc': u'blah'})
+
+  def test_schedule_request_id_without_pool(self):
+    self.mock_dim_acls({u'pool:good': u'mocked'})
+    with self.assertRaises(auth.AuthorizationError):
+      _quick_schedule({u'id': u'abc'})
+    auth_testing.mock_is_admin(self)
+    _quick_schedule({u'id': u'abc'})
+
+  def test_schedule_request_id_and_pool(self):
+    self.mock_dim_acls({u'pool:good': u'mocked'})
+    self.mock_dim_acls({u'pool:bad': u'unknown'})
+
+    def mocked_is_group_member(group, ident):
+      if group == 'mocked' and ident == auth_testing.DEFAULT_MOCKED_IDENTITY:
+        return True
+      return False
+    self.mock(auth, 'is_group_member', mocked_is_group_member)
+
+    _quick_schedule({u'id': u'abc', u'pool': u'unknown'})
+    _quick_schedule({u'id': u'abc', u'pool': u'good'})
+    with self.assertRaises(auth.AuthorizationError):
+      _quick_schedule({u'id': u'abc', u'pool': u'bad'})
 
   def test_bot_update_task(self):
     run_result = _quick_reap()

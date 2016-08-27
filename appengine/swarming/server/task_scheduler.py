@@ -7,20 +7,20 @@
 This is the interface closest to the HTTP handlers.
 """
 
-import contextlib
 import datetime
 import logging
 import math
 import random
 
-from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
-from google.appengine.runtime import apiproxy_errors
 
+from components import auth
 from components import datastore_utils
 from components import pubsub
 from components import utils
+
 import ts_mon_metrics
+
 from server import acl
 from server import config
 from server import stats
@@ -356,6 +356,52 @@ def _pubsub_notify(task_id, topic, auth_token, userdata):
     logging.exception('Fatal error when sending PubSub notification')
 
 
+def _check_dimension_acls(request):
+  """Raises AuthorizationError if some requested dimensions are forbidden.
+
+  Uses 'dimension_acls' field from the settings. See proto/config.proto.
+  """
+  dim_acls = config.settings().dimension_acls
+  if not dim_acls or not dim_acls.entry:
+    return # not configured, this is fine
+
+  ident = request.authenticated
+  dims = request.properties.dimensions
+  assert 'id' in dims or 'pool' in dims, dims # see _validate_dimensions
+  assert ident is not None # see task_request.init_new_request
+
+  # Forbid targeting individual bots for non-admins, but allow using 'id' if
+  # 'pool' is used as well (so whoever can posts tasks to 'pool', can target an
+  # individual bot in that pool).
+  if 'id' in dims and 'pool' not in dims:
+    if not acl.is_admin():
+      raise auth.AuthorizationError(
+          'Only Swarming administrators can post tasks with "id" dimension '
+          'without specifying a "pool" dimension.')
+
+  for k, v in sorted(dims.iteritems()):
+    if not _can_use_dimension(dim_acls, ident, k, v):
+      raise auth.AuthorizationError(
+          'User %s is not allowed to schedule tasks with dimension "%s:%s"' %
+          (ident.to_bytes(), k, v))
+
+
+def _can_use_dimension(dim_acls, ident, k, v):
+  """Returns True if 'dimension_acls' allow the given dimension to be used.
+
+  Args:
+    dim_acls: config_pb2.DimensionACLs message.
+    ident: auth.Identity to check.
+    k: dimension name.
+    v: dimension value.
+  """
+  for e in dim_acls.entry:
+    if '%s:%s' % (k, v) in e.dimension or '%s:*' % k in e.dimension:
+      return auth.is_group_member(e.usable_by, ident)
+  # A dimension not mentioned in 'dimension_acls' is allowed by default.
+  return True
+
+
 ### Public API.
 
 
@@ -374,6 +420,9 @@ def exponential_backoff(attempt_num):
 def schedule_request(request):
   """Creates and stores all the entities to schedule a new task request.
 
+  Checks ACLs first. Raises auth.AuthorizationError if caller is not authorized
+  to post this request.
+
   The number of entities created is 3: TaskRequest, TaskToRun and
   TaskResultSummary.
 
@@ -389,6 +438,10 @@ def schedule_request(request):
   """
   assert isinstance(request, task_request.TaskRequest), request
   assert not request.key, request.key
+
+  # Raises AuthorizationError with helpful message if the request.authorized
+  # can't use some of the requested dimensions.
+  _check_dimension_acls(request)
 
   now = utils.utcnow()
   request.key = task_request.new_request_key()

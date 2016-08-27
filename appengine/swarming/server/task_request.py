@@ -388,8 +388,8 @@ class TaskProperties(ndb.Model):
   cipd_input = ndb.LocalStructuredProperty(CipdInput)
 
   # Filter to use to determine the required properties on the bot to run on. For
-  # example, Windows or hostname. Encoded as json. Optional but highly
-  # recommended.
+  # example, Windows or hostname. Encoded as json. Either 'pool' or 'id'
+  # dimension are required (see _validate_dimensions).
   dimensions = datastore_utils.DeterministicJsonProperty(
       validator=_validate_dimensions, json_type=dict, indexed=False)
 
@@ -481,6 +481,7 @@ class TaskProperties(ndb.Model):
             raise datastore_errors.BadValueError(
                 'an idempotent task cannot have unpinned packages; '
                 'use tags or instance IDs as package versions')
+
 
 class TaskRequest(ndb.Model):
   """Contains a user request.

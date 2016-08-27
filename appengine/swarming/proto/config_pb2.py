@@ -13,7 +13,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='config.proto',
   package='',
-  serialized_pb='\n\x0c\x63onfig.proto\"\xaf\x02\n\x0bSettingsCfg\x12\x18\n\x10google_analytics\x18\x01 \x01(\t\x12\x1e\n\x16reusable_task_age_secs\x18\x02 \x01(\x05\x12\x1e\n\x16\x62ot_death_timeout_secs\x18\x03 \x01(\x05\x12\x1c\n\x14\x65nable_ts_monitoring\x18\x04 \x01(\x08\x12!\n\x07isolate\x18\x05 \x01(\x0b\x32\x10.IsolateSettings\x12\x1b\n\x04\x63ipd\x18\x06 \x01(\x0b\x32\r.CipdSettings\x12$\n\x02mp\x18\x07 \x01(\x0b\x32\x18.MachineProviderSettings\x12,\n$force_bots_to_sleep_and_not_run_task\x18\x08 \x01(\x08\x12\x14\n\x0cui_client_id\x18\t \x01(\t\"D\n\x0fIsolateSettings\x12\x16\n\x0e\x64\x65\x66\x61ult_server\x18\x01 \x01(\t\x12\x19\n\x11\x64\x65\x66\x61ult_namespace\x18\x02 \x01(\t\"4\n\x0b\x43ipdPackage\x12\x14\n\x0cpackage_name\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t\"T\n\x0c\x43ipdSettings\x12\x16\n\x0e\x64\x65\x66\x61ult_server\x18\x01 \x01(\t\x12,\n\x16\x64\x65\x66\x61ult_client_package\x18\x02 \x01(\x0b\x32\x0c.CipdPackage\":\n\x17MachineProviderSettings\x12\x0f\n\x07\x65nabled\x18\x01 \x01(\x08\x12\x0e\n\x06server\x18\x02 \x01(\t')
+  serialized_pb='\n\x0c\x63onfig.proto\"\xd7\x02\n\x0bSettingsCfg\x12\x18\n\x10google_analytics\x18\x01 \x01(\t\x12\x1e\n\x16reusable_task_age_secs\x18\x02 \x01(\x05\x12\x1e\n\x16\x62ot_death_timeout_secs\x18\x03 \x01(\x05\x12\x1c\n\x14\x65nable_ts_monitoring\x18\x04 \x01(\x08\x12!\n\x07isolate\x18\x05 \x01(\x0b\x32\x10.IsolateSettings\x12\x1b\n\x04\x63ipd\x18\x06 \x01(\x0b\x32\r.CipdSettings\x12$\n\x02mp\x18\x07 \x01(\x0b\x32\x18.MachineProviderSettings\x12,\n$force_bots_to_sleep_and_not_run_task\x18\x08 \x01(\x08\x12\x14\n\x0cui_client_id\x18\t \x01(\t\x12&\n\x0e\x64imension_acls\x18\n \x01(\x0b\x32\x0e.DimensionACLs\"D\n\x0fIsolateSettings\x12\x16\n\x0e\x64\x65\x66\x61ult_server\x18\x01 \x01(\t\x12\x19\n\x11\x64\x65\x66\x61ult_namespace\x18\x02 \x01(\t\"4\n\x0b\x43ipdPackage\x12\x14\n\x0cpackage_name\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t\"T\n\x0c\x43ipdSettings\x12\x16\n\x0e\x64\x65\x66\x61ult_server\x18\x01 \x01(\t\x12,\n\x16\x64\x65\x66\x61ult_client_package\x18\x02 \x01(\x0b\x32\x0c.CipdPackage\":\n\x17MachineProviderSettings\x12\x0f\n\x07\x65nabled\x18\x01 \x01(\x08\x12\x0e\n\x06server\x18\x02 \x01(\t\"c\n\rDimensionACLs\x12#\n\x05\x65ntry\x18\x01 \x03(\x0b\x32\x14.DimensionACLs.Entry\x1a-\n\x05\x45ntry\x12\x11\n\tdimension\x18\x01 \x03(\t\x12\x11\n\tusable_by\x18\x02 \x01(\t')
 
 
 
@@ -88,6 +88,13 @@ _SETTINGSCFG = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='dimension_acls', full_name='SettingsCfg.dimension_acls', index=9,
+      number=10, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -98,7 +105,7 @@ _SETTINGSCFG = _descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=17,
-  serialized_end=320,
+  serialized_end=360,
 )
 
 
@@ -132,8 +139,8 @@ _ISOLATESETTINGS = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=322,
-  serialized_end=390,
+  serialized_start=362,
+  serialized_end=430,
 )
 
 
@@ -167,8 +174,8 @@ _CIPDPACKAGE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=392,
-  serialized_end=444,
+  serialized_start=432,
+  serialized_end=484,
 )
 
 
@@ -202,8 +209,8 @@ _CIPDSETTINGS = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=446,
-  serialized_end=530,
+  serialized_start=486,
+  serialized_end=570,
 )
 
 
@@ -237,19 +244,85 @@ _MACHINEPROVIDERSETTINGS = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=532,
-  serialized_end=590,
+  serialized_start=572,
+  serialized_end=630,
+)
+
+
+_DIMENSIONACLS_ENTRY = _descriptor.Descriptor(
+  name='Entry',
+  full_name='DimensionACLs.Entry',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='dimension', full_name='DimensionACLs.Entry.dimension', index=0,
+      number=1, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='usable_by', full_name='DimensionACLs.Entry.usable_by', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=686,
+  serialized_end=731,
+)
+
+_DIMENSIONACLS = _descriptor.Descriptor(
+  name='DimensionACLs',
+  full_name='DimensionACLs',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='entry', full_name='DimensionACLs.entry', index=0,
+      number=1, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[_DIMENSIONACLS_ENTRY, ],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=632,
+  serialized_end=731,
 )
 
 _SETTINGSCFG.fields_by_name['isolate'].message_type = _ISOLATESETTINGS
 _SETTINGSCFG.fields_by_name['cipd'].message_type = _CIPDSETTINGS
 _SETTINGSCFG.fields_by_name['mp'].message_type = _MACHINEPROVIDERSETTINGS
+_SETTINGSCFG.fields_by_name['dimension_acls'].message_type = _DIMENSIONACLS
 _CIPDSETTINGS.fields_by_name['default_client_package'].message_type = _CIPDPACKAGE
+_DIMENSIONACLS_ENTRY.containing_type = _DIMENSIONACLS;
+_DIMENSIONACLS.fields_by_name['entry'].message_type = _DIMENSIONACLS_ENTRY
 DESCRIPTOR.message_types_by_name['SettingsCfg'] = _SETTINGSCFG
 DESCRIPTOR.message_types_by_name['IsolateSettings'] = _ISOLATESETTINGS
 DESCRIPTOR.message_types_by_name['CipdPackage'] = _CIPDPACKAGE
 DESCRIPTOR.message_types_by_name['CipdSettings'] = _CIPDSETTINGS
 DESCRIPTOR.message_types_by_name['MachineProviderSettings'] = _MACHINEPROVIDERSETTINGS
+DESCRIPTOR.message_types_by_name['DimensionACLs'] = _DIMENSIONACLS
 
 class SettingsCfg(_message.Message):
   __metaclass__ = _reflection.GeneratedProtocolMessageType
@@ -280,6 +353,18 @@ class MachineProviderSettings(_message.Message):
   DESCRIPTOR = _MACHINEPROVIDERSETTINGS
 
   # @@protoc_insertion_point(class_scope:MachineProviderSettings)
+
+class DimensionACLs(_message.Message):
+  __metaclass__ = _reflection.GeneratedProtocolMessageType
+
+  class Entry(_message.Message):
+    __metaclass__ = _reflection.GeneratedProtocolMessageType
+    DESCRIPTOR = _DIMENSIONACLS_ENTRY
+
+    # @@protoc_insertion_point(class_scope:DimensionACLs.Entry)
+  DESCRIPTOR = _DIMENSIONACLS
+
+  # @@protoc_insertion_point(class_scope:DimensionACLs)
 
 
 # @@protoc_insertion_point(module_scope)
