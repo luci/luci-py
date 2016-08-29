@@ -320,6 +320,12 @@ class _AdbConnection(object):
       logging.warning(
           'Unexpected remote ID: expected %d: %s', self.remote_id, message)
     if message.header.arg1 != self._local_id:
+      # As per adb protocol, "A CLOSE message containing a remote-id which
+      # does not map to an open stream on the recipient's side is ignored."
+      if cmd_name == 'CLSE':
+        # It seems adbd on N devices sends duplicate CLSE packets.
+        # TODO(bpastene): Find out why/how to detect it.
+        return
       raise InvalidResponseError(
           'Unexpected local ID: expected %d' % self._local_id, message)
     if cmd_name == 'CLSE':
