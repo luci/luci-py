@@ -29,6 +29,11 @@ import traceback
 import urllib
 import zipfile
 
+# Import _strptime before threaded code. datetime.datetime.strptime is
+# threadsafe except for the initial import of the _strptime module.
+# See https://bugs.python.org/issue7980.
+import _strptime  # pylint: disable=unused-import
+
 import bot_auth
 import common
 import file_refresher
