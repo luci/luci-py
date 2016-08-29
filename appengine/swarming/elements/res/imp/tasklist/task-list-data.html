@@ -45,6 +45,7 @@
 <dom-module id="task-list-data">
   <script>
   (function(){
+    var TIMES = ["abandoned_ts", "completed_ts", "created_ts", "modified_ts", "started_ts"];
     Polymer({
       is: 'task-list-data',
 
@@ -209,15 +210,13 @@
         pMap["state"] = ["PENDING", "RUNNING", "PENDING_RUNNING", "COMPLETED",
             "COMPLETED_SUCCESS","COMPLETED_FAILURE", "EXPIRED", "TIMED_OUT",
             "BOT_DIED", "CANCELED", "ALL", "DEDUPED"];
-        pMap["abandoned_ts"] = [];
-        pMap["completed_ts"] = [];
         pMap["costs_usd"] = [];
-        pMap["created_ts"] = [];
         pMap["deduped_from"] = [];
         pMap["duration"] = [];
-        pMap["modified_ts"] = [];
         pMap["server_versions"] = [];
-        pMap["started_ts"] = [];
+        TIMES.forEach(function(t) {
+          pMap[t] = [];
+        });
 
         return pMap;
       },
@@ -235,6 +234,12 @@
         if (!this._list || !this._list.items) {
           return [];
         }
+        // Date.toString() looks like "Mon Aug 29 2016 09:03:41 GMT-0400 (EDT)"
+        // we want to extract the time zone part and append it to the
+        // locale time.
+        var str = (new Date()).toString();
+        var timeZone = str.substring(str.indexOf("("))
+
         // Do any preprocessing here
         this._list.items.forEach(function(t) {
           var tagMap = {};
@@ -245,6 +250,13 @@
             tagMap[key] = rest;
           });
           t.tagMap = tagMap;
+          TIMES.forEach(function(time) {
+            if (t[time]) {
+              var d = new Date(t[time]);
+              var locale = d.toLocaleString();
+              t["human_"+time] = locale + " " + timeZone;
+            }
+          });
         });
         return this._list.items;
       }

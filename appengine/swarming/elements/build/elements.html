@@ -23892,6 +23892,12 @@ the fleet.">
 <dom-module id="task-filters" assetpath="/res/imp/tasklist/">
   <template>
     <style is="custom-style" include="iron-flex iron-flex-alignment iron-positioning query-column-filter-style">
+    .item.wide {
+      max-width: 400px;
+    }
+    .selector.wide {
+      min-width: 275px;
+    }
 
     </style>
 
@@ -23913,7 +23919,7 @@ the fleet.">
           </paper-input>
         </div>
 
-        <div class="selector side-by-side" title="This shows all task tags and other interesting task properties. Mark the check box to add as a column. Select the row to see filter options.">
+        <div class="wide selector side-by-side" title="This shows all task tags and other interesting task properties. Mark the check box to add as a column. Select the row to see filter options.">
           <iron-selector attr-for-selected="label" selected="{{_primarySelected}}">
             <template is="dom-repeat" items="[[_primaryItems]]" as="item">
               <div class="selectable item horizontal layout" label="[[item]]">
@@ -24053,6 +24059,7 @@ the fleet.">
 </dom-module><dom-module id="task-list-data" assetpath="/res/imp/tasklist/">
   <script>
   (function(){
+    var TIMES = ["abandoned_ts", "completed_ts", "created_ts", "modified_ts", "started_ts"];
     Polymer({
       is: 'task-list-data',
 
@@ -24217,15 +24224,13 @@ the fleet.">
         pMap["state"] = ["PENDING", "RUNNING", "PENDING_RUNNING", "COMPLETED",
             "COMPLETED_SUCCESS","COMPLETED_FAILURE", "EXPIRED", "TIMED_OUT",
             "BOT_DIED", "CANCELED", "ALL", "DEDUPED"];
-        pMap["abandoned_ts"] = [];
-        pMap["completed_ts"] = [];
         pMap["costs_usd"] = [];
-        pMap["created_ts"] = [];
         pMap["deduped_from"] = [];
         pMap["duration"] = [];
-        pMap["modified_ts"] = [];
         pMap["server_versions"] = [];
-        pMap["started_ts"] = [];
+        TIMES.forEach(function(t) {
+          pMap[t] = [];
+        });
 
         return pMap;
       },
@@ -24243,6 +24248,12 @@ the fleet.">
         if (!this._list || !this._list.items) {
           return [];
         }
+        // Date.toString() looks like "Mon Aug 29 2016 09:03:41 GMT-0400 (EDT)"
+        // we want to extract the time zone part and append it to the
+        // locale time.
+        var str = (new Date()).toString();
+        var timeZone = str.substring(str.indexOf("("))
+
         // Do any preprocessing here
         this._list.items.forEach(function(t) {
           var tagMap = {};
@@ -24253,6 +24264,13 @@ the fleet.">
             tagMap[key] = rest;
           });
           t.tagMap = tagMap;
+          TIMES.forEach(function(time) {
+            if (t[time]) {
+              var d = new Date(t[time]);
+              var locale = d.toLocaleString();
+              t["human_"+time] = locale + " " + timeZone;
+            }
+          });
         });
         return this._list.items;
       }
@@ -24377,10 +24395,21 @@ the fleet.">
   <script>
   (function(){
     var specialColumns = ["deduped_from", "name", "state"];
+
+    function humanTime(attr) {
+      return function(task) {
+        return this._attribute(task, "human_" + attr)[0];
+      }
+    }
     var columnMap = {
+      abandoned_ts: humanTime("abandoned_ts"),
+      completed_ts: humanTime("completed_ts"),
       costs_usd: function(task) {
         return this._attribute(task, "costs_usd", 0)[0];
       },
+      created_ts: humanTime("created_ts"),
+      modified_ts: humanTime("modified_ts"),
+      started_ts: humanTime("started_ts"),
       state: function(task) {
         var state = this._attribute(task, "state")[0];
         if (state === "COMPLETED") {
@@ -24400,7 +24429,25 @@ the fleet.">
     var headerMap = {
       "user": "Requesting User",
     };
-    var specialSort = {};
+
+    function sortableTime(attr) {
+      // sort times based on the string they come with, formatted like
+      // "2016-08-16T13:12:40.606300" which sorts correctly.  Locale time
+      // (used in the columns), does not.
+      return function(dir, a, b) {
+        var aCol = this._attribute(a, attr)[0];
+        var bCol = this._attribute(b, attr)[0];
+
+        return dir * swarming.naturalCompare(aCol, bCol);
+      }
+    }
+    var specialSort = {
+      abandoned_ts: sortableTime("abandoned_ts"),
+      completed_ts: sortableTime("completed_ts"),
+      created_ts: sortableTime("created_ts"),
+      modified_ts: sortableTime("modified_ts"),
+      started_ts: sortableTime("started_ts"),
+    };
 
     Polymer({
       is: 'task-list',

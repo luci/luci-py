@@ -211,10 +211,24 @@
   <script>
   (function(){
     var specialColumns = ["deduped_from", "name", "state"];
+
+    // Given a time attribute like "abandoned_ts", humanTime returns a function
+    // that returns the human-friendly version of that attribute. The human
+    // friendly time was created in task-list-data.
+    function humanTime(attr) {
+      return function(task) {
+        return this._attribute(task, "human_" + attr)[0];
+      }
+    }
     var columnMap = {
+      abandoned_ts: humanTime("abandoned_ts"),
+      completed_ts: humanTime("completed_ts"),
       costs_usd: function(task) {
         return this._attribute(task, "costs_usd", 0)[0];
       },
+      created_ts: humanTime("created_ts"),
+      modified_ts: humanTime("modified_ts"),
+      started_ts: humanTime("started_ts"),
       state: function(task) {
         var state = this._attribute(task, "state")[0];
         if (state === "COMPLETED") {
@@ -234,7 +248,27 @@
     var headerMap = {
       "user": "Requesting User",
     };
-    var specialSort = {};
+
+    // Given a time attribute like "abandoned_ts", sortableTime returns a function
+    // that compares the tasks based on the attribute.  This is used for sorting.
+    function sortableTime(attr) {
+      // sort times based on the string they come with, formatted like
+      // "2016-08-16T13:12:40.606300" which sorts correctly.  Locale time
+      // (used in the columns), does not.
+      return function(dir, a, b) {
+        var aCol = this._attribute(a, attr)[0];
+        var bCol = this._attribute(b, attr)[0];
+
+        return dir * swarming.naturalCompare(aCol, bCol);
+      }
+    }
+    var specialSort = {
+      abandoned_ts: sortableTime("abandoned_ts"),
+      completed_ts: sortableTime("completed_ts"),
+      created_ts: sortableTime("created_ts"),
+      modified_ts: sortableTime("modified_ts"),
+      started_ts: sortableTime("started_ts"),
+    };
 
     Polymer({
       is: 'task-list',

@@ -26,6 +26,7 @@
 <link rel="import" href="/res/imp/bower_components/iron-flex-layout/iron-flex-layout-classes.html">
 <link rel="import" href="/res/imp/bower_components/iron-icons/iron-icons.html">
 <link rel="import" href="/res/imp/bower_components/iron-selector/iron-selector.html">
+<link rel="import" href="/res/imp/bower_components/paper-checkbox/paper-checkbox.html">
 <link rel="import" href="/res/imp/bower_components/paper-icon-button/paper-icon-button.html">
 <link rel="import" href="/res/imp/bower_components/paper-input/paper-input.html">
 
@@ -35,6 +36,12 @@
 <dom-module id="task-filters">
   <template>
     <style is="custom-style" include="iron-flex iron-flex-alignment iron-positioning query-column-filter-style">
+    .item.wide {
+      max-width: 400px;
+    }
+    .selector.wide {
+      min-width: 275px;
+    }
 
     </style>
 
@@ -75,7 +82,7 @@
           </paper-input>
         </div>
 
-        <div class="selector side-by-side"
+        <div class="wide selector side-by-side"
             title="This shows all task tags and other interesting task properties. Mark the check box to add as a column. Select the row to see filter options.">
           <iron-selector attr-for-selected="label" selected="{{_primarySelected}}">
             <template is="dom-repeat" items="[[_primaryItems]]" as="item">
