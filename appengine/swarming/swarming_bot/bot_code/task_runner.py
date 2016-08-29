@@ -187,7 +187,7 @@ class MustExit(Exception):
 
 def load_and_run(
     in_file, swarming_server, cost_usd_hour, start, out_file, min_free_space,
-    bot_file):
+    bot_file, auth_params_file):
   """Loads the task's metadata and execute it.
 
   This may throw all sorts of exceptions in case of failure. It's up to the
@@ -213,7 +213,7 @@ def load_and_run(
 
       task_result = run_command(
           swarming_server, task_details, work_dir,
-          cost_usd_hour, start, min_free_space, bot_file)
+          cost_usd_hour, start, min_free_space, bot_file, auth_params_file)
   except MustExit as e:
     # This normally means run_command() didn't get the chance to run, as it
     # itself trap MustExit and will report accordingly. In this case, we want
@@ -321,7 +321,7 @@ def kill_and_wait(proc, grace_period, reason):
 
 
 def start_reading_headers(auth_params_file):
-  """Spawns a thread that rereads headers from SWARMING_AUTH_PARAMS file.
+  """Spawns a thread that rereads headers from --auth-params-file path.
 
   Returns:
     Tuple (callback that returns the last known headers, stop callback).
@@ -345,7 +345,7 @@ def start_reading_headers(auth_params_file):
 
 def run_command(
     swarming_server, task_details, work_dir, cost_usd_hour,
-    task_start, min_free_space, bot_file):
+    task_start, min_free_space, bot_file, auth_params_file):
   """Runs a command and sends packets to the server to stream results back.
 
   Implements both I/O and hard timeouts. Sends the packets numbered, so the
@@ -360,7 +360,6 @@ def run_command(
   # MUST be there already. It's fatal internal error if they are not.
   headers_cb = lambda: {}
   stop_headers_reader = lambda: None
-  auth_params_file = os.environ.get('SWARMING_AUTH_PARAMS')
   if auth_params_file:
     try:
       headers_cb, stop_headers_reader = start_reading_headers(auth_params_file)
@@ -621,6 +620,9 @@ def main(args):
       help='Value to send down to run_isolated')
   parser.add_option(
       '--bot-file', help='Path to a file describing the state of the host.')
+  parser.add_option(
+      '--auth-params-file',
+      help='Path to a file with bot authentication parameters')
 
   options, args = parser.parse_args(args)
   if not options.in_file or not options.out_file or args:
@@ -637,7 +639,7 @@ def main(args):
     load_and_run(
         options.in_file, options.swarming_server, options.cost_usd_hour,
         options.start, options.out_file, options.min_free_space,
-        options.bot_file)
+        options.bot_file, options.auth_params_file)
     return 0
   finally:
     logging.info('quitting')

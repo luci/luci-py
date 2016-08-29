@@ -40,7 +40,6 @@ always set:
   - `SWARMING_HEADLESS=1` is always set.
   - `SWARMING_BOT_ID` is set to the bot id.
   - `SWARMING_TASK_ID` is set to the task id.
-  - `SWARMING_AUTH_PARAMS` is path to a file with task authentication tokens.
 
 The following environment variables may be set to alter bot behavior:
 

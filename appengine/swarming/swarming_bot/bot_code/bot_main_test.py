@@ -95,6 +95,10 @@ class TestBotMain(net_utils.TestCase):
     file_path.rmtree(self.root_dir)
     super(TestBotMain, self).tearDown()
 
+  def print_err_and_fail(self, _bot, msg, _task_id):
+    print msg
+    self.fail('post_error_task was called')
+
   def make_bot(self, auth_headers_cb=None):
     return bot.Bot(
         remote_client.RemoteClient('https://localhost:1', auth_headers_cb),
@@ -495,9 +499,16 @@ class TestBotMain(net_utils.TestCase):
             (os_utilities.get_min_free_space(bot_main.THIS_FILE) + 250.) *
             1024 * 1024)),
         ]
-        self.assertEqual(cmd[-2], '--bot-file')
-        self.assertTrue(cmd[-1].endswith('.json'))
-        cmd = cmd[:-2]
+        self.assertEqual(cmd[15], '--bot-file')
+        self.assertTrue(cmd[16].endswith('.json'))
+        del cmd[15:17]
+        if auth_params_json:
+          auth_params_file = os.path.join(
+              self.root_dir, 'w', 'bot_auth_params.json')
+          with open(auth_params_file, 'rb') as f:
+            actual_auth_params = json.load(f)
+          self.assertEqual(auth_params_json, actual_auth_params)
+          expected.extend(['--auth-params-file', auth_params_file])
         self.assertEqual(expected, cmd)
         self.assertEqual(True, detached)
         self.assertEqual(self.bot.base_dir, cwd)
@@ -506,13 +517,6 @@ class TestBotMain(net_utils.TestCase):
         self.assertEqual(subprocess42.STDOUT, stderr)
         self.assertEqual(subprocess42.PIPE, stdin)
         self.assertEqual(sys.platform != 'win32', close_fds)
-        if auth_params_json is not None:
-          auth_params_file = os.path.join(
-              self.root_dir, 'w', 'bot_auth_params.json')
-          self.assertEqual(auth_params_file, env.get('SWARMING_AUTH_PARAMS'))
-          with open(auth_params_file, 'rb') as f:
-            actual_auth_params = json.load(f)
-          self.assertEqual(auth_params_json, actual_auth_params)
 
       def wait(self2, timeout=None): # pylint: disable=unused-argument
         self2.returncode = returncode
@@ -524,7 +528,7 @@ class TestBotMain(net_utils.TestCase):
     return result
 
   def test_run_manifest(self):
-    self.mock(bot_main, 'post_error_task', lambda *args: self.fail(args))
+    self.mock(bot_main, 'post_error_task', self.print_err_and_fail)
     def call_hook(botobj, name, *args):
       if name == 'on_after_task':
         failure, internal_failure, dimensions, summary = args
@@ -551,7 +555,7 @@ class TestBotMain(net_utils.TestCase):
     self.bot = self.make_bot(
         auth_headers_cb=lambda: ({'A': 'a'}, time.time() + 3600))
 
-    self.mock(bot_main, 'post_error_task', lambda *args: self.fail(args))
+    self.mock(bot_main, 'post_error_task', self.print_err_and_fail)
     def call_hook(botobj, name, *args):
       if name == 'on_after_task':
         failure, internal_failure, dimensions, summary = args
@@ -577,7 +581,7 @@ class TestBotMain(net_utils.TestCase):
     bot_main.run_manifest(self.bot, manifest, time.time())
 
   def test_run_manifest_task_failure(self):
-    self.mock(bot_main, 'post_error_task', lambda *args: self.fail(args))
+    self.mock(bot_main, 'post_error_task', self.print_err_and_fail)
     def call_hook(_botobj, name, *args):
       if name == 'on_after_task':
         failure, internal_failure, dimensions, summary = args

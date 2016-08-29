@@ -656,18 +656,13 @@ def run_manifest(botobj, manifest, start):
       os.remove(task_result_file)
 
     # Start a thread that periodically puts authentication headers and other
-    # authentication related information to a file on disk. task_runner and its
-    # subprocesses read it from there before making authenticated HTTP calls.
+    # authentication related information to a file on disk. task_runner reads it
+    # from there before making authenticated HTTP calls.
     auth_params_file = os.path.join(work_dir, 'bot_auth_params.json')
     if botobj.remote.uses_auth:
-      env['SWARMING_AUTH_PARAMS'] = str(auth_params_file)
       auth_params_dumper = file_refresher.FileRefresherThread(
           auth_params_file, lambda: bot_auth.prepare_auth_params_json(botobj))
       auth_params_dumper.start()
-    else:
-      env.pop('SWARMING_AUTH_PARAMS', None)
-      if os.path.exists(auth_params_file):
-        os.remove(auth_params_file)
 
     command = [
       sys.executable, THIS_FILE, 'task_runner',
@@ -680,6 +675,8 @@ def run_manifest(botobj, manifest, start):
       '--min-free-space', str(get_min_free_space()),
       '--bot-file', bot_file,
     ]
+    if botobj.remote.uses_auth:
+      command.extend(['--auth-params-file', auth_params_file])
     logging.debug('Running command: %s', command)
 
     # Put the output file into the current working directory, which should be

@@ -162,19 +162,20 @@ class TestTaskRunner(TestTaskRunnerBase):
       self.assertEqual(expected, kwargs)
     return check_final
 
-  def _run_command(self, task_details):
+  def _run_command(self, task_details, auth_params_file=None):
     start = time.time()
     self.mock(time, 'time', lambda: start + 10)
     server = 'https://localhost:1'
     return task_runner.run_command(
-        server, task_details, self.work_dir, 3600., start, 1, '/path/to/file')
+        server, task_details, self.work_dir, 3600., start, 1,
+        '/path/to/file', auth_params_file)
 
   def test_load_and_run_raw(self):
     server = 'https://localhost:1'
 
     def run_command(
         swarming_server, task_details, work_dir,
-        cost_usd_hour, start, min_free_space, bot_file):
+        cost_usd_hour, start, min_free_space, bot_file, auth_params_file):
       self.assertEqual(server, swarming_server)
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       # Necessary for OSX.
@@ -183,7 +184,8 @@ class TestTaskRunner(TestTaskRunnerBase):
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
       self.assertEqual(1, min_free_space)
-      self.assertEqual('/path/to/file', bot_file)
+      self.assertEqual('/path/to/bot-file', bot_file)
+      self.assertEqual('/path/to/auth-params-file', auth_params_file)
       return {
         u'exit_code': 1,
         u'hard_timeout': False,
@@ -210,7 +212,8 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     out_file = os.path.join(self.root_dir, 'w', 'task_runner_out.json')
     task_runner.load_and_run(
-        manifest, server, 3600., time.time(), out_file, 1, '/path/to/file')
+        manifest, server, 3600., time.time(), out_file, 1,
+        '/path/to/bot-file', '/path/to/auth-params-file')
     expected = {
       u'exit_code': 1,
       u'hard_timeout': False,
@@ -227,7 +230,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     def run_command(
         swarming_server, task_details, work_dir,
-        cost_usd_hour, start, min_free_space, bot_file):
+        cost_usd_hour, start, min_free_space, bot_file, auth_params_file):
       self.assertEqual(server, swarming_server)
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       # Necessary for OSX.
@@ -236,7 +239,8 @@ class TestTaskRunner(TestTaskRunnerBase):
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
       self.assertEqual(1, min_free_space)
-      self.assertEqual('/path/to/file', bot_file)
+      self.assertEqual('/path/to/bot-file', bot_file)
+      self.assertEqual('/path/to/auth-params-file', auth_params_file)
       return {
         u'exit_code': 0,
         u'hard_timeout': False,
@@ -267,7 +271,8 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     out_file = os.path.join(self.root_dir, 'w', 'task_runner_out.json')
     task_runner.load_and_run(
-        manifest, server, 3600., time.time(), out_file, 1, '/path/to/file')
+        manifest, server, 3600., time.time(), out_file, 1,
+        '/path/to/bot-file', '/path/to/auth-params-file')
     expected = {
       u'exit_code': 0,
       u'hard_timeout': False,
@@ -295,7 +300,6 @@ class TestTaskRunner(TestTaskRunnerBase):
     auth_params_file = os.path.join(self.root_dir, 'auth_params.json')
     with open(auth_params_file, 'wb') as f:
       json.dump({'swarming_http_headers': {'A': 'a'}}, f)
-    os.environ['SWARMING_AUTH_PARAMS'] = auth_params_file
 
     # This runs the command for real.
     self.requests(cost_usd=1, exit_code=0, auth_headers={'A': 'a'})
@@ -307,7 +311,9 @@ class TestTaskRunner(TestTaskRunnerBase):
       u'must_signal_internal_failure': None,
       u'version': task_runner.OUT_VERSION,
     }
-    self.assertEqual(expected, self._run_command(task_details))
+    self.assertEqual(
+        expected,
+        self._run_command(task_details, auth_params_file=auth_params_file))
 
   def test_run_command_isolated(self):
     # This runs the command for real.
@@ -537,14 +543,15 @@ class TestTaskRunner(TestTaskRunnerBase):
   def test_main(self):
     def load_and_run(
         manifest, swarming_server, cost_usd_hour, start,
-        json_file, min_free_space, bot_file):
+        json_file, min_free_space, bot_file, auth_params_file):
       self.assertEqual('foo', manifest)
       self.assertEqual('http://localhost', swarming_server)
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
       self.assertEqual('task_summary.json', json_file)
       self.assertEqual(1, min_free_space)
-      self.assertEqual('/path/to/file', bot_file)
+      self.assertEqual('/path/to/bot-file', bot_file)
+      self.assertEqual('/path/to/auth-params-file', auth_params_file)
 
     self.mock(task_runner, 'load_and_run', load_and_run)
     cmd = [
@@ -554,31 +561,8 @@ class TestTaskRunner(TestTaskRunnerBase):
       '--cost-usd-hour', '3600',
       '--start', str(time.time()),
       '--min-free-space', '1',
-      '--bot-file', '/path/to/file',
-    ]
-    self.assertEqual(0, task_runner.main(cmd))
-
-  def test_main_reboot(self):
-    def load_and_run(
-        manifest, swarming_server, cost_usd_hour, start,
-        json_file, min_free_space, bot_file):
-      self.assertEqual('foo', manifest)
-      self.assertEqual('http://localhost', swarming_server)
-      self.assertEqual(3600., cost_usd_hour)
-      self.assertEqual(time.time(), start)
-      self.assertEqual('task_summary.json', json_file)
-      self.assertEqual(1, min_free_space)
-      self.assertEqual('/path/to/file', bot_file)
-
-    self.mock(task_runner, 'load_and_run', load_and_run)
-    cmd = [
-      '--swarming-server', 'http://localhost',
-      '--in-file', 'foo',
-      '--out-file', 'task_summary.json',
-      '--cost-usd-hour', '3600',
-      '--start', str(time.time()),
-      '--min-free-space', '1',
-      '--bot-file', '/path/to/file',
+      '--bot-file', '/path/to/bot-file',
+      '--auth-params-file', '/path/to/auth-params-file',
     ]
     self.assertEqual(0, task_runner.main(cmd))
 
@@ -676,7 +660,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       json.dump(manifest, f)
     out_file = os.path.join(self.work_dir, 'task_runner_out.json')
     task_runner.load_and_run(
-        in_file, server, 3600., time.time(), out_file, 1, None)
+        in_file, server, 3600., time.time(), out_file, 1, None, None)
     with open(out_file, 'rb') as f:
       return json.load(f)
 
@@ -685,7 +669,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     server = 'https://localhost:1'
     return task_runner.run_command(
         server, task_details, self.work_dir, 3600., time.time(), 1,
-        '/path/to/file')
+        '/path/to/file', None)
 
   def test_hard(self):
     # Actually 0xc000013a
