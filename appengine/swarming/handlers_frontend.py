@@ -616,6 +616,17 @@ class BaseTaskHandler(auth.AuthenticatingHandler):
 class TaskHandler(BaseTaskHandler):
   """Show the full text of a task request and its result."""
 
+  @staticmethod
+  def packages_grouped_by_path(flat_packages):
+    """Returns sorted [(path, [PinInfo, ...])].
+
+    Used by user_task.html.
+    """
+    retval = collections.defaultdict(list)
+    for pkg in flat_packages:
+      retval[pkg.path].append(pkg)
+    return sorted(retval.iteritems())
+
   @auth.autologin
   @auth.require(acl.is_user)
   def get(self, task_id):
@@ -663,9 +674,27 @@ class TaskHandler(BaseTaskHandler):
       parent_task = parent_task_future.get_result()
     children_tasks = [c.get_result() for c in children_tasks_futures]
 
+    cipd = None
+    if request.properties.cipd_input:
+      cipd = {
+        'server': request.properties.cipd_input.server,
+        'client_package': request.properties.cipd_input.client_package,
+        'packages': self.packages_grouped_by_path(
+            request.properties.cipd_input.packages),
+      }
+
+    cipd_pins = None
+    if result.cipd_pins:
+      cipd_pins = {
+        'client_package': result.cipd_pins.client_package,
+        'packages': self.packages_grouped_by_path(result.cipd_pins.packages),
+      }
+
     params = {
       'bot': bot_future.get_result() if bot_future else None,
       'children_tasks': children_tasks,
+      'cipd': cipd,
+      'cipd_pins': cipd_pins,
       'is_admin': acl.is_admin(),
       'is_gae_admin': users.is_current_user_admin(),
       'is_privileged_user': acl.is_privileged_user(),

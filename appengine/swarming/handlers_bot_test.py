@@ -436,6 +436,17 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'isolatedserver': u'http://localhost:1',
         u'namespace': u'default-gzip',
       },
+      'cipd_pins': {
+        u'client_package': {
+          u'package_name': u'infra/tools/cipd/windows-amd64',
+          u'version': u'deadbeef'*5,
+        },
+        u'packages': [{
+          u'package_name': u'rm',
+          u'path': u'bin',
+          u'version': u'badc0fee'*5,
+        }]
+      },
       'task_id': task_id,
     }
     response = self.post_json('/swarming/api/v1/bot/task_update', params)
@@ -463,6 +474,17 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'isolated': u'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
         u'isolatedserver': u'http://localhost:1',
         u'namespace': u'default-gzip',
+      },
+      'cipd_pins': {
+        u'client_package': {
+          u'package_name': u'infra/tools/cipd/windows-amd64',
+          u'version': u'deadbeef'*5,
+        },
+        u'packages': [{
+          u'package_name': u'rm',
+          u'path': u'bin',
+          u'version': u'badc0fee'*5,
+        }]
       },
       u'server_versions': [u'v1a'],
       u'started_ts': str_now,

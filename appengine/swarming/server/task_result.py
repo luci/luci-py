@@ -58,9 +58,11 @@ Graph of schema:
     +---------------+  +---------------+
 """
 
+import collections
 import datetime
 import logging
 import random
+import re
 
 from google.appengine.api import datastore_errors
 from google.appengine.datastore import datastore_query
@@ -71,6 +73,8 @@ from components import utils
 from server import large
 from server import task_pack
 from server import task_request
+
+import cipd
 
 # Amount of time after which a bot is considered dead. In short, if a bot has
 # not ping in the last 5 minutes while running a task, it is considered dead.
@@ -306,6 +310,21 @@ class PerformanceStats(ndb.Model):
           'PerformanceStats.bot_overhead is required')
 
 
+class CipdPins(ndb.Model):
+  """Specifies which CIPD client and packages were actually installed.
+
+  A part of _TaskResultCommon.
+  """
+  # CIPD package of CIPD client to use.
+  # client_package.package_name and version are provided.
+  # client_package.path will be None.
+  client_package = ndb.LocalStructuredProperty(task_request.CipdPackage)
+
+  # List of packages to install in $CIPD_PATH prior task execution.
+  packages = ndb.LocalStructuredProperty(task_request.CipdPackage,
+                                         repeated=True)
+
+
 class _TaskResultCommon(ndb.Model):
   """Contains properties that is common to both TaskRunResult and
   TaskResultSummary.
@@ -372,6 +391,9 @@ class _TaskResultCommon(ndb.Model):
   # File outputs of the task. Only set if TaskRequest.properties.sources_ref is
   # set. The isolateserver and namespace should match.
   outputs_ref = ndb.LocalStructuredProperty(task_request.FilesRef)
+
+  # The pinned versions of all the CIPD packages used in the task.
+  cipd_pins = ndb.LocalStructuredProperty(CipdPins)
 
   @property
   def can_be_canceled(self):
@@ -563,6 +585,24 @@ class _TaskResultCommon(ndb.Model):
     output_key = _run_result_key_to_output_key(self.run_result_key)
     out = yield TaskOutput.get_output_async(output_key, self.stdout_chunks)
     raise ndb.Return(out)
+
+  def validate(self, request):
+    """Validation that requires the task_request.
+
+    Full validation includes calling this method, and the checks in
+    _pre_put_hook.
+
+    Raises ValueError if this is invalid, otherwise returns None.
+    """
+    props = request.properties
+
+    if props.cipd_input and self.cipd_pins:
+      with cipd.pin_check_fn(None, None) as check:
+        check(props.cipd_input.client_package, self.cipd_pins.client_package)
+        if len(props.cipd_input.packages) != len(self.cipd_pins.packages):
+          raise ValueError('Mismatched package lengths')
+        for a, b in zip(props.cipd_input.packages, self.cipd_pins.packages):
+          check(a, b)
 
   def _pre_put_hook(self):
     """Use extra validation that cannot be validated throught 'validator'."""
@@ -782,6 +822,7 @@ class TaskResultSummary(_TaskResultCommon):
 
   def reset_to_pending(self):
     """Resets this entity to pending state."""
+    self.cipd_pins = None
     self.duration = None
     self.exit_code = None
     self.internal_failure = False

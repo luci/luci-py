@@ -333,15 +333,6 @@ class CipdInput(ndb.Model):
       package_names.add(p.package_name)
     self.packages.sort(key=lambda p: p.package_name)
 
-  def packages_grouped_by_path(self):
-    """Returns sorted [(path), [package]) list. Used by user_task.html."""
-    packages = collections.defaultdict(list)
-    for p in self.packages:
-      packages[p.path].append(p)
-    for pkgs in packages.itervalues():
-      pkgs.sort()
-    return sorted(packages.iteritems())
-
 
 class TaskProperties(ndb.Model):
   """Defines all the properties of a task to be run on the Swarming

@@ -608,7 +608,8 @@ def bot_reap_task(dimensions, bot_id, bot_version, deadline):
 
 def bot_update_task(
     run_result_key, bot_id, output, output_chunk_start, exit_code, duration,
-    hard_timeout, io_timeout, cost_usd, outputs_ref, performance_stats):
+    hard_timeout, io_timeout, cost_usd, outputs_ref, cipd_pins,
+    performance_stats):
   """Updates a TaskRunResult and TaskResultSummary, along TaskOutput.
 
   Arguments:
@@ -622,6 +623,7 @@ def bot_update_task(
   - io_timeout: Bool set if an I/O timeout occured.
   - cost_usd: Cost in $USD of this task up to now.
   - outputs_ref: task_request.FilesRef instance or None.
+  - cipd_pins: None or task_result.CipdPins
   - performance_stats: task_result.PerformanceStats instance or None. Can only
         be set when the task is completing.
 
@@ -649,10 +651,10 @@ def bot_update_task(
 
   packed = task_pack.pack_run_result_key(run_result_key)
   logging.debug(
-      'bot_update_task(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)',
+      'bot_update_task(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)',
       packed, bot_id, len(output) if output else output, output_chunk_start,
       exit_code, duration, hard_timeout, io_timeout, cost_usd, outputs_ref,
-      performance_stats)
+      cipd_pins, performance_stats)
 
   result_summary_key = task_pack.run_result_key_to_result_summary_key(
       run_result_key)
@@ -708,6 +710,9 @@ def bot_update_task(
     if outputs_ref:
       run_result.outputs_ref = outputs_ref
 
+    if cipd_pins:
+      run_result.cipd_pins = cipd_pins
+
     if run_result.state in task_result.State.STATES_RUNNING:
       if hard_timeout or io_timeout:
         run_result.state = task_result.State.TIMED_OUT
@@ -717,6 +722,7 @@ def bot_update_task(
         run_result.completed_ts = now
 
     run_result.signal_server_version(server_version)
+    run_result.validate(request)
     to_put = [run_result]
     if output:
       # This does 1 multi GETs. This also modifies run_result in place.
@@ -740,6 +746,7 @@ def bot_update_task(
     else:
       result_summary.set_from_run_result(run_result, request)
 
+    result_summary.validate(request)
     to_put.append(result_summary)
     ndb.put_multi(to_put)
 

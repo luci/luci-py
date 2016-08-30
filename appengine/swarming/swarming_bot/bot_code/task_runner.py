@@ -578,6 +578,9 @@ def run_command(
         cipd_stats = run_isolated_result.get('stats', {}).get('cipd')
         if cipd_stats:
           params['cipd_stats'] = cipd_stats
+        cipd_pins = run_isolated_result.get('cipd_pins')
+        if cipd_pins:
+          params['cipd_pins'] = cipd_pins
     except (IOError, OSError, ValueError) as e:
       logging.error('Swallowing error: %s', e)
       if not must_signal_internal_failure:

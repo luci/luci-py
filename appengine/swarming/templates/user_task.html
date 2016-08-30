@@ -73,6 +73,14 @@
   .package-list {
     margin-left: 1em;
   }
+
+  .package-pin-name {
+    font-weight: bold;
+  }
+
+  .package-pin-version {
+    color: blue;
+  }
 </style>
 {% endblock %}
 
@@ -223,26 +231,28 @@
           <td>Idempotent</td>
           <td>{{request.properties.idempotent}}</td>
         </tr>
-        {% if request.properties.cipd_input %}
+        {% if cipd %}
           <tr title="CIPD server">
             <td>CIPD server</td>
-            <td>{{request.properties.cipd_input.server}}</td>
+            <td>{{cipd.server}}</td>
           </tr>
           <tr title="CIPD client">
             <td>CIPD client</td>
-            <td>{{request.properties.cipd_input.client_package}}</td>
+            <td>{{cipd.client_package}}</td>
           </tr>
-          <tr title="CIPD pacakges">
-            <td>CIPD packages</td>
-            <td>
-              {% for path, packages in request.properties.cipd_input.packages_grouped_by_path() %}
-                <div>{{ path or '.'}}/</div>
-                <div class="package-list">
-                  {{packages|join('<br>'|safe)}}
-                </div>
-              {% endfor %}
-            </td>
-          </tr>
+          {% if cipd.packages %}
+            <tr title="CIPD pacakges">
+              <td>CIPD packages</td>
+              <td>
+                {% for path, packages in cipd.packages %}
+                  <div>{{path or '.'}}/</div>
+                  <div class="package-list">
+                    {{packages|join('<br>'|safe)}}
+                  </div>
+                {% endfor %}
+              </td>
+            </tr>
+          {% endif %}
         {% endif %}
         {% if request.properties.inputs_ref and request.properties.inputs_ref.isolated %}
           <tr title="Inputs files">
@@ -418,6 +428,25 @@
           {% endif %}
         </td>
       </tr>
+      {% if cipd_pins %}
+        <tr title="CIPD client">
+          <td>CIPD client</td>
+          <td>{{cipd_pins.client_package}}</td>
+        </tr>
+        {% if cipd_pins.packages %}
+          <tr title="CIPD pacakges">
+            <td>CIPD packages</td>
+            <td>
+              {% for path, packages in cipd_pins.packages %}
+                <div>{{path or '.'}}/</div>
+                <div class="package-list">
+                  {{packages|join('<br>'|safe)}}
+                </div>
+              {% endfor %}
+            </td>
+          </tr>
+        {% endif %}
+      {% endif %}
       <tr title="Current bot version. TODO(maruel): List bot version at time of task reaping.">
         <td>Bot version</td>
         <td>{{task.bot_version}}</td>

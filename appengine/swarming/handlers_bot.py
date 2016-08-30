@@ -632,9 +632,9 @@ class BotTaskUpdateHandler(_BotApiHandler):
   out-of-order packets.
   """
   ACCEPTED_KEYS = {
-    u'bot_overhead', u'cipd_stats', u'cost_usd', u'duration', u'exit_code',
-    u'hard_timeout', u'id', u'io_timeout', u'isolated_stats', u'output',
-    u'output_chunk_start', u'outputs_ref', u'task_id',
+    u'bot_overhead', u'cipd_pins', u'cipd_stats', u'cost_usd', u'duration',
+    u'exit_code', u'hard_timeout', u'id', u'io_timeout', u'isolated_stats',
+    u'output', u'output_chunk_start', u'outputs_ref', u'task_id',
   }
   REQUIRED_KEYS = {u'id', u'task_id'}
 
@@ -657,13 +657,14 @@ class BotTaskUpdateHandler(_BotApiHandler):
     bot_auth.validate_bot_id_and_fetch_config(bot_id)
 
     bot_overhead = request.get('bot_overhead')
+    cipd_pins = request.get('cipd_pins')
+    cipd_stats = request.get('cipd_stats')
     cost_usd = request.get('cost_usd', 0)
     duration = request.get('duration')
     exit_code = request.get('exit_code')
     hard_timeout = request.get('hard_timeout')
     io_timeout = request.get('io_timeout')
     isolated_stats = request.get('isolated_stats')
-    cipd_stats = request.get('cipd_stats')
     output = request.get('output')
     output_chunk_start = request.get('output_chunk_start')
     outputs_ref = request.get('outputs_ref')
@@ -720,6 +721,14 @@ class BotTaskUpdateHandler(_BotApiHandler):
     if outputs_ref:
       outputs_ref = task_request.FilesRef(**outputs_ref)
 
+    if cipd_pins:
+      cipd_pins = task_result.CipdPins(
+        client_package=task_request.CipdPackage(
+            **cipd_pins['client_package']),
+        packages=[
+            task_request.CipdPackage(**args) for args in cipd_pins['packages']]
+      )
+
     try:
       state = task_scheduler.bot_update_task(
           run_result_key=run_result_key,
@@ -732,6 +741,7 @@ class BotTaskUpdateHandler(_BotApiHandler):
           io_timeout=io_timeout,
           cost_usd=cost_usd,
           outputs_ref=outputs_ref,
+          cipd_pins=cipd_pins,
           performance_stats=performance_stats)
       if not state:
         logging.info('Failed to update, please retry')

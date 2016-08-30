@@ -200,6 +200,19 @@ def task_result_to_rpc(entity, send_stats):
   outputs_ref = (
       _ndb_to_rpc(swarming_rpcs.FilesRef, entity.outputs_ref)
       if entity.outputs_ref else None)
+  cipd_pins = None
+  if entity.cipd_pins:
+    cipd_pins = swarming_rpcs.CipdPins(
+      client_package=(
+        _ndb_to_rpc(swarming_rpcs.CipdPackage,
+                    entity.cipd_pins.client_package)
+        if entity.cipd_pins.client_package else None
+      ),
+      packages=[
+        _ndb_to_rpc(swarming_rpcs.CipdPackage, pkg)
+        for pkg in entity.cipd_pins.packages
+      ] if entity.cipd_pins.packages else None
+    )
   performance_stats = None
   if send_stats and entity.performance_stats.is_valid:
       def op(entity):
@@ -213,8 +226,9 @@ def task_result_to_rpc(entity, send_stats):
           isolated_upload=op(entity.performance_stats.isolated_upload))
   kwargs = {
     'bot_dimensions': _string_list_pairs_from_dict(entity.bot_dimensions or {}),
-    'performance_stats': performance_stats,
+    'cipd_pins': cipd_pins,
     'outputs_ref': outputs_ref,
+    'performance_stats': performance_stats,
     'state': swarming_rpcs.StateField(entity.state),
   }
   if entity.__class__ is task_result.TaskRunResult:

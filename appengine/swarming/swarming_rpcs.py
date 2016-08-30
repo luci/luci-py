@@ -143,6 +143,17 @@ class CipdInput(messages.Message):
   packages = messages.MessageField(CipdPackage, 3, repeated=True)
 
 
+class CipdPins(messages.Message):
+  """Defines pinned CIPD packages that were installed during the task."""
+
+  # The pinned package + version of the CIPD client that was actually used.
+  client_package = messages.MessageField(CipdPackage, 1)
+
+  # List of CIPD packages that were installed in the task with fully resolved
+  # package names and versions.
+  packages = messages.MessageField(CipdPackage, 2, repeated=True)
+
+
 class TaskProperties(messages.Message):
   """Important metadata about a particular task."""
   cipd_input = messages.MessageField(CipdInput, 10)
@@ -289,6 +300,11 @@ class TaskResult(messages.Message):
   user = messages.StringField(25)
   # Statistics about overhead for an isolated task. Only sent when requested.
   performance_stats = messages.MessageField(PerformanceStats, 26)
+
+  # A listing of the ACTUAL pinned CipdPackages that the task used. These can
+  # vary from the input packages if the inputs included non-identity versions
+  # (e.g. a ref like "latest").
+  cipd_pins = messages.MessageField(CipdPins, 27)
 
 
 class TaskList(messages.Message):
