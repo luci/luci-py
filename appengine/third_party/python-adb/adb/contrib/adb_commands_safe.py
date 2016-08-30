@@ -828,7 +828,8 @@ class AdbCommandsSafe(object):
         except usb_exceptions.LibusbWrappingError as e:
           self._failure = 'usb_failure'
           _LOG.warning('I/O FAILURE: %s: %s', self.port_path, e)
-          self._handle.Reset()
+          # TODO(crbug.com/642440): Reset the handle here if fleet health
+          # regresses and host kernel panics don't subside.
         except adb_protocol.InvalidResponseError as e:
           self._failure = 'protocol_fault'
           _LOG.warning('SYNC FAILURE: %s: %s', self.port_path, e)
