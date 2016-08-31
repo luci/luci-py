@@ -137,7 +137,8 @@ def _validate_dict_of_strings(prop, value):
          isinstance(k, unicode) and isinstance(v, unicode)
          for k, v in value.iteritems()):
     # pylint: disable=W0212
-    raise TypeError('%s must be a dict of strings' % prop._name)
+    raise TypeError(
+        '%s must be a dict of strings, not %r' % (prop._name, value))
 
 
 def _validate_dimensions(prop, value):

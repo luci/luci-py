@@ -567,12 +567,13 @@ class SwarmingBotService(remote.Service):
     # pending or if the bot is considered 'dead', e.g. no contact since 10
     # minutes.
     logging.info('%s', request)
-    bot_key = bot_management.get_info_key(request.bot_id)
+    bot_id = unicode(request.bot_id)
+    bot_key = bot_management.get_info_key(bot_id)
     get_or_raise(bot_key)  # raises 404 if there is no such bot
     try:
       # Craft a special priority 0 task to tell the bot to shutdown.
       properties = task_request.TaskProperties(
-          dimensions={u'id': request.bot_id},
+          dimensions={u'id': bot_id},
           execution_timeout_secs=0,
           grace_period_secs=0,
           io_timeout_secs=0)
@@ -580,10 +581,10 @@ class SwarmingBotService(remote.Service):
       request = task_request.TaskRequest(
           created_ts=now,
           expiration_ts=now + datetime.timedelta(days=1),
-          name='Terminate %s' % request.bot_id,
+          name=u'Terminate %s' % bot_id,
           priority=0,
           properties=properties,
-          tags=['terminate:1'],
+          tags=[u'terminate:1'],
           user=auth.get_current_identity().to_bytes())
       assert request.properties.is_terminate
       task_request.init_new_request(request, acl.is_bot_or_admin())
