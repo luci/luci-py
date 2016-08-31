@@ -636,10 +636,11 @@ class _TaskResultCommon(ndb.Model):
     if self.deduped_from:
       if self.state != State.COMPLETED:
         raise datastore_errors.BadValueError(
-            'state must be COMPLETED on deduped task')
+            'state(%d) must be COMPLETED on deduped task %s' %
+            (self.state, self.deduped_from))
       if self.failure:
         raise datastore_errors.BadValueError(
-            'failure can\'t be True on deduped task')
+            'failure can\'t be True on deduped task %s' % self.deduped_from)
 
     self.children_task_ids = sorted(
         set(self.children_task_ids), key=lambda x: int(x, 16))
