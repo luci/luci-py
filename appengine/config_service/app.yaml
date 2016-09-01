@@ -33,6 +33,7 @@ libraries:
 
 builtins:
 - deferred: on
+- remote_api: on
 
 includes:
 - components/auth
