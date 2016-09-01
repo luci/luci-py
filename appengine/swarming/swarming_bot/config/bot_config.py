@@ -100,8 +100,13 @@ def get_authentication_headers(bot):
     Tuple (dict with headers or None, unix timestamp of when they expire).
   """
   if platforms.is_gce():
-    tok = platforms.gce.oauth2_access_token()
-    return {'Authorization': 'Bearer %s' % tok}, time.time() + 5*60
+    # By default, VMs do not have "User info" API enabled, as comment above.
+    # When this is the case, the oauth token is unusable. So do not use the
+    # oauth token in this case and fall back to IP based whitelisting.
+    if ('https://www.googleapis.com/auth/userinfo.email' in
+        platforms.gce.oauth2_available_scopes()):
+      tok = platforms.gce.oauth2_access_token()
+      return {'Authorization': 'Bearer %s' % tok}, time.time() + 5*60
   return (None, None)
 
 
