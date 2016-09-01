@@ -49,11 +49,12 @@
       client_id="[[client_id]]"
       auth_headers="{{auth_headers}}"
       permissions="{{_permissions}}"
+      server_version="{{_server_version}}"
       name="Swarming Server"
       busy="[[_busy]]">
 
       <h2>Service Status</h2>
-      <div>Server Version: [[serverDetails.server_version]]</div>
+      <div>Server Version: [[_server_version.server_version]]</div>
       <ul>
         <li>
           <!-- TODO(kjlubick) convert these linked pages to Polymer-->
@@ -63,7 +64,7 @@
           <a href="/restricted/mapreduce/status">Map Reduce Jobs</a>
         </li>
         <li>
-          <a href$="[[_makeInstancesUrl(serverDetails,_project_id)]]">View version's instances on Cloud Console</a>
+          <a href$="[[_makeInstancesUrl(_server_version,_project_id)]]">View version's instances on Cloud Console</a>
         </li>
         <li>
           <a><a href$="[[_makeErrorUrl(_project_id)]]">View server errors on Cloud Console</a></a>
@@ -131,15 +132,6 @@
           type: String,
         },
 
-        auth_headers: {
-          type: Object,
-          observer: "signIn",
-        },
-
-        serverDetails: {
-          type: Object,
-        },
-
         _bootstrap_token: {
           type: String,
           // TODO(kjlubick): fetch this from an API
@@ -164,13 +156,12 @@
             var idx = location.hostname.indexOf(".appspot.com");
             return location.hostname.substring(0, idx);
           },
-        }
+        },
+        _server_version: {
+          type: Object,
+        },
       },
 
-      signIn: function(){
-        this._getJsonAsync("serverDetails", "/_ah/api/swarming/v1/server/details",
-          "_busy", this.auth_headers);
-      },
 
       _cannotBootstrap: function(permissions) {
         return !(permissions && permissions.get_bootstrap_token);

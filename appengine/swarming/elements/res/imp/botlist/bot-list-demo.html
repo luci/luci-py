@@ -57,6 +57,12 @@
 
     server.respondWith("GET", /^\/_ah\/api\/swarming\/v1\/bots\/dimensions/, JSON.stringify(fleetData));
     server.respondWith("GET", /^\/api\/swarming\/v1\/bots\/dimensions/, JSON.stringify(fleetData));
+
+    var details = {
+      server_version: "1234-deadbeef",
+    };
+    server.respondWith("GET", /^\/_ah\/api\/swarming\/v1\/server\/details/, JSON.stringify(details));
+    server.respondWith("GET", /^\/api\/swarming\/v1\/server\/details/, JSON.stringify(details));
     </script>
 
     <link rel="import" href="bot-list.html">

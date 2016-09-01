@@ -16408,6 +16408,10 @@ You can bind to `isAuthorized` property to monitor authorization state.
         color: #1F78B4;
       }
 
+      auth-signin, .small {
+        font-size: .7em;
+      }
+
       paper-fab {
         position: fixed;
         bottom: 5px;
@@ -16423,12 +16427,18 @@ You can bind to `isAuthorized` property to monitor authorization state.
       <app-header fixed="">
         <app-toolbar>
           <div class="title left">[[name]]</div>
-          <paper-spinner-lite class="left" active="[[_or(busy,_busy)]]"></paper-spinner-lite>
+          <paper-spinner-lite class="left" active="[[_or(busy,_busy1,_busy2)]]"></paper-spinner-lite>
 
           <a class="left" href="/newui/">Home</a>
           <a class="left" href="/newui/botlist">Bot List</a>
           <a class="left" href="/newui/tasklist">Task List</a>
           <div class="flex"></div>
+          <div class="small right">
+            Server:
+            <a href$="[[_versionLink(server_version)]]">
+              [[server_version.server_version]]
+            </a>
+          </div>
           <auth-signin class="right" client_id="[[client_id]]" auth_headers="{{auth_headers}}" signed_in="{{signed_in}}">
           </auth-signin>
         </app-toolbar>
@@ -16465,7 +16475,7 @@ You can bind to `isAuthorized` property to monitor authorization state.
         auth_headers: {
           type: Object,
           notify: true,
-          observer: "_loadPermissions"
+          observer: "_load"
         },
 
         permissions: {
@@ -16477,24 +16487,46 @@ You can bind to `isAuthorized` property to monitor authorization state.
           notify: true,
         },
 
+        server_version: {
+          type: Object,
+          notify: true,
+        },
+
         signed_in: {
           type: Boolean,
           value: false,
-          notify:true,
+          notify: true,
         },
 
         // private
-        _busy: {
+        _busy1: {
+          type: Boolean,
+          value: false,
+        },
+        _busy2: {
           type: Boolean,
           value: false,
         }
 
       },
 
-      _loadPermissions: function() {
+      _load: function() {
         this._getJsonAsync("permissions", "/_ah/api/swarming/v1/server/permissions",
-          "_busy", this.auth_headers);
+          "_busy1", this.auth_headers);
+        this._getJsonAsync("server_version", "/_ah/api/swarming/v1/server/details",
+          "_busy2", this.auth_headers)
       },
+
+      _versionLink: function(version) {
+        if (!version || !version.server_version) {
+          return undefined;
+        }
+        var split = version.server_version.split("-");
+        if (split.length !== 2) {
+          return undefined;
+        }
+        return "https://github.com/luci/luci-py/commit/"+split[1];
+      }
 
     });
   </script>
@@ -16525,10 +16557,10 @@ You can bind to `isAuthorized` property to monitor authorization state.
       }
     </style>
 
-    <swarming-app client_id="[[client_id]]" auth_headers="{{auth_headers}}" permissions="{{_permissions}}" name="Swarming Server" busy="[[_busy]]">
+    <swarming-app client_id="[[client_id]]" auth_headers="{{auth_headers}}" permissions="{{_permissions}}" server_version="{{_server_version}}" name="Swarming Server" busy="[[_busy]]">
 
       <h2>Service Status</h2>
-      <div>Server Version: [[serverDetails.server_version]]</div>
+      <div>Server Version: [[_server_version.server_version]]</div>
       <ul>
         <li>
           
@@ -16538,7 +16570,7 @@ You can bind to `isAuthorized` property to monitor authorization state.
           <a href="/restricted/mapreduce/status">Map Reduce Jobs</a>
         </li>
         <li>
-          <a href$="[[_makeInstancesUrl(serverDetails,_project_id)]]">View version's instances on Cloud Console</a>
+          <a href$="[[_makeInstancesUrl(_server_version,_project_id)]]">View version's instances on Cloud Console</a>
         </li>
         <li>
           <a></a><a href$="[[_makeErrorUrl(_project_id)]]">View server errors on Cloud Console</a>
@@ -16606,15 +16638,6 @@ You can bind to `isAuthorized` property to monitor authorization state.
           type: String,
         },
 
-        auth_headers: {
-          type: Object,
-          observer: "signIn",
-        },
-
-        serverDetails: {
-          type: Object,
-        },
-
         _bootstrap_token: {
           type: String,
           // TODO(kjlubick): fetch this from an API
@@ -16639,13 +16662,12 @@ You can bind to `isAuthorized` property to monitor authorization state.
             var idx = location.hostname.indexOf(".appspot.com");
             return location.hostname.substring(0, idx);
           },
-        }
+        },
+        _server_version: {
+          type: Object,
+        },
       },
 
-      signIn: function(){
-        this._getJsonAsync("serverDetails", "/_ah/api/swarming/v1/server/details",
-          "_busy", this.auth_headers);
-      },
 
       _cannotBootstrap: function(permissions) {
         return !(permissions && permissions.get_bootstrap_token);

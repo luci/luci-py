@@ -27,6 +27,8 @@
     auth_headers: Object, Use this as an argument to sk.request to set oauth2 headers.
     permissions: Object, {String:Boolean} of permissions to perform various
         behaviors, such as terminate_bot.
+    server_version: Object, containing String server_version. server_version
+        represents what git revision the server is using.
     signed_in: Boolean, if the user is signed in.
   Methods:
     None.
@@ -78,6 +80,10 @@
         color: #1F78B4;
       }
 
+      auth-signin, .small {
+        font-size: .7em;
+      }
+
       paper-fab {
         position: fixed;
         bottom: 5px;
@@ -93,12 +99,18 @@
       <app-header fixed>
         <app-toolbar>
           <div class="title left">[[name]]</div>
-          <paper-spinner-lite class="left" active="[[_or(busy,_busy)]]"></paper-spinner-lite>
+          <paper-spinner-lite class="left" active="[[_or(busy,_busy1,_busy2)]]"></paper-spinner-lite>
 
           <a class="left" href="/newui/">Home</a>
           <a class="left" href="/newui/botlist">Bot List</a>
           <a class="left" href="/newui/tasklist">Task List</a>
           <div class="flex"></div>
+          <div class="small right">
+            Server:
+            <a href$="[[_versionLink(server_version)]]">
+              [[server_version.server_version]]
+            </a>
+          </div>
           <auth-signin
               class="right"
               client_id="[[client_id]]"
@@ -139,7 +151,7 @@
         auth_headers: {
           type: Object,
           notify: true,
-          observer: "_loadPermissions"
+          observer: "_load"
         },
 
         permissions: {
@@ -151,24 +163,46 @@
           notify: true,
         },
 
+        server_version: {
+          type: Object,
+          notify: true,
+        },
+
         signed_in: {
           type: Boolean,
           value: false,
-          notify:true,
+          notify: true,
         },
 
         // private
-        _busy: {
+        _busy1: {
+          type: Boolean,
+          value: false,
+        },
+        _busy2: {
           type: Boolean,
           value: false,
         }
 
       },
 
-      _loadPermissions: function() {
+      _load: function() {
         this._getJsonAsync("permissions", "/_ah/api/swarming/v1/server/permissions",
-          "_busy", this.auth_headers);
+          "_busy1", this.auth_headers);
+        this._getJsonAsync("server_version", "/_ah/api/swarming/v1/server/details",
+          "_busy2", this.auth_headers)
       },
+
+      _versionLink: function(version) {
+        if (!version || !version.server_version) {
+          return undefined;
+        }
+        var split = version.server_version.split("-");
+        if (split.length !== 2) {
+          return undefined;
+        }
+        return "https://github.com/luci/luci-py/commit/"+split[1];
+      }
 
     });
   </script>

@@ -68,6 +68,12 @@
     };
     server.respondWith("GET",  /^\/_ah\/api\/swarming\/v1\/server\/permissions/, JSON.stringify(permissions));
     server.respondWith("GET", /^\/api\/swarming\/v1\/server\/permissions/, JSON.stringify(permissions));
+
+    var details = {
+      server_version: "1234-deadbeef",
+    };
+    server.respondWith("GET", /^\/_ah\/api\/swarming\/v1\/server\/details/, JSON.stringify(details));
+    server.respondWith("GET", /^\/api\/swarming\/v1\/server\/details/, JSON.stringify(details));
     </script>
 
     <link rel="import" href="task-list.html">
