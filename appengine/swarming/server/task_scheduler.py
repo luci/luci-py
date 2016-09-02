@@ -114,14 +114,20 @@ def _reap_task(to_run_key, request, bot_id, bot_version, bot_dimensions):
     to_run_future = to_run_key.get_async()
     result_summary_future = result_summary_key.get_async()
     to_run = to_run_future.get_result()
-    if not to_run or not to_run.is_reapable:
-      result_summary_future.wait()
-      return None
     result_summary = result_summary_future.get_result()
+    if not to_run:
+      logging.error('Missing TaskToRun?\n%s', result_summary.task_id)
+      return None
+    if not to_run.is_reapable:
+      logging.info('%s is not reapable', result_summary.task_id)
+      return None
     if result_summary.bot_id == bot_id:
       # This means two things, first it's a retry, second it's that the first
       # try failed and the retry is being reaped by the same bot. Deny that, as
       # the bot may be deeply broken and could be in a killing spree.
+      logging.warning(
+          '%s can\'t retry its own internal failure task',
+          result_summary.task_id)
       return None
     to_run.queue_number = None
     run_result = task_result.new_run_result(
