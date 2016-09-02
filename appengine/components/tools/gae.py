@@ -5,7 +5,7 @@
 
 """Wrapper around GAE SDK tools to simplify working with multi module apps."""
 
-__version__ = '1.0'
+__version__ = '1.1'
 
 import atexit
 import code
@@ -42,6 +42,28 @@ from depot_tools import subcommand
 
 from tool_support import gae_sdk_utils
 from tools import calculate_version
+
+
+def CMDactive(parser, args):
+  """Prints the active versions on the server.
+
+  This is an approximation of querying which version is the default.
+  """
+  parser.add_option(
+      '-b', '--bare', action='store_true',
+      help='Only print the version(s), nothing else')
+  app, options, _modules = parser.parse_args(args)
+  data = app.get_actives()
+  if options.bare:
+    print('\n'.join(sorted(set(i['id'] for i in data))))
+    return 0
+  print('%s:' % app.app_id)
+  for service in data:
+    print(
+        '  %s: %s by %s at %s' % (
+          service['service'], service['id'], service['deployer'],
+          service['creationTime']))
+  return 0
 
 
 def CMDapp_dir(parser, args):

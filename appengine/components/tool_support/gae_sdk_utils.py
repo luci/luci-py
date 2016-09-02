@@ -8,6 +8,7 @@ import collections
 import getpass
 import glob
 import hashlib
+import json
 import logging
 import os
 import re
@@ -469,7 +470,7 @@ class Application(object):
     # 'aedeploy' requires cwd to be set to module path.
     check_tool_in_path('gcloud')
     cmd = [
-      'gcloud', 'preview', 'app', 'deploy', os.path.basename(mod.path),
+      'gcloud', 'app', 'deploy', os.path.basename(mod.path),
       '--project', self.app_id,
       '--version', version,
       '--docker-build', 'remote',
@@ -481,6 +482,33 @@ class Application(object):
       check_tool_in_path('aedeploy')
       cmd = ['aedeploy'] + cmd
     self.run_cmd(cmd, cwd=os.path.dirname(mod.path))
+
+  def get_actives(self, modules=None):
+    """Returns active version(s)."""
+    check_tool_in_path('gcloud')
+    cmd = [
+      'gcloud', 'app', 'versions', 'list',
+      '--project', self.app_id,
+      '--format', 'json',
+      '--hide-no-traffic',
+    ]
+    raw = self.run_cmd(cmd)
+    try:
+      data = json.loads(raw)
+    except ValueError:
+      sys.stderr.write('Failed to decode %r as JSON\n' % raw)
+      raise RuntimeError('Failed to query active version')
+    # TODO(maruel): Handle when traffic_split != 1.0.
+    # TODO(maruel): There's a lot more data, decide what is generally useful in
+    # there.
+    return [
+      {
+        'creationTime': service['version']['creationTime'].split('.', 1)[0],
+        'deployer': service['version']['deployer'],
+        'id': service['id'],
+        'service': service['service'],
+      } for service in data if not modules or service['service'] in modules
+    ]
 
 
 def check_tool_in_path(tool):
