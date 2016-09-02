@@ -1,0 +1,98 @@
+<!--
+  Copyright 2016 The LUCI Authors. All rights reserved.
+  Use of this source code is governed under the Apache License, Version 2.0
+  that can be found in the LICENSE file.
+
+  This in an HTML Import-able file that contains the definition
+  of the following elements:
+
+    <bot-page>
+
+  bot-page shows the tasks, events, and dimensions of a bot.
+
+  This is a top-level element.
+
+  Properties:
+    bot_id: String, Used in testing to specify a bot_id
+    client_id: String, Oauth 2.0 client id.  It will be set by server-side
+        template evaluation.
+
+  Methods:
+    None.
+
+  Events:
+    None.
+-->
+
+<link rel="import" href="/res/imp/bower_components/polymer/polymer.html">
+
+<link rel="import" href="/res/imp/common/common-behavior.html">
+<link rel="import" href="/res/imp/common/swarming-app.html">
+<link rel="import" href="/res/imp/common/url-param.html">
+
+<link rel="import" href="bot-page-data.html">
+
+
+<dom-module id="bot-page">
+  <template>
+    <style include="iron-flex iron-flex-alignment iron-positioning swarming-app-style">
+
+    </style>
+
+    <url-param name="id"
+      value="{{bot_id}}">
+    </url-param>
+
+    <swarming-app
+      client_id="[[client_id]]"
+      auth_headers="{{_auth_headers}}"
+      signed_in="{{_signed_in}}"
+
+      busy="[[_busy]]"
+      name="Swarming Bot Page">
+
+      <h2 hidden$="[[_signed_in]]">You must sign in to see anything useful.</h2>
+
+      <div hidden$="[[_not(_signed_in)]]">
+
+        <bot-page-data
+          auth_headers="[[_auth_headers]]"
+          bot_id="[[bot_id]]"
+
+          bot="{{_bot}}"
+          busy="{{_busy}}"
+          events="{{_events}}"
+          tasks="{{_tasks}}">
+        </bot-page-data>
+
+        <h1> Bot Page Stub </h1>
+      </div>
+
+    </swarming-app>
+
+  </template>
+  <script>
+  (function(){
+
+
+    Polymer({
+      is: 'bot-page',
+
+      behaviors: [
+          SwarmingBehaviors.CommonBehavior,
+      ],
+
+      properties: {
+        bot_id: {
+          type: String,
+        },
+        client_id: {
+          type: String,
+        },
+
+      },
+
+    });
+  })();
+  </script>
+</dom-module>

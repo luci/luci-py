@@ -24603,4 +24603,164 @@ the fleet.">
     });
   })();
   </script>
+</dom-module><dom-module id="bot-page-data" assetpath="/res/imp/botpage/">
+  <script>
+  (function(){
+
+    Polymer({
+      is: 'bot-page-data',
+
+      behaviors: [
+          SwarmingBehaviors.CommonBehavior,
+      ],
+
+      properties: {
+        // inputs
+        auth_headers: {
+          type: Object,
+        },
+        bot_id: {
+          type: String,
+        },
+
+        // outputs
+        busy: {
+          type: Boolean,
+          computed: "_or(_busy1,_busy2,_busy3)",
+          notify: true,
+        },
+        bot: {
+          type: Object,
+          computed: "_parseBot(_bot)",
+          notify: true,
+        },
+        events: {
+          type: Array,
+          computed: "_parseEvents(_events)",
+          notify: true,
+        },
+        tasks: {
+          type: Array,
+          computed: "_parseTasks(_tasks)",
+          notify: true,
+        },
+
+        // private
+         _busy1: {
+          type: Boolean,
+          value: false
+        },
+        _busy2: {
+          type: Boolean,
+          value: false
+        },
+        _busy3: {
+          type: Boolean,
+          value: false
+        },
+        _bot: {
+          type: Object,
+        },
+        _events: {
+          type: Object,
+        },
+        _tasks: {
+          type: Object,
+        },
+      },
+
+      observers: [
+        "request(auth_headers,bot_id)",
+      ],
+
+      request: function(){
+        if (!this.bot_id || !this.auth_headers) {
+          console.log("bot_id and auth_headers can't be empty");
+          return;
+        }
+        var baseUrl = "/_ah/api/swarming/v1/bot/"+this.bot_id;
+        this._getJsonAsync("_bot", baseUrl + "/get",
+          "_busy1", this.auth_headers);
+        // We limit the fields on these two queries to make them faster.
+        this._getJsonAsync("_events",
+          baseUrl + "/events?fields=items(event_type%2Cmessage%2Cquarantined%2Ctask_id%2Cts%2Cversion)",
+          "_busy2", this.auth_headers);
+        this._getJsonAsync("_tasks",
+          baseUrl + "/tasks?fields=items(abandoned_ts%2Cbot_version%2Ccompleted_ts%2Cduration%2Cexit_code%2Cfailure%2Cinternal_failure%2Cmodified_ts%2Cname%2Cstarted_ts%2Cstate%2Ctask_id%2Ctry_number)",
+          "_busy3", this.auth_headers);
+      },
+
+      _parseBot: function(bot) {
+        if (!bot) {
+          return {};
+        }
+        return bot;
+      },
+
+      _parseEvents: function(events) {
+        if (!events || !events.items) {
+          return [];
+        }
+        return events.items;
+      },
+
+      _parseTasks: function(tasks) {
+        if (!tasks || !tasks.items) {
+          return [];
+        }
+        return tasks.items;
+      }
+
+    });
+  })();
+  </script>
+</dom-module>
+<dom-module id="bot-page" assetpath="/res/imp/botpage/">
+  <template>
+    <style include="iron-flex iron-flex-alignment iron-positioning swarming-app-style">
+
+    </style>
+
+    <url-param name="id" value="{{bot_id}}">
+    </url-param>
+
+    <swarming-app client_id="[[client_id]]" auth_headers="{{_auth_headers}}" signed_in="{{_signed_in}}" busy="[[_busy]]" name="Swarming Bot Page">
+
+      <h2 hidden$="[[_signed_in]]">You must sign in to see anything useful.</h2>
+
+      <div hidden$="[[_not(_signed_in)]]">
+
+        <bot-page-data auth_headers="[[_auth_headers]]" bot_id="[[bot_id]]" bot="{{_bot}}" busy="{{_busy}}" events="{{_events}}" tasks="{{_tasks}}">
+        </bot-page-data>
+
+        <h1> Bot Page Stub </h1>
+      </div>
+
+    </swarming-app>
+
+  </template>
+  <script>
+  (function(){
+
+
+    Polymer({
+      is: 'bot-page',
+
+      behaviors: [
+          SwarmingBehaviors.CommonBehavior,
+      ],
+
+      properties: {
+        bot_id: {
+          type: String,
+        },
+        client_id: {
+          type: String,
+        },
+
+      },
+
+    });
+  })();
+  </script>
 </dom-module></div></body></html>

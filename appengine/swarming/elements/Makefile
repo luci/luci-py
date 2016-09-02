@@ -16,6 +16,10 @@ run: default
 	-wget -nc --output-document=./res/imp/tasklist/task-list-fleet-data-demo.json https://raw.githubusercontent.com/wiki/luci/luci-py/task-list-fleet-data-demo.json
 	-wget -nc --output-document=./res/imp/tasklist/task-tags-demo.json https://raw.githubusercontent.com/wiki/luci/luci-py/task-tags-demo.json
 
+	-wget -nc --output-document=./res/imp/botpage/bot-demo.json https://raw.githubusercontent.com/wiki/luci/luci-py/bot-demo.json
+	-wget -nc --output-document=./res/imp/botpage/bot-events-demo.json https://raw.githubusercontent.com/wiki/luci/luci-py/bot-events-demo.json
+	-wget -nc --output-document=./res/imp/botpage/bot-tasks-demo.json https://raw.githubusercontent.com/wiki/luci/luci-py/bot-tasks-demo.json
+
 	node_modules/.bin/http-server -p 9050
 
 

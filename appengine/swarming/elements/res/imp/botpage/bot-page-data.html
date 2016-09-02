@@ -1,0 +1,148 @@
+<!--
+  Copyright 2016 The LUCI Authors. All rights reserved.
+  Use of this source code is governed under the Apache License, Version 2.0
+  that can be found in the LICENSE file.
+
+  This in an HTML Import-able file that contains the definition
+  of the following elements:
+
+    <bot-page-data>
+
+  This makes calls authenticated with Oauth 2 to the swarming apis.  It parses
+  that data into usable data structures.
+
+  Properties:
+    busy: Boolean, if we are fetching any data from the server.
+    bot: Object, The information about the bot. See swarming_rpcs.py#BotInfo
+        for all relevent fields.
+    events: Array<Object>, The most recent events that pertain to this bot.
+        Contains the following fields: "event_type", "message", "ts" (timestamp),
+        "quarantined", "version".
+    tasks: Array<Object>, The most recent tasks done by this bot.
+        Contains the following fields: "abandoned_ts", "bot_version", "duration",
+        "failure", "internal_failure", "modified_ts", "name", "started_ts",
+        "state", "task_id", "try_number".
+
+  Methods:
+    request(): Force a fetch of the data. This happens automatically when
+        auth_headers is set or bot_id is changed.
+
+  Events:
+    None.
+-->
+
+
+<link rel="import" href="/res/imp/common/common-behavior.html">
+
+<dom-module id="bot-page-data">
+  <script>
+  (function(){
+
+    Polymer({
+      is: 'bot-page-data',
+
+      behaviors: [
+          SwarmingBehaviors.CommonBehavior,
+      ],
+
+      properties: {
+        // inputs
+        auth_headers: {
+          type: Object,
+        },
+        bot_id: {
+          type: String,
+        },
+
+        // outputs
+        busy: {
+          type: Boolean,
+          computed: "_or(_busy1,_busy2,_busy3)",
+          notify: true,
+        },
+        bot: {
+          type: Object,
+          computed: "_parseBot(_bot)",
+          notify: true,
+        },
+        events: {
+          type: Array,
+          computed: "_parseEvents(_events)",
+          notify: true,
+        },
+        tasks: {
+          type: Array,
+          computed: "_parseTasks(_tasks)",
+          notify: true,
+        },
+
+        // private
+         _busy1: {
+          type: Boolean,
+          value: false
+        },
+        _busy2: {
+          type: Boolean,
+          value: false
+        },
+        _busy3: {
+          type: Boolean,
+          value: false
+        },
+        _bot: {
+          type: Object,
+        },
+        _events: {
+          type: Object,
+        },
+        _tasks: {
+          type: Object,
+        },
+      },
+
+      observers: [
+        "request(auth_headers,bot_id)",
+      ],
+
+      request: function(){
+        if (!this.bot_id || !this.auth_headers) {
+          console.log("bot_id and auth_headers can't be empty");
+          return;
+        }
+        var baseUrl = "/_ah/api/swarming/v1/bot/"+this.bot_id;
+        this._getJsonAsync("_bot", baseUrl + "/get",
+          "_busy1", this.auth_headers);
+        // We limit the fields on these two queries to make them faster.
+        this._getJsonAsync("_events",
+          baseUrl + "/events?fields=items(event_type%2Cmessage%2Cquarantined%2Ctask_id%2Cts%2Cversion)",
+          "_busy2", this.auth_headers);
+        this._getJsonAsync("_tasks",
+          baseUrl + "/tasks?fields=items(abandoned_ts%2Cbot_version%2Ccompleted_ts%2Cduration%2Cexit_code%2Cfailure%2Cinternal_failure%2Cmodified_ts%2Cname%2Cstarted_ts%2Cstate%2Ctask_id%2Ctry_number)",
+          "_busy3", this.auth_headers);
+      },
+
+      _parseBot: function(bot) {
+        if (!bot) {
+          return {};
+        }
+        return bot;
+      },
+
+      _parseEvents: function(events) {
+        if (!events || !events.items) {
+          return [];
+        }
+        return events.items;
+      },
+
+      _parseTasks: function(tasks) {
+        if (!tasks || !tasks.items) {
+          return [];
+        }
+        return tasks.items;
+      }
+
+    });
+  })();
+  </script>
+</dom-module>
