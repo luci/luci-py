@@ -39,7 +39,9 @@
         if (busy) {
           this.set(busy, true);
         }
-        url = url + "?" + sk.query.fromParamSet(params);
+        if (params) {
+          url = url + "?" + sk.query.fromParamSet(params);
+        }
         sk.request("GET", url, "", headers).then(JSON.parse).then(function(json){
           this.set(bindTo, json);
           if (busy) {

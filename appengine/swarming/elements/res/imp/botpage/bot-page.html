@@ -24,28 +24,122 @@
     None.
 -->
 
+<link rel="import" href="/res/imp/bower_components/iron-collapse/iron-collapse.html">
+<link rel="import" href="/res/imp/bower_components/iron-icon/iron-icon.html">
+<link rel="import" href="/res/imp/bower_components/iron-icons/iron-icons.html">
+<link rel="import" href="/res/imp/bower_components/paper-checkbox/paper-checkbox.html">
+<link rel="import" href="/res/imp/bower_components/paper-input/paper-input.html">
+<link rel="import" href="/res/imp/bower_components/paper-tabs/paper-tabs.html">
+<link rel="import" href="/res/imp/bower_components/paper-icon-button/paper-icon-button.html">
 <link rel="import" href="/res/imp/bower_components/polymer/polymer.html">
 
-<link rel="import" href="/res/imp/common/common-behavior.html">
 <link rel="import" href="/res/imp/common/swarming-app.html">
 <link rel="import" href="/res/imp/common/url-param.html">
 
 <link rel="import" href="bot-page-data.html">
+<link rel="import" href="bot-page-shared-behavior.html">
 
 
 <dom-module id="bot-page">
   <template>
     <style include="iron-flex iron-flex-alignment iron-positioning swarming-app-style">
 
+    .header {
+      max-width: 450px;
+    }
+
+    .title {
+      font-size: 1.5em;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    .id_input {
+      --paper-input-container-input: {
+        font-size: 2em;
+      };
+    }
+    .refresh {
+      max-width: 50px;
+      max-height: 50px;
+      width: initial;
+      height: initial;
+    }
+
+    table {
+      border-collapse: collapse;
+      margin-left: 5px;
+      margin-bottom: 5px;
+    }
+    td, th {
+      border: 1px solid #BBB;
+      padding: 5px;
+    }
+
+    .quarantined, .failed_task {
+      background-color: #ffdddd;
+    }
+    .dead {
+      background-color: #cccccc;
+    }
+
+    .message {
+      white-space: pre-line;
+      font-family: monospace;
+    }
+
+    .bot_state {
+      white-space: pre;
+      font-family: monospace;
+      margin-bottom: 10px;
+    }
+
+    .tabs {
+      background-color: #1F78B4;
+      color: #fff;
+      max-width: 600px;
+      --paper-checkbox-label-color: #fff;
+      margin-left: 5px;
+    }
+
+    .tasks_table, .events_table {
+      border: 3px solid #1F78B4;
+    }
+
+    paper-checkbox {
+      --paper-checkbox-label-color: #fff;
+      --paper-checkbox-checked-color: #fff;
+      --paper-checkbox-checkmark-color: #000;
+      --paper-checkbox-unchecked-color: #fff;
+      padding: 3px;
+    }
+
+    paper-tab.iron-selected {
+      background-color: #A6CEE3;
+      border: 3px solid #1F78B4;
+      color: #000;
+      font-weight: bold;
+      text-decoration: underline;
+    }
+
     </style>
 
     <url-param name="id"
       value="{{bot_id}}">
     </url-param>
+    <url-param name="show_all_events"
+      value="{{_show_all}}">
+    </url-param>
+    <url-param name="selected"
+      value="{{_selected}}">
+    </url-param>
+    <url-param name="show_state"
+      value="{{_show_state}}">
+    </url-param>
 
     <swarming-app
       client_id="[[client_id]]"
       auth_headers="{{_auth_headers}}"
+      permissions="{{_permissions}}"
       signed_in="{{_signed_in}}"
 
       busy="[[_busy]]"
@@ -65,7 +159,174 @@
           tasks="{{_tasks}}">
         </bot-page-data>
 
-        <h1> Bot Page Stub </h1>
+        <div class="header horizontal layout">
+          <paper-input class="id_input" label="Bot id" value="{{bot_id}}"></paper-input>
+          <button>
+            <iron-icon class="refresh" icon="icons:refresh"></iron-icon>
+          </button>
+        </div>
+
+        <div>
+          <table>
+            <tr class$="[[_isDead(_bot)]]">
+              <td>Last Seen</td>
+              <td title="[[_bot.human_last_seen_ts]]">
+                [[_timeDiffExact(_bot.last_seen_ts)]] ago</td>
+              <td>
+              <!-- dom-ifs are slightly less performant than hidden$=, but
+              prevent things from first drawing and then hiding. We prefer to
+              not flash buttons or quarantined messages -->
+                <template is="dom-if" if="[[_canShutdown(_bot,_permissions)]]">
+                  <button class="raised">
+                    Shut Down Gracefully
+                  </button>
+                </template>
+                <template is="dom-if" if="[[_canDelete(_bot,_permissions)]]">
+                  <button class="raised">
+                    Delete
+                  </button>
+                </template>
+              </td>
+            </tr>
+            <template is="dom-if" if="[[_bot.quarantined]]">
+              <tr class="quarantined">
+                <td>Quarantined</td>
+                <td colspan="2">[[_quarantineMessage(_bot)]]</td>
+              </tr>
+            </template>
+            <tr>
+              <td>Current Task</td>
+              <td>
+                <a target="_blank" href$="[[_taskLink(_bot.task_id)]]">
+                  [[_task(_bot)]]
+                </a>
+              </td>
+              <td>
+              <!-- TODO(kjlubick) add the cancel button when swarming can
+              cancel running tasks -->
+              </td>
+            </tr>
+            <tr>
+              <td rowspan$="[[_numRows(_bot.dimensions)]]">Dimensions</td>
+            </tr>
+            <template
+                is="dom-repeat"
+                items="[[_bot.dimensions]]"
+                as="dim">
+              <tr>
+                <td>[[dim.key]]</td>
+                <td>[[_concat(dim.value)]]</td>
+              </tr>
+            </template>
+
+            <tr>
+              <td>External IP</td>
+              <td><a href$="[[_bot.external_ip]]">[[_bot.external_ip]]</a></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Swarming Revision</td>
+              <td>
+                <a target="_blank" href$="[[_luciLink(_bot.version)]]">[[_shorten(_bot.version,'8')]]</a>
+              </td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>First seen</td>
+              <td title="[[_bot.human_first_seen_ts]]">
+                [[_timeDiffApprox(_bot.first_seen_ts)]] ago
+              </td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Authenticated as</td>
+              <td>[[_bot.authenticated_as]]</td>
+              <td></td>
+            </tr>
+          </table>
+
+          <span class="title">State</span>
+
+          <template is="dom-if" if="[[_not(_show_state)]]">
+            <button on-click="_toggleState">
+              <iron-icon icon="icons:add-circle-outline"></iron-icon>
+            </button>
+          </template>
+
+          <template is="dom-if" if="[[_show_state]]">
+            <button on-click="_toggleState">
+              <iron-icon icon="icons:remove-circle-outline"></iron-icon>
+            </button>
+          </template>
+
+          <iron-collapse id="collapse" opened="[[_show_state]]">
+            <div class="bot_state">[[_prettyPrint(_bot.state)]]</div>
+          </iron-collapse>
+        </div>
+
+        <div class="tabs">
+          <paper-tabs selected="{{_selected}}" no-bar>
+            <paper-tab>Tasks</paper-tab>
+            <paper-tab>Events</paper-tab>
+          </paper-tabs>
+
+          <template is="dom-if" if="[[_selected]]">
+            <paper-checkbox checked="{{_show_all}}">
+                Show all events
+            </paper-checkbox>
+          </template>
+        </div>
+
+        <template is="dom-if" if="[[_not(_selected)]]">
+          <table class="tasks_table">
+            <thead>
+              <tr>
+                <th>Task</th>
+                <th>Started</th>
+                <th>Duration</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template is="dom-repeat" items="{{_tasks}}" as="task">
+                <tr>
+                  <td><a target="_blank" href$="[[_taskLink(task.task_id)]]">[[task.name]]</a></td>
+                  <td>[[task.human_started_ts]]</td>
+                  <td title="[[task.human_completed_ts]]">[[task.human_duration]]</td>
+                  <td>[[task.state]]</td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </template>
+
+        <template is="dom-if" if="[[_selected]]">
+          <table class="events_table">
+            <thead>
+              <tr>
+                <th>Message</th>
+                <th>Type</th>
+                <th>Timestamp</th>
+                <th>Task ID</th>
+                <th>Version</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template is="dom-repeat" items="{{_eventList(_events,_show_all)}}" as="event">
+                <tr>
+                  <td class="message">[[event.message]]</a></td>
+                  <td>[[event.event_type]]</td>
+                  <td>[[event.human_ts]]</td>
+                  <td><a target="_blank" href$="[[_taskLink(event.task_id)]]">[[event.task_id]]</a></td>
+                  <td>
+                    <a target="_blank" href$="[[_luciLink(_bot.version)]]">[[_shorten(_bot.version,'8')]]</a>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </template>
+        </div>
       </div>
 
     </swarming-app>
@@ -79,7 +340,7 @@
       is: 'bot-page',
 
       behaviors: [
-          SwarmingBehaviors.CommonBehavior,
+          SwarmingBehaviors.BotPageBehavior,
       ],
 
       properties: {
@@ -90,7 +351,110 @@
           type: String,
         },
 
+        _bot: {
+          type: Object,
+        },
+        _selected: {
+          type: Number,
+        },
+        _show_all: {
+          type: Boolean,
+        },
+        _show_state: {
+          type: Boolean,
+        }
       },
+
+      _canCancel: function(bot, permissions) {
+        return bot && bot.task_id && permissions.cancel_task;
+      },
+
+      _canDelete: function(bot, permissions) {
+        return bot && bot.is_dead && permissions.delete_bot;
+      },
+
+      _canShutdown: function(bot, permissions){
+        return bot && !bot.is_dead && permissions.terminate_bot;
+      },
+
+      _concat: function(arr) {
+        if (!arr) {
+          return "";
+        }
+        return arr.join(" | ");
+      },
+
+      _eventList(events, showAll) {
+        if (!events) {
+          return [];
+        }
+        return events.filter(function(e){
+          return showAll || e.message;
+        });
+      },
+
+      _isDead(bot){
+        if (bot && bot.is_dead) {
+          return "dead";
+        }
+        return "";
+      },
+
+      _luciLink: function(revision) {
+        if (!revision) {
+          return undefined;
+        }
+        return "https://github.com/luci/luci-py/commit/" + revision;
+
+      },
+
+      _numRows: function(arr) {
+        if (!arr || !arr.length) {
+          return 1;
+        }
+        return 1 + arr.length;
+      },
+
+      _prettyPrint: function(obj) {
+        obj = obj || {};
+        return JSON.stringify(obj, null, 2);
+      },
+
+      _quarantineMessage: function(bot) {
+        if (bot && bot.quarantined) {
+          var msg = bot.state.quarantined;
+          // Sometimes, the quarantined message is actually in "error".  This
+          // happens when the bot code has thrown an exception.
+          if (msg === undefined || msg === "true" || msg === true) {
+            msg = this._attribute(bot, "error");
+          }
+          return msg || "True";
+        }
+        return "";
+      },
+
+      _shorten: function(str, length) {
+        if (!str || ! length) {
+          return "";
+        }
+        return str.substring(0, length);
+      },
+
+      _task: function(bot) {
+        return (bot && bot.task_id) || "idle";
+      },
+
+      _taskLink: function(task_id) {
+        // TODO(kjlubick): Migrate this to /newui/ when ready
+        if (task_id) {
+          return "/user/task/" + task_id;
+        }
+        return undefined;
+      },
+
+      _toggleState: function() {
+        this.set("_show_state", !this._show_state);
+      }
 
     });
   })();

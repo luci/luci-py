@@ -8117,7 +8117,9 @@ this.fire('dom-change');
         if (busy) {
           this.set(busy, true);
         }
-        url = url + "?" + sk.query.fromParamSet(params);
+        if (params) {
+          url = url + "?" + sk.query.fromParamSet(params);
+        }
         sk.request("GET", url, "", headers).then(JSON.parse).then(function(json){
           this.set(bindTo, json);
           if (busy) {
@@ -16541,6 +16543,81 @@ You can bind to `isAuthorized` property to monitor authorization state.
       a[href] {
         color: #1F78B4;
       }
+
+      /*
+       * A set of styles to make buttons and select/options look more Material
+       * Design-ish.
+       */
+      button {
+        min-width: 5.14em;
+        background-color: #fff;
+        color: #1f78b4;
+        text-align: center;
+        text-transform: uppercase;
+        outline: none;
+        border-radius: 3px;
+        padding: 0.6em 1.2em;
+        border: solid lightgray 1px;
+        margin: 0.6em;
+      }
+
+      button:hover {
+        background: #eee;
+      }
+
+      button:focus {
+        background-color: #ddd;
+        transition: background-color 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      button:active,
+      button.raised:active {
+        background-color: #999;
+        transition: background-color 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      button:disabled {
+        color: #999;
+      }
+
+      button.action:active {
+        background-color: #A6CEE3;
+        transition: background-color 0.1s color 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      button.action {
+        color: white;
+        background: #1f78b4;
+        border: none;
+      }
+
+      button.action:disabled {
+        color: white;
+        background: #999;
+        border: none;
+      }
+
+      button.raised {
+        transition: box-shadow 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 5px 5px 18px 0 rgba(0, 0, 0, 0.3);
+      }
+
+      button.raised:active {
+        box-shadow: 2px 2px 5px 0 rgba(0, 0, 0, 0.1);
+      }
+
+      select,
+      option {
+        padding: 0.4em 1.2em;
+        background-color: white;
+        border: none;
+        line-height: 20px;
+        vertical-align: middle;
+      }
+
+      select {
+        overflow-y: auto;
+      }
   </style>
 </dom-module>
 <dom-module id="swarming-index" assetpath="/res/imp/index/">
@@ -23727,8 +23804,7 @@ the fleet.">
       },
 
       _botLink: function(id) {
-        // TODO(kjlubick) Make this point to /newui/ when appropriate.
-        return "/restricted/bot/"+id;
+        return "/newui/bot?id="+id;
       },
 
 
@@ -23755,6 +23831,7 @@ the fleet.">
       },
 
       _taskLink: function(data) {
+        // TODO(kjlubick): Migrate this to /newui/ when ready
         if (data && data.task_id) {
           return "/user/task/" + data.task_id;
         }
@@ -24603,15 +24680,1396 @@ the fleet.">
     });
   })();
   </script>
-</dom-module><dom-module id="bot-page-data" assetpath="/res/imp/botpage/">
+</dom-module>
+
+<dom-module id="iron-collapse" assetpath="/res/imp/bower_components/iron-collapse/">
+
+  <template>
+
+    <style>
+      :host {
+        display: block;
+        transition-duration: var(--iron-collapse-transition-duration, 300ms);
+        overflow: visible;
+      }
+
+      :host(.iron-collapse-closed) {
+        display: none;
+      }
+
+      :host(:not(.iron-collapse-opened)) {
+        overflow: hidden;
+      }
+    </style>
+
+    <content></content>
+
+  </template>
+
+</dom-module>
+
+<script>
+
+  Polymer({
+
+    is: 'iron-collapse',
+
+    behaviors: [
+      Polymer.IronResizableBehavior
+    ],
+
+    properties: {
+
+      /**
+       * If true, the orientation is horizontal; otherwise is vertical.
+       *
+       * @attribute horizontal
+       */
+      horizontal: {
+        type: Boolean,
+        value: false,
+        observer: '_horizontalChanged'
+      },
+
+      /**
+       * Set opened to true to show the collapse element and to false to hide it.
+       *
+       * @attribute opened
+       */
+      opened: {
+        type: Boolean,
+        value: false,
+        notify: true,
+        observer: '_openedChanged'
+      },
+
+      /**
+       * Set noAnimation to true to disable animations
+       *
+       * @attribute noAnimation
+       */
+      noAnimation: {
+        type: Boolean
+      },
+
+    },
+
+    get dimension() {
+      return this.horizontal ? 'width' : 'height';
+    },
+
+    /**
+     * `maxWidth` or `maxHeight`.
+     * @private
+     */
+    get _dimensionMax() {
+      return this.horizontal ? 'maxWidth' : 'maxHeight';
+    },
+
+    /**
+     * `max-width` or `max-height`.
+     * @private
+     */
+    get _dimensionMaxCss() {
+      return this.horizontal ? 'max-width' : 'max-height';
+    },
+
+    hostAttributes: {
+      role: 'group',
+      'aria-hidden': 'true',
+      'aria-expanded': 'false'
+    },
+
+    listeners: {
+      transitionend: '_transitionEnd'
+    },
+
+    attached: function() {
+      // It will take care of setting correct classes and styles.
+      this._transitionEnd();
+    },
+
+    /**
+     * Toggle the opened state.
+     *
+     * @method toggle
+     */
+    toggle: function() {
+      this.opened = !this.opened;
+    },
+
+    show: function() {
+      this.opened = true;
+    },
+
+    hide: function() {
+      this.opened = false;
+    },
+
+    /**
+     * Updates the size of the element.
+     * @param {string} size The new value for `maxWidth`/`maxHeight` as css property value, usually `auto` or `0px`.
+     * @param {boolean=} animated if `true` updates the size with an animation, otherwise without.
+     */
+    updateSize: function(size, animated) {
+      // No change!
+      var curSize = this.style[this._dimensionMax];
+      if (curSize === size || (size === 'auto' && !curSize)) {
+        return;
+      }
+
+      this._updateTransition(false);
+      // If we can animate, must do some prep work.
+      if (animated && !this.noAnimation && this._isDisplayed) {
+        // Animation will start at the current size.
+        var startSize = this._calcSize();
+        // For `auto` we must calculate what is the final size for the animation.
+        // After the transition is done, _transitionEnd will set the size back to `auto`.
+        if (size === 'auto') {
+          this.style[this._dimensionMax] = '';
+          size = this._calcSize();
+        }
+        // Go to startSize without animation.
+        this.style[this._dimensionMax] = startSize;
+        // Force layout to ensure transition will go. Set scrollTop to itself
+        // so that compilers won't remove it.
+        this.scrollTop = this.scrollTop;
+        // Enable animation.
+        this._updateTransition(true);
+      }
+      // Set the final size.
+      if (size === 'auto') {
+        this.style[this._dimensionMax] = '';
+      } else {
+        this.style[this._dimensionMax] = size;
+      }
+    },
+
+    /**
+     * enableTransition() is deprecated, but left over so it doesn't break existing code.
+     * Please use `noAnimation` property instead.
+     *
+     * @method enableTransition
+     * @deprecated since version 1.0.4
+     */
+    enableTransition: function(enabled) {
+      Polymer.Base._warn('`enableTransition()` is deprecated, use `noAnimation` instead.');
+      this.noAnimation = !enabled;
+    },
+
+    _updateTransition: function(enabled) {
+      this.style.transitionDuration = (enabled && !this.noAnimation) ? '' : '0s';
+    },
+
+    _horizontalChanged: function() {
+      this.style.transitionProperty = this._dimensionMaxCss;
+      var otherDimension = this._dimensionMax === 'maxWidth' ? 'maxHeight' : 'maxWidth';
+      this.style[otherDimension] = '';
+      this.updateSize(this.opened ? 'auto' : '0px', false);
+    },
+
+    _openedChanged: function() {
+      this.setAttribute('aria-expanded', this.opened);
+      this.setAttribute('aria-hidden', !this.opened);
+
+      this.toggleClass('iron-collapse-closed', false);
+      this.toggleClass('iron-collapse-opened', false);
+      this.updateSize(this.opened ? 'auto' : '0px', true);
+
+      // Focus the current collapse.
+      if (this.opened) {
+        this.focus();
+      }
+      if (this.noAnimation) {
+        this._transitionEnd();
+      }
+    },
+
+    _transitionEnd: function() {
+      if (this.opened) {
+        this.style[this._dimensionMax] = '';
+      }
+      this.toggleClass('iron-collapse-closed', !this.opened);
+      this.toggleClass('iron-collapse-opened', this.opened);
+      this._updateTransition(false);
+      this.notifyResize();
+    },
+
+    /**
+     * Simplistic heuristic to detect if element has a parent with display: none
+     *
+     * @private
+     */
+    get _isDisplayed() {
+      var rect = this.getBoundingClientRect();
+      for (var prop in rect) {
+        if (rect[prop] !== 0) return true;
+      }
+      return false;
+    },
+
+    _calcSize: function() {
+      return this.getBoundingClientRect()[this.dimension] + 'px';
+    }
+
+  });
+
+</script>
+<script>
+
+  /**
+   * `Polymer.IronMenuBehavior` implements accessible menu behavior.
+   *
+   * @demo demo/index.html
+   * @polymerBehavior Polymer.IronMenuBehavior
+   */
+  Polymer.IronMenuBehaviorImpl = {
+
+    properties: {
+
+      /**
+       * Returns the currently focused item.
+       * @type {?Object}
+       */
+      focusedItem: {
+        observer: '_focusedItemChanged',
+        readOnly: true,
+        type: Object
+      },
+
+      /**
+       * The attribute to use on menu items to look up the item title. Typing the first
+       * letter of an item when the menu is open focuses that item. If unset, `textContent`
+       * will be used.
+       */
+      attrForItemTitle: {
+        type: String
+      }
+    },
+
+    hostAttributes: {
+      'role': 'menu',
+      'tabindex': '0'
+    },
+
+    observers: [
+      '_updateMultiselectable(multi)'
+    ],
+
+    listeners: {
+      'focus': '_onFocus',
+      'keydown': '_onKeydown',
+      'iron-items-changed': '_onIronItemsChanged'
+    },
+
+    keyBindings: {
+      'up': '_onUpKey',
+      'down': '_onDownKey',
+      'esc': '_onEscKey',
+      'shift+tab:keydown': '_onShiftTabDown'
+    },
+
+    attached: function() {
+      this._resetTabindices();
+    },
+
+    /**
+     * Selects the given value. If the `multi` property is true, then the selected state of the
+     * `value` will be toggled; otherwise the `value` will be selected.
+     *
+     * @param {string|number} value the value to select.
+     */
+    select: function(value) {
+      // Cancel automatically focusing a default item if the menu received focus
+      // through a user action selecting a particular item.
+      if (this._defaultFocusAsync) {
+        this.cancelAsync(this._defaultFocusAsync);
+        this._defaultFocusAsync = null;
+      }
+      var item = this._valueToItem(value);
+      if (item && item.hasAttribute('disabled')) return;
+      this._setFocusedItem(item);
+      Polymer.IronMultiSelectableBehaviorImpl.select.apply(this, arguments);
+    },
+
+    /**
+     * Resets all tabindex attributes to the appropriate value based on the
+     * current selection state. The appropriate value is `0` (focusable) for
+     * the default selected item, and `-1` (not keyboard focusable) for all
+     * other items.
+     */
+    _resetTabindices: function() {
+      var selectedItem = this.multi ? (this.selectedItems && this.selectedItems[0]) : this.selectedItem;
+
+      this.items.forEach(function(item) {
+        item.setAttribute('tabindex', item === selectedItem ? '0' : '-1');
+      }, this);
+    },
+
+    /**
+     * Sets appropriate ARIA based on whether or not the menu is meant to be
+     * multi-selectable.
+     *
+     * @param {boolean} multi True if the menu should be multi-selectable.
+     */
+    _updateMultiselectable: function(multi) {
+      if (multi) {
+        this.setAttribute('aria-multiselectable', 'true');
+      } else {
+        this.removeAttribute('aria-multiselectable');
+      }
+    },
+
+    /**
+     * Given a KeyboardEvent, this method will focus the appropriate item in the
+     * menu (if there is a relevant item, and it is possible to focus it).
+     *
+     * @param {KeyboardEvent} event A KeyboardEvent.
+     */
+    _focusWithKeyboardEvent: function(event) {
+      for (var i = 0, item; item = this.items[i]; i++) {
+        var attr = this.attrForItemTitle || 'textContent';
+        var title = item[attr] || item.getAttribute(attr);
+
+        if (!item.hasAttribute('disabled') && title &&
+            title.trim().charAt(0).toLowerCase() === String.fromCharCode(event.keyCode).toLowerCase()) {
+          this._setFocusedItem(item);
+          break;
+        }
+      }
+    },
+
+    /**
+     * Focuses the previous item (relative to the currently focused item) in the
+     * menu, disabled items will be skipped.
+     * Loop until length + 1 to handle case of single item in menu.
+     */
+    _focusPrevious: function() {
+      var length = this.items.length;
+      var curFocusIndex = Number(this.indexOf(this.focusedItem));
+      for (var i = 1; i < length + 1; i++) {
+        var item = this.items[(curFocusIndex - i + length) % length];
+        if (!item.hasAttribute('disabled')) {
+          this._setFocusedItem(item);
+          return;
+        }
+      }
+    },
+
+    /**
+     * Focuses the next item (relative to the currently focused item) in the
+     * menu, disabled items will be skipped.
+     * Loop until length + 1 to handle case of single item in menu.
+     */
+    _focusNext: function() {
+      var length = this.items.length;
+      var curFocusIndex = Number(this.indexOf(this.focusedItem));
+      for (var i = 1; i < length + 1; i++) {
+        var item = this.items[(curFocusIndex + i) % length];
+        if (!item.hasAttribute('disabled')) {
+          this._setFocusedItem(item);
+          return;
+        }
+      }
+    },
+
+    /**
+     * Mutates items in the menu based on provided selection details, so that
+     * all items correctly reflect selection state.
+     *
+     * @param {Element} item An item in the menu.
+     * @param {boolean} isSelected True if the item should be shown in a
+     * selected state, otherwise false.
+     */
+    _applySelection: function(item, isSelected) {
+      if (isSelected) {
+        item.setAttribute('aria-selected', 'true');
+      } else {
+        item.removeAttribute('aria-selected');
+      }
+      Polymer.IronSelectableBehavior._applySelection.apply(this, arguments);
+    },
+
+    /**
+     * Discretely updates tabindex values among menu items as the focused item
+     * changes.
+     *
+     * @param {Element} focusedItem The element that is currently focused.
+     * @param {?Element} old The last element that was considered focused, if
+     * applicable.
+     */
+    _focusedItemChanged: function(focusedItem, old) {
+      old && old.setAttribute('tabindex', '-1');
+      if (focusedItem) {
+        focusedItem.setAttribute('tabindex', '0');
+        focusedItem.focus();
+      }
+    },
+
+    /**
+     * A handler that responds to mutation changes related to the list of items
+     * in the menu.
+     *
+     * @param {CustomEvent} event An event containing mutation records as its
+     * detail.
+     */
+    _onIronItemsChanged: function(event) {
+      if (event.detail.addedNodes.length) {
+        this._resetTabindices();
+      }
+    },
+
+    /**
+     * Handler that is called when a shift+tab keypress is detected by the menu.
+     *
+     * @param {CustomEvent} event A key combination event.
+     */
+    _onShiftTabDown: function(event) {
+      var oldTabIndex = this.getAttribute('tabindex');
+
+      Polymer.IronMenuBehaviorImpl._shiftTabPressed = true;
+
+      this._setFocusedItem(null);
+
+      this.setAttribute('tabindex', '-1');
+
+      this.async(function() {
+        this.setAttribute('tabindex', oldTabIndex);
+        Polymer.IronMenuBehaviorImpl._shiftTabPressed = false;
+        // NOTE(cdata): polymer/polymer#1305
+      }, 1);
+    },
+
+    /**
+     * Handler that is called when the menu receives focus.
+     *
+     * @param {FocusEvent} event A focus event.
+     */
+    _onFocus: function(event) {
+      if (Polymer.IronMenuBehaviorImpl._shiftTabPressed) {
+        // do not focus the menu itself
+        return;
+      }
+
+      // Do not focus the selected tab if the deepest target is part of the
+      // menu element's local DOM and is focusable.
+      var rootTarget = /** @type {?HTMLElement} */(
+          Polymer.dom(event).rootTarget);
+      if (rootTarget !== this && typeof rootTarget.tabIndex !== "undefined" && !this.isLightDescendant(rootTarget)) {
+        return;
+      }
+
+      // clear the cached focus item
+      this._defaultFocusAsync = this.async(function() {
+        // focus the selected item when the menu receives focus, or the first item
+        // if no item is selected
+        var selectedItem = this.multi ? (this.selectedItems && this.selectedItems[0]) : this.selectedItem;
+
+        this._setFocusedItem(null);
+
+        if (selectedItem) {
+          this._setFocusedItem(selectedItem);
+        } else if (this.items[0]) {
+          // We find the first none-disabled item (if one exists)
+          this._focusNext();
+        }
+      });
+    },
+
+    /**
+     * Handler that is called when the up key is pressed.
+     *
+     * @param {CustomEvent} event A key combination event.
+     */
+    _onUpKey: function(event) {
+      // up and down arrows moves the focus
+      this._focusPrevious();
+      event.detail.keyboardEvent.preventDefault();
+    },
+
+    /**
+     * Handler that is called when the down key is pressed.
+     *
+     * @param {CustomEvent} event A key combination event.
+     */
+    _onDownKey: function(event) {
+      this._focusNext();
+      event.detail.keyboardEvent.preventDefault();
+    },
+
+    /**
+     * Handler that is called when the esc key is pressed.
+     *
+     * @param {CustomEvent} event A key combination event.
+     */
+    _onEscKey: function(event) {
+      // esc blurs the control
+      this.focusedItem.blur();
+    },
+
+    /**
+     * Handler that is called when a keydown event is detected.
+     *
+     * @param {KeyboardEvent} event A keyboard event.
+     */
+    _onKeydown: function(event) {
+      if (!this.keyboardEventMatchesKeys(event, 'up down esc')) {
+        // all other keys focus the menu item starting with that character
+        this._focusWithKeyboardEvent(event);
+      }
+      event.stopPropagation();
+    },
+
+    // override _activateHandler
+    _activateHandler: function(event) {
+      Polymer.IronSelectableBehavior._activateHandler.call(this, event);
+      event.stopPropagation();
+    }
+  };
+
+  Polymer.IronMenuBehaviorImpl._shiftTabPressed = false;
+
+  /** @polymerBehavior Polymer.IronMenuBehavior */
+  Polymer.IronMenuBehavior = [
+    Polymer.IronMultiSelectableBehavior,
+    Polymer.IronA11yKeysBehavior,
+    Polymer.IronMenuBehaviorImpl
+  ];
+
+</script>
+<script>
+
+  /**
+   * `Polymer.IronMenubarBehavior` implements accessible menubar behavior.
+   *
+   * @polymerBehavior Polymer.IronMenubarBehavior
+   */
+  Polymer.IronMenubarBehaviorImpl = {
+
+    hostAttributes: {
+      'role': 'menubar'
+    },
+
+    keyBindings: {
+      'left': '_onLeftKey',
+      'right': '_onRightKey'
+    },
+
+    _onUpKey: function(event) {
+      this.focusedItem.click();
+      event.detail.keyboardEvent.preventDefault();
+    },
+
+    _onDownKey: function(event) {
+      this.focusedItem.click();
+      event.detail.keyboardEvent.preventDefault();
+    },
+
+    get _isRTL() {
+      return window.getComputedStyle(this)['direction'] === 'rtl';
+    },
+
+    _onLeftKey: function(event) {
+      if (this._isRTL) {
+        this._focusNext();
+      } else {
+        this._focusPrevious();
+      }
+      event.detail.keyboardEvent.preventDefault();
+    },
+
+    _onRightKey: function(event) {
+      if (this._isRTL) {
+        this._focusPrevious();
+      } else {
+        this._focusNext();
+      }
+      event.detail.keyboardEvent.preventDefault();
+    },
+
+    _onKeydown: function(event) {
+      if (this.keyboardEventMatchesKeys(event, 'up down left right esc')) {
+        return;
+      }
+
+      // all other keys focus the menu item starting with that character
+      this._focusWithKeyboardEvent(event);
+    }
+
+  };
+
+  /** @polymerBehavior Polymer.IronMenubarBehavior */
+  Polymer.IronMenubarBehavior = [
+    Polymer.IronMenuBehavior,
+    Polymer.IronMenubarBehaviorImpl
+  ];
+
+</script>
+<iron-iconset-svg name="paper-tabs" size="24">
+<svg><defs>
+<g id="chevron-left"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path></g>
+<g id="chevron-right"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"></path></g>
+</defs></svg>
+</iron-iconset-svg>
+
+
+<dom-module id="paper-tab" assetpath="/res/imp/bower_components/paper-tabs/">
+  <template>
+    <style>
+      :host {
+        @apply(--layout-inline);
+        @apply(--layout-center);
+        @apply(--layout-center-justified);
+        @apply(--layout-flex-auto);
+
+        position: relative;
+        padding: 0 12px;
+        overflow: hidden;
+        cursor: pointer;
+        vertical-align: middle;
+
+        @apply(--paper-font-common-base);
+        @apply(--paper-tab);
+      }
+
+      :host(:focus) {
+        outline: none;
+      }
+
+      :host([link]) {
+        padding: 0;
+      }
+
+      .tab-content {
+        height: 100%;
+        transform: translateZ(0);
+          -webkit-transform: translateZ(0);
+        transition: opacity 0.1s cubic-bezier(0.4, 0.0, 1, 1);
+        @apply(--layout-horizontal);
+        @apply(--layout-center-center);
+        @apply(--layout-flex-auto);
+        @apply(--paper-tab-content);
+      }
+
+      :host(:not(.iron-selected)) > .tab-content {
+        opacity: 0.8;
+
+        @apply(--paper-tab-content-unselected);
+      }
+
+      :host(:focus) .tab-content {
+        opacity: 1;
+        font-weight: 700;
+      }
+
+      paper-ripple {
+        color: var(--paper-tab-ink, --paper-yellow-a100);
+      }
+
+      .tab-content > ::content > a {
+        @apply(--layout-flex-auto);
+
+        height: 100%;
+      }
+    </style>
+
+    <div class="tab-content">
+      <content></content>
+    </div>
+  </template>
+
+  <script>
+    Polymer({
+      is: 'paper-tab',
+
+      behaviors: [
+        Polymer.IronControlState,
+        Polymer.IronButtonState,
+        Polymer.PaperRippleBehavior
+      ],
+
+      properties: {
+
+        /**
+         * If true, the tab will forward keyboard clicks (enter/space) to
+         * the first anchor element found in its descendants
+         */
+        link: {
+          type: Boolean,
+          value: false,
+          reflectToAttribute: true
+        }
+
+      },
+
+      hostAttributes: {
+        role: 'tab'
+      },
+
+      listeners: {
+        down: '_updateNoink',
+        tap: '_onTap'
+      },
+
+      attached: function() {
+        this._updateNoink();
+      },
+
+      get _parentNoink () {
+        var parent = Polymer.dom(this).parentNode;
+        return !!parent && !!parent.noink;
+      },
+
+      _updateNoink: function() {
+        this.noink = !!this.noink || !!this._parentNoink;
+      },
+
+      _onTap: function(event) {
+        if (this.link) {
+          var anchor = this.queryEffectiveChildren('a');
+
+          if (!anchor) {
+            return;
+          }
+
+          // Don't get stuck in a loop delegating
+          // the listener from the child anchor
+          if (event.target === anchor) {
+            return;
+          }
+
+          anchor.click();
+        }
+      }
+
+    });
+  </script>
+</dom-module>
+
+
+<dom-module id="paper-tabs" assetpath="/res/imp/bower_components/paper-tabs/">
+  <template>
+    <style>
+      :host {
+        @apply(--layout);
+        @apply(--layout-center);
+
+        height: 48px;
+        font-size: 14px;
+        font-weight: 500;
+        overflow: hidden;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        -webkit-user-select: none;
+        user-select: none;
+
+        /* NOTE: Both values are needed, since some phones require the value to be `transparent`. */
+        -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+        -webkit-tap-highlight-color: transparent;
+
+        @apply(--paper-tabs);
+      }
+
+      :host-context([dir=rtl]) {
+        @apply(--layout-horizontal-reverse);
+      }
+
+      #tabsContainer {
+        position: relative;
+        height: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        @apply(--layout-flex-auto);
+      }
+
+      #tabsContent {
+        height: 100%;
+        -moz-flex-basis: auto;
+        -ms-flex-basis: auto;
+        flex-basis: auto;
+      }
+
+      #tabsContent.scrollable {
+        position: absolute;
+        white-space: nowrap;
+      }
+
+      #tabsContent:not(.scrollable),
+      #tabsContent.scrollable.fit-container {
+        @apply(--layout-horizontal);
+      }
+
+      #tabsContent.scrollable.fit-container {
+        min-width: 100%;
+      }
+
+      #tabsContent.scrollable.fit-container > ::content > * {
+        /* IE - prevent tabs from compressing when they should scroll. */
+        -ms-flex: 1 0 auto;
+        -webkit-flex: 1 0 auto;
+        flex: 1 0 auto;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      .not-visible {
+        opacity: 0;
+        cursor: default;
+      }
+
+      paper-icon-button {
+        width: 48px;
+        height: 48px;
+        padding: 12px;
+        margin: 0 4px;
+      }
+
+      #selectionBar {
+        position: absolute;
+        height: 2px;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background-color: var(--paper-tabs-selection-bar-color, --paper-yellow-a100);
+          -webkit-transform: scale(0);
+        transform: scale(0);
+          -webkit-transform-origin: left center;
+        transform-origin: left center;
+          transition: -webkit-transform;
+        transition: transform;
+
+        @apply(--paper-tabs-selection-bar);
+      }
+
+      #selectionBar.align-bottom {
+        top: 0;
+        bottom: auto;
+      }
+
+      #selectionBar.expand {
+        transition-duration: 0.15s;
+        transition-timing-function: cubic-bezier(0.4, 0.0, 1, 1);
+      }
+
+      #selectionBar.contract {
+        transition-duration: 0.18s;
+        transition-timing-function: cubic-bezier(0.0, 0.0, 0.2, 1);
+      }
+
+      #tabsContent > ::content > *:not(#selectionBar) {
+        height: 100%;
+      }
+    </style>
+
+    <paper-icon-button icon="paper-tabs:chevron-left" class$="[[_computeScrollButtonClass(_leftHidden, scrollable, hideScrollButtons)]]" on-up="_onScrollButtonUp" on-down="_onLeftScrollButtonDown" tabindex="-1"></paper-icon-button>
+
+    <div id="tabsContainer" on-track="_scroll" on-down="_down">
+      <div id="tabsContent" class$="[[_computeTabsContentClass(scrollable, fitContainer)]]">
+        <div id="selectionBar" class$="[[_computeSelectionBarClass(noBar, alignBottom)]]" on-transitionend="_onBarTransitionEnd"></div>
+        <content select="*"></content>
+      </div>
+    </div>
+
+    <paper-icon-button icon="paper-tabs:chevron-right" class$="[[_computeScrollButtonClass(_rightHidden, scrollable, hideScrollButtons)]]" on-up="_onScrollButtonUp" on-down="_onRightScrollButtonDown" tabindex="-1"></paper-icon-button>
+
+  </template>
+
+  <script>
+    Polymer({
+      is: 'paper-tabs',
+
+      behaviors: [
+        Polymer.IronResizableBehavior,
+        Polymer.IronMenubarBehavior
+      ],
+
+      properties: {
+        /**
+         * If true, ink ripple effect is disabled. When this property is changed,
+         * all descendant `<paper-tab>` elements have their `noink` property
+         * changed to the new value as well.
+         */
+        noink: {
+          type: Boolean,
+          value: false,
+          observer: '_noinkChanged'
+        },
+
+        /**
+         * If true, the bottom bar to indicate the selected tab will not be shown.
+         */
+        noBar: {
+          type: Boolean,
+          value: false
+        },
+
+        /**
+         * If true, the slide effect for the bottom bar is disabled.
+         */
+        noSlide: {
+          type: Boolean,
+          value: false
+        },
+
+        /**
+         * If true, tabs are scrollable and the tab width is based on the label width.
+         */
+        scrollable: {
+          type: Boolean,
+          value: false
+        },
+
+        /**
+         * If true, tabs expand to fit their container. This currently only applies when
+         * scrollable is true.
+         */
+        fitContainer: {
+          type: Boolean,
+          value: false
+        },
+
+        /**
+         * If true, dragging on the tabs to scroll is disabled.
+         */
+        disableDrag: {
+          type: Boolean,
+          value: false
+        },
+
+        /**
+         * If true, scroll buttons (left/right arrow) will be hidden for scrollable tabs.
+         */
+        hideScrollButtons: {
+          type: Boolean,
+          value: false
+        },
+
+        /**
+         * If true, the tabs are aligned to bottom (the selection bar appears at the top).
+         */
+        alignBottom: {
+          type: Boolean,
+          value: false
+        },
+
+        selectable: {
+          type: String,
+          value: 'paper-tab'
+        },
+
+        /**
+         * If true, tabs are automatically selected when focused using the
+         * keyboard.
+         */
+        autoselect: {
+          type: Boolean,
+          value: false
+        },
+
+        /**
+         * The delay (in milliseconds) between when the user stops interacting
+         * with the tabs through the keyboard and when the focused item is
+         * automatically selected (if `autoselect` is true).
+         */
+        autoselectDelay: {
+          type: Number,
+          value: 0
+        },
+
+        _step: {
+          type: Number,
+          value: 10
+        },
+
+        _holdDelay: {
+          type: Number,
+          value: 1
+        },
+
+        _leftHidden: {
+          type: Boolean,
+          value: false
+        },
+
+        _rightHidden: {
+          type: Boolean,
+          value: false
+        },
+
+        _previousTab: {
+          type: Object
+        }
+      },
+
+      hostAttributes: {
+        role: 'tablist'
+      },
+
+      listeners: {
+        'iron-resize': '_onTabSizingChanged',
+        'iron-items-changed': '_onTabSizingChanged',
+        'iron-select': '_onIronSelect',
+        'iron-deselect': '_onIronDeselect'
+      },
+
+      keyBindings: {
+        'left:keyup right:keyup': '_onArrowKeyup'
+      },
+
+      created: function() {
+        this._holdJob = null;
+        this._pendingActivationItem = undefined;
+        this._pendingActivationTimeout = undefined;
+        this._bindDelayedActivationHandler = this._delayedActivationHandler.bind(this);
+        this.addEventListener('blur', this._onBlurCapture.bind(this), true);
+      },
+
+      ready: function() {
+        this.setScrollDirection('y', this.$.tabsContainer);
+      },
+
+      detached: function() {
+        this._cancelPendingActivation();
+      },
+
+      _noinkChanged: function(noink) {
+        var childTabs = Polymer.dom(this).querySelectorAll('paper-tab');
+        childTabs.forEach(noink ? this._setNoinkAttribute : this._removeNoinkAttribute);
+      },
+
+      _setNoinkAttribute: function(element) {
+        element.setAttribute('noink', '');
+      },
+
+      _removeNoinkAttribute: function(element) {
+        element.removeAttribute('noink');
+      },
+
+      _computeScrollButtonClass: function(hideThisButton, scrollable, hideScrollButtons) {
+        if (!scrollable || hideScrollButtons) {
+          return 'hidden';
+        }
+
+        if (hideThisButton) {
+          return 'not-visible';
+        }
+
+        return '';
+      },
+
+      _computeTabsContentClass: function(scrollable, fitContainer) {
+        return scrollable ? 'scrollable' + (fitContainer ? ' fit-container' : '') : ' fit-container';
+      },
+
+      _computeSelectionBarClass: function(noBar, alignBottom) {
+        if (noBar) {
+          return 'hidden';
+        } else if (alignBottom) {
+          return 'align-bottom';
+        }
+
+        return '';
+      },
+
+      // TODO(cdata): Add `track` response back in when gesture lands.
+
+      _onTabSizingChanged: function() {
+        this.debounce('_onTabSizingChanged', function() {
+          this._scroll();
+          this._tabChanged(this.selectedItem);
+        }, 10);
+      },
+
+      _onIronSelect: function(event) {
+        this._tabChanged(event.detail.item, this._previousTab);
+        this._previousTab = event.detail.item;
+        this.cancelDebouncer('tab-changed');
+      },
+
+      _onIronDeselect: function(event) {
+        this.debounce('tab-changed', function() {
+          this._tabChanged(null, this._previousTab);
+          this._previousTab = null;
+        // See polymer/polymer#1305
+        }, 1);
+      },
+
+      _activateHandler: function() {
+        // Cancel item activations scheduled by keyboard events when any other
+        // action causes an item to be activated (e.g. clicks).
+        this._cancelPendingActivation();
+
+        Polymer.IronMenuBehaviorImpl._activateHandler.apply(this, arguments);
+      },
+
+      /**
+       * Activates an item after a delay (in milliseconds).
+       */
+      _scheduleActivation: function(item, delay) {
+        this._pendingActivationItem = item;
+        this._pendingActivationTimeout = this.async(
+            this._bindDelayedActivationHandler, delay);
+      },
+
+      /**
+       * Activates the last item given to `_scheduleActivation`.
+       */
+      _delayedActivationHandler: function() {
+        var item = this._pendingActivationItem;
+        this._pendingActivationItem = undefined;
+        this._pendingActivationTimeout = undefined;
+        item.fire(this.activateEvent, null, {
+          bubbles: true,
+          cancelable: true
+        });
+      },
+
+      /**
+       * Cancels a previously scheduled item activation made with
+       * `_scheduleActivation`.
+       */
+      _cancelPendingActivation: function() {
+        if (this._pendingActivationTimeout !== undefined) {
+          this.cancelAsync(this._pendingActivationTimeout);
+          this._pendingActivationItem = undefined;
+          this._pendingActivationTimeout = undefined;
+        }
+      },
+
+      _onArrowKeyup: function(event) {
+        if (this.autoselect) {
+          this._scheduleActivation(this.focusedItem, this.autoselectDelay);
+        }
+      },
+
+      _onBlurCapture: function(event) {
+        // Cancel a scheduled item activation (if any) when that item is
+        // blurred.
+        if (event.target === this._pendingActivationItem) {
+          this._cancelPendingActivation();
+        }
+      },
+
+      get _tabContainerScrollSize () {
+        return Math.max(
+          0,
+          this.$.tabsContainer.scrollWidth -
+            this.$.tabsContainer.offsetWidth
+        );
+      },
+
+      _scroll: function(e, detail) {
+        if (!this.scrollable) {
+          return;
+        }
+
+        var ddx = (detail && -detail.ddx) || 0;
+        this._affectScroll(ddx);
+      },
+
+      _down: function(e) {
+        // go one beat async to defeat IronMenuBehavior
+        // autorefocus-on-no-selection timeout
+        this.async(function() {
+          if (this._defaultFocusAsync) {
+            this.cancelAsync(this._defaultFocusAsync);
+            this._defaultFocusAsync = null;
+          }
+        }, 1);
+      },
+
+      _affectScroll: function(dx) {
+        this.$.tabsContainer.scrollLeft += dx;
+
+        var scrollLeft = this.$.tabsContainer.scrollLeft;
+
+        this._leftHidden = scrollLeft === 0;
+        this._rightHidden = scrollLeft === this._tabContainerScrollSize;
+      },
+
+      _onLeftScrollButtonDown: function() {
+        this._scrollToLeft();
+        this._holdJob = setInterval(this._scrollToLeft.bind(this), this._holdDelay);
+      },
+
+      _onRightScrollButtonDown: function() {
+        this._scrollToRight();
+        this._holdJob = setInterval(this._scrollToRight.bind(this), this._holdDelay);
+      },
+
+      _onScrollButtonUp: function() {
+        clearInterval(this._holdJob);
+        this._holdJob = null;
+      },
+
+      _scrollToLeft: function() {
+        this._affectScroll(-this._step);
+      },
+
+      _scrollToRight: function() {
+        this._affectScroll(this._step);
+      },
+
+      _tabChanged: function(tab, old) {
+        if (!tab) {
+          // Remove the bar without animation.
+          this.$.selectionBar.classList.remove('expand');
+          this.$.selectionBar.classList.remove('contract');
+          this._positionBar(0, 0);
+          return;
+        }
+
+        var r = this.$.tabsContent.getBoundingClientRect();
+        var w = r.width;
+        var tabRect = tab.getBoundingClientRect();
+        var tabOffsetLeft = tabRect.left - r.left;
+
+        this._pos = {
+          width: this._calcPercent(tabRect.width, w),
+          left: this._calcPercent(tabOffsetLeft, w)
+        };
+
+        if (this.noSlide || old == null) {
+          // Position the bar without animation.
+          this.$.selectionBar.classList.remove('expand');
+          this.$.selectionBar.classList.remove('contract');
+          this._positionBar(this._pos.width, this._pos.left);
+          return;
+        }
+
+        var oldRect = old.getBoundingClientRect();
+        var oldIndex = this.items.indexOf(old);
+        var index = this.items.indexOf(tab);
+        var m = 5;
+
+        // bar animation: expand
+        this.$.selectionBar.classList.add('expand');
+
+        var moveRight = oldIndex < index;
+        var isRTL = this._isRTL;
+        if (isRTL) {
+          moveRight = !moveRight;
+        }
+
+        if (moveRight) {
+          this._positionBar(this._calcPercent(tabRect.left + tabRect.width - oldRect.left, w) - m,
+              this._left);
+        } else {
+          this._positionBar(this._calcPercent(oldRect.left + oldRect.width - tabRect.left, w) - m,
+              this._calcPercent(tabOffsetLeft, w) + m);
+        }
+
+        if (this.scrollable) {
+          this._scrollToSelectedIfNeeded(tabRect.width, tabOffsetLeft);
+        }
+      },
+
+      _scrollToSelectedIfNeeded: function(tabWidth, tabOffsetLeft) {
+        var l = tabOffsetLeft - this.$.tabsContainer.scrollLeft;
+        if (l < 0) {
+          this.$.tabsContainer.scrollLeft += l;
+        } else {
+          l += (tabWidth - this.$.tabsContainer.offsetWidth);
+          if (l > 0) {
+            this.$.tabsContainer.scrollLeft += l;
+          }
+        }
+      },
+
+      _calcPercent: function(w, w0) {
+        return 100 * w / w0;
+      },
+
+      _positionBar: function(width, left) {
+        width = width || 0;
+        left = left || 0;
+
+        this._width = width;
+        this._left = left;
+        this.transform(
+            'translateX(' + left + '%) scaleX(' + (width / 100) + ')',
+            this.$.selectionBar);
+      },
+
+      _onBarTransitionEnd: function(e) {
+        var cl = this.$.selectionBar.classList;
+        // bar animation: expand -> contract
+        if (cl.contains('expand')) {
+          cl.remove('expand');
+          cl.add('contract');
+          this._positionBar(this._pos.width, this._pos.left);
+        // bar animation done
+        } else if (cl.contains('contract')) {
+          cl.remove('contract');
+        }
+      }
+    });
+  </script>
+</dom-module>
+<script>
+  (function(){
+
+
+    // This behavior wraps up all the shared bot-page functionality by
+    // extending SwarmingBehaviors.CommonBehavior
+    SwarmingBehaviors.BotPageBehavior = [SwarmingBehaviors.CommonBehavior, {
+
+      // timeDiffApprox returns the approximate difference between now and
+      // the specified date.
+      _timeDiffApprox: function(date){
+        if (!date) {
+          return "eons";
+        }
+        return sk.human.diffDate(date.getTime());
+      },
+
+      // timeDiffExact returns the exact difference between the two specified
+      // dates.  E.g. 2d 22h 22m 28s ago If a second date is not provided,
+      // now is used.
+      _timeDiffExact: function(first, second){
+        if (!first) {
+          return "eons";
+        }
+        if (!second) {
+          second = new Date();
+        }
+        return sk.human.strDuration((second.getTime() - first.getTime())/1000);
+      },
+
+    }];
+  })()
+</script>
+<dom-module id="bot-page-data" assetpath="/res/imp/botpage/">
   <script>
   (function(){
+    // Time to wait before requesting a new bot. This is to allow a user to
+    // type in a name and not have it make one set of requests for each
+    // keystroke.
+    var BOT_ID_DEBOUNCE_MS = 400;
+    var lastRequest;
+
+    var BOT_TIMES = ["first_seen_ts", "last_seen_ts"];
+    var TASK_TIMES = ["started_ts", "completed_ts", "abandoned_ts", "modified_ts"];
+
+    var timezone;
+    function formatDate(date) {
+      if (!timezone) {
+        // Date.toString() looks like "Mon Aug 29 2016 09:03:41 GMT-0400 (EDT)"
+        // we want to extract the time zone part and append it to the
+        // locale time.
+        var str = date.toString();
+        timezone = str.substring(str.indexOf("("));
+      }
+      return date.toLocaleString() + " " + timezone;
+    }
 
     Polymer({
       is: 'bot-page-data',
 
       behaviors: [
-          SwarmingBehaviors.CommonBehavior,
+          SwarmingBehaviors.BotPageBehavior,
       ],
 
       properties: {
@@ -24675,25 +26133,58 @@ the fleet.">
 
       request: function(){
         if (!this.bot_id || !this.auth_headers) {
-          console.log("bot_id and auth_headers can't be empty");
           return;
         }
-        var baseUrl = "/_ah/api/swarming/v1/bot/"+this.bot_id;
-        this._getJsonAsync("_bot", baseUrl + "/get",
-          "_busy1", this.auth_headers);
-        // We limit the fields on these two queries to make them faster.
-        this._getJsonAsync("_events",
-          baseUrl + "/events?fields=items(event_type%2Cmessage%2Cquarantined%2Ctask_id%2Cts%2Cversion)",
-          "_busy2", this.auth_headers);
-        this._getJsonAsync("_tasks",
-          baseUrl + "/tasks?fields=items(abandoned_ts%2Cbot_version%2Ccompleted_ts%2Cduration%2Cexit_code%2Cfailure%2Cinternal_failure%2Cmodified_ts%2Cname%2Cstarted_ts%2Cstate%2Ctask_id%2Ctry_number)",
-          "_busy3", this.auth_headers);
+        if (lastRequest) {
+          this.cancelAsync(lastRequest);
+        }
+
+        lastRequest = this.async(function(){
+          lastRequest = undefined;
+          var baseUrl = "/_ah/api/swarming/v1/bot/"+this.bot_id;
+          this._getJsonAsync("_bot", baseUrl + "/get",
+            "_busy1", this.auth_headers);
+          // We limit the fields on these two queries to make them faster.
+          this._getJsonAsync("_events",
+            baseUrl + "/events?fields=items(event_type%2Cmessage%2Cquarantined%2Ctask_id%2Cts%2Cversion)",
+            "_busy2", this.auth_headers);
+          this._getJsonAsync("_tasks",
+            baseUrl + "/tasks?fields=items(abandoned_ts%2Cbot_version%2Ccompleted_ts%2Cduration%2Cexit_code%2Cfailure%2Cinternal_failure%2Cmodified_ts%2Cname%2Cstarted_ts%2Cstate%2Ctask_id%2Ctry_number)",
+            "_busy3", this.auth_headers);
+        }, BOT_ID_DEBOUNCE_MS);
+
       },
 
       _parseBot: function(bot) {
         if (!bot) {
           return {};
         }
+        // Do any preprocessing here
+        bot.state = bot.state || "{}";
+        bot.state = JSON.parse(bot.state);
+
+        // get the disks in an easier to deal with format, sorted by size.
+        var disks = bot.state.disks || {};
+        var keys = Object.keys(disks);
+        if (!keys.length) {
+          bot.disks = [{"id": "unknown", "mb": 0}];
+        } else {
+          bot.disks = [];
+          for (var i = 0; i < keys.length; i++) {
+            bot.disks.push({"id":keys[i], "mb":disks[keys[i]].free_mb});
+          }
+          // Sort these so the biggest disk comes first.
+          bot.disks.sort(function(a, b) {
+            return b.mb - a.mb;
+          });
+        }
+
+        BOT_TIMES.forEach(function(time) {
+          if (bot[time]) {
+            bot[time] = new Date(bot[time]);
+            bot["human_"+time] = formatDate(bot[time]);
+          }
+        });
         return bot;
       },
 
@@ -24701,14 +26192,62 @@ the fleet.">
         if (!events || !events.items) {
           return [];
         }
-        return events.items;
+        var events = events.items;
+        events.forEach(function(event){
+          // Do any preprocessing here
+          if (event.ts) {
+            event.ts = new Date(event.ts);
+            event.human_ts = formatDate(event.ts);
+          }
+        });
+
+        // Sort the most recent events first.
+        events.sort(function(a,b) {
+          return b.ts - a.ts;
+        });
+
+        return events;
       },
 
       _parseTasks: function(tasks) {
         if (!tasks || !tasks.items) {
           return [];
         }
-        return tasks.items;
+        var tasks = tasks.items;
+
+        tasks.forEach(function(task){
+          // Do any preprocessing here
+          TASK_TIMES.forEach(function(time) {
+            if (task[time]) {
+              task[time] = new Date(task[time]);
+              task["human_"+time] = formatDate(task[time]);
+            }
+          });
+
+          if (task.duration) {
+            task.human_duration = sk.human.strDuration(task.duration) || "0s";
+          } else {
+            var end = task.completed_ts || task.abandoned_ts || task.modified_ts || new Date();
+            task.human_duration = this._timeDiffExact(task.started_ts, end);
+          }
+
+          task.state = task.state || "UNKNOWN";
+          if (task.state === "COMPLETED") {
+            if (task.failure) {
+              task.state = "FAILURE";
+            } else {
+              task.state = "SUCCESS";
+            }
+          }
+
+        }.bind(this));
+
+        // Sort the most recent tasks first.
+        tasks.sort(function(a,b) {
+          return b.started_ts - a.started_ts;
+        });
+
+        return tasks;
       }
 
     });
@@ -24719,12 +26258,95 @@ the fleet.">
   <template>
     <style include="iron-flex iron-flex-alignment iron-positioning swarming-app-style">
 
+    .header {
+      max-width: 450px;
+    }
+
+    .title {
+      font-size: 1.5em;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    .id_input {
+      --paper-input-container-input: {
+        font-size: 2em;
+      };
+    }
+    .refresh {
+      max-width: 50px;
+      max-height: 50px;
+      width: initial;
+      height: initial;
+    }
+
+    table {
+      border-collapse: collapse;
+      margin-left: 5px;
+      margin-bottom: 5px;
+    }
+    td, th {
+      border: 1px solid #BBB;
+      padding: 5px;
+    }
+
+    .quarantined, .failed_task {
+      background-color: #ffdddd;
+    }
+    .dead {
+      background-color: #cccccc;
+    }
+
+    .message {
+      white-space: pre-line;
+      font-family: monospace;
+    }
+
+    .bot_state {
+      white-space: pre;
+      font-family: monospace;
+      margin-bottom: 10px;
+    }
+
+    .tabs {
+      background-color: #1F78B4;
+      color: #fff;
+      max-width: 600px;
+      --paper-checkbox-label-color: #fff;
+      margin-left: 5px;
+    }
+
+    .tasks_table, .events_table {
+      border: 3px solid #1F78B4;
+    }
+
+    paper-checkbox {
+      --paper-checkbox-label-color: #fff;
+      --paper-checkbox-checked-color: #fff;
+      --paper-checkbox-checkmark-color: #000;
+      --paper-checkbox-unchecked-color: #fff;
+      padding: 3px;
+    }
+
+    paper-tab.iron-selected {
+      background-color: #A6CEE3;
+      border: 3px solid #1F78B4;
+      color: #000;
+      font-weight: bold;
+      text-decoration: underline;
+    }
+
     </style>
 
     <url-param name="id" value="{{bot_id}}">
     </url-param>
+    <url-param name="show_all_events" value="{{_show_all}}">
+    </url-param>
+    <url-param name="selected" value="{{_selected}}">
+    </url-param>
+    <url-param name="show_state" value="{{_show_state}}">
+    </url-param>
 
-    <swarming-app client_id="[[client_id]]" auth_headers="{{_auth_headers}}" signed_in="{{_signed_in}}" busy="[[_busy]]" name="Swarming Bot Page">
+    <swarming-app client_id="[[client_id]]" auth_headers="{{_auth_headers}}" permissions="{{_permissions}}" signed_in="{{_signed_in}}" busy="[[_busy]]" name="Swarming Bot Page">
 
       <h2 hidden$="[[_signed_in]]">You must sign in to see anything useful.</h2>
 
@@ -24733,8 +26355,169 @@ the fleet.">
         <bot-page-data auth_headers="[[_auth_headers]]" bot_id="[[bot_id]]" bot="{{_bot}}" busy="{{_busy}}" events="{{_events}}" tasks="{{_tasks}}">
         </bot-page-data>
 
-        <h1> Bot Page Stub </h1>
-      </div>
+        <div class="header horizontal layout">
+          <paper-input class="id_input" label="Bot id" value="{{bot_id}}"></paper-input>
+          <button>
+            <iron-icon class="refresh" icon="icons:refresh"></iron-icon>
+          </button>
+        </div>
+
+        <div>
+          <table>
+            <tbody><tr class$="[[_isDead(_bot)]]">
+              <td>Last Seen</td>
+              <td title="[[_bot.human_last_seen_ts]]">
+                [[_timeDiffExact(_bot.last_seen_ts)]] ago</td>
+              <td>
+              
+                <template is="dom-if" if="[[_canShutdown(_bot,_permissions)]]">
+                  <button class="raised">
+                    Shut Down Gracefully
+                  </button>
+                </template>
+                <template is="dom-if" if="[[_canDelete(_bot,_permissions)]]">
+                  <button class="raised">
+                    Delete
+                  </button>
+                </template>
+              </td>
+            </tr>
+            <template is="dom-if" if="[[_bot.quarantined]]">
+              <tr class="quarantined">
+                <td>Quarantined</td>
+                <td colspan="2">[[_quarantineMessage(_bot)]]</td>
+              </tr>
+            </template>
+            <tr>
+              <td>Current Task</td>
+              <td>
+                <a target="_blank" href$="[[_taskLink(_bot.task_id)]]">
+                  [[_task(_bot)]]
+                </a>
+              </td>
+              <td>
+              
+              </td>
+            </tr>
+            <tr>
+              <td rowspan$="[[_numRows(_bot.dimensions)]]">Dimensions</td>
+            </tr>
+            <template is="dom-repeat" items="[[_bot.dimensions]]" as="dim">
+              <tr>
+                <td>[[dim.key]]</td>
+                <td>[[_concat(dim.value)]]</td>
+              </tr>
+            </template>
+
+            <tr>
+              <td>External IP</td>
+              <td><a href$="[[_bot.external_ip]]">[[_bot.external_ip]]</a></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Swarming Revision</td>
+              <td>
+                <a target="_blank" href$="[[_luciLink(_bot.version)]]">[[_shorten(_bot.version,'8')]]</a>
+              </td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>First seen</td>
+              <td title="[[_bot.human_first_seen_ts]]">
+                [[_timeDiffApprox(_bot.first_seen_ts)]] ago
+              </td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>Authenticated as</td>
+              <td>[[_bot.authenticated_as]]</td>
+              <td></td>
+            </tr>
+          </tbody></table>
+
+          <span class="title">State</span>
+
+          <template is="dom-if" if="[[_not(_show_state)]]">
+            <button on-click="_toggleState">
+              <iron-icon icon="icons:add-circle-outline"></iron-icon>
+            </button>
+          </template>
+
+          <template is="dom-if" if="[[_show_state]]">
+            <button on-click="_toggleState">
+              <iron-icon icon="icons:remove-circle-outline"></iron-icon>
+            </button>
+          </template>
+
+          <iron-collapse id="collapse" opened="[[_show_state]]">
+            <div class="bot_state">[[_prettyPrint(_bot.state)]]</div>
+          </iron-collapse>
+        </div>
+
+        <div class="tabs">
+          <paper-tabs selected="{{_selected}}" no-bar="">
+            <paper-tab>Tasks</paper-tab>
+            <paper-tab>Events</paper-tab>
+          </paper-tabs>
+
+          <template is="dom-if" if="[[_selected]]">
+            <paper-checkbox checked="{{_show_all}}">
+                Show all events
+            </paper-checkbox>
+          </template>
+        </div>
+
+        <template is="dom-if" if="[[_not(_selected)]]">
+          <table class="tasks_table">
+            <thead>
+              <tr>
+                <th>Task</th>
+                <th>Started</th>
+                <th>Duration</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template is="dom-repeat" items="{{_tasks}}" as="task">
+                <tr>
+                  <td><a target="_blank" href$="[[_taskLink(task.task_id)]]">[[task.name]]</a></td>
+                  <td>[[task.human_started_ts]]</td>
+                  <td title="[[task.human_completed_ts]]">[[task.human_duration]]</td>
+                  <td>[[task.state]]</td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </template>
+
+        <template is="dom-if" if="[[_selected]]">
+          <table class="events_table">
+            <thead>
+              <tr>
+                <th>Message</th>
+                <th>Type</th>
+                <th>Timestamp</th>
+                <th>Task ID</th>
+                <th>Version</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template is="dom-repeat" items="{{_eventList(_events,_show_all)}}" as="event">
+                <tr>
+                  <td class="message">[[event.message]]</td>
+                  <td>[[event.event_type]]</td>
+                  <td>[[event.human_ts]]</td>
+                  <td><a target="_blank" href$="[[_taskLink(event.task_id)]]">[[event.task_id]]</a></td>
+                  <td>
+                    <a target="_blank" href$="[[_luciLink(_bot.version)]]">[[_shorten(_bot.version,'8')]]</a>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </template>
+        </div>
+      
 
     </swarming-app>
 
@@ -24747,7 +26530,7 @@ the fleet.">
       is: 'bot-page',
 
       behaviors: [
-          SwarmingBehaviors.CommonBehavior,
+          SwarmingBehaviors.BotPageBehavior,
       ],
 
       properties: {
@@ -24758,7 +26541,110 @@ the fleet.">
           type: String,
         },
 
+        _bot: {
+          type: Object,
+        },
+        _selected: {
+          type: Number,
+        },
+        _show_all: {
+          type: Boolean,
+        },
+        _show_state: {
+          type: Boolean,
+        }
       },
+
+      _canCancel: function(bot, permissions) {
+        return bot && bot.task_id && permissions.cancel_task;
+      },
+
+      _canDelete: function(bot, permissions) {
+        return bot && bot.is_dead && permissions.delete_bot;
+      },
+
+      _canShutdown: function(bot, permissions){
+        return bot && !bot.is_dead && permissions.terminate_bot;
+      },
+
+      _concat: function(arr) {
+        if (!arr) {
+          return "";
+        }
+        return arr.join(" | ");
+      },
+
+      _eventList(events, showAll) {
+        if (!events) {
+          return [];
+        }
+        return events.filter(function(e){
+          return showAll || e.message;
+        });
+      },
+
+      _isDead(bot){
+        if (bot && bot.is_dead) {
+          return "dead";
+        }
+        return "";
+      },
+
+      _luciLink: function(revision) {
+        if (!revision) {
+          return undefined;
+        }
+        return "https://github.com/luci/luci-py/commit/" + revision;
+
+      },
+
+      _numRows: function(arr) {
+        if (!arr || !arr.length) {
+          return 1;
+        }
+        return 1 + arr.length;
+      },
+
+      _prettyPrint: function(obj) {
+        obj = obj || {};
+        return JSON.stringify(obj, null, 2);
+      },
+
+      _quarantineMessage: function(bot) {
+        if (bot && bot.quarantined) {
+          var msg = bot.state.quarantined;
+          // Sometimes, the quarantined message is actually in "error".  This
+          // happens when the bot code has thrown an exception.
+          if (msg === undefined || msg === "true" || msg === true) {
+            msg = this._attribute(bot, "error");
+          }
+          return msg || "True";
+        }
+        return "";
+      },
+
+      _shorten: function(str, length) {
+        if (!str || ! length) {
+          return "";
+        }
+        return str.substring(0, length);
+      },
+
+      _task: function(bot) {
+        return (bot && bot.task_id) || "idle";
+      },
+
+      _taskLink: function(task_id) {
+        // TODO(kjlubick): Migrate this to /newui/ when ready
+        if (task_id) {
+          return "/user/task/" + task_id;
+        }
+        return undefined;
+      },
+
+      _toggleState: function() {
+        this.set("_show_state", !this._show_state);
+      }
 
     });
   })();

@@ -32,17 +32,37 @@
 -->
 
 
-<link rel="import" href="/res/imp/common/common-behavior.html">
+<link rel="import" href="bot-page-shared-behavior.html">
 
 <dom-module id="bot-page-data">
   <script>
   (function(){
+    // Time to wait before requesting a new bot. This is to allow a user to
+    // type in a name and not have it make one set of requests for each
+    // keystroke.
+    var BOT_ID_DEBOUNCE_MS = 400;
+    var lastRequest;
+
+    var BOT_TIMES = ["first_seen_ts", "last_seen_ts"];
+    var TASK_TIMES = ["started_ts", "completed_ts", "abandoned_ts", "modified_ts"];
+
+    var timezone;
+    function formatDate(date) {
+      if (!timezone) {
+        // Date.toString() looks like "Mon Aug 29 2016 09:03:41 GMT-0400 (EDT)"
+        // we want to extract the time zone part and append it to the
+        // locale time.
+        var str = date.toString();
+        timezone = str.substring(str.indexOf("("));
+      }
+      return date.toLocaleString() + " " + timezone;
+    }
 
     Polymer({
       is: 'bot-page-data',
 
       behaviors: [
-          SwarmingBehaviors.CommonBehavior,
+          SwarmingBehaviors.BotPageBehavior,
       ],
 
       properties: {
@@ -106,25 +126,58 @@
 
       request: function(){
         if (!this.bot_id || !this.auth_headers) {
-          console.log("bot_id and auth_headers can't be empty");
           return;
         }
-        var baseUrl = "/_ah/api/swarming/v1/bot/"+this.bot_id;
-        this._getJsonAsync("_bot", baseUrl + "/get",
-          "_busy1", this.auth_headers);
-        // We limit the fields on these two queries to make them faster.
-        this._getJsonAsync("_events",
-          baseUrl + "/events?fields=items(event_type%2Cmessage%2Cquarantined%2Ctask_id%2Cts%2Cversion)",
-          "_busy2", this.auth_headers);
-        this._getJsonAsync("_tasks",
-          baseUrl + "/tasks?fields=items(abandoned_ts%2Cbot_version%2Ccompleted_ts%2Cduration%2Cexit_code%2Cfailure%2Cinternal_failure%2Cmodified_ts%2Cname%2Cstarted_ts%2Cstate%2Ctask_id%2Ctry_number)",
-          "_busy3", this.auth_headers);
+        if (lastRequest) {
+          this.cancelAsync(lastRequest);
+        }
+
+        lastRequest = this.async(function(){
+          lastRequest = undefined;
+          var baseUrl = "/_ah/api/swarming/v1/bot/"+this.bot_id;
+          this._getJsonAsync("_bot", baseUrl + "/get",
+            "_busy1", this.auth_headers);
+          // We limit the fields on these two queries to make them faster.
+          this._getJsonAsync("_events",
+            baseUrl + "/events?fields=items(event_type%2Cmessage%2Cquarantined%2Ctask_id%2Cts%2Cversion)",
+            "_busy2", this.auth_headers);
+          this._getJsonAsync("_tasks",
+            baseUrl + "/tasks?fields=items(abandoned_ts%2Cbot_version%2Ccompleted_ts%2Cduration%2Cexit_code%2Cfailure%2Cinternal_failure%2Cmodified_ts%2Cname%2Cstarted_ts%2Cstate%2Ctask_id%2Ctry_number)",
+            "_busy3", this.auth_headers);
+        }, BOT_ID_DEBOUNCE_MS);
+
       },
 
       _parseBot: function(bot) {
         if (!bot) {
           return {};
         }
+        // Do any preprocessing here
+        bot.state = bot.state || "{}";
+        bot.state = JSON.parse(bot.state);
+
+        // get the disks in an easier to deal with format, sorted by size.
+        var disks = bot.state.disks || {};
+        var keys = Object.keys(disks);
+        if (!keys.length) {
+          bot.disks = [{"id": "unknown", "mb": 0}];
+        } else {
+          bot.disks = [];
+          for (var i = 0; i < keys.length; i++) {
+            bot.disks.push({"id":keys[i], "mb":disks[keys[i]].free_mb});
+          }
+          // Sort these so the biggest disk comes first.
+          bot.disks.sort(function(a, b) {
+            return b.mb - a.mb;
+          });
+        }
+
+        BOT_TIMES.forEach(function(time) {
+          if (bot[time]) {
+            bot[time] = new Date(bot[time]);
+            bot["human_"+time] = formatDate(bot[time]);
+          }
+        });
         return bot;
       },
 
@@ -132,14 +185,62 @@
         if (!events || !events.items) {
           return [];
         }
-        return events.items;
+        var events = events.items;
+        events.forEach(function(event){
+          // Do any preprocessing here
+          if (event.ts) {
+            event.ts = new Date(event.ts);
+            event.human_ts = formatDate(event.ts);
+          }
+        });
+
+        // Sort the most recent events first.
+        events.sort(function(a,b) {
+          return b.ts - a.ts;
+        });
+
+        return events;
       },
 
       _parseTasks: function(tasks) {
         if (!tasks || !tasks.items) {
           return [];
         }
-        return tasks.items;
+        var tasks = tasks.items;
+
+        tasks.forEach(function(task){
+          // Do any preprocessing here
+          TASK_TIMES.forEach(function(time) {
+            if (task[time]) {
+              task[time] = new Date(task[time]);
+              task["human_"+time] = formatDate(task[time]);
+            }
+          });
+
+          if (task.duration) {
+            task.human_duration = sk.human.strDuration(task.duration) || "0s";
+          } else {
+            var end = task.completed_ts || task.abandoned_ts || task.modified_ts || new Date();
+            task.human_duration = this._timeDiffExact(task.started_ts, end);
+          }
+
+          task.state = task.state || "UNKNOWN";
+          if (task.state === "COMPLETED") {
+            if (task.failure) {
+              task.state = "FAILURE";
+            } else {
+              task.state = "SUCCESS";
+            }
+          }
+
+        }.bind(this));
+
+        // Sort the most recent tasks first.
+        tasks.sort(function(a,b) {
+          return b.started_ts - a.started_ts;
+        });
+
+        return tasks;
       }
 
     });
