@@ -150,6 +150,10 @@ def get_state(botobj, sleep_streak):
       'quarantined': True,
     }
 
+  if not state.get('quarantined') and not is_base_dir_ok(botobj):
+    # Use super hammer in case of dangerous environment.
+    state['quarantined'] = 'Can\'t run from blacklisted directory'
+
   state['sleep_streak'] = sleep_streak
   return state
 
@@ -222,12 +226,21 @@ def get_authentication_headers(botobj):
 ### end of bot_config handler part.
 
 
-def get_min_free_space():
+def is_base_dir_ok(botobj):
+  """Returns False if the bot must be quarantined at all cost."""
+  if not botobj:
+    # This can happen very early in the process lifetime.
+    return os.path.dirname(THIS_FILE) != os.path.expanduser('~')
+  return botobj.base_dir != os.path.expanduser('~')
+
+
+def get_min_free_space(botobj):
   """Returns free disk space needed.
 
   Add a "250 MiB slack space" for logs, temporary files and whatever other leak.
   """
-  return int((os_utilities.get_min_free_space(THIS_FILE) + 250.) * 1024 * 1024)
+  return int(
+      (os_utilities.get_min_free_space(botobj.base_dir) + 250.) * 1024 * 1024)
 
 
 def generate_version():
@@ -305,6 +318,7 @@ def get_bot():
   config = get_config()
   assert not config['server'].endswith('/'), config
 
+  base_dir = os.path.dirname(THIS_FILE)
   # Use temporary Bot object to call get_attributes. Attributes are needed to
   # construct the "real" bot.Bot.
   attributes = get_attributes(
@@ -313,7 +327,7 @@ def get_bot():
       attributes,
       config['server'],
       config['server_version'],
-      os.path.dirname(THIS_FILE),
+      base_dir,
       on_shutdown_hook))
 
   # Make remote client callback use the returned bot object. We assume here
@@ -326,7 +340,7 @@ def get_bot():
       attributes,
       config['server'],
       config['server_version'],
-      os.path.dirname(THIS_FILE),
+      base_dir,
       on_shutdown_hook)
   return botobj
 
@@ -337,6 +351,11 @@ def cleanup_bot_directory(botobj):
   This helps with stale work directory or any unexpected junk that could cause
   this bot to self-quarantine. Do only this when running from the zip.
   """
+  if not is_base_dir_ok(botobj):
+    # That's an important one-off check as cleaning the $HOME directory has
+    # really bad effects on normal host.
+    logging.error('Not cleaning root directory because of bad base directory')
+    return
   for i in os.listdir(botobj.base_dir):
     if any(fnmatch.fnmatch(i, w) for w in PASSLIST):
       continue
@@ -361,13 +380,12 @@ def clean_isolated_cache(botobj):
   It will remove unexpected files, remove corrupted files, trim the cache size
   based on the policies and update state.json.
   """
-  bot_dir = botobj.base_dir
   cmd = [
     sys.executable, THIS_FILE, 'run_isolated',
     '--clean',
-    '--log-file', os.path.join(bot_dir, 'logs', 'run_isolated.log'),
-    '--cache', os.path.join(bot_dir, 'isolated_cache'),
-    '--min-free-space', str(get_min_free_space()),
+    '--log-file', os.path.join(botobj.base_dir, 'logs', 'run_isolated.log'),
+    '--cache', os.path.join(botobj.base_dir, 'isolated_cache'),
+    '--min-free-space', str(get_min_free_space(botobj)),
   ]
   logging.info('Running: %s', cmd)
   try:
@@ -377,7 +395,7 @@ def clean_isolated_cache(botobj):
         cmd,
         stdin=subprocess42.PIPE,
         stdout=subprocess42.PIPE, stderr=subprocess42.STDOUT,
-        cwd=bot_dir,
+        cwd=botobj.base_dir,
         detached=True,
         close_fds=sys.platform != 'win32')
     output, _ = proc.communicate(None)
@@ -672,7 +690,7 @@ def run_manifest(botobj, manifest, start):
       '--cost-usd-hour', str(botobj.state.get('cost_usd_hour') or 0.),
       # Include the time taken to poll the task in the cost.
       '--start', str(start),
-      '--min-free-space', str(get_min_free_space()),
+      '--min-free-space', str(get_min_free_space(botobj)),
       '--bot-file', bot_file,
     ]
     if botobj.remote.uses_auth:
@@ -768,7 +786,7 @@ def update_bot(botobj, version):
   new_zip = 'swarming_bot.1.zip'
   if os.path.basename(THIS_FILE) == new_zip:
     new_zip = 'swarming_bot.2.zip'
-  new_zip = os.path.join(os.path.dirname(THIS_FILE), new_zip)
+  new_zip = os.path.join(botobj.base_dir, new_zip)
 
   # Download as a new file.
   url_path = '/swarming/api/v1/bot/bot_code/%s?bot_id=%s' % (
@@ -829,7 +847,7 @@ def update_lkgbc(botobj):
       botobj.post_error('Missing file %s for LKGBC' % THIS_FILE)
       return
 
-    golden = os.path.join(os.path.dirname(THIS_FILE), 'swarming_bot.zip')
+    golden = os.path.join(botobj.base_dir, 'swarming_bot.zip')
     if os.path.isfile(golden):
       org = os.stat(golden)
       cur = os.stat(THIS_FILE)
@@ -880,9 +898,9 @@ def main(args):
       print >> sys.stderr, 'Found a previous bot, %d exiting.' % os.getpid()
     return 1
 
+  base_dir = os.path.dirname(THIS_FILE)
   for t in ('out', 'err'):
-    log_path = os.path.join(
-        os.path.dirname(THIS_FILE), 'logs', 'bot_std%s.log' % t)
+    log_path = os.path.join(base_dir, 'logs', 'bot_std%s.log' % t)
     os_utilities.roll_log(log_path)
     os_utilities.trim_rolled_log(log_path)
 
@@ -892,6 +910,6 @@ def main(args):
   try:
     return run_bot(error)
   finally:
-    call_hook(bot.Bot(None, None, None, None, os.path.dirname(THIS_FILE), None),
-              'on_bot_shutdown')
+    call_hook(
+        bot.Bot(None, None, None, None, base_dir, None), 'on_bot_shutdown')
     logging.info('main() returning')

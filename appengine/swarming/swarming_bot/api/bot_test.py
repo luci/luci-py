@@ -7,8 +7,6 @@ import os
 import sys
 import unittest
 
-THIS_FILE = os.path.abspath(__file__)
-
 import test_env_api
 test_env_api.setup_test_env()
 
@@ -26,8 +24,7 @@ class TestBot(unittest.TestCase):
         None)
     self.assertEqual({'foo': ['bar']}, obj.dimensions)
     self.assertEqual(
-        os.path.join(os.path.dirname(THIS_FILE), 'swarming_bot.zip'),
-        obj.swarming_bot_zip)
+        os.path.join(obj.base_dir, 'swarming_bot.zip'), obj.swarming_bot_zip)
     self.assertEqual('1234-1a2b3c4-tainted-joe', obj.server_version)
     self.assertEqual('base_dir', obj.base_dir)
 

@@ -11,8 +11,6 @@ import time
 import os_utilities
 from utils import zip_package
 
-THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
-
 # Method could be a function - pylint: disable=R0201
 
 
@@ -35,7 +33,7 @@ class Bot(object):
   def base_dir(self):
     """Returns the working directory.
 
-    It is normally the current workind directory, e.g. os.getcwd() but it is
+    It is normally the current working directory, e.g. os.getcwd() but it is
     preferable to not assume that.
     """
     return self._base_dir
@@ -119,8 +117,11 @@ class Bot(object):
     The bot itself is run as swarming_bot.1.zip or swarming_bot.2.zip. Always
     return swarming_bot.zip since this is the script that must be used when
     starting up.
+
+    This is generally used by bot_config.setup_bot() when setting up the bot to
+    automatically start upon boot.
     """
-    return os.path.join(os.path.dirname(THIS_FILE), 'swarming_bot.zip')
+    return os.path.join(self.base_dir, 'swarming_bot.zip')
 
   def post_event(self, event_type, message):
     """Posts an event to the server."""
