@@ -26,6 +26,7 @@ from utils import file_path
 from utils import large
 from utils import logging_utils
 from utils import subprocess42
+import bot_auth
 import fake_swarming
 import task_runner
 
@@ -52,6 +53,24 @@ def get_manifest(script=None, isolated=None, **kwargs):
   }
   out.update(kwargs)
   return out
+
+
+class FakeAuthSystem(object):
+  def __init__(self):
+    self._running = False
+
+  def start(self, auth_params_file):
+    assert auth_params_file == '/path/to/auth-params-file'
+    assert not self._running
+    self._running = True
+
+  def stop(self):
+    self._running = False
+
+  @property
+  def bot_headers(self):
+    assert self._running
+    return {'Fake': 'Header'}
 
 
 class TestTaskRunnerBase(net_utils.TestCase):
@@ -162,20 +181,22 @@ class TestTaskRunner(TestTaskRunnerBase):
       self.assertEqual(expected, kwargs)
     return check_final
 
-  def _run_command(self, task_details, auth_params_file=None):
+  def _run_command(self, task_details, headers_cb=None):
     start = time.time()
     self.mock(time, 'time', lambda: start + 10)
     server = 'https://localhost:1'
     return task_runner.run_command(
         server, task_details, self.work_dir, 3600., start, 1,
-        '/path/to/file', auth_params_file)
+        '/path/to/file', headers_cb or (lambda: {}))
 
   def test_load_and_run_raw(self):
     server = 'https://localhost:1'
 
+    self.mock(bot_auth, 'AuthSystem', FakeAuthSystem)
+
     def run_command(
         swarming_server, task_details, work_dir,
-        cost_usd_hour, start, min_free_space, bot_file, auth_params_file):
+        cost_usd_hour, start, min_free_space, bot_file, headers_cb):
       self.assertEqual(server, swarming_server)
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       # Necessary for OSX.
@@ -185,7 +206,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       self.assertEqual(time.time(), start)
       self.assertEqual(1, min_free_space)
       self.assertEqual('/path/to/bot-file', bot_file)
-      self.assertEqual('/path/to/auth-params-file', auth_params_file)
+      self.assertEqual({'Fake': 'Header'}, headers_cb())
       return {
         u'exit_code': 1,
         u'hard_timeout': False,
@@ -228,9 +249,11 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.expected_requests([])
     server = 'https://localhost:1'
 
+    self.mock(bot_auth, 'AuthSystem', FakeAuthSystem)
+
     def run_command(
         swarming_server, task_details, work_dir,
-        cost_usd_hour, start, min_free_space, bot_file, auth_params_file):
+        cost_usd_hour, start, min_free_space, bot_file, headers_cb):
       self.assertEqual(server, swarming_server)
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       # Necessary for OSX.
@@ -240,7 +263,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       self.assertEqual(time.time(), start)
       self.assertEqual(1, min_free_space)
       self.assertEqual('/path/to/bot-file', bot_file)
-      self.assertEqual('/path/to/auth-params-file', auth_params_file)
+      self.assertEqual({'Fake': 'Header'}, headers_cb())
       return {
         u'exit_code': 0,
         u'hard_timeout': False,
@@ -297,10 +320,6 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.assertEqual(expected, self._run_command(task_details))
 
   def test_run_command_raw_with_auth(self):
-    auth_params_file = os.path.join(self.root_dir, 'auth_params.json')
-    with open(auth_params_file, 'wb') as f:
-      json.dump({'swarming_http_headers': {'A': 'a'}}, f)
-
     # This runs the command for real.
     self.requests(cost_usd=1, exit_code=0, auth_headers={'A': 'a'})
     task_details = self.get_task_details('print(\'hi\')')
@@ -313,7 +332,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     }
     self.assertEqual(
         expected,
-        self._run_command(task_details, auth_params_file=auth_params_file))
+        self._run_command(task_details, headers_cb=lambda: {'A': 'a'}))
 
   def test_run_command_isolated(self):
     # This runs the command for real.
@@ -669,7 +688,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     server = 'https://localhost:1'
     return task_runner.run_command(
         server, task_details, self.work_dir, 3600., time.time(), 1,
-        '/path/to/file', None)
+        '/path/to/file', lambda: {})
 
   def test_hard(self):
     # Actually 0xc000013a
