@@ -26,10 +26,10 @@
 
 <link rel="import" href="/res/imp/bower_components/iron-flex-layout/iron-flex-layout-classes.html">
 <link rel="import" href="/res/imp/bower_components/paper-button/paper-button.html">
-<link rel="import" href="/res/imp/bower_components/paper-toast/paper-toast.html">
 <link rel="import" href="/res/imp/bower_components/polymer/polymer.html">
 
 <link rel="import" href="/res/imp/common/dynamic-table-behavior.html">
+<link rel="import" href="/res/imp/common/error-toast.html">
 <link rel="import" href="/res/imp/common/sort-toggle.html">
 <link rel="import" href="/res/imp/common/swarming-app.html">
 <link rel="import" href="/res/imp/common/url-param.html">
@@ -89,7 +89,7 @@
           primary_arr="{{_primary_arr}}">
         </task-list-data>
 
-        <paper-toast id="toast"></paper-toast>
+        <error-toast></error-toast>
 
         <div class="horizontal layout">
 
@@ -332,25 +332,8 @@
         }
         var id = task.task_id
 
-        // Keep toast displayed until we hear back from the cancel.
-        this.$.toast.duration = 0;
-        this.$.toast.text="Canceling task " + id;
-        this.$.toast.open();
         var url = "/_ah/api/swarming/v1/task/" + id +"/cancel";
-        sk.request("POST", url, undefined, this._auth_headers).then(function(response) {
-          this.$.toast.close();
-          this.$.toast.show({
-            text: "Request sent.  Response: "+response,
-            duration: 3000,
-          });
-        }.bind(this)).catch(function(reason) {
-          console.log("Cancellation failed", reason);
-          this.$.toast.close();
-          this.$.toast.show({
-            text: "Request failed.  Reason: "+reason,
-            duration: 3000,
-          });
-        }.bind(this));
+        swarming.postWithToast(url, "Canceling task " + id, this._auth_headers);
       },
 
       _tag: function(task, col) {

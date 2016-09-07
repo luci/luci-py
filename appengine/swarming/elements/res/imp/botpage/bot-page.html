@@ -27,14 +27,16 @@
 <link rel="import" href="/res/imp/bower_components/iron-collapse/iron-collapse.html">
 <link rel="import" href="/res/imp/bower_components/iron-icon/iron-icon.html">
 <link rel="import" href="/res/imp/bower_components/iron-icons/iron-icons.html">
+<link rel="import" href="/res/imp/bower_components/paper-button/paper-button.html">
 <link rel="import" href="/res/imp/bower_components/paper-checkbox/paper-checkbox.html">
+<link rel="import" href="/res/imp/bower_components/paper-dialog/paper-dialog.html">
 <link rel="import" href="/res/imp/bower_components/paper-input/paper-input.html">
 <link rel="import" href="/res/imp/bower_components/paper-tabs/paper-tabs.html">
-<link rel="import" href="/res/imp/bower_components/paper-icon-button/paper-icon-button.html">
 <link rel="import" href="/res/imp/bower_components/polymer/polymer.html">
 
 <link rel="import" href="/res/imp/common/swarming-app.html">
 <link rel="import" href="/res/imp/common/url-param.html">
+<link rel="import" href="/res/imp/common/error-toast.html">
 
 <link rel="import" href="bot-page-data.html">
 <link rel="import" href="bot-page-shared-behavior.html">
@@ -70,15 +72,18 @@
       margin-left: 5px;
       margin-bottom: 5px;
     }
-    td, th {
+    td,
+    th {
       border: 1px solid #BBB;
       padding: 5px;
     }
 
-    .quarantined, .failed_task {
+    .quarantined,
+    .failed_task {
       background-color: #ffdddd;
     }
-    .dead {
+    .dead,
+    .bot_died {
       background-color: #cccccc;
     }
 
@@ -101,7 +106,8 @@
       margin-left: 5px;
     }
 
-    .tasks_table, .events_table {
+    .tasks_table,
+    .events_table {
       border: 3px solid #1F78B4;
     }
 
@@ -119,6 +125,10 @@
       color: #000;
       font-weight: bold;
       text-decoration: underline;
+    }
+
+    paper-dialog {
+      border-radius: 6px;
     }
 
     </style>
@@ -150,6 +160,7 @@
       <div hidden$="[[_not(_signed_in)]]">
 
         <bot-page-data
+          id="data"
           auth_headers="[[_auth_headers]]"
           bot_id="[[bot_id]]"
 
@@ -161,7 +172,7 @@
 
         <div class="header horizontal layout">
           <paper-input class="id_input" label="Bot id" value="{{bot_id}}"></paper-input>
-          <button>
+          <button on-click="_refresh">
             <iron-icon class="refresh" icon="icons:refresh"></iron-icon>
           </button>
         </div>
@@ -177,12 +188,12 @@
               prevent things from first drawing and then hiding. We prefer to
               not flash buttons or quarantined messages -->
                 <template is="dom-if" if="[[_canShutdown(_bot,_permissions)]]">
-                  <button class="raised">
+                  <button class="raised" on-click="_promptShutdown">
                     Shut Down Gracefully
                   </button>
                 </template>
                 <template is="dom-if" if="[[_canDelete(_bot,_permissions)]]">
-                  <button class="raised">
+                  <button class="raised" on-click="_promptDelete">
                     Delete
                   </button>
                 </template>
@@ -289,7 +300,7 @@
             </thead>
             <tbody>
               <template is="dom-repeat" items="{{_tasks}}" as="task">
-                <tr>
+                <tr class$="[[_taskClass(task)]]">
                   <td><a target="_blank" href$="[[_taskLink(task.task_id)]]">[[task.name]]</a></td>
                   <td>[[task.human_started_ts]]</td>
                   <td title="[[task.human_completed_ts]]">[[task.human_duration]]</td>
@@ -328,8 +339,18 @@
         </template>
         </div>
       </div>
-
     </swarming-app>
+
+    <paper-dialog id="prompt" modal on-iron-overlay-closed="_promptClosed">
+      <h2>Are you sure?</h2>
+      <div>Are you sure you want to [[_dialogPrompt]]?</div>
+      <div class="buttons">
+        <paper-button dialog-dismiss autofocus>No</paper-button>
+        <paper-button dialog-confirm>Yes</paper-button>
+      </div>
+    </paper-dialog>
+
+    <error-toast></error-toast>
 
   </template>
   <script>
@@ -351,8 +372,15 @@
           type: String,
         },
 
+        _auth_headers: {
+          type: Object,
+        },
         _bot: {
           type: Object,
+        },
+        _dialogPrompt: {
+          type: String,
+          value: "",
         },
         _selected: {
           type: Number,
@@ -382,6 +410,11 @@
           return "";
         }
         return arr.join(" | ");
+      },
+
+      _deleteBot: function() {
+        swarming.postWithToast("/_ah/api/swarming/v1/bot/"+this.bot_id+"/delete",
+          "Deleting "+this.bot_id, this._auth_headers);
       },
 
       _eventList(events, showAll) {
@@ -420,6 +453,26 @@
         return JSON.stringify(obj, null, 2);
       },
 
+      _promptClosed: function(e) {
+        if (e.detail.confirmed) {
+          if (this._dialogPrompt.startsWith("shut down")) {
+            this._shutdownBot();
+          } else {
+            this._deleteBot();
+          }
+        }
+      },
+
+      _promptDelete: function() {
+        this.set("_dialogPrompt", "delete "+this.bot_id);
+        this.$.prompt.open();
+      },
+
+      _promptShutdown: function() {
+        this.set("_dialogPrompt", "shut down "+this.bot_id);
+        this.$.prompt.open();
+      },
+
       _quarantineMessage: function(bot) {
         if (bot && bot.quarantined) {
           var msg = bot.state.quarantined;
@@ -433,6 +486,10 @@
         return "";
       },
 
+      _refresh: function() {
+        this.$.data.request();
+      },
+
       _shorten: function(str, length) {
         if (!str || ! length) {
           return "";
@@ -440,8 +497,23 @@
         return str.substring(0, length);
       },
 
+      _shutdownBot: function() {
+        swarming.postWithToast("/_ah/api/swarming/v1/bot/"+this.bot_id+"/terminate",
+          "Shutting down "+this.bot_id, this._auth_headers);
+      },
+
       _task: function(bot) {
         return (bot && bot.task_id) || "idle";
+      },
+
+      _taskClass: function(task) {
+        if (task && task.internal_failure) {
+          return "bot_died";
+        }
+        if (task && task.failure) {
+          return "failed_task";
+        }
+        return "";
       },
 
       _taskLink: function(task_id) {

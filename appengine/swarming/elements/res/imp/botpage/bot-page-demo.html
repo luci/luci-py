@@ -28,7 +28,7 @@
     sinon.log = function(message) {console.log(message);};
     var server = sinon.fakeServer.create();
     server.autoRespond = true;
-    //server.autoRespondAfter = 2000;
+    server.autoRespondAfter = 1000;
 
     var genResponse = function(arr) {
       return function(request){
@@ -77,6 +77,32 @@
     };
     server.respondWith("GET", /^\/_ah\/api\/swarming\/v1\/server\/details/, JSON.stringify(details));
     server.respondWith("GET", /^\/api\/swarming\/v1\/server\/details/, JSON.stringify(details));
+
+    var deleteRequest = function(request) {
+      console.log("Deleting", request);
+      if (!request.requestHeaders.authorization) {
+        sinon.log("You must be logged in (check your Oauth?)");
+          request.respond(403, {}, "You must be logged in (check your Oauth?)");
+        return;
+      }
+      request.respond(200, {}, "Bot has been deleted.");
+    }
+
+    server.respondWith("POST", /^\/_ah\/api\/swarming\/v1\/bot\/.+\/delete/, deleteRequest);
+    server.respondWith("POST", /^\/api\/swarming\/v1\/bot\/.+\/delete/, deleteRequest);
+
+    var terminateRequest = function(request) {
+      console.log("Terminating", request);
+      if (!request.requestHeaders.authorization) {
+        sinon.log("You must be logged in (check your Oauth?)");
+          request.respond(403, {}, "You must be logged in (check your Oauth?)");
+        return;
+      }
+      request.respond(200, {}, "Bot has been terminated.");
+    }
+
+    server.respondWith("POST", /^\/_ah\/api\/swarming\/v1\/bot\/.+\/terminate/, terminateRequest);
+    server.respondWith("POST", /^\/api\/swarming\/v1\/bot\/.+\/terminate/, terminateRequest);
     </script>
 
     <link rel="import" href="bot-page.html">
@@ -85,8 +111,7 @@
 
 <bot-page
   bot_id="test-bot-001"
-  client_id="20770472288-t5smpbpjptka4nd888fv0ctd23ftba2o.apps.googleusercontent.com"
-  >
+  client_id="20770472288-t5smpbpjptka4nd888fv0ctd23ftba2o.apps.googleusercontent.com">
 </bot-page>
 
 </body>

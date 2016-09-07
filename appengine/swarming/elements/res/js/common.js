@@ -50,5 +50,20 @@ this.swarming = this.swarming || function() {
     return String(a).localeCompare(b);
   };
 
+  // postWithToast makes a post request and updates the error-toast
+  // element with the response, regardless of failure.  See error-toast.html
+  // for more information.
+  swarming.postWithToast = function(url, msg, auth_headers) {
+    // Keep toast displayed until we hear back from the request.
+    sk.errorMessage(msg, 0);
+
+    sk.request("POST", url, undefined, auth_headers).then(function(response) {
+      sk.errorMessage("Request sent.  Response: "+response, 3000);
+    }).catch(function(reason) {
+      console.log("Request failed", reason);
+      sk.errorMessage("Request failed.  Reason: "+reason, 5000);
+    });
+  }
+
   return swarming;
 }();

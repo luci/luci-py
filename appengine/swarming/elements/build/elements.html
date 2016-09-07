@@ -23988,6 +23988,35 @@ the fleet.">
     });
   </script>
 </dom-module>
+<dom-module id="error-toast" assetpath="/res/imp/common/">
+  <template>
+    <paper-toast id="toast"></paper-toast>
+  </template>
+</dom-module>
+
+<script>
+  Polymer({
+    is: "error-toast",
+
+    ready: function() {
+      document.addEventListener('error-sk', function(e) {
+        this.$.toast.close();
+        if (e.detail.message) {
+          this.$.toast.text = e.detail.message;
+          var duration = 10000;
+          // duration = 0 is a valid input for "keep open indefinitely".
+          if (e.detail.duration !== undefined) {
+            duration = e.detail.duration;
+          }
+          this.$.toast.duration = duration;
+          this.$.toast.show();
+        } else {
+          console.log("Empty message?", e);
+        }
+      }.bind(this));
+    },
+  });
+</script>
 <dom-module id="task-filters" assetpath="/res/imp/tasklist/">
   <template>
     <style is="custom-style" include="iron-flex iron-flex-alignment iron-positioning query-column-filter-style">
@@ -24424,7 +24453,7 @@ the fleet.">
         <task-list-data auth_headers="[[_auth_headers]]" query_params="[[_query_params]]" tasks="{{_items}}" busy="{{_busy}}" primary_map="{{_primary_map}}" primary_arr="{{_primary_arr}}">
         </task-list-data>
 
-        <paper-toast id="toast"></paper-toast>
+        <error-toast></error-toast>
 
         <div class="horizontal layout">
 
@@ -24624,25 +24653,8 @@ the fleet.">
         }
         var id = task.task_id
 
-        // Keep toast displayed until we hear back from the cancel.
-        this.$.toast.duration = 0;
-        this.$.toast.text="Canceling task " + id;
-        this.$.toast.open();
         var url = "/_ah/api/swarming/v1/task/" + id +"/cancel";
-        sk.request("POST", url, undefined, this._auth_headers).then(function(response) {
-          this.$.toast.close();
-          this.$.toast.show({
-            text: "Request sent.  Response: "+response,
-            duration: 3000,
-          });
-        }.bind(this)).catch(function(reason) {
-          console.log("Cancellation failed", reason);
-          this.$.toast.close();
-          this.$.toast.show({
-            text: "Request failed.  Reason: "+reason,
-            duration: 3000,
-          });
-        }.bind(this));
+        swarming.postWithToast(url, "Canceling task " + id, this._auth_headers);
       },
 
       _tag: function(task, col) {
@@ -24913,6 +24925,491 @@ the fleet.">
     }
 
   });
+
+</script>
+<script>
+
+  /**
+   * `Polymer.NeonAnimatableBehavior` is implemented by elements containing animations for use with
+   * elements implementing `Polymer.NeonAnimationRunnerBehavior`.
+   * @polymerBehavior
+   */
+  Polymer.NeonAnimatableBehavior = {
+
+    properties: {
+
+      /**
+       * Animation configuration. See README for more info.
+       */
+      animationConfig: {
+        type: Object
+      },
+
+      /**
+       * Convenience property for setting an 'entry' animation. Do not set `animationConfig.entry`
+       * manually if using this. The animated node is set to `this` if using this property.
+       */
+      entryAnimation: {
+        observer: '_entryAnimationChanged',
+        type: String
+      },
+
+      /**
+       * Convenience property for setting an 'exit' animation. Do not set `animationConfig.exit`
+       * manually if using this. The animated node is set to `this` if using this property.
+       */
+      exitAnimation: {
+        observer: '_exitAnimationChanged',
+        type: String
+      }
+
+    },
+
+    _entryAnimationChanged: function() {
+      this.animationConfig = this.animationConfig || {};
+      this.animationConfig['entry'] = [{
+        name: this.entryAnimation,
+        node: this
+      }];
+    },
+
+    _exitAnimationChanged: function() {
+      this.animationConfig = this.animationConfig || {};
+      this.animationConfig['exit'] = [{
+        name: this.exitAnimation,
+        node: this
+      }];
+    },
+
+    _copyProperties: function(config1, config2) {
+      // shallowly copy properties from config2 to config1
+      for (var property in config2) {
+        config1[property] = config2[property];
+      }
+    },
+
+    _cloneConfig: function(config) {
+      var clone = {
+        isClone: true
+      };
+      this._copyProperties(clone, config);
+      return clone;
+    },
+
+    _getAnimationConfigRecursive: function(type, map, allConfigs) {
+      if (!this.animationConfig) {
+        return;
+      }
+
+      if(this.animationConfig.value && typeof this.animationConfig.value === 'function') {
+      	this._warn(this._logf('playAnimation', "Please put 'animationConfig' inside of your components 'properties' object instead of outside of it."));
+      	return;
+      }
+
+      // type is optional
+      var thisConfig;
+      if (type) {
+        thisConfig = this.animationConfig[type];
+      } else {
+        thisConfig = this.animationConfig;
+      }
+
+      if (!Array.isArray(thisConfig)) {
+        thisConfig = [thisConfig];
+      }
+
+      // iterate animations and recurse to process configurations from child nodes
+      if (thisConfig) {
+        for (var config, index = 0; config = thisConfig[index]; index++) {
+          if (config.animatable) {
+            config.animatable._getAnimationConfigRecursive(config.type || type, map, allConfigs);
+          } else {
+            if (config.id) {
+              var cachedConfig = map[config.id];
+              if (cachedConfig) {
+                // merge configurations with the same id, making a clone lazily
+                if (!cachedConfig.isClone) {
+                  map[config.id] = this._cloneConfig(cachedConfig)
+                  cachedConfig = map[config.id];
+                }
+                this._copyProperties(cachedConfig, config);
+              } else {
+                // put any configs with an id into a map
+                map[config.id] = config;
+              }
+            } else {
+              allConfigs.push(config);
+            }
+          }
+        }
+      }
+    },
+
+    /**
+     * An element implementing `Polymer.NeonAnimationRunnerBehavior` calls this method to configure
+     * an animation with an optional type. Elements implementing `Polymer.NeonAnimatableBehavior`
+     * should define the property `animationConfig`, which is either a configuration object
+     * or a map of animation type to array of configuration objects.
+     */
+    getAnimationConfig: function(type) {
+      var map = {};
+      var allConfigs = [];
+      this._getAnimationConfigRecursive(type, map, allConfigs);
+      // append the configurations saved in the map to the array
+      for (var key in map) {
+        allConfigs.push(map[key]);
+      }
+      return allConfigs;
+    }
+
+  };
+
+</script>
+<script>
+
+  /**
+   * `Polymer.NeonAnimationRunnerBehavior` adds a method to run animations.
+   *
+   * @polymerBehavior Polymer.NeonAnimationRunnerBehavior
+   */
+  Polymer.NeonAnimationRunnerBehaviorImpl = {
+
+    _configureAnimations: function(configs) {
+      var results = [];
+      if (configs.length > 0) {
+        for (var config, index = 0; config = configs[index]; index++) {
+          var neonAnimation = document.createElement(config.name);
+          // is this element actually a neon animation?
+          if (neonAnimation.isNeonAnimation) {
+            var result = null;
+            // configuration or play could fail if polyfills aren't loaded
+            try {
+              result = neonAnimation.configure(config);
+              // Check if we have an Effect rather than an Animation
+              if (typeof result.cancel != 'function') { 
+                result = document.timeline.play(result);
+              }
+            } catch (e) {
+              result = null;
+              console.warn('Couldnt play', '(', config.name, ').', e);
+            }
+            if (result) {
+              results.push({
+                neonAnimation: neonAnimation,
+                config: config,
+                animation: result,
+              });
+            }
+          } else {
+            console.warn(this.is + ':', config.name, 'not found!');
+          }
+        }
+      }
+      return results;
+    },
+
+    _shouldComplete: function(activeEntries) {
+      var finished = true;
+      for (var i = 0; i < activeEntries.length; i++) {
+        if (activeEntries[i].animation.playState != 'finished') {
+          finished = false;
+          break;
+        }
+      }
+      return finished;
+    },
+
+    _complete: function(activeEntries) {
+      for (var i = 0; i < activeEntries.length; i++) {
+        activeEntries[i].neonAnimation.complete(activeEntries[i].config);
+      }
+      for (var i = 0; i < activeEntries.length; i++) {
+        activeEntries[i].animation.cancel();
+      }
+    },
+
+    /**
+     * Plays an animation with an optional `type`.
+     * @param {string=} type
+     * @param {!Object=} cookie
+     */
+    playAnimation: function(type, cookie) {
+      var configs = this.getAnimationConfig(type);
+      if (!configs) {
+        return;
+      }
+      this._active = this._active || {};
+      if (this._active[type]) {
+        this._complete(this._active[type]);
+        delete this._active[type];
+      }
+
+      var activeEntries = this._configureAnimations(configs);
+
+      if (activeEntries.length == 0) {
+        this.fire('neon-animation-finish', cookie, {bubbles: false});
+        return;
+      }
+
+      this._active[type] = activeEntries;
+
+      for (var i = 0; i < activeEntries.length; i++) {
+        activeEntries[i].animation.onfinish = function() {
+          if (this._shouldComplete(activeEntries)) {
+            this._complete(activeEntries);
+            delete this._active[type];
+            this.fire('neon-animation-finish', cookie, {bubbles: false});
+          }
+        }.bind(this);
+      }
+    },
+
+    /**
+     * Cancels the currently running animations.
+     */
+    cancelAnimation: function() {
+      for (var k in this._animations) {
+        this._animations[k].cancel();
+      }
+      this._animations = {};
+    }
+  };
+
+  /** @polymerBehavior Polymer.NeonAnimationRunnerBehavior */
+  Polymer.NeonAnimationRunnerBehavior = [
+    Polymer.NeonAnimatableBehavior,
+    Polymer.NeonAnimationRunnerBehaviorImpl
+  ];
+</script>
+<script>
+
+/**
+Use `Polymer.PaperDialogBehavior` and `paper-dialog-shared-styles.html` to implement a Material Design
+dialog.
+
+For example, if `<paper-dialog-impl>` implements this behavior:
+
+    <paper-dialog-impl>
+        <h2>Header</h2>
+        <div>Dialog body</div>
+        <div class="buttons">
+            <paper-button dialog-dismiss>Cancel</paper-button>
+            <paper-button dialog-confirm>Accept</paper-button>
+        </div>
+    </paper-dialog-impl>
+
+`paper-dialog-shared-styles.html` provide styles for a header, content area, and an action area for buttons.
+Use the `<h2>` tag for the header and the `buttons` class for the action area. You can use the
+`paper-dialog-scrollable` element (in its own repository) if you need a scrolling content area.
+
+Use the `dialog-dismiss` and `dialog-confirm` attributes on interactive controls to close the
+dialog. If the user dismisses the dialog with `dialog-confirm`, the `closingReason` will update
+to include `confirmed: true`.
+
+### Accessibility
+
+This element has `role="dialog"` by default. Depending on the context, it may be more appropriate
+to override this attribute with `role="alertdialog"`.
+
+If `modal` is set, the element will prevent the focus from exiting the element.
+It will also ensure that focus remains in the dialog.
+
+@hero hero.svg
+@demo demo/index.html
+@polymerBehavior Polymer.PaperDialogBehavior
+*/
+
+  Polymer.PaperDialogBehaviorImpl = {
+
+    hostAttributes: {
+      'role': 'dialog',
+      'tabindex': '-1'
+    },
+
+    properties: {
+
+      /**
+       * If `modal` is true, this implies `no-cancel-on-outside-click`, `no-cancel-on-esc-key` and `with-backdrop`.
+       */
+      modal: {
+        type: Boolean,
+        value: false
+      }
+
+    },
+
+    observers: [
+      '_modalChanged(modal, _readied)'
+    ],
+
+    listeners: {
+      'tap': '_onDialogClick'
+    },
+
+    ready: function () {
+      // Only now these properties can be read.
+      this.__prevNoCancelOnOutsideClick = this.noCancelOnOutsideClick;
+      this.__prevNoCancelOnEscKey = this.noCancelOnEscKey;
+      this.__prevWithBackdrop = this.withBackdrop;
+    },
+
+    _modalChanged: function(modal, readied) {
+      // modal implies noCancelOnOutsideClick, noCancelOnEscKey and withBackdrop.
+      // We need to wait for the element to be ready before we can read the
+      // properties values.
+      if (!readied) {
+        return;
+      }
+
+      if (modal) {
+        this.__prevNoCancelOnOutsideClick = this.noCancelOnOutsideClick;
+        this.__prevNoCancelOnEscKey = this.noCancelOnEscKey;
+        this.__prevWithBackdrop = this.withBackdrop;
+        this.noCancelOnOutsideClick = true;
+        this.noCancelOnEscKey = true;
+        this.withBackdrop = true;
+      } else {
+        // If the value was changed to false, let it false.
+        this.noCancelOnOutsideClick = this.noCancelOnOutsideClick &&
+          this.__prevNoCancelOnOutsideClick;
+        this.noCancelOnEscKey = this.noCancelOnEscKey &&
+          this.__prevNoCancelOnEscKey;
+        this.withBackdrop = this.withBackdrop && this.__prevWithBackdrop;
+      }
+    },
+
+    _updateClosingReasonConfirmed: function(confirmed) {
+      this.closingReason = this.closingReason || {};
+      this.closingReason.confirmed = confirmed;
+    },
+
+    /**
+     * Will dismiss the dialog if user clicked on an element with dialog-dismiss
+     * or dialog-confirm attribute.
+     */
+    _onDialogClick: function(event) {
+      // Search for the element with dialog-confirm or dialog-dismiss,
+      // from the root target until this (excluded).
+      var path = Polymer.dom(event).path;
+      for (var i = 0; i < path.indexOf(this); i++) {
+        var target = path[i];
+        if (target.hasAttribute && (target.hasAttribute('dialog-dismiss') || target.hasAttribute('dialog-confirm'))) {
+          this._updateClosingReasonConfirmed(target.hasAttribute('dialog-confirm'));
+          this.close();
+          event.stopPropagation();
+          break;
+        }
+      }
+    }
+
+  };
+
+  /** @polymerBehavior */
+  Polymer.PaperDialogBehavior = [Polymer.IronOverlayBehavior, Polymer.PaperDialogBehaviorImpl];
+
+</script>
+
+
+<dom-module id="paper-dialog-shared-styles" assetpath="/res/imp/bower_components/paper-dialog-behavior/">
+  <template>
+    <style>
+      :host {
+        display: block;
+        margin: 24px 40px;
+
+        background: var(--paper-dialog-background-color, --primary-background-color);
+        color: var(--paper-dialog-color, --primary-text-color);
+
+        @apply(--paper-font-body1);
+        @apply(--shadow-elevation-16dp);
+        @apply(--paper-dialog);
+      }
+
+      :host > ::content > * {
+        margin-top: 20px;
+        padding: 0 24px;
+      }
+
+      :host > ::content > .no-padding {
+        padding: 0;
+      }
+
+      :host > ::content > *:first-child {
+        margin-top: 24px;
+      }
+
+      :host > ::content > *:last-child {
+        margin-bottom: 24px;
+      }
+
+      :host > ::content h2 {
+        position: relative;
+        margin: 0;
+        @apply(--paper-font-title);
+
+        @apply(--paper-dialog-title);
+      }
+
+      :host > ::content .buttons {
+        position: relative;
+        padding: 8px 8px 8px 24px;
+        margin: 0;
+
+        color: var(--paper-dialog-button-color, --primary-color);
+
+        @apply(--layout-horizontal);
+        @apply(--layout-end-justified);
+      }
+    </style>
+  </template>
+</dom-module>
+
+
+<dom-module id="paper-dialog" assetpath="/res/imp/bower_components/paper-dialog/">
+  <template>
+    <style include="paper-dialog-shared-styles"></style>
+    <content></content>
+  </template>
+</dom-module>
+
+<script>
+
+(function() {
+
+  Polymer({
+
+    is: 'paper-dialog',
+
+    behaviors: [
+      Polymer.PaperDialogBehavior,
+      Polymer.NeonAnimationRunnerBehavior
+    ],
+
+    listeners: {
+      'neon-animation-finish': '_onNeonAnimationFinish'
+    },
+
+    _renderOpened: function() {
+      this.cancelAnimation();
+      this.playAnimation('entry');
+    },
+
+    _renderClosed: function() {
+      this.cancelAnimation();
+      this.playAnimation('exit');
+    },
+
+    _onNeonAnimationFinish: function() {
+      if (this.opened) {
+        this._finishRenderOpened();
+      } else {
+        this._finishRenderClosed();
+      }
+    }
+
+  });
+
+})();
 
 </script>
 <script>
@@ -26284,15 +26781,18 @@ the fleet.">
       margin-left: 5px;
       margin-bottom: 5px;
     }
-    td, th {
+    td,
+    th {
       border: 1px solid #BBB;
       padding: 5px;
     }
 
-    .quarantined, .failed_task {
+    .quarantined,
+    .failed_task {
       background-color: #ffdddd;
     }
-    .dead {
+    .dead,
+    .bot_died {
       background-color: #cccccc;
     }
 
@@ -26315,7 +26815,8 @@ the fleet.">
       margin-left: 5px;
     }
 
-    .tasks_table, .events_table {
+    .tasks_table,
+    .events_table {
       border: 3px solid #1F78B4;
     }
 
@@ -26335,6 +26836,10 @@ the fleet.">
       text-decoration: underline;
     }
 
+    paper-dialog {
+      border-radius: 6px;
+    }
+
     </style>
 
     <url-param name="id" value="{{bot_id}}">
@@ -26352,12 +26857,12 @@ the fleet.">
 
       <div hidden$="[[_not(_signed_in)]]">
 
-        <bot-page-data auth_headers="[[_auth_headers]]" bot_id="[[bot_id]]" bot="{{_bot}}" busy="{{_busy}}" events="{{_events}}" tasks="{{_tasks}}">
+        <bot-page-data id="data" auth_headers="[[_auth_headers]]" bot_id="[[bot_id]]" bot="{{_bot}}" busy="{{_busy}}" events="{{_events}}" tasks="{{_tasks}}">
         </bot-page-data>
 
         <div class="header horizontal layout">
           <paper-input class="id_input" label="Bot id" value="{{bot_id}}"></paper-input>
-          <button>
+          <button on-click="_refresh">
             <iron-icon class="refresh" icon="icons:refresh"></iron-icon>
           </button>
         </div>
@@ -26371,12 +26876,12 @@ the fleet.">
               <td>
               
                 <template is="dom-if" if="[[_canShutdown(_bot,_permissions)]]">
-                  <button class="raised">
+                  <button class="raised" on-click="_promptShutdown">
                     Shut Down Gracefully
                   </button>
                 </template>
                 <template is="dom-if" if="[[_canDelete(_bot,_permissions)]]">
-                  <button class="raised">
+                  <button class="raised" on-click="_promptDelete">
                     Delete
                   </button>
                 </template>
@@ -26479,7 +26984,7 @@ the fleet.">
             </thead>
             <tbody>
               <template is="dom-repeat" items="{{_tasks}}" as="task">
-                <tr>
+                <tr class$="[[_taskClass(task)]]">
                   <td><a target="_blank" href$="[[_taskLink(task.task_id)]]">[[task.name]]</a></td>
                   <td>[[task.human_started_ts]]</td>
                   <td title="[[task.human_completed_ts]]">[[task.human_duration]]</td>
@@ -26518,8 +27023,18 @@ the fleet.">
         </template>
         </div>
       
-
     </swarming-app>
+
+    <paper-dialog id="prompt" modal="" on-iron-overlay-closed="_promptClosed">
+      <h2>Are you sure?</h2>
+      <div>Are you sure you want to [[_dialogPrompt]]?</div>
+      <div class="buttons">
+        <paper-button dialog-dismiss="" autofocus="">No</paper-button>
+        <paper-button dialog-confirm="">Yes</paper-button>
+      </div>
+    </paper-dialog>
+
+    <error-toast></error-toast>
 
   </template>
   <script>
@@ -26541,8 +27056,15 @@ the fleet.">
           type: String,
         },
 
+        _auth_headers: {
+          type: Object,
+        },
         _bot: {
           type: Object,
+        },
+        _dialogPrompt: {
+          type: String,
+          value: "",
         },
         _selected: {
           type: Number,
@@ -26572,6 +27094,11 @@ the fleet.">
           return "";
         }
         return arr.join(" | ");
+      },
+
+      _deleteBot: function() {
+        swarming.postWithToast("/_ah/api/swarming/v1/bot/"+this.bot_id+"/delete",
+          "Deleting "+this.bot_id, this._auth_headers);
       },
 
       _eventList(events, showAll) {
@@ -26610,6 +27137,26 @@ the fleet.">
         return JSON.stringify(obj, null, 2);
       },
 
+      _promptClosed: function(e) {
+        if (e.detail.confirmed) {
+          if (this._dialogPrompt.startsWith("shut down")) {
+            this._shutdownBot();
+          } else {
+            this._deleteBot();
+          }
+        }
+      },
+
+      _promptDelete: function() {
+        this.set("_dialogPrompt", "delete "+this.bot_id);
+        this.$.prompt.open();
+      },
+
+      _promptShutdown: function() {
+        this.set("_dialogPrompt", "shut down "+this.bot_id);
+        this.$.prompt.open();
+      },
+
       _quarantineMessage: function(bot) {
         if (bot && bot.quarantined) {
           var msg = bot.state.quarantined;
@@ -26623,6 +27170,10 @@ the fleet.">
         return "";
       },
 
+      _refresh: function() {
+        this.$.data.request();
+      },
+
       _shorten: function(str, length) {
         if (!str || ! length) {
           return "";
@@ -26630,8 +27181,23 @@ the fleet.">
         return str.substring(0, length);
       },
 
+      _shutdownBot: function() {
+        swarming.postWithToast("/_ah/api/swarming/v1/bot/"+this.bot_id+"/terminate",
+          "Shutting down "+this.bot_id, this._auth_headers);
+      },
+
       _task: function(bot) {
         return (bot && bot.task_id) || "idle";
+      },
+
+      _taskClass: function(task) {
+        if (task && task.internal_failure) {
+          return "bot_died";
+        }
+        if (task && task.failure) {
+          return "failed_task";
+        }
+        return "";
       },
 
       _taskLink: function(task_id) {

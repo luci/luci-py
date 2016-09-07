@@ -8,7 +8,7 @@
   "devDependencies": {
     "http-server": "~0.9.0",
     "sinon": "1.17.5",
-    "skia-common-js": "^1.1.0",
+    "skia-common-js": "^1.2.0",
     "uglify-js": "^2.7.0",
     "vulcanize": "~1.14.8"
   }
