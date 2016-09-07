@@ -10,6 +10,7 @@
     "sinon": "1.17.5",
     "skia-common-js": "^1.2.0",
     "uglify-js": "^2.7.0",
-    "vulcanize": "~1.14.8"
+    "vulcanize": "~1.14.8",
+    "html-minifier": "~3.0.0"
   }
 }

@@ -27,7 +27,7 @@ run: default
 vulcanize: default
 	rm -rf ./build/*
 	mkdir ./build/js
-	./node_modules/.bin/vulcanize --inline-css=true --inline-scripts=true --strip-comments=true --abspath=./ --out-html=./build/elements.html elements.html
+	./node_modules/.bin/vulcanize --inline-css --inline-scripts --strip-comments --abspath=./ elements.html | ./node_modules/.bin/html-minifier -o ./build/elements.html --minify-css --minify-js --remove-comments --collapse-whitespace --conservative-collapse
 	cat ./res/imp/bower_components/webcomponentsjs/webcomponents-lite.min.js ./node_modules/skia-common-js/common.js ./res/js/common.js ./res/js/alias.js | ./node_modules/.bin/uglifyjs -o ./build/js/js.js
 
 .PHONY: debug_build
