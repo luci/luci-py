@@ -2,6 +2,8 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
+// TODO(kjlubick): add tests for this code
+
 this.swarming = this.swarming || {};
 this.swarming.alias = this.swarming.alias || (function(){
   var ANDROID_ALIASES = {
@@ -60,9 +62,22 @@ this.swarming.alias = this.swarming.alias || (function(){
     return ANDROID_ALIASES[dt] || UNKNOWN;
   };
 
-  // alias.apply is the consistent way to modify a string to show its alias.
-  alias.apply = function(orig, alias) {
-    return alias +" ("+orig+")";
+  // alias.apply tries to alias the string "orig" based on what "type" it is.
+  // If type is in DIMENSIONS_WITH_ALIASES, the appropriate alias (e.g. gpu)
+  // is automatically applied.  Otherwise, "type" is treated as the alias.
+  // If type is known, but there is no matching alias (e.g. for gpu: FOOBAR)
+  // the original will be returned.
+  alias.apply = function(orig, type) {
+    var aliaser = aliasMap[type];
+    if (!aliaser) {
+      // treat type as the actual alias
+      return type + " ("+orig+")";
+    }
+    var alias = aliaser(orig);
+    if (alias !== "unknown") {
+      return alias + " ("+orig+")";
+    }
+    return orig;
   };
 
   alias.gpu = function(gpu) {
@@ -78,6 +93,11 @@ this.swarming.alias = this.swarming.alias || (function(){
     }
     return str;
   };
+
+  var aliasMap = {
+    "device_type": alias.android,
+    "gpu": alias.gpu,
+  }
 
   return alias;
 })();

@@ -172,6 +172,15 @@
           });
         }
 
+        bot.dimensions = bot.dimensions || [];
+        bot.dimensions.forEach(function(dim) {
+          if (swarming.alias.DIMENSIONS_WITH_ALIASES.indexOf(dim.key) !== -1) {
+            dim.value.forEach(function(value, i){
+              dim.value[i] = swarming.alias.apply(value, dim.key);
+            });
+          }
+        });
+
         BOT_TIMES.forEach(function(time) {
           if (bot[time]) {
             bot[time] = new Date(bot[time]);

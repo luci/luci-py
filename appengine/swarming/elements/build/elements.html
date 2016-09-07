@@ -23274,30 +23274,12 @@ the fleet.">
           if (swarming.alias.DIMENSIONS_WITH_ALIASES.indexOf(d.key) === -1) {
             // value is an array of all seen values for the dimension d.key
             pMap[d.key] = d.value;
-          } else if (d.key === "gpu") {
-            var gpus = [];
-            d.value.forEach(function(g){
-              var alias = swarming.alias.gpu(g);
-              if (alias !== "unknown") {
-                gpus.push(swarming.alias.apply(g, alias));
-              } else {
-                gpus.push(g);
-              }
-            }.bind(this));
-            pMap["gpu"] = gpus;
-          } else if (d.key === "device_type") {
-            var devs = [];
-            d.value.forEach(function(dt){
-              var alias = swarming.alias.android(dt);
-              if (alias !== "unknown") {
-                devs.push(swarming.alias.apply(dt, alias));
-              } else {
-                devs.push(dt);
-              }
-            }.bind(this));
-            pMap["device_type"] = devs;
           } else {
-            console.log("Unknown alias type: ", d);
+            var aliased = [];
+            d.value.forEach(function(value){
+              aliased.push(swarming.alias.apply(value, d.key));
+            });
+            pMap[d.key] = aliased;
           }
         });
 
@@ -24314,30 +24296,12 @@ the fleet.">
           var values = Object.keys(map[key]);
           if (swarming.alias.DIMENSIONS_WITH_ALIASES.indexOf(key) === -1) {
             pMap[key] = values;
-          } else if (key === "gpu") {
-            var gpus = [];
-            values.forEach(function(g){
-              var alias = swarming.alias.gpu(g);
-              if (alias !== "unknown") {
-                gpus.push(swarming.alias.apply(g, alias));
-              } else {
-                gpus.push(g);
-              }
-            }.bind(this));
-            pMap["gpu"] = gpus;
-          } else if (key === "device_type") {
-            var devs = [];
-            values.forEach(function(dt){
-              var alias = swarming.alias.android(dt);
-              if (alias !== "unknown") {
-                devs.push(swarming.alias.apply(dt, alias));
-              } else {
-                devs.push(dt);
-              }
-            }.bind(this));
-            pMap["device_type"] = devs;
           } else {
-            console.log("Unknown alias type: ", d);
+            var aliased = [];
+            values.forEach(function(value){
+              aliased.push(swarming.alias.apply(value, key));
+            });
+            pMap[key] = aliased;
           }
         }
 
@@ -26675,6 +26639,15 @@ It will also ensure that focus remains in the dialog.
             return b.mb - a.mb;
           });
         }
+
+        bot.dimensions = bot.dimensions || [];
+        bot.dimensions.forEach(function(dim) {
+          if (swarming.alias.DIMENSIONS_WITH_ALIASES.indexOf(dim.key) !== -1) {
+            dim.value.forEach(function(value, i){
+              dim.value[i] = swarming.alias.apply(value, dim.key);
+            });
+          }
+        });
 
         BOT_TIMES.forEach(function(time) {
           if (bot[time]) {

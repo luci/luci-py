@@ -226,30 +226,12 @@
           if (swarming.alias.DIMENSIONS_WITH_ALIASES.indexOf(d.key) === -1) {
             // value is an array of all seen values for the dimension d.key
             pMap[d.key] = d.value;
-          } else if (d.key === "gpu") {
-            var gpus = [];
-            d.value.forEach(function(g){
-              var alias = swarming.alias.gpu(g);
-              if (alias !== "unknown") {
-                gpus.push(swarming.alias.apply(g, alias));
-              } else {
-                gpus.push(g);
-              }
-            }.bind(this));
-            pMap["gpu"] = gpus;
-          } else if (d.key === "device_type") {
-            var devs = [];
-            d.value.forEach(function(dt){
-              var alias = swarming.alias.android(dt);
-              if (alias !== "unknown") {
-                devs.push(swarming.alias.apply(dt, alias));
-              } else {
-                devs.push(dt);
-              }
-            }.bind(this));
-            pMap["device_type"] = devs;
           } else {
-            console.log("Unknown alias type: ", d);
+            var aliased = [];
+            d.value.forEach(function(value){
+              aliased.push(swarming.alias.apply(value, d.key));
+            });
+            pMap[d.key] = aliased;
           }
         });
 
