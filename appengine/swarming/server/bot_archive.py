@@ -175,6 +175,7 @@ FILES = (
     'third_party/rsa/rsa/varblock.py',
     'third_party/six/__init__.py',
     'utils/__init__.py',
+    'utils/auth_server.py',
     'utils/authenticators.py',
     'utils/cacert.pem',
     'utils/file_path.py',

@@ -3,7 +3,11 @@
 # that can be found in the LICENSE file.
 
 import collections
+import logging
 import threading
+import time
+
+from utils import auth_server
 
 import file_reader
 
@@ -77,18 +81,20 @@ class AuthSystem(object):
     * Another thread hosts local HTTP server that servers authentication tokens
       to local processes.
 
-  The local HTTP server exposes /prpc/LuciLocalAuthService.GetOAuthToken
+  The local HTTP server exposes /rpc/LuciLocalAuthService.GetOAuthToken
   endpoint that the processes running inside Swarming tasks can use to request
   an OAuth access token associated with the task.
 
   They can discover the port to connect to by looking at LUCI_CONTEXT
   environment variable.
 
-  TODO(vadimsh): Actually implement the second thread and LUCI_CONTEXT.
+  TODO(vadimsh): Actually implement LUCI_CONTEXT env var.
   """
 
   def __init__(self):
     self._auth_params_reader = None
+    self._local_server = None
+    self._local_auth_context = None
     self._lock = threading.Lock()
 
   def start(self, auth_params_file):
@@ -118,15 +124,29 @@ class AuthSystem(object):
       reader.stop()
       raise AuthSystemError('Cannot parse bot_auth_params.json: %s' % e)
 
+    # Launch local HTTP server that serves tokens (let OS assign the port).
+    server = None
+    try:
+      server = auth_server.LocalAuthServer()
+      local_auth_context = server.start(token_provider=self)
+    except Exception as exc:
+      reader.stop() # cleanup
+      raise AuthSystemError('Failed to start local auth server - %s' % exc)
+
     # Good to go.
     with self._lock:
       self._auth_params_reader = reader
+      self._local_server = server
+      self._local_auth_context = local_auth_context
 
   def stop(self):
     """Shuts down all the threads if they are running."""
     with self._lock:
-      reader = self._auth_params_reader
-      self._auth_params_reader = None
+      reader, self._auth_params_reader = self._auth_params_reader, None
+      server, self._local_server = self._local_server, None
+      self._local_auth_context = None
+    if server:
+      server.stop()
     if reader:
       reader.stop()
 
@@ -148,3 +168,60 @@ class AuthSystem(object):
       return val.swarming_http_headers
     except ValueError as e:
       raise AuthSystemError('Cannot parse bot_auth_params.json: %s' % e)
+
+  @property
+  def local_auth_context(self):
+    """A dict with parameters of local auth server to put into LUCI_CONTEXT.
+
+    Format:
+    {
+      'rpc_port': <int with port number>,
+      'secret': <str with a random string to send with RPCs>,
+    }
+    """
+    with self._lock:
+      return self._local_auth_context
+
+  def generate_token(self, scopes):
+    """Generates a new access token with given scopes.
+
+    Called by LocalAuthServer from some internal thread whenever new token is
+    needed. See TokenProvider for more details.
+
+    Returns:
+      AccessToken.
+
+    Raises:
+      RPCError, TokenError, AuthSystemError.
+    """
+    logging.info('Getting the token for scopes %s', scopes)
+
+    # Grab AuthParams supplied by the main bot process.
+    with self._lock:
+      if not self._auth_params_reader:
+        raise auth_server.RPCError(503, 'Stopped already.')
+      val = self._auth_params_reader.last_value
+    params = process_auth_params_json(val)
+
+    # Piggyback on the bot own credentials for now. This works only for bots
+    # that use OAuth for authentication (e.g. GCE bots). Also it totally ignores
+    # scopes or expiration time. It relies on bot_main to keep the bot OAuth
+    # token sufficiently fresh. See remote_client.AUTH_HEADERS_EXPIRATION_SEC.
+    bot_auth_hdr = params.swarming_http_headers.get('Authorization') or ''
+    if not bot_auth_hdr.startswith('Bearer '):
+      raise auth_server.TokenError(1, 'The bot is not using OAuth', fatal=True)
+    tok = bot_auth_hdr[len('Bearer '):]
+
+    # bot_main guarantees swarming_http_headers are usable for at least 6 min.
+    # (see AUTH_HEADERS_EXPIRATION_SEC). task_runner grabs these headers from
+    # bot_main asynchronously with some delay. To account for that delay make
+    # expiration time shorter (4 min instead of 6 min).
+    #
+    # TODO(vadimsh): The real token expiration time can be passed from
+    # bot_main.py via --auth-params-file mechanism (same way as
+    # 'swarming_http_headers' are passed).
+    #
+    # TODO(vadimsh): For GCE bots specifically we can pass a list of OAuth
+    # scopes granted to the GCE token and verify it contains all the requested
+    # scopes.
+    return auth_server.AccessToken(tok, int(time.time()) + 4*60)
