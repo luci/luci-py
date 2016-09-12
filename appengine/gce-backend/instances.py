@@ -388,9 +388,9 @@ def count_instances():
   for instance in models.Instance.query():
     total += 1
     instance_group_manager = instance.key.parent().get()
-    if instance_group_manager:
-      if instance.key not in instance_group_manager.instances:
-        logging.warning('Found orphaned Instance: %s', instance.key)
-        orphaned += 1
+    if (not instance_group_manager
+        or instance.key not in instance_group_manager.instances):
+      logging.warning('Found orphaned Instance: %s', instance.key)
+      orphaned += 1
   logging.info('Orphaned Instances: %s/%s', orphaned, total)
   return orphaned, total
