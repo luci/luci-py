@@ -12,15 +12,7 @@ ProtoRPC.
 """
 
 import datetime
-import functools
 import json
-import logging
-import re
-
-import endpoints
-from protorpc import message_types
-from protorpc import messages
-from protorpc import remote
 
 import swarming_rpcs
 
@@ -190,7 +182,11 @@ def new_task_request_from_rpc(msg, now):
       expiration_ts=now+datetime.timedelta(seconds=msg.expiration_secs),
       # It is set in task_request.init_new_request().
       authenticated=None,
-      properties=properties)
+      properties=properties,
+      # It is set in task_request.init_new_request().
+      service_account=None,
+      # Need to convert it to 'str', since it is stored as byte blob, not text.
+      service_account_token=str(msg.service_account_token or 'none'))
 
 
 def task_result_to_rpc(entity, send_stats):

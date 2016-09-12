@@ -176,13 +176,33 @@ class NewTaskRequest(messages.Message):
   priority = messages.IntegerField(4)
   properties = messages.MessageField(TaskProperties, 5)
   tags = messages.StringField(6, repeated=True)
+
+  # Arbitrary user name associated with a task for UI and tags. Not validated.
   user = messages.StringField(7)
+
+  # Defines what OAuth2 credentials the task uses when calling other services.
+  #
+  # Possible values are:
+  #   - 'none': do not use task service accounts at all, this is default.
+  #   - 'bot': use bot's own account, works only if bots authenticate with
+  #       OAuth2.
+  #   - <token>: a properly signed and scoped delegation token that asserts that
+  #       the caller is allowed to use the specific service account (encoded in
+  #       the token) on Swarming. This is not implemented yet.
+  #
+  # Note that the service account name is specified outside of task properties,
+  # and thus it is possible to have two tasks with different service accounts,
+  # but identical properties hash (so one can be deduped). If this is unsuitable
+  # use 'idempotent=False' or include a service account name in properties
+  # separately.
+  service_account_token = messages.StringField(8)
+
   # Full topic name to post too, e.g. "projects/<id>/topics/<id>".
-  pubsub_topic = messages.StringField(8)
+  pubsub_topic = messages.StringField(9)
   # Secret string to put into "auth_token" attribute of PubSub message.
-  pubsub_auth_token = messages.StringField(9)
+  pubsub_auth_token = messages.StringField(10)
   # Will be but into "userdata" fields of PubSub message.
-  pubsub_userdata = messages.StringField(10)
+  pubsub_userdata = messages.StringField(11)
 
 
 class TaskRequest(messages.Message):
@@ -193,11 +213,17 @@ class TaskRequest(messages.Message):
   priority = messages.IntegerField(4)
   properties = messages.MessageField(TaskProperties, 5)
   tags = messages.StringField(6, repeated=True)
-  user = messages.StringField(7)
-  authenticated = messages.StringField(8)
-  created_ts = message_types.DateTimeField(9)
-  pubsub_topic = messages.StringField(10)
-  pubsub_userdata = messages.StringField(11)
+  created_ts = message_types.DateTimeField(7)
+
+  # Arbitrary user name associated with a task for UI and tags. Not validated.
+  user = messages.StringField(8)
+  # User name of whoever posted this task, extracted from the credentials.
+  authenticated = messages.StringField(9)
+  # Indicates what OAuth2 credentials the task uses when calling other services.
+  service_account = messages.StringField(10)
+
+  pubsub_topic = messages.StringField(11)
+  pubsub_userdata = messages.StringField(12)
 
 
 class TasksRequest(messages.Message):

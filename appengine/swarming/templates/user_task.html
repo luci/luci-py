@@ -137,6 +137,16 @@
           {% endif %}
         </td>
       </tr>
+      <tr title="What credentials that task is using when calling other services.">
+        <td>Running as</td>
+        <td>
+          {% if request.service_account and request.service_account != 'none' %}
+            {{request.service_account}}
+          {% else %}
+            &#8209;&#8209;
+          {% endif %}
+        </td>
+      </tr>
       <tr title="Task priority is between 1 and 255, lower value is higher priority. Higher priority requests are executed first.">
         <td>Priority</td>
         <td>{{request.priority}}</td>

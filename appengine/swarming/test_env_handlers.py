@@ -240,7 +240,7 @@ class AppTestBase(test_case.TestCase):
     params.update(kwargs)
 
     # Note that protorpc message constructor accepts dicts for submessages.
-    request = swarming_rpcs.TaskRequest(**params)
+    request = swarming_rpcs.NewTaskRequest(**params)
     response = self.endpoint_call(
         handlers_endpoints.SwarmingTasksService, 'new', request)
     return response, response['task_id']

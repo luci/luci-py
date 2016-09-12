@@ -56,11 +56,11 @@ def get_manifest(script=None, isolated=None, **kwargs):
 
 
 class FakeAuthSystem(object):
-  def __init__(self):
+  def __init__(self, auth_params_file):
     self._running = False
-
-  def start(self, auth_params_file):
     assert auth_params_file == '/path/to/auth-params-file'
+
+  def start(self):
     assert not self._running
     self._running = True
 

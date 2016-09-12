@@ -45,8 +45,6 @@ TaskProperties is embedded in TaskRequest. TaskProperties is still declared as a
 separate entity to clearly declare the boundary for task request deduplication.
 """
 
-
-import collections
 import datetime
 import hashlib
 import random
@@ -237,6 +235,17 @@ def _validate_package_path(_prop, path):
   if path.startswith('/'):
     raise datastore_errors.BadValueError(
         'CIPD package path cannot start with "/".')
+
+
+def _validate_service_account(prop, value):
+  """Validates that 'service_account' field is 'bot', 'none' or email."""
+  if not value:
+    return None
+  if value in ('bot', 'none') or '@' in value:
+    return value
+  raise datastore_errors.BadValueError(
+      '%r must be an email, "bot" or "none" string, got %r' %
+      (prop._name, value))
 
 
 ### Models.
@@ -495,8 +504,27 @@ class TaskRequest(ndb.Model):
   # Authenticated client that triggered this task.
   authenticated = auth.IdentityProperty()
 
-  # Which user to blame for this task.
+  # Which user to blame for this task. Can be arbitrary, not asserted by any
+  # credentials.
   user = ndb.StringProperty(default='')
+
+  # Indicates what OAuth2 credentials the task uses when calling other services.
+  #
+  # Possible values are: 'none', 'bot' or <email>. For more information see
+  # swarming_rpcs.NewTaskRequest.
+  #
+  # This property exists only for informational purposes and for indexing. When
+  # actually getting an OAuth credentials, the original token (stored in hidden
+  # 'service_account_token' field) is used.
+  service_account = ndb.StringProperty(validator=_validate_service_account)
+
+  # The delegation token passed via 'service_account_token' when creating a new
+  # task that should by run with the authority of some service account. Can also
+  # be set to literal 'none' or 'bot'. See swarming_rpcs.NewTaskRequest for more
+  # information.
+  #
+  # This property never shows up in UI or API responses.
+  service_account_token = ndb.BlobProperty()
 
   # The actual properties are embedded in this model.
   properties = ndb.LocalStructuredProperty(
@@ -558,7 +586,7 @@ class TaskRequest(ndb.Model):
     """Converts properties_hash to hex so it is json serializable."""
     # to_dict() doesn't recurse correctly into ndb.LocalStructuredProperty!
     out = super(TaskRequest, self).to_dict(
-        exclude=['pubsub_auth_token', 'properties'])
+        exclude=['pubsub_auth_token', 'properties', 'service_account_token'])
     properties_hash = self.properties.properties_hash
     out['properties'] = self.properties.to_dict()
     out['properties_hash'] = (
@@ -727,8 +755,18 @@ def init_new_request(request, allow_high_priority):
   if request.properties.idempotent is None:
     request.properties.idempotent = False
 
+  request.service_account = 'none'
+  if request.service_account_token and request.service_account_token != 'none':
+    if request.service_account_token == 'bot':
+      request.service_account = 'bot'
+    else:
+      # TODO(vadimsh): Check the token signature, verify it can be used by the
+      # current user, extract service account email.
+      raise auth.AuthorizationError('service_account_token is not implemented')
+
   request.tags.append('priority:%s' % request.priority)
   request.tags.append('user:%s' % request.user)
+  request.tags.append('service_account:%s' % request.service_account)
   for key, value in request.properties.dimensions.iteritems():
     request.tags.append('%s:%s' % (key, value))
   request.tags = sorted(set(request.tags))
@@ -742,12 +780,16 @@ def new_request_clone(original_request, allow_high_priority):
   Modifications:
   - Enforces idempotent=False.
   - Removes the parent_task_id if any.
-  - Append suffix '(Retry #1)' to the task name, incrementing the number of
+  - Appends suffix '(Retry #1)' to the task name, incrementing the number of
     followup retries.
-  - Strip any tag starting with 'user:'.
-  - Override request's user with the credentials of the currently logged in
+  - Strips any tag starting with 'user:'.
+  - Overrides request's user with the credentials of the currently logged in
     user.
-  - Do not inherit pubsub parameter.
+  - Does not inherit pubsub parameter.
+
+  New request uses same 'service_account_token', but 'init_new_request' will
+  recheck it again, ensuring the current user (the one that triggers the retry)
+  is able to use the token.
 
   Returns:
     The newly created TaskRequest.
@@ -779,6 +821,7 @@ def new_request_clone(original_request, allow_high_priority):
       parent_task_id=None,
       priority=original_request.priority,
       properties=properties,
+      service_account_token=original_request.service_account_token,
       tags=tags,
       user=username)
   init_new_request(request, allow_high_priority)

@@ -474,7 +474,7 @@ class TestBotMain(net_utils.TestCase):
 
   def _mock_popen(
       self, returncode=0, exit_code=0, url='https://localhost:1',
-      auth_params_json=None):
+      expected_auth_params_json=None):
     result = {
       'exit_code': exit_code,
       'must_signal_internal_failure': None,
@@ -502,12 +502,12 @@ class TestBotMain(net_utils.TestCase):
         self.assertEqual(cmd[15], '--bot-file')
         self.assertTrue(cmd[16].endswith('.json'))
         del cmd[15:17]
-        if auth_params_json:
+        if expected_auth_params_json:
           auth_params_file = os.path.join(
               self.root_dir, 'w', 'bot_auth_params.json')
           with open(auth_params_file, 'rb') as f:
             actual_auth_params = json.load(f)
-          self.assertEqual(auth_params_json, actual_auth_params)
+          self.assertEqual(expected_auth_params_json, actual_auth_params)
           expected.extend(['--auth-params-file', auth_params_file])
         self.assertEqual(expected, cmd)
         self.assertEqual(True, detached)
@@ -551,7 +551,7 @@ class TestBotMain(net_utils.TestCase):
     self.assertEqual(self.root_dir, self.bot.base_dir)
     bot_main.run_manifest(self.bot, manifest, time.time())
 
-  def test_run_manifest_with_auth(self):
+  def test_run_manifest_with_auth_headers(self):
     self.bot = self.make_bot(
         auth_headers_cb=lambda: ({'A': 'a'}, time.time() + 3600))
 
@@ -567,7 +567,10 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, 'call_hook', call_hook)
     result = self._mock_popen(
         url='https://localhost:3',
-        auth_params_json={'swarming_http_headers': {'A': 'a'}})
+        expected_auth_params_json={
+          'swarming_http_headers': {'A': 'a'},
+          'task_service_account': 'bot', # as in task manifest
+        })
 
     manifest = {
       'command': ['echo', 'hi'],
@@ -575,6 +578,7 @@ class TestBotMain(net_utils.TestCase):
       'grace_period': 30,
       'hard_timeout': 60,
       'host': 'https://localhost:3',
+      'service_account': 'bot',
       'task_id': '24',
     }
     self.assertEqual(self.root_dir, self.bot.base_dir)

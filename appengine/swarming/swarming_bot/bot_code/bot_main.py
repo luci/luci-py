@@ -679,7 +679,8 @@ def run_manifest(botobj, manifest, start):
     auth_params_file = os.path.join(work_dir, 'bot_auth_params.json')
     if botobj.remote.uses_auth:
       auth_params_dumper = file_refresher.FileRefresherThread(
-          auth_params_file, lambda: bot_auth.prepare_auth_params_json(botobj))
+          auth_params_file,
+          lambda: bot_auth.prepare_auth_params_json(botobj, manifest))
       auth_params_dumper.start()
 
     command = [

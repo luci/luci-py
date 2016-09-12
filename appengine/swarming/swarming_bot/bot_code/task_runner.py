@@ -232,8 +232,8 @@ def load_and_run(
       # headers from 'auth_params_file'.
       if auth_params_file:
         try:
-          auth_system = bot_auth.AuthSystem()
-          auth_system.start(auth_params_file)
+          auth_system = bot_auth.AuthSystem(auth_params_file)
+          auth_system.start()
         except bot_auth.AuthSystemError as e:
           raise InternalError('Failed to init auth: %s' % e)
 

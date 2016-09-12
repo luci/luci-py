@@ -262,11 +262,13 @@ class TaskRequestApiTest(TestCase):
       'properties_hash': '411f20b8cda819b5fe47bcf26f5566c37afce0ed',
       'pubsub_topic': None,
       'pubsub_userdata': None,
+      'service_account': u'none',
       'tags': [
         u'OS:Windows-3.1.1',
         u'hostname:localhost',
         u'pool:default',
         u'priority:49',
+        u'service_account:none',
         u'tag:1',
         u'user:Jesus',
       ],
@@ -334,11 +336,13 @@ class TaskRequestApiTest(TestCase):
       'properties_hash': '411f20b8cda819b5fe47bcf26f5566c37afce0ed',
       'pubsub_topic': None,
       'pubsub_userdata': None,
+      'service_account': u'none',
       'tags': [
         u'OS:Windows-3.1.1',
         u'hostname:localhost',
         u'pool:default',
         u'priority:49',
+        u'service_account:none',
         u'tag:1',
         u'user:Jesus',
       ],
@@ -372,6 +376,12 @@ class TaskRequestApiTest(TestCase):
     # Ensure the algorithm is deterministic.
     self.assertEqual(
         '411f20b8cda819b5fe47bcf26f5566c37afce0ed', as_dict['properties_hash'])
+
+  def test_init_new_request_bot_service_account(self):
+    request = mkreq(_gen_request(service_account_token='bot'))
+    as_dict = request.to_dict()
+    self.assertEqual('bot', as_dict['service_account'])
+    self.assertIn(u'service_account:bot', as_dict['tags'])
 
   def test_duped(self):
     # Two TestRequest with the same properties.
@@ -585,11 +595,13 @@ class TaskRequestApiTest(TestCase):
       'properties_hash': None,
       'pubsub_topic': None,
       'pubsub_userdata': None,
+      'service_account': u'none',
       'tags': [
         u'OS:Windows-3.1.1',
         u'hostname:localhost',
         u'pool:default',
         u'priority:49',
+        u'service_account:none',
         u'tag:1',
         u'user:mocked@example.com',
       ],

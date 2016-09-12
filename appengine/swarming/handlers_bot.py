@@ -550,6 +550,7 @@ class BotPollHandler(_BotBaseHandler):
           'namespace': request.properties.inputs_ref.namespace,
           'server': request.properties.inputs_ref.isolatedserver,
         } if request.properties.inputs_ref else None,
+        'service_account': request.service_account,
         'task_id': task_pack.pack_run_result_key(run_result_key),
       },
     }

@@ -51,33 +51,37 @@ class AuthSystemTest(auto_stub.TestCase):
       json.dump(auth_params, f)
     return path
 
-  def test_works(self):
-    """High level test of the overall functionality."""
+  def test_bot_auth_works(self):
+    # If 'task_service_account' is 'bot', local HTTP server returns bot tokens.
     auth_params_path = self.write_auth_params({
       'swarming_http_headers': {
         'Authorization': 'Bearer bot-own-token',
       },
+      'task_service_account': 'bot',
     })
-
-    auth_sys = bot_auth.AuthSystem()
-    try:
-      auth_sys.start(auth_params_path)
-
+    with bot_auth.AuthSystem(auth_params_path) as auth_sys:
       self.assertEqual(
           {'Authorization': 'Bearer bot-own-token'},
           auth_sys.bot_headers)
       self.assertEqual(
           ['rpc_port', 'secret'],
           sorted(auth_sys.local_auth_context))
-
       # Try to actually use the local RPC service to grab a token.
       resp = call_rpc(auth_sys.local_auth_context, ['A', 'B', 'C'])
       self.assertEqual([u'access_token', u'expiry'], sorted(resp))
       self.assertEqual(u'bot-own-token', resp['access_token'])
       self.assertGreater(resp['expiry'], time.time())
 
-    finally:
-      auth_sys.stop()
+  def test_no_auth_works(self):
+    # If 'task_service_account' is empty, doesn't launch local HTTP server.
+    auth_params_path = self.write_auth_params({
+      'swarming_http_headers': {
+        'Authorization': 'Bearer bot-own-token',
+      },
+      'task_service_account': 'none',
+    })
+    with bot_auth.AuthSystem(auth_params_path) as auth_sys:
+      self.assertIsNone(auth_sys.local_auth_context)
 
 
 if __name__ == '__main__':

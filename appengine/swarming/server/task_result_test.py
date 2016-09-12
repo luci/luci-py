@@ -172,6 +172,7 @@ class TaskResultApiTest(TestCase):
       'tags': [
         u'pool:default',
         u'priority:50',
+        u'service_account:none',
         u'tag:1',
         u'user:Jesus',
       ],
@@ -259,6 +260,7 @@ class TaskResultApiTest(TestCase):
       'tags': [
         u'pool:default',
         u'priority:50',
+        u'service_account:none',
         u'tag:1',
         u'user:Jesus',
       ],
@@ -306,6 +308,7 @@ class TaskResultApiTest(TestCase):
       'tags': [
         u'pool:default',
         u'priority:50',
+        u'service_account:none',
         u'tag:1',
         u'user:Jesus',
       ],
@@ -361,6 +364,7 @@ class TaskResultApiTest(TestCase):
       'tags': [
         u'pool:default',
         u'priority:50',
+        u'service_account:none',
         u'tag:1',
         u'user:Jesus',
       ],

@@ -11,7 +11,6 @@ Swarming client to ensure the system works end to end.
 
 import base64
 import json
-import glob
 import logging
 import os
 import re
@@ -19,7 +18,6 @@ import signal
 import socket
 import sys
 import tempfile
-import time
 import unittest
 import urllib
 
@@ -233,7 +231,12 @@ def gen_expected(**kwargs):
     u'properties_hash': None,
     u'server_versions': [u'1'],
     u'state': 0x70,  # task_result.State.COMPLETED.
-    u'tags': [u'pool:default', u'priority:100', u'user:joe@localhost'],
+    u'tags': [
+      u'pool:default',
+      u'priority:100',
+      u'service_account:none',
+      u'user:joe@localhost',
+    ],
     u'try_number': 1,
     u'user': u'joe@localhost',
   }

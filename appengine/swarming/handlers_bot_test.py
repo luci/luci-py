@@ -293,6 +293,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'host': u'http://localhost:8080',
         u'isolated': None,
         u'io_timeout': 1200,
+        u'service_account': u'none',
         u'task_id': task_id,
       },
     }
@@ -317,6 +318,49 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'state': u'RUNNING',
       u'task_id': u'5cee488008811',
       u'try_number': u'1',
+    }
+    self.assertEqual(expected, response)
+
+  def test_poll_task_with_bot_service_account(self):
+    params = self.do_handshake()
+
+    _, task_id = self.client_create_task_raw(service_account_token='bot')
+    self.assertEqual('0', task_id[-1])
+    task_id = task_id[:-1] + '1'
+
+    response = self.post_json('/swarming/api/v1/bot/poll', params)
+    expected = {
+      u'cmd': u'run',
+      u'manifest': {
+        u'bot_id': u'bot1',
+        u'cipd_input': {
+          u'client_package': {
+            u'package_name': u'infra/tools/cipd/${platform}',
+            u'path': None,
+            u'version': u'git_revision:deadbeef',
+          },
+          u'packages': [{
+            u'package_name': u'rm',
+            u'path': u'bin',
+            u'version': u'git_revision:deadbeef',
+          }],
+          u'server': u'https://chrome-infra-packages.appspot.com',
+        },
+        u'command': [u'python', u'run_test.py'],
+        u'dimensions': {
+          u'os': u'Amiga',
+          u'pool': u'default',
+        },
+        u'env': {},
+        u'extra_args': [],
+        u'grace_period': 30,
+        u'hard_timeout': 3600,
+        u'host': u'http://localhost:8080',
+        u'isolated': None,
+        u'io_timeout': 1200,
+        u'service_account': u'bot',
+        u'task_id': task_id,
+      },
     }
     self.assertEqual(expected, response)
 
@@ -403,6 +447,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
           u'namespace': u'default-gzip',
         },
         u'io_timeout': 1200,
+        u'service_account': u'none',
         u'task_id': task_id,
       },
     }
@@ -554,6 +599,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
           u'namespace': u'default-gzip',
         },
         u'io_timeout': 1200,
+        u'service_account': u'none',
         u'task_id': task_id,
       },
     }
