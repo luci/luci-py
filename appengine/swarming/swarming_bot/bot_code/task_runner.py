@@ -21,6 +21,7 @@ import optparse
 import os
 import signal
 import sys
+import tempfile
 import time
 import traceback
 
@@ -229,13 +230,28 @@ def load_and_run(
       task_details = TaskDetails.load(in_file)
 
       # This will start a thread that occasionally reads bot authentication
-      # headers from 'auth_params_file'.
+      # headers from 'auth_params_file'. It will also optionally launch local
+      # HTTP server that serves OAuth tokens to the task processes. We put
+      # location of this service into a file referenced by LUCI_CONTEXT env var
+      # below.
       if auth_params_file:
         try:
           auth_system = bot_auth.AuthSystem(auth_params_file)
           auth_system.start()
         except bot_auth.AuthSystemError as e:
           raise InternalError('Failed to init auth: %s' % e)
+
+      # If the task is using service accounts, setup LUCI_CONTEXT env var
+      # pointing to the local auth server that hands out the tokens. Note that
+      # bot_main.py completely removes work_dir on completion.
+      luci_context_path = None
+      if auth_system and auth_system.local_auth_context:
+        fd, luci_context_path = tempfile.mkstemp(
+            suffix='.json', prefix='luci_context.', dir=work_dir)
+        with os.fdopen(fd, 'w') as f:
+          json.dump(
+              {'local_auth': auth_system.local_auth_context}, f,
+              indent=2, sort_keys=True)
 
       # Returns bot authentication headers dict or raises InternalError.
       def headers_cb():
@@ -248,7 +264,8 @@ def load_and_run(
       # disk in 'finally' block.
       task_result = run_command(
           swarming_server, task_details, work_dir,
-          cost_usd_hour, start, min_free_space, bot_file, headers_cb)
+          cost_usd_hour, start, min_free_space, bot_file,
+          headers_cb, {'LUCI_CONTEXT': luci_context_path})
 
   except (ExitSignal, InternalError) as e:
     # This normally means run_command() didn't get the chance to run, as it
@@ -365,7 +382,7 @@ def kill_and_wait(proc, grace_period, reason):
 
 def run_command(
     swarming_server, task_details, work_dir, cost_usd_hour,
-    task_start, min_free_space, bot_file, headers_cb):
+    task_start, min_free_space, bot_file, headers_cb, extra_env):
   """Runs a command and sends packets to the server to stream results back.
 
   Implements both I/O and hard timeouts. Sends the packets numbered, so the
@@ -410,10 +427,9 @@ def run_command(
   try:
     # TODO(maruel): Support both channels independently and display stderr in
     # red.
-    env = None
-    if task_details.env:
-      env = os.environ.copy()
-      for key, value in task_details.env.iteritems():
+    env = os.environ.copy()
+    for env_to_add in (task_details.env, extra_env):
+      for key, value in (env_to_add or {}).iteritems():
         if not value:
           env.pop(key, None)
         else:

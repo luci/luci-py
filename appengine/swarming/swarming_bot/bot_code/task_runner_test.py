@@ -56,6 +56,8 @@ def get_manifest(script=None, isolated=None, **kwargs):
 
 
 class FakeAuthSystem(object):
+  local_auth_context = None
+
   def __init__(self, auth_params_file):
     self._running = False
     assert auth_params_file == '/path/to/auth-params-file'
@@ -88,11 +90,12 @@ class TestTaskRunnerBase(net_utils.TestCase):
       return [sys.executable, os.path.join(CLIENT_DIR, 'run_isolated.py')]
     self.mock(task_runner, 'get_run_isolated', _get_run_isolated)
 
-    # In case this test itself is running one Swarming, clear the bots
+    # In case this test itself is running on Swarming, clear the bot
     # environment.
+    os.environ.pop('LUCI_CONTEXT', None)
+    os.environ.pop('SWARMING_AUTH_PARAMS', None)
     os.environ.pop('SWARMING_BOT_ID', None)
     os.environ.pop('SWARMING_TASK_ID', None)
-    os.environ.pop('SWARMING_AUTH_PARAMS', None)
 
   def tearDown(self):
     os.chdir(test_env_bot_code.BOT_DIR)
@@ -187,16 +190,18 @@ class TestTaskRunner(TestTaskRunnerBase):
     server = 'https://localhost:1'
     return task_runner.run_command(
         server, task_details, self.work_dir, 3600., start, 1,
-        '/path/to/file', headers_cb or (lambda: {}))
+        '/path/to/file', headers_cb or (lambda: {}), None)
 
   def test_load_and_run_raw(self):
     server = 'https://localhost:1'
 
+    FakeAuthSystem.local_auth_context = {'rpc_port': 123, 'secret': 'abcdef'}
     self.mock(bot_auth, 'AuthSystem', FakeAuthSystem)
 
     def run_command(
         swarming_server, task_details, work_dir,
-        cost_usd_hour, start, min_free_space, bot_file, headers_cb):
+        cost_usd_hour, start, min_free_space, bot_file,
+        headers_cb, extra_env):
       self.assertEqual(server, swarming_server)
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       # Necessary for OSX.
@@ -207,6 +212,12 @@ class TestTaskRunner(TestTaskRunnerBase):
       self.assertEqual(1, min_free_space)
       self.assertEqual('/path/to/bot-file', bot_file)
       self.assertEqual({'Fake': 'Header'}, headers_cb())
+      self.assertEqual(['LUCI_CONTEXT'], extra_env.keys())
+      self.assertTrue(extra_env['LUCI_CONTEXT'].startswith(self.work_dir))
+      with open(extra_env['LUCI_CONTEXT'], 'r') as f:
+        self.assertEqual(
+            {u'local_auth': {u'rpc_port': 123, u'secret': u'abcdef'}},
+            json.load(f))
       return {
         u'exit_code': 1,
         u'hard_timeout': False,
@@ -249,11 +260,13 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.expected_requests([])
     server = 'https://localhost:1'
 
+    FakeAuthSystem.local_auth_context = None
     self.mock(bot_auth, 'AuthSystem', FakeAuthSystem)
 
     def run_command(
         swarming_server, task_details, work_dir,
-        cost_usd_hour, start, min_free_space, bot_file, headers_cb):
+        cost_usd_hour, start, min_free_space, bot_file,
+        headers_cb, extra_env):
       self.assertEqual(server, swarming_server)
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       # Necessary for OSX.
@@ -264,6 +277,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       self.assertEqual(1, min_free_space)
       self.assertEqual('/path/to/bot-file', bot_file)
       self.assertEqual({'Fake': 'Header'}, headers_cb())
+      self.assertEqual({'LUCI_CONTEXT': None}, extra_env)
       return {
         u'exit_code': 0,
         u'hard_timeout': False,
@@ -688,7 +702,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     server = 'https://localhost:1'
     return task_runner.run_command(
         server, task_details, self.work_dir, 3600., time.time(), 1,
-        '/path/to/file', lambda: {})
+        '/path/to/file', lambda: {}, {})
 
   def test_hard(self):
     # Actually 0xc000013a
