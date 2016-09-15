@@ -599,6 +599,7 @@ class BotEventHandler(_BotBaseHandler):
     res = self._process()
     event = res.request.get('event')
     if event not in self.ALLOWED_EVENTS:
+      logging.error('Unexpected event type')
       self.abort_with_error(400, error='Unsupported event type')
     message = res.request.get('message')
     # Record the event in a BotEvent entity so it can be listed on the bot's

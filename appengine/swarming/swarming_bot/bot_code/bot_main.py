@@ -94,6 +94,21 @@ def _in_load_test_mode():
   return os.environ.get('SWARMING_LOAD_TEST') == '1'
 
 
+def log_call(name=None):
+  def gen(fn):
+    def hook(*args, **kwargs):
+      start = time.time()
+      fnname = name(*args) if name else fn.__name__
+      logging.info('%s()', fnname)
+      try:
+        return fn(*args, **kwargs)
+      finally:
+        logging.info('%s() took %.1fs', fnname, round(time.time() - start, 1))
+    return hook
+  return gen
+
+
+@log_call()
 def get_dimensions(botobj):
   """Returns bot_config.py's get_dimensions() dict."""
   # Importing this administrator provided script could have side-effects on
@@ -120,9 +135,11 @@ def get_dimensions(botobj):
       out['quarantined'] = ['1']
       return out
     except Exception as e:
+      logging.exception('os.utilities.get_dimensions() failed')
       try:
         botid = os_utilities.get_hostname_short()
       except Exception as e2:
+        logging.exception('os.utilities.get_hostname_short() failed')
         botid = 'error_%s' % str(e2)
       return {
           'id': [botid],
@@ -131,6 +148,7 @@ def get_dimensions(botobj):
         }
 
 
+@log_call()
 def get_state(botobj, sleep_streak):
   """Returns dict with a state of the bot reported to the server with each poll.
   """
@@ -158,18 +176,19 @@ def get_state(botobj, sleep_streak):
   return state
 
 
+@log_call(lambda _, name, *args: name)
 def call_hook(botobj, name, *args):
   """Calls a hook function in bot_config.py."""
   try:
     if _in_load_test_mode():
       return
 
-    logging.info('call_hook(%s)', name)
     from config import bot_config
     hook = getattr(bot_config, name, None)
     if hook:
       return hook(botobj, *args)
   except Exception as e:
+    logging.exception('%s() threw', name)
     msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
     botobj.post_error('Failed to call hook %s(): %s' % (name, msg))
 
