@@ -20,8 +20,17 @@ eventually consistent, converging on the desired state over multiple calls.
     same name as pubsub.get\_machine\_provider\_subscription(). On the topic,
     authorize the Machine Provider's default service account as a publisher,
     e.g. machine-provider@appspot.gserviceaccount.com.
-*   Use the ConfigApi to set the ConfigSettings datastore entity to the
-    address of the config service, e.g. luci-config.appspot.com.
+*   If you plan to use a [config service](../config_service),
+    *   Make sure it is setup already.
+    *   [Follow instruction
+        here](../config_service/doc#linking-to-the-config-service).
+*   If you plan to use an [auth_service](../auth_service),
+    *   Make sure it is setup already.
+    *   [Follow instructions
+        here](../auth_service#linking-isolate-or-swarming-to-auth_service).
+*   _else_
+    *   Visit "_https://\<appid\>.appspot.com/auth/bootstrap_" and click
+        `Proceed`.
 *   Configure the Machine Provider with the
     [config service](https://github.com/luci/luci-py/blob/master/appengine/gce-backend/proto/config.proto)
     or the `instance\_url` property of the

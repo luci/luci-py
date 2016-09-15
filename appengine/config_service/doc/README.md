@@ -90,7 +90,9 @@ project ids (chromium, v8, skia) and location of project configs. This list is
 available through get_projects() API. This is how projects are discovered by
 services.
 
-See [ProjectsCfg message](proto/service_config.proto) for more info.
+See
+[ProjectsCfg message](../../components/components/config/proto/service_config.proto)
+for more info.
 
 
 ## Service registry
@@ -99,7 +101,9 @@ See [ProjectsCfg message](proto/service_config.proto) for more info.
 service ids (chrome-infra-auth, swarming), location of configs if different from
 default and metadata url.
 
-See [ServicesCfg message](proto/service_config.proto) for more info.
+See
+[ServicesCfg message](../../components/components/config/proto/service_config.proto)
+for more info.
 
 
 ## Access control
@@ -108,7 +112,8 @@ Service configs are accessible to a group defined in service/luci-config:acl.cfg
 and a GAE app with the same id, e.g. x.appspot.com has access to `services/x`.
 
 Projects define access to their configs in projects/foo:project.cfg. See
-[access field in ProjectCfg message](proto/project_config.proto).
+[access field in ProjectCfg message](../../components/components/config/proto/project_config.proto)
+for more info.
 
 
 ## Configuration validation
@@ -120,8 +125,16 @@ registered services. A service may expose a list of config patterns that it is
 able to validate and the config service will call service's endpoint to
 validate.
 
-See [ServicesCfg and Validator messages](proto/service_config.proto) for more
-info.
+See
+[ServicesCfg and Validator messages](../../components/components/config/proto/service_config.proto)
+for more info.
+
+
+## Config import
+
+Configs are continuously imported from external sources to the datastore by
+config service backend, with 10 min latency.
+[Read more](Config-Import.md)
 
 
 ## GAE component
@@ -130,8 +143,21 @@ info.
 read configs.
 
 
-## Config import
+### Linking to the config service
 
-Configs are continuously imported from external sources to the datastore by
-config service backend, with 10 min latency.
-[Read more](Config-Import.md)
+Each project using the config component needs to be configured to specify the
+config service location. This setting can be modified through the
+`ConfigSettings` datastore entity, or using the APIs Explorer to access the
+`ConfigApi`:
+
+"_https://apis-explorer.appspot.com/apis-explorer/?base=https://\<appid\>.appspot.com/_ah/api#p/config/v1/config.settings_"
+
+The `service_hostname` property should be set to the config service (e.g.
+`luci-config.appspot.com`). 
+Note that `trusted_service_account` should be set to the service account of the
+LUCI config service (i.e. `user:<appid>@appspot.gserviceaccount.com` or
+`service:<appid>`).
+
+If using the API for configuring a config service, the above step should be
+completed before linking with the auth service, as Admin access is required to
+call the API (in case of insufficient privilege with the auth service).

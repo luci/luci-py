@@ -38,7 +38,7 @@ scheduler is needed.
 *   If you plan to use an [auth_service](../auth_service),
     *   Make sure it is setup already.
     *   [Follow instructions
-        here](../auth_service#linking-isolate-or-swarming-to-auth_service).
+        here](../auth_service#linking-other-services-to-auth_service).
 *   _else_
     *   Visit "_https://\<appid\>.appspot.com/auth/bootstrap_" and click
         Proceed.

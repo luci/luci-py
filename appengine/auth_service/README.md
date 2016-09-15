@@ -52,9 +52,13 @@ installations. For one-off experimentation, this is not strictly necessary.
 *   Visit "_https://\<appid\>.appspot.com_" and make sure you can access the
     service before connecting [Isolate](../isolate) and [Swarming](../swarming)
     to this instance.
+*   If you plan to use a [config service](../config_service),
+    *   Make sure it is setup already.
+    *   [Follow instruction
+        here](../config_service/doc#linking-to-the-config-service).
 
 
-### Linking isolate or swarming to auth_service
+### Linking other services to auth_service
 
 *   Make sure your app is fully working.
 *   Visit https://\<authid\>.appspot.com where authid is the auth_service
