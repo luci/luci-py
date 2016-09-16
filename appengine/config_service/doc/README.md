@@ -8,7 +8,8 @@ Auth service admins keep client id whitelist and configuration of group import
 from external sources. These configs are stored as files in Gitiles.
 Config service imports them from Gitiles to `services/<auth-service-app-id>`
 config set. Auth service can use
-[config component](../components/components/config) to access its the configs.
+[components/config](../../components/components/config) to access its the
+configs.
 
 As a result, Auth services has the following for free
 
@@ -139,25 +140,22 @@ config service backend, with 10 min latency.
 
 ## GAE component
 
-[config component](../components/components/config) can be used by a GAE app to
-read configs.
+[components/config](../../components/components/config) can be used by a GAE app
+to read configs.
 
 
 ### Linking to the config service
 
-Each project using the config component needs to be configured to specify the
-config service location. This setting can be modified through the
-`ConfigSettings` datastore entity, or using the APIs Explorer to access the
-`ConfigApi`:
-
-"_https://apis-explorer.appspot.com/apis-explorer/?base=https://\<appid\>.appspot.com/_ah/api#p/config/v1/config.settings_"
-
-The `service_hostname` property should be set to the config service (e.g.
-`luci-config.appspot.com`). 
-Note that `trusted_service_account` should be set to the service account of the
-LUCI config service (i.e. `user:<appid>@appspot.gserviceaccount.com` or
-`service:<appid>`).
-
-If using the API for configuring a config service, the above step should be
-completed before linking with the auth service, as Admin access is required to
-call the API (in case of insufficient privilege with the auth service).
+*  Each project using the config component needs to be configured to specify the
+   config service location. This setting can be modified through the
+   `ConfigSettings` datastore entity, or using the APIs Explorer to access the
+   `ConfigApi`:
+   *  `https://apis-explorer.appspot.com/apis-explorer/?base=https://<appid>.appspot.com/_ah/api#p/config/v1/config.settings`
+   *  `service_hostname` property should be set to the config service (e.g.
+      `luci-config.appspot.com`).
+   *  `trusted_service_account` should be set to the service account of the
+      LUCI config service (i.e. `user:<appid>@appspot.gserviceaccount.com` or
+      `service:<appid>`).
+*  If using the API for configuring a config service, the above step should be
+   completed before linking with the auth service, as Admin access is required to
+   call the API (in case of insufficient privilege with the auth service).

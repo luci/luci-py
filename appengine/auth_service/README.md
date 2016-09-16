@@ -61,9 +61,10 @@ installations. For one-off experimentation, this is not strictly necessary.
 ### Linking other services to auth_service
 
 *   Make sure your app is fully working.
-*   Visit https://\<authid\>.appspot.com where authid is the auth_service
+*   Visit https://\<authid\>.appspot.com where \<authid\> is the auth_service
     instance to link with.
-*   Type your \<appid\> in GAE application id and click Generate linking URL.
+*   Type your \<appid\> in GAE application id and click Generate linking URL,
+    where \<appid\> is the service being linked to the auth_service.
 *   Click the link in the UI.
 *   Click the red Switch button, understanding that any previous ACL
     configuration on this instance is lost.
