@@ -216,16 +216,12 @@
         if (!this._list || !this._list.items) {
           return [];
         }
-        // Date.toString() looks like "Mon Aug 29 2016 09:03:41 GMT-0400 (EDT)"
-        // we want to extract the time zone part and append it to the
-        // locale time.
         var now = new Date();
-        var str = now.toString();
-        var timeZone = str.substring(str.indexOf("("))
 
         // Do any preprocessing here
         this._list.items.forEach(function(t) {
           var tagMap = {};
+          t.tags = t.tags || [];
           t.tags.forEach(function(tag) {
             var split = tag.split(":", 1)
             var key = split[0];
@@ -233,11 +229,11 @@
             tagMap[key] = rest;
           });
           t.tagMap = tagMap;
+
           TIMES.forEach(function(time) {
             if (t[time]) {
               t[time] = new Date(t[time]);
-              var locale = t[time].toLocaleString();
-              t["human_"+time] = locale + " " + timeZone;
+              t["human_"+time] = sk.human.localeTime(t[time]);
             }
           });
           // Running tasks have no duration set, so we can figure it out.
@@ -246,9 +242,9 @@
           }
           // Make the duration human readable
           if (t.duration){
-            t.human_duration = sk.human.strDuration(t.duration);
+            t.human_duration = this._humanDuration(t.duration);
           }
-        });
+        }.bind(this));
         return this._list.items;
       }
     });

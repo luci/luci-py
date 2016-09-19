@@ -85,9 +85,9 @@
     <url-param name="verbose"
       value="{{verbose}}">
     </url-param>
-    <url-param name="limit"
+    <url-param name="_limit"
       default_value="200"
-      value="{{limit}}">
+      value="{{_limit}}">
     </url-param>
 
     <div class="container horizontal layout">
@@ -164,13 +164,13 @@ the fleet.">
 
         <div class="side-by-side">
         <paper-checkbox checked="{{verbose}}">Verbose Entries</paper-checkbox>
-          <paper-input id="limit"
+          <paper-input id="_limit"
             label="Limit Results"
             auto-validate
             min="0"
             max="1000"
             pattern="[0-9]+"
-            value="{{limit}}">
+            value="{{_limit}}">
           </paper-input>
         </div>
       </div>
@@ -224,7 +224,7 @@ the fleet.">
         },
         query_params: {
           type: Object,
-          computed: "_extractQueryParams(dimensions.*,_filters.*, limit)",
+          computed: "_extractQueryParams(dimensions.*,_filters.*, _limit)",
           notify: true,
         },
         verbose: {
@@ -273,15 +273,15 @@ the fleet.">
           }
         }.bind(this));
         params["dimensions"] = dims;
-        var lim = Math.floor(this.limit)
+        var lim = parseInt(this._limit);
         if (Number.isInteger(lim)) {
           // Clamp the limit
           lim = Math.max(lim, 1);
           lim = Math.min(1000, lim);
-          params["limit"] = [lim];
+          params["_limit"] = [lim];
           // not !== because limit could be a string, e.g. "900"
-          if (this.limit != lim) {
-            this.set("limit", lim);
+          if (this._limit != lim) {
+            this.set("_limit", lim);
           }
         }
         return params;

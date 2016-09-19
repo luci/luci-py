@@ -22,6 +22,13 @@
     // This behavior wraps up all the shared swarming functionality.
     SwarmingBehaviors.CommonBehavior = {
 
+      _botLink: function(bot_id) {
+        if (!bot_id) {
+          return undefined;
+        }
+        return "/newui/bot?id=" + bot_id;
+      },
+
       // _getJsonAsync makes an XHR to a url, parses the response as JSON
       // and sticks the resulting object into the property with the name given
       // by "bindTo". If busy is defined, the property with that name will be
@@ -56,6 +63,10 @@
         }.bind(this));
       },
 
+      _humanDuration: function(timeInSecs) {
+        return sk.human.strDuration(timeInSecs) || "0s";
+      },
+
       _not: function(a) {
         return !a;
       },
@@ -67,6 +78,35 @@
           result = result || arguments[i];
         }
         return result;
+      },
+
+      _taskLink: function(task_id) {
+        if (!task_id) {
+          return undefined;
+        }
+        return "/newui/task?id=" + task_id;
+      },
+
+      // )timeDiffApprox returns the approximate difference between now and
+      // the specified date.
+      _timeDiffApprox: function(date){
+        if (!date) {
+          return "eons";
+        }
+        return sk.human.diffDate(date.getTime());
+      },
+
+      // timeDiffExact returns the exact difference between the two specified
+      // dates.  E.g. 2d 22h 22m 28s ago If a second date is not provided,
+      // now is used.
+      _timeDiffExact: function(first, second){
+        if (!first) {
+          return "eons";
+        }
+        if (!second) {
+          second = new Date();
+        }
+        return this._humanDuration((second.getTime() - first.getTime())/1000);
       },
     };
   })();

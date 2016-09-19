@@ -268,8 +268,8 @@
       // "2016-08-16T13:12:40.606300" which sorts correctly.  Locale time
       // (used in the columns), does not.
       return function(dir, a, b) {
-        var aCol = this._attribute(a, attr)[0];
-        var bCol = this._attribute(b, attr)[0];
+        var aCol = this._attribute(a, attr, "0")[0];
+        var bCol = this._attribute(b, attr, "0")[0];
 
         return dir * (aCol - bCol);
       }
@@ -368,14 +368,6 @@
           return undefined;
         }
         return task.tagMap[col];
-      },
-
-      _taskLink: function(taskId) {
-        if (!taskId) {
-          return undefined;
-        }
-        // TODO(kjlubick) Make this point to /newui/ when appropriate.
-        return "/user/task/"+taskId;
       },
 
       _taskClass: function(task) {

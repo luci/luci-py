@@ -12,9 +12,14 @@
   that data into usable data structures.
 
   Properties:
-    busy: Boolean, if we are fetching any data from the server.
+    // input
+    auth_headers: Object, the OAuth2 header to include in the request.  This
+        should come from swarming-app.
+    bot_id: String, the id of the bot to fetch data on.
+    // output
     bot: Object, The information about the bot. See swarming_rpcs.py#BotInfo
         for all relevent fields.
+    busy: Boolean, if we are fetching any data from the server.
     events: Array<Object>, The most recent events that pertain to this bot.
         Contains the following fields: "event_type", "message", "ts" (timestamp),
         "quarantined", "version".
@@ -227,7 +232,7 @@
           });
 
           if (task.duration) {
-            task.human_duration = sk.human.strDuration(task.duration) || "0s";
+            task.human_duration = this._humanDuration(task.duration);
           } else {
             var end = task.completed_ts || task.abandoned_ts || task.modified_ts || new Date();
             task.human_duration = this._timeDiffExact(task.started_ts, end);

@@ -34,9 +34,10 @@
 <link rel="import" href="/res/imp/bower_components/paper-tabs/paper-tabs.html">
 <link rel="import" href="/res/imp/bower_components/polymer/polymer.html">
 
+<link rel="import" href="/res/imp/common/error-toast.html">
+<link rel="import" href="/res/imp/common/single-page-style.html">
 <link rel="import" href="/res/imp/common/swarming-app.html">
 <link rel="import" href="/res/imp/common/url-param.html">
-<link rel="import" href="/res/imp/common/error-toast.html">
 
 <link rel="import" href="bot-page-data.html">
 <link rel="import" href="bot-page-shared-behavior.html">
@@ -44,93 +45,34 @@
 
 <dom-module id="bot-page">
   <template>
-    <style include="iron-flex iron-flex-alignment iron-positioning swarming-app-style">
+    <style include="iron-flex iron-flex-alignment iron-positioning swarming-app-style single-page-style">
+      .message {
+        white-space: pre-line;
+        font-family: monospace;
+      }
 
-    .header {
-      max-width: 450px;
-    }
+      .bot_state {
+        white-space: pre;
+        font-family: monospace;
+        margin-bottom: 10px;
+      }
 
-    .title {
-      font-size: 1.5em;
-      font-weight: bold;
-      margin-bottom: 5px;
-    }
-    .id_input {
-      --paper-input-container-input: {
-        font-size: 2em;
-      };
-    }
-    .refresh {
-      max-width: 50px;
-      max-height: 50px;
-      width: initial;
-      height: initial;
-    }
+      .tasks_table,
+      .events_table {
+        border: 3px solid #1F78B4;
+      }
 
-    table {
-      border-collapse: collapse;
-      margin-left: 5px;
-      margin-bottom: 5px;
-    }
-    td,
-    th {
-      border: 1px solid #BBB;
-      padding: 5px;
-    }
+      paper-checkbox {
+        --paper-checkbox-label-color: #fff;
+        --paper-checkbox-checked-color: #fff;
+        --paper-checkbox-checkmark-color: #000;
+        --paper-checkbox-unchecked-color: #fff;
+        padding: 3px;
+      }
 
-    .quarantined,
-    .failed_task {
-      background-color: #ffdddd;
-    }
-    .dead,
-    .bot_died {
-      background-color: #cccccc;
-    }
-
-    .message {
-      white-space: pre-line;
-      font-family: monospace;
-    }
-
-    .bot_state {
-      white-space: pre;
-      font-family: monospace;
-      margin-bottom: 10px;
-    }
-
-    .tabs {
-      background-color: #1F78B4;
-      color: #fff;
-      max-width: 600px;
-      --paper-checkbox-label-color: #fff;
-      margin-left: 5px;
-    }
-
-    .tasks_table,
-    .events_table {
-      border: 3px solid #1F78B4;
-    }
-
-    paper-checkbox {
-      --paper-checkbox-label-color: #fff;
-      --paper-checkbox-checked-color: #fff;
-      --paper-checkbox-checkmark-color: #000;
-      --paper-checkbox-unchecked-color: #fff;
-      padding: 3px;
-    }
-
-    paper-tab.iron-selected {
-      background-color: #A6CEE3;
-      border: 3px solid #1F78B4;
-      color: #000;
-      font-weight: bold;
-      text-decoration: underline;
-    }
-
-    paper-dialog {
-      border-radius: 6px;
-    }
-
+      paper-dialog {
+        border-radius: 6px;
+      }
     </style>
 
     <url-param name="id"
@@ -356,7 +298,6 @@
   <script>
   (function(){
 
-
     Polymer({
       is: 'bot-page',
 
@@ -514,14 +455,6 @@
           return "failed_task";
         }
         return "";
-      },
-
-      _taskLink: function(task_id) {
-        // TODO(kjlubick): Migrate this to /newui/ when ready
-        if (task_id) {
-          return "/user/task/" + task_id;
-        }
-        return undefined;
       },
 
       _toggleState: function() {

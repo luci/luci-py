@@ -1,0 +1,92 @@
+<!--
+  Copyright 2016 The LUCI Authors. All rights reserved.
+  Use of this source code is governed under the Apache License, Version 2.0
+  that can be found in the LICENSE file.
+
+  This contains the shared styles for the "single page" look, e.g. bot-page.
+  To use, include this file and then
+
+  <style include="single-page-style">
+
+  -->
+
+<dom-module id="single-page-style">
+  <template>
+    <style>
+      .header {
+        max-width: 450px;
+      }
+
+      .title {
+        font-size: 1.5em;
+        font-weight: bold;
+        margin-top: 5px;
+        margin-bottom: 5px;
+      }
+      .id_input {
+        --paper-input-container-input: {
+          font-size: 2em;
+        };
+      }
+      .refresh {
+        max-width: 50px;
+        max-height: 50px;
+        width: initial;
+        height: initial;
+      }
+
+      table {
+        border-collapse: collapse;
+        margin-left: 5px;
+        margin-bottom: 5px;
+      }
+      td,
+      th {
+        border: 1px solid #BBB;
+        padding: 5px;
+      }
+
+      .tabs {
+        background-color: #1F78B4;
+        color: #fff;
+        max-width: 600px;
+        --paper-checkbox-label-color: #fff;
+        margin-left: 5px;
+      }
+
+      paper-tab {
+        background-color: #A6CEE3;
+        color: #000;
+      }
+
+      paper-tab.iron-selected {
+        background-color: #1F78B4;
+        color: #fff;
+        font-weight: bold;
+        text-decoration: underline;
+      }
+
+      paper-tab[disabled] {
+        background-color: #AAA;
+        text-decoration: line-through;
+      }
+
+      /* These colors are from buildbot */
+      .quarantined,
+      .failed_task {
+        background-color: #ffdddd;
+      }
+      .dead,
+      .bot_died {
+        background-color: #cccccc;
+      }
+      .exception {
+        background-color: #edd2ff;
+      }
+      .pending {
+        background-color: #fffc6c;
+      }
+
+    </style>
+  </template>
+</dom-module>

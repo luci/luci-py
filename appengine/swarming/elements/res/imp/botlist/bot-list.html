@@ -170,7 +170,7 @@
                   </a>
                 </td>
                 <td hidden$="[[_hide('task', _columns.*)]]">
-                  <a href$="[[_taskLink(bot)]]">[[_taskId(bot)]]</a>
+                  <a href$="[[_taskLink(bot.task_id)]]">[[_taskId(bot)]]</a>
                 </td>
 
                 <template
@@ -369,11 +369,6 @@
         return "";
       },
 
-      _botLink: function(id) {
-        return "/newui/bot?id="+id;
-      },
-
-
       _androidAliasDevice: function(device) {
         if (device.notReady) {
           return UNAUTHENTICATED.toUpperCase();
@@ -395,14 +390,6 @@
         }
         return "";
       },
-
-      _taskLink: function(data) {
-        // TODO(kjlubick): Migrate this to /newui/ when ready
-        if (data && data.task_id) {
-          return "/user/task/" + data.task_id;
-        }
-        return undefined;
-      }
 
     });
   })();
