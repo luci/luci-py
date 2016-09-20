@@ -1,0 +1,153 @@
+<!--
+  Copyright 2016 The LUCI Authors. All rights reserved.
+  Use of this source code is governed under the Apache License, Version 2.0
+  that can be found in the LICENSE file.
+
+  This in an HTML Import-able file that contains the definition
+  of the following elements:
+
+    <task-page-data>
+
+  This makes calls authenticated with Oauth 2 to the swarming apis.  It parses
+  that data into usable data structures.
+
+  Properties:
+    busy: Boolean, if we are fetching any data from the server.
+    TODO(kjlubick)
+
+  Methods:
+    request(): Force a fetch of the data. This happens automatically when
+        auth_headers is set or task_id is changed.
+
+  Events:
+    None.
+-->
+
+
+<link rel="import" href="/res/imp/common/common-behavior.html">
+
+<dom-module id="task-page-data">
+  <script>
+  (function(){
+    // Time to wait before requesting a new task. This is to allow a user to
+    // type in a name and not have it make one set of requests for each
+    // keystroke.
+    var TASK_ID_DEBOUNCE_MS = 400;
+    var lastRequest;
+
+    Polymer({
+      is: 'task-page-data',
+
+      behaviors: [
+          SwarmingBehaviors.CommonBehavior,
+      ],
+
+      properties: {
+        // inputs
+        auth_headers: {
+          type: Object,
+        },
+        task_id: {
+          type: String,
+        },
+
+        // outputs
+        busy: {
+          type: Boolean,
+          computed: "_or(_busy1,_busy2,_busy3)",
+          notify: true,
+        },
+        request: {
+          type: Object,
+          computed: "_parseRequest(_request)",
+          notify: true,
+        },
+        result: {
+          type: Array,
+          computed: "_parseResult(_result)",
+          notify: true,
+        },
+        stdout: {
+          type: String,
+          computed: "_parseStdout(_stdout)",
+          notify: true,
+        },
+
+        // private
+         _busy1: {
+          type: Boolean,
+          value: false
+        },
+        _busy2: {
+          type: Boolean,
+          value: false
+        },
+        _busy3: {
+          type: Boolean,
+          value: false
+        },
+        _request: {
+          type: Object,
+        },
+        _result: {
+          type: Object,
+        },
+        _stdout: {
+          type: Object,
+        },
+      },
+
+      observers: [
+        "reload(auth_headers,task_id)",
+      ],
+
+      reload: function(){
+        if (!this.task_id || !this.auth_headers) {
+          console.log("task_id and auth_headers can't be empty");
+          return;
+        }
+        if (lastRequest) {
+          this.cancelAsync(lastRequest);
+        }
+
+        lastRequest = this.async(function(){
+          lastRequest = undefined;
+          var baseUrl = "/_ah/api/swarming/v1/task/"+this.task_id;
+          this._getJsonAsync("_request", baseUrl + "/request",
+            "_busy1", this.auth_headers);
+          this._getJsonAsync("_result",
+            baseUrl + "/result?include_performance_stats=true",
+            "_busy2", this.auth_headers);
+          this._getJsonAsync("_stdout", baseUrl + "/stdout",
+            "_busy3", this.auth_headers);
+        }, TASK_ID_DEBOUNCE_MS);
+      },
+
+      _parseRequest: function(request) {
+        console.log(request);
+        if (!request) {
+          return {};
+        }
+        return request;
+      },
+
+      _parseResult: function(result) {
+        console.log(result);
+        if (!result) {
+          return {};
+        }
+        return result;
+      },
+
+      _parseStdout: function(stdout) {
+        console.log(stdout);
+        if (!stdout || !stdout.output) {
+          return "";
+        }
+        return stdout.output;
+      }
+
+    });
+  })();
+  </script>
+</dom-module>

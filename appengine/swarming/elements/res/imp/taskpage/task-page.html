@@ -1,0 +1,93 @@
+<!--
+  Copyright 2016 The LUCI Authors. All rights reserved.
+  Use of this source code is governed under the Apache License, Version 2.0
+  that can be found in the LICENSE file.
+
+  This in an HTML Import-able file that contains the definition
+  of the following elements:
+
+    <task-page>
+
+  task-page shows the request, results, stats, and standard output of a task.
+
+  This is a top-level element.
+
+  Properties:
+    task_id: String, Used in testing to specify a task_id
+    client_id: String, Oauth 2.0 client id.  It will be set by server-side
+        template evaluation.
+
+  Methods:
+    None.
+
+  Events:
+    None.
+-->
+
+<link rel="import" href="/res/imp/bower_components/polymer/polymer.html">
+
+<link rel="import" href="/res/imp/common/common-behavior.html">
+<link rel="import" href="/res/imp/common/swarming-app.html">
+<link rel="import" href="/res/imp/common/url-param.html">
+
+<link rel="import" href="task-page-data.html">
+
+<dom-module id="task-page">
+  <template>
+    <style include="iron-flex iron-flex-alignment iron-positioning swarming-app-style">
+
+    </style>
+
+    <url-param name="id"
+      value="{{task_id}}">
+    </url-param>
+
+    <swarming-app
+      client_id="[[client_id]]"
+      auth_headers="{{_auth_headers}}"
+      signed_in="{{_signed_in}}"
+
+      busy="[[_busy]]"
+      name="Swarming Task Page">
+
+      <h2 hidden$="[[_signed_in]]">You must sign in to see anything useful.</h2>
+
+      <div hidden$="[[_not(_signed_in)]]">
+
+        <task-page-data
+          auth_headers="[[_auth_headers]]"
+          task_id="[[task_id]]"
+
+          busy="{{_busy}}"
+          request="{{_request}}"
+          result="{{_result}}"
+          stdout="{{_stdout}}">
+        </task-page-data>
+
+        <h1>Task Page Stub</h1>
+      </div>
+
+    </swarming-app>
+
+  </template>
+  <script>
+  (function(){
+    Polymer({
+      is: 'task-page',
+
+      behaviors: [
+          SwarmingBehaviors.CommonBehavior,
+      ],
+
+      properties: {
+        task_id: {
+          type: String,
+        },
+        client_id: {
+          type: String,
+        },
+      },
+    });
+  })();
+  </script>
+</dom-module>

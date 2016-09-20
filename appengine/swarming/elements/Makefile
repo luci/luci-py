@@ -20,6 +20,11 @@ run: default
 	-wget -nc --output-document=./res/imp/botpage/bot-events-demo.json https://raw.githubusercontent.com/wiki/luci/luci-py/bot-events-demo.json
 	-wget -nc --output-document=./res/imp/botpage/bot-tasks-demo.json https://raw.githubusercontent.com/wiki/luci/luci-py/bot-tasks-demo.json
 
+	-wget -nc --output-document=./res/imp/taskpage/task-request-demo.json https://raw.githubusercontent.com/wiki/luci/luci-py/task-request-demo.json
+	-wget -nc --output-document=./res/imp/taskpage/task-result-demo.json https://raw.githubusercontent.com/wiki/luci/luci-py/task-result-demo.json
+	-wget -nc --output-document=./res/imp/taskpage/task-stdout-demo.json https://raw.githubusercontent.com/wiki/luci/luci-py/task-stdout-demo.json
+	-wget -nc --output-document=./res/imp/taskpage/milo-sample.html https://raw.githubusercontent.com/wiki/luci/luci-py/milo-sample.html
+
 	node_modules/.bin/http-server -p 9050
 
 
