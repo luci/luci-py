@@ -20,25 +20,29 @@
       .title {
         font-size: 1.5em;
         font-weight: bold;
-        margin-top: 5px;
-        margin-bottom: 5px;
+        margin: 5px;
       }
       .id_input {
+        margin-left: 5px;
         --paper-input-container-input: {
           font-size: 2em;
         };
       }
       .refresh {
-        max-width: 50px;
-        max-height: 50px;
+        max-width: 40px;
+        max-height: 40px;
         width: initial;
         height: initial;
+      }
+      button {
+        min-width: 4em;
+        max-height: 55px;
       }
 
       table {
         border-collapse: collapse;
         margin-left: 5px;
-        margin-bottom: 5px;
+        margin-bottom: 8px;
       }
       td,
       th {
@@ -50,8 +54,8 @@
         background-color: #1F78B4;
         color: #fff;
         max-width: 600px;
-        --paper-checkbox-label-color: #fff;
         margin-left: 5px;
+        --paper-checkbox-label-color: #fff;
       }
 
       paper-tab {
@@ -72,19 +76,11 @@
       }
 
       /* These colors are from buildbot */
-      .quarantined,
-      .failed_task {
+      .quarantined, {
         background-color: #ffdddd;
       }
-      .dead,
-      .bot_died {
+      .dead {
         background-color: #cccccc;
-      }
-      .exception {
-        background-color: #edd2ff;
-      }
-      .pending {
-        background-color: #fffc6c;
       }
 
     </style>

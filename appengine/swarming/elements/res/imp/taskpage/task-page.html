@@ -24,22 +24,79 @@
     None.
 -->
 
+<link rel="import" href="/res/imp/bower_components/iron-icon/iron-icon.html">
+<link rel="import" href="/res/imp/bower_components/iron-icons/iron-icons.html">
+<link rel="import" href="/res/imp/bower_components/paper-button/paper-button.html">
+<link rel="import" href="/res/imp/bower_components/paper-dialog/paper-dialog.html">
+<link rel="import" href="/res/imp/bower_components/paper-input/paper-input.html">
+<link rel="import" href="/res/imp/bower_components/paper-tabs/paper-tabs.html">
 <link rel="import" href="/res/imp/bower_components/polymer/polymer.html">
 
 <link rel="import" href="/res/imp/common/common-behavior.html">
+<link rel="import" href="/res/imp/common/single-page-style.html">
 <link rel="import" href="/res/imp/common/swarming-app.html">
+<link rel="import" href="/res/imp/common/task-behavior.html">
 <link rel="import" href="/res/imp/common/url-param.html">
 
 <link rel="import" href="task-page-data.html">
 
 <dom-module id="task-page">
   <template>
-    <style include="iron-flex iron-flex-alignment iron-positioning swarming-app-style">
+    <style include="iron-flex iron-flex-alignment swarming-app-style single-page-style task-style">
+      .milo {
+        width: calc(100% - 11px);
+        /** We don't control the milo site and it's on a different domain than
+        us, so there's no good way to avoid scrolling other than tell the iframe
+        it is really tall.*/
+        height: 2000px;
+      }
 
+      .left {
+        min-width: 550px;
+      }
+      .right {
+        min-width: 500px;
+        margin-top: 8px;
+      }
+
+      .expand {
+        min-width: 3em;
+        vertical-align: middle;
+        padding: .5em;
+      }
+
+      .code {
+        font-family: monospace;
+      }
+
+      .stdout {
+        white-space: pre-line;
+        padding: 2px;
+      }
+
+      .refresh_input {
+        padding: 0 5px;
+      }
+
+      .tabbed {
+        border: 3px solid #1F78B4;
+        margin-left: 5px;
+        min-height: 80vh;
+      }
     </style>
 
     <url-param name="id"
       value="{{task_id}}">
+    </url-param>
+    <url-param name="request_detail"
+      value="{{_request_detail}}">
+    </url-param>
+    <url-param name="show_raw"
+      value="{{_show_raw}}">
+    </url-param>
+    <url-param name="refresh"
+      value="{{_refresh}}"
+      default_value="10">
     </url-param>
 
     <swarming-app
@@ -64,7 +121,312 @@
           stdout="{{_stdout}}">
         </task-page-data>
 
-        <h1>Task Page Stub</h1>
+        <div class="horizontal layout wrap">
+          <div class="left flex">
+            <div class="horizontal layout">
+              <paper-input class="id_input" label="Task id" value="{{task_id}}"></paper-input>
+              <button on-click="_refresh">
+                <iron-icon class="refresh" icon="icons:refresh"></iron-icon>
+              </button>
+              <button on-click="_retry"><span>Retry</span></button>
+              <button on-click="_cancel">Cancel</button>
+            </div>
+            <table>
+              <tr>
+                <td>Name</td>
+                <td>[[_request.name]]</td>
+              </tr>
+              <tr>
+                <td>State</td>
+                <td class$="[[_stateClass(_result)]]">[[_state(_result)]]</td>
+              </tr>
+              <tr>
+                <td>Created</td>
+                <td>[[_request.human_created_ts]]</td>
+              </tr>
+              <template is="dom-if" if="[[_wasPickedUp(_result)]]">
+                <tr>
+                  <td>Started</td>
+                  <td>[[_result.human_started_ts]]</td>
+                </tr>
+              </template>
+              <template is="dom-if" if="[[_wasNotPickedUp(_result)]]">
+                <tr>
+                  <td>Expires</td>
+                  <td>[[_expires(_request)]]</td>
+                </tr>
+              </template>
+              <template is="dom-if" if="[[_result.human_completed_ts]]">
+                <tr>
+                  <td>Completed</td>
+                  <td>[[_result.human_completed_ts]]</td>
+                </tr>
+              </template>
+              <template is="dom-if" if="[[_result.human_abandoned_ts]]">
+                <tr>
+                  <td>Abandoned</td>
+                  <td>[[_result.human_abandoned_ts]]</td>
+                </tr>
+              </template>
+              <tr>
+                <td>Last Updated</td>
+                <td>[[_result.human_modified_ts]]</td>
+              </tr>
+              <template is="dom-if" if="[[_result.deduped_from]]">
+                <tr>
+                  <td><b>Deduped from</b></td>
+                  <td>
+                    <a href$="[[_taskLink(_result.deduped_from)]]">
+                      [[_result.deduped_from]]
+                    </a>
+                  </td>
+                </tr>
+              </template>
+              <tr>
+                <td>Pending Time</td>
+                <td>[[_pending(_result)]]</td>
+              </tr>
+              <tr>
+                <td>Duration</td>
+                <td>[[_result.human_duration]]</td>
+              </tr>
+              <tr>
+                <td>Priority</td>
+                <td>[[_request.priority]]</td>
+              </tr>
+              <tr>
+                <td>User</td>
+                <td>[[_request.user]]</td>
+              </tr>
+              <tr>
+                <td>Authenticated</td>
+                <td>[[_request.authenticated]]</td>
+              </tr>
+              <template is="dom-if" if="[[_request.service_account]]">
+                <tr>
+                  <td>Service Account</td>
+                  <td>[[_request.service_account]]</td>
+                </tr>
+              </template>
+              <template is="dom-if" if="[[_request.properties.secret_bytes]]">
+                <tr>
+                  <td>Secret Bytes</td>
+                  <td>[[_request.properties.secret_bytes]]</td>
+                </tr>
+              </template>
+              <template is="dom-if" if="[[_request.parent_task_id]]">
+                <tr>
+                  <td>Parent Task</td>
+                  <td>
+                    <a href$="[[_taskLink(_request.parent_task_id)]]">[[_request.parent_task_id]]</a>
+                  </td>
+                </tr>
+              </template>
+              <tr>
+                <td rowspan$="[[_rowspan(_request.properties.dimensions)]]">Requested Dimensions</td>
+              </tr>
+              <template is="dom-repeat" items="{{_request.properties.dimensions}}" as="dimension">
+                <tr>
+                  <td><b>[[dimension.key]]:</b> [[dimension.value]]</td>
+                </tr>
+              </template>
+              <tr>
+                <td>Isolated Inputs</td>
+                <td>
+                  <a href$="[[_isolateLink(_request.properties.inputs_ref)]]">
+                    [[_request.properties.inputs_ref.isolated]]
+                  </a>
+                </td>
+              </tr>
+              <template is="dom-if" if="[[_not(_request_detail)]]">
+                <tr>
+                  <td>More Details</td>
+                  <td>
+                    <button on-click="_toggleDetails">
+                      <iron-icon icon="icons:add-circle-outline"></iron-icon>
+                    </button>
+                  </td>
+                </tr>
+              </template>
+              <template is="dom-if" if="[[_request_detail]]">
+                <tr>
+                  <td>Hide Details</td>
+                  <td>
+                    <button on-click="_toggleDetails">
+                      <iron-icon icon="icons:remove-circle-outline"></iron-icon>
+                    </button>
+                  </td>
+                </tr>
+              </template>
+              <template is="dom-if" if="[[_request_detail]]">
+                <tr>
+                  <td>Extra Args</td>
+                  <td class="code">[[_extraArgs(_request)]]</td>
+                </tr>
+                <tr>
+                  <td rowspan$="[[_rowspan(_request.tags)]]">Tags</td>
+                </tr>
+                <template is="dom-repeat" items="{{_request.tags}}" as="tag">
+                  <tr>
+                    <td>[[tag]]</td>
+                  </tr>
+                </template>
+
+                <tr>
+                  <td>Execution timeout</td>
+                  <td>[[_humanDuration(_request.properties.execution_timeout_secs)]]</td>
+                </tr>
+                <tr>
+                  <td>I/O timeout</td>
+                  <td>[[_humanDuration(_request.properties.io_timeout_secs)]]</td>
+                </tr>
+                <tr>
+                  <td>Grace period</td>
+                  <td>[[_humanDuration(_request.properties.grace_period_secs)]]</td>
+                </tr>
+
+                <tr>
+                  <td>CIPD server</td>
+                  <td>
+                    <a href$="[[_request.properties.cipd_input.server]]">
+                      [[_request.properties.cipd_input.server]]
+                    </a>
+                  </td>
+                </tr>
+                <tr>
+                  <td>CIPD version</td>
+                  <td>[[_request.properties.cipd_input.client_package.version]]</td>
+                </tr>
+                <template is="dom-if" if="[[_wasPickedUp(_result)]]">
+                  <tr>
+                    <td>CIPD package name</td>
+                    <td>[[_result.cipd_pins.client_package.package_name]]</td>
+                  </tr>
+                </template>
+
+                <tr hidden$="[[_not(_request.properties.cipd_input)]]">
+                  <td rowspan$="[[_cipdRowspan(_request,_result)]]">CIPD packages</td>
+                </tr>
+                <template is="dom-repeat" items="[[_cipdPackages(_request,_result)]]" as="cipd">
+                  <tr>
+                    <td>[[cipd.path]]/</td>
+                  </tr>
+                  <tr>
+                    <td><b>Requested:</b>[[cipd.requested]]</td>
+                  </tr>
+                  <tr hidden$="[[_wasNotPickedUp(_result)]]">
+                    <td><b>Actual:</b>[[cipd.actual]]</td>
+                  </tr>
+                </template>
+              </template>
+            </table>
+
+            <div class="title">Task Execution</div>
+            <template is="dom-if" if="[[_wasPickedUp(_result)]]">
+              <table>
+                <tr>
+                  <td>Bot assigned to task</td>
+                  <td><a href$="[[_botLink(_result.bot_id)]]">[[_result.bot_id]]</td>
+                </tr>
+                <tr>
+                  <td rowspan$="[[_rowspan(_result.bot_dimensions)]]">Bot Dimensions</td>
+                </tr>
+                <template is="dom-repeat" items="[[_result.bot_dimensions]]" as="dimension">
+                  <tr>
+                    <td><b>[[dimension.key]]:</b> [[_join(dimension.value," | ")]]</td>
+                  </tr>
+                </template>
+
+                <tr>
+                  <td>Exit code</td>
+                  <td>[[_result.exit_code]]</td>
+                </tr>
+                <tr>
+                  <td>Try number</td>
+                  <td>[[_result.try_number]]</td>
+                </tr>
+                <tr>
+                  <td>Failure</td>
+                  <td class$="[[_failureClass(_result.failure)]]">[[_result.failure]]</td>
+                </tr>
+                <tr>
+                  <td>Internal Failure</td>
+                  <td class$="[[_internalClass(_result.internal_failure)]]">[[_result.internal_failure]]</td>
+                </tr>
+                <tr>
+                  <td>Isolated Outputs</td>
+                  <td>
+                    <a href$="[[_isolateLink(_result.outputs_ref)]]">
+                      [[_result.outputs_ref.isolated]]
+                    </a>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Bot version</td>
+                  <td>[[_result.bot_version]]</td>
+                </tr>
+                <tr>
+                  <td>Server version</td>
+                  <td>[[_result.server_versions]]</td>
+                </tr>
+              </table>
+            </template>
+            <template is="dom-if" if="[[_wasNotPickedUp(_result)]]">
+              This space left blank until a bot is assigned to the task.
+            </template>
+
+            <template is="dom-if" if="[[_result.performance_stats]]">
+              <div class="title">Performance Stats</div>
+              <table>
+                <tr>
+                  <td title="This includes time taken to download inputs, isolate outputs, and setup CIPD">Total Overhead</td>
+                  <td>[[_humanDuration(_result.performance_stats.bot_overhead)]]</td>
+                </tr>
+                <tr>
+                  <td>Downloading Inputs From Isolate</td>
+                  <td>[[_humanDuration(_result.performance_stats.isolated_download.duration)]]</td>
+                </tr>
+                <tr>
+                  <td>Uploading Outputs To Isolate</td>
+                  <td>[[_humanDuration(_result.performance_stats.isolated_upload.duration)]]</td>
+                </tr>
+                <tr>
+                  <td>Initial bot cache</td>
+                  <td>[[_result.performance_stats.isolated_download.initial_number_items]] items;
+                  [[_bytes(_result.performance_stats.isolated_download.initial_size)]]</td>
+                </tr>
+              </table>
+            </template>
+          </div>
+
+          <div class="flex right">
+            <div class="horizontal layout">
+              <div class="tabs">
+                <paper-tabs selected="{{_show_raw}}" no-bar>
+                  <paper-tab disabled$="[[_noMilo(_request)]]">Milo Output</paper-tab>
+                  <paper-tab>Raw Output</paper-tab>
+                </paper-tabs>
+              </div>
+
+              <paper-input
+                class="refresh_input"
+                label="Refresh Interval (seconds)"
+                value="{{_refresh}}"
+                auto-validate
+                min="1"
+                max="1000"
+                pattern="[0-9]+">
+              </paper-input>
+            </div>
+
+            <template is="dom-if" if="[[_supportsMilo(_request,_show_raw)]]">
+              <iframe id="miloFrame" class="milo tabbed" src$="[[_getMiloLink(milo_prefix,task_id)]]"></iframe>
+            </template>
+            <template is="dom-if" if="[[_show_raw]]">
+              <div class="code stdout tabbed">[[_stdout]]</div>
+            </template>
+          </div>
+        </div>
       </div>
 
     </swarming-app>
@@ -77,6 +439,7 @@
 
       behaviors: [
           SwarmingBehaviors.CommonBehavior,
+          SwarmingBehaviors.TaskBehavior,
       ],
 
       properties: {
@@ -86,6 +449,176 @@
         client_id: {
           type: String,
         },
+        milo_prefix: {
+          type: String,
+        },
+
+        _request: {
+          type: Object,
+          observer: "_requestUpdated"
+        },
+        _request_detail: {
+          type: Boolean,
+        }
+      },
+
+      _bytes: function(sizeInBytes) {
+        return sk.human.bytes(sizeInBytes);
+      },
+
+      _cipdRowspan: function(request, result) {
+        if (!request || !request.properties || !request.properties.cipd_input) {
+          return 0;
+        }
+        // We always need to at least double the number of packages because we
+        // show the path and then the requested.  If the actual package info
+        // is available, we triple the number of packages to account for that.
+        var rowSpan = (request.properties.cipd_input.packages || []).length;
+        if (result && result.cipd_pins && result.cipd_pins.packages) {
+          rowSpan *= 3;
+        } else {
+          rowSpan *= 2;
+        }
+        // Add one because rowSpan counts from 1.
+        return rowSpan + 1;
+      },
+
+      _cipdPackages: function(request, result) {
+        if (!request || !request.properties || !request.properties.cipd_input) {
+          return [];
+        }
+        var packages = request.properties.cipd_input.packages || [];
+        var actual = (result && result.cipd_pins && result.cipd_pins.packages) || [];
+        packages.forEach(function(p) {
+          p.requested = p.package_name + ":" + p.version;
+          actual.forEach(function(c) {
+            if (c.path === p.path) {
+              p.actual = c.package_name + ":" + c.version;
+            }
+          });
+        });
+        return packages;
+      },
+
+      _expires: function(request) {
+        var delta = parseInt(request.expiration_secs);
+        if (delta) {
+          return sk.human.localeTime(new Date(request.created_ts.getTime() + delta * 1000));
+        }
+        // Fall back to something
+        return request.expiration_secs + " seconds from created time";
+      },
+
+      _extraArgs: function(request) {
+        if (!request || !request.properties) {
+          return "";
+        }
+        var args = request.properties.extra_args || [];
+        return args.join(" ");
+      },
+
+      _failureClass: function(failure) {
+        if (failure) {
+          return "failed_task";
+        }
+        return "";
+      },
+
+      _getMiloLink: function(prefix,id) {
+        if (!prefix) {
+          return undefined;
+        }
+        return prefix + id;
+      },
+
+      _internalClass: function(failure) {
+        if (failure) {
+          return "exception";
+        }
+        return "";
+      },
+
+      _isolateLink: function(ref) {
+        if (!ref || !ref.isolatedserver) {
+          return undefined;
+        }
+        return ref.isolatedserver + "/browse?namespace="+ref.namespace +
+          "&hash=" + ref.isolated;
+      },
+
+      _join: function(arr, s) {
+        arr = arr || [];
+        return arr.join(s);
+      },
+
+      _noMilo: function(result) {
+        return !this._tag(result, "allow_milo");
+      },
+
+      _pending: function(result) {
+        if (!result.created_ts) {
+          return "";
+        }
+        var end = result.started_ts || result.abandoned_ts || new Date();
+        // In the case of deduplicated tasks, started_ts comes before the task.
+        if (end <= result.created_ts) {
+          return "0s";
+        }
+        return this._timeDiffExact(result.created_ts, end);
+      },
+
+      _requestUpdated: function(request) {
+        if (this._noMilo(request)) {
+          this.set("_show_raw", 1);
+        }
+      },
+
+      _rowspan: function(dims) {
+        dims = dims || [];
+        return dims.length + 1;
+      },
+
+      _supportsMilo: function(request, showRaw) {
+        return !showRaw && request && this._tag(request, "allow_milo");
+      },
+
+      _state: function(result) {
+        if (!result) {
+          return "";
+        }
+        if (result.state === this.COMPLETED) {
+          if (result.failure) {
+            return this.COMPLETED_FAILURE;
+          }
+          if (result.try_number === "0") {
+            return this.COMPLETED_DEDUPED;
+          }
+          return this.COMPLETED_SUCCESS;
+        }
+        return result.state;
+      },
+
+      _stateClass: function(result) {
+        return this.stateClass(this._state(result));
+      },
+
+      _toggleDetails: function() {
+        this.set("_request_detail", !this._request_detail);
+      },
+
+      _tag: function(result, col) {
+        if (!result || !result.tagMap) {
+          return undefined;
+        }
+        return result.tagMap[col];
+      },
+
+      _wasPickedUp: function(result) {
+        return result && result.state !== this.PENDING && result.state !== this.CANCELED && result.state != this.EXPIRED;
+      },
+
+      _wasNotPickedUp: function(result) {
+        return result && !this._wasPickedUp(result);
       },
     });
   })();

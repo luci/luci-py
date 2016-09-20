@@ -34,6 +34,7 @@
 <link rel="import" href="/res/imp/common/error-toast.html">
 <link rel="import" href="/res/imp/common/sort-toggle.html">
 <link rel="import" href="/res/imp/common/swarming-app.html">
+<link rel="import" href="/res/imp/common/task-behavior.html">
 <link rel="import" href="/res/imp/common/url-param.html">
 
 <link rel="import" href="task-filters.html">
@@ -41,7 +42,7 @@
 
 <dom-module id="task-list">
   <template>
-    <style include="iron-flex iron-flex-alignment iron-positioning swarming-app-style dynamic-table-style">
+    <style include="iron-flex iron-flex-alignment iron-positioning swarming-app-style dynamic-table-style task-style">
       task-filters {
         margin-bottom: 8px;
         margin-right: 10px;
@@ -49,20 +50,6 @@
       .task-list th > span {
         /* Leave space for sort-toggle*/
         padding-right: 30px;
-      }
-
-      /* These colors are from buildbot */
-      .failed {
-        background-color: #ffdddd;
-      }
-      .died {
-        background-color: #cccccc;
-      }
-      .exception {
-        background-color: #edd2ff;
-      }
-      .pending {
-        background-color: #fffc6c;
       }
     </style>
 
@@ -287,6 +274,7 @@
       is: 'task-list',
       behaviors: [
           SwarmingBehaviors.DynamicTableBehavior,
+          SwarmingBehaviors.TaskBehavior,
       ],
 
       properties: {
@@ -371,22 +359,8 @@
       },
 
       _taskClass: function(task) {
-        var state = this._column("state", task);
-        if (state === "CANCELED" ||state === "TIMED_OUT" || state === "EXPIRED") {
-          return "exception";
-        }
-        if (state === "BOT_DIED") {
-          return "died";
-        }
-        if (state === "COMPLETED (FAILURE)") {
-          return "failed";
-        }
-        if (state === "RUNNING" || state === "PENDING") {
-          return "pending";
-        }
-        return "";
+        return this.stateClass(this._column("state", task));
       }
-
     });
   })();
   </script>

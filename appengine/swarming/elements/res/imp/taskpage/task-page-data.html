@@ -38,6 +38,7 @@
 
 
 <link rel="import" href="/res/imp/common/common-behavior.html">
+<link rel="import" href="/res/imp/common/task-behavior.html">
 
 <dom-module id="task-page-data">
   <script>
@@ -55,6 +56,7 @@
 
       behaviors: [
           SwarmingBehaviors.CommonBehavior,
+          SwarmingBehaviors.TaskBehavior,
       ],
 
       properties: {
@@ -181,7 +183,7 @@
           }
         });
         // Running tasks have no duration set, so we can figure it out.
-        if (!result.duration && result.state === "RUNNING" && result.started_ts){
+        if (!result.duration && result.state === this.RUNNING && result.started_ts){
           result.duration = (now - result.started_ts) / 1000;
         }
         // Make the duration human readable

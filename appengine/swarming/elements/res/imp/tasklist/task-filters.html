@@ -31,6 +31,7 @@
 <link rel="import" href="/res/imp/bower_components/paper-input/paper-input.html">
 
 <link rel="import" href="/res/imp/common/query-column-filter-behavior.html">
+<link rel="import" href="/res/imp/common/task-behavior.html">
 <link rel="import" href="/res/imp/common/url-param.html">
 
 <dom-module id="task-filters">
@@ -156,29 +157,33 @@
     var filterMap = {
       state: function(task, s) {
         var state = this._attribute(task, "state")[0];
-        if (s === state) {
+        if (s === state || s === "ALL") {
           return true;
         }
         if (s === "PENDING_RUNNING") {
-          return state === "PENDING" || state === "RUNNING";
+          return state === this.PENDING || state === this.RUNNING;
         }
         var failure = this._attribute(task, "failure", false)[0];
         if (s === "COMPLETED_SUCCESS") {
-          return state === "COMPLETED" && !failure;
+          return state === this.COMPLETED && !failure;
         }
         if (s === "COMPLETED_FAILURE") {
-          return state === "COMPLETED" && failure;
+          return state === this.COMPLETED && failure;
         }
         var tryNum = this._attribute(task, "try_number", "-1")[0];
         if (s === "DEDUPED") {
-          return state === "COMPLETED" && tryNum === "0";
+          return state === this.COMPLETED && tryNum === "0";
         }
       },
     };
+
     Polymer({
       is: 'task-filters',
 
-      behaviors: [SwarmingBehaviors.QueryColumnFilter],
+      behaviors: [
+          SwarmingBehaviors.QueryColumnFilter,
+          SwarmingBehaviors.TaskBehavior,
+      ],
 
       properties: {
       // output

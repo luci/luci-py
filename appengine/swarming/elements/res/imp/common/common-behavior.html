@@ -38,28 +38,39 @@
       // error, bindTo will be set to false.  It is not set to undefined
       // because computed values in Polymer don't fire if a property is
       // undefined. Clients should check that bindTo is not falsey.
+      // To avoid multiple requests clobering one another, an object _jsonAsync
+      // is created on "this" to debounce requests - the most recent request
+      // will win out.
        _getJsonAsync: function(bindTo, url, busy, headers, params) {
-        if (!bindTo || !url) {
-          console.log("Need at least a polymer element to bind to and a url");
+        if (!bindTo || !url || !busy) {
+          console.log("Need at least a polymer element to bind to, a busy element, and a url");
           return;
         }
-        if (busy) {
-          this.set(busy, true);
-        }
+        this.set(busy, true);
+        var now = new Date();
+        this._jsonAsync = this._jsonAsync || {};
+        this._jsonAsync[bindTo] = now;
         if (params) {
           url = url + "?" + sk.query.fromParamSet(params);
         }
         sk.request("GET", url, "", headers).then(JSON.parse).then(function(json){
-          this.set(bindTo, json);
-          if (busy) {
+          if (this._jsonAsync[bindTo] !== now) {
+            console.log("ignoring result because a second request happened.");
             this.set(busy, false);
+            return;
           }
+          this.set(bindTo, json);
+          this.set(busy, false);
         }.bind(this)).catch(function(reason){
           console.log("Reason for failure of request to " + url, reason);
-          this.set(bindTo, false);
-          if (busy) {
+
+          if (this._jsonAsync[bindTo] !== now) {
+            console.log("ignoring failure because a second request happened.");
             this.set(busy, false);
+            return;
           }
+          this.set(bindTo, false);
+          this.set(busy, false);
         }.bind(this));
       },
 
