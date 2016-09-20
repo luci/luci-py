@@ -91,11 +91,42 @@
           readOnly: true,
           value: false,
           notify: true,
-        }
+        },
       },
 
-      _onSignin: function(e) {
-        this._setSigned_in(true);
+      attached: function() {
+        if (!this.client_id) {
+          return;
+        }
+        // If a page is opened in a new tab, we are (likely) already logged in
+        // so we wait for the gapi and auth2 to be loaded and re-extract our
+        // access_token.
+        var trySignin = window.setTimeout(function(){
+          // The 'gapi' checks are the same that signin-aware does. We do them
+          // to avoid extraneous errors in the console.
+          if (('gapi' in window) && ('auth2' in window.gapi) &&
+              !this.signed_in && !this._signingIn) {
+            var user = gapi.auth2.getAuthInstance().currentUser.get();
+            if (user && user.getAuthResponse().access_token) {
+              // User is already logged in, can use the access_token.
+              this._onSignin();
+            } else {
+              this.$.aware.signIn();
+            }
+          } else {
+            window.setTimeout(this.attached.bind(this));
+          }
+        }.bind(this),
+        // 300 ms is chosen because this seems to be long enough for the signin
+        // to happen normally on a "visible" page and avoid the popup that
+        // always happens when signIn() is manually called. It is also short
+        // enough such that when the page is opened in a new tab, it seems to
+        // happen automatically.
+        300);
+      },
+
+      _onSignin: function() {
+        this._signingIn = true;
         var user = gapi.auth2.getAuthInstance().currentUser.get();
         var profile = user.getBasicProfile();
         this._setProfile({
@@ -105,6 +136,14 @@
         this.set("auth_response", user.getAuthResponse());
         this._setSigned_in(true);
         this.fire("auth-signin");
+        // The credential will expire after a while (usually an hour)
+        // so we need to reload it.
+        this.async(function(){
+          console.log("reloading credentials");
+          user.reloadAuthResponse();
+          this._onSignin();
+        }, this.auth_response.expires_in * 1000);  // convert seconds to ms
+        this._signingIn = false;
       },
 
       _onSignout: function(e) {
