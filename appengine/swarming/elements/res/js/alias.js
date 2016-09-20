@@ -82,6 +82,10 @@ this.swarming.alias = this.swarming.alias || (function(){
     return orig;
   };
 
+  alias.has = function(type) {
+    return !!aliasMap[type];
+  };
+
   alias.gpu = function(gpu) {
     return GPU_ALIASES[gpu] || UNKNOWN;
   };

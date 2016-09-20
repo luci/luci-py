@@ -12,8 +12,21 @@
   that data into usable data structures.
 
   Properties:
+    // input
+    auth_headers: Object, the OAuth2 header to include in the request.  This
+        should come from swarming-app.
+    task_id: String, the id of the task to fetch data on.
+    // output
     busy: Boolean, if we are fetching any data from the server.
-    TODO(kjlubick)
+    request: Object, the task request. This contains information such as the
+       name, id, created_ts, tags, and dimensions.  See the sample data in
+       task-request-demo.json for a full rundown.
+    result: Object, the result or progress of the task. This contains information such as the
+       modified_ts, duration, exit_code, information about the bot that picked
+       up the task, etc.  See the sample data in task-result-demo.json for a
+       full rundown.
+    stdout: String, the raw output of the task, if any.  See
+        task-stdout-demo.json for a full rundown.
 
   Methods:
     request(): Force a fetch of the data. This happens automatically when
@@ -34,6 +47,8 @@
     // keystroke.
     var TASK_ID_DEBOUNCE_MS = 400;
     var lastRequest;
+
+    var TIMES = ["abandoned_ts", "completed_ts", "created_ts", "modified_ts", "started_ts"];
 
     Polymer({
       is: 'task-page-data',
@@ -63,7 +78,7 @@
           notify: true,
         },
         result: {
-          type: Array,
+          type: Object,
           computed: "_parseResult(_result)",
           notify: true,
         },
@@ -124,23 +139,70 @@
       },
 
       _parseRequest: function(request) {
-        console.log(request);
         if (!request) {
           return {};
+        }
+        request.tagMap = {};
+        request.tags = request.tags || [];
+        request.tags.forEach(function(tag) {
+          var split = tag.split(":", 1)
+          var key = split[0];
+          var rest = tag.substring(key.length + 1);
+          request.tagMap[key] = rest;
+        });
+
+        TIMES.forEach(function(time) {
+          if (request[time]) {
+            request[time] = new Date(request[time]);
+            request["human_"+time] = sk.human.localeTime(request[time]);
+          }
+        });
+        // request.properties.dimensions
+        request.properties = request.properties || {};
+        if (request.properties.dimensions) {
+          request.properties.dimensions.forEach(function(dim){
+            if (swarming.alias.has(dim.key)) {
+              dim.value = swarming.alias.apply(dim.value, dim.key);
+            }
+          })
         }
         return request;
       },
 
       _parseResult: function(result) {
-        console.log(result);
         if (!result) {
           return {};
+        }
+        var now = new Date();
+        TIMES.forEach(function(time) {
+          if (result[time]) {
+            result[time] = new Date(result[time]);
+            result["human_"+time] = sk.human.localeTime(result[time]);
+          }
+        });
+        // Running tasks have no duration set, so we can figure it out.
+        if (!result.duration && result.state === "RUNNING" && result.started_ts){
+          result.duration = (now - result.started_ts) / 1000;
+        }
+        // Make the duration human readable
+        if (result.duration){
+          result.human_duration = this._humanDuration(result.duration);
+        }
+        // result.bot_dimensions
+        if (result.bot_dimensions) {
+          result.bot_dimensions.forEach(function(dim){
+            if (swarming.alias.has(dim.key)) {
+              // dim.value is an array
+              dim.value.forEach(function(v, i){
+                dim.value[i] = swarming.alias.apply(v, dim.key);
+              });
+            }
+          })
         }
         return result;
       },
 
       _parseStdout: function(stdout) {
-        console.log(stdout);
         if (!stdout || !stdout.output) {
           return "";
         }
