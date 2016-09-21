@@ -111,12 +111,12 @@ def get_devices(bot, endpoints=None):
   if not gce.is_gce():
     devices += high.GetLocalDevices(
       'swarming', 10000, 10000, on_error=bot.post_error if bot else None,
-      as_root=True)
+      as_root=False)
 
   if endpoints:
     devices += high.GetRemoteDevices(
         'swarming', endpoints, 10000, 10000,
-        on_error=bot.post_error if bot else None, as_root=True)
+        on_error=bot.post_error if bot else None, as_root=False)
 
   return devices
 
