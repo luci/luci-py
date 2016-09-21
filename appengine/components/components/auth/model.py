@@ -544,6 +544,9 @@ class AuthGlobalConfig(ndb.Model, AuthVersionedEntityMixin):
   # Additional OAuth2 client_ids allowed to access the services.
   oauth_additional_client_ids = ndb.StringProperty(repeated=True, indexed=False)
 
+  # URL of a token server to use to generate delegation tokens.
+  token_server_url = ndb.StringProperty(indexed=False, default='')
+
 
 class AuthReplicationState(ndb.Model, datastore_utils.SerializableModelMixin):
   """Contains state used to control Primary -> Replica replication.

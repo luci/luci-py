@@ -134,6 +134,7 @@ class ReplicationTest(unittest.TestCase):
       u'client_id': u'some-id',
       u'client_not_so_secret': u'secret',
       u'primary_url': u'http://localhost:9500',
+      u'token_server_url': u'https://some-url',
     }
     response = self.auth_service.client.json_request(
         resource='/auth/api/v1/server/oauth_config',

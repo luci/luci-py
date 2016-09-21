@@ -9,13 +9,11 @@
 import datetime
 import sys
 import threading
-import time
 import unittest
 
 from test_support import test_env
 test_env.setup_test_env()
 
-from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
 from components import utils
@@ -60,6 +58,29 @@ class UtilsTest(test_case.TestCase):
     self.assertEqual([0, 1], utils.to_json_encodable(range(2)))
     self.assertEqual([0, 1], utils.to_json_encodable(i for i in (0, 1)))
     self.assertEqual([0, 1], utils.to_json_encodable(xrange(2)))
+
+  def test_validate_root_service_url_dev_server(self):
+    self.mock(utils, 'is_local_dev_server', lambda: True)
+    utils.validate_root_service_url('https://blah')
+    utils.validate_root_service_url('http://localhost:8080')
+
+  def test_validate_root_service_url_gae(self):
+    self.mock(utils, 'is_local_dev_server', lambda: False)
+    utils.validate_root_service_url('https://blah')
+    with self.assertRaises(ValueError):
+      utils.validate_root_service_url('http://localhost:8080')
+
+  def test_validate_root_service_bad(self):
+    with self.assertRaises(ValueError):
+      utils.validate_root_service_url('')
+    with self.assertRaises(ValueError):
+      utils.validate_root_service_url('blah://blah')
+    with self.assertRaises(ValueError):
+      utils.validate_root_service_url('https://')
+    with self.assertRaises(ValueError):
+      utils.validate_root_service_url('https://blah/')
+    with self.assertRaises(ValueError):
+      utils.validate_root_service_url('https://blah?asdad')
 
   def test_datetime_to_rfc2822(self):
     self.assertEqual(

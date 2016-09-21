@@ -12,7 +12,6 @@ import webapp2
 from google.appengine.api import datastore_errors
 from google.appengine.api import modules
 from google.appengine.api import taskqueue
-from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
 from google.appengine.ext.ndb import polymodel
 
@@ -22,7 +21,6 @@ from components import utils
 
 from . import config
 from . import model
-from . import utils
 
 
 def process_change(auth_db_rev):
@@ -119,9 +117,10 @@ class AuthDBChange(polymodel.PolyModel):
   CHANGE_IPWLASSIGN_UNSET = 5100
 
   # AuthDBConfigChange change types.
-  CHANGE_CONF_OAUTH_CLIENT_CHANGED = 7000
-  CHANGE_CONF_CLIENT_IDS_ADDED     = 7100
-  CHANGE_CONF_CLIENT_IDS_REMOVED   = 7200
+  CHANGE_CONF_OAUTH_CLIENT_CHANGED     = 7000
+  CHANGE_CONF_CLIENT_IDS_ADDED         = 7100
+  CHANGE_CONF_CLIENT_IDS_REMOVED       = 7200
+  CHANGE_CONF_TOKEN_SERVER_URL_CHANGED = 7300
 
   # What kind of a change this is (see CHANGE_*). Defines what subclass to use.
   change_type = ndb.IntegerProperty()
@@ -476,6 +475,10 @@ class AuthDBConfigChange(AuthDBChange):
   oauth_client_secret = ndb.StringProperty()
   # Valid for CHANGE_CONF_CLIENT_IDS_ADDED and CHANGE_CONF_CLIENT_IDS_REMOVED.
   oauth_additional_client_ids = ndb.StringProperty(repeated=True)
+  # Valid for CHANGE_CONF_TOKEN_SERVER_URL_CHANGED.
+  token_server_url_old = ndb.StringProperty()
+  # Valid for CHANGE_CONF_TOKEN_SERVER_URL_CHANGED.
+  token_server_url_new = ndb.StringProperty()
 
 
 def diff_global_config(target, old, new):
@@ -491,6 +494,7 @@ def diff_global_config(target, old, new):
   prev_client_id = old.oauth_client_id if old else ''
   prev_client_secret = old.oauth_client_secret if old else ''
   prev_client_ids = old.oauth_additional_client_ids if old else []
+  prev_token_server_url = old.token_server_url if old else ''
 
   if (prev_client_id != new.oauth_client_id or
       prev_client_secret != new.oauth_client_secret):
@@ -504,6 +508,12 @@ def diff_global_config(target, old, new):
     yield change('CLIENT_IDS_ADDED', oauth_additional_client_ids=added)
   if removed:
     yield change('CLIENT_IDS_REMOVED', oauth_additional_client_ids=removed)
+
+  if prev_token_server_url != new.token_server_url:
+    yield change(
+        'TOKEN_SERVER_URL_CHANGED',
+        token_server_url_old=prev_token_server_url,
+        token_server_url_new=new.token_server_url)
 
 
 ###

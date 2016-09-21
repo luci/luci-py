@@ -739,6 +739,7 @@ class GenerateChangesTest(test_case.TestCase):
     def modify():
       c = model.root_key().get()
       c.oauth_additional_client_ids = ['1', '3']
+      c.token_server_url = 'https://token-server'
       c.record_revision(
           modified_by=ident('me@example.com'),
           modified_ts=utils.utcnow(),
@@ -765,6 +766,18 @@ class GenerateChangesTest(test_case.TestCase):
         'comment': u'Config change',
         'oauth_additional_client_ids': [u'2'],
         'target': u'AuthGlobalConfig$root',
+        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
+        'who': model.Identity(kind='user', name='me@example.com'),
+      },
+      'AuthDBChange:AuthGlobalConfig$root!7300': {
+        'app_version': u'v1a',
+        'auth_db_rev': 2,
+        'change_type':
+            change_log.AuthDBChange.CHANGE_CONF_TOKEN_SERVER_URL_CHANGED,
+        'class_': [u'AuthDBChange', u'AuthDBConfigChange'],
+        'comment': u'Config change',
+        'target': u'AuthGlobalConfig$root',
+        'token_server_url_new': u'https://token-server',
         'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
         'who': model.Identity(kind='user', name='me@example.com'),
       },

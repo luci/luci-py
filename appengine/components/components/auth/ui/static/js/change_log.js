@@ -37,11 +37,11 @@ var parseTarget = function(t) {
       targetURL = '/auth/ip_whitelists';
       break;
     case 'AuthIPWhitelistAssignments':
-      title = 'IP Whitelist Assignment';
+      title = 'IP whitelist assignment';
       targetURL = '/auth/ip_whitelists';
       break;
     case 'AuthGlobalConfig':
-      title = 'OAuth Config';
+      title = 'Global config';
       targetURL = '/auth/oauth_config';
       break;
   }

@@ -903,6 +903,7 @@ class OAuthConfigHandler(handler.ApiHandler):
     client_id = None
     client_secret = None
     additional_ids = None
+    token_server_url = None
 
     # Use most up-to-date data in datastore if requested. Used by management UI.
     if _is_no_cache(self.request):
@@ -910,11 +911,13 @@ class OAuthConfigHandler(handler.ApiHandler):
       client_id = global_config.oauth_client_id
       client_secret = global_config.oauth_client_secret
       additional_ids = global_config.oauth_additional_client_ids
+      token_server_url = global_config.token_server_url
     else:
       # Faster call that uses cached config (that may be several minutes stale).
       # Used by all client side scripts that just want to authenticate.
       auth_db = api.get_request_auth_db()
       client_id, client_secret, additional_ids = auth_db.get_oauth_config()
+      token_server_url = auth_db.token_server_url
 
     # Grab URL of a primary service if running as a replica.
     replication_state = model.get_replication_state()
@@ -925,6 +928,7 @@ class OAuthConfigHandler(handler.ApiHandler):
       'client_id': client_id,
       'client_not_so_secret': client_secret,
       'primary_url': primary_url,
+      'token_server_url': token_server_url,
     })
 
   @forbid_api_on_replica
@@ -934,9 +938,19 @@ class OAuthConfigHandler(handler.ApiHandler):
       self.abort_with_error(409, text='The configuration is managed elsewhere')
 
     body = self.parse_body()
-    client_id = body['client_id']
-    client_secret = body['client_not_so_secret']
-    additional_client_ids = filter(bool, body['additional_client_ids'])
+    try:
+      client_id = body['client_id']
+      client_secret = body['client_not_so_secret']
+      additional_client_ids = filter(bool, body['additional_client_ids'])
+      token_server_url = body['token_server_url']
+    except KeyError as exc:
+      self.abort_with_error(400, text='Missing key %s' % exc)
+
+    if token_server_url:
+      try:
+        utils.validate_root_service_url(token_server_url)
+      except ValueError as exc:
+        self.abort_with_error(400, text='Invalid token server URL - %s' % exc)
 
     @ndb.transactional
     def update():
@@ -944,7 +958,8 @@ class OAuthConfigHandler(handler.ApiHandler):
       config.populate(
           oauth_client_id=client_id,
           oauth_client_secret=client_secret,
-          oauth_additional_client_ids=additional_client_ids)
+          oauth_additional_client_ids=additional_client_ids,
+          token_server_url=token_server_url)
       config.record_revision(
           modified_by=api.get_current_identity(),
           modified_ts=utils.utcnow(),

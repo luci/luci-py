@@ -178,6 +178,8 @@ message AuthDB {
   repeated AuthIPWhitelist ip_whitelists = 6;
   // Mapping 'account -> IP whitlist to use for that account'.
   repeated AuthIPWhitelistAssignment ip_whitelist_assignments = 7;
+  // URL of a token server to use to generate delegation tokens.
+  optional string token_server_url = 8;
 }
 
 

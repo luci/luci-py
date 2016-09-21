@@ -400,6 +400,7 @@ class ConfigTest(test_case.TestCase):
       'oauth_additional_client_ids': ['c', 'd'],
       'oauth_client_id': 'a',
       'oauth_client_secret': 'b',
+      'token_server_url': '',
     }, model.root_key().get().to_dict())
     # Same config again -> no changes.
     self.assertFalse(run(config_pb2.OAuthConfig(

@@ -1769,6 +1769,7 @@ class OAuthConfigHandlerTest(RestAPITestCase):
       'client_id': '',
       'client_not_so_secret': '',
       'primary_url': None,
+      'token_server_url': '',
     }
     status, body, _ = self.get('/auth/api/v1/server/oauth_config')
     self.assertEqual(200, status)
@@ -1781,6 +1782,7 @@ class OAuthConfigHandlerTest(RestAPITestCase):
       'client_id': '',
       'client_not_so_secret': '',
       'primary_url': 'https://primary-url',
+      'token_server_url': '',
     }
     status, body, _ = self.get('/auth/api/v1/server/oauth_config')
     self.assertEqual(200, status)
@@ -1791,7 +1793,8 @@ class OAuthConfigHandlerTest(RestAPITestCase):
     fake_config = model.AuthGlobalConfig(
         oauth_client_id='some-client-id',
         oauth_client_secret='some-secret',
-        oauth_additional_client_ids=['a', 'b', 'c'])
+        oauth_additional_client_ids=['a', 'b', 'c'],
+        token_server_url='https://token-server')
     self.mock(rest_api.api, 'get_request_auth_db',
         lambda: api.AuthDB(global_config=fake_config))
     # Call should return this data.
@@ -1800,6 +1803,7 @@ class OAuthConfigHandlerTest(RestAPITestCase):
       'client_id': 'some-client-id',
       'client_not_so_secret': 'some-secret',
       'primary_url': None,
+      'token_server_url': 'https://token-server',
     }
     status, body, _ = self.get('/auth/api/v1/server/oauth_config')
     self.assertEqual(200, status)
@@ -1811,14 +1815,16 @@ class OAuthConfigHandlerTest(RestAPITestCase):
         key=model.root_key(),
         oauth_client_id='config-from-db',
         oauth_client_secret='some-secret-db',
-        oauth_additional_client_ids=['a', 'b'])
+        oauth_additional_client_ids=['a', 'b'],
+        token_server_url='https://token-server-db')
     config_in_db.put()
 
     # Put another version into auth DB cache.
     config_in_cache = model.AuthGlobalConfig(
         oauth_client_id='config-from-cache',
         oauth_client_secret='some-secret-cache',
-        oauth_additional_client_ids=['c', 'd'])
+        oauth_additional_client_ids=['c', 'd'],
+        token_server_url='https://token-server-cache')
     self.mock(rest_api.api, 'get_request_auth_db',
         lambda: api.AuthDB(global_config=config_in_cache))
 
@@ -1828,6 +1834,7 @@ class OAuthConfigHandlerTest(RestAPITestCase):
       'client_id': 'config-from-cache',
       'client_not_so_secret': 'some-secret-cache',
       'primary_url': None,
+      'token_server_url': 'https://token-server-cache',
     }
     status, body, _ = self.get('/auth/api/v1/server/oauth_config')
     self.assertEqual(200, status)
@@ -1839,6 +1846,7 @@ class OAuthConfigHandlerTest(RestAPITestCase):
       'client_id': 'config-from-db',
       'client_not_so_secret': 'some-secret-db',
       'primary_url': None,
+      'token_server_url': 'https://token-server-db',
     }
     status, body, _ = self.get(
         path='/auth/api/v1/server/oauth_config',
@@ -1852,6 +1860,7 @@ class OAuthConfigHandlerTest(RestAPITestCase):
       'additional_client_ids': ['1', '2', '3'],
       'client_id': 'some-client-id',
       'client_not_so_secret': 'some-secret',
+      'token_server_url': 'https://token-server',
     }
     self.expect_auth_db_rev_change()
     status, response, _ = self.post(
@@ -1866,6 +1875,7 @@ class OAuthConfigHandlerTest(RestAPITestCase):
     self.assertEqual('some-client-id', config.oauth_client_id)
     self.assertEqual('some-secret', config.oauth_client_secret)
     self.assertEqual(['1', '2', '3'], config.oauth_additional_client_ids)
+    self.assertEqual('https://token-server', config.token_server_url)
 
     # Created a copy in the historical log.
     copy_in_history = ndb.Key(
@@ -1895,6 +1905,7 @@ class OAuthConfigHandlerTest(RestAPITestCase):
       'additional_client_ids': ['1', '2', '3'],
       'client_id': 'some-client-id',
       'client_not_so_secret': 'some-secret',
+      'token_server_url': 'https://token-server',
     }
     status, response, _ = self.post(
         path='/auth/api/v1/server/oauth_config',

@@ -2,7 +2,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-"""Mixed bag of NDB utilities."""
+"""Mixed bag of utilities."""
 
 # Disable 'Access to a protected member ...'. NDB uses '_' for other purposes.
 # pylint: disable=W0212
@@ -19,7 +19,7 @@ import os
 import re
 import sys
 import threading
-import time
+import urlparse
 
 from email import utils as email_utils
 
@@ -156,6 +156,19 @@ def to_units(number):
   if unit:
     return '%.2f%s' % (number, UNITS[unit])
   return '%d' % number
+
+
+def validate_root_service_url(url):
+  """Raises ValueError if the URL doesn't look like https://<host>."""
+  schemes = ('https', 'http') if is_local_dev_server() else ('https',)
+  parsed = urlparse.urlparse(url)
+  if parsed.scheme not in schemes:
+    raise ValueError('unsupported protocol %r' % str(parsed.scheme))
+  if not parsed.netloc:
+    raise ValueError('missing hostname')
+  stripped = urlparse.urlunparse((parsed[0], parsed[1], '', '', '', ''))
+  if stripped != url:
+    raise ValueError('expecting root host URL, e.g. %r)' % str(stripped))
 
 
 ### Time

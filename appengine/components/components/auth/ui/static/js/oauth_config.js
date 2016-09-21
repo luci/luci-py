@@ -26,6 +26,7 @@ exports.onContentLoaded = function() {
     var id = $('input[name="client_id"]', $form).val();
     var secret = $('input[name="client_secret"]', $form).val();
     var more_ids = $('textarea[name="more_ids"]', $form).val().split('\n');
+    var tok = $('input[name="token_server_url"]', $form).val();
 
     // Disable UI while request is in flight.
     common.setInteractionDisabled($form, true);
@@ -37,7 +38,7 @@ exports.onContentLoaded = function() {
     };
 
     // Push it to the server.
-    api.updateOAuthConfig(id, secret, more_ids).then(function(response) {
+    api.updateOAuthConfig(id, secret, more_ids, tok).then(function(response) {
       showResult('success', 'Config updated.', UPDATED_TEXT);
     }, function(error) {
       showResult('error', 'Oh snap!', error.text);
@@ -51,6 +52,7 @@ exports.onContentLoaded = function() {
     $('input[name="client_secret"]', $form).val(config.client_not_so_secret);
     $('textarea[name="more_ids"]', $form).val(
         (config.additional_client_ids || []).join('\n'));
+    $('input[name="token_server_url"]', $form).val(config.token_server_url);
     common.presentContent();
   }, function(error) {
     common.presentError(error.text);

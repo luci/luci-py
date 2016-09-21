@@ -179,11 +179,13 @@ exports.fetchOAuthConfig = function(allowCached) {
 
 
 // Stores OAuth configuration.
-exports.updateOAuthConfig = function(client_id, client_secret, additional_ids) {
+exports.updateOAuthConfig = function(client_id, client_secret,
+                                     additional_ids, token_server_url) {
   return call('POST', '/auth/api/v1/server/oauth_config', {
     additional_client_ids: additional_ids,
     client_id: client_id,
-    client_not_so_secret: client_secret
+    client_not_so_secret: client_secret,
+    token_server_url: token_server_url
   });
 };
 

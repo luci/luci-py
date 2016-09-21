@@ -74,7 +74,8 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
         'modified_ts': None,
         'oauth_additional_client_ids': [],
         'oauth_client_id': u'',
-        'oauth_client_secret': u''
+        'oauth_client_secret': u'',
+        'token_server_url': u'',
       },
       'groups': [],
       'secrets': [],
@@ -107,7 +108,8 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
         modified_by=model.Identity.from_bytes('user:modifier@example.com'),
         oauth_client_id='oauth_client_id',
         oauth_client_secret='oauth_client_secret',
-        oauth_additional_client_ids=['a', 'b'])
+        oauth_additional_client_ids=['a', 'b'],
+        token_server_url='https://token-server')
     global_config.put()
 
     group = model.AuthGroup(
@@ -190,6 +192,7 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
         'oauth_additional_client_ids': [u'a', u'b'],
         'oauth_client_id': u'oauth_client_id',
         'oauth_client_secret': u'oauth_client_secret',
+        'token_server_url': u'https://token-server',
       },
       'groups': [
         {
@@ -434,7 +437,8 @@ class ReplaceAuthDbTest(test_case.TestCase):
             modified_ts=utils.utcnow(),
             oauth_client_id='another_oauth_client_id',
             oauth_client_secret='another_oauth_client_secret',
-            oauth_additional_client_ids=[]),
+            oauth_additional_client_ids=[],
+            token_server_url='https://token-server'),
         groups=[
           group('New'),
           group('Modify', description='blah', owners='some-other-owners'),
@@ -488,7 +492,9 @@ class ReplaceAuthDbTest(test_case.TestCase):
         'modified_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
         'oauth_additional_client_ids': [],
         'oauth_client_id': u'another_oauth_client_id',
-        'oauth_client_secret': u'another_oauth_client_secret'},
+        'oauth_client_secret': u'another_oauth_client_secret',
+        'token_server_url': u'https://token-server',
+      },
       'groups': [
         {
           '__id__': 'Keep',

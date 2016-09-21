@@ -191,6 +191,11 @@ class AuthDB(object):
     """For services in Replica mode, root URL of Primary, i.e https://<host>."""
     return self.replication_state.primary_url
 
+  @property
+  def token_server_url(self):
+    """URL of a token server to use to generate tokens, provided by Primary."""
+    return self.global_config.token_server_url
+
   def is_group_member(self, group_name, identity):
     """Returns True if |identity| belongs to group |group_name|.
 
