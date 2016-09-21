@@ -346,7 +346,7 @@
           if (matchPartCaseInsensitive(s, query).idx !== -1) {
             return true;
           }
-          var opts = primary_map[s];
+          var opts = primary_map[s] || [];
           for (var i = 0; i < opts.length; i++) {
             if (matchPartCaseInsensitive(opts[i], query).idx !== -1) {
               return true;
@@ -378,9 +378,10 @@
         if (!primarySelected) {
           return [];
         }
+        var arr = primary_map[primarySelected] || [];
         if (matchPartCaseInsensitive(primarySelected, query).idx !== -1) {
           // Sort the secondaries alphabetically, but prioritize query matches.
-          return primary_map[primarySelected].sort(function(a, b){
+          return arr.sort(function(a, b){
             var aMatch = matchPartCaseInsensitive(a, query).idx !== -1;
             var bMatch = matchPartCaseInsensitive(b, query).idx !== -1;
             if (aMatch === bMatch) {
@@ -391,7 +392,7 @@
           });
         }
         // Otherwise, filter out those that do not match.
-        return primary_map[primarySelected].filter(function(s) {
+        return arr.filter(function(s) {
           return matchPartCaseInsensitive(s, query).idx !== -1;
         });
       },

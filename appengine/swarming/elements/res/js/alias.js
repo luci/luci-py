@@ -51,6 +51,25 @@ this.swarming.alias = this.swarming.alias || (function(){
     "8086:22b1": "Intel Braswell Integrated",
   }
 
+  // Taken from http://developer.android.com/reference/android/os/BatteryManager.html
+  var BATTERY_HEALTH_ALIASES = {
+    1: "Unknown",
+    2: "Good",
+    3: "Overheated",
+    4: "Dead",
+    5: "Over Voltage",
+    6: "Unspecified Failure",
+    7: "Too Cold",
+  }
+
+  var BATTERY_STATUS_ALIASES = {
+    1: "Unknown",
+    2: "Charging",
+    3: "Discharging",
+    4: "Not Charging",
+    5: "Full",
+  }
+
   // For consistency, all aliases are displayed like:
   // Nexus 5X (bullhead)
   // This regex matches a string like "ALIAS (ORIG)", with ORIG as group 1.
@@ -58,10 +77,18 @@ this.swarming.alias = this.swarming.alias || (function(){
 
   var alias = {};
 
-  alias.DIMENSIONS_WITH_ALIASES = ["device_type", "gpu"];
+  alias.DIMENSIONS_WITH_ALIASES = ["device_type", "gpu", "battery_health"];
 
   alias.android = function(dt) {
     return ANDROID_ALIASES[dt] || UNKNOWN;
+  };
+
+  alias.battery_health = function(bh) {
+    return BATTERY_HEALTH_ALIASES[bh] || UNKNOWN;
+  };
+
+  alias.battery_status = function(bs) {
+    return BATTERY_STATUS_ALIASES[bs] || UNKNOWN;
   };
 
   // alias.apply tries to alias the string "orig" based on what "type" it is.
@@ -76,7 +103,7 @@ this.swarming.alias = this.swarming.alias || (function(){
       return type + " ("+orig+")";
     }
     var alias = aliaser(orig);
-    if (alias !== "unknown") {
+    if (alias !== UNKNOWN) {
       return alias + " ("+orig+")";
     }
     return orig;
@@ -103,6 +130,8 @@ this.swarming.alias = this.swarming.alias || (function(){
   var aliasMap = {
     "device_type": alias.android,
     "gpu": alias.gpu,
+    "battery_health": alias.battery_health,
+    "battery_status": alias.battery_status,
   }
 
   return alias;

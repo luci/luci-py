@@ -40,8 +40,8 @@
           fArr.push(f.key + ":" + f.value);
         });
         var obj = {
-          filters: fArr,
-          columns: columns,
+          f: fArr,
+          c: columns,
         }
         return "/newui/botlist?" + sk.query.fromParamSet(obj);
       },

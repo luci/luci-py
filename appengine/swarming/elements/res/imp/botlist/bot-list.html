@@ -56,7 +56,7 @@
       }
     </style>
 
-    <url-param name="sort"
+    <url-param name="s"
       value="{{_sortstr}}"
       default_value="id:asc">
     </url-param>
@@ -212,6 +212,7 @@
   </template>
   <script>
   (function(){
+    var UNKNOWN = "unknown";
     // see dynamic-table for more information on specialColumns, headerMap,
     // columnMap, and specialSort
     var specialColumns = ["id", "task"];
@@ -231,6 +232,13 @@
       "pool": "Pool",
       "status": "Status",
       "xcode_version": "XCode Version",
+      "battery_health": "Battery Health",
+      "battery_level": "Battery Level (%)",
+      "battery_status": "Battery Status",
+      "battery_temperature": "Battery Temp (°C)",
+      "battery_voltage": "Battery Voltage (mV)",
+      "bot_temperature": "Bot Temp (°C)",
+      "device_temperature": "Device Temp (°C)",
     };
 
     var columnMap = {
@@ -241,6 +249,30 @@
         }
         // max() works on strings as long as they can be coerced to Number.
         return Math.max(...devs) + " devices available";
+      },
+      battery_health: function(){
+        return "";
+      },
+      battery_level: function(){
+        return "";
+      },
+      battery_status: function(){
+        return "";
+      },
+      battery_temperature: function(){
+        return "";
+      },
+      battery_voltage: function(){
+        return "";
+      },
+      bot_temperature: function(bot){
+        if (this._verbose) {
+          return bot.state.temp.zones || UNKNOWN;
+        }
+        return bot.state.temp.average || UNKNOWN;
+      },
+      device_temperature: function(){
+        return "";
       },
       disk_space: function(bot) {
         var aliased = [];
@@ -253,8 +285,21 @@
         }
         return aliased[0];
       },
+
+      external_ip: function(bot) {
+        return bot.external_ip || "none";
+      },
+      first_seen: function(bot) {
+        return sk.human.localeTime(bot.first_seen_ts)
+      },
       id: function(bot) {
         return bot.bot_id;
+      },
+      last_seen: function(bot) {
+        if (this._verbose) {
+          return sk.human.localeTime(bot.last_seen_ts);
+        }
+        return this._timeDiffApprox(bot.last_seen_ts) + " ago";
       },
       status: function(bot) {
         // If a bot is both dead and quarantined, show the deadness over the
@@ -267,16 +312,20 @@
           var msg = this._state(bot, "quarantined")[0];
           // Sometimes, the quarantined message is actually in "error".  This
           // happens when the bot code has thrown an exception.
-          if (msg === "unknown" || msg === "true" || msg === true) {
+          if (msg === UNKNOWN || msg === "true" || msg === true) {
             msg = this._attribute(bot, "error");
           }
           return "Quarantined: " + msg;
         }
         return "Alive";
       },
-      task: function(bot){
+      task: function(bot) {
         return this._taskId(bot);
       },
+      version: function(bot) {
+        var v = bot.version || UNKNOWN
+        return v.substring(0, 10);
+      }
     };
 
     var deviceColumnMap = {
@@ -289,15 +338,61 @@
         str += device.serial;
         return str;
       },
+      battery_health: function(device){
+        var h = (device.battery && device.battery.health) || UNKNOWN;
+        return swarming.alias.apply(h, "battery_health");
+      },
+      battery_level: function(device){
+        return (device.battery && device.battery.level) || UNKNOWN;
+      },
+      battery_status: function(device){
+        var s = (device.battery && device.battery.status) || UNKNOWN;
+        return swarming.alias.apply(s, "battery_status");
+      },
+      battery_temperature: function(device){
+        // Battery temps are in tenths of degrees C - convert to more human range.
+        return (device.battery && device.battery.temperature / 10) || UNKNOWN
+      },
+      battery_voltage: function(device){
+        return (device.battery && device.battery.voltage) || UNKNOWN;
+      },
+      device_temperature: function(device){
+        if (this._verbose) {
+          return device.temp.zones || UNKNOWN;
+        }
+        return device.temp.average || UNKNOWN;
+      },
       device_os: function(device) {
         if (device.build) {
           return device.build["build.id"];
         }
-        return "unknown";
+        return UNKNOWN;
       },
       status: function(device) {
         return device.state;
       }
+    }
+
+
+    function deviceAverage(col) {
+      return function(dir, botA, botB) {
+        // sort by average of all devices or 0 if no devices.
+        var avgA = 0;
+        var avgB = 0;
+        var devsA = this._devices(botA);
+        devsA.forEach(function(device) {
+          var v = deviceColumnMap[col](device);
+          v = parseFloat(swarming.alias.unapply(v)) || 0;
+          avgA += v / devsA.length;
+        }.bind(this));
+        var devsB = this._devices(botB);
+        devsB.forEach(function(device) {
+          var v = deviceColumnMap[col](device);
+          v = parseFloat(swarming.alias.unapply(v)) || 0;
+          avgB += v / devsB.length;
+        }.bind(this));
+        return dir * swarming.naturalCompare(avgA, avgB);
+      };
     }
 
     var specialSort = {
@@ -310,12 +405,36 @@
         var botBCol = this._devices(botB).length;
         return dir * swarming.naturalCompare(botACol, botBCol);
       },
+
+      battery_health: deviceAverage("battery_health"),
+      battery_level: deviceAverage("battery_level"),
+      battery_status: deviceAverage("battery_status"),
+      battery_temperature: deviceAverage("battery_temperature"),
+      battery_voltage: deviceAverage("battery_voltage"),
+      device_temperature: deviceAverage("device_temperature"),
+
+      bot_temperature: function(dir, botA, botB) {
+        // Sort by average temperature.
+        var botACol = botA.state.temp.average || 0;
+        var botBCol = botB.state.temp.average || 0;
+        return dir * swarming.naturalCompare(botACol, botBCol);
+      },
       disk_space: function(dir, botA, botB) {
         // We sort based on the raw number of MB of the first disk.
         var botACol = botA.disks[0].mb;
-        var botBCol = botB.disks[0].mb;;
+        var botBCol = botB.disks[0].mb;
         return dir * swarming.naturalCompare(botACol, botBCol);
       },
+      first_seen: function(dir, botA, botB) {
+        var botACol = botA.first_seen_ts;
+        var botBCol = botB.first_seen_ts;
+        return dir * swarming.naturalCompare(botACol, botBCol)
+      },
+      last_seen: function(dir, botA, botB) {
+        var botACol = botA.last_seen_ts;
+        var botBCol = botB.last_seen_ts;
+        return dir * swarming.naturalCompare(botACol, botBCol)
+      }
     };
 
     Polymer({

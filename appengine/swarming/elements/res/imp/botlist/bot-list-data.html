@@ -66,7 +66,30 @@
 
   <script>
   (function(){
+    var AVAILABLE = "available";
     var BLACKLIST_DIMENSIONS = ["quarantined", "error"];
+
+    function aggregateTemps(temps) {
+      if (!temps) {
+        return {};
+      }
+      var zones = [];
+      var avg = 0;
+      for (k in temps) {
+        zones.push(k +": "+temps[k]);
+        avg += temps[k];
+      }
+      avg = avg / zones.length
+      if (avg) {
+        avg = avg.toFixed(1);
+      } else {
+        avg = "unknown";
+      }
+      return {
+        average: avg,
+        zones: zones.join(" | ") || "unknown",
+      }
+    }
 
     Polymer({
       is: 'bot-list-data',
@@ -178,7 +201,33 @@
             });
           }
 
-        });
+          // Make sure every bot has a state.temp object and precompute
+          // average and list of temps by zone if applicable.
+          bot.state.temp = aggregateTemps(bot.state.temp);
+
+          var devices = [];
+          var d = (bot && bot.state && bot.state.devices) || {};
+          // state.devices is like {Serial:Object}, so we need to keep the serial
+          for (key in d) {
+            var o = d[key];
+            o.serial = key;
+            o.okay = (o.state === AVAILABLE);
+            // It is easier to assume all devices on a bot are of the same type
+            // than to pick through the (incomplete) device state and find it.
+            o.device_type = this._dimension(bot, "device_type")[0];
+            o.temp = aggregateTemps(o.temp);
+            devices.push(o);
+          }
+          bot.state.devices = devices;
+
+          if (bot.last_seen_ts) {
+            bot.last_seen_ts = new Date(bot.last_seen_ts);
+          }
+          if (bot.first_seen_ts) {
+            bot.first_seen_ts = new Date(bot.first_seen_ts);
+          }
+
+        }.bind(this));
         return this._list.items;
       },
 

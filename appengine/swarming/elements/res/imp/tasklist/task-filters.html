@@ -46,22 +46,22 @@
 
     </style>
 
-    <url-param name="filters"
+    <url-param name="f"
       value="{{_filters}}"
       default_values="[]"
       multi>
     </url-param>
-    <url-param name="columns"
+    <url-param name="c"
       value="{{columns}}"
       default_values='["name","state","created_ts","user"]'
       multi>
     </url-param>
-    <url-param name="query"
+    <url-param name="q"
      value="{{_query}}"
      default_value="">
     </url-param>
-    <url-param name="_limit"
-      default_value="200"
+    <url-param name="l"
+      default_value="50"
       value="{{_limit}}">
     </url-param>
 

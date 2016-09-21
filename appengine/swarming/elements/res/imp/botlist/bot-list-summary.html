@@ -189,18 +189,18 @@
         if (preserveOthers) {
           var fstr = encodeURIComponent(this._getFilterStr(filter));
           if (window.location.href.indexOf(fstr) === -1) {
-            return window.location.href + "&filters=" + fstr;
+            return window.location.href + "&f=" + fstr;
           }
           // The filter is already on the list.
           return undefined;
         }
         var params = {
-          sort: [this.sort],
-          columns: this.columns,
-          verbose: [this.verbose],
+          s: [this.sort],
+          c: this.columns,
+          v: [this.verbose],
         }
         if (filter) {
-          params["filters"] = [this._getFilterStr(filter)];
+          params["f"] = [this._getFilterStr(filter)];
         }
 
         return window.location.href.split('?')[0] + '?' + sk.query.fromParamSet(params);

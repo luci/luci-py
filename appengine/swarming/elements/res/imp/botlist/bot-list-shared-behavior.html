@@ -13,13 +13,6 @@
 <link rel="import" href="/res/imp/common/common-behavior.html">
 <script>
   (function(){
-    // Taken from http://developer.android.com/reference/android/os/BatteryManager.html
-    var BATTERY_HEALTH_UNKNOWN = 1;
-    var BATTERY_HEALTH_GOOD = 2;
-    var BATTERY_STATUS_CHARGING = 2;
-
-    var UNAUTHENTICATED = "unauthenticated";
-    var AVAILABLE = "available";
     var UNKNOWN = "unknown";
 
     // This behavior wraps up all the shared bot-list functionality by
@@ -32,7 +25,7 @@
           value: function() {
             // TODO(kjlubick): Add more of these things from state, as they
             // needed/useful/requested.
-            return ["disk_space", "task", "status"];
+            return ["disk_space", "task", "status", "version", "external_ip", "last_seen", "first_seen", "battery_level", "battery_voltage", "battery_temperature", "battery_status", "battery_health", "bot_temperature", "device_temperature"];
           }
         },
       },
@@ -46,19 +39,7 @@
       },
 
       _devices: function(bot) {
-        var devices = [];
-        var d = (bot && bot.state && bot.state.devices) || {};
-        // state.devices is like {Serial:Object}, so we need to keep the serial
-        for (key in d) {
-          var o = d[key];
-          o.serial = key;
-          o.okay = (o.state === AVAILABLE);
-          // It is easier to assume all devices on a bot are of the same type
-          // than to pick through the (incomplete) device state and find it.
-          o.device_type = this._attribute(bot, "device_type")[0];
-          devices.push(o);
-        }
-        return devices;
+        return bot.state.devices;
       },
 
       // _deviceType returns the codename of a given Android device.
