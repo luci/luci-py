@@ -115,6 +115,7 @@
               class="right"
               client_id="[[client_id]]"
               auth_headers="{{auth_headers}}"
+              profile="{{profile}}"
               signed_in="{{signed_in}}">
           </auth-signin>
         </app-toolbar>
@@ -160,6 +161,10 @@
             // If we aren't logged in, default to no permissions.
             return {};
           },
+          notify: true,
+        },
+        profile: {
+          type: Object,
           notify: true,
         },
 

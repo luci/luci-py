@@ -29,8 +29,9 @@
         task-stdout-demo.json for a full rundown.
 
   Methods:
-    request(): Force a fetch of the data. This happens automatically when
+    reload(): Force a fetch of the data. This happens automatically when
         auth_headers is set or task_id is changed.
+    reloadStdout(): Force a fetch of just the stdout
 
   Events:
     None.
@@ -64,6 +65,7 @@
         auth_headers: {
           type: Object,
         },
+
         task_id: {
           type: String,
         },
@@ -127,16 +129,15 @@
           this.cancelAsync(lastRequest);
         }
 
+        var baseUrl = "/_ah/api/swarming/v1/task/" + this.task_id;
         lastRequest = this.async(function(){
           lastRequest = undefined;
-          var baseUrl = "/_ah/api/swarming/v1/task/"+this.task_id;
           this._getJsonAsync("_request", baseUrl + "/request",
             "_busy1", this.auth_headers);
           this._getJsonAsync("_result",
             baseUrl + "/result?include_performance_stats=true",
             "_busy2", this.auth_headers);
-          this._getJsonAsync("_stdout", baseUrl + "/stdout",
-            "_busy3", this.auth_headers);
+          this.reloadStdout();
         }, TASK_ID_DEBOUNCE_MS);
       },
 
@@ -159,15 +160,6 @@
             request["human_"+time] = sk.human.localeTime(request[time]);
           }
         });
-        // request.properties.dimensions
-        request.properties = request.properties || {};
-        if (request.properties.dimensions) {
-          request.properties.dimensions.forEach(function(dim){
-            if (swarming.alias.has(dim.key)) {
-              dim.value = swarming.alias.apply(dim.value, dim.key);
-            }
-          })
-        }
         return request;
       },
 
@@ -190,26 +182,20 @@
         if (result.duration){
           result.human_duration = this._humanDuration(result.duration);
         }
-        // result.bot_dimensions
-        if (result.bot_dimensions) {
-          result.bot_dimensions.forEach(function(dim){
-            if (swarming.alias.has(dim.key)) {
-              // dim.value is an array
-              dim.value.forEach(function(v, i){
-                dim.value[i] = swarming.alias.apply(v, dim.key);
-              });
-            }
-          })
-        }
         return result;
       },
 
       _parseStdout: function(stdout) {
         if (!stdout || !stdout.output) {
-          return "";
+          return "[No output yet]";
         }
         return stdout.output;
-      }
+      },
+
+      reloadStdout: function() {
+        this._getJsonAsync("_stdout", "/_ah/api/swarming/v1/task/" +
+              this.task_id + "/stdout", "_busy3", this.auth_headers);
+      },
 
     });
   })();

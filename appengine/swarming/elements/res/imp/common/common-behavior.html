@@ -29,6 +29,23 @@
         return "/newui/bot?id=" + bot_id;
       },
 
+      // Create a link to a bot list with the preloaded filters and columns.
+      // filters should be an array of {key:String, value:String} and
+      // columns should be an array of Strings.
+      _botListLink: function(filters, columns) {
+        filters = filters || [];
+        columns = columns || [];
+        var fArr = [];
+        filters.forEach(function(f){
+          fArr.push(f.key + ":" + f.value);
+        });
+        var obj = {
+          filters: fArr,
+          columns: columns,
+        }
+        return "/newui/botlist?" + sk.query.fromParamSet(obj);
+      },
+
       // _getJsonAsync makes an XHR to a url, parses the response as JSON
       // and sticks the resulting object into the property with the name given
       // by "bindTo". If busy is defined, the property with that name will be
@@ -98,7 +115,7 @@
         return "/newui/task?id=" + task_id;
       },
 
-      // )timeDiffApprox returns the approximate difference between now and
+      // _timeDiffApprox returns the approximate difference between now and
       // the specified date.
       _timeDiffApprox: function(date){
         if (!date) {

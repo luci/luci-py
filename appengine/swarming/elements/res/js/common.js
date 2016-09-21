@@ -53,16 +53,23 @@ this.swarming = this.swarming || function() {
 
   // postWithToast makes a post request and updates the error-toast
   // element with the response, regardless of failure.  See error-toast.html
-  // for more information.
-  swarming.postWithToast = function(url, msg, auth_headers) {
+  // for more information. The body param should be an object or undefined.
+  swarming.postWithToast = function(url, msg, auth_headers, body) {
     // Keep toast displayed until we hear back from the request.
     sk.errorMessage(msg, 0);
 
-    sk.request("POST", url, undefined, auth_headers).then(function(response) {
+    auth_headers["content-type"] = "application/json; charset=UTF-8";
+    if (body) {
+      body = JSON.stringify(body);
+    }
+
+    return sk.request("POST", url, body, auth_headers).then(function(response) {
       sk.errorMessage("Request sent.  Response: "+response, 3000);
+      return response;
     }).catch(function(reason) {
       console.log("Request failed", reason);
       sk.errorMessage("Request failed.  Reason: "+reason, 5000);
+      return Promise.reject(reason);
     });
   }
 
