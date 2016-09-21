@@ -13,7 +13,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='config.proto',
   package='auth_service',
-  serialized_pb='\n\x0c\x63onfig.proto\x12\x0c\x61uth_service\"\xd3\x02\n\x13GroupImporterConfig\x12?\n\x07tarball\x18\x01 \x03(\x0b\x32..auth_service.GroupImporterConfig.TarballEntry\x12\x43\n\tplainlist\x18\x02 \x03(\x0b\x32\x30.auth_service.GroupImporterConfig.PlainlistEntry\x1a\x62\n\x0cTarballEntry\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x14\n\x0coauth_scopes\x18\x02 \x03(\t\x12\x0e\n\x06\x64omain\x18\x03 \x01(\t\x12\x0f\n\x07systems\x18\x04 \x03(\t\x12\x0e\n\x06groups\x18\x05 \x03(\t\x1aR\n\x0ePlainlistEntry\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x14\n\x0coauth_scopes\x18\x02 \x03(\t\x12\x0e\n\x06\x64omain\x18\x03 \x01(\t\x12\r\n\x05group\x18\x04 \x01(\t\"[\n\x0bOAuthConfig\x12\x19\n\x11primary_client_id\x18\x01 \x01(\t\x12\x1d\n\x15primary_client_secret\x18\x02 \x01(\t\x12\x12\n\nclient_ids\x18\x03 \x03(\t\"\x81\x02\n\x11IPWhitelistConfig\x12\x42\n\rip_whitelists\x18\x01 \x03(\x0b\x32+.auth_service.IPWhitelistConfig.IPWhitelist\x12?\n\x0b\x61ssignments\x18\x02 \x03(\x0b\x32*.auth_service.IPWhitelistConfig.Assignment\x1a,\n\x0bIPWhitelist\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07subnets\x18\x02 \x03(\t\x1a\x39\n\nAssignment\x12\x10\n\x08identity\x18\x01 \x01(\t\x12\x19\n\x11ip_whitelist_name\x18\x02 \x01(\t\"\xb6\x01\n\x10\x44\x65legationConfig\x12\x32\n\x05rules\x18\x01 \x03(\x0b\x32#.auth_service.DelegationConfig.Rule\x1an\n\x04Rule\x12\x0f\n\x07user_id\x18\x01 \x03(\t\x12\x16\n\x0etarget_service\x18\x02 \x03(\t\x12\x1d\n\x15max_validity_duration\x18\x03 \x01(\x05\x12\x1e\n\x16\x61llowed_to_impersonate\x18\x04 \x03(\t')
+  serialized_pb='\n\x0c\x63onfig.proto\x12\x0c\x61uth_service\"\xd3\x02\n\x13GroupImporterConfig\x12?\n\x07tarball\x18\x01 \x03(\x0b\x32..auth_service.GroupImporterConfig.TarballEntry\x12\x43\n\tplainlist\x18\x02 \x03(\x0b\x32\x30.auth_service.GroupImporterConfig.PlainlistEntry\x1a\x62\n\x0cTarballEntry\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x14\n\x0coauth_scopes\x18\x02 \x03(\t\x12\x0e\n\x06\x64omain\x18\x03 \x01(\t\x12\x0f\n\x07systems\x18\x04 \x03(\t\x12\x0e\n\x06groups\x18\x05 \x03(\t\x1aR\n\x0ePlainlistEntry\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x14\n\x0coauth_scopes\x18\x02 \x03(\t\x12\x0e\n\x06\x64omain\x18\x03 \x01(\t\x12\r\n\x05group\x18\x04 \x01(\t\"u\n\x0bOAuthConfig\x12\x19\n\x11primary_client_id\x18\x01 \x01(\t\x12\x1d\n\x15primary_client_secret\x18\x02 \x01(\t\x12\x12\n\nclient_ids\x18\x03 \x03(\t\x12\x18\n\x10token_server_url\x18\x04 \x01(\t\"\x81\x02\n\x11IPWhitelistConfig\x12\x42\n\rip_whitelists\x18\x01 \x03(\x0b\x32+.auth_service.IPWhitelistConfig.IPWhitelist\x12?\n\x0b\x61ssignments\x18\x02 \x03(\x0b\x32*.auth_service.IPWhitelistConfig.Assignment\x1a,\n\x0bIPWhitelist\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07subnets\x18\x02 \x03(\t\x1a\x39\n\nAssignment\x12\x10\n\x08identity\x18\x01 \x01(\t\x12\x19\n\x11ip_whitelist_name\x18\x02 \x01(\t\"\xb6\x01\n\x10\x44\x65legationConfig\x12\x32\n\x05rules\x18\x01 \x03(\x0b\x32#.auth_service.DelegationConfig.Rule\x1an\n\x04Rule\x12\x0f\n\x07user_id\x18\x01 \x03(\t\x12\x16\n\x0etarget_service\x18\x02 \x03(\t\x12\x1d\n\x15max_validity_duration\x18\x03 \x01(\x05\x12\x1e\n\x16\x61llowed_to_impersonate\x18\x04 \x03(\t')
 
 
 
@@ -184,6 +184,13 @@ _OAUTHCONFIG = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='token_server_url', full_name='auth_service.OAuthConfig.token_server_url', index=3,
+      number=4, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -194,7 +201,7 @@ _OAUTHCONFIG = _descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=372,
-  serialized_end=463,
+  serialized_end=489,
 )
 
 
@@ -228,8 +235,8 @@ _IPWHITELISTCONFIG_IPWHITELIST = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=620,
-  serialized_end=664,
+  serialized_start=646,
+  serialized_end=690,
 )
 
 _IPWHITELISTCONFIG_ASSIGNMENT = _descriptor.Descriptor(
@@ -262,8 +269,8 @@ _IPWHITELISTCONFIG_ASSIGNMENT = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=666,
-  serialized_end=723,
+  serialized_start=692,
+  serialized_end=749,
 )
 
 _IPWHITELISTCONFIG = _descriptor.Descriptor(
@@ -296,8 +303,8 @@ _IPWHITELISTCONFIG = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=466,
-  serialized_end=723,
+  serialized_start=492,
+  serialized_end=749,
 )
 
 
@@ -345,8 +352,8 @@ _DELEGATIONCONFIG_RULE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=798,
-  serialized_end=908,
+  serialized_start=824,
+  serialized_end=934,
 )
 
 _DELEGATIONCONFIG = _descriptor.Descriptor(
@@ -372,8 +379,8 @@ _DELEGATIONCONFIG = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=726,
-  serialized_end=908,
+  serialized_start=752,
+  serialized_end=934,
 )
 
 _GROUPIMPORTERCONFIG_TARBALLENTRY.containing_type = _GROUPIMPORTERCONFIG;

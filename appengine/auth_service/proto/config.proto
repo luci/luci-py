@@ -50,7 +50,7 @@ message GroupImporterConfig {
 }
 
 
-// OAuth client_id whitelist config.
+// Global config. Includes OAuth client_id whitelist and token server URL.
 message OAuthConfig {
   // ClientID returned by /auth/api/v1/server/oauth_config endpoint to clients.
   optional string primary_client_id = 1;
@@ -60,6 +60,8 @@ message OAuthConfig {
   optional string primary_client_secret = 2;
   // Whitelist of all accepted client_ids (in addition to the primary one).
   repeated string client_ids = 3;
+  // URL of a token server to use to generate delegation tokens.
+  optional string token_server_url = 4;
 }
 
 

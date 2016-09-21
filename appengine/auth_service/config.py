@@ -454,9 +454,10 @@ def _update_ip_whitelist_config(rev, conf):
 
 
 def _validate_oauth_config(conf):
-  # Any correctly structured config is acceptable for now.
   if not isinstance(conf, config_pb2.OAuthConfig):
     raise ValueError('Wrong message type')
+  if conf.token_server_url:
+    utils.validate_root_service_url(conf.token_server_url)
 
 
 def _update_oauth_config(rev, conf):
@@ -466,11 +467,13 @@ def _update_oauth_config(rev, conf):
     'oauth_client_id': existing.oauth_client_id,
     'oauth_client_secret': existing.oauth_client_secret,
     'oauth_additional_client_ids': list(existing.oauth_additional_client_ids),
+    'token_server_url': existing.token_server_url,
   }
   new_as_dict = {
     'oauth_client_id': conf.primary_client_id,
     'oauth_client_secret': conf.primary_client_secret,
     'oauth_additional_client_ids': list(conf.client_ids),
+    'token_server_url': conf.token_server_url,
   }
   if new_as_dict == existing_as_dict:
     return False

@@ -391,7 +391,8 @@ class ConfigTest(test_case.TestCase):
     self.assertTrue(run(config_pb2.OAuthConfig(
         primary_client_id='a',
         primary_client_secret='b',
-        client_ids=['c', 'd'])))
+        client_ids=['c', 'd'],
+        token_server_url='https://token-server')))
     self.assertEqual({
       'auth_db_rev': 1,
       'auth_db_prev_rev': None,
@@ -400,13 +401,23 @@ class ConfigTest(test_case.TestCase):
       'oauth_additional_client_ids': ['c', 'd'],
       'oauth_client_id': 'a',
       'oauth_client_secret': 'b',
-      'token_server_url': '',
+      'token_server_url': 'https://token-server',
     }, model.root_key().get().to_dict())
     # Same config again -> no changes.
     self.assertFalse(run(config_pb2.OAuthConfig(
         primary_client_id='a',
         primary_client_secret='b',
-        client_ids=['c', 'd'])))
+        client_ids=['c', 'd'],
+        token_server_url='https://token-server')))
+
+  def test_validate_oauth_config(self):
+    with self.assertRaises(ValueError):
+      config._validate_oauth_config(
+          config_pb2.OAuthConfig(
+            primary_client_id='a',
+            primary_client_secret='b',
+            client_ids=['c', 'd'],
+            token_server_url='https://not-root-url/abc/def'))
 
   def test_fetch_configs_ok(self):
     fetches = {
