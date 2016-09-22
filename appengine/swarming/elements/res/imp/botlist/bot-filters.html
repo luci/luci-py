@@ -49,6 +49,7 @@
     None.
 -->
 
+<link rel="import" href="/res/imp/bower_components/iron-a11y-keys/iron-a11y-keys.html">
 <link rel="import" href="/res/imp/bower_components/iron-flex-layout/iron-flex-layout-classes.html">
 <link rel="import" href="/res/imp/bower_components/iron-icons/iron-icons.html">
 <link rel="import" href="/res/imp/bower_components/iron-selector/iron-selector.html">
@@ -101,10 +102,11 @@
 
       <div class="narrow-down-selector">
         <div>
+          <iron-a11y-keys target="[[_filter_input]]" keys="enter" on-keys-pressed="_manuallyAddFilter"></iron-a11y-keys>
           <paper-input id="filter"
-            label="Search columns and filters"
-            placeholder="gpu nvidia"
-            value="{{_query}}">
+            label="Search columns and filters or supply a filter and press enter"
+            placeholder="gpu nvidia pool:Chrome"
+            value="{{_query::input}}">
           </paper-input>
         </div>
 
@@ -230,6 +232,13 @@ the fleet.">
         verbose: {
           type: Boolean,
           notify: true,
+        },
+
+        _filter_input: {
+          type: Object,
+          value: function() {
+            return this.$.filter;
+          }
         },
 
         // for QueryColumnFilter

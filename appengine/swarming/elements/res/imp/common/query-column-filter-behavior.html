@@ -309,6 +309,21 @@
         }
       },
 
+      _manuallyAddFilter: function(){
+        var parts = this._query.trim().split(":");
+        if (parts.length != 2) {
+          sk.errorMessage('Invalid filter.  Should be like "foo:bar"', 5000);
+          return;
+        }
+        var f = parts.join(":");
+        if (this._filters.indexOf(f) !== -1) {
+          sk.errorMessage('Filter "'+f+'" is already active', 5000);
+          return;
+        }
+        this.push("_filters", f);
+        this.set("_query", "");
+      },
+
       _toggleColumn: function(e) {
         var col = e.model.item;
 
