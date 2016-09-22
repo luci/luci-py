@@ -192,9 +192,9 @@
       },
 
       _load: function() {
-        this._getJsonAsync("permissions", "/_ah/api/swarming/v1/server/permissions",
+        this._getJsonAsync("permissions", "/api/swarming/v1/server/permissions",
           "_busy1", this.auth_headers);
-        this._getJsonAsync("server_version", "/_ah/api/swarming/v1/server/details",
+        this._getJsonAsync("server_version", "/api/swarming/v1/server/details",
           "_busy2", this.auth_headers)
       },
 

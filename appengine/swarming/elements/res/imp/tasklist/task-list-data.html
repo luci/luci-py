@@ -113,9 +113,9 @@
       },
 
       signIn: function(){
-        this._getJsonAsync("_tags", "/_ah/api/swarming/v1/tasks/tags",
+        this._getJsonAsync("_tags", "/api/swarming/v1/tasks/tags",
           "_busy2", this.auth_headers);
-        this._getJsonAsync("_dimensions","/_ah/api/swarming/v1/bots/dimensions",
+        this._getJsonAsync("_dimensions","/api/swarming/v1/bots/dimensions",
           "_busy3", this.auth_headers);
 
         this._request();
@@ -213,7 +213,7 @@
         if (!this.auth_headers || !this.query_params) {
           return;
         }
-        this._getJsonAsync("_list", "/_ah/api/swarming/v1/tasks/list",
+        this._getJsonAsync("_list", "/api/swarming/v1/tasks/list",
           "_busy1", this.auth_headers, this.query_params);
       },
 
