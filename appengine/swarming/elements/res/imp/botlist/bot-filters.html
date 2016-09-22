@@ -278,7 +278,7 @@ the fleet.">
           // Clamp the limit
           lim = Math.max(lim, 1);
           lim = Math.min(1000, lim);
-          params["_limit"] = [lim];
+          params["limit"] = [lim];
           // not !== because limit could be a string, e.g. "900"
           if (this._limit != lim) {
             this.set("_limit", lim);
