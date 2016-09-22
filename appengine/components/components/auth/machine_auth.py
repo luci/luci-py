@@ -23,8 +23,6 @@ See:
 
 import base64
 import logging
-import random
-import threading
 
 from google.protobuf import message
 
@@ -139,11 +137,10 @@ def machine_authentication(request):
 
   # Check the token was actually signed by the server.
   try:
-    certs = get_service_account_certificates(body.issued_by, now)
-    cert = signature.get_x509_certificate_by_name(certs, envelope.key_id)
-    is_valid_sig = signature.check_signature(
+    certs = signature.get_service_account_certificates(body.issued_by)
+    is_valid_sig = certs.check_signature(
         blob=envelope.token_body,
-        x509_certificate_pem=cert,
+        key_name=envelope.key_id,
         signature=envelope.rsa_sha256)
     if not is_valid_sig:
       log_error(request, body, None, 'Bad signature')
@@ -210,28 +207,3 @@ def log_error(request, token_body, exc, msg, *args):
       '  cert_sn: %s' % token_body.cert_sn,
     ])
   logging.warning('\n'.join(lines))
-
-
-_certs_cache = {} # email => (certs, expiration time)
-_certs_cache_lock = threading.Lock()
-
-
-def get_service_account_certificates(email, now):
-  """Fetches service account certificates, caching them in local memory.
-
-  Caches certificates in local instance memory. Randomize time a little bit when
-  checking for expiration, so that concurrent requests do not all go refresh the
-  cache simultaneously.
-  """
-  randomized_now = now + 0.1 * CERTS_CACHE_EXP_SEC * random.random()
-  with _certs_cache_lock:
-    if email in _certs_cache:
-      certs, exp = _certs_cache[email]
-      if exp > randomized_now:
-        return certs
-  # Fetch outside the lock. Multiple concurrent fetches are possible, but it's
-  # not a big deal. The last one wins.
-  certs = signature.get_service_account_certificates(email)
-  with _certs_cache_lock:
-    _certs_cache[email] = (certs, now + CERTS_CACHE_EXP_SEC)
-  return certs

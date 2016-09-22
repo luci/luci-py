@@ -78,21 +78,6 @@ class SerializationTest(test_case.TestCase):
       delegation.deserialize_token(tok)
 
 
-class SignatureCheckerTest(test_case.TestCase):
-  def test_default_works(self):
-    checker = delegation.get_signature_checker()
-    self_id = model.get_service_self_identity().to_bytes()
-    self.assertTrue(checker.is_trusted_signer(self_id))
-    # 'key' is name of fake key in the testbed.
-    self.assertTrue(checker.get_x509_certificate_pem(self_id, 'key'))
-
-  def test_bad_key_id(self):
-    checker = delegation.get_signature_checker()
-    self_id = model.get_service_self_identity().to_bytes()
-    with self.assertRaises(signature.CertificateError):
-      checker.get_x509_certificate_pem(self_id, 'bad key id')
-
-
 class SignatureTest(test_case.TestCase):
   def test_round_trip(self):
     tok = fake_subtoken_proto()

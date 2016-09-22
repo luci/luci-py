@@ -375,12 +375,11 @@ def is_signed_by_primary(blob, key_name, sig):
   # Assert that running on Replica.
   state = model.get_replication_state()
   assert state and state.primary_url, state
-  # Grab the cert from primary and verify the signature.
+  # Grab the cert from primary and verify the signature. We are signing SHA512
+  # hashes, since AuthDB blob is too large.
   certs = signature.get_service_public_certificates(state.primary_url)
-  x509_certificate_pem = signature.get_x509_certificate_by_name(certs, key_name)
-  # We are signing SHA512 hashes, since AuthDB blob is too large.
   digest = hashlib.sha512(blob).digest()
-  return signature.check_signature(digest, x509_certificate_pem, sig)
+  return certs.check_signature(digest, key_name, sig)
 
 
 def push_auth_db(revision, auth_db):

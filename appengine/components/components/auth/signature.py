@@ -11,6 +11,8 @@ functions, and thus private keys are managed by GAE.
 import base64
 import json
 import logging
+import random
+import threading
 import urllib
 
 from google.appengine.api import app_identity
@@ -23,14 +25,22 @@ from components import utils
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
+  'CertificateBundle',
   'CertificateError',
-  'check_signature',
   'get_own_public_certificates',
-  'get_service_public_certificates',
   'get_service_account_certificates',
-  'get_x509_certificate_by_name',
+  'get_service_public_certificates',
   'sign_blob',
 ]
+
+
+# For how long to cache the certificates. Due to the way how local memory cache
+# and memcache are used, the actual expiration time can be up to 2 times larger.
+# This is fine, since certs lifetime are usually 12h or more.
+_CERTS_CACHE_EXP_SEC = 3600
+
+_certs_cache = {} # cache key => (CertificateBundle, cache expiration time)
+_certs_cache_lock = threading.Lock()
 
 
 class CertificateError(Exception):
@@ -41,9 +51,131 @@ class CertificateError(Exception):
     self.transient = transient
 
 
+class CertificateBundle(object):
+  """A bunch of certificates of some service or service account.
+
+  This is NOT a certificate chain.
+
+  It is just a list of currently non-expired certificates of some service.
+  Usually one of them contains a public key currently used for singing, while
+  the rest contain "old" public keys that are being rotated out.
+
+  It is identical to this structure:
+  {
+    'certificates': [
+      {
+        'key_name': '...',
+        'x509_certificate_pem': '...'
+      },
+      ...
+    ],
+    'timestamp': 123354545
+  }
+
+  This object caches parsed public keys internally.
+  """
+
+  def __init__(self, jsonish):
+    self._jsonish = jsonish
+    self._lock = threading.Lock()
+    self._verifiers = {} # key_id => PKCS1_v1_5 verifier
+
+  def to_jsonish(self):
+    """Returns JSON-serializable representation of this bundle.
+
+    Caller must not modify the returned object.
+
+    {
+      'certificates': [
+        {
+          'key_name': '...',
+          'x509_certificate_pem': '...'
+        },
+        ...
+      ],
+      'timestamp': 123354545 # when it was fetched
+    }
+    """
+    return self._jsonish
+
+  def check_signature(self, blob, key_name, signature):
+    """Verifies signature produced by 'sign_blob' function.
+
+    Args:
+      blob: binary buffer to check the signature for.
+      key_name: identifier of a private key used to sign the blob.
+      signature: the signature, as returned by sign_blob function.
+
+    Returns:
+      True if signature is correct.
+
+    Raises:
+      CertificateError if no such key or the certificate is invalid.
+    """
+    # Lazy import Crypto, since not all service that use 'auth' may need it.
+    from Crypto.Hash import SHA256
+    from Crypto.PublicKey import RSA
+    from Crypto.Signature import PKCS1_v1_5
+    from Crypto.Util import asn1
+
+    verifier = None
+    with self._lock:
+      verifier = self._verifiers.get(key_name)
+      if not verifier:
+        # Grab PEM-encoded x509 cert.
+        x509_cert = None
+        for cert in self._jsonish['certificates']:
+          if cert['key_name'] == key_name:
+            x509_cert = cert['x509_certificate_pem']
+            break
+        else:
+          raise CertificateError('The key %r was not found' % key_name)
+
+        # See https://stackoverflow.com/a/12921889.
+
+        # Convert PEM to DER. There's a function for this in 'ssl' module
+        # (ssl.PEM_cert_to_DER_cert), but 'ssl' is not importable in GAE sandbox
+        # on dev server (C extension is not whitelisted).
+        lines = x509_cert.strip().split('\n')
+        if (len(lines) < 3 or
+            lines[0] != '-----BEGIN CERTIFICATE-----' or
+            lines[-1] != '-----END CERTIFICATE-----'):
+          raise CertificateError('Invalid certificate format')
+        der = base64.b64decode(''.join(lines[1:-1]))
+
+        # Extract subjectPublicKeyInfo field from X.509 certificate
+        # (see RFC3280).
+        cert = asn1.DerSequence()
+        cert.decode(der)
+        tbsCertificate = asn1.DerSequence()
+        tbsCertificate.decode(cert[0])
+        subjectPublicKeyInfo = tbsCertificate[6]
+
+        verifier = PKCS1_v1_5.new(RSA.importKey(subjectPublicKeyInfo))
+        self._verifiers[key_name] = verifier
+
+    return verifier.verify(SHA256.new(blob), signature)
+
+
+def sign_blob(blob, deadline=None):
+  """Signs a blob using current service's private key.
+
+  Just an alias for GAE app_identity.sign_blob function for symmetry with
+  'check_signature'. Note that |blob| can be at most 8KB.
+
+  Returns:
+    Tuple (name of a key used, RSA+SHA256 signature).
+  """
+  # app_identity.sign_blob is producing RSA+SHA256 signature. Sadly, it isn't
+  # documented anywhere. But it should be relatively stable since this API is
+  # used by OAuth2 libraries (and so changing signature method may break a lot
+  # of stuff).
+  return app_identity.sign_blob(blob, deadline)
+
+
 @utils.cache_with_expiration(3600)
 def get_own_public_certificates():
-  """Returns jsonish object with public certificates of current service."""
+  """Returns CertificateBundle with certificates of the current service."""
   attempt = 0
   while True:
     attempt += 1
@@ -54,7 +186,7 @@ def get_own_public_certificates():
       logging.warning('%s', e)
       if attempt == 3:
         raise
-  return {
+  return CertificateBundle({
     'certificates': [
       {
         'key_name': cert.key_name,
@@ -63,20 +195,35 @@ def get_own_public_certificates():
       for cert in certs
     ],
     'timestamp': utils.datetime_to_timestamp(utils.utcnow()),
-  }
+  })
 
 
 def get_service_public_certificates(service_url):
-  """Returns jsonish object with public certificates of a service.
+  """Returns CertificateBundle with certificates of a LUCI service.
 
-  Service at |service_url| must have 'auth' component enabled (to serve
+  The LUCI service at |service_url| must have 'auth' component enabled (to serve
   the certificates).
-  """
-  cache_key = 'pub_certs:%s' % service_url
-  certs = memcache.get(cache_key)
-  if certs:
-    return certs
 
+  Raises CertificateError on errors.
+  """
+  return _use_cached_or_fetch(
+      'v1:service_certs:%s' % service_url,
+      lambda: _fetch_service_certs(service_url))
+
+
+def get_service_account_certificates(service_account_email):
+  """Returns CertificateBundle with certificates of a service account.
+
+  Works only for Google Cloud Platform service accounts.
+
+  Raises CertificateError on errors.
+  """
+  return _use_cached_or_fetch(
+      'v1:service_account_certs:%s' % service_account_email,
+      lambda: _fetch_robot_certs(service_account_email))
+
+
+def _fetch_service_certs(service_url):
   protocol = 'http://' if utils.is_local_dev_server() else 'https://'
   assert service_url.startswith(protocol)
   url = '%s/auth/api/v1/server/certificates' % service_url
@@ -108,10 +255,7 @@ def get_service_public_certificates(service_url):
       logging.warning(
           'GET %s failed, HTTP %d: %r', url, result.status_code, result.content)
       continue
-    # Success.
-    certs = json.loads(result.content)
-    memcache.set(cache_key, certs, time=3600)
-    return certs
+    return json.loads(result.content)
 
   # All attempts failed, give up.
   msg = 'Failed to grab public certs from %s (HTTP code %s)' % (
@@ -119,21 +263,7 @@ def get_service_public_certificates(service_url):
   raise CertificateError(msg, transient=True)
 
 
-def get_service_account_certificates(service_account_email):
-  """Returns jsonish object with public certificates of a service account.
-
-  Works only for Google Cloud Platform service accounts.
-
-  Returned object is similar to what get_service_public_certificates returns
-  and can be passed to get_x509_certificate_by_name.
-
-  Raises CertificateError on errors.
-  """
-  cache_key = 'service_account_certs:%s' % service_account_email
-  certs = memcache.get(cache_key)
-  if certs:
-    return certs
-
+def _fetch_robot_certs(service_account_email):
   url = 'https://www.googleapis.com/robot/v1/metadata/x509/'
   url += urllib.quote_plus(service_account_email)
 
@@ -163,9 +293,8 @@ def get_service_account_certificates(service_account_email):
       logging.warning(
           'GET %s failed, HTTP %d: %r', url, result.status_code, result.content)
       continue
-    # Success. Convert to the format used by get_x509_certificate_by_name().
     response = json.loads(result.content)
-    certs = {
+    return {
       'certificates': [
         {
           'key_name': key_name,
@@ -175,8 +304,6 @@ def get_service_account_certificates(service_account_email):
       ],
       'timestamp': utils.datetime_to_timestamp(utils.utcnow()),
     }
-    memcache.set(cache_key, certs, time=3600)
-    return certs
 
   # All attempts failed, give up.
   msg = 'Failed to grab service account certs for %s (HTTP code %s)' % (
@@ -184,78 +311,40 @@ def get_service_account_certificates(service_account_email):
   raise CertificateError(msg, transient=True)
 
 
-def get_x509_certificate_by_name(certs, key_name):
-  """Given jsonish object with certificates returns x509 cert with given name.
+def _use_cached_or_fetch(cache_key, fetch_cb):
+  """Implements caching layer for the public certificates.
 
-  Args:
-    certs: return value of get_own_public_certificates() or
-        get_service_public_certificates().
-    key_name: name of the certificate.
+  Caches certificate in both memcache and local instance memory. Uses
+  probabilistic early expiration to avoid hitting the backend from multiple
+  request handlers simultaneously when cache expires.
 
-  Returns:
-    PEM encoded x509 certificate.
-
-  Raises:
-    CertificateError if no such cert.
+  'fetch_cb' is expected to return a dict to be passed to CertificateBundle
+  constructor.
   """
-  for cert in certs['certificates']:
-    if cert['key_name'] == key_name:
-      return cert['x509_certificate_pem']
-  raise CertificateError('Certificate \'%s\' not found' % key_name)
+  # Try local memory first.
+  now = utils.time_time()
+  with _certs_cache_lock:
+    if cache_key in _certs_cache:
+      certs, exp = _certs_cache[cache_key]
+      if exp > now + 0.1 * _CERTS_CACHE_EXP_SEC * random.random():
+        return certs
 
+  # Try memcache now. Use same trick with random early expiration.
+  entry = memcache.get(cache_key)
+  if entry:
+    certs_dict, exp = entry
+    if exp > now + 0.1 * _CERTS_CACHE_EXP_SEC * random.random():
+      certs = CertificateBundle(certs_dict)
+      with _certs_cache_lock:
+        _certs_cache[cache_key] = (certs, now + _CERTS_CACHE_EXP_SEC)
+      return certs
 
-def sign_blob(blob, deadline=None):
-  """Signs a blob using current service's private key.
-
-  Just an alias for GAE app_identity.sign_blob function for symmetry with
-  'check_signature'. Note that |blob| can be at most 8KB.
-
-  Returns:
-    Tuple (name of a key used, RSA+SHA256 signature).
-  """
-  # app_identity.sign_blob is producing RSA+SHA256 signature. Sadly, it isn't
-  # documented anywhere. But it should be relatively stable since this API is
-  # used by OAuth2 libraries (and so changing signature method may break a lot
-  # of stuff).
-  return app_identity.sign_blob(blob, deadline)
-
-
-def check_signature(blob, x509_certificate_pem, signature):
-  """Verifies signature produced by 'sign_blob' function.
-
-  Args:
-    blob: binary buffer to check the signature for.
-    x509_certificate_pem: PEM encoded x509 certificate, may be obtained with
-        get_service_public_certificates() and get_x509_certificate_by_name().
-    signature: the signature, as returned by sign_blob function.
-
-  Returns:
-    True if signature is correct.
-  """
-  # See http://stackoverflow.com/a/12921889.
-
-  # Lazy import Crypto, since not all service that use 'components' may need it.
-  from Crypto.Hash import SHA256
-  from Crypto.PublicKey import RSA
-  from Crypto.Signature import PKCS1_v1_5
-  from Crypto.Util import asn1
-
-  # Convert PEM to DER. There's a function for this in 'ssl' module
-  # (ssl.PEM_cert_to_DER_cert), but 'ssl' is not importable in GAE sandbox
-  # on dev server (C extension is not whitelisted).
-  lines = x509_certificate_pem.strip().split('\n')
-  if (len(lines) < 3 or
-      lines[0] != '-----BEGIN CERTIFICATE-----' or
-      lines[-1] != '-----END CERTIFICATE-----'):
-    raise CertificateError('Invalid certificate format')
-  der = base64.b64decode(''.join(lines[1:-1]))
-
-  # Extract subjectPublicKeyInfo field from X.509 certificate (see RFC3280).
-  cert = asn1.DerSequence()
-  cert.decode(der)
-  tbsCertificate = asn1.DerSequence()
-  tbsCertificate.decode(cert[0])
-  subjectPublicKeyInfo = tbsCertificate[6]
-
-  verifier = PKCS1_v1_5.new(RSA.importKey(subjectPublicKeyInfo))
-  return verifier.verify(SHA256.new(blob), signature)
+  # Multiple concurrent fetches are possible, but it's not a big deal. The last
+  # one wins.
+  certs_dict = fetch_cb()
+  exp = now + _CERTS_CACHE_EXP_SEC
+  memcache.set(cache_key, (certs_dict, exp), time=exp)
+  certs = CertificateBundle(certs_dict)
+  with _certs_cache_lock:
+    _certs_cache[cache_key] = (certs, exp)
+  return certs

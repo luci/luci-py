@@ -114,18 +114,14 @@ class SignatureChecker(object):
     """
     return signer_id in self._signers
 
-  def get_x509_certificate_pem(self, signer_id, signing_key_id):
-    """Returns PEM encoded x509 certificate of a given trusted signer.
+  def get_certificate_bundle(self, signer_id):
+    """Returns CertificateBundle of a given trusted signer.
 
     Args:
       signer_id: string with identity name of a signer.
-      signing_key_id: name of a signing key.
-
-    Returns:
-      PEM encoded x509 certificate.
 
     Raises:
-      signature.CertificateError if no such cert or if it can't be fetched.
+      CertificateError if it can't load the certificates.
     """
     # Use a lock so that all pending requests wait for a single fetch, instead
     # of initiating a bunch of redundant fetches.
@@ -133,8 +129,8 @@ class SignatureChecker(object):
     with s.lock:
       if s.certs is None:
         s.certs = s.callback()
-    assert s.certs is not None
-    return signature.get_x509_certificate_by_name(s.certs, signing_key_id)
+        assert isinstance(s.certs, signature.CertificateBundle), s.certs
+    return s.certs
 
 
 @utils.cache_with_expiration(expiration_sec=300)
@@ -254,10 +250,10 @@ def unseal_token(tok):
   if not checker.is_trusted_signer(tok.signer_id):
     raise BadTokenError('Unknown signer: "%s"' % tok.signer_id)
   try:
-    cert = checker.get_x509_certificate_pem(tok.signer_id, tok.signing_key_id)
-    is_valid_sig = signature.check_signature(
+    certs = checker.get_certificate_bundle(tok.signer_id)
+    is_valid_sig = certs.check_signature(
         blob=tok.serialized_subtoken,
-        x509_certificate_pem=cert,
+        key_name=tok.signing_key_id,
         signature=tok.pkcs1_sha256_sig)
   except signature.CertificateError as exc:
     if exc.transient:

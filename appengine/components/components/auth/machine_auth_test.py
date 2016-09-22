@@ -39,28 +39,25 @@ class MachineAuthTest(test_case.TestCase):
     self.logs = []
     self.mock(
         machine_auth.logging, 'warning', lambda msg, *_: self.logs.append(msg))
-    machine_auth._certs_cache.clear()
 
     def is_group_member(group, ident):
       return (group == machine_auth.TOKEN_SERVERS_GROUP and
           ident.to_bytes() == 'user:good-issuer@example.com')
     self.mock(machine_auth.api, 'is_group_member', is_group_member)
 
-    self.mock_certs('good-issuer@example.com', GOOD_CERTS)
     self.mock_check_signature(True)
 
-  def mock_certs(self, email, certs):
-    def get(asked):
-      self.assertEqual(email, asked)
-      return certs
-    self.mock(signature, 'get_service_account_certificates', get)
-
   def mock_check_signature(self, is_valid=False, exc=None):
-    def mocked(**_kwargs):
+    bundle = signature.CertificateBundle(GOOD_CERTS)
+    def mocked_check_sig(**_kwargs):
       if exc:
         raise exc  # pylint: disable=raising-bad-type
       return is_valid
-    self.mock(signature, 'check_signature', mocked)
+    self.mock(bundle, 'check_signature', mocked_check_sig)
+    def get(asked):
+      self.assertEqual('good-issuer@example.com', asked)
+      return bundle
+    self.mock(signature, 'get_service_account_certificates', get)
 
   def has_log(self, msg):
     for m in self.logs:

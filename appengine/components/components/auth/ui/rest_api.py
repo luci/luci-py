@@ -888,7 +888,7 @@ class CertificatesHandler(handler.ApiHandler):
   # Available to anyone, there's no secrets here.
   @api.public
   def get(self):
-    self.send_response(signature.get_own_public_certificates())
+    self.send_response(signature.get_own_public_certificates().to_jsonish())
 
 
 class OAuthConfigHandler(handler.ApiHandler):
