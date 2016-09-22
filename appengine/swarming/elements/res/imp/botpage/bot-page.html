@@ -145,7 +145,7 @@
             <template is="dom-if" if="[[_bot.quarantined]]">
               <tr class="quarantined">
                 <td>Quarantined</td>
-                <td colspan="2">[[_quarantineMessage(_bot)]]</td>
+                <td colspan="2" class="message">[[_quarantineMessage(_bot)]]</td>
               </tr>
             </template>
             <tr>
@@ -420,7 +420,7 @@
           // Sometimes, the quarantined message is actually in "error".  This
           // happens when the bot code has thrown an exception.
           if (msg === undefined || msg === "true" || msg === true) {
-            msg = this._attribute(bot, "error");
+            msg = bot.state && bot.state.error;
           }
           return msg || "True";
         }
