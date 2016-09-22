@@ -288,6 +288,23 @@ class GceTest(test_case.TestCase):
     self.assertTrue(gce.is_valid_instance('slave123-c4'))
     self.assertFalse(gce.is_valid_instance('slave123/c4'))
 
+  def test_get_network_interfaces(self):
+    expected_interfaces_ext  = [{'network': 'global/networks/default',
+                                 'accessConfigs': [{}]}]
+    expected_interfaces_int  = [{'network': 'global/networks/default'}]
+    self.assertEqual(expected_interfaces_int,
+                     gce.get_network_interfaces('project',
+                                                'global/networks/default',
+                                                False))
+    self.assertEqual(expected_interfaces_ext,
+                     gce.get_network_interfaces('project',
+                                                'global/networks/default',
+                                                True))
+    expected_interfaces_int  = [{'network':
+                                 gce.get_network_url('project', 'default')}]
+    self.assertEqual(expected_interfaces_int,
+                     gce.get_network_interfaces('project', '', False))
+
   def test_get_zone_url(self):
     self.assertEqual(
         'https://www.googleapis.com/compute/v1/projects'

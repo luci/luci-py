@@ -13,7 +13,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='config.proto',
   package='gce_backend',
-  serialized_pb='\n\x0c\x63onfig.proto\x12\x0bgce_backend\"\xb4\x03\n\x16InstanceTemplateConfig\x12G\n\ttemplates\x18\x01 \x03(\x0b\x32\x34.gce_backend.InstanceTemplateConfig.InstanceTemplate\x1a\xd0\x02\n\x10InstanceTemplate\x12\x11\n\tbase_name\x18\x01 \x01(\t\x12\x0f\n\x07project\x18\x02 \x01(\t\x12\x12\n\ndimensions\x18\x03 \x03(\t\x12\x12\n\nimage_name\x18\x04 \x01(\t\x12\x15\n\rimage_project\x18\n \x01(\t\x12\x14\n\x0c\x64isk_size_gb\x18\x05 \x01(\x05\x12]\n\x10service_accounts\x18\x06 \x03(\x0b\x32\x43.gce_backend.InstanceTemplateConfig.InstanceTemplate.ServiceAccount\x12\x0c\n\x04tags\x18\x07 \x03(\t\x12\x10\n\x08metadata\x18\x08 \x03(\t\x12\x14\n\x0cmachine_type\x18\t \x01(\t\x1a.\n\x0eServiceAccount\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06scopes\x18\x02 \x03(\t\"\xda\x01\n\x1aInstanceGroupManagerConfig\x12N\n\x08managers\x18\x01 \x03(\x0b\x32<.gce_backend.InstanceGroupManagerConfig.InstanceGroupManager\x1al\n\x14InstanceGroupManager\x12\x1a\n\x12template_base_name\x18\x01 \x01(\t\x12\x14\n\x0cminimum_size\x18\x02 \x01(\x05\x12\x14\n\x0cmaximum_size\x18\x03 \x01(\x05\x12\x0c\n\x04zone\x18\x04 \x01(\t\">\n\x0bSettingsCfg\x12\x1c\n\x14\x65nable_ts_monitoring\x18\x01 \x01(\x08\x12\x11\n\tmp_server\x18\x02 \x01(\t')
+  serialized_pb='\n\x0c\x63onfig.proto\x12\x0bgce_backend\"\xea\x03\n\x16InstanceTemplateConfig\x12G\n\ttemplates\x18\x01 \x03(\x0b\x32\x34.gce_backend.InstanceTemplateConfig.InstanceTemplate\x1a\x86\x03\n\x10InstanceTemplate\x12\x11\n\tbase_name\x18\x01 \x01(\t\x12\x0f\n\x07project\x18\x02 \x01(\t\x12\x12\n\ndimensions\x18\x03 \x03(\t\x12\x12\n\nimage_name\x18\x04 \x01(\t\x12\x15\n\rimage_project\x18\n \x01(\t\x12\x14\n\x0c\x64isk_size_gb\x18\x05 \x01(\x05\x12]\n\x10service_accounts\x18\x06 \x03(\x0b\x32\x43.gce_backend.InstanceTemplateConfig.InstanceTemplate.ServiceAccount\x12\x0c\n\x04tags\x18\x07 \x03(\t\x12\x10\n\x08metadata\x18\x08 \x03(\t\x12\x14\n\x0cmachine_type\x18\t \x01(\t\x12\x13\n\x0bnetwork_url\x18\x0b \x01(\t\x12\x1f\n\x17\x61uto_assign_external_ip\x18\x0c \x01(\x08\x1a.\n\x0eServiceAccount\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06scopes\x18\x02 \x03(\t\"\xda\x01\n\x1aInstanceGroupManagerConfig\x12N\n\x08managers\x18\x01 \x03(\x0b\x32<.gce_backend.InstanceGroupManagerConfig.InstanceGroupManager\x1al\n\x14InstanceGroupManager\x12\x1a\n\x12template_base_name\x18\x01 \x01(\t\x12\x14\n\x0cminimum_size\x18\x02 \x01(\x05\x12\x14\n\x0cmaximum_size\x18\x03 \x01(\x05\x12\x0c\n\x04zone\x18\x04 \x01(\t\">\n\x0bSettingsCfg\x12\x1c\n\x14\x65nable_ts_monitoring\x18\x01 \x01(\x08\x12\x11\n\tmp_server\x18\x02 \x01(\t')
 
 
 
@@ -48,8 +48,8 @@ _INSTANCETEMPLATECONFIG_INSTANCETEMPLATE_SERVICEACCOUNT = _descriptor.Descriptor
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=420,
-  serialized_end=466,
+  serialized_start=474,
+  serialized_end=520,
 )
 
 _INSTANCETEMPLATECONFIG_INSTANCETEMPLATE = _descriptor.Descriptor(
@@ -129,6 +129,20 @@ _INSTANCETEMPLATECONFIG_INSTANCETEMPLATE = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='network_url', full_name='gce_backend.InstanceTemplateConfig.InstanceTemplate.network_url', index=10,
+      number=11, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='auto_assign_external_ip', full_name='gce_backend.InstanceTemplateConfig.InstanceTemplate.auto_assign_external_ip', index=11,
+      number=12, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -139,7 +153,7 @@ _INSTANCETEMPLATECONFIG_INSTANCETEMPLATE = _descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=130,
-  serialized_end=466,
+  serialized_end=520,
 )
 
 _INSTANCETEMPLATECONFIG = _descriptor.Descriptor(
@@ -166,7 +180,7 @@ _INSTANCETEMPLATECONFIG = _descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=30,
-  serialized_end=466,
+  serialized_end=520,
 )
 
 
@@ -214,8 +228,8 @@ _INSTANCEGROUPMANAGERCONFIG_INSTANCEGROUPMANAGER = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=579,
-  serialized_end=687,
+  serialized_start=633,
+  serialized_end=741,
 )
 
 _INSTANCEGROUPMANAGERCONFIG = _descriptor.Descriptor(
@@ -241,8 +255,8 @@ _INSTANCEGROUPMANAGERCONFIG = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=469,
-  serialized_end=687,
+  serialized_start=523,
+  serialized_end=741,
 )
 
 
@@ -276,8 +290,8 @@ _SETTINGSCFG = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=689,
-  serialized_end=751,
+  serialized_start=743,
+  serialized_end=805,
 )
 
 _INSTANCETEMPLATECONFIG_INSTANCETEMPLATE_SERVICEACCOUNT.containing_type = _INSTANCETEMPLATECONFIG_INSTANCETEMPLATE;

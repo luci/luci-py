@@ -224,8 +224,9 @@ class Project(object):
         break
 
   def create_instance_template(
-      self, name, disk_size_gb, image, machine_type, network, tags=None,
-      metadata=None, service_accounts=None):
+      self, name, disk_size_gb, image, machine_type,
+      auto_assign_external_ip=False, metadata=None, network_url='',
+      service_accounts=None, tags=None):
     """
     Args:
       name: Name of the instance template.
@@ -233,20 +234,23 @@ class Project(object):
       image: Image to use for instances created from this template.
       machine_type: GCE machine type for instances created from this template.
         e.g. n1-standard-8.
-      network: URL of the network instances created from this template should be
-        a part of.
-      tags: List of strings to attach as tags to instances created from this
-        template.
+      auto_assign_external_ip: flag to enable external network with
+        auto-assigned IP address.
       metadata: List of {'key': ..., 'value': ...} dicts to attach as metadata
         to instances created from this template.
+      network_url: name or URL of the network resource for this template.
       service_accounts: List of {'email': ..., 'scopes': [...]} dicts to make
         available to instances created from this template.
+      tags: List of strings to attach as tags to instances created from this
+        template.
 
     Returns:
       A compute#operation dict.
     """
     tags = tags or []
     metadata = metadata or []
+    network_interfaces = get_network_interfaces(self.project_id, network_url,
+                                                auto_assign_external_ip)
     service_accounts = service_accounts or []
     return self.call_api(
         '/global/instanceTemplates',
@@ -268,11 +272,7 @@ class Project(object):
                 'metadata': {
                     'items': metadata,
                 },
-                'networkInterfaces': [
-                  {
-                      'network': network,
-                  },
-                ],
+                'networkInterfaces': network_interfaces,
                 'serviceAccounts': service_accounts,
                 'tags': {
                     'items': tags,
@@ -529,6 +529,29 @@ def get_image_url(project_id, image):
   return (
       'https://www.googleapis.com/compute/v1/projects/%s/global/images/%s' % (
           project_id, image))
+
+
+def get_network_interfaces(project_id, network_url, auto_assign_external_ip):
+  """Returns list of network interfaces for configuring a network.
+
+  Args:
+    project_id: project ID
+    network_url: name or URL of the network resource property.
+    auto_assign_external_ip: flag to enable external network with auto-assigned
+      IP address.
+
+  Returns:
+    network_interfaces: List of network_interface dicts to configure instance
+      networks. For more details, see:
+      https://cloud.google.com/compute/docs/reference/latest/instanceTemplates
+  """
+  network = network_url or get_network_url(project_id, 'default')
+  network_interfaces = [{'network': network}]
+  if auto_assign_external_ip:
+    # This creates a single accessConfig instance and uses default values for
+    # all fields to enable external network with auto-assigned IP.
+    network_interfaces[0]['accessConfigs'] = [{}]
+  return network_interfaces
 
 
 def get_network_url(project_id, network):

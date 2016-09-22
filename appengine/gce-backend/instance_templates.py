@@ -133,10 +133,11 @@ def create(key):
             entity.image_name
         ),
         entity.machine_type,
-        gce.get_network_url(api.project_id, 'default'),
-        tags=entity.tags,
+        auto_assign_external_ip=entity.auto_assign_external_ip,
         metadata=metadata,
+        network_url=entity.network_url,
         service_accounts=service_accounts,
+        tags=entity.tags,
     )
   except net.Error as e:
     if e.status_code == 409:

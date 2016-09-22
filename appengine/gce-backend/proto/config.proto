@@ -43,6 +43,11 @@ message InstanceTemplateConfig {
     repeated string metadata = 8;
     // GCE machine type.
     optional string machine_type = 9;
+    // Network resource attached to instance.
+    // If not specified, use 'default'.
+    optional string network_url = 11;
+    // Enables an external network with auto-assigned IP address.
+    optional bool auto_assign_external_ip = 12;
   }
 
   repeated InstanceTemplate templates = 1;
