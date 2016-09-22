@@ -245,6 +245,9 @@ class BotsListHandler(auth.AuthenticatingHandler):
     num_bots_dead = num_bots_dead_future.get_result()
     num_bots_quarantined = num_bots_quarantined_future.get_result()
     num_bots_total = num_bots_total_future.get_result()
+    try_link = '/newui/botlist?l=%d' % limit
+    if dimensions:
+      try_link += '&f=' + '&f='.join(dimensions)
     params = {
       'bots': bots,
       'current_version': version,
@@ -258,6 +261,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
       'num_bots_busy': num_bots_busy,
       'num_bots_dead': num_bots_dead,
       'num_bots_quarantined': num_bots_quarantined,
+      'try_link': try_link,
       'sort_by': sort_by,
       'sort_options': self.SORT_OPTIONS,
       'xsrf_token': self.generate_xsrf_token(),
@@ -343,6 +347,7 @@ class BotHandler(auth.AuthenticatingHandler):
       'now': now,
       'run_results': run_results,
       'run_time': run_time,
+      'try_link': '/newui/bot?id=%s' % bot_id,
       'xsrf_token': self.generate_xsrf_token(),
     }
     self.response.write(
@@ -520,6 +525,10 @@ class TasksHandler(auth.AuthenticatingHandler):
     total_saved_percent = (
         (100. * total_saved.total_seconds() / duration_sum.total_seconds())
         if duration_sum else 0.)
+
+    try_link = '/newui/tasklist?l=%d' % limit
+    if task_tags:
+      try_link += '&f=' + '&f='.join(task_tags)
     params = {
       'cursor': cursor_str,
       'duration_average': avg(durations),
@@ -545,6 +554,7 @@ class TasksHandler(auth.AuthenticatingHandler):
       'total_cost_saved_usd': total_cost_saved_usd,
       'total_saved': total_saved,
       'total_saved_percent': total_saved_percent,
+      'try_link': try_link,
       'xsrf_token': self.generate_xsrf_token(),
     }
     # TODO(maruel): If admin or if the user is task's .user, show the Cancel
@@ -706,6 +716,7 @@ class TaskHandler(BaseTaskHandler):
       'previous_task': previous_task,
       'request': request,
       'task': result,
+      'try_link': '/newui/task?id=%s' % task_id,
       'xsrf_token': self.generate_xsrf_token(),
     }
     self.response.write(template.render('swarming/user_task.html', params))
