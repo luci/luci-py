@@ -527,7 +527,7 @@
       },
 
       _cancelTask: function() {
-        var url = "/api/swarming/v1/task/" + this.task_id +"/cancel";
+        var url = "/_ah/api/swarming/v1/task/" + this.task_id +"/cancel";
         swarming.postWithToast(url, "Canceling task " + this.task_id, this._auth_headers);
       },
 
@@ -680,7 +680,7 @@
           user: this._profile.email,
           service_account: this._request.service_account,
         }
-        swarming.postWithToast("/api/swarming/v1/tasks/new", "Retrying task " + this.task_id,
+        swarming.postWithToast("/_ah/api/swarming/v1/tasks/new", "Retrying task " + this.task_id,
           this._auth_headers, newTask)
         .then(function(response) {
             response = JSON.parse(response);

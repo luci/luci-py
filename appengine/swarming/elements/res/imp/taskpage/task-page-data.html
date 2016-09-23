@@ -129,7 +129,7 @@
           this.cancelAsync(lastRequest);
         }
 
-        var baseUrl = "/api/swarming/v1/task/" + this.task_id;
+        var baseUrl = "/_ah/api/swarming/v1/task/" + this.task_id;
         lastRequest = this.async(function(){
           lastRequest = undefined;
           this._getJsonAsync("_request", baseUrl + "/request",
@@ -193,7 +193,7 @@
       },
 
       reloadStdout: function() {
-        this._getJsonAsync("_stdout", "/api/swarming/v1/task/" +
+        this._getJsonAsync("_stdout", "/_ah/api/swarming/v1/task/" +
               this.task_id + "/stdout", "_busy3", this.auth_headers);
       },
 

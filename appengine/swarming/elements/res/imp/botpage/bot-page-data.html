@@ -139,7 +139,7 @@
 
         lastRequest = this.async(function(){
           lastRequest = undefined;
-          var baseUrl = "/api/swarming/v1/bot/"+this.bot_id;
+          var baseUrl = "/_ah/api/swarming/v1/bot/"+this.bot_id;
           this._getJsonAsync("_bot", baseUrl + "/get",
             "_busy1", this.auth_headers);
           // We limit the fields on these two queries to make them faster.

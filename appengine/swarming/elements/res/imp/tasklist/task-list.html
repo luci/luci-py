@@ -329,7 +329,7 @@
       },
 
       _cancelTask: function() {
-        var url = "/api/swarming/v1/task/" + this._toCancel +"/cancel";
+        var url = "/_ah/api/swarming/v1/task/" + this._toCancel +"/cancel";
         swarming.postWithToast(url, "Canceling task " + this._toCancel, this._auth_headers);
         this.set("_toCancel", "");
       },

@@ -354,7 +354,7 @@
       },
 
       _deleteBot: function() {
-        swarming.postWithToast("/api/swarming/v1/bot/"+this.bot_id+"/delete",
+        swarming.postWithToast("/_ah/api/swarming/v1/bot/"+this.bot_id+"/delete",
           "Deleting "+this.bot_id, this._auth_headers);
       },
 
@@ -439,7 +439,7 @@
       },
 
       _shutdownBot: function() {
-        swarming.postWithToast("/api/swarming/v1/bot/"+this.bot_id+"/terminate",
+        swarming.postWithToast("/_ah/api/swarming/v1/bot/"+this.bot_id+"/terminate",
           "Shutting down "+this.bot_id, this._auth_headers);
       },
 
