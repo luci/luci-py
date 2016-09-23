@@ -157,16 +157,15 @@ class CronTasksTagsAggregationHandler(webapp2.RequestHandler):
             s.add(v)
             # 128 is arbitrary large number to avoid OOM
             if len(s) >= 128:
-              logging.info('Stripping tag %s because there are too many', k)
+              logging.info('Limiting tag %s because there are too many', k)
               seen[k] = None
       if not cursor or len(tasks) == 0:
         break
 
     tags = [
-      task_result.TagValues(tag=k, values=sorted(values))
-      for k, values in sorted(seen.iteritems()) if values is not None
+      task_result.TagValues(tag=k, values=sorted(values or []))
+      for k, values in sorted(seen.iteritems())
     ]
-
     logging.info('From %d tasks, saw %d tags', count, len(tags))
     task_result.TagAggregation(
         key=task_result.TagAggregation.KEY,
