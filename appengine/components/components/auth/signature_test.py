@@ -46,6 +46,8 @@ class SignatureTest(test_case.TestCase):
 
     certs = signature.get_service_account_certificates(
         '123@appspot.gserviceaccount.com')
+    self.assertEqual(
+        '123@appspot.gserviceaccount.com', certs.service_account_name)
     self.assertEqual(certs.to_jsonish()['certificates'], [
       {
         'key_name': u'cba74246d54580c5ee7a6a778c997a7cb1abc918',

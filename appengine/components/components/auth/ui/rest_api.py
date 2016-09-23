@@ -874,7 +874,7 @@ class ServerInfoHandler(handler.ApiHandler):
       'app_id': app_identity.get_application_id(),
       'app_runtime': 'python27',
       'app_version': utils.get_app_version(),
-      'service_account_name': app_identity.get_service_account_name(),
+      'service_account_name': utils.get_service_account_name(),
     })
 
 

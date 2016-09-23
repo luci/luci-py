@@ -457,6 +457,16 @@ def get_app_revision_url():
   return template % rev.group(1) if rev else None
 
 
+@cache
+def get_service_account_name():
+  """Same as app_identity.get_service_account_name(), but caches the result.
+
+  app_identity.get_service_account_name() does an RPC on each call, yet the
+  result is always the same.
+  """
+  return app_identity.get_service_account_name()
+
+
 ### Task queue
 
 

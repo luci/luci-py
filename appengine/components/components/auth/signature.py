@@ -80,12 +80,24 @@ class CertificateBundle(object):
     self._lock = threading.Lock()
     self._verifiers = {} # key_id => PKCS1_v1_5 verifier
 
+  @property
+  def service_account_name(self):
+    """Returns the service account that owns the keys.
+
+    It matches Subject Name in the certificates.
+
+    May return None for CertificateBundle objects fetched from old services
+    that do not provide this information. The support was added in v1.2.9.
+    """
+    return self._jsonish.get('service_account_name')
+
   def to_jsonish(self):
     """Returns JSON-serializable representation of this bundle.
 
     Caller must not modify the returned object.
 
     {
+      'service_account_name': '<email>',
       'certificates': [
         {
           'key_name': '...',
@@ -151,6 +163,11 @@ class CertificateBundle(object):
         tbsCertificate.decode(cert[0])
         subjectPublicKeyInfo = tbsCertificate[6]
 
+        # TODO(vadimsh): Extract certificate subject name and verify that it
+        # matches self.service_account_name. Unfortunately, PyCrypto's asn1
+        # library is to dumb for this task. It doesn't support ASN1 SET OF
+        # elements.
+
         verifier = PKCS1_v1_5.new(RSA.importKey(subjectPublicKeyInfo))
         self._verifiers[key_name] = verifier
 
@@ -187,6 +204,7 @@ def get_own_public_certificates():
       if attempt == 3:
         raise
   return CertificateBundle({
+    'service_account_name': utils.get_service_account_name(),
     'certificates': [
       {
         'key_name': cert.key_name,
@@ -211,7 +229,7 @@ def get_service_public_certificates(service_url):
       lambda: _fetch_service_certs(service_url))
 
 
-def get_service_account_certificates(service_account_email):
+def get_service_account_certificates(service_account_name):
   """Returns CertificateBundle with certificates of a service account.
 
   Works only for Google Cloud Platform service accounts.
@@ -219,8 +237,8 @@ def get_service_account_certificates(service_account_email):
   Raises CertificateError on errors.
   """
   return _use_cached_or_fetch(
-      'v1:service_account_certs:%s' % service_account_email,
-      lambda: _fetch_robot_certs(service_account_email))
+      'v1:service_account_certs:%s' % service_account_name,
+      lambda: _fetch_robot_certs(service_account_name))
 
 
 def _fetch_service_certs(service_url):
@@ -263,9 +281,9 @@ def _fetch_service_certs(service_url):
   raise CertificateError(msg, transient=True)
 
 
-def _fetch_robot_certs(service_account_email):
+def _fetch_robot_certs(service_account_name):
   url = 'https://www.googleapis.com/robot/v1/metadata/x509/'
-  url += urllib.quote_plus(service_account_email)
+  url += urllib.quote_plus(service_account_name)
 
   # Retry code is adapted from components/net.py. net.py can't be used directly
   # since it depends on components.auth (and dependency cycles between
@@ -295,6 +313,7 @@ def _fetch_robot_certs(service_account_email):
       continue
     response = json.loads(result.content)
     return {
+      'service_account_name': service_account_name,
       'certificates': [
         {
           'key_name': key_name,
@@ -307,7 +326,7 @@ def _fetch_robot_certs(service_account_email):
 
   # All attempts failed, give up.
   msg = 'Failed to grab service account certs for %s (HTTP code %s)' % (
-      service_account_email, result.status_code if result else '???')
+      service_account_name, result.status_code if result else '???')
   raise CertificateError(msg, transient=True)
 
 
