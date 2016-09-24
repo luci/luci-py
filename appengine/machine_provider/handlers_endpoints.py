@@ -76,6 +76,50 @@ class CatalogEndpoints(remote.Service):
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
+      rpc_messages.CatalogMachineRetrievalRequest,
+      rpc_messages.CatalogMachineRetrievalResponse,
+  )
+  @auth.require(acl.is_backend_service_or_catalog_admin)
+  def get(self, request):
+    """Handles an incoming CatalogMachineRetrievalRequest."""
+    user = auth.get_current_identity().to_bytes()
+    logging.info(
+        'Received CatalogMachineRetrievalRequest:\nUser: %s\n%s',
+        user,
+        request,
+    )
+    if acl.is_catalog_admin():
+      if not request.backend:
+        raise endpoints.BadRequestException(
+            'Backend unspecified by administrator')
+    elif acl.is_backend_service():
+      current_backend = acl.get_current_backend()
+      if request.backend is None:
+        request.backend = current_backend
+      if request.backend != current_backend:
+        raise endpoints.ForbiddenException('Mismatched backend')
+
+    entry = models.CatalogMachineEntry.get(request.backend, request.hostname)
+    if not entry:
+      raise endpoints.NotFoundException('CatalogMachineEntry not found')
+
+    response = rpc_messages.CatalogMachineRetrievalResponse(
+        dimensions=entry.dimensions,
+        policies=entry.policies,
+        pubsub_subscription=entry.pubsub_subscription,
+        pubsub_subscription_project=entry.pubsub_subscription_project,
+        pubsub_topic=entry.pubsub_topic,
+        pubsub_topic_project=entry.pubsub_topic,
+        state=entry.state,
+    )
+    if entry.lease_expiration_ts:
+      # datetime_to_timestamp returns microseconds, convert to seconds.
+      response.lease_expiration_ts = utils.datetime_to_timestamp(
+          entry.lease_expiration_ts) / 1000 / 1000
+    return response
+
+  @gae_ts_mon.instrument_endpoint()
+  @auth.endpoints_method(
       rpc_messages.CatalogMachineAdditionRequest,
       rpc_messages.CatalogManipulationResponse,
   )

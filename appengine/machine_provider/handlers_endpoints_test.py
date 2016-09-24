@@ -20,6 +20,7 @@ from test_support import test_case
 
 import acl
 import handlers_endpoints
+import models
 
 
 def rpc_to_json(rpc_message):
@@ -59,6 +60,23 @@ class CatalogTest(test_case.EndpointsTestCase):
 
   def mock_get_current_backend(self, backend=rpc_messages.Backend.DUMMY):
     self.mock(acl, 'get_current_backend', lambda *args, **kwargs: backend)
+
+  def test_get(self):
+    models.CatalogMachineEntry(
+        key=models.CatalogMachineEntry._generate_key('DUMMY', 'fake-host'),
+        dimensions=rpc_messages.Dimensions(hostname='fake-host'),
+    ).put()
+    request = rpc_to_json(rpc_messages.CatalogMachineRetrievalRequest(
+        hostname='fake-host',
+    ))
+
+    self.mock_get_current_backend()
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('get', request).json,
+        rpc_messages.CatalogMachineRetrievalResponse,
+    )
+    self.assertEqual(response.dimensions.hostname, 'fake-host')
 
   def test_add(self):
     request = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(

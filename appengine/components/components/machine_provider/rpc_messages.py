@@ -13,6 +13,34 @@ from components.machine_provider.instructions import *
 from components.machine_provider.policies import *
 
 
+class CatalogMachineRetrievalRequest(messages.Message):
+  """Represents a request to retrieve a machine from the catalog."""
+  # Hostname of the machine to retrieve.
+  hostname = messages.StringField(1, required=True)
+  # Backend which added the machine.
+  backend = messages.EnumField(Backend, 2)
+
+
+class CatalogMachineRetrievalResponse(messages.Message):
+  """Represents a response to a catalog machine retrieval request."""
+  # Dimensions instance specifying what sort of machine this is.
+  dimensions = messages.MessageField(Dimensions, 1)
+  # Policies governing this machine.
+  policies = messages.MessageField(Policies, 2)
+  # State of the CatalogMachineEntry.
+  state = messages.StringField(3)
+  # Cloud Pub/Sub subscription the machine must listen to for instructions.
+  pubsub_subscription = messages.StringField(4)
+  # Project the Cloud Pub/Sub subscription exists in.
+  pubsub_subscription_project = messages.StringField(5)
+  # Cloud Pub/Sub topic the machine must be subscribed to.
+  pubsub_topic = messages.StringField(6)
+  # Project the Cloud Pub/Sub topic exists in.
+  pubsub_topic_project = messages.StringField(7)
+  # Timestamp indicating lease expiration seconds from epoch in UTC.
+  lease_expiration_ts = messages.IntegerField(8)
+
+
 class CatalogMachineAdditionRequest(messages.Message):
   """Represents a request to add a machine to the catalog.
 

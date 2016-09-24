@@ -234,12 +234,36 @@ class CatalogMachineEntry(CatalogEntry):
     # Enforces per-backend hostname uniqueness.
     assert dimensions.backend is not None
     assert dimensions.hostname is not None
+    return cls._generate_key(dimensions.backend, dimensions.hostname)
+
+  @classmethod
+  def _generate_key(cls, backend, hostname):
+    """Generates the key for a CatalogEntry with the given backend and hostname.
+
+    Args:
+      backend: rpc_messages.Backend.
+      hostname: Hostname of the machine.
+
+    Returns:
+      An ndb.Key instance.
+    """
     return ndb.Key(
         cls,
-        hashlib.sha1(
-            '%s\0%s' % (dimensions.backend, dimensions.hostname)
-        ).hexdigest(),
+        hashlib.sha1('%s\0%s' % (backend, hostname)).hexdigest(),
     )
+
+  @classmethod
+  def get(cls, backend, hostname):
+    """Gets the CatalogEntry with by backend and hostname.
+
+    Args:
+      backend: rpc_messages.Backend.
+      hostname: Hostname of the machine.
+
+    Returns:
+      An ndb.Key instance.
+    """
+    return cls._generate_key(backend, hostname).get()
 
   @classmethod
   def query_available(cls, *filters):
