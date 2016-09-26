@@ -229,6 +229,11 @@
           if (col === "state") {
             params["state"] = [rest];
           } else {
+            if (col === "user" && rest === "none") {
+              // empty string means no user.  We use "none" in the UI because
+              // it is more user friendly.
+              rest = "";
+            }
             tags.push(col + this.FILTER_SEP + swarming.alias.unapply(rest))
           }
         }.bind(this));

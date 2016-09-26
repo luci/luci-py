@@ -167,6 +167,9 @@
           });
         });
 
+        delete map["user"][""];
+        map["user"]["none"] = true;
+
         // Turn the Map<Object,Map<Boolean>> into a Map<Object,Array<String>>
         // with all of the aliases applied.
         var pMap = {};
@@ -183,12 +186,6 @@
           }
         }
 
-        // Add some options that might not show up.
-        pMap["android_devices"].push("0");
-        pMap["device_os"].push("none");
-        pMap["device_type"].push("none");
-        pMap["user"].push("none");
-
         // Custom filter options
         pMap["name"] = [];
         // Some of these are hard coded because the server expects something
@@ -201,6 +198,9 @@
         pMap["deduped_from"] = [];
         pMap["duration"] = [];
         pMap["server_versions"] = [];
+
+        // TODO(kjlubick): Allow a person to sort on the task list by bot
+        pMap["bot"] = [];
         TIMES.forEach(function(t) {
           pMap[t] = [];
         });

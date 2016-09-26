@@ -120,6 +120,14 @@
                 </sort-toggle>
               </th>
 
+              <th hidden$="[[_hide('bot', _columns.*)]]">
+                <span>Bot Assigned</span>
+                <sort-toggle
+                    name="bot"
+                    current="[[_sort]]">
+                </sort-toggle>
+              </th>
+
               <th hidden$="[[_hide('deduped_from', _columns.*)]]">
                 <span>Deduped from</span>
                 <sort-toggle
@@ -168,6 +176,14 @@
                     Cancel
                   </paper-button>
                 </td>
+                <td hidden$="[[_hide('bot', _columns.*)]]">
+                  <a
+                      class="center"
+                      href$="[[_botLink(task.bot_id)]]"
+                      target="_blank">
+                      [[_column('bot',task)]]
+                  </a>
+                </td>
                 <td hidden$="[[_hide('deduped_from', _columns.*)]]">
                   <a
                       class="center"
@@ -208,7 +224,7 @@
   </template>
   <script>
   (function(){
-    var specialColumns = ["deduped_from", "name", "state"];
+    var specialColumns = ["deduped_from", "name", "state", "bot"];
 
     // Given a time attribute like "abandoned_ts", humanTime returns a function
     // that returns the human-friendly version of that attribute. The human
@@ -220,6 +236,9 @@
     }
     var columnMap = {
       abandoned_ts: humanTime("abandoned_ts"),
+      bot: function(task) {
+        return this._attribute(task, "bot_id")[0];
+      },
       completed_ts: humanTime("completed_ts"),
       costs_usd: function(task) {
         return this._attribute(task, "costs_usd", 0)[0];
