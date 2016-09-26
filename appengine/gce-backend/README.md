@@ -11,15 +11,18 @@ eventually consistent, converging on the desired state over multiple calls.
 
 *   Visit http://console.cloud.google.com and create a project. Replace
     `<appid>` below with your project id.
-*   Visit Google Cloud Console, IAM & Admin, click Add Member and add someone
-    else so you can safely be hit by a bus.
-*   Upload the code with: `./tools/gae upl -x -A <appid>`
-*   Enable Pub/Sub and Compute Engine.
+*   Visit Google Cloud Console,
+    *   IAM & Admin, click `Add Member` and add someone else so you can safely
+        be hit by a bus.
+    *   Pub/Sub, click `Enable API`.
+    *   Compute Engine, to enable Compute Engine.
 *   In Pub/Sub, create a topic with the same name as
     pubsub.get\_machine\_provider\_topic(), and a pull subscription with the
     same name as pubsub.get\_machine\_provider\_subscription(). On the topic,
     authorize the Machine Provider's default service account as a publisher,
     e.g. machine-provider@appspot.gserviceaccount.com.
+*   Upload the code with: `./tools/gae upl -x -A <appid>`
+*   Visit https://\<appid\>.appspot.com/auth/bootstrap and click `Proceed`.
 *   If you plan to use a [config service](../config_service),
     *   Make sure it is setup already.
     *   [Follow instruction
@@ -28,9 +31,6 @@ eventually consistent, converging on the desired state over multiple calls.
     *   Make sure it is setup already.
     *   [Follow instructions
         here](../auth_service#linking-isolate-or-swarming-to-auth_service).
-*   _else_
-    *   Visit "_https://\<appid\>.appspot.com/auth/bootstrap_" and click
-        `Proceed`.
 *   Configure the Machine Provider with the
     [config service](https://github.com/luci/luci-py/blob/master/appengine/gce-backend/proto/config.proto)
     or the `instance\_url` property of the

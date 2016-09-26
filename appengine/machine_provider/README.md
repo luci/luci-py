@@ -14,6 +14,7 @@ Services that manages leasing VMs to clients based on desired characteristics.
         from `Editor` to `Owner`.
     *   Pub/Sub, click `Enable API`.
 *   Upload the code with: `./tools/gae upl -x -A <appid>`
+*   Visit https://\<appid\>.appspot.com/auth/bootstrap and click `Proceed`.
 *   If you plan to use a [config service](../config_service),
     *   Make sure it is setup already.
     *   [Follow instruction
@@ -22,7 +23,5 @@ Services that manages leasing VMs to clients based on desired characteristics.
     *   Make sure it is setup already.
     *   [Follow instructions
         here](../auth_service#linking-isolate-or-swarming-to-auth_service).
-*   _else_
-    *   Visit "_https://\<appid\>.appspot.com/auth/bootstrap_" and click
-        `Proceed`.
-*   TODO(smut): Add more.
+*   Visit "_https://\<appid\>.appspot.com/auth/groups_":
+    *   Create [access groups](doc/Access-Groups.md) as relevant.

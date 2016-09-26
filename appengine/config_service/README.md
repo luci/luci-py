@@ -17,6 +17,7 @@
 *   Upload the code with: `./tools/gae upl -x -A <appid>`
 *   Ensure that the import location has been properly configured for access by
     the service account of the config service.
+*   Visit https://\<appid\>.appspot.com/auth/bootstrap and click `Proceed`.
 *   Set the import location and type using the Administration API's
     `globalConfig` setting call:
     *   `https://apis-explorer.appspot.com/apis-explorer/?base=https://<appid>.appspot.com/_ah/api#p/admin/v1/admin.globalConfig`
@@ -27,6 +28,3 @@
     *   Make sure it is setup already.
     *   [Follow instructions
         here](../auth_service#linking-other-services-to-auth_service).
-*   _else_
-    *   Visit `https://\<appid\>.appspot.com/auth/bootstrap` and click
-        `Proceed`.

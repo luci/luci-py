@@ -19,6 +19,7 @@ Swarming is purely a task scheduler service.
         be hit by a bus.
     *   Pub/Sub, click `Enable API`.
 *   Upload the code with: `./tools/gae upl -x -A <appid>`
+*   Visit https://\<appid\>.appspot.com/auth/bootstrap and click `Proceed`.
 *   If you plan to use a [config service](../config_service),
     *   Make sure it is setup already.
     *   [Follow instruction
@@ -27,15 +28,33 @@ Swarming is purely a task scheduler service.
     *   Make sure it is setup already.
     *   [Follow instructions
         here](../auth_service#linking-other-services-to-auth_service).
-*   _else_
-    *   Visit "_https://\<appid\>.appspot.com/auth/bootstrap_" and click
-        `Proceed`.
 *   Visit "_https://\<appid\>.appspot.com/auth/groups_":
     *   Create [access groups](doc/Access-Groups.md) as relevant. Visit the
         "_IP Whitelists_" tab and add bot external IP addresses if needed.
 *   Configure [bot_config.py](swarming_bot/config/bot_config.py) and
     [bootstrap.py](swarming_bot/config/bootstrap.py) as desired. Both are
     optional.
+*   If using [machine_provider](../machine_provider),
+    *   In Pub/Sub, create a topic with the name 'machine-provider, and a pull
+        subscription with the name 'machine-provider'. On the topic, authorize
+        the Machine Provider's default service account as a publisher,
+        e.g. machine-provider@appspot.gserviceaccount.com.
+    *   Ensure the `mp` parameter is enabled in the swarming
+        [config](https://github.com/luci/luci-py/blob/master/appengine/swarming/proto/config.proto).
+    *   Create a MachineType entity in the datastore for each bot pool required:
+        *   The remote shell provides a simple way of creating the entity:
+            *   From the swarming folder:
+
+                ```
+                ./tools/gae shell -A <appid>
+                import server.lease_management as lm
+                machine_type = lm.MachineType('id'='<name>',
+                    mp_dimensions=machine_provider.Dimensions(os_family=machine_provider.OSFamily.LINUX,),
+                    target_size=<num_in_pool>, lease_duration_secs=<value>)
+                machine_type.put()
+                ```
+
+            *   Note that `mp_dimensions` should be adjusted, as required.
 *   Visit "_https://\<appid\>.appspot.com_" and follow the instructions to start
     a bot.
 *   Visit "_https://\<appid\>.appspot.com/restricted/bots_" to ensure the bot is
