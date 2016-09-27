@@ -28,6 +28,7 @@ import handlers_endpoints
 import swarming_rpcs
 
 from server import acl
+from server import bot_code
 from server import bot_management
 from server import config
 from server import large
@@ -68,7 +69,10 @@ class ServerApiTest(BaseTest):
   def test_details(self):
     """Asserts that server_details returns the correct version."""
     response = self.call_api('details')
-    self.assertEqual({'server_version': utils.get_app_version()}, response.json)
+    self.assertEqual({
+      'server_version': utils.get_app_version(),
+      'bot_version': bot_code.get_bot_version('https://testbed.example.com'),
+      }, response.json)
 
   def test_public_permissions(self):
     """Asserts that permissions respond correctly to an unauthed user."""

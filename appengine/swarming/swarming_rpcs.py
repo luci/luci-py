@@ -67,8 +67,14 @@ def to_bool(three_state):
 
 
 class ServerDetails(messages.Message):
-  """Reports the server version."""
+  """Reports details about the server."""
   server_version = messages.StringField(1)
+  bot_version = messages.StringField(2)
+
+
+class BootstrapToken(messages.Message):
+  """Returns a token to bootstrap a new bot."""
+  bootstrap_token = messages.StringField(1)
 
 
 class ClientPermissions(messages.Message):

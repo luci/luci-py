@@ -6,6 +6,7 @@
 
 import datetime
 import logging
+import os
 
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
@@ -133,7 +134,20 @@ class SwarmingServerService(remote.Service):
   @auth.require(acl.is_bot_or_user)
   def details(self, _request):
     """Returns information about the server."""
-    return swarming_rpcs.ServerDetails(server_version=utils.get_app_version())
+    host = 'https://' + os.environ['HTTP_HOST']
+    return swarming_rpcs.ServerDetails(
+        bot_version = bot_code.get_bot_version(host),
+        server_version = utils.get_app_version())
+
+  @gae_ts_mon.instrument_endpoint()
+  @auth.endpoints_method(
+      message_types.VoidMessage, swarming_rpcs.BootstrapToken)
+  @auth.require(acl.is_bootstrapper)
+  def token(self, _request):
+    """Returns a token to bootstrap a new bot."""
+    return swarming_rpcs.BootstrapToken(
+        bootstrap_token = bot_code.generate_bootstrap_token(),
+      )
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
