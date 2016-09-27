@@ -63,6 +63,10 @@
         border: 3px solid #1F78B4;
       }
 
+      .old_version {
+        background-color: #ffffdd;
+      }
+
       paper-checkbox {
         --paper-checkbox-label-color: #fff;
         --paper-checkbox-checked-color: #fff;
@@ -93,6 +97,7 @@
       client_id="[[client_id]]"
       auth_headers="{{_auth_headers}}"
       permissions="{{_permissions}}"
+      server_version="{{_server_version}}"
       signed_in="{{_signed_in}}"
 
       busy="[[_busy]]"
@@ -122,7 +127,7 @@
 
         <div>
           <table>
-            <tr class$="[[_isDead(_bot)]]">
+            <tr class$="[[_isDead(_bot)]]" title="Last time the bot contacted the server.">
               <td>Last Seen</td>
               <td title="[[_bot.human_last_seen_ts]]">
                 [[_timeDiffExact(_bot.last_seen_ts)]] ago</td>
@@ -173,26 +178,32 @@
               </tr>
             </template>
 
-            <tr>
+            <tr title="IP address that the server saw the connection from.">
               <td>External IP</td>
               <td><a href$="[[_bot.external_ip]]">[[_bot.external_ip]]</a></td>
               <td></td>
             </tr>
-            <tr>
-              <td>Swarming Revision</td>
+            <tr
+                class$="[[_classVersion(_server_version.bot_version,_bot.version)]]"
+                title="Version is based on the content of swarming_bot.zip which is the swarming bot code. The bot won't update if quarantined, dead, or busy.">
               <td>
-                <a target="_blank" href$="[[_luciLink(_bot.version)]]">[[_shorten(_bot.version,'8')]]</a>
-              </td>
+                  Bot Version</td>
+                <td>[[_shorten(_bot.version,'8')]]</td>
               <td></td>
             </tr>
-            <tr>
+            <tr title="The version the server expects the bot to be using.">
+              <td>Expected Bot Version</td>
+                <td>[[_shorten(_server_version.bot_version,'8')]]</td>
+              <td></td>
+            </tr>
+            <tr title="First time ever a bot with this id contacted the server.">
               <td>First seen</td>
               <td title="[[_bot.human_first_seen_ts]]">
                 [[_timeDiffApprox(_bot.first_seen_ts)]] ago
               </td>
               <td></td>
             </tr>
-            <tr>
+            <tr title="How the bot is authenticated by the server.">
               <td>Authenticated as</td>
               <td>[[_bot.authenticated_as]]</td>
               <td></td>
@@ -272,7 +283,7 @@
                   <td>[[event.event_type]]</td>
                   <td>[[event.human_ts]]</td>
                   <td><a target="_blank" href$="[[_taskLink(event.task_id)]]">[[event.task_id]]</a></td>
-                  <td>
+                  <td class$="[[_classVersion(_server_version.bot_version,event.version)]]">
                     <a target="_blank" href$="[[_luciLink(event.version)]]">[[_shorten(event.version,'8')]]</a>
                   </td>
                 </tr>
@@ -344,6 +355,13 @@
 
       _canShutdown: function(bot, permissions){
         return bot && !bot.is_dead && permissions.terminate_bot;
+      },
+
+      _classVersion: function(serverVersion, otherVersion) {
+        if (serverVersion !== otherVersion) {
+          return "old_version";
+        }
+        return "";
       },
 
       _concat: function(arr) {

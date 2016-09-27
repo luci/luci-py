@@ -47,7 +47,7 @@
 
     <swarming-app
       client_id="[[client_id]]"
-      auth_headers="{{auth_headers}}"
+      auth_headers="{{_auth_headers}}"
       permissions="{{_permissions}}"
       server_version="{{_server_version}}"
       name="Swarming Server"
@@ -55,6 +55,7 @@
 
       <h2>Service Status</h2>
       <div>Server Version: [[_server_version.server_version]]</div>
+      <div>Bot Version: [[_server_version.bot_version]]</div>
       <ul>
         <li>
           <!-- TODO(kjlubick) convert these linked pages to Polymer-->
@@ -132,10 +133,13 @@
           type: String,
         },
 
+
+        _auth_headers: {
+          type: String,
+        },
         _bootstrap_token: {
           type: String,
-          // TODO(kjlubick): fetch this from an API
-          value: "abc123",
+          value: "...",
         },
         _busy: {
           type: Boolean,
@@ -162,9 +166,26 @@
         },
       },
 
+      observers: ["_fetchBootstrap(_permissions,_auth_headers)"],
+
 
       _cannotBootstrap: function(permissions) {
         return !(permissions && permissions.get_bootstrap_token);
+      },
+
+      _fetchBootstrap: function(permissions, auth_headers) {
+        if (!auth_headers || !permissions || this._cannotBootstrap(permissions)) {
+          return;
+        }
+        this.set("_busy", true);
+
+        sk.request("POST", "/_ah/api/swarming/v1/server/token", undefined, auth_headers).then(JSON.parse).then(function(t) {
+          this.set("_bootstrap_token", t.bootstrap_token);
+          this.set("_busy", false);
+        }.bind(this)).catch(function(reason) {
+          console.log("Could not get token", reason);
+          this.set("_busy", false);
+        }.bind(this));
       },
 
       _makeInstancesUrl: function(details, project_id) {

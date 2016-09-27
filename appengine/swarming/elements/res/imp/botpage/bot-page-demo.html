@@ -74,6 +74,7 @@
 
     var details = {
       server_version: "1234-deadbeef",
+      bot_version: "abcdoeraymeyouandme",
     };
     server.respondWith("GET", /^\/_ah\/api\/swarming\/v1\/server\/details/, JSON.stringify(details));
     server.respondWith("GET", /^\/api\/swarming\/v1\/server\/details/, JSON.stringify(details));

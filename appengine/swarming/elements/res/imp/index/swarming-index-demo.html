@@ -25,6 +25,7 @@
 
     var details = {
       server_version: "1234-deadbeef",
+      bot_version: "abcdoeraymeyouandme",
     };
 
     var respond = function(request){
@@ -45,6 +46,12 @@
     };
     server.respondWith("GET",  /^\/_ah\/api\/swarming\/v1\/server\/permissions/, JSON.stringify(permissions));
     server.respondWith("GET", /^\/api\/swarming\/v1\/server\/permissions/, JSON.stringify(permissions));
+
+    var token = {
+      bootstrap_token: "8675309JennyDontChangeYourNumber8675309"
+    };
+    server.respondWith("POST",  /^\/_ah\/api\/swarming\/v1\/server\/token/, JSON.stringify(token));
+    server.respondWith("POST", /^\/api\/swarming\/v1\/server\/token/, JSON.stringify(token));
     </script>
 
     <link rel="import" href="swarming-index.html">
