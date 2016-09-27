@@ -26,6 +26,9 @@ run: default
 	-wget -nc --output-document=./res/imp/taskpage/milo-sample.html https://raw.githubusercontent.com/wiki/luci/luci-py/milo-sample.html
 	-wget -nc --output-document=./res/imp/taskpage/new-task-demo.json https://raw.githubusercontent.com/wiki/luci/luci-py/new-task-demo.json
 
+	-wget -nc --output-document=./res/imp/index/index-overview-stats-demo.json https://raw.githubusercontent.com/wiki/luci/luci-py/index-overview-stats-demo.json
+	-wget -nc --output-document=./res/imp/stats/stats-overview-demo.json https://raw.githubusercontent.com/wiki/luci/luci-py/stats/stats-overview-demo.json
+
 	node_modules/.bin/http-server -p 9050
 
 

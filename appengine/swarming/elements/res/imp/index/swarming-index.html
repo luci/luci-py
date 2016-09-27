@@ -51,7 +51,7 @@
       permissions="{{_permissions}}"
       server_version="{{_server_version}}"
       name="Swarming Server"
-      busy="[[_busy]]">
+      busy="[[_or(_busy1,busy2)]]">
 
       <h2>Service Status</h2>
       <div>Server Version: [[_server_version.server_version]]</div>
@@ -113,10 +113,15 @@
         </ol>
       </div>
 
+      <!-- TODO(kjlubick): Enable this when the stats endpoint uses oauth
       <h2>Stats</h2>
-      <div>TODO(kjlubick) add these in</div>
-
-
+      <div class="stats">
+        <stats-overview
+          auth_headers=[[_auth_headers]]
+          busy="{{_busy2}}">
+        </stats-overview>
+      </div>
+      -->
     </swarming-app>
 
   </template>
@@ -141,7 +146,11 @@
           type: String,
           value: "...",
         },
-        _busy: {
+        _busy1: {
+          type: Boolean,
+          value: false,
+        },
+        _busy2: {
           type: Boolean,
           value: false,
         },
@@ -177,14 +186,14 @@
         if (!auth_headers || !permissions || this._cannotBootstrap(permissions)) {
           return;
         }
-        this.set("_busy", true);
+        this.set("_busy1", true);
 
         sk.request("POST", "/_ah/api/swarming/v1/server/token", undefined, auth_headers).then(JSON.parse).then(function(t) {
           this.set("_bootstrap_token", t.bootstrap_token);
-          this.set("_busy", false);
+          this.set("_busy1", false);
         }.bind(this)).catch(function(reason) {
           console.log("Could not get token", reason);
-          this.set("_busy", false);
+          this.set("_busy1", false);
         }.bind(this));
       },
 
