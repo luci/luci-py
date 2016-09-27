@@ -404,6 +404,228 @@ class GetInstanceGroupManagerToDeleteTest(test_case.TestCase):
     )
 
 
+class ResizeTest(test_case.TestCase):
+  """Tests for instance_group_managers.resize."""
+
+  def test_resize_none_created(self):
+    def get_instance_group_manager(*args, **kwargs):
+      return {
+          'currentActions': {
+              'none': 0,
+          },
+          'name': 'name',
+      }
+
+    def resize_managed_instance_group(_, name, zone, size):
+      self.assertEqual(name, 'name')
+      self.assertEqual(zone, 'zone')
+      self.assertEqual(size, 10)
+
+    self.mock(
+        instance_group_managers.gce.Project,
+        'get_instance_group_manager',
+        get_instance_group_manager,
+    )
+    self.mock(
+        instance_group_managers.gce.Project,
+        'resize_managed_instance_group',
+        resize_managed_instance_group,
+    )
+
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+        minimum_size=10,
+        url='https://example.com',
+    ).put()
+    models.InstanceTemplateRevision(
+        key=key.parent(),
+        project='fake-project',
+    ).put()
+    models.InstanceTemplate(key=key.parent().parent()).put()
+
+    instance_group_managers.resize(key)
+
+  def test_resize_some_created(self):
+    def get_instance_group_manager(*args, **kwargs):
+      return {
+          'currentActions': {
+              'none': 3,
+          },
+          'name': 'name',
+      }
+
+    def resize_managed_instance_group(_, name, zone, size):
+      self.assertEqual(name, 'name')
+      self.assertEqual(zone, 'zone')
+      self.assertEqual(size, 103)
+
+    self.mock(
+        instance_group_managers.gce.Project,
+        'get_instance_group_manager',
+        get_instance_group_manager,
+    )
+    self.mock(
+        instance_group_managers.gce.Project,
+        'resize_managed_instance_group',
+        resize_managed_instance_group,
+    )
+
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+        minimum_size=1000,
+        url='https://example.com',
+    ).put()
+    models.InstanceTemplateRevision(
+        key=key.parent(),
+        project='fake-project',
+    ).put()
+    models.InstanceTemplate(key=key.parent().parent()).put()
+
+    instance_group_managers.resize(key)
+
+  def test_resize_all_created(self):
+    def get_instance_group_manager(*args, **kwargs):
+      return {
+          'currentActions': {
+              'none': 10,
+          },
+          'name': 'name',
+      }
+
+    def resize_managed_instance_group(_, name, zone, size):
+      self.failIf(True)
+
+    self.mock(
+        instance_group_managers.gce.Project,
+        'get_instance_group_manager',
+        get_instance_group_manager,
+    )
+    self.mock(
+        instance_group_managers.gce.Project,
+        'resize_managed_instance_group',
+        resize_managed_instance_group,
+    )
+
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+        minimum_size=10,
+        url='https://example.com',
+    ).put()
+    models.InstanceTemplateRevision(
+        key=key.parent(),
+        project='fake-project',
+    ).put()
+    models.InstanceTemplate(key=key.parent().parent()).put()
+
+    instance_group_managers.resize(key)
+
+  def test_resize_excess_created(self):
+    def get_instance_group_manager(*args, **kwargs):
+      return {
+          'currentActions': {
+              'none': 2,
+          },
+          'name': 'name',
+      }
+
+    def resize_managed_instance_group(_, name, zone, size):
+      self.failIf(True)
+
+    self.mock(
+        instance_group_managers.gce.Project,
+        'get_instance_group_manager',
+        get_instance_group_manager,
+    )
+    self.mock(
+        instance_group_managers.gce.Project,
+        'resize_managed_instance_group',
+        resize_managed_instance_group,
+    )
+
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+        minimum_size=1,
+        url='https://example.com',
+    ).put()
+    models.InstanceTemplateRevision(
+        key=key.parent(),
+        project='fake-project',
+    ).put()
+    models.InstanceTemplate(key=key.parent().parent()).put()
+
+    instance_group_managers.resize(key)
+
+  def test_resize_other_revisions_created(self):
+    def get_instance_group_manager(*args, **kwargs):
+      return {
+          'currentActions': {
+              'none': 0,
+          },
+          'name': 'name',
+      }
+
+    def resize_managed_instance_group(_, name, zone, size):
+      self.assertEqual(name, 'name')
+      self.assertEqual(zone, 'zone')
+      self.assertEqual(size, 4)
+
+    self.mock(
+        instance_group_managers.gce.Project,
+        'get_instance_group_manager',
+        get_instance_group_manager,
+    )
+    self.mock(
+        instance_group_managers.gce.Project,
+        'resize_managed_instance_group',
+        resize_managed_instance_group,
+    )
+
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision-1',
+            'zone',
+        ),
+        minimum_size=7,
+        url='https://example.com',
+    ).put()
+    models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision-2',
+            'zone',
+        ),
+        instances=[
+            ndb.Key(models.Instance, 'instance-name-1'),
+            ndb.Key(models.Instance, 'instance-name-2'),
+            ndb.Key(models.Instance, 'instance-name-3'),
+        ],
+    ).put()
+    models.InstanceTemplateRevision(
+        key=key.parent(),
+        project='fake-project',
+    ).put()
+    models.InstanceTemplate(key=key.parent().parent()).put()
+
+    instance_group_managers.resize(key)
+
+
 class ScheduleCreationTest(test_case.TestCase):
   """Tests for instance_group_managers.schedule_creation."""
 

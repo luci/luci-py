@@ -306,6 +306,20 @@ def resize(key):
     logging.warning('InstanceTemplateRevision project unspecified: %s', key)
     return
 
+  # Determine how many total VMs exist for all other revisions of this
+  # InstanceGroupManager. Different revisions will all have the same
+  # grandparent InstanceTemplate.
+  other_revision_total_size = 0
+  for igm in models.InstanceGroupManager.query(ancestor=parent.key.parent()):
+    # Find InstanceGroupManagers in the same zone, except the one being resized.
+    if igm.key.id() == key.id() and igm.key != key:
+        logging.info(
+            'Found another revision of InstanceGroupManager: %s\nSize: %s',
+            igm.key,
+            igm.current_size,
+        )
+        other_revision_total_size += igm.current_size
+
   api = gce.Project(parent.project)
   response = api.get_instance_group_manager(get_name(entity), key.id())
 
@@ -316,11 +330,24 @@ def resize(key):
     logging.error('Unexpected response: %s', json.dumps(response, indent=2))
     return
 
-  # Try to reach the target size, but avoid increasing the number of
+  # Try to reach the configured size less the number that exist in other
+  # revisions of the InstanceGroupManager, but avoid increasing the number of
   # instances by more than the resize limit. For now, the target size
   # is just the minimum size.
-  target_size = min(entity.minimum_size, current_size + RESIZE_LIMIT)
-  if current_size >= target_size:
+  target_size = min(
+      entity.minimum_size - other_revision_total_size,
+      current_size + RESIZE_LIMIT,
+  )
+  logging.info(
+      'Key: %s\nSize: %s\nTarget: %s\nMin: %s\nMax: %s\nOther revisions: %s',
+      key,
+      current_size,
+      target_size,
+      entity.minimum_size,
+      entity.maximum_size,
+      other_revision_total_size,
+  )
+  if target_size <= current_size:
     return
 
   api.resize_managed_instance_group(response['name'], key.id(), target_size)
