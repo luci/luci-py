@@ -50,26 +50,34 @@ def decode_message(remote_method_info, request):
     body_type = remote_method_info.request_type
 
   body = PROTOCOL.decode_message(body_type, request.body)
-  if not res_container:
-    return body
+  if res_container:
+    result = res_container.combined_message_class()
+    for f in body.all_fields():
+      setattr(result, f.name, getattr(body, f.name))
+  else:
+    result = body
 
-  msg = res_container.combined_message_class()
-  for f in body.all_fields():
-    setattr(msg, f.name, getattr(body, f.name))
-
-  # We expect fields in the resource container to be in the URL.
-  for f in res_container.parameters_message_class.all_fields():
-    if f.name in request.route_kwargs:
-      values = [request.route_kwargs[f.name]]
+  # Read field values from query string parameters or URL path.
+  if res_container or request.method == 'GET':
+    # In addition to standard ResourceContainer request type, we also support
+    # GET request handlers that use Message instead of ResourceContainer,
+    # because it is non-ambiguous (because GET requests cannot have body).
+    if res_container:
+      param_fields = res_container.parameters_message_class.all_fields()
     else:
-      values = request.get_all(f.name)
-    if values:
-      values = [decode_field(f, v) for v in values]
-      if f.repeated:
-        getattr(msg, f.name).extend(values)
+      param_fields = result.all_fields()
+    for f in param_fields:
+      if f.name in request.route_kwargs:
+        values = [request.route_kwargs[f.name]]
       else:
-        setattr(msg, f.name, values[0])
-  return msg
+        values = request.get_all(f.name)
+      if values:
+        values = [decode_field(f, v) for v in values]
+        if f.repeated:
+          getattr(result, f.name).extend(values)
+        else:
+          setattr(result, f.name, values[0])
+  return result
 
 
 def add_cors_headers(headers):
