@@ -45,12 +45,12 @@
         if (idx !=-1) {
           var name = request.url.substring(idx+1, idx+4);
           item = parseInt(name) || 0;
-          name = Math.max(name - 1, 0);
-          name = Math.min(name, arr.length-1);
+          item = Math.max(item - 1, 0);
+          item = Math.min(item, arr.length-1);
         }
 
 
-        request.respond(200, {"Content-Type":"application/json"}, JSON.stringify(arr[name]));
+        request.respond(200, {"Content-Type":"application/json"}, JSON.stringify(arr[item]));
       }
     }
 

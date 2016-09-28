@@ -35,6 +35,7 @@
 <link rel="import" href="/res/imp/bower_components/polymer/polymer.html">
 
 <link rel="import" href="/res/imp/common/error-toast.html">
+<link rel="import" href="/res/imp/common/pageable-data.html">
 <link rel="import" href="/res/imp/common/single-page-style.html">
 <link rel="import" href="/res/imp/common/swarming-app.html">
 <link rel="import" href="/res/imp/common/task-behavior.html">
@@ -100,7 +101,7 @@
       server_version="{{_server_version}}"
       signed_in="{{_signed_in}}"
 
-      busy="[[_busy]]"
+      busy="[[_or(_busy1,_busy2,_busy3)]]"
       name="Swarming Bot Page">
 
       <h2 hidden$="[[_signed_in]]">You must sign in to see anything useful.</h2>
@@ -113,9 +114,10 @@
           bot_id="[[bot_id]]"
 
           bot="{{_bot}}"
-          busy="{{_busy}}"
+          busy="{{_busy1}}"
           events="{{_events}}"
-          tasks="{{_tasks}}">
+          tasks="{{_tasks}}"
+          on-reload="_clearAndReload">
         </bot-page-data>
 
         <div class="header horizontal layout">
@@ -235,14 +237,14 @@
             <paper-tab>Events</paper-tab>
           </paper-tabs>
 
-          <template is="dom-if" if="[[_selected]]">
+          <template is="dom-if" if="[[_showEvents]]">
             <paper-checkbox checked="{{_show_all}}">
                 Show all events
             </paper-checkbox>
           </template>
         </div>
 
-        <template is="dom-if" if="[[_not(_selected)]]">
+        <template is="dom-if" if="[[_not(_showEvents)]]">
           <table class="tasks_table">
             <thead>
               <tr>
@@ -265,7 +267,7 @@
           </table>
         </template>
 
-        <template is="dom-if" if="[[_selected]]">
+        <template is="dom-if" if="[[_showEvents]]">
           <table class="events_table">
             <thead>
               <tr>
@@ -277,7 +279,7 @@
               </tr>
             </thead>
             <tbody>
-              <template is="dom-repeat" items="{{_eventList(_events,_show_all)}}" as="event">
+              <template is="dom-repeat" items="{{_eventList(_show_all,_events.*)}}" as="event">
                 <tr>
                   <td class="message">[[event.message]]</a></td>
                   <td>[[event.event_type]]</td>
@@ -291,6 +293,25 @@
             </tbody>
           </table>
         </template>
+        <!-- https://github.com/Polymer/polymer/issues/3669 hidden$ doesn't
+            respect truthiness, only booleanness, so we have _showEvents
+            instead of using _selected directly.-->
+        <pageable-data
+          id="page_tasks"
+          hidden$="[[_showEvents]]"
+          busy="{{_busy2}}"
+          label="Show more tasks"
+          output="{{_tasks}}"
+          parse="[[_parseTasks]]">
+        </pageable-data>
+        <pageable-data
+          id="page_events"
+          hidden$="[[_not(_showEvents)]]"
+          busy="{{_busy3}}"
+          label="Show more events"
+          output="{{_events}}"
+          parse="[[_parseEvents]]">
+        </pageable-data>
       </div>
     </swarming-app>
 
@@ -326,6 +347,7 @@
 
         _auth_headers: {
           type: Object,
+          observer: "_reload",
         },
         _bot: {
           type: Object,
@@ -340,8 +362,25 @@
         _show_all: {
           type: Boolean,
         },
+        _showEvents: {
+          type: Boolean,
+          computed: "_truthy(_selected)"
+        },
         _show_state: {
           type: Boolean,
+        },
+
+        _parseEvents: {
+          type: Function,
+          value: function() {
+            return this.$.data.parseEvents.bind(this);
+          }
+        },
+        _parseTasks: {
+          type: Function,
+          value: function() {
+            return this.$.data.parseTasks.bind(this);
+          }
         }
       },
 
@@ -364,6 +403,12 @@
         return "";
       },
 
+      _clearAndReload: function(botID) {
+        this.$.page_tasks.clear();
+        this.$.page_events.clear();
+        this._reload();
+      },
+
       _concat: function(arr) {
         if (!arr) {
           return "";
@@ -376,11 +421,11 @@
           "Deleting "+this.bot_id, this._auth_headers);
       },
 
-      _eventList(events, showAll) {
-        if (!events) {
+      _eventList(showAll) {
+        if (!this._events) {
           return [];
         }
-        return events.filter(function(e){
+        return this._events.filter(function(e){
           return showAll || e.message;
         });
       },
@@ -447,6 +492,18 @@
 
       _refresh: function() {
         this.$.data.request();
+      },
+
+      _reload: function() {
+        if (!this._auth_headers) {
+          return;
+        }
+        var baseUrl = "/_ah/api/swarming/v1/bot/"+this.bot_id;
+        // We limit the fields on these two queries to make them faster.
+        this.$.page_tasks.load(baseUrl + "/tasks?fields=cursor%2Citems(abandoned_ts%2Cbot_version%2Ccompleted_ts%2Cduration%2Cexit_code%2Cfailure%2Cinternal_failure%2Cmodified_ts%2Cname%2Cstarted_ts%2Cstate%2Ctask_id%2Ctry_number)",
+          this._auth_headers, 30);
+        this.$.page_events.load(baseUrl + "/events?fields=cursor%2Citems(event_type%2Cmessage%2Cquarantined%2Ctask_id%2Cts%2Cversion)",
+          this._auth_headers, 50);
       },
 
       _shorten: function(str, length) {

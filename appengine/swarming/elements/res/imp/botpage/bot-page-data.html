@@ -29,11 +29,18 @@
         "state", "task_id", "try_number".
 
   Methods:
+    parseEvents(json): Given the json returned by the server on a request to
+        api/swarming/v1/bot/[botid]/events, return an array of event Objects.
+
+    parseTasks(json):  Given the json returned by the server on a request to
+        api/swarming/v1/bot/[botid]/events, return an array of task Objects.
+
     request(): Force a fetch of the data. This happens automatically when
         auth_headers is set or bot_id is changed.
 
   Events:
-    None.
+    reload: When this element is making a request for data. Other data sources
+        should also reload themselves.
 -->
 
 
@@ -82,7 +89,7 @@
         // outputs
         busy: {
           type: Boolean,
-          computed: "_or(_busy1,_busy2,_busy3)",
+          computed: "_or(_busy1)",
           notify: true,
         },
         bot: {
@@ -90,27 +97,9 @@
           computed: "_parseBot(_bot)",
           notify: true,
         },
-        events: {
-          type: Array,
-          computed: "_parseEvents(_events)",
-          notify: true,
-        },
-        tasks: {
-          type: Array,
-          computed: "_parseTasks(_tasks)",
-          notify: true,
-        },
 
         // private
          _busy1: {
-          type: Boolean,
-          value: false
-        },
-        _busy2: {
-          type: Boolean,
-          value: false
-        },
-        _busy3: {
           type: Boolean,
           value: false
         },
@@ -142,13 +131,7 @@
           var baseUrl = "/_ah/api/swarming/v1/bot/"+this.bot_id;
           this._getJsonAsync("_bot", baseUrl + "/get",
             "_busy1", this.auth_headers);
-          // We limit the fields on these two queries to make them faster.
-          this._getJsonAsync("_events",
-            baseUrl + "/events?fields=items(event_type%2Cmessage%2Cquarantined%2Ctask_id%2Cts%2Cversion)",
-            "_busy2", this.auth_headers);
-          this._getJsonAsync("_tasks",
-            baseUrl + "/tasks?fields=items(abandoned_ts%2Cbot_version%2Ccompleted_ts%2Cduration%2Cexit_code%2Cfailure%2Cinternal_failure%2Cmodified_ts%2Cname%2Cstarted_ts%2Cstate%2Ctask_id%2Ctry_number)",
-            "_busy3", this.auth_headers);
+          this.fire("reload", {id: this.bot_id});
         }, BOT_ID_DEBOUNCE_MS);
 
       },
@@ -195,7 +178,7 @@
         return bot;
       },
 
-      _parseEvents: function(events) {
+      parseEvents: function(events) {
         if (!events || !events.items) {
           return [];
         }
@@ -216,7 +199,7 @@
         return events;
       },
 
-      _parseTasks: function(tasks) {
+      parseTasks: function(tasks) {
         if (!tasks || !tasks.items) {
           return [];
         }
