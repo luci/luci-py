@@ -242,8 +242,10 @@ def get_service_account_certificates(service_account_name):
 
 
 def _fetch_service_certs(service_url):
-  protocol = 'http://' if utils.is_local_dev_server() else 'https://'
-  assert service_url.startswith(protocol)
+  protocol = 'https://'
+  if utils.is_local_dev_server():
+    protocol = ('http://', 'https://')
+  assert service_url.startswith(protocol), (service_url, protocol)
   url = '%s/auth/api/v1/server/certificates' % service_url
 
   # Retry code is adapted from components/net.py. net.py can't be used directly

@@ -18,7 +18,6 @@ from components import utils
 from components.auth import api
 from components.auth import delegation
 from components.auth import model
-from components.auth import signature
 from components.auth import tokens
 from components.auth.proto import delegation_pb2
 
@@ -79,6 +78,10 @@ class SerializationTest(test_case.TestCase):
 
 
 class SignatureTest(test_case.TestCase):
+  def setUp(self):
+    super(SignatureTest, self).setUp()
+    api.reset_local_state()  # to clear request-cached AuthDB
+
   def test_round_trip(self):
     tok = fake_subtoken_proto()
     self.assertEqual(tok, delegation.unseal_token(delegation.seal_token(tok)))
@@ -90,8 +93,8 @@ class SignatureTest(test_case.TestCase):
       delegation.unseal_token(msg)
 
   def test_unknown_signer_id(self):
-    checker = delegation.SignatureChecker() # empty, no trusted signers
-    self.mock(delegation, 'get_signature_checker', lambda: checker)
+    # Empty dict, no trusted signers.
+    self.mock(delegation, 'get_trusted_signers', lambda: {})
     with self.assertRaises(delegation.BadTokenError):
       delegation.unseal_token(delegation.seal_token(fake_subtoken_proto()))
 
@@ -190,6 +193,7 @@ class ValidationTest(test_case.TestCase):
 
 class FullRoundtripTest(test_case.TestCase):
   def test_works(self):
+    api.reset_local_state()  # to clear request-cached AuthDB
     # Subtoken proto.
     tok = fake_subtoken_proto(
         'user:initial@a.com', audience=['user:final@a.com'])
@@ -238,7 +242,8 @@ class CreateTokenTest(test_case.TestCase):
 
     model.AuthReplicationState(
         key=model.replication_state_key(),
-        primary_url='https://example.com'
+        primary_url='https://example.com',
+        primary_id='example-app-id',
     ).put()
 
     args = {

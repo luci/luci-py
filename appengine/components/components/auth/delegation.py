@@ -9,11 +9,9 @@ See delegation.proto for general idea behind it.
 
 import collections
 import datetime
-import functools
 import hashlib
 import json
 import logging
-import threading
 import urllib
 
 from google.appengine.api import urlfetch
@@ -76,81 +74,41 @@ DelegationToken = collections.namedtuple('DelegationToken', [
 ])
 
 
-class SignatureChecker(object):
-  """Defines a set of trusted token signers, used by unseal_token.
-
-  Lives in local instance memory cache (with small expiration time to account
-  for key rotation and possible AuthDB changes). Once constructed (i.e. after
-  last register_trusted_signer call) may be shared by multiple threads.
-
-  Lazily loads requested certs and holds them in memory.
-  """
-  class _TrustedSigner(object):
-    """Synchronizes fetch of some signer's certs, caches them in memory."""
-    def __init__(self, callback):
-      self.lock = threading.Lock()
-      self.callback = callback
-      self.certs = None
-
-  def __init__(self):
-    self._signers = {} # {signer_id => _TrustedSigner}
-
-  def register_trusted_signer(self, signer_id, fetch_callback):
-    """Adds a new trusted signer to this config object.
-
-    Args:
-      signer_id: string with identity name of the signer.
-      fetch_callback: function to grab bundle with certificates, has same return
-          value format as signature.get_service_public_certificates().
-    """
-    assert signer_id not in self._signers
-    self._signers[signer_id] = self._TrustedSigner(fetch_callback)
-
-  def is_trusted_signer(self, signer_id):
-    """True if given identity's signature is meaningful for us.
-
-    Args:
-      signer_id: string with identity name of a signer to check.
-    """
-    return signer_id in self._signers
-
-  def get_certificate_bundle(self, signer_id):
-    """Returns CertificateBundle of a given trusted signer.
-
-    Args:
-      signer_id: string with identity name of a signer.
-
-    Raises:
-      CertificateError if it can't load the certificates.
-    """
-    # Use a lock so that all pending requests wait for a single fetch, instead
-    # of initiating a bunch of redundant fetches.
-    s = self._signers[signer_id]
-    with s.lock:
-      if s.certs is None:
-        s.certs = s.callback()
-        assert isinstance(s.certs, signature.CertificateBundle), s.certs
-    return s.certs
-
-
 @utils.cache_with_expiration(expiration_sec=300)
-def get_signature_checker():
-  """Returns configured SignatureChecker that knows whom to trust."""
-  checker = SignatureChecker()
-  # A service always trusts itself.
-  checker.register_trusted_signer(
-      signer_id=model.get_service_self_identity().to_bytes(),
-      fetch_callback=signature.get_own_public_certificates)
-  # Services linked to some primary auth_service trust that primary.
-  if model.is_replica():
-    state = model.get_replication_state()
-    fetch_callback = functools.partial(
-        signature.get_service_public_certificates,
-        state.primary_url)
-    checker.register_trusted_signer(
-        signer_id=model.Identity('service', state.primary_id).to_bytes(),
-        fetch_callback=fetch_callback)
-  return checker
+def get_trusted_signers():
+  """Returns dict {signer_id => CertificateBundle} with all signers we trust.
+
+  Keys are identity strings (e.g. 'service:<app-id>' and 'user:<email>'), values
+  are CertificateBundle with certificates to use when verifying signatures.
+  """
+  bundles = {}
+  auth_db = api.get_request_auth_db()
+
+  if not auth_db.primary_url:
+    # A primary or standalone service trusts itself.
+    own_app_id = model.get_service_self_identity().to_bytes()
+    bundles[own_app_id] = signature.get_own_public_certificates()
+  else:
+    # Services linked to some primary auth_service trust that primary.
+    prim_app_id = model.Identity('service', auth_db.primary_id).to_bytes()
+    bundles[prim_app_id] = signature.get_service_public_certificates(
+        auth_db.primary_url)
+
+  # Services trust the token server specified in the config.
+  if auth_db.token_server_url:
+    certs = signature.get_service_public_certificates(auth_db.token_server_url)
+    if certs.service_account_name:
+      # Construct Identity to ensure service_account_name is a valid email.
+      tok_server_id = model.Identity('user', certs.service_account_name)
+      bundles[tok_server_id.to_bytes()] = certs
+    else:
+      # This can happen if the token server is too old (pre v1.2.9). Just skip
+      # it then.
+      logging.warning(
+          'The token server at %r didn\'t provide its service account name. '
+          'Old version? Ignoring it.', auth_db.token_server_url)
+
+  return bundles
 
 
 ## Low level API for components.auth and services that know what they are doing.
@@ -246,11 +204,10 @@ def unseal_token(tok):
     raise BadTokenError('signer_id is not a valid identity: %s' % exc)
 
   # Validate the signature.
-  checker = get_signature_checker()
-  if not checker.is_trusted_signer(tok.signer_id):
-    raise BadTokenError('Unknown signer: "%s"' % tok.signer_id)
+  certs = get_trusted_signers().get(tok.signer_id)
+  if not certs:
+    raise BadTokenError('Not a trusted signer: %r' % tok.signer_id)
   try:
-    certs = checker.get_certificate_bundle(tok.signer_id)
     is_valid_sig = certs.check_signature(
         blob=tok.serialized_subtoken,
         key_name=tok.signing_key_id,
@@ -452,6 +409,7 @@ def delegate_async(
       {k: v for k, v in req.iteritems() if v},
   )
 
+  # TODO(vadimsh): Use the token server API (via token_server_url) instead.
   res = yield _authenticated_request_async(
       '%s/auth_service/api/v1/delegation/token/create' % auth_service_url,
       method='POST',
