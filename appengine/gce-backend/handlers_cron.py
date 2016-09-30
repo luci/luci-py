@@ -29,6 +29,14 @@ class CatalogedInstanceRemovalHandler(webapp2.RequestHandler):
     catalog.schedule_removal()
 
 
+class CatalogedInstanceUpdateHandler(webapp2.RequestHandler):
+  """Worker for updating information about cataloged instances."""
+
+  @decorators.require_cronjob
+  def get(self):
+    catalog.schedule_cataloged_instance_update()
+
+
 class ConfigImportHandler(webapp2.RequestHandler):
   """Worker for importing the config."""
 
@@ -184,5 +192,7 @@ def create_cron_app():
       ('/internal/cron/remove-cataloged-instances',
        CatalogedInstanceRemovalHandler),
       ('/internal/cron/resize-instance-groups', InstanceGroupResizeHandler),
+      ('/internal/cron/update-cataloged-instances',
+       CatalogedInstanceUpdateHandler),
       ('/internal/cron/schedule-metadata-tasks', MetadataTaskScheduleHandler),
   ])

@@ -26,18 +26,10 @@ cron:
 - url: /internal/cron/fetch-instances
   schedule: every 1 minutes
 
-- description: read luci-config configs
-  # Handled by inclusion of components/config in app.yaml.
-  url: /internal/cron/config/update
-  schedule: every 1 minutes
-
 - url: /internal/cron/import-config
   schedule: every 1 minutes synchronized
 
 - url: /internal/cron/process-config
-  schedule: every 1 minutes
-
-- url: /internal/cron/process-pubsub-messages
   schedule: every 1 minutes
 
 - url: /internal/cron/remove-cataloged-instances
@@ -46,8 +38,18 @@ cron:
 - url: /internal/cron/resize-instance-groups
   schedule: every 1 minutes
 
+- url: /internal/cron/update-cataloged-instances
+  schedule: every 1 minutes
+
 - url: /internal/cron/schedule-metadata-tasks
   schedule: every 1 minutes
 
+# External Handlers
+
+# components/config
+- url: /internal/cron/config/update
+  schedule: every 1 minutes
+
+# gae_ts_mon
 - url: /internal/cron/ts_mon/send
   schedule: every 1 minutes

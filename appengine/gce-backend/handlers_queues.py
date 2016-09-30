@@ -36,6 +36,21 @@ class CatalogedInstanceRemovalHandler(webapp2.RequestHandler):
     catalog.remove(key)
 
 
+class CatalogedInstanceUpdateHandler(webapp2.RequestHandler):
+  """Worker for updating information about cataloged instances."""
+
+  @decorators.require_taskqueue('update-cataloged-instance')
+  def post(self):
+    """Updates information about a cataloged instance.
+
+    Params:
+      key: URL-safe key for a models.Instance.
+    """
+    key = ndb.Key(urlsafe=self.request.get('key'))
+    assert key.kind() == 'Instance', key
+    catalog.update_cataloged_instance(key)
+
+
 class DeletedInstanceCheckHandler(webapp2.RequestHandler):
   """Worker for checking for deleted instances."""
 
@@ -300,6 +315,8 @@ def create_queues_app():
       ('/internal/queues/remove-cataloged-instance',
        CatalogedInstanceRemovalHandler),
       ('/internal/queues/resize-instance-group', InstanceGroupResizeHandler),
+      ('/internal/queues/update-cataloged-instance',
+       CatalogedInstanceUpdateHandler),
       ('/internal/queues/update-instance-metadata',
        InstanceMetadataUpdateHandler),
   ])

@@ -11,6 +11,7 @@ from google.appengine.ext import ndb
 
 from components import gce
 from components import net
+from components import pubsub
 from components import utils
 
 import instance_group_managers
@@ -38,27 +39,25 @@ def get_instance_key(base_name, revision, zone, instance_name):
   )
 
 
-@ndb.tasklet
+@ndb.transactional
 def mark_for_deletion(key):
   """Marks the given instance for deletion.
 
   Args:
     key: ndb.Key for a models.Instance entity.
   """
-  assert ndb.in_transaction()
-
-  entity = yield key.get_async()
+  entity = key.get()
   if not entity:
     logging.warning('Instance does not exist: %s', key)
     return
 
-  logging.info('Marking Instance for deletion: %s', key)
   if not entity.pending_deletion:
+    logging.info('Marking Instance for deletion: %s', key)
     entity.pending_deletion = True
-    yield entity.put_async()
+    entity.put()
 
 
-@ndb.tasklet
+@ndb.transactional
 def add_subscription_metadata(key, subscription_project, subscription):
   """Queues the addition of subscription metadata.
 
@@ -68,19 +67,20 @@ def add_subscription_metadata(key, subscription_project, subscription):
     subscription: Name of the Pub/Sub subscription that Machine Provider will
       communicate with the instance on.
   """
-  assert ndb.in_transaction()
-
-  entity = yield key.get_async()
+  entity = key.get()
   if not entity:
     logging.warning('Instance does not exist: %s', key)
     return
 
-  parent = yield key.parent().get_async()
+  if entity.pubsub_subscription:
+    return
+
+  parent = key.parent().get()
   if not parent:
     logging.warning('InstanceGroupManager does not exist: %s', key.parent())
     return
 
-  grandparent = yield parent.key.parent().get_async()
+  grandparent = parent.key.parent().get()
   if not grandparent:
     logging.warning(
         'InstanceTemplateRevision does not exist: %s', parent.key.parent())
@@ -101,7 +101,9 @@ def add_subscription_metadata(key, subscription_project, subscription):
           'pubsub_subscription_project': subscription_project,
       },
   ))
-  yield entity.put_async()
+  entity.pubsub_subscription = pubsub.full_subscription_name(
+      subscription_project, subscription)
+  entity.put()
 
 
 def fetch(key):

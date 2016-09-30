@@ -101,12 +101,14 @@ Adds instances to the Machine Provider catalog. Any instance not cataloged and
 not pending deletion is added to the catalog.
 
 
-## process-pubsub-messages
+## update-cataloged-instances
 
-Handles Pub/Sub communication from the Machine Provider. Polls the pull
-subscription for new messages regarding machines and operates accordingly. If
-a machine is SUBSCRIBED, schedules an operation to update its metadata with the
-subscription details. If a machine is RECLAIMED, sets it to pending deletion.
+Checks the state of the instance in the Machine Provider catalog. If the Machine
+Provider has created a Pub/Sub topic for the instance, schedules a metadata
+operation to add Pub/Sub subscription information to the instance. If the
+Machine Provider has reclaimed the instance after lease expiration, schedules
+an operation to delete the GCE instance.
+
 
 ## schedule-metadata-tasks
 

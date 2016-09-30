@@ -101,3 +101,22 @@ def lease_machines(requests):
       payload=utils.to_json_encodable({'requests': requests}),
       scopes=MACHINE_PROVIDER_SCOPES,
   )
+
+
+def retrieve_machine(hostname, backend=None):
+  """Requests information about a machine from the Machine Provider's Catalog.
+
+  Args:
+    hostname: Hostname of the machine to request information about.
+    backend: Backend the machine belongs to.
+  """
+  return net.json_request(
+      '%s/_ah/api/catalog/v1/get' %
+          MachineProviderConfiguration.get_instance_url(),
+      method='POST',
+      payload=utils.to_json_encodable({
+          'backend': backend,
+          'hostname': hostname,
+      }),
+      scopes=MACHINE_PROVIDER_SCOPES,
+  )

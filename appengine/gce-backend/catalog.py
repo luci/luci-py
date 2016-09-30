@@ -12,8 +12,10 @@ from protorpc.remote import protojson
 
 from components import gce
 from components import machine_provider
+from components import net
 from components import utils
 
+import instances
 import instance_group_managers
 import models
 import pubsub
@@ -215,3 +217,43 @@ def schedule_removal():
           ):
             logging.warning(
                 'Failed to enqueue task for Instance: %s', instance.key)
+
+
+def update_cataloged_instance(key):
+  """Updates an Instance based on its state in Machine Provider's catalog.
+
+  Args:
+    key: ndb.Key for a models.Instance entity.
+  """
+  entity = key.get()
+  if not entity:
+    logging.warning('Instance does not exist: %s', key)
+    return
+
+  if not entity.cataloged:
+    return
+
+  try:
+    response = machine_provider.retrieve_machine(key.id())
+    if response.get('pubsub_subscription') and not entity.pubsub_subscription:
+      instances.add_subscription_metadata(
+          key,
+          response['pubsub_subscription_project'],
+          response['pubsub_subscription'],
+      )
+  except net.NotFoundError:
+    instances.mark_for_deletion(key)
+
+
+def schedule_cataloged_instance_update():
+  """Enqueues tasks to update information about cataloged instances."""
+  for instance in models.Instance.query():
+    if instance.cataloged:
+      if not utils.enqueue_task(
+          '/internal/queues/update-cataloged-instance',
+          'update-cataloged-instance',
+          params={
+              'key': instance.key.urlsafe(),
+          },
+      ):
+        logging.warning('Failed to enqueue task for Instance: %s', instance.key)
