@@ -19,23 +19,20 @@ import tempfile
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-# Printed if protoc is missing or too old.
-PROTOC_INSTALL_HELP = r"""Could not find working protocol buffers compiler.
-
-To install it on Linux and Mac run %s.
-
-On Windows you are on your own.
-""" % (os.path.join(THIS_DIR, 'install_protoc.py'))
-
-
-# Where to look for 'protoc' first (before hitting PATH). install_protoc.py
-# installs protoc there.
-DEFAULT_PROTOC_DIR = os.path.join(THIS_DIR, 'protoc')
-
 # Minimally required protoc version.
-MIN_SUPPORTED_PROTOC_VERSION = (2, 5, 0)
+MIN_SUPPORTED_PROTOC_VERSION = (3, 0, 0)
 # Maximally supported protoc version.
-MAX_SUPPORTED_PROTOC_VERSION = (2, 5, 9)
+MAX_SUPPORTED_PROTOC_VERSION = (3, 0, 0)
+
+
+# Printed if protoc is missing or too old.
+PROTOC_INSTALL_HELP = (
+    "Could not find working protoc (%s <= ver <= %s) in PATH." %
+    (
+      '.'.join(map(str, MIN_SUPPORTED_PROTOC_VERSION)),
+      '.'.join(map(str, MAX_SUPPORTED_PROTOC_VERSION)),
+    ))
+
 
 # Paths that should not be searched for *.proto.
 BLACKLISTED_PATHS = [
@@ -67,11 +64,7 @@ def find_proto_files(path, blacklist):
 
 def get_protoc():
   """Returns protoc executable path (maybe relative to PATH)."""
-  protoc_exe = 'protoc.exe' if sys.platform == 'win32' else 'protoc'
-  bundled = os.path.join(DEFAULT_PROTOC_DIR, 'bin', protoc_exe)
-  if os.path.exists(bundled):
-    return bundled
-  return protoc_exe
+  return 'protoc.exe' if sys.platform == 'win32' else 'protoc'
 
 
 def compile_proto(proto_file, import_paths, output_path=None):

@@ -36,8 +36,8 @@ def fake_token_proto():
       pkcs1_sha256_sig='pkcs1_sha256_sig')
 
 
-def fake_subtoken_proto(issuer_id='user:abc@example.com', **kwargs):
-  kwargs['issuer_id'] = issuer_id
+def fake_subtoken_proto(delegated_identity='user:abc@example.com', **kwargs):
+  kwargs['delegated_identity'] = delegated_identity
   kwargs.setdefault('audience', ['*'])
   kwargs.setdefault('services', ['*'])
   kwargs.setdefault('creation_time', int(utils.time_time()))
@@ -201,7 +201,8 @@ class FullRoundtripTest(test_case.TestCase):
     blob = delegation.serialize_token(delegation.seal_token(tok))
     # Deserialize, check sig, validate.
     make_id = model.Identity.from_bytes
-    ident = delegation.check_delegation_token(blob, make_id('user:final@a.com'))
+    ident = delegation.check_bearer_delegation_token(
+        blob, make_id('user:final@a.com'))
     self.assertEqual(make_id('user:initial@a.com'), ident)
 
 

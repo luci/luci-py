@@ -321,8 +321,8 @@ def delegate_async(
     impersonate (str or Identity): a caller can mint a delegation token on some
       else's behalf (effectively impersonating them).
       Only a privileged set of callers can do that.
-      If impersonation is allowed, token's issuer_id field will contain whatever
-      is in 'impersonate' field.
+      If impersonation is allowed, token's delegated_identity field will contain
+      whatever is in 'impersonate' field.
       Example: 'user:abc@example.com'
     auth_service_url (str): the URL for the authentication service that will
       mint the token. Defaults to the URL of the primary if this is a replica.
@@ -446,7 +446,7 @@ def delegate(**kwargs):
 
 
 def check_subtoken(subtoken, peer_identity):
-  """Validates the delegation subtoken, extracts original issuer_id.
+  """Validates the delegation subtoken, extracts delegated_identity.
 
   Args:
     subtoken: instance of delegation_pb2.Subtoken.
@@ -468,9 +468,9 @@ def check_subtoken(subtoken, peer_identity):
   # Verify caller can use the token, figure out a delegated identity.
   check_subtoken_audience(subtoken, peer_identity)
   try:
-    return model.Identity.from_bytes(subtoken.issuer_id)
+    return model.Identity.from_bytes(subtoken.delegated_identity)
   except ValueError as exc:
-    raise BadTokenError('Invalid issuer_id: %s' % exc)
+    raise BadTokenError('Invalid delegated_identity: %s' % exc)
 
 
 def check_subtoken_expiration(subtoken, now):
@@ -546,7 +546,15 @@ def check_subtoken_audience(subtoken, current_identity):
 ## High level API to parse, validate and traverse delegation token.
 
 
-def check_delegation_token(token, peer_identity):
+# TODO(vadimsh): Remove UNKNOWN_KIND from here when all services generate
+# tokens with BEARER_DELEGATION_TOKEN.
+_ACCEPTABLE_DELEGATION_TOKEN_KINDS = (
+  delegation_pb2.Subtoken.UNKNOWN_KIND,
+  delegation_pb2.Subtoken.BEARER_DELEGATION_TOKEN,
+)
+
+
+def check_bearer_delegation_token(token, peer_identity):
   """Decodes the token, checks its validity, extracts delegated Identity.
 
   Logs details about the token.
@@ -563,8 +571,10 @@ def check_delegation_token(token, peer_identity):
     TransientError if token can't be verified due to transient errors.
   """
   subtoken = unseal_token(deserialize_token(token))
+  if subtoken.kind not in _ACCEPTABLE_DELEGATION_TOKEN_KINDS:
+    raise BadTokenError('Not a valid delegation token kind: %s' % subtoken.kind)
   ident = check_subtoken(subtoken, peer_identity)
   logging.debug(
-      'Using delegation token: subtoken_id=%s, issuer_id=%s',
+      'Using delegation token: subtoken_id=%s, delegated_identity=%s',
       subtoken.subtoken_id, ident.to_bytes())
   return ident

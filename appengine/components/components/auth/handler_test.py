@@ -423,7 +423,7 @@ class AuthenticatingHandlerTest(test_case.TestCase):
 
     # TODO(vadimsh): Mint token via some high-level function call.
     subtoken = delegation_pb2.Subtoken(
-        issuer_id='user:delegated@a.com',
+        delegated_identity='user:delegated@a.com',
         audience=['*'],
         services=['*'],
         creation_time=int(utils.time_time()),
@@ -445,7 +445,7 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     # Transient error.
     def mocked_check(*_args):
       raise delegation.TransientError('Blah')
-    self.mock(delegation, 'check_delegation_token', mocked_check)
+    self.mock(delegation, 'check_bearer_delegation_token', mocked_check)
     r = app.get(
         '/request',
         headers={'X-Delegation-Token-V1': tok},

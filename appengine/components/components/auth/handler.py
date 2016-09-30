@@ -101,7 +101,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     """Extracts and verifies Identity, sets up request auth context."""
     # Ensure auth component is configured before executing any code.
     conf = config.ensure_configured()
-    auth_context = api.reinitialize_request_cache()
+    ctx = api.reinitialize_request_cache()
 
     # http://www.html5rocks.com/en/tutorials/security/content-security-policy/
     # https://www.owasp.org/index.php/Content_Security_Policy
@@ -151,7 +151,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
 
     assert self.request.remote_addr
     ip = ipaddr.ip_from_string(self.request.remote_addr)
-    auth_context.peer_ip = ip
+    ctx.peer_ip = ip
 
     # Hack to allow pure IP-whitelist based authentication for bots, until they
     # are switched to use something better.
@@ -163,7 +163,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
           api.is_in_ip_whitelist(model.BOTS_IP_WHITELIST, ip)):
         identity = model.IP_WHITELISTED_BOT_ID
 
-    auth_context.peer_identity = identity
+    ctx.peer_identity = identity
 
     # Verify the caller is allowed to make calls from the given IP. It raises
     # AuthorizationError if IP is not allowed.
@@ -177,8 +177,8 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     delegation_tok = self.request.headers.get(delegation.HTTP_HEADER)
     if delegation_tok:
       try:
-        auth_context.current_identity = delegation.check_delegation_token(
-            delegation_tok, auth_context.peer_identity)
+        ctx.current_identity = delegation.check_bearer_delegation_token(
+            delegation_tok, ctx.peer_identity)
       except delegation.BadTokenError as exc:
         self.authorization_error(
             api.AuthorizationError('Bad delegation token: %s' % exc))
@@ -187,7 +187,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
         logging.error(msg)
         self.abort(500, detail=msg)
     else:
-      auth_context.current_identity = auth_context.peer_identity
+      ctx.current_identity = ctx.peer_identity
 
     try:
       # Fail if XSRF token is required, but not provided.

@@ -69,8 +69,9 @@ class CreateDelegationTokenHandler(auth.ApiHandler):
 
     # A caller can mint a delegation token on some else's behalf (effectively
     # impersonating them). Only a privileged set of callers can do that.
-    # If impersonation is allowed, token's issuer_id field will contain whatever
-    # is in 'impersonate' field. See DelegationConfig in proto/config.proto.
+    # If impersonation is allowed, token's delegated_identity field will contain
+    # whatever is in 'impersonate' field. See DelegationConfig in
+    # proto/config.proto.
     'impersonate': 'user:abc@example.com',
 
     # Optional reason why the token is created. Used only for logging purposes,
@@ -107,12 +108,11 @@ class CreateDelegationTokenHandler(auth.ApiHandler):
       self.abort_with_error(400, text=str(exc))
 
     # Fill in defaults.
-    assert not subtoken.impersonator_id
+    assert not subtoken.requestor_identity
     user_id = auth.get_current_identity().to_bytes()
-    if not subtoken.issuer_id:
-      subtoken.issuer_id = user_id
-    if subtoken.issuer_id != user_id:
-      subtoken.impersonator_id = user_id
+    subtoken.requestor_identity = user_id
+    if not subtoken.delegated_identity:
+      subtoken.delegated_identity = user_id
     subtoken.creation_time = int(utils.time_time())
     if not subtoken.validity_duration:
       subtoken.validity_duration = DEF_VALIDITY_DURATION_SEC
@@ -214,7 +214,7 @@ def subtoken_from_jsonish(d):
     except ValueError as exc:
       raise ValueError(
           'Invalid identity name "%s" in "impersonate": %s' % (imp, exc))
-    msg.issuer_id = str(imp)
+    msg.delegated_identity = str(imp)
 
   return msg
 
@@ -301,18 +301,18 @@ def check_can_create_token(user_id, subtoken):
         (rule.max_validity_duration, subtoken.validity_duration))
 
   # Just delegating one's own identity (not impersonating someone else)? Allow.
-  if subtoken.issuer_id == user_id:
+  if subtoken.delegated_identity == user_id:
     return rule
 
   # Verify it's OK to impersonate a given user.
-  impersonated = auth.Identity.from_bytes(subtoken.issuer_id)
+  impersonated = auth.Identity.from_bytes(subtoken.delegated_identity)
   for principal_set in rule.allowed_to_impersonate:
     if is_identity_in_principal_set(impersonated, principal_set):
       return rule
 
   raise auth.AuthorizationError(
       '"%s" is not allowed to impersonate "%s" on %s' %
-      (user_id, subtoken.issuer_id, subtoken.services or ['*']))
+      (user_id, subtoken.delegated_identity, subtoken.services or ['*']))
 
 
 def get_default_allowed_services(user_id):
@@ -347,13 +347,13 @@ class AuthDelegationSubtoken(ndb.Model):
   # Fields below are extracted from 'subtoken', for indexing purposes.
 
   # Whose authority the token conveys.
-  issuer_id = ndb.StringProperty()
+  delegated_identity = ndb.StringProperty()
   # When the token was created.
   creation_time = ndb.DateTimeProperty()
   # List of services that accept the token (or ['*'] if all).
   services = ndb.StringProperty(repeated=True)
-  # Who initiated the minting request if it is an impersonation token.
-  impersonator_id = ndb.StringProperty()
+  # Who initiated the minting request.
+  requestor_identity = ndb.StringProperty()
 
 
 def register_subtoken(subtoken, rule, intent, caller_ip):
@@ -374,16 +374,18 @@ def register_subtoken(subtoken, rule, intent, caller_ip):
       intent=intent,
       caller_ip=ipaddr.ip_to_string(caller_ip),
       auth_service_version=utils.get_app_version(),
-      issuer_id=subtoken.issuer_id,
+      delegated_identity=subtoken.delegated_identity,
       creation_time=utils.timestamp_to_datetime(subtoken.creation_time*1e6),
       services=list(subtoken.services),
-      impersonator_id=subtoken.impersonator_id)
+      requestor_identity=subtoken.requestor_identity)
   entity.put(use_cache=False, use_memcache=False)
   subtoken_id = entity.key.integer_id()
 
   # Keep a logging entry (extractable via BigQuery) too.
   logging.info(
-      'subtoken: subtoken_id=%d caller_ip=%s issuer_id=%s impersonator_id=%s',
-      subtoken_id, entity.caller_ip, entity.issuer_id, entity.impersonator_id)
+      'subtoken: subtoken_id=%d caller_ip=%s '
+      'delegated_identity=%s requestor_identity=%s',
+      subtoken_id, entity.caller_ip,
+      entity.delegated_identity, entity.requestor_identity)
 
   return subtoken_id

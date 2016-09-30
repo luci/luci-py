@@ -117,7 +117,7 @@ class MachineAuthTest(test_case.TestCase):
       self.call(raw_token=raw_token)
     self.assertTrue(self.has_log('Failed to deserialize the token'))
 
-  def test_bad_issuer_id(self):
+  def test_bad_issued_by_field(self):
     body = self.good_body()
     body.issued_by='not an email'
     with self.assertRaises(machine_auth.BadTokenError):

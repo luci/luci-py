@@ -274,7 +274,7 @@ def initialize_request_auth(remote_address, headers):
   delegation_tok = headers.get(delegation.HTTP_HEADER)
   if delegation_tok:
     try:
-      auth_context.current_identity = delegation.check_delegation_token(
+      auth_context.current_identity = delegation.check_bearer_delegation_token(
           delegation_tok, auth_context.peer_identity)
     except delegation.BadTokenError as exc:
       raise api.AuthorizationError('Bad delegation token: %s' % exc)
