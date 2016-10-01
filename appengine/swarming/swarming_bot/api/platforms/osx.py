@@ -17,6 +17,7 @@ import plistlib
 from utils import tools
 
 import common
+import gpu
 
 
 ## Private stuff.
@@ -214,15 +215,24 @@ def get_gpu():
       if match:
         ven_id = match.group(1)
     dev_id = card['spdisplays_device-id'][2:]
-    dimensions.add(unicode(ven_id))
-    dimensions.add(u'%s:%s' % (ven_id, dev_id))
 
-    if 'spdisplays_gmux-version' in card:
-      state.add('Version: %s' % card['spdisplays_gmux-version'])
+    # Looks like: u'4.0.20 [3.2.8]'
+    version = unicode(card.get('spdisplays_gmux-version', u''))
 
     # VMWare doesn't set it.
-    if 'sppci_model' in card:
-      state.add(unicode(card['sppci_model']))
+    dev_name = unicode(card.get('sppci_model', u''))
+    if dev_name:
+      # The first word is pretty much always the company name on OSX so strip
+      # it.
+      dev_name = dev_name.split(' ', 1)[-1]
+    ven_name, dev_name = gpu.ids_to_names(ven_id, u'', dev_id, dev_name)
+
+    dimensions.add(unicode(ven_id))
+    dimensions.add(u'%s:%s' % (ven_id, dev_id))
+    if version:
+      state.add(u'%s %s %s' % (ven_name, dev_name, version))
+    else:
+      state.add(u'%s %s' % (ven_name, dev_name))
   return sorted(dimensions), sorted(state)
 
 

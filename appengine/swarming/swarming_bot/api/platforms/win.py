@@ -15,6 +15,8 @@ import sys
 
 from utils import tools
 
+import gpu
+
 
 ## Private stuff.
 
@@ -240,10 +242,6 @@ def get_gpu():
   state = set()
   # https://msdn.microsoft.com/library/aa394512.aspx
   for device in wbem.ExecQuery('SELECT * FROM Win32_VideoController'):
-    vp = device.VideoProcessor
-    if vp:
-      state.add(vp)
-
     # The string looks like:
     #  PCI\VEN_15AD&DEV_0405&SUBSYS_040515AD&REV_00\3&2B8E0B4B&0&78
     pnp_string = device.PNPDeviceID
@@ -255,10 +253,17 @@ def get_gpu():
     match = re.search(r'DEV_([0-9A-F]{4})', pnp_string)
     if match:
       dev_id = match.group(1).lower()
-    if device.DriverVersion:
-      state.add('Version: %s' % device.DriverVersion)
+
+    dev_name = device.VideoProcessor or u''
+    version = device.DriverVersion or u''
+    ven_name, dev_name = gpu.ids_to_names(ven_id, u'', dev_id, dev_name)
+
     dimensions.add(unicode(ven_id))
     dimensions.add(u'%s:%s' % (ven_id, dev_id))
+    if version:
+      state.add(u'%s %s %s' % (ven_name, dev_name, version))
+    else:
+      state.add(u'%s %s' % (ven_name, dev_name))
   return sorted(dimensions), sorted(state)
 
 

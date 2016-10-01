@@ -32,6 +32,7 @@ FILES = (
     'api/platforms/android.py',
     'api/platforms/common.py',
     'api/platforms/gce.py',
+    'api/platforms/gpu.py',
     'api/platforms/linux.py',
     'api/platforms/osx.py',
     'api/platforms/posix.py',

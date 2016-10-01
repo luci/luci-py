@@ -14,6 +14,7 @@ import subprocess
 from utils import tools
 
 import common
+import gpu
 
 
 ## Private stuff.
@@ -33,6 +34,16 @@ def _lspci():
     # default and on ARM since they do not have a PCI bus.
     return None
   return [shlex.split(l) for l in lines]
+
+
+@tools.cached
+def _get_nvidia_version():
+  try:
+    with open('/sys/module/nvidia/version', 'rb') as f:
+      # Looks like '367.27'.
+      return f.read().strip()
+  except (IOError, OSError):
+    return None
 
 
 ## Public API.
@@ -134,12 +145,6 @@ def get_cpuinfo():
 def get_gpu():
   """Returns video device as listed by 'lspci'. See get_gpu().
   """
-  try:
-    with open('/proc/driver/nvidia/version', 'rb') as f:
-      version = f.readlines()[0]
-  except (IOError, OSError):
-    version = None
-
   pci_devices = _lspci()
   if not pci_devices:
     # It normally happens on Google Compute Engine as lspci is not installed by
@@ -153,15 +158,29 @@ def get_gpu():
   for line in pci_devices:
     # Look for display class as noted at http://wiki.osdev.org/PCI
     dev_type = re_id.match(line[1]).group(2)
-    if dev_type.startswith('03'):
-      vendor = re_id.match(line[2])
-      device = re_id.match(line[3])
-      ven_id = vendor.group(2)
-      dimensions.add(unicode(ven_id))
-      dimensions.add(u'%s:%s' % (ven_id, device.group(2)))
-      state.add(u'%s %s' % (vendor.group(1), device.group(1)))
-  if version:
-    state.add('Version: %s' % version)
+    if not dev_type or not dev_type.startswith('03'):
+      continue
+    vendor = re_id.match(line[2])
+    device = re_id.match(line[3])
+    if not vendor or not device:
+      continue
+    ven_name = vendor.group(1)
+    ven_id = vendor.group(2)
+    dev_name = device.group(1)
+    dev_id = device.group(2)
+
+    # TODO(maruel): Implement for AMD once needed.
+    version = u''
+    if ven_id == gpu.NVIDIA:
+      version = _get_nvidia_version()
+    ven_name, dev_name = gpu.ids_to_names(ven_id, ven_name, dev_id, dev_name)
+
+    dimensions.add(unicode(ven_id))
+    dimensions.add(u'%s:%s' % (ven_id, dev_id))
+    if version:
+      state.add(u'%s %s %s' % (ven_name, dev_name, version))
+    else:
+      state.add(u'%s %s' % (ven_name, dev_name))
   return sorted(dimensions), sorted(state)
 
 
