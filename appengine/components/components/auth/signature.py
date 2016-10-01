@@ -91,12 +91,22 @@ class CertificateBundle(object):
     """
     return self._jsonish.get('service_account_name')
 
+  @property
+  def app_id(self):
+    """If the service that owns the keys is on GAE, returns its app ID.
+
+    May return None for CertificateBundle objects fetched from old services
+    that do not provide this information. The support was added in v1.2.11.
+    """
+    return self._jsonish.get('app_id')
+
   def to_jsonish(self):
     """Returns JSON-serializable representation of this bundle.
 
     Caller must not modify the returned object.
 
     {
+      'app_id': '<GAE app id or None if not fetched from GAE>',
       'service_account_name': '<email>',
       'certificates': [
         {
@@ -204,6 +214,7 @@ def get_own_public_certificates():
       if attempt == 3:
         raise
   return CertificateBundle({
+    'app_id': app_identity.get_application_id(),
     'service_account_name': utils.get_service_account_name(),
     'certificates': [
       {
