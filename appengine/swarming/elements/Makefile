@@ -9,7 +9,7 @@ default:
 
 # Run a local HTTP server for the demo pages.
 .PHONY: run
-run: default
+run: default common_strings
 	-wget -nc --output-document=./res/imp/botlist/bot-list-demo.json https://raw.githubusercontent.com/wiki/luci/luci-py/bot-list-demo.json
 	-wget -nc --output-document=./res/imp/botlist/bot-list-fleet-data-demo.json https://raw.githubusercontent.com/wiki/luci/luci-py/bot-list-fleet-data-demo.json
 	-wget -nc --output-document=./res/imp/tasklist/task-list-demo.json https://raw.githubusercontent.com/wiki/luci/luci-py/task-list-demo.json
@@ -31,21 +31,36 @@ run: default
 
 	node_modules/.bin/http-server -p 9050
 
+.PHONY: clean
+clean:
+	rm -rf ./build/*
+	mkdir ./build/js
 
 .PHONY: vulcanize
-vulcanize: default
-	rm -rf ./build/*
-	mkdir ./build/js
+vulcanize: clean default common_strings
 	./node_modules/.bin/vulcanize --inline-css --inline-scripts --strip-comments --abspath=./ elements.html | ./node_modules/.bin/html-minifier -o ./build/elements.html --minify-css --minify-js --remove-comments --collapse-whitespace --conservative-collapse
-	cat ./res/imp/bower_components/webcomponentsjs/webcomponents-lite.min.js ./node_modules/skia-common-js/common.js ./res/js/common.js ./res/js/alias.js | ./node_modules/.bin/uglifyjs -o ./build/js/js.js
+	cat ./res/imp/bower_components/webcomponentsjs/webcomponents-lite.min.js ./build/js/common-strings.js ./node_modules/skia-common-js/common.js ./res/js/common.js ./res/js/alias.js | ./node_modules/.bin/uglifyjs -o ./build/js/js.js
 
 .PHONY: debug_build
-debug_build: default
-	rm -rf ./build/*
-	mkdir ./build/js
+debug_build: clean default common_strings
 	cp elements.html ./build/elements.html
-	cat ./res/imp/bower_components/webcomponentsjs/webcomponents-lite.min.js ./node_modules/skia-common-js/common.js ./res/js/common.js ./res/js/alias.js > ./build/js/js.js
+	cat ./res/imp/bower_components/webcomponentsjs/webcomponents-lite.min.js ./build/js/common-strings.js ./node_modules/skia-common-js/common.js ./res/js/common.js ./res/js/alias.js > ./build/js/js.js
 	ln --symbolic ../res/imp/ ./build/
+
+.PHONY: common_strings
+common_strings:
+	echo "(function(){var customUtils = {};" > ./build/js/common-strings.js
+	cat node_modules/common-substrings/lib/customUtils.js node_modules/common-substrings/lib/bst.js node_modules/common-substrings/lib/commonSubstrings.js >> ./build/js/common-strings.js
+	echo "window.Substrings = SuffixTrie;})();" >> ./build/js/common-strings.js
+	# Remove require-js related things.
+	sed -i -e 's/module.exports.getRandomArray/customUtils.getRandomArray/g' ./build/js/common-strings.js
+	sed -i -e 's/module.exports.defaultCompareKeysFunction/customUtils.defaultCompareKeysFunction/g' ./build/js/common-strings.js
+	sed -i -e 's/module.exports.defaultCheckValueEquality/customUtils.defaultCheckValueEquality/g' ./build/js/common-strings.js
+	sed -i -e 's/var customUtils = require.*/ /g' ./build/js/common-strings.js
+	sed -i -e 's/module.exports = BinarySearchTree;/ /g' ./build/js/common-strings.js
+	sed -i -e 's/var BinarySearchTree = require.*/ /g' ./build/js/common-strings.js
+	sed -i -e 's/module.exports = SuffixTrie;/ /g' ./build/js/common-strings.js
+
 
 .PHONY: dev_deploy
 dev_deploy: vulcanize
@@ -62,3 +77,7 @@ local_deploy: vulcanize
 .PHONY: debug_local_deploy
 debug_local_deploy: debug_build
 	../tools/start_servers.py
+
+.PHONY: debug_dev_deploy
+debug_dev_deploy: debug_build
+	../tools/gae upl -A chromium-swarm-dev

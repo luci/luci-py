@@ -13,6 +13,7 @@
   <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1, user-scalable=yes">
   <script src="../bower_components/webcomponentsjs/webcomponents-lite.js"></script>
   <script src="../../../node_modules/skia-common-js/common.js"></script>
+  <script src="../../../build/js/common-strings.js"></script>
   <script src="/res/js/common.js"></script>
   <script src="/res/js/alias.js"></script>
   <script src="../../../node_modules/sinon/pkg/sinon-1.17.5.js"></script>
@@ -29,6 +30,10 @@
     var server = sinon.fakeServer.create();
     server.autoRespond = true;
     server.autoRespondAfter = 1000;
+    sk.now = function(){
+      // for stats, lock in "now" at Wed Sep 28 2016 16:23:04 GMT-0400 (EDT)
+      return 1475094184;
+    }
 
     var genResponse = function(arr) {
       return function(request){

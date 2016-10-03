@@ -43,6 +43,7 @@
 
 <link rel="import" href="bot-page-data.html">
 <link rel="import" href="bot-page-shared-behavior.html">
+<link rel="import" href="bot-page-summary.html">
 
 
 <dom-module id="bot-page">
@@ -66,6 +67,15 @@
 
       .old_version {
         background-color: #ffffdd;
+      }
+
+      .stats {
+        min-width: 700px;
+        flex-grow: 2;
+      }
+
+      #collapse {
+        max-width: 700px;
       }
 
       paper-checkbox {
@@ -127,108 +137,114 @@
           </button>
         </div>
 
-        <div>
-          <table>
-            <tr class$="[[_isDead(_bot)]]" title="Last time the bot contacted the server.">
-              <td>Last Seen</td>
-              <td title="[[_bot.human_last_seen_ts]]">
-                [[_timeDiffExact(_bot.last_seen_ts)]] ago</td>
-              <td>
-              <!-- dom-ifs are slightly less performant than hidden$=, but
-              prevent things from first drawing and then hiding. We prefer to
-              not flash buttons or quarantined messages -->
-                <template is="dom-if" if="[[_canShutdown(_bot,_permissions)]]">
-                  <button class="raised" on-click="_promptShutdown">
-                    Shut Down Gracefully
-                  </button>
-                </template>
-                <template is="dom-if" if="[[_canDelete(_bot,_permissions)]]">
-                  <button class="raised" on-click="_promptDelete">
-                    Delete
-                  </button>
-                </template>
-              </td>
-            </tr>
-            <template is="dom-if" if="[[_bot.quarantined]]">
-              <tr class="quarantined">
-                <td>Quarantined</td>
-                <td colspan="2" class="message">[[_quarantineMessage(_bot)]]</td>
+        <div class="horizontal wrap layout">
+          <div class="flex">
+            <table>
+              <tr class$="[[_isDead(_bot)]]" title="Last time the bot contacted the server.">
+                <td>Last Seen</td>
+                <td title="[[_bot.human_last_seen_ts]]">
+                  [[_timeDiffExact(_bot.last_seen_ts)]] ago</td>
+                <td>
+                <!-- dom-ifs are slightly less performant than hidden$=, but
+                prevent things from first drawing and then hiding. We prefer to
+                not flash buttons or quarantined messages -->
+                  <template is="dom-if" if="[[_canShutdown(_bot,_permissions)]]">
+                    <button class="raised" on-click="_promptShutdown">
+                      Shut Down Gracefully
+                    </button>
+                  </template>
+                  <template is="dom-if" if="[[_canDelete(_bot,_permissions)]]">
+                    <button class="raised" on-click="_promptDelete">
+                      Delete
+                    </button>
+                  </template>
+                </td>
               </tr>
-            </template>
-            <tr>
-              <td>Current Task</td>
-              <td>
-                <a target="_blank" href$="[[_taskLink(_bot.task_id)]]">
-                  [[_task(_bot)]]
-                </a>
-              </td>
-              <td>
-              <!-- TODO(kjlubick) add the cancel button when swarming can
-              cancel running tasks -->
-              </td>
-            </tr>
-            <tr>
-              <td rowspan$="[[_numRows(_bot.dimensions)]]">Dimensions</td>
-            </tr>
-            <template
-                is="dom-repeat"
-                items="[[_bot.dimensions]]"
-                as="dim">
+              <template is="dom-if" if="[[_bot.quarantined]]">
+                <tr class="quarantined">
+                  <td>Quarantined</td>
+                  <td colspan="2" class="message">[[_quarantineMessage(_bot)]]</td>
+                </tr>
+              </template>
               <tr>
-                <td>[[dim.key]]</td>
-                <td>[[_concat(dim.value)]]</td>
+                <td>Current Task</td>
+                <td>
+                  <a target="_blank" href$="[[_taskLink(_bot.task_id)]]">
+                    [[_task(_bot)]]
+                  </a>
+                </td>
+                <td>
+                <!-- TODO(kjlubick) add the cancel button when swarming can
+                cancel running tasks -->
+                </td>
               </tr>
+              <tr>
+                <td rowspan$="[[_numRows(_bot.dimensions)]]">Dimensions</td>
+              </tr>
+              <template
+                  is="dom-repeat"
+                  items="[[_bot.dimensions]]"
+                  as="dim">
+                <tr>
+                  <td>[[dim.key]]</td>
+                  <td>[[_concat(dim.value)]]</td>
+                </tr>
+              </template>
+
+              <tr title="IP address that the server saw the connection from.">
+                <td>External IP</td>
+                <td><a href$="[[_bot.external_ip]]">[[_bot.external_ip]]</a></td>
+                <td></td>
+              </tr>
+              <tr
+                  class$="[[_classVersion(_server_version.bot_version,_bot.version)]]"
+                  title="Version is based on the content of swarming_bot.zip which is the swarming bot code. The bot won't update if quarantined, dead, or busy.">
+                <td>Bot Version</td>
+                <td>[[_shorten(_bot.version,'8')]]</td>
+                <td></td>
+              </tr>
+              <tr title="The version the server expects the bot to be using.">
+                <td>Expected Bot Version</td>
+                <td>[[_shorten(_server_version.bot_version,'8')]]</td>
+                <td></td>
+              </tr>
+              <tr title="First time ever a bot with this id contacted the server.">
+                <td>First seen</td>
+                <td title="[[_bot.human_first_seen_ts]]">
+                  [[_timeDiffApprox(_bot.first_seen_ts)]] ago
+                </td>
+                <td></td>
+              </tr>
+              <tr title="How the bot is authenticated by the server.">
+                <td>Authenticated as</td>
+                <td colspan=2>[[_bot.authenticated_as]]</td>
+              </tr>
+            </table>
+
+            <span class="title">State</span>
+
+            <template is="dom-if" if="[[_not(_show_state)]]">
+              <button on-click="_toggleState">
+                <iron-icon icon="icons:add-circle-outline"></iron-icon>
+              </button>
             </template>
 
-            <tr title="IP address that the server saw the connection from.">
-              <td>External IP</td>
-              <td><a href$="[[_bot.external_ip]]">[[_bot.external_ip]]</a></td>
-              <td></td>
-            </tr>
-            <tr
-                class$="[[_classVersion(_server_version.bot_version,_bot.version)]]"
-                title="Version is based on the content of swarming_bot.zip which is the swarming bot code. The bot won't update if quarantined, dead, or busy.">
-              <td>
-                  Bot Version</td>
-                <td>[[_shorten(_bot.version,'8')]]</td>
-              <td></td>
-            </tr>
-            <tr title="The version the server expects the bot to be using.">
-              <td>Expected Bot Version</td>
-                <td>[[_shorten(_server_version.bot_version,'8')]]</td>
-              <td></td>
-            </tr>
-            <tr title="First time ever a bot with this id contacted the server.">
-              <td>First seen</td>
-              <td title="[[_bot.human_first_seen_ts]]">
-                [[_timeDiffApprox(_bot.first_seen_ts)]] ago
-              </td>
-              <td></td>
-            </tr>
-            <tr title="How the bot is authenticated by the server.">
-              <td>Authenticated as</td>
-              <td>[[_bot.authenticated_as]]</td>
-              <td></td>
-            </tr>
-          </table>
+            <template is="dom-if" if="[[_show_state]]">
+              <button on-click="_toggleState">
+                <iron-icon icon="icons:remove-circle-outline"></iron-icon>
+              </button>
+            </template>
 
-          <span class="title">State</span>
+            <iron-collapse id="collapse" opened="[[_show_state]]">
+              <div class="bot_state">[[_prettyPrint(_bot.state)]]</div>
+            </iron-collapse>
+          </div>
 
-          <template is="dom-if" if="[[_not(_show_state)]]">
-            <button on-click="_toggleState">
-              <iron-icon icon="icons:add-circle-outline"></iron-icon>
-            </button>
-          </template>
-
-          <template is="dom-if" if="[[_show_state]]">
-            <button on-click="_toggleState">
-              <iron-icon icon="icons:remove-circle-outline"></iron-icon>
-            </button>
-          </template>
-
-          <iron-collapse id="collapse" opened="[[_show_state]]">
-            <div class="bot_state">[[_prettyPrint(_bot.state)]]</div>
-          </iron-collapse>
+          <div class="stats flex">
+            <bot-page-summary
+              tasks="[[_tasks]]">
+            </bot-page-summary>
+          </div>
         </div>
 
         <div class="tabs">
@@ -281,7 +297,7 @@
             <tbody>
               <template is="dom-repeat" items="{{_eventList(_show_all,_events.*)}}" as="event">
                 <tr>
-                  <td class="message">[[event.message]]</a></td>
+                  <td class="message">[[event.message]]</td>
                   <td>[[event.event_type]]</td>
                   <td>[[event.human_ts]]</td>
                   <td><a target="_blank" href$="[[_taskLink(event.task_id)]]">[[event.task_id]]</a></td>
@@ -312,7 +328,7 @@
           output="{{_events}}"
           parse="[[_parseEvents]]">
         </pageable-data>
-      </div>
+      </div> <!-- hidden when not signed in-->
     </swarming-app>
 
     <paper-dialog id="prompt" modal on-iron-overlay-closed="_promptClosed">

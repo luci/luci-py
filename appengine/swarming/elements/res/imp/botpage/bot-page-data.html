@@ -219,6 +219,7 @@
           } else {
             var end = task.completed_ts || task.abandoned_ts || task.modified_ts || new Date();
             task.human_duration = this._timeDiffExact(task.started_ts, end);
+            task.duration = (end.getTime() - task.started_ts) / 1000;
           }
 
           task.state = task.state || "UNKNOWN";
