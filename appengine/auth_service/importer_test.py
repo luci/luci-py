@@ -3,7 +3,6 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-import collections
 import datetime
 import logging
 import os
@@ -29,7 +28,6 @@ from test_support import test_case
 # Must be after 'components' import, since they add it to sys.path.
 from google import protobuf
 
-from proto import config_pb2
 import importer
 
 
@@ -123,6 +121,11 @@ class ImporterTest(test_case.TestCase):
       auth.Identity.from_bytes('user:b@example.com'),
     ]
     self.assertEqual(expected, importer.load_group_file(body, 'example.com'))
+
+  def test_load_group_file_gtempaccount(self):
+    self.assertEqual(
+        [auth.Identity.from_bytes('user:blah@domain.org')],
+        importer.load_group_file(r'blah%domain.org@gtempaccount.com', None))
 
   def test_load_group_file_bad_id(self):
     body = 'bad id'

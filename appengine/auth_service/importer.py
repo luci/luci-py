@@ -392,11 +392,13 @@ def load_group_file(body, domain):
   """
   members = []
   for uid in body.strip().splitlines():
+    email = '%s@%s' % (uid, domain) if domain else uid
+    if email.endswith('@gtempaccount.com'):
+      # See https://support.google.com/a/answer/185186?hl=en. These emails look
+      # like 'name%domain@gtempaccount.com'. We convert them to 'name@domain'.
+      email = email[:-len('@gtempaccount.com')].replace('%', '@')
     try:
-      ident = auth.Identity(
-          auth.IDENTITY_USER,
-          '%s@%s' % (uid, domain) if domain else uid)
-      members.append(ident)
+      members.append(auth.Identity(auth.IDENTITY_USER, email))
     except ValueError as exc:
       raise BundleBadFormatError(exc)
   return sorted(members, key=lambda x: x.to_bytes())
