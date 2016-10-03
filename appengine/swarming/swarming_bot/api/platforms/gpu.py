@@ -16,7 +16,7 @@ _VENDOR_MAPPING = {
     u'AMD',
     {
       # http://developer.amd.com/resources/ati-catalyst-pc-vendor-id-1002-li/
-      u'6613': u'Radeon HD 8500',
+      u'6613': u'Radeon R7 240',   # The table is incorrect
       u'6821': u'Radeon R8 M370X', # 'HD 8800M' or 'R7 M380' based on rev_id
       u'683d': u'Radeon HD 7700',
     }),
