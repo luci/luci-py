@@ -32,6 +32,7 @@
 
 <link rel="import" href="/res/imp/common/dynamic-table-behavior.html">
 <link rel="import" href="/res/imp/common/error-toast.html">
+<link rel="import" href="/res/imp/common/pageable-data.html">
 <link rel="import" href="/res/imp/common/sort-toggle.html">
 <link rel="import" href="/res/imp/common/swarming-app.html">
 <link rel="import" href="/res/imp/common/task-behavior.html">
@@ -63,23 +64,23 @@
       auth_headers="{{_auth_headers}}"
       permissions="{{_permissions}}"
       signed_in="{{_signed_in}}"
-      busy="[[_busy]]"
+      busy="[[_or(_busy1,_busy2)]]"
       name="Swarming Task List">
 
       <h2 hidden$="[[_signed_in]]">You must sign in to see anything useful.</h2>
 
       <div hidden$="[[_not(_signed_in)]]">
         <task-list-data
+          id="data"
           auth_headers="[[_auth_headers]]"
           query_params="[[_query_params]]"
-          tasks="{{_items}}"
-          busy="{{_busy}}"
+          tasks="[[_items]]"
+          busy="{{_busy1)}}"
           primary_map="{{_primary_map}}"
           primary_arr="{{_primary_arr}}">
         </task-list-data>
 
         <div class="horizontal layout">
-
           <task-filters
             primary_map="[[_primary_map]]"
             primary_arr="[[_primary_arr]]"
@@ -87,7 +88,6 @@
             query_params="{{_query_params}}"
             filter="{{_filter}}">
           </task-filters>
-
         </div>
 
         <table class="task-list">
@@ -206,8 +206,15 @@
             </template> <!--tasks_table repeat-->
           </tbody>
         </table>
-      </div>
 
+        <pageable-data
+          id="page_tasks"
+          busy="{{_busy2}}"
+          label="Show more tasks"
+          output="{{_items}}"
+          parse="[[_parseTasks]]">
+        </pageable-data>
+      </div>
     </swarming-app>
 
     <paper-dialog id="prompt" modal on-iron-overlay-closed="_promptClosed">
@@ -301,6 +308,20 @@
           type: String,
         },
 
+        _busy1: {
+          type: Boolean,
+          value: false
+        },
+         _busy2: {
+          type: Boolean,
+          value: false
+        },
+        _parseTasks: {
+          type: Function,
+          value: function() {
+            return this.$.data.parseTasks.bind(this);
+          }
+        },
         // The task id to cancel if the prompt is accepted.
         _toCancel: {
           type: String,
@@ -330,6 +351,8 @@
           value: specialSort,
         },
       },
+
+      observers:["reload(_query_params,_auth_headers)"],
 
       _attribute: function(task, col, def) {
         if (def === undefined) {
@@ -368,6 +391,14 @@
         this.set("_toCancel", task.task_id);
         this.set("_dialogPrompt", 'cancel task "'+ task.name +'"');
         this.$.prompt.open();
+      },
+
+      reload: function() {
+        if (!this._auth_headers || !this._query_params) {
+          return;
+        }
+        var url = "/_ah/api/swarming/v1/tasks/list?" + sk.query.fromParamSet(this._query_params);
+        this.$.page_tasks.load(url,this._auth_headers);
       },
 
       _tag: function(task, col) {

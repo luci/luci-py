@@ -19,16 +19,7 @@
     // inputs
     auth_headers: Object, the OAuth2 header to include in the request.  This
         should come from swarming-app.
-    query_params: Object, The query params that will filter the query
-        server-side.  This can have dimensions:Array<String>, quarantined:String
-        and is_dead: String. For example:
-        {
-          "dimensions": ["pool:Skia", "device_type:Sprout"],
-          "quarantined": "FALSE",  // optional
-          "is_dead": "TRUE",       // optional
-        }
-        For a full list of dimensions in the fleet, see the API call:
-        https://[swarming_url]/_ah/api/swarming/v1/bots/dimensions
+
     // outputs
     bots: Array<Object>, all bots returned by the server.  This is an Object
         with at least the following structure:
@@ -104,20 +95,16 @@
           type: Object,
           observer: "signIn",
         },
-        query_params: {
-          type: Object,
-          observer: "_request",
-        },
 
         //outputs
         bots: {
           type: Array,
-          computed: "_bots(_list)",
+          computed: "parseBots(_list)",
           notify: true,
         },
         busy: {
           type: Boolean,
-          computed: "_or(_busy1,_busy2,_busy3)",
+          computed: "_or(_busy2,_busy1)",
           notify: true,
         },
         dimensions: {
@@ -143,15 +130,11 @@
         },
 
         // private
-         _busy1: {
+        _busy1: {
           type: Boolean,
           value: false
         },
         _busy2: {
-          type: Boolean,
-          value: false
-        },
-        _busy3: {
           type: Boolean,
           value: false
         },
@@ -170,17 +153,15 @@
         this._getJsonAsync("_count", "/_ah/api/swarming/v1/bots/count",
           "_busy2", this.auth_headers);
         this._getJsonAsync("_dimensions","/_ah/api/swarming/v1/bots/dimensions",
-          "_busy3", this.auth_headers);
-
-        this._request();
+          "_busy1", this.auth_headers);
       },
 
-      _bots: function(){
-        if (!this._list || !this._list.items) {
+      parseBots: function(json){
+        if (!json || !json.items) {
           return [];
         }
         // Do any preprocessing here
-        this._list.items.forEach(function(bot){
+        json.items.forEach(function(bot){
           // Parse the state, which is a JSON string.  This contains a lot of
           // interesting information like details about the devices attached.
           bot.state = bot.state || "{}";
@@ -228,7 +209,7 @@
           }
 
         }.bind(this));
-        return this._list.items;
+        return json.items;
       },
 
       _fleet: function() {
@@ -299,15 +280,6 @@
         // No need to sort any of this, bot-filters sorts secondary items
         // automatically, especially when the user types a query.
         return pMap;
-      },
-
-      _request: function() {
-        // wait until the user has logged in and the filters have loaded before requesting this to avoid double or even triple requests.
-        if (!this.auth_headers || !this.query_params) {
-          return;
-        }
-        this._getJsonAsync("_list", "/_ah/api/swarming/v1/bots/list",
-          "_busy1", this.auth_headers, this.query_params);
       },
 
     });

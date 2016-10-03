@@ -63,18 +63,20 @@
         },
         query_params: {
           type: Object,
-          observer: "_request",
+        },
+        tasks: {
+          type: Array,
         },
 
         // outputs
         busy: {
           type: Boolean,
-          computed: "_or(_busy1,_busy2,_busy3)",
+          computed: "_or(_busy2,_busy1)",
           notify: true,
         },
         primary_map: {
           type: Object,
-          computed: "_primaryMap(_tags,_dimensions,tasks)",
+          computed: "_primaryMap(_tags,_dimensions,tasks.*)",
           notify: true,
         },
         primary_arr: {
@@ -82,22 +84,14 @@
           computed: "_primaryArr(primary_map)",
           notify: true,
         },
-        tasks: {
-          type: Array,
-          computed: "_tasks(_list)",
-          notify: true,
-        },
+
 
         // private
-         _busy1: {
-          type: Boolean,
-          value: false
-        },
         _busy2: {
           type: Boolean,
           value: false
         },
-        _busy3: {
+        _busy1: {
           type: Boolean,
           value: false
         },
@@ -116,9 +110,7 @@
         this._getJsonAsync("_tags", "/_ah/api/swarming/v1/tasks/tags",
           "_busy2", this.auth_headers);
         this._getJsonAsync("_dimensions","/_ah/api/swarming/v1/bots/dimensions",
-          "_busy3", this.auth_headers);
-
-        this._request();
+          "_busy1", this.auth_headers);
       },
 
       _primaryArr: function(map) {
@@ -127,10 +119,10 @@
         return arr;
       },
 
-      _primaryMap: function(tags, dims, tasks) {
+      _primaryMap: function(tags, dims) {
         tags = (tags && tags.tasks_tags) || [];
         dims = (dims && dims.bots_dimensions) || [];
-        tasks = tasks || [];
+        tasks = this.tasks || [];
         var map = {};
         // We combine all the tags reported by the tags endpoint, all known
         // dimensions from the dimensions endpoint, and the tags seen in the
@@ -208,23 +200,15 @@
         return pMap;
       },
 
-      _request: function() {
-        // wait until the user has logged in and the filters have loaded before requesting this to avoid double or even triple requests.
-        if (!this.auth_headers || !this.query_params) {
-          return;
-        }
-        this._getJsonAsync("_list", "/_ah/api/swarming/v1/tasks/list",
-          "_busy1", this.auth_headers, this.query_params);
-      },
-
-      _tasks: function() {
-        if (!this._list || !this._list.items) {
+      parseTasks: function(json) {
+        console.log("ping", json);
+        if (!json|| !json.items) {
           return [];
         }
         var now = new Date();
 
         // Do any preprocessing here
-        this._list.items.forEach(function(t) {
+        json.items.forEach(function(t) {
           var tagMap = {};
           t.tags = t.tags || [];
           t.tags.forEach(function(tag) {
@@ -250,7 +234,7 @@
             t.human_duration = this._humanDuration(t.duration);
           }
         }.bind(this));
-        return this._list.items;
+        return json.items;
       }
     });
   })();

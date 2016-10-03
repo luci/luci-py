@@ -32,6 +32,7 @@
 <link rel="import" href="/res/imp/common/sort-toggle.html">
 <link rel="import" href="/res/imp/common/swarming-app.html">
 <link rel="import" href="/res/imp/common/url-param.html">
+<link rel="import" href="/res/imp/common/pageable-data.html">
 
 <link rel="import" href="bot-filters.html">
 <link rel="import" href="bot-list-data.html">
@@ -67,7 +68,7 @@
       auth_headers="{{_auth_headers}}"
       signed_in="{{_signed_in}}"
 
-      busy="[[_busy]]"
+      busy="[[_or(_busy1,_busy2)]]"
       name="Swarming Bot List">
 
       <h2 hidden$="[[_signed_in]]">You must sign in to see anything useful.</h2>
@@ -98,11 +99,11 @@
         </div>
 
         <bot-list-data
+          id="data"
           auth_headers="[[_auth_headers]]"
           query_params="[[_query_params]]"
 
-          bots="{{_items}}"
-          busy="{{_busy}}"
+          busy="{{_busy1}}"
           dimensions="{{_dimensions}}"
           fleet="{{_fleet}}"
           primary_map="{{_primary_map}}"
@@ -206,6 +207,13 @@
             </template> <!--bot-table repeat-->
           </tbody>
         </table>
+        <pageable-data
+          id="page_bots"
+          busy="{{_busy2}}"
+          label="Show more bots"
+          output="{{_items}}"
+          parse="[[_parseBots]]">
+        </pageable-data>
       </div>
 
       <error-toast></error-toast>
@@ -456,6 +464,21 @@
           type: String,
         },
 
+        _busy1: {
+          type: Boolean,
+          value: false
+        },
+         _busy2: {
+          type: Boolean,
+          value: false
+        },
+        _parseBots: {
+          type: Function,
+          value: function() {
+            return this.$.data.parseBots.bind(this);
+          }
+        },
+
         // For dynamic table.
         _columnMap: {
           type: Object,
@@ -479,8 +502,9 @@
           type: Object,
           value: specialSort,
         },
-
       },
+
+      observers:["_reload(_query_params,_auth_headers)"],
 
       _botClass: function(bot) {
         if (bot.is_dead) {
@@ -513,6 +537,14 @@
         }
         return "";
       },
+
+      _reload: function() {
+        if (!this._auth_headers || !this._query_params) {
+          return;
+        }
+        var url = "/_ah/api/swarming/v1/bots/list?" + sk.query.fromParamSet(this._query_params);
+        this.$.page_bots.load(url,this._auth_headers);
+      }
 
     });
   })();

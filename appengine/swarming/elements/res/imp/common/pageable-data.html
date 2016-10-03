@@ -34,8 +34,9 @@
     clear(): Reset the element, emptying output.  page() will not work until
         a call to load() has been made.
 
-    load(url, headers, pageSize): Initialize the element and make a call to
-        the server for the first batch of data.
+    load(url, headers, [pageSize]): Initialize the element and make a call to
+        the server for the first batch of data. If [pageSize] is omitted, the
+        server default (or those specified in the url) will be used
 
     page(): Must be called after a call to load().  Fetch the next batch of
         data from the server.
@@ -108,6 +109,7 @@
       clear: function() {
         this.set("output", []);
         this._cursor = null;
+        this._url = "";
       },
 
       load: function(url, headers, pageSize) {
@@ -119,7 +121,8 @@
         }
         this._url = url;
         this._headers = headers;
-        this._page_size = pageSize || 50;
+        this._page_size = pageSize;
+        this._cursor = null;
         this.page();
       },
 
@@ -133,14 +136,19 @@
         }
         this.set("busy", true);
 
-        var url = this._url + "&limit=" + this._page_size;
+        var url = this._url;
+        if (this._page_size) {
+          url += "&limit=" + this._page_size;
+        }
         if (this._cursor) {
           url += "&cursor=" + this._cursor;
         }
 
         sk.request("GET", url, "", this._headers).then(JSON.parse).then(function(json){
           var vals = this.parse(json);
-          if (!this.output) {
+          // !this._cursor means this is our first load and we should empty the
+          // array
+          if (!this._cursor || !this.output) {
             this.set("output", vals);
           } else {
             this.push("output", ...vals);
