@@ -16,7 +16,7 @@ queue:
 - name: pubsub
   rate: 500/s
 
-- name: machine-provider-pubsub
+- name: machine-provider-manage
   rate: 500/s
   # Cron will reschedule, so don't retry on failure.
   retry_parameters:

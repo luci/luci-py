@@ -462,11 +462,6 @@ class BackendTest(AppTestBase):
     ]
     self.assertTrue(cron_job_urls, cron_job_urls)
 
-    # Stub out task queue triggered by /internal/cron/machine_provider_pubsub.
-    self.mock(
-        handlers_frontend.handlers_backend.lease_management,
-        'process_pubsub', lambda *args, **kwargs: None)
-
     # For ereporter.
     for cron_job_url in cron_job_urls:
       self.app.get(
@@ -555,8 +550,8 @@ class BackendTest(AppTestBase):
     )
     task_queues = [
       ('cleanup', '/internal/taskqueue/cleanup_data'),
-      ('machine-provider-pubsub',
-       '/internal/taskqueue/pubsub/machine_provider'),
+      ('machine-provider-manage',
+       '/internal/taskqueue/machine-provider-manage'),
       ('pubsub', '/internal/taskqueue/pubsub/<task_id:[0-9a-f]+>'),
     ]
     self.assertEqual(sorted(zip(*task_queues)[1]), task_queue_urls)

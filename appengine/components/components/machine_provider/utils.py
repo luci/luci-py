@@ -87,6 +87,21 @@ def delete_machine(dimensions):
   )
 
 
+def lease_machine(request):
+  """Lease a machine from the Machine Provider.
+
+  Args:
+    request: An rpc_messages.LeaseRequest instance.
+  """
+  return net.json_request(
+      '%s/_ah/api/machine_provider/v1/lease' %
+          MachineProviderConfiguration.get_instance_url(),
+      method='POST',
+      payload=utils.to_json_encodable(request),
+      scopes=MACHINE_PROVIDER_SCOPES,
+  )
+
+
 def lease_machines(requests):
   """Lease machines from the Machine Provider.
 

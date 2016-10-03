@@ -18,13 +18,13 @@ cron:
   url: /internal/cron/abort_expired_task_to_run
   schedule: every 1 minutes
 
-- description: Manage bots leased from Machine Provider.
-  url: /internal/cron/machine_provider
-  schedule: every 1 minutes synchronized
+- description: Configure Machine Provider leases.
+  url: /internal/cron/machine_provider_config
+  schedule: every 1 minutes
 
-- description: Clean up bots leased from Machine Provider.
-  url: /internal/cron/machine_provider_cleanup
-  schedule: every 5 minutes
+- description: Manage Machine Provider leases.
+  url: /internal/cron/machine_provider_manage
+  schedule: every 1 minutes synchronized
 
 - description: Aggregate all bots dimensions for easier sorting.
   url: /internal/cron/aggregate_bots_dimensions
@@ -33,10 +33,6 @@ cron:
 - description: Aggregate all tasks tags for easier sorting.
   url: /internal/cron/aggregate_tasks_tags
   schedule: every 1 hours
-
-- description: Enqueue task to handle Pub/Sub messages from Machine Provider.
-  url: /internal/cron/machine_provider_pubsub
-  schedule: every 1 minutes
 
 ### ereporter2
 

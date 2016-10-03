@@ -9,9 +9,9 @@ import json
 import logging
 
 import webapp2
-from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.appengine.api import taskqueue
+from google.appengine.ext import ndb
 
 from components import utils
 
@@ -62,13 +62,11 @@ class CronTriggerCleanupDataHandler(webapp2.RequestHandler):
     self.response.out.write('Success.')
 
 
-class CronMachineProviderBotHandler(webapp2.RequestHandler):
-  """Handles bots leased from the Machine Provider."""
+class CronMachineProviderConfigHandler(webapp2.RequestHandler):
+  """Configures entities to lease bots from the Machine Provider."""
 
   @decorators.require_cronjob
   def get(self):
-    BATCH_SIZE = 50
-
     if not config.settings().mp.enabled:
       logging.info('MP support is disabled')
       return
@@ -80,26 +78,12 @@ class CronMachineProviderBotHandler(webapp2.RequestHandler):
         logging.info('Updating Machine Provider server to %s', new_server)
         current_config.modify(instance_url=new_server)
 
-    app_id = app_identity.get_application_id()
-    swarming_server = 'https://%s' % app_identity.get_default_version_hostname()
-    found = 0
-    for machine_type_key in lease_management.MachineType.query().fetch(
-        keys_only=True):
-      lease_requests = lease_management.generate_lease_requests(
-          machine_type_key, app_id, swarming_server)
-      found += len(lease_requests)
-      responses = []
-      while lease_requests:
-        response = machine_provider.lease_machines(lease_requests[:BATCH_SIZE])
-        responses.extend(response.get('responses', []))
-        lease_requests = lease_requests[BATCH_SIZE:]
-      if responses:
-        lease_management.update_leases(machine_type_key, responses)
-    logging.info('Updated %d', found)
+    lease_management.ensure_entities_exist()
+    lease_management.drain_excess()
 
 
-class CronMachineProviderCleanUpHandler(webapp2.RequestHandler):
-  """Cleans up leftover BotInfo entities."""
+class CronMachineProviderManagementHandler(webapp2.RequestHandler):
+  """Manages leases for bots from the Machine Provider."""
 
   @decorators.require_cronjob
   def get(self):
@@ -107,7 +91,7 @@ class CronMachineProviderCleanUpHandler(webapp2.RequestHandler):
       logging.info('MP support is disabled')
       return
 
-    lease_management.clean_up_bots()
+    lease_management.schedule_lease_management()
 
 
 class CronBotsDimensionAggregationHandler(webapp2.RequestHandler):
@@ -173,22 +157,6 @@ class CronTasksTagsAggregationHandler(webapp2.RequestHandler):
         ts=now).put()
 
 
-class CronMachineProviderPubSubHandler(webapp2.RequestHandler):
-  """Listens for Pub/Sub communication from Machine Provider."""
-
-  @decorators.require_cronjob
-  def get(self):
-    if not config.settings().mp.enabled:
-      logging.info('MP support is disabled')
-      return
-
-    taskqueue.add(
-        method='POST', url='/internal/taskqueue/pubsub/machine_provider',
-        queue_name='machine-provider-pubsub')
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
-
-
 class TaskCleanupDataHandler(webapp2.RequestHandler):
   """Deletes orphaned blobs."""
 
@@ -200,15 +168,6 @@ class TaskCleanupDataHandler(webapp2.RequestHandler):
     self.response.out.write('Success.')
 
 
-class TaskMachineProviderPubSubHandler(webapp2.RequestHandler):
-  """Handles Pub/Sub messages from the Machine Provider."""
-
-  @decorators.require_taskqueue('machine-provider-pubsub')
-  def post(self):
-    app_id = app_identity.get_application_id()
-    lease_management.process_pubsub(app_id)
-
-
 class TaskSendPubSubMessage(webapp2.RequestHandler):
   """Sends PubSub notification about task completion."""
 
@@ -218,6 +177,16 @@ class TaskSendPubSubMessage(webapp2.RequestHandler):
     task_scheduler.task_handle_pubsub_task(json.loads(self.request.body))
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
+
+
+class TaskMachineProviderManagementHandler(webapp2.RequestHandler):
+  """Manages a lease for a Machine Provider bot."""
+
+  @decorators.require_taskqueue('machine-provider-manage')
+  def post(self):
+    key = ndb.Key(urlsafe=self.request.get('key'))
+    assert key.kind() == 'MachineLease', key
+    lease_management.manage_lease(key)
 
 
 ### Mapreduce related handlers
@@ -250,17 +219,18 @@ def get_routes():
         CronBotsDimensionAggregationHandler),
     ('/internal/cron/aggregate_tasks_tags',
         CronTasksTagsAggregationHandler),
-    ('/internal/cron/machine_provider', CronMachineProviderBotHandler),
-    ('/internal/cron/machine_provider_cleanup',
-        CronMachineProviderCleanUpHandler),
-    ('/internal/cron/machine_provider_pubsub',
-        CronMachineProviderPubSubHandler),
+
+    # Machine Provider.
+    ('/internal/cron/machine_provider_config',
+        CronMachineProviderConfigHandler),
+    ('/internal/cron/machine_provider_manage',
+        CronMachineProviderManagementHandler),
 
     # Task queues.
     ('/internal/taskqueue/cleanup_data', TaskCleanupDataHandler),
     (r'/internal/taskqueue/pubsub/<task_id:[0-9a-f]+>', TaskSendPubSubMessage),
-    ('/internal/taskqueue/pubsub/machine_provider',
-        TaskMachineProviderPubSubHandler),
+    ('/internal/taskqueue/machine-provider-manage',
+        TaskMachineProviderManagementHandler),
 
     # Mapreduce related urls.
     (r'/internal/taskqueue/mapreduce/launch/<job_id:[^\/]+>',
