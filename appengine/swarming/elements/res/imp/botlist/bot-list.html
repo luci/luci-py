@@ -249,7 +249,9 @@
       "last_seen": "Last Seen",
       "os": "OS",
       "pool": "Pool",
+      "running_time": "Swarming Uptime",
       "status": "Status",
+      "uptime": "Bot Uptime",
       "xcode_version": "XCode Version",
     };
 
@@ -313,6 +315,13 @@
         }
         return this._timeDiffApprox(bot.last_seen_ts) + " ago";
       },
+      running_time: function(bot) {
+        var u = this._state(bot, "running_time");
+        if (!u) {
+          return "unknown";
+        }
+        return sk.human.strDuration(u);
+      },
       status: function(bot) {
         // If a bot is both dead and quarantined, show the deadness over the
         // quarentinedness.
@@ -333,6 +342,13 @@
       },
       task: function(bot) {
         return this._taskId(bot);
+      },
+      uptime: function(bot) {
+        var u = this._state(bot, "uptime");
+        if (!u) {
+          return "unknown";
+        }
+        return sk.human.strDuration(u);
       },
       version: function(bot) {
         var v = bot.version || UNKNOWN
@@ -446,7 +462,17 @@
         var botACol = botA.last_seen_ts;
         var botBCol = botB.last_seen_ts;
         return dir * swarming.naturalCompare(botACol, botBCol)
-      }
+      },
+      running_time: function(dir, botA, botB) {
+        var botACol = this._state(botA, "running_time") || 0;
+        var botBCol = this._state(botB, "running_time") || 0;
+        return dir * swarming.naturalCompare(botACol, botBCol)
+      },
+      uptime: function(dir, botA, botB) {
+        var botACol = this._state(botA, "uptime") || 0;
+        var botBCol = this._state(botB, "uptime") || 0;
+        return dir * swarming.naturalCompare(botACol, botBCol)
+      },
     };
 
     Polymer({
