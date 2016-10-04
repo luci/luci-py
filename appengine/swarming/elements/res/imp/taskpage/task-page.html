@@ -118,7 +118,6 @@
         <task-page-data
           id="data"
           auth_headers="[[_auth_headers]]"
-          refresh_interval="[[_refresh_interval]]"
           task_id="[[task_id]]"
 
           busy="{{_busy}}"
@@ -428,6 +427,7 @@
                 class="refresh_input"
                 label="Refresh Interval (seconds)"
                 value="{{_refresh_interval}}"
+                title="How often to refresh all information about the task"
                 auto-validate
                 min="1"
                 max="1000"
@@ -457,7 +457,7 @@
 
     <error-toast></error-toast>
 
-    <interval-timer period="[[_refresh_interval]]" on-trigger="_refreshOutput">
+    <interval-timer period="[[_refresh_interval]]" on-trigger="_softRefresh">
     </interval-timer>
 
   </template>
@@ -651,17 +651,22 @@
         this.$.data.reload();
       },
 
-      _refreshOutput: function() {
-        this.$.data.reloadStdout();
-        var miloFrame = this.$$("iframe")
-        if (miloFrame) {
-          miloFrame.src = this._getMiloLink(this.milo_prefix,this.task_id);
-        }
-      },
-
       _requestUpdated: function(request) {
         if (this._noMilo(request)) {
           this.set("_show_raw", 1);
+        }
+      },
+
+      _softRefresh: function() {
+        if (this._result && this._result.state !== "RUNNING" &&
+            this._result.state !==  "PENDING") {
+          console.log("Don't reload because not running");
+          return;
+        }
+        this.$.data.reload();
+        var miloFrame = this.$$("iframe")
+        if (miloFrame) {
+          miloFrame.src = this._getMiloLink(this.milo_prefix,this.task_id);
         }
       },
 

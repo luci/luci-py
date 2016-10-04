@@ -136,6 +136,14 @@
                 </sort-toggle>
               </th>
 
+              <th hidden$="[[_hide('sk_revision', _columns.*)]]">
+                <span>Skia Revision</span>
+                <sort-toggle
+                    name="sk_revision"
+                    current="[[_sort]]">
+                </sort-toggle>
+              </th>
+
               <template
                     is="dom-repeat"
                     items="[[_plainColumns]]"
@@ -190,6 +198,15 @@
                       href$="[[_taskLink(task.deduped_from)]]"
                       target="_blank">
                       [[_column('deduped_from',task)]]
+                  </a>
+                </td>
+
+                <td hidden$="[[_hide('sk_revision', _columns.*)]]">
+                  <a
+                      class="center"
+                      href$="[[_skLink(task)]]"
+                      target="_blank">
+                      [[_column('sk_revision',task)]]
                   </a>
                 </td>
 
@@ -253,6 +270,10 @@
       created_ts: humanTime("created_ts"),
       duration: humanTime("duration"),
       modified_ts: humanTime("modified_ts"),
+      sk_revision: function(task) {
+        var r = this._attribute(task, "sk_revision")[0];
+        return r.substring(0,8);
+      },
       started_ts: humanTime("started_ts"),
       state: function(task) {
         var state = this._attribute(task, "state")[0];
@@ -399,6 +420,14 @@
         }
         var url = "/_ah/api/swarming/v1/tasks/list?" + sk.query.fromParamSet(this._query_params);
         this.$.page_tasks.load(url,this._auth_headers);
+      },
+
+      _skLink: function(task) {
+        var r = this._attribute(task, "sk_revision")[0];
+        if (r === "none") {
+          return false;
+        }
+        return "https://skia.googlesource.com/skia/+/" + r;
       },
 
       _tag: function(task, col) {

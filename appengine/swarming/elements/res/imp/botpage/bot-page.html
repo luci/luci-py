@@ -78,6 +78,12 @@
         max-width: 700px;
       }
 
+      .cloud {
+        white-space: nowrap;
+        margin-bottom: 5px;
+        margin-top: auto;
+      }
+
       paper-checkbox {
         --paper-checkbox-label-color: #fff;
         --paper-checkbox-checked-color: #fff;
@@ -132,6 +138,11 @@
 
         <div class="header horizontal layout">
           <paper-input class="id_input" label="Bot id" value="{{bot_id}}"></paper-input>
+          <template is="dom-if" if="[[_ccLink(_bot)]]">
+            <div class="vertical layout">
+              <a href$="[[_ccLink(_bot)]]" class="cloud">Cloud Console</a>
+            </div>
+          </template>
           <button on-click="_refresh">
             <iron-icon class="refresh" icon="icons:refresh"></iron-icon>
           </button>
@@ -169,7 +180,8 @@
               <tr>
                 <td>Current Task</td>
                 <td>
-                  <a target="_blank" href$="[[_taskLink(_bot.task_id)]]">
+                  <a target="_blank" rel="noopener"
+                      href$="[[_taskLink(_bot.task_id)]]">
                     [[_task(_bot)]]
                   </a>
                 </td>
@@ -273,7 +285,12 @@
             <tbody>
               <template is="dom-repeat" items="{{_tasks}}" as="task">
                 <tr class$="[[_taskClass(task)]]">
-                  <td><a target="_blank" href$="[[_taskLink(task.task_id)]]">[[task.name]]</a></td>
+                  <td>
+                    <a target="_blank" rel="noopener"
+                        href$="[[_taskLink(task.task_id)]]">
+                      [[task.name]]
+                    </a>
+                  </td>
                   <td>[[task.human_started_ts]]</td>
                   <td title="[[task.human_completed_ts]]">[[task.human_duration]]</td>
                   <td>[[task.state]]</td>
@@ -300,9 +317,17 @@
                   <td class="message">[[event.message]]</td>
                   <td>[[event.event_type]]</td>
                   <td>[[event.human_ts]]</td>
-                  <td><a target="_blank" href$="[[_taskLink(event.task_id)]]">[[event.task_id]]</a></td>
+                  <td>
+                    <a target="_blank" rel="noopener"
+                        href$="[[_taskLink(event.task_id)]]">
+                      [[event.task_id]]
+                    </a>
+                  </td>
                   <td class$="[[_classVersion(_server_version.bot_version,event.version)]]">
-                    <a target="_blank" href$="[[_luciLink(event.version)]]">[[_shorten(event.version,'8')]]</a>
+                    <a target="_blank" rel="noopener"
+                        href$="[[_luciLink(event.version)]]">
+                      [[_shorten(event.version,'8')]]
+                    </a>
                   </td>
                 </tr>
               </template>
@@ -423,6 +448,22 @@
         this.$.page_tasks.clear();
         this.$.page_events.clear();
         this._reload();
+      },
+
+      _ccLink: function(bot) {
+        // We create a link to this bot in cloud console if we detect it is
+        // on GCE.  We look for the zone dimension and create the link using
+        // that.
+        if (!bot || !bot.dimensions) {
+          return false;
+        }
+        var link;
+        bot.dimensions.forEach(function(d){
+          if (d.key === "zone") {
+            link = this._cloudConsoleLink(d.value[0], bot.bot_id);
+          }
+        }.bind(this))
+        return link;
       },
 
       _concat: function(arr) {

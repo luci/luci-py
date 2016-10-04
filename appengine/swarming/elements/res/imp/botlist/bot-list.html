@@ -132,6 +132,13 @@
               array (we are listening to all subproperties). The element returned is
               not of much use, so we'll ignore it in _hide() and use this._columns.
               -->
+              <th hidden$="[[_hide('cloud_console_link', _columns.*)]]">
+                <span>Bot in Cloud Console</span>
+                <sort-toggle
+                    name="cloud_console_link"
+                    current="[[_sort]]">
+                </sort-toggle>
+              </th>
               <th hidden$="[[_hide('task', _columns.*)]]">
                 <span>Current Task</span>
                 <sort-toggle
@@ -167,9 +174,13 @@
                   <a
                       class="center"
                       href$="[[_botLink(bot.bot_id)]]"
-                      target="_blank">
+                      target="_blank"
+                      rel="noopener">
                       [[bot.bot_id]]
                   </a>
+                </td>
+                <td hidden$="[[_hide('cloud_console_link', _columns.*)]]">
+                  <a href$="[[_ccLink(bot)]]">[[_ccText(bot)]]</a>
                 </td>
                 <td hidden$="[[_hide('task', _columns.*)]]">
                   <a href$="[[_taskLink(bot.task_id)]]">[[_taskId(bot)]]</a>
@@ -540,6 +551,22 @@
           return "quarantined";
         }
         return "";
+      },
+
+      _ccLink: function(bot){
+        var z = this._attribute(bot, "zone")[0];
+        if (z === "unknown") {
+          return undefined;
+        }
+        return this._cloudConsoleLink(z, bot.bot_id);
+      },
+
+      _ccText: function(bot){
+        var z = this._attribute(bot, "zone")[0];
+        if (z === "unknown") {
+          return "Not on GCE";
+        }
+        return "View Bot";
       },
 
       _androidAliasDevice: function(device) {
