@@ -195,7 +195,12 @@
             o.okay = (o.state === AVAILABLE);
             // It is easier to assume all devices on a bot are of the same type
             // than to pick through the (incomplete) device state and find it.
-            o.device_type = this._dimension(bot, "device_type")[0];
+            // Bots that are quarentined because they have no devices
+            // still have devices in their state (the last known device attached)
+            // but don't have the device_type dimension. In that case, we punt
+            // on device type.
+            var types = this._dimension(bot, "device_type") || ["unknown"];
+            o.device_type = types[0];
             o.temp = aggregateTemps(o.temp);
             devices.push(o);
           }
