@@ -6,6 +6,7 @@
 
 from components import utils
 
+import gae_event_mon
 import gae_ts_mon
 
 import config
@@ -31,6 +32,7 @@ def main():
   for app in apps[1:]:
     # Not callable on endpoints app
     gae_ts_mon.initialize(app=app, is_enabled_fn=is_enabled_callback)
+  gae_event_mon.initialize('gce-backend')
   metrics.initialize()
   return apps
 

@@ -13,6 +13,7 @@ from components import gce
 from components import net
 from components import utils
 
+import metrics
 import models
 import utilities
 
@@ -112,6 +113,7 @@ def compress(key):
     return
 
   compress_pending_metadata_updates(key)
+  metrics.send_machine_event('METADATA_UPDATE_READY', key.id())
 
 
 @ndb.transactional
@@ -189,6 +191,7 @@ def update(key):
       apply_metadata_update(
           result['metadata']['items'], entity.active_metadata_update.metadata),
   )
+  metrics.send_machine_event('METADATA_UPDATE_SCHEDULED', key.id())
 
   associate_metadata_operation(
       key,
@@ -284,8 +287,11 @@ def check(key):
         key,
         json.dumps(result, indent=2),
     )
+    metrics.send_machine_event('METADATA_UPDATE_FAILED', key.id())
     reschedule_active_metadata_update(key, entity.active_metadata_update.url)
+    metrics.send_machine_event('METADATA_UPDATE_READY', key.id())
   else:
+    metrics.send_machine_event('METADATA_UPDATE_SUCCEEDED', key.id())
     clear_active_metadata_update(key, entity.active_metadata_update.url)
 
 

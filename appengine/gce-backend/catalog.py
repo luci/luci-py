@@ -17,6 +17,7 @@ from components import utils
 
 import instances
 import instance_group_managers
+import metrics
 import models
 import pubsub
 
@@ -143,6 +144,7 @@ def catalog(key):
     return
 
   set_cataloged(key, True)
+  metrics.send_machine_event('CATALOGED', key.id())
 
 
 def schedule_catalog():
@@ -236,11 +238,13 @@ def update_cataloged_instance(key):
   try:
     response = machine_provider.retrieve_machine(key.id())
     if response.get('pubsub_subscription') and not entity.pubsub_subscription:
+      metrics.send_machine_event('SUBSCRIPTION_RECEIVED', key.id())
       instances.add_subscription_metadata(
           key,
           response['pubsub_subscription_project'],
           response['pubsub_subscription'],
       )
+      metrics.send_machine_event('METADATA_UPDATE_PROPOSED', key.id())
   except net.NotFoundError:
     instances.mark_for_deletion(key)
 

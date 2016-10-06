@@ -16,6 +16,7 @@ from components import utils
 import instance_group_managers
 import instance_templates
 import instances
+import metrics
 import models
 import utilities
 
@@ -312,6 +313,7 @@ def cleanup_deleted_instance(key):
 
   logging.info('Deleting Instance entity: %s', key)
   key.delete()
+  metrics.send_machine_event('DELETED', key.id())
 
 
 def schedule_deleted_instance_cleanup():

@@ -15,6 +15,7 @@ from components import pubsub
 from components import utils
 
 import instance_group_managers
+import metrics
 import models
 import utilities
 
@@ -55,6 +56,7 @@ def mark_for_deletion(key):
     logging.info('Marking Instance for deletion: %s', key)
     entity.pending_deletion = True
     entity.put()
+    metrics.send_machine_event('DELETION_PROPOSED', key.id())
 
 
 @ndb.transactional
@@ -168,6 +170,7 @@ def ensure_entity_exists(key, url):
 
   logging.info('Creating Instance entity: %s', key)
   yield models.Instance(key=key, url=url).put_async()
+  metrics.send_machine_event('CREATED', key.id())
 
 
 @ndb.transactional
@@ -252,9 +255,12 @@ def _delete(instance_template_revision, instance_group_manager, instance):
           parent.key,
           json.dumps(result, indent=2),
       )
+    else:
+      metrics.send_machine_event('DELETION_SCHEDULED', instance.key.id())
   except net.Error as e:
-    if e.status_code != 400:
-      # If the instance isn't found, assume it's already deleted.
+    if e.status_code == 400:
+      metrics.send_machine_event('DELETION_SUCCEEDED', instance.key.id())
+    else:
       raise
 
 

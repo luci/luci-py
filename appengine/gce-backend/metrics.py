@@ -4,6 +4,9 @@
 
 """Metrics to track with ts_mon and event_mon."""
 
+import logging
+
+import gae_event_mon
 import gae_ts_mon
 
 import instances
@@ -56,3 +59,18 @@ def initialize():
   gae_ts_mon.register_global_metrics(GLOBAL_METRICS.values())
   gae_ts_mon.register_global_metrics_callback(
       'callback', compute_global_metrics)
+
+
+def send_machine_event(state, hostname):
+  """Sends an event_mon event about a GCE instance.
+
+  Args:
+    state: gae_event_mon.ChromeInfraEvent.GCEBackendMachineState.
+    hostname: Name of the GCE instance this event is for.
+  """
+  state = gae_event_mon.MachineProviderEvent.GCEBackendMachineState.Value(state)
+  event = gae_event_mon.Event('POINT')
+  event.proto.event_source.host_name = hostname
+  event.proto.machine_provider_event.gce_backend_state = state
+  logging.info('Sending event: %s', event.proto)
+  event.send()
