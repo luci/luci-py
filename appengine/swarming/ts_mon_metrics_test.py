@@ -122,11 +122,12 @@ class TestMetrics(test_case.TestCase):
         'master:test_master',
         'buildername:test_builder',
         'name:some_tests',
+        'spec_name:my:custom:test:spec:name',
     ]
     fields = {
         'project_id': 'test_project',
         'subproject_id': 'test_subproject',
-        'spec_name': 'test_master:test_builder:some_tests',
+        'spec_name': 'my:custom:test:spec:name',
     }
     summary = _gen_task_result_summary(self.now, 1, tags=tags)
 

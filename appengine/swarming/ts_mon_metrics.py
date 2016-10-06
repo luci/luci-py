@@ -133,12 +133,17 @@ def extract_job_fields(tags):
     except ValueError:
       pass
 
+  spec_name = tags_dict.get('spec_name')
+  if not spec_name:
+    spec_name = '%s:%s:%s' % (
+        tags_dict.get('master', ''),
+        tags_dict.get('buildername', ''),
+        tags_dict.get('name', ''))
+
   fields = {
       'project_id': tags_dict.get('project', ''),
       'subproject_id': tags_dict.get('subproject', ''),
-      'spec_name': '%s:%s:%s' % (tags_dict.get('master', ''),
-                                 tags_dict.get('buildername', ''),
-                                 tags_dict.get('name', '')),
+      'spec_name': spec_name,
   }
   return fields
 
