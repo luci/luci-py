@@ -84,6 +84,12 @@ class _BotCommon(ndb.Model):
   # 'task_error'.
   task_id = ndb.StringProperty(indexed=False)
 
+  # Machine Provider lease ID, for bots acquired from Machine Provider.
+  lease_id = ndb.StringProperty(indexed=False)
+
+  # UTC seconds from epoch when bot will be reclaimed by Machine Provider.
+  lease_expiration_ts = ndb.DateTimeProperty(indexed=False)
+
   @property
   def dimensions(self):
     """Returns a dict representation of self.dimensions_flat."""
@@ -175,8 +181,8 @@ class BotEvent(_BotCommon):
   This entity is created on each bot state transition.
   """
   ALLOWED_EVENTS = {
-    'bot_connected', 'bot_error', 'bot_log', 'bot_rebooting', 'bot_shutdown',
-    'bot_terminate',
+    'bot_connected', 'bot_error', 'bot_leased', 'bot_log', 'bot_rebooting',
+    'bot_shutdown', 'bot_terminate',
     'request_restart', 'request_update', 'request_sleep', 'request_task',
     'task_completed', 'task_error', 'task_update',
   }
@@ -312,6 +318,9 @@ def bot_event(
   - task_id: packed task id if relevant. Set to '' to zap the stored value.
   - task_name: task name if relevant. Zapped when task_id is zapped.
   - kwargs: optional values to add to BotEvent relevant to event_type.
+  - lease_id (in kwargs): ID assigned by Machine Provider for this bot.
+  - lease_expiration_ts (in kwargs): UTC seconds from epoch when Machine
+        Provider lease expires.
   """
   if not bot_id:
     return
@@ -334,6 +343,10 @@ def bot_event(
     bot_info.task_name = task_name
   if version is not None:
     bot_info.version = version
+  if kwargs.get('lease_id') is not None:
+    bot_info.lease_id = kwargs['lease_id']
+  if kwargs.get('lease_expiration_ts') is not None:
+    bot_info.lease_expiration_ts = kwargs['lease_expiration_ts']
 
   if event_type in ('request_sleep', 'task_update'):
     # Handle this specifically. It's not much of an even worth saving a BotEvent

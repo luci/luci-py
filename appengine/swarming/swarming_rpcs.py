@@ -453,6 +453,8 @@ class BotInfo(messages.Message):
   version = messages.StringField(11)
   # Encoded as json since it's an arbitrary dict.
   state = messages.StringField(12)
+  lease_id = messages.StringField(13)
+  lease_expiration_ts = message_types.DateTimeField(14)
 
 
 class BotList(messages.Message):

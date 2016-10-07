@@ -740,6 +740,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
         },
         'event_type': unicode(e),
         'external_ip': u'192.168.2.2',
+        'lease_id': None,
+        'lease_expiration_ts': None,
         'message': u'for the best',
         'quarantined': False,
         'state': {
@@ -764,6 +766,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
         },
         'event_type': u'bot_connected',
         'external_ip': u'192.168.2.2',
+        'lease_id': None,
+        'lease_expiration_ts': None,
         'message': None,
         'quarantined': False,
         'state': {

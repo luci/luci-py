@@ -71,6 +71,8 @@ class MachineLease(ndb.Model):
   lease_duration_secs = ndb.IntegerProperty(indexed=False)
   # DateTime indicating lease expiration time.
   lease_expiration_ts = ndb.DateTimeProperty()
+  # Lease ID assigned by Machine Provider.
+  lease_id = ndb.StringProperty(indexed=False)
   # ndb.Key for the MachineType this MachineLease is created for.
   machine_type = ndb.KeyProperty()
   # machine_provider.Dimensions describing the machine.
@@ -231,13 +233,15 @@ def clear_lease_request(key, request_id):
 
 
 @ndb.transactional
-def log_lease_fulfillment(key, request_id, hostname, lease_expiration_ts):
+def log_lease_fulfillment(
+    key, request_id, hostname, lease_expiration_ts, lease_id):
   """Logs lease fulfillment.
 
   Args:
     request_id: ID of the request being fulfilled.
     hostname: Hostname of the machine fulfilling the request.
     lease_expiration_ts: UTC seconds since epoch when the lease expires.
+    lease_id: ID of the lease assigned by Machine Provider.
   """
   machine_lease = key.get()
   if not machine_lease:
@@ -254,12 +258,14 @@ def log_lease_fulfillment(key, request_id, hostname, lease_expiration_ts):
     return
 
   if (hostname == machine_lease.hostname
-      and lease_expiration_ts == machine_lease.lease_expiration_ts):
+      and lease_expiration_ts == machine_lease.lease_expiration_ts
+      and lease_id == machine_lease.lease_id):
     return
 
   machine_lease.hostname = hostname
   machine_lease.lease_expiration_ts = datetime.datetime.utcfromtimestamp(
       lease_expiration_ts)
+  machine_lease.lease_id = lease_id
   machine_lease.put()
 
 
@@ -370,8 +376,8 @@ def handle_lease_request_response(machine_lease, response):
           machine_lease.client_request_id,
           response['hostname'],
           int(response['lease_expiration_ts']),
+          response['request_hash'],
       )
-      # TODO(smut): Create BotInfo, associate lease information.
   elif state == machine_provider.LeaseRequestState.DENIED:
     logging.warning(
         'Request denied: %s\nRequest ID: %s',
@@ -420,9 +426,26 @@ def manage_lease(key):
 
   # Manage a leased machine.
   if machine_lease.lease_expiration_ts:
+    assert machine_lease.hostname, key
+    bot_info = bot_management.get_info_key(machine_lease.hostname).get()
+    if not (bot_info and bot_info.lease_id and bot_info.lease_expiration_ts):
+      bot_management.bot_event(
+          event_type='bot_leased',
+          bot_id=machine_lease.hostname,
+          external_ip=None,
+          authenticated_as=None,
+          dimensions=None,
+          state=None,
+          version=None,
+          quarantined=False,
+          task_id='',
+          task_name=None,
+          lease_id=machine_lease.lease_id,
+          lease_expiration_ts=machine_lease.lease_expiration_ts,
+      )
+
     if machine_lease.lease_expiration_ts <= utils.utcnow():
       logging.info('MachineLease expired: %s', key)
-      assert machine_lease.hostname, key
       clear_lease_request(key, machine_lease.client_request_id)
     return
 
