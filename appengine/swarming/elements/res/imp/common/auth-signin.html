@@ -47,6 +47,7 @@
 
     <google-signin-aware id="aware"
       client-id="[[client_id]]"
+      offline
       scopes="email"
       on-google-signin-aware-success="_onSignin"
       on-google-signin-aware-signed-out="_onSignout">
@@ -95,35 +96,30 @@
         },
       },
 
-      attached: function() {
+      ready: function() {
         if (!this.client_id) {
           return;
         }
         // If a page is opened in a new tab, we are (likely) already logged in
         // so we wait for the gapi and auth2 to be loaded and re-extract our
         // access_token.
-        var trySignin = window.setTimeout(function(){
+        window.setTimeout(function(){
           // The 'gapi' checks are the same that signin-aware does. We do them
           // to avoid extraneous errors in the console.
-          if (('gapi' in window) && ('auth2' in window.gapi) &&
-              !this.signed_in && !this._signingIn) {
-            var user = gapi.auth2.getAuthInstance().currentUser.get();
-            if (user && user.getAuthResponse().access_token) {
-              // User is already logged in, can use the access_token.
-              this._onSignin();
+          if (!this.signed_in && !this._signingIn){
+            if (('gapi' in window) && ('auth2' in window.gapi)) {
+              var user = gapi.auth2.getAuthInstance().currentUser.get();
+              if (user && user.getAuthResponse().access_token) {
+                // User is already logged in, can use the access_token.
+                this._onSignin();
+              } else {
+                window.setTimeout(this.ready.bind(this), 50);
+              }
             } else {
-              this.$.aware.signIn();
+              window.setTimeout(this.ready.bind(this), 50);
             }
-          } else {
-            window.setTimeout(this.attached.bind(this));
           }
-        }.bind(this),
-        // 300 ms is chosen because this seems to be long enough for the signin
-        // to happen normally on a "visible" page and avoid the popup that
-        // always happens when signIn() is manually called. It is also short
-        // enough such that when the page is opened in a new tab, it seems to
-        // happen automatically.
-        300);
+        }.bind(this), 50);
       },
 
       _onSignin: function() {

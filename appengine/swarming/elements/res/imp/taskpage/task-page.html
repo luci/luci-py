@@ -660,7 +660,6 @@
       _softRefresh: function() {
         if (this._result && this._result.state !== "RUNNING" &&
             this._result.state !==  "PENDING") {
-          console.log("Don't reload because not running");
           return;
         }
         this.$.data.reload();
