@@ -231,6 +231,16 @@
                 <td>Authenticated as</td>
                 <td colspan=2>[[_bot.authenticated_as]]</td>
               </tr>
+              <template is="dom-if" if="[[_bot.lease_id]]">
+                <tr>
+                  <td>Machine Provider Lease ID</td>
+                  <td colspan=2>[[_bot.lease_id]]</td>
+                </tr>
+                <tr>
+                  <td>Machine Provider Lease Expires</td>
+                  <td colspan=2>[[_bot.human_lease_expiration_ts]]</td>
+                </tr>
+              </template>
             </table>
 
             <span class="title">State</span>
