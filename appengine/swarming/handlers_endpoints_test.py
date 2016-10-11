@@ -2006,6 +2006,35 @@ class BotApiTest(BaseTest):
     expected['items'] = expected['items'][:-3]
     self.assertEqual(expected, response.json)
 
+  def test_terminate_admin(self):
+    self.set_as_bot()
+    self.bot_poll()
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.mock_now(datetime.datetime(2010, 1, 2, 3, 4, 5))
+
+    self.set_as_admin()
+    response = self.call_api('terminate', body={'bot_id': 'bot1'})
+    self.assertEqual({u'task_id': u'5cee488008810'}, response.json)
+
+  def test_terminate_privileged_user(self):
+    self.set_as_bot()
+    self.bot_poll()
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.mock_now(datetime.datetime(2010, 1, 2, 3, 4, 5))
+
+    self.set_as_privileged_user()
+    response = self.call_api('terminate', body={'bot_id': 'bot1'})
+    self.assertEqual({u'task_id': u'5cee488008810'}, response.json)
+
+  def test_terminate_user(self):
+    self.set_as_bot()
+    self.bot_poll()
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.mock_now(datetime.datetime(2010, 1, 2, 3, 4, 5))
+
+    self.set_as_user()
+    self.call_api('terminate', body={'bot_id': 'bot1'}, status=403)
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

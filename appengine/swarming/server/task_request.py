@@ -745,8 +745,10 @@ def init_new_request(request, allow_high_priority):
 
   # If the priority is below 100, make sure the user has right to do so.
   if request.priority < 100 and not allow_high_priority:
-    # Silently drop the priority of normal users.
-    request.priority = 100
+    # Special case for terminate request.
+    if not request.properties.is_terminate:
+      # Silently drop the priority of normal users.
+      request.priority = 100
 
   request.authenticated = auth.get_current_identity()
   if (not request.properties.is_terminate and
