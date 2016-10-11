@@ -775,6 +775,8 @@ class AdbCommandsSafe(object):
               'yourself to plugdev: %s', self.port_path, e)
           # Not worth retrying, exit early.
           break
+        except common.usb1.USBErrorIO as e:
+          _LOG.warning('%s._OpenHandle(): USBErrorIO: %s', self.port_path, e)
       else:
         _LOG.error(
             '%s._OpenHandle(): Failed after %d tries', self.port_path, i+1)
