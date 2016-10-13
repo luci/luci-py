@@ -20,6 +20,7 @@ from protorpc import remote
 from components import auth
 from components import datastore_utils
 from components import endpoints_webapp2
+from components import machine_provider
 from components import utils
 
 import message_conversion
@@ -135,9 +136,22 @@ class SwarmingServerService(remote.Service):
   def details(self, _request):
     """Returns information about the server."""
     host = 'https://' + os.environ['HTTP_HOST']
+
+    mpp = ''
+    if config.settings().mp and config.settings().mp.server:
+      mpp = config.settings().mp.server
+    # as a fallback, try pulling from datastore
+    if not mpp:
+      mpp = machine_provider.MachineProviderConfiguration.get_instance_url()
+    if mpp:
+      mpp = mpp + '/leases/%s'
+
     return swarming_rpcs.ServerDetails(
         bot_version = bot_code.get_bot_version(host),
-        server_version = utils.get_app_version())
+        server_version = utils.get_app_version(),
+        machine_provider_template = mpp,
+        display_server_url_template =
+            config.settings().display_server_url_template)
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(

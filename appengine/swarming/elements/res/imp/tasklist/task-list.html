@@ -136,10 +136,10 @@
                 </sort-toggle>
               </th>
 
-              <th hidden$="[[_hide('sk_revision', _columns.*)]]">
-                <span>Skia Revision</span>
+              <th hidden$="[[_hide('source_revision', _columns.*)]]">
+                <span>Source Revision</span>
                 <sort-toggle
-                    name="sk_revision"
+                    name="source_revision"
                     current="[[_sort]]">
                 </sort-toggle>
               </th>
@@ -201,12 +201,12 @@
                   </a>
                 </td>
 
-                <td hidden$="[[_hide('sk_revision', _columns.*)]]">
+                <td hidden$="[[_hide('source_revision', _columns.*)]]">
                   <a
                       class="center"
-                      href$="[[_skLink(task)]]"
+                      href$="[[_sourceLink(task)]]"
                       target="_blank">
-                      [[_column('sk_revision',task)]]
+                      [[_column('source_revision',task)]]
                   </a>
                 </td>
 
@@ -248,7 +248,7 @@
   </template>
   <script>
   (function(){
-    var specialColumns = ["deduped_from", "name", "state", "bot"];
+    var specialColumns = ["deduped_from", "name", "state", "bot", "source_revision"];
 
     // Given a time attribute like "abandoned_ts", humanTime returns a function
     // that returns the human-friendly version of that attribute. The human
@@ -270,8 +270,8 @@
       created_ts: humanTime("created_ts"),
       duration: humanTime("duration"),
       modified_ts: humanTime("modified_ts"),
-      sk_revision: function(task) {
-        var r = this._attribute(task, "sk_revision")[0];
+      source_revision: function(task) {
+        var r = this._attribute(task, "source_revision")[0];
         return r.substring(0,8);
       },
       started_ts: humanTime("started_ts"),
@@ -422,12 +422,13 @@
         this.$.page_tasks.load(url,this._auth_headers);
       },
 
-      _skLink: function(task) {
-        var r = this._attribute(task, "sk_revision")[0];
-        if (r === "none") {
+      _sourceLink: function(task) {
+        var rev = this._attribute(task, "source_revision")[0];
+        var repo = this._attribute(task, "source_repo")[0];
+        if (rev === "none" || repo === "none") {
           return false;
         }
-        return "https://skia.googlesource.com/skia/+/" + r;
+        return repo.replace("%s", rev);
       },
 
       _tag: function(task, col) {

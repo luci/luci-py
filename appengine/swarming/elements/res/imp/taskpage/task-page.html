@@ -106,6 +106,7 @@
       auth_headers="{{_auth_headers}}"
       permissions="{{_permissions}}"
       profile="{{_profile}}"
+      server_details="{{_server_details}}"
       signed_in="{{_signed_in}}"
 
       busy="[[_busy]]"
@@ -436,7 +437,7 @@
             </div>
 
             <template is="dom-if" if="[[_supportsMilo(_request,_show_raw)]]">
-              <iframe id="miloFrame" class="milo tabbed" src$="[[_getMiloLink(milo_prefix,task_id)]]"></iframe>
+              <iframe id="miloFrame" class="milo tabbed" src$="[[_getDisplayServerLink(_server_details.display_server_url_template,task_id)]]"></iframe>
             </template>
             <template is="dom-if" if="[[_show_raw]]">
               <div class="code stdout tabbed">[[_stdout]]</div>
@@ -478,10 +479,6 @@
         client_id: {
           type: String,
         },
-        milo_prefix: {
-          type: String,
-        },
-
 
         _dialogPrompt: {
           type: String,
@@ -498,6 +495,9 @@
           type: Boolean,
         },
         _result: {
+          type: Object,
+        },
+        _server_details: {
           type: Object,
         },
         _stdout: {
@@ -589,11 +589,11 @@
         return "";
       },
 
-      _getMiloLink: function(prefix,id) {
-        if (!prefix) {
+      _getDisplayServerLink: function(template,id) {
+        if (!template) {
           return undefined;
         }
-        return prefix + id;
+        return template.replace("%s", id);
       },
 
       _internalClass: function(failure) {
@@ -665,7 +665,7 @@
         this.$.data.reload();
         var miloFrame = this.$$("iframe")
         if (miloFrame) {
-          miloFrame.src = this._getMiloLink(this.milo_prefix,this.task_id);
+          miloFrame.src = this._getDisplayServerLink(this._server_details.display_server_url_template,this.task_id);
         }
       },
 

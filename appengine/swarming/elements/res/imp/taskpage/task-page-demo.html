@@ -73,6 +73,7 @@
 
     var details = {
       server_version: "1234-deadbeef",
+      display_server_url_template: "/res/imp/taskpage/milo-sample.html?id=%s&foo=bar",
     };
     server.respondWith("GET", /^\/_ah\/api\/swarming\/v1\/server\/details/, JSON.stringify(details));
     server.respondWith("GET", /^\/api\/swarming\/v1\/server\/details/, JSON.stringify(details));
@@ -105,8 +106,7 @@
 
 <task-page
   task_id="abcdef001"
-  client_id="20770472288-t5smpbpjptka4nd888fv0ctd23ftba2o.apps.googleusercontent.com"
-  milo_prefix="/res/imp/taskpage/milo-sample.html?">
+  client_id="20770472288-t5smpbpjptka4nd888fv0ctd23ftba2o.apps.googleusercontent.com">
 </task-page>
 
 </body>

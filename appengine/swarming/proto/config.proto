@@ -38,6 +38,10 @@ message SettingsCfg {
 
   // A mapping "dimension" => "who can posts tasks for it".
   optional DimensionACLs dimension_acls = 10;
+
+  // A url to a task display server (e.g. milo).  This should have a %s where
+  // a task id can go.
+  optional string display_server_url_template = 11;
 }
 
 

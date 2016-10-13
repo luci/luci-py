@@ -70,6 +70,9 @@ class ServerApiTest(BaseTest):
     """Asserts that server_details returns the correct version."""
     response = self.call_api('details')
     self.assertEqual({
+      'machine_provider_template':
+          u'https://machine-provider.appspot.com/leases/%s',
+      'display_server_url_template': '',
       'server_version': utils.get_app_version(),
       'bot_version': bot_code.get_bot_version('https://testbed.example.com'),
       }, response.json)

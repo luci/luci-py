@@ -71,3 +71,11 @@ The following environment variables may be set to alter bot behavior:
     configuration (extract from bots.cfg), applied to the bot during initial
     handshake. The server will ask the bot to restart if this configuration
     changes.
+
+### tags
+
+  - `source_revision`: if present, it specifies the SCM revision related to the
+    task.  This allows the UI to link to the relevant revision.
+  - `source_repo`: if present, it is a url to the hosted SCM related to the
+    task, with a %s where the revision should be placed.  This allows the UI
+    to link to the relevant revision.

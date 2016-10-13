@@ -142,7 +142,7 @@
         }
         // Do any preprocessing here
         bot.state = bot.state || "{}";
-        bot.state = JSON.parse(bot.state);
+        bot.state = JSON.parse(bot.state) || {};
 
         // get the disks in an easier to deal with format, sorted by size.
         var disks = bot.state.disks || {};

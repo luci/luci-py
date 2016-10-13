@@ -70,6 +70,8 @@ class ServerDetails(messages.Message):
   """Reports details about the server."""
   server_version = messages.StringField(1)
   bot_version = messages.StringField(2)
+  machine_provider_template = messages.StringField(3)
+  display_server_url_template = messages.StringField(4)
 
 
 class BootstrapToken(messages.Message):

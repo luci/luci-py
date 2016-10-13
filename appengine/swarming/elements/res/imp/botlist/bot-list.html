@@ -67,6 +67,7 @@
       client_id="[[client_id]]"
       auth_headers="{{_auth_headers}}"
       signed_in="{{_signed_in}}"
+      server_details="{{_server_details}}"
 
       busy="[[_or(_busy1,_busy2)]]"
       name="Swarming Bot List">
@@ -139,6 +140,13 @@
                     current="[[_sort]]">
                 </sort-toggle>
               </th>
+              <th hidden$="[[_hide('mp_lease_id', _columns.*)]]">
+                <span>Machine Provider Lease Id</span>
+                <sort-toggle
+                    name="mp_lease_id"
+                    current="[[_sort]]">
+                </sort-toggle>
+              </th>
               <th hidden$="[[_hide('task', _columns.*)]]">
                 <span>Current Task</span>
                 <sort-toggle
@@ -181,6 +189,11 @@
                 </td>
                 <td hidden$="[[_hide('cloud_console_link', _columns.*)]]">
                   <a href$="[[_ccLink(bot)]]">[[_ccText(bot)]]</a>
+                </td>
+                <td hidden$="[[_hide('mp_lease_id', _columns.*)]]">
+                  <a href$="[[_mpLink(bot, _server_details.machine_provider_template)]]">
+                    [[_column('mp_lease_id', bot,_verbose)]]
+                  </a>
                 </td>
                 <td hidden$="[[_hide('task', _columns.*)]]">
                   <a href$="[[_taskLink(bot.task_id)]]">[[_taskId(bot)]]</a>
@@ -236,7 +249,7 @@
     var UNKNOWN = "unknown";
     // see dynamic-table for more information on specialColumns, headerMap,
     // columnMap, and specialSort
-    var specialColumns = ["id", "task"];
+    var specialColumns = ["id", "task", "cloud_console_link", "mp_lease_id"];
 
     var headerMap = {
       // "id" and "task" are special, so they don't go here. They have their
@@ -258,6 +271,7 @@
       "first_seen": "First Seen",
       "gpu": "GPU",
       "last_seen": "Last Seen",
+      "mp_lease_expires": "Machine Provider Lease Expires",
       "os": "OS",
       "pool": "Pool",
       "running_time": "Swarming Uptime",
@@ -302,7 +316,7 @@
       disk_space: function(bot) {
         var aliased = [];
         bot.disks.forEach(function(disk){
-          var alias = sk.human.bytes(disk.mb, swarming.MB);
+          var alias = sk.human.bytes(disk.mb, sk.MB);
           aliased.push(swarming.alias.apply(disk.mb, disk.id + " "+ alias));
         }.bind(this));
         if (this._verbose) {
@@ -310,7 +324,6 @@
         }
         return aliased[0];
       },
-
       external_ip: function(bot) {
         return bot.external_ip || "none";
       },
@@ -325,6 +338,25 @@
           return sk.human.localeTime(bot.last_seen_ts);
         }
         return this._timeDiffApprox(bot.last_seen_ts) + " ago";
+      },
+      mp_lease_id: function(bot) {
+        var id = bot.lease_id || "none";
+        if (this._verbose) {
+          return id;
+        }
+        return id.substring(0, 10);
+      },
+      mp_lease_expires: function(bot) {
+        if (!bot.lease_expiration_ts) {
+          return "N/A";
+        }
+        if (this._verbose) {
+          return sk.human.localeTime(bot.lease_expiration_ts);
+        }
+        if (bot.lease_expiration_ts < new Date()) {
+          return this._timeDiffApprox(bot.lease_expiration_ts) + " ago";
+        }
+        return "in " + this._timeDiffApprox(bot.lease_expiration_ts);
       },
       running_time: function(bot) {
         var u = this._state(bot, "running_time");
@@ -543,6 +575,13 @@
 
       observers:["_reload(_query_params,_auth_headers)"],
 
+      _androidAliasDevice: function(device) {
+        if (device.notReady) {
+          return UNAUTHENTICATED.toUpperCase();
+        }
+        return swarming.alias.android(this._deviceType(device));
+      },
+
       _botClass: function(bot) {
         if (bot.is_dead) {
           return "dead";
@@ -569,13 +608,6 @@
         return "View Bot";
       },
 
-      _androidAliasDevice: function(device) {
-        if (device.notReady) {
-          return UNAUTHENTICATED.toUpperCase();
-        }
-        return swarming.alias.android(this._deviceType(device));
-      },
-
       _deviceColumn: function(col, device) {
         var f = deviceColumnMap[col];
         if (!f || !device) {
@@ -589,6 +621,13 @@
           return "bad-device";
         }
         return "";
+      },
+
+      _mpLink: function(bot, template) {
+        if (!bot || !bot.lease_id || !template) {
+          return false;
+        }
+        return template.replace("%s", bot.lease_id);
       },
 
       _reload: function() {

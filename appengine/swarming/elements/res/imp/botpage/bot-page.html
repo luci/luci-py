@@ -114,7 +114,7 @@
       client_id="[[client_id]]"
       auth_headers="{{_auth_headers}}"
       permissions="{{_permissions}}"
-      server_version="{{_server_version}}"
+      server_details="{{_server_details}}"
       signed_in="{{_signed_in}}"
 
       busy="[[_or(_busy1,_busy2,_busy3)]]"
@@ -209,7 +209,7 @@
                 <td></td>
               </tr>
               <tr
-                  class$="[[_classVersion(_server_version.bot_version,_bot.version)]]"
+                  class$="[[_classVersion(_server_details.bot_version,_bot.version)]]"
                   title="Version is based on the content of swarming_bot.zip which is the swarming bot code. The bot won't update if quarantined, dead, or busy.">
                 <td>Bot Version</td>
                 <td>[[_shorten(_bot.version,'8')]]</td>
@@ -217,7 +217,7 @@
               </tr>
               <tr title="The version the server expects the bot to be using.">
                 <td>Expected Bot Version</td>
-                <td>[[_shorten(_server_version.bot_version,'8')]]</td>
+                <td>[[_shorten(_server_details.bot_version,'8')]]</td>
                 <td></td>
               </tr>
               <tr title="First time ever a bot with this id contacted the server.">
@@ -234,7 +234,11 @@
               <template is="dom-if" if="[[_bot.lease_id]]">
                 <tr>
                   <td>Machine Provider Lease ID</td>
-                  <td colspan=2>[[_bot.lease_id]]</td>
+                  <td colspan=2>
+                    <a href$="[[_mpLink(_bot,_server_details.machine_provider_template)]]">
+                      [[_bot.lease_id]]
+                    </a>
+                  </td>
                 </tr>
                 <tr>
                   <td>Machine Provider Lease Expires</td>
@@ -333,11 +337,8 @@
                       [[event.task_id]]
                     </a>
                   </td>
-                  <td class$="[[_classVersion(_server_version.bot_version,event.version)]]">
-                    <a target="_blank" rel="noopener"
-                        href$="[[_luciLink(event.version)]]">
+                  <td class$="[[_classVersion(_server_details.bot_version,event.version)]]">
                       [[_shorten(event.version,'8')]]
-                    </a>
                   </td>
                 </tr>
               </template>
@@ -509,7 +510,13 @@
           return undefined;
         }
         return "https://github.com/luci/luci-py/commit/" + revision;
+      },
 
+      _mpLink: function(bot, template) {
+        if (!bot || !bot.lease_id || !template) {
+          return false;
+        }
+        return template.replace("%s", bot.lease_id);
       },
 
       _numRows: function(arr) {

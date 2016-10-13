@@ -27,8 +27,10 @@
     auth_headers: Object, Use this as an argument to sk.request to set oauth2 headers.
     permissions: Object, {String:Boolean} of permissions to perform various
         behaviors, such as terminate_bot.
-    server_version: Object, containing String server_version. server_version
-        represents what git revision the server is using.
+    server_details: Object, containing mutliple Strings including:
+        server_version: what git revision the server is using.
+        bot_version: A hash of the bot code being distributed. Isn't associated
+            with any git revisions
     signed_in: Boolean, if the user is signed in.
   Methods:
     None.
@@ -107,8 +109,8 @@
           <div class="flex"></div>
           <div class="small right">
             Server:
-            <a href$="[[_versionLink(server_version)]]">
-              [[server_version.server_version]]
+            <a href$="[[_versionLink(server_details)]]">
+              [[server_details.server_version]]
             </a>
           </div>
           <auth-signin
@@ -168,7 +170,7 @@
           notify: true,
         },
 
-        server_version: {
+        server_details: {
           type: Object,
           notify: true,
         },
@@ -194,7 +196,7 @@
       _load: function() {
         this._getJsonAsync("permissions", "/_ah/api/swarming/v1/server/permissions",
           "_busy1", this.auth_headers);
-        this._getJsonAsync("server_version", "/_ah/api/swarming/v1/server/details",
+        this._getJsonAsync("server_details", "/_ah/api/swarming/v1/server/details",
           "_busy2", this.auth_headers)
       },
 

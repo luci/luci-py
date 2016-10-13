@@ -34,7 +34,7 @@ run: default common_strings
 .PHONY: clean
 clean:
 	rm -rf ./build/*
-	mkdir ./build/js
+	mkdir -p ./build/js
 
 .PHONY: vulcanize
 vulcanize: clean default common_strings

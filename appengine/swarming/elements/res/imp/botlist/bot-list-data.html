@@ -165,7 +165,7 @@
           // Parse the state, which is a JSON string.  This contains a lot of
           // interesting information like details about the devices attached.
           bot.state = bot.state || "{}";
-          bot.state = JSON.parse(bot.state);
+          bot.state = JSON.parse(bot.state) || {};
           // get the disks in an easier to deal with format, sorted by size.
           var disks = bot.state.disks || {};
           var keys = Object.keys(disks);
@@ -211,6 +211,9 @@
           }
           if (bot.first_seen_ts) {
             bot.first_seen_ts = new Date(bot.first_seen_ts);
+          }
+          if (bot.lease_expiration_ts) {
+            bot.lease_expiration_ts = new Date(bot.lease_expiration_ts);
           }
 
         }.bind(this));
