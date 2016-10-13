@@ -26,7 +26,7 @@
         if (!bot_id) {
           return undefined;
         }
-        return "/newui/bot?id=" + bot_id;
+        return "/bot?id=" + bot_id;
       },
 
       // Create a link to a bot list with the preloaded filters and columns.
@@ -43,7 +43,7 @@
           f: fArr,
           c: columns,
         }
-        return "/newui/botlist?" + sk.query.fromParamSet(obj);
+        return "/botlist?" + sk.query.fromParamSet(obj);
       },
 
       // Create a link to a bot in Google Cloud Console. Cloud console will try
@@ -127,7 +127,7 @@
           // abcefgh0, not abcefgh1 or abcefgh2.
           taskId = taskId.substring(0, taskId.length - 1) + "0";
         }
-        return "/newui/task?id=" + taskId;
+        return "/task?id=" + taskId;
       },
 
       // _timeDiffApprox returns the approximate difference between now and

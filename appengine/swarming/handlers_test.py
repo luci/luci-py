@@ -94,7 +94,7 @@ class FrontendTest(AppTestBase):
 
   def test_root(self):
     response = self.app.get('/', status=200)
-    self.assertGreater(len(response.body), 1000)
+    self.assertGreater(len(response.body), 600)
 
   def testAllSwarmingHandlersAreSecured(self):
     # Test that all handlers are accessible only to authenticated user or
@@ -110,6 +110,7 @@ class FrontendTest(AppTestBase):
 
     public_urls = frozenset([
       '/',
+      '/oldui',
       '/_ah/warmup',
       '/api/config/v1/validate',
       '/auth',

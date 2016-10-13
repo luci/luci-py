@@ -245,7 +245,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
     num_bots_dead = num_bots_dead_future.get_result()
     num_bots_quarantined = num_bots_quarantined_future.get_result()
     num_bots_total = num_bots_total_future.get_result()
-    try_link = '/newui/botlist?l=%d' % limit
+    try_link = '/botlist?l=%d' % limit
     if dimensions:
       try_link += '&f=' + '&f='.join(dimensions)
     params = {
@@ -347,7 +347,7 @@ class BotHandler(auth.AuthenticatingHandler):
       'now': now,
       'run_results': run_results,
       'run_time': run_time,
-      'try_link': '/newui/bot?id=%s' % bot_id,
+      'try_link': '/bot?id=%s' % bot_id,
       'xsrf_token': self.generate_xsrf_token(),
     }
     self.response.write(
@@ -526,7 +526,7 @@ class TasksHandler(auth.AuthenticatingHandler):
         (100. * total_saved.total_seconds() / duration_sum.total_seconds())
         if duration_sum else 0.)
 
-    try_link = '/newui/tasklist?l=%d' % limit
+    try_link = '/tasklist?l=%d' % limit
     if task_tags:
       try_link += '&f=' + '&f='.join(task_tags)
     params = {
@@ -716,7 +716,7 @@ class TaskHandler(BaseTaskHandler):
       'previous_task': previous_task,
       'request': request,
       'task': result,
-      'try_link': '/newui/task?id=%s' % task_id,
+      'try_link': '/task?id=%s' % task_id,
       'xsrf_token': self.generate_xsrf_token(),
     }
     self.response.write(template.render('swarming/user_task.html', params))
@@ -759,7 +759,7 @@ class TaskRetryHandler(BaseTaskHandler):
 ### Public pages.
 
 
-class RootHandler(auth.AuthenticatingHandler):
+class OldUIHandler(auth.AuthenticatingHandler):
   @auth.public
   def get(self):
     params = {
@@ -788,13 +788,16 @@ class UIHandler(auth.AuthenticatingHandler):
   @auth.public
   def get(self, page):
     if not page:
-      page = "swarming"
+      page = 'swarming'
 
     params = {
       'client_id': config.settings().ui_client_id,
     }
-    self.response.write(template.render(
+    try:
+      self.response.write(template.render(
         'swarming/public_%s_index.html' % page, params))
+    except template.TemplateNotFound:
+      self.abort(404, 'Page not found.')
 
 
 class WarmupHandler(webapp2.RequestHandler):
@@ -819,9 +822,9 @@ def create_application(debug):
   routes = [
       # Frontend pages. They return HTML.
       # Public pages.
-      ('/', RootHandler),
+      ('/oldui', OldUIHandler),
       ('/stats', stats_gviz.StatsSummaryHandler),
-      ('/newui/<page:[a-z]*>', UIHandler),
+      ('/<page:(bot|botlist|task|tasklist|)>', UIHandler),
 
       # User pages.
       ('/user/tasks', TasksHandler),
