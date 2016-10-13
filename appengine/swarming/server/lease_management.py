@@ -112,15 +112,34 @@ def ensure_entity_exists(machine_type, n):
   """
   key = ndb.Key(MachineLease, '%s-%s' % (machine_type.key.id(), n))
   machine_lease = yield key.get_async()
-  if machine_lease:
+
+  # If there is no MachineLease in the datastore at all, create one.
+  if not machine_lease:
+    yield MachineLease(
+        key=key,
+        lease_duration_secs=machine_type.lease_duration_secs,
+        machine_type=machine_type.key,
+        mp_dimensions=machine_type.mp_dimensions,
+    ).put_async()
     return
 
-  yield MachineLease(
-      key=key,
-      lease_duration_secs=machine_type.lease_duration_secs,
-      machine_type=machine_type.key,
-      mp_dimensions=machine_type.mp_dimensions,
-  ).put_async()
+  # If there is a MachineLease, we may need to update it if the MachineType's
+  # lease properties have changed. It's only safe to update it if the current
+  # lease is fulfilled (indicated by the presence of lease_expiration_ts) so
+  # the changes only go into effect for the next lease request.
+  if machine_lease.lease_expiration_ts:
+    put = False
+
+    if machine_lease.lease_duration_secs != machine_type.lease_duration_secs:
+      machine_lease.lease_duration_secs = machine_type.lease_duration_secs
+      put = True
+
+    if machine_lease.mp_dimensions != machine_type.mp_dimensions:
+      machine_lease.mp_dimensions = machine_type.mp_dimensions
+      put = True
+
+    if put:
+      yield machine_lease.put_async()
 
 
 def ensure_entities_exist(max_concurrent=50):
@@ -188,17 +207,15 @@ def drain_excess(max_concurrent=50):
 def schedule_lease_management():
   """Schedules task queues to process each MachineLease."""
   for machine_lease in MachineLease.query():
-    # TODO(smut): Remove this check once migrated to the new format.
-    if machine_lease.machine_type:
-      if not utils.enqueue_task(
-          '/internal/taskqueue/machine-provider-manage',
-          'machine-provider-manage',
-          params={
-              'key': machine_lease.key.urlsafe(),
-          },
-      ):
-        logging.warning(
-            'Failed to enqueue task for MachineLease: %s', machine_lease.key)
+    if not utils.enqueue_task(
+        '/internal/taskqueue/machine-provider-manage',
+        'machine-provider-manage',
+        params={
+            'key': machine_lease.key.urlsafe(),
+        },
+    ):
+      logging.warning(
+          'Failed to enqueue task for MachineLease: %s', machine_lease.key)
 
 
 @ndb.transactional
