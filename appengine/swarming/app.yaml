@@ -43,9 +43,9 @@ handlers:
     Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
     X-Frame-Options: deny
 
-- url: /elements/polymer05/([^/]+\-build)\.(html|js)
-  static_files: elements/polymer05/\1.\2
-  upload: elements/polymer05/([^/]+\-build)\.(html|js)
+- url: /ui/polymer05/([^/]+\-build)\.(html|js)
+  static_files: ui/polymer05/\1.\2
+  upload: ui/polymer05/([^/]+\-build)\.(html|js)
   secure: always
   http_headers:
     # TODO(maruel): Unsure about polymer if it is inline-style free.
@@ -71,8 +71,8 @@ handlers:
   login: admin
 
 - url: /res/(.+)
-  static_files: elements/build/\1
-  upload: elements/build/(.+)
+  static_files: ui/build/\1
+  upload: ui/build/(.+)
   secure: always
   http_headers:
     Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
@@ -128,5 +128,5 @@ skip_files:
 - ^doc/
 - ^[A-Z]+$
 - ^[A-Z]+\.[a-z]+$
-- elements/node_modules/
-- elements/res/imp/bower_components/
+- ui/node_modules/
+- ui/res/imp/bower_components/
