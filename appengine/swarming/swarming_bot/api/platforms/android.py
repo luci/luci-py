@@ -106,12 +106,12 @@ def initialize(pub_key, priv_key):
   return high.Initialize(pub_key, priv_key)
 
 
-def get_devices(bot, endpoints=None):
+def get_devices(bot, endpoints=None, enable_resets=False):
   devices = []
   if not gce.is_gce():
     devices += high.GetLocalDevices(
       'swarming', 10000, 10000, on_error=bot.post_error if bot else None,
-      as_root=False)
+      as_root=False, enable_resets=enable_resets)
 
   if endpoints:
     devices += high.GetRemoteDevices(
