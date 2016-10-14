@@ -26,7 +26,6 @@ import tempfile
 import threading
 import time
 import traceback
-import urllib
 import zipfile
 
 # Import _strptime before threaded code. datetime.datetime.strptime is
@@ -304,13 +303,7 @@ def post_error_task(botobj, error, task_id):
         this function is invoked.
   """
   logging.error('Error: %s', error)
-  data = {
-    'id': botobj.id,
-    'message': error,
-    'task_id': task_id,
-  }
-  return botobj.remote.url_read_json(
-      '/swarming/api/v1/bot/task_error/%s' % task_id, data=data)
+  return botobj.remote.post_task_error(task_id, botobj.id, error)
 
 
 def on_shutdown_hook(b):
@@ -342,7 +335,7 @@ def get_bot():
   # construct the "real" bot.Bot.
   attributes = get_attributes(
     bot.Bot(
-      remote_client.RemoteClient(config['server'], None),
+      remote_client.createRemoteClient(config['server'], None),
       attributes,
       config['server'],
       config['server_version'],
@@ -353,7 +346,7 @@ def get_bot():
   # RemoteClient doesn't call its callback in the constructor (since 'botobj' is
   # undefined during the construction).
   botobj = bot.Bot(
-      remote_client.RemoteClient(
+      remote_client.createRemoteClient(
           config['server'],
           lambda: get_authentication_headers(botobj)),
       attributes,
@@ -444,9 +437,11 @@ def run_bot(arg_error):
     try:
       # First thing is to get an arbitrary url. This also ensures the network is
       # up and running, which is necessary before trying to get the FQDN below.
-      resp = net.url_read(config['server'] + '/swarming/api/v1/bot/server_ping')
-      if resp is None:
-        logging.error('No response from server_ping')
+      # There's no need to do error handling here - the "ping" is just to "wake
+      # up" the network; if there's something seriously wrong, the handshake
+      # will fail and we'll handle it there.
+      remote = remote_client.createRemoteClient(config['server'], None)
+      remote.ping()
     except Exception as e:
       # url_read() already traps pretty much every exceptions. This except
       # clause is kept there "just in case".
@@ -499,8 +494,7 @@ def run_bot(arg_error):
     # and generate error reports, so bots stuck in this state are discoverable.
     sleep_time = 5
     while not quit_bit.is_set():
-      resp = botobj.remote.url_read_json(
-          '/swarming/api/v1/bot/handshake', data=botobj._attributes)
+      resp = botobj.remote.do_handshake(botobj._attributes)
       if resp:
         logging.info('Connected to %s', resp.get('server_version'))
         if resp.get('bot_version') != botobj._attributes['version']:
@@ -570,41 +564,35 @@ def poll_server(botobj, quit_bit, last_action):
   """
   # Access to a protected member _XXX of a client class - pylint: disable=W0212
   start = time.time()
-  resp = botobj.remote.url_read_json(
-      '/swarming/api/v1/bot/poll', data=botobj._attributes)
-  if not resp:
+  cmd, value = botobj.remote.poll(botobj._attributes)
+  if cmd == '':
     # Back off on failure.
     time.sleep(max(1, min(60, botobj.state.get('sleep_streak', 10) * 2)))
     return False
-  logging.debug('Server response:\n%s', resp)
+  logging.debug('Server response:\n%s: %s', cmd, value)
 
-  cmd = resp['cmd']
   if cmd == 'sleep':
+    # Value is duration
     call_hook(botobj, 'on_bot_idle', max(0, time.time() - last_action))
-    quit_bit.wait(resp['duration'])
+    quit_bit.wait(value)
     return False
 
   if cmd == 'terminate':
+    # The value is the task ID to serve as the special termination command.
     quit_bit.set()
-    # This is similar to post_update() in task_runner.py.
-    params = {
-      'cost_usd': 0,
-      'duration': 0,
-      'exit_code': 0,
-      'hard_timeout': False,
-      'id': botobj.id,
-      'io_timeout': False,
-      'output': '',
-      'output_chunk_start': 0,
-      'task_id': resp['task_id'],
-    }
-    botobj.remote.url_read_json(
-        '/swarming/api/v1/bot/task_update/%s' % resp['task_id'],
-        data=params)
+    try:
+      # Duration must be set or server IEs. For that matter, we've never cared
+      # if there's an error here before, so let's preserve that behaviour
+      # (though anything that's not a remote_client.InternalError will make
+      # it through, again preserving prior behaviour).
+      botobj.remote.post_task_update(value, botobj.id, {'duration':0}, None, 0)
+    except remote_client.InternalError:
+      pass
     return False
 
   if cmd == 'run':
-    if run_manifest(botobj, resp['manifest'], start):
+    # Value is the manifest
+    if run_manifest(botobj, value, start):
       # Completed a task successfully so update swarming_bot.zip if necessary.
       update_lkgbc(botobj)
     # Clean up cache after a task
@@ -613,14 +601,16 @@ def poll_server(botobj, quit_bit, last_action):
     # is concerning as this means a signal (often SIGTERM) was received while
     # running the task. Make sure the host is properly restarting.
   elif cmd == 'update':
-    update_bot(botobj, resp['version'])
+    # Value is the version
+    update_bot(botobj, value)
   elif cmd == 'restart':
+    # Value is the message to display while restarting
     if _in_load_test_mode():
-      logging.warning('Would have restarted: %s' % resp['message'])
+      logging.warning('Would have restarted: %s' % value)
     else:
-      botobj.restart(resp['message'])
+      botobj.restart(value)
   else:
-    raise ValueError('Unexpected command: %s\n%s' % (cmd, resp))
+    raise ValueError('Unexpected command: %s\n%s' % (cmd, value))
 
   return True
 
@@ -809,13 +799,10 @@ def update_bot(botobj, version):
   new_zip = os.path.join(botobj.base_dir, new_zip)
 
   # Download as a new file.
-  url_path = '/swarming/api/v1/bot/bot_code/%s?bot_id=%s' % (
-      version, urllib.quote_plus(botobj.id))
-  if not botobj.remote.url_retrieve(new_zip, url_path):
-    # It can happen when a server is rapidly updated multiple times in a row.
-    botobj.post_error(
-        'Unable to download %s from %s; first tried version %s' %
-        (new_zip, botobj.server + url_path, version))
+  try:
+    botobj.remote.get_bot_code(new_zip, version, botobj.id)
+  except remote_client.BotCodeError as e:
+    botobj.post_error(str(e))
     # Poll again, this may work next time. To prevent busy-loop, sleep a little.
     time.sleep(2)
     return

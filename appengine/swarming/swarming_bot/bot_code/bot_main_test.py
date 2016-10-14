@@ -101,7 +101,8 @@ class TestBotMain(net_utils.TestCase):
 
   def make_bot(self, auth_headers_cb=None):
     return bot.Bot(
-        remote_client.RemoteClient('https://localhost:1', auth_headers_cb),
+        remote_client.createRemoteClient('https://localhost:1',
+                                         auth_headers_cb),
         self.attributes, 'https://localhost:1', 'version1',
         self.root_dir, self.fail)
 
@@ -195,7 +196,7 @@ class TestBotMain(net_utils.TestCase):
           ),
         ])
     botobj = bot_main.get_bot()
-    self.assertEqual({'resp': 1}, bot_main.post_error_task(botobj, 'error', 23))
+    self.assertEqual(True, bot_main.post_error_task(botobj, 'error', 23))
 
   def test_run_bot(self):
     self.mock(threading, 'Event', FakeThreadingEvent)

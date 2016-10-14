@@ -125,10 +125,7 @@ class Bot(object):
 
   def post_event(self, event_type, message):
     """Posts an event to the server."""
-    data = self._attributes.copy()
-    data['event'] = event_type
-    data['message'] = message
-    self._remote.url_read_json('/swarming/api/v1/bot/event', data=data)
+    self._remote.post_bot_event(event_type, message, self._attributes)
 
   def post_error(self, message):
     """Posts given string as a failure.

@@ -32,6 +32,7 @@ from utils import subprocess42
 from utils import zip_package
 
 import bot_auth
+import remote_client
 
 
 # Path to this file or the zip containing this file.
@@ -256,16 +257,22 @@ def load_and_run(
       # Returns bot authentication headers dict or raises InternalError.
       def headers_cb():
         try:
-          return auth_system.bot_headers if auth_system else {}
+          if auth_system:
+            # The second parameter is the time until which the remote client
+            # should cache the headers. Since auth_system is doing the
+            # caching, we're just sending "0", which is to say the Epoch
+            # (Jan 1 1970), which effectively means "never cache."
+            return (auth_system.bot_headers, 0)
+          return (None, None) # A timeout of "None" means "don't use auth"
         except bot_auth.AuthSystemError as e:
           raise InternalError('Failed to grab bot auth headers: %s' % e)
 
       # Auth environment is up, start the command. task_result is dumped to
       # disk in 'finally' block.
+      remote = remote_client.createRemoteClient(swarming_server, headers_cb)
       task_result = run_command(
-          swarming_server, task_details, work_dir,
-          cost_usd_hour, start, min_free_space, bot_file,
-          headers_cb, {'LUCI_CONTEXT': luci_context_path})
+          remote, task_details, work_dir, cost_usd_hour,
+          start, min_free_space, bot_file, {'LUCI_CONTEXT': luci_context_path})
 
   except (ExitSignal, InternalError) as e:
     # This normally means run_command() didn't get the chance to run, as it
@@ -289,50 +296,6 @@ def load_and_run(
       auth_system.stop()
     with open(out_file, 'wb') as f:
       json.dump(task_result, f)
-
-
-def post_update(
-    swarming_server, auth_headers, params, exit_code,
-    stdout, output_chunk_start):
-  """Posts task update to task_update.
-
-  Arguments:
-    swarming_server: Base URL to Swarming server.
-    auth_headers: dict with HTTP authentication headers.
-    params: Default JSON parameters for the POST.
-    exit_code: Process exit code, only when a command completed.
-    stdout: Incremental output since last call, if any.
-    output_chunk_start: Total number of stdout previously sent, for coherency
-        with the server.
-
-  Returns:
-    False if the task should stop.
-
-  Raises:
-    InternalError if can't contact the server after many attempts or the server
-    replies with an error.
-  """
-  params = params.copy()
-  if exit_code is not None:
-    params['exit_code'] = exit_code
-  if stdout:
-    # The output_chunk_start is used by the server to make sure that the stdout
-    # chunks are processed and saved in the DB in order.
-    params['output'] = base64.b64encode(stdout)
-    params['output_chunk_start'] = output_chunk_start
-  # TODO(maruel): Support early cancellation.
-  # https://code.google.com/p/swarming/issues/detail?id=62
-  resp = net.url_read_json(
-      swarming_server+'/swarming/api/v1/bot/task_update/%s' % params['task_id'],
-      data=params,
-      headers=auth_headers,
-      follow_redirects=False)
-  logging.debug('post_update() = %s', resp)
-  if not resp or resp.get('error'):
-    # Abandon it. This will force a process exit.
-    raise InternalError(
-        resp.get('error') if resp else 'Failed to contact server')
-  return not resp.get('must_stop', False)
 
 
 def should_post_update(stdout, now, last_packet):
@@ -380,9 +343,8 @@ def kill_and_wait(proc, grace_period, reason):
   return exit_code
 
 
-def run_command(
-    swarming_server, task_details, work_dir, cost_usd_hour,
-    task_start, min_free_space, bot_file, headers_cb, extra_env):
+def run_command(remote, task_details, work_dir, cost_usd_hour,
+                task_start, min_free_space, bot_file, extra_env):
   """Runs a command and sends packets to the server to stream results back.
 
   Implements both I/O and hard timeouts. Sends the packets numbered, so the
@@ -399,12 +361,12 @@ def run_command(
 
   # Signal the command is about to be started.
   last_packet = start = now = monotonic_time()
+  task_id = task_details.task_id
+  bot_id = task_details.bot_id
   params = {
     'cost_usd': cost_usd_hour * (now - task_start) / 60. / 60.,
-    'id': task_details.bot_id,
-    'task_id': task_details.task_id,
   }
-  if not post_update(swarming_server, headers_cb(), params, None, '', 0):
+  if not remote.post_task_update(task_id, bot_id, params):
     # Don't even bother, the task was already canceled.
     return {
       u'exit_code': -1,
@@ -455,7 +417,7 @@ def run_command(
       params['io_timeout'] = False
       params['hard_timeout'] = False
       # Ignore server reply to stop.
-      post_update(swarming_server, headers_cb(), params, 1, stdout, 0)
+      remote.post_task_update(task_id, bot_id, params, (stdout, 0), 1)
       return {
         u'exit_code': 1,
         u'hard_timeout': False,
@@ -487,9 +449,9 @@ def run_command(
           last_packet = monotonic_time()
           params['cost_usd'] = (
               cost_usd_hour * (last_packet - task_start) / 60. / 60.)
-          if not post_update(
-              swarming_server, headers_cb(), params, None, stdout,
-              output_chunk_start):
+          if not remote.post_task_update(
+              task_id, bot_id,
+              params, (stdout, output_chunk_start)):
             # Server is telling us to stop. Normally task cancellation.
             if not kill_sent:
               logging.warning('Server induced stop; sending SIGKILL')
@@ -613,9 +575,8 @@ def run_command(
     # Ignore server reply to stop. Also ignore internal errors here if we are
     # already handling some.
     try:
-      post_update(
-          swarming_server, headers_cb(), params, exit_code,
-          stdout, output_chunk_start)
+      remote.post_task_update(
+          task_id, bot_id, params, (stdout, output_chunk_start), exit_code)
     except InternalError as e:
       logging.error('Internal error while finishing the task: %s', e)
       if not must_signal_internal_failure:

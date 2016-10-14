@@ -27,6 +27,7 @@ from utils import large
 from utils import logging_utils
 from utils import subprocess42
 import bot_auth
+import remote_client
 import fake_swarming
 import task_runner
 
@@ -142,6 +143,7 @@ class TestTaskRunnerBase(net_utils.TestCase):
             'task_id': 23,
           },
           'follow_redirects': False,
+          'timeout': 300,
           'headers': auth_headers or {},
         },
         kwargs)
@@ -177,6 +179,7 @@ class TestTaskRunner(TestTaskRunnerBase):
           'task_id': 23,
         },
         'follow_redirects': False,
+        'timeout': 300,
         'headers': auth_headers or {},
       }
       if outputs_ref:
@@ -187,22 +190,20 @@ class TestTaskRunner(TestTaskRunnerBase):
   def _run_command(self, task_details, headers_cb=None):
     start = time.time()
     self.mock(time, 'time', lambda: start + 10)
-    server = 'https://localhost:1'
+    remote = remote_client.createRemoteClient('https://localhost:1', headers_cb)
     return task_runner.run_command(
-        server, task_details, self.work_dir, 3600., start, 1,
-        '/path/to/file', headers_cb or (lambda: {}), None)
+        remote, task_details, self.work_dir, 3600.,
+        start, 1, '/path/to/file', None)
 
   def test_load_and_run_raw(self):
-    server = 'https://localhost:1'
-
     FakeAuthSystem.local_auth_context = {'rpc_port': 123, 'secret': 'abcdef'}
     self.mock(bot_auth, 'AuthSystem', FakeAuthSystem)
 
     def run_command(
-        swarming_server, task_details, work_dir,
+        remote, task_details, work_dir,
         cost_usd_hour, start, min_free_space, bot_file,
-        headers_cb, extra_env):
-      self.assertEqual(server, swarming_server)
+        extra_env):
+      self.assertTrue(remote.uses_auth) # mainly to avoid "unused arg" warning
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       # Necessary for OSX.
       self.assertEqual(
@@ -211,7 +212,6 @@ class TestTaskRunner(TestTaskRunnerBase):
       self.assertEqual(time.time(), start)
       self.assertEqual(1, min_free_space)
       self.assertEqual('/path/to/bot-file', bot_file)
-      self.assertEqual({'Fake': 'Header'}, headers_cb())
       self.assertEqual(['LUCI_CONTEXT'], extra_env.keys())
       self.assertTrue(extra_env['LUCI_CONTEXT'].startswith(self.work_dir))
       with open(extra_env['LUCI_CONTEXT'], 'r') as f:
@@ -244,7 +244,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     out_file = os.path.join(self.root_dir, 'w', 'task_runner_out.json')
     task_runner.load_and_run(
-        manifest, server, 3600., time.time(), out_file, 1,
+        manifest, 'localhost:1', 3600., time.time(), out_file, 1,
         '/path/to/bot-file', '/path/to/auth-params-file')
     expected = {
       u'exit_code': 1,
@@ -258,16 +258,15 @@ class TestTaskRunner(TestTaskRunnerBase):
 
   def test_load_and_run_isolated(self):
     self.expected_requests([])
-    server = 'https://localhost:1'
 
     FakeAuthSystem.local_auth_context = None
     self.mock(bot_auth, 'AuthSystem', FakeAuthSystem)
 
     def run_command(
-        swarming_server, task_details, work_dir,
+        remote, task_details, work_dir,
         cost_usd_hour, start, min_free_space, bot_file,
-        headers_cb, extra_env):
-      self.assertEqual(server, swarming_server)
+        extra_env):
+      self.assertTrue(remote.uses_auth) # mainly to avoid unused arg warning
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       # Necessary for OSX.
       self.assertEqual(
@@ -276,7 +275,6 @@ class TestTaskRunner(TestTaskRunnerBase):
       self.assertEqual(time.time(), start)
       self.assertEqual(1, min_free_space)
       self.assertEqual('/path/to/bot-file', bot_file)
-      self.assertEqual({'Fake': 'Header'}, headers_cb())
       self.assertEqual({'LUCI_CONTEXT': None}, extra_env)
       return {
         u'exit_code': 0,
@@ -308,7 +306,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     out_file = os.path.join(self.root_dir, 'w', 'task_runner_out.json')
     task_runner.load_and_run(
-        manifest, server, 3600., time.time(), out_file, 1,
+        manifest, 'localhost:1', 3600., time.time(), out_file, 1,
         '/path/to/bot-file', '/path/to/auth-params-file')
     expected = {
       u'exit_code': 0,
@@ -346,7 +344,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     }
     self.assertEqual(
         expected,
-        self._run_command(task_details, headers_cb=lambda: {'A': 'a'}))
+        self._run_command(task_details, headers_cb=lambda: ({'A': 'a'}, 0)))
 
   def test_run_command_isolated(self):
     # This runs the command for real.
@@ -492,6 +490,7 @@ class TestTaskRunner(TestTaskRunnerBase):
               'task_id': 23,
             },
             'follow_redirects': False,
+            'timeout': 300,
             'headers': {},
           },
           kwargs)
@@ -506,6 +505,7 @@ class TestTaskRunner(TestTaskRunnerBase):
             'task_id': 23,
           },
           'follow_redirects': False,
+          'timeout': 300,
           'headers': {},
         },
         {'must_stop': False, 'ok': True},
@@ -521,6 +521,7 @@ class TestTaskRunner(TestTaskRunnerBase):
             'task_id': 23,
           },
           'follow_redirects': False,
+          'timeout': 300,
           'headers': {},
         },
         {'must_stop': False, 'ok': True},
@@ -680,6 +681,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
               'task_id': 23,
             },
             'follow_redirects': False,
+            'timeout': 300,
             'headers': auth_headers or {},
           },
           kwargs)
@@ -699,10 +701,10 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
 
   def _run_command(self, task_details):
     # Dot not mock time since this test class is testing timeouts.
-    server = 'https://localhost:1'
+    remote = remote_client.createRemoteClient('https://localhost:1', None)
     return task_runner.run_command(
-        server, task_details, self.work_dir, 3600., time.time(), 1,
-        '/path/to/file', lambda: {}, {})
+        remote, task_details, self.work_dir, 3600., time.time(), 1,
+        '/path/to/file', {})
 
   def test_hard(self):
     # Actually 0xc000013a
@@ -892,6 +894,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
               'task_id': 23,
             },
             'follow_redirects': False,
+            'timeout': 300,
             'headers': {},
           },
           kwargs)
@@ -1013,6 +1016,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
               'task_id': 23,
             },
             'follow_redirects': False,
+            'timeout': 300,
             'headers': {},
           },
           kwargs)

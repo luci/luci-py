@@ -28,7 +28,7 @@ class TestRemoteClient(auto_stub.TestCase):
   def test_initialize_success(self):
     headers = {'A': 'a'}
     exp_ts = time.time() + 3600
-    c = remote_client.RemoteClient(
+    c = remote_client.RemoteClientNative(
         'http://localhost:1', lambda: (headers, exp_ts))
     c.initialize(threading.Event())
     self.assertEqual(0, self.slept)
@@ -44,7 +44,7 @@ class TestRemoteClient(auto_stub.TestCase):
       if attempt[0] == 10:
         return headers, exp_ts
       raise Exception('fail')
-    c = remote_client.RemoteClient('http://localhost:1', callback)
+    c = remote_client.RemoteClientNative('http://localhost:1', callback)
     c.initialize(threading.Event())
     self.assertEqual(9*2, self.slept)
     self.assertTrue(c.uses_auth)
@@ -53,7 +53,7 @@ class TestRemoteClient(auto_stub.TestCase):
   def test_initialize_gives_up(self):
     def callback():
       raise Exception('fail')
-    c = remote_client.RemoteClient('http://localhost:1', callback)
+    c = remote_client.RemoteClientNative('http://localhost:1', callback)
     with self.assertRaises(remote_client.InitializationError):
       c.initialize(threading.Event())
     self.assertEqual(29*2, self.slept)
@@ -62,7 +62,7 @@ class TestRemoteClient(auto_stub.TestCase):
 
   def test_get_authentication_headers(self):
     self.mock(time, 'time', lambda: 100000)
-    c = remote_client.RemoteClient(
+    c = remote_client.RemoteClientNative(
         'http://localhost:1',
         lambda: ({'Now': str(time.time())}, time.time() + 3600))
 
