@@ -459,7 +459,7 @@ def exponential_backoff(attempt_num):
   return min(max_wait, math.pow(1.5, min(attempt_num, 10) + 1))
 
 
-def schedule_request(request):
+def schedule_request(request, check_acls=True):
   """Creates and stores all the entities to schedule a new task request.
 
   Checks ACLs first. Raises auth.AuthorizationError if caller is not authorized
@@ -474,6 +474,7 @@ def schedule_request(request):
   Arguments:
   - request: TaskRequest entity to be saved in the DB. It's key must not be set
              and the entity must not be saved in the DB yet.
+  - check_acls: Whether the request should check ACLs.
 
   Returns:
     TaskResultSummary. TaskToRun is not returned.
@@ -483,7 +484,8 @@ def schedule_request(request):
 
   # Raises AuthorizationError with helpful message if the request.authorized
   # can't use some of the requested dimensions.
-  _check_dimension_acls(request)
+  if check_acls:
+    _check_dimension_acls(request)
 
   now = utils.utcnow()
   request.key = task_request.new_request_key()

@@ -226,6 +226,7 @@ class EnsureEntitiesExistTest(test_case.TestCase):
 
   def test_machine_lease_exists_mismatched_not_updated(self):
     key = lease_management.MachineType(
+        early_release_secs=0,
         lease_duration_secs=1,
         mp_dimensions=machine_provider.Dimensions(
             disk_gb=100,
@@ -234,6 +235,7 @@ class EnsureEntitiesExistTest(test_case.TestCase):
     ).put()
     key = lease_management.MachineLease(
         id='%s-0' % key.id(),
+        early_release_secs=1,
         lease_duration_secs=2,
         machine_type=key,
         mp_dimensions=machine_provider.Dimensions(
@@ -244,11 +246,13 @@ class EnsureEntitiesExistTest(test_case.TestCase):
     lease_management.ensure_entities_exist()
 
     self.assertEqual(lease_management.MachineLease.query().count(), 1)
+    self.assertEqual(key.get().early_release_secs, 1)
     self.assertEqual(key.get().lease_duration_secs, 2)
     self.assertEqual(key.get().mp_dimensions.disk_gb, 200)
 
   def test_machine_lease_exists_mismatched_updated(self):
     key = lease_management.MachineType(
+        early_release_secs=0,
         lease_duration_secs=1,
         mp_dimensions=machine_provider.Dimensions(
             disk_gb=100,
@@ -257,6 +261,7 @@ class EnsureEntitiesExistTest(test_case.TestCase):
     ).put()
     key = lease_management.MachineLease(
         id='%s-0' % key.id(),
+        early_release_secs=1,
         lease_duration_secs=2,
         lease_expiration_ts=utils.utcnow(),
         machine_type=key,
@@ -268,6 +273,7 @@ class EnsureEntitiesExistTest(test_case.TestCase):
     lease_management.ensure_entities_exist()
 
     self.assertEqual(lease_management.MachineLease.query().count(), 1)
+    self.assertEqual(key.get().early_release_secs, 0)
     self.assertEqual(key.get().lease_duration_secs, 1)
     self.assertEqual(key.get().mp_dimensions.disk_gb, 100)
 

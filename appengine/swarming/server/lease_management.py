@@ -44,6 +44,10 @@ from components import machine_provider
 from components import pubsub
 from components import utils
 from server import bot_management
+from server import task_request
+from server import task_result
+from server import task_pack
+from server import task_scheduler
 
 
 # Name of the topic the Machine Provider is authorized to publish
@@ -65,6 +69,8 @@ class MachineLease(ndb.Model):
   client_request_id = ndb.StringProperty(indexed=True)
   # Whether or not this MachineLease should issue lease requests.
   drained = ndb.BooleanProperty(indexed=True)
+  # Number of seconds ahead of lease_expiration_ts to release leases.
+  early_release_secs = ndb.IntegerProperty(indexed=False)
   # Hostname of the machine currently allocated for this request.
   hostname = ndb.StringProperty()
   # Duration to lease for.
@@ -80,6 +86,8 @@ class MachineLease(ndb.Model):
       machine_provider.Dimensions, indexed=False)
   # Last request number used.
   request_count = ndb.IntegerProperty(default=0, required=True)
+  # Task ID for the termination task scheduled for this machine.
+  termination_task = ndb.StringProperty(indexed=False)
 
 
 class MachineType(ndb.Model):
@@ -91,6 +99,8 @@ class MachineType(ndb.Model):
   """
   # Description of this machine type for humans.
   description = ndb.StringProperty(indexed=False)
+  # Number of seconds ahead of lease_expiration_ts to release leases.
+  early_release_secs = ndb.IntegerProperty(indexed=False)
   # Whether or not to attempt to lease machines of this type.
   enabled = ndb.BooleanProperty(default=True)
   # Duration to lease each machine for.
@@ -118,6 +128,7 @@ def ensure_entity_exists(machine_type, n):
     yield MachineLease(
         key=key,
         lease_duration_secs=machine_type.lease_duration_secs,
+        early_release_secs=machine_type.early_release_secs,
         machine_type=machine_type.key,
         mp_dimensions=machine_type.mp_dimensions,
     ).put_async()
@@ -129,6 +140,10 @@ def ensure_entity_exists(machine_type, n):
   # the changes only go into effect for the next lease request.
   if machine_lease.lease_expiration_ts:
     put = False
+
+    if machine_lease.early_release_secs != machine_type.early_release_secs:
+      machine_lease.early_release_secs = machine_type.early_release_secs
+      put = True
 
     if machine_lease.lease_duration_secs != machine_type.lease_duration_secs:
       machine_lease.lease_duration_secs = machine_type.lease_duration_secs
@@ -223,6 +238,7 @@ def clear_lease_request(key, request_id):
   """Clears information about given lease request.
 
   Args:
+    key: ndb.Key for a MachineLease entity.
     request_id: ID of the request to clear.
   """
   machine_lease = key.get()
@@ -246,6 +262,37 @@ def clear_lease_request(key, request_id):
   machine_lease.client_request_id = None
   machine_lease.hostname = None
   machine_lease.lease_expiration_ts = None
+  machine_lease.termination_task = None
+  machine_lease.put()
+
+
+@ndb.transactional
+def associate_termination_task(key, hostname, task_id):
+  """Associates a termination task with the given lease request.
+
+  Args:
+    key: ndb.Key for a MachineLease entity.
+    hostname: Hostname of the machine the termination task is for.
+    task_id: ID for a termination task.
+  """
+  machine_lease = key.get()
+  if not machine_lease:
+    logging.error('MachineLease does not exist\nKey: %s', key)
+    return
+
+  if hostname != machine_lease.hostname:
+    logging.error(
+        'Hostname mismatch\nKey: %s\nExpected: %s\nActual: %s',
+        key,
+        hostname,
+        machine_lease.hostname,
+    )
+    return
+
+  if machine_lease.termination_task == task_id:
+    return
+
+  machine_lease.termination_task = task_id
   machine_lease.put()
 
 
@@ -255,6 +302,7 @@ def log_lease_fulfillment(
   """Logs lease fulfillment.
 
   Args:
+    key: ndb.Key for a MachineLease entity.
     request_id: ID of the request being fulfilled.
     hostname: Hostname of the machine fulfilling the request.
     lease_expiration_ts: UTC seconds since epoch when the lease expires.
@@ -269,8 +317,8 @@ def log_lease_fulfillment(
     logging.error(
         'Request ID mismatch\nKey: %s\nExpected: %s\nActual: %s',
         key,
-        machine_lease.client_request_id,
         request_id,
+        machine_lease.client_request_id,
     )
     return
 
@@ -330,6 +378,111 @@ def delete_machine_lease(key):
     return
 
   key.delete()
+
+
+def ensure_bot_info_exists(machine_lease):
+  """Ensures a BotInfo entity exists and has Machine Provider-related fields.
+
+  Args:
+    machine_lease: MachineLease instance.
+  """
+  bot_info = bot_management.get_info_key(machine_lease.hostname).get()
+  if not (bot_info and bot_info.lease_id and bot_info.lease_expiration_ts):
+    bot_management.bot_event(
+        event_type='bot_leased',
+        bot_id=machine_lease.hostname,
+        external_ip=None,
+        authenticated_as=None,
+        dimensions=None,
+        state=None,
+        version=None,
+        quarantined=False,
+        task_id='',
+        task_name=None,
+        lease_id=machine_lease.lease_id,
+        lease_expiration_ts=machine_lease.lease_expiration_ts,
+    )
+
+
+def handle_termination_task(machine_lease):
+  """Checks the state of the termination task, releasing the lease if completed.
+
+  Args:
+    machine_lease: MachineLease instance.
+  """
+  assert machine_lease.termination_task
+
+  task_result_summary = task_pack.unpack_result_summary_key(
+      machine_lease.termination_task).get()
+  if task_result_summary.state == task_result.State.COMPLETED:
+    response = machine_provider.release_machine(
+        machine_lease.client_request_id)
+    if response.get('error'):
+      error = machine_provider.LeaseReleaseRequestError.lookup_by_name(
+          response['error'])
+      if error not in (
+          machine_provider.LeaseReleaseRequestError.ALREADY_RECLAIMED,
+          machine_provider.LeaseReleaseRequestError.NOT_FOUND,
+      ):
+        logging.error(
+            'Lease release failed\nKey: %s\nRequest ID: %s\nError: %s',
+            machine_lease.key,
+            response['client_request_id'],
+            response['error'],
+        )
+        return
+    logging.info('MachineLease released: %s', machine_lease.key)
+    clear_lease_request(machine_lease.key, machine_lease.client_request_id)
+    bot_management.get_info_key(machine_lease.hostname).delete()
+
+
+def handle_early_release(machine_lease):
+  """Handles the early release of a leased machine.
+
+  Args:
+    machine_lease: MachineLease instance.
+  """
+  if machine_lease.lease_expiration_ts <= utils.utcnow() + datetime.timedelta(
+      seconds=machine_lease.early_release_secs):
+    logging.info('MachineLease ready to be released: %s', machine_lease.key)
+    task_result_summary = task_scheduler.schedule_request(
+        task_request.create_termination_task(machine_lease.hostname, True),
+        check_acls=False,
+    )
+    associate_termination_task(
+        machine_lease.key, machine_lease.hostname, task_result_summary.task_id)
+
+
+def manage_leased_machine(machine_lease):
+  """Manages a leased machine.
+
+  Args:
+    machine_lease: MachineLease instance with client_request_id, hostname,
+      lease_expiration_ts set.
+  """
+  assert machine_lease.client_request_id, machine_lease.key
+  assert machine_lease.hostname, machine_lease.key
+  assert machine_lease.lease_expiration_ts, machine_lease.key
+
+  ensure_bot_info_exists(machine_lease)
+
+  # Handle an expired lease.
+  if machine_lease.lease_expiration_ts <= utils.utcnow():
+    logging.info('MachineLease expired: %s', machine_lease.key)
+    clear_lease_request(machine_lease.key, machine_lease.client_request_id)
+    bot_management.get_info_key(machine_lease.hostname).delete()
+    return
+
+  # Handle an active lease with a termination task scheduled.
+  # TODO(smut): Check if the bot got terminated by some other termination task.
+  if machine_lease.termination_task:
+    handle_termination_task(machine_lease)
+    return
+
+  # Handle a lease ready for early release.
+  if machine_lease.early_release_secs:
+    handle_early_release(machine_lease)
+    return
 
 
 def handle_lease_request_error(machine_lease, response):
@@ -443,31 +596,12 @@ def manage_lease(key):
 
   # Manage a leased machine.
   if machine_lease.lease_expiration_ts:
-    assert machine_lease.hostname, key
-    bot_info = bot_management.get_info_key(machine_lease.hostname).get()
-    if not (bot_info and bot_info.lease_id and bot_info.lease_expiration_ts):
-      bot_management.bot_event(
-          event_type='bot_leased',
-          bot_id=machine_lease.hostname,
-          external_ip=None,
-          authenticated_as=None,
-          dimensions=None,
-          state=None,
-          version=None,
-          quarantined=False,
-          task_id='',
-          task_name=None,
-          lease_id=machine_lease.lease_id,
-          lease_expiration_ts=machine_lease.lease_expiration_ts,
-      )
-
-    if machine_lease.lease_expiration_ts <= utils.utcnow():
-      logging.info('MachineLease expired: %s', key)
-      clear_lease_request(key, machine_lease.client_request_id)
+    manage_leased_machine(machine_lease)
     return
 
   # Lease expiration time is unknown, so there must be no leased machine.
   assert not machine_lease.hostname, key
+  assert not machine_lease.termination_task, key
 
   # Manage a pending lease request.
   if machine_lease.client_request_id:

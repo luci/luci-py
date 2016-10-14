@@ -620,6 +620,31 @@ class TaskRequest(ndb.Model):
 ### Public API.
 
 
+def create_termination_task(bot_id, allow_high_priority):
+  """Returns a task to terminate the given bot.
+
+  Returns:
+    TaskRequest for priority 0 (highest) termination task.
+  """
+  properties = TaskProperties(
+      dimensions={u'id': unicode(bot_id)},
+      execution_timeout_secs=0,
+      grace_period_secs=0,
+      io_timeout_secs=0)
+  now = utils.utcnow()
+  request = TaskRequest(
+      created_ts=now,
+      expiration_ts=now + datetime.timedelta(days=1),
+      name=u'Terminate %s' % bot_id,
+      priority=0,
+      properties=properties,
+      tags=[u'terminate:1'],
+      user=auth.get_current_identity().to_bytes())
+  assert request.properties.is_terminate
+  init_new_request(request, allow_high_priority)
+  return request
+
+
 def new_request_key():
   """Returns a valid ndb.Key for this entity.
 

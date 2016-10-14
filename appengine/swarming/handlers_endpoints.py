@@ -600,22 +600,8 @@ class SwarmingBotService(remote.Service):
     get_or_raise(bot_key)  # raises 404 if there is no such bot
     try:
       # Craft a special priority 0 task to tell the bot to shutdown.
-      properties = task_request.TaskProperties(
-          dimensions={u'id': bot_id},
-          execution_timeout_secs=0,
-          grace_period_secs=0,
-          io_timeout_secs=0)
-      now = utils.utcnow()
-      request = task_request.TaskRequest(
-          created_ts=now,
-          expiration_ts=now + datetime.timedelta(days=1),
-          name=u'Terminate %s' % bot_id,
-          priority=0,
-          properties=properties,
-          tags=[u'terminate:1'],
-          user=auth.get_current_identity().to_bytes())
-      assert request.properties.is_terminate
-      task_request.init_new_request(request, acl.is_bot_or_admin())
+      request = task_request.create_termination_task(
+          bot_id, acl.is_bot_or_admin())
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
 

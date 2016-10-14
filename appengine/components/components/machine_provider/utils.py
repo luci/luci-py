@@ -118,6 +118,22 @@ def lease_machines(requests):
   )
 
 
+def release_machine(client_request_id):
+  """Voluntarily releases a leased machine back to Machine Provider.
+
+  Args:
+    client_request_id: Request ID originally used by the client when creating
+      the lease request.
+  """
+  return net.json_request(
+      '%s/_ah/api/machine_provider/v1/release' %
+          MachineProviderConfiguration.get_instance_url(),
+      method='POST',
+      payload=utils.to_json_encodable({'request_id': client_request_id}),
+      scopes=MACHINE_PROVIDER_SCOPES,
+  )
+
+
 def retrieve_machine(hostname, backend=None):
   """Requests information about a machine from the Machine Provider's Catalog.
 

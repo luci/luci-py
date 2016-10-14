@@ -138,6 +138,10 @@ class TaskRequestApiTest(TestCase):
         i[5:] for i in dir(self) if i.startswith('test_'))
     self.assertFalse(missing)
 
+  def test_create_termination_task(self):
+    request = task_request.create_termination_task(u'some-bot', True)
+    self.assertTrue(request.properties.is_terminate)
+
   def test_new_request_key(self):
     for _ in xrange(3):
       delta = utils.utcnow() - task_request._BEGINING_OF_THE_WORLD
