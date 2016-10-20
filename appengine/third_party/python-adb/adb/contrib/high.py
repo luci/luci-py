@@ -274,8 +274,7 @@ def _ConnectFromHandles(handles, as_root=False, **kwargs):
 
 
 def GetLocalDevices(
-    banner, default_timeout_ms, auth_timeout_ms, on_error=None, as_root=False,
-    enable_resets=False):
+    banner, default_timeout_ms, auth_timeout_ms, on_error=None, as_root=False):
   """Returns the list of devices available.
 
   Caller MUST call CloseDevices(devices) on the return value or call .Close() on
@@ -304,7 +303,7 @@ def GetLocalDevices(
   return _ConnectFromHandles(handles, banner=banner,
                              default_timeout_ms=default_timeout_ms,
                              auth_timeout_ms=auth_timeout_ms, on_error=on_error,
-                             as_root=as_root, enable_resets=enable_resets)
+                             as_root=as_root)
 
 
 def GetRemoteDevices(banner, endpoints, default_timeout_ms, auth_timeout_ms,
@@ -854,8 +853,15 @@ class HighDevice(object):
         return False
       # sys.boot_completed can't be relyed on. It fires too early or worse can
       # be completely missing on some kernels (e.g. Manta).
-      if self.GetProp('init.svc.bootanim') == 'stopped':
+      prop = self.GetProp('init.svc.bootanim')
+      if prop == 'stopped':
         break
+      if prop is None:
+        _LOG.warning(
+            '%s.WaitUntilFullyBooted() could not get init.svc.bootanim: '
+            'Device is unreachable.' %
+            self.port_path)
+        return False
       time.sleep(0.1)
 
     # Then the slowest part of all.

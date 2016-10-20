@@ -91,8 +91,7 @@ class AdbCommandsSafe(object):
 
   def __init__(
       self, handle, banner, rsa_keys, on_error, port_path=None,
-      default_timeout_ms=10000, auth_timeout_ms=10000, lost_timeout_ms=10000,
-      enable_resets=False):
+      default_timeout_ms=10000, auth_timeout_ms=10000, lost_timeout_ms=10000):
     """Constructs an AdbCommandsSafe.
 
     Arguments:
@@ -130,7 +129,6 @@ class AdbCommandsSafe(object):
     self._rsa_keys = rsa_keys
     self._sleep = 0.1
     self._tries = int(round((self._lost_timeout_ms / 1000. + 5) / self._sleep))
-    self._should_reset = enable_resets
 
     # State.
     self._adb_cmd = None
@@ -832,8 +830,8 @@ class AdbCommandsSafe(object):
         except usb_exceptions.LibusbWrappingError as e:
           self._failure = 'usb_failure'
           _LOG.warning('I/O FAILURE: %s: %s', self.port_path, e)
-          if self._should_reset:
-            self._handle.Reset()
+          # TODO(crbug.com/642440): Reset the handle here if fleet health
+          # regresses and host kernel panics don't subside.
         except adb_protocol.InvalidResponseError as e:
           self._failure = 'protocol_fault'
           _LOG.warning('SYNC FAILURE: %s: %s', self.port_path, e)
