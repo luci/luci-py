@@ -21,7 +21,6 @@ import optparse
 import os
 import signal
 import sys
-import tempfile
 import time
 import traceback
 
@@ -30,6 +29,8 @@ from utils import net
 from utils import on_error
 from utils import subprocess42
 from utils import zip_package
+
+from libs import luci_context
 
 import bot_auth
 import remote_client
@@ -242,17 +243,12 @@ def load_and_run(
         except bot_auth.AuthSystemError as e:
           raise InternalError('Failed to init auth: %s' % e)
 
-      # If the task is using service accounts, setup LUCI_CONTEXT env var
-      # pointing to the local auth server that hands out the tokens. Note that
-      # bot_main.py completely removes work_dir on completion.
-      luci_context_path = None
+      context_edits = {}
+
+      # If the task is using service accounts, add local_auth details to
+      # LUCI_CONTEXT.
       if auth_system and auth_system.local_auth_context:
-        fd, luci_context_path = tempfile.mkstemp(
-            suffix='.json', prefix='luci_context.', dir=work_dir)
-        with os.fdopen(fd, 'w') as f:
-          json.dump(
-              {'local_auth': auth_system.local_auth_context}, f,
-              indent=2, sort_keys=True)
+        context_edits['local_auth'] = auth_system.local_auth_context
 
       # Returns bot authentication headers dict or raises InternalError.
       def headers_cb():
@@ -270,9 +266,10 @@ def load_and_run(
       # Auth environment is up, start the command. task_result is dumped to
       # disk in 'finally' block.
       remote = remote_client.createRemoteClient(swarming_server, headers_cb)
-      task_result = run_command(
-          remote, task_details, work_dir, cost_usd_hour,
-          start, min_free_space, bot_file, {'LUCI_CONTEXT': luci_context_path})
+      with luci_context.write(_tmpdir=work_dir, **context_edits):
+        task_result = run_command(
+            remote, task_details, work_dir, cost_usd_hour,
+            start, min_free_space, bot_file)
 
   except (ExitSignal, InternalError) as e:
     # This normally means run_command() didn't get the chance to run, as it
@@ -344,7 +341,7 @@ def kill_and_wait(proc, grace_period, reason):
 
 
 def run_command(remote, task_details, work_dir, cost_usd_hour,
-                task_start, min_free_space, bot_file, extra_env):
+                task_start, min_free_space, bot_file):
   """Runs a command and sends packets to the server to stream results back.
 
   Implements both I/O and hard timeouts. Sends the packets numbered, so the
@@ -390,12 +387,11 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     # TODO(maruel): Support both channels independently and display stderr in
     # red.
     env = os.environ.copy()
-    for env_to_add in (task_details.env, extra_env):
-      for key, value in (env_to_add or {}).iteritems():
-        if not value:
-          env.pop(key, None)
-        else:
-          env[key] = value
+    for key, value in (task_details.env or {}).iteritems():
+      if not value:
+        env.pop(key, None)
+      else:
+        env[key] = value
     logging.info('cmd=%s', cmd)
     logging.info('cwd=%s', work_dir)
     logging.info('env=%s', env)

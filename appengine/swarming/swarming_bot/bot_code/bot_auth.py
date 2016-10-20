@@ -103,8 +103,6 @@ class AuthSystem(object):
   They can discover the port to connect to by looking at LUCI_CONTEXT
   environment variable. This variables is only set if the task is running in
   the context of some service account.
-
-  TODO(vadimsh): Actually implement LUCI_CONTEXT env var.
   """
 
   def __init__(self, auth_params_file):

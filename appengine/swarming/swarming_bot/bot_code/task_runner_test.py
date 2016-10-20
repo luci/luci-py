@@ -26,6 +26,7 @@ from utils import file_path
 from utils import large
 from utils import logging_utils
 from utils import subprocess42
+from libs import luci_context
 import bot_auth
 import remote_client
 import fake_swarming
@@ -193,7 +194,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     remote = remote_client.createRemoteClient('https://localhost:1', headers_cb)
     return task_runner.run_command(
         remote, task_details, self.work_dir, 3600.,
-        start, 1, '/path/to/file', None)
+        start, 1, '/path/to/file')
 
   def test_load_and_run_raw(self):
     FakeAuthSystem.local_auth_context = {'rpc_port': 123, 'secret': 'abcdef'}
@@ -201,8 +202,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     def run_command(
         remote, task_details, work_dir,
-        cost_usd_hour, start, min_free_space, bot_file,
-        extra_env):
+        cost_usd_hour, start, min_free_space, bot_file):
       self.assertTrue(remote.uses_auth) # mainly to avoid "unused arg" warning
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       # Necessary for OSX.
@@ -212,12 +212,8 @@ class TestTaskRunner(TestTaskRunnerBase):
       self.assertEqual(time.time(), start)
       self.assertEqual(1, min_free_space)
       self.assertEqual('/path/to/bot-file', bot_file)
-      self.assertEqual(['LUCI_CONTEXT'], extra_env.keys())
-      self.assertTrue(extra_env['LUCI_CONTEXT'].startswith(self.work_dir))
-      with open(extra_env['LUCI_CONTEXT'], 'r') as f:
-        self.assertEqual(
-            {u'local_auth': {u'rpc_port': 123, u'secret': u'abcdef'}},
-            json.load(f))
+      self.assertDictEqual(luci_context.read('local_auth'),
+                           {'rpc_port': 123, 'secret': 'abcdef'})
       return {
         u'exit_code': 1,
         u'hard_timeout': False,
@@ -264,8 +260,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     def run_command(
         remote, task_details, work_dir,
-        cost_usd_hour, start, min_free_space, bot_file,
-        extra_env):
+        cost_usd_hour, start, min_free_space, bot_file):
       self.assertTrue(remote.uses_auth) # mainly to avoid unused arg warning
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       # Necessary for OSX.
@@ -275,7 +270,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       self.assertEqual(time.time(), start)
       self.assertEqual(1, min_free_space)
       self.assertEqual('/path/to/bot-file', bot_file)
-      self.assertEqual({'LUCI_CONTEXT': None}, extra_env)
+      self.assertIsNone(luci_context.read('local_auth'))
       return {
         u'exit_code': 0,
         u'hard_timeout': False,
@@ -704,7 +699,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     remote = remote_client.createRemoteClient('https://localhost:1', None)
     return task_runner.run_command(
         remote, task_details, self.work_dir, 3600., time.time(), 1,
-        '/path/to/file', {})
+        '/path/to/file')
 
   def test_hard(self):
     # Actually 0xc000013a
