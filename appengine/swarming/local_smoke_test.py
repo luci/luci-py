@@ -609,6 +609,9 @@ def main():
   os.environ['LANG'] = 'en_US.UTF-8'
   os.environ['LANGUAGE'] = 'en_US.UTF-8'
 
+  # So that we don't get goofed up when running this test on swarming :)
+  os.environ.pop('SWARMING_TASK_ID', None)
+
   bot = None
   client = None
   servers = None
