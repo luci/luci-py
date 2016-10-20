@@ -11,3 +11,4 @@ protocols, using libusb1 for USB communications.
 
 Local Modifications:
 - Removed tests.
+- enable_resets flag

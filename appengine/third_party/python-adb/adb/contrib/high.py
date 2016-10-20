@@ -274,7 +274,8 @@ def _ConnectFromHandles(handles, as_root=False, **kwargs):
 
 
 def GetLocalDevices(
-    banner, default_timeout_ms, auth_timeout_ms, on_error=None, as_root=False):
+    banner, default_timeout_ms, auth_timeout_ms, on_error=None, as_root=False,
+    enable_resets=False):
   """Returns the list of devices available.
 
   Caller MUST call CloseDevices(devices) on the return value or call .Close() on
@@ -303,7 +304,7 @@ def GetLocalDevices(
   return _ConnectFromHandles(handles, banner=banner,
                              default_timeout_ms=default_timeout_ms,
                              auth_timeout_ms=auth_timeout_ms, on_error=on_error,
-                             as_root=as_root)
+                             as_root=as_root, enable_resets=enable_resets)
 
 
 def GetRemoteDevices(banner, endpoints, default_timeout_ms, auth_timeout_ms,
