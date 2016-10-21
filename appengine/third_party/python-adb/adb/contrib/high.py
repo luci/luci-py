@@ -638,6 +638,16 @@ class HighDevice(object):
     out = self.Dumpsys('battery')
     if not out:
       return props
+
+    # This isn't in "dumpsys battery" for some reason, but is still useful.
+    current = self.PullContent('/sys/class/power_supply/battery/current_now')
+    out['current'] = None
+    if current:
+      try:
+        out['current'] = current
+      except ValueError:
+        pass
+
     for line in out.splitlines():
       if line.endswith(u':'):
         continue
