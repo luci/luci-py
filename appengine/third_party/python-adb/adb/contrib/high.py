@@ -639,15 +639,6 @@ class HighDevice(object):
     if not out:
       return props
 
-    # This isn't in "dumpsys battery" for some reason, but is still useful.
-    current = self.PullContent('/sys/class/power_supply/battery/current_now')
-    out['current'] = None
-    if current:
-      try:
-        out['current'] = current
-      except ValueError:
-        pass
-
     for line in out.splitlines():
       if line.endswith(u':'):
         continue
@@ -656,7 +647,16 @@ class HighDevice(object):
       if len(parts) == 2:
         key, value = parts
         props[key.lstrip()] = value.strip()
-    out = {u'power': []}
+    out = {u'power': [], u'current': None}
+
+    # This isn't in "dumpsys battery" for some reason, but is still useful.
+    current = self.PullContent('/sys/class/power_supply/battery/current_now')
+    if current:
+      try:
+        out[u'current'] = int(current.strip())
+      except ValueError:
+        pass
+
     if props.get(u'AC powered') == u'true':
       out[u'power'].append(u'AC')
     if props.get(u'USB powered') == u'true':
