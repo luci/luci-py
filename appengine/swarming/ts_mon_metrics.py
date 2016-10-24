@@ -50,6 +50,10 @@ jobs_pending_durations = gae_ts_mon.NonCumulativeDistributionMetric(
     'jobs/pending_durations', bucketer=_bucketer,
     description='Pending times of active jobs, in seconds.')
 
+jobs_max_pending_duration = gae_ts_mon.FloatMetric(
+    'jobs/max_pending_duration',
+    description='Maximum pending seconds of pending jobs.')
+
 # Similar to jobs/completed and jobs/duration, but with a dedup field.
 # - project_id: e.g. 'chromium'
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
@@ -176,6 +180,8 @@ def _set_jobs_metrics(now):
   jobs_counts = defaultdict(lambda: 0)
   jobs_pending_distributions = defaultdict(
       lambda: gae_ts_mon.Distribution(_bucketer))
+  jobs_max_pending_durations = defaultdict(
+      lambda: 0.0)
   while (yield query_iter.has_next_async()):
     summary = query_iter.next()
     status = state_map.get(summary.state, '')
@@ -194,6 +200,9 @@ def _set_jobs_metrics(now):
     pending_duration = summary.pending_now(now)
     if pending_duration is not None:
       jobs_pending_distributions[key].add(pending_duration.total_seconds())
+      jobs_max_pending_durations[key] = max(
+          jobs_max_pending_durations[key],
+          pending_duration.total_seconds())
 
   for key, count in jobs_counts.iteritems():
     jobs_active.set(count, target_fields=TARGET_FIELDS, fields=dict(key))
@@ -201,6 +210,10 @@ def _set_jobs_metrics(now):
   for key, distribution in jobs_pending_distributions.iteritems():
     jobs_pending_durations.set(
         distribution, target_fields=TARGET_FIELDS, fields=dict(key))
+
+  for key, val in jobs_max_pending_durations.iteritems():
+    jobs_max_pending_duration.set(
+        val, target_fields=TARGET_FIELDS, fields=dict(key))
 
 
 @ndb.tasklet
