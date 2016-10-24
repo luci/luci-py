@@ -400,9 +400,9 @@ class TaskRequestApiTest(TestCase):
         tags=['tag:2'],
         properties=dict(idempotent=True)))
     self.assertEqual(
-        request_1.properties.properties_hash,
-        request_2.properties.properties_hash)
-    self.assertTrue(request_1.properties.properties_hash)
+        request_1.properties_hash(),
+        request_2.properties_hash())
+    self.assertTrue(request_1.properties_hash())
 
   def test_different(self):
     # Two TestRequest with different properties.
@@ -411,8 +411,8 @@ class TaskRequestApiTest(TestCase):
     request_2 = mkreq(_gen_request(
         properties=dict(execution_timeout_secs=129, idempotent=True)))
     self.assertNotEqual(
-        request_1.properties.properties_hash,
-        request_2.properties.properties_hash)
+        request_1.properties_hash(),
+        request_2.properties_hash())
 
   def test_bad_values(self):
     with self.assertRaises(AssertionError):

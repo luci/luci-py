@@ -364,9 +364,6 @@ class TaskProperties(ndb.Model):
   #   simplified version of FilesRef
   # - _TaskResultCommon.output = String which is isolated output, if any.
 
-  # Hashing algorithm used to hash TaskProperties to create its key.
-  HASHING_ALGO = hashlib.sha1
-
   # Commands to run. It is a list of 1 item, the command to run.
   # TODO(maruel): Remove after 2016-06-01.
   commands = datastore_utils.DeterministicJsonProperty(
@@ -438,20 +435,6 @@ class TaskProperties(ndb.Model):
         not self.io_timeout_secs and
         not self.idempotent)
 
-  @property
-  def properties_hash(self):
-    """Calculates the hash for this entity IFF the task is idempotent.
-
-    It uniquely identifies the TaskProperties instance to permit deduplication
-    by the task scheduler. It is None if the task is not idempotent.
-
-    Returns:
-      Hash as a compact byte str.
-    """
-    if not self.idempotent:
-      return None
-    return self.HASHING_ALGO(utils.encode_to_json(self)).digest()
-
   def to_dict(self):
     out = super(TaskProperties, self).to_dict(exclude=['commands'])
     out['command'] = self.commands[0] if self.commands else self.command
@@ -493,6 +476,9 @@ class TaskRequest(ndb.Model):
 
   This model is immutable.
   """
+  # Hashing algorithm used to hash TaskProperties to create its key.
+  HASHING_ALGO = hashlib.sha1
+
   # Time this request was registered. It is set manually instead of using
   # auto_now_add=True so that expiration_ts can be set very precisely relative
   # to this property.
@@ -557,6 +543,19 @@ class TaskRequest(ndb.Model):
   # Data to send in 'userdata' field of PubSub messages.
   pubsub_userdata = ndb.StringProperty(indexed=False)
 
+  def properties_hash(self):
+    """Calculates the this task's TaskProperties IFF the task is idempotent.
+
+    It uniquely identifies the TaskProperties instance to permit deduplication
+    by the task scheduler. It is None if the task is not idempotent.
+
+    Returns:
+      Hash as a compact byte str.
+    """
+    if not self.properties.idempotent:
+      return None
+    return self.HASHING_ALGO(utils.encode_to_json(self.properties)).digest()
+
   @property
   def task_id(self):
     """Returns the TaskResultSummary packed id, not the task request key."""
@@ -587,8 +586,8 @@ class TaskRequest(ndb.Model):
     # to_dict() doesn't recurse correctly into ndb.LocalStructuredProperty!
     out = super(TaskRequest, self).to_dict(
         exclude=['pubsub_auth_token', 'properties', 'service_account_token'])
-    properties_hash = self.properties.properties_hash
     out['properties'] = self.properties.to_dict()
+    properties_hash = self.properties_hash()
     out['properties_hash'] = (
         properties_hash.encode('hex') if properties_hash else None)
     return out

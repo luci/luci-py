@@ -504,7 +504,7 @@ def schedule_request(request, check_acls=True):
 
   deduped = False
   if request.properties.idempotent:
-    dupe_summary = _find_dupe_task(now, request.properties.properties_hash)
+    dupe_summary = _find_dupe_task(now, request.properties_hash())
     if dupe_summary:
       # Setting task.queue_number to None removes it from the scheduling.
       task.queue_number = None
