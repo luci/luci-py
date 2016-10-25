@@ -1,4 +1,5 @@
 /res/imp/bower_components
+bower_components
 /node_modules
 *demo.json
 *sample.html

@@ -69,7 +69,7 @@
       signed_in="{{_signed_in}}"
       server_details="{{_server_details}}"
 
-      busy="[[_or(_busy1,_busy2)]]"
+      busy="[[_or(_busy1,_busy2,_busy3)]]"
       name="Swarming Bot List">
 
       <h2 hidden$="[[_signed_in]]">You must sign in to see anything useful.</h2>
@@ -90,7 +90,10 @@
           </bot-filters>
 
           <bot-list-summary
+            auth_headers="[[_auth_headers]]"
+            busy="{{_busy3}}"
             columns="[[_columns]]"
+            count_params="[[_query_params]]"
             fleet="[[_fleet]]"
             filtered_bots="[[_filteredSortedItems]]"
             sort="[[_sortstr]]"

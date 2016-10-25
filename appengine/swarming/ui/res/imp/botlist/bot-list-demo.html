@@ -64,6 +64,14 @@
     };
     server.respondWith("GET", /^\/_ah\/api\/swarming\/v1\/server\/details/, JSON.stringify(details));
     server.respondWith("GET", /^\/api\/swarming\/v1\/server\/details/, JSON.stringify(details));
+
+    var count = {
+      count: 905,
+      busy: 581,
+      dead: 10,
+      quarantined: 0,
+    }
+    server.respondWith("GET", /^\/api\/swarming\/v1\/bots\/count.*/, JSON.stringify(count));
     </script>
 
     <link rel="import" href="bot-list.html">

@@ -42,6 +42,9 @@
         font-size: 1.2em;
         font-weight: bold;
       }
+      .header.buffer{
+        margin-top: 5px;
+      }
       .right {
         text-align: right;
       }
@@ -90,43 +93,49 @@
       </tr>
     </table>
 
-    <div class="header">Displayed</div>
+    <div class="header buffer">Selected</div>
     <table>
+      <tr>
+        <td class="right">
+          Displayed:
+        </td>
+        <td class="left">[[_currentlyDisplayed(filtered_bots.*)]]</td>
+      </tr>
       <tr>
         <td class="right">
           All:
         </td>
-        <td class="left">[[_currently_showing.all]]</td>
+        <td class="left">[[_count_query.count]]</td>
       </tr>
       <tr>
         <td class="right">
           <a href$="[[_makeURL('alive','true',columns.*,filtered_bots.*,sort,verbose)]]">Alive</a>:
         </td>
-        <td class="left">[[_currently_showing.alive]]</td>
+        <td class="left">[[_computeAlive(_count_query.*)]]</td>
       </tr>
       <tr>
         <td class="right">
           <a href$="[[_makeURL('busy','true',columns.*,filtered_bots.*,sort,verbose)]]">Busy</a>:
         </td>
-        <td class="left">[[_currently_showing.busy]]</td>
+        <td class="left">[[_count_query.busy]]</td>
       </tr>
       <tr>
         <td class="right">
           <a href$="[[_makeURL('idle','true',columns.*,filtered_bots.*,sort,verbose)]]">Idle</a>:
         </td>
-        <td class="left">[[_currently_showing.idle]]</td>
+        <td class="left">[[_computeIdle(_count_query.*)]]</td>
       </tr>
       <tr>
         <td class="right">
           <a href$="[[_makeURL('dead','true',columns.*,filtered_bots.*,sort,verbose)]]">Dead</a>:
         </td>
-        <td class="left">[[_currently_showing.dead]]</td>
+        <td class="left">[[_count_query.dead]]</td>
       </tr>
       <tr>
         <td class="right">
           <a href$="[[_makeURL('quarantined','true',columns.*,filtered_bots.*,sort,verbose)]]">Quarantined</a>:
         </td>
-        <td class="left">[[_currently_showing.quarantined]]</td>
+        <td class="left">[[_count_query.quarantined]]</td>
       </tr>
     </table>
 
@@ -138,8 +147,19 @@
       behaviors: [SwarmingBehaviors.BotListBehavior],
 
       properties: {
+        auth_headers: {
+          type: Object,
+        },
+        busy: {
+          type: Boolean,
+          value: false,
+          notify: true,
+        },
         columns: {
           type: Array,
+        },
+        count_params: {
+          type: Object,
         },
         filtered_bots: {
           type: Array,
@@ -154,24 +174,28 @@
           type: Boolean,
         },
 
-        _currently_showing: {
+        _count_query: {
           type: Object,
-          value: function() {
-            return {
-              all: -1,
-              alive:  -1,
-              busy:  -1,
-              idle: -1,
-              dead: -1,
-              quarantined: -1,
-            };
-          },
-        },
+        }
       },
 
       // Do this because Array changes in Polymer don't always trigger normal
       // property observers
-      observers: ["_recount(filtered_bots.*)"],
+      observers: [
+          "_recountTotal(auth_headers.*,count_params.*)"
+      ],
+
+      _computeAlive: function() {
+        return this._count_query.count - this._count_query.dead;
+      },
+
+      _computeIdle: function() {
+        return this._count_query.count - this._count_query.busy;
+      },
+
+      _currentlyDisplayed: function(){
+        return this.filtered_bots && this.filtered_bots.length;
+      },
 
       _getFilterStr: function(filter) {
         if (!filter) {
@@ -206,35 +230,12 @@
         return window.location.href.split('?')[0] + '?' + sk.query.fromParamSet(params);
       },
 
-      _recount: function() {
-        var curr = {
-          all: 0,
-          alive: 0,
-          busy: 0,
-          idle: 0,
-          dead: 0,
-          quarantined: 0,
-        };
-        if (!this.filtered_bots) {
-          return curr;
+      _recountTotal: function() {
+        if (!this.auth_headers || !this.count_params) {
+          return;
         }
-        this.filtered_bots.forEach(function(bot) {
-          if (this._taskId(bot) === "idle") {
-            curr.idle++;
-          } else {
-            curr.busy++;
-          }
-          if (bot.quarantined) {
-            curr.quarantined++;
-          }
-          if (bot.is_dead) {
-            curr.dead++;
-          } else {
-            curr.alive++;
-          }
-          curr.all++;
-        }.bind(this));
-        this.set("_currently_showing", curr);
+        this._getJsonAsync("_count_query","/api/swarming/v1/bots/count","busy",
+          this.auth_headers, this.count_params);
       }
     });
   </script>
