@@ -56,11 +56,11 @@ def is_local_dev_server():
   return os.environ.get('SERVER_SOFTWARE', '').startswith('Development')
 
 
-def is_canary():
-  """Returns True if the server is running a canary instance.
+def is_dev():
+  """Returns True if the server is running a development/staging instance.
 
-  We define a 'canary instance' any instance that has the suffix '-dev' in its
-  instance name.
+  We define a 'development instance' as an instance that has the suffix '-dev'
+  in its instance name.
 
   This function is safe to run outside the scope of a HTTP request.
   """

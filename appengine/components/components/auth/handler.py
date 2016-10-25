@@ -10,13 +10,9 @@
 import functools
 import json
 import logging
-import urllib
 import webapp2
 
-from google.appengine.api import urlfetch
 from google.appengine.api import users
-
-from components import utils
 
 from . import api
 from . import config
@@ -455,44 +451,10 @@ def openid_cookie_authentication(request):
 
 
 def oauth_authentication(request):
-  """OAuth2 based authentication via oauth.get_current_user()."""
+  """OAuth2 based authentication via access tokens."""
   if not request.headers.get('Authorization'):
     return None
-  if not utils.is_local_dev_server():
-    return api.extract_oauth_caller_identity()
-
-  # OAuth2 library is mocked on dev server to return some nonsense. Use (slow,
-  # but real) OAuth2 API endpoint instead to validate access_token. It is also
-  # what Cloud Endpoints do on a local server. For simplicity ignore client_id
-  # on dev server.
-  header = request.headers['Authorization'].split(' ', 1)
-  if len(header) != 2 or header[0] not in ('OAuth', 'Bearer'):
-    raise api.AuthenticationError('Invalid authorization header')
-
-  # Adapted from endpoints/users_id_tokens.py, _set_bearer_user_vars_local.
-  base_url = 'https://www.googleapis.com/oauth2/v1/tokeninfo'
-  result = urlfetch.fetch(
-      url='%s?%s' % (base_url, urllib.urlencode({'access_token': header[1]})),
-      follow_redirects=False,
-      validate_certificate=True)
-  if result.status_code != 200:
-    try:
-      error = json.loads(result.content)['error_description']
-    except (KeyError, ValueError):
-      error = repr(result.content)
-    raise api.AuthenticationError('Failed to validate the token: %s' % error)
-
-  token_info = json.loads(result.content)
-  if 'email' not in token_info:
-    raise api.AuthenticationError('Token doesn\'t include an email address')
-  if not token_info.get('verified_email'):
-    raise api.AuthenticationError('Token email isn\'t verified')
-
-  email = token_info['email']
-  try:
-    return model.Identity(model.IDENTITY_USER, email)
-  except ValueError:
-    raise api.AuthenticationError('Unsupported user email: %s' % email)
+  return api.check_oauth_access_token(request.headers)
 
 
 def service_to_service_authentication(request):

@@ -454,8 +454,8 @@ def exponential_backoff(attempt_num):
     # Randomly ask the bot to return quickly.
     return 1.0
 
-  # Enforces more frequent polls on canary.
-  max_wait = 3. if utils.is_canary() else 60.
+  # Enforces more frequent polls on staging.
+  max_wait = 3. if utils.is_dev() else 60.
   return min(max_wait, math.pow(1.5, min(attempt_num, 10) + 1))
 
 

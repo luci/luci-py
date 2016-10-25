@@ -31,7 +31,7 @@ TASK_REQUEST_KEY_ID_MASK = int(2L**63-1)
 # production server, use 16**6 (~16 million) root entities to reduce the number
 # of transaction conflict.
 # TODO(maruel): Remove support 2015-02-01.
-DEPRECATED_SHARDING_LEVEL = 3 if utils.is_canary() else 6
+DEPRECATED_SHARDING_LEVEL = 3 if utils.is_dev() else 6
 
 
 ### Entities relationships.

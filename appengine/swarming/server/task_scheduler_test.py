@@ -203,7 +203,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.mock(
         task_scheduler.random, 'random',
         lambda: task_scheduler._PROBABILITY_OF_QUICK_COMEBACK)
-    self.mock(utils, 'is_canary', lambda: False)
+    self.mock(utils, 'is_dev', lambda: False)
     data = [
       (0, 2),
       (1, 2),

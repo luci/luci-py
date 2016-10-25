@@ -16,6 +16,7 @@ generally should not be used outside of Auth components implementation.
 
 import collections
 import functools
+import json
 import logging
 import os
 import threading
@@ -23,9 +24,12 @@ import time
 import urllib
 
 from google.appengine.api import oauth
+from google.appengine.api import urlfetch
 from google.appengine.ext import ndb
 from google.appengine.ext.ndb import metadata
 from google.appengine.runtime import apiproxy_errors
+
+from components import utils
 
 from . import config
 from . import ipaddr
@@ -73,6 +77,13 @@ _auth_db_fetching_thread = None
 _thread_local = threading.local()
 
 
+# The endpoint used to validate an access token on dev server.
+TOKEN_INFO_ENDPOINT = 'https://www.googleapis.com/oauth2/v1/tokeninfo'
+
+# OAuth2 client_id of the "API Explorer" web app.
+API_EXPLORER_CLIENT_ID = '292824132082.apps.googleusercontent.com'
+
+
 ################################################################################
 ## Exception classes.
 
@@ -92,7 +103,7 @@ class AuthorizationError(Error):
 
 
 ################################################################################
-## AuthDB and RequestCache.
+## AuthDB.
 
 
 # Name of a secret. Can be service-local (scope == 'local') or global across
@@ -409,6 +420,10 @@ class AuthDB(object):
         self.global_config.oauth_additional_client_ids)
 
 
+################################################################################
+## OAuth token check.
+
+
 def attempt_oauth_initialization(scope):
   """Attempts to perform GetOAuthUser RPC retrying deadlines.
 
@@ -440,19 +455,15 @@ def attempt_oauth_initialization(scope):
       return
 
 
-def extract_oauth_caller_identity(extra_client_ids=None):
-  """Extracts and validates Identity of a caller for current request.
+def extract_oauth_caller_identity():
+  """Extracts and validates Identity of a caller for the current request.
+
+  Implemented on top of GAE OAuth2 API.
 
   Uses client_id whitelist fetched from the datastore to validate OAuth client
   used to build access_token. Also recognizes various types of service accounts
   and verifies that their client_id is what it should be. Service account's
   client_id doesn't have to be in client_id whitelist.
-
-  Used by webapp2 request handlers and Cloud Endpoints API methods.
-
-  Args:
-    extra_client_ids: optional list of allowed client_ids, in addition to
-      the whitelist in the datastore.
 
   Returns:
     Identity of the caller in case the request was successfully validated.
@@ -483,8 +494,8 @@ def extract_oauth_caller_identity(extra_client_ids=None):
   # since email address uniquely identifies credentials used.
   good = (
       email.endswith('.gserviceaccount.com') or
-      get_request_auth_db().is_allowed_oauth_client_id(client_id) or
-      client_id in (extra_client_ids or []))
+      client_id == API_EXPLORER_CLIENT_ID or
+      get_request_auth_db().is_allowed_oauth_client_id(client_id))
 
   if not good:
     raise AuthorizationError(
@@ -495,6 +506,118 @@ def extract_oauth_caller_identity(extra_client_ids=None):
     return model.Identity(model.IDENTITY_USER, email)
   except ValueError:
     raise AuthenticationError('Unsupported user email: %s' % email)
+
+
+def check_oauth_access_token(headers):
+  """Verifies the access token of the current request.
+
+  This function uses slightly different strategies for prod, dev and local
+  environments:
+    * In prod it always require real OAuth2 tokens, validated by GAE OAuth2 API.
+    * On local devserver it uses URL Fetch and prod token info endpoint.
+    * On '-dev' instances or on dev server it can also fallback to a custom
+      token info endpoint, defined in AuthDevConfig datastore entity. This is
+      useful to "stub" authentication when running integration or load tests.
+
+  In addition to checking the correctness of OAuth token, this function also
+  verifies that the client_id associated with the token is whitelisted in the
+  auth config.
+
+  The client_id check is skipped on the local devserver or when using custom
+  token info endpoint (e.g. on '-dev' instances).
+
+  Args:
+    headers: a dict with request headers.
+
+  Returns:
+    Identity of the caller in case the request was successfully validated.
+    Always 'user:...', never anonymous.
+
+  Raises:
+    AuthenticationError in case the access token is invalid.
+    AuthorizationError in case the access token is not allowed.
+  """
+  header = headers.get('Authorization')
+  if not header:
+    raise AuthenticationError('No "Authorization" header')
+
+  # Non-development instances always use real OAuth API.
+  if not utils.is_local_dev_server() and not utils.is_dev():
+    return extract_oauth_caller_identity()
+
+  # OAuth2 library is mocked on dev server to return some nonsense. Use (slow,
+  # but real) OAuth2 API endpoint instead to validate access_token. It is also
+  # what Cloud Endpoints do on a local server.
+  if utils.is_local_dev_server():
+    auth_call = lambda: dev_oauth_authentication(header, TOKEN_INFO_ENDPOINT)
+  else:
+    auth_call = extract_oauth_caller_identity
+
+  # Do not fallback to custom endpoint if not configured. This call also has a
+  # side effect of initializing AuthDevConfig entity in the datastore, to make
+  # it editable in Datastore UI.
+  cfg = model.get_dev_config()
+  if not cfg.token_info_endpoint:
+    return auth_call()
+
+  # Try the real call first, then fallback to the custom validation endpoint.
+  try:
+    return auth_call()
+  except AuthenticationError:
+    ident = dev_oauth_authentication(header, cfg.token_info_endpoint, '.dev')
+    logging.warning('Authenticated as dev account: %s', ident.to_bytes())
+    return ident
+
+
+def dev_oauth_authentication(header, token_info_endpoint, suffix=''):
+  """OAuth2 based authentication via URL Fetch to the token info endpoint.
+
+  This is slow and ignores client_id whitelist. Must be used only in
+  a development environment.
+
+  Returns:
+    Identity of the caller in case the request was successfully validated.
+
+  Raises:
+    AuthenticationError in case access token is missing or invalid.
+    AuthorizationError in case the token is not trusted.
+  """
+  assert utils.is_local_dev_server() or utils.is_dev()
+
+  header = header.split(' ', 1)
+  if len(header) != 2 or header[0] not in ('OAuth', 'Bearer'):
+    raise AuthenticationError('Invalid authorization header')
+
+  # Adapted from endpoints/users_id_tokens.py, _set_bearer_user_vars_local.
+  logging.info('Using dev token info endpoint %s', token_info_endpoint)
+  result = urlfetch.fetch(
+      url='%s?%s' % (
+          token_info_endpoint,
+          urllib.urlencode({'access_token': header[1]})),
+      follow_redirects=False,
+      validate_certificate=True)
+  if result.status_code != 200:
+    try:
+      error = json.loads(result.content)['error_description']
+    except (KeyError, ValueError):
+      error = repr(result.content)
+    raise AuthenticationError('Failed to validate the token: %s' % error)
+
+  token_info = json.loads(result.content)
+  if 'email' not in token_info:
+    raise AuthorizationError('Token doesn\'t include an email address')
+  if not token_info.get('verified_email'):
+    raise AuthorizationError('Token email isn\'t verified')
+
+  email = token_info['email'] + suffix
+  try:
+    return model.Identity(model.IDENTITY_USER, email)
+  except ValueError:
+    raise AuthorizationError('Unsupported user email: %s' % email)
+
+
+################################################################################
+## RequestCache.
 
 
 class RequestCache(object):

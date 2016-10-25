@@ -62,7 +62,7 @@ monkey_patch_endpoints_logger()
 @util.positional(2)
 def endpoints_api(
     name, version,
-    auth_level=endpoints.AUTH_LEVEL.OPTIONAL,
+    auth_level=None,
     allowed_client_ids=None,
     **kwargs):
   """Same as @endpoints.api but tweaks default auth related properties.
@@ -81,9 +81,20 @@ def endpoints_api(
   # 'audiences' is used with id_token auth, it's not supported yet.
   assert 'audiences' not in kwargs, 'Not supported'
 
-  # We love authentication.
-  if auth_level == endpoints.AUTH_LEVEL.NONE:
-    raise ValueError('Authentication is required')
+  # On prod, make sure Cloud Endpoints frontend validates OAuth tokens for us.
+  # On dev instances we will validate them ourselves to support custom token
+  # validation endpoint.
+  if auth_level is not None:
+    if utils.is_local_dev_server() or utils.is_dev():
+      # AUTH_LEVEL.NONE: Frontend authentication will be skipped. If
+      # authentication is desired, it will need to be performed by the backend.
+      auth_level = endpoints.AUTH_LEVEL.NONE
+    else:
+      # AUTH_LEVEL.OPTIONAL: Authentication is optional. If authentication
+      # credentials are supplied they must be valid. Backend will be called if
+      # the request contains valid authentication credentials or no
+      # authentication credentials.
+      auth_level = endpoints.AUTH_LEVEL.OPTIONAL
 
   # We love API Explorer.
   if allowed_client_ids is None:
@@ -212,43 +223,15 @@ def initialize_request_auth(remote_address, headers):
   config.ensure_configured()
   auth_context = api.reinitialize_request_cache()
 
-  # Endpoints library always does authentication before invoking a method. Just
-  # grab the result of that authentication: it's doesn't make any RPCs.
-  current_user = endpoints.get_current_user()
-
-  # Cloud Endpoints auth on local dev server works much better compared to OAuth
-  # library since endpoints is using real authentication backend, while oauth.*
-  # API is mocked. It makes API Explorer work with local apps. Always use Cloud
-  # Endpoints auth on the dev server. It has a side effect: client_id whitelist
-  # is ignored, there's no way to get client_id on dev server via endpoints API.
-  identity = None
-  if utils.is_local_dev_server():
-    if current_user:
-      identity = model.Identity(model.IDENTITY_USER, current_user.email())
-    else:
-      identity = model.Anonymous
+  # Verify the validity of the token (including client_id check), if given.
+  if headers.get('Authorization'):
+    identity = api.check_oauth_access_token(headers)
   else:
-    # Use OAuth API directly to grab both client_id and email and validate them.
-    # endpoints.get_current_user() itself is implemented in terms of OAuth API,
-    # with some additional code to handle id_token that we currently skip (see
-    # TODO at the top of this file). OAuth API calls below will just reuse
-    # cached values without making any additional RPCs.
-    if headers.get('Authorization'):
-      # Raises error for forbidden client_id, never returns None or Anonymous.
-      identity = api.extract_oauth_caller_identity(
-          extra_client_ids=[endpoints.API_EXPLORER_CLIENT_ID])
-      # Double check that we used same cached values as endpoints did.
-      assert identity and not identity.is_anonymous, identity
-      assert current_user is not None
-      assert identity.name == current_user.email(), (
-          identity.name, current_user.email())
-    else:
-      # 'Authorization' header is missing. Endpoints still could have found
-      # id_token in GET request parameters. Ignore it for now, the code is
-      # complicated without it already.
-      if current_user is not None:
-        raise api.AuthenticationError('Unsupported authentication method')
-      identity = model.Anonymous
+    # Cloud Endpoints support more authentication methods than we do. Make sure
+    # to fail the request if one of such methods is used.
+    if endpoints.get_current_user() is not None:
+      raise api.AuthenticationError('Unsupported authentication method')
+    identity = model.Anonymous
 
   assert remote_address
   ip = ipaddr.ip_from_string(remote_address)

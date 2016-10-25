@@ -33,8 +33,18 @@ class EndpointsAuthTest(test_case.TestCase):
     self.mock(logging, 'warning', lambda *_args: None)
 
   def call(self, remote_address, email, headers=None):
-    """Mocks current user calls initialize_request_auth."""
+    """Mocks current user in initialize_request_auth."""
+    headers = (headers or {}).copy()
+    if email:
+      headers['Authorization'] = 'Bearer %s' % email
 
+    # Mock ours auth.
+    ident = model.Anonymous
+    if email:
+      ident = model.Identity(model.IDENTITY_USER, email)
+    self.mock(api, 'check_oauth_access_token', lambda _: ident)
+
+    # Mock auth implemented by the Cloud Endpoints.
     class User(object):
       def email(self):
         return email
@@ -43,7 +53,7 @@ class EndpointsAuthTest(test_case.TestCase):
         lambda: User() if email else None)
 
     api.reset_local_state()
-    endpoints_support.initialize_request_auth(remote_address, headers or {})
+    endpoints_support.initialize_request_auth(remote_address, headers)
     return api.get_current_identity().to_bytes()
 
   def test_ip_whitelist_bot(self):

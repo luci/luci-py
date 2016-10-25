@@ -1251,3 +1251,41 @@ def fetch_ip_whitelists():
 
   whitelists = sorted(whitelists_fut.get_result(), key=lambda x: x.key.id())
   return assignments, whitelists
+
+
+################################################################################
+## Dev config. Used only on dev server or '-dev' instances.
+
+
+class AuthDevConfig(ndb.Model):
+  """Authentication related configuration for development or tests.
+
+  Meant to be updated via Cloud Console Datastore UI.
+
+  ID is 'dev_config'.
+  """
+
+  # Disable memcache to simplify editing of this entity through datastore UI.
+  _use_cache = False
+  _use_memcache = False
+
+  # A custom endpoint to validate OAuth tokens to use as a fallback.
+  #
+  # E.g. "https://www.googleapis.com/oauth2/v1/tokeninfo".
+  token_info_endpoint = ndb.StringProperty(indexed=False, default='')
+
+
+@utils.cache_with_expiration(60)
+def get_dev_config():
+  """Returns an instance of AuthDevConfig (possibly uninitialized).
+
+  Asserts that it is used only on dev instance.
+  """
+  assert utils.is_local_dev_server() or utils.is_dev()
+  k = ndb.Key('AuthDevConfig', 'dev_config')
+  e = k.get()
+  if not e:
+    logging.warning('Initializing AuthDevConfig entity')
+    e = AuthDevConfig(key=k)
+    e.put()  # there's a race condition here, but we don't care
+  return e
