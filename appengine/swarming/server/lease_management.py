@@ -404,6 +404,22 @@ def ensure_bot_info_exists(machine_lease):
     )
 
 
+def last_shutdown_ts(hostname):
+  """Returns the time the given bot posted a final bot_shutdown event.
+
+  The bot_shutdown event is only considered if it is the last recorded event.
+
+  Args:
+    hostname: Hostname of the machine.
+
+  Returns:
+    datetime.datetime or None if the last recorded event is not bot_shutdown.
+  """
+  bot_event = bot_management.get_events_query(hostname, True).get()
+  if bot_event and bot_event.event_type == 'bot_shutdown':
+    return bot_event.ts
+
+
 def handle_termination_task(machine_lease):
   """Checks the state of the termination task, releasing the lease if completed.
 
@@ -415,6 +431,18 @@ def handle_termination_task(machine_lease):
   task_result_summary = task_pack.unpack_result_summary_key(
       machine_lease.termination_task).get()
   if task_result_summary.state == task_result.State.COMPLETED:
+    # There is a race condition where the bot reports the termination task as
+    # completed but hasn't exited yet. The last thing it does before exiting
+    # is post a bot_shutdown event. Check for the presence of a bot_shutdown
+    # event which occurred after the termination task was completed.
+    shutdown_ts = last_shutdown_ts(machine_lease.hostname)
+    if not shutdown_ts or shutdown_ts < task_result_summary.completed_ts:
+      logging.info(
+          'Machine terminated but not yet shut down:\nKey: %s',
+          machine_lease.key,
+      )
+      return
+
     response = machine_provider.release_machine(
         machine_lease.client_request_id)
     if response.get('error'):
