@@ -36,6 +36,13 @@ class LocalBot(object):
     self._logs = {}
     self._redirect = redirect
 
+  def wipe_cache(self):
+    """Blows away this bot's cache."""
+    try:
+      file_path.rmtree(os.path.join(self._tmpdir, 'isolated_cache'))
+    except OSError:
+      pass
+
   @property
   def bot_id(self):
     # TODO(maruel): Big assumption.

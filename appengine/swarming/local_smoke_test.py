@@ -253,10 +253,17 @@ class Test(unittest.TestCase):
   client = None
   dimensions = None
   servers = None
+  bot = None
 
   @classmethod
   def setUpClass(cls):
     cls.dimensions = os_utilities.get_dimensions()
+
+  def setUp(self):
+    super(Test, self).setUp()
+    # Reset the bot's cache at the start of each task, so that the cache reuse
+    # data becomes deterministic.
+    self.bot.wipe_cache()
 
   def gen_expected(self, **kwargs):
     return gen_expected(bot_dimensions=self.dimensions, **kwargs)
@@ -424,8 +431,8 @@ class Test(unittest.TestCase):
         failure=True,
         performance_stats={
           u'isolated_download': {
-            u'initial_number_items': u'2',
-            u'initial_size': u'312',
+            u'initial_number_items': u'0',
+            u'initial_size': u'0',
             u'items_cold': [172, 200],
             u'items_hot': [],
           },
@@ -470,8 +477,8 @@ class Test(unittest.TestCase):
         isolated_out=RESULT_HEY_ISOLATED_OUT,
         performance_stats={
           u'isolated_download': {
-            u'initial_number_items': u'4',
-            u'initial_size': u'684',
+            u'initial_number_items': u'0',
+            u'initial_size': u'0',
             u'items_cold': [200, 407],
             u'items_hot': [],
           },
@@ -491,6 +498,35 @@ class Test(unittest.TestCase):
         ['--hard-timeout', '1', '--', '${ISOLATED_OUTDIR}'],
         expected_summary, expected_files)
 
+  def test_idempotent_reuse(self):
+    hello_world = 'print "hi"\n'
+    expected_summary = self.gen_expected(
+      name=u'idempotent_reuse',
+      performance_stats={
+        u'isolated_download': {
+          u'initial_number_items': u'0',
+          u'initial_size': u'0',
+          u'items_cold': [11, 199],
+          u'items_hot': [],
+        },
+        u'isolated_upload': {
+          u'items_cold': [],
+          u'items_hot': [],
+        },
+      },
+      properties_hash = u'4c8f82e77f79b0998fc4764c458eb79a20ac00d4',
+    )
+    task_id = self._run_isolated(
+        hello_world, 'idempotent_reuse', ['--idempotent'], expected_summary, {})
+    expected_summary[u'costs_usd'] = None
+    expected_summary.pop('performance_stats')
+    expected_summary[u'cost_saved_usd'] = 0.02
+    expected_summary[u'deduped_from'] = task_id[:-1] + '1'
+    expected_summary[u'try_number'] = 0
+    expected_summary[u'properties_hash'] = None
+    self._run_isolated(
+        hello_world, 'idempotent_reuse', ['--idempotent'], expected_summary, {})
+
   def _run_isolated(self, hello_world, name, args, expected_summary,
       expected_files):
     # Shared code for all test_isolated_* test cases.
@@ -509,6 +545,7 @@ class Test(unittest.TestCase):
       self.assertResults(expected_summary, actual_summary)
       actual_files.pop('summary.json')
       self.assertEqual(expected_files, actual_files)
+      return task_id
     finally:
       file_path.rmtree(tmpdir)
 
@@ -541,7 +578,12 @@ class Test(unittest.TestCase):
 
     bot_version = result.pop('bot_version')
     self.assertTrue(bot_version)
-    self.assertLess(0, result.pop('costs_usd'))
+    if result[u'costs_usd'] is not None:
+      expected.pop(u'costs_usd', None)
+      self.assertLess(0, result.pop(u'costs_usd'))
+    if result[u'cost_saved_usd'] is not None:
+      expected.pop(u'cost_saved_usd', None)
+      self.assertLess(0, result.pop(u'cost_saved_usd'))
     self.assertTrue(result.pop('created_ts'))
     self.assertTrue(result.pop('completed_ts'))
     self.assertLess(0, result.pop('durations'))
@@ -620,6 +662,7 @@ def main():
     servers = start_servers.LocalServers(False)
     servers.start()
     bot = start_bot.LocalBot(servers.swarming_server.url)
+    Test.bot = bot
     bot.start()
     client = SwarmingClient(
         servers.swarming_server.url, servers.isolate_server.url)
@@ -644,7 +687,7 @@ def main():
   except KeyboardInterrupt:
     print >> sys.stderr, '<Ctrl-C>'
     failed = True
-    if bot.poll() is None:
+    if bot is not None and bot.poll() is None:
       bot.kill()
       bot.wait()
   finally:
