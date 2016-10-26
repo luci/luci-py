@@ -485,7 +485,7 @@
       },
 
       _deleteBot: function() {
-        swarming.postWithToast("/_ah/api/swarming/v1/bot/"+this.bot_id+"/delete",
+        swarming.postWithToast("/api/swarming/v1/bot/"+this.bot_id+"/delete",
           "Deleting "+this.bot_id, this._auth_headers);
       },
 
@@ -572,7 +572,7 @@
         if (!this._auth_headers) {
           return;
         }
-        var baseUrl = "/_ah/api/swarming/v1/bot/"+this.bot_id;
+        var baseUrl = "/api/swarming/v1/bot/"+this.bot_id;
         // We limit the fields on these two queries to make them faster.
         this.$.page_tasks.load(baseUrl + "/tasks?fields=cursor%2Citems(abandoned_ts%2Cbot_version%2Ccompleted_ts%2Cduration%2Cexit_code%2Cfailure%2Cinternal_failure%2Cmodified_ts%2Cname%2Cstarted_ts%2Cstate%2Ctask_id%2Ctry_number)",
           this._auth_headers, 30);
@@ -588,7 +588,7 @@
       },
 
       _shutdownBot: function() {
-        swarming.postWithToast("/_ah/api/swarming/v1/bot/"+this.bot_id+"/terminate",
+        swarming.postWithToast("/api/swarming/v1/bot/"+this.bot_id+"/terminate",
           "Shutting down "+this.bot_id, this._auth_headers);
       },
 

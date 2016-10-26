@@ -637,7 +637,7 @@
         if (!this._auth_headers || !this._query_params) {
           return;
         }
-        var url = "/_ah/api/swarming/v1/bots/list?" + sk.query.fromParamSet(this._query_params);
+        var url = "/api/swarming/v1/bots/list?" + sk.query.fromParamSet(this._query_params);
         this.$.page_bots.load(url,this._auth_headers);
       }
 

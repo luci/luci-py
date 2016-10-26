@@ -392,7 +392,7 @@
       },
 
       _cancelTask: function() {
-        var url = "/_ah/api/swarming/v1/task/" + this._toCancel +"/cancel";
+        var url = "/api/swarming/v1/task/" + this._toCancel +"/cancel";
         swarming.postWithToast(url, "Canceling task " + this._toCancel, this._auth_headers);
         this.set("_toCancel", "");
       },
@@ -418,7 +418,7 @@
         if (!this._auth_headers || !this._query_params) {
           return;
         }
-        var url = "/_ah/api/swarming/v1/tasks/list?" + sk.query.fromParamSet(this._query_params);
+        var url = "/api/swarming/v1/tasks/list?" + sk.query.fromParamSet(this._query_params);
         this.$.page_tasks.load(url,this._auth_headers);
       },
 
