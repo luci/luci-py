@@ -185,6 +185,8 @@ def new_task_request_from_rpc(msg, now):
       properties=properties,
       # It is set in task_request.init_new_request().
       service_account=None,
+      # It is set in task_request.init_new_request().
+      properties_hash=None,
       # Need to convert it to 'str', since it is stored as byte blob, not text.
       service_account_token=str(msg.service_account_token or 'none'))
 

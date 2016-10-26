@@ -543,18 +543,9 @@ class TaskRequest(ndb.Model):
   # Data to send in 'userdata' field of PubSub messages.
   pubsub_userdata = ndb.StringProperty(indexed=False)
 
-  def properties_hash(self):
-    """Calculates the this task's TaskProperties IFF the task is idempotent.
-
-    It uniquely identifies the TaskProperties instance to permit deduplication
-    by the task scheduler. It is None if the task is not idempotent.
-
-    Returns:
-      Hash as a compact byte str.
-    """
-    if not self.properties.idempotent:
-      return None
-    return self.HASHING_ALGO(utils.encode_to_json(self.properties)).digest()
+  # This stores the computed properties_hash for this Task's properties object.
+  # It is set in init_new_request. It is None for non-idempotent tasks.
+  properties_hash = ndb.BlobProperty(indexed=False)
 
   @property
   def task_id(self):
@@ -587,7 +578,7 @@ class TaskRequest(ndb.Model):
     out = super(TaskRequest, self).to_dict(
         exclude=['pubsub_auth_token', 'properties', 'service_account_token'])
     out['properties'] = self.properties.to_dict()
-    properties_hash = self.properties_hash()
+    properties_hash = out['properties_hash']
     out['properties_hash'] = (
         properties_hash.encode('hex') if properties_hash else None)
     return out
@@ -796,6 +787,12 @@ def init_new_request(request, allow_high_priority):
   for key, value in request.properties.dimensions.iteritems():
     request.tags.append('%s:%s' % (key, value))
   request.tags = sorted(set(request.tags))
+
+  if request.properties.idempotent:
+    request.properties_hash = request.HASHING_ALGO(
+      utils.encode_to_json(request.properties)).digest()
+  else:
+    request.properties_hash = None
 
 
 def new_request_clone(original_request, allow_high_priority):

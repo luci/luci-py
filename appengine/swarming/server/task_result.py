@@ -858,7 +858,7 @@ class TaskResultSummary(_TaskResultCommon):
         request.properties.idempotent and
         not self.deduped_from):
       # Signal the results are valid and can be reused.
-      self.properties_hash = request.properties_hash()
+      self.properties_hash = request.properties_hash
       assert self.properties_hash
 
   def need_update_from_run_result(self, run_result):

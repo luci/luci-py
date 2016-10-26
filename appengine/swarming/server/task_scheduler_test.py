@@ -62,7 +62,9 @@ def _gen_request(properties=None, **kwargs):
     'user': 'Jesus',
   }
   args.update(kwargs)
-  return task_request.TaskRequest(**args)
+  ret = task_request.TaskRequest(**args)
+  task_request.init_new_request(ret, True)
+  return ret
 
 
 def get_results(request_key):
