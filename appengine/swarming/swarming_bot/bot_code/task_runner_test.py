@@ -358,9 +358,14 @@ class TestTaskRunner(TestTaskRunnerBase):
     # Mock running run_isolated with a script.
     SCRIPT_ISOLATED = (
       'import json, sys;\n'
-      'if len(sys.argv) != 2:\n'
-      '  raise Exception(sys.argv);\n'
-      'with open(sys.argv[1], \'wb\') as f:\n'
+      'args = []\n'
+      'if len(sys.argv) != 3 or sys.argv[1] != \'-a\':\n'
+      '  raise Exception(sys.argv)\n'
+      'with open(sys.argv[2], \'r\') as argsfile:\n'
+      '  args = json.loads(argsfile.read())\n'
+      'if len(args) != 1:\n'
+      '  raise Exception(args);\n'
+      'with open(args[0], \'wb\') as f:\n'
       '  json.dump({\n'
       '    \'exit_code\': 0,\n'
       '    \'had_hard_timeout\': False,\n'
@@ -373,9 +378,13 @@ class TestTaskRunner(TestTaskRunnerBase):
       '  }, f)\n'
       'sys.stdout.write(\'hi\\n\')')
     self.mock(
-        task_runner, 'get_isolated_cmd',
+        task_runner, 'get_run_isolated',
+        lambda :
+          [sys.executable, '-u', '-c', SCRIPT_ISOLATED])
+    self.mock(
+        task_runner, 'get_isolated_args',
         lambda _work_dir, _details, isolated_result, bot_file, min_free_space:
-          [sys.executable, '-u', '-c', SCRIPT_ISOLATED, isolated_result])
+          [isolated_result])
     expected = {
       u'exit_code': 0,
       u'hard_timeout': False,

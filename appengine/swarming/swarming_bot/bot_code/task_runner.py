@@ -84,7 +84,7 @@ def get_run_isolated():
   return [sys.executable, THIS_FILE, 'run_isolated']
 
 
-def get_isolated_cmd(
+def get_isolated_args(
     work_dir, task_details, isolated_result, bot_file, min_free_space):
   """Returns the command to call run_isolated. Mocked in tests."""
   assert (bool(task_details.command) !=
@@ -92,7 +92,7 @@ def get_isolated_cmd(
   bot_dir = os.path.dirname(work_dir)
   if os.path.isfile(isolated_result):
     os.remove(isolated_result)
-  cmd = get_run_isolated()
+  cmd = []
 
   if task_details.isolated:
     cmd.extend(
@@ -340,6 +340,24 @@ def kill_and_wait(proc, grace_period, reason):
   return exit_code
 
 
+def fail_without_command(remote, bot_id, task_id, params, cost_usd_hour,
+                         task_start, exit_code, stdout):
+  now = monotonic_time()
+  params['cost_usd'] = cost_usd_hour * (now - task_start) / 60. / 60.
+  params['duration'] = now - task_start
+  params['io_timeout'] = False
+  params['hard_timeout'] = False
+  # Ignore server reply to stop.
+  remote.post_task_update(task_id, bot_id, params, (stdout, 0), 1)
+  return {
+    u'exit_code': exit_code,
+    u'hard_timeout': False,
+    u'io_timeout': False,
+    u'must_signal_internal_failure': None,
+    u'version': OUT_VERSION,
+  }
+
+
 def run_command(remote, task_details, work_dir, cost_usd_hour,
                 task_start, min_free_space, bot_file):
   """Runs a command and sends packets to the server to stream results back.
@@ -374,7 +392,10 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     }
 
   isolated_result = os.path.join(work_dir, 'isolated_result.json')
-  cmd = get_isolated_cmd(
+  args_path = os.path.join(work_dir, 'run_isolated_args.json')
+  cmd = get_run_isolated()
+  cmd.extend(['-a', args_path])
+  args = get_isolated_args(
       work_dir, task_details, isolated_result, bot_file, min_free_space)
   # Hard timeout enforcement is deferred to run_isolated. Grace is doubled to
   # give one 'grace_period' slot to the child process and one slot to upload
@@ -395,6 +416,21 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     logging.info('cmd=%s', cmd)
     logging.info('cwd=%s', work_dir)
     logging.info('env=%s', env)
+    fail_on_start = lambda exit_code, stdout: fail_without_command(
+        remote, bot_id, task_id, params, cost_usd_hour, task_start,
+        exit_code, stdout)
+
+    # We write args to a file since there may be more of them than the OS
+    # can handle.
+    try:
+      with open(args_path, 'w') as f:
+        json.dump(args, f)
+    except (IOError, OSError) as e:
+      return fail_on_start(
+          -1,
+          'Could not write args to %s: %s' % (args_path, e))
+
+    # Start the command
     try:
       assert cmd and all(isinstance(a, basestring) for a in cmd)
       proc = subprocess42.Popen(
@@ -406,22 +442,11 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
           stderr=subprocess42.STDOUT,
           stdin=subprocess42.PIPE)
     except OSError as e:
-      stdout = 'Command "%s" failed to start.\nError: %s' % (' '.join(cmd), e)
-      now = monotonic_time()
-      params['cost_usd'] = cost_usd_hour * (now - task_start) / 60. / 60.
-      params['duration'] = now - start
-      params['io_timeout'] = False
-      params['hard_timeout'] = False
-      # Ignore server reply to stop.
-      remote.post_task_update(task_id, bot_id, params, (stdout, 0), 1)
-      return {
-        u'exit_code': 1,
-        u'hard_timeout': False,
-        u'io_timeout': False,
-        u'must_signal_internal_failure': None,
-        u'version': OUT_VERSION,
-      }
+      return fail_on_start(
+          1,
+          'Command "%s" failed to start.\nError: %s' % (' '.join(cmd), e))
 
+    # Monitor the task
     output_chunk_start = 0
     stdout = ''
     exit_code = None
