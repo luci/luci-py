@@ -116,6 +116,10 @@ def get_isolated_args(
     for c in task_details.caches:
       cmd.extend(['--named-cache', c['name'], c['path']])
 
+  # Expected output files:
+  for output in task_details.outputs:
+    cmd.extend(['--output', output])
+
   # CIPD options.
   if task_details.cipd_input and task_details.cipd_input.get('packages'):
     for pkg in task_details.cipd_input.get('packages'):
@@ -189,6 +193,7 @@ class TaskDetails(object):
     self.hard_timeout = data['hard_timeout']
     self.io_timeout = data['io_timeout']
     self.task_id = data['task_id']
+    self.outputs = data.get('outputs', [])
 
   @staticmethod
   def load(path):
