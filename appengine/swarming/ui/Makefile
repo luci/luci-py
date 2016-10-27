@@ -45,7 +45,7 @@ vulcanize: clean default common_strings
 debug_build: clean default common_strings
 	cp elements.html ./build/elements.html
 	cat ./res/imp/bower_components/webcomponentsjs/webcomponents-lite.min.js ./build/js/common-strings.js ./node_modules/skia-common-js/common.js ./res/js/common.js ./res/js/alias.js > ./build/js/js.js
-	ln --symbolic ../res/imp/ ./build/
+	ln -s ../res/imp/ ./build/
 
 .PHONY: common_strings
 common_strings:
