@@ -9,8 +9,9 @@ from components import utils
 
 
 # Names of groups.
-# See https://code.google.com/p/swarming/wiki/SwarmingAccessGroups for each
-# level.
+# See
+# https://github.com/luci/luci-py/blob/master/appengine/swarming/doc/Access-Groups.md
+# for each level.
 #
 # TODO(vadimsh): Move them to the config.
 ADMINS_GROUP = 'swarming-admins'
