@@ -858,7 +858,15 @@ class TaskResultSummary(_TaskResultCommon):
         request.properties.idempotent and
         not self.deduped_from):
       # Signal the results are valid and can be reused.
-      self.properties_hash = request.properties_hash
+      phash = request.properties_hash
+      if phash is None:
+        # TODO(iannucci): Remove this 24 hours after addition.
+        # this was triggered on the older schema where properties_hash was
+        # dynamically calculated on every use, and so its value in the db is
+        # None. Recalculate it here to smooth the transition.
+        phash = request.HASHING_ALGO(
+          utils.encode_to_json(request.properties)).digest()
+      self.properties_hash = phash
       assert self.properties_hash
 
   def need_update_from_run_result(self, run_result):
