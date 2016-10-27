@@ -332,6 +332,16 @@
                     <td><b>Actual:</b>[[cipd.actual]]</td>
                   </tr>
                 </template>
+
+                <tr hidden$="[[_empty(_request.properties.caches)]]">
+                  <td rowspan$="[[_rowspan(_request.properties.caches)]]">Named caches</td>
+                </tr>
+                <template is="dom-repeat" items="[[_request.properties.caches]]" as="cache">
+                  <tr>
+                    <td><span>[[cache.name]]</span>:<span>[[cache.path]]</span></td>
+                  </tr>
+                </template>
+
               </template>
             </table>
 
@@ -700,6 +710,10 @@
       _rowspan: function(dims) {
         dims = dims || [];
         return dims.length + 1;
+      },
+
+      _empty: function(array) {
+        return array.length == 0;
       },
 
       _supportsMilo: function(request, showRaw) {

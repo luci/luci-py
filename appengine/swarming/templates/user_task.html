@@ -266,6 +266,20 @@
             </tr>
           {% endif %}
         {% endif %}
+
+        {% if request.properties.caches %}
+        <tr title="Named caches">
+          <td>Named caches</td>
+          <td>
+            {% for cache in request.properties.caches %}
+              <div>
+                <span>{{cache.name}}</span>:<span>{{cache.path}}</span>
+              </div>
+            {% endfor %}
+          </td>
+        </tr>
+        {% endif %}
+
         {% if request.properties.inputs_ref and request.properties.inputs_ref.isolated %}
           <tr title="Inputs files">
             <td>Isolated inputs</td>
