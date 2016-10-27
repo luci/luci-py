@@ -59,13 +59,13 @@ def decode_message(remote_method_info, request):
 
   # Read field values from query string parameters or URL path.
   if res_container or request.method == 'GET':
-    # In addition to standard ResourceContainer request type, we also support
-    # GET request handlers that use Message instead of ResourceContainer,
-    # because it is non-ambiguous (because GET requests cannot have body).
-    if res_container:
-      param_fields = res_container.parameters_message_class.all_fields()
-    else:
+    if request.method == 'GET':
+      # In addition to standard ResourceContainer request type, we also support
+      # GET request handlers that use Message instead of ResourceContainer,
+      # because it is non-ambiguous (because GET requests cannot have body).
       param_fields = result.all_fields()
+    else:
+      param_fields = res_container.parameters_message_class.all_fields()
     for f in param_fields:
       if f.name in request.route_kwargs:
         values = [request.route_kwargs[f.name]]

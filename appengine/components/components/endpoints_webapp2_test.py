@@ -23,6 +23,9 @@ class Msg(messages.Message):
   s2 = messages.StringField(2)
 
 
+CONTAINER = endpoints.ResourceContainer(Msg, x=messages.StringField(3))
+
+
 @endpoints.api('Service', 'v1')
 class EndpointsService(remote.Service):
 
@@ -32,6 +35,10 @@ class EndpointsService(remote.Service):
 
   @endpoints.method(Msg, Msg, http_method='GET')
   def get(self, _request):
+    return Msg()
+
+  @endpoints.method(CONTAINER, Msg, http_method='GET')
+  def get_container(self, _request):
     return Msg()
 
 
@@ -60,6 +67,20 @@ class EndpointsWebapp2TestCase(test_case.TestCase):
     msg = endpoints_webapp2.decode_message(EndpointsService.get.remote, request)
     self.assertEqual(msg.s, 'a')
     self.assertEqual(msg.s2, 'b')
+
+  def test_decode_message_get_resource_container(self):
+    request = webapp2.Request(
+        {
+          'QUERY_STRING': 's=a',
+        },
+        method='GET',
+        route_kwargs={'s2': 'b', 'x': 'c'},
+    )
+    rc = endpoints_webapp2.decode_message(
+        EndpointsService.get_container.remote, request)
+    self.assertEqual(rc.s, 'a')
+    self.assertEqual(rc.s2, 'b')
+    self.assertEqual(rc.x, 'c')
 
 
 if __name__ == '__main__':
