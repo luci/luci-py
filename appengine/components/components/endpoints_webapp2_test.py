@@ -3,6 +3,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import json
 import sys
 import unittest
 
@@ -40,6 +41,10 @@ class EndpointsService(remote.Service):
   @endpoints.method(CONTAINER, Msg, http_method='GET')
   def get_container(self, _request):
     return Msg()
+
+  @endpoints.method(Msg, Msg)
+  def post_403(self, _request):
+    raise endpoints.ForbiddenException('access denied')
 
 
 class EndpointsWebapp2TestCase(test_case.TestCase):
@@ -82,6 +87,18 @@ class EndpointsWebapp2TestCase(test_case.TestCase):
     self.assertEqual(rc.s2, 'b')
     self.assertEqual(rc.x, 'c')
 
+  def test_handle_403(self):
+    app = webapp2.WSGIApplication(
+        endpoints_webapp2.api_routes(EndpointsService), debug=True)
+    request = webapp2.Request.blank('/api/Service/v1/post_403')
+    request.method = 'POST'
+    response = request.get_response(app)
+    self.assertEqual(response.status_int, 403)
+    self.assertEqual(json.loads(response.body), {
+      'error': {
+        'message': 'access denied',
+      },
+    })
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

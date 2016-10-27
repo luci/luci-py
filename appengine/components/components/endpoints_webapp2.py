@@ -115,24 +115,21 @@ def path_handler(api_class, api_method, service_path):
       try:
         req = decode_message(api_method.remote, self.request)
       except (messages.DecodeError, messages.ValidationError, ValueError) as ex:
-        self.response.write(ex.message)
-        self.response.write('\n')
+        response_body = json.dumps({'error': {'message': ex.message}})
         self.response.set_status(httplib.BAD_REQUEST)
-        return
+      else:
+        try:
+          res = api_method(api, req)
+        except endpoints.ServiceException as ex:
+          response_body = json.dumps({'error': {'message': ex.message}})
+          self.response.set_status(ex.http_status)
+        else:
+          response_body = PROTOCOL.encode_message(res)
+          if isinstance(res, message_types.VoidMessage):
+            self.response.set_status(204)
 
-      try:
-        res = api_method(api, req)
-      except endpoints.ServiceException as ex:
-        self.response.write(ex.message)
-        self.response.write('\n')
-        self.response.set_status(ex.http_status)
-        return
-
-      res_encoded = PROTOCOL.encode_message(res)
-      if isinstance(res, message_types.VoidMessage):
-        self.response.set_status(204)
       self.response.content_type = 'application/json; charset=utf-8'
-      self.response.out.write(res_encoded)
+      self.response.out.write(response_body)
 
   return Handler
 
