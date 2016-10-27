@@ -224,6 +224,7 @@ class TaskRequestApiTest(TestCase):
     r = _gen_request(properties=dict(idempotent=True), parent_task_id=parent_id)
     request = mkreq(r)
     expected_properties = {
+      'caches': [],
       'cipd_input': {
         'client_package': {
           'package_name': 'infra/tools/cipd/${platform}',
@@ -263,7 +264,7 @@ class TaskRequestApiTest(TestCase):
       'properties': expected_properties,
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
-      'properties_hash': '411f20b8cda819b5fe47bcf26f5566c37afce0ed',
+      'properties_hash': '2202337f592f7e31b407e38832c35e23f306c6c8',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'service_account': u'none',
@@ -298,6 +299,7 @@ class TaskRequestApiTest(TestCase):
     request = mkreq(_gen_request(
         properties={'idempotent':True}, parent_task_id=parent_id))
     expected_properties = {
+      'caches': [],
       'cipd_input': {
         'client_package': {
           'package_name': 'infra/tools/cipd/${platform}',
@@ -337,7 +339,7 @@ class TaskRequestApiTest(TestCase):
       'properties': expected_properties,
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
-      'properties_hash': '411f20b8cda819b5fe47bcf26f5566c37afce0ed',
+      'properties_hash': '2202337f592f7e31b407e38832c35e23f306c6c8',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'service_account': u'none',
@@ -379,7 +381,7 @@ class TaskRequestApiTest(TestCase):
     # Other unit tests should use the calculated value.
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        '411f20b8cda819b5fe47bcf26f5566c37afce0ed', as_dict['properties_hash'])
+        '2202337f592f7e31b407e38832c35e23f306c6c8', as_dict['properties_hash'])
 
   def test_init_new_request_bot_service_account(self):
     request = mkreq(_gen_request(service_account_token='bot'))
@@ -423,6 +425,7 @@ class TaskRequestApiTest(TestCase):
       mkreq(_gen_request(properties={'foo': 'bar'}))
     mkreq(_gen_request())
 
+    # Command.
     with self.assertRaises(datastore_errors.BadValueError):
       mkreq(_gen_request(properties=dict(command=[])))
     with self.assertRaises(datastore_errors.BadValueError):
@@ -432,6 +435,7 @@ class TaskRequestApiTest(TestCase):
     mkreq(_gen_request(properties=dict(command=['python'])))
     mkreq(_gen_request(properties=dict(command=[u'python'])))
 
+    # CIPD.
     def mkcipdreq(idempotent=False, **cipd_input):
       mkreq(_gen_request(
           properties=dict(idempotent=idempotent, cipd_input=cipd_input)))
@@ -445,6 +449,16 @@ class TaskRequestApiTest(TestCase):
       mkcipdreq(packages=[dict(package_name='rm', path='.')])
     with self.assertRaises(datastore_errors.BadValueError):
       mkcipdreq(packages=[dict(package_name='rm', version='latest')])
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkcipdreq(packages=[dict(package_name='rm', path='/', version='latest')])
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkcipdreq(packages=[dict(package_name='rm', path='/a', version='latest')])
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkcipdreq(packages=[
+        dict(package_name='rm', path='a/..', version='latest')])
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkcipdreq(packages=[
+        dict(package_name='rm', path='a/./b', version='latest')])
     with self.assertRaises(datastore_errors.BadValueError):
       mkcipdreq(packages=[
         dict(package_name='rm', path='.', version='latest'),
@@ -469,6 +483,51 @@ class TaskRequestApiTest(TestCase):
         server='https://chrome-infra-packages.appspot.com',
     )
 
+    # Named caches.
+    mkcachereq = lambda *c: mkreq(_gen_request(properties=dict(caches=c)))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkcachereq(dict(name='', path='git_cache'))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkcachereq(dict(name='git_chromium', path=''))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkcachereq(
+          dict(name='git_chromium', path='git_cache'),
+          dict(name='git_v8', path='git_cache'),
+      )
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkcachereq(
+          dict(name='git_chromium', path='git_cache'),
+          dict(name='git_chromium', path='git_cache2'),
+      )
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkcachereq(dict(name='git_chromium', path='/git_cache'))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkcachereq(dict(name='git_chromium', path='../git_cache'))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkcachereq(dict(name='git_chromium', path='git_cache/../../a'))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkcachereq(dict(name='git_chromium', path='../git_cache'))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkcachereq(dict(name='git_chromium', path='git_cache//a'))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkcachereq(dict(name='git_chromium', path='a/./git_cache'))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkcachereq(dict(name='has space', path='git_cache'))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkcachereq(dict(name='CAPITAL', path='git_cache'))
+    with self.assertRaises(datastore_errors.BadValueError):
+      # A CIPD package and named caches cannot be mapped to the same path.
+      mkreq(_gen_request(properties=dict(
+          caches=[dict(name='git_chromium', path='git_cache')],
+          cipd_input=dict(packages=[
+            dict(package_name='foo', path='git_cache', version='latest')]))))
+    mkcachereq()
+    mkcachereq(dict(name='git_chromium', path='git_cache'))
+    mkcachereq(
+        dict(name='git_chromium', path='git_cache'),
+        dict(name='build_chromium', path='out'))
+
+    # Dimensions.
     with self.assertRaises(TypeError):
       mkreq(_gen_request(properties=dict(dimensions=[])))
     with self.assertRaises(datastore_errors.BadValueError):
@@ -479,22 +538,26 @@ class TaskRequestApiTest(TestCase):
     mkreq(_gen_request(
         properties=dict(dimensions={u'id': u'b', u'a.': u'b'})))
 
+    # Environment.
     with self.assertRaises(TypeError):
       mkreq(_gen_request(properties=dict(env=[])))
     with self.assertRaises(TypeError):
       mkreq(_gen_request(properties=dict(env={u'a': 1})))
     mkreq(_gen_request(properties=dict(env={})))
 
+    # Priority.
     with self.assertRaises(datastore_errors.BadValueError):
       mkreq(_gen_request(priority=task_request.MAXIMUM_PRIORITY+1))
     mkreq(_gen_request(priority=task_request.MAXIMUM_PRIORITY))
 
+    # Execution timeout.
     with self.assertRaises(datastore_errors.BadValueError):
       mkreq(_gen_request(
           properties=dict(execution_timeout_secs=task_request._ONE_DAY_SECS+1)))
     mkreq(_gen_request(
         properties=dict(execution_timeout_secs=task_request._ONE_DAY_SECS)))
 
+    # Expiration.
     now = utils.utcnow()
     with self.assertRaises(datastore_errors.BadValueError):
       mkreq(_gen_request(
@@ -555,6 +618,7 @@ class TaskRequestApiTest(TestCase):
     # - idempotent was reset to False.
     # - parent_task_id was reset to None.
     expected_properties = {
+      'caches': [],
       'cipd_input': {
         'client_package': {
           'package_name': 'infra/tools/cipd/${platform}',

@@ -52,6 +52,7 @@ FILES = (
     'client/cipd.py',
     'client/isolated_format.py',
     'client/isolateserver.py',
+    'client/named_cache.py',
     'client/run_isolated.py',
     'config/__init__.py',
     'libs/__init__.py',

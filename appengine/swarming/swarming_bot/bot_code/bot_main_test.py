@@ -368,7 +368,7 @@ class TestBotMain(net_utils.TestCase):
     bit = threading.Event()
     self.mock(bit, 'wait', self.fail)
     self.mock(bot_main, 'run_manifest', lambda *args: manifest.append(args))
-    self.mock(bot_main, 'clean_isolated_cache',
+    self.mock(bot_main, 'clean_cache',
               lambda *args: clean.append(args))
     self.mock(bot_main, 'update_bot', self.fail)
 

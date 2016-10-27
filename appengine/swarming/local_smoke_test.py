@@ -249,7 +249,7 @@ def gen_expected(**kwargs):
 
 
 class Test(unittest.TestCase):
-  maxDiff = 2000
+  maxDiff = None
   client = None
   dimensions = None
   servers = None
@@ -514,7 +514,7 @@ class Test(unittest.TestCase):
           u'items_hot': [],
         },
       },
-      properties_hash = u'4c8f82e77f79b0998fc4764c458eb79a20ac00d4',
+      properties_hash = u'f5ce2aa67d68519e3013f40869806046a0266f1a',
     )
     task_id = self._run_isolated(
         hello_world, 'idempotent_reuse', ['--idempotent'], expected_summary, {})

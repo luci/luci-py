@@ -124,6 +124,7 @@ def task_request_to_rpc(entity):
   properties = _ndb_to_rpc(
       swarming_rpcs.TaskProperties,
       props,
+      caches=[_ndb_to_rpc(swarming_rpcs.CacheEntry, c) for c in props.caches],
       cipd_input=cipd_input,
       command=cmd,
       dimensions=_string_pairs_from_dict(props.dimensions),
@@ -166,6 +167,7 @@ def new_task_request_from_rpc(msg, now):
   properties = _rpc_to_ndb(
       task_request.TaskProperties,
       props,
+      caches=[_rpc_to_ndb(task_request.CacheEntry, c) for c in props.caches],
       cipd_input=cipd_input,
       # Passing command=None is supported at API level but not at NDB level.
       command=props.command or [],

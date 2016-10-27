@@ -47,6 +47,7 @@ separate entity to clearly declare the boundary for task request deduplication.
 
 import datetime
 import hashlib
+import posixpath
 import random
 import re
 import urlparse
@@ -95,6 +96,9 @@ _BEGINING_OF_THE_WORLD = datetime.datetime(2010, 1, 1, 0, 0, 0, 0)
 
 # Used for isolated files.
 _HASH_CHARS = frozenset('0123456789abcdef')
+
+# Keep synced with named_cache.py
+CACHE_NAME_RE = re.compile(ur'^[a-z0-9_]{1,4096}$')
 
 
 ### Properties validators must come before the models.
@@ -222,19 +226,27 @@ def _validate_package_version(prop, value):
 
 def _validate_package_path(_prop, path):
   """Validates a CIPD installation path."""
+  _validate_rel_path('CIPD package path', path)
+
+
+def _validate_rel_path(value_name, path):
   if not path:
     raise datastore_errors.BadValueError(
-        'CIPD package path is required. Use "." to install to run dir.')
+        '%s is required. Use "." to install to run dir.' % value_name)
   if '\\' in path:
     raise datastore_errors.BadValueError(
-        'CIPD package path cannot contain \\. On Windows forward-slashes '
-        'will be replaced with back-slashes.')
+        '%s cannot contain \\. On Windows forward-slashes '
+        'will be replaced with back-slashes.' % value_name)
   if '..' in path.split('/'):
     raise datastore_errors.BadValueError(
-        'CIPD package path cannot contain "..".')
+        '%s cannot contain "..".' % value_name)
+  normalized = posixpath.normpath(path)
+  if path != normalized:
+    raise datastore_errors.BadValueError(
+        '%s is not normalized. Normalized is "%s".' % (value_name, normalized))
   if path.startswith('/'):
     raise datastore_errors.BadValueError(
-        'CIPD package path cannot start with "/".')
+        '%s cannot start with "/".' % value_name)
 
 
 def _validate_service_account(prop, value):
@@ -344,6 +356,21 @@ class CipdInput(ndb.Model):
     self.packages.sort(key=lambda p: p.package_name)
 
 
+class CacheEntry(ndb.Model):
+  """Describes a named cache that should be present on the bot."""
+  name = ndb.StringProperty()
+  path = ndb.StringProperty()
+
+  def _pre_put_hook(self):
+    if not self.name:
+      raise datastore_errors.BadValueError('name is not specified')
+    if not CACHE_NAME_RE.match(self.name):
+      raise datastore_errors.BadValueError(
+          'name "%s" does not match %s' % (self.name, CACHE_NAME_RE.pattern))
+
+    _validate_rel_path('Cache path', self.path)
+
+
 class TaskProperties(ndb.Model):
   """Defines all the properties of a task to be run on the Swarming
   infrastructure.
@@ -363,6 +390,8 @@ class TaskProperties(ndb.Model):
   # - isolated_server = <server, metadata e.g. namespace> which is a
   #   simplified version of FilesRef
   # - _TaskResultCommon.output = String which is isolated output, if any.
+
+  caches = ndb.LocalStructuredProperty(CacheEntry, repeated=True)
 
   # Commands to run. It is a list of 1 item, the command to run.
   # TODO(maruel): Remove after 2016-06-01.
@@ -456,8 +485,29 @@ class TaskProperties(ndb.Model):
       if self.inputs_ref:
         self.inputs_ref._pre_put_hook()
 
+      # Validate caches.
+      cache_names = set()
+      cache_paths = set()
+      for c in self.caches:
+        c._pre_put_hook()
+        if c.name in cache_names:
+          raise datastore_errors.BadValueError(
+              'Cache name %s is used more than once' % c.name)
+        if c.path in cache_paths:
+          raise datastore_errors.BadValueError(
+              'Cache path "%s" is mapped more than once' % c.path)
+        cache_names.add(c.name)
+        cache_paths.add(c.path)
+      self.caches.sort(key=lambda c: c.name)
+
+      # Validate CIPD Input.
       if self.cipd_input:
         self.cipd_input._pre_put_hook()
+        for p in self.cipd_input.packages:
+          if p.path in cache_paths:
+            raise datastore_errors.BadValueError(
+                'Path "%s" is mapped to a named cache and cannot be a target '
+                'of CIPD installation' % p.path)
         if self.idempotent:
           pinned = lambda p: cipd.is_pinned_version(p.version)
           assert self.cipd_input.packages  # checked by cipd_input._pre_put_hook

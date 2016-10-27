@@ -162,8 +162,30 @@ class CipdPins(messages.Message):
   packages = messages.MessageField(CipdPackage, 2, repeated=True)
 
 
+class CacheEntry(messages.Message):
+  """Describes a named cache that should be present on the bot.
+
+  A CacheEntry in a task specified that the task prefers the cache to be present
+  on the bot. A symlink to the cache directory is created at <run_dir>/|path|.
+  If cache is not present on the machine, the directory is empty.
+  If the tasks makes any changes to the contents of the cache directory, they
+  are persisted on the machine. If another task runs on the same machine and
+  requests the same named cache, even if mapped to a different path, it will see
+  the changes.
+  """
+
+  # Unique name of the cache. Required. Length is limited to 4096.
+  name = messages.StringField(1)
+  # Relative path to the directory that will be linked to the named cache.
+  # Required.
+  # A path cannot be shared among multiple caches or CIPD installations.
+  # A task will fail if a file/dir with the same name already exists.
+  path = messages.StringField(2)
+
+
 class TaskProperties(messages.Message):
   """Important metadata about a particular task."""
+  caches = messages.MessageField(CacheEntry, 11, repeated=True)
   cipd_input = messages.MessageField(CipdInput, 10)
   command = messages.StringField(1, repeated=True)
   dimensions = messages.MessageField(StringPair, 2, repeated=True)

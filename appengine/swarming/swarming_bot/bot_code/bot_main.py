@@ -382,7 +382,7 @@ def cleanup_bot_directory(botobj):
           'Failed to remove %s from bot\'s directory: %s' % (i, e))
 
 
-def clean_isolated_cache(botobj):
+def clean_cache(botobj):
   """Asks run_isolated to clean its cache.
 
   This may take a while but it ensures that in the case of a run_isolated run
@@ -397,6 +397,7 @@ def clean_isolated_cache(botobj):
     '--clean',
     '--log-file', os.path.join(botobj.base_dir, 'logs', 'run_isolated.log'),
     '--cache', os.path.join(botobj.base_dir, 'isolated_cache'),
+    '--named-cache-root', os.path.join(botobj.base_dir, 'c'),
     '--min-free-space', str(get_min_free_space(botobj)),
   ]
   logging.info('Running: %s', cmd)
@@ -524,7 +525,7 @@ def run_bot(arg_error):
     call_hook(botobj, 'on_handshake')
 
     cleanup_bot_directory(botobj)
-    clean_isolated_cache(botobj)
+    clean_cache(botobj)
 
     if quit_bit.is_set():
       logging.info('Early quit 5')
@@ -596,7 +597,7 @@ def poll_server(botobj, quit_bit, last_action):
       # Completed a task successfully so update swarming_bot.zip if necessary.
       update_lkgbc(botobj)
     # Clean up cache after a task
-    clean_isolated_cache(botobj)
+    clean_cache(botobj)
     # TODO(maruel): Handle the case where quit_bit.is_set() happens here. This
     # is concerning as this means a signal (often SIGTERM) was received while
     # running the task. Make sure the host is properly restarting.

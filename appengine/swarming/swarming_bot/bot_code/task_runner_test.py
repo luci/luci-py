@@ -167,7 +167,9 @@ class TestTaskRunner(TestTaskRunnerBase):
       output = ''
       if 'output' in kwargs['data']:
         output = base64.b64decode(kwargs['data'].pop('output'))
-      self.assertTrue(re.match(output_re, output))
+      self.assertTrue(
+          re.match(output_re, output),
+          '%r does not match %s' % (output, output_re))
 
       expected = {
         'data': {
@@ -185,7 +187,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       }
       if outputs_ref:
         expected['data']['outputs_ref'] = outputs_ref
-      self.assertEqual(expected, kwargs)
+      self.assertEqual(expected, kwargs, kwargs)
     return check_final
 
   def _run_command(self, task_details, headers_cb=None):
@@ -577,6 +579,35 @@ class TestTaskRunner(TestTaskRunnerBase):
       u'version': 3,
     }
     self.assertEqual(expected, self._run_command(task_details))
+
+  def test_run_command_caches(self):
+    # This runs the command for real.
+    self.requests(cost_usd=1, exit_code=0);
+    script = (
+      'import os\n'
+      'print "hi"\n'
+      'with open("../../result", "w") as f:\n'
+      '  print >> f, os.path.abspath(os.readlink("git_cache"))'
+    )
+    task_details = self.get_task_details(
+        script,
+        caches=[{'name': 'git_chromium', 'path': 'git_cache'}])
+    expected = {
+      u'exit_code': 0,
+      u'hard_timeout': False,
+      u'io_timeout': False,
+      u'must_signal_internal_failure': None,
+      u'version': task_runner.OUT_VERSION,
+    }
+    self.assertEqual(expected, self._run_command(task_details))
+
+    with open(os.path.join(self.root_dir, 'result')) as f:
+      rundir_cache_path = f.read().strip()
+    named_caches = os.path.join(self.root_dir, 'c', 'named')
+    self.assertTrue(os.path.isdir(named_caches))
+    named_cache_path = os.path.abspath(
+        os.readlink(os.path.join(named_caches, 'git_chromium')))
+    self.assertEqual(rundir_cache_path, named_cache_path)
 
   def test_main(self):
     def load_and_run(
@@ -1179,6 +1210,7 @@ class TaskRunnerSmoke(unittest.TestCase):
       'w',
       'isolated_cache',
       'logs',
+      'c',
     }
     self.assertEqual(expected, set(os.listdir(self.root_dir)))
     expected = {

@@ -529,6 +529,9 @@ class BotPollHandler(_BotBaseHandler):
       'cmd': 'run',
       'manifest': {
         'bot_id': bot_id,
+        'caches': [
+          c.to_dict() for c in request.properties.caches
+        ],
         'cipd_input': {
           'client_package': (
               request.properties.cipd_input.client_package.to_dict()),

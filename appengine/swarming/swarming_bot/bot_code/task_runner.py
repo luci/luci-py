@@ -94,6 +94,7 @@ def get_isolated_args(
     os.remove(isolated_result)
   cmd = []
 
+  # Isolated options.
   if task_details.isolated:
     cmd.extend(
         [
@@ -107,6 +108,15 @@ def get_isolated_args(
             '--isolated', isolated_input,
           ])
 
+  # Named caches options.
+  # Specify --named-cache-root unconditionally so run_isolated.py never creates
+  # "named_caches" dir and always operats in "c" dir.
+  cmd.extend(['--named-cache-root', os.path.join(bot_dir, 'c')])
+  if task_details.caches:
+    for c in task_details.caches:
+      cmd.extend(['--named-cache', c['name'], c['path']])
+
+  # CIPD options.
   if task_details.cipd_input and task_details.cipd_input.get('packages'):
     for pkg in task_details.cipd_input.get('packages'):
       cmd.extend([
@@ -169,6 +179,8 @@ class TaskDetails(object):
     self.extra_args = data['extra_args']
 
     self.cipd_input = data.get('cipd_input')
+
+    self.caches = data.get('caches')
 
     self.env = {
       k.encode('utf-8'): v.encode('utf-8') for k, v in data['env'].iteritems()
