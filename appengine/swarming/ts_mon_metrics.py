@@ -6,6 +6,7 @@
 
 from collections import defaultdict
 import itertools
+import logging
 
 from google.appengine.ext import ndb
 
@@ -238,15 +239,21 @@ def _set_executors_metrics(now):
         target_fields=target_fields)
 
 
-@ndb.tasklet
-def _set_global_metrics_async(now):
-  yield _set_executors_metrics(now), _set_jobs_metrics(now)
-
-
-def _set_global_metrics(now=None):
+def set_global_metrics(kind, now=None):
   if now is None:
     now = utils.utcnow()
-  _set_global_metrics_async(now).get_result()
+  if kind == 'jobs':
+    _set_jobs_metrics(now).get_result()
+  elif kind == 'executors':
+    _set_executors_metrics(now).get_result()
+  else:
+    logging.error('set_global_metrics(kind=%s): unknown kind.', kind)
+
+
+def _set_global_metrics():
+  utils.enqueue_task(url='/internal/taskqueue/tsmon/jobs', queue_name='tsmon')
+  utils.enqueue_task(url='/internal/taskqueue/tsmon/executors',
+                     queue_name='tsmon')
 
 
 def initialize():

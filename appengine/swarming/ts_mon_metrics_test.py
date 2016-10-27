@@ -185,7 +185,8 @@ class TestMetrics(test_case.TestCase):
         'bot_dead': 'dead',
     }
 
-    ts_mon_metrics._set_global_metrics(self.now)
+    ts_mon_metrics.set_global_metrics('jobs', self.now)
+    ts_mon_metrics.set_global_metrics('executors', self.now)
 
     jobs_fields = {
         'project_id': 'test_project',

@@ -25,6 +25,7 @@ from server import lease_management
 from server import stats
 from server import task_result
 from server import task_scheduler
+import ts_mon_metrics
 
 
 class CronBotDiedHandler(webapp2.RequestHandler):
@@ -189,6 +190,14 @@ class TaskMachineProviderManagementHandler(webapp2.RequestHandler):
     lease_management.manage_lease(key)
 
 
+class TaskGlobalMetrics(webapp2.RequestHandler):
+  """Compute global metrics for timeseries monitoring."""
+
+  @decorators.require_taskqueue('tsmon')
+  def post(self, kind):
+    ts_mon_metrics.set_global_metrics(kind)
+
+
 ### Mapreduce related handlers
 
 
@@ -231,6 +240,7 @@ def get_routes():
     (r'/internal/taskqueue/pubsub/<task_id:[0-9a-f]+>', TaskSendPubSubMessage),
     ('/internal/taskqueue/machine-provider-manage',
         TaskMachineProviderManagementHandler),
+    (r'/internal/taskqueue/tsmon/<kind:[0-9A-Za-z]+>', TaskGlobalMetrics),
 
     # Mapreduce related urls.
     (r'/internal/taskqueue/mapreduce/launch/<job_id:[^\/]+>',

@@ -547,20 +547,25 @@ class BackendTest(AppTestBase):
     # TODO(maruel): Test mapreduce.
     task_queue_urls = sorted(
       r for r in self._GetRoutes() if r.startswith('/internal/taskqueue/')
-      if r != '/internal/taskqueue/mapreduce/launch/<job_id:[^\\/]+>'
+      if not r.startswith('/internal/taskqueue/mapreduce/launch/')
     )
+    # Format: (<queue-name>, <base-url>, <argument>).
     task_queues = [
-      ('cleanup', '/internal/taskqueue/cleanup_data'),
+      ('cleanup', '/internal/taskqueue/cleanup_data', ''),
       ('machine-provider-manage',
-       '/internal/taskqueue/machine-provider-manage'),
-      ('pubsub', '/internal/taskqueue/pubsub/<task_id:[0-9a-f]+>'),
+       '/internal/taskqueue/machine-provider-manage', ''),
+      ('pubsub', '/internal/taskqueue/pubsub/', 'abcabcabc'),
+      ('tsmon', '/internal/taskqueue/tsmon/', 'executors'),
     ]
-    self.assertEqual(sorted(zip(*task_queues)[1]), task_queue_urls)
+    self.assertEqual(len(task_queues), len(task_queue_urls))
+    for i, url in enumerate(task_queue_urls):
+      self.assertTrue(
+          url.startswith(task_queues[i][1]),
+          '%s does not start with %s' % (url, task_queues[i][1]))
 
-    for _, url in task_queues:
-      url = url.replace('<task_id:[0-9a-f]+>', 'abcabcabc')
+    for _, url, arg in task_queues:
       self.app.post(
-          url, headers={'X-AppEngine-QueueName': 'bogus name'}, status=403)
+          url+arg, headers={'X-AppEngine-QueueName': 'bogus name'}, status=403)
 
 
 if __name__ == '__main__':
