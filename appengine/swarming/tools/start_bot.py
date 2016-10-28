@@ -38,10 +38,12 @@ class LocalBot(object):
 
   def wipe_cache(self):
     """Blows away this bot's cache."""
-    try:
-      file_path.rmtree(os.path.join(self._tmpdir, 'isolated_cache'))
-    except OSError:
-      pass
+    cache_dir = os.path.join(self._tmpdir, 'isolated_cache')
+    if os.path.exists(cache_dir):
+      try:
+        file_path.rmtree(cache_dir)
+      except OSError:
+        pass
 
   @property
   def bot_id(self):

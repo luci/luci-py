@@ -101,7 +101,7 @@ def _reap_task(to_run_key, request, bot_id, bot_version, bot_dimensions):
   """Reaps a task and insert the results entity.
 
   Returns:
-    TaskRunResult if successful, None otherwise.
+    (TaskRunResult, SecretBytes) if successful, (None, None) otherwise.
   """
   assert bot_id, bot_id
   assert request.key == task_to_run.task_to_run_key_to_request_key(to_run_key)
@@ -110,17 +110,22 @@ def _reap_task(to_run_key, request, bot_id, bot_version, bot_dimensions):
   now = utils.utcnow()
 
   def run():
-    # 2 GET, 1 PUT at the end.
+    # 3 GET, 1 PUT at the end.
     to_run_future = to_run_key.get_async()
     result_summary_future = result_summary_key.get_async()
+    if request.properties.has_secret_bytes:
+      secret_bytes_future = request.secret_bytes_key.get_async()
     to_run = to_run_future.get_result()
     result_summary = result_summary_future.get_result()
+    secret_bytes = None
+    if request.properties.has_secret_bytes:
+      secret_bytes = secret_bytes_future.get_result()
     if not to_run:
       logging.error('Missing TaskToRun?\n%s', result_summary.task_id)
-      return None
+      return None, None
     if not to_run.is_reapable:
       logging.info('%s is not reapable', result_summary.task_id)
-      return None
+      return None, None
     if result_summary.bot_id == bot_id:
       # This means two things, first it's a retry, second it's that the first
       # try failed and the retry is being reaped by the same bot. Deny that, as
@@ -128,7 +133,7 @@ def _reap_task(to_run_key, request, bot_id, bot_version, bot_dimensions):
       logging.warning(
           '%s can\'t retry its own internal failure task',
           result_summary.task_id)
-      return None
+      return None, None
     to_run.queue_number = None
     run_result = task_result.new_run_result(
         request, (result_summary.try_number or 0) + 1, bot_id, bot_version,
@@ -136,16 +141,17 @@ def _reap_task(to_run_key, request, bot_id, bot_version, bot_dimensions):
     run_result.modified_ts = now
     result_summary.set_from_run_result(run_result, request)
     ndb.put_multi([to_run, run_result, result_summary])
-    return run_result
+    return run_result, secret_bytes
 
   # The bot will reap the next available task in case of failure, no big deal.
   try:
-    run_result = datastore_utils.transaction(run, retries=0)
+    run_result, secret_bytes = datastore_utils.transaction(run, retries=0)
   except datastore_utils.CommitError:
     run_result = None
+    secret_bytes = None
   if run_result:
     task_to_run.set_lookup_cache(to_run_key, False)
-  return run_result
+  return run_result, secret_bytes
 
 
 def _update_stats(run_result, bot_id, request, completed):
@@ -459,7 +465,7 @@ def exponential_backoff(attempt_num):
   return min(max_wait, math.pow(1.5, min(attempt_num, 10) + 1))
 
 
-def schedule_request(request, check_acls=True):
+def schedule_request(request, secret_bytes, check_acls=True):
   """Creates and stores all the entities to schedule a new task request.
 
   Checks ACLs first. Raises auth.AuthorizationError if caller is not authorized
@@ -468,12 +474,15 @@ def schedule_request(request, check_acls=True):
   The number of entities created is 3: TaskRequest, TaskToRun and
   TaskResultSummary.
 
-  All 3 entities in the same entity group (TaskReqest, TaskToRun,
-  TaskResultSummary) are saved as a DB transaction.
+  All 4 entities in the same entity group (TaskReqest, TaskToRun,
+  TaskResultSummary, SecretBytes) are saved as a DB transaction.
 
   Arguments:
   - request: TaskRequest entity to be saved in the DB. It's key must not be set
              and the entity must not be saved in the DB yet.
+  - secret_bytes: SecretBytes entity to be saved in the DB. It's key will be set
+             and the entity will be stored by this function. None is allowed if
+             there are no SecretBytes for this task.
   - check_acls: Whether the request should check ACLs.
 
   Returns:
@@ -492,11 +501,15 @@ def schedule_request(request, check_acls=True):
   task = task_to_run.new_task_to_run(request)
   result_summary = task_result.new_result_summary(request)
   result_summary.modified_ts = now
+  if secret_bytes:
+    secret_bytes.key = request.secret_bytes_key
 
   def get_new_keys():
     # Warning: this assumes knowledge about the hierarchy of each entity.
     key = task_request.new_request_key()
     task.key.parent = key
+    if secret_bytes:
+      secret_bytes.key.parent = key
     old = result_summary.task_id
     result_summary.parent = key
     logging.info('%s conflicted, using %s', old, result_summary.task_id)
@@ -522,7 +535,11 @@ def schedule_request(request, check_acls=True):
           dupe_summary.run_result_key)
       # In this code path, there's not much to do as the task will not be run,
       # previous results are returned. We still need to store all the entities
-      # correctly.
+      # correctly. However, since the has_secret_bytes property is already set
+      # for UI purposes, and the task itself will never be run, we skip storing
+      # the SecretBytes, as they would never be read and will just consume space
+      # in the datastore (and the task we deduplicated with will have them
+      # stored anyway, if we really want to get them again).
       datastore_utils.insert(
           request, get_new_keys, extra=[task, result_summary])
       logging.debug(
@@ -534,7 +551,8 @@ def schedule_request(request, check_acls=True):
     # Storing these entities makes this task live. It is important at this point
     # that the HTTP handler returns as fast as possible, otherwise the task will
     # be run but the client will not know about it.
-    datastore_utils.insert(request, get_new_keys, extra=[task, result_summary])
+    datastore_utils.insert(request, get_new_keys,
+        extra=filter(bool, [task, result_summary, secret_bytes]))
     logging.debug('New request %s', result_summary.task_id)
 
   # Get parent task details if applicable.
@@ -575,8 +593,8 @@ def bot_reap_task(dimensions, bot_id, bot_version, deadline):
   create a TaskRunResult for it.
 
   Returns:
-    tuple of (TaskRequest, TaskRunResult) for the task that was reaped.
-    The TaskToRun involved is not returned.
+    tuple of (TaskRequest, SecretBytes, TaskRunResult) for the task that was
+    reaped.  The TaskToRun involved is not returned.
   """
   assert bot_id
   q = task_to_run.yield_next_available_task_to_dispatch(dimensions, deadline)
@@ -593,7 +611,7 @@ def bot_reap_task(dimensions, bot_id, bot_version, deadline):
       total_skipped += 1
       continue
 
-    run_result = _reap_task(
+    run_result, secret_bytes = _reap_task(
         to_run.key, request, bot_id, bot_version, dimensions)
     if not run_result:
       failures += 1
@@ -621,11 +639,11 @@ def bot_reap_task(dimensions, bot_id, bot_version, deadline):
         dimensions=request.properties.dimensions,
         pending_ms=_secs_to_ms(pending_time.total_seconds()),
         user=request.user)
-    return request, run_result
+    return request, secret_bytes, run_result
   if failures:
     logging.info(
         'Chose nothing (failed %d, skipped %d)', failures, total_skipped)
-  return None, None
+  return None, None, None
 
 
 def bot_update_task(

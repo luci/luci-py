@@ -121,12 +121,14 @@ def task_request_to_rpc(entity):
     cmd = props.commands[0]
   elif props.command:
     cmd = props.command
+
   properties = _ndb_to_rpc(
       swarming_rpcs.TaskProperties,
       props,
       caches=[_ndb_to_rpc(swarming_rpcs.CacheEntry, c) for c in props.caches],
       cipd_input=cipd_input,
       command=cmd,
+      secret_bytes='<REDACTED>' if props.has_secret_bytes else None,
       dimensions=_string_pairs_from_dict(props.dimensions),
       env=_string_pairs_from_dict(props.env),
       inputs_ref=inputs_ref)
@@ -139,7 +141,12 @@ def task_request_to_rpc(entity):
 
 
 def new_task_request_from_rpc(msg, now):
-  """"Returns a task_request.TaskRequest from a swarming_rpcs.NewTaskRequest."""
+  """"Returns a (task_request.TaskRequest, task_request.SecretBytes) from
+  a swarming_rpcs.NewTaskRequest.
+
+  If secret_bytes were not included in the rpc, the SecretBytes entity will be
+  None.
+  """
   assert msg.__class__ is swarming_rpcs.NewTaskRequest
   props = msg.properties
   if not props:
@@ -164,6 +171,10 @@ def new_task_request_from_rpc(msg, now):
   if props.inputs_ref:
     inputs_ref = _rpc_to_ndb(task_request.FilesRef, props.inputs_ref)
 
+  secret_bytes = None
+  if props.secret_bytes:
+    secret_bytes = task_request.SecretBytes(secret_bytes=props.secret_bytes)
+
   properties = _rpc_to_ndb(
       task_request.TaskProperties,
       props,
@@ -173,11 +184,13 @@ def new_task_request_from_rpc(msg, now):
       command=props.command or [],
       # Legacy, ignored.
       commands=None,
+      has_secret_bytes=secret_bytes is not None,
+      secret_bytes=None, # ignore this, it's handled out of band
       dimensions={i.key: i.value for i in props.dimensions},
       env={i.key: i.value for i in props.env},
       inputs_ref=inputs_ref)
 
-  return _rpc_to_ndb(
+  req = _rpc_to_ndb(
       task_request.TaskRequest,
       msg,
       created_ts=now,
@@ -191,6 +204,8 @@ def new_task_request_from_rpc(msg, now):
       properties_hash=None,
       # Need to convert it to 'str', since it is stored as byte blob, not text.
       service_account_token=str(msg.service_account_token or 'none'))
+
+  return req, secret_bytes
 
 
 def task_result_to_rpc(entity, send_stats):

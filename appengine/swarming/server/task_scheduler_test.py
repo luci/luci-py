@@ -63,7 +63,7 @@ def _gen_request(properties=None, **kwargs):
   }
   args.update(kwargs)
   ret = task_request.TaskRequest(**args)
-  task_request.init_new_request(ret, True)
+  task_request.init_new_request(ret, True, None)
   return ret
 
 
@@ -87,14 +87,14 @@ def get_results(request_key):
 def _quick_schedule(dims):
   """Schedules a task."""
   request = _gen_request(properties={'dimensions': dims})
-  task_request.init_new_request(request, True)
-  return task_scheduler.schedule_request(request)
+  task_request.init_new_request(request, True, None)
+  return task_scheduler.schedule_request(request, None)
 
 
 def _quick_reap():
   """Reaps a task."""
   _quick_schedule({u'OS': u'Windows-3.1.1', u'pool': u'default'})
-  reaped_request, run_result = task_scheduler.bot_reap_task(
+  reaped_request, _, run_result = task_scheduler.bot_reap_task(
       {'OS': 'Windows-3.1.1', u'pool': u'default'}, 'localhost', 'abc', None)
   return run_result
 
@@ -148,15 +148,15 @@ class TaskSchedulerApiTest(test_case.TestCase):
         properties={
           'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
         })
-    task_request.init_new_request(request, True)
-    _result_summary = task_scheduler.schedule_request(request)
+    task_request.init_new_request(request, True, None)
+    _result_summary = task_scheduler.schedule_request(request, None)
     bot_dimensions = {
       u'OS': [u'Windows', u'Windows-3.1.1'],
       u'hostname': u'localhost',
       u'foo': u'bar',
       u'pool': u'default',
     }
-    actual_request, run_result  = task_scheduler.bot_reap_task(
+    actual_request, _, run_result  = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(request, actual_request)
     self.assertEqual('localhost', run_result.bot_id)
@@ -167,15 +167,15 @@ class TaskSchedulerApiTest(test_case.TestCase):
         properties={
           'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
         })
-    task_request.init_new_request(request, True)
-    _result_summary = task_scheduler.schedule_request(request)
+    task_request.init_new_request(request, True, None)
+    _result_summary = task_scheduler.schedule_request(request, None)
     bot_dimensions = {
       u'OS': [u'Windows', u'Windows-3.1.1'],
       u'hostname': u'localhost',
       u'foo': u'bar',
       u'pool': u'default',
     }
-    actual_request, run_result  = task_scheduler.bot_reap_task(
+    actual_request, _, run_result  = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc', 0)
     self.failIf(actual_request)
     self.failIf(run_result)
@@ -186,15 +186,15 @@ class TaskSchedulerApiTest(test_case.TestCase):
         properties={
           'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
         })
-    task_request.init_new_request(request, True)
-    _result_summary = task_scheduler.schedule_request(request)
+    task_request.init_new_request(request, True, None)
+    _result_summary = task_scheduler.schedule_request(request, None)
     bot_dimensions = {
       u'OS': [u'Windows', u'Windows-3.1.1'],
       u'hostname': u'localhost',
       u'foo': u'bar',
       u'pool': u'default',
     }
-    actual_request, run_result  = task_scheduler.bot_reap_task(
+    actual_request, _, run_result  = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc',
         utils.time_time() + 86400 + 600 + 3 * 30 + 10 + 1)
     self.assertEqual(request, actual_request)
@@ -255,15 +255,15 @@ class TaskSchedulerApiTest(test_case.TestCase):
           'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
           'idempotent': True,
         })
-    task_request.init_new_request(request, True)
-    _result_summary = task_scheduler.schedule_request(request)
+    task_request.init_new_request(request, True, None)
+    _result_summary = task_scheduler.schedule_request(request, None)
     bot_dimensions = {
       u'OS': [u'Windows', u'Windows-3.1.1'],
       u'hostname': u'localhost',
       u'foo': u'bar',
       u'pool': u'default',
     }
-    actual_request, run_result = task_scheduler.bot_reap_task(
+    actual_request, _, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(request, actual_request)
     self.assertEqual('localhost', run_result.bot_id)
@@ -295,8 +295,8 @@ class TaskSchedulerApiTest(test_case.TestCase):
           'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
           'idempotent': True,
         })
-    task_request.init_new_request(request, True)
-    _result_summary = task_scheduler.schedule_request(request)
+    task_request.init_new_request(request, True, None)
+    _result_summary = task_scheduler.schedule_request(request, None)
     bot_dimensions = {
       u'OS': [u'Windows', u'Windows-3.1.1'],
       u'hostname': u'localhost',
@@ -304,7 +304,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       u'pool': u'default',
     }
     self.assertEqual(None, task_to_run.TaskToRun.query().get().queue_number)
-    actual_request_2, run_result_2 = task_scheduler.bot_reap_task(
+    actual_request_2, _, run_result_2 = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(None, actual_request_2)
     result_summary_duped, run_results_duped = get_results(request.key)
@@ -372,8 +372,8 @@ class TaskSchedulerApiTest(test_case.TestCase):
           'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
           'idempotent': True,
         })
-    task_request.init_new_request(request, True)
-    _result_summary = task_scheduler.schedule_request(request)
+    task_request.init_new_request(request, True, None)
+    _result_summary = task_scheduler.schedule_request(request, None)
     # The task was enqueued for execution.
     self.assertNotEqual(None, task_to_run.TaskToRun.query().get().queue_number)
 
@@ -396,8 +396,8 @@ class TaskSchedulerApiTest(test_case.TestCase):
           'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
           'idempotent': True,
         })
-    task_request.init_new_request(request, True)
-    _result_summary = task_scheduler.schedule_request(request)
+    task_request.init_new_request(request, True, None)
+    _result_summary = task_scheduler.schedule_request(request, None)
     # The task was enqueued for execution.
     self.assertNotEqual(None, task_to_run.TaskToRun.query().get().queue_number)
 
@@ -433,8 +433,8 @@ class TaskSchedulerApiTest(test_case.TestCase):
         properties={
           'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
         })
-    task_request.init_new_request(request, True)
-    result_summary = task_scheduler.schedule_request(request)
+    task_request.init_new_request(request, True, None)
+    result_summary = task_scheduler.schedule_request(request, None)
     self.assertEqual([], result_summary.children_task_ids)
     self.assertEqual(parent_id, request.parent_task_id)
 
@@ -456,15 +456,15 @@ class TaskSchedulerApiTest(test_case.TestCase):
             'namespace': 'default-gzip',
           },
         })
-    task_request.init_new_request(request, True)
-    _result_summary = task_scheduler.schedule_request(request)
+    task_request.init_new_request(request, True, None)
+    _result_summary = task_scheduler.schedule_request(request, None)
     bot_dimensions = {
       u'OS': [u'Windows', u'Windows-3.1.1'],
       u'hostname': u'localhost',
       u'foo': u'bar',
       u'pool': u'default',
     }
-    actual_request, run_result = task_scheduler.bot_reap_task(
+    actual_request, _, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(request, actual_request)
     self.assertEqual('localhost', run_result.bot_id)
@@ -492,8 +492,8 @@ class TaskSchedulerApiTest(test_case.TestCase):
         properties={
           'dimensions':{u'OS': u'Windows-3.1.1', u'pool': u'default'},
         })
-    task_request.init_new_request(request, True)
-    result_summary = task_scheduler.schedule_request(request)
+    task_request.init_new_request(request, True, None)
+    result_summary = task_scheduler.schedule_request(request, None)
     self.assertEqual([], result_summary.children_task_ids)
     self.assertEqual(parent_id, request.parent_task_id)
 
@@ -513,8 +513,8 @@ class TaskSchedulerApiTest(test_case.TestCase):
         properties={
           'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
         })
-    task_request.init_new_request(request, True)
-    _result_summary = task_scheduler.schedule_request(request)
+    task_request.init_new_request(request, True, None)
+    _result_summary = task_scheduler.schedule_request(request, None)
 
     # The TaskRequest was enqueued, the TaskResultSummary was created but no
     # TaskRunResult exist yet since the task was not scheduled on any bot.
@@ -561,7 +561,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     reaped_ts = self.now + datetime.timedelta(seconds=60)
     self.mock_now(reaped_ts)
     bot_dimensions = {u'OS': u'Windows-3.1.1', u'pool': u'default'}
-    reaped_request, run_result = task_scheduler.bot_reap_task(
+    reaped_request, _, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(request, reaped_request)
     self.assertTrue(run_result)
@@ -752,10 +752,10 @@ class TaskSchedulerApiTest(test_case.TestCase):
         properties={
           'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
         })
-    task_request.init_new_request(request, True)
-    _result_summary = task_scheduler.schedule_request(request)
+    task_request.init_new_request(request, True, None)
+    _result_summary = task_scheduler.schedule_request(request, None)
     bot_dimensions = {'OS': 'Windows-3.1.1', u'pool': u'default'}
-    reaped_request, run_result = task_scheduler.bot_reap_task(
+    reaped_request, _, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(request, reaped_request)
     self.assertEqual(
@@ -980,15 +980,15 @@ class TaskSchedulerApiTest(test_case.TestCase):
           'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
         },
         pubsub_topic='projects/abc/topics/def')
-    task_request.init_new_request(request, True)
-    task_scheduler.schedule_request(request)
+    task_request.init_new_request(request, True, None)
+    task_scheduler.schedule_request(request, None)
     bot_dimensions = {
       u'OS': [u'Windows', u'Windows-3.1.1'],
       u'hostname': u'localhost',
       u'foo': u'bar',
       u'pool': u'default',
     }
-    _, run_result = task_scheduler.bot_reap_task(
+    _, _, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual('localhost', run_result.bot_id)
 
@@ -1035,10 +1035,10 @@ class TaskSchedulerApiTest(test_case.TestCase):
         properties={
           'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
         })
-    task_request.init_new_request(request, True)
-    result_summary = task_scheduler.schedule_request(request)
+    task_request.init_new_request(request, True, None)
+    result_summary = task_scheduler.schedule_request(request, None)
     bot_dimensions = {'OS': 'Windows-3.1.1', u'pool': u'default'}
-    reaped_request, run_result = task_scheduler.bot_reap_task(
+    reaped_request, _, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(
         task_result.State.TIMED_OUT,
@@ -1128,9 +1128,9 @@ class TaskSchedulerApiTest(test_case.TestCase):
     request = _gen_request(
         properties={'dimensions': dimensions},
         pubsub_topic='projects/abc/topics/def')
-    task_request.init_new_request(request, True)
-    result_summary = task_scheduler.schedule_request(request)
-    reaped_request, run_result = task_scheduler.bot_reap_task(
+    task_request.init_new_request(request, True, None)
+    result_summary = task_scheduler.schedule_request(request, None)
+    reaped_request, _, run_result = task_scheduler.bot_reap_task(
         {'OS': 'Windows-3.1.1', u'pool': u'default'}, 'localhost', 'abc', None)
 
     self.assertEqual(
@@ -1201,9 +1201,9 @@ class TaskSchedulerApiTest(test_case.TestCase):
         properties={
           'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
         })
-    task_request.init_new_request(request, True)
-    result_summary = task_scheduler.schedule_request(request)
-    reaped_request, run_result = task_scheduler.bot_reap_task(
+    task_request.init_new_request(request, True, None)
+    result_summary = task_scheduler.schedule_request(request, None)
+    reaped_request, _, run_result = task_scheduler.bot_reap_task(
         {'OS': 'Windows-3.1.1', u'pool': u'default'}, 'localhost', 'abc', None)
     expected = (
       'Bot bot1 sent task kill for task 1d69b9f088008811 owned by bot '
@@ -1218,8 +1218,8 @@ class TaskSchedulerApiTest(test_case.TestCase):
         },
         pubsub_topic='projects/abc/topics/def')
     pub_sub_calls = self.mock_pub_sub()
-    task_request.init_new_request(request, True)
-    result_summary = task_scheduler.schedule_request(request)
+    task_request.init_new_request(request, True, None)
+    result_summary = task_scheduler.schedule_request(request, None)
     ok, was_running = task_scheduler.cancel_task(request, result_summary.key)
     self.assertEqual(True, ok)
     self.assertEqual(False, was_running)
@@ -1234,9 +1234,9 @@ class TaskSchedulerApiTest(test_case.TestCase):
         },
         pubsub_topic='projects/abc/topics/def')
     pub_sub_calls = self.mock_pub_sub()
-    task_request.init_new_request(request, True)
-    result_summary = task_scheduler.schedule_request(request)
-    reaped_request, run_result = task_scheduler.bot_reap_task(
+    task_request.init_new_request(request, True, None)
+    result_summary = task_scheduler.schedule_request(request, None)
+    reaped_request, _, run_result = task_scheduler.bot_reap_task(
         {'OS': 'Windows-3.1.1', u'pool': u'default'}, 'localhost', 'abc', None)
     ok, was_running = task_scheduler.cancel_task(request, result_summary.key)
     self.assertEqual(False, ok)
@@ -1252,9 +1252,9 @@ class TaskSchedulerApiTest(test_case.TestCase):
               'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
             },
             pubsub_topic='projects/abc/topics/def')
-    task_request.init_new_request(request, True)
+    task_request.init_new_request(request, True, None)
     pub_sub_calls = self.mock_pub_sub()
-    result_summary = task_scheduler.schedule_request(request)
+    result_summary = task_scheduler.schedule_request(request, None)
     abandoned_ts = self.mock_now(self.now, request.expiration_secs+1)
     self.assertEqual(
         ['1d69b9f088008810'],
@@ -1309,8 +1309,8 @@ class TaskSchedulerApiTest(test_case.TestCase):
         created_ts=now,
         expiration_ts=now+datetime.timedelta(seconds=600),
         pubsub_topic='projects/abc/topics/def')
-    task_request.init_new_request(request, True)
-    result_summary = task_scheduler.schedule_request(request)
+    task_request.init_new_request(request, True, None)
+    result_summary = task_scheduler.schedule_request(request, None)
 
     # Fake first try bot died.
     bot_dimensions = {
@@ -1319,7 +1319,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       u'foo': u'bar',
       u'pool': u'default',
     }
-    _request, run_result = task_scheduler.bot_reap_task(
+    _request, _, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc', None)
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
     self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died('f.local'))
@@ -1388,15 +1388,15 @@ class TaskSchedulerApiTest(test_case.TestCase):
         created_ts=now,
         expiration_ts=now+datetime.timedelta(seconds=600),
         pubsub_topic='projects/abc/topics/def')
-    task_request.init_new_request(request, True)
-    _result_summary = task_scheduler.schedule_request(request)
+    task_request.init_new_request(request, True, None)
+    _result_summary = task_scheduler.schedule_request(request, None)
     bot_dimensions = {
       u'OS': [u'Windows', u'Windows-3.1.1'],
       u'hostname': u'localhost',
       u'foo': u'bar',
       u'pool': u'default',
     }
-    _request, run_result = task_scheduler.bot_reap_task(
+    _request, _, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(task_result.State.RUNNING, run_result.state)
@@ -1468,7 +1468,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
 
     # Task was retried.
     now_2 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 2)
-    _request, run_result = task_scheduler.bot_reap_task(
+    _request, _, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost-second', 'abc', None)
     logging.info('%s', [t.to_dict() for t in task_to_run.TaskToRun.query()])
     self.assertEqual(2, run_result.try_number)
@@ -1538,15 +1538,15 @@ class TaskSchedulerApiTest(test_case.TestCase):
         },
         created_ts=now,
         expiration_ts=now+datetime.timedelta(seconds=600))
-    task_request.init_new_request(request, True)
-    _result_summary = task_scheduler.schedule_request(request)
+    task_request.init_new_request(request, True, None)
+    _result_summary = task_scheduler.schedule_request(request, None)
     bot_dimensions = {
       u'OS': [u'Windows', u'Windows-3.1.1'],
       u'hostname': u'localhost',
       u'foo': u'bar',
       u'pool': u'default',
     }
-    _request, run_result = task_scheduler.bot_reap_task(
+    _request, _, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(task_result.State.RUNNING, run_result.state)
@@ -1615,7 +1615,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
 
     # Task was retried but the same bot polls again, it's denied the task.
     now_2 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 2)
-    request, run_result = task_scheduler.bot_reap_task(
+    request, _, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(None, request)
     self.assertEqual(None, run_result)
@@ -1631,15 +1631,15 @@ class TaskSchedulerApiTest(test_case.TestCase):
         },
         created_ts=now,
         expiration_ts=now+datetime.timedelta(seconds=600))
-    task_request.init_new_request(request, True)
-    _result_summary = task_scheduler.schedule_request(request)
+    task_request.init_new_request(request, True, None)
+    _result_summary = task_scheduler.schedule_request(request, None)
     bot_dimensions = {
       u'OS': [u'Windows', u'Windows-3.1.1'],
       u'hostname': u'localhost',
       u'foo': u'bar',
       u'pool': u'default',
     }
-    _request, run_result = task_scheduler.bot_reap_task(
+    _request, _, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(task_result.State.RUNNING, run_result.state)
@@ -1647,7 +1647,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died('f.local'))
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 2)
     # It must be a different bot.
-    _request, run_result = task_scheduler.bot_reap_task(
+    _request, _, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost-second', 'abc', None)
     now_2 = self.mock_now(self.now + 2 * task_result.BOT_PING_TOLERANCE, 3)
     self.assertEqual(
@@ -1700,15 +1700,15 @@ class TaskSchedulerApiTest(test_case.TestCase):
         },
         created_ts=now,
         expiration_ts=now+datetime.timedelta(seconds=600))
-    task_request.init_new_request(request, True)
-    _result_summary = task_scheduler.schedule_request(request)
+    task_request.init_new_request(request, True, None)
+    _result_summary = task_scheduler.schedule_request(request, None)
     bot_dimensions = {
       u'OS': [u'Windows', u'Windows-3.1.1'],
       u'hostname': u'localhost',
       u'foo': u'bar',
       u'pool': u'default',
     }
-    _request, run_result = task_scheduler.bot_reap_task(
+    _request, _, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(task_result.State.RUNNING, run_result.state)

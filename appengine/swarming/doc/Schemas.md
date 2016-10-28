@@ -15,7 +15,8 @@ block depends on the previous ones:
     HTTP POST to the Swarming server:
     - A TaskRequest describing this request is saved to note that a new request
       exists. The details of the task is saved in TaskProperties embedded in
-      TaskRequest.
+      TaskRequest. If the task contains any SecretBytes, a child SecretBytes
+      entity with id=1 will also be saved.
     - A TaskResultSummary is created to describe the request's overall status,
       taking in account retries.
     - A TaskToRun is created to dispatch this request so it can be run on a
@@ -38,6 +39,9 @@ block depends on the previous ones:
                |TaskRequest          |
                |    +--------------+ |                           task_request.py
                |    |TaskProperties| |
+               |    +--------------+ |
+               |    +--------------+ |
+               |    |SecretBytes   | |
                |    +--------------+ |
                |id=<based on epoch>  |
                +---------------------+

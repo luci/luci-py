@@ -311,6 +311,16 @@
             </td>
           </tr>
         {% endif %}
+        <tr title="Secret bytes">
+          <td>Secret bytes</td>
+          <td>
+            {% if request.properties.has_secret_bytes %}
+              <strong>&lt;REDACTED&gt;</strong>
+            {% else %}
+              &#8209;&#8209;
+            {% endif %}
+          </td>
+        </tr>
       </tbody>
     </table>
   {% endif %}

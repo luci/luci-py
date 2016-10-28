@@ -18,6 +18,7 @@ import signal
 import socket
 import sys
 import tempfile
+import textwrap
 import unittest
 import urllib
 
@@ -70,6 +71,15 @@ RESULT_HEY_OUTPUTS_REF = {
   u'view_url':
     u'http://localhost:10050/browse?namespace=default-gzip'
     '&hash=b12052452e7246af8bcf135afc8f0b1a883df43c',
+}
+
+RESULT_SECRET_OUTPUT = {
+  u'isolated': u'8622843a69073335b2266110e3392320a86730c9',
+  u'isolatedserver': u'http://localhost:10050',
+  u'namespace': u'default-gzip',
+  u'view_url':
+    u'http://localhost:10050/browse?namespace=default-gzip'
+    '&hash=8622843a69073335b2266110e3392320a86730c9',
 }
 
 
@@ -514,7 +524,7 @@ class Test(unittest.TestCase):
           u'items_hot': [],
         },
       },
-      properties_hash = u'dc5ba0b5f15b179cb004994a6dcc1e9b728d4346',
+      properties_hash = u'8c65206d3c6c818cc23b18d4c435eaedaa5f57bc',
     )
     task_id = self._run_isolated(
         hello_world, 'idempotent_reuse', ['--idempotent'], expected_summary, {})
@@ -526,6 +536,48 @@ class Test(unittest.TestCase):
     expected_summary[u'properties_hash'] = None
     self._run_isolated(
         hello_world, 'idempotent_reuse', ['--idempotent'], expected_summary, {})
+
+  def test_secret_bytes(self):
+    hello_world = textwrap.dedent("""
+      import sys
+      import os
+      import json
+
+      print "hi"
+
+      with open(os.environ['LUCI_CONTEXT'], 'r') as f:
+        data = json.load(f)
+
+      with open(os.path.join(sys.argv[1], 'sekret'), 'w') as f:
+        print >> f, data['swarming']['secret_bytes']
+    """)
+    expected_summary = self.gen_expected(
+      name=u'secret_bytes',
+      isolated_out=RESULT_SECRET_OUTPUT,
+      performance_stats={
+        u'isolated_download': {
+          u'initial_number_items': u'0',
+          u'initial_size': u'0',
+          u'items_cold': [200, 224],
+          u'items_hot': [],
+        },
+        u'isolated_upload': {
+          u'items_cold': [7, 114],
+          u'items_hot': [],
+        },
+      },
+      outputs_ref=RESULT_SECRET_OUTPUT,
+    )
+    h, tmp = tempfile.mkstemp(prefix='swarming_smoke_test_secret')
+    os.write(h, 'foobar')
+    os.close(h)
+    try:
+      self._run_isolated(
+          hello_world, 'secret_bytes',
+          ['--secret_bytes_path', tmp, '--', '${ISOLATED_OUTDIR}'],
+          expected_summary, {os.path.join('0', 'sekret'): 'foobar\n'})
+    finally:
+      os.remove(tmp)
 
   def _run_isolated(self, hello_world, name, args, expected_summary,
       expected_files):

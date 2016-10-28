@@ -59,7 +59,7 @@ def _gen_request(properties=None, **kwargs):
 def mkreq(req):
   # This function fits the old style where TaskRequest was stored first, before
   # TaskToRun and TaskResultSummary.
-  task_request.init_new_request(req, True)
+  task_request.init_new_request(req, True, None)
   req.key = task_request.new_request_key()
   req.put()
   return req

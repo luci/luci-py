@@ -197,6 +197,7 @@ class TaskProperties(messages.Message):
   inputs_ref = messages.MessageField(FilesRef, 8)
   io_timeout_secs = messages.IntegerField(9)
   outputs = messages.StringField(12, repeated=True)
+  secret_bytes = messages.BytesField(13)  # only for rpc->ndb
 
 
 class NewTaskRequest(messages.Message):

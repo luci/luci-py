@@ -26,12 +26,19 @@ from server import task_request
 # pylint: disable=W0212
 
 
-def mkreq(req):
+def mkreq(req, secret_bytes=None):
   # This function fits the old style where TaskRequest was stored first, before
   # TaskToRun and TaskResultSummary.
-  task_request.init_new_request(req, True)
+  sb = None
+  if secret_bytes is not None:
+    req.properties.has_secret_bytes = True
+    sb = task_request.SecretBytes(secret_bytes=secret_bytes)
+  task_request.init_new_request(req, True, sb)
   req.key = task_request.new_request_key()
   req.put()
+  if sb:
+    sb.key = req.secret_bytes_key
+    sb.put()
   return req
 
 
@@ -79,6 +86,7 @@ def _gen_request(properties=None, **kwargs):
     'idempotent': False,
     'inputs_ref': inputs_ref,
     'io_timeout_secs': None,
+    'has_secret_bytes': 'secret_bytes' in kwargs,
   })
   now = utils.utcnow()
   args = {
@@ -90,6 +98,7 @@ def _gen_request(properties=None, **kwargs):
     'tags': [u'tag:1'],
     'user': 'Jesus',
   }
+  _sb = args.pop('secret_bytes', None)
   args.update(kwargs)
   # Note that ndb model constructor accepts dicts for structured properties.
   return task_request.TaskRequest(**args)
@@ -221,8 +230,10 @@ class TaskRequestApiTest(TestCase):
     parent = mkreq(_gen_request())
     # Hack: Would need to know about TaskResultSummary.
     parent_id = task_pack.pack_request_key(parent.key) + '1'
-    r = _gen_request(properties=dict(idempotent=True), parent_task_id=parent_id)
-    request = mkreq(r)
+    r = _gen_request(
+      properties=dict(idempotent=True),
+      parent_task_id=parent_id)
+    request = mkreq(r, 'I am a banana')
     expected_properties = {
       'caches': [],
       'cipd_input': {
@@ -256,6 +267,7 @@ class TaskRequestApiTest(TestCase):
       },
       'io_timeout_secs': None,
       'outputs': [],
+      'has_secret_bytes': True,
     }
     expected_request = {
       'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
@@ -265,7 +277,7 @@ class TaskRequestApiTest(TestCase):
       'properties': expected_properties,
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
-      'properties_hash': 'c6e0db8e858dd5b1bdae0e8eae7486f4a8a82967',
+      'properties_hash': '902aaa4d27a7a9e3edb7e06206fdb1126dd71b2c',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'service_account': u'none',
@@ -298,7 +310,8 @@ class TaskRequestApiTest(TestCase):
     # Hack: Would need to know about TaskResultSummary.
     parent_id = task_pack.pack_request_key(parent.key) + '1'
     request = mkreq(_gen_request(
-        properties={'idempotent':True}, parent_task_id=parent_id))
+      properties={'idempotent':True},
+      parent_task_id=parent_id), 'I am not a banana')
     expected_properties = {
       'caches': [],
       'cipd_input': {
@@ -332,6 +345,7 @@ class TaskRequestApiTest(TestCase):
       },
       'io_timeout_secs': None,
       'outputs': [],
+      'has_secret_bytes': True,
     }
     expected_request = {
       'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
@@ -341,7 +355,7 @@ class TaskRequestApiTest(TestCase):
       'properties': expected_properties,
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
-      'properties_hash': 'c6e0db8e858dd5b1bdae0e8eae7486f4a8a82967',
+      'properties_hash': '7973bfdbfe5cdcb9ea50a8f91cee03cd8f98edfd',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'service_account': u'none',
@@ -383,7 +397,7 @@ class TaskRequestApiTest(TestCase):
     # Other unit tests should use the calculated value.
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        'c6e0db8e858dd5b1bdae0e8eae7486f4a8a82967', as_dict['properties_hash'])
+        'b335fc59351bd95e52d840b57f252ab6a0a50112', as_dict['properties_hash'])
 
   def test_init_new_request_bot_service_account(self):
     request = mkreq(_gen_request(service_account_token='bot'))
@@ -613,7 +627,7 @@ class TaskRequestApiTest(TestCase):
     parent_id = task_pack.pack_request_key(parent.key) + '1'
     data = _gen_request(
         properties=dict(idempotent=True), parent_task_id=parent_id)
-    request = task_request.new_request_clone(mkreq(data), True)
+    request = task_request.new_request_clone(mkreq(data), None, True)
     request.key = task_request.new_request_key()
     request.put()
     # Differences from init_new_request() are:
@@ -652,6 +666,7 @@ class TaskRequestApiTest(TestCase):
       },
       'io_timeout_secs': None,
       'outputs': [],
+      'has_secret_bytes': False,
     }
     # Differences from new_request() are:
     # - parent_task_id was reset to None.

@@ -595,15 +595,15 @@ class BaseTaskHandler(auth.AuthenticatingHandler):
 
   Ensures that the user has access to the task.
   """
-  def get_request_and_result(self, task_id):
+  def get_request_and_result(self, task_id, with_secret_bytes=False):
     """Retrieves the TaskRequest for 'task_id' and enforces the ACL.
 
     Supports both TaskResultSummary (ends with 0) or TaskRunResult (ends with 1
     or 2).
 
     Returns:
-      tuple(TaskRequest, result): result can be either for a TaskRunResult or a
-                                  TaskResultSummay.
+      tuple(TaskRequest, SecretBytes, result): result can be either for
+          a TaskRunResult or a TaskResultSummay.
     """
     try:
       key = task_pack.unpack_result_summary_key(task_id)
@@ -615,12 +615,17 @@ class BaseTaskHandler(auth.AuthenticatingHandler):
             task_pack.run_result_key_to_result_summary_key(key))
       except ValueError:
         self.abort(404, 'Invalid key format.')
-    request, result = ndb.get_multi((request_key, key))
+    if with_secret_bytes:
+      sb_key = task_pack.request_key_to_secret_bytes_key(request_key)
+      request, result, secret_bytes = ndb.get_multi((request_key, key, sb_key))
+    else:
+      request, result = ndb.get_multi((request_key, key))
+      secret_bytes = None
     if not request or not result:
       self.abort(404, '%s not found.' % key.id())
     if not request.has_access:
       self.abort(403, '%s is not accessible.' % key.id())
-    return request, result
+    return request, secret_bytes, result
 
 
 class TaskHandler(BaseTaskHandler):
@@ -640,7 +645,7 @@ class TaskHandler(BaseTaskHandler):
   @auth.autologin
   @auth.require(acl.is_user)
   def get(self, task_id):
-    request, result = self.get_request_and_result(task_id)
+    request, _, result = self.get_request_and_result(task_id)
     parent_task_future = None
     if request.parent_task_id:
       parent_key = task_pack.unpack_run_result_key(request.parent_task_id)
@@ -727,7 +732,7 @@ class TaskCancelHandler(BaseTaskHandler):
 
   @auth.require(acl.is_user)
   def post(self, task_id):
-    request, result = self.get_request_and_result(task_id)
+    request, _, result = self.get_request_and_result(task_id)
     if not task_scheduler.cancel_task(request, result.key)[0]:
       self.abort(400, 'Task cancelation error')
     # The cancel button appears at both the /tasks and /task pages. Redirect to
@@ -747,12 +752,14 @@ class TaskRetryHandler(BaseTaskHandler):
 
   @auth.require(acl.is_user)
   def post(self, task_id):
-    original_request, _ = self.get_request_and_result(task_id)
+    original_request, secret_bytes, _ = self.get_request_and_result(
+        task_id, with_secret_bytes=True)
     # Retrying a task is essentially reusing the same task request as the
     # original one, but with new parameters.
     new_request = task_request.new_request_clone(
-        original_request, allow_high_priority=acl.is_admin())
-    result_summary = task_scheduler.schedule_request(new_request)
+        original_request, secret_bytes, allow_high_priority=acl.is_admin())
+    result_summary = task_scheduler.schedule_request(
+      new_request, secret_bytes)
     self.redirect('/user/task/%s' % result_summary.task_id)
 
 

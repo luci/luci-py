@@ -486,7 +486,7 @@ class BotPollHandler(_BotBaseHandler):
     # The bot is in good shape. Try to grab a task.
     try:
       # This is a fairly complex function call, exceptions are expected.
-      request, run_result = task_scheduler.bot_reap_task(
+      request, secret_bytes, run_result = task_scheduler.bot_reap_task(
           res.dimensions, res.bot_id, res.version,
           res.state.get('lease_expiration_ts'))
       if not request:
@@ -505,7 +505,7 @@ class BotPollHandler(_BotBaseHandler):
           bot_event(
               'request_task', task_id=run_result.task_id,
               task_name=request.name)
-          self._cmd_run(request, run_result.key, res.bot_id)
+          self._cmd_run(request, secret_bytes, run_result.key, res.bot_id)
       except:
         logging.exception('Dang, exception after reaping')
         raise
@@ -519,7 +519,7 @@ class BotPollHandler(_BotBaseHandler):
       # https://code.google.com/p/swarming/issues/detail?id=130
       self.abort(500, 'Deadline')
 
-  def _cmd_run(self, request, run_result_key, bot_id):
+  def _cmd_run(self, request, secret_bytes, run_result_key, bot_id):
     cmd = None
     if request.properties.commands:
       cmd = request.properties.commands[0]
@@ -548,6 +548,7 @@ class BotPollHandler(_BotBaseHandler):
         'hard_timeout': request.properties.execution_timeout_secs,
         'host': utils.get_versioned_hosturl(),
         'io_timeout': request.properties.io_timeout_secs,
+        'secret_bytes': secret_bytes.secret_bytes if secret_bytes else None,
         'isolated': {
           'input': request.properties.inputs_ref.isolated,
           'namespace': request.properties.inputs_ref.namespace,

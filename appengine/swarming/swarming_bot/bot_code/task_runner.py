@@ -194,6 +194,7 @@ class TaskDetails(object):
     self.io_timeout = data['io_timeout']
     self.task_id = data['task_id']
     self.outputs = data.get('outputs', [])
+    self.secret_bytes = data.get('secret_bytes')
 
   @staticmethod
   def load(path):
@@ -267,6 +268,11 @@ def load_and_run(
       if auth_system and auth_system.local_auth_context:
         context_edits['local_auth'] = auth_system.local_auth_context
 
+      if task_details.secret_bytes is not None:
+        swarming = luci_context.read('swarming') or {}
+        swarming['secret_bytes'] = task_details.secret_bytes
+        context_edits['swarming'] = swarming
+
       # Returns bot authentication headers dict or raises InternalError.
       def headers_cb():
         try:
@@ -287,7 +293,6 @@ def load_and_run(
         task_result = run_command(
             remote, task_details, work_dir, cost_usd_hour,
             start, min_free_space, bot_file)
-
   except (ExitSignal, InternalError) as e:
     # This normally means run_command() didn't get the chance to run, as it
     # itself traps exceptions and will report accordingly. In this case, we want

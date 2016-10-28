@@ -21,6 +21,9 @@ Graph of schema:
                |    +--------------+ |   (task_request.py)
                |    |TaskProperties| |
                |    +--------------+ |
+               |    +--------------+ |
+               |    |SecretBytes   | |
+               |    +--------------+ |
                |id=<based on epoch>  |
                +---------------------+
                           ^

@@ -67,7 +67,7 @@ def insert_async(entity, new_key_callback=None, extra=None):
         If this parameter is None, insertion is only tried once.
         May return a future.
     extra: additional entities to store simultaneously. For example a bookeeping
-        entity that must be updated simultaneously along |entity|. All the
+        entity that must be updated simultaneously along with |entity|. All the
         entities must be inside the same entity group. This function is not safe
         w.r.t. `extra`, entities in this list will overwrite entities already in
         the DB or have their key updated when new_key_callback() is called.

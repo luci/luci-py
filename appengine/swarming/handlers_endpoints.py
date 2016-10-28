@@ -340,14 +340,15 @@ class SwarmingTasksService(remote.Service):
     logging.info('%s', request)
 
     try:
-      request = message_conversion.new_task_request_from_rpc(
+      request, secret_bytes = message_conversion.new_task_request_from_rpc(
           request, utils.utcnow())
       apply_property_defaults(request.properties)
-      task_request.init_new_request(request, acl.is_bot_or_admin())
+      task_request.init_new_request(
+          request, acl.is_bot_or_admin(), secret_bytes)
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
 
-    result_summary = task_scheduler.schedule_request(request)
+    result_summary = task_scheduler.schedule_request(request, secret_bytes)
 
     previous_result = None
     if result_summary.deduped_from:
@@ -605,7 +606,7 @@ class SwarmingBotService(remote.Service):
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
 
-    result_summary = task_scheduler.schedule_request(request)
+    result_summary = task_scheduler.schedule_request(request, None)
     return swarming_rpcs.TerminateResponse(
         task_id=task_pack.pack_result_summary_key(result_summary.key))
 

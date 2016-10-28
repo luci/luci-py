@@ -33,6 +33,12 @@ Graph of the schema:
     |    |   +--------+ | |
     |    |   |FilesRef| | |
     |    |   +--------+ | |
+    |    |id=EMBEDDED   | |
+    |    +--------------+ |
+    |                     |
+    |    +--------------+ |
+    |    |SecretBytes   | |
+    |    |id=1          | |
     |    +--------------+ |
     |                     |
     |id=<based on epoch>  |
@@ -131,6 +137,14 @@ def _validate_url(prop, value):
 def _validate_namespace(prop, value):
   if not config.NAMESPACE_RE.match(value):
     raise datastore_errors.BadValueError('malformed %s' % prop._name)
+
+
+def _validate_length(maximum):
+  def _inner(prop, value):
+    if len(value) > maximum:
+      raise datastore_errors.BadValueError('too long %s: %d > %d', prop._name,
+                                           len(value), maximum)
+  return _inner
 
 
 def _validate_dict_of_strings(prop, value):
@@ -294,6 +308,17 @@ class FilesRef(ndb.Model):
           'isolate server and namespace are required')
 
 
+class SecretBytes(ndb.Model):
+  """Defines an optional secret byte string logically defined with the
+  TaskProperties.
+
+  Stored separately for size and data-leakage reasons.
+  """
+  _use_memcache = False
+  secret_bytes = ndb.BlobProperty(
+      validator=_validate_length(1024), indexed=False)
+
+
 class CipdPackage(ndb.Model):
   """A CIPD package to install in $CIPD_PATH and $PATH before task execution.
 
@@ -392,7 +417,6 @@ class TaskProperties(ndb.Model):
   behavior is desired, the member .inputs_ref with an .isolated field value must
   be supplied. .extra_args can be supplied to pass extraneous arguments.
   """
-
   # TODO(maruel): convert inputs_ref and _TaskResultCommon.outputs_ref as:
   # - input = String which is the isolated input, if any
   # - isolated_server = <server, metadata e.g. namespace> which is a
@@ -462,6 +486,10 @@ class TaskProperties(ndb.Model):
   # will be added to those in that directory.
   outputs = ndb.StringProperty(repeated=True, indexed=False,
       validator=_validate_output_path)
+
+  # If True, the TaskRequest embedding these TaskProperties has an associated
+  # SecretBytes entity.
+  has_secret_bytes = ndb.BooleanProperty(default=False, indexed=False)
 
   @property
   def is_terminate(self):
@@ -612,6 +640,11 @@ class TaskRequest(ndb.Model):
   properties_hash = ndb.BlobProperty(indexed=False)
 
   @property
+  def secret_bytes_key(self):
+    if self.properties.has_secret_bytes:
+      return task_pack.request_key_to_secret_bytes_key(self.key)
+
+  @property
   def task_id(self):
     """Returns the TaskResultSummary packed id, not the task request key."""
     return task_pack.pack_result_summary_key(
@@ -695,7 +728,7 @@ def create_termination_task(bot_id, allow_high_priority):
       tags=[u'terminate:1'],
       user=auth.get_current_identity().to_bytes())
   assert request.properties.is_terminate
-  init_new_request(request, allow_high_priority)
+  init_new_request(request, allow_high_priority, None)
   return request
 
 
@@ -798,7 +831,7 @@ def validate_request_key(request_key):
             root_entity_shard_id))
 
 
-def init_new_request(request, allow_high_priority):
+def init_new_request(request, allow_high_priority, secret_bytes_ent):
   """Initializes a new TaskRequest but doesn't store it.
 
   Fills up some values and does minimal checks.
@@ -853,14 +886,19 @@ def init_new_request(request, allow_high_priority):
   request.tags = sorted(set(request.tags))
 
   if request.properties.idempotent:
+    props = request.properties.to_dict()
+    if secret_bytes_ent is not None:
+      props['secret_bytes'] = secret_bytes_ent.secret_bytes.encode('hex')
     request.properties_hash = request.HASHING_ALGO(
-      utils.encode_to_json(request.properties)).digest()
+      utils.encode_to_json(props)).digest()
   else:
     request.properties_hash = None
 
 
-def new_request_clone(original_request, allow_high_priority):
-  """Creates a new TaskRequest as a copy of another one but doesn't store it.
+def new_request_clone(original_request, original_secret_bytes,
+                      allow_high_priority):
+  """Creates a new TaskRequest and possibly a SecretBytes as a copy of another
+  one but doesn't store them.
 
   Used by "Retry task" UI button.
 
@@ -911,7 +949,7 @@ def new_request_clone(original_request, allow_high_priority):
       service_account_token=original_request.service_account_token,
       tags=tags,
       user=username)
-  init_new_request(request, allow_high_priority)
+  init_new_request(request, allow_high_priority, original_secret_bytes)
   return request
 
 

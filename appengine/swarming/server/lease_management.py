@@ -475,6 +475,7 @@ def handle_early_release(machine_lease):
     logging.info('MachineLease ready to be released: %s', machine_lease.key)
     task_result_summary = task_scheduler.schedule_request(
         task_request.create_termination_task(machine_lease.hostname, True),
+        None,
         check_acls=False,
     )
     associate_termination_task(
