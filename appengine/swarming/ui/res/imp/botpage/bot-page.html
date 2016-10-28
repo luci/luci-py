@@ -573,11 +573,8 @@
           return;
         }
         var baseUrl = "/api/swarming/v1/bot/"+this.bot_id;
-        // We limit the fields on these two queries to make them faster.
-        this.$.page_tasks.load(baseUrl + "/tasks?fields=cursor%2Citems(abandoned_ts%2Cbot_version%2Ccompleted_ts%2Cduration%2Cexit_code%2Cfailure%2Cinternal_failure%2Cmodified_ts%2Cname%2Cstarted_ts%2Cstate%2Ctask_id%2Ctry_number)",
-          this._auth_headers, 30);
-        this.$.page_events.load(baseUrl + "/events?fields=cursor%2Citems(event_type%2Cmessage%2Cquarantined%2Ctask_id%2Cts%2Cversion)",
-          this._auth_headers, 50);
+        this.$.page_tasks.load(baseUrl + "/tasks", this._auth_headers, 30);
+        this.$.page_events.load(baseUrl + "/events", this._auth_headers, 50);
       },
 
       _shorten: function(str, length) {

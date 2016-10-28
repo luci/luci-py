@@ -138,10 +138,16 @@
 
         var url = this._url;
         if (this._page_size) {
-          url += "&limit=" + this._page_size;
+          if (!url.endsWith("?")) {
+            url += "&";
+          }
+          url += "limit=" + this._page_size;
         }
         if (this._cursor) {
-          url += "&cursor=" + this._cursor;
+          if (!url.endsWith("?")) {
+            url += "&";
+          }
+          url += "cursor=" + this._cursor;
         }
 
         sk.request("GET", url, "", this._headers).then(JSON.parse).then(function(json){

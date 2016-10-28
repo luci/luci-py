@@ -9,6 +9,7 @@ this.swarming.alias = this.swarming.alias || (function(){
   var ANDROID_ALIASES = {
     "angler": "Nexus 6p",
     "bullhead": "Nexus 5X",
+    "dragon": "Pixel C",
     "flo": "Nexus 7 (2013)",
     "flounder": "Nexus 9",
     "foster": "NVIDIA Shield",
@@ -19,6 +20,8 @@ this.swarming.alias = this.swarming.alias || (function(){
     "m0": "Galaxy S3",
     "mako": "Nexus 4",
     "manta": "Nexus 10",
+    "marlin": "Pixel XL",
+    "sailfish": "Pixel",
     "shamu": "Nexus 6",
     "sprout": "Android One",
   };
