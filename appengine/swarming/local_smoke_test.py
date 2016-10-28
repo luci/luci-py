@@ -574,7 +574,7 @@ class Test(unittest.TestCase):
     try:
       self._run_isolated(
           hello_world, 'secret_bytes',
-          ['--secret_bytes_path', tmp, '--', '${ISOLATED_OUTDIR}'],
+          ['--secret-bytes-path', tmp, '--', '${ISOLATED_OUTDIR}'],
           expected_summary, {os.path.join('0', 'sekret'): 'foobar\n'})
     finally:
       os.remove(tmp)
