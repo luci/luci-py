@@ -231,7 +231,8 @@ class TasksApiTest(BaseTest):
               swarming_rpcs.StringPair(key='PATH', value='/'),
             ],
             execution_timeout_secs=30,
-            io_timeout_secs=30),
+            io_timeout_secs=30,
+            outputs=['foo','path/to/dir']),
         tags=['foo:bar'],
         user='joe@localhost',
         pubsub_topic='projects/abc/topics/def',
@@ -269,6 +270,7 @@ class TasksApiTest(BaseTest):
           u'grace_period_secs': u'30',
           u'idempotent': False,
           u'io_timeout_secs': u'30',
+          u'outputs': [u'foo', u'path/to/dir'],
         },
         u'pubsub_topic': u'projects/abc/topics/def',
         u'pubsub_userdata': u'userdata',
@@ -327,7 +329,8 @@ class TasksApiTest(BaseTest):
             ],
             execution_timeout_secs=3600,
             idempotent=True,
-            io_timeout_secs=1200),
+            io_timeout_secs=1200,
+            outputs=['foo', 'path/to/foobar']),
         tags=['foo:bar'],
         user='joe@localhost')
     expected = {
@@ -359,6 +362,7 @@ class TasksApiTest(BaseTest):
           u'grace_period_secs': u'30',
           u'idempotent': True,
           u'io_timeout_secs': u'1200',
+          u'outputs': [u'foo', u'path/to/foobar'],
         },
         u'service_account': u'none',
         u'tags': [
@@ -504,6 +508,7 @@ class TasksApiTest(BaseTest):
             u'grace_period_secs': u'30',
             u'idempotent': True,
             u'io_timeout_secs': u'1200',
+            u'outputs': [u'foo', u'path/to/foobar'],
           },
           u'service_account': u'none',
           u'tags': [
@@ -544,6 +549,7 @@ class TasksApiTest(BaseTest):
             u'grace_period_secs': u'30',
             u'idempotent': True,
             u'io_timeout_secs': u'1200',
+            u'outputs': [u'foo', u'path/to/foobar'],
           },
           u'service_account': u'none',
           u'tags': [
@@ -1473,6 +1479,7 @@ class TaskApiTest(BaseTest):
         u'grace_period_secs': u'30',
         u'idempotent': False,
         u'io_timeout_secs': u'1200',
+        u'outputs': [u'foo', u'path/to/foobar'],
       },
       u'service_account': u'none',
       u'tags': [

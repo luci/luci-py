@@ -255,6 +255,7 @@ class TaskRequestApiTest(TestCase):
         'namespace': 'default-gzip',
       },
       'io_timeout_secs': None,
+      'outputs': [],
     }
     expected_request = {
       'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
@@ -264,7 +265,7 @@ class TaskRequestApiTest(TestCase):
       'properties': expected_properties,
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
-      'properties_hash': '2202337f592f7e31b407e38832c35e23f306c6c8',
+      'properties_hash': 'c6e0db8e858dd5b1bdae0e8eae7486f4a8a82967',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'service_account': u'none',
@@ -330,6 +331,7 @@ class TaskRequestApiTest(TestCase):
         'namespace': 'default-gzip',
       },
       'io_timeout_secs': None,
+      'outputs': [],
     }
     expected_request = {
       'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
@@ -339,7 +341,7 @@ class TaskRequestApiTest(TestCase):
       'properties': expected_properties,
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
-      'properties_hash': '2202337f592f7e31b407e38832c35e23f306c6c8',
+      'properties_hash': 'c6e0db8e858dd5b1bdae0e8eae7486f4a8a82967',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'service_account': u'none',
@@ -381,7 +383,7 @@ class TaskRequestApiTest(TestCase):
     # Other unit tests should use the calculated value.
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        '2202337f592f7e31b407e38832c35e23f306c6c8', as_dict['properties_hash'])
+        'c6e0db8e858dd5b1bdae0e8eae7486f4a8a82967', as_dict['properties_hash'])
 
   def test_init_new_request_bot_service_account(self):
     request = mkreq(_gen_request(service_account_token='bot'))
@@ -649,6 +651,7 @@ class TaskRequestApiTest(TestCase):
         'namespace': 'default-gzip',
       },
       'io_timeout_secs': None,
+      'outputs': [],
     }
     # Differences from new_request() are:
     # - parent_task_id was reset to None.

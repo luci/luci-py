@@ -226,6 +226,7 @@ class AppTestBase(test_case.TestCase):
       'env': [],
       'execution_timeout_secs': 3600,
       'io_timeout_secs': 1200,
+      'outputs': ['foo', 'path/to/foobar']
     }
     props.update(properties or {})
 

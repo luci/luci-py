@@ -226,13 +226,21 @@ def _validate_package_version(prop, value):
 
 def _validate_package_path(_prop, path):
   """Validates a CIPD installation path."""
+  if not path:
+    raise datastore_errors.BadValueError(
+        'CIPD package path is required. Use "." to install to run dir.')
   _validate_rel_path('CIPD package path', path)
+
+
+def _validate_output_path(_prop, value):
+  """Validates a path for an output file."""
+  _validate_rel_path('output file', value)
 
 
 def _validate_rel_path(value_name, path):
   if not path:
     raise datastore_errors.BadValueError(
-        '%s is required. Use "." to install to run dir.' % value_name)
+        'No argument provided for %s.' % value_name)
   if '\\' in path:
     raise datastore_errors.BadValueError(
         '%s cannot contain \\. On Windows forward-slashes '
@@ -448,6 +456,12 @@ class TaskProperties(ndb.Model):
   # If True, the task can safely be served results from a previously succeeded
   # task.
   idempotent = ndb.BooleanProperty(default=False, indexed=False)
+
+  # A list of outputs expected. If empty, all files written to
+  # $(ISOLATED_OUTDIR) will be returned; otherwise, the files in this list
+  # will be added to those in that directory.
+  outputs = ndb.StringProperty(repeated=True, indexed=False,
+      validator=_validate_output_path)
 
   @property
   def is_terminate(self):

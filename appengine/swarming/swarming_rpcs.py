@@ -196,6 +196,7 @@ class TaskProperties(messages.Message):
   idempotent = messages.BooleanField(7)
   inputs_ref = messages.MessageField(FilesRef, 8)
   io_timeout_secs = messages.IntegerField(9)
+  outputs = messages.StringField(12, repeated=True)
 
 
 class NewTaskRequest(messages.Message):

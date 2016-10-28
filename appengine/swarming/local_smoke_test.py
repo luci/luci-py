@@ -514,7 +514,7 @@ class Test(unittest.TestCase):
           u'items_hot': [],
         },
       },
-      properties_hash = u'f5ce2aa67d68519e3013f40869806046a0266f1a',
+      properties_hash = u'dc5ba0b5f15b179cb004994a6dcc1e9b728d4346',
     )
     task_id = self._run_isolated(
         hello_world, 'idempotent_reuse', ['--idempotent'], expected_summary, {})
