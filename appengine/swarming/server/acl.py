@@ -70,6 +70,11 @@ def is_bot_or_admin():
   return is_bot() or is_admin()
 
 
+def can_schedule_high_priority_tasks():
+  """Returns True if the current user can schedule high priority tasks."""
+  return is_bot() or is_privileged_user()
+
+
 def get_user_type():
   """Returns a string describing the current access control for the user."""
   if is_admin():

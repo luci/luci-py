@@ -344,7 +344,7 @@ class SwarmingTasksService(remote.Service):
           request, utils.utcnow())
       apply_property_defaults(request.properties)
       task_request.init_new_request(
-          request, acl.is_bot_or_admin(), secret_bytes)
+          request, acl.can_schedule_high_priority_tasks(), secret_bytes)
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
 
@@ -602,7 +602,7 @@ class SwarmingBotService(remote.Service):
     try:
       # Craft a special priority 0 task to tell the bot to shutdown.
       request = task_request.create_termination_task(
-          bot_id, acl.is_bot_or_admin())
+          bot_id, acl.can_schedule_high_priority_tasks())
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
 
