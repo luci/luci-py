@@ -4,6 +4,7 @@
 
 """This module defines Isolate Server frontend url handlers."""
 
+import cgi
 import datetime
 import json
 import logging
@@ -260,6 +261,7 @@ class ContentHandler(auth.AuthenticatingHandler):
             content = json.dumps(
                 json.loads(content), sort_keys=True, indent=2,
                 separators=(',', ': '))
+            content = cgi.escape(content)
             # If we don't wrap this in html, browsers will put content in a pre
             # tag which is also styled with monospace/pre-wrap.  We can't use
             # anchor tags in <pre>, so we force it to be a <div>, which happily
