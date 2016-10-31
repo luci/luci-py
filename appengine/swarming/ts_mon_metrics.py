@@ -47,14 +47,6 @@ jobs_durations = gae_ts_mon.CumulativeDistributionMetric(
     description='Cycle times of completed jobs, in seconds.')
 
 
-jobs_pending_durations = gae_ts_mon.NonCumulativeDistributionMetric(
-    'jobs/pending_durations', bucketer=_bucketer,
-    description='Pending times of active jobs, in seconds.')
-
-jobs_max_pending_duration = gae_ts_mon.FloatMetric(
-    'jobs/max_pending_duration',
-    description='Maximum pending seconds of pending jobs.')
-
 # Similar to jobs/completed and jobs/duration, but with a dedup field.
 # - project_id: e.g. 'chromium'
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
@@ -114,6 +106,30 @@ executors_pool = gae_ts_mon.StringMetric(
 executors_status = gae_ts_mon.StringMetric(
     'executors/status',
     description=('Status of a job executor.'))
+
+
+# Global metric. Target fields:
+# - hostname = 'autogen:<executor_id>' (bot id).
+# Status value must be 'ready', 'running', or anything else, possibly
+# swarming-specific, when it cannot run a job. E.g. 'quarantined' or
+# 'dead'.
+# Note that 'running' will report data as long as the job is running,
+# so it is best to restrict data to status == 'pending.'
+jobs_pending_durations = gae_ts_mon.NonCumulativeDistributionMetric(
+    'jobs/pending_durations', bucketer=_bucketer,
+    description='Pending times of active jobs, in seconds.')
+
+
+# Global metric. Target fields:
+# - hostname = 'autogen:<executor_id>' (bot id).
+# Status value must be 'ready', 'running', or anything else, possibly
+# swarming-specific, when it cannot run a job. E.g. 'quarantined' or
+# 'dead'.
+# Note that 'running' will report data as long as the job is running,
+# so it is best to restrict data to status == 'pending.'
+jobs_max_pending_duration = gae_ts_mon.FloatMetric(
+    'jobs/max_pending_duration',
+    description='Maximum pending seconds of pending jobs.')
 
 
 def pool_from_dimensions(dimensions):
@@ -257,6 +273,12 @@ def _set_global_metrics():
 
 
 def initialize():
-  gae_ts_mon.register_global_metrics(
-      [jobs_running, executors_pool, executors_status])
+  gae_ts_mon.register_global_metrics([
+      executors_pool,
+      executors_status,
+      jobs_active,
+      jobs_max_pending_duration,
+      jobs_pending_durations,
+      jobs_running,
+  ])
   gae_ts_mon.register_global_metrics_callback('callback', _set_global_metrics)
