@@ -185,8 +185,8 @@ class TestMetrics(test_case.TestCase):
         'bot_dead': 'dead',
     }
 
-    ts_mon_metrics.set_global_metrics('jobs', self.now)
-    ts_mon_metrics.set_global_metrics('executors', self.now)
+    ts_mon_metrics.set_global_metrics('jobs')
+    ts_mon_metrics.set_global_metrics('executors')
 
     jobs_fields = {
         'project_id': 'test_project',
@@ -195,6 +195,8 @@ class TestMetrics(test_case.TestCase):
     }
     jobs_target_fields = dict(ts_mon_metrics.TARGET_FIELDS)
     jobs_target_fields['hostname'] = 'autogen:test_bot1'
+    jobs_shard_target_fields = dict(ts_mon_metrics.TARGET_FIELDS)
+    jobs_shard_target_fields['task_num'] = 1
 
     self.assertTrue(ts_mon_metrics.jobs_running.get(
         fields=jobs_fields, target_fields=jobs_target_fields))
@@ -203,15 +205,15 @@ class TestMetrics(test_case.TestCase):
         fields=jobs_fields, target_fields=jobs_target_fields))
     jobs_fields['status'] = 'running'
     self.assertEqual(1, ts_mon_metrics.jobs_active.get(
-        fields=jobs_fields, target_fields=ts_mon_metrics.TARGET_FIELDS))
+        fields=jobs_fields, target_fields=jobs_shard_target_fields))
     jobs_fields['status'] = 'pending'
     self.assertEqual(2, ts_mon_metrics.jobs_active.get(
-        fields=jobs_fields, target_fields=ts_mon_metrics.TARGET_FIELDS))
+        fields=jobs_fields, target_fields=jobs_shard_target_fields))
 
     self.assertEqual(900, ts_mon_metrics.jobs_pending_durations.get(
-        fields=jobs_fields, target_fields=ts_mon_metrics.TARGET_FIELDS).sum)
+        fields=jobs_fields, target_fields=jobs_shard_target_fields).sum)
     self.assertEqual(600, ts_mon_metrics.jobs_max_pending_duration.get(
-        fields=jobs_fields, target_fields=ts_mon_metrics.TARGET_FIELDS))
+        fields=jobs_fields, target_fields=jobs_shard_target_fields))
 
     for bot_id, status in bots_expected.iteritems():
       target_fields = dict(ts_mon_metrics.TARGET_FIELDS)
