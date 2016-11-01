@@ -195,7 +195,7 @@ class TaskGlobalMetrics(webapp2.RequestHandler):
 
   @decorators.require_taskqueue('tsmon')
   def post(self, kind):
-    ts_mon_metrics.set_global_metrics(kind, payload=self.request.body)
+    ts_mon_metrics.set_global_metrics(kind)
 
 
 ### Mapreduce related handlers
