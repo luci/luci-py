@@ -27,7 +27,7 @@ from server import task_result
 def _string_pairs_from_dict(dictionary):
   return [
     swarming_rpcs.StringPair(key=k, value=v)
-    for k, v in sorted(dictionary.iteritems())
+    for k, v in sorted((dictionary or {}).iteritems())
   ]
 
 
