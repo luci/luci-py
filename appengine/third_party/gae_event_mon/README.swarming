@@ -2,7 +2,7 @@ Name: gae_event_mon
 Short Name: gae_event_mon
 URL: https://chromium.googlesource.com/infra/infra/+/master/appengine_module/gae_event_mon/
 Version: 1.0.0
-Revision: 787308026a9d5d89a99214fede8da93d5461ed4d
+Revision: 564aaf7480f24c90687df79d9cef910cc342a54d
 License: Chromium License
 
 Description:
