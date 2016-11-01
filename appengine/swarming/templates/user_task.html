@@ -296,6 +296,14 @@
               {{request.properties.extra_args|join(' ')}}<br>
             </td>
           </tr>
+          <tr title="Expected output files">
+            <td>Expected outputs</td>
+            <td>
+                {% for output in request.properties.outputs %}
+                {{output}}<br/>
+                {% endfor %}
+            </td>
+          </tr>
         {% else %}
           {# Raw command #}
           <tr title="Actual command executed by the bot.">
