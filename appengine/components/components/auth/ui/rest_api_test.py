@@ -1999,7 +1999,7 @@ class ForbidUiOnReplicaTest(test_case.TestCase):
     self.assertEqual(
         '405 Method Not Allowed\n\n'
         'The method GET is not allowed for this resource. \n\n '
-        'Now allowed on a replica, see primary at http://locahost:1234',
+        'Not allowed on a replica, see primary at http://locahost:1234',
         response.body)
 
 

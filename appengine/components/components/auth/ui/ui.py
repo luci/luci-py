@@ -87,7 +87,7 @@ def forbid_ui_on_replica(method):
       primary_url = model.get_replication_state().primary_url
       self.abort(
           405,
-          detail='Now allowed on a replica, see primary at %s' % primary_url)
+          detail='Not allowed on a replica, see primary at %s' % primary_url)
     return method(self, *args, **kwargs)
   return wrapper
 
