@@ -18,7 +18,7 @@ Services that manages leasing VMs to clients based on desired characteristics.
 *   If you plan to use a [config service](../config_service),
     *   Make sure it is setup already.
     *   [Follow instruction
-        here](../config_service/doc#linking-to-the-config-service).
+        here](../components/components/config/#linking-to-the-config-service).
 *   If you plan to use an [auth_service](../auth_service),
     *   Make sure it is setup already.
     *   [Follow instructions

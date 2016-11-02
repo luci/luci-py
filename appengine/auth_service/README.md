@@ -55,7 +55,7 @@ installations. For one-off experimentation, this is not strictly necessary.
 *   If you plan to use a [config service](../config_service),
     *   Make sure it is setup already.
     *   [Follow instruction
-        here](../config_service/doc#linking-to-the-config-service).
+        here](../components/components/config/#linking-to-the-config-service).
 
 
 ### Linking other services to auth_service
