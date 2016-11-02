@@ -252,6 +252,16 @@
                   </a>
                 </td>
               </tr>
+              <template is="dom-if" if="[[_request.properties.outputs.length]]">
+                <tr>
+                  <td rowspan$="[[_rowspan(_request.properties.outputs)]]">Expected outputs</td>
+                </tr>
+                <template is="dom-repeat" items="{{_request.properties.outputs}}" as="output">
+                  <tr>
+                    <td>[[output]]</td>
+                  </tr>
+                </template>
+              </template>
               <template is="dom-if" if="[[_not(_request_detail)]]">
                 <tr>
                   <td>More Details</td>
@@ -713,7 +723,7 @@
       },
 
       _empty: function(array) {
-        return array.length == 0;
+        return !array || array.length == 0;
       },
 
       _supportsMilo: function(request, showRaw) {
