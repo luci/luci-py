@@ -5,10 +5,13 @@
 """Timeseries metrics."""
 
 from collections import defaultdict
+import datetime
 import itertools
+import json
 import logging
 
 from google.appengine.ext import ndb
+from google.appengine.datastore.datastore_query import Cursor
 
 from components import utils
 import gae_ts_mon
@@ -17,6 +20,12 @@ from server import bot_management
 from server import task_result
 
 IGNORED_DIMENSIONS = ('id', 'android_devices')
+# Real timeout is 60s, keep it slightly under to bail out early.
+REQUEST_TIMEOUT_SEC = 50
+# Cap the max number of items per taskqueue task, to keep the total
+# number of collected streams managable within each instance.
+EXECUTORS_PER_SHARD = 500
+JOBS_PER_SHARD = 500
 
 # Override default target fields for app-global metrics.
 TARGET_FIELDS = {
@@ -188,18 +197,72 @@ def update_jobs_requested_metrics(task_request, deduped):
   jobs_requested.increment(fields=fields)
 
 
-@ndb.tasklet
-def _set_jobs_metrics(now):
+class ShardException(Exception):
+  def __init__(self, msg):
+    super(ShardException, self).__init__(msg)
+
+
+class ShardParams(object):
+  """Parameters for a chain of taskqueue tasks."""
+  def __init__(self, payload):
+    self.start_time = utils.utcnow()
+    self.cursor = None
+    self.task_start = self.start_time
+    self.task_count = 0
+    self.count = 0
+    if not payload:
+      return
+    try:
+      params = json.loads(payload)
+      if params['cursor']:
+        self.cursor = Cursor(urlsafe=params['cursor'])
+      self.task_start = datetime.datetime.strptime(
+          params['task_start'], utils.DATETIME_FORMAT)
+      self.task_count = params['task_count']
+      self.count = params['count']
+    except (ValueError, KeyError) as e:
+      logging.error('ShardParams: bad JSON: %s: %s', payload, e)
+      # Stop the task chain and let the request fail.
+      raise ShardException(str(e))
+
+  def json(self):
+    return utils.encode_to_json({
+        'cursor': self.cursor.urlsafe() if self.cursor else None,
+        'task_start': self.task_start,
+        'task_count': self.task_count,
+        'count': self.count,
+    })
+
+
+def _set_jobs_metrics(payload):
+  params = ShardParams(payload)
+
   state_map = {task_result.State.RUNNING: 'running',
                task_result.State.PENDING: 'pending'}
-  query_iter = task_result.get_result_summaries_query(
-      None, None, 'created_ts', 'pending_running', None).iter()
   jobs_counts = defaultdict(lambda: 0)
+  jobs_total = 0
   jobs_pending_distributions = defaultdict(
       lambda: gae_ts_mon.Distribution(_bucketer))
   jobs_max_pending_durations = defaultdict(
       lambda: 0.0)
-  while (yield query_iter.has_next_async()):
+
+  query_iter = task_result.get_result_summaries_query(
+      None, None, 'created_ts', 'pending_running', None).iter(
+      produce_cursors=True, start_cursor=params.cursor)
+
+  while query_iter.has_next():
+    runtime = (utils.utcnow() - params.start_time).total_seconds()
+    if jobs_total >= JOBS_PER_SHARD or runtime > REQUEST_TIMEOUT_SEC:
+      params.cursor = query_iter.cursor_after()
+      params.task_count += 1
+      utils.enqueue_task(url='/internal/taskqueue/tsmon/jobs',
+                         queue_name='tsmon',
+                         payload=params.json())
+      params.task_count -= 1  # For accurate logging below.
+      break
+
+    params.count += 1
+    jobs_total += 1
     summary = query_iter.next()
     status = state_map.get(summary.state, '')
     fields = extract_job_fields(summary.tags)
@@ -214,36 +277,59 @@ def _set_jobs_metrics(now):
 
     jobs_counts[key] += 1
 
-    pending_duration = summary.pending_now(now)
+    pending_duration = summary.pending_now(utils.utcnow())
     if pending_duration is not None:
       jobs_pending_distributions[key].add(pending_duration.total_seconds())
       jobs_max_pending_durations[key] = max(
           jobs_max_pending_durations[key],
           pending_duration.total_seconds())
 
+  logging.debug(
+      '_set_jobs_metrics: task %d started at %s, processed %d jobs (%d total)',
+      params.task_count, params.task_start, jobs_total, params.count)
+
+  # Global counts are sharded by task_num and aggregated in queries.
+  target_fields = dict(TARGET_FIELDS)
+  target_fields['task_num'] = params.task_count
+
   for key, count in jobs_counts.iteritems():
-    jobs_active.set(count, target_fields=TARGET_FIELDS, fields=dict(key))
+    jobs_active.set(count, target_fields=target_fields, fields=dict(key))
 
   for key, distribution in jobs_pending_distributions.iteritems():
     jobs_pending_durations.set(
-        distribution, target_fields=TARGET_FIELDS, fields=dict(key))
+        distribution, target_fields=target_fields, fields=dict(key))
 
   for key, val in jobs_max_pending_durations.iteritems():
     jobs_max_pending_duration.set(
-        val, target_fields=TARGET_FIELDS, fields=dict(key))
+        val, target_fields=target_fields, fields=dict(key))
 
 
-@ndb.tasklet
-def _set_executors_metrics(now):
-  query_iter = bot_management.BotInfo.query().iter()
-  while (yield query_iter.has_next_async()):
+def _set_executors_metrics(payload):
+  params = ShardParams(payload)
+  query_iter = bot_management.BotInfo.query().iter(
+      produce_cursors=True, start_cursor=params.cursor)
+
+  executors_count = 0
+  while query_iter.has_next():
+    runtime = (utils.utcnow() - params.start_time).total_seconds()
+    if executors_count >= EXECUTORS_PER_SHARD or runtime > REQUEST_TIMEOUT_SEC:
+      params.cursor = query_iter.cursor_after()
+      params.task_count += 1
+      utils.enqueue_task(url='/internal/taskqueue/tsmon/executors',
+                         queue_name='tsmon',
+                         payload=params.json())
+      params.task_count -= 1  # For accurate logging below.
+      break
+
+    params.count += 1
+    executors_count += 1
     bot_info = query_iter.next()
     status = 'ready'
     if bot_info.task_id:
       status = 'running'
     elif bot_info.quarantined:
       status = 'quarantined'
-    elif bot_info.is_dead(now):
+    elif bot_info.is_dead(utils.utcnow()):
       status = 'dead'
 
     target_fields = dict(TARGET_FIELDS)
@@ -254,14 +340,17 @@ def _set_executors_metrics(now):
         pool_from_dimensions(bot_info.dimensions),
         target_fields=target_fields)
 
+  logging.debug(
+      '%s: task %d started at %s, processed %d bots (%d total)',
+      '_set_executors_metrics', params.task_count, params.task_start,
+       executors_count, params.count)
 
-def set_global_metrics(kind, now=None):
-  if now is None:
-    now = utils.utcnow()
+
+def set_global_metrics(kind, payload=None):
   if kind == 'jobs':
-    _set_jobs_metrics(now).get_result()
+    _set_jobs_metrics(payload)
   elif kind == 'executors':
-    _set_executors_metrics(now).get_result()
+    _set_executors_metrics(payload)
   else:
     logging.error('set_global_metrics(kind=%s): unknown kind.', kind)
 

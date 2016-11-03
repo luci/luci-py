@@ -4,6 +4,7 @@
 # that can be found in the LICENSE file.
 
 import datetime
+import json
 import os
 import sys
 import unittest
@@ -79,6 +80,20 @@ class TestMetrics(test_case.TestCase):
     dimensions.update({k: 'ignored' for k in ts_mon_metrics.IGNORED_DIMENSIONS})
     expected = 'cpu:x86-64|os:Linux|os:Ubuntu'
     self.assertEqual(expected, ts_mon_metrics.pool_from_dimensions(dimensions))
+
+  def test_shard_params(self):
+    payload = {
+        'cursor': None,
+        'task_start': '2016-04-07 12:13:14',
+        'task_count': 2,
+        'count': 42,
+    }
+    params = ts_mon_metrics.ShardParams(json.dumps(payload))
+    self.assertEqual(json.loads(params.json()), payload)
+
+  def test_shard_params_fail(self):
+    with self.assertRaises(ts_mon_metrics.ShardException):
+      ts_mon_metrics.ShardParams('invalid}')
 
   def test_update_jobs_completed_metrics(self):
     tags = [
@@ -185,8 +200,8 @@ class TestMetrics(test_case.TestCase):
         'bot_dead': 'dead',
     }
 
-    ts_mon_metrics.set_global_metrics('jobs', self.now)
-    ts_mon_metrics.set_global_metrics('executors', self.now)
+    ts_mon_metrics.set_global_metrics('jobs')
+    ts_mon_metrics.set_global_metrics('executors')
 
     jobs_fields = {
         'project_id': 'test_project',
