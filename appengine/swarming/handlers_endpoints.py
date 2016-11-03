@@ -337,7 +337,13 @@ class SwarmingTasksService(remote.Service):
     earliest opportunity by a bot that has at least the dimensions as described
     in the task request.
     """
+    sb = (request.properties.secret_bytes
+          if request.properties is not None else None)
+    if sb is not None:
+      request.properties.secret_bytes = "HIDDEN"
     logging.info('%s', request)
+    if sb is not None:
+      request.properties.secret_bytes = sb
 
     try:
       request, secret_bytes = message_conversion.new_task_request_from_rpc(
