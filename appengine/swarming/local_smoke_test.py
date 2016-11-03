@@ -549,7 +549,7 @@ class Test(unittest.TestCase):
         data = json.load(f)
 
       with open(os.path.join(sys.argv[1], 'sekret'), 'w') as f:
-        print >> f, data['swarming']['secret_bytes']
+        print >> f, data['swarming']['secret_bytes'].decode('base64')
     """)
     expected_summary = self.gen_expected(
       name=u'secret_bytes',
@@ -558,7 +558,7 @@ class Test(unittest.TestCase):
         u'isolated_download': {
           u'initial_number_items': u'0',
           u'initial_size': u'0',
-          u'items_cold': [200, 224],
+          u'items_cold': [200, 241],
           u'items_hot': [],
         },
         u'isolated_upload': {

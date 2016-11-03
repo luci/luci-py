@@ -548,7 +548,8 @@ class BotPollHandler(_BotBaseHandler):
         'hard_timeout': request.properties.execution_timeout_secs,
         'host': utils.get_versioned_hosturl(),
         'io_timeout': request.properties.io_timeout_secs,
-        'secret_bytes': secret_bytes.secret_bytes if secret_bytes else None,
+        'secret_bytes': (secret_bytes.secret_bytes.encode('base64')
+                         if secret_bytes else None),
         'isolated': {
           'input': request.properties.inputs_ref.isolated,
           'namespace': request.properties.inputs_ref.namespace,
