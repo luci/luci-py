@@ -97,6 +97,11 @@
           computed: "_parseBot(_bot)",
           notify: true,
         },
+        bot_exists: {
+          type: Boolean,
+          value: true,
+          notify: true,
+        },
 
         // private
          _busy1: {
@@ -129,8 +134,17 @@
         lastRequest = this.async(function(){
           lastRequest = undefined;
           var baseUrl = "/api/swarming/v1/bot/"+this.bot_id;
-          this._getJsonAsync("_bot", baseUrl + "/get",
+          var p = this._getJsonAsync("_bot", baseUrl + "/get",
             "_busy1", this.auth_headers);
+          p.then(function(){
+            this.set("bot_exists", true);
+          }.bind(this)).catch(function(r){
+            if (r.status === 404) {
+              this.set("bot_exists", false);
+            } else {
+              sk.errorMessage("Http response: " + (r.status || " ") + " " + r.response);
+            }
+          }.bind(this));
           this.fire("reload", {id: this.bot_id});
         }, BOT_ID_DEBOUNCE_MS);
 

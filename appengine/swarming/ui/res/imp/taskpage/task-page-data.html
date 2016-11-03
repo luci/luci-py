@@ -91,6 +91,11 @@
           computed: "_parseStdout(_stdout)",
           notify: true,
         },
+        task_exists: {
+          type: Boolean,
+          value: true,
+          notify: true,
+        },
 
         // private
          _busy1: {
@@ -132,8 +137,17 @@
         var baseUrl = "/api/swarming/v1/task/" + this.task_id;
         lastRequest = this.async(function(){
           lastRequest = undefined;
-          this._getJsonAsync("_request", baseUrl + "/request",
+          var p = this._getJsonAsync("_request", baseUrl + "/request",
             "_busy1", this.auth_headers);
+          p.then(function(){
+            this.set("task_exists", true);
+          }.bind(this)).catch(function(r){
+            if (r.status === 404) {
+              this.set("task_exists", false);
+            } else {
+              sk.errorMessage("Http response: "+ (r.status || " ") + " " + r.response);
+            }
+          }.bind(this));
           this._getJsonAsync("_result",
             baseUrl + "/result?include_performance_stats=true",
             "_busy2", this.auth_headers);

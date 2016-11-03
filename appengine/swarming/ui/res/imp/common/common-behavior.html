@@ -59,9 +59,12 @@
       // set to true while the request is in flight and false afterwards.
       // request headers (e.g. authentication) and query params will be used if
       // provided. Query params is an object like {String:Array<String>}. On
-      // error, bindTo will be set to false.  It is not set to undefined
-      // because computed values in Polymer don't fire if a property is
-      // undefined. Clients should check that bindTo is not falsey.
+      // error, bindTo will be set to false and the promise will be rejected
+      // with {status:Number, reason:String} where the reason is the text
+      // returned from the server.
+      // The object bindTo is not set to undefined because computed values in
+      // Polymer don't fire if a property is undefined. Clients should check
+      // that bindTo is not falsey.
       // To avoid multiple requests clobering one another, an object _jsonAsync
       // is created on "this" to debounce requests - the most recent request
       // will win out.
@@ -77,7 +80,7 @@
         if (params) {
           url = url + "?" + sk.query.fromParamSet(params);
         }
-        sk.request("GET", url, "", headers).then(JSON.parse).then(function(json){
+        return sk.request("GET", url, "", headers).then(JSON.parse).then(function(json){
           if (this._jsonAsync[bindTo] !== now) {
             console.log("ignoring result because a second request happened.");
             this.set(busy, false);
@@ -95,6 +98,7 @@
           }
           this.set(bindTo, false);
           this.set(busy, false);
+          return Promise.reject(reason);
         }.bind(this));
       },
 

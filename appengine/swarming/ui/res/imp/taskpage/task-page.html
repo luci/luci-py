@@ -124,7 +124,8 @@
           busy="{{_busy}}"
           request="{{_request}}"
           result="{{_result}}"
-          stdout="{{_stdout}}">
+          stdout="{{_stdout}}"
+          task_exists="{{_task_exists}}">
         </task-page-data>
 
         <div class="horizontal layout wrap">
@@ -139,7 +140,8 @@
                 <button on-click="_promptCancel">Cancel</button>
               </template>
             </div>
-            <table>
+            <h2 hidden$="[[_task_exists]]">Task not found.</h2>
+            <table hidden$="[[_not(_task_exists)]]">
               <tr>
                 <td>Name</td>
                 <td>[[_request.name]]</td>
@@ -355,9 +357,9 @@
               </template>
             </table>
 
-            <div class="title">Task Execution</div>
+            <div class="title" hidden$="[[_not(_task_exists)]]">Task Execution</div>
             <template is="dom-if" if="[[_wasPickedUp(_result)]]">
-              <table>
+              <table hidden$="[[_not(_task_exists)]]">
                 <tr>
                   <td>Bot assigned to task</td>
                   <td><a href$="[[_botLink(_result.bot_id)]]">[[_result.bot_id]]</td>
@@ -435,7 +437,7 @@
             </template>
           </div>
 
-          <div class="flex right">
+          <div class="flex right" hidden$="[[_not(_task_exists)]]">
             <div class="horizontal layout">
               <div class="tabs">
                 <paper-tabs selected="{{_show_raw}}" no-bar>

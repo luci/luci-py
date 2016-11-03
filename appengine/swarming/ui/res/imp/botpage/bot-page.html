@@ -130,6 +130,7 @@
           bot_id="[[bot_id]]"
 
           bot="{{_bot}}"
+          bot_exists="{{_bot_exists}}"
           busy="{{_busy1}}"
           events="{{_events}}"
           tasks="{{_tasks}}"
@@ -147,7 +148,11 @@
             <iron-icon class="refresh" icon="icons:refresh"></iron-icon>
           </button>
         </div>
+      </div>
 
+      <h2 hidden$="[[_bot_exists]]">Bot not found.</h2>
+
+      <div hidden$="[[_not(_bot_exists)]]">
         <div class="horizontal wrap layout">
           <div class="flex">
             <table>
