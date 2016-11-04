@@ -34,9 +34,24 @@ To access the demo pages on localhost:9050, run
 Prerequisites
 =============
 
-You will need to install node.js, npm, and bower, for example:
+You will need to install a recent version of node.js, npm, and bower:
 
     sudo apt-get install npm nodejs-legacy
+    # node and npm installed at this point are ancient, we need to update
+    sudo npm install npm@latest -g
+    # uninstall old npm
+    sudo apt-get purge npm
+    # make sure npm shows version 3.X or newer
+    npm -v
+    # you may need to add /usr/local/bin/npm to your superuser path
+    # or just use /usr/local/bin/npm instead of npm below
+    sudo npm cache clean -f
+    sudo npm install -g n
+    sudo n stable
+
+    # should return 6.x or 7.x
+    node -v
+
     sudo npm install -g bower
 
 

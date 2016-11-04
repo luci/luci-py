@@ -15,25 +15,44 @@ Swarming is purely a task scheduler service.
 *   Visit http://console.cloud.google.com and create a project. Replace
     `<appid>` below with your project id.
 *   Visit Google Cloud Console
-    *   IAM & Admin, click `Add Member` and add someone else so you can safely
-        be hit by a bus.
+    *   IAM & Admin
+        *   Click `Add Member` and add someone else so you can safely be hit by a
+            bus.
+        *   Create a new "Oauth 2.0 Client Id" of type "web application".  Make sure
+            `https://<appid>.appspot.com` is an authorized JavaScript origin
+            and `https://<appid>.appspot.com/oauth2callback` is an authorized
+            redirect URL.  Replace \<client_id\> below with the created client id.
     *   Pub/Sub, click `Enable API`.
 *   Upload the code with: `./tools/gae upl -x -A <appid>`
 *   Visit https://\<appid\>.appspot.com/auth/bootstrap and click `Proceed`.
 *   If you plan to use a [config service](../config_service),
     *   Make sure it is setup already.
+    *   Make sure you set [SettingsCfg.ui_client_id](https://github.com/luci/luci-py/blob/master/appengine/swarming/proto/config.proto#L37)
+        to be \<client_id\>
     *   [Follow instruction
         here](../components/components/config/#linking-to-the-config-service).
+
+*   If you are not using a config service, see [Configuring using FS mode](https://github.com/luci/luci-py/blob/master/appengine/components/components/config/README.md#fs-mode).
+    You'll need to add an entry to settings.cfg like `ui_client_id: "<client_id>"`
+
 *   If you plan to use an [auth_service](../auth_service),
     *   Make sure it is setup already.
     *   [Follow instructions
         here](../auth_service#linking-other-services-to-auth_service).
+
 *   Visit "_https://\<appid\>.appspot.com/auth/groups_":
     *   Create [access groups](doc/Access-Groups.md) as relevant. Visit the
         "_IP Whitelists_" tab and add bot external IP addresses if needed.
+
+*   Visit "_https://\<appid\>.appspot.com/auth/oauth_config_":
+    *   Make sure \<client_id\> is in the "List of known OAuth client IDs".
+        If you are using an config_service, you'll need to modify this via the
+        oauth.cfg file, not via the web UI.
+
 *   Configure [bot_config.py](swarming_bot/config/bot_config.py) and
     [bootstrap.py](swarming_bot/config/bootstrap.py) as desired. Both are
     optional.
+
 *   If using [machine_provider](../machine_provider),
     *   In Pub/Sub, create a topic with the name 'machine-provider, and a pull
         subscription with the name 'machine-provider'. On the topic, authorize
