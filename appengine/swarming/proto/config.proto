@@ -42,6 +42,11 @@ message SettingsCfg {
   // A url to a task display server (e.g. milo).  This should have a %s where
   // a task id can go.
   optional string display_server_url_template = 11;
+
+  // Sets a maximum sleep time in seconds for bots that limits the exponental
+  // backoff. If missing, the task scheduler will provide the default maximum
+  // (usually 60s, but see bot_code/task_scheduler.py for details).
+  optional int32 max_bot_sleep_time = 12;
 }
 
 
