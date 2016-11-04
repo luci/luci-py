@@ -30,6 +30,8 @@ this.swarming.alias = this.swarming.alias || (function(){
 
   var GPU_ALIASES = {
     "1002": "AMD",
+    "1002:9874": "AMD Carrizo",
+    "1002:6613": "AMD Radeon R7 240",
     "1002:6779": "AMD Radeon HD 6450/7450/8450",
     "1002:6821": "AMD Radeon HD 8870M",
     "1002:683d": "AMD Radeon HD 7770/8760",
@@ -47,11 +49,14 @@ this.swarming.alias = this.swarming.alias || (function(){
     "10de:1244": "NVIDIA GeForce GTX 550 Ti",
     "10de:1401": "NVIDIA GeForce GTX 960",
     "8086":      "Intel",
-    "8086:0412": "Intel Haswell Integrated",
-    "8086:041a": "Intel Xeon Integrated",
-    "8086:0a2e": "Intel Haswell Integrated",
-    "8086:0d26": "Intel Crystal Well Integrated",
-    "8086:22b1": "Intel Braswell Integrated",
+    "8086:0412": "Intel Haswell HD Graphics 4600",
+    "8086:041a": "Intel Haswell HD Graphics",
+    "8086:0a2e": "Intel Haswell Iris Graphics 5100",
+    "8086:0d26": "Intel Haswell Iris Pro Graphics 5200",
+    "8086:1626": "Intel Broadwell HD Graphics 6000",
+    "8086:162b": "Intel Broadwell Iris Graphics 6100",
+    "8086:1912": "Intel Skylake HD Graphics 530",
+    "8086:22b1": "Intel Braswell HD Graphics",
   }
 
   // Taken from http://developer.android.com/reference/android/os/BatteryManager.html
