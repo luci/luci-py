@@ -11,7 +11,6 @@ from google.appengine.ext import ndb
 
 from components import gce
 from components import net
-from components import pubsub
 from components import utils
 
 import instance_group_managers

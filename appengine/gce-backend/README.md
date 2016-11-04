@@ -14,13 +14,7 @@ eventually consistent, converging on the desired state over multiple calls.
 *   Visit Google Cloud Console,
     *   IAM & Admin, click `Add Member` and add someone else so you can safely
         be hit by a bus.
-    *   Pub/Sub, click `Enable API`.
     *   Compute Engine, to enable Compute Engine.
-*   In Pub/Sub, create a topic with the same name as
-    pubsub.get\_machine\_provider\_topic(), and a pull subscription with the
-    same name as pubsub.get\_machine\_provider\_subscription(). On the topic,
-    authorize the Machine Provider's default service account as a publisher,
-    e.g. machine-provider@appspot.gserviceaccount.com.
 *   Upload the code with: `./tools/gae upl -x -A <appid>`
 *   Visit https://\<appid\>.appspot.com/auth/bootstrap and click `Proceed`.
 *   If you plan to use a [config service](../config_service),

@@ -18,7 +18,6 @@ import instance_group_managers
 import instance_templates
 import instances
 import metadata
-import pubsub
 
 
 class CatalogedInstanceRemovalHandler(webapp2.RequestHandler):
@@ -276,15 +275,6 @@ class InstanceTemplateDeletionHandler(webapp2.RequestHandler):
     instance_templates.delete(key)
 
 
-class PubSubMessageProcessHandler(webapp2.RequestHandler):
-  """Worker for polling and processing Pub/Sub messages."""
-
-  @decorators.require_taskqueue('process-pubsub-messages')
-  def post(self):
-    """Polls and processes Pub/Sub messages."""
-    pubsub.poll()
-
-
 def create_queues_app():
   return webapp2.WSGIApplication([
       ('/internal/queues/catalog-instance', InstanceCatalogHandler),
@@ -311,7 +301,6 @@ def create_queues_app():
       ('/internal/queues/delete-instance-template',
        InstanceTemplateDeletionHandler),
       ('/internal/queues/fetch-instances', InstanceFetchHandler),
-      ('/internal/queues/process-pubsub-messages', PubSubMessageProcessHandler),
       ('/internal/queues/remove-cataloged-instance',
        CatalogedInstanceRemovalHandler),
       ('/internal/queues/resize-instance-group', InstanceGroupResizeHandler),

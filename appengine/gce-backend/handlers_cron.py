@@ -18,7 +18,6 @@ import instance_templates
 import instances
 import metadata
 import parse
-import pubsub
 
 
 class CatalogedInstanceRemovalHandler(webapp2.RequestHandler):
@@ -160,14 +159,6 @@ class MetadataTaskScheduleHandler(webapp2.RequestHandler):
     metadata.schedule_metadata_tasks()
 
 
-class PubSubMessageProcessHandler(webapp2.RequestHandler):
-  """Worker for processing Pub/Sub messages."""
-
-  @decorators.require_cronjob
-  def get(self):
-    pubsub.schedule_poll()
-
-
 def create_cron_app():
   return webapp2.WSGIApplication([
       ('/internal/cron/catalog-instances', InstanceCatalogHandler),
@@ -188,7 +179,6 @@ def create_cron_app():
       ('/internal/cron/fetch-instances', InstanceFetchHandler),
       ('/internal/cron/import-config', ConfigImportHandler),
       ('/internal/cron/process-config', ConfigProcessHandler),
-      ('/internal/cron/process-pubsub-messages', PubSubMessageProcessHandler),
       ('/internal/cron/remove-cataloged-instances',
        CatalogedInstanceRemovalHandler),
       ('/internal/cron/resize-instance-groups', InstanceGroupResizeHandler),

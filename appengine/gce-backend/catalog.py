@@ -19,7 +19,6 @@ import instances
 import instance_group_managers
 import metrics
 import models
-import pubsub
 
 
 def get_policies(key, service_account):
@@ -35,8 +34,6 @@ def get_policies(key, service_account):
           'key': 'key',
           'value': key.urlsafe(),
       },
-      'backend_project': pubsub.get_machine_provider_topic_project(),
-      'backend_topic': pubsub.get_machine_provider_topic(),
       'machine_service_account': service_account,
       'on_reclamation': 'DELETE',
   }
