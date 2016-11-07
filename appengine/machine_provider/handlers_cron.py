@@ -352,8 +352,6 @@ def create_subscription(machine_key):
     return
 
   params = {
-      'backend_project': machine.policies.backend_project,
-      'backend_topic': machine.policies.backend_topic,
       'hostname': machine.dimensions.hostname,
       'machine_id': machine.key.id(),
       'machine_service_account': machine.policies.machine_service_account,
@@ -366,6 +364,9 @@ def create_subscription(machine_key):
   for attribute in machine.policies.backend_attributes:
     backend_attributes[attribute.key] = attribute.value
   params['backend_attributes'] = utils.encode_to_json(backend_attributes)
+  if machine.policies.backend_topic:
+    params['backend_topic'] = machine.policies.backend_topic
+    params['backend_project'] = machine.policies.backend_project
   if not utils.enqueue_task(
       '/internal/queues/subscribe-machine',
       'subscribe-machine',

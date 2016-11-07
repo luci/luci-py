@@ -46,7 +46,7 @@ class Policies(messages.Message):
   """
   # Cloud Pub/Sub topic name to communicate on with the backend regarding
   # this machine.
-  backend_topic = messages.StringField(1, required=True)
+  backend_topic = messages.StringField(1)
   # Cloud Pub/Sub project to communicate on with the backend regarding
   # this machine.
   backend_project = messages.StringField(2)
