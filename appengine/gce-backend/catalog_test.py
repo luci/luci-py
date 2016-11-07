@@ -66,7 +66,7 @@ class ExtractDimensionsTest(test_case.TestCase):
     )
     expected_dimensions = {
         'backend': 'GCE',
-        'disk_size_gb': 300,
+        'disk_gb': 300,
         'hostname': 'instance-name',
         'memory_gb': 30,
         'num_cpus': 8,

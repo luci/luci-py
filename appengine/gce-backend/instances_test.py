@@ -25,6 +25,10 @@ class EnsureEntityExistsTest(test_case.TestCase):
 
   def test_creates(self):
     """Ensures entity is created when it doesn't exist."""
+    def send_machine_event(*args, **kwargs):
+      pass
+    self.mock(instances.metrics, 'send_machine_event', send_machine_event)
+
     key=instances.get_instance_key(
         'base-name',
         'revision',
@@ -126,7 +130,10 @@ class EnsureEntitiesExistTest(test_case.TestCase):
     """Ensures entity gets created."""
     def fetch(*args, **kwargs):
       return ['url/name']
+    def send_machine_event(*args, **kwargs):
+      pass
     self.mock(instances, 'fetch', fetch)
+    self.mock(instances.metrics, 'send_machine_event', send_machine_event)
 
     key = instances.get_instance_key(
         'base-name',

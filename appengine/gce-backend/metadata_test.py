@@ -369,8 +369,11 @@ class UpdateTest(test_case.TestCase):
       return {'metadata': {'fingerprint': 'fingerprint', 'items': []}}
     def set_metadata(*args, **kwargs):
       return collections.namedtuple('operation', ['url'])(url='url')
+    def send_machine_event(*args, **kwargs):
+      pass
     self.mock(metadata.net, 'json_request', json_request)
     self.mock(metadata.gce.Project, 'set_metadata', set_metadata)
+    self.mock(metadata.metrics, 'send_machine_event', send_machine_event)
 
     key = models.Instance(
         key=instances.get_instance_key(
