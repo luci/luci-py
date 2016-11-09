@@ -92,6 +92,22 @@ def has_missing_keys(minimum_keys, actual_keys, name):
     return 'Unexpected %s%s; did you make a typo?' % (name, msg_missing)
 
 
+def get_bot_contact_server(request):
+  """Gets the server contacted by the bot.
+
+  Usually, this is the URL of the Swarming server itself, but if the bot
+  is communicating to the server by a gRPC intermediary, this will be the
+  IP address of the gRPC endpoint. The Native API will have an http or
+  https protocol, while gRPC endpoints will have a fake "grpc://" protocol.
+  This is to help consumers of this information (mainly the bot code
+  generators) distinguish between native and gRPC bots.
+  """
+  server = request.host_url
+  if 'luci-grpc' in request.headers:
+    server = 'grpc://%s' % request.headers['luci-grpc']
+  return server
+
+
 class _BotApiHandler(auth.ApiHandler):
   """Like ApiHandler, but also implements machine authentication."""
 
@@ -152,6 +168,10 @@ class _BotAuthenticatingHandler(auth.AuthenticatingHandler):
 
     return bot_code.generate_bootstrap_token() if generate_token else None
 
+  def get_bot_contact_server(self):
+    """Gets the server contacted by the bot."""
+    return get_bot_contact_server(self.request)
+
 
 class BootstrapHandler(_BotAuthenticatingHandler):
   """Returns python code to run to bootstrap a swarming bot."""
@@ -179,10 +199,11 @@ class BotCodeHandler(_BotAuthenticatingHandler):
 
   @auth.public  # auth inside check_bot_code_access()
   def get(self, version=None):
+    server = self.get_bot_contact_server()
     self.check_bot_code_access(
         bot_id=self.request.get('bot_id'), generate_token=False)
     if version:
-      expected = bot_code.get_bot_version(self.request.host_url)
+      expected = bot_code.get_bot_version(server)
       if version != expected:
         # This can happen when the server is rapidly updated.
         logging.error('Requested Swarming bot %s, have %s', version, expected)
@@ -194,7 +215,7 @@ class BotCodeHandler(_BotAuthenticatingHandler):
     self.response.headers['Content-Disposition'] = (
         'attachment; filename="swarming_bot.zip"')
     self.response.out.write(
-        bot_code.get_swarming_bot_zip(self.request.host_url))
+        bot_code.get_swarming_bot_zip(server))
 
 
 class _ProcessResult(object):
@@ -355,6 +376,10 @@ class _BotBaseHandler(_BotApiHandler):
 
     return result
 
+  def get_bot_contact_server(self):
+    """Gets the server contacted by the bot."""
+    return get_bot_contact_server(self.request)
+
 
 class BotHandshakeHandler(_BotBaseHandler):
   """First request to be called to get initial data like bot code version.
@@ -390,7 +415,7 @@ class BotHandshakeHandler(_BotBaseHandler):
         task_id='', task_name=None, message=res.quarantined_msg)
 
     data = {
-      'bot_version': bot_code.get_bot_version(self.request.host_url),
+      'bot_version': bot_code.get_bot_version(self.get_bot_contact_server()),
       'server_version': utils.get_app_version(),
       'bot_group_cfg_version': res.bot_group_cfg.version,
       'bot_group_cfg': {
@@ -448,7 +473,7 @@ class BotPollHandler(_BotBaseHandler):
 
     # Bot version is host-specific because the host URL is embedded in
     # swarming_bot.zip
-    expected_version = bot_code.get_bot_version(self.request.host_url)
+    expected_version = bot_code.get_bot_version(self.get_bot_contact_server())
     if res.version != expected_version:
       bot_event('request_update')
       self._cmd_update(expected_version)

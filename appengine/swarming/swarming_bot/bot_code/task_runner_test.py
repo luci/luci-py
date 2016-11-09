@@ -193,7 +193,8 @@ class TestTaskRunner(TestTaskRunnerBase):
   def _run_command(self, task_details, headers_cb=None):
     start = time.time()
     self.mock(time, 'time', lambda: start + 10)
-    remote = remote_client.createRemoteClient('https://localhost:1', headers_cb)
+    remote = remote_client.createRemoteClient('https://localhost:1', headers_cb,
+                                              False)
     return task_runner.run_command(
         remote, task_details, self.work_dir, 3600.,
         start, 1, '/path/to/file')
@@ -242,7 +243,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     out_file = os.path.join(self.root_dir, 'w', 'task_runner_out.json')
     task_runner.load_and_run(
-        manifest, 'localhost:1', 3600., time.time(), out_file, 1,
+        manifest, 'localhost:1', False, 3600., time.time(), out_file, 1,
         '/path/to/bot-file', '/path/to/auth-params-file')
     expected = {
       u'exit_code': 1,
@@ -303,7 +304,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     out_file = os.path.join(self.root_dir, 'w', 'task_runner_out.json')
     task_runner.load_and_run(
-        manifest, 'localhost:1', 3600., time.time(), out_file, 1,
+        manifest, 'localhost:1', False, 3600., time.time(), out_file, 1,
         '/path/to/bot-file', '/path/to/auth-params-file')
     expected = {
       u'exit_code': 0,
@@ -611,10 +612,11 @@ class TestTaskRunner(TestTaskRunnerBase):
 
   def test_main(self):
     def load_and_run(
-        manifest, swarming_server, cost_usd_hour, start,
+        manifest, swarming_server, is_grpc, cost_usd_hour, start,
         json_file, min_free_space, bot_file, auth_params_file):
       self.assertEqual('foo', manifest)
       self.assertEqual('http://localhost', swarming_server)
+      self.assertFalse(is_grpc)
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
       self.assertEqual('task_summary.json', json_file)
@@ -632,6 +634,34 @@ class TestTaskRunner(TestTaskRunnerBase):
       '--min-free-space', '1',
       '--bot-file', '/path/to/bot-file',
       '--auth-params-file', '/path/to/auth-params-file',
+    ]
+    self.assertEqual(0, task_runner.main(cmd))
+
+  def test_main_grpc(self):
+    def load_and_run(
+        manifest, swarming_server, is_grpc, cost_usd_hour, start,
+        json_file, min_free_space, bot_file, auth_params_file):
+      self.assertEqual('foo', manifest)
+      self.assertEqual('http://localhost', swarming_server)
+      self.assertTrue(is_grpc)
+      self.assertEqual(3600., cost_usd_hour)
+      self.assertEqual(time.time(), start)
+      self.assertEqual('task_summary.json', json_file)
+      self.assertEqual(1, min_free_space)
+      self.assertEqual('/path/to/bot-file', bot_file)
+      self.assertEqual('/path/to/auth-params-file', auth_params_file)
+
+    self.mock(task_runner, 'load_and_run', load_and_run)
+    cmd = [
+      '--swarming-server', 'http://localhost',
+      '--in-file', 'foo',
+      '--out-file', 'task_summary.json',
+      '--cost-usd-hour', '3600',
+      '--start', str(time.time()),
+      '--min-free-space', '1',
+      '--bot-file', '/path/to/bot-file',
+      '--auth-params-file', '/path/to/auth-params-file',
+      '--is-grpc',
     ]
     self.assertEqual(0, task_runner.main(cmd))
 
@@ -730,13 +760,14 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       json.dump(manifest, f)
     out_file = os.path.join(self.work_dir, 'task_runner_out.json')
     task_runner.load_and_run(
-        in_file, server, 3600., time.time(), out_file, 1, None, None)
+        in_file, server, False, 3600., time.time(), out_file, 1, None, None)
     with open(out_file, 'rb') as f:
       return json.load(f)
 
   def _run_command(self, task_details):
     # Dot not mock time since this test class is testing timeouts.
-    remote = remote_client.createRemoteClient('https://localhost:1', None)
+    remote = remote_client.createRemoteClient('https://localhost:1', None,
+                                              False)
     return task_runner.run_command(
         remote, task_details, self.work_dir, 3600., time.time(), 1,
         '/path/to/file')

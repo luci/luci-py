@@ -1,4 +1,5 @@
 {
+  "is_grpc": false,
   "server": "http://localhost:8080",
   "server_version": "version1"
 }

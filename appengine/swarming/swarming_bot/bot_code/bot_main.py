@@ -335,7 +335,8 @@ def get_bot():
   # construct the "real" bot.Bot.
   attributes = get_attributes(
     bot.Bot(
-      remote_client.createRemoteClient(config['server'], None),
+      remote_client.createRemoteClient(config['server'],
+                                       None, config['is_grpc']),
       attributes,
       config['server'],
       config['server_version'],
@@ -348,7 +349,8 @@ def get_bot():
   botobj = bot.Bot(
       remote_client.createRemoteClient(
           config['server'],
-          lambda: get_authentication_headers(botobj)),
+          lambda: get_authentication_headers(botobj),
+          config['is_grpc']),
       attributes,
       config['server'],
       config['server_version'],
@@ -441,7 +443,8 @@ def run_bot(arg_error):
       # There's no need to do error handling here - the "ping" is just to "wake
       # up" the network; if there's something seriously wrong, the handshake
       # will fail and we'll handle it there.
-      remote = remote_client.createRemoteClient(config['server'], None)
+      remote = remote_client.createRemoteClient(config['server'], None,
+                                                config['is_grpc'])
       remote.ping()
     except Exception as e:
       # url_read() already traps pretty much every exceptions. This except
@@ -642,7 +645,36 @@ def run_manifest(botobj, manifest, start):
     if not manifest['command']:
       hard_timeout += manifest['io_timeout'] or 600
 
-  url = manifest.get('host', botobj.server)
+  # Get the server info to pass to the task runner so it can provide updates.
+  url = botobj.server
+  is_grpc = botobj.remote.is_grpc()
+  if not is_grpc and 'host' in manifest:
+    # The URL in the manifest includes the version - eg not https://chromium-
+    # swarm-dev.appspot.com, but https://<some-version>-dot-chromiium-swarm-
+    # dev.appspot.com. That way, if a new server version becomes the default,
+    # old bots will continue to work with a server version that can manipulate
+    # the old data (the new server will only ever have to read it, which is
+    # much simpler) while new bots won't accidentally contact an old server
+    # which the GAE engine hasn't gotten around to updating yet.
+    #
+    # With a gRPC proxy, we could theoretically run into the same problem
+    # if we change the meaning of some data without changing the protos.
+    # However, if we *do* change the protos, we already need to make the
+    # change in a few steps:
+    #    1. Modify the Swarming server to accept the new data
+    #    2. Modify the protos and the proxy to accept the new data
+    #       in gRPC calls and translate it to "native" Swarming calls.
+    #    3. Update the bots to transmit the new protos.
+    # Throughout all this, the proto format itself irons out minor differences
+    # and additions. But because we deploy in three steps, the odds of a
+    # newer bot contacting an older server is very low.
+    #
+    # None of this applies if we don't actually update the protos but just
+    # change the semantics. If this becomes a significant problem, we could
+    # start transmitting the expected server version using gRPC metadata.
+    #    - aludwin, Nov 2016
+    url = manifest['host']
+
   task_dimensions = manifest['dimensions']
   task_result = {}
 
@@ -706,6 +738,8 @@ def run_manifest(botobj, manifest, start):
     ]
     if botobj.remote.uses_auth:
       command.extend(['--auth-params-file', auth_params_file])
+    if is_grpc:
+      command.append('--is-grpc')
     logging.debug('Running command: %s', command)
 
     # Put the output file into the current working directory, which should be

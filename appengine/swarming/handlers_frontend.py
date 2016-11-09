@@ -235,6 +235,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
     # TODO(maruel): self.request.host_url should be the default AppEngine url
     # version and not the current one. It is only an issue when
     # version-dot-appid.appspot.com urls are used to access this page.
+    # TODO(aludwin): Display both gRPC and non-gRPC versions
     version = bot_code.get_bot_version(self.request.host_url)
     bots, cursor, more = fetch_future.get_result()
     # Prefetch the tasks. We don't actually use the value here, it'll be
@@ -338,6 +339,8 @@ class BotHandler(auth.AuthenticatingHandler):
     params = {
       'bot': bot,
       'bot_id': bot_id,
+      # TODO(aludwin): Use the bot's correct gRPC status to determine the
+      # version
       'current_version': bot_code.get_bot_version(self.request.host_url),
       'cursor': cursor.urlsafe() if cursor and more else None,
       'events': events,

@@ -59,7 +59,6 @@ FILES = (
     'bot_code/remote_client_grpc.py',
     'bot_code/singleton.py',
     'bot_code/task_runner.py',
-    'bot_code/workers_pb2.py',
     'client/auth.py',
     'client/cipd.py',
     'client/isolated_format.py',
@@ -111,6 +110,8 @@ FILES = (
     'libs/arfile/arfile.py',
     'libs/luci_context/__init__.py',
     'libs/luci_context/luci_context.py',
+    'proto/__init__.py',
+    'proto/swarming_bot_pb2.py',
     'python_libusb1/__init__.py',
     'python_libusb1/libusb1.py',
     'python_libusb1/usb1.py',
@@ -341,9 +342,15 @@ def yield_swarming_bot_files(root_dir, host, host_version, additionals):
 
   This function guarantees that the output is sorted by filename.
   """
+  grpc_prefix = 'grpc://'
+  is_grpc = host.startswith(grpc_prefix)
+  if is_grpc:
+    host = host[len(grpc_prefix):]
+
   items = {i: None for i in FILES}
   items.update(additionals)
   config = {
+    'is_grpc': is_grpc,
     'server': host.rstrip('/'),
     'server_version': host_version,
   }

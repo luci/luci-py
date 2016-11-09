@@ -102,7 +102,8 @@ class TestBotMain(net_utils.TestCase):
   def make_bot(self, auth_headers_cb=None):
     return bot.Bot(
         remote_client.createRemoteClient('https://localhost:1',
-                                         auth_headers_cb),
+                                         auth_headers_cb,
+                                         False),
         self.attributes, 'https://localhost:1', 'version1',
         self.root_dir, self.fail)
 
@@ -176,7 +177,7 @@ class TestBotMain(net_utils.TestCase):
     self.mock(logging, 'error', lambda *_, **_kw: None)
     self.mock(
         bot_main, 'get_config',
-        lambda: {'server': self.url, 'server_version': '1'})
+        lambda: {'server': self.url, 'server_version': '1', 'is_grpc': False})
     expected_attribs = bot_main.get_attributes(None)
     self.expected_requests(
         [
@@ -231,7 +232,7 @@ class TestBotMain(net_utils.TestCase):
 
     self.mock(
         bot_main, 'get_config',
-        lambda: {'server': self.url, 'server_version': '1'})
+        lambda: {'server': self.url, 'server_version': '1', 'is_grpc': False})
     self.mock(
         bot_main, 'get_dimensions', lambda _: self.attributes['dimensions'])
     self.mock(os_utilities, 'get_state', lambda *_: self.attributes['state'])

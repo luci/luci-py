@@ -1,0 +1,33 @@
+// Copyright 2014 The LUCI Authors. All rights reserved.
+// Use of this source code is governed under the Apache License, Version 2.0
+// that can be found in the LICENSE file.
+
+// This describes the interface a Swarming bot can use to contact a Swarming
+// server over a gRPC proxy. It essentially duplicates the "native" Swarming
+// REST API (or, at least, it will in the near future).
+//
+// This proto is *not yet stable* and *will* change over time in non-backward-
+// compatible ways.
+
+syntax = "proto3";
+
+package luci.swarming;
+
+service BotService {
+  rpc Poll(PollRequest) returns (PollResponse);
+}
+
+message PollRequest {
+  //TODO(aludwin)
+  bool test = 1;
+}
+
+message PollResponse {
+  oneof action {
+    double sleep_time = 1;
+    bytes new_bot = 2;  // max size is 4MB; current size is 900kb
+    string manifest = 3; // temp; should be a manifest object
+    int32 terminate_taskid = 4;
+    string restart_message = 5;
+  }
+}

@@ -4,17 +4,21 @@
 
 # This is a reimplementation of RemoteClientNative but it uses (will use)
 # a gRPC method to communicate with a server instead of REST.
+
 import grpc
-import workers_pb2
+from proto import swarming_bot_pb2
+
 
 class RemoteClientGrpc(object):
   """RemoteClientGrpc knows how to make calls via gRPC.
   """
 
   def __init__(self, server):
-    del server # Not used yet
-    self._channel = grpc.insecure_channel("localhost:90")
-    self._stub = workers_pb2.WorkerServiceStub(self._channel)
+    self._channel = grpc.insecure_channel(server)
+    self._stub = swarming_bot_pb2.BotServiceStub(self._channel)
+
+  def is_grpc(self):
+    return True
 
   def initialize(self, quit_bit):
     pass
@@ -55,8 +59,9 @@ class RemoteClientGrpc(object):
   def poll(self, attributes):
     del attributes # Not used yet
     print "Polling!"
-    platform = workers_pb2.WorkerPlatform()
-    action = self._stub.RequestTask(platform)
+    request = swarming_bot_pb2.PollRequest()
+    request.test = True
+    response = self._stub.Poll(request)
     manifest = {
       'task_id': '42',
       'dimensions': {},
@@ -72,7 +77,7 @@ class RemoteClientGrpc(object):
       'bot_id': 'fake_bot',
 
       #Splitting should be done server-side:
-      'command': action.command.split(),
+      'command': response.manifest.split(),
     }
     print "Will execute manifest: %s" % manifest
     return ('run', manifest)

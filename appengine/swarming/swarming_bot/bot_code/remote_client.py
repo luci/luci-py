@@ -42,7 +42,7 @@ class InternalError(Exception):
   """Raised on unrecoverable errors that abort task with 'internal error'."""
 
 
-def createRemoteClient(server, auth, useGrpc=False):
+def createRemoteClient(server, auth, useGrpc):
   if useGrpc:
     import remote_client_grpc
     return remote_client_grpc.RemoteClientGrpc(server)
@@ -67,6 +67,9 @@ class RemoteClientNative(object):
     self._headers = None
     self._exp_ts = None
     self._disabled = not auth_headers_callback
+
+  def is_grpc(self):
+    return False
 
   def initialize(self, quit_bit):
     """Grabs initial auth headers, retrying on errors a bunch of times.
