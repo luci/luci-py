@@ -42,8 +42,9 @@ class Instance(ndb.Model):
   """A GCE instance.
 
   Key:
-    id: Name of the instance.
-    kind: InstanceGroupManager.
+    id: Space-separated string:
+      instance template base name, revision, zone, GCE instance name.
+    parent: None (root).
   """
   # Active metadata operation.
   active_metadata_update = ndb.LocalStructuredProperty(MetadataUpdate)
@@ -51,6 +52,11 @@ class Instance(ndb.Model):
   cataloged = ndb.BooleanProperty(indexed=True)
   # Whether or not this instance has been deleted.
   deleted = ndb.BooleanProperty(indexed=True)
+  # Name of this instance.
+  hostname = ndb.ComputedProperty(
+      lambda self: self.key.id().split()[-1], indexed=True)
+  # ndb.Key for the InstanceGroupManager this Instance belongs to.
+  instance_group_manager = ndb.KeyProperty(indexed=True)
   # Last modification to this entity.
   last_updated = ndb.DateTimeProperty(auto_now=True, indexed=True)
   # Whether or not this instance is pending deletion.
@@ -58,6 +64,8 @@ class Instance(ndb.Model):
   # Pending metadata operations.
   pending_metadata_updates = ndb.LocalStructuredProperty(
       MetadataUpdate, repeated=True)
+  # Service account authorized to read the Pub/Sub subscription.
+  pubsub_service_account = ndb.StringProperty(indexed=False)
   # Pub/Sub subscription used by Machine provider to signal this instance.
   pubsub_subscription = ndb.StringProperty(indexed=False)
   # URL of the instance.
@@ -71,7 +79,7 @@ class InstanceGroupManager(ndb.Model):
     id: zone of the
       proto.config_pb2.InstanceGroupManagerConfig.InstanceGroupManager this
       entity represents.
-    kind: InstanceTemplateRevision.
+    parent: InstanceTemplateRevision.
   """
   # Current number of instances managed by the instance group manager created
   # from this entity.
@@ -95,7 +103,7 @@ class InstanceTemplateRevision(ndb.Model):
 
   Key:
     id: Checksum of the instance template config.
-    kind: InstanceTemplate.
+    parent: InstanceTemplate.
   """
   # List of ndb.Keys for the InstanceGroupManagers.
   active = ndb.KeyProperty(kind=InstanceGroupManager, repeated=True)
@@ -134,7 +142,7 @@ class InstanceTemplate(ndb.Model):
     id: base_name of the
       proto.config_pb2.InstanceTemplateConfig.InstanceTemplate this entity
       represents.
-    kind: InstanceTemplate (root entity).
+    parent: None (root entity).
   """
   # ndb.Key for the active InstanceTemplateRevision.
   active = ndb.KeyProperty(kind=InstanceTemplateRevision)

@@ -299,18 +299,20 @@ class UpdateTest(test_case.TestCase):
 
   def test_parent_not_found(self):
     """Ensures nothing happens when the parent doesn't exist."""
-    key = models.Instance(
-        key=instances.get_instance_key(
-            'base-name',
-            'revision',
-            'zone',
-            'instance-name',
-        ),
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    models.Instance(
+        key=key,
         active_metadata_update=models.MetadataUpdate(
             metadata={
                 'key': 'value',
             },
         ),
+        instance_group_manager=instances.get_instance_group_manager_key(key),
     ).put()
 
     metadata.update(key)
@@ -318,21 +320,26 @@ class UpdateTest(test_case.TestCase):
 
   def test_grandparent_not_found(self):
     """Ensures nothing happens when the grandparent doesn't exist."""
-    key = models.Instance(
-        key=instances.get_instance_key(
-            'base-name',
-            'revision',
-            'zone',
-            'instance-name',
-        ),
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    models.Instance(
+        key=key,
         active_metadata_update=models.MetadataUpdate(
             metadata={
                 'key': 'value',
             },
         ),
+        instance_group_manager=instances.get_instance_group_manager_key(key),
     ).put()
     models.InstanceGroupManager(
-        key=key.parent(),
+        key=instances.get_instance_group_manager_key(key),
+        instances=[
+            key,
+        ],
     ).put()
 
     metadata.update(key)
@@ -340,24 +347,26 @@ class UpdateTest(test_case.TestCase):
 
   def test_project_unspecified(self):
     """Ensures nothing happens when project is unspecified."""
-    key = models.Instance(
-        key=instances.get_instance_key(
-            'base-name',
-            'revision',
-            'zone',
-            'instance-name',
-        ),
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    models.Instance(
+        key=key,
         active_metadata_update=models.MetadataUpdate(
             metadata={
                 'key': 'value',
             },
         ),
+        instance_group_manager=instances.get_instance_group_manager_key(key),
     ).put()
     models.InstanceGroupManager(
-        key=key.parent(),
+        key=instances.get_instance_group_manager_key(key),
     ).put()
     models.InstanceTemplateRevision(
-        key=key.parent().parent(),
+        key=instances.get_instance_group_manager_key(key).parent(),
     ).put()
 
     metadata.update(key)
@@ -375,24 +384,26 @@ class UpdateTest(test_case.TestCase):
     self.mock(metadata.gce.Project, 'set_metadata', set_metadata)
     self.mock(metadata.metrics, 'send_machine_event', send_machine_event)
 
-    key = models.Instance(
-        key=instances.get_instance_key(
-            'base-name',
-            'revision',
-            'zone',
-            'instance-name',
-        ),
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    models.Instance(
+        key=key,
         active_metadata_update=models.MetadataUpdate(
             metadata={
                 'key': 'value',
             },
         ),
+        instance_group_manager=instances.get_instance_group_manager_key(key),
     ).put()
     models.InstanceGroupManager(
-        key=key.parent(),
+        key=instances.get_instance_group_manager_key(key),
     ).put()
     models.InstanceTemplateRevision(
-        key=key.parent().parent(),
+        key=instances.get_instance_group_manager_key(key).parent(),
         project='project',
     ).put()
     expected_url = 'url'

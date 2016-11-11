@@ -66,7 +66,7 @@ def extract_dimensions(instance, instance_template_revision):
     dimensions['num_cpus'] = gce.machine_type_to_num_cpus(
         instance_template_revision.machine_type)
 
-  dimensions['hostname'] = instance.key.id()
+  dimensions['hostname'] = instance.hostname
 
   return dimensions
 
@@ -107,9 +107,12 @@ def catalog(key):
     logging.warning('Instance pending deletion: %s', instance)
     return
 
-  parent = key.parent().get()
+  parent = entity.instance_group_manager.get()
   if not parent:
-    logging.warning('InstanceGroupManager does not exist: %s', key.parent())
+    logging.warning(
+        'InstanceGroupManager does not exist: %s',
+        entity.instance_group_manager,
+    )
     return
 
   grandparent = parent.key.parent().get()
@@ -141,7 +144,7 @@ def catalog(key):
     return
 
   set_cataloged(key, True)
-  metrics.send_machine_event('CATALOGED', key.id())
+  metrics.send_machine_event('CATALOGED', entity.hostname)
 
 
 def schedule_catalog():
@@ -185,7 +188,7 @@ def remove(key):
   if not entity.cataloged:
     return
 
-  response = machine_provider.delete_machine({'hostname': key.id()})
+  response = machine_provider.delete_machine({'hostname': entity.hostname})
   if response.get('error') and response['error'] != 'ENTRY_NOT_FOUND':
     # Assume ENTRY_NOT_FOUND implies a duplicate request.
     logging.warning(
@@ -233,15 +236,16 @@ def update_cataloged_instance(key):
     return
 
   try:
-    response = machine_provider.retrieve_machine(key.id())
+    response = machine_provider.retrieve_machine(entity.hostname)
     if response.get('pubsub_subscription') and not entity.pubsub_subscription:
-      metrics.send_machine_event('SUBSCRIPTION_RECEIVED', key.id())
+      metrics.send_machine_event('SUBSCRIPTION_RECEIVED', entity.hostname)
       instances.add_subscription_metadata(
           key,
           response['pubsub_subscription_project'],
           response['pubsub_subscription'],
+          response['policies']['machine_service_account'],
       )
-      metrics.send_machine_event('METADATA_UPDATE_PROPOSED', key.id())
+      metrics.send_machine_event('METADATA_UPDATE_PROPOSED', entity.hostname)
   except net.NotFoundError:
     instances.mark_for_deletion(key)
 

@@ -42,95 +42,27 @@ def exists(instance_url):
     raise
 
 
-def _set_instance_deleted(instance_key, instance_group_manager):
-  """Sets the given Instance as deleted.
-
-  Args:
-    instance_key: ndb.Key for a models.Instance entity.
-    instance_group_manager: models.InstanceGroupManager.
-  """
-  assert ndb.in_transaction()
-
-  instance = instance_key.get()
-  if instance:
-    logging.info('Setting Instance as deleted: %s', instance.key)
-    instance.deleted = True
-    instance.put()
-  else:
-    logging.warning('Instance not found: %s', instance_key)
-
-  for i, key in enumerate(instance_group_manager.instances):
-    if key.id() == instance_key.id():
-      instance_group_manager.instances.pop(i)
-      instance_group_manager.put()
-      return
-  logging.warning(
-      'Instance not found in InstanceGroupManager: %s', instance_key)
-
-
 @ndb.transactional
-def set_instance_deleted(key):
+def set_instance_deleted(key, drained):
   """Attempts to set the given Instance as deleted.
 
   Args:
     key: ndb.Key for a models.Instance entity.
+    drained: Whether or not the Instance is being set as deleted
+      because it is drained.
   """
   entity = key.get()
   if not entity:
     logging.info('Instance does not exist: %s', key)
     return
 
-  if not entity.pending_deletion:
-    logging.warning('Instance not pending deletion: %s', key)
+  if not drained and not entity.pending_deletion:
+    logging.warning('Instance not drained or ending deletion: %s', key)
     return
 
-  parent = key.parent().get()
-  if not parent:
-    logging.warning('InstanceGroupManager does not exist: %s', key.parent())
-    return
-
-  _set_instance_deleted(key, parent)
-
-
-@ndb.transactional
-def delete_drained_instance(key):
-  """Deletes the given drained Instance.
-
-  Args:
-    key: ndb.Key for a models.Instance entity.
-  """
-  entity = key.get()
-  if not entity:
-    logging.warning('Instance does not exist: %s', key)
-    return
-
-  if entity.cataloged:
-    logging.warning('Instance is cataloged: %s', key)
-    return
-
-  parent = key.parent().get()
-  if not parent:
-    logging.warning('InstanceGroupManager does not exist: %s', key.parent())
-    return
-
-  grandparent = parent.key.parent().get()
-  if not grandparent:
-    logging.warning(
-        'InstanceTemplateRevision does not exist: %s', parent.key.parent())
-    return
-
-  root = grandparent.key.parent().get()
-  if not root:
-    logging.warning(
-        'InstanceTemplate does not exist: %s', grandparent.key.parent())
-    return
-
-  if parent.key not in grandparent.drained:
-    if grandparent.key not in root.drained:
-      logging.warning('Instance is not drained: %s', key)
-      return
-
-  _set_instance_deleted(key, parent)
+  logging.info('Setting Instance as deleted: %s', key)
+  entity.deleted = True
+  entity.put()
 
 
 @ndb.transactional_tasklet
@@ -279,7 +211,7 @@ def check_deleted_instance(key):
 
   if not exists(entity.url):
     # When the instance isn't found, assume it's deleted.
-    set_instance_deleted(key)
+    set_instance_deleted(key, False)
 
 
 def schedule_deleted_instance_check():
@@ -355,9 +287,12 @@ def cleanup_drained_instance(key):
     logging.warning('Instance URL unspecified: %s', key)
     return
 
-  parent = key.parent().get()
+  parent = entity.instance_group_manager.get()
   if not parent:
-    logging.warning('InstanceGroupManager does not exist: %s', key.parent())
+    logging.warning(
+        'InstanceGroupManager does not exist: %s',
+        entity.instance_group_manager,
+    )
     return
 
   grandparent = parent.key.parent().get()
@@ -379,7 +314,7 @@ def cleanup_drained_instance(key):
 
   if not exists(entity.url):
     # When the instance isn't found, assume it's deleted.
-    delete_drained_instance(key)
+    set_instance_deleted(True)
 
 
 def schedule_drained_instance_cleanup():

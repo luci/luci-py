@@ -113,7 +113,7 @@ def compress(key):
     return
 
   compress_pending_metadata_updates(key)
-  metrics.send_machine_event('METADATA_UPDATE_READY', key.id())
+  metrics.send_machine_event('METADATA_UPDATE_READY', entity.hostname)
 
 
 @ndb.transactional
@@ -166,9 +166,12 @@ def update(key):
   if entity.active_metadata_update.url:
     return
 
-  parent = key.parent().get()
+  parent = entity.instance_group_manager.get()
   if not parent:
-    logging.warning('InstanceGroupManager does not exist: %s', key.parent())
+    logging.warning(
+        'InstanceGroupManager does not exist: %s',
+        entity.instance_group_manager,
+    )
     return
 
   grandparent = parent.key.parent().get()
@@ -186,12 +189,12 @@ def update(key):
   api = gce.Project(grandparent.project)
   operation = api.set_metadata(
       parent.key.id(),
-      key.id(),
+      entity.hostname,
       result['metadata']['fingerprint'],
       apply_metadata_update(
           result['metadata']['items'], entity.active_metadata_update.metadata),
   )
-  metrics.send_machine_event('METADATA_UPDATE_SCHEDULED', key.id())
+  metrics.send_machine_event('METADATA_UPDATE_SCHEDULED', entity.hostname)
 
   associate_metadata_operation(
       key,
@@ -287,11 +290,11 @@ def check(key):
         key,
         json.dumps(result, indent=2),
     )
-    metrics.send_machine_event('METADATA_UPDATE_FAILED', key.id())
+    metrics.send_machine_event('METADATA_UPDATE_FAILED', entity.hostname)
     reschedule_active_metadata_update(key, entity.active_metadata_update.url)
-    metrics.send_machine_event('METADATA_UPDATE_READY', key.id())
+    metrics.send_machine_event('METADATA_UPDATE_READY', entity.hostname)
   else:
-    metrics.send_machine_event('METADATA_UPDATE_SUCCEEDED', key.id())
+    metrics.send_machine_event('METADATA_UPDATE_SUCCEEDED', entity.hostname)
     clear_active_metadata_update(key, entity.active_metadata_update.url)
 
 

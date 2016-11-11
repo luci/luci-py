@@ -11,6 +11,7 @@ from google.appengine.ext import ndb
 
 from components import gce
 from components import net
+from components import pubsub
 from components import utils
 
 import instance_group_managers
@@ -29,14 +30,23 @@ def get_instance_key(base_name, revision, zone, instance_name):
     instance_name: Name of the models.Instance.
 
   Returns:
-    ndb.Key for a models.InstanceTemplate entity.
+    ndb.Key for a models.Instance entity.
   """
   return ndb.Key(
-      models.Instance,
-      instance_name,
-      parent=instance_group_managers.get_instance_group_manager_key(
-          base_name, revision, zone),
-  )
+    models.Instance, '%s %s %s %s' % (base_name, revision, zone, instance_name))
+
+
+def get_instance_group_manager_key(key):
+  """Returns a key for the InstanceGroupManager the given Instance belongs to.
+
+  Args:
+    key: ndb.Key for a models.Instance.
+
+  Returns:
+    ndb.Key for a models.InstanceGroupManager entity.
+  """
+  return instance_group_managers.get_instance_group_manager_key(
+      *key.id().split()[:-1])
 
 
 @ndb.transactional
@@ -55,11 +65,12 @@ def mark_for_deletion(key):
     logging.info('Marking Instance for deletion: %s', key)
     entity.pending_deletion = True
     entity.put()
-    metrics.send_machine_event('DELETION_PROPOSED', key.id())
+    metrics.send_machine_event('DELETION_PROPOSED', entity.hostname)
 
 
 @ndb.transactional
-def add_subscription_metadata(key, subscription_project, subscription):
+def add_subscription_metadata(
+      key, subscription_project, subscription, service_account):
   """Queues the addition of subscription metadata.
 
   Args:
@@ -67,6 +78,8 @@ def add_subscription_metadata(key, subscription_project, subscription):
     subscription_project: Project containing the Pub/Sub subscription.
     subscription: Name of the Pub/Sub subscription that Machine Provider will
       communicate with the instance on.
+    service_account: Service account authorized to read the Pub/Sub
+      subscription.
   """
   entity = key.get()
   if not entity:
@@ -76,32 +89,15 @@ def add_subscription_metadata(key, subscription_project, subscription):
   if entity.pubsub_subscription:
     return
 
-  parent = key.parent().get()
-  if not parent:
-    logging.warning('InstanceGroupManager does not exist: %s', key.parent())
-    return
-
-  grandparent = parent.key.parent().get()
-  if not grandparent:
-    logging.warning(
-        'InstanceTemplateRevision does not exist: %s', parent.key.parent())
-    return
-
-  if not grandparent.service_accounts:
-    logging.warning(
-        'InstanceTemplateRevision service account unspecified: %s',
-        parent.key.parent(),
-    )
-    return
-
   logging.info('Instance Pub/Sub subscription received: %s', key)
   entity.pending_metadata_updates.append(models.MetadataUpdate(
       metadata={
-          'pubsub_service_account': grandparent.service_accounts[0].name,
+          'pubsub_service_account': service_account,
           'pubsub_subscription': subscription,
           'pubsub_subscription_project': subscription_project,
       },
   ))
+  entity.pubsub_service_account = service_account
   entity.pubsub_subscription = pubsub.full_subscription_name(
       subscription_project, subscription)
   entity.put()
@@ -155,12 +151,14 @@ def fetch(key):
 
 
 @ndb.transactional_tasklet
-def ensure_entity_exists(key, url):
+def ensure_entity_exists(key, url, instance_group_manager):
   """Ensures an Instance entity exists.
 
   Args:
     key: ndb.Key for a models.Instance entity.
     url: URL for the instance.
+    instance_group_manager: ndb.Key for the models.InstanceGroupManager the
+      instance was created from.
   """
   entity = yield key.get_async()
   if entity:
@@ -168,8 +166,12 @@ def ensure_entity_exists(key, url):
     return
 
   logging.info('Creating Instance entity: %s', key)
-  yield models.Instance(key=key, url=url).put_async()
-  metrics.send_machine_event('CREATED', key.id())
+  yield models.Instance(
+      key=key,
+      instance_group_manager=instance_group_manager,
+      url=url,
+  ).put_async()
+  metrics.send_machine_event('CREATED', gce.extract_instance_name(url))
 
 
 @ndb.transactional
@@ -202,14 +204,19 @@ def ensure_entities_exist(key, max_concurrent=50):
   if not urls:
     return
 
+  base_name = key.parent().parent().id()
+  revision = key.parent().id()
+  zone = key.id()
+
   keys = {
-      url: ndb.Key(models.Instance, gce.extract_instance_name(url), parent=key)
+      url: get_instance_key(
+          base_name, revision, zone, gce.extract_instance_name(url))
       for url in urls
   }
 
   utilities.batch_process_async(
       urls,
-      lambda url: ensure_entity_exists(keys[url], url),
+      lambda url: ensure_entity_exists(keys[url], url, key),
       max_concurrent=max_concurrent,
   )
 
@@ -255,10 +262,10 @@ def _delete(instance_template_revision, instance_group_manager, instance):
           json.dumps(result, indent=2),
       )
     else:
-      metrics.send_machine_event('DELETION_SCHEDULED', instance.key.id())
+      metrics.send_machine_event('DELETION_SCHEDULED', instance.hostname)
   except net.Error as e:
     if e.status_code == 400:
-      metrics.send_machine_event('DELETION_SUCCEEDED', instance.key.id())
+      metrics.send_machine_event('DELETION_SUCCEEDED', instance.hostname)
     else:
       raise
 
@@ -281,9 +288,12 @@ def delete_pending(key):
     logging.warning('Instance URL unspecified: %s', key)
     return
 
-  parent = key.parent().get()
+  parent = entity.instance_group_manager.get()
   if not parent:
-    logging.warning('InstanceGroupManager does not exist: %s', key.parent())
+    logging.warning(
+        'InstanceGroupManager does not exist: %s',
+        entity.instance_group_manager,
+    )
     return
 
   grandparent = parent.key.parent().get()
@@ -333,9 +343,12 @@ def delete_drained(key):
     logging.warning('Instance URL unspecified: %s', key)
     return
 
-  parent = key.parent().get()
+  parent = entity.instance_group_manager.get()
   if not parent:
-    logging.warning('InstanceGroupManager does not exist: %s', key.parent())
+    logging.warning(
+        'InstanceGroupManager does not exist: %s',
+        entity.instance_group_manager,
+    )
     return
 
   grandparent = parent.key.parent().get()
@@ -394,7 +407,7 @@ def count_instances():
   orphaned = 0
   for instance in models.Instance.query():
     total += 1
-    instance_group_manager = instance.key.parent().get()
+    instance_group_manager = instance.instance_group_manager.get()
     if (not instance_group_manager
         or instance.key not in instance_group_manager.instances):
       logging.warning('Found orphaned Instance: %s', instance.key)

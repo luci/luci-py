@@ -20,6 +20,26 @@ import instances
 import models
 
 
+class GetInstanceGroupManagerKey(test_case.TestCase):
+  """Tests for instances.get_instance_group_manager_key."""
+
+  def test_equal(self):
+    expected = instance_group_managers.get_instance_group_manager_key(
+        'base-name',
+        'revision',
+        'zone',
+    )
+
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+
+    self.assertEqual(instances.get_instance_group_manager_key(key), expected)
+
+
 class EnsureEntityExistsTest(test_case.TestCase):
   """Tests for instances.ensure_entity_exists."""
 
@@ -29,7 +49,7 @@ class EnsureEntityExistsTest(test_case.TestCase):
       pass
     self.mock(instances.metrics, 'send_machine_event', send_machine_event)
 
-    key=instances.get_instance_key(
+    key = instances.get_instance_key(
         'base-name',
         'revision',
         'zone',
@@ -37,7 +57,11 @@ class EnsureEntityExistsTest(test_case.TestCase):
     )
     expected_url = 'url'
 
-    future = instances.ensure_entity_exists(key, expected_url)
+    future = instances.ensure_entity_exists(
+        key,
+        expected_url,
+        instances.get_instance_group_manager_key(key),
+    )
     future.wait()
 
     self.assertEqual(key.get().url, expected_url)
@@ -106,25 +130,31 @@ class EnsureEntitiesExistTest(test_case.TestCase):
       return ['url/name']
     self.mock(instances, 'fetch', fetch)
 
-    key = models.Instance(
-        key=instances.get_instance_key(
-            'base-name',
-            'revision',
-            'zone',
-            'name',
-        ),
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'name',
+    )
+    models.Instance(
+        key=key,
+        instance_group_manager=instances.get_instance_group_manager_key(key),
     ).put()
     models.InstanceGroupManager(
-        key=key.parent(),
+        key=instances.get_instance_group_manager_key(key),
         url='url',
     ).put()
     expected_instances = [
         key,
     ]
 
-    instances.ensure_entities_exist(key.parent())
+    instances.ensure_entities_exist(
+        instances.get_instance_group_manager_key(key))
     self.failIf(key.get().url)
-    self.assertItemsEqual(key.parent().get().instances, expected_instances)
+    self.assertItemsEqual(
+        instances.get_instance_group_manager_key(key).get().instances,
+        expected_instances,
+    )
 
   def test_creates(self):
     """Ensures entity gets created."""
@@ -142,7 +172,7 @@ class EnsureEntitiesExistTest(test_case.TestCase):
         'name',
     )
     models.InstanceGroupManager(
-        key=key.parent(),
+        key=instances.get_instance_group_manager_key(key),
         url='url',
     ).put()
     expected_instances = [
@@ -150,8 +180,12 @@ class EnsureEntitiesExistTest(test_case.TestCase):
     ]
     expected_url = 'url/name'
 
-    instances.ensure_entities_exist(key.parent())
-    self.assertItemsEqual(key.parent().get().instances, expected_instances)
+    instances.ensure_entities_exist(
+        instances.get_instance_group_manager_key(key))
+    self.assertItemsEqual(
+        instances.get_instance_group_manager_key(key).get().instances,
+        expected_instances,
+    )
     self.assertEqual(key.get().url, expected_url)
 
 
@@ -175,7 +209,7 @@ class FetchTest(test_case.TestCase):
     ).put()
     models.InstanceTemplateRevision(key=key.parent(), project='project').put()
 
-    urls= instances.fetch(key)
+    urls = instances.fetch(key)
     self.failIf(urls)
 
   def test_parent_doesnt_exist(self):
@@ -188,7 +222,7 @@ class FetchTest(test_case.TestCase):
         ),
     ).put()
 
-    urls= instances.fetch(key)
+    urls = instances.fetch(key)
     self.failIf(urls)
 
   def test_parent_project_unspecified(self):
@@ -202,7 +236,7 @@ class FetchTest(test_case.TestCase):
     ).put()
     models.InstanceTemplateRevision(key=key.parent()).put()
 
-    urls= instances.fetch(key)
+    urls = instances.fetch(key)
     self.failIf(urls)
 
   def test_no_instances(self):
