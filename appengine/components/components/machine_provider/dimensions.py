@@ -21,6 +21,11 @@ class OSFamily(messages.Enum):
   WINDOWS = 3
 
 
+class LinuxFlavor(messages.Enum):
+  """Lists valid flavors of Linux."""
+  UBUNTU = 1
+
+
 class Dimensions(messages.Message):
   """Represents the dimensions of a machine."""
   # The operating system family of this machine.
@@ -37,3 +42,7 @@ class Dimensions(messages.Message):
   memory_gb = messages.FloatField(5)
   # The disk space available to this machine.
   disk_gb = messages.IntegerField(6)
+  # The flavor of Linux of this machine.
+  linux_flavor = messages.EnumField(LinuxFlavor, 7)
+  # The operating system version of this machine.
+  os_version = messages.StringField(8)
