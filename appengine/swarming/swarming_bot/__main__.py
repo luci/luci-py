@@ -35,6 +35,15 @@ sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'pyasn1'))
 sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'pyasn1-modules'))
 sys.path.insert(0, os.path.join(THIS_FILE, 'third_party', 'rsa'))
 
+# The google library can occasionally get imported prior to the path
+# maipulation above. If this happens, reload the module to pick up the version
+# packaged in the bot_code in third_party.
+path_to_zip = os.path.dirname(os.path.realpath(__file__))
+path_to_google = os.path.join(path_to_zip, 'third_party', 'google')
+import google
+if google.__path__[0] != path_to_google:
+  google = reload(google)
+
 from bot_code import common
 
 
