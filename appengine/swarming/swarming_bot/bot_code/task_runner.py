@@ -114,7 +114,7 @@ def get_isolated_args(
   cmd.extend(['--named-cache-root', os.path.join(bot_dir, 'c')])
   if task_details.caches:
     for c in task_details.caches:
-      cmd.extend(['--named-cache', c['name'], c['path']])
+      cmd.extend(['--named-cache', c['name'], c['path'].replace('/', os.sep)])
 
   # Expected output files:
   for output in task_details.outputs:
