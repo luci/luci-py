@@ -55,31 +55,32 @@ ISOLATE_HELLO_WORLD = {
   },
 }
 
+# Update these hashes everytime isolated_format.py is updated:
 RESULT_HEY_ISOLATED_OUT = {
-  u'isolated': u'b12052452e7246af8bcf135afc8f0b1a883df43c',
+  u'isolated': u'5c64883277eb00bceafe3659f182e194cffc5d96',
   u'isolatedserver': u'http://localhost:10050',
   u'namespace': u'default-gzip',
   u'view_url':
     u'http://localhost:10050/browse?namespace=default-gzip'
-    '&hash=b12052452e7246af8bcf135afc8f0b1a883df43c',
+    '&hash=5c64883277eb00bceafe3659f182e194cffc5d96',
 }
 
 RESULT_HEY_OUTPUTS_REF = {
-  u'isolated': u'b12052452e7246af8bcf135afc8f0b1a883df43c',
+  u'isolated': u'5c64883277eb00bceafe3659f182e194cffc5d96',
   u'isolatedserver': u'http://localhost:10050',
   u'namespace': u'default-gzip',
   u'view_url':
     u'http://localhost:10050/browse?namespace=default-gzip'
-    '&hash=b12052452e7246af8bcf135afc8f0b1a883df43c',
+    '&hash=5c64883277eb00bceafe3659f182e194cffc5d96',
 }
 
 RESULT_SECRET_OUTPUT = {
-  u'isolated': u'8622843a69073335b2266110e3392320a86730c9',
+  u'isolated': u'd2eca4d860e4f1728272f6a736fd1c9ac6e98c4f',
   u'isolatedserver': u'http://localhost:10050',
   u'namespace': u'default-gzip',
   u'view_url':
     u'http://localhost:10050/browse?namespace=default-gzip'
-    '&hash=8622843a69073335b2266110e3392320a86730c9',
+    '&hash=d2eca4d860e4f1728272f6a736fd1c9ac6e98c4f',
 }
 
 
@@ -254,7 +255,7 @@ def gen_expected(**kwargs):
   # convert_to_old_format.py in //client/swarming.py.
   keys = set(expected) | {u'performance_stats'}
   assert keys.issuperset(kwargs)
-  expected.update(kwargs)
+  expected.update({unicode(k): v for k, v in kwargs.iteritems()})
   return expected
 
 
@@ -524,7 +525,7 @@ class Test(unittest.TestCase):
           u'items_hot': [],
         },
       },
-      properties_hash = u'8c65206d3c6c818cc23b18d4c435eaedaa5f57bc',
+      properties_hash = u'b15c5abfd375eb32daa5d364a6fe2b0fbabdf06e',
     )
     task_id = self._run_isolated(
         hello_world, 'idempotent_reuse', ['--idempotent'], expected_summary, {})
@@ -602,33 +603,34 @@ class Test(unittest.TestCase):
       file_path.rmtree(tmpdir)
 
   def assertResults(self, expected, result):
-    self.assertEqual(['shards'], result.keys())
-    self.assertEqual(1, len(result['shards']))
-    self.assertTrue(result['shards'][0])
-    result = result['shards'][0].copy()
-    self.assertFalse(result.get('abandoned_ts'))
+    self.assertEqual([u'shards'], result.keys())
+    self.assertEqual(1, len(result[u'shards']))
+    self.assertTrue(result[u'shards'][0])
+    result = result[u'shards'][0].copy()
+    self.assertFalse(result.get(u'abandoned_ts'))
     # These are not deterministic (or I'm too lazy to calculate the value).
-    if expected.get('performance_stats'):
+    if expected.get(u'performance_stats'):
       self.assertLess(
-          0, result['performance_stats'].pop('bot_overhead'))
+          0, result[u'performance_stats'].pop(u'bot_overhead'))
       self.assertLess(
-          0, result['performance_stats']['isolated_download'].pop('duration'))
+          0,
+          result[u'performance_stats'][u'isolated_download'].pop(u'duration'))
       self.assertLess(
-          0, result['performance_stats']['isolated_upload'].pop('duration'))
-      for k in ('isolated_download', 'isolated_upload'):
-        for j in ('items_cold', 'items_hot'):
-          result['performance_stats'][k][j] = large.unpack(
-              base64.b64decode(result['performance_stats'][k].get(j, '')))
+          0, result[u'performance_stats'][u'isolated_upload'].pop(u'duration'))
+      for k in (u'isolated_download', u'isolated_upload'):
+        for j in (u'items_cold', u'items_hot'):
+          result[u'performance_stats'][k][j] = large.unpack(
+              base64.b64decode(result[u'performance_stats'][k].get(j, '')))
     else:
-      perf_stats = result.pop('performance_stats', None)
+      perf_stats = result.pop(u'performance_stats', None)
       if perf_stats:
         # Ignore bot_overhead, everything else should be empty.
-        perf_stats.pop('bot_overhead', None)
-        self.assertFalse(perf_stats.pop('isolated_download', None))
-        self.assertFalse(perf_stats.pop('isolated_upload', None))
+        perf_stats.pop(u'bot_overhead', None)
+        self.assertFalse(perf_stats.pop(u'isolated_download', None))
+        self.assertFalse(perf_stats.pop(u'isolated_upload', None))
         self.assertFalse(perf_stats)
 
-    bot_version = result.pop('bot_version')
+    bot_version = result.pop(u'bot_version')
     self.assertTrue(bot_version)
     if result[u'costs_usd'] is not None:
       expected.pop(u'costs_usd', None)
@@ -636,16 +638,16 @@ class Test(unittest.TestCase):
     if result[u'cost_saved_usd'] is not None:
       expected.pop(u'cost_saved_usd', None)
       self.assertLess(0, result.pop(u'cost_saved_usd'))
-    self.assertTrue(result.pop('created_ts'))
-    self.assertTrue(result.pop('completed_ts'))
-    self.assertLess(0, result.pop('durations'))
-    self.assertTrue(result.pop('id'))
-    self.assertTrue(result.pop('modified_ts'))
-    self.assertTrue(result.pop('started_ts'))
+    self.assertTrue(result.pop(u'created_ts'))
+    self.assertTrue(result.pop(u'completed_ts'))
+    self.assertLess(0, result.pop(u'durations'))
+    self.assertTrue(result.pop(u'id'))
+    self.assertTrue(result.pop(u'modified_ts'))
+    self.assertTrue(result.pop(u'started_ts'))
 
-    if getattr(expected.get('outputs'), 'match', None):
-      expected_outputs = expected.pop('outputs')
-      outputs = '\n'.join(result.pop('outputs'))
+    if getattr(expected.get(u'outputs'), 'match', None):
+      expected_outputs = expected.pop(u'outputs')
+      outputs = '\n'.join(result.pop(u'outputs'))
       self.assertTrue(
           expected_outputs.match(outputs),
           '%s does not match %s' % (outputs, expected_outputs.pattern))
