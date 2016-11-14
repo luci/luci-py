@@ -133,10 +133,12 @@ The root is a dictionary with the following keys:
 
 ##### File types
 
-There are two file types;
+There are the following file types;
   - `basic`: All normal files, the default type.
   - `ar`: An [ar](https://en.wikipedia.org/wiki/Ar_(Unix)) archive containing a
     large number of small files.
+  - `tar`: An [tar](https://en.wikipedia.org/wiki/Tar_(Unix)) archive
+    containing a large number of small files.
 
 
 #### Arbitrary split vs recursive trees
