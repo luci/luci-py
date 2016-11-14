@@ -75,7 +75,27 @@
           return "pending_task";
         }
         return "";
-      }
+      },
+
+      state: function(result) {
+        if (!result) {
+          return "";
+        }
+        if (result.state === this.COMPLETED) {
+          if (result.failure) {
+            return this.COMPLETED_FAILURE;
+          }
+          if (result.try_number === "0") {
+            return this.COMPLETED_DEDUPED;
+          }
+          return this.COMPLETED_SUCCESS;
+        }
+        return result.state;
+      },
+
+      _stateClass: function(result) {
+        return this.stateClass(this.state(result));
+      },
     };
   })();
 </script>

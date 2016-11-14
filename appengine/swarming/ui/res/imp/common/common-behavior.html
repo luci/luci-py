@@ -102,6 +102,54 @@
         }.bind(this));
       },
 
+      // _getJsonAsyncArr is the array analog to _getJsonAsync.  For example,
+      // if there is an array that will contain multiple results rendered with
+      // a dom-repeat, _getJsonAsyncArr will make an XHR GET request and put
+      // the results into the given array at the index specified by idx.
+      //
+      // Prior to making this call, it is assumed that arr is initialized to be
+      // an array of empty (or filler) objects. busyArr be initialized in the
+      // same way.  Due to how Polymer deals with arrays, arrays of primitives
+      // are not supported, thus clients observing busyArr should iterate over
+      // all objects in busyArr and test to see if busyArr[i].status is true.
+      //
+      // To avoid multiple requests clobering one another, an object _jsonAsync
+      // is created on "this" to debounce requests - the most recent request
+      // will win out.
+      _getJsonAsyncArr: function(idx, arr, url, busyArr, headers, params) {
+        if (!arr || !url || !busyArr) {
+          console.log("Need at least a polymer array to bind to, a busy element, and a url");
+          return;
+        }
+        var key = arr + ":" + idx;
+        this.splice(busyArr, idx, 1, {status:true});
+        var now = new Date();
+        this._jsonAsync = this._jsonAsync || {};
+        this._jsonAsync[key] = now;
+        if (params) {
+          url = url + "?" + sk.query.fromParamSet(params);
+        }
+        return sk.request("GET", url, "", headers).then(JSON.parse).then(function(json){
+          if (this._jsonAsync[key] !== now) {
+            console.log("ignoring result because a second request happened for ", key);
+            this.splice(busyArr, idx, 1, {status:false});
+            return;
+          }
+          this.splice(arr, idx, 1, json);
+          this.splice(busyArr, idx, 1, {status:false});
+        }.bind(this)).catch(function(reason){
+          console.log("Reason for failure of request to " + url, reason);
+
+          if (this._jsonAsync[key] !== now) {
+            console.log("ignoring failure because a second request happened.");
+            this.splice(busyArr, idx, 1, {status:false});
+            return;
+          }
+          this.splice(busyArr, idx, 1, {status:false});
+          return Promise.reject(reason);
+        }.bind(this));
+      },
+
       _humanDuration: function(timeInSecs) {
         return sk.human.strDuration(timeInSecs) || "0s";
       },

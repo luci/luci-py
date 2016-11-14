@@ -502,7 +502,19 @@
       first_seen: function(dir, botA, botB) {
         var botACol = botA.first_seen_ts;
         var botBCol = botB.first_seen_ts;
-        return dir * swarming.naturalCompare(botACol, botBCol)
+        return dir * swarming.naturalCompare(botACol, botBCol);
+      },
+      gpu: function(dir, botA, botB) {
+        // We want all the "none" GPU bots to come last in the list.
+        var botACol = this._column("gpu", botA);
+        if (botACol === "none") {
+          botACol = "ZZZ";
+        }
+        var botBCol = this._column("gpu", botB);
+        if (botBCol === "none") {
+          botBCol = "ZZZ";
+        }
+        return dir * swarming.naturalCompare(botACol, botBCol);
       },
       last_seen: function(dir, botA, botB) {
         var botACol = botA.last_seen_ts;
