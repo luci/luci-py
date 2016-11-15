@@ -174,25 +174,6 @@ def ensure_entity_exists(key, url, instance_group_manager):
   metrics.send_machine_event('CREATED', gce.extract_instance_name(url))
 
 
-@ndb.transactional
-def set_instances(key, keys):
-  """Associates the given Instances with the given InstanceGroupManager.
-
-  Args:
-    key: ndb.Key for a models.InstanceGroupManager entity.
-    keys: List of ndb.Keys for models.Instance entities.
-  """
-  entity = key.get()
-  if not entity:
-    logging.warning('InstanceGroupManager does not exist: %s', key)
-    return
-
-  instances = sorted(keys)
-  if sorted(entity.instances) != instances:
-    entity.instances = instances
-    entity.put()
-
-
 def ensure_entities_exist(key, max_concurrent=50):
   """Ensures Instance entities exist for the given instance group manager.
 
@@ -202,6 +183,7 @@ def ensure_entities_exist(key, max_concurrent=50):
   """
   urls = fetch(key)
   if not urls:
+    instance_group_managers.set_instances(key, [])
     return
 
   base_name = key.parent().parent().id()
@@ -220,7 +202,7 @@ def ensure_entities_exist(key, max_concurrent=50):
       max_concurrent=max_concurrent,
   )
 
-  set_instances(key, keys.values())
+  instance_group_managers.set_instances(key, keys.values())
 
 
 def schedule_fetch():

@@ -70,6 +70,25 @@ def get_base_name(instance_group_manager):
 
 
 @ndb.transactional
+def set_instances(key, keys):
+  """Associates the given Instances with the given InstanceGroupManager.
+
+  Args:
+    key: ndb.Key for a models.InstanceGroupManager entity.
+    keys: List of ndb.Keys for models.Instance entities.
+  """
+  entity = key.get()
+  if not entity:
+    logging.warning('InstanceGroupManager does not exist: %s', key)
+    return
+
+  instances = sorted(keys)
+  if sorted(entity.instances) != instances:
+    entity.instances = instances
+    entity.put()
+
+
+@ndb.transactional
 def update_url(key, url):
   """Updates the given InstanceGroupManager with the instance group manager URL.
 

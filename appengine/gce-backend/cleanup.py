@@ -60,9 +60,10 @@ def set_instance_deleted(key, drained):
     logging.warning('Instance not drained or ending deletion: %s', key)
     return
 
-  logging.info('Setting Instance as deleted: %s', key)
-  entity.deleted = True
-  entity.put()
+  if not entity.deleted:
+    logging.info('Setting Instance as deleted: %s', key)
+    entity.deleted = True
+    entity.put()
 
 
 @ndb.transactional_tasklet
@@ -314,7 +315,7 @@ def cleanup_drained_instance(key):
 
   if not exists(entity.url):
     # When the instance isn't found, assume it's deleted.
-    set_instance_deleted(True)
+    set_instance_deleted(key, True)
 
 
 def schedule_drained_instance_cleanup():
