@@ -159,8 +159,10 @@
           });
         });
 
-        delete map["user"][""];
-        map["user"]["none"] = true;
+        if (map["user"]) {
+          delete map["user"][""];
+          map["user"]["none"] = true;
+        }
 
         // Turn the Map<Object,Map<Boolean>> into a Map<Object,Array<String>>
         // with all of the aliases applied.

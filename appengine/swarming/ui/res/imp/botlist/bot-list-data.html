@@ -257,7 +257,7 @@
         // pMap will have a list of columns to available values (primary key
         // to secondary values). This includes bot dimensions, but also
         // includes state like disk_space, quarantined, busy, etc.
-        dimensions = dimensions.bots_dimensions;
+        dimensions = dimensions.bots_dimensions || [];
 
         var pMap = {};
         dimensions.forEach(function(d){
@@ -274,9 +274,9 @@
         });
 
         // Add some options that might not show up.
-        pMap["android_devices"].push("0");
-        pMap["device_os"].push("none");
-        pMap["device_type"].push("none");
+        pMap["android_devices"] && pMap["android_devices"].push("0");
+        pMap["device_os"] && pMap["device_os"].push("none");
+        pMap["device_type"] && pMap["device_type"].push("none");
 
         pMap["id"] = [];
 
