@@ -375,6 +375,17 @@
             arr.indexOf(this._primarySelected) === -1) {
           this.set("_primarySelected", arr[0]);
         }
+        arr.sort(function(a, b){
+          var selA = this._columnState(a);
+          var selB = this._columnState(b);
+          if (selA && !selB) {
+            return -1;
+          }
+          if (selB && !selA) {
+            return 1;
+          }
+          return swarming.naturalCompare(a, b);
+        }.bind(this));
         return arr;
       },
 
