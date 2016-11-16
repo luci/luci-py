@@ -5,7 +5,10 @@
 # This is a reimplementation of RemoteClientNative but it uses (will use)
 # a gRPC method to communicate with a server instead of REST.
 
+import json
+
 import grpc
+import google.protobuf.json_format
 from proto import swarming_bot_pb2
 
 
@@ -14,6 +17,7 @@ class RemoteClientGrpc(object):
   """
 
   def __init__(self, server):
+    print "Communicating with host %s via gRPC" % server
     self._channel = grpc.insecure_channel(server)
     self._stub = swarming_bot_pb2.BotServiceStub(self._channel)
 
@@ -49,11 +53,27 @@ class RemoteClientGrpc(object):
     return True
 
   def do_handshake(self, attributes):
-    del attributes # Not used yet
-    print "Handshaking"
+    request = swarming_bot_pb2.HandshakeRequest()
+    request.attributes.version = attributes['version']
+    dims = attributes['dimensions']
+    for k in dims:
+      pair = request.attributes.dimensions.add()
+      pair.name = k
+      for v in dims[k]:
+        pair.values.append(v)
+    create_state_proto(attributes['state'], request.attributes.state)
+    response = self._stub.Handshake(request)
     resp = {
-        'bot_version': 'test',
+        'server_version': response.server_version,
+        'bot_version': response.bot_version,
+        'bot_group_cfg_version': response.bot_group_cfg_version,
+        'bot_group_cfg': {
+            'dimensions': {
+                d.name: d.values for d in response.bot_group_cfg.dimensions
+            },
+        },
     }
+    print "Completed handshake: %s" % resp
     return resp
 
   def poll(self, attributes):
@@ -87,3 +107,35 @@ class RemoteClientGrpc(object):
 
   def ping(self):
     pass
+
+
+def create_state_proto(state_dict, message):
+  """ Constructs a State message out of a state dict.
+
+  Inspired by https://github.com/davyzhang/dict-to-protobuf, but all sub-dicts
+  need to be encoded as google.protobuf.Structs because only Structs can handle
+  free-form key-value pairs (and the mount points, for example, are not known
+  at compile time).
+
+  Why not use Struct for the *entire* message? It's because json_format.Parse
+  expects the json to have a very specific format (all lists must be wrapped in
+  a field called "values") that is too hard to enforce here. So we only use
+  Structs where they're needed, and rely on the format of the State proto being
+  correct for everything else.
+  """
+  for k, v in state_dict.iteritems():
+    if isinstance(v, dict):
+      sub_msg = getattr(message, k)
+      json_val = json.dumps(v)
+      google.protobuf.json_format.Parse(json_val, sub_msg)
+    elif isinstance(v, list):
+      l = getattr(message, k)
+      l.extend(v)
+    elif v != None:
+      # setattr doesn't like setting "None" state_dict. Other falsy values are
+      # ok. Also, setting something to its default value apparently has no
+      # effect, so be ready to deal with it on the receiving side.
+      #
+      # Warning: setattr will throw if attr doesn't exist.
+      # TODO(aludwin): catch in sane way
+      setattr(message, k, v)

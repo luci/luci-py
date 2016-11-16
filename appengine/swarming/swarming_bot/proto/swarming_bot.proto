@@ -12,9 +12,67 @@
 syntax = "proto3";
 
 package luci.swarming;
+import "google/protobuf/struct.proto";
 
 service BotService {
+  rpc Handshake(HandshakeRequest) returns (HandshakeResponse);
+  rpc Update(UpdateRequest) returns (UpdateResponse);
   rpc Poll(PollRequest) returns (PollResponse);
+}
+
+message Dimension {
+  string name = 1;
+  repeated string values = 2;
+}
+
+message State {
+  repeated string audio = 1;
+  string bot_group_cfg_version = 2;
+  double cost_usd_hour = 3;
+  string cpu = 4;
+  string cwd = 5;
+  google.protobuf.Struct disks = 6;
+  repeated string gpu = 7;
+  string hostname = 8;
+  string ip = 9;
+  string locale = 10;
+  int32 nb_files_in_temp = 11;
+  int32 pid = 12;
+  int32 ram = 13;
+  int32 running_time = 14;
+  int32 sleep_streak = 15;
+  int32 started_ts = 16;
+  google.protobuf.Struct temp = 17;
+  int32 uptime = 18;
+  string user = 19;
+}
+
+message Attributes {
+  repeated Dimension dimensions = 1;
+  State state = 2;
+  string version = 3;
+}
+
+message HandshakeRequest {
+  Attributes attributes = 1;
+}
+
+message HandshakeResponse {
+  string server_version = 1;
+  string bot_version = 2;
+  string bot_group_cfg_version = 3;
+  message BotGroupCfg {
+    repeated Dimension dimensions = 1;
+  }
+  BotGroupCfg bot_group_cfg = 4;
+}
+
+message UpdateRequest {
+  string bot_version = 1;
+}
+
+message UpdateResponse {
+  bytes bot_code = 1;
 }
 
 message PollRequest {
@@ -23,9 +81,17 @@ message PollRequest {
 }
 
 message PollResponse {
+  enum ResponseType {
+    UPDATE = 0;
+    SLEEP = 1;
+    TERMINATE = 2;
+    RUN = 3;
+    RESTART = 4;
+  }
+
+  ResponseType cmd = 1;
   oneof action {
-    double sleep_time = 1;
-    bytes new_bot = 2;  // max size is 4MB; current size is 900kb
+    double sleep_time = 2;
     string manifest = 3; // temp; should be a manifest object
     int32 terminate_taskid = 4;
     string restart_message = 5;
