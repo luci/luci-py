@@ -499,7 +499,7 @@
               <iframe id="miloFrame" class="milo tabbed" src$="[[_getDisplayServerLink(_server_details.display_server_url_template,task_id)]]"></iframe>
             </template>
             <template is="dom-if" if="[[_show_raw]]">
-              <div class="code stdout tabbed">[[_stdout]]</div>
+              <div class="code stdout tabbed">[[_rawOutput(_stdout,_result)]]</div>
             </template>
           </div>
         </div>
@@ -637,6 +637,10 @@
         return result.try_number > 1;
       },
 
+      _empty: function(array) {
+        return !array || array.length == 0;
+      },
+
       _expires: function(request) {
         var delta = parseInt(request.expiration_secs);
         if (delta) {
@@ -723,6 +727,16 @@
         this.$.prompt.open();
       },
 
+      _rawOutput: function(stdout, result) {
+        if (stdout) {
+          return stdout;
+        }
+        if (result.state === "PENDING" || result.state === "RUNNING") {
+          return "[No output yet]";
+        }
+        return "[No output received]";
+      },
+
       _refresh: function() {
         this.$.data.reload();
       },
@@ -778,15 +792,9 @@
         return dims.length + 1;
       },
 
-      _empty: function(array) {
-        return !array || array.length == 0;
-      },
-
       _supportsMilo: function(request, showRaw) {
         return !showRaw && request && this._tag(request, "allow_milo");
       },
-
-
 
       _toggleDetails: function() {
         this.set("_request_detail", !this._request_detail);
