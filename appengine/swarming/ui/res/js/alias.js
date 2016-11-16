@@ -14,6 +14,7 @@ this.swarming.alias = this.swarming.alias || (function(){
     "flounder": "Nexus 9",
     "foster": "NVIDIA Shield",
     "fugu": "Nexus Player",
+    "gce_x86": "Android on GCE",
     "grouper": "Nexus 7 (2012)",
     "hammerhead": "Nexus 5",
     "heroqlteatt": "Galaxy S7",

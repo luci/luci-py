@@ -148,6 +148,7 @@
 
 <script>
   (function(){
+    var FILTER_SEP = ":";
     // Given a space separated list of queries, matchPartCaseInsensitive
     // returns an object of any query that matches a part of str, case
     // insensitive.  The object has an idx (index) and the part that matched.
@@ -180,6 +181,27 @@
       };
     };
 
+    var matchFilter = function(toMatch, filterStr, isColumn) {
+      if (!filterStr) {
+        return true;
+      }
+      if (!toMatch) {
+        return false;
+      }
+
+      toMatch = toMatch.toLocaleLowerCase();
+      filterStr = filterStr.trim().toLocaleLowerCase();
+      if (filterStr.indexOf(" ") !== -1 || filterStr.indexOf(":") === -1) {
+        return false;
+      }
+      var col = filterStr.split(FILTER_SEP, 1)[0];
+      var rest = filterStr.substring(col.length + FILTER_SEP.length);
+      if (isColumn) {
+        return toMatch === col;
+      }
+      return toMatch.startsWith(rest);
+    }
+
     // Extend the Aliases behavior
     SwarmingBehaviors.QueryColumnFilter = [SwarmingBehaviors.CommonBehavior, {
 
@@ -204,7 +226,7 @@
         // private
         FILTER_SEP: {
           type:String,
-          value: ":",
+          value: FILTER_SEP,
         },
         _filters: {
           type:Array,
@@ -357,6 +379,9 @@
         // partially match the query or that have secondary values which
         // partially match.
         var arr = this.primary_arr.filter(function(s){
+          if (matchFilter(s, query, true)) {
+            return true;
+          }
           if (matchPartCaseInsensitive(s, query).idx !== -1) {
             return true;
           }
@@ -404,6 +429,17 @@
           return [];
         }
         var arr = primary_map[primarySelected] || [];
+        if (matchFilter(primarySelected, query, true)) {
+          return arr.sort(function(a, b){
+            var aMatch = matchFilter(a, query, false);
+            var bMatch = matchFilter(b, query, false);
+            if (aMatch === bMatch) {
+              return swarming.naturalCompare(a,b);
+            }
+            // true == 1 and false == 0.  So, put the one that matches first.
+            return bMatch - aMatch;
+          });
+        }
         if (matchPartCaseInsensitive(primarySelected, query).idx !== -1) {
           // Sort the secondaries alphabetically, but prioritize query matches.
           return arr.sort(function(a, b){
@@ -426,7 +462,7 @@
       // instance of the filter query, making it easier to see why elements
       // show up.
       _beforeBold: function(item, query) {
-        var match = matchPartCaseInsensitive(item, query);
+        var match = matchPartCaseInsensitive(item, query.replace(":", " "));
         if (match.idx === -1) {
           return item;
         }
@@ -434,7 +470,7 @@
       },
 
       _bold: function(item, query) {
-        var match = matchPartCaseInsensitive(item, query);
+        var match = matchPartCaseInsensitive(item, query.replace(":", " "));
         if (match.idx === -1) {
           return "";
         }
@@ -442,7 +478,7 @@
       },
 
       _afterBold: function(item, query) {
-        var match = matchPartCaseInsensitive(item, query);
+        var match = matchPartCaseInsensitive(item, query.replace(":", " "));
         if (match.idx === -1) {
           return "";
         }
