@@ -254,6 +254,8 @@
     // columnMap, and specialSort
     var specialColumns = ["id", "task", "cloud_console_link", "mp_lease_id"];
 
+    var deviceColumns = ["battery_health", "battery_level", "battery_status", "battery_temperature", "battery_voltage", "device_temperature"];
+
     var headerMap = {
       // "id" and "task" are special, so they don't go here. They have their
       // headers hard-coded above.
@@ -315,6 +317,9 @@
       },
       device_temperature: function(){
         return "";
+      },
+      device_os: function(bot) {
+        return this._attribute(bot, "device_os", "none").join(" | ");
       },
       disk_space: function(bot) {
         var aliased = [];
@@ -588,7 +593,10 @@
         },
       },
 
-      observers:["_reload(_query_params,_auth_headers)"],
+      observers:[
+        "_reload(_query_params,_auth_headers)",
+        "_checkDeviceColumns(_columns.*)"
+      ],
 
       _androidAliasDevice: function(device) {
         if (device.notReady) {
@@ -621,6 +629,23 @@
           return "Not on GCE";
         }
         return "View Bot";
+      },
+
+      _checkDeviceColumns: function() {
+        var shouldAdd = false;
+        for (var i = 0; i< this._columns.length; i++) {
+          var col = this._columns[i];
+          if (col === "android_devices") {
+            return;
+          }
+          if (deviceColumns.indexOf(col) !== -1) {
+            shouldAdd = true;
+          }
+        }
+        if (shouldAdd) {
+          this.push("_columns", "android_devices");
+          sk.errorMessage("Some of the columns selected require 'android_devices' to be displayed.  It has been automatically added.", 4000);
+        }
       },
 
       _deviceColumn: function(col, device) {
