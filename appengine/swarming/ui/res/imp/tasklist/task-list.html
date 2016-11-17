@@ -83,6 +83,8 @@
           <task-filters
             primary_map="[[_primary_map]]"
             primary_arr="[[_primary_arr]]"
+            special_columns="[[_specialColumns]]"
+
             columns="{{_columns}}"
             query_params="{{_query_params}}"
             filter="{{_filter}}">
@@ -289,6 +291,12 @@
       },
     };
     var headerMap = {
+      "abandoned_ts": "Abandoned On",
+      "completed_ts": "Completed On",
+      "created_ts": "Created On",
+      "duration": "Duration",
+      "modified_ts": "Last Modified",
+      "started_ts": "Started Working On",
       "user": "Requesting User",
     };
 

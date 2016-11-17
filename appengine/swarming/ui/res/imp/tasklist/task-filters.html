@@ -39,13 +39,12 @@
 <dom-module id="task-filters">
   <template>
     <style is="custom-style" include="iron-flex iron-flex-alignment iron-positioning query-column-filter-style">
-    .item.wide {
-      max-width: 400px;
-    }
-    .selector.wide {
-      min-width: 275px;
-    }
-
+      .item.wide {
+        max-width: 400px;
+      }
+      .selector.wide {
+        min-width: 275px;
+      }
     </style>
 
     <url-param name="f"
@@ -120,6 +119,12 @@
                   on-tap="_addFilter">
               </iron-icon>
             </div>
+          </template>
+          <template is="dom-if" if="[[_secondaryItems.length]]">
+            <div class="pointable item" title="There may be more valid options than just the ones shown.">...</div>
+          </template>
+          <template is="dom-if" if="[[_showTagMessage(_primarySelected,_secondaryItems.length)]]">
+            <div class="item">Only tags can be used for filtering. <i>"[[_primarySelected]]"</i> is informational only.</div>
           </template>
         </div>
 
@@ -250,7 +255,12 @@
           }
         }
         return params;
+      },
+
+      _showTagMessage: function(primarySelected, selectedItems) {
+        return primarySelected && primarySelected !== "name" && !selectedItems;
       }
+
     });
   })();
   </script>

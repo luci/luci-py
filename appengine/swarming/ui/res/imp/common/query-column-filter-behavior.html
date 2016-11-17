@@ -43,6 +43,9 @@
         on. Primary consists of dimensions and state.  Secondary contains the
         values primary things can be.
     primary_arr: Array<String>, the display order of the primary keys.
+    special_columns: Array<String>, the sorted order for the special columns.
+        This is used to "float" the selected columns to the top of the list in
+        the order that corresponds to how they are displayed on screen.
 
     // output
     filter: Object, an object {filter:Function} where filter will take one param
@@ -99,7 +102,7 @@
         overflow-y: auto;
       }
 
-      .selectable {
+      .selectable, .pointable {
         cursor: pointer;
       }
 
@@ -207,15 +210,22 @@
 
       properties: {
         // input
+        dimensions: {
+          type: Array,
+        },
         primary_map: {
           type: Object,
         },
         primary_arr: {
           type: Array,
         },
-        dimensions: {
+        special_columns: {
           type: Array,
+          value: function() {
+            return [];
+          }
         },
+
         // output
         filter: {
           type: Function,
@@ -401,6 +411,7 @@
           this.set("_primarySelected", arr[0]);
         }
         arr.sort(function(a, b){
+          // Show selected columns above non selected columns
           var selA = this._columnState(a);
           var selB = this._columnState(b);
           if (selA && !selB) {
@@ -408,6 +419,21 @@
           }
           if (selB && !selA) {
             return 1;
+          }
+          if (selA && selB) {
+            // Put the selected special columns first in the order they are displayed.
+            selA = this.special_columns.indexOf(a);
+            selB = this.special_columns.indexOf(b);
+            if (selA !== -1 && selB === -1) {
+              return -1;
+            }
+            if (selA === -1 && selB !== -1) {
+              return 1;
+            }
+            if (selA !== -1 && selB !== -1) {
+              return selA - selB;
+            }
+            // neither column was special, fallback to alphabetical sorting.
           }
           return swarming.naturalCompare(a, b);
         }.bind(this));

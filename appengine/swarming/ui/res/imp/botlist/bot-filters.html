@@ -145,6 +145,13 @@
               </iron-icon>
             </div>
           </template>
+          <template is="dom-if" if="[[_showDimensionMessage(_primarySelected,_secondaryItems.length)]]">
+            <div class="item">
+              Only dimensions can be used for filtering.
+              <i>"[[_primarySelected]]"</i> is a part of the bot's state and is
+              informational only.
+            </div>
+          </template>
         </div>
 
         <div class="selector side-by-side"
@@ -294,6 +301,10 @@ the fleet.">
           }
         }
         return params;
+      },
+
+      _showDimensionMessage: function(primarySelected, selectedItems) {
+        return primarySelected && primarySelected !== "id" && !selectedItems;
       }
 
     });

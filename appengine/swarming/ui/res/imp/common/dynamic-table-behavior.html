@@ -154,7 +154,15 @@
         }
         // Default to a natural compare of the columns.
         var aCol = this._column(this._sort.name, a);
+        if (aCol === "none"){
+          // put "none" at the bottom of the sort order
+          aCol = "ZZZ";
+        }
         var bCol = this._column(this._sort.name, b);
+        if (bCol === "none"){
+          // put "none" at the bottom of the sort order
+          bCol = "ZZZ";
+        }
 
         return dir * swarming.naturalCompare(aCol, bCol);
       },

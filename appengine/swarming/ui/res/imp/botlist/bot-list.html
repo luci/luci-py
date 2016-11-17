@@ -51,6 +51,9 @@
       .dead {
         background-color: #cccccc;
       }
+      .alt {
+        background-color: #f8f8f8;
+      }
       .bot-list th > span {
         /* Leave space for sort-toggle*/
         padding-right: 30px;
@@ -81,6 +84,7 @@
             dimensions="[[_dimensions]]"
             primary_map="[[_primary_map]]"
             primary_arr="[[_primary_arr]]"
+            special_columns="[[_specialColumns]]"
 
             columns="{{_columns}}"
             query_params="{{_query_params}}"
@@ -217,8 +221,10 @@
                   as="device">
                 <tr
                     hidden$="[[_hide('android_devices', _columns.*)]]"
-                    class$="[[_deviceClass(device)]]">
+                    class$="[[_deviceClass(device,index)]]">
                   <td></td>
+                  <td hidden$="[[_hide('cloud_console_link', _columns.*)]]"></td>
+                  <td hidden$="[[_hide('mp_lease_id', _columns.*)]]"></td>
                   <td hidden$="[[_hide('task', _columns.*)]]"></td>
                   <template
                       is="dom-repeat"
@@ -250,12 +256,12 @@
     var UNKNOWN = "unknown";
     // see dynamic-table for more information on specialColumns, headerMap,
     // columnMap, and specialSort
-    var specialColumns = ["id", "task", "cloud_console_link", "mp_lease_id"];
+    var specialColumns = ["id", "cloud_console_link", "mp_lease_id", "task"];
 
     var deviceColumns = ["battery_health", "battery_level", "battery_status", "battery_temperature", "battery_voltage", "device_temperature"];
 
     var headerMap = {
-      // "id" and "task" are special, so they don't go here. They have their
+      // "id", "task" and other special columns don't go here. They have their
       // headers hard-coded above.
       "android_devices": "Android Devices",
       "battery_health": "Battery Health",
@@ -271,8 +277,10 @@
       "device_temperature": "Device Temp (°C)",
       "device_type": "Device Type",
       "disk_space": "Free Space (MB)",
+      "external_ip": "External IP",
       "first_seen": "First Seen",
       "gpu": "GPU",
+      "internal_ip": "Internal or Local IP",
       "last_seen": "Last Seen",
       "mp_lease_expires": "Machine Provider Lease Expires",
       "os": "OS",
@@ -338,6 +346,9 @@
       },
       id: function(bot) {
         return bot.bot_id;
+      },
+      internal_ip: function(bot) {
+        return this._attribute(bot, "ip", "none")[0];
       },
       last_seen: function(bot) {
         if (this._verbose) {
@@ -507,18 +518,6 @@
         var botBCol = botB.first_seen_ts;
         return dir * swarming.naturalCompare(botACol, botBCol);
       },
-      gpu: function(dir, botA, botB) {
-        // We want all the "none" GPU bots to come last in the list.
-        var botACol = this._column("gpu", botA);
-        if (botACol === "none") {
-          botACol = "ZZZ";
-        }
-        var botBCol = this._column("gpu", botB);
-        if (botBCol === "none") {
-          botBCol = "ZZZ";
-        }
-        return dir * swarming.naturalCompare(botACol, botBCol);
-      },
       last_seen: function(dir, botA, botB) {
         var botACol = botA.last_seen_ts;
         var botBCol = botB.last_seen_ts;
@@ -654,9 +653,12 @@
         return f.bind(this)(device);
       },
 
-      _deviceClass: function(device) {
+      _deviceClass: function(device, idx) {
         if (!device.okay) {
           return "bad-device";
+        }
+        if (idx % 2 === 0){
+          return "alt";
         }
         return "";
       },
