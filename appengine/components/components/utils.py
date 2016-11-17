@@ -506,7 +506,8 @@ def set_task_queue_module(module):
   clear_cache(get_task_queue_host)
 
 
-def enqueue_task(
+@ndb.tasklet
+def enqueue_task_async(
     url,
     queue_name,
     params=None,
@@ -532,23 +533,22 @@ def enqueue_task(
     headers = None
     if use_dedicated_module:
       headers = {'Host': get_task_queue_host()}
-    # Note that just using 'target=module' here would redirect task request to
-    # a default version of a module, not the currently executing one.
-    taskqueue.add(
-        url=url,
-        queue_name=queue_name,
-        params=params,
-        payload=payload,
-        name=name,
-        countdown=countdown,
-        headers=headers,
-        transactional=transactional)
-    return True
+      # Note that just using 'target=module' here would redirect task request to
+      # a default version of a module, not the curently executing one.
+      task = taskqueue.Task(
+          url=url,
+          params=params,
+          payload=payload,
+          name=name,
+          countdown=countdown,
+          headers=headers)
+      yield task.add_async(queue_name=queue_name, transactional=transactional)
+      raise ndb.Return(True)
   except (taskqueue.TombstonedTaskError, taskqueue.TaskAlreadyExistsError):
     logging.info(
         'Task %r deduplicated (already exists in queue %r)',
         name, queue_name)
-    return True
+    raise ndb.Return(True)
   except (
       taskqueue.Error,
       runtime.DeadlineExceededError,
@@ -558,7 +558,16 @@ def enqueue_task(
     logging.warning(
         'Problem adding task %r to task queue %r (%s): %s',
         url, queue_name, e.__class__.__name__, e)
-    return False
+    raise ndb.Return(False)
+
+
+def enqueue_task(*args, **kwargs):
+  """Adds a task to a task queue.
+
+  Returns:
+    True if the task was enqueued, False otherwise.
+  """
+  return enqueue_task_async(*args, **kwargs).get_result()
 
 
 ## JSON
