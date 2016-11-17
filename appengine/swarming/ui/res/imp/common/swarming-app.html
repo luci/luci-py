@@ -51,6 +51,7 @@
 
 <link rel="import" href="auth-signin.html">
 <link rel="import" href="common-behavior.html">
+<link rel="import" href="error-toast.html">
 
 <dom-module id="swarming-app">
   <template>
@@ -65,6 +66,11 @@
 
       app-toolbar {
         background-color: #1F78B4;
+        color: #fff;
+      }
+
+      app-toolbar.error {
+        background-color: #b41f1f;
         color: #fff;
       }
 
@@ -129,7 +135,7 @@
           <div class="menu-item"><a class="left" href="/oldui">Old UI</a></div>
       </app-drawer>
       <app-header fixed>
-        <app-toolbar>
+        <app-toolbar class$="[[_toolbarClass(client_id)]]">
           <paper-icon-button
               class="menu-button"
               icon="icons:menu"
@@ -143,28 +149,33 @@
           <a class="left" href="/botlist" hidden$="[[!wide_layout]]">Bot List</a>
           <a class="left" href="/tasklist" hidden$="[[!wide_layout]]">Task List</a>
           <div class="flex" hidden$="[[!wide_layout]]"></div>
-          <a class="small right" href="/oldui" hidden$="[[!wide_layout]]">Old UI</a>
-          <div class="small right">
-            Server:
-            <a href$="[[_versionLink(server_details)]]">
-              [[server_details.server_version]]
-            </a>
-          </div>
-          <auth-signin
-              class="right"
-              client_id="[[client_id]]"
-              auth_headers="{{auth_headers}}"
-              profile="{{profile}}"
-              signed_in="{{signed_in}}">
-          </auth-signin>
+          <template is="dom-if" if="[[client_id]]">
+            <div class="small right">
+              Server:
+              <a href$="[[_versionLink(server_details)]]">
+                [[server_details.server_version]]
+              </a>
+            </div>
+            <auth-signin
+                class="right"
+                client_id="[[client_id]]"
+                auth_headers="{{auth_headers}}"
+                profile="{{profile}}"
+                signed_in="{{signed_in}}">
+            </auth-signin>
+          </template>
+          <template is="dom-if" if="[[!client_id]]">
+            <div class="right">No OAauth client id found.</div>
+          </template>
         </app-toolbar>
       </app-header>
       <div class="main-content">
         <content></content>
       </div>
-        <a target="_blank" rel="noopener" href="https://bugs.chromium.org/p/chromium/issues/entry?components=Infra%3EPlatform%3ESwarming&owner=kjlubick@chromium.org&status=Assigned">
-          <paper-fab mini icon="icons:bug-report"></paper-fab>
-        </a>
+      <error-toast></error-toast>
+      <a target="_blank" rel="noopener" href="https://bugs.chromium.org/p/chromium/issues/entry?components=Infra%3EPlatform%3ESwarming&owner=kjlubick@chromium.org&status=Assigned">
+        <paper-fab mini icon="icons:bug-report"></paper-fab>
+      </a>
     </app-header-layout>
 
     <iron-media-query query="min-width: 600px" query-matches="{{wide_layout}}"></iron-media-query>
@@ -236,11 +247,20 @@
         this._getJsonAsync("permissions", "/api/swarming/v1/server/permissions",
           "_busy1", this.auth_headers);
         this._getJsonAsync("server_details", "/api/swarming/v1/server/details",
-          "_busy2", this.auth_headers)
+          "_busy2", this.auth_headers).catch(function(r){
+            sk.errorMessage("Http response: "+ (r.status || " ") + " " + r.response);
+          });
       },
 
       _toggleMobileMenu: function() {
         this.$.mobile_menu.toggle();
+      },
+
+      _toolbarClass: function(client_id) {
+        if (!client_id) {
+          return "error";
+        }
+        return "";
       },
 
       _versionLink: function(version) {

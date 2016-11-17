@@ -32,7 +32,7 @@
     };
 
     var respond = function(request){
-      if (!request.requestHeaders.authorization) {
+      if (!request.requestHeaders.authorization || true) {
         sinon.log("You must be logged in (check your Oauth?)");
         request.respond(403, {}, "You must be logged in (check your Oauth?)");
         return;
