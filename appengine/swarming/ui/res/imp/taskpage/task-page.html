@@ -308,6 +308,10 @@
                   <td class="code">[[_extraArgs(_request)]]</td>
                 </tr>
                 <tr>
+                  <td>Command</td>
+                  <td class="code">[[_command(_request)]]</td>
+                </tr>
+                <tr>
                   <td rowspan$="[[_rowspan(_request.tags)]]">Tags</td>
                 </tr>
                 <template is="dom-repeat" items="{{_request.tags}}" as="tag">
@@ -625,6 +629,14 @@
           });
         });
         return packages;
+      },
+
+      _command: function(request) {
+        if (!request || !request.properties) {
+          return "";
+        }
+        var args = request.properties.command || [];
+        return args.join(" ");
       },
 
       _disambiguate: function(taskId, result) {
