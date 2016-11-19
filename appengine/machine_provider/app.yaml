@@ -5,6 +5,8 @@ runtime: python27
 threadsafe: true
 api_version: 1
 
+instance_class: F4
+
 handlers:
 - url: /_ah/spi/.*
   script: main.endpoints_app

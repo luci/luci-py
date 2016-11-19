@@ -5,6 +5,7 @@ runtime: python27
 threadsafe: true
 api_version: 1
 
+instance_class: F4
 automatic_scaling:
   min_idle_instances: 1
 
