@@ -59,7 +59,7 @@ class BotAuthTest(test_case.TestCase):
     super(BotAuthTest, self).setUp()
 
     self.logs = []
-    self.mock(logging, 'error', lambda l, *_args: self.logs.append(l))
+    self.mock(logging, 'error', lambda l, *_args: self.logs.append(l % _args))
 
     auth.bootstrap_ip_whitelist(auth.BOTS_IP_WHITELIST, ['1.2.3.4', '1.2.3.5'])
     auth.bootstrap_ip_whitelist('ip_whitelist', ['1.1.1.1', '1.2.3.4'])
@@ -127,6 +127,8 @@ class BotAuthTest(test_case.TestCase):
     with self.assertRaises(auth.AuthorizationError):
       bot_auth.validate_bot_id_and_fetch_config('bot_with_token')
     self.assert_error_log('bot ID doesn\'t match the machine token used')
+    self.assert_error_log('bot_id: "bot_with_token"')
+    self.assert_error_log('original bot_id: "bot_with_token"')
 
   def test_machine_token_ip_whitelist_ok(self):
     # Caller is using valid machine token and belongs to the IP whitelist.
@@ -188,6 +190,23 @@ class BotAuthTest(test_case.TestCase):
     with self.assertRaises(auth.AuthorizationError):
       bot_auth.validate_bot_id_and_fetch_config('broken_config')
     self.assert_error_log('invalid bot group config, no auth method defined')
+
+  def test_composite_machine_token_ok(self):
+    # Caller is using valid machine token.
+    self.mock_config(TEST_CONFIG)
+    self.mock_caller('bot:bot_with_token.domain', '1.2.3.5')
+    cfg = bot_auth.validate_bot_id_and_fetch_config('bot_with_token--vm123')
+    self.assertEquals({u'pool': [u'with_token']}, cfg.dimensions)
+
+  def test_composite_machine_token_bad_id(self):
+    # Caller is using machine token that doesn't match bot_id.
+    self.mock_config(TEST_CONFIG)
+    self.mock_caller('bot:some-other-bot.domain', '1.2.3.5')
+    with self.assertRaises(auth.AuthorizationError):
+      bot_auth.validate_bot_id_and_fetch_config('bot_with_token--vm123')
+    self.assert_error_log('bot ID doesn\'t match the machine token used')
+    self.assert_error_log('bot_id: "bot_with_token"')
+    self.assert_error_log('original bot_id: "bot_with_token--vm123"')
 
 
 if __name__ == '__main__':
