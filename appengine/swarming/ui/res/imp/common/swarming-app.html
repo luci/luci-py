@@ -149,6 +149,7 @@
           <a class="left" href="/botlist" hidden$="[[!wide_layout]]">Bot List</a>
           <a class="left" href="/tasklist" hidden$="[[!wide_layout]]">Task List</a>
           <div class="flex" hidden$="[[!wide_layout]]"></div>
+          <a class="small right" href$="[[_getOldURL()]]" hidden$="[[!wide_layout]]">Old UI</a>
           <template is="dom-if" if="[[client_id]]">
             <div class="small right">
               Server:
@@ -241,6 +242,32 @@
           value: false,
         }
 
+      },
+
+      _getOldURL: function() {
+        // TODO(kjlubick): Remove this on Jan 1, 2017, along with the rest
+        // of the stuff.
+        var path = window.location.pathname;
+        if (path === "/botlist") {
+          return "/oldui/restricted/bots";
+        }
+        if (path === "/tasklist") {
+          return "/oldui/user/tasks";
+        }
+        var idRegex = new RegExp("id=([^&]+)");
+        var match = idRegex.exec(window.location.search);
+        var id = "";
+        if (match && match.length > 1) {
+          id = match[1];
+        }
+        if (path === "/bot") {
+          return "/oldui/restricted/bot/" + id;
+        }
+        if (path === "/task") {
+          return "/oldui/user/task/"+id;
+        }
+
+        return "/oldui";
       },
 
       _load: function() {
