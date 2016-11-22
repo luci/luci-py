@@ -76,8 +76,27 @@ message UpdateResponse {
 }
 
 message PollRequest {
-  //TODO(aludwin)
-  bool test = 1;
+  Attributes attributes = 1;
+}
+
+message Manifest {
+  string task_id = 1; // Looks like a numer but encoded as a string
+
+  // Not the "Dimensions" message - these are the *actual*
+  // dimensions, not the *allowed* dimensions, so the values
+  // are scalars, not lists
+  map<string,string> dimensions = 2;
+
+  message Isolated {
+    string input = 1; // sha1 digest
+    string namespace = 2;
+  }
+  Isolated isolated = 3;
+  map<string, string> env = 4;
+  int32 grace_period = 5;
+  int32 hard_timeout = 6;
+  int32 io_timeout = 7;
+  string bot_id = 8;
 }
 
 message PollResponse {
@@ -92,8 +111,9 @@ message PollResponse {
   ResponseType cmd = 1;
   oneof action {
     double sleep_time = 2;
-    string manifest = 3; // temp; should be a manifest object
-    int32 terminate_taskid = 4;
+    Manifest manifest = 3;
+    string terminate_taskid = 4;
     string restart_message = 5;
+    string version = 6;
   }
 }

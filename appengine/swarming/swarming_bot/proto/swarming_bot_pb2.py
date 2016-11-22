@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='swarming_bot.proto',
   package='luci.swarming',
   syntax='proto3',
-  serialized_pb=_b('\n\x12swarming_bot.proto\x12\rluci.swarming\x1a\x1cgoogle/protobuf/struct.proto\")\n\tDimension\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06values\x18\x02 \x03(\t\"\x82\x03\n\x05State\x12\r\n\x05\x61udio\x18\x01 \x03(\t\x12\x1d\n\x15\x62ot_group_cfg_version\x18\x02 \x01(\t\x12\x15\n\rcost_usd_hour\x18\x03 \x01(\x01\x12\x0b\n\x03\x63pu\x18\x04 \x01(\t\x12\x0b\n\x03\x63wd\x18\x05 \x01(\t\x12&\n\x05\x64isks\x18\x06 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x0b\n\x03gpu\x18\x07 \x03(\t\x12\x10\n\x08hostname\x18\x08 \x01(\t\x12\n\n\x02ip\x18\t \x01(\t\x12\x0e\n\x06locale\x18\n \x01(\t\x12\x18\n\x10nb_files_in_temp\x18\x0b \x01(\x05\x12\x0b\n\x03pid\x18\x0c \x01(\x05\x12\x0b\n\x03ram\x18\r \x01(\x05\x12\x14\n\x0crunning_time\x18\x0e \x01(\x05\x12\x14\n\x0csleep_streak\x18\x0f \x01(\x05\x12\x12\n\nstarted_ts\x18\x10 \x01(\x05\x12%\n\x04temp\x18\x11 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x0e\n\x06uptime\x18\x12 \x01(\x05\x12\x0c\n\x04user\x18\x13 \x01(\t\"p\n\nAttributes\x12,\n\ndimensions\x18\x01 \x03(\x0b\x32\x18.luci.swarming.Dimension\x12#\n\x05state\x18\x02 \x01(\x0b\x32\x14.luci.swarming.State\x12\x0f\n\x07version\x18\x03 \x01(\t\"A\n\x10HandshakeRequest\x12-\n\nattributes\x18\x01 \x01(\x0b\x32\x19.luci.swarming.Attributes\"\xe1\x01\n\x11HandshakeResponse\x12\x16\n\x0eserver_version\x18\x01 \x01(\t\x12\x13\n\x0b\x62ot_version\x18\x02 \x01(\t\x12\x1d\n\x15\x62ot_group_cfg_version\x18\x03 \x01(\t\x12\x43\n\rbot_group_cfg\x18\x04 \x01(\x0b\x32,.luci.swarming.HandshakeResponse.BotGroupCfg\x1a;\n\x0b\x42otGroupCfg\x12,\n\ndimensions\x18\x01 \x03(\x0b\x32\x18.luci.swarming.Dimension\"$\n\rUpdateRequest\x12\x13\n\x0b\x62ot_version\x18\x01 \x01(\t\"\"\n\x0eUpdateResponse\x12\x10\n\x08\x62ot_code\x18\x01 \x01(\x0c\"\x1b\n\x0bPollRequest\x12\x0c\n\x04test\x18\x01 \x01(\x08\"\xfc\x01\n\x0cPollResponse\x12\x35\n\x03\x63md\x18\x01 \x01(\x0e\x32(.luci.swarming.PollResponse.ResponseType\x12\x14\n\nsleep_time\x18\x02 \x01(\x01H\x00\x12\x12\n\x08manifest\x18\x03 \x01(\tH\x00\x12\x1a\n\x10terminate_taskid\x18\x04 \x01(\x05H\x00\x12\x19\n\x0frestart_message\x18\x05 \x01(\tH\x00\"J\n\x0cResponseType\x12\n\n\x06UPDATE\x10\x00\x12\t\n\x05SLEEP\x10\x01\x12\r\n\tTERMINATE\x10\x02\x12\x07\n\x03RUN\x10\x03\x12\x0b\n\x07RESTART\x10\x04\x42\x08\n\x06\x61\x63tion2\xe4\x01\n\nBotService\x12N\n\tHandshake\x12\x1f.luci.swarming.HandshakeRequest\x1a .luci.swarming.HandshakeResponse\x12\x45\n\x06Update\x12\x1c.luci.swarming.UpdateRequest\x1a\x1d.luci.swarming.UpdateResponse\x12?\n\x04Poll\x12\x1a.luci.swarming.PollRequest\x1a\x1b.luci.swarming.PollResponseb\x06proto3')
+  serialized_pb=_b('\n\x12swarming_bot.proto\x12\rluci.swarming\x1a\x1cgoogle/protobuf/struct.proto\")\n\tDimension\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06values\x18\x02 \x03(\t\"\x82\x03\n\x05State\x12\r\n\x05\x61udio\x18\x01 \x03(\t\x12\x1d\n\x15\x62ot_group_cfg_version\x18\x02 \x01(\t\x12\x15\n\rcost_usd_hour\x18\x03 \x01(\x01\x12\x0b\n\x03\x63pu\x18\x04 \x01(\t\x12\x0b\n\x03\x63wd\x18\x05 \x01(\t\x12&\n\x05\x64isks\x18\x06 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x0b\n\x03gpu\x18\x07 \x03(\t\x12\x10\n\x08hostname\x18\x08 \x01(\t\x12\n\n\x02ip\x18\t \x01(\t\x12\x0e\n\x06locale\x18\n \x01(\t\x12\x18\n\x10nb_files_in_temp\x18\x0b \x01(\x05\x12\x0b\n\x03pid\x18\x0c \x01(\x05\x12\x0b\n\x03ram\x18\r \x01(\x05\x12\x14\n\x0crunning_time\x18\x0e \x01(\x05\x12\x14\n\x0csleep_streak\x18\x0f \x01(\x05\x12\x12\n\nstarted_ts\x18\x10 \x01(\x05\x12%\n\x04temp\x18\x11 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x0e\n\x06uptime\x18\x12 \x01(\x05\x12\x0c\n\x04user\x18\x13 \x01(\t\"p\n\nAttributes\x12,\n\ndimensions\x18\x01 \x03(\x0b\x32\x18.luci.swarming.Dimension\x12#\n\x05state\x18\x02 \x01(\x0b\x32\x14.luci.swarming.State\x12\x0f\n\x07version\x18\x03 \x01(\t\"A\n\x10HandshakeRequest\x12-\n\nattributes\x18\x01 \x01(\x0b\x32\x19.luci.swarming.Attributes\"\xe1\x01\n\x11HandshakeResponse\x12\x16\n\x0eserver_version\x18\x01 \x01(\t\x12\x13\n\x0b\x62ot_version\x18\x02 \x01(\t\x12\x1d\n\x15\x62ot_group_cfg_version\x18\x03 \x01(\t\x12\x43\n\rbot_group_cfg\x18\x04 \x01(\x0b\x32,.luci.swarming.HandshakeResponse.BotGroupCfg\x1a;\n\x0b\x42otGroupCfg\x12,\n\ndimensions\x18\x01 \x03(\x0b\x32\x18.luci.swarming.Dimension\"$\n\rUpdateRequest\x12\x13\n\x0b\x62ot_version\x18\x01 \x01(\t\"\"\n\x0eUpdateResponse\x12\x10\n\x08\x62ot_code\x18\x01 \x01(\x0c\"<\n\x0bPollRequest\x12-\n\nattributes\x18\x01 \x01(\x0b\x32\x19.luci.swarming.Attributes\"\x98\x03\n\x08Manifest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12;\n\ndimensions\x18\x02 \x03(\x0b\x32\'.luci.swarming.Manifest.DimensionsEntry\x12\x32\n\x08isolated\x18\x03 \x01(\x0b\x32 .luci.swarming.Manifest.Isolated\x12-\n\x03\x65nv\x18\x04 \x03(\x0b\x32 .luci.swarming.Manifest.EnvEntry\x12\x14\n\x0cgrace_period\x18\x05 \x01(\x05\x12\x14\n\x0chard_timeout\x18\x06 \x01(\x05\x12\x12\n\nio_timeout\x18\x07 \x01(\x05\x12\x0e\n\x06\x62ot_id\x18\x08 \x01(\t\x1a\x31\n\x0f\x44imensionsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a,\n\x08Isolated\x12\r\n\x05input\x18\x01 \x01(\t\x12\x11\n\tnamespace\x18\x02 \x01(\t\x1a*\n\x08\x45nvEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xa8\x02\n\x0cPollResponse\x12\x35\n\x03\x63md\x18\x01 \x01(\x0e\x32(.luci.swarming.PollResponse.ResponseType\x12\x14\n\nsleep_time\x18\x02 \x01(\x01H\x00\x12+\n\x08manifest\x18\x03 \x01(\x0b\x32\x17.luci.swarming.ManifestH\x00\x12\x1a\n\x10terminate_taskid\x18\x04 \x01(\tH\x00\x12\x19\n\x0frestart_message\x18\x05 \x01(\tH\x00\x12\x11\n\x07version\x18\x06 \x01(\tH\x00\"J\n\x0cResponseType\x12\n\n\x06UPDATE\x10\x00\x12\t\n\x05SLEEP\x10\x01\x12\r\n\tTERMINATE\x10\x02\x12\x07\n\x03RUN\x10\x03\x12\x0b\n\x07RESTART\x10\x04\x42\x08\n\x06\x61\x63tion2\xe4\x01\n\nBotService\x12N\n\tHandshake\x12\x1f.luci.swarming.HandshakeRequest\x1a .luci.swarming.HandshakeResponse\x12\x45\n\x06Update\x12\x1c.luci.swarming.UpdateRequest\x1a\x1d.luci.swarming.UpdateResponse\x12?\n\x04Poll\x12\x1a.luci.swarming.PollRequest\x1a\x1b.luci.swarming.PollResponseb\x06proto3')
   ,
   dependencies=[google_dot_protobuf_dot_struct__pb2.DESCRIPTOR,])
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
@@ -56,8 +56,8 @@ _POLLRESPONSE_RESPONSETYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=1180,
-  serialized_end=1254,
+  serialized_start=1668,
+  serialized_end=1742,
 )
 _sym_db.RegisterEnumDescriptor(_POLLRESPONSE_RESPONSETYPE)
 
@@ -485,9 +485,9 @@ _POLLREQUEST = _descriptor.Descriptor(
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='test', full_name='luci.swarming.PollRequest.test', index=0,
-      number=1, type=8, cpp_type=7, label=1,
-      has_default_value=False, default_value=False,
+      name='attributes', full_name='luci.swarming.PollRequest.attributes', index=0,
+      number=1, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
@@ -504,7 +504,198 @@ _POLLREQUEST = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=982,
-  serialized_end=1009,
+  serialized_end=1042,
+)
+
+
+_MANIFEST_DIMENSIONSENTRY = _descriptor.Descriptor(
+  name='DimensionsEntry',
+  full_name='luci.swarming.Manifest.DimensionsEntry',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='key', full_name='luci.swarming.Manifest.DimensionsEntry.key', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='value', full_name='luci.swarming.Manifest.DimensionsEntry.value', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=_descriptor._ParseOptions(descriptor_pb2.MessageOptions(), _b('8\001')),
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1314,
+  serialized_end=1363,
+)
+
+_MANIFEST_ISOLATED = _descriptor.Descriptor(
+  name='Isolated',
+  full_name='luci.swarming.Manifest.Isolated',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='input', full_name='luci.swarming.Manifest.Isolated.input', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='namespace', full_name='luci.swarming.Manifest.Isolated.namespace', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1365,
+  serialized_end=1409,
+)
+
+_MANIFEST_ENVENTRY = _descriptor.Descriptor(
+  name='EnvEntry',
+  full_name='luci.swarming.Manifest.EnvEntry',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='key', full_name='luci.swarming.Manifest.EnvEntry.key', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='value', full_name='luci.swarming.Manifest.EnvEntry.value', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=_descriptor._ParseOptions(descriptor_pb2.MessageOptions(), _b('8\001')),
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1411,
+  serialized_end=1453,
+)
+
+_MANIFEST = _descriptor.Descriptor(
+  name='Manifest',
+  full_name='luci.swarming.Manifest',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='task_id', full_name='luci.swarming.Manifest.task_id', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='dimensions', full_name='luci.swarming.Manifest.dimensions', index=1,
+      number=2, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='isolated', full_name='luci.swarming.Manifest.isolated', index=2,
+      number=3, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='env', full_name='luci.swarming.Manifest.env', index=3,
+      number=4, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='grace_period', full_name='luci.swarming.Manifest.grace_period', index=4,
+      number=5, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='hard_timeout', full_name='luci.swarming.Manifest.hard_timeout', index=5,
+      number=6, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='io_timeout', full_name='luci.swarming.Manifest.io_timeout', index=6,
+      number=7, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='bot_id', full_name='luci.swarming.Manifest.bot_id', index=7,
+      number=8, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[_MANIFEST_DIMENSIONSENTRY, _MANIFEST_ISOLATED, _MANIFEST_ENVENTRY, ],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1045,
+  serialized_end=1453,
 )
 
 
@@ -531,21 +722,28 @@ _POLLRESPONSE = _descriptor.Descriptor(
       options=None),
     _descriptor.FieldDescriptor(
       name='manifest', full_name='luci.swarming.PollResponse.manifest', index=2,
-      number=3, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=_b("").decode('utf-8'),
+      number=3, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='terminate_taskid', full_name='luci.swarming.PollResponse.terminate_taskid', index=3,
-      number=4, type=5, cpp_type=1, label=1,
-      has_default_value=False, default_value=0,
+      number=4, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
       name='restart_message', full_name='luci.swarming.PollResponse.restart_message', index=4,
       number=5, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='version', full_name='luci.swarming.PollResponse.version', index=5,
+      number=6, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -566,8 +764,8 @@ _POLLRESPONSE = _descriptor.Descriptor(
       name='action', full_name='luci.swarming.PollResponse.action',
       index=0, containing_type=None, fields=[]),
   ],
-  serialized_start=1012,
-  serialized_end=1264,
+  serialized_start=1456,
+  serialized_end=1752,
 )
 
 _STATE.fields_by_name['disks'].message_type = google_dot_protobuf_dot_struct__pb2._STRUCT
@@ -578,7 +776,15 @@ _HANDSHAKEREQUEST.fields_by_name['attributes'].message_type = _ATTRIBUTES
 _HANDSHAKERESPONSE_BOTGROUPCFG.fields_by_name['dimensions'].message_type = _DIMENSION
 _HANDSHAKERESPONSE_BOTGROUPCFG.containing_type = _HANDSHAKERESPONSE
 _HANDSHAKERESPONSE.fields_by_name['bot_group_cfg'].message_type = _HANDSHAKERESPONSE_BOTGROUPCFG
+_POLLREQUEST.fields_by_name['attributes'].message_type = _ATTRIBUTES
+_MANIFEST_DIMENSIONSENTRY.containing_type = _MANIFEST
+_MANIFEST_ISOLATED.containing_type = _MANIFEST
+_MANIFEST_ENVENTRY.containing_type = _MANIFEST
+_MANIFEST.fields_by_name['dimensions'].message_type = _MANIFEST_DIMENSIONSENTRY
+_MANIFEST.fields_by_name['isolated'].message_type = _MANIFEST_ISOLATED
+_MANIFEST.fields_by_name['env'].message_type = _MANIFEST_ENVENTRY
 _POLLRESPONSE.fields_by_name['cmd'].enum_type = _POLLRESPONSE_RESPONSETYPE
+_POLLRESPONSE.fields_by_name['manifest'].message_type = _MANIFEST
 _POLLRESPONSE_RESPONSETYPE.containing_type = _POLLRESPONSE
 _POLLRESPONSE.oneofs_by_name['action'].fields.append(
   _POLLRESPONSE.fields_by_name['sleep_time'])
@@ -592,6 +798,9 @@ _POLLRESPONSE.fields_by_name['terminate_taskid'].containing_oneof = _POLLRESPONS
 _POLLRESPONSE.oneofs_by_name['action'].fields.append(
   _POLLRESPONSE.fields_by_name['restart_message'])
 _POLLRESPONSE.fields_by_name['restart_message'].containing_oneof = _POLLRESPONSE.oneofs_by_name['action']
+_POLLRESPONSE.oneofs_by_name['action'].fields.append(
+  _POLLRESPONSE.fields_by_name['version'])
+_POLLRESPONSE.fields_by_name['version'].containing_oneof = _POLLRESPONSE.oneofs_by_name['action']
 DESCRIPTOR.message_types_by_name['Dimension'] = _DIMENSION
 DESCRIPTOR.message_types_by_name['State'] = _STATE
 DESCRIPTOR.message_types_by_name['Attributes'] = _ATTRIBUTES
@@ -600,6 +809,7 @@ DESCRIPTOR.message_types_by_name['HandshakeResponse'] = _HANDSHAKERESPONSE
 DESCRIPTOR.message_types_by_name['UpdateRequest'] = _UPDATEREQUEST
 DESCRIPTOR.message_types_by_name['UpdateResponse'] = _UPDATERESPONSE
 DESCRIPTOR.message_types_by_name['PollRequest'] = _POLLREQUEST
+DESCRIPTOR.message_types_by_name['Manifest'] = _MANIFEST
 DESCRIPTOR.message_types_by_name['PollResponse'] = _POLLRESPONSE
 
 Dimension = _reflection.GeneratedProtocolMessageType('Dimension', (_message.Message,), dict(
@@ -666,6 +876,37 @@ PollRequest = _reflection.GeneratedProtocolMessageType('PollRequest', (_message.
   ))
 _sym_db.RegisterMessage(PollRequest)
 
+Manifest = _reflection.GeneratedProtocolMessageType('Manifest', (_message.Message,), dict(
+
+  DimensionsEntry = _reflection.GeneratedProtocolMessageType('DimensionsEntry', (_message.Message,), dict(
+    DESCRIPTOR = _MANIFEST_DIMENSIONSENTRY,
+    __module__ = 'swarming_bot_pb2'
+    # @@protoc_insertion_point(class_scope:luci.swarming.Manifest.DimensionsEntry)
+    ))
+  ,
+
+  Isolated = _reflection.GeneratedProtocolMessageType('Isolated', (_message.Message,), dict(
+    DESCRIPTOR = _MANIFEST_ISOLATED,
+    __module__ = 'swarming_bot_pb2'
+    # @@protoc_insertion_point(class_scope:luci.swarming.Manifest.Isolated)
+    ))
+  ,
+
+  EnvEntry = _reflection.GeneratedProtocolMessageType('EnvEntry', (_message.Message,), dict(
+    DESCRIPTOR = _MANIFEST_ENVENTRY,
+    __module__ = 'swarming_bot_pb2'
+    # @@protoc_insertion_point(class_scope:luci.swarming.Manifest.EnvEntry)
+    ))
+  ,
+  DESCRIPTOR = _MANIFEST,
+  __module__ = 'swarming_bot_pb2'
+  # @@protoc_insertion_point(class_scope:luci.swarming.Manifest)
+  ))
+_sym_db.RegisterMessage(Manifest)
+_sym_db.RegisterMessage(Manifest.DimensionsEntry)
+_sym_db.RegisterMessage(Manifest.Isolated)
+_sym_db.RegisterMessage(Manifest.EnvEntry)
+
 PollResponse = _reflection.GeneratedProtocolMessageType('PollResponse', (_message.Message,), dict(
   DESCRIPTOR = _POLLRESPONSE,
   __module__ = 'swarming_bot_pb2'
@@ -674,6 +915,10 @@ PollResponse = _reflection.GeneratedProtocolMessageType('PollResponse', (_messag
 _sym_db.RegisterMessage(PollResponse)
 
 
+_MANIFEST_DIMENSIONSENTRY.has_options = True
+_MANIFEST_DIMENSIONSENTRY._options = _descriptor._ParseOptions(descriptor_pb2.MessageOptions(), _b('8\001'))
+_MANIFEST_ENVENTRY.has_options = True
+_MANIFEST_ENVENTRY._options = _descriptor._ParseOptions(descriptor_pb2.MessageOptions(), _b('8\001'))
 import grpc
 from grpc.beta import implementations as beta_implementations
 from grpc.beta import interfaces as beta_interfaces

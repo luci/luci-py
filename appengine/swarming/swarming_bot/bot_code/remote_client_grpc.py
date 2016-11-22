@@ -6,6 +6,7 @@
 # a gRPC method to communicate with a server instead of REST.
 
 import json
+import logging
 
 import grpc
 import google.protobuf.json_format
@@ -17,9 +18,11 @@ class RemoteClientGrpc(object):
   """
 
   def __init__(self, server):
-    print "Communicating with host %s via gRPC" % server
+    logging.info('Communicating with host %s via gRPC', server)
+    self._server = server
     self._channel = grpc.insecure_channel(server)
     self._stub = swarming_bot_pb2.BotServiceStub(self._channel)
+    self._log_is_asleep = False
 
   def is_grpc(self):
     return True
@@ -34,34 +37,33 @@ class RemoteClientGrpc(object):
   def get_authentication_headers(self):
     return {}
 
-  def post_bot_event(self, event_type, message, attributes):
-    del event_type, attributes # Not used yet
-    print "Posting bot event: %s" % message
+  def post_bot_event(self, _event_type, message, _attributes):
+    logging.warning('Not yet implemented: posting bot event: %s', message)
 
   def post_task_update(self, task_id, bot_id, params,
-                       stdout_and_chunk=None, exit_code=None):
-    del exit_code # Not used yet
-    print "Posting task update for task %s, bot %s: %s" % \
-      (task_id, bot_id, params)
+                       stdout_and_chunk=None, _exit_code=None):
+    logging.warning(
+      'Not yet implemented: posting task update for task %s, bot %s: %s',
+      task_id, bot_id, params)
     if stdout_and_chunk != None:
-      print "stdout: %s" % stdout_and_chunk[0]
+      logging.warning('stdout: %s', stdout_and_chunk[0])
     return True
 
-  def post_task_error(self, task_id, bot_id, message):
-    del task_id, bot_id, message # Not used yet
-    print "Posting task error"
+  def post_task_error(self, _task_id, _bot_id, _message):
+    logging.warning('Not yet implemented: posting task error')
     return True
+
+  def _attributes_json_to_proto(self, json_attr, msg):
+    msg.version = json_attr['version']
+    for k, values in sorted(json_attr['dimensions'].iteritems()):
+      pair = msg.dimensions.add()
+      pair.name = k
+      pair.values.extend(values)
+    create_state_proto(json_attr['state'], msg.state)
 
   def do_handshake(self, attributes):
     request = swarming_bot_pb2.HandshakeRequest()
-    request.attributes.version = attributes['version']
-    dims = attributes['dimensions']
-    for k in dims:
-      pair = request.attributes.dimensions.add()
-      pair.name = k
-      for v in dims[k]:
-        pair.values.append(v)
-    create_state_proto(attributes['state'], request.attributes.state)
+    self._attributes_json_to_proto(attributes, request.attributes)
     response = self._stub.Handshake(request)
     resp = {
         'server_version': response.server_version,
@@ -73,37 +75,67 @@ class RemoteClientGrpc(object):
             },
         },
     }
-    print "Completed handshake: %s" % resp
+    logging.info('Completed handshake: %s', resp)
     return resp
 
   def poll(self, attributes):
-    del attributes # Not used yet
-    print "Polling!"
     request = swarming_bot_pb2.PollRequest()
-    request.test = True
+    self._attributes_json_to_proto(attributes, request.attributes)
+    # TODO(aludwin): gRPC-specific exception handling
     response = self._stub.Poll(request)
-    manifest = {
-      'task_id': '42',
-      'dimensions': {},
-      'isolated': False,
-      'extra_args': '',
-      'cipd_input': '',
-      'env': {},
-      'grace_period': None,
-      'hard_timeout': None,
-      'io_timeout': None,
 
-      # required in task_runner, why does the server need to send?
-      'bot_id': 'fake_bot',
+    if response.cmd == swarming_bot_pb2.PollResponse.UPDATE:
+      return 'update', response.version
 
-      #Splitting should be done server-side:
-      'command': response.manifest.split(),
-    }
-    print "Will execute manifest: %s" % manifest
-    return ('run', manifest)
+    if response.cmd == swarming_bot_pb2.PollResponse.SLEEP:
+      if not self._log_is_asleep:
+        logging.info('Going to sleep')
+        self._log_is_asleep = True
+      return 'sleep', response.sleep_time
 
-  def get_bot_code(self, new_zip_fn, bot_version, bot_id):
-    raise NotImplementedError("what are you doing?")
+    if response.cmd == swarming_bot_pb2.PollResponse.TERMINATE:
+      logging.info('Terminating!')
+      return 'terminate', response.terminate_taskid
+
+    if response.cmd == swarming_bot_pb2.PollResponse.RESTART:
+      logging.info('Restarting: %s', response.restart_message)
+      return 'restart', response.restart_message
+
+    if response.cmd == swarming_bot_pb2.PollResponse.RUN:
+      protoManifest = response.manifest
+      manifest = {
+        'bot_id': protoManifest.bot_id,
+        'command': None, # only supports Isolated, but avoid key error
+        'dimensions' : {
+            key: val for key, val in protoManifest.dimensions.items()
+        },
+        'env': {
+            key: val for key, val in protoManifest.env.items()
+        },
+        'grace_period': protoManifest.grace_period,
+        'hard_timeout': protoManifest.hard_timeout,
+        'io_timeout': protoManifest.io_timeout,
+        'isolated': {
+            'namespace': protoManifest.isolated.namespace,
+            'input' : protoManifest.isolated.input,
+            'server': self._server, #TODO(aludwin): make this work properly
+        },
+        'task_id': protoManifest.task_id,
+      }
+      logging.info('Received job manifest: %s', manifest)
+      self._log_is_asleep = False
+      return 'run', manifest
+
+    raise ValueError('Unknown command in response: %s' % response)
+
+  def get_bot_code(self, new_zip_fn, bot_version, _bot_id):
+    # TODO(aludwin): exception handling, pass bot_id
+    logging.info('Updating to version: %s', bot_version)
+    request = swarming_bot_pb2.UpdateRequest()
+    request.bot_version = bot_version
+    response = self._stub.Update(request)
+    with open(new_zip_fn, 'wb') as f:
+      f.write(response.bot_code)
 
   def ping(self):
     pass
