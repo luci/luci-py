@@ -795,7 +795,7 @@ class OldUIHandler(auth.AuthenticatingHandler):
     self.response.write(template.render('swarming/root.html', params))
 
 
-class BotsListHandler(auth.AuthenticatingHandler):
+class BotsListHandler(webapp2.RequestHandler):
   """Redirects to a list of known bots."""
 
   @auth.public
@@ -814,7 +814,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
     self.redirect(new_ui_link)
 
 
-class BotHandler(auth.AuthenticatingHandler):
+class BotHandler(webapp2.RequestHandler):
   """Redirects to a page about the bot, including last tasks and events."""
 
   @auth.public
@@ -825,7 +825,7 @@ class BotHandler(auth.AuthenticatingHandler):
 ### User accessible pages.
 
 
-class TasksHandler(auth.AuthenticatingHandler):
+class TasksHandler(webapp2.RequestHandler):
   """Redirects to a list of all task requests."""
 
   @auth.public
@@ -842,7 +842,7 @@ class TasksHandler(auth.AuthenticatingHandler):
     self.redirect(new_ui_link)
 
 
-class TaskHandler(auth.AuthenticatingHandler):
+class TaskHandler(webapp2.RequestHandler):
   """Redirects to a page containing task request and result."""
 
   @auth.public
@@ -850,7 +850,7 @@ class TaskHandler(auth.AuthenticatingHandler):
     self.redirect('/task?id=%s' % task_id)
 
 
-class UIHandler(auth.AuthenticatingHandler):
+class UIHandler(webapp2.RequestHandler):
   """Serves the landing page for the new UI of the requested page.
 
   This landing page is stamped with the OAuth 2.0 client id from the
@@ -863,6 +863,11 @@ class UIHandler(auth.AuthenticatingHandler):
     params = {
       'client_id': config.settings().ui_client_id,
     }
+    # Can cache for 1 week, because the only thing that would change in this
+    # template is the oauth client id, which changes very infrequently.
+    self.response.cache_control.no_cache = None
+    self.response.cache_control.public = True
+    self.response.cache_control.max_age = 604800
     try:
       self.response.write(template.render(
         'swarming/public_%s_index.html' % page, params))

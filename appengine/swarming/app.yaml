@@ -11,6 +11,8 @@ automatic_scaling:
   min_pending_latency: 50ms
   max_pending_latency: 250ms
 
+default_expiration: "10m"
+
 handlers:
 - url: /_ah/spi/.*
   script: main.endpoints_app
@@ -74,6 +76,7 @@ handlers:
   static_files: ui/build/\1
   upload: ui/build/(.+)
   secure: always
+  expiration: "1h"
   http_headers:
     Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
     X-Frame-Options: deny
