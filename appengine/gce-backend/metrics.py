@@ -9,7 +9,7 @@ import logging
 import gae_event_mon
 import gae_ts_mon
 
-import instances
+import instance_group_managers
 
 
 # Overrides to create app-global metrics.
@@ -38,21 +38,15 @@ config_valid = gae_ts_mon.BooleanMetric(
 
 
 def compute_global_metrics():
-  orphaned, total = instances.count_instances()
-  GLOBAL_METRICS['instances'].set(
-      orphaned,
-      fields={
-          'orphaned': True,
-      },
-      target_fields=GLOBAL_TARGET_FIELDS,
-  )
-  GLOBAL_METRICS['instances'].set(
-      total - orphaned,
-      fields={
-          'orphaned': False,
-      },
-      target_fields=GLOBAL_TARGET_FIELDS,
-  )
+  for name, count in instance_group_managers.count_instances().iteritems():
+    logging.info('%s: %s', name, count)
+    GLOBAL_METRICS['instances'].set(
+        count,
+        fields={
+            'instance_template': name,
+        },
+        target_fields=GLOBAL_TARGET_FIELDS,
+    )
 
 
 def initialize():

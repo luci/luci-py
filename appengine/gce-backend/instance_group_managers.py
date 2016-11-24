@@ -4,6 +4,7 @@
 
 """Utilities for operating on instance group managers."""
 
+import collections
 import logging
 
 from google.appengine.ext import ndb
@@ -390,3 +391,18 @@ def schedule_resize():
                 'Failed to enqueue task for InstanceGroupManager: %s',
                 instance_group_manager_key,
             )
+
+
+def count_instances():
+  """Counts the number of instances owned by each instance template.
+
+  Returns:
+    A dict mapping instance template name to count of instances.
+  """
+  # Aggregate the number of instances owned by each instance group manager
+  # created for each instance template.
+  totals = collections.defaultdict(int)
+  for instance_group_manager in models.InstanceGroupManager.query():
+    instance_template_name = instance_group_manager.key.parent().parent().id()
+    totals[instance_template_name] += len(instance_group_manager.instances)
+  return totals
