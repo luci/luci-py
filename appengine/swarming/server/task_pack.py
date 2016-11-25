@@ -11,27 +11,9 @@ schema details to the user.
 
 from google.appengine.ext import ndb
 
-from components import datastore_utils
-from components import utils
-
 
 # Mask to TaskRequest key ids so they become decreasing numbers.
 TASK_REQUEST_KEY_ID_MASK = int(2L**63-1)
-
-
-# The production server must handle up to 1000 task requests per second. The
-# number of root entities must be a few orders of magnitude higher. The goal is
-# to almost completely get rid of transactions conflicts. This means that the
-# probability of two transactions happening on the same shard must be very low.
-# This relates to number of transactions per second * seconds per transaction /
-# number of shard.
-#
-# Intentionally starve the canary server by using only 16³=4096 root entities.
-# This will cause mild transaction conflicts during load tests. On the
-# production server, use 16**6 (~16 million) root entities to reduce the number
-# of transaction conflict.
-# TODO(maruel): Remove support 2015-02-01.
-DEPRECATED_SHARDING_LEVEL = 3 if utils.is_dev() else 6
 
 
 ### Entities relationships.
@@ -97,13 +79,9 @@ def pack_request_key(request_key):
   """Returns a task_id as a string from a TaskRequest ndb.Key."""
   key_id = request_key.integer_id()
   # It's 0xE instead of 0x1 in the DB because of the XOR.
-  if (key_id & 0xF) == 0xE:
-    # New style key.
-    return '%x' % (key_id ^ TASK_REQUEST_KEY_ID_MASK)
-  else:
-    # Old style key.
-    # TODO(maruel): Remove support 2015-02-01.
-    return ('%x' % key_id)[:-1]
+  if (key_id & 0xF) != 0xE:
+    raise ValueError('Invalid request key')
+  return '%x' % (key_id ^ TASK_REQUEST_KEY_ID_MASK)
 
 
 def pack_result_summary_key(result_summary_key):
@@ -128,32 +106,27 @@ def pack_run_result_key(run_result_key):
 def unpack_request_key(task_id):
   """Returns the ndb.Key for a TaskRequest id with the try number stripped.
 
-  There's two style of keys. Old ones ends with '0', new ones ends with '1'.
+  If you find yourself the need to unpack a task id as a ndb Key to use the
+  datastore web UI, run the following in a python shell:
+    task = 0x<task id>
+    print((task/16)^int(2L**63-1))
 
-  TODO(maruel): Remove support 2015-02-01.
+  Then create a GQL query in the web UI that retrieves all the entities stored
+  for this request, replace 1234 with the number printed by the commands above:
+      SELECT * WHERE __key__ HAS ANCESTOR ndb.Key(TaskRequest, 1234)
   """
   assert isinstance(task_id, basestring)
   if not task_id:
     raise ValueError('Invalid null key')
   c = task_id[-1]
   if c == '1':
-    # New style key. The key id is the reverse of the value.
+    # The key id is the reverse of the value.
     task_id_int = int(task_id, 16)
     if task_id_int < 0:
       raise ValueError('Invalid task id (overflowed)')
     return ndb.Key('TaskRequest', task_id_int ^ TASK_REQUEST_KEY_ID_MASK)
-  elif c == '0':
-    # TODO(maruel): Remove support 2015-02-01.
-    # Old style key.
-    task_id += '0'
-    task_id_int = int(task_id, 16)
-    # The sharding was done on the decimal representation of the number, not
-    # hex. Oops.
-    parent = datastore_utils.hashed_shard_key(
-        str(task_id_int), DEPRECATED_SHARDING_LEVEL, 'TaskRequestShard')
-    return ndb.Key('TaskRequest', task_id_int, parent=parent)
   else:
-    raise ValueError('Invalid key')
+    raise ValueError('Invalid key %s' % task_id)
 
 
 def unpack_result_summary_key(packed_key):

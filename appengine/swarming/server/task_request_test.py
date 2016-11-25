@@ -212,18 +212,9 @@ class TaskRequestApiTest(TestCase):
     self.assertEqual('0x7ffffffffff77661', '0x%016x' % key_id)
 
   def test_validate_request_key(self):
-    task_request.validate_request_key(task_pack.unpack_request_key('10'))
-    task_request.validate_request_key(
-        ndb.Key(
-            'TaskRequestShard', 'a' * task_pack.DEPRECATED_SHARDING_LEVEL,
-            'TaskRequest', 0x100))
+    task_request.validate_request_key(task_pack.unpack_request_key('11'))
     with self.assertRaises(ValueError):
       task_request.validate_request_key(ndb.Key('TaskRequest', 1))
-    with self.assertRaises(ValueError):
-      key = ndb.Key(
-          'TaskRequestShard', 'a' * (task_pack.DEPRECATED_SHARDING_LEVEL + 1),
-          'TaskRequest', 0x100)
-      task_request.validate_request_key(key)
 
   def test_init_new_request(self):
     # Compare with test_new_request_clone().

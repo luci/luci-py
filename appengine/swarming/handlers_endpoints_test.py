@@ -1264,7 +1264,7 @@ class TaskApiTest(BaseTest):
 
   def test_result_unknown(self):
     """Asserts that result raises 404 for unknown task IDs."""
-    self.call_api('result', body={'task_id': '12300'}, status=404)
+    self.call_api('result', body={'task_id': '12310'}, status=404)
 
   def test_result_ok(self):
     """Asserts that result produces a result entity."""
@@ -1443,7 +1443,7 @@ class TaskApiTest(BaseTest):
 
   def test_request_unknown(self):
     """Asserts that 404 is raised for unknown tasks."""
-    self.call_api('request', body={'task_id': '12300'}, status=404)
+    self.call_api('request', body={'task_id': '12310'}, status=404)
 
   def test_request_ok(self):
     """Asserts that request produces a task request."""
