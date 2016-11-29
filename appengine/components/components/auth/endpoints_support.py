@@ -224,8 +224,9 @@ def initialize_request_auth(remote_address, headers):
   auth_context = api.reinitialize_request_cache()
 
   # Verify the validity of the token (including client_id check), if given.
+  is_superuser = False
   if headers.get('Authorization'):
-    identity = api.check_oauth_access_token(headers)
+    identity, is_superuser = api.check_oauth_access_token(headers)
   else:
     # Cloud Endpoints support more authentication methods than we do. Make sure
     # to fail the request if one of such methods is used.
@@ -259,6 +260,7 @@ def initialize_request_auth(remote_address, headers):
     try:
       auth_context.current_identity = delegation.check_bearer_delegation_token(
           delegation_tok, auth_context.peer_identity)
+      auth_context.is_superuser = False
     except delegation.BadTokenError as exc:
       raise api.AuthorizationError('Bad delegation token: %s' % exc)
     except delegation.TransientError as exc:
@@ -267,3 +269,4 @@ def initialize_request_auth(remote_address, headers):
       raise endpoints.InternalServerErrorException(msg)
   else:
     auth_context.current_identity = auth_context.peer_identity
+    auth_context.is_superuser = is_superuser

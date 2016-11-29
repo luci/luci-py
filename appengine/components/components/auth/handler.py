@@ -120,9 +120,10 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       self.response.headers['X-Frame-Options'] = self.frame_options
 
     identity = None
+    is_superuser = False
     for method_func in self.get_auth_methods(conf):
       try:
-        identity = method_func(self.request)
+        identity, is_superuser = method_func(self.request)
         if identity:
           break
       except api.AuthenticationError as err:
@@ -136,7 +137,9 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     self.auth_method = method_func
 
     # If no authentication method is applicable, default to anonymous identity.
-    identity = identity or model.Anonymous
+    if not identity:
+      identity = model.Anonymous
+      is_superuser = False
 
     # XSRF token is required only if using Cookie based or IP whitelist auth.
     # A browser doesn't send Authorization: 'Bearer ...' or any other headers
@@ -169,12 +172,15 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       self.authorization_error(err)
       return
 
-    # Parse delegation token, if given, to deduce end-user identity.
+    # Parse delegation token, if given, to deduce end-user identity. We clear
+    # 'is_superuser' bit if delegation is used, since it no longer applies to
+    # delegated identity.
     delegation_tok = self.request.headers.get(delegation.HTTP_HEADER)
     if delegation_tok:
       try:
         ctx.current_identity = delegation.check_bearer_delegation_token(
             delegation_tok, ctx.peer_identity)
+        ctx.is_superuser = False
       except delegation.BadTokenError as exc:
         self.authorization_error(
             api.AuthorizationError('Bad delegation token: %s' % exc))
@@ -184,6 +190,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
         self.abort(500, detail=msg)
     else:
       ctx.current_identity = ctx.peer_identity
+      ctx.is_superuser = is_superuser
 
     try:
       # Fail if XSRF token is required, but not provided.
@@ -224,12 +231,13 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     Each auth method is a function that accepts webapp2.Request and can finish
     with 3 outcomes:
 
-    * Return None: authentication method is not applicable to that request
-      and next method should be tried (for example cookie-based
+    * Return (None, ...): authentication method is not applicable to that
+      request and next method should be tried (for example cookie-based
       authentication is not applicable when there's no cookies).
 
-    * Returns Identity associated with the request. Means authentication method
-      is applicable and request authenticity is confirmed.
+    * Returns (Identity, is_superuser). It means the authentication method
+      is applicable and caller is authenticated as 'Identity'. If caller is
+      GAE-level admin, is_superuser is set to True.
 
     * Raises AuthenticationError: authentication method is applicable, but
       request contains bad credentials or invalid token, etc. For example,
@@ -329,10 +337,6 @@ class AuthenticatingHandler(webapp2.RequestHandler):
   def get_current_user(self):
     """When cookie auth is used returns instance of CurrentUser or None."""
     return self._get_users_api().get_current_user(self.request)
-
-  def is_current_user_gae_admin(self):
-    """When cookie auth is used returns True if current caller is GAE admin."""
-    return self._get_users_api().is_current_user_gae_admin(self.request)
 
   def create_login_url(self, dest_url):
     """When cookie auth is used returns URL to redirect user to login."""
@@ -436,24 +440,26 @@ def gae_cookie_authentication(_request):
   """AppEngine cookie based authentication via users.get_current_user()."""
   user = users.get_current_user()
   try:
-    return model.Identity(model.IDENTITY_USER, user.email()) if user else None
+    ident = model.Identity(model.IDENTITY_USER, user.email()) if user else None
   except ValueError:
     raise api.AuthenticationError('Unsupported user email: %s' % user.email())
+  return ident, users.is_current_user_admin()
 
 
 def openid_cookie_authentication(request):
   """Cookie based authentication that uses OpenID flow for login."""
   user = openid.get_current_user(request)
   try:
-    return model.Identity(model.IDENTITY_USER, user.email) if user else None
+    ident = model.Identity(model.IDENTITY_USER, user.email) if user else None
   except ValueError:
     raise api.AuthenticationError('Unsupported user email: %s' % user.email)
+  return ident, False
 
 
 def oauth_authentication(request):
   """OAuth2 based authentication via access tokens."""
   if not request.headers.get('Authorization'):
-    return None
+    return None, False
   return api.check_oauth_access_token(request.headers)
 
 
@@ -465,9 +471,10 @@ def service_to_service_authentication(request):
   """
   app_id = request.headers.get('X-Appengine-Inbound-Appid')
   try:
-    return model.Identity(model.IDENTITY_SERVICE, app_id) if app_id else None
+    ident = model.Identity(model.IDENTITY_SERVICE, app_id) if app_id else None
   except ValueError:
     raise api.AuthenticationError('Unsupported application ID: %s' % app_id)
+  return ident, False
 
 
 ################################################################################
@@ -511,10 +518,6 @@ class GAEUsersAPI(object):
     return CurrentUser(user.user_id(), user.email(), None) if user else None
 
   @staticmethod
-  def is_current_user_gae_admin(request):  # pylint: disable=unused-argument
-    return users.is_current_user_admin()
-
-  @staticmethod
   def create_login_url(request, dest_url):  # pylint: disable=unused-argument
     return users.create_login_url(dest_url)
 
@@ -528,10 +531,6 @@ class OpenIDAPI(object):
   def get_current_user(request):
     user = openid.get_current_user(request)
     return CurrentUser(user.sub, user.email, user.picture) if user else None
-
-  @staticmethod
-  def is_current_user_gae_admin(request):  # pylint: disable=unused-argument
-    return False
 
   @staticmethod
   def create_login_url(request, dest_url):

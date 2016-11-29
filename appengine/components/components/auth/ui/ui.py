@@ -10,8 +10,6 @@ import os
 import urlparse
 import webapp2
 
-from google.appengine.api import users
-
 from components import template
 from components import utils
 
@@ -241,11 +239,11 @@ class BootstrapHandler(UIHandler):
 
   @classmethod
   def get_auth_methods(cls, conf):
-    # Using users.is_current_user_admin(). Other auth methods don't make sense.
+    # This method sets 'is_superuser' bit for GAE-level admins.
     return [handler.gae_cookie_authentication]
 
   @forbid_ui_on_replica
-  @api.require(users.is_current_user_admin)
+  @api.require(api.is_superuser)
   def get(self):
     env = {
       'page_title': 'Bootstrap',
@@ -255,7 +253,7 @@ class BootstrapHandler(UIHandler):
     self.reply('auth/bootstrap.html', env)
 
   @forbid_ui_on_replica
-  @api.require(users.is_current_user_admin)
+  @api.require(api.is_superuser)
   def post(self):
     added = model.bootstrap_group(
         model.ADMIN_GROUP, [api.get_current_identity()],
@@ -286,11 +284,11 @@ class LinkToPrimaryHandler(UIHandler):
 
   @classmethod
   def get_auth_methods(cls, conf):
-    # Using users.is_current_user_admin(). Other auth methods don't make sense.
+    # This method sets 'is_superuser' bit for GAE-level admins.
     return [handler.gae_cookie_authentication]
 
   @forbid_ui_on_replica
-  @api.require(users.is_current_user_admin)
+  @api.require(api.is_superuser)
   def get(self):
     ticket = self.decode_link_ticket()
     env = {
@@ -302,7 +300,7 @@ class LinkToPrimaryHandler(UIHandler):
     self.reply('auth/linking.html', env)
 
   @forbid_ui_on_replica
-  @api.require(users.is_current_user_admin)
+  @api.require(api.is_superuser)
   def post(self):
     ticket = self.decode_link_ticket()
     success = True

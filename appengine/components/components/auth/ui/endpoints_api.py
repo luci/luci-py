@@ -65,7 +65,7 @@ class AuthService(remote.Service):
       OpenIDConfig, OpenIDConfig,
       http_method='POST',
       path='/admin/openid/config')
-  @api.require(api.is_admin)
+  @api.require(api.is_superuser)
   def configure_openid(self, request):
     @ndb.transactional
     def txn():

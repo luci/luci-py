@@ -84,9 +84,9 @@ def machine_authentication(request):
     request: webapp2.Request with the incoming request.
 
   Returns:
-    auth.Identity with machine ID ("bot:<fqdn>") on success or None if there's
-    no machine token header (which means this authentication method is not
-    applicable).
+    (auth.Identity, False) with machine ID ("bot:<fqdn>") on success or
+    (None, False) if there's no machine token header (which means this
+    authentication method is not applicable).
 
   Raises:
     BadTokenError (which is api.AuthenticationError) if machine token header is
@@ -95,7 +95,7 @@ def machine_authentication(request):
   """
   token = request.headers.get(MACHINE_TOKEN_HEADER)
   if not token:
-    return None
+    return None, False
 
   # Deserialize both envelope and the body.
   try:
@@ -166,7 +166,7 @@ def machine_authentication(request):
     log_error(request, body, None, 'Bot ID %s is forbidden', ident.to_bytes())
     raise BadTokenError()
 
-  return ident
+  return ident, False
 
 
 def optional_machine_authentication(request):
@@ -178,7 +178,7 @@ def optional_machine_authentication(request):
   try:
     return machine_authentication(request)
   except BadTokenError:
-    return None # error details are already logged
+    return None, False # error details are already logged
 
 
 def b64_decode(data):

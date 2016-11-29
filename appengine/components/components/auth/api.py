@@ -50,6 +50,7 @@ __all__ = [
   'is_admin',
   'is_group_member',
   'is_in_ip_whitelist',
+  'is_superuser',
   'list_group',
   'public',
   'require',
@@ -466,7 +467,7 @@ def extract_oauth_caller_identity():
   client_id doesn't have to be in client_id whitelist.
 
   Returns:
-    Identity of the caller in case the request was successfully validated.
+    (Identity, is_superuser).
 
   Raises:
     AuthenticationError in case access_token is missing or invalid.
@@ -503,9 +504,10 @@ def extract_oauth_caller_identity():
         'Is client_id whitelisted? Is it unrecognized service account?' %
         (email, client_id))
   try:
-    return model.Identity(model.IDENTITY_USER, email)
+    ident = model.Identity(model.IDENTITY_USER, email)
   except ValueError:
     raise AuthenticationError('Unsupported user email: %s' % email)
+  return ident, oauth.is_current_user_admin(oauth_scope)
 
 
 def check_oauth_access_token(headers):
@@ -530,8 +532,9 @@ def check_oauth_access_token(headers):
     headers: a dict with request headers.
 
   Returns:
-    Identity of the caller in case the request was successfully validated.
-    Always 'user:...', never anonymous.
+    Tuple (ident, is_superuser), where ident is an identity of the caller in
+    case the request was successfully validated (always 'user:...', never
+    anonymous), and is_superuser is true if the caller is GAE-level admin.
 
   Raises:
     AuthenticationError in case the access token is invalid.
@@ -549,7 +552,10 @@ def check_oauth_access_token(headers):
   # but real) OAuth2 API endpoint instead to validate access_token. It is also
   # what Cloud Endpoints do on a local server.
   if utils.is_local_dev_server():
-    auth_call = lambda: dev_oauth_authentication(header, TOKEN_INFO_ENDPOINT)
+    # auth_call returns tuple (Identity, is_superuser). Superuser is always
+    # False if not using native GAE OAuth API.
+    auth_call = lambda: (
+        dev_oauth_authentication(header, TOKEN_INFO_ENDPOINT), False)
   else:
     auth_call = extract_oauth_caller_identity
 
@@ -566,7 +572,7 @@ def check_oauth_access_token(headers):
   except AuthenticationError:
     ident = dev_oauth_authentication(header, cfg.token_info_endpoint, '.dev')
     logging.warning('Authenticated as dev account: %s', ident.to_bytes())
-    return ident
+    return ident, False
 
 
 def dev_oauth_authentication(header, token_info_endpoint, suffix=''):
@@ -641,6 +647,7 @@ class RequestCache(object):
     self._current_identity = None
     self._peer_identity = None
     self._peer_ip = None
+    self._is_superuser = None
 
   @property
   def auth_db(self):
@@ -660,7 +667,7 @@ class RequestCache(object):
     It may be delegated identity conveyed through delegation token.
     If delegation is not used, it is equal to peer identity.
     """
-    assert current_identity
+    assert isinstance(current_identity, model.Identity), current_identity
     assert not self._current_identity
     self._current_identity = current_identity
 
@@ -675,7 +682,7 @@ class RequestCache(object):
     It's an identity directly extracted from user credentials (ignoring
     delegation tokens).
     """
-    assert peer_identity
+    assert isinstance(peer_identity, model.Identity), peer_identity
     assert not self._peer_identity
     self._peer_identity = peer_identity
 
@@ -685,10 +692,18 @@ class RequestCache(object):
 
   @peer_ip.setter
   def peer_ip(self, peer_ip):
-    """Remembers caller's ipaddr.IP address."""
     assert isinstance(peer_ip, ipaddr.IP)
     assert not self._peer_ip
     self._peer_ip = peer_ip
+
+  @property
+  def is_superuser(self):
+    return bool(self._is_superuser)
+
+  @is_superuser.setter
+  def is_superuser(self, value):
+    assert self._is_superuser is None # haven't been set yet
+    self._is_superuser = bool(value)
 
   def close(self):
     """Helps GC to collect garbage faster."""
@@ -974,8 +989,22 @@ def is_group_member(group_name, identity=None):
 
 
 def is_admin(identity=None):
-  """Returns True if |identity| (or current identity if None) is an admin."""
+  """Returns True if |identity| (or current identity if None) is an admin.
+
+  Admins are identities belonging to 'administrators' group
+  (see model.ADMIN_GROUP). They have no relation to GAE notion of 'admin'.
+
+  See 'is_superuser' for asserting GAE-level admin access.
+  """
   return is_group_member(model.ADMIN_GROUP, identity)
+
+
+def is_superuser():
+  """Returns True if the current caller is GAE-level administrator.
+
+  This works only for requests authenticated via GAE Users API or OAuth APIs.
+  """
+  return get_request_cache().is_superuser
 
 
 def list_group(group_name, recursive=True):
@@ -1123,8 +1152,11 @@ def autologin(func):
     try:
       return func(self, *args, **kwargs)
     except AuthorizationError:
-      if (not self.is_current_user_gae_admin() or
-          is_admin() or model.is_replica()):
+      # Redirect to auth bootstrap page only if called by GAE-level admin
+      # (only they are capable of running bootstrap), not already bootstrapped
+      # (as approximated by is_admin returning False), and not on replica
+      # (bootstrap works only on standalone or on primary).
+      if not is_superuser() or is_admin() or model.is_replica():
         raise
       self.redirect(
           '/auth/bootstrap?r=%s' % urllib.quote_plus(self.request.path_qs))

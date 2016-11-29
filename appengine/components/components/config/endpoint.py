@@ -60,7 +60,7 @@ def is_trusted_requester():
   Returns:
     True if the current identity is an admin or the config service.
   """
-  if auth.is_admin():
+  if auth.is_superuser() or auth.is_admin():
     return True
 
   settings = common.ConfigSettings.cached()
@@ -103,7 +103,7 @@ class ConfigApi(remote.Service):
   @auth.endpoints_method(
       ConfigSettingsMessage, ConfigSettingsMessage,
       http_method='POST')
-  @auth.require(auth.is_admin)
+  @auth.require(lambda: auth.is_superuser() or auth.is_admin())
   def settings(self, request):
     """Reads/writes config service location. Accessible only by admins."""
     settings = common.ConfigSettings.fetch() or common.ConfigSettings()

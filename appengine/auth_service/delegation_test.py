@@ -44,7 +44,7 @@ class HandlersTest(test_case.TestCase):
         delegation.CreateDelegationTokenHandler, 'xsrf_token_enforce_on', [])
     # Simplify auth.
     def dumb_auth(req):
-      return auth.Identity.from_bytes(req.headers['Mock-Peer-Id'])
+      return auth.Identity.from_bytes(req.headers['Mock-Peer-Id']), False
     self.mock(
         handler.AuthenticatingHandler, 'get_auth_methods',
         classmethod(lambda *_: [dumb_auth]))
