@@ -312,6 +312,10 @@
                   <td class="code">[[_command(_request)]]</td>
                 </tr>
                 <tr>
+                  <td>Idempotent</td>
+                  <td>[[_request.properties.idempotent]]</td>
+                </tr>
+                <tr>
                   <td rowspan$="[[_rowspan(_request.tags)]]">Tags</td>
                 </tr>
                 <template is="dom-repeat" items="{{_request.tags}}" as="tag">
@@ -789,11 +793,14 @@
           user: this._profile.email,
           service_account: this._request.service_account,
         }
+        newTask.properties.idempotent = false;
         swarming.postWithToast("/api/swarming/v1/tasks/new", "Retrying task " + this.task_id,
           this._auth_headers, newTask)
         .then(function(response) {
             response = JSON.parse(response);
             if (response && response.task_id) {
+              var state = {id: this.task_id};
+              history.pushState(state, "Task Page");
               this.set("task_id", response.task_id);
             }
           }.bind(this), function(e) {
