@@ -22,6 +22,7 @@ from components import ereporter2
 
 import handlers_endpoints
 import handlers_frontend
+import event_mon_metrics
 import ts_mon_metrics
 from server import config
 
@@ -47,6 +48,7 @@ def create_application():
     config.ConfigApi,
   ])
 
+  event_mon_metrics.initialize()
   ts_mon_metrics.initialize()
   return frontend_app, api, main.APP
 

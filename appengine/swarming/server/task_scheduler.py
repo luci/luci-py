@@ -19,6 +19,7 @@ from components import datastore_utils
 from components import pubsub
 from components import utils
 
+import event_mon_metrics
 import ts_mon_metrics
 
 from server import acl
@@ -812,6 +813,7 @@ def bot_update_task(
     return None
   _update_stats(run_result, bot_id, request, task_completed)
   if task_completed:
+    event_mon_metrics.send_task_event(smry)
     ts_mon_metrics.update_jobs_completed_metrics(smry)
   return run_result.state
 

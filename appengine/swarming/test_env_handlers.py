@@ -15,6 +15,7 @@ test_env.setup_test_env()
 from protorpc.remote import protojson
 import webtest
 
+import event_mon_metrics
 import handlers_endpoints
 import swarming_rpcs
 from components import auth
@@ -38,6 +39,7 @@ class AppTestBase(test_case.TestCase):
     self.testbed.init_user_stub()
 
     gae_ts_mon.reset_for_unittest(disable=True)
+    event_mon_metrics.initialize()
 
     # By default requests in tests are coming from bot with fake IP.
     # WSGI app that implements auth REST API.

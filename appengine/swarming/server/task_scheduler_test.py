@@ -18,6 +18,8 @@ from google.appengine.ext import ndb
 
 import webtest
 
+import event_mon_metrics
+
 from components import auth
 from components import auth_testing
 from components import datastore_utils
@@ -114,6 +116,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         })
     self.mock(stats_framework, 'add_entry', self._parse_line)
     auth_testing.mock_get_current_identity(self)
+    event_mon_metrics.initialize()
 
   def _parse_line(self, line):
     # pylint: disable=W0212
