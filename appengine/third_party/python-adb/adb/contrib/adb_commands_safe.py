@@ -50,7 +50,8 @@ def KillADB():
   adb's stability is less than stellar. Kill it with fire.
   """
   _LOG.info('KillADB()')
-  while True:
+  attempts = 10
+  for _ in xrange(attempts):
     try:
       subprocess.check_output(['pgrep', 'adb'])
     except subprocess.CalledProcessError:
@@ -68,6 +69,16 @@ def KillADB():
     # process.
     time.sleep(0.001)
 
+  try:
+    processes = subprocess.check_output(['ps', 'aux']).splitlines()
+  except subprocess.CalledProcessError:
+    _LOG.error('KillADB(): unable to scan process list.')
+    processes = []
+
+  culprits = '\n'.join(p for p in processes if 'adb' in p)
+  _LOG.error(
+      'KillADB() failed after %d attempts. Potential culprits: %s' % culprits)
+
 
 class AdbCommandsSafe(object):
   """Wraps an AdbCommands to make it exception safe.
@@ -78,12 +89,14 @@ class AdbCommandsSafe(object):
   Only contains the low level commands. High level operations are built upon the
   low level functionality provided by this class.
   """
-  # - CommonUsbError means that device I/O failed, e.g. a write or a read call
-  #   returned an error.
+  # - IOError includes usb_exceptions.CommonUsbError, which means that device
+  #   I/O failed, e.g.  a write or a read call returned an error. It also
+  #   includes adb_protocol.InvalidResponseError which happens if the
+  #   communication becomes desynchronized.
   # - USBError means that a bus I/O failed, e.g. the device path is not present
   #   anymore. It is sometimes thrown as USBErrorIO.
   _ERRORS = (
-      usb_exceptions.CommonUsbError,
+      IOError,
       common.usb1.USBError,
       common.usb1.USBErrorIO)
 

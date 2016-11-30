@@ -357,12 +357,16 @@ class _AdbConnection(object):
 
   def ReadUntil(self, finish_command='WRTE'):
     try:
+      with self._manager._lock:
+        yielder = self._yielder
+      if yielder is None:
+        raise InvalidResponseError('Never got \'%s\'' % finish_command, '<N/A>')
       while True:
-        message = self._yielder.next()
+        message = yielder.next()
         if message.header.command_name == finish_command:
           return message
     except StopIteration:
-      raise InvalidResponseError('Never got \'WRTE\'', '<N/A>')
+      raise InvalidResponseError('Never got \'%s\'' % finish_command, '<N/A>')
 
 
 class AdbConnectionManager(object):

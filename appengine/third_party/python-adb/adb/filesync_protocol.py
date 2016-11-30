@@ -210,7 +210,7 @@ class FileSyncConnection(object):
         # Wait for ack from device, ignoring these for too long causes things
         # to explode.
         self.adb.ReadUntil('OKAY')
-      except libusb1.USBError as e:
+      except (libusb1.USBError, adb_protocol.InvalidResponseError) as e:
         self.send_buffer = ''
         raise usb_exceptions.WriteFailedError('Could not write %r' % chunk, e)
       self.send_buffer = self.send_buffer[self.adb.max_packet_size:]
