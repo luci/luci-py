@@ -16,8 +16,10 @@ import "google/protobuf/struct.proto";
 
 service BotService {
   rpc Handshake(HandshakeRequest) returns (HandshakeResponse);
-  rpc Update(UpdateRequest) returns (UpdateResponse);
+  rpc BotUpdate(BotUpdateRequest) returns (BotUpdateResponse);
   rpc Poll(PollRequest) returns (PollResponse);
+  rpc TaskUpdate(TaskUpdateRequest) returns (TaskUpdateResponse);
+  rpc TaskError(TaskErrorRequest) returns (TaskErrorResponse);
 }
 
 message Dimension {
@@ -67,11 +69,11 @@ message HandshakeResponse {
   BotGroupCfg bot_group_cfg = 4;
 }
 
-message UpdateRequest {
+message BotUpdateRequest {
   string bot_version = 1;
 }
 
-message UpdateResponse {
+message BotUpdateResponse {
   bytes bot_code = 1;
 }
 
@@ -116,4 +118,28 @@ message PollResponse {
     string restart_message = 5;
     string version = 6;
   }
+}
+
+message TaskUpdateRequest {
+  google.protobuf.Struct params = 1;
+  string bot_id = 2;
+  string task_id = 3;
+  string output = 4;
+  int32 output_chunk_start = 5;
+  int32 exit_code = 6;
+}
+
+message TaskUpdateResponse {
+  string error = 1;
+  bool must_stop = 2;
+}
+
+message TaskErrorRequest {
+  string bot_id = 1;
+  string task_id = 2;
+  string msg = 3;
+}
+
+message TaskErrorResponse {
+  bool ok = 1; // Doesn't appear to be set by server?
 }

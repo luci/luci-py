@@ -37,6 +37,7 @@ import bot_auth
 import common
 import file_refresher
 import remote_client
+import remote_client_errors
 import singleton
 from api import bot
 from api import os_utilities
@@ -590,7 +591,7 @@ def poll_server(botobj, quit_bit, last_action):
       # (though anything that's not a remote_client.InternalError will make
       # it through, again preserving prior behaviour).
       botobj.remote.post_task_update(value, botobj.id, {'duration':0}, None, 0)
-    except remote_client.InternalError:
+    except remote_client_errors.InternalError:
       pass
     return False
 

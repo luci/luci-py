@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='swarming_bot.proto',
   package='luci.swarming.bot',
   syntax='proto3',
-  serialized_pb=_b('\n\x12swarming_bot.proto\x12\x11luci.swarming.bot\x1a\x1cgoogle/protobuf/struct.proto\")\n\tDimension\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06values\x18\x02 \x03(\t\"\x82\x03\n\x05State\x12\r\n\x05\x61udio\x18\x01 \x03(\t\x12\x1d\n\x15\x62ot_group_cfg_version\x18\x02 \x01(\t\x12\x15\n\rcost_usd_hour\x18\x03 \x01(\x01\x12\x0b\n\x03\x63pu\x18\x04 \x01(\t\x12\x0b\n\x03\x63wd\x18\x05 \x01(\t\x12&\n\x05\x64isks\x18\x06 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x0b\n\x03gpu\x18\x07 \x03(\t\x12\x10\n\x08hostname\x18\x08 \x01(\t\x12\n\n\x02ip\x18\t \x01(\t\x12\x0e\n\x06locale\x18\n \x01(\t\x12\x18\n\x10nb_files_in_temp\x18\x0b \x01(\x05\x12\x0b\n\x03pid\x18\x0c \x01(\x05\x12\x0b\n\x03ram\x18\r \x01(\x05\x12\x14\n\x0crunning_time\x18\x0e \x01(\x05\x12\x14\n\x0csleep_streak\x18\x0f \x01(\x05\x12\x12\n\nstarted_ts\x18\x10 \x01(\x05\x12%\n\x04temp\x18\x11 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x0e\n\x06uptime\x18\x12 \x01(\x05\x12\x0c\n\x04user\x18\x13 \x01(\t\"x\n\nAttributes\x12\x30\n\ndimensions\x18\x01 \x03(\x0b\x32\x1c.luci.swarming.bot.Dimension\x12\'\n\x05state\x18\x02 \x01(\x0b\x32\x18.luci.swarming.bot.State\x12\x0f\n\x07version\x18\x03 \x01(\t\"E\n\x10HandshakeRequest\x12\x31\n\nattributes\x18\x01 \x01(\x0b\x32\x1d.luci.swarming.bot.Attributes\"\xe9\x01\n\x11HandshakeResponse\x12\x16\n\x0eserver_version\x18\x01 \x01(\t\x12\x13\n\x0b\x62ot_version\x18\x02 \x01(\t\x12\x1d\n\x15\x62ot_group_cfg_version\x18\x03 \x01(\t\x12G\n\rbot_group_cfg\x18\x04 \x01(\x0b\x32\x30.luci.swarming.bot.HandshakeResponse.BotGroupCfg\x1a?\n\x0b\x42otGroupCfg\x12\x30\n\ndimensions\x18\x01 \x03(\x0b\x32\x1c.luci.swarming.bot.Dimension\"$\n\rUpdateRequest\x12\x13\n\x0b\x62ot_version\x18\x01 \x01(\t\"\"\n\x0eUpdateResponse\x12\x10\n\x08\x62ot_code\x18\x01 \x01(\x0c\"@\n\x0bPollRequest\x12\x31\n\nattributes\x18\x01 \x01(\x0b\x32\x1d.luci.swarming.bot.Attributes\"\xa4\x03\n\x08Manifest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12?\n\ndimensions\x18\x02 \x03(\x0b\x32+.luci.swarming.bot.Manifest.DimensionsEntry\x12\x36\n\x08isolated\x18\x03 \x01(\x0b\x32$.luci.swarming.bot.Manifest.Isolated\x12\x31\n\x03\x65nv\x18\x04 \x03(\x0b\x32$.luci.swarming.bot.Manifest.EnvEntry\x12\x14\n\x0cgrace_period\x18\x05 \x01(\x05\x12\x14\n\x0chard_timeout\x18\x06 \x01(\x05\x12\x12\n\nio_timeout\x18\x07 \x01(\x05\x12\x0e\n\x06\x62ot_id\x18\x08 \x01(\t\x1a\x31\n\x0f\x44imensionsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a,\n\x08Isolated\x12\r\n\x05input\x18\x01 \x01(\t\x12\x11\n\tnamespace\x18\x02 \x01(\t\x1a*\n\x08\x45nvEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xb0\x02\n\x0cPollResponse\x12\x39\n\x03\x63md\x18\x01 \x01(\x0e\x32,.luci.swarming.bot.PollResponse.ResponseType\x12\x14\n\nsleep_time\x18\x02 \x01(\x01H\x00\x12/\n\x08manifest\x18\x03 \x01(\x0b\x32\x1b.luci.swarming.bot.ManifestH\x00\x12\x1a\n\x10terminate_taskid\x18\x04 \x01(\tH\x00\x12\x19\n\x0frestart_message\x18\x05 \x01(\tH\x00\x12\x11\n\x07version\x18\x06 \x01(\tH\x00\"J\n\x0cResponseType\x12\n\n\x06UPDATE\x10\x00\x12\t\n\x05SLEEP\x10\x01\x12\r\n\tTERMINATE\x10\x02\x12\x07\n\x03RUN\x10\x03\x12\x0b\n\x07RESTART\x10\x04\x42\x08\n\x06\x61\x63tion2\xfc\x01\n\nBotService\x12V\n\tHandshake\x12#.luci.swarming.bot.HandshakeRequest\x1a$.luci.swarming.bot.HandshakeResponse\x12M\n\x06Update\x12 .luci.swarming.bot.UpdateRequest\x1a!.luci.swarming.bot.UpdateResponse\x12G\n\x04Poll\x12\x1e.luci.swarming.bot.PollRequest\x1a\x1f.luci.swarming.bot.PollResponseb\x06proto3')
+  serialized_pb=_b('\n\x12swarming_bot.proto\x12\x11luci.swarming.bot\x1a\x1cgoogle/protobuf/struct.proto\")\n\tDimension\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06values\x18\x02 \x03(\t\"\x82\x03\n\x05State\x12\r\n\x05\x61udio\x18\x01 \x03(\t\x12\x1d\n\x15\x62ot_group_cfg_version\x18\x02 \x01(\t\x12\x15\n\rcost_usd_hour\x18\x03 \x01(\x01\x12\x0b\n\x03\x63pu\x18\x04 \x01(\t\x12\x0b\n\x03\x63wd\x18\x05 \x01(\t\x12&\n\x05\x64isks\x18\x06 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x0b\n\x03gpu\x18\x07 \x03(\t\x12\x10\n\x08hostname\x18\x08 \x01(\t\x12\n\n\x02ip\x18\t \x01(\t\x12\x0e\n\x06locale\x18\n \x01(\t\x12\x18\n\x10nb_files_in_temp\x18\x0b \x01(\x05\x12\x0b\n\x03pid\x18\x0c \x01(\x05\x12\x0b\n\x03ram\x18\r \x01(\x05\x12\x14\n\x0crunning_time\x18\x0e \x01(\x05\x12\x14\n\x0csleep_streak\x18\x0f \x01(\x05\x12\x12\n\nstarted_ts\x18\x10 \x01(\x05\x12%\n\x04temp\x18\x11 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x0e\n\x06uptime\x18\x12 \x01(\x05\x12\x0c\n\x04user\x18\x13 \x01(\t\"x\n\nAttributes\x12\x30\n\ndimensions\x18\x01 \x03(\x0b\x32\x1c.luci.swarming.bot.Dimension\x12\'\n\x05state\x18\x02 \x01(\x0b\x32\x18.luci.swarming.bot.State\x12\x0f\n\x07version\x18\x03 \x01(\t\"E\n\x10HandshakeRequest\x12\x31\n\nattributes\x18\x01 \x01(\x0b\x32\x1d.luci.swarming.bot.Attributes\"\xe9\x01\n\x11HandshakeResponse\x12\x16\n\x0eserver_version\x18\x01 \x01(\t\x12\x13\n\x0b\x62ot_version\x18\x02 \x01(\t\x12\x1d\n\x15\x62ot_group_cfg_version\x18\x03 \x01(\t\x12G\n\rbot_group_cfg\x18\x04 \x01(\x0b\x32\x30.luci.swarming.bot.HandshakeResponse.BotGroupCfg\x1a?\n\x0b\x42otGroupCfg\x12\x30\n\ndimensions\x18\x01 \x03(\x0b\x32\x1c.luci.swarming.bot.Dimension\"\'\n\x10\x42otUpdateRequest\x12\x13\n\x0b\x62ot_version\x18\x01 \x01(\t\"%\n\x11\x42otUpdateResponse\x12\x10\n\x08\x62ot_code\x18\x01 \x01(\x0c\"@\n\x0bPollRequest\x12\x31\n\nattributes\x18\x01 \x01(\x0b\x32\x1d.luci.swarming.bot.Attributes\"\xa4\x03\n\x08Manifest\x12\x0f\n\x07task_id\x18\x01 \x01(\t\x12?\n\ndimensions\x18\x02 \x03(\x0b\x32+.luci.swarming.bot.Manifest.DimensionsEntry\x12\x36\n\x08isolated\x18\x03 \x01(\x0b\x32$.luci.swarming.bot.Manifest.Isolated\x12\x31\n\x03\x65nv\x18\x04 \x03(\x0b\x32$.luci.swarming.bot.Manifest.EnvEntry\x12\x14\n\x0cgrace_period\x18\x05 \x01(\x05\x12\x14\n\x0chard_timeout\x18\x06 \x01(\x05\x12\x12\n\nio_timeout\x18\x07 \x01(\x05\x12\x0e\n\x06\x62ot_id\x18\x08 \x01(\t\x1a\x31\n\x0f\x44imensionsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a,\n\x08Isolated\x12\r\n\x05input\x18\x01 \x01(\t\x12\x11\n\tnamespace\x18\x02 \x01(\t\x1a*\n\x08\x45nvEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xb0\x02\n\x0cPollResponse\x12\x39\n\x03\x63md\x18\x01 \x01(\x0e\x32,.luci.swarming.bot.PollResponse.ResponseType\x12\x14\n\nsleep_time\x18\x02 \x01(\x01H\x00\x12/\n\x08manifest\x18\x03 \x01(\x0b\x32\x1b.luci.swarming.bot.ManifestH\x00\x12\x1a\n\x10terminate_taskid\x18\x04 \x01(\tH\x00\x12\x19\n\x0frestart_message\x18\x05 \x01(\tH\x00\x12\x11\n\x07version\x18\x06 \x01(\tH\x00\"J\n\x0cResponseType\x12\n\n\x06UPDATE\x10\x00\x12\t\n\x05SLEEP\x10\x01\x12\r\n\tTERMINATE\x10\x02\x12\x07\n\x03RUN\x10\x03\x12\x0b\n\x07RESTART\x10\x04\x42\x08\n\x06\x61\x63tion\"\x9c\x01\n\x11TaskUpdateRequest\x12\'\n\x06params\x18\x01 \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x0e\n\x06\x62ot_id\x18\x02 \x01(\t\x12\x0f\n\x07task_id\x18\x03 \x01(\t\x12\x0e\n\x06output\x18\x04 \x01(\t\x12\x1a\n\x12output_chunk_start\x18\x05 \x01(\x05\x12\x11\n\texit_code\x18\x06 \x01(\x05\"6\n\x12TaskUpdateResponse\x12\r\n\x05\x65rror\x18\x01 \x01(\t\x12\x11\n\tmust_stop\x18\x02 \x01(\x08\"@\n\x10TaskErrorRequest\x12\x0e\n\x06\x62ot_id\x18\x01 \x01(\t\x12\x0f\n\x07task_id\x18\x02 \x01(\t\x12\x0b\n\x03msg\x18\x03 \x01(\t\"\x1f\n\x11TaskErrorResponse\x12\n\n\x02ok\x18\x01 \x01(\x08\x32\xb8\x03\n\nBotService\x12V\n\tHandshake\x12#.luci.swarming.bot.HandshakeRequest\x1a$.luci.swarming.bot.HandshakeResponse\x12V\n\tBotUpdate\x12#.luci.swarming.bot.BotUpdateRequest\x1a$.luci.swarming.bot.BotUpdateResponse\x12G\n\x04Poll\x12\x1e.luci.swarming.bot.PollRequest\x1a\x1f.luci.swarming.bot.PollResponse\x12Y\n\nTaskUpdate\x12$.luci.swarming.bot.TaskUpdateRequest\x1a%.luci.swarming.bot.TaskUpdateResponse\x12V\n\tTaskError\x12#.luci.swarming.bot.TaskErrorRequest\x1a$.luci.swarming.bot.TaskErrorResponseb\x06proto3')
   ,
   dependencies=[google_dot_protobuf_dot_struct__pb2.DESCRIPTOR,])
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
@@ -56,8 +56,8 @@ _POLLRESPONSE_RESPONSETYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=1716,
-  serialized_end=1790,
+  serialized_start=1722,
+  serialized_end=1796,
 )
 _sym_db.RegisterEnumDescriptor(_POLLRESPONSE_RESPONSETYPE)
 
@@ -415,15 +415,15 @@ _HANDSHAKERESPONSE = _descriptor.Descriptor(
 )
 
 
-_UPDATEREQUEST = _descriptor.Descriptor(
-  name='UpdateRequest',
-  full_name='luci.swarming.bot.UpdateRequest',
+_BOTUPDATEREQUEST = _descriptor.Descriptor(
+  name='BotUpdateRequest',
+  full_name='luci.swarming.bot.BotUpdateRequest',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='bot_version', full_name='luci.swarming.bot.UpdateRequest.bot_version', index=0,
+      name='bot_version', full_name='luci.swarming.bot.BotUpdateRequest.bot_version', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -442,19 +442,19 @@ _UPDATEREQUEST = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=932,
-  serialized_end=968,
+  serialized_end=971,
 )
 
 
-_UPDATERESPONSE = _descriptor.Descriptor(
-  name='UpdateResponse',
-  full_name='luci.swarming.bot.UpdateResponse',
+_BOTUPDATERESPONSE = _descriptor.Descriptor(
+  name='BotUpdateResponse',
+  full_name='luci.swarming.bot.BotUpdateResponse',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='bot_code', full_name='luci.swarming.bot.UpdateResponse.bot_code', index=0,
+      name='bot_code', full_name='luci.swarming.bot.BotUpdateResponse.bot_code', index=0,
       number=1, type=12, cpp_type=9, label=1,
       has_default_value=False, default_value=_b(""),
       message_type=None, enum_type=None, containing_type=None,
@@ -472,8 +472,8 @@ _UPDATERESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=970,
-  serialized_end=1004,
+  serialized_start=973,
+  serialized_end=1010,
 )
 
 
@@ -503,8 +503,8 @@ _POLLREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1006,
-  serialized_end=1070,
+  serialized_start=1012,
+  serialized_end=1076,
 )
 
 
@@ -541,8 +541,8 @@ _MANIFEST_DIMENSIONSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1354,
-  serialized_end=1403,
+  serialized_start=1360,
+  serialized_end=1409,
 )
 
 _MANIFEST_ISOLATED = _descriptor.Descriptor(
@@ -578,8 +578,8 @@ _MANIFEST_ISOLATED = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1405,
-  serialized_end=1449,
+  serialized_start=1411,
+  serialized_end=1455,
 )
 
 _MANIFEST_ENVENTRY = _descriptor.Descriptor(
@@ -615,8 +615,8 @@ _MANIFEST_ENVENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1451,
-  serialized_end=1493,
+  serialized_start=1457,
+  serialized_end=1499,
 )
 
 _MANIFEST = _descriptor.Descriptor(
@@ -694,8 +694,8 @@ _MANIFEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1073,
-  serialized_end=1493,
+  serialized_start=1079,
+  serialized_end=1499,
 )
 
 
@@ -764,8 +764,188 @@ _POLLRESPONSE = _descriptor.Descriptor(
       name='action', full_name='luci.swarming.bot.PollResponse.action',
       index=0, containing_type=None, fields=[]),
   ],
-  serialized_start=1496,
-  serialized_end=1800,
+  serialized_start=1502,
+  serialized_end=1806,
+)
+
+
+_TASKUPDATEREQUEST = _descriptor.Descriptor(
+  name='TaskUpdateRequest',
+  full_name='luci.swarming.bot.TaskUpdateRequest',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='params', full_name='luci.swarming.bot.TaskUpdateRequest.params', index=0,
+      number=1, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='bot_id', full_name='luci.swarming.bot.TaskUpdateRequest.bot_id', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='task_id', full_name='luci.swarming.bot.TaskUpdateRequest.task_id', index=2,
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='output', full_name='luci.swarming.bot.TaskUpdateRequest.output', index=3,
+      number=4, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='output_chunk_start', full_name='luci.swarming.bot.TaskUpdateRequest.output_chunk_start', index=4,
+      number=5, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='exit_code', full_name='luci.swarming.bot.TaskUpdateRequest.exit_code', index=5,
+      number=6, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1809,
+  serialized_end=1965,
+)
+
+
+_TASKUPDATERESPONSE = _descriptor.Descriptor(
+  name='TaskUpdateResponse',
+  full_name='luci.swarming.bot.TaskUpdateResponse',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='error', full_name='luci.swarming.bot.TaskUpdateResponse.error', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='must_stop', full_name='luci.swarming.bot.TaskUpdateResponse.must_stop', index=1,
+      number=2, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=1967,
+  serialized_end=2021,
+)
+
+
+_TASKERRORREQUEST = _descriptor.Descriptor(
+  name='TaskErrorRequest',
+  full_name='luci.swarming.bot.TaskErrorRequest',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='bot_id', full_name='luci.swarming.bot.TaskErrorRequest.bot_id', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='task_id', full_name='luci.swarming.bot.TaskErrorRequest.task_id', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='msg', full_name='luci.swarming.bot.TaskErrorRequest.msg', index=2,
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=2023,
+  serialized_end=2087,
+)
+
+
+_TASKERRORRESPONSE = _descriptor.Descriptor(
+  name='TaskErrorResponse',
+  full_name='luci.swarming.bot.TaskErrorResponse',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='ok', full_name='luci.swarming.bot.TaskErrorResponse.ok', index=0,
+      number=1, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=2089,
+  serialized_end=2120,
 )
 
 _STATE.fields_by_name['disks'].message_type = google_dot_protobuf_dot_struct__pb2._STRUCT
@@ -801,16 +981,21 @@ _POLLRESPONSE.fields_by_name['restart_message'].containing_oneof = _POLLRESPONSE
 _POLLRESPONSE.oneofs_by_name['action'].fields.append(
   _POLLRESPONSE.fields_by_name['version'])
 _POLLRESPONSE.fields_by_name['version'].containing_oneof = _POLLRESPONSE.oneofs_by_name['action']
+_TASKUPDATEREQUEST.fields_by_name['params'].message_type = google_dot_protobuf_dot_struct__pb2._STRUCT
 DESCRIPTOR.message_types_by_name['Dimension'] = _DIMENSION
 DESCRIPTOR.message_types_by_name['State'] = _STATE
 DESCRIPTOR.message_types_by_name['Attributes'] = _ATTRIBUTES
 DESCRIPTOR.message_types_by_name['HandshakeRequest'] = _HANDSHAKEREQUEST
 DESCRIPTOR.message_types_by_name['HandshakeResponse'] = _HANDSHAKERESPONSE
-DESCRIPTOR.message_types_by_name['UpdateRequest'] = _UPDATEREQUEST
-DESCRIPTOR.message_types_by_name['UpdateResponse'] = _UPDATERESPONSE
+DESCRIPTOR.message_types_by_name['BotUpdateRequest'] = _BOTUPDATEREQUEST
+DESCRIPTOR.message_types_by_name['BotUpdateResponse'] = _BOTUPDATERESPONSE
 DESCRIPTOR.message_types_by_name['PollRequest'] = _POLLREQUEST
 DESCRIPTOR.message_types_by_name['Manifest'] = _MANIFEST
 DESCRIPTOR.message_types_by_name['PollResponse'] = _POLLRESPONSE
+DESCRIPTOR.message_types_by_name['TaskUpdateRequest'] = _TASKUPDATEREQUEST
+DESCRIPTOR.message_types_by_name['TaskUpdateResponse'] = _TASKUPDATERESPONSE
+DESCRIPTOR.message_types_by_name['TaskErrorRequest'] = _TASKERRORREQUEST
+DESCRIPTOR.message_types_by_name['TaskErrorResponse'] = _TASKERRORRESPONSE
 
 Dimension = _reflection.GeneratedProtocolMessageType('Dimension', (_message.Message,), dict(
   DESCRIPTOR = _DIMENSION,
@@ -855,19 +1040,19 @@ HandshakeResponse = _reflection.GeneratedProtocolMessageType('HandshakeResponse'
 _sym_db.RegisterMessage(HandshakeResponse)
 _sym_db.RegisterMessage(HandshakeResponse.BotGroupCfg)
 
-UpdateRequest = _reflection.GeneratedProtocolMessageType('UpdateRequest', (_message.Message,), dict(
-  DESCRIPTOR = _UPDATEREQUEST,
+BotUpdateRequest = _reflection.GeneratedProtocolMessageType('BotUpdateRequest', (_message.Message,), dict(
+  DESCRIPTOR = _BOTUPDATEREQUEST,
   __module__ = 'swarming_bot_pb2'
-  # @@protoc_insertion_point(class_scope:luci.swarming.bot.UpdateRequest)
+  # @@protoc_insertion_point(class_scope:luci.swarming.bot.BotUpdateRequest)
   ))
-_sym_db.RegisterMessage(UpdateRequest)
+_sym_db.RegisterMessage(BotUpdateRequest)
 
-UpdateResponse = _reflection.GeneratedProtocolMessageType('UpdateResponse', (_message.Message,), dict(
-  DESCRIPTOR = _UPDATERESPONSE,
+BotUpdateResponse = _reflection.GeneratedProtocolMessageType('BotUpdateResponse', (_message.Message,), dict(
+  DESCRIPTOR = _BOTUPDATERESPONSE,
   __module__ = 'swarming_bot_pb2'
-  # @@protoc_insertion_point(class_scope:luci.swarming.bot.UpdateResponse)
+  # @@protoc_insertion_point(class_scope:luci.swarming.bot.BotUpdateResponse)
   ))
-_sym_db.RegisterMessage(UpdateResponse)
+_sym_db.RegisterMessage(BotUpdateResponse)
 
 PollRequest = _reflection.GeneratedProtocolMessageType('PollRequest', (_message.Message,), dict(
   DESCRIPTOR = _POLLREQUEST,
@@ -914,6 +1099,34 @@ PollResponse = _reflection.GeneratedProtocolMessageType('PollResponse', (_messag
   ))
 _sym_db.RegisterMessage(PollResponse)
 
+TaskUpdateRequest = _reflection.GeneratedProtocolMessageType('TaskUpdateRequest', (_message.Message,), dict(
+  DESCRIPTOR = _TASKUPDATEREQUEST,
+  __module__ = 'swarming_bot_pb2'
+  # @@protoc_insertion_point(class_scope:luci.swarming.bot.TaskUpdateRequest)
+  ))
+_sym_db.RegisterMessage(TaskUpdateRequest)
+
+TaskUpdateResponse = _reflection.GeneratedProtocolMessageType('TaskUpdateResponse', (_message.Message,), dict(
+  DESCRIPTOR = _TASKUPDATERESPONSE,
+  __module__ = 'swarming_bot_pb2'
+  # @@protoc_insertion_point(class_scope:luci.swarming.bot.TaskUpdateResponse)
+  ))
+_sym_db.RegisterMessage(TaskUpdateResponse)
+
+TaskErrorRequest = _reflection.GeneratedProtocolMessageType('TaskErrorRequest', (_message.Message,), dict(
+  DESCRIPTOR = _TASKERRORREQUEST,
+  __module__ = 'swarming_bot_pb2'
+  # @@protoc_insertion_point(class_scope:luci.swarming.bot.TaskErrorRequest)
+  ))
+_sym_db.RegisterMessage(TaskErrorRequest)
+
+TaskErrorResponse = _reflection.GeneratedProtocolMessageType('TaskErrorResponse', (_message.Message,), dict(
+  DESCRIPTOR = _TASKERRORRESPONSE,
+  __module__ = 'swarming_bot_pb2'
+  # @@protoc_insertion_point(class_scope:luci.swarming.bot.TaskErrorResponse)
+  ))
+_sym_db.RegisterMessage(TaskErrorResponse)
+
 
 _MANIFEST_DIMENSIONSENTRY.has_options = True
 _MANIFEST_DIMENSIONSENTRY._options = _descriptor._ParseOptions(descriptor_pb2.MessageOptions(), _b('8\001'))
@@ -939,15 +1152,25 @@ class BotServiceStub(object):
         request_serializer=HandshakeRequest.SerializeToString,
         response_deserializer=HandshakeResponse.FromString,
         )
-    self.Update = channel.unary_unary(
-        '/luci.swarming.bot.BotService/Update',
-        request_serializer=UpdateRequest.SerializeToString,
-        response_deserializer=UpdateResponse.FromString,
+    self.BotUpdate = channel.unary_unary(
+        '/luci.swarming.bot.BotService/BotUpdate',
+        request_serializer=BotUpdateRequest.SerializeToString,
+        response_deserializer=BotUpdateResponse.FromString,
         )
     self.Poll = channel.unary_unary(
         '/luci.swarming.bot.BotService/Poll',
         request_serializer=PollRequest.SerializeToString,
         response_deserializer=PollResponse.FromString,
+        )
+    self.TaskUpdate = channel.unary_unary(
+        '/luci.swarming.bot.BotService/TaskUpdate',
+        request_serializer=TaskUpdateRequest.SerializeToString,
+        response_deserializer=TaskUpdateResponse.FromString,
+        )
+    self.TaskError = channel.unary_unary(
+        '/luci.swarming.bot.BotService/TaskError',
+        request_serializer=TaskErrorRequest.SerializeToString,
+        response_deserializer=TaskErrorResponse.FromString,
         )
 
 
@@ -958,12 +1181,22 @@ class BotServiceServicer(object):
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
 
-  def Update(self, request, context):
+  def BotUpdate(self, request, context):
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
 
   def Poll(self, request, context):
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
+  def TaskUpdate(self, request, context):
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
+  def TaskError(self, request, context):
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
@@ -976,15 +1209,25 @@ def add_BotServiceServicer_to_server(servicer, server):
           request_deserializer=HandshakeRequest.FromString,
           response_serializer=HandshakeResponse.SerializeToString,
       ),
-      'Update': grpc.unary_unary_rpc_method_handler(
-          servicer.Update,
-          request_deserializer=UpdateRequest.FromString,
-          response_serializer=UpdateResponse.SerializeToString,
+      'BotUpdate': grpc.unary_unary_rpc_method_handler(
+          servicer.BotUpdate,
+          request_deserializer=BotUpdateRequest.FromString,
+          response_serializer=BotUpdateResponse.SerializeToString,
       ),
       'Poll': grpc.unary_unary_rpc_method_handler(
           servicer.Poll,
           request_deserializer=PollRequest.FromString,
           response_serializer=PollResponse.SerializeToString,
+      ),
+      'TaskUpdate': grpc.unary_unary_rpc_method_handler(
+          servicer.TaskUpdate,
+          request_deserializer=TaskUpdateRequest.FromString,
+          response_serializer=TaskUpdateResponse.SerializeToString,
+      ),
+      'TaskError': grpc.unary_unary_rpc_method_handler(
+          servicer.TaskError,
+          request_deserializer=TaskErrorRequest.FromString,
+          response_serializer=TaskErrorResponse.SerializeToString,
       ),
   }
   generic_handler = grpc.method_handlers_generic_handler(
@@ -995,9 +1238,13 @@ def add_BotServiceServicer_to_server(servicer, server):
 class BetaBotServiceServicer(object):
   def Handshake(self, request, context):
     context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
-  def Update(self, request, context):
+  def BotUpdate(self, request, context):
     context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
   def Poll(self, request, context):
+    context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
+  def TaskUpdate(self, request, context):
+    context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
+  def TaskError(self, request, context):
     context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
 
 
@@ -1005,29 +1252,41 @@ class BetaBotServiceStub(object):
   def Handshake(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
     raise NotImplementedError()
   Handshake.future = None
-  def Update(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
+  def BotUpdate(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
     raise NotImplementedError()
-  Update.future = None
+  BotUpdate.future = None
   def Poll(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
     raise NotImplementedError()
   Poll.future = None
+  def TaskUpdate(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
+    raise NotImplementedError()
+  TaskUpdate.future = None
+  def TaskError(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
+    raise NotImplementedError()
+  TaskError.future = None
 
 
 def beta_create_BotService_server(servicer, pool=None, pool_size=None, default_timeout=None, maximum_timeout=None):
   request_deserializers = {
+    ('luci.swarming.bot.BotService', 'BotUpdate'): BotUpdateRequest.FromString,
     ('luci.swarming.bot.BotService', 'Handshake'): HandshakeRequest.FromString,
     ('luci.swarming.bot.BotService', 'Poll'): PollRequest.FromString,
-    ('luci.swarming.bot.BotService', 'Update'): UpdateRequest.FromString,
+    ('luci.swarming.bot.BotService', 'TaskError'): TaskErrorRequest.FromString,
+    ('luci.swarming.bot.BotService', 'TaskUpdate'): TaskUpdateRequest.FromString,
   }
   response_serializers = {
+    ('luci.swarming.bot.BotService', 'BotUpdate'): BotUpdateResponse.SerializeToString,
     ('luci.swarming.bot.BotService', 'Handshake'): HandshakeResponse.SerializeToString,
     ('luci.swarming.bot.BotService', 'Poll'): PollResponse.SerializeToString,
-    ('luci.swarming.bot.BotService', 'Update'): UpdateResponse.SerializeToString,
+    ('luci.swarming.bot.BotService', 'TaskError'): TaskErrorResponse.SerializeToString,
+    ('luci.swarming.bot.BotService', 'TaskUpdate'): TaskUpdateResponse.SerializeToString,
   }
   method_implementations = {
+    ('luci.swarming.bot.BotService', 'BotUpdate'): face_utilities.unary_unary_inline(servicer.BotUpdate),
     ('luci.swarming.bot.BotService', 'Handshake'): face_utilities.unary_unary_inline(servicer.Handshake),
     ('luci.swarming.bot.BotService', 'Poll'): face_utilities.unary_unary_inline(servicer.Poll),
-    ('luci.swarming.bot.BotService', 'Update'): face_utilities.unary_unary_inline(servicer.Update),
+    ('luci.swarming.bot.BotService', 'TaskError'): face_utilities.unary_unary_inline(servicer.TaskError),
+    ('luci.swarming.bot.BotService', 'TaskUpdate'): face_utilities.unary_unary_inline(servicer.TaskUpdate),
   }
   server_options = beta_implementations.server_options(request_deserializers=request_deserializers, response_serializers=response_serializers, thread_pool=pool, thread_pool_size=pool_size, default_timeout=default_timeout, maximum_timeout=maximum_timeout)
   return beta_implementations.server(method_implementations, options=server_options)
@@ -1035,19 +1294,25 @@ def beta_create_BotService_server(servicer, pool=None, pool_size=None, default_t
 
 def beta_create_BotService_stub(channel, host=None, metadata_transformer=None, pool=None, pool_size=None):
   request_serializers = {
+    ('luci.swarming.bot.BotService', 'BotUpdate'): BotUpdateRequest.SerializeToString,
     ('luci.swarming.bot.BotService', 'Handshake'): HandshakeRequest.SerializeToString,
     ('luci.swarming.bot.BotService', 'Poll'): PollRequest.SerializeToString,
-    ('luci.swarming.bot.BotService', 'Update'): UpdateRequest.SerializeToString,
+    ('luci.swarming.bot.BotService', 'TaskError'): TaskErrorRequest.SerializeToString,
+    ('luci.swarming.bot.BotService', 'TaskUpdate'): TaskUpdateRequest.SerializeToString,
   }
   response_deserializers = {
+    ('luci.swarming.bot.BotService', 'BotUpdate'): BotUpdateResponse.FromString,
     ('luci.swarming.bot.BotService', 'Handshake'): HandshakeResponse.FromString,
     ('luci.swarming.bot.BotService', 'Poll'): PollResponse.FromString,
-    ('luci.swarming.bot.BotService', 'Update'): UpdateResponse.FromString,
+    ('luci.swarming.bot.BotService', 'TaskError'): TaskErrorResponse.FromString,
+    ('luci.swarming.bot.BotService', 'TaskUpdate'): TaskUpdateResponse.FromString,
   }
   cardinalities = {
+    'BotUpdate': cardinality.Cardinality.UNARY_UNARY,
     'Handshake': cardinality.Cardinality.UNARY_UNARY,
     'Poll': cardinality.Cardinality.UNARY_UNARY,
-    'Update': cardinality.Cardinality.UNARY_UNARY,
+    'TaskError': cardinality.Cardinality.UNARY_UNARY,
+    'TaskUpdate': cardinality.Cardinality.UNARY_UNARY,
   }
   stub_options = beta_implementations.stub_options(host=host, metadata_transformer=metadata_transformer, request_serializers=request_serializers, response_deserializers=response_deserializers, thread_pool=pool, thread_pool_size=pool_size)
   return beta_implementations.dynamic_stub(channel, 'luci.swarming.bot.BotService', cardinalities, options=stub_options)

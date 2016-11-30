@@ -11,6 +11,7 @@ import logging
 import grpc
 import google.protobuf.json_format
 from proto import swarming_bot_pb2
+from remote_client_errors import InternalError
 
 
 class RemoteClientGrpc(object):
@@ -41,17 +42,35 @@ class RemoteClientGrpc(object):
     logging.warning('Not yet implemented: posting bot event: %s', message)
 
   def post_task_update(self, task_id, bot_id, params,
-                       stdout_and_chunk=None, _exit_code=None):
-    logging.warning(
-      'Not yet implemented: posting task update for task %s, bot %s: %s',
-      task_id, bot_id, params)
-    if stdout_and_chunk != None:
-      logging.warning('stdout: %s', stdout_and_chunk[0])
-    return True
+                       stdout_and_chunk=None, exit_code=None):
+    request = swarming_bot_pb2.TaskUpdateRequest()
+    request.bot_id = bot_id
+    request.task_id = task_id
+    if params.has_key('bot_id') or params.has_key('task_id'):
+      raise InternalError('params has bot_id or task_id')
+    # Preserving prior behaviour: empty stdout is not transmitted
+    if stdout_and_chunk and stdout_and_chunk[0]:
+      request.output = stdout_and_chunk[0]
+      request.output_chunk_start = stdout_and_chunk[1]
+    if exit_code != None:
+      request.exit_code = exit_code
+    insert_dict_as_submessage_struct(request, 'params', params)
 
-  def post_task_error(self, _task_id, _bot_id, _message):
-    logging.warning('Not yet implemented: posting task error')
-    return True
+    response = self._stub.TaskUpdate(request)
+    logging.debug('post_task_update() = %s', request)
+    if not response.error:
+      raise InternalError(response.error)
+    return not response.must_stop
+
+  def post_task_error(self, task_id, bot_id, message):
+    request = swarming_bot_pb2.TaskErrorRequest()
+    request.bot_id = bot_id
+    request.task_id = task_id
+    request.msg = message
+    logging.error('post_task_error() = %s', request)
+
+    response = self._stub.TaskError(request)
+    return response.ok
 
   def _attributes_json_to_proto(self, json_attr, msg):
     msg.version = json_attr['version']
@@ -131,9 +150,9 @@ class RemoteClientGrpc(object):
   def get_bot_code(self, new_zip_fn, bot_version, _bot_id):
     # TODO(aludwin): exception handling, pass bot_id
     logging.info('Updating to version: %s', bot_version)
-    request = swarming_bot_pb2.UpdateRequest()
+    request = swarming_bot_pb2.BotUpdateRequest()
     request.bot_version = bot_version
-    response = self._stub.Update(request)
+    response = self._stub.BotUpdate(request)
     with open(new_zip_fn, 'wb') as f:
       f.write(response.bot_code)
 
@@ -157,9 +176,7 @@ def create_state_proto(state_dict, message):
   """
   for k, v in state_dict.iteritems():
     if isinstance(v, dict):
-      sub_msg = getattr(message, k)
-      json_val = json.dumps(v)
-      google.protobuf.json_format.Parse(json_val, sub_msg)
+      insert_dict_as_submessage_struct(message, k, v)
     elif isinstance(v, list):
       l = getattr(message, k)
       l.extend(v)
@@ -171,3 +188,15 @@ def create_state_proto(state_dict, message):
       # Warning: setattr will throw if attr doesn't exist.
       # TODO(aludwin): catch in sane way
       setattr(message, k, v)
+
+
+def insert_dict_as_submessage_struct(message, keyname, value):
+  """Encodes a dict as a Protobuf struct.
+
+  The keyname for the Struct field is passed in to simplify the creation
+  of the submessage in the first place - you need to say getattr and not
+  simply refer to message.keyname since the former actually creates the
+  submessage while the latter does not.
+  """
+  sub_msg = getattr(message, keyname)
+  google.protobuf.json_format.Parse(json.dumps(value), sub_msg)

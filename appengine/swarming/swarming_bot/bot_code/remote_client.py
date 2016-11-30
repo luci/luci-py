@@ -11,6 +11,10 @@ import urllib
 
 from utils import net
 
+from remote_client_errors import InitializationError
+from remote_client_errors import BotCodeError
+from remote_client_errors import InternalError
+
 
 # RemoteClient will attempt to refresh the authentication headers once they are
 # this close to the expiration.
@@ -21,25 +25,6 @@ AUTH_HEADERS_EXPIRATION_SEC = 6*60
 # AUTH_HEADERS_EXPIRATION_SEC, since otherwise there's a chance auth headers
 # will expire while we wait for connection.
 NET_CONNECTION_TIMEOUT_SEC = 5*60
-
-
-class InitializationError(Exception):
-  """Raised by RemoteClient.initialize on fatal errors."""
-  def __init__(self, last_error):
-    super(InitializationError, self).__init__('Failed to grab auth headers')
-    self.last_error = last_error
-
-
-class BotCodeError(Exception):
-  """Raised by RemoteClient.get_bot_code."""
-  def __init__(self, new_zip, url, version):
-    super(BotCodeError, self).__init__(
-        'Unable to download %s from %s; first tried version %s' %
-        (new_zip, url, version))
-
-
-class InternalError(Exception):
-  """Raised on unrecoverable errors that abort task with 'internal error'."""
 
 
 def createRemoteClient(server, auth, useGrpc):
