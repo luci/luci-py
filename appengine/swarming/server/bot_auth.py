@@ -67,6 +67,9 @@ def validate_bot_id_and_fetch_config(bot_id):
           'bot_id: "%s", expected_id: "%s", peer_ident: "%s", '
           'original bot_id: "%s"', bot_id, expected_id.to_bytes(),
           peer_ident.to_bytes(), original_bot_id)
+      if peer_ident.to_bytes() == 'anonymous:anonymous':
+        logging.error('bot is identifying as anonymous. Is the "userinfo" '
+                      'scope enabled for this instance?')
       raise auth.AuthorizationError('bot is not using expected service account')
   elif not cfg.ip_whitelist:
     # This branch should not be hit for validated configs.

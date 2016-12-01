@@ -208,6 +208,7 @@ def _fetch_bot_groups():
   rev, cfg = config.get_self_config(
       BOTS_CFG_FILENAME, bots_pb2.BotsCfg, store_last_good=True)
   if not cfg:
+    logging.info('Didn\'t find bots.cfg, using default')
     return _DEFAULT_BOT_GROUPS
 
   # The code below assumes the config is already validated (as promised by
