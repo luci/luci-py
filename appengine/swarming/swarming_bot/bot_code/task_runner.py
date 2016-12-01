@@ -84,8 +84,8 @@ def get_run_isolated():
   return [sys.executable, THIS_FILE, 'run_isolated']
 
 
-def get_isolated_args(
-    work_dir, task_details, isolated_result, bot_file, min_free_space):
+def get_isolated_args(is_grpc, work_dir, task_details, isolated_result,
+                      bot_file, min_free_space):
   """Returns the command to call run_isolated. Mocked in tests."""
   assert (bool(task_details.command) !=
           bool(task_details.isolated and task_details.isolated.get('input')))
@@ -107,6 +107,8 @@ def get_isolated_args(
           [
             '--isolated', isolated_input,
           ])
+    if is_grpc:
+      cmd.append('--is-grpc')
 
   # Named caches options.
   # Specify --named-cache-root unconditionally so run_isolated.py never creates
@@ -418,8 +420,8 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
   args_path = os.path.join(work_dir, 'run_isolated_args.json')
   cmd = get_run_isolated()
   cmd.extend(['-a', args_path])
-  args = get_isolated_args(
-      work_dir, task_details, isolated_result, bot_file, min_free_space)
+  args = get_isolated_args(remote.is_grpc(), work_dir, task_details,
+                           isolated_result, bot_file, min_free_space)
   # Hard timeout enforcement is deferred to run_isolated. Grace is doubled to
   # give one 'grace_period' slot to the child process and one slot to upload
   # the results back.

@@ -10,7 +10,7 @@ import logging
 
 import grpc
 import google.protobuf.json_format
-from proto import swarming_bot_pb2
+from proto_bot import swarming_bot_pb2
 from remote_client_errors import InternalError
 
 
@@ -50,15 +50,16 @@ class RemoteClientGrpc(object):
       raise InternalError('params has bot_id or task_id')
     # Preserving prior behaviour: empty stdout is not transmitted
     if stdout_and_chunk and stdout_and_chunk[0]:
-      request.output = stdout_and_chunk[0]
-      request.output_chunk_start = stdout_and_chunk[1]
+      request.output_chunk = stdout_and_chunk[0]
+      request.output_chunk_offset = stdout_and_chunk[1]
     if exit_code != None:
+      request.finished = True
       request.exit_code = exit_code
     insert_dict_as_submessage_struct(request, 'params', params)
 
     response = self._stub.TaskUpdate(request)
     logging.debug('post_task_update() = %s', request)
-    if not response.error:
+    if response.error:
       raise InternalError(response.error)
     return not response.must_stop
 
@@ -122,9 +123,11 @@ class RemoteClientGrpc(object):
 
     if response.cmd == swarming_bot_pb2.PollResponse.RUN:
       protoManifest = response.manifest
+      # IsolateServerGrpc in client/isolate_storage.py only supports
+      # the default namespace.
+      assert protoManifest.isolated.namespace == 'default-gzip'
       manifest = {
         'bot_id': protoManifest.bot_id,
-        'command': None, # only supports Isolated, but avoid key error
         'dimensions' : {
             key: val for key, val in protoManifest.dimensions.items()
         },
@@ -137,9 +140,16 @@ class RemoteClientGrpc(object):
         'isolated': {
             'namespace': protoManifest.isolated.namespace,
             'input' : protoManifest.isolated.input,
-            'server': self._server, #TODO(aludwin): make this work properly
+            'server': self._server,
         },
+        'outputs': [ o for o in protoManifest.outputs ],
         'task_id': protoManifest.task_id,
+
+        # These keys are only needed by raw commands. While this method
+        # only supports isolated commands, the keys need to exist to avoid
+        # missing key errors.
+        'command': None,
+        'extra_args': None,
       }
       logging.info('Received job manifest: %s', manifest)
       self._log_is_asleep = False

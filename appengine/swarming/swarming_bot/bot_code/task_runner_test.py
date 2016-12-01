@@ -386,7 +386,8 @@ class TestTaskRunner(TestTaskRunnerBase):
           [sys.executable, '-u', '-c', SCRIPT_ISOLATED])
     self.mock(
         task_runner, 'get_isolated_args',
-        lambda _work_dir, _details, isolated_result, bot_file, min_free_space:
+        lambda _is_grpc, _work_dir, _details, isolated_result,
+          bot_file, min_free_space:
           [isolated_result])
     expected = {
       u'exit_code': 0,

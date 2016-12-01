@@ -99,6 +99,7 @@ message Manifest {
   int32 hard_timeout = 6;
   int32 io_timeout = 7;
   string bot_id = 8;
+  repeated string outputs = 9;
 }
 
 message PollResponse {
@@ -124,9 +125,10 @@ message TaskUpdateRequest {
   google.protobuf.Struct params = 1;
   string bot_id = 2;
   string task_id = 3;
-  string output = 4;
-  int32 output_chunk_start = 5;
-  int32 exit_code = 6;
+  bytes output_chunk = 4;
+  int32 output_chunk_offset = 5;
+  bool finished = 6;
+  int32 exit_code = 7;
 }
 
 message TaskUpdateResponse {
