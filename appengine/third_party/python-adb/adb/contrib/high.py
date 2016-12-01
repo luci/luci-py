@@ -140,6 +140,12 @@ def _InitCache(device):
 
     mode, _, _ = device.Stat('/system/xbin/su')
     has_su = bool(mode)
+    # Stat'ing /system/xbin/su directly from adbd outside of a shell can fail
+    # due to SELinux permission errors. Try again by executing su via shell.
+    if not has_su:
+      out, exit_code = device.Shell('/system/xbin/su root whoami')
+      if not exit_code and out and out.strip() == 'root':
+        has_su = True
 
     available_governors = KNOWN_CPU_SCALING_GOVERNOR_VALUES
     out = device.PullContent(
