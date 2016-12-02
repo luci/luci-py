@@ -65,6 +65,8 @@ class MachineLease(ndb.Model):
     id: A string in the form <machine type id>-<number>.
     kind: MachineLease. Is a root entity.
   """
+  # Bot ID for the BotInfo created for this machine.
+  bot_id = ndb.StringProperty(indexed=False)
   # Request ID used to generate this request.
   client_request_id = ndb.StringProperty(indexed=True)
   # Whether or not this MachineLease should issue lease requests.
@@ -221,16 +223,23 @@ def drain_excess(max_concurrent=50):
 
 def schedule_lease_management():
   """Schedules task queues to process each MachineLease."""
+  now = utils.utcnow()
   for machine_lease in MachineLease.query():
-    if not utils.enqueue_task(
-        '/internal/taskqueue/machine-provider-manage',
-        'machine-provider-manage',
-        params={
-            'key': machine_lease.key.urlsafe(),
-        },
-    ):
-      logging.warning(
-          'Failed to enqueue task for MachineLease: %s', machine_lease.key)
+    # If there's no known bot_id, we're waiting on a lease so schedule the
+    # management job to check on it. If there is a bot_id, then don't bother
+    # scheduling the management job until it's time to release the machine.
+    if (not machine_lease.bot_id
+        or machine_lease.lease_expiration_ts <= now + datetime.timedelta(
+            seconds=machine_lease.early_release_secs)):
+      if not utils.enqueue_task(
+          '/internal/taskqueue/machine-provider-manage',
+          'machine-provider-manage',
+          params={
+              'key': machine_lease.key.urlsafe(),
+          },
+      ):
+        logging.warning(
+            'Failed to enqueue task for MachineLease: %s', machine_lease.key)
 
 
 @ndb.transactional
@@ -259,9 +268,11 @@ def clear_lease_request(key, request_id):
     )
     return
 
+  machine_lease.bot_id = None
   machine_lease.client_request_id = None
   machine_lease.hostname = None
   machine_lease.lease_expiration_ts = None
+  machine_lease.lease_id = None
   machine_lease.termination_task = None
   machine_lease.put()
 
@@ -380,12 +391,34 @@ def delete_machine_lease(key):
   key.delete()
 
 
+@ndb.transactional
+def associate_bot_id(key, bot_id):
+  """Associates a bot with the given machine lease.
+
+  Args:
+    key: ndb.Key for a MachineLease entity.
+    bot_id: ID for a bot.
+  """
+  machine_lease = key.get()
+  if not machine_lease:
+    logging.error('MachineLease does not exist\nKey: %s', key)
+    return
+
+  if machine_lease.bot_id == bot_id:
+    return
+
+  machine_lease.bot_id = bot_id
+  machine_lease.put()
+
+
 def ensure_bot_info_exists(machine_lease):
   """Ensures a BotInfo entity exists and has Machine Provider-related fields.
 
   Args:
     machine_lease: MachineLease instance.
   """
+  if machine_lease.bot_id == machine_lease.hostname:
+    return
   bot_info = bot_management.get_info_key(machine_lease.hostname).get()
   if not (bot_info and bot_info.lease_id and bot_info.lease_expiration_ts):
     bot_management.bot_event(
@@ -402,6 +435,7 @@ def ensure_bot_info_exists(machine_lease):
         lease_id=machine_lease.lease_id,
         lease_expiration_ts=machine_lease.lease_expiration_ts,
     )
+  associate_bot_id(machine_lease.key, machine_lease.hostname)
 
 
 def last_shutdown_ts(hostname):
@@ -493,7 +527,9 @@ def manage_leased_machine(machine_lease):
   assert machine_lease.hostname, machine_lease.key
   assert machine_lease.lease_expiration_ts, machine_lease.key
 
-  ensure_bot_info_exists(machine_lease)
+  # Handle a newly leased machine.
+  if not machine_lease.bot_id:
+    ensure_bot_info_exists(machine_lease)
 
   # Handle an expired lease.
   if machine_lease.lease_expiration_ts <= utils.utcnow():
