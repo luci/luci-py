@@ -68,23 +68,23 @@ def update_url(key, url):
     key: ndb.Key for a models.InstanceTemplateRevision entity.
     url: URL string for the instance template.
   """
-  entity = key.get()
-  if not entity:
+  instance_template_revision = key.get()
+  if not instance_template_revision:
     logging.warning('InstanceTemplateRevision does not exist: %s', key)
     return
 
-  if entity.url == url:
+  if instance_template_revision.url == url:
     return
 
   logging.warning(
       'Updating URL for InstanceTemplateRevision: %s\nOld: %s\nNew: %s',
       key,
-      entity.url,
+      instance_template_revision.url,
       url,
   )
 
-  entity.url = url
-  entity.put()
+  instance_template_revision.url = url
+  instance_template_revision.put()
 
 
 def create(key):
@@ -96,59 +96,60 @@ def create(key):
   Raises:
     net.Error: HTTP status code is not 200 (created) or 409 (already created).
   """
-  entity = key.get()
-  if not entity:
+  instance_template_revision = key.get()
+  if not instance_template_revision:
     logging.warning('InstanceTemplateRevision does not exist: %s', key)
     return
 
-  if not entity.project:
+  if not instance_template_revision.project:
     logging.warning('InstanceTemplateRevision project unspecified: %s', key)
     return
 
-  if entity.url:
+  if instance_template_revision.url:
     logging.info(
         'Instance template for InstanceTemplateRevision already exists: %s',
         key,
     )
     return
 
-  if entity.metadata:
-    metadata = [{'key': key, 'value': value}
-                for key, value in entity.metadata.iteritems()]
+  if instance_template_revision.metadata:
+    metadata = [{'key': k, 'value': v}
+                for k, v in instance_template_revision.metadata.iteritems()]
   else:
     metadata = []
 
-  service_accounts = [{
-      'email': service_account.name, 'scopes': service_account.scopes
-  }
-  for service_account in entity.service_accounts]
+  service_accounts = [
+      {'email': service_account.name, 'scopes': service_account.scopes}
+      for service_account in instance_template_revision.service_accounts
+  ]
 
-  api = gce.Project(entity.project)
+  api = gce.Project(instance_template_revision.project)
   try:
+    image_project = api.project_id
+    if instance_template_revision.image_project:
+      image_project = instance_template_revision.image_project
     result = api.create_instance_template(
-        get_name(entity),
-        entity.disk_size_gb,
-        gce.get_image_url(
-            entity.image_project if entity.image_project else api.project_id,
-            entity.image_name
-        ),
-        entity.machine_type,
-        auto_assign_external_ip=entity.auto_assign_external_ip,
+        get_name(instance_template_revision),
+        instance_template_revision.disk_size_gb,
+        gce.get_image_url(image_project, instance_template_revision.image_name),
+        instance_template_revision.machine_type,
+        auto_assign_external_ip=
+            instance_template_revision.auto_assign_external_ip,
         metadata=metadata,
-        network_url=entity.network_url,
+        network_url=instance_template_revision.network_url,
         service_accounts=service_accounts,
-        tags=entity.tags,
+        tags=instance_template_revision.tags,
     )
   except net.Error as e:
     if e.status_code == 409:
       # If the instance template already exists, just record the URL.
-      result = api.get_instance_template(get_name(entity))
-      update_url(entity.key, result['selfLink'])
+      result = api.get_instance_template(get_name(instance_template_revision))
+      update_url(instance_template_revision.key, result['selfLink'])
       return
     else:
       raise
 
-  update_url(entity.key, result['targetLink'])
+  update_url(instance_template_revision.key, result['targetLink'])
 
 
 def schedule_creation():
@@ -184,26 +185,26 @@ def get_instance_template_to_delete(key):
   Returns:
     The URL of the instance template to delete, or None if there isn't one.
   """
-  entity = key.get()
-  if not entity:
+  instance_template_revision = key.get()
+  if not instance_template_revision:
     logging.warning('InstanceTemplateRevision does not exist: %s', key)
     return
 
-  if entity.active:
+  if instance_template_revision.active:
     logging.warning(
         'InstanceTemplateRevision has active InstanceGroupManagers: %s', key)
     return
 
-  if entity.drained:
+  if instance_template_revision.drained:
     logging.warning(
         'InstanceTemplateRevision has drained InstanceGroupManagers: %s', key)
     return
 
-  if not entity.url:
+  if not instance_template_revision.url:
     logging.warning('InstanceTemplateRevision URL unspecified: %s', key)
     return
 
-  return entity.url
+  return instance_template_revision.url
 
 
 def delete(key):
@@ -252,14 +253,15 @@ def get_drained_instance_template_revisions():
 def schedule_deletion():
   """Enqueues tasks to delete drained instance templates."""
   for key in get_drained_instance_template_revisions():
-    entity = key.get()
-    if entity and entity.url and not entity.active and not entity.drained:
-      if not utils.enqueue_task(
-          '/internal/queues/delete-instance-template',
-          'delete-instance-template',
-          params={
-              'key': key.urlsafe(),
-          },
-      ):
-        logging.warning(
-            'Failed to enqueue task for InstanceTemplateRevision: %s', key)
+    instance_template = key.get()
+    if instance_template and instance_template.url:
+      if not instance_template.active and not instance_template.drained:
+        if not utils.enqueue_task(
+            '/internal/queues/delete-instance-template',
+            'delete-instance-template',
+            params={
+                'key': key.urlsafe(),
+            },
+        ):
+          logging.warning(
+              'Failed to enqueue task for InstanceTemplateRevision: %s', key)

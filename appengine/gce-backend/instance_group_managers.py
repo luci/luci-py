@@ -78,15 +78,15 @@ def set_instances(key, keys):
     key: ndb.Key for a models.InstanceGroupManager entity.
     keys: List of ndb.Keys for models.Instance entities.
   """
-  entity = key.get()
-  if not entity:
+  instance_group_manager = key.get()
+  if not instance_group_manager:
     logging.warning('InstanceGroupManager does not exist: %s', key)
     return
 
   instances = sorted(keys)
-  if sorted(entity.instances) != instances:
-    entity.instances = instances
-    entity.put()
+  if sorted(instance_group_manager.instances) != instances:
+    instance_group_manager.instances = instances
+    instance_group_manager.put()
 
 
 @ndb.transactional
@@ -97,23 +97,23 @@ def update_url(key, url):
     key: ndb.Key for a models.InstanceGroupManager entity.
     url: URL string for the instance group manager.
   """
-  entity = key.get()
-  if not entity:
+  instance_group_manager = key.get()
+  if not instance_group_manager:
     logging.warning('InstanceGroupManager does not exist: %s', key)
     return
 
-  if entity.url == url:
+  if instance_group_manager.url == url:
     return
 
   logging.warning(
       'Updating URL for InstanceGroupManager: %s\nOld: %s\nNew: %s',
       key,
-      entity.url,
+      instance_group_manager.url,
       url,
   )
 
-  entity.url = url
-  entity.put()
+  instance_group_manager.url = url
+  instance_group_manager.put()
 
 
 def create(key):
@@ -125,54 +125,55 @@ def create(key):
   Raises:
     net.Error: HTTP status code is not 200 (created) or 409 (already created).
   """
-  entity = key.get()
-  if not entity:
+  instance_group_manager = key.get()
+  if not instance_group_manager:
     logging.warning('InstanceGroupManager does not exist: %s', key)
     return
 
-  if entity.url:
+  if instance_group_manager.url:
     logging.warning(
         'Instance group manager for InstanceGroupManager already exists: %s',
         key,
     )
     return
 
-  parent = key.parent().get()
-  if not parent:
+  instance_template_revision = key.parent().get()
+  if not instance_template_revision:
     logging.warning('InstanceTemplateRevision does not exist: %s', key.parent())
     return
 
-  if not parent.project:
+  if not instance_template_revision.project:
     logging.warning(
         'InstanceTemplateRevision project unspecified: %s', key.parent())
     return
 
-  if not parent.url:
+  if not instance_template_revision.url:
     logging.warning(
         'InstanceTemplateRevision URL unspecified: %s', key.parent())
     return
 
-  api = gce.Project(parent.project)
+  api = gce.Project(instance_template_revision.project)
   try:
     # Create the instance group manager with 0 instances. The resize cron job
     # will adjust this later.
     result = api.create_instance_group_manager(
-        get_name(entity),
-        parent.url,
+        get_name(instance_group_manager),
+        instance_template_revision.url,
         0,
-        entity.key.id(),
-        base_name=get_base_name(entity),
+        instance_group_manager.key.id(),
+        base_name=get_base_name(instance_group_manager),
     )
   except net.Error as e:
     if e.status_code == 409:
       # If the instance template already exists, just record the URL.
-      result = api.get_instance_group_manager(get_name(entity), entity.key.id())
-      update_url(entity.key, result['selfLink'])
+      result = api.get_instance_group_manager(
+          get_name(instance_group_manager), instance_group_manager.key.id())
+      update_url(instance_group_manager.key, result['selfLink'])
       return
     else:
       raise
 
-  update_url(entity.key, result['targetLink'])
+  update_url(instance_group_manager.key, result['targetLink'])
 
 
 def schedule_creation():
@@ -211,20 +212,20 @@ def get_instance_group_manager_to_delete(key):
   Returns:
     The URL of the instance group manager to delete, or None if there isn't one.
   """
-  entity = key.get()
-  if not entity:
+  instance_group_manager = key.get()
+  if not instance_group_manager:
     logging.warning('InstanceGroupManager does not exist: %s', key)
     return
 
-  if entity.instances:
+  if instance_group_manager.instances:
     logging.warning('InstanceGroupManager has active Instances: %s', key)
     return
 
-  if not entity.url:
+  if not instance_group_manager.url:
     logging.warning('InstanceGroupManager URL unspecified: %s', key)
     return
 
-  return entity.url
+  return instance_group_manager.url
 
 
 def delete(key):
@@ -284,17 +285,18 @@ def get_drained_instance_group_managers():
 def schedule_deletion():
   """Enqueues tasks to delete drained instance group managers."""
   for key in get_drained_instance_group_managers():
-    entity = key.get()
-    if entity and entity.url and not entity.instances:
-      if not utils.enqueue_task(
-          '/internal/queues/delete-instance-group-manager',
-          'delete-instance-group-manager',
-          params={
-              'key': key.urlsafe(),
-          },
-      ):
-        logging.warning(
-          'Failed to enqueue task for InstanceGroupManager: %s', key)
+    instance_group_manager = key.get()
+    if instance_group_manager:
+      if instance_group_manager.url and not instance_group_manager.instances:
+        if not utils.enqueue_task(
+            '/internal/queues/delete-instance-group-manager',
+            'delete-instance-group-manager',
+            params={
+                'key': key.urlsafe(),
+            },
+        ):
+          logging.warning(
+            'Failed to enqueue task for InstanceGroupManager: %s', key)
 
 
 def resize(key):
@@ -309,28 +311,29 @@ def resize(key):
   # this limit controls the rate at which instances are created.
   RESIZE_LIMIT = 100
 
-  entity = key.get()
-  if not entity:
+  instance_group_manager = key.get()
+  if not instance_group_manager:
     logging.warning('InstanceGroupManager does not exist: %s', key)
     return
 
-  if not entity.url:
+  if not instance_group_manager.url:
     logging.warning('InstanceGroupManager URL unspecified: %s', key)
 
-  parent = key.parent().get()
-  if not parent:
+  instance_template_revision = key.parent().get()
+  if not instance_template_revision:
     logging.warning('InstanceTemplateRevision does not exist: %s', key)
     return
 
-  if not parent.project:
+  if not instance_template_revision.project:
     logging.warning('InstanceTemplateRevision project unspecified: %s', key)
     return
 
   # Determine how many total VMs exist for all other revisions of this
   # InstanceGroupManager. Different revisions will all have the same
-  # grandparent InstanceTemplate.
+  # ancestral InstanceTemplate.
+  instance_template_key = instance_template_revision.key.parent()
   other_revision_total_size = 0
-  for igm in models.InstanceGroupManager.query(ancestor=parent.key.parent()):
+  for igm in models.InstanceGroupManager.query(ancestor=instance_template_key):
     # Find InstanceGroupManagers in the same zone, except the one being resized.
     if igm.key.id() == key.id() and igm.key != key:
         logging.info(
@@ -340,8 +343,9 @@ def resize(key):
         )
         other_revision_total_size += igm.current_size
 
-  api = gce.Project(parent.project)
-  response = api.get_instance_group_manager(get_name(entity), key.id())
+  api = gce.Project(instance_template_revision.project)
+  response = api.get_instance_group_manager(
+      get_name(instance_group_manager), key.id())
 
   # Find out how many VMs are idle (i.e. not currently being created
   # or deleted). This helps avoid doing too many VM actions simultaneously.
@@ -355,7 +359,7 @@ def resize(key):
   # instances by more than the resize limit. For now, the target size
   # is just the minimum size.
   target_size = min(
-      entity.minimum_size - other_revision_total_size,
+      instance_group_manager.minimum_size - other_revision_total_size,
       current_size + RESIZE_LIMIT,
   )
   logging.info(
@@ -363,8 +367,8 @@ def resize(key):
       key,
       current_size,
       target_size,
-      entity.minimum_size,
-      entity.maximum_size,
+      instance_group_manager.minimum_size,
+      instance_group_manager.maximum_size,
       other_revision_total_size,
   )
   if target_size <= current_size:

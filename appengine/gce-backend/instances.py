@@ -56,16 +56,16 @@ def mark_for_deletion(key):
   Args:
     key: ndb.Key for a models.Instance entity.
   """
-  entity = key.get()
-  if not entity:
+  instance = key.get()
+  if not instance:
     logging.warning('Instance does not exist: %s', key)
     return
 
-  if not entity.pending_deletion:
+  if not instance.pending_deletion:
     logging.info('Marking Instance for deletion: %s', key)
-    entity.pending_deletion = True
-    entity.put()
-    metrics.send_machine_event('DELETION_PROPOSED', entity.hostname)
+    instance.pending_deletion = True
+    instance.put()
+    metrics.send_machine_event('DELETION_PROPOSED', instance.hostname)
 
 
 @ndb.transactional
@@ -81,26 +81,26 @@ def add_subscription_metadata(
     service_account: Service account authorized to read the Pub/Sub
       subscription.
   """
-  entity = key.get()
-  if not entity:
+  instance = key.get()
+  if not instance:
     logging.warning('Instance does not exist: %s', key)
     return
 
-  if entity.pubsub_subscription:
+  if instance.pubsub_subscription:
     return
 
   logging.info('Instance Pub/Sub subscription received: %s', key)
-  entity.pending_metadata_updates.append(models.MetadataUpdate(
+  instance.pending_metadata_updates.append(models.MetadataUpdate(
       metadata={
           'pubsub_service_account': service_account,
           'pubsub_subscription': subscription,
           'pubsub_subscription_project': subscription_project,
       },
   ))
-  entity.pubsub_service_account = service_account
-  entity.pubsub_subscription = pubsub.full_subscription_name(
+  instance.pubsub_service_account = service_account
+  instance.pubsub_subscription = pubsub.full_subscription_name(
       subscription_project, subscription)
-  entity.put()
+  instance.put()
 
 
 def fetch(key):
@@ -112,36 +112,36 @@ def fetch(key):
   Returns:
     A list of instance URLs.
   """
-  entity = key.get()
-  if not entity:
+  instance = key.get()
+  if not instance:
     logging.warning('InstanceGroupManager does not exist: %s', key)
     return []
 
-  if not entity.url:
+  if not instance.url:
     logging.warning('InstanceGroupManager URL unspecified: %s', key)
     return []
 
-  parent = key.parent().get()
-  if not parent:
+  instance_template_revision = key.parent().get()
+  if not instance_template_revision:
     logging.warning('InstanceTemplateRevision does not exist: %s', key.parent())
     return []
 
-  if not parent.project:
+  if not instance_template_revision.project:
     logging.warning(
         'InstanceTemplateRevision project unspecified: %s', key.parent())
     return []
 
-  api = gce.Project(parent.project)
+  api = gce.Project(instance_template_revision.project)
   result = api.get_instances_in_instance_group(
-      instance_group_managers.get_name(entity),
-      entity.key.id(),
+      instance_group_managers.get_name(instance),
+      instance.key.id(),
       max_results=500,
   )
-  instance_urls = [instance['instance'] for instance in result.get('items', [])]
+  instance_urls = [i['instance'] for i in result.get('items', [])]
   while result.get('nextPageToken'):
     result = api.get_instances_in_instance_group(
-        instance_group_managers.get_name(entity),
-        entity.key.id(),
+        instance_group_managers.get_name(instance),
+        instance.key.id(),
         max_results=500,
         page_token=result['nextPageToken'],
     )
@@ -160,8 +160,8 @@ def ensure_entity_exists(key, url, instance_group_manager):
     instance_group_manager: ndb.Key for the models.InstanceGroupManager the
       instance was created from.
   """
-  entity = yield key.get_async()
-  if entity:
+  instance = yield key.get_async()
+  if instance:
     logging.info('Instance entity already exists: %s', key)
     return
 
@@ -240,7 +240,7 @@ def _delete(instance_template_revision, instance_group_manager, instance):
     if result['status'] != 'DONE':
       logging.warning(
           'Instance group manager operation failed: %s\n%s',
-          parent.key,
+          instance_group_manager.key,
           json.dumps(result, indent=2),
       )
     else:
@@ -258,38 +258,42 @@ def delete_pending(key):
   Args:
     key: ndb.Key for a models.Instance entity.
   """
-  entity = key.get()
-  if not entity:
+  instance = key.get()
+  if not instance:
     return
 
-  if not entity.pending_deletion:
+  if not instance.pending_deletion:
     logging.warning('Instance not pending deletion: %s', key)
     return
 
-  if not entity.url:
+  if not instance.url:
     logging.warning('Instance URL unspecified: %s', key)
     return
 
-  parent = entity.instance_group_manager.get()
-  if not parent:
+  instance_group_manager = instance.instance_group_manager.get()
+  if not instance_group_manager:
     logging.warning(
         'InstanceGroupManager does not exist: %s',
-        entity.instance_group_manager,
+        instance.instance_group_manager,
     )
     return
 
-  grandparent = parent.key.parent().get()
-  if not grandparent:
+  instance_template_revision = instance_group_manager.key.parent().get()
+  if not instance_template_revision:
     logging.warning(
-        'InstanceTemplateRevision does not exist: %s', parent.key.parent())
+        'InstanceTemplateRevision does not exist: %s',
+        instance_group_manager.key.parent(),
+    )
     return
 
-  if not grandparent.project:
+  if not instance_template_revision.project:
     logging.warning(
-        'InstanceTemplateRevision project unspecified: %s', grandparent.key)
+        'InstanceTemplateRevision project unspecified: %s',
+        instance_template_revision.key,
+    )
     return
 
-  _delete(grandparent, parent, entity)
+  _delete(instance_template_revision, instance_group_manager, instance)
 
 
 def schedule_pending_deletion():
@@ -312,50 +316,56 @@ def delete_drained(key):
   Args:
     key: ndb.Key for a models.Instance entity.
   """
-  entity = key.get()
-  if not entity:
+  instance = key.get()
+  if not instance:
     logging.warning('Instance does not exist: %s', key)
     return
 
-  if entity.cataloged:
+  if instance.cataloged:
     logging.warning('Instance is cataloged: %s', key)
     return
 
-  if not entity.url:
+  if not instance.url:
     logging.warning('Instance URL unspecified: %s', key)
     return
 
-  parent = entity.instance_group_manager.get()
-  if not parent:
+  instance_group_manager = instance.instance_group_manager.get()
+  if not instance_group_manager:
     logging.warning(
         'InstanceGroupManager does not exist: %s',
-        entity.instance_group_manager,
+        instance.instance_group_manager,
     )
     return
 
-  grandparent = parent.key.parent().get()
-  if not grandparent:
+  instance_template_revision = instance_group_manager.key.parent().get()
+  if not instance_template_revision:
     logging.warning(
-        'InstanceTemplateRevision does not exist: %s', parent.key.parent())
+        'InstanceTemplateRevision does not exist: %s',
+        instance_group_manager.key.parent(),
+    )
     return
 
-  if not grandparent.project:
+  if not instance_template_revision.project:
     logging.warning(
-        'InstanceTemplateRevision project unspecified: %s', grandparent.key)
+        'InstanceTemplateRevision project unspecified: %s',
+        instance_template_revision.key,
+    )
     return
 
-  root = grandparent.key.parent().get()
-  if not root:
+  instance_template = instance_template_revision.key.parent().get()
+  if not instance_template:
     logging.warning(
-        'InstanceTemplate does not exist: %s', grandparent.key.parent())
+        'InstanceTemplate does not exist: %s',
+        instance_template_revision.key.parent(),
+    )
     return
 
-  if parent.key not in grandparent.drained:
-    if grandparent.key not in root.drained:
+  if instance_group_manager.key not in instance_template_revision.drained:
+    if instance_template_revision.key not in instance_template.drained:
       logging.warning('Instance is not drained: %s', key)
       return
 
-  _delete(grandparent, parent, entity)
+  _delete(instance_template_revision, instance_group_manager, instance)
 
 
 def schedule_drained_deletion():

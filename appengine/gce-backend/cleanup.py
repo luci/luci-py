@@ -51,19 +51,19 @@ def set_instance_deleted(key, drained):
     drained: Whether or not the Instance is being set as deleted
       because it is drained.
   """
-  entity = key.get()
-  if not entity:
+  instance = key.get()
+  if not instance:
     logging.info('Instance does not exist: %s', key)
     return
 
-  if not drained and not entity.pending_deletion:
+  if not drained and not instance.pending_deletion:
     logging.warning('Instance not drained or ending deletion: %s', key)
     return
 
-  if not entity.deleted:
+  if not instance.deleted:
     logging.info('Setting Instance as deleted: %s', key)
-    entity.deleted = True
-    entity.put()
+    instance.deleted = True
+    instance.put()
 
 
 @ndb.transactional_tasklet
@@ -73,38 +73,41 @@ def delete_instance_group_manager(key):
   Args:
     key: ndb.Key for a models.InstanceGroupManager entity.
   """
-  entity = yield key.get_async()
-  if not entity:
+  instance_group_manager = yield key.get_async()
+  if not instance_group_manager:
     logging.warning('InstanceGroupManager does not exist: %s', key)
     return
 
-  if entity.url or entity.instances:
+  if instance_group_manager.url or instance_group_manager.instances:
     return
 
-  parent = yield key.parent().get_async()
-  if not parent:
+  instance_template_revision = yield key.parent().get_async()
+  if not instance_template_revision:
     logging.warning('InstanceTemplateRevision does not exist: %s', key.parent())
     return
 
-  root = yield parent.key.parent().get_async()
-  if not root:
-    logging.warning('InstanceTemplate does not exist: %s', parent.key.parent())
+  instance_template = yield instance_template_revision.key.parent().get_async()
+  if not instance_template:
+    logging.warning(
+        'InstanceTemplate does not exist: %s',
+        instance_template_revision.key.parent(),
+    )
     return
 
   # If the InstanceGroupManager is drained, we can delete it now.
-  for i, drained_key in enumerate(parent.drained):
+  for i, drained_key in enumerate(instance_template_revision.drained):
     if key.id() == drained_key.id():
-      parent.drained.pop(i)
-      yield parent.put_async()
+      instance_template_revision.drained.pop(i)
+      yield instance_template_revision.put_async()
       yield key.delete_async()
       return
 
   # If the InstanceGroupManager is implicitly drained, we can still delete it.
-  if parent.key in root.drained:
-    for i, drained_key in enumerate(parent.active):
+  if instance_template_revision.key in instance_template.drained:
+    for i, drained_key in enumerate(instance_template_revision.active):
       if key.id() == drained_key.id():
-        parent.active.pop(i)
-        yield parent.put_async()
+        instance_template_revision.active.pop(i)
+        yield instance_template_revision.put_async()
         yield key.delete_async()
 
 
@@ -115,23 +118,28 @@ def delete_instance_template_revision(key):
   Args:
     key: ndb.Key for a models.InstanceTemplateRevision entity.
   """
-  entity = yield key.get_async()
-  if not entity:
+  instance_template_revision = yield key.get_async()
+  if not instance_template_revision:
     logging.warning('InstanceTemplateRevision does not exist: %s', key)
     return
 
-  if entity.url or entity.active or entity.drained:
+  if instance_template_revision.active or instance_template_revision.drained:
+    # All instance group managers, even drained ones, must be deleted first.
     return
 
-  parent = yield key.parent().get_async()
-  if not parent:
+  if instance_template_revision.url:
+    # GCE instance template must be deleted first.
+    return
+
+  instance_template = yield key.parent().get_async()
+  if not instance_template:
     logging.warning('InstanceTemplate does not exist: %s', key.parent())
     return
 
-  for i, drained_key in enumerate(parent.drained):
+  for i, drained_key in enumerate(instance_template.drained):
     if key.id() == drained_key.id():
-      parent.drained.pop(i)
-      yield parent.put_async()
+      instance_template.drained.pop(i)
+      yield instance_template.put_async()
       yield key.delete_async()
 
 
@@ -142,12 +150,13 @@ def delete_instance_template(key):
   Args:
     key: ndb.Key for a models.InstanceTemplate entity.
   """
-  entity = yield key.get_async()
-  if not entity:
+  instance_template = yield key.get_async()
+  if not instance_template:
     logging.warning('InstanceTemplate does not exist: %s', key)
     return
 
-  if entity.active or entity.drained:
+  if instance_template.active or instance_template.drained:
+    # All instance template revisions, even drained ones, must be deleted first.
     return
 
   yield key.delete_async()
@@ -198,19 +207,19 @@ def check_deleted_instance(key):
   Args:
     key: ndb.Key for a models.Instance entity.
   """
-  entity = key.get()
-  if not entity:
+  instance = key.get()
+  if not instance:
     return
 
-  if not entity.pending_deletion:
+  if not instance.pending_deletion:
     logging.warning('Instance not pending deletion: %s', key)
     return
 
-  if not entity.url:
+  if not instance.url:
     logging.warning('Instance URL unspecified: %s', key)
     return
 
-  if not exists(entity.url):
+  if not exists(instance.url):
     # When the instance isn't found, assume it's deleted.
     set_instance_deleted(key, False)
 
@@ -236,17 +245,17 @@ def cleanup_deleted_instance(key):
   Args:
     key: ndb.Key for a models.Instance entity.
   """
-  entity = key.get()
-  if not entity:
+  instance = key.get()
+  if not instance:
     return
 
-  if not entity.deleted:
+  if not instance.deleted:
     logging.warning('Instance not deleted: %s', key)
     return
 
   logging.info('Deleting Instance entity: %s', key)
   key.delete()
-  metrics.send_machine_event('DELETED', key.id())
+  metrics.send_machine_event('DELETED', instance.hostname)
 
 
 def schedule_deleted_instance_cleanup():
@@ -280,40 +289,44 @@ def cleanup_drained_instance(key):
   Args:
     key: ndb.Key for a models.Instance entity.
   """
-  entity = key.get()
-  if not entity:
+  instance = key.get()
+  if not instance:
     return
 
-  if not entity.url:
+  if not instance.url:
     logging.warning('Instance URL unspecified: %s', key)
     return
 
-  parent = entity.instance_group_manager.get()
-  if not parent:
+  instance_group_manager = instance.instance_group_manager.get()
+  if not instance_group_manager:
     logging.warning(
         'InstanceGroupManager does not exist: %s',
-        entity.instance_group_manager,
+        instance.instance_group_manager,
     )
     return
 
-  grandparent = parent.key.parent().get()
-  if not grandparent:
+  instance_template_revision = instance_group_manager.key.parent().get()
+  if not instance_template_revision:
     logging.warning(
-        'InstanceTemplateRevision does not exist: %s', parent.key.parent())
+        'InstanceTemplateRevision does not exist: %s',
+        instance_group_manager.key.parent(),
+    )
     return
 
-  root = grandparent.key.parent().get()
-  if not root:
+  instance_template = instance_template_revision.key.parent().get()
+  if not instance_template:
     logging.warning(
-        'InstanceTemplate does not exist: %s', grandparent.key.parent())
+        'InstanceTemplate does not exist: %s',
+        instance_template_revision.key.parent(),
+    )
     return
 
-  if parent.key not in grandparent.drained:
-    if grandparent.key not in root.drained:
+  if instance_group_manager.key not in instance_template_revision.drained:
+    if instance_template_revision.key not in instance_template.drained:
       logging.warning('Instance is not drained: %s', key)
       return
 
-  if not exists(entity.url):
+  if not exists(instance.url):
     # When the instance isn't found, assume it's deleted.
     set_instance_deleted(key, True)
 

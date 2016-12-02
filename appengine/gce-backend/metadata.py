@@ -76,22 +76,22 @@ def compress_pending_metadata_updates(key):
   Args:
     key: ndb.Key for a models.Instance entity.
   """
-  entity = key.get()
-  if not entity:
+  instance = key.get()
+  if not instance:
     logging.warning('Instance does not exist: %s', key)
     return
 
-  if entity.active_metadata_update:
+  if instance.active_metadata_update:
     logging.warning('Instance already has active metadata update: %s', key)
     return
 
-  if not entity.pending_metadata_updates:
+  if not instance.pending_metadata_updates:
     return
 
-  entity.active_metadata_update = compress_metadata_updates(
-      entity.pending_metadata_updates)
-  entity.pending_metadata_updates = []
-  entity.put()
+  instance.active_metadata_update = compress_metadata_updates(
+      instance.pending_metadata_updates)
+  instance.pending_metadata_updates = []
+  instance.put()
 
 
 def compress(key):
@@ -100,20 +100,20 @@ def compress(key):
   Args:
     key: ndb.Key for a models.instance entity.
   """
-  entity = key.get()
-  if not entity:
+  instance = key.get()
+  if not instance:
     logging.warning('Instance does not exist: %s', key)
     return
 
-  if entity.active_metadata_update:
+  if instance.active_metadata_update:
     logging.warning('Instance already has active metadata update: %s', key)
     return
 
-  if not entity.pending_metadata_updates:
+  if not instance.pending_metadata_updates:
     return
 
   compress_pending_metadata_updates(key)
-  metrics.send_machine_event('METADATA_UPDATE_READY', entity.hostname)
+  metrics.send_machine_event('METADATA_UPDATE_READY', instance.hostname)
 
 
 @ndb.transactional
@@ -125,27 +125,27 @@ def associate_metadata_operation(key, checksum, url):
     checksum: Metadata checksum the operation is associated with.
     url: URL for the the zone operation.
   """
-  entity = key.get()
-  if not entity:
+  instance = key.get()
+  if not instance:
     logging.warning('Instance does not exist: %s', key)
     return
 
-  if not entity.active_metadata_update:
+  if not instance.active_metadata_update:
     logging.warning('Instance active metadata update unspecified: %s', key)
     return
 
-  if entity.active_metadata_update.checksum != checksum:
+  if instance.active_metadata_update.checksum != checksum:
     logging.warning('Instance has unexpected active metadata update: %s', key)
     return
 
-  if entity.active_metadata_update.url:
-    if entity.active_metadata_update.url == url:
+  if instance.active_metadata_update.url:
+    if instance.active_metadata_update.url == url:
       return
     logging.warning('Instance has associated metadata operation: %s', key)
     return
 
-  entity.active_metadata_update.url = url
-  entity.put()
+  instance.active_metadata_update.url = url
+  instance.put()
 
 
 def update(key):
@@ -154,51 +154,57 @@ def update(key):
   Args:
     key: ndb.Key for a models.instance entity.
   """
-  entity = key.get()
-  if not entity:
+  instance = key.get()
+  if not instance:
     logging.warning('Instance does not exist: %s', key)
     return
 
-  if not entity.active_metadata_update:
+  if not instance.active_metadata_update:
     logging.warning('Instance active metadata update unspecified: %s', key)
     return
 
-  if entity.active_metadata_update.url:
+  if instance.active_metadata_update.url:
     return
 
-  parent = entity.instance_group_manager.get()
-  if not parent:
+  instance_group_manager = instance.instance_group_manager.get()
+  if not instance_group_manager:
     logging.warning(
         'InstanceGroupManager does not exist: %s',
-        entity.instance_group_manager,
+        instance.instance_group_manager,
     )
     return
 
-  grandparent = parent.key.parent().get()
-  if not grandparent:
+  instance_template_revision = instance_group_manager.key.parent().get()
+  if not instance_template_revision:
     logging.warning(
-        'InstanceTemplateRevision does not exist: %s', parent.key.parent())
+        'InstanceTemplateRevision does not exist: %s',
+        instance_group_manager.key.parent(),
+    )
     return
 
-  if not grandparent.project:
+  if not instance_template_revision.project:
     logging.warning(
-        'InstanceTemplateRevision project unspecified: %s', grandparent.key)
+        'InstanceTemplateRevision project unspecified: %s',
+        instance_template_revision.key,
+    )
     return
 
-  result = net.json_request(entity.url, scopes=gce.AUTH_SCOPES)
-  api = gce.Project(grandparent.project)
+  result = net.json_request(instance.url, scopes=gce.AUTH_SCOPES)
+  api = gce.Project(instance_template_revision.project)
   operation = api.set_metadata(
-      parent.key.id(),
-      entity.hostname,
+      instance_group_manager.key.id(),
+      instance.hostname,
       result['metadata']['fingerprint'],
       apply_metadata_update(
-          result['metadata']['items'], entity.active_metadata_update.metadata),
+          result['metadata']['items'],
+          instance.active_metadata_update.metadata,
+      ),
   )
-  metrics.send_machine_event('METADATA_UPDATE_SCHEDULED', entity.hostname)
+  metrics.send_machine_event('METADATA_UPDATE_SCHEDULED', instance.hostname)
 
   associate_metadata_operation(
       key,
-      utilities.compute_checksum(entity.active_metadata_update.metadata),
+      utilities.compute_checksum(instance.active_metadata_update.metadata),
       operation.url,
   )
 
@@ -211,25 +217,25 @@ def reschedule_active_metadata_update(key, url):
     key: ndb.Key for a models.Instance entity.
     url: URL for the zone operation to reschedule.
   """
-  entity = key.get()
-  if not entity:
+  instance = key.get()
+  if not instance:
     logging.warning('Instance does not exist: %s', key)
     return
 
-  if not entity.active_metadata_update:
+  if not instance.active_metadata_update:
     logging.warning('Instance active metadata operation unspecified: %s', key)
     return
 
-  if entity.active_metadata_update.url != url:
+  if instance.active_metadata_update.url != url:
     logging.warning(
         'Instance has unexpected active metadata operation: %s', key)
     return
 
-  metadata_updates = [entity.active_metadata_update]
-  metadata_updates.extend(entity.pending_metadata_updates)
-  entity.active_metadata_update = compress_metadata_updates(metadata_updates)
-  entity.pending_metadata_updates = []
-  entity.put()
+  metadata_updates = [instance.active_metadata_update]
+  metadata_updates.extend(instance.pending_metadata_updates)
+  instance.active_metadata_update = compress_metadata_updates(metadata_updates)
+  instance.pending_metadata_updates = []
+  instance.put()
 
 
 @ndb.transactional
@@ -240,21 +246,21 @@ def clear_active_metadata_update(key, url):
     key: ndb.Key for a models.Instance entity.
     url: URL for the zone operation to clear.
   """
-  entity = key.get()
-  if not entity:
+  instance = key.get()
+  if not instance:
     logging.warning('Instance does not exist: %s', key)
     return
 
-  if not entity.active_metadata_update:
+  if not instance.active_metadata_update:
     return
 
-  if entity.active_metadata_update.url != url:
+  if instance.active_metadata_update.url != url:
     logging.warning(
         'Instance has unexpected active metadata operation: %s', key)
     return
 
-  entity.active_metadata_update = None
-  entity.put()
+  instance.active_metadata_update = None
+  instance.put()
 
 
 def check(key):
@@ -265,22 +271,22 @@ def check(key):
   Args:
     key: ndb.Key for a models.Instance entity.
   """
-  entity = key.get()
-  if not entity:
+  instance = key.get()
+  if not instance:
     logging.warning('Instance does not exist: %s', key)
     return
 
-  if not entity.active_metadata_update:
+  if not instance.active_metadata_update:
     logging.warning('Instance active metadata operation unspecified: %s', key)
     return
 
-  if not entity.active_metadata_update.url:
+  if not instance.active_metadata_update.url:
     logging.warning(
         'Instance active metadata operation URL unspecified: %s', key)
     return
 
   result = net.json_request(
-      entity.active_metadata_update.url, scopes=gce.AUTH_SCOPES)
+      instance.active_metadata_update.url, scopes=gce.AUTH_SCOPES)
   if result['status'] != 'DONE':
     return
 
@@ -290,12 +296,12 @@ def check(key):
         key,
         json.dumps(result, indent=2),
     )
-    metrics.send_machine_event('METADATA_UPDATE_FAILED', entity.hostname)
-    reschedule_active_metadata_update(key, entity.active_metadata_update.url)
-    metrics.send_machine_event('METADATA_UPDATE_READY', entity.hostname)
+    metrics.send_machine_event('METADATA_UPDATE_FAILED', instance.hostname)
+    reschedule_active_metadata_update(key, instance.active_metadata_update.url)
+    metrics.send_machine_event('METADATA_UPDATE_READY', instance.hostname)
   else:
-    metrics.send_machine_event('METADATA_UPDATE_SUCCEEDED', entity.hostname)
-    clear_active_metadata_update(key, entity.active_metadata_update.url)
+    metrics.send_machine_event('METADATA_UPDATE_SUCCEEDED', instance.hostname)
+    clear_active_metadata_update(key, instance.active_metadata_update.url)
 
 
 def schedule_metadata_tasks():

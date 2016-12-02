@@ -79,14 +79,14 @@ def set_cataloged(key, cataloged):
     key: ndb.Key for a models.Instance entity.
     cataloged: True or False.
   """
-  entity = key.get()
-  if not entity:
-    logging.warning('Instance does not exist: %s', instance)
+  instance = key.get()
+  if not instance:
+    logging.warning('Instance does not exist: %s', key)
     return
 
-  if entity.cataloged != cataloged:
-    entity.cataloged = cataloged
-    entity.put()
+  if instance.cataloged != cataloged:
+    instance.cataloged = cataloged
+    instance.put()
 
 
 def catalog(key):
@@ -95,43 +95,45 @@ def catalog(key):
   Args:
     key: ndb.Key for a models.Instance entity.
   """
-  entity = key.get()
-  if not entity:
-    logging.warning('Instance does not exist: %s', instance)
+  instance = key.get()
+  if not instance:
+    logging.warning('Instance does not exist: %s', key)
     return
 
-  if entity.cataloged:
+  if instance.cataloged:
     return
 
-  if entity.pending_deletion:
-    logging.warning('Instance pending deletion: %s', instance)
+  if instance.pending_deletion:
+    logging.warning('Instance pending deletion: %s', key)
     return
 
-  parent = entity.instance_group_manager.get()
-  if not parent:
+  instance_group_manager = instance.instance_group_manager.get()
+  if not instance_group_manager:
     logging.warning(
         'InstanceGroupManager does not exist: %s',
-        entity.instance_group_manager,
+        instance.instance_group_manager,
     )
     return
 
-  grandparent = parent.key.parent().get()
-  if not grandparent:
+  instance_template_revision = instance_group_manager.key.parent().get()
+  if not instance_template_revision:
     logging.warning(
-        'InstanceTemplateRevision does not exist: %s', parent.key.parent())
+        'InstanceTemplateRevision does not exist: %s',
+        instance_group_manager.key.parent(),
+    )
     return
 
-  if not grandparent.service_accounts:
+  if not instance_template_revision.service_accounts:
     logging.warning(
         'InstanceTemplateRevision service account unspecified: %s',
-        parent.key.parent(),
+        instance_template_revision.key,
     )
     return
 
   logging.info('Cataloging Instance: %s', key)
   response = machine_provider.add_machine(
-      extract_dimensions(entity, grandparent),
-      get_policies(key, grandparent.service_accounts[0].name),
+      extract_dimensions(instance, instance_template_revision),
+      get_policies(key, instance_template_revision.service_accounts[0].name),
   )
 
   if response.get('error') and response['error'] != 'HOSTNAME_REUSE':
@@ -144,7 +146,7 @@ def catalog(key):
     return
 
   set_cataloged(key, True)
-  metrics.send_machine_event('CATALOGED', entity.hostname)
+  metrics.send_machine_event('CATALOGED', instance.hostname)
 
 
 def schedule_catalog():
@@ -180,15 +182,15 @@ def remove(key):
   Args:
     key: ndb.Key for a models.Instance entity.
   """
-  entity = key.get()
-  if not entity:
+  instance = key.get()
+  if not instance:
     logging.warning('Instance does not exist: %s', key)
     return
 
-  if not entity.cataloged:
+  if not instance.cataloged:
     return
 
-  response = machine_provider.delete_machine({'hostname': entity.hostname})
+  response = machine_provider.delete_machine({'hostname': instance.hostname})
   if response.get('error') and response['error'] != 'ENTRY_NOT_FOUND':
     # Assume ENTRY_NOT_FOUND implies a duplicate request.
     logging.warning(
@@ -227,25 +229,25 @@ def update_cataloged_instance(key):
   Args:
     key: ndb.Key for a models.Instance entity.
   """
-  entity = key.get()
-  if not entity:
+  instance = key.get()
+  if not instance:
     logging.warning('Instance does not exist: %s', key)
     return
 
-  if not entity.cataloged:
+  if not instance.cataloged:
     return
 
   try:
-    response = machine_provider.retrieve_machine(entity.hostname)
-    if response.get('pubsub_subscription') and not entity.pubsub_subscription:
-      metrics.send_machine_event('SUBSCRIPTION_RECEIVED', entity.hostname)
+    response = machine_provider.retrieve_machine(instance.hostname)
+    if response.get('pubsub_subscription') and not instance.pubsub_subscription:
+      metrics.send_machine_event('SUBSCRIPTION_RECEIVED', instance.hostname)
       instances.add_subscription_metadata(
           key,
           response['pubsub_subscription_project'],
           response['pubsub_subscription'],
           response['policies']['machine_service_account'],
       )
-      metrics.send_machine_event('METADATA_UPDATE_PROPOSED', entity.hostname)
+      metrics.send_machine_event('METADATA_UPDATE_PROPOSED', instance.hostname)
   except net.NotFoundError:
     instances.mark_for_deletion(key)
 
