@@ -122,26 +122,46 @@ message PollResponse {
 }
 
 message TaskUpdateRequest {
+  // A set of opaque (to the proxy) parameters that should simply be passed
+  // directly to the Swarming server.
   google.protobuf.Struct params = 1;
+
   string bot_id = 2;
   string task_id = 3;
+
+  // A chunk of stdout contents of unknown encoding.
   bytes output_chunk = 4;
-  int32 output_chunk_offset = 5;
+
+  // The offset of the current chunk of stdout - used by Swarming to ensure
+  // there's nothing missing.
+  int64 output_chunk_offset = 5;
+
+  // True if this is the final update for this task.
   bool finished = 6;
+
+  // The exit code of the process; only meaningful if finished is true.
   int32 exit_code = 7;
 }
 
 message TaskUpdateResponse {
+  // If the TaskUpdateRequest was not accepted, this string will be populated
+  // with the reason why. Otherwise, it will be empty.
   string error = 1;
+
+  // True if the bot is still working but Swarming has determined that the task
+  // should be cancelled.
   bool must_stop = 2;
 }
 
 message TaskErrorRequest {
   string bot_id = 1;
   string task_id = 2;
+
+  // A human-readable message that states why the task could not be completed.
   string msg = 3;
 }
 
 message TaskErrorResponse {
-  bool ok = 1; // Doesn't appear to be set by server?
+  // I'm not sure what this is for - duplicating the native API.
+  bool ok = 1;
 }
