@@ -30,7 +30,14 @@
         For a full list of dimensions in the fleet, see the API call:
         https://[swarming_url]/api/swarming/v1/bots/dimensions
     // outputs
+    dimensions: Array<String>, of all valid dimensions.
     tasks: Array<Object>, all tasks returned by the server.
+    primary_map: Object, a mapping of primary keys to secondary items.
+        The primary keys are things that can be columns or sorted by.  The
+        primary values (aka the secondary items) are things that can be filtered
+        on. Primary consists of tags and state.  Secondary contains the
+        values primary things can be.
+    primary_arr: Array<String>, the display order of the primary keys.
 
   Methods:
     signIn(): Force a signin of the user using OAuth.  This happens
@@ -47,6 +54,8 @@
   <script>
   (function(){
     var TIMES = ["abandoned_ts", "completed_ts", "created_ts", "modified_ts", "started_ts"];
+    var BLACKLIST_DIMENSIONS = ["quarantined", "error"];
+
     Polymer({
       is: 'task-list-data',
 
@@ -72,6 +81,11 @@
         busy: {
           type: Boolean,
           computed: "_or(_busy2,_busy1)",
+          notify: true,
+        },
+        dimensions: {
+          type: Array,
+          computed: "_makeArray(_dimensions)",
           notify: true,
         },
         primary_map: {
@@ -111,6 +125,21 @@
           "_busy2", this.auth_headers);
         this._getJsonAsync("_dimensions","/api/swarming/v1/bots/dimensions",
           "_busy1", this.auth_headers);
+      },
+
+      _makeArray: function(dimObj) {
+        if (!dimObj || !dimObj.bots_dimensions) {
+          return [];
+        }
+        var dims = [];
+        dimObj.bots_dimensions.forEach(function(d){
+          if (BLACKLIST_DIMENSIONS.indexOf(d.key) === -1) {
+            dims.push(d.key);
+          }
+        });
+        dims.push("id");
+        dims.sort();
+        return dims;
       },
 
       _primaryArr: function(map) {

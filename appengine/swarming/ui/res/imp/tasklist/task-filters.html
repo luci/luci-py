@@ -33,12 +33,13 @@
 <link rel="import" href="/res/imp/bower_components/paper-input/paper-input.html">
 
 <link rel="import" href="/res/imp/common/query-column-filter-behavior.html">
+<link rel="import" href="/res/imp/common/swarming-app.html">
 <link rel="import" href="/res/imp/common/task-behavior.html">
 <link rel="import" href="/res/imp/common/url-param.html">
 
 <dom-module id="task-filters">
   <template>
-    <style is="custom-style" include="iron-flex iron-flex-alignment iron-positioning query-column-filter-style">
+    <style is="custom-style" include="iron-flex iron-flex-alignment iron-positioning query-column-filter-style swarming-app-style">
       .item.wide {
         max-width: 400px;
       }
@@ -153,6 +154,7 @@
             pattern="[0-9]+"
             value="{{_limit}}">
           </paper-input>
+          <a href$="[[_matchingBotsLink(query_params,dimensions.*)]]">View Matching Bots</a>
         </div>
       </div>
 
@@ -255,6 +257,26 @@
           }
         }
         return params;
+      },
+
+      _matchingBotsLink: function(queryParams) {
+        var cols = ["id", "os", "task", "status"];
+        if (!queryParams.tags || !this.dimensions) {
+          return this._botListLink([], cols);
+        }
+
+        var dimensions = queryParams.tags.filter(function(t){
+          var col = t.split(this.FILTER_SEP, 1)[0];
+          return this.dimensions.indexOf(col) !== -1;
+        }.bind(this));
+
+        dimensions.forEach(function(f) {
+          var col = f.split(this.FILTER_SEP, 1)[0];
+          if (cols.indexOf(col) === -1) {
+            cols.push(col);
+          }
+        }.bind(this));
+        return this._botListLink(dimensions, cols);
       },
 
       _showTagMessage: function(primarySelected, selectedItems) {

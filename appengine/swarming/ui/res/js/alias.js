@@ -57,6 +57,8 @@ this.swarming.alias = this.swarming.alias || (function(){
     "8086:041a": "Intel Haswell HD Graphics",
     "8086:0a2e": "Intel Haswell Iris Graphics 5100",
     "8086:0d26": "Intel Haswell Iris Pro Graphics 5200",
+    "8086:1616": "Intel Broadwell HD Graphics 5500",
+    "8086:161e": "Intel Broadwell HD Graphics 5300",
     "8086:1626": "Intel Broadwell HD Graphics 6000",
     "8086:162b": "Intel Broadwell Iris Graphics 6100",
     "8086:1912": "Intel Skylake HD Graphics 530",

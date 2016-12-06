@@ -341,17 +341,24 @@
       },
 
       _manuallyAddFilter: function(){
-        var parts = this._query.trim().split(":");
-        if (parts.length != 2) {
+        var filter = this._query.trim();
+        var idx = filter.indexOf(this.FILTER_SEP);
+        if (idx === -1) {
           sk.errorMessage('Invalid filter.  Should be like "foo:bar"', 5000);
           return;
         }
-        var f = parts.join(":");
-        if (this._filters.indexOf(f) !== -1) {
-          sk.errorMessage('Filter "'+f+'" is already active', 5000);
+        var primary = filter.slice(0, idx);
+        var param = filter.slice(idx + this.FILTER_SEP.length);
+        if (swarming.alias.DIMENSIONS_WITH_ALIASES.indexOf(primary) !== -1) {
+          param = swarming.alias.apply(param, primary);
+        }
+        filter = primary + this.FILTER_SEP + param;
+
+        if (this._filters.indexOf(filter) !== -1) {
+          sk.errorMessage('Filter "'+filter+'" is already active', 5000);
           return;
         }
-        this.push("_filters", f);
+        this.push("_filters", filter);
         this.set("_query", "");
       },
 

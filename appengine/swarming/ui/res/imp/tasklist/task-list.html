@@ -75,12 +75,14 @@
           query_params="[[_query_params]]"
           tasks="[[_items]]"
           busy="{{_busy1)}}"
+          dimensions="{{_dimensions}}"
           primary_map="{{_primary_map}}"
           primary_arr="{{_primary_arr}}">
         </task-list-data>
 
         <div class="horizontal layout">
           <task-filters
+            dimensions="[[_dimensions]]"
             primary_map="[[_primary_map]]"
             primary_arr="[[_primary_arr]]"
             special_columns="[[_specialColumns]]"

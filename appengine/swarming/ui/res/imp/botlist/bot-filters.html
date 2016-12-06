@@ -57,15 +57,15 @@
 <link rel="import" href="/res/imp/bower_components/paper-icon-button/paper-icon-button.html">
 <link rel="import" href="/res/imp/bower_components/paper-input/paper-input.html">
 
-<link rel="import" href="/res/imp/common/url-param.html">
 <link rel="import" href="/res/imp/common/query-column-filter-behavior.html">
-
+<link rel="import" href="/res/imp/common/swarming-app.html">
+<link rel="import" href="/res/imp/common/url-param.html">
 
 <link rel="import" href="bot-list-shared-behavior.html">
 
 <dom-module id="bot-filters">
   <template>
-    <style is="custom-style" include="iron-flex iron-flex-alignment iron-positioning query-column-filter-style">
+    <style is="custom-style" include="iron-flex iron-flex-alignment iron-positioning query-column-filter-style swarming-app-style">
 
     </style>
 
@@ -172,7 +172,7 @@ the fleet.">
         </div>
 
         <div class="side-by-side">
-        <paper-checkbox checked="{{verbose}}">Verbose Entries</paper-checkbox>
+          <paper-checkbox checked="{{verbose}}">Verbose Entries</paper-checkbox>
           <paper-input id="_limit"
             label="Limit Results"
             auto-validate
@@ -181,6 +181,7 @@ the fleet.">
             pattern="[0-9]+"
             value="{{_limit}}">
           </paper-input>
+          <a href$="[[_matchingTasksLink(query_params)]]">View Matching Tasks</a>
         </div>
       </div>
 
@@ -301,6 +302,21 @@ the fleet.">
           }
         }
         return params;
+      },
+
+      _matchingTasksLink: function(query_params) {
+        var cols = ["name", "state", "created_ts"];
+        if (!query_params.dimensions) {
+          return this._taskListLink([], cols);
+        }
+
+        query_params.dimensions.forEach(function(f) {
+          var col = f.split(this.FILTER_SEP, 1)[0];
+          if (cols.indexOf(col) === -1) {
+            cols.push(col);
+          }
+        }.bind(this));
+        return this._taskListLink(query_params.dimensions, cols);
       },
 
       _showDimensionMessage: function(primarySelected, selectedItems) {

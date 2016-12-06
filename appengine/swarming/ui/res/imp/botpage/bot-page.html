@@ -195,7 +195,9 @@
                 </td>
               </tr>
               <tr>
-                <td rowspan$="[[_numRows(_bot.dimensions)]]">Dimensions</td>
+                <td rowspan$="[[_numRows(_bot.dimensions)]]">
+                  <a href$="[[_siblingBotsLink(_bot.dimensions)]]" title="The list of bots that also matches these dimensions (except id)."> Dimensions</a>
+                </td>
               </tr>
               <template
                   is="dom-repeat"
@@ -589,6 +591,25 @@
       _shutdownBot: function() {
         swarming.postWithToast("/api/swarming/v1/bot/"+this.bot_id+"/terminate",
           "Shutting down "+this.bot_id, this._auth_headers);
+      },
+
+      _siblingBotsLink(dimensions) {
+        var cols = ["id", "os", "task", "status"];
+         if (!dimensions) {
+          return this._botListLink([], cols);
+        }
+
+        dimensions = dimensions.filter(function(f){
+          return f.key !== "id";
+        });
+
+        dimensions.forEach(function(f) {
+          if (cols.indexOf(f.key) === -1) {
+            cols.push(f.key);
+          }
+        }.bind(this));
+
+        return this._botListLink(dimensions, cols);
       },
 
       _task: function(bot) {

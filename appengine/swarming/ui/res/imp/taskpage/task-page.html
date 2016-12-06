@@ -472,7 +472,7 @@
                   <td>Uploading Outputs To Isolate</td>
                   <td>[[_humanDuration(_result.performance_stats.isolated_upload.duration)]]</td>
                 </tr>
-                <tr>
+                <tr hidden$="[[!_result.performance_stats.isolated_download.initial_size]]">
                   <td>Initial bot cache</td>
                   <td>[[_result.performance_stats.isolated_download.initial_number_items]] items;
                   [[_bytes(_result.performance_stats.isolated_download.initial_size)]]</td>

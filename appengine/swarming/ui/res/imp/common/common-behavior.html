@@ -30,14 +30,27 @@
       },
 
       // Create a link to a bot list with the preloaded filters and columns.
-      // filters should be an array of {key:String, value:String} and
-      // columns should be an array of Strings.
+      // filters - Array<Object> or Array<String>.  If Array<Object>, Object
+      //     should be {key:String, value:String} or
+      //     {key:String, value:Array<String>}. If Array<String>, the Strings
+      //     should be valid filters (e.g. "foo:bar").
+      // columns - Array<String> , the the column names that should be shown.
       _botListLink: function(filters, columns) {
         filters = filters || [];
         columns = columns || [];
         var fArr = [];
         filters.forEach(function(f){
-          fArr.push(f.key + ":" + f.value);
+          if (f.key && f.value) {
+            if (Array.isArray(f.value)) {
+              f.value.forEach(function(v) {
+                fArr.push(f.key + ":" + v);
+              });
+            } else {
+              fArr.push(f.key + ":" + f.value);
+            }
+          } else {
+            fArr.push(f);
+          }
         });
         var obj = {
           f: fArr,
@@ -180,6 +193,36 @@
           taskId = taskId.substring(0, taskId.length - 1) + "0";
         }
         return "/task?id=" + taskId;
+      },
+
+      // Create a link to a task list with the preloaded filters and columns.
+      // filters - Array<Object> or Array<String>.  If Array<Object>, Object
+      //     should be {key:String, value:String} or
+      //     {key:String, value:Array<String>}. If Array<String>, the Strings
+      //     should be valid filters (e.g. "foo:bar").
+      // columns - Array<String> , the the column names that should be shown.
+      _taskListLink: function(filters, columns) {
+        filters = filters || [];
+        columns = columns || [];
+        var fArr = [];
+        filters.forEach(function(f){
+          if (f.key && f.value) {
+            if (Array.isArray(f.value)) {
+              f.value.forEach(function(v) {
+                fArr.push(f.key + ":" + v);
+              });
+            } else {
+              fArr.push(f.key + ":" + f.value);
+            }
+          } else {
+            fArr.push(f);
+          }
+        });
+        var obj = {
+          f: fArr,
+          c: columns,
+        }
+        return "/tasklist?" + sk.query.fromParamSet(obj);
       },
 
       // _timeDiffApprox returns the approximate difference between now and
