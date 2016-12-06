@@ -174,149 +174,151 @@
             </template>
 
             <table class="task-info" hidden$="[[_not(_task_exists)]]">
-              <tr>
-                <td>Name</td>
-                <td>[[_request.name]]</td>
-              </tr>
-              <tr>
-                <td>State</td>
-                <td class$="[[_stateClass(_result)]]">[[state(_result)]]</td>
-              </tr>
-              <tr>
-                <td>Created</td>
-                <td title$="[[_request.created_ts]]">[[_request.human_created_ts]]</td>
-              </tr>
-              <template is="dom-if" if="[[_wasPickedUp(_result)]]">
+              <tbody>
                 <tr>
-                  <td>Started</td>
-                  <td title$="[[_result.started_ts]]">[[_result.human_started_ts]]</td>
+                  <td>Name</td>
+                  <td>[[_request.name]]</td>
                 </tr>
-              </template>
-              <template is="dom-if" if="[[_wasNotPickedUp(_result)]]">
                 <tr>
-                  <td>Expires</td>
-                  <td>[[_expires(_request)]]</td>
+                  <td>State</td>
+                  <td class$="[[_stateClass(_result)]]">[[state(_result)]]</td>
                 </tr>
-              </template>
-              <template is="dom-if" if="[[_result.human_completed_ts]]">
                 <tr>
-                  <td>Completed</td>
-                  <td title$="[[_result.completed_ts]]">[[_result.human_completed_ts]]</td>
+                  <td>Created</td>
+                  <td title$="[[_request.created_ts]]">[[_request.human_created_ts]]</td>
                 </tr>
-              </template>
-              <template is="dom-if" if="[[_result.human_abandoned_ts]]">
+                <template is="dom-if" if="[[_wasPickedUp(_result)]]">
+                  <tr>
+                    <td>Started</td>
+                    <td title$="[[_result.started_ts]]">[[_result.human_started_ts]]</td>
+                  </tr>
+                </template>
+                <template is="dom-if" if="[[_wasNotPickedUp(_result)]]">
+                  <tr>
+                    <td>Expires</td>
+                    <td>[[_expires(_request)]]</td>
+                  </tr>
+                </template>
+                <template is="dom-if" if="[[_result.human_completed_ts]]">
+                  <tr>
+                    <td>Completed</td>
+                    <td title$="[[_result.completed_ts]]">[[_result.human_completed_ts]]</td>
+                  </tr>
+                </template>
+                <template is="dom-if" if="[[_result.human_abandoned_ts]]">
+                  <tr>
+                    <td>Abandoned</td>
+                    <td title$="[[_result.abandoned_ts]]">[[_result.human_abandoned_ts]]</td>
+                  </tr>
+                </template>
                 <tr>
-                  <td>Abandoned</td>
-                  <td title$="[[_result.abandoned_ts]]">[[_result.human_abandoned_ts]]</td>
+                  <td>Last Updated</td>
+                  <td title$="[[_result.modified_ts]]">[[_result.human_modified_ts]]</td>
                 </tr>
-              </template>
-              <tr>
-                <td>Last Updated</td>
-                <td title$="[[_result.modified_ts]]">[[_result.human_modified_ts]]</td>
-              </tr>
-              <template is="dom-if" if="[[_result.deduped_from]]">
+                <template is="dom-if" if="[[_result.deduped_from]]">
+                  <tr>
+                    <td><b>Deduped from</b></td>
+                    <td>
+                      <a href$="[[_taskLink(_result.deduped_from)]]">
+                        [[_result.deduped_from]]
+                      </a>
+                    </td>
+                  </tr>
+                </template>
                 <tr>
-                  <td><b>Deduped from</b></td>
-                  <td>
-                    <a href$="[[_taskLink(_result.deduped_from)]]">
-                      [[_result.deduped_from]]
+                  <td>Pending Time</td>
+                  <td>[[_pending(_result)]]</td>
+                </tr>
+                <tr>
+                  <td>Duration</td>
+                  <td>[[_result.human_duration]]</td>
+                </tr>
+                <tr>
+                  <td>Priority</td>
+                  <td>[[_request.priority]]</td>
+                </tr>
+                <tr>
+                  <td>User</td>
+                  <td>[[_request.user]]</td>
+                </tr>
+                <tr>
+                  <td>Authenticated</td>
+                  <td>[[_request.authenticated]]</td>
+                </tr>
+                <template is="dom-if" if="[[_request.service_account]]">
+                  <tr>
+                    <td>Service Account</td>
+                    <td>[[_request.service_account]]</td>
+                  </tr>
+                </template>
+                <template is="dom-if" if="[[_request.properties.secret_bytes]]">
+                  <tr>
+                    <td>Secret Bytes</td>
+                    <td>[[_request.properties.secret_bytes]]</td>
+                  </tr>
+                </template>
+                <template is="dom-if" if="[[_request.parent_task_id]]">
+                  <tr>
+                    <td>Parent Task</td>
+                    <td>
+                      <a href$="[[_taskLink(_request.parent_task_id)]]">[[_request.parent_task_id]]</a>
+                    </td>
+                  </tr>
+                </template>
+                <tr>
+                  <td rowspan$="[[_rowspan(_request.properties.dimensions)]]">
+                    <a
+                        title="The list of bots that matches the list of dimensions"
+                        href$="[[_botListLink(_request.properties.dimensions)]]">
+                      Requested Dimensions
                     </a>
                   </td>
                 </tr>
-              </template>
-              <tr>
-                <td>Pending Time</td>
-                <td>[[_pending(_result)]]</td>
-              </tr>
-              <tr>
-                <td>Duration</td>
-                <td>[[_result.human_duration]]</td>
-              </tr>
-              <tr>
-                <td>Priority</td>
-                <td>[[_request.priority]]</td>
-              </tr>
-              <tr>
-                <td>User</td>
-                <td>[[_request.user]]</td>
-              </tr>
-              <tr>
-                <td>Authenticated</td>
-                <td>[[_request.authenticated]]</td>
-              </tr>
-              <template is="dom-if" if="[[_request.service_account]]">
-                <tr>
-                  <td>Service Account</td>
-                  <td>[[_request.service_account]]</td>
-                </tr>
-              </template>
-              <template is="dom-if" if="[[_request.properties.secret_bytes]]">
-                <tr>
-                  <td>Secret Bytes</td>
-                  <td>[[_request.properties.secret_bytes]]</td>
-                </tr>
-              </template>
-              <template is="dom-if" if="[[_request.parent_task_id]]">
-                <tr>
-                  <td>Parent Task</td>
-                  <td>
-                    <a href$="[[_taskLink(_request.parent_task_id)]]">[[_request.parent_task_id]]</a>
-                  </td>
-                </tr>
-              </template>
-              <tr>
-                <td rowspan$="[[_rowspan(_request.properties.dimensions)]]">
-                  <a
-                      title="The list of bots that matches the list of dimensions"
-                      href$="[[_botListLink(_request.properties.dimensions)]]">
-                    Requested Dimensions
-                  </a>
-                </td>
-              </tr>
-              <template is="dom-repeat" items="{{_request.properties.dimensions}}" as="dimension">
-                <tr>
-                  <td><b>[[dimension.key]]:</b> [[_alias(dimension)]]</td>
-                </tr>
-              </template>
-              <tr>
-                <td>Isolated Inputs</td>
-                <td>
-                  <a href$="[[_isolateLink(_request.properties.inputs_ref)]]">
-                    [[_request.properties.inputs_ref.isolated]]
-                  </a>
-                </td>
-              </tr>
-              <template is="dom-if" if="[[_request.properties.outputs.length]]">
-                <tr>
-                  <td rowspan$="[[_rowspan(_request.properties.outputs)]]">Expected outputs</td>
-                </tr>
-                <template is="dom-repeat" items="{{_request.properties.outputs}}" as="output">
+                <template is="dom-repeat" items="{{_request.properties.dimensions}}" as="dimension">
                   <tr>
-                    <td>[[output]]</td>
+                    <td><b>[[dimension.key]]:</b> [[_alias(dimension)]]</td>
                   </tr>
                 </template>
-              </template>
-              <template is="dom-if" if="[[_not(_request_detail)]]">
                 <tr>
-                  <td>More Details</td>
+                  <td>Isolated Inputs</td>
                   <td>
-                    <button on-click="_toggleDetails">
-                      <iron-icon icon="icons:add-circle-outline"></iron-icon>
-                    </button>
+                    <a href$="[[_isolateLink(_request.properties.inputs_ref)]]">
+                      [[_request.properties.inputs_ref.isolated]]
+                    </a>
                   </td>
                 </tr>
-              </template>
-              <template is="dom-if" if="[[_request_detail]]">
-                <tr>
-                  <td>Hide Details</td>
-                  <td>
-                    <button on-click="_toggleDetails">
-                      <iron-icon icon="icons:remove-circle-outline"></iron-icon>
-                    </button>
-                  </td>
-                </tr>
-              </template>
-              <template is="dom-if" if="[[_request_detail]]">
+                <template is="dom-if" if="[[_request.properties.outputs.length]]">
+                  <tr>
+                    <td rowspan$="[[_rowspan(_request.properties.outputs)]]">Expected outputs</td>
+                  </tr>
+                  <template is="dom-repeat" items="{{_request.properties.outputs}}" as="output">
+                    <tr>
+                      <td>[[output]]</td>
+                    </tr>
+                  </template>
+                </template>
+                <template is="dom-if" if="[[_not(_request_detail)]]">
+                  <tr>
+                    <td>More Details</td>
+                    <td>
+                      <button on-click="_toggleDetails">
+                        <iron-icon icon="icons:add-circle-outline"></iron-icon>
+                      </button>
+                    </td>
+                  </tr>
+                </template>
+                <template is="dom-if" if="[[_request_detail]]">
+                  <tr>
+                    <td>Hide Details</td>
+                    <td>
+                      <button on-click="_toggleDetails">
+                        <iron-icon icon="icons:remove-circle-outline"></iron-icon>
+                      </button>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+              <tbody id="more_details" hidden$="[[!_request_detail]]">
                 <tr>
                   <td>Extra Args</td>
                   <td class="code break-all">[[_extraArgs(_request)]]</td>
@@ -398,7 +400,7 @@
                   </tr>
                 </template>
 
-              </template>
+              </tbody>
             </table>
 
             <div class="title" hidden$="[[_not(_task_exists)]]">Task Execution</div>
