@@ -53,12 +53,12 @@
         height: 2000px;
       }
 
-      .left {
-        min-width: 550px;
-      }
       .right {
-        min-width: 500px;
         margin-top: 8px;
+      }
+
+      .break-all {
+        word-break: break-all;
       }
 
       .expand {
@@ -88,6 +88,20 @@
         border: 3px solid #1F78B4;
         margin-left: 5px;
         min-height: 80vh;
+        min-width: 550px;
+      }
+
+      .task-info {
+        min-width: 500px;
+      }
+
+      .cipd-header {
+        -moz-user-select: none;
+        -webkit-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        font-weight: bold;
+        margin-left: 8px;
       }
     </style>
 
@@ -159,7 +173,7 @@
               </task-disambiguation>
             </template>
 
-            <table hidden$="[[_not(_task_exists)]]">
+            <table class="task-info" hidden$="[[_not(_task_exists)]]">
               <tr>
                 <td>Name</td>
                 <td>[[_request.name]]</td>
@@ -305,11 +319,11 @@
               <template is="dom-if" if="[[_request_detail]]">
                 <tr>
                   <td>Extra Args</td>
-                  <td class="code">[[_extraArgs(_request)]]</td>
+                  <td class="code break-all">[[_extraArgs(_request)]]</td>
                 </tr>
                 <tr>
                   <td>Command</td>
-                  <td class="code">[[_command(_request)]]</td>
+                  <td class="code break-all">[[_command(_request)]]</td>
                 </tr>
                 <tr>
                   <td>Idempotent</td>
@@ -320,7 +334,7 @@
                 </tr>
                 <template is="dom-repeat" items="{{_request.tags}}" as="tag">
                   <tr>
-                    <td>[[tag]]</td>
+                    <td class="break-all">[[tag]]</td>
                   </tr>
                 </template>
 
@@ -347,7 +361,7 @@
                 </tr>
                 <tr>
                   <td>CIPD version</td>
-                  <td>[[_request.properties.cipd_input.client_package.version]]</td>
+                  <td class="break-all">[[_request.properties.cipd_input.client_package.version]]</td>
                 </tr>
                 <template is="dom-if" if="[[_wasPickedUp(_result)]]">
                   <tr>
@@ -364,10 +378,14 @@
                     <td>[[cipd.path]]/</td>
                   </tr>
                   <tr>
-                    <td><b>Requested:</b>[[cipd.requested]]</td>
+                    <td class="break-all">
+                      <span class="cipd-header">Requested: </span>[[cipd.requested]]
+                    </td>
                   </tr>
                   <tr hidden$="[[!_hasActualCIPDPackages(_result)]]">
-                    <td><b>Actual:</b>[[cipd.actual]]</td>
+                    <td class="break-all">
+                      <span class="cipd-header">Actual: </span>[[cipd.actual]]
+                    </td>
                   </tr>
                 </template>
 
@@ -508,7 +526,7 @@
               <iframe id="miloFrame" class="milo tabbed" src$="[[_getDisplayServerLink(_server_details.display_server_url_template,task_id)]]"></iframe>
             </template>
             <template is="dom-if" if="[[_show_raw]]">
-              <div class="code stdout tabbed">[[_rawOutput(_stdout,_result)]]</div>
+              <div class="code stdout tabbed break-all">[[_rawOutput(_stdout,_result)]]</div>
             </template>
           </div>
         </div>
