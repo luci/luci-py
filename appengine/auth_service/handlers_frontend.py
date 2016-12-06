@@ -10,7 +10,6 @@ import base64
 import webapp2
 
 from google.appengine.api import app_identity
-from google.appengine.api import users
 
 from components import auth
 from components import template
@@ -406,6 +405,7 @@ def create_application(debug):
         ui.OAuthConfigHandler,
         ui.IPWhitelistsHandler,
         ConfigHandler,
+        ui.ApiDocHandler,
       ],
       env_callback=get_additional_ui_environment)
   template.bootstrap({'auth_service': TEMPLATES_DIR})

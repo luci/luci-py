@@ -1,0 +1,95 @@
+{% extends 'auth/base.html' %}
+{% block content %}
+
+
+<div class="row">
+  <div class="col-md-12">
+    <h2>Overview</h2>
+    <hr>
+
+    <p>The service exposes a REST-like API for managing user groups and for
+    querying the database. This API is used by the web interface
+    (via Javascript), as well as by standalone clients.
+    </p>
+
+    <p>It supports two ways of authentication:</p>
+    <ul>
+      <li>Cookies. This is used by the web interface and when issuing
+      requests directly from the browser
+      (like <a href="/auth/api/v1/accounts/self" target="_blank">so</a>). This
+      is useful when tinkering with API from the browser. Any state-modifying
+      requests (POST, PUT, DELETE) must also be accompanied by X-XSRF-Token
+      request header.
+      </li>
+      <li>Google OAuth2 access tokens in Authorization header. This is used by
+      all other clients. The token must have
+      'https://www.googleapis.com/auth/userinfo.email' OAuth scope, and its
+      associated client_id must be whitelisted.
+      </li>
+    </ul>
+  </div>
+</div>
+
+
+<div class="row">
+  <div class="col-md-12">
+    <h2>API methods</h2>
+    <hr>
+    <table class="table">
+      <thead>
+        <tr>
+          <th style="width: 80px;">Verb</th>
+          <th style="width: 220px;">Path</th>
+          <th style="width: 120px">Request</th>
+          <th style="width: 120px">Response</th>
+          <th>Documentation</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for method in api_methods %}
+        <tr>
+          <td>{{method["verb"]}}</td>
+          <td>{{method["path"]}}</td>
+          <td>
+            {% if method["request_type"] %}
+              <a href="#{{method["request_type"]}}">{{method["request_type"]}}</a>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>
+            {% if method["response_type"] %}
+              <a href="#{{method["response_type"]}}">{{method["response_type"]}}</a>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>{{method["doc"]}}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-12">
+    <h2>Request and response types</h2>
+    <hr>
+  </div>
+</div>
+
+
+{% for tp in doc_types %}
+<div class="row">
+  <div class="col-md-12">
+    <h3><a name="{{tp["name"]}}" href="#{{tp["name"]}}"></a>{{tp["name"]}}</h3>
+    <p>{{tp["doc"]}}</p>
+    <p>Example:</p>
+    <pre>{{tp["example"]}}</pre>
+  </div>
+</div>
+{% endfor %}
+
+
+{% endblock content %}

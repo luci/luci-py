@@ -7,13 +7,15 @@
 import functools
 import json
 import os
-import urlparse
+import re
 import webapp2
 
 from components import template
 from components import utils
 
 from . import acl
+from . import rest_api
+
 from .. import api
 from .. import change_log
 from .. import config
@@ -162,12 +164,6 @@ class UIHandler(handler.AuthenticatingHandler):
     }
     js_config.update(common)
 
-    # Prepare URL to explore app API.
-    schema, netloc = urlparse.urlparse(self.request.url)[:2]
-    api_url = (
-        'https://apis-explorer.appspot.com/apis-explorer/?'
-        'base=%s://%s/_ah/api' % (schema, netloc))
-
     # Jinja2 environment to use to render a template.
     full_env = {
       'app_name': _ui_app_name,
@@ -176,7 +172,6 @@ class UIHandler(handler.AuthenticatingHandler):
       'config': json.dumps(js_config),
       'identity': api.get_current_identity(),
       'js_module_name': js_module_name,
-      'api_url': api_url,
       'navbar': [
         (cls.navbar_tab_id, cls.navbar_tab_title, cls.navbar_tab_url)
         for cls in _ui_navbar_tabs
@@ -403,6 +398,112 @@ class IPWhitelistsHandler(UINavbarTabHandler):
   template_file = 'auth/ip_whitelists.html'
 
 
-# Register them as default tabs.
+def pretty_json(d):
+  return json.dumps(d, sort_keys=True, separators=(', ', ': '), indent=2)
+
+
+class ApiDocHandler(UINavbarTabHandler):
+  """Page with API documentation extracted from rest_api.py."""
+  navbar_tab_url = '/auth/api'
+  navbar_tab_id = 'api'
+  navbar_tab_title = 'API'
+
+  # These can be used as 'request_type' and 'response_type' in api_doc.
+  doc_types = [
+    {
+      'name': 'Status',
+      'doc': 'Outcome of some operation.',
+      'example': pretty_json({'ok': True}),
+    },
+    {
+      'name': 'Self info',
+      'doc': 'Information about the requester.',
+      'example': pretty_json({
+        'identity': 'user:someone@example.com',
+        'ip': '192.168.0.1',
+      }),
+    },
+    {
+      'name': 'Group',
+      'doc': 'Represents a group, as stored in the database.',
+      'example': pretty_json({
+        'group': {
+          'caller_can_modify': True,
+          'created_by': 'user:someone@example.com',
+          'created_ts': 1409250754978540,
+          'description': 'Some free form description',
+          'globs': ['user:*@example.com'],
+          'members': ['user:a@example.com', 'anonymous:anonymous'],
+          'modified_by': 'user:someone@example.com',
+          'modified_ts': 1470871200558130,
+          'name': 'Some group',
+          'nested': ['Some nested group', 'Another nested group'],
+          'owners': 'Owning group',
+        },
+      }),
+    },
+    {
+      'name': 'Group listing',
+      'doc':
+        'All groups, along with their metadata. Does not include members '
+        'listings.',
+      'example': pretty_json({
+        'groups': [
+          {
+            'caller_can_modify': True,
+            'created_by': 'user:someone@example.com',
+            'created_ts': 1409250754978540,
+            'description': 'Some free form description',
+            'modified_by': 'user:someone@example.com',
+            'modified_ts': 1470871200558130,
+            'name': 'Some group',
+            'owners': 'Owning group',
+          },
+          {
+            'caller_can_modify': True,
+            'created_by': 'user:someone@example.com',
+            'created_ts': 1409250754978540,
+            'description': 'Another description',
+            'modified_by': 'user:someone@example.com',
+            'modified_ts': 1470871200558130,
+            'name': 'Another group',
+            'owners': 'Owning group',
+          },
+        ],
+      }),
+    },
+  ]
+
+  @redirect_ui_on_replica
+  @api.require(acl.has_access)
+  def get(self):
+    """Extracts API doc for registered webapp2 API routes."""
+    api_methods = []
+    for route in rest_api.get_rest_api_routes():
+      # Remove API parameter regexps from route template, they are mostly noise.
+      simplified = re.sub(r'\:.*\>', '>', route.template)
+      for doc in getattr(route.handler, 'api_doc', []):
+        api_methods.append({
+          'verb': doc['verb'],
+          'path': simplified,
+          'doc': doc['doc'],
+          'request_type': doc.get('request_type'),
+          'response_type': doc.get('response_type'),
+        })
+    env = {
+      'navbar_tab_id': self.navbar_tab_id,
+      'page_title': self.navbar_tab_title,
+      'api_methods': api_methods,
+      'doc_types': self.doc_types,
+    }
+    self.reply('auth/api.html', env)
+
+
+# Register them as default tabs. Order is important.
 _ui_navbar_tabs = (
-    GroupsHandler, ChangeLogHandler, OAuthConfigHandler, IPWhitelistsHandler)
+  GroupsHandler,
+  ChangeLogHandler,
+  OAuthConfigHandler,
+  IPWhitelistsHandler,
+  ApiDocHandler,
+)

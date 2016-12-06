@@ -435,6 +435,18 @@ class SelfHandler(handler.ApiHandler):
   Available in Standalone, Primary and Replica modes.
   """
 
+  # This is visible in the UI.
+  api_doc = [
+    {
+      'verb': 'GET',
+      'doc':
+        'Returns identity of a caller based on passed authentication tokens, '
+        'as well as requester\'s IP address (as seen by AppEngine). Useful '
+        'when debugging authentication issues.',
+      'response_type': 'Self info',
+    },
+  ]
+
   @api.public
   def get(self):
     self.send_response({
@@ -557,6 +569,15 @@ class GroupsHandler(handler.ApiHandler):
   Available in Standalone, Primary and Replica modes.
   """
 
+  # This is visible in the UI.
+  api_doc = [
+    {
+      'verb': 'GET',
+      'doc': 'Lists names and descriptions of all known groups.',
+      'response_type': 'Group listing',
+    },
+  ]
+
   @staticmethod
   def cache_key(auth_db_rev):
     return 'api:v1:GroupsHandler/%d' % auth_db_rev
@@ -611,6 +632,36 @@ class GroupHandler(EntityHandlerBase):
   entity_kind = model.AuthGroup
   entity_kind_name = 'group'
   entity_kind_title = 'group'
+
+  # This is visible in the UI.
+  api_doc = [
+    {
+      'verb': 'GET',
+      'doc': 'Returns a group given its name. Doesn\'t expand nested groups.',
+      'response_type': 'Group',
+    },
+    {
+      'verb': 'POST',
+      'doc': 'Creates a new group (ensuring it is indeed new).',
+      'request_type': 'Group',
+      'response_type': 'Status',
+    },
+    {
+      'verb': 'PUT',
+      'doc':
+        'Updates an existing group. Use If-Unmodified-Since header to '
+        'avoid unintentional overwrites.',
+      'request_type': 'Group',
+      'response_type': 'Status',
+    },
+    {
+      'verb': 'DELETE',
+      'doc':
+        'Deletes an existing group. Use If-Unmodified-Since header to '
+        'avoid unintentional removals.',
+      'response_type': 'Status',
+    },
+  ]
 
   @classmethod
   def get_entity_key(cls, name):
