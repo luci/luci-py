@@ -795,7 +795,7 @@ class OldUIHandler(auth.AuthenticatingHandler):
     self.response.write(template.render('swarming/root.html', params))
 
 
-class BotsListHandler(webapp2.RequestHandler):
+class BotsListHandler(auth.AuthenticatingHandler):
   """Redirects to a list of known bots."""
 
   @auth.public
@@ -814,7 +814,7 @@ class BotsListHandler(webapp2.RequestHandler):
     self.redirect(new_ui_link)
 
 
-class BotHandler(webapp2.RequestHandler):
+class BotHandler(auth.AuthenticatingHandler):
   """Redirects to a page about the bot, including last tasks and events."""
 
   @auth.public
@@ -825,7 +825,7 @@ class BotHandler(webapp2.RequestHandler):
 ### User accessible pages.
 
 
-class TasksHandler(webapp2.RequestHandler):
+class TasksHandler(auth.AuthenticatingHandler):
   """Redirects to a list of all task requests."""
 
   @auth.public
@@ -842,7 +842,7 @@ class TasksHandler(webapp2.RequestHandler):
     self.redirect(new_ui_link)
 
 
-class TaskHandler(webapp2.RequestHandler):
+class TaskHandler(auth.AuthenticatingHandler):
   """Redirects to a page containing task request and result."""
 
   @auth.public
@@ -850,7 +850,7 @@ class TaskHandler(webapp2.RequestHandler):
     self.redirect('/task?id=%s' % task_id)
 
 
-class UIHandler(webapp2.RequestHandler):
+class UIHandler(auth.AuthenticatingHandler):
   """Serves the landing page for the new UI of the requested page.
 
   This landing page is stamped with the OAuth 2.0 client id from the
