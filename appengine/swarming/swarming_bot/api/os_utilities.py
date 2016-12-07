@@ -179,18 +179,6 @@ def get_os_version_number():
 
 
 @tools.cached
-def get_os_version_name():
-  """Returns the marketing name on Windows.
-
-  Returns None on other OSes, since it's not problematic there. Having
-  dimensions like Trusty or Snow Leopard is not useful.
-  """
-  if sys.platform == 'win32':
-    return platforms.win.get_os_version_name()
-  return None
-
-
-@tools.cached
 def get_os_name():
   """Returns standardized OS name.
 
@@ -884,10 +872,9 @@ def get_dimensions():
   }
   if u'avx2' in get_cpuinfo().get(u'flags', []):
     dimensions[u'cpu'].append(cpu_type + u'-' + cpu_bitness + u'-avx2')
-  os_version_name = get_os_version_name()
-  if os_version_name:
-    # This only happens on Windows.
-    dimensions[u'os'].append(u'%s-%s' % (os_name, os_version_name))
+  if sys.platform == 'win32':
+    dimensions[u'os'].extend(
+        u'%s-%s' % (os_name, n) for n in platforms.win.get_os_version_names())
   else:
     dimensions[u'os'].append(u'%s-%s' % (os_name, get_os_version_number()))
   if u'none' not in dimensions[u'gpu']:

@@ -22,22 +22,22 @@ import gpu
 
 
 _WIN32_CLIENT_NAMES = {
-    '5.0': '2000',
-    '5.1': 'XP',
-    '5.2': 'XP',
-    '6.0': 'Vista',
-    '6.1': '7',
-    '6.2': '8',
-    '6.3': '8.1',
-    '10.0': '10',
+    u'5.0': u'2000',
+    u'5.1': u'XP',
+    u'5.2': u'XP',
+    u'6.0': u'Vista',
+    u'6.1': u'7',
+    u'6.2': u'8',
+    u'6.3': u'8.1',
+    u'10.0': u'10',
 }
 
 _WIN32_SERVER_NAMES = {
-    '5.2': '2003Server',
-    '6.0': '2008Server',
-    '6.1': '2008ServerR2',
-    '6.2': '2012Server',
-    '6.3': '2012ServerR2',
+    u'5.2': u'2003Server',
+    u'6.0': u'2008Server',
+    u'6.1': u'2008ServerR2',
+    u'6.2': u'2012Server',
+    u'6.3': u'2012ServerR2',
 }
 
 
@@ -145,8 +145,8 @@ def get_os_version_number():
 
 
 @tools.cached
-def get_os_version_name():
-  """Returns the marketing name of the OS including the service pack.
+def get_os_version_names():
+  """Returns the marketing name of the OS, without and with the service pack.
 
   On Windows 10, use the build number since there will be no service pack.
   """
@@ -156,12 +156,12 @@ def get_os_version_name():
   lookup = _WIN32_SERVER_NAMES if is_server else _WIN32_CLIENT_NAMES
   version_number, build_number = _get_os_numbers()
   marketing_name = lookup.get(version_number, version_number)
-  if version_number == '10.0':
+  if version_number == u'10.0':
     # Windows 10 doesn't have service packs, the build number now is the
     # reference number.
-    return '%s-%s' % (marketing_name, build_number)
-  service_pack = platform.win32_ver()[2] or 'SP0'
-  return '%s-%s' % (marketing_name, service_pack)
+    return marketing_name, u'%s-%s' % (marketing_name, build_number)
+  service_pack = platform.win32_ver()[2] or u'SP0'
+  return marketing_name, u'%s-%s' % (marketing_name, service_pack)
 
 
 def get_startup_dir():

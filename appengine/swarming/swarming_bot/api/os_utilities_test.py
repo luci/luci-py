@@ -27,13 +27,6 @@ class TestOsUtilities(auto_stub.TestCase):
     self.assertTrue(version)
     self.assertTrue(re.match(r'^\d+\.\d+$', version), version)
 
-  def test_get_os_version_names(self):
-    name = os_utilities.get_os_version_name()
-    if sys.platform == 'win32':
-      self.assertTrue(isinstance(name, str), name)
-    else:
-      self.assertEqual(None, name)
-
   def test_get_os_name(self):
     expected = (u'Linux', u'Mac', u'Raspbian', u'Ubuntu', u'Windows')
     self.assertIn(os_utilities.get_os_name(), expected)

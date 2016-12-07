@@ -36,6 +36,12 @@ class TestWin(unittest.TestCase):
       actual = win.to_cygwin_path(inputs)
       self.assertEqual(expected, actual, (inputs, expected, actual, i))
 
+  def test_get_os_version_names(self):
+    if sys.platform == 'win32':
+      names = win.get_os_version_names()
+      self.assertEqual(2, len(names))
+      self.assertTrue(isinstance(name, unicode) for name in names)
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
