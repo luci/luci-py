@@ -44,19 +44,23 @@ class RemoteClientGrpc(object):
   def post_task_update(self, task_id, bot_id, params,
                        stdout_and_chunk=None, exit_code=None):
     request = swarming_bot_pb2.TaskUpdateRequest()
-    request.bot_id = bot_id
-    request.task_id = task_id
+
+    # Insert all custom/optional data
     if params.has_key('bot_id') or params.has_key('task_id'):
       raise InternalError('params has bot_id or task_id')
-    # Preserving prior behaviour: empty stdout is not transmitted
+    request.id = bot_id
+    request.task_id = task_id
     if stdout_and_chunk and stdout_and_chunk[0]:
-      request.output_chunk = stdout_and_chunk[0]
-      request.output_chunk_offset = stdout_and_chunk[1]
+      # Preserving prior behaviour: empty stdout is not transmitted
+      request.output_chunk.data = stdout_and_chunk[0]
+      request.output_chunk.offset = stdout_and_chunk[1]
     if exit_code != None:
-      request.finished = True
-      request.exit_code = exit_code
-    insert_dict_as_submessage_struct(request, 'params', params)
+      request.exit_status.code = exit_code
 
+    # Insert everything else
+    google.protobuf.json_format.ParseDict(params, request)
+
+    # Perform update
     response = self._stub.TaskUpdate(request)
     logging.debug('post_task_update() = %s', request)
     if response.error:
@@ -186,12 +190,12 @@ def create_state_proto(state_dict, message):
   """
   for k, v in state_dict.iteritems():
     if isinstance(v, dict):
-      insert_dict_as_submessage_struct(message, k, v)
+      insert_dict_as_submessage(message, k, v)
     elif isinstance(v, list):
       l = getattr(message, k)
       l.extend(v)
     elif v != None:
-      # setattr doesn't like setting "None" state_dict. Other falsy values are
+      # setattr doesn't like setting "None" values. Other falsy values are
       # ok. Also, setting something to its default value apparently has no
       # effect, so be ready to deal with it on the receiving side.
       #
@@ -200,10 +204,10 @@ def create_state_proto(state_dict, message):
       setattr(message, k, v)
 
 
-def insert_dict_as_submessage_struct(message, keyname, value):
-  """Encodes a dict as a Protobuf struct.
+def insert_dict_as_submessage(message, keyname, value):
+  """Encodes a dict as a Protobuf message.
 
-  The keyname for the Struct field is passed in to simplify the creation
+  The keyname for the message field is passed in to simplify the creation
   of the submessage in the first place - you need to say getattr and not
   simply refer to message.keyname since the former actually creates the
   submessage while the latter does not.

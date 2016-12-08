@@ -122,25 +122,67 @@ message PollResponse {
 }
 
 message TaskUpdateRequest {
-  // A set of opaque (to the proxy) parameters that should simply be passed
-  // directly to the Swarming server.
-  google.protobuf.Struct params = 1;
+  // Basic IDs
+  string id = 1; // Bot ID
+  string task_id = 2;
 
-  string bot_id = 2;
-  string task_id = 3;
+  // Missing if the task isn't finished yet
+  message ExitStatus {
+    int32 code = 1;
+  }
+  ExitStatus exit_status = 3;
 
-  // A chunk of stdout contents of unknown encoding.
-  bytes output_chunk = 4;
+  // Some standard output. Can be missing.
+  message OutputChunk {
+    bytes data = 1;
+    int64 offset = 2;
+  }
+  OutputChunk output_chunk = 4;
 
-  // The offset of the current chunk of stdout - used by Swarming to ensure
-  // there's nothing missing.
-  int64 output_chunk_offset = 5;
+  // All remaining parameters must match the Python dict exactly, as they are
+  // automatically converted using protobuf.json_format.ParseDict (which,
+  // despite the name, doesn't actually use json). The types must be exactly
+  // what are expected by the Swarming server otherwise exceptions will be
+  // thrown (see
+  // https://developers.google.com/protocol-buffers/docs/proto#scalar for proto
+  // vs Python scalar types).
+  //
+  // All params used to be represented by google.protobuf.Struct, but
+  // unfortunately that data type doesn't distinguish between integer and
+  // floating point numbers, so it didn't sufficiently preserve types.
 
-  // True if this is the final update for this task.
-  bool finished = 6;
+  // Flags and IDs (first id = 100)
+  bool hard_timeout = 100;
+  bool io_timeout = 101;
 
-  // The exit code of the process; only meaningful if finished is true.
-  int32 exit_code = 7;
+  // Other scalars (first id = 200)
+  float bot_overhead = 200;
+  float cost_usd = 201;
+  float duration = 202;
+
+  // Structured data (first id = 300)
+  message OutputsRef {
+    string isolated = 1;
+    string isolatedserver = 2;
+    string namespace = 3;
+  }
+  OutputsRef outputs_ref = 300;
+  message IsolatedStats {
+    message TransferStats {
+      float duration = 1;
+      int32 initial_number_items = 2;
+      int32 initial_size = 3;
+      bytes items_cold = 4; //b64-encoded
+      bytes items_hot = 5; //b64-encoded
+    }
+    TransferStats download = 1;
+    TransferStats upload = 2;
+  }
+  IsolatedStats isolated_stats = 301;
+
+  // Unknown types: represent as structs for now (first id = 400)
+  google.protobuf.Struct cipd_pins = 400;
+  google.protobuf.Struct cipd_stats = 401;
 }
 
 message TaskUpdateResponse {
