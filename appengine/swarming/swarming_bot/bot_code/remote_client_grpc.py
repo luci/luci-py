@@ -57,7 +57,8 @@ class RemoteClientGrpc(object):
     if exit_code != None:
       request.exit_status.code = exit_code
 
-    # Insert everything else
+    # Insert everything else. Note that the b64-encoded strings in the dict
+    # are automatically decoded by ParseDict.
     google.protobuf.json_format.ParseDict(params, request)
 
     # Perform update

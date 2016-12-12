@@ -172,8 +172,8 @@ message TaskUpdateRequest {
       float duration = 1;
       int32 initial_number_items = 2;
       int32 initial_size = 3;
-      bytes items_cold = 4; //b64-encoded
-      bytes items_hot = 5; //b64-encoded
+      bytes items_cold = 4; // Python packed
+      bytes items_hot = 5; // Python packed
     }
     TransferStats download = 1;
     TransferStats upload = 2;
