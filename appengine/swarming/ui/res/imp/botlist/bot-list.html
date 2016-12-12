@@ -45,6 +45,9 @@
         margin-bottom: 8px;
         margin-right: 10px;
       }
+      .old_version {
+        background-color: #ffffdd;
+      }
       .quarantined, .bad-device {
         background-color: #ffdddd;
       }
@@ -183,7 +186,7 @@
                 as="bot"
                 initial-count=50>
 
-              <tr class$="[[_botClass(bot)]]">
+              <tr class$="[[_botClass(bot,_server_details.bot_version)]]">
                 <td>
                   <a
                       class="center"
@@ -602,14 +605,18 @@
         return swarming.alias.android(this._deviceType(device));
       },
 
-      _botClass: function(bot) {
+      _botClass: function(bot, serverVersion) {
+        var classes = "";
         if (bot.is_dead) {
-          return "dead";
+          classes += "dead ";
         }
         if (bot.quarantined) {
-          return "quarantined";
+          classes += "quarantined ";
         }
-        return "";
+        if (bot.version !== serverVersion) {
+          classes += "old_version";
+        }
+        return classes;
       },
 
       _ccLink: function(bot){

@@ -60,6 +60,7 @@
 
     var details = {
       server_version: "1234-deadbeef",
+      bot_version: "ec524892ac1cd0748b88c2271371df51402f3daf",
       machine_provider_template: "http://example.com#/leases/%s?foo=bar",
     };
     server.respondWith("GET", /^\/_ah\/api\/swarming\/v1\/server\/details/, JSON.stringify(details));
