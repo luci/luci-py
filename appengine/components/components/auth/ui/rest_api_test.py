@@ -1907,6 +1907,36 @@ class MembershipsCheckHandlerTest(RestAPITestCase):
     self.assertEqual(400, status)
 
 
+class GroupsSuggestHandlerTest(RestAPITestCase):
+  def setUp(self):
+    super(GroupsSuggestHandlerTest, self).setUp()
+    self.mock_is_admin(True)
+    make_group(model.ADMIN_GROUP)
+    make_group('Ade')
+    make_group('Abc')
+    make_group('Z')
+    api.reset_local_state()  # invalidate request cache to reread new groups
+
+  def test_get_some(self):
+    status, body, _ = self.get(
+        path='/auth/api/v1/suggest/groups?name=A')
+    self.assertEqual(200, status)
+    self.assertEqual({u'names': [u'Abc', u'Ade']}, body)
+
+  def test_get_none(self):
+    status, body, _ = self.get(
+        path='/auth/api/v1/suggest/groups?name=ZZZ')
+    self.assertEqual(200, status)
+    self.assertEqual({u'names': []}, body)
+
+  def test_get_all(self):
+    status, body, _ = self.get(
+        path='/auth/api/v1/suggest/groups')
+    self.assertEqual(200, status)
+    self.assertEqual(
+        {u'names': [u'Abc', u'Ade', u'Z', u'administrators']}, body)
+
+
 class CertificatesHandlerTest(RestAPITestCase):
   def test_works(self):
     # Test mostly for code coverage.

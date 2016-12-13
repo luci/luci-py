@@ -54,6 +54,7 @@ def get_rest_api_routes():
         IPWhitelistHandler),
     webapp2.Route('/auth/api/v1/memberships/list', MembershipsListHandler),
     webapp2.Route('/auth/api/v1/memberships/check', MembershipsCheckHandler),
+    webapp2.Route('/auth/api/v1/suggest/groups', GroupsSuggestHandler),
     webapp2.Route('/auth/api/v1/server/certificates', CertificatesHandler),
     webapp2.Route('/auth/api/v1/server/info', ServerInfoHandler),
     webapp2.Route('/auth/api/v1/server/oauth_config', OAuthConfigHandler),
@@ -1198,6 +1199,34 @@ class MembershipsCheckHandler(PerIdentityBatchHandler):
         'is_member': any(auth_db.is_group_member(g, iden) for g in p['groups']),
       }
     return resp
+
+
+class GroupsSuggestHandler(handler.ApiHandler):
+  """Auto-complete for group names."""
+
+  # This is visible in the UI.
+  api_doc = [
+    {
+      'verb': 'GET',
+      'params': 'name=...',
+
+      'doc': 'Suggests group names that match the given string.',
+
+      'response_type': {
+        'name': 'Names',
+        'doc': 'A list of group names.',
+        'example': {
+          'names': ['Group A', 'Group B'],
+        },
+      },
+    },
+  ]
+
+  @api.require(acl.has_access)
+  def get(self):
+    name = self.request.get('name') or ''
+    auth_db = api.get_request_cache().auth_db
+    self.send_response({'names': auth_db.get_group_names_with_prefix(name)})
 
 
 class ServerInfoHandler(handler.ApiHandler):
