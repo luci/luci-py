@@ -4,10 +4,24 @@
 
 // Configuration schema for configs fetched via a config service.
 
+syntax = "proto2";
+
 package auth_service;
 
 
+// Auth service configuration that applies specifically to the service, not to
+// any linked services.
+//
+// Provided via 'settings.cfg' config file.
+message SettingsCfg {
+  // Enable ts_mon based monitoring.
+  optional bool enable_ts_monitoring = 1;
+}
+
+
 // Configuration of cron job that imports groups from external sources.
+//
+// Provided via 'imports.cfg' config file.
 message GroupImporterConfig {
   // Import groups stored as files in a tarball.
   message TarballEntry {
@@ -51,6 +65,8 @@ message GroupImporterConfig {
 
 
 // Global config. Includes OAuth client_id whitelist and token server URL.
+//
+// Provided via 'oauth.cfg' config file.
 message OAuthConfig {
   // ClientID returned by /auth/api/v1/server/oauth_config endpoint to clients.
   optional string primary_client_id = 1;
@@ -90,6 +106,10 @@ message IPWhitelistConfig {
 
 
 // Configuration for delegation token minter.
+//
+// Provided via 'delegation.cfg' config file.
+//
+// DEPRECATED.
 message DelegationConfig {
   // Rules restrict what kind of delegation token can be minted by a particular
   // user targeting particular services. Given an incoming token request from

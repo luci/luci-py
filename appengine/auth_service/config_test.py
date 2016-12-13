@@ -60,7 +60,7 @@ class ConfigTest(test_case.TestCase):
         'updater': lambda rev, conf: bump_rev('b.cfg', rev, conf),
         'use_authdb_transaction': False,
       },
-      # Will be updated instance auth db transaction.
+      # Will be updated inside auth db transaction.
       'c.cfg': {
         'proto_class': None,
         'revision_getter': lambda: revs['c.cfg'],
@@ -426,6 +426,7 @@ class ConfigTest(test_case.TestCase):
           'ip_whitelist_cfg_rev', config_pb2.IPWhitelistConfig()),
       'oauth.cfg': (
           'oauth_cfg_rev', config_pb2.OAuthConfig(primary_client_id='a')),
+      'settings.cfg': (None, None),  # emulate missing config
     }
     @ndb.tasklet
     def get_self_config_mock(path, *_args, **_kwargs):
@@ -445,6 +446,7 @@ class ConfigTest(test_case.TestCase):
       'oauth.cfg': (
           config.Revision('oauth_cfg_rev', 'http://url'),
           config_pb2.OAuthConfig(primary_client_id='a')),
+      'settings.cfg': (config.Revision('0'*40, 'http://url'), ''),
     }, result)
 
   def test_fetch_configs_not_valid(self):
@@ -599,6 +601,43 @@ class ConfigTest(test_case.TestCase):
     utils.clear_cache(config.get_delegation_config)
     proto = config.get_delegation_config()
     self.assertEqual(1, len(proto.rules))
+
+  def test_settings_updates(self):
+    # Fetch only settings.cfg in this test case.
+    self.mock(config, 'is_remote_configured', lambda: True)
+    self.mock(config, '_CONFIG_SCHEMAS', {
+      'settings.cfg': config._CONFIG_SCHEMAS['settings.cfg'],
+    })
+
+    # Default settings.
+    self.assertEqual(config_pb2.SettingsCfg(), config.get_settings())
+
+    # Mock new settings value in luci-config.
+    settings_cfg_text = 'enable_ts_monitoring: true'
+    self.mock(config, '_fetch_configs', lambda _: {
+      'settings.cfg': (config.Revision('rev', 'url'), settings_cfg_text),
+    })
+
+    # Fetch them.
+    config.refetch_config()
+
+    # Verify they are used now.
+    utils.clear_cache(config.get_settings)
+    self.assertEqual(
+        config_pb2.SettingsCfg(enable_ts_monitoring=True),
+        config.get_settings())
+
+    # "Delete" them from luci-config.
+    self.mock(config, '_fetch_configs', lambda _: {
+      'settings.cfg': (config.Revision('0'*40, 'url'), ''),
+    })
+
+    # Fetch them.
+    config.refetch_config()
+
+    # Verify defaults are restored.
+    utils.clear_cache(config.get_settings)
+    self.assertEqual(config_pb2.SettingsCfg(), config.get_settings())
 
 
 if __name__ == '__main__':

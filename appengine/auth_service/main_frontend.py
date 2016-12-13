@@ -20,18 +20,23 @@ import endpoints
 from components import auth
 from components import config
 from components import ereporter2
-from components import utils
 
 import handlers_frontend
+import monitoring
 
 
 def create_applications():
   ereporter2.register_formatter()
 
-  # App that serves HTML pages and old API.
-  frontend = handlers_frontend.create_application(False)
-  # App that serves endpoints APIs.
+  # App that serves HTML pages and the main API.
+  frontend = monitoring.wrap_webapp2_app(
+      handlers_frontend.create_application(False))
+
+  # App that serves endpoints APIs. Note: monitoring.wrap_webapp2_app doesn't
+  # support Endpoints server. This is fine, we don't host any important APIs
+  # there.
   api = endpoints.api_server([auth.AuthService, config.ConfigApi])
+
   return frontend, api
 
 

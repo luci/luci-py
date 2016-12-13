@@ -16,14 +16,14 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
 
 from components import ereporter2
-from components import utils
 
 import handlers_backend
+import monitoring
 
 
 def create_application():
   ereporter2.register_formatter()
-  return handlers_backend.create_application(False)
+  return monitoring.wrap_webapp2_app(handlers_backend.create_application(False))
 
 
 app = create_application()

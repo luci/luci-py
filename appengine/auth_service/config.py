@@ -95,6 +95,26 @@ def get_delegation_config():
   return msg
 
 
+@utils.cache_with_expiration(expiration_sec=60)
+def get_settings():
+  """Returns auth service own settings (from settings.cfg) as SettingsCfg proto.
+
+  Returns default settings if the ones in the datastore are no longer valid.
+  """
+  text = _get_service_config('settings.cfg')
+  if not text:
+    return config_pb2.SettingsCfg()
+  # The config MUST be valid, since we do validation before storing it. If it
+  # doesn't, better to revert to default setting rather than fail all requests.
+  try:
+    msg = config_pb2.SettingsCfg()
+    protobuf.text_format.Merge(text, msg)
+    return msg
+  except protobuf.text_format.ParseError as ex:
+    logging.error('Invalid settings.cfg: %s', ex)
+    return config_pb2.SettingsCfg()
+
+
 def refetch_config(force=False):
   """Refetches all configs from luci-config (if enabled).
 
@@ -190,6 +210,13 @@ def validate_delegation_config(conf, ctx):
           'allowed_to_impersonate', r.allowed_to_impersonate)
       if r.max_validity_duration <= 0:
         ctx.error('max_validity_duration must be a positive integer')
+
+
+@validation.self_rule('settings.cfg', config_pb2.SettingsCfg)
+def validate_settings_cfg(conf, _ctx):
+  assert isinstance(conf, config_pb2.SettingsCfg)
+  # Nothing to validate here actually. There's only one boolean field in
+  # SettingsCfg.
 
 
 # TODO(vadimsh): Below use validation context for real (e.g. emit multiple
@@ -494,6 +521,7 @@ def _update_oauth_config(rev, conf):
 #   'validator': lambda config: <raises ValueError on invalid format>
 #   'updater': lambda rev, config: True if applied, False if not.
 #   'use_authdb_transaction': True to call 'updater' in AuthDB transaction.
+#   'default': Default config value to use if the config file is missing.
 # }
 _CONFIG_SCHEMAS = {
   'delegation.cfg': {
@@ -519,6 +547,13 @@ _CONFIG_SCHEMAS = {
     'revision_getter': lambda: _get_authdb_config_rev('oauth.cfg'),
     'updater': _update_oauth_config,
     'use_authdb_transaction': True,
+  },
+  'settings.cfg': {
+    'proto_class': None, # settings are stored as text in datastore
+    'default': '',  # it's fine if config file is not there
+    'revision_getter': lambda: _get_service_config_rev('settings.cfg'),
+    'updater': lambda rev, c: _update_service_config('settings.cfg', rev, c),
+    'use_authdb_transaction': False,
   },
 }
 
@@ -551,7 +586,10 @@ def _fetch_configs(paths):
   for path, future in zip(paths, futures):
     rev, conf = future.get_result()
     if conf is None:
-      raise CannotLoadConfigError('Config %s is missing' % path)
+      default = _CONFIG_SCHEMAS[path].get('default')
+      if default is None:
+        raise CannotLoadConfigError('Config %s is missing' % path)
+      rev, conf = '0'*40, default
     try:
       validation.validate(config.self_config_set(), path, conf)
     except ValueError as exc:

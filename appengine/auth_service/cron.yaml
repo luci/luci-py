@@ -25,3 +25,10 @@ cron:
   target: backend
   url: /internal/cron/ereporter2/mail
   schedule: every 1 hours synchronized
+
+### gae_ts_mon
+
+- description: ts_mon housekeeping
+  target: backend
+  url: /internal/cron/ts_mon/send
+  schedule: every 1 minutes
