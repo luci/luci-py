@@ -1745,6 +1745,168 @@ class IPWhitelistHandlerTest(RestAPITestCase):
         {'text': 'The configuration is managed elsewhere'}, body)
 
 
+class MembershipsListHandlerTest(RestAPITestCase):
+  def setUp(self):
+    super(MembershipsListHandlerTest, self).setUp()
+    self.mock_is_admin(True)
+    make_group(model.ADMIN_GROUP)
+    make_group('A', members=[
+      model.Identity.from_bytes('user:a@example.com'),
+      model.Identity.from_bytes('user:c@example.com'),
+    ])
+    make_group('B', members=[
+      model.Identity.from_bytes('user:b@example.com'),
+      model.Identity.from_bytes('user:c@example.com'),
+    ])
+    api.reset_local_state()  # invalidate request cache to reread new groups
+
+  def test_get_ok(self):
+    status, body, _ = self.get(
+        path='/auth/api/v1/memberships/list?identity=user:c@example.com')
+    self.assertEqual(200, status)
+    self.assertEqual(
+        {u'memberships': [{u'group': u'A'}, {u'group': u'B'}]}, body)
+
+  def test_get_empty(self):
+    status, body, _ = self.get(
+        path='/auth/api/v1/memberships/list?identity=user:unknown@example.com')
+    self.assertEqual(200, status)
+    self.assertEqual({u'memberships': []}, body)
+
+  def test_get_no_ident(self):
+    status, _, _ = self.get(
+        path='/auth/api/v1/memberships/list',
+        expect_errors=True)
+    self.assertEqual(400, status)
+
+  def test_get_bad_ident(self):
+    status, _, _ = self.get(
+        path='/auth/api/v1/memberships/list?identity=unknown@example.com',
+        expect_errors=True)
+    self.assertEqual(400, status)
+
+  def test_post_ok(self):
+    status, body, _ = self.post(
+        path='/auth/api/v1/memberships/list',
+        body={
+          'per_identity': {
+            'user:a@example.com': None,
+            'user:b@example.com': None,
+            'user:c@example.com': None,
+            'user:d@example.com': None,
+          }
+        })
+    self.assertEqual(200, status)
+    self.assertEqual({
+      u'per_identity': {
+        u'user:a@example.com': {u'memberships': [{u'group': u'A'}]},
+        u'user:b@example.com': {u'memberships': [{u'group': u'B'}]},
+        u'user:c@example.com': {
+          u'memberships': [{u'group': u'A'}, {u'group': u'B'}],
+        },
+        u'user:d@example.com': {u'memberships': []},
+      },
+    }, body)
+
+  def test_post_empty(self):
+    status, _, _ = self.post(
+        path='/auth/api/v1/memberships/list',
+        body={'per_identity': {}},
+        expect_errors=True)
+    self.assertEqual(400, status)
+
+  def test_post_bad_params(self):
+    status, _, _ = self.post(
+        path='/auth/api/v1/memberships/list',
+        body={
+          'per_identity': {
+            'user:a@example.com': 'blah',
+          }
+        },
+        expect_errors=True)
+    self.assertEqual(400, status)
+
+
+class MembershipsCheckHandlerTest(RestAPITestCase):
+  def setUp(self):
+    super(MembershipsCheckHandlerTest, self).setUp()
+    self.mock_is_admin(True)
+    make_group(model.ADMIN_GROUP)
+    make_group('A', members=[
+      model.Identity.from_bytes('user:a@example.com'),
+      model.Identity.from_bytes('user:c@example.com'),
+    ])
+    make_group('B', members=[
+      model.Identity.from_bytes('user:b@example.com'),
+      model.Identity.from_bytes('user:c@example.com'),
+    ])
+    api.reset_local_state()  # invalidate request cache to reread new groups
+
+  def test_get_ok(self):
+    status, body, _ = self.get(
+        path='/auth/api/v1/memberships/check?' +
+             'identity=user:a@example.com&groups=XXX&groups=A')
+    self.assertEqual(200, status)
+    self.assertEqual({u'is_member': True}, body)
+
+  def test_get_no_ident(self):
+    status, _, _ = self.get(
+        path='/auth/api/v1/memberships/check?groups=XXX&groups=A',
+        expect_errors=True)
+    self.assertEqual(400, status)
+
+  def test_get_no_groups(self):
+    status, _, _ = self.get(
+        path='/auth/api/v1/memberships/check?identity=user:a@example.com',
+        expect_errors=True)
+    self.assertEqual(400, status)
+
+  def test_get_bad_ident(self):
+    status, _, _ = self.get(
+        path='/auth/api/v1/memberships/check?identity=unknown@example.com',
+        expect_errors=True)
+    self.assertEqual(400, status)
+
+  def test_post_ok(self):
+    status, body, _ = self.post(
+        path='/auth/api/v1/memberships/check',
+        body={
+          'per_identity': {
+            'user:a@example.com': {'groups': ['A']},
+            'user:b@example.com': {'groups': ['A']},
+            'user:c@example.com': {'groups': ['A', 'B']},
+            'user:d@example.com': {'groups': ['A', 'B', 'C']},
+          }
+        })
+    self.assertEqual(200, status)
+    self.assertEqual({
+      u'per_identity': {
+        u'user:a@example.com': {u'is_member': True},
+        u'user:b@example.com': {u'is_member': False},
+        u'user:c@example.com': {u'is_member': True},
+        u'user:d@example.com': {u'is_member': False},
+      },
+    }, body)
+
+  def test_post_empty(self):
+    status, _, _ = self.post(
+        path='/auth/api/v1/memberships/check',
+        body={'per_identity': {}},
+        expect_errors=True)
+    self.assertEqual(400, status)
+
+  def test_post_bad_params(self):
+    status, _, _ = self.post(
+        path='/auth/api/v1/memberships/check',
+        body={
+          'per_identity': {
+            'user:a@example.com': {'groups': 'blah'},
+          }
+        },
+        expect_errors=True)
+    self.assertEqual(400, status)
+
+
 class CertificatesHandlerTest(RestAPITestCase):
   def test_works(self):
     # Test mostly for code coverage.

@@ -332,6 +332,14 @@ class AuthDB(object):
     visit_group(group_name)
     return set(model.Identity.from_bytes(m) for m in listing)
 
+  def fetch_groups_with_member(self, ident):
+    """Returns a set of group names that have given Identity as a member.
+
+    This is expensive call, don't use it unless really necessary.
+    """
+    # TODO(vadimsh): This is currently very dumb and can probably be optimized.
+    return {g for g in self.groups if self.is_group_member(g, ident)}
+
   def get_secret(self, secret_key):
     """Returns list of strings with last known values of a secret.
 

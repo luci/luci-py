@@ -398,10 +398,6 @@ class IPWhitelistsHandler(UINavbarTabHandler):
   template_file = 'auth/ip_whitelists.html'
 
 
-def pretty_json(d):
-  return json.dumps(d, sort_keys=True, separators=(', ', ': '), indent=2)
-
-
 class ApiDocHandler(UINavbarTabHandler):
   """Page with API documentation extracted from rest_api.py."""
   navbar_tab_url = '/auth/api'
@@ -413,20 +409,20 @@ class ApiDocHandler(UINavbarTabHandler):
     {
       'name': 'Status',
       'doc': 'Outcome of some operation.',
-      'example': pretty_json({'ok': True}),
+      'example': {'ok': True},
     },
     {
       'name': 'Self info',
       'doc': 'Information about the requester.',
-      'example': pretty_json({
+      'example': {
         'identity': 'user:someone@example.com',
         'ip': '192.168.0.1',
-      }),
+      },
     },
     {
       'name': 'Group',
       'doc': 'Represents a group, as stored in the database.',
-      'example': pretty_json({
+      'example': {
         'group': {
           'caller_can_modify': True,
           'created_by': 'user:someone@example.com',
@@ -440,14 +436,14 @@ class ApiDocHandler(UINavbarTabHandler):
           'nested': ['Some nested group', 'Another nested group'],
           'owners': 'Owning group',
         },
-      }),
+      },
     },
     {
       'name': 'Group listing',
       'doc':
         'All groups, along with their metadata. Does not include members '
         'listings.',
-      'example': pretty_json({
+      'example': {
         'groups': [
           {
             'caller_can_modify': True,
@@ -470,7 +466,7 @@ class ApiDocHandler(UINavbarTabHandler):
             'owners': 'Owning group',
           },
         ],
-      }),
+      },
     },
   ]
 
@@ -478,23 +474,57 @@ class ApiDocHandler(UINavbarTabHandler):
   @api.require(acl.has_access)
   def get(self):
     """Extracts API doc for registered webapp2 API routes."""
+    doc_types = []
+
+    def add_doc_type(tp):
+      """Adds a request or response format definition to the documentation page.
+
+      'tp' can either reference a globally known doc type by name
+      (see ApiDocHandler.doc_types), or can itself be a dict with doc type
+      definition.
+
+      Returns the name of the doc type.
+      """
+      if not tp:
+        return None
+      # If referenced by name, try to find it among globally known types.
+      if isinstance(tp, basestring):
+        for d in self.doc_types:
+          if d['name'] == tp:
+            tp = d
+            break
+        else:
+          return tp  # not found, return original name as is
+      # Add, if not already there. Serialize the example first, since doing it
+      # from Jinja is a bit more complicated.
+      if not any(d['name'] == tp['name'] for d in doc_types):
+        tp = tp.copy()
+        tp['example'] = json.dumps(
+            tp['example'], sort_keys=True, separators=(', ', ': '), indent=2)
+        doc_types.append(tp)
+      return tp['name']
+
     api_methods = []
     for route in rest_api.get_rest_api_routes():
       # Remove API parameter regexps from route template, they are mostly noise.
       simplified = re.sub(r'\:.*\>', '>', route.template)
       for doc in getattr(route.handler, 'api_doc', []):
+        path = simplified
+        if 'params' in doc:
+          path += '?' + doc['params']
         api_methods.append({
           'verb': doc['verb'],
-          'path': simplified,
+          'path': path,
           'doc': doc['doc'],
-          'request_type': doc.get('request_type'),
-          'response_type': doc.get('response_type'),
+          'request_type': add_doc_type(doc.get('request_type')),
+          'response_type': add_doc_type(doc.get('response_type')),
         })
+
     env = {
       'navbar_tab_id': self.navbar_tab_id,
       'page_title': self.navbar_tab_title,
       'api_methods': api_methods,
-      'doc_types': self.doc_types,
+      'doc_types': doc_types,
     }
     self.reply('auth/api.html', env)
 

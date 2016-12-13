@@ -52,6 +52,8 @@ def get_rest_api_routes():
     webapp2.Route(
         '/auth/api/v1/ip_whitelists/<name:%s>' % ip_whitelist_re,
         IPWhitelistHandler),
+    webapp2.Route('/auth/api/v1/memberships/list', MembershipsListHandler),
+    webapp2.Route('/auth/api/v1/memberships/check', MembershipsCheckHandler),
     webapp2.Route('/auth/api/v1/server/certificates', CertificatesHandler),
     webapp2.Route('/auth/api/v1/server/info', ServerInfoHandler),
     webapp2.Route('/auth/api/v1/server/oauth_config', OAuthConfigHandler),
@@ -909,6 +911,293 @@ class IPWhitelistHandler(EntityHandlerBase):
   def do_delete(cls, entity):
     # TODO(vadimsh): Verify it isn't being referenced by whitelist assigments.
     entity.key.delete()
+
+
+class PerIdentityBatchHandler(handler.ApiHandler):
+  """A class with the POST handler being the batch version of the GET handler.
+
+  GET handler accepts 'identity=...' query parameter.
+  POST handler accepts {'per_identity': {<ident>: <parameters>}} dict.
+
+  Subclasses must override 'collect_get_params', 'validate_params' and
+  'execute_batch'.
+  """
+
+  # POST here is not state-modifying, no need for XSRF token.
+  xsrf_token_enforce_on = ()
+
+  def collect_get_params(self):
+    """Examines GET query and returns a dict with them.
+
+    The format of the dict must match what is supposed to be passed as a value
+    in 'per_identity' dict in POST body. So POST body is essentially
+    a collection of GET queries to be executed as a batch.
+    """
+    raise NotImplementedError()
+
+  def validate_params(self, params):
+    """Takes a dict with some single query parameters and validates it.
+
+    Raises ValueError if parameters are invalid.
+    """
+    raise NotImplementedError()
+
+  def execute_batch(self, queries):
+    """Takes a dict {Identity => params dict} and returns {Identity => results}.
+
+    Parameters are already validated at this point.
+    """
+    raise NotImplementedError()
+
+  @api.require(acl.has_access)
+  def post(self):
+    self.send_response(self._handle_batch(self.parse_body()))
+
+  @api.require(acl.has_access)
+  def get(self):
+    ident = self.request.get('identity')
+    if not ident:
+      self.abort_with_error(400, text='"identity" query parameter is required')
+    try:
+      model.Identity.from_bytes(ident)
+    except ValueError as e:
+      self.abort_with_error(400, text='Invalid "identity" - %s' % e)
+
+    # Make the "batch" call with the single request.
+    resp = self._handle_batch({
+      'per_identity': {
+        ident: self.collect_get_params(),
+      },
+    })
+
+    # Extract back singular response.
+    per_ident = resp.get('per_identity')
+    assert ident in per_ident, resp
+    self.send_response(per_ident[ident])
+
+  def _handle_batch(self, body):
+    # 'per_identity' is a dict {identity => request parameters},
+    if not isinstance(body, dict):
+      self.abort_with_error(400, text='The body must be a dict')
+    per_identity = body.get('per_identity', None)
+    if not isinstance(per_identity, dict) or not per_identity:
+      self.abort_with_error(400, text='"per_identity" must be a non-empty dict')
+
+    # Validate individual queries.
+    queries = {}
+    for ident_str, params in per_identity.iteritems():
+      try:
+        ident = model.Identity.from_bytes(ident_str)
+      except ValueError as e:
+        self.abort_with_error(
+            400, text='Not a valid identity %r - %s' % (ident_str, e))
+      # Make sure 'ident' serializes back to 'ident_str'. This is important,
+      # since we use it as key in the response, and callers most likely will be
+      # searching for exact same value they pass in the query.
+      assert ident.to_bytes() == ident_str, (ident, ident_str)
+      if params is None:
+        params = {}
+      try:
+        if not isinstance(params, dict):
+          raise ValueError('parameters must be specified as a dict')
+        self.validate_params(params)
+      except ValueError as e:
+        self.abort_with_error(400, text='When querying %s: %s' % (ident_str, e))
+      queries[ident] = params
+
+    return {
+      'per_identity': {
+        ident.to_bytes(): res
+        for ident, res in self.execute_batch(queries).iteritems()
+      },
+    }
+
+
+class MembershipsListHandler(PerIdentityBatchHandler):
+  """Lists all groups a user belongs to."""
+
+  # This is visible in the UI.
+  api_doc = [
+    {
+      'verb': 'GET',
+      'params': 'identity=...',
+
+      'doc':
+        'Returns a list of groups an identity belongs to (including all '
+        'transitive relations) as a list of memberships.',
+
+      'response_type': {
+        'name': 'Membership list',
+        'doc': 'Represents a list of groups some identity is a member of.',
+        'example': {
+          'memberships': [
+            {'group': 'Group name'},
+            {'group': 'Another group name'},
+          ],
+        },
+      },
+    },
+
+    {
+      'verb': 'POST',
+
+      'doc':
+        'A batch version of the membership listing call. Executes multiple '
+        'queries for multiple identities in parallel.',
+
+      'request_type': {
+        'name': 'Batch listing request',
+        'doc':
+          'A request to query a list of groups of multiple identities in '
+          'parallel. Per-identity dict values are options for membership '
+          'listing (there are currently none, so pass null or {}).',
+        'example': {
+          'per_identity': {
+            'user:someone@example.com': None,
+            'user:someone_else@example.com': None,
+          },
+        },
+      },
+
+      'response_type': {
+        'name': 'Batch listing response',
+        'doc':
+          'For each identity specifies a list of groups it is a member of '
+          '(in the same format as non-batched version).',
+        'example': {
+          'per_identity': {
+            'user:someone@example.com': {
+              'memberships': [
+                {'group': 'Group name'},
+                {'group': 'Another group name'},
+              ],
+            },
+            'user:someone_else@example.com': {
+              'memberships': [
+                {'group': 'Group name'},
+                {'group': 'Another group name'},
+              ],
+            },
+          },
+        },
+      },
+    },
+  ]
+
+  def collect_get_params(self):
+    # No parameters for now.
+    return {}
+
+  def validate_params(self, params):
+    # No parameters for now.
+    pass
+
+  def execute_batch(self, queries):
+    # Since we currently have all groups data in memory, doing queries truly
+    # in parallel will only hurt, since we have only one CPU and there's no IO.
+    auth_db = api.get_request_cache().auth_db
+    resp = {}
+    for ident in queries:
+      resp[ident] = {
+        'memberships': [
+          {'group': g} for g in sorted(auth_db.fetch_groups_with_member(ident))
+        ],
+      }
+    return resp
+
+
+class MembershipsCheckHandler(PerIdentityBatchHandler):
+  """Checks whether an identity belongs to any of given groups."""
+
+  # This is visible in the UI.
+  api_doc = [
+    {
+      'verb': 'GET',
+      'params': 'identity=...&groups=...',
+
+      'doc':
+        'Checks whether a user belongs to any of given groups (provided via '
+        '"groups" query parameter that can be specified multiple times).',
+
+      'response_type': {
+        'name': 'Check response',
+        'doc':
+          'Indicates whether the identity is a member of any of the groups '
+          'specified in the request.',
+        'example': {
+          'is_member': True,
+        }
+      },
+    },
+
+    {
+      'verb': 'POST',
+
+      'doc':
+        'A batch version of the membership check call. Executes multiple '
+        'checks for multiple identities in parallel.',
+
+      'request_type': {
+        'name': 'Batch check request',
+        'doc':
+          'Represents a request to check memberships of multiple identities in '
+          'parallel.',
+        'example': {
+          'per_identity': {
+            'user:someone@example.com': {
+              'groups': ['Group A', 'Group B'],
+            },
+            'user:someone_else@example.com': {
+              'groups': ['Group C', 'Group D'],
+            },
+          },
+        },
+      },
+
+      'response_type': {
+        'name': 'Batch check response',
+        'doc':
+          'For each queried identity specifies whether it is a member of any '
+          'of the groups specified in the request for this identity.',
+        'example': {
+          'per_identity': {
+            'user:someone@example.com': {
+              'is_member': True,
+            },
+            'user:someone_else@example.com': {
+              'is_member': False,
+            },
+          },
+        },
+      }
+    },
+  ]
+
+  def collect_get_params(self):
+    groups = self.request.GET.getall('groups')
+    if not groups:
+      self.abort_with_error(400, text='"groups" query parameter is required')
+    return {'groups': groups}
+
+  def validate_params(self, params):
+    groups = params.get('groups')
+    if not isinstance(groups, list) or not groups:
+      raise ValueError('must specify a non-empty list of groups to check')
+    for g in groups:
+      if not isinstance(g, basestring):
+        raise ValueError('not a group name %r' % (g,))
+
+  def execute_batch(self, queries):
+    # Since we currently have all groups data in memory, doing queries truly
+    # in parallel will only hurt, since we have only one CPU and there's no IO.
+    auth_db = api.get_request_cache().auth_db
+    resp = {}
+    for iden, p in queries.iteritems():
+      assert isinstance(p['groups'], list)
+      resp[iden] = {
+        'is_member': any(auth_db.is_group_member(g, iden) for g in p['groups']),
+      }
+    return resp
 
 
 class ServerInfoHandler(handler.ApiHandler):
