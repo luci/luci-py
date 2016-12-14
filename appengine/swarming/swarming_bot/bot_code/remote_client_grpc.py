@@ -14,6 +14,11 @@ from proto_bot import swarming_bot_pb2
 from remote_client_errors import InternalError
 
 
+# How long to wait for a response from the server. Keeping the same as
+# the equivalent in remote_client.py for now.
+NET_CONNECTION_TIMEOUT_SEC = 5*60
+
+
 class RemoteClientGrpc(object):
   """RemoteClientGrpc knows how to make calls via gRPC.
   """
@@ -62,7 +67,8 @@ class RemoteClientGrpc(object):
     google.protobuf.json_format.ParseDict(params, request)
 
     # Perform update
-    response = self._stub.TaskUpdate(request)
+    response = self._stub.TaskUpdate(request,
+                                     timeout=NET_CONNECTION_TIMEOUT_SEC)
     logging.debug('post_task_update() = %s', request)
     if response.error:
       raise InternalError(response.error)
@@ -75,7 +81,7 @@ class RemoteClientGrpc(object):
     request.msg = message
     logging.error('post_task_error() = %s', request)
 
-    response = self._stub.TaskError(request)
+    response = self._stub.TaskError(request, timeout=NET_CONNECTION_TIMEOUT_SEC)
     return response.ok
 
   def _attributes_json_to_proto(self, json_attr, msg):
@@ -89,7 +95,7 @@ class RemoteClientGrpc(object):
   def do_handshake(self, attributes):
     request = swarming_bot_pb2.HandshakeRequest()
     self._attributes_json_to_proto(attributes, request.attributes)
-    response = self._stub.Handshake(request)
+    response = self._stub.Handshake(request, timeout=NET_CONNECTION_TIMEOUT_SEC)
     resp = {
         'server_version': response.server_version,
         'bot_version': response.bot_version,
@@ -107,7 +113,7 @@ class RemoteClientGrpc(object):
     request = swarming_bot_pb2.PollRequest()
     self._attributes_json_to_proto(attributes, request.attributes)
     # TODO(aludwin): gRPC-specific exception handling
-    response = self._stub.Poll(request)
+    response = self._stub.Poll(request, timeout=NET_CONNECTION_TIMEOUT_SEC)
 
     if response.cmd == swarming_bot_pb2.PollResponse.UPDATE:
       return 'update', response.version
@@ -167,7 +173,7 @@ class RemoteClientGrpc(object):
     logging.info('Updating to version: %s', bot_version)
     request = swarming_bot_pb2.BotUpdateRequest()
     request.bot_version = bot_version
-    response = self._stub.BotUpdate(request)
+    response = self._stub.BotUpdate(request, timeout=NET_CONNECTION_TIMEOUT_SEC)
     with open(new_zip_fn, 'wb') as f:
       f.write(response.bot_code)
 
