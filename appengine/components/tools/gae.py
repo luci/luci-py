@@ -349,7 +349,8 @@ def CMDupload(parser, args):
   print('Uploaded as:')
   print('  https://%s-dot-%s.appspot.com' % (version, app.app_id))
   print('Manage at:')
-  print('  https://appengine.google.com/deployment?app_id=s~' + app.app_id)
+  print('  https://console.cloud.google.com/appengine/versions?project=' +
+        app.app_id)
   print('-' * 80)
 
   if options.switch:
