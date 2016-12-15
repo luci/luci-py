@@ -138,6 +138,27 @@ class DrainExcessTest(test_case.TestCase):
       self.assertTrue(machine_lease.drained)
 
 
+class EnsureBotInfoExistsTest(test_case.TestCase):
+  """Tests for lease_management.ensure_bot_info_exists."""
+
+  def test_creates(self):
+    key = lease_management.MachineLease(
+        hostname='hostname',
+        lease_id='lease-id',
+        lease_expiration_ts=utils.utcnow(),
+        machine_type=ndb.Key(lease_management.MachineType, 'machine-type'),
+    ).put()
+
+    lease_management.ensure_bot_info_exists(key.get())
+
+    machine_lease = key.get()
+    bot_info = bot_management.get_info_key(machine_lease.bot_id).get()
+    self.assertEqual(machine_lease.bot_id, machine_lease.hostname)
+    self.assertEqual(bot_info.lease_id, machine_lease.lease_id)
+    self.assertEqual(
+        bot_info.lease_expiration_ts, machine_lease.lease_expiration_ts)
+    self.assertEqual(bot_info.machine_type, machine_lease.machine_type.id())
+
 
 class EnsureEntitiesExistTest(test_case.TestCase):
   """Tests for lease_management.ensure_entities_exist."""

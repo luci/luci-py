@@ -420,7 +420,12 @@ def ensure_bot_info_exists(machine_lease):
   if machine_lease.bot_id == machine_lease.hostname:
     return
   bot_info = bot_management.get_info_key(machine_lease.hostname).get()
-  if not (bot_info and bot_info.lease_id and bot_info.lease_expiration_ts):
+  if not (
+      bot_info
+      and bot_info.lease_id
+      and bot_info.lease_expiration_ts
+      and bot_info.machine_type
+  ):
     bot_management.bot_event(
         event_type='bot_leased',
         bot_id=machine_lease.hostname,
@@ -434,6 +439,7 @@ def ensure_bot_info_exists(machine_lease):
         task_name=None,
         lease_id=machine_lease.lease_id,
         lease_expiration_ts=machine_lease.lease_expiration_ts,
+        machine_type=machine_lease.machine_type.id(),
     )
   associate_bot_id(machine_lease.key, machine_lease.hostname)
 

@@ -808,6 +808,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'external_ip': u'192.168.2.2',
         'lease_id': None,
         'lease_expiration_ts': None,
+        'machine_type': None,
         'message': u'for the best',
         'quarantined': False,
         'state': {
@@ -834,6 +835,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'external_ip': u'192.168.2.2',
         'lease_id': None,
         'lease_expiration_ts': None,
+        'machine_type': None,
         'message': None,
         'quarantined': False,
         'state': {
