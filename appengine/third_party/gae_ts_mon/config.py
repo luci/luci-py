@@ -39,7 +39,7 @@ def _reset_cumulative_metrics():
   """Clear the state when an instance loses its task_num assignment."""
   logging.warning('Instance %s got purged from Datastore, but is still alive. '
                   'Clearing cumulative metrics.', shared.instance_key_id())
-  for _target, metric, start_time, _fields in interface.state.store.get_all():
+  for _, metric, _, _, _ in interface.state.store.get_all():
     if metric.is_cumulative():
       metric.reset()
 

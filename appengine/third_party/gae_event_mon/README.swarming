@@ -1,12 +1,16 @@
 Name: gae_event_mon
 Short Name: gae_event_mon
 URL: https://chromium.googlesource.com/infra/infra/+/master/appengine_module/gae_event_mon/
-Version: 1.0.0
-Revision: 564aaf7480f24c90687df79d9cef910cc342a54d
+Version: 1.1.1
+Revision: 066f135e603f90945be764884a3d2863f72d21c1
 License: Chromium License
 
 Description:
 Event monitoring library for Google AppEngine.
+
+Please roll in sync with client/third_party/infra_libs.  You may want
+to roll infra_libs in infra.git first, to make sure they are at
+compatible at the version you need.
 
 Local Modifications:
 - Copied LICENSE from the root of infra.git.
