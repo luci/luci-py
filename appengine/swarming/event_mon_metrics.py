@@ -25,6 +25,20 @@ DIMENSIONS = (
 )
 
 
+TAGS = {
+    'build_id': ['buildnumber'],
+    'buildername': ['buildername'],
+    'codereview': ['rietveld'],
+    'master': ['master'],
+    'name': ['name'],
+    'patch_project': ['patch_project'],
+    'project': ['project'],
+    'purpose': ['purpose'],
+    'slavename': ['slavename'],
+    'stepname': ['stepname'],
+}
+
+
 def _to_timestamp(dt):
   return int(time.mktime(dt.timetuple()))
 
@@ -139,6 +153,15 @@ def _task_summary_to_proto(summary, event):
   if summary.deduped_from:
     event.proto.swarming_task_event.deduped_from = summary.deduped_from
   event.proto.swarming_task_event.try_number = summary.try_number
+
+  for tag in summary.tags:
+    if ':' not in tag:
+      logging.error('Unexpected tag: %r', tag)
+      continue
+    name, value = tag.split(':', 1)
+    for event_tag, task_tags in TAGS.iteritems():
+      if name in task_tags:
+        getattr(event.proto.swarming_task_event.tags, event_tag).append(value)
 
 
 def initialize():
