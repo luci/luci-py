@@ -18,13 +18,13 @@ from remote_client_errors import InternalError
 
 # RemoteClient will attempt to refresh the authentication headers once they are
 # this close to the expiration.
-AUTH_HEADERS_EXPIRATION_SEC = 6*60
+AUTH_HEADERS_EXPIRATION_SEC = 3*60
 
 
 # How long to wait for a response from the server. Must not be greater than
 # AUTH_HEADERS_EXPIRATION_SEC, since otherwise there's a chance auth headers
 # will expire while we wait for connection.
-NET_CONNECTION_TIMEOUT_SEC = 5*60
+NET_CONNECTION_TIMEOUT_SEC = 3*60
 
 
 def createRemoteClient(server, auth, useGrpc):
@@ -43,6 +43,10 @@ class RemoteClientNative(object):
 
   If the callback is None, skips authentication (this is used during initial
   stages of the bot bootstrap).
+
+  If the callback returns (*, None), disables authentication. This allows
+  bot_config.py to disable strong authentication on machines that don't have any
+  credentials (the server uses only IP whitelist check in this case).
   """
 
   def __init__(self, server, auth_headers_callback):
@@ -59,13 +63,18 @@ class RemoteClientNative(object):
   def initialize(self, quit_bit):
     """Grabs initial auth headers, retrying on errors a bunch of times.
 
+    Disabled authentication (when auth_headers_callback returns None) is not
+    an error. Retries only real exceptions raised by the callback.
+
     Raises InitializationError if all attempts fail. Aborts attempts and returns
     if quit_bit is signaled.
     """
     attempts = 30
     while not quit_bit.is_set():
       try:
-        self._get_headers_or_throw()
+        logging.info('Fetching initial auth headers')
+        headers = self._get_headers_or_throw()
+        logging.info('Got auth headers: %s', headers.keys() or 'none')
         return
       except Exception as e:
         last_error = '%s\n%s' % (e, traceback.format_exc()[-2048:])
@@ -104,13 +113,22 @@ class RemoteClientNative(object):
           self._exp_ts - time.time() < AUTH_HEADERS_EXPIRATION_SEC):
         self._headers, self._exp_ts = self._auth_headers_callback()
         if self._exp_ts is None:
-          logging.info('Not using auth headers')
+          logging.info('Headers callback returned None, disabling auth')
           self._disabled = True
           self._headers = {}
         else:
-          logging.info(
-              'Refreshed auth headers, they expire in %d sec',
-              self._exp_ts - time.time())
+          next_check = max(
+              0, self._exp_ts - AUTH_HEADERS_EXPIRATION_SEC - time.time())
+          if self._headers:
+            logging.info(
+                'Fetched auth headers (%s), they expire in %d sec. '
+                'Next check in %d sec.',
+                self._headers.keys(),
+                self._exp_ts - time.time(),
+                next_check)
+          else:
+            logging.info(
+                'No headers available yet, next check in %d sec.', next_check)
       return self._headers or {}
 
   def _url_read_json(self, url_path, data=None):

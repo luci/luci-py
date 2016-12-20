@@ -144,7 +144,7 @@ class TestTaskRunnerBase(net_utils.TestCase):
             'task_id': 23,
           },
           'follow_redirects': False,
-          'timeout': 300,
+          'timeout': 180,
           'headers': auth_headers or {},
         },
         kwargs)
@@ -182,7 +182,7 @@ class TestTaskRunner(TestTaskRunnerBase):
           'task_id': 23,
         },
         'follow_redirects': False,
-        'timeout': 300,
+        'timeout': 180,
         'headers': auth_headers or {},
       }
       if outputs_ref:
@@ -498,7 +498,7 @@ class TestTaskRunner(TestTaskRunnerBase):
               'task_id': 23,
             },
             'follow_redirects': False,
-            'timeout': 300,
+            'timeout': 180,
             'headers': {},
           },
           kwargs)
@@ -513,7 +513,7 @@ class TestTaskRunner(TestTaskRunnerBase):
             'task_id': 23,
           },
           'follow_redirects': False,
-          'timeout': 300,
+          'timeout': 180,
           'headers': {},
         },
         {'must_stop': False, 'ok': True},
@@ -529,7 +529,7 @@ class TestTaskRunner(TestTaskRunnerBase):
             'task_id': 23,
           },
           'follow_redirects': False,
-          'timeout': 300,
+          'timeout': 180,
           'headers': {},
         },
         {'must_stop': False, 'ok': True},
@@ -747,7 +747,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
               'task_id': 23,
             },
             'follow_redirects': False,
-            'timeout': 300,
+            'timeout': 180,
             'headers': auth_headers or {},
           },
           kwargs)
@@ -961,7 +961,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
               'task_id': 23,
             },
             'follow_redirects': False,
-            'timeout': 300,
+            'timeout': 180,
             'headers': {},
           },
           kwargs)
@@ -1083,7 +1083,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
               'task_id': 23,
             },
             'follow_redirects': False,
-            'timeout': 300,
+            'timeout': 180,
             'headers': {},
           },
           kwargs)
