@@ -130,6 +130,11 @@ class BotInfo(_BotCommon):
   This entity is a cache of the last BotEvent and is additionally updated on
   poll, which does not create a BotEvent.
   """
+  NOT_QUARANTINED = 1<<3
+  QUARANTINED = 1<<2
+  NOT_BUSY = 1<<1
+  BUSY = 1<<0
+
   # Dimensions are used for task selection. They are encoded as a list of
   # key:value. Keep in mind that the same key can be used multiple times. The
   # list must be sorted.
@@ -145,8 +150,15 @@ class BotInfo(_BotCommon):
   # Must only be set when self.task_id is set.
   task_name = ndb.StringProperty(indexed=False)
 
-  # Used to count the instantaneous number of busy bots.
-  is_busy = ndb.ComputedProperty(lambda self: bool(self.task_id))
+  # Avoid having huge amounts of indices to query by quarantined/idle
+  composite = ndb.ComputedProperty(lambda self: self._calc_composite(),
+                                   repeated=True)
+
+  def _calc_composite(self):
+    return [
+      self.QUARANTINED if self.quarantined else self.NOT_QUARANTINED,
+      self.BUSY if self.task_id else self.NOT_BUSY
+    ]
 
   @property
   def id(self):
@@ -287,10 +299,19 @@ def filter_dimensions(q, dimensions):
   return q
 
 
-def filter_availability(q, quarantined, is_dead, now):
-  """Filters a ndb.Query for BotInfo based on quarantined/is_dead."""
+def filter_availability(q, quarantined, is_dead, now, is_busy):
+  """Filters a ndb.Query for BotInfo based on quarantined/is_dead/is_busy."""
   if quarantined is not None:
-    q = q.filter(BotInfo.quarantined == quarantined)
+    if quarantined:
+      q = q.filter(BotInfo.composite == BotInfo.QUARANTINED)
+    else:
+      q = q.filter(BotInfo.composite == BotInfo.NOT_QUARANTINED)
+
+  if is_busy is not None:
+    if is_busy:
+      q = q.filter(BotInfo.composite == BotInfo.BUSY)
+    else:
+      q = q.filter(BotInfo.composite == BotInfo.NOT_BUSY)
 
   dt = datetime.timedelta(seconds=config.settings().bot_death_timeout_secs)
   timeout = now - dt
@@ -298,6 +319,7 @@ def filter_availability(q, quarantined, is_dead, now):
     q = q.filter(BotInfo.last_seen_ts < timeout)
   elif is_dead is not None:
     q = q.filter(BotInfo.last_seen_ts > timeout)
+
   return q
 
 

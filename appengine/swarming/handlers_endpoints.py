@@ -678,7 +678,8 @@ class SwarmingBotsService(remote.Service):
       q = bot_management.filter_dimensions(q, request.dimensions)
       q = bot_management.filter_availability(
           q, swarming_rpcs.to_bool(request.quarantined),
-          swarming_rpcs.to_bool(request.is_dead), now)
+          swarming_rpcs.to_bool(request.is_dead), now,
+          swarming_rpcs.to_bool(request.is_busy))
     except ValueError as e:
       raise endpoints.BadRequestException(str(e))
 
@@ -705,11 +706,13 @@ class SwarmingBotsService(remote.Service):
       raise endpoints.BadRequestException(str(e))
 
     f_count = q.count_async()
-    f_dead = (bot_management.filter_availability(q, None, True, now)
+    f_dead = (bot_management.filter_availability(q, None, True, now, None)
         .count_async())
-    f_quarantined = (bot_management.filter_availability(q, True, None, now)
+    f_quarantined = (
+        bot_management.filter_availability(q, True, None, now, None)
         .count_async())
-    f_busy = q.filter(bot_management.BotInfo.is_busy == True).count_async()
+    f_busy = (bot_management.filter_availability(q, None, None, now, True)
+        .count_async())
     return swarming_rpcs.BotsCount(
         count=f_count.get_result(),
         quarantined=f_quarantined.get_result(),

@@ -220,8 +220,9 @@ class OldBotsListHandler(auth.AuthenticatingHandler):
 
     # TODO(maruel): Counting becomes an issue at the 10k range, at that point it
     # should be prepopulated in an entity and updated via a cron job.
-    num_bots_busy_future = bot_management.BotInfo.query(
-        bot_management.BotInfo.is_busy == True).count_async()
+    num_bots_busy_future = (bot_management.BotInfo.query(
+        bot_management.BotInfo.composite == bot_management.BotInfo.BUSY)
+        .count_async())
     num_bots_dead_future = bot_management.BotInfo.query(
         bot_management.BotInfo.last_seen_ts < cutoff).count_async()
     num_bots_quarantined_future = bot_management.BotInfo.query(

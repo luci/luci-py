@@ -46,6 +46,7 @@ class BotManagementTest(test_case.TestCase):
 
     expected = {
       'authenticated_as': 'bot:id1.domain',
+      'composite': [8, 2],
       'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
       'external_ip': u'8.8.4.4',
       'first_seen_ts': now,
@@ -106,6 +107,7 @@ class BotManagementTest(test_case.TestCase):
     # Assert that BotInfo was updated too.
     expected = {
       'authenticated_as': 'bot:id1.domain',
+      'composite': [4, 2],
       'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
       'external_ip': u'8.8.4.4',
       'first_seen_ts': now,
@@ -122,7 +124,6 @@ class BotManagementTest(test_case.TestCase):
     }
     bot_info = bot_management.get_info_key('id1').get()
     self.assertEqual(expected, bot_info.to_dict())
-    self.assertEqual(False, bot_info.is_busy)
 
     # No BotEvent is registered for 'poll'.
     self.assertEqual([], bot_management.get_events_query('id1', True).fetch())
@@ -139,6 +140,7 @@ class BotManagementTest(test_case.TestCase):
 
     expected = {
       'authenticated_as': 'bot:id1.domain',
+      'composite': [8, 1],
       'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
       'external_ip': u'8.8.4.4',
       'first_seen_ts': now,
@@ -155,7 +157,6 @@ class BotManagementTest(test_case.TestCase):
     }
     bot_info = bot_management.get_info_key('id1').get()
     self.assertEqual(expected, bot_info.to_dict())
-    self.assertEqual(True, bot_info.is_busy)
 
     expected = [
       {

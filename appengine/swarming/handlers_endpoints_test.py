@@ -1588,7 +1588,7 @@ class BotsApiTest(BaseTest):
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
     # Only bot1 corresponds to these two dimensions
-    expected[u'items']=[bot1]
+    expected[u'items'] = [bot1]
     request = swarming_rpcs.BotsRequest(dimensions=['foo:bar', 'id:id1'])
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
@@ -1601,19 +1601,19 @@ class BotsApiTest(BaseTest):
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
     # exclude bot2 only, which is quarantined
-    expected[u'items']=[bot1, bot3]
+    expected[u'items'] = [bot1, bot3]
     request = swarming_rpcs.BotsRequest(
         quarantined=swarming_rpcs.ThreeStateBool.FALSE)
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
     # exclude bot3 only, which is dead
-    expected[u'items']=[bot1, bot2]
+    expected[u'items'] = [bot1, bot2]
     request = swarming_rpcs.BotsRequest(
         is_dead=swarming_rpcs.ThreeStateBool.FALSE)
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
     # only bot2 is quarantined
-    expected[u'items']=[bot2]
+    expected[u'items'] = [bot2]
     request = swarming_rpcs.BotsRequest(
         quarantined=swarming_rpcs.ThreeStateBool.TRUE)
     response = self.call_api('list', body=message_to_dict(request))
@@ -1624,7 +1624,7 @@ class BotsApiTest(BaseTest):
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
     # only bot3 is dead
-    expected[u'items']=[bot3]
+    expected[u'items'] = [bot3]
     request = swarming_rpcs.BotsRequest(
         is_dead=swarming_rpcs.ThreeStateBool.TRUE)
     response = self.call_api('list', body=message_to_dict(request))
@@ -1632,6 +1632,14 @@ class BotsApiTest(BaseTest):
     # is_dead:true can be paired with other dimensions and still work
     request = swarming_rpcs.BotsRequest(
         is_dead=swarming_rpcs.ThreeStateBool.TRUE, dimensions=['foo:bar'])
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+    # only 1 bot is "ready for work"
+    expected[u'items'] = [bot1]
+    request = swarming_rpcs.BotsRequest(
+        is_busy=swarming_rpcs.ThreeStateBool.FALSE,
+        is_dead=swarming_rpcs.ThreeStateBool.FALSE,
+        quarantined=swarming_rpcs.ThreeStateBool.FALSE)
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
     # not:existing is a dimension that doesn't exist, nothing returned.

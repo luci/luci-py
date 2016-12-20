@@ -24,19 +24,18 @@ indexes:
 - kind: BotInfo
   properties:
   - name: dimensions_flat
-  - name: quarantined
-    direction: desc
+  - name: composite
 
 - kind: BotInfo
   properties:
-  - name: quarantined
+  - name: composite
   - name: last_seen_ts
 
 - kind: BotInfo
   properties:
   - name: dimensions_flat
+  - name: composite
   - name: last_seen_ts
-  - name: quarantined
 
 - kind: TaskResultSummary
   properties:
