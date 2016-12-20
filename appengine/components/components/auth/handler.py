@@ -392,6 +392,7 @@ class ApiHandler(AuthenticatingHandler):
 
   def abort_with_error(self, http_code, **kwargs):
     """Sends error reply and stops execution."""
+    logging.warning('abort_with_error(%s)', kwargs)
     self.abort(
         http_code,
         json=kwargs,
