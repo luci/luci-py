@@ -12,6 +12,7 @@ import grpc
 import google.protobuf.json_format
 from proto_bot import swarming_bot_pb2
 from remote_client_errors import InternalError
+from remote_client_errors import PollError
 
 
 # How long to wait for a response from the server. Keeping the same as
@@ -112,7 +113,7 @@ class RemoteClientGrpc(object):
   def poll(self, attributes):
     request = swarming_bot_pb2.PollRequest()
     self._attributes_json_to_proto(attributes, request.attributes)
-    # TODO(aludwin): gRPC-specific exception handling
+    # TODO(aludwin): gRPC-specific exception handling (raise PollError).
     response = self._stub.Poll(request, timeout=NET_CONNECTION_TIMEOUT_SEC)
 
     if response.cmd == swarming_bot_pb2.PollResponse.UPDATE:
@@ -166,7 +167,7 @@ class RemoteClientGrpc(object):
       self._log_is_asleep = False
       return 'run', manifest
 
-    raise ValueError('Unknown command in response: %s' % response)
+    raise PollError('Unknown command in response: %s' % response)
 
   def get_bot_code(self, new_zip_fn, bot_version, _bot_id):
     # TODO(aludwin): exception handling, pass bot_id

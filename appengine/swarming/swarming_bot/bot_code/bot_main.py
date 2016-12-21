@@ -43,7 +43,6 @@ from api import bot
 from api import os_utilities
 from api import platforms
 from utils import file_path
-from utils import net
 from utils import on_error
 from utils import subprocess42
 from utils import zip_package
@@ -551,10 +550,12 @@ def run_bot(arg_error):
         else:
           consecutive_sleeps += 1
       except Exception as e:
-        logging.exception('poll_server failed')
+        logging.exception('poll_server failed in a completely unexpected way')
         msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
         botobj.post_error(msg)
         consecutive_sleeps = 0
+        # Sleep a bit as a precaution to avoid hammering the server.
+        quit_bit.wait(10)
     logging.info('Quitting')
 
   # Tell the server we are going away.
@@ -567,12 +568,14 @@ def poll_server(botobj, quit_bit, last_action):
 
   Returns True if executed some action, False if server asked the bot to sleep.
   """
-  # Access to a protected member _XXX of a client class - pylint: disable=W0212
   start = time.time()
-  cmd, value = botobj.remote.poll(botobj._attributes)
-  if cmd == '':
+  try:
+    cmd, value = botobj.remote.poll(botobj._attributes)
+  except remote_client_errors.PollError as e:
     # Back off on failure.
-    time.sleep(max(1, min(60, botobj.state.get('sleep_streak', 10) * 2)))
+    delay = max(1, min(60, botobj.state.get('sleep_streak', 10) * 2))
+    logging.warning('Poll failed (%s), sleeping %.1f sec', e, delay)
+    quit_bit.wait(delay)
     return False
   logging.debug('Server response:\n%s: %s', cmd, value)
 

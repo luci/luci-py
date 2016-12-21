@@ -20,3 +20,7 @@ class BotCodeError(Exception):
 
 class InternalError(Exception):
   """Raised on unrecoverable errors that abort task with 'internal error'."""
+
+
+class PollError(Exception):
+  """Raised on unrecoverable errors when in RemoteClient.poll."""

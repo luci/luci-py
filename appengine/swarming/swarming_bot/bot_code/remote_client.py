@@ -11,9 +11,10 @@ import urllib
 
 from utils import net
 
-from remote_client_errors import InitializationError
 from remote_client_errors import BotCodeError
+from remote_client_errors import InitializationError
 from remote_client_errors import InternalError
+from remote_client_errors import PollError
 
 
 # RemoteClient will attempt to refresh the authentication headers once they are
@@ -214,12 +215,15 @@ class RemoteClientNative(object):
     """Polls for new work or other commands; returns a (cmd, value) pair as
     shown below.
 
-    Note that if the returned dict does not have the correct
-    values set, this method will raise an exception.
+    Raises:
+      PollError if can't contact the server after many attempts, the server
+      replies with an error or the returned dict does not have the correct
+      values set.
     """
     resp = self._url_read_json('/swarming/api/v1/bot/poll', data=attributes)
-    if not resp:
-      return (None, None)
+    if not resp or resp.get('error'):
+      raise PollError(
+          resp.get('error') if resp else 'Failed to contact server')
 
     cmd = resp['cmd']
     if cmd == 'sleep':
@@ -232,7 +236,7 @@ class RemoteClientNative(object):
       return (cmd, resp['version'])
     if cmd == 'restart':
       return (cmd, resp['message'])
-    raise ValueError('Unexpected command: %s\n%s' % (cmd, resp))
+    raise PollError('Unexpected command: %s\n%s' % (cmd, resp))
 
   def get_bot_code(self, new_zip_path, bot_version, bot_id):
     """Downloads code into the file specified by new_zip_fn (a string).

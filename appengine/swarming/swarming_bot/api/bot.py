@@ -9,7 +9,6 @@ import os
 import time
 
 import os_utilities
-from utils import zip_package
 
 # Method could be a function - pylint: disable=R0201
 
