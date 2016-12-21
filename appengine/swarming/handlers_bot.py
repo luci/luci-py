@@ -13,6 +13,7 @@ import webob
 import webapp2
 
 from google.appengine.api import app_identity
+from google.appengine.ext import ndb
 from google.appengine import runtime
 
 from components import auth
@@ -159,11 +160,17 @@ class _BotAuthenticatingHandler(auth.AuthenticatingHandler):
       logging.info('Using bootstrap token %r', payload)
       return existing_token
 
+    machine_type = None
+    if bot_id:
+      bot_info = bot_management.get_info_key(bot_id).get()
+      if bot_info:
+        machine_type = bot_info.machine_type
+
     # TODO(vadimsh): Remove is_ip_whitelisted_machine check once all bots are
     # using auth for bootstrap and updating.
     if (not acl.is_bootstrapper() and
         not acl.is_ip_whitelisted_machine() and
-        not (bot_id and bot_auth.is_authenticated_bot(bot_id))):
+        not (bot_id and bot_auth.is_authenticated_bot(bot_id, machine_type))):
       raise auth.AuthorizationError('Not allowed to access the bot code')
 
     return bot_code.generate_bootstrap_token() if generate_token else None
@@ -280,9 +287,18 @@ class _BotBaseHandler(_BotApiHandler):
           and isinstance(dimension_id[0], unicode)):
         bot_id = dimensions['id'][0]
 
+    machine_type = None
+    if bot_id:
+      bot_info, bot_settings = ndb.get_multi([
+          bot_management.get_info_key(bot_id),
+          bot_management.get_settings_key(bot_id)])
+      if bot_info:
+        machine_type = bot_info.machine_type
+
     # Make sure bot self-reported ID matches the authentication token. Raises
     # auth.AuthorizationError if not.
-    bot_group_cfg = bot_auth.validate_bot_id_and_fetch_config(bot_id)
+    bot_group_cfg = bot_auth.validate_bot_id_and_fetch_config(
+        bot_id, machine_type)
 
     # The server side dimensions from bot_group_cfg override bot-provided ones.
     # If both server side config and bot report some dimension, server side
@@ -369,7 +385,6 @@ class _BotBaseHandler(_BotApiHandler):
       return result
 
     # Look for admin enforced quarantine.
-    bot_settings = bot_management.get_settings_key(bot_id).get()
     if bool(bot_settings and bot_settings.quarantined):
       result.quarantined_msg = 'Quarantined by admin'
       return result
@@ -685,9 +700,14 @@ class BotTaskUpdateHandler(_BotApiHandler):
     bot_id = request['id']
     task_id = request['task_id']
 
+    machine_type = None
+    bot_info = bot_management.get_info_key(bot_id).get()
+    if bot_info:
+      machine_type = bot_info.machine_type
+
     # Make sure bot self-reported ID matches the authentication token. Raises
     # auth.AuthorizationError if not.
-    bot_auth.validate_bot_id_and_fetch_config(bot_id)
+    bot_auth.validate_bot_id_and_fetch_config(bot_id, machine_type)
 
     bot_overhead = request.get('bot_overhead')
     cipd_pins = request.get('cipd_pins')
@@ -827,9 +847,14 @@ class BotTaskErrorHandler(_BotApiHandler):
     task_id = request.get('task_id', '')
     message = request.get('message', 'unknown')
 
+    machine_type = None
+    bot_info = bot_management.get_info_key(bot_id).get()
+    if bot_info:
+      machine_type = bot_info.machine_type
+
     # Make sure bot self-reported ID matches the authentication token. Raises
     # auth.AuthorizationError if not.
-    bot_auth.validate_bot_id_and_fetch_config(bot_id)
+    bot_auth.validate_bot_id_and_fetch_config(bot_id, machine_type)
 
     bot_management.bot_event(
         event_type='task_error', bot_id=bot_id,

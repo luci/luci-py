@@ -16,20 +16,21 @@ from components.auth import ipaddr
 from server import bot_groups_config
 
 
-def is_authenticated_bot(bot_id):
+def is_authenticated_bot(bot_id, machine_type):
   """Returns True if bot with given ID is using correct credentials.
 
   Expected to be called in a context of a handler of a request coming from the
   bot with given ID.
   """
   try:
-    validate_bot_id_and_fetch_config(bot_id)
+    validate_bot_id_and_fetch_config(bot_id, machine_type)
     return True
   except auth.AuthorizationError:
     return False
 
 
-def validate_bot_id_and_fetch_config(bot_id):
+# pylint: disable=unused-argument
+def validate_bot_id_and_fetch_config(bot_id, machine_type):
   """Verifies ID reported by a bot matches the credentials being used.
 
   Expected to be called in a context of some bot API request handler. Uses

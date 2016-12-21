@@ -424,7 +424,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     }
     self.assertEqual(expected, response)
 
-  def test_poll_confliciting_dimensions(self):
+  def test_poll_conflicting_dimensions(self):
     params = self.do_handshake()
     self.assertEqual(params['dimensions']['pool'], ['default'])
 
@@ -435,7 +435,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
         ip_whitelist=None,
         owners=None,
         dimensions={u'pool': [u'server-side']})
-    self.mock(bot_auth, 'validate_bot_id_and_fetch_config', lambda _: cfg)
+    self.mock(bot_auth, 'validate_bot_id_and_fetch_config',
+              lambda *args, **kwargs: cfg)
 
     actions = []
     self.mock(stats, 'add_entry', lambda **kwargs: actions.append(kwargs))

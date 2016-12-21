@@ -90,19 +90,20 @@ class BotAuthTest(test_case.TestCase):
     self.mock_config(None)
     self.mock_caller('anonymous:anonymous', '1.1.1.1')
     with self.assertRaises(auth.AuthorizationError):
-      bot_auth.validate_bot_id_and_fetch_config('some-bot')
+      bot_auth.validate_bot_id_and_fetch_config('some-bot', None)
 
   def test_default_config_ip_whitelisted(self):
     # With default config, callers in 'bots' IP whitelist are allowed.
     self.mock_config(None)
     self.mock_caller('anonymous:anonymous', '1.2.3.5')
-    bot_auth.validate_bot_id_and_fetch_config('some-bot')
+    bot_auth.validate_bot_id_and_fetch_config('some-bot', None)
 
   def test_ip_whitelist_based_auth_ok(self):
     # Caller passes 'bots' IP whitelist and belongs to 'ip_whitelist'.
     self.mock_config(TEST_CONFIG)
     self.mock_caller('anonymous:anonymous', '1.2.3.4')
-    cfg = bot_auth.validate_bot_id_and_fetch_config('bot_with_ip_whitelist')
+    cfg = bot_auth.validate_bot_id_and_fetch_config(
+        'bot_with_ip_whitelist', None)
     self.assertEquals({u'pool': [u'with_ip_whitelist']}, cfg.dimensions)
 
   def test_unknown_bot_id(self):
@@ -110,14 +111,14 @@ class BotAuthTest(test_case.TestCase):
     self.mock_config(TEST_CONFIG)
     self.mock_caller('anonymous:anonymous', '1.2.3.4')
     with self.assertRaises(auth.AuthorizationError):
-      bot_auth.validate_bot_id_and_fetch_config('unknown_bot_id')
+      bot_auth.validate_bot_id_and_fetch_config('unknown_bot_id', None)
     self.assert_error_log('unknown bot_id, not in the config')
 
   def test_machine_token_ok(self):
     # Caller is using valid machine token.
     self.mock_config(TEST_CONFIG)
     self.mock_caller('bot:bot_with_token.domain', '1.2.3.5')
-    cfg = bot_auth.validate_bot_id_and_fetch_config('bot_with_token')
+    cfg = bot_auth.validate_bot_id_and_fetch_config('bot_with_token', None)
     self.assertEquals({u'pool': [u'with_token']}, cfg.dimensions)
 
   def test_machine_token_bad_id(self):
@@ -125,7 +126,7 @@ class BotAuthTest(test_case.TestCase):
     self.mock_config(TEST_CONFIG)
     self.mock_caller('bot:some-other-bot.domain', '1.2.3.5')
     with self.assertRaises(auth.AuthorizationError):
-      bot_auth.validate_bot_id_and_fetch_config('bot_with_token')
+      bot_auth.validate_bot_id_and_fetch_config('bot_with_token', None)
     self.assert_error_log('bot ID doesn\'t match the machine token used')
     self.assert_error_log('bot_id: "bot_with_token"')
     self.assert_error_log('original bot_id: "bot_with_token"')
@@ -135,7 +136,7 @@ class BotAuthTest(test_case.TestCase):
     self.mock_config(TEST_CONFIG)
     self.mock_caller('bot:bot_with_token_and_ip_whitelist.domain', '1.2.3.4')
     cfg = bot_auth.validate_bot_id_and_fetch_config(
-        'bot_with_token_and_ip_whitelist')
+        'bot_with_token_and_ip_whitelist', None)
     self.assertEquals(
         {u'pool': [u'with_token_and_ip_whitelist']}, cfg.dimensions)
 
@@ -146,14 +147,15 @@ class BotAuthTest(test_case.TestCase):
     self.mock_caller('bot:bot_with_token_and_ip_whitelist.domain', '1.2.3.5')
     with self.assertRaises(auth.AuthorizationError):
       bot_auth.validate_bot_id_and_fetch_config(
-          'bot_with_token_and_ip_whitelist')
+          'bot_with_token_and_ip_whitelist', None)
     self.assert_error_log('bot IP is not whitelisted')
 
   def test_service_account_ok(self):
     # Caller is using valid service account.
     self.mock_config(TEST_CONFIG)
     self.mock_caller('user:a@example.com', '1.2.3.5')
-    cfg = bot_auth.validate_bot_id_and_fetch_config('bot_with_service_account')
+    cfg = bot_auth.validate_bot_id_and_fetch_config(
+        'bot_with_service_account', None)
     self.assertEquals({u'pool': [u'with_service_account']}, cfg.dimensions)
 
   def test_service_account_not_ok(self):
@@ -161,7 +163,8 @@ class BotAuthTest(test_case.TestCase):
     self.mock_config(TEST_CONFIG)
     self.mock_caller('user:b@example.com', '1.2.3.5')
     with self.assertRaises(auth.AuthorizationError):
-      bot_auth.validate_bot_id_and_fetch_config('bot_with_service_account')
+      bot_auth.validate_bot_id_and_fetch_config(
+          'bot_with_service_account', None)
     self.assert_error_log('bot is not using expected service account')
 
   def test_service_account_ip_whitelist_ok(self):
@@ -169,7 +172,7 @@ class BotAuthTest(test_case.TestCase):
     self.mock_config(TEST_CONFIG)
     self.mock_caller('user:a@example.com', '1.2.3.4')
     cfg = bot_auth.validate_bot_id_and_fetch_config(
-        'bot_with_service_account_and_ip_whitelist')
+        'bot_with_service_account_and_ip_whitelist', None)
     self.assertEquals(
         {u'pool': [u'with_service_account_and_ip_whitelist']}, cfg.dimensions)
 
@@ -180,7 +183,7 @@ class BotAuthTest(test_case.TestCase):
     self.mock_caller('user:a@example.com', '1.2.3.5')
     with self.assertRaises(auth.AuthorizationError):
       bot_auth.validate_bot_id_and_fetch_config(
-          'bot_with_service_account_and_ip_whitelist')
+          'bot_with_service_account_and_ip_whitelist', None)
     self.assert_error_log('bot IP is not whitelisted')
 
   def test_broken_config_section(self):
@@ -188,14 +191,15 @@ class BotAuthTest(test_case.TestCase):
     self.mock_config(TEST_CONFIG)
     self.mock_caller('anonymous:anonymous', '1.2.3.4')
     with self.assertRaises(auth.AuthorizationError):
-      bot_auth.validate_bot_id_and_fetch_config('broken_config')
+      bot_auth.validate_bot_id_and_fetch_config('broken_config', None)
     self.assert_error_log('invalid bot group config, no auth method defined')
 
   def test_composite_machine_token_ok(self):
     # Caller is using valid machine token.
     self.mock_config(TEST_CONFIG)
     self.mock_caller('bot:bot_with_token.domain', '1.2.3.5')
-    cfg = bot_auth.validate_bot_id_and_fetch_config('bot_with_token--vm123')
+    cfg = bot_auth.validate_bot_id_and_fetch_config(
+        'bot_with_token--vm123', None)
     self.assertEquals({u'pool': [u'with_token']}, cfg.dimensions)
 
   def test_composite_machine_token_bad_id(self):
@@ -203,7 +207,7 @@ class BotAuthTest(test_case.TestCase):
     self.mock_config(TEST_CONFIG)
     self.mock_caller('bot:some-other-bot.domain', '1.2.3.5')
     with self.assertRaises(auth.AuthorizationError):
-      bot_auth.validate_bot_id_and_fetch_config('bot_with_token--vm123')
+      bot_auth.validate_bot_id_and_fetch_config('bot_with_token--vm123', None)
     self.assert_error_log('bot ID doesn\'t match the machine token used')
     self.assert_error_log('bot_id: "bot_with_token"')
     self.assert_error_log('original bot_id: "bot_with_token--vm123"')
