@@ -19,7 +19,7 @@ class Bot(object):
       shutdown_hook):
     # Do not expose attributes for now, as attributes may be refactored.
     assert server is None or not server.endswith('/'), server
-    self._attributes = attributes
+    self._attributes = attributes or {}
     self._base_dir = base_dir
     self._bot_group_cfg_ver = None
     self._remote = remote
