@@ -7,17 +7,29 @@
 
 import json
 import logging
+import math
+import random
+import time
 
 import grpc
 import google.protobuf.json_format
 from proto_bot import swarming_bot_pb2
 from remote_client_errors import InternalError
 from remote_client_errors import PollError
+from utils import net
 
 
 # How long to wait for a response from the server. Keeping the same as
 # the equivalent in remote_client.py for now.
 NET_CONNECTION_TIMEOUT_SEC = 5*60
+
+
+# How many times to retry a gRPC call
+MAX_GRPC_ATTEMPTS = 30
+
+
+# Longest time to sleep between gRPC calls
+MAX_GRPC_SLEEP = 10.
 
 
 class RemoteClientGrpc(object):
@@ -68,8 +80,7 @@ class RemoteClientGrpc(object):
     google.protobuf.json_format.ParseDict(params, request)
 
     # Perform update
-    response = self._stub.TaskUpdate(request,
-                                     timeout=NET_CONNECTION_TIMEOUT_SEC)
+    response = call_grpc(self._stub.TaskUpdate, request)
     logging.debug('post_task_update() = %s', request)
     if response.error:
       raise InternalError(response.error)
@@ -82,7 +93,7 @@ class RemoteClientGrpc(object):
     request.msg = message
     logging.error('post_task_error() = %s', request)
 
-    response = self._stub.TaskError(request, timeout=NET_CONNECTION_TIMEOUT_SEC)
+    response = call_grpc(self._stub.TaskError, request)
     return response.ok
 
   def _attributes_json_to_proto(self, json_attr, msg):
@@ -96,7 +107,7 @@ class RemoteClientGrpc(object):
   def do_handshake(self, attributes):
     request = swarming_bot_pb2.HandshakeRequest()
     self._attributes_json_to_proto(attributes, request.attributes)
-    response = self._stub.Handshake(request, timeout=NET_CONNECTION_TIMEOUT_SEC)
+    response = call_grpc(self._stub.Handshake, request)
     resp = {
         'server_version': response.server_version,
         'bot_version': response.bot_version,
@@ -114,7 +125,7 @@ class RemoteClientGrpc(object):
     request = swarming_bot_pb2.PollRequest()
     self._attributes_json_to_proto(attributes, request.attributes)
     # TODO(aludwin): gRPC-specific exception handling (raise PollError).
-    response = self._stub.Poll(request, timeout=NET_CONNECTION_TIMEOUT_SEC)
+    response = call_grpc(self._stub.Poll, request)
 
     if response.cmd == swarming_bot_pb2.PollResponse.UPDATE:
       return 'update', response.version
@@ -174,7 +185,7 @@ class RemoteClientGrpc(object):
     logging.info('Updating to version: %s', bot_version)
     request = swarming_bot_pb2.BotUpdateRequest()
     request.bot_version = bot_version
-    response = self._stub.BotUpdate(request, timeout=NET_CONNECTION_TIMEOUT_SEC)
+    response = call_grpc(self._stub.BotUpdate, request)
     with open(new_zip_fn, 'wb') as f:
       f.write(response.bot_code)
 
@@ -222,3 +233,20 @@ def insert_dict_as_submessage(message, keyname, value):
   """
   sub_msg = getattr(message, keyname)
   google.protobuf.json_format.Parse(json.dumps(value), sub_msg)
+
+
+def call_grpc(method, request):
+  """Retries a command a set number of times"""
+  for attempt in range(1, MAX_GRPC_ATTEMPTS+1):
+    try:
+      return method(request, timeout=NET_CONNECTION_TIMEOUT_SEC)
+    except grpc.RpcError as g:
+      if g.code() is not grpc.StatusCode.UNAVAILABLE:
+        raise
+      logging.warning('call_grpc - proxy is unavailable (attempt %d/%d)',
+                      attempt, MAX_GRPC_ATTEMPTS)
+      grpc_error = g
+      time.sleep(net.calculate_sleep_before_retry(attempt, MAX_GRPC_SLEEP))
+  # If we get here, it must be because we got (and saved) an error
+  assert grpc_error is not None
+  raise grpc_error

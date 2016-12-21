@@ -36,15 +36,44 @@ class FakeBotServiceStub(object):
     return self._testobj._handle_call('Poll', request)
 
 
+# If gRPC isn't successfully imported, this will be seen as a nonstandard
+# exception because it won't appear to be derived from Exception. This
+# only affects PyLint because the test will never be run if gRPC import
+# fails.
+# pylint: disable=W0710
+class FakeGrpcError(remote_client_grpc.grpc.RpcError):
+  """Duplicates a basic UNAVAILABLE error"""
+  def __init__(self, code):
+    self._code = code
+    super(FakeGrpcError, self).__init__('something terrible happened')
+
+  def code(self):
+    return self._code
+
+
 class TestRemoteClientGrpc(auto_stub.TestCase):
   def setUp(self):
     super(TestRemoteClientGrpc, self).setUp()
+    self._num_sleeps = 0
+    def fake_sleep(_time):
+      self._num_sleeps += 1
+    self.mock(time, 'sleep', fake_sleep)
     self._client = remote_client_grpc.RemoteClientGrpc('1.2.3.4:90')
     self._client._stub = FakeBotServiceStub(self)
     self._expected = []
+    self._error_codes = []
 
   def _handle_call(self, method, request):
     """This is called by FakeBotServiceStub to implement fake calls"""
+    if len(self._error_codes) > 0:
+      code, self._error_codes = self._error_codes[0], self._error_codes[1:]
+      raise FakeGrpcError(code)
+
+    if self._error_codes:
+      text = self._error_codes
+      self._error_codes = ''
+      raise FakeGrpcError(text)
+
     # Pop off the first item on the list
     self.assertTrue(len(self._expected) > 0)
     expected, self._expected = self._expected[0], self._expected[1:]
@@ -57,7 +86,7 @@ class TestRemoteClientGrpc(auto_stub.TestCase):
     return expected[2]
 
   def get_bot_attributes_dict(self):
-    """Gets the attributes of a basic bot"""
+    """Gets the attributes of a basic bot; must match next function"""
     return {
         'version': '123',
         'dimensions': {
@@ -124,6 +153,62 @@ class TestRemoteClientGrpc(auto_stub.TestCase):
             },
         },
     })
+
+  def test_handshake_grpc_unavailable(self):
+    """Ensures that the handshake function sleeps after a gRPC error"""
+    msg_req = remote_client_grpc.swarming_bot_pb2.HandshakeRequest()
+    msg_req.attributes.CopyFrom(self.get_bot_attributes_proto())
+
+    # Create proto response
+    msg_rsp = remote_client_grpc.swarming_bot_pb2.HandshakeResponse()
+    msg_rsp.server_version = '101'
+    msg_rsp.bot_version = '102'
+    d1 = msg_rsp.bot_group_cfg.dimensions.add()
+    d1.name = 'mammal'
+    d1.values.extend(['kangaroo', 'emu'])
+
+    # Execute call and verify response
+    expected_call = ('Handshake', msg_req, msg_rsp)
+    self._expected.append(expected_call)
+    self._error_codes.append(remote_client_grpc.grpc.StatusCode.UNAVAILABLE)
+    self._error_codes.append(remote_client_grpc.grpc.StatusCode.UNAVAILABLE)
+    response = self._client.do_handshake(self.get_bot_attributes_dict())
+    self.assertEqual(self._num_sleeps, 2)
+    self.assertEqual(response, {
+        'server_version': u'101',
+        'bot_version': u'102',
+        'bot_group_cfg_version': u'',
+        'bot_group_cfg': {
+            'dimensions': {
+                u'mammal': [u'kangaroo', u'emu'],
+            },
+        },
+    })
+
+  def test_handshake_grpc_other_error(self):
+    """Ensures that the handshake function only catches UNAVAILABLE"""
+    self._error_codes.append(remote_client_grpc.grpc.StatusCode.UNAVAILABLE)
+    self._error_codes.append(remote_client_grpc.grpc.StatusCode.INTERNAL)
+    got_exception = None
+    try:
+      self._client.do_handshake(self.get_bot_attributes_dict())
+    except remote_client_grpc.grpc.RpcError as g:
+      got_exception = g
+    self.assertEqual(got_exception.code(),
+                     remote_client_grpc.grpc.StatusCode.INTERNAL)
+    self.assertEqual(self._num_sleeps, 1)
+
+  def test_handshake_grpc_too_many_errors(self):
+    """Ensures that the handshake function only catches UNAVAILABLE"""
+    self._error_codes.append(remote_client_grpc.grpc.StatusCode.UNAVAILABLE)
+    self._error_codes.append(remote_client_grpc.grpc.StatusCode.UNAVAILABLE)
+    self._error_codes.append(remote_client_grpc.grpc.StatusCode.UNAVAILABLE)
+    self.mock(remote_client_grpc, 'MAX_GRPC_ATTEMPTS', 2)
+    with self.assertRaises(remote_client_grpc.grpc.RpcError) as g:
+      self._client.do_handshake(self.get_bot_attributes_dict())
+    self.assertEqual(self._num_sleeps, 2)
+    self.assertEqual(g.exception.code(),
+                     remote_client_grpc.grpc.StatusCode.UNAVAILABLE)
 
   def test_poll_manifest(self):
     """Verifies that we can generate a reasonable manifest from a proto"""
