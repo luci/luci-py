@@ -45,7 +45,7 @@ Installation
 
 Releases from PyPI, with name *libusb1*. Installing from command line::
 
-    $ pip install libusb1
+    $ pip libusb1
 
 or::
 
@@ -340,32 +340,6 @@ Introduce USBPollerThread.stop .
 Fix USBDeviceHandle.getSupportedLanguageList bug when running under python 3.
 While fixing this bug it was realised that this method returned ctypes objects.
 This was not intended, and it now returns regular integers.
-
-1.5.2
------
-
-Make USBTransfer.cancel raise specific error instances.
-
-1.5.3
------
-
-Fix USBTransfer.cancel exception raising introduced in 1.5.2: it was
-accidentally becomming a bound method, preventing the raise to actually
-happen (in at least CPython 2.x) or raising type conversion errors (in at least
-CPython 3.5.2).
-
-1.6
----
-
-Improve asynchronous transfer performance: (very) suboptimal code was used to
-initialise asynchronous transfer buffer. As a consequence, usb1 now exposes
-``bytearrays`` where it used to expose ``bytes`` or ``str`` objects.
-
-Deprecate libusb1 module import, which should not be needed since all (?)
-needed constants were re-bound to usb1 module.
-
-Move testUSB1 module inside usb1, to eventually only expose usb1 as top-level
-module.
 
 .. _CPython: http://www.python.org/
 
