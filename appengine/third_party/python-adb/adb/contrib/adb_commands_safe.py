@@ -218,7 +218,7 @@ class AdbCommandsSafe(object):
 
   @property
   def serial(self):
-    return self._serial or self._port_path
+    return self._serial
 
   def Close(self):
     if self._adb_cmd:
@@ -773,12 +773,16 @@ class AdbCommandsSafe(object):
           # Do not kill adb, it just means the USB host is likely resetting and
           # the device is temporarily unavailable. We can't use
           # handle.serial_number since this communicates with the device.
+          # Might take a while for the device to come back. Exit early.
+          break
         except common.usb1.USBErrorNotFound as e:
           _LOG.warning(
               '%s._OpenHandle(): USBErrorNotFound: %s', self.port_path, e)
           # Do not kill adb, it just means the USB host is likely resetting (?)
           # and the device is temporarily unavailable. We can't use
           # handle.serial_number since this communicates with the device.
+          # Might take a while for the device to come back. Exit early.
+          break
         except common.usb1.USBErrorBusy as e:
           _LOG.warning('%s._OpenHandle(): USBErrorBusy: %s', self.port_path, e)
           KillADB()
