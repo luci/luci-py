@@ -498,8 +498,7 @@ class TestBotMain(net_utils.TestCase):
           '--cost-usd-hour', '3600.0', '--start', '100.0',
           '--min-free-space',
           str(int(
-            (os_utilities.get_min_free_space(bot_main.THIS_FILE) + 250.) *
-            1024 * 1024)),
+            os_utilities.get_desired_free_space(bot_main.THIS_FILE)*1024*1024)),
         ]
         self.assertEqual(cmd[15], '--bot-file')
         self.assertTrue(cmd[16].endswith('.json'))

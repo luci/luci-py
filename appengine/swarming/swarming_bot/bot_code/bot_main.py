@@ -252,13 +252,9 @@ def is_base_dir_ok(botobj):
   return botobj.base_dir != os.path.expanduser('~')
 
 
-def get_min_free_space(botobj):
-  """Returns free disk space needed.
-
-  Add a "250 MiB slack space" for logs, temporary files and whatever other leak.
-  """
-  return int(
-      (os_utilities.get_min_free_space(botobj.base_dir) + 250.) * 1024 * 1024)
+def get_desired_free_space(botobj):
+  """Returns free disk space needed (in bytes)."""
+  return int(os_utilities.get_desired_free_space(botobj.base_dir) * 1024 * 1024)
 
 
 def generate_version():
@@ -400,7 +396,7 @@ def clean_cache(botobj):
     '--log-file', os.path.join(botobj.base_dir, 'logs', 'run_isolated.log'),
     '--cache', os.path.join(botobj.base_dir, 'isolated_cache'),
     '--named-cache-root', os.path.join(botobj.base_dir, 'c'),
-    '--min-free-space', str(get_min_free_space(botobj)),
+    '--min-free-space', str(get_desired_free_space(botobj)),
   ]
   logging.info('Running: %s', cmd)
   try:
@@ -737,7 +733,7 @@ def run_manifest(botobj, manifest, start):
       '--cost-usd-hour', str(botobj.state.get('cost_usd_hour') or 0.),
       # Include the time taken to poll the task in the cost.
       '--start', str(start),
-      '--min-free-space', str(get_min_free_space(botobj)),
+      '--min-free-space', str(get_desired_free_space(botobj)),
       '--bot-file', bot_file,
     ]
     if botobj.remote.uses_auth:

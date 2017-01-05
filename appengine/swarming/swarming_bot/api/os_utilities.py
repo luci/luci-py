@@ -47,14 +47,38 @@ cached = tools.cached
 # Global configurable values. These are meant to be the default values under
 # which the bot will self-quarantine when the disk size is too small. Setting
 # either of the following value to 0 or None disables self-quarantine.
-# Self-quarantine only happens when *both* thresholds are under.
-#
+# Self-quarantine only happens when the free disk space is below the lower of
+# the two thresholds. It means that for sufficiently large disks THRESHOLD_MB is
+# the actual threshold (for them disk_size * THRESHOLD_RELATIVE > THRESHOLD_MB).
+
 # THRESHOLD_MB is the number of MiB below which the bot will quarantine itself
 # automatically.
 THRESHOLD_MB = 4*1024
+
 # THRESHOLD_RELATIVE is the minimum free space percentage under which the bot
 # will quarantine itself automatically.
+#
+# This threshold is effectively disabled for large disks (ones with
+# disk_size * THRESHOLD_RELATIVE > THRESHOLD_MB), since THRESHOLD_MB takes
+# precedence there (being smaller).
 THRESHOLD_RELATIVE = 0.15
+
+# DESIRED_FREE_DISK_SPACE is percentage of a disk to strive to keep available
+# (e.g. by trimming the isolate cache appropriately).
+#
+# If disk_size * DESIRED_FREE_DISK_SPACE is lower than self-quarantine threshold
+# (defined above), the self-quarantine threshold will be used instead. Will also
+# always add 250 MiB as an additional slack space for logs, temporary files etc.
+#
+# The goal is to always have some percentage of the disk available above
+# the self-quarantine threshold.
+#
+# The default values in practice mean:
+#   * For large disks (>27GB): try to keep 5%+250MB of disk free,
+#     self-quarantine if the free disk space is below 4GB.
+#   * For small disks (<27GB): try to keep 15%+250MB of disk free,
+#     self-quarantine if the free disk space is below 15%.
+DESIRED_FREE_DISK_SPACE = 0.05
 
 
 # https://cloud.google.com/compute/pricing#machinetype
@@ -378,6 +402,16 @@ def get_min_free_space(path):
   Returns 0 when disabled.
   """
   return min(THRESHOLD_MB or 0, get_disk_size(path) * THRESHOLD_RELATIVE or 0)
+
+
+@tools.cached
+def get_desired_free_space(path):
+  """Returns the disk space (in MiB) to strive to keep available."""
+  mb = get_disk_size(path) * DESIRED_FREE_DISK_SPACE  # this can be 0
+  threshold = get_min_free_space(path)
+  if mb < threshold:
+    mb = threshold
+  return mb + 250
 
 
 @tools.cached
