@@ -235,6 +235,38 @@ class ImporterConfigHandler(auth.ApiHandler):
     self.send_response({'ok': True})
 
 
+class ImporterIngestTarballHandler(auth.ApiHandler):
+  """Accepts PUT with a tarball containing a bunch of groups to import.
+
+  The request body is expected to be the tarball as a raw byte stream.
+
+  See proto/config.proto, GroupImporterConfig for more details.
+  """
+
+  # For some reason webapp2 attempts to deserialize the body as a form data when
+  # searching for XSRF token (which doesn't work when the body is tarball).
+  # Disable this (along with the cookies-based auth, we want only OAuth2).
+  xsrf_token_request_param = None
+  xsrf_token_enforce_on = ()
+
+  @classmethod
+  def get_auth_methods(cls, conf):
+    return [auth.oauth_authentication]
+
+  # The real authorization check is inside 'ingest_tarball'. This one just
+  # rejects anonymous calls earlier.
+  @auth.require(lambda: not auth.get_current_identity().is_anonymous)
+  def put(self, name):
+    try:
+      groups, auth_db_rev = importer.ingest_tarball(name, self.request.body)
+      self.send_response({
+        'groups': groups,
+        'auth_db_rev': auth_db_rev,
+      })
+    except importer.BundleImportError as e:
+      self.abort_with_error(400, error=str(e))
+
+
 class ServiceListingHandler(auth.ApiHandler):
   """Lists registered replicas with their state."""
 
@@ -378,6 +410,9 @@ def get_routes():
     webapp2.Route(
         r'/auth_service/api/v1/importer/config',
         ImporterConfigHandler),
+    webapp2.Route(
+        r'/auth_service/api/v1/importer/ingest_tarball/<name:.+>',
+        ImporterIngestTarballHandler),
     webapp2.Route(
         r'/auth_service/api/v1/internal/link_replica',
         LinkRequestHandler),

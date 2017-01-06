@@ -31,11 +31,13 @@ Plain list format should have one userid per line and can only describe a single
 group in a single system. Such groups will be added to 'external/*' groups
 namespace. Removing such group from importer config will remove it from
 service too.
+
+The service can also be configured to accept tarball uploads (instead of
+fetching them). Fetched and uploaded tarballs are handled in the exact same way,
+in particular all caveats related to external group system names apply.
 """
 
-import collections
 import contextlib
-import json
 import logging
 import StringIO
 import tarfile
@@ -99,45 +101,10 @@ def config_key():
 
 class GroupImporterConfig(ndb.Model):
   """Singleton entity with group importer configuration JSON."""
-  config = ndb.TextProperty() # legacy field with JSON config
   config_proto = ndb.TextProperty()
   config_revision = ndb.JsonProperty() # see config.py, _update_imports_config
   modified_by = auth.IdentityProperty(indexed=False)
   modified_ts = ndb.DateTimeProperty(auto_now=True, indexed=False)
-
-
-def legacy_json_config_to_proto(config_json):
-  """Converts legacy JSON config to config_pb2.GroupImporterConfig message.
-
-  TODO(vadimsh): Remove once all instances of auth service use protobuf configs.
-  """
-  try:
-    config = json.loads(config_json)
-  except ValueError as ex:
-    logging.error('Invalid JSON: %s', ex)
-    return None
-  msg = config_pb2.GroupImporterConfig()
-  for item in config:
-    fmt = item.get('format', 'tarball')
-    if fmt == 'tarball':
-      entry = msg.tarball.add()
-    elif fmt == 'plainlist':
-      entry = msg.plainlist.add()
-    else:
-      logging.error('Unrecognized format: %s', fmt)
-      continue
-    entry.url = item.get('url') or ''
-    entry.oauth_scopes.extend(item.get('oauth_scopes') or [])
-    if 'domain' in item:
-      entry.domain = item['domain']
-    if fmt == 'tarball':
-      entry.systems.extend(item.get('systems') or [])
-      entry.groups.extend(item.get('groups') or [])
-    elif fmt == 'plainlist':
-      entry.group = item.get('group') or ''
-    else:
-      assert False, 'Not reachable'
-  return msg
 
 
 def validate_config(text):
@@ -163,26 +130,48 @@ def validate_config_proto(config):
   if not isinstance(config, config_pb2.GroupImporterConfig):
     raise ValueError('Not GroupImporterConfig proto message')
 
-  # TODO(vadimsh): Can be made stricter.
-
   # Validate fields common to Tarball and Plainlist.
   for entry in list(config.tarball) + list(config.plainlist):
     if not entry.url:
       raise ValueError(
           '"url" field is required in %s' % entry.__class__.__name__)
 
-  # Validate tarball fields.
-  seen_systems = set(['external'])
-  for tarball in config.tarball:
-    if not tarball.systems:
+  # Check TarballUpload names are unique, validate authorized_uploader emails.
+  tarball_upload_names = set()
+  for entry in config.tarball_upload:
+    if not entry.name:
+      raise ValueError('Some tarball_upload entry does\'t have a name')
+    if entry.name in tarball_upload_names:
       raise ValueError(
-          '"tarball" entry "%s" needs "systems" field' % tarball.url)
+          'tarball_upload entry "%s" is specified twice' % entry.name)
+    tarball_upload_names.add(entry.name)
+    if not entry.authorized_uploader:
+      raise ValueError(
+          'authorized_uploader is required in tarball_upload entry "%s"' %
+          entry.name)
+    for email in entry.authorized_uploader:
+      try:
+        model.Identity(model.IDENTITY_USER, email)
+      except ValueError:
+        raise ValueError(
+            'invalid email "%s" in tarball_upload entry "%s"' %
+            (email, entry.name))
+
+  # Validate tarball and tarball_upload fields.
+  seen_systems = set(['external'])
+  for tarball in list(config.tarball) + list(config.tarball_upload):
+    title = ''
+    if isinstance(tarball, config_pb2.GroupImporterConfig.TarballEntry):
+      title = '"tarball" entry with URL "%s"' % tarball.url
+    elif isinstance(tarball, config_pb2.GroupImporterConfig.TarballUploadEntry):
+      title = '"tarball_upload" entry with name "%s"' % tarball.name
+    if not tarball.systems:
+      raise ValueError('%s needs "systems" field' % title)
     # There should be no overlap in systems between different bundles.
     twice = set(tarball.systems) & seen_systems
     if twice:
       raise ValueError(
-          'A system is imported twice by "%s": %s' %
-          (tarball.url, sorted(twice)))
+          '%s is specifying a duplicate system(s): %s' % (title, sorted(twice)))
     seen_systems.update(tarball.systems)
 
   # Validate plainlist fields.
@@ -192,35 +181,14 @@ def validate_config_proto(config):
       raise ValueError(
           '"plainlist" entry "%s" needs "group" field' % plainlist.url)
     if plainlist.group in seen_groups:
-      raise ValueError(
-          'In "%s" the group is imported twice: %s' %
-          (plainlist.url, plainlist.group))
+      raise ValueError('The group "%s" imported twice' % plainlist.group)
     seen_groups.add(plainlist.group)
 
 
 def read_config():
   """Returns importer config as a text blob (or '' if not set)."""
   e = config_key().get()
-  if not e:
-    return ''
-  if e.config_proto:
-    return e.config_proto
-  if e.config:
-    msg = legacy_json_config_to_proto(e.config)
-    if not msg:
-      return ''
-    return protobuf.text_format.MessageToString(msg)
-  return ''
-
-
-def read_legacy_config():
-  """Returns legacy JSON config stored in GroupImporterConfig entity.
-
-  TODO(vadimsh): Remove once all instance of auth service use protobuf configs.
-  """
-  # Note: we do not care to do it in transaction.
-  e = config_key().get()
-  return e.config if e else None
+  return e.config_proto if e else ''
 
 
 def write_config(text, config_revision=None, modified_by=None):
@@ -232,23 +200,22 @@ def write_config(text, config_revision=None, modified_by=None):
   validate_config(text)
   e = GroupImporterConfig(
       key=config_key(),
-      config=read_legacy_config(),
       config_proto=text,
       config_revision=config_revision,
       modified_by=modified_by or auth.get_service_self_identity())
   e.put()
 
 
-def import_external_groups():
-  """Refetches all external groups.
+def load_config():
+  """Reads and parses the config, returns it as GroupImporterConfig or None.
 
-  Runs as a cron task. Raises BundleImportError in case of import errors.
+  Raises BundleImportError if the config can't be parsed or doesn't pass
+  the validation. Missing config is not an error (the function just returns
+  None).
   """
-  # Missing config is not a error.
   config_text = read_config()
   if not config_text:
-    logging.info('Not configured')
-    return
+    return None
   config = config_pb2.GroupImporterConfig()
   try:
     protobuf.text_format.Merge(config_text, config)
@@ -258,8 +225,72 @@ def import_external_groups():
     validate_config_proto(config)
   except ValueError as ex:
     raise BundleImportError('Bad config structure: %s' % ex)
+  return config
 
-  # Fetch all files specified in config in parallel.
+
+def ingest_tarball(name, content):
+  """Handles upload of tarballs specified in 'tarball_upload' config entries.
+
+  Expected to be called in an auth context of the upload PUT request.
+
+  Args:
+    name: name of the corresponding 'tarball_upload' entry (defines ACLs).
+    content: raw byte buffer with *.tar.gz file data.
+
+  Returns:
+    (list of modified groups, new AuthDB revision number or 0 if no changes).
+
+  Raises:
+    auth.AuthorizationError if caller is not authorized to do this upload.
+    BundleImportError if the tarball can't be imported (e.g. wrong format).
+  """
+  # Return generic HTTP 403 error unless we can verify the caller to avoid
+  # leaking information about our config.
+  config = load_config()
+  if not config:
+    logging.error('Group imports are not configured')
+    raise auth.AuthorizationError()
+
+  # Same here. We should not leak config entry names to untrusted callers.
+  entry = None
+  for entry in config.tarball_upload:
+    if entry.name == name:
+      break
+  else:
+    logging.error('No such tarball_upload entry in the config: "%s"', name)
+    raise auth.AuthorizationError()
+
+  # The caller must be specified in 'authorized_uploader' field.
+  caller = auth.get_current_identity()
+  for email in entry.authorized_uploader:
+    if caller == model.Identity(model.IDENTITY_USER, email):
+      break
+  else:
+    logging.error(
+        'Caller %s is not authorized to upload tarball "%s"',
+        caller.to_bytes(), entry.name)
+    raise auth.AuthorizationError()
+
+  # Authorization check passed. Now parse the tarball, converting it into
+  # {system -> {group -> identities}} map (aka "bundles set") and import it into
+  # the datastore.
+  logging.info('Ingesting tarball "%s" uploaded by %s', name, caller.to_bytes())
+  bundles = load_tarball(content, entry.systems, entry.groups, entry.domain)
+  return import_bundles(
+      bundles, caller, 'Uploaded as "%s" tarball' % entry.name)
+
+
+def import_external_groups():
+  """Refetches external groups specified via 'tarball' or 'plainlist' entries.
+
+  Runs as a cron task. Raises BundleImportError in case of import errors.
+  """
+  config = load_config()
+  if not config:
+    logging.info('Not configured')
+    return
+
+  # Fetch files specified in the config in parallel.
   entries = list(config.tarball) + list(config.plainlist)
   futures = [fetch_file_async(e.url, e.oauth_scopes) for e in entries]
 
@@ -287,9 +318,36 @@ def import_external_groups():
 
     assert False, 'Unreachable'
 
+  import_bundles(
+      bundles, model.get_service_self_identity(), 'External group import')
+
+
+def import_bundles(bundles, provided_by, change_log_comment):
+  """Imports given set of bundles all at once.
+
+  A bundle is a dict with groups that is result of a processing of some tarball.
+  A bundle specifies the _desired state_ of all groups under some system, e.g.
+  import_bundles({'ldap': {}}, ...) will REMOVE all existing 'ldap/*' groups.
+
+  Group names in the bundle are specified in their full prefixed form (with
+  system name prefix). An example of expected 'bundles':
+  {
+    'ldap': {
+      'ldap/group': [Identity(...), Identity(...)],
+    },
+  }
+
+  Args:
+    bundles: dict {system name -> {group name -> list of identities}}.
+    provided_by: auth.Identity to put in 'modified_by' or 'created_by' fields.
+    change_log_comment: a comment to put in the change log.
+
+  Returns:
+    (list of modified groups, new AuthDB revision number or 0 if no changes).
+  """
   # Nothing to process?
   if not bundles:
-    return
+    return [], 0
 
   @ndb.transactional
   def snapshot_groups():
@@ -306,14 +364,14 @@ def import_external_groups():
     # Apply mutations, bump revision number.
     for e in entities_to_put:
       e.record_revision(
-          modified_by=model.get_service_self_identity(),
+          modified_by=provided_by,
           modified_ts=ts,
-          comment='External group import')
+          comment=change_log_comment)
     for e in entities_to_delete:
       e.record_deletion(
-          modified_by=model.get_service_self_identity(),
+          modified_by=provided_by,
           modified_ts=ts,
-          comment='External group import')
+          comment=change_log_comment)
     futures = []
     futures.extend(ndb.put_multi_async(entities_to_put))
     futures.extend(ndb.delete_multi_async(e.key for e in entities_to_delete))
@@ -334,15 +392,26 @@ def import_external_groups():
     entities_to_delete = []
     revision, existing_groups = snapshot_groups()
     for system, groups in bundles.iteritems():
-      to_put, to_delete = prepare_import(system, existing_groups, groups, ts)
+      to_put, to_delete = prepare_import(
+          system, existing_groups, groups, ts, provided_by)
       entities_to_put.extend(to_put)
       entities_to_delete.extend(to_delete)
     if not entities_to_put and not entities_to_delete:
       break
     if apply_import(revision, entities_to_put, entities_to_delete, ts):
+      revision += 1
       break
-  logging.info(
-      'Groups updated: %d', len(entities_to_put) + len(entities_to_delete))
+
+  if not entities_to_put and not entities_to_delete:
+    logging.info('No changes')
+    return [], 0
+
+  logging.info('Groups updated, new authDB rev is %d', revision)
+  updated_groups = []
+  for e in entities_to_put + entities_to_delete:
+    logging.info('%s', e.key.id())
+    updated_groups.append(e.key.id())
+  return sorted(updated_groups), revision
 
 
 def load_tarball(content, systems, groups, domain):
@@ -351,7 +420,7 @@ def load_tarball(content, systems, groups, domain):
   Args:
     content: byte buffer with *.tar.gz data.
     systems: names of external group systems expected to be in the bundle.
-    groups: list of group name to extract, or None to extract all.
+    groups: list of group name to extract, or empty to extract all.
     domain: email domain to append to naked user ids.
 
   Returns:
@@ -360,7 +429,7 @@ def load_tarball(content, systems, groups, domain):
   Raises:
     BundleImportError on errors.
   """
-  bundles = collections.defaultdict(dict)
+  bundles = {s: {} for s in systems}
   try:
     # Expected filenames are <external system name>/<group name>, skip
     # everything else.
@@ -369,7 +438,7 @@ def load_tarball(content, systems, groups, domain):
       if len(chunks) != 2 or not auth.is_valid_group_name(filename):
         logging.warning('Skipping file %s, not a valid name', filename)
         continue
-      if groups is not None and filename not in groups:
+      if groups and filename not in groups:
         continue
       system = chunks[0]
       if system not in systems:
@@ -382,7 +451,7 @@ def load_tarball(content, systems, groups, domain):
       bundles[system][filename] = load_group_file(fileobj.read(), domain)
   except tarfile.TarError as exc:
     raise BundleUnpackError('Not a valid tar archive: %s' % exc)
-  return dict(bundles.iteritems())
+  return bundles
 
 
 def load_group_file(body, domain):
@@ -436,16 +505,20 @@ def extract_tar_archive(content):
           yield item.name, extracted
 
 
-def prepare_import(system_name, existing_groups, imported_groups, timestamp):
+def prepare_import(
+    system_name, existing_groups, imported_groups, timestamp, provided_by):
   """Prepares lists of entities to put and delete to apply group import.
+
+  Operates exclusively over '<system name>/*' groups.
 
   Args:
     system_name: name of external groups system being imported (e.g. 'ldap'),
       all existing groups belonging to that system will be replaced with
       |imported_groups|.
-    existing_groups: ALL existing groups.
+    existing_groups: ALL existing groups (not only '<system name>/*' ones).
     imported_groups: dict {imported group name -> list of identities}.
     timestamp: modification timestamp to set on all touched entities.
+    provided_by: auth.Identity to put in 'modified_by' or 'created_by' fields.
 
   Returns:
     (List of entities to put, list of entities to delete).
@@ -461,33 +534,37 @@ def prepare_import(system_name, existing_groups, imported_groups, timestamp):
   }
 
   def clear_group(group_name):
+    assert group_name.startswith('%s/' % system_name), group_name
     ent = system_groups[group_name]
     if ent.members:
       ent.members = []
       ent.modified_ts = timestamp
-      ent.modified_by = auth.get_service_self_identity()
+      ent.modified_by = provided_by
       to_put.append(ent)
 
   def delete_group(group_name):
+    assert group_name.startswith('%s/' % system_name), group_name
     to_delete.append(system_groups[group_name])
 
   def create_group(group_name):
+    assert group_name.startswith('%s/' % system_name), group_name
     ent = model.AuthGroup(
         key=model.group_key(group_name),
         members=imported_groups[group_name],
         created_ts=timestamp,
-        created_by=auth.get_service_self_identity(),
+        created_by=provided_by,
         modified_ts=timestamp,
-        modified_by=auth.get_service_self_identity())
+        modified_by=provided_by)
     to_put.append(ent)
 
   def update_group(group_name):
+    assert group_name.startswith('%s/' % system_name), group_name
     existing = system_groups[group_name]
     imported = imported_groups[group_name]
     if existing.members != imported:
       existing.members = imported
       existing.modified_ts = timestamp
-      existing.modified_by = auth.get_service_self_identity()
+      existing.modified_by = provided_by
       to_put.append(existing)
 
   # Delete groups that are no longer present in the bundle. If group is
