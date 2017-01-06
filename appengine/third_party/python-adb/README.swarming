@@ -1,7 +1,7 @@
 Name: Python ADB + Fastboot implementation
 Short Name: python-adb
 URL: https://github.com/luci/python-adb
-Revision: f56093f0dd94c0c5a62c60f52feae9bcdb5cc148
+Revision: 75477ebf4fb8b906707f35e5fb385a9203256bef
 License: Apache License, Version 2.0
 
 Description:

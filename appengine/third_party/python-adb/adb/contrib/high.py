@@ -302,10 +302,15 @@ def GetLocalDevices(
   with _ADB_KEYS_LOCK:
     if not _ADB_KEYS:
       return []
+
+  # Skip devices that don't expose a serial number.
+  device_matcher = lambda device: device.serial_number is not None
+
   # Create unopened handles for all usb devices.
   handles = list(
       common.UsbHandle.FindDevicesSafe(
-          adb_commands_safe.DeviceIsAvailable, timeout_ms=default_timeout_ms))
+          adb_commands_safe.DeviceIsAvailable, timeout_ms=default_timeout_ms,
+          device_matcher=device_matcher))
 
   return _ConnectFromHandles(handles, banner=banner,
                              default_timeout_ms=default_timeout_ms,

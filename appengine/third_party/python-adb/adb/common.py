@@ -340,7 +340,7 @@ class UsbHandle(Handle):
       DeviceNotFoundError: Raised if the device is not available.
     """
     try:
-      return next(cls.FindDevices(
+      return next(cls.FindDevicesSafe(
           setting_matcher, device_matcher=device_matcher, **kwargs))
     except StopIteration:
       raise usb_exceptions.DeviceNotFoundError(
@@ -373,21 +373,33 @@ class UsbHandle(Handle):
         yield handle
 
   @classmethod
-  def FindDevicesSafe(cls, *args, **kwargs):
-    """Safe version of FindDevicesSafe.
+  def FindDevicesSafe(cls, setting_matcher, device_matcher=None,
+                      usb_info='', timeout_ms=None):
+    """Safe version of FindDevices.
 
-    Use manual iterator handling instead of "for handle in generator" to catch
-    USB exception explicitly.
+    Like FindDevices, but catch USB exceptions as devices are iterated through.
+
+    Yields:
+      Unopened UsbHandle instances.
     """
-    generator = cls.FindDevices(*args, **kwargs)
-    while True:
-      try:
-        handle = generator.next()
-      except usb1.USBErrorOther as e:
-        logging.error(
-            'Failed to open USB device, is user in group plugdev? %s', e)
-        continue
-      yield handle
+    ctx = usb1.USBContext()
+    try:
+      for device in ctx.getDeviceList(skip_on_error=True):
+        setting = setting_matcher(device)
+        if setting is None:
+          continue
+
+        try:
+          handle = cls(device, setting, usb_info=usb_info,
+                       timeout_ms=timeout_ms)
+          if device_matcher is None or device_matcher(handle):
+            yield handle
+        except (usb1.USBErrorOther, usb1.USBErrorNoDevice) as e:
+          logging.error(
+              'Failed to open USB device, is user in group plugdev? %s', e)
+          continue
+    except usb1.USBError as e:
+      logging.error('Failed to get device list: %s', e)
 
 
 class TcpHandle(Handle):
