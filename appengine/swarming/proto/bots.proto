@@ -53,13 +53,38 @@ message BotsCfg {
 }
 
 
+// A type of machine to lease from the Machine Provider.
+message MachineType {
+  // Name for this type of machine. Must be globally unique.
+  optional string name = 1;
+
+  // Human-readable description for this type of machine.
+  optional string description = 2;
+
+  // Number of seconds ahead of lease_expiration_ts to release leases.
+  optional int32 early_release_secs = 3;
+
+  // Duration to lease each machine for.
+  optional int32 lease_duration_secs = 4;
+
+  // Machine Provider dimensions describing this machine.
+  //
+  // Each string should be in the format "<key>:<value>".
+  repeated string mp_dimensions = 5;
+
+  // Target number of machines of this type to have leased at once.
+  optional int32 target_size = 6;
+}
+
+
 // A group of bots that share authentication method, dimensions and owners.
 //
-// Union of bot_id and bot_id_prefix define a set of bot IDs that belong to this
-// group. The rest of the fields define properties of this group.
+// Union of bot_id, bot_id_prefix, and machine_type define a set of bots that
+// belong to this group. The rest of the fields define properties of this group.
 //
-// If both bot_id and bot_id_prefix are missing, the group defines all bots that
-// didn't fit into other groups. There can be only one such "default" group.
+// If bot_id, bot_id_prefix, and machine_type are all missing, the group defines
+// all bots that didn't fit into other groups. There can be only one such
+// "default" group.
 message BotGroup {
   // Explicit enumeration of bot IDs belonging to this group.
   //
@@ -73,6 +98,9 @@ message BotGroup {
 
   // A prefix to match against bot ID string.
   repeated string bot_id_prefix = 2;
+
+  // A type of machine to lease from the Machine Provider.
+  repeated MachineType machine_type = 3;
 
   ////////////////////////
 

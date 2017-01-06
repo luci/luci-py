@@ -267,6 +267,8 @@ def validate_settings(cfg, ctx):
   bot_ids = {}
   # bot_id_prefix => index of a group where it was defined.
   bot_id_prefixes = {}
+  # machine_type names.
+  machine_type_names = set()
 
   for i, entry in enumerate(cfg.bot_group):
     with ctx.prefix('bot_group #%d: ', i):
@@ -295,6 +297,37 @@ def validate_settings(cfg, ctx):
               bot_id_prefix, bot_id_prefixes[bot_id_prefix])
           continue
         bot_id_prefixes[bot_id_prefix] = i
+
+      # Validate machine_type.
+      for i, machine_type in enumerate(entry.machine_type):
+        with ctx.prefix('machine_type #%d: ', i):
+          if not machine_type.name:
+            ctx.error('name is required')
+            continue
+          if machine_type.name in machine_type_names:
+            ctx.error('reusing name "%s"', machine_type.name)
+            continue
+          machine_type_names.add(machine_type.name)
+          if not machine_type.lease_duration_secs:
+            ctx.error('lease_duration_secs is required')
+            continue
+          if machine_type.lease_duration_secs < 0:
+            ctx.error('lease_duration_secs must be positive')
+            continue
+          if not machine_type.mp_dimensions:
+            ctx.error('at least one dimension is required')
+            continue
+          for j, dim in enumerate(machine_type.mp_dimensions):
+            with ctx.prefix('mp_dimensions #%d: ', j):
+              if ':' not in dim:
+                ctx.error('bad dimension "%s", not a key:value pair', dim)
+                continue
+          if not machine_type.target_size:
+            ctx.error('target_size is required')
+            continue
+          if machine_type.target_size < 0:
+            ctx.error('target_size must be positive')
+            continue
 
       # Validate 'auth' field.
       a = entry.auth

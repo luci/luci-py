@@ -281,6 +281,155 @@ class BotGroupsConfigTest(test_case.TestCase):
       '"abc-def-" ambigious'
     ])
 
+  def test_machine_types(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1),
+        ]),
+    ])
+    self.validator_test(cfg, [])
+
+  def test_machine_type_name_unspecified(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1),
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0: name is required'
+    ])
+
+  def test_machine_type_name_reused_same_bot_group(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1),
+          bots_pb2.MachineType(name='abc', lease_duration_secs=456,
+                               mp_dimensions=['key:value'], target_size=2),
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #1: reusing name "abc"'
+    ])
+
+  def test_machine_type_name_reused_different_bot_group(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1),
+        ]),
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=456,
+                               mp_dimensions=['key:value'], target_size=2),
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #1: machine_type #0: reusing name "abc"'
+    ])
+
+  def test_machine_type_lease_duration_secs_unspecified(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc',
+                               mp_dimensions=['key:value'], target_size=1),
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0: lease_duration_secs is required'
+    ])
+
+  def test_machine_type_lease_duration_secs_zero(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=0,
+                               mp_dimensions=['key:value'], target_size=1),
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0: lease_duration_secs is required'
+    ])
+
+  def test_machine_type_lease_duration_secs_negative(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=-123,
+                               mp_dimensions=['key:value'], target_size=1),
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0: lease_duration_secs must be positive'
+    ])
+
+  def test_machine_type_mp_dimensions_unspecified(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=[], target_size=1),
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0: at least one dimension is required'
+    ])
+
+  def test_machine_type_mp_dimensions_wrong_format(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key'], target_size=1),
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0: mp_dimensions #0:'
+      ' bad dimension "key", not a key:value pair'
+    ])
+
+  def test_machine_type_target_size_unspecified(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value']),
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0: target_size is required'
+    ])
+
+  def test_machine_type_target_size_zero(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=0),
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0: target_size is required'
+    ])
+
+  def test_machine_type_target_size_negative(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=-1),
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0: target_size must be positive'
+    ])
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
