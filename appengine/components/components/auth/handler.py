@@ -102,10 +102,10 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     # Set CSP header, if necessary. Subclasses may extend it or disable it.
     policy = self.get_content_security_policy()
     if policy:
-      self.response.headers['Content-Security-Policy'] = '; '.join(
+      self.response.headers['Content-Security-Policy'] = str('; '.join(
         '%s %s' % (directive, ' '.join(sources))
         for directive, sources in sorted(policy.iteritems())
-      )
+      ))
     # Enforce HTTPS by adding the HSTS header; 365*24*60*60s.
     # https://www.owasp.org/index.php/HTTP_Strict_Transport_Security
     self.response.headers['Strict-Transport-Security'] = (
