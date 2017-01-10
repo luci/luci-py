@@ -10,7 +10,6 @@
 *   Android
     *   On an Debian desktop host, the current user must be a member
         of `plugdev` so it can open USB ports.
-    *   python [libusb1](https://pypi.python.org/pypi/libusb1) is installed.
 *   GNU/linux and OSX
     *   Must have passwordless `sudo reboot` enabled, otherwise the bot will
         hang when trying to reboot the host.
@@ -100,7 +99,7 @@ As root (sudo -i) run the following:
     ExecStart=/usr/bin/env python /path/to/swarming_bot.zip start_bot
 
     [Install]
-    WantedBy=multi-user.target
+    WantedBy=default.target
     EOF
 
     systemctl daemon-reload
@@ -145,17 +144,14 @@ OS-per-OS and each test at a time.
 
 `run_isolated.py` by default keeps a local cache of 20gb or 100,000 items, which
 ever comes first. It also enforces that at least 2gb of free disk space remains
-at the start and end of execution. Taking in account the swarm_bot code is of
+at the start and end of execution. Taking in account the swarming_bot code is of
 negligible size and the amount of data used in the chrome infrastructure is
-fairly static, 30gb of disk space should be sufficient for Chrome purposes.
-YMMV. This could have to be revisited in case of significant use case change,
-e.g. starting to run tests for another project. As an example, Blink layout
-tests consist of ~80k files so it is near the 100k items default limit. As such,
-50gb would be ample free room, anything above is likely wasted space.
-
-Because the swarming bots do not compile and always run the tests in a
-temporary directory, deleting it afterward, using 2 separate partitions is not
-as useful as for normal try bots.
+fairly static, 30gb of free disk space (after OS installation) should be
+sufficient for most purposes. YMMV. This could have to be revisited in case of
+significant use case change, e.g. starting to run tests for another project. As
+an example, Blink layout tests consist of ~80k files so it is near the 100k
+items default limit. As such, 50gb would be ample free room, anything above is
+likely wasted space.
 
 
 #### CPU and RAM Specing

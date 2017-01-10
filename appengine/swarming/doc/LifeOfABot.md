@@ -164,19 +164,19 @@ all changes are not backward or forward, they are content addressed.
 
 There are two places where bots behavior can be tweaked:
 
-   - [bot_config.py](../swarming_bot/config/bot_config.py). It is stored on
-     the server, and injected into the swarming_bot.zip each time a zip is
-     requested. It is a python module that defines hook functions called during
-     various stages of the bot life. It can contain essentially any code, and
-     it is executed only on the bot. See Hooks section below.
-   - `bots.cfg` (with the schema defined by [bots.proto](../proto/bots.proto)).
-     This is purely server side configuration, fetched via luci-config. It
-     describes how server authenticates the bots and what dimensions it
-     forcefully applies to them (based on their id). For example, it allows to
-     partition bots into multiple pools (with different 'pool' dimension) solely
-     based on bot credentials, so no matter what bot itself reports, 'pool'
-     dimension will be enforced by the server. It useful for isolating bots that
-     run less trusted tasks into a dedicated pool.
+*   [bot_config.py](../swarming_bot/config/bot_config.py). It is stored on the
+    server, and injected into the swarming_bot.zip each time a zip is requested.
+    It is a python module that defines hook functions called during various
+    stages of the bot life. It can contain essentially any code, and it is
+    executed only on the bot. See Hooks section below.
+*   `bots.cfg` (with the schema defined by [bots.proto](../proto/bots.proto)).
+    This is purely server side configuration, fetched via luci-config. It
+    describes how server authenticates the bots and what dimensions it
+    forcefully applies to them (based on their id). For example, it allows to
+    partition bots into multiple pools (with different 'pool' dimension) solely
+    based on bot credentials, so no matter what bot itself reports, 'pool'
+    dimension will be enforced by the server. It useful for isolating bots that
+    run less trusted tasks into a dedicated pool.
 
 
 ### Hooks
@@ -393,20 +393,24 @@ of files and directories, **EVERYTHING NOT LISTED THERE IS DELETED ON STARTUP**:
 
 *   `*-cacert.pem` are certificate files to verify the SSL certificates. Sadly
     the python libraries used enforce the program to write this file to disk.
+*   `c/` is the named cache storage directory. It is managed by run_isolated.py.
+    Named caches can be requested in the TaskRequest. Common use of these caches
+    are for incremental builds, local git clones, etc. Deleting it causes the
+    next task to start with a fresh empty cache.
 *   `cipd_cache/` is a version cache for CIPD packages.
-*   `isolated_cache/` is the run_isolated cache. Deleting it causes the next
-    task to download all the files instead of reusing whatever was previously
-    downloaded.
+*   `isolated_cache/` is the isolated cache. It is managed by run_isolated.py.
+    Deleting it causes the next task to download all the inputs files instead of
+    reusing previously downloaded files.
 *   `logs/` is the logs for all the processes. Deleting it is fine, the
     directory will be recreated.
 *   `swarming.lck` is a lock file to prevent the bot from starting twice on the
     same host. If you want to run multiple bots on a single host, use multiple
     directories.
 *   `swarming_bot.zip` is the _LKGBC_ (Last Known Good Bot Code), it is reset
-    after an upgrade and a successful task execution.
+    after an upgrade *and* a successful task execution.
 *   `swarming_bot.1.zip` and `swarming_bot.2.zip` are the two 'partitions' used
     when the bot is running and self-updating.
-*   `work/` is the temporary working directory created for each task then
+*   `w/` is the temporary _working directory_ created for each task then
     deleted. By definition it only exists for the lifetime of a single task, so
     it is deleted on bot startup if found.
 
