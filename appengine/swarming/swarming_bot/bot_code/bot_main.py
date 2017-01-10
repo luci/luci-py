@@ -75,6 +75,7 @@ PASSLIST = (
   'isolated_cache',
   'logs',
   'README',
+  'README.md',
   'swarming.lck',
   'swarming_bot.1.zip',
   'swarming_bot.2.zip',
