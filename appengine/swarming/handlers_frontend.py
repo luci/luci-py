@@ -875,6 +875,22 @@ class UIHandler(auth.AuthenticatingHandler):
     except template.TemplateNotFound:
       self.abort(404, 'Page not found.')
 
+  def get_content_security_policy(self):
+    # We use iframes to display pages at display_server_url_template. Need to
+    # allow it in CSP.
+    csp = super(UIHandler, self).get_content_security_policy()
+    tmpl = config.settings().display_server_url_template
+    if tmpl:
+      if tmpl.startswith('/'):
+        csp['child-src'].append("'self'")
+      else:
+        # We assume the template specifies '%s' in its last path component.
+        # We strip it to get a "parent" path that we can put into CSP. Note that
+        # whitelisting an entire display server domain is unnecessary wide.
+        assert tmpl.startswith('https://'), tmpl
+        csp['child-src'].append(tmpl[:tmpl.rfind('/')])
+    return csp
+
 
 class WarmupHandler(webapp2.RequestHandler):
   def get(self):

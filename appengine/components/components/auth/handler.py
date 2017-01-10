@@ -86,7 +86,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
   xsrf_token_request_param = 'xsrf_token'
   # Embedded data extracted from XSRF token of current request.
   xsrf_token_data = None
-  # If not None, sets X_Frame-Options on all replies.
+  # If not None, sets X-Frame-Options on all replies.
   frame_options = 'DENY'
   # A method used to authenticate this request, see get_auth_methods().
   auth_method = None
@@ -99,17 +99,13 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     conf = config.ensure_configured()
     ctx = api.reinitialize_request_cache()
 
-    # http://www.html5rocks.com/en/tutorials/security/content-security-policy/
-    # https://www.owasp.org/index.php/Content_Security_Policy
-    # TODO(maruel): Remove 'unsafe-inline' once all inline style="foo:bar" in
-    # all HTML tags were removed. Warning if seeing this post 2016, it could
-    # take a while.
-    # - https://www.google.com is due to Google Viz library.
-    # - https://www.google-analytics.com due to Analytics.
-    # - 'unsafe-eval' due to polymer.
-    self.response.headers['Content-Security-Policy'] = (
-        'default-src https: \'self\' \'unsafe-inline\' https://www.google.com '
-        'https://www.google-analytics.com \'unsafe-eval\'')
+    # Set CSP header, if necessary. Subclasses may extend it or disable it.
+    policy = self.get_content_security_policy()
+    if policy:
+      self.response.headers['Content-Security-Policy'] = '; '.join(
+        '%s %s' % (directive, ' '.join(sources))
+        for directive, sources in sorted(policy.iteritems())
+      )
     # Enforce HTTPS by adding the HSTS header; 365*24*60*60s.
     # https://www.owasp.org/index.php/HTTP_Strict_Transport_Security
     self.response.headers['Strict-Transport-Security'] = (
@@ -298,6 +294,60 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     except tokens.InvalidTokenError as err:
       raise api.AuthorizationError(str(err))
 
+  def get_content_security_policy(self):
+    """Returns a dict {CSP directive (e.g. 'script-src') => list of sources}.
+
+    The returned policy (unless empty or None) will be formated and put in
+    Content-Security-Policy header. Default implementation returns a policy
+    suitable for apps that depend on Google (and only Google) services.
+
+    Called once at the start of request handler. Always returns a copy, caller
+    can safely modify it.
+    """
+    # See:
+    #   https://developers.google.com/web/fundamentals/security/csp/
+    #   https://www.w3.org/TR/CSP2/
+    #   https://www.owasp.org/index.php/Content_Security_Policy
+    #
+    # TODO(maruel): Remove 'unsafe-inline' once all inline style="foo:bar" in
+    # all HTML tags were removed. Warning if seeing this post 2016, it could
+    # take a while.
+    return {
+      'default-src': ["'self'"],
+
+      'script-src': [
+        "'self'",
+        "'unsafe-inline'",  # TODO(vadimsh): get rid of this (use nonces)
+        "'unsafe-eval'",    # required by Polymer and Handlebars templates
+
+        'https://www.google-analytics.com',
+        'https://www.google.com/jsapi',
+        'https://apis.google.com',
+      ],
+
+      'style-src': [
+        "'self'",
+        "'unsafe-inline'",  # TODO(vadimsh): get rid of this (use nonces)
+        "https://fonts.googleapis.com",
+      ],
+
+      'child-src': [
+        'https://accounts.google.com',  # Google OAuth2 library opens iframes
+      ],
+
+      'img-src': [
+        "'self'",
+        'https://*.googleusercontent.com',  # Google user avatars
+      ],
+
+      'font-src': [
+        "'self'",
+        "https://fonts.gstatic.com",  # Google-hosted fonts
+      ],
+
+      'object-src': ["'none'"],  # we don't generally use Flash or Java
+    }
+
   def authentication_error(self, error):
     """Called when authentication fails to report the error to requester.
 
@@ -370,8 +420,13 @@ class ApiHandler(AuthenticatingHandler):
   CONTENT_TYPE_BASE = 'application/json'
   CONTENT_TYPE_FULL = 'application/json; charset=utf-8'
   _json_body = None
+
   # Clickjacking not applicable to APIs.
   frame_options = None
+
+  # CSP is not applicable to APIs.
+  def get_content_security_policy(self):
+    return None
 
   def authentication_error(self, error):
     logging.warning('Authentication error.\n%s', error)
