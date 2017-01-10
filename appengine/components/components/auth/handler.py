@@ -10,6 +10,7 @@
 import functools
 import json
 import logging
+import uuid
 import webapp2
 
 from google.appengine.api import users
@@ -86,8 +87,18 @@ class AuthenticatingHandler(webapp2.RequestHandler):
   xsrf_token_request_param = 'xsrf_token'
   # Embedded data extracted from XSRF token of current request.
   xsrf_token_data = None
+
   # If not None, sets X-Frame-Options on all replies.
   frame_options = 'DENY'
+
+  # If true, will add 'nonce-*' to script-src CSP. Forbids inline scripts.
+  csp_use_script_nonce = False
+  # If true, will add 'nonce-*' to style-src CSP. Forbids inline styles.
+  csp_use_style_nonce = False
+
+  # See csp_nonce attribute.
+  _csp_nonce = None
+
   # A method used to authenticate this request, see get_auth_methods().
   auth_method = None
   # If True, allow to use 'bots' IP whitelist to authenticate anonymous calls.
@@ -102,10 +113,10 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     # Set CSP header, if necessary. Subclasses may extend it or disable it.
     policy = self.get_content_security_policy()
     if policy:
-      self.response.headers['Content-Security-Policy'] = str('; '.join(
-        '%s %s' % (directive, ' '.join(sources))
+      self.response.headers['Content-Security-Policy'] = '; '.join(
+        str('%s %s' % (directive, ' '.join(sources)))
         for directive, sources in sorted(policy.iteritems())
-      ))
+      )
     # Enforce HTTPS by adding the HSTS header; 365*24*60*60s.
     # https://www.owasp.org/index.php/HTTP_Strict_Transport_Security
     self.response.headers['Strict-Transport-Security'] = (
@@ -294,6 +305,38 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     except tokens.InvalidTokenError as err:
       raise api.AuthorizationError(str(err))
 
+  @property
+  def csp_nonce(self):
+    """Returns random nonce used in Content-Security-Policies.
+
+    It should be used as nonce=... attribute of all inline Javascript code
+    (<script> tags) if self.csp_use_script_nonce is True, and <style> tags
+    if self.csp_use_style_nonce is True.
+
+    It makes harder to inject unintended Javascript or CSS code into the page
+    (one now has to extract the nonce somehow first), thus improving XSS
+    protection.
+
+    For more details see https://www.w3.org/TR/CSP2/#script-src-nonce-usage.
+
+    Usage:
+      class MyHandler(AuthenticatingHandler):
+        csp_use_script_nonce = True
+
+        def get(self):
+          ...
+          self.response.write(
+            template.render(..., {'csp_nonce': self.csp_nonce}))
+
+    In the template:
+      <script nonce="{{csp_nonce}}">
+        ...
+      </script>
+    """
+    if not self._csp_nonce:
+      self._csp_nonce = tokens.base64_encode(uuid.uuid4().bytes)
+    return self._csp_nonce
+
   def get_content_security_policy(self):
     """Returns a dict {CSP directive (e.g. 'script-src') => list of sources}.
 
@@ -312,12 +355,12 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     # TODO(maruel): Remove 'unsafe-inline' once all inline style="foo:bar" in
     # all HTML tags were removed. Warning if seeing this post 2016, it could
     # take a while.
-    return {
+    csp = {
       'default-src': ["'self'"],
 
       'script-src': [
         "'self'",
-        "'unsafe-inline'",  # TODO(vadimsh): get rid of this (use nonces)
+        "'unsafe-inline'",  # fallback if the browser doesn't support nonces
         "'unsafe-eval'",    # required by Polymer and Handlebars templates
 
         'https://www.google-analytics.com',
@@ -327,7 +370,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
 
       'style-src': [
         "'self'",
-        "'unsafe-inline'",  # TODO(vadimsh): get rid of this (use nonces)
+        "'unsafe-inline'",  # fallback if the browser doesn't support nonces
         "https://fonts.googleapis.com",
       ],
 
@@ -347,6 +390,16 @@ class AuthenticatingHandler(webapp2.RequestHandler):
 
       'object-src': ["'none'"],  # we don't generally use Flash or Java
     }
+
+    # When 'unsafe-inline' and 'nonce-*' are both specified, newer browsers
+    # prefer nonces. Older browsers (that don't support nonces), fall back to
+    # 'unsafe-inline' and just ignore nonces.
+    if self.csp_use_script_nonce:
+      csp['script-src'].append("'nonce-%s'" % self.csp_nonce)
+    if self.csp_use_style_nonce:
+      csp['style-src'].append("'nonce-%s'" % self.csp_nonce)
+
+    return csp
 
   def authentication_error(self, error):
     """Called when authentication fails to report the error to requester.

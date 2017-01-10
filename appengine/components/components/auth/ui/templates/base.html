@@ -85,7 +85,7 @@ style="font-family:monospace;">{{auth_service_config_rev}}</a>.
           {% if not identity.is_anonymous %}
             <span>{{identity.name}}</span>
             <span> |</span>
-            <a href="javascript:common.logout();" class="navbar-link">Logout</a>
+            <a id="logout-btn" class="navbar-link" href="#">Logout</a>
           {% else %}
             <a href="{{login_url}}" class="navbar-link">Login</a>
           {% endif %}
@@ -128,7 +128,7 @@ style="font-family:monospace;">{{auth_service_config_rev}}</a>.
   </div>
 
   <!-- JS bootstrap process. -->
-  <script type="text/javascript">
+  <script type="text/javascript" nonce="{{csp_nonce}}">
     // Expose 'config' as global js variable.
     var config = {{config|safe}};
     {% if js_module_name %}
@@ -142,6 +142,10 @@ style="font-family:monospace;">{{auth_service_config_rev}}</a>.
     {% else %}
     common.presentContent();
     {% endif %}
+    $('#logout-btn').click(function(e) {
+      common.logout();
+      e.preventDefault();
+    });
   </script>
 </body>
 

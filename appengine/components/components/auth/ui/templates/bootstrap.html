@@ -7,10 +7,8 @@
 access protected pages.</p>
 <hr>
 <p>
-  <a class="btn btn-primary" href="#" onclick="javascript:submit(event);">
-    Proceed
-  </a>
-  <a class="btn btn-default" href="javascript:common.logout();">Logout</a>
+  <a id="proceed-btn" class="btn btn-primary" href="#">Proceed</a>
+  <a id="logout-btn" class="btn btn-default" href="#">Logout</a>
 </p>
 
 <form name="token" method="POST">
@@ -18,12 +16,16 @@ access protected pages.</p>
   <input type="hidden" name="return_url" value="{{return_url}}" />
 </form>
 
-<script type="text/javascript">
-function submit(event) {
-  document.token.submit();
-  event.preventDefault();
-  return false;
-}
+<script type="text/javascript" nonce="{{csp_nonce}}">
+  $('#proceed-btn').click(function(e) {
+    document.token.submit();
+    e.preventDefault();
+  });
+
+  $('#logout-btn').click(function(e) {
+    common.logout();
+    e.preventDefault();
+  });
 </script>
 
 {% endblock %}

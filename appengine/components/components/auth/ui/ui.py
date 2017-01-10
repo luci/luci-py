@@ -115,6 +115,10 @@ def redirect_ui_on_replica(method):
 class UIHandler(handler.AuthenticatingHandler):
   """Renders Jinja templates extending base.html or base_minimal.html."""
 
+  # TODO(vadimsh): Enable CSP nonce for styles too. We'll need to get rid of
+  # all 'style=...' attributes first.
+  csp_use_script_nonce = True
+
   def reply(self, path, env=None, status=200):
     """Render template |path| to response using given environment.
 
@@ -170,6 +174,7 @@ class UIHandler(handler.AuthenticatingHandler):
       'app_revision_url': utils.get_app_revision_url(),
       'app_version': utils.get_app_version(),
       'config': json.dumps(js_config),
+      'csp_nonce': self.csp_nonce,
       'identity': api.get_current_identity(),
       'js_module_name': js_module_name,
       'navbar': [

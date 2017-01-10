@@ -10,7 +10,14 @@
 <pre>{{error}}</pre>
 <hr>
 <p>
-  <a class="btn btn-primary" href="javascript:common.logout();">Logout</a>
+  <a id="logout-btn" class="btn btn-primary" href="#">Logout</a>
 </p>
+
+<script type="text/javascript" nonce="{{csp_nonce}}">
+  $('#logout-btn').click(function(e) {
+    common.logout();
+    e.preventDefault();
+  });
+</script>
 
 {% endblock %}

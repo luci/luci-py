@@ -13,21 +13,18 @@ performed on <a href="{{primary_url}}">{{primary_id}}</a>.
 <p><b>All current groups will be permanently deleted. There's no undo.</b></p>
 <hr>
 <p>
-  <a class="btn btn-danger" href="#" onclick="javascript:submit(event);">
-    Switch
-  </a>
+  <a id="switch-btn" class="btn btn-danger" href="#">Switch</a>
 </p>
 
 <form name="token" method="POST">
   <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
 </form>
 
-<script type="text/javascript">
-function submit(event) {
-  document.token.submit();
-  event.preventDefault();
-  return false;
-}
+<script type="text/javascript" nonce="{{csp_nonce}}">
+  $('#switch-btn').click(function(e) {
+    document.token.submit();
+    e.preventDefault();
+  });
 </script>
 
 {% endblock %}
