@@ -55,6 +55,7 @@ BotGroupConfig = collections.namedtuple('BotGroupConfig', [
 _BotGroups = collections.namedtuple('_BotGroups', [
   'direct_matches', # dict bot_id => BotGroupConfig
   'prefix_matches', # list of pairs (bot_id_prefix, BotGroupConfig)
+  'machine_types',  # dict machine_type.name => BotGroupConfig
   'default_group',  # fallback BotGroupConfig or None if not defined
 ])
 
@@ -63,6 +64,7 @@ _BotGroups = collections.namedtuple('_BotGroups', [
 _DEFAULT_BOT_GROUPS = _BotGroups(
     direct_matches={},
     prefix_matches=[],
+    machine_types={},
     default_group=BotGroupConfig(
         version='default',
         require_luci_machine_token=False,
@@ -98,13 +100,16 @@ def _make_bot_group_config(**fields):
   return BotGroupConfig(version=_gen_version(fields), **fields)
 
 
-def get_bot_group_config(bot_id):
-  """Returns BotGroupConfig for a bot with given ID.
+def get_bot_group_config(bot_id, machine_type):
+  """Returns BotGroupConfig for a bot with given ID or machine type.
 
   Returns:
     BotGroupConfig or None if not found.
   """
   cfg = _fetch_bot_groups()
+
+  if machine_type and cfg.machine_types.get(machine_type):
+    return cfg.machine_types[machine_type]
 
   gr = cfg.direct_matches.get(bot_id)
   if gr is not None:
@@ -196,29 +201,53 @@ def _expand_bot_id_expr(expr):
 
 
 @utils.cache_with_expiration(60)
+def fetch_machine_types():
+  """Returns a dict of MachineTypes contained in bots.cfg.
+
+  Returns:
+    A dict mapping the name of a MachineType to a bots_pb2.MachineType.
+  """
+  cfg = _fetch_bots_config()
+  if not cfg:
+    return {}
+
+  machine_types = {}
+  for bot_group in cfg.bot_group:
+    for mt in bot_group.machine_type:
+      machine_types[mt.name] = mt
+
+  return machine_types
+
+
+def _fetch_bots_config():
+  """Fetches bots.cfg."""
+  # store_last_good=True tells config components to update the config file
+  # in a cron job. Here we juts read from the datastore. In case it's the first
+  # call ever, or config doesn't exist, it returns (None, None).
+  rev, cfg = config.get_self_config(
+      BOTS_CFG_FILENAME, bots_pb2.BotsCfg, store_last_good=True)
+  if cfg:
+    logging.debug('Using bots.cfg at rev %s', rev)
+    # Callers can assume the config is already validated (as promised by
+    # components.config). There should be no error at this point.
+  return cfg
+
+
+@utils.cache_with_expiration(60)
 def _fetch_bot_groups():
   """Loads bots.cfg and parses it into _BotGroups struct.
 
   If bots.cfg doesn't exist, returns default config that allows any caller from
   'bots' IP whitelist to act as a bot.
   """
-  # store_last_good=True tells config component to update the config file
-  # in a cron job. Here we just read from datastore. In case it's the first
-  # call ever, or config doesn't exist, it returns (None, None).
-  rev, cfg = config.get_self_config(
-      BOTS_CFG_FILENAME, bots_pb2.BotsCfg, store_last_good=True)
+  cfg = _fetch_bots_config()
   if not cfg:
     logging.info('Didn\'t find bots.cfg, using default')
     return _DEFAULT_BOT_GROUPS
 
-  # The code below assumes the config is already validated (as promised by
-  # components.config), so it logs and ignores errors, without aborting. There
-  # should be no error at this point.
-
-  logging.info('Using bots.cfg at rev %s', rev)
-
   direct_matches = {}
   prefix_matches = []
+  machine_types = {}
   default_group = None
 
   for entry in cfg.bot_group:
@@ -243,14 +272,18 @@ def _fetch_bot_groups():
         continue
       prefix_matches.append((bot_id_prefix, group_cfg))
 
+    for machine_type in entry.machine_type:
+      machine_types[machine_type.name] = group_cfg
+
     # Default group?
-    if not entry.bot_id and not entry.bot_id_prefix:
+    if not entry.bot_id and not entry.bot_id_prefix and not entry.machine_type:
       if default_group is not None:
         logging.error('Default bot group is specified twice')
       else:
         default_group = group_cfg
 
-  return _BotGroups(direct_matches, prefix_matches, default_group)
+  return _BotGroups(
+      direct_matches, prefix_matches, machine_types, default_group)
 
 
 @validation.self_rule(BOTS_CFG_FILENAME, bots_pb2.BotsCfg)

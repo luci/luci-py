@@ -39,10 +39,12 @@ import logging
 from google.appengine.api import app_identity
 from google.appengine.ext import ndb
 from google.appengine.ext.ndb import msgprop
+from protorpc.remote import protojson
 
 from components import machine_provider
 from components import pubsub
 from components import utils
+from server import bot_groups_config
 from server import bot_management
 from server import task_request
 from server import task_result
@@ -159,8 +161,34 @@ def ensure_entity_exists(machine_type, n):
       yield machine_lease.put_async()
 
 
+def machine_type_pb2_to_entity(pb2):
+  """Creates a MachineType entity from the given bots_pb2.MachineType.
+
+  Args:
+    pb2: A proto.bots_pb2.MachineType proto.
+
+  Returns:
+    A MachineType entity.
+  """
+  return MachineType(
+      id=pb2.name,
+      description=pb2.description,
+      early_release_secs=pb2.early_release_secs,
+      enabled=True,
+      lease_duration_secs=pb2.lease_duration_secs,
+      mp_dimensions=protojson.decode_message(
+          machine_provider.Dimensions,
+          json.dumps(dict(pair.split(':', 1) for pair in pb2.mp_dimensions)),
+      ),
+      target_size=pb2.target_size,
+  )
+
+
 def ensure_entities_exist(max_concurrent=50):
-  """Ensures MachineLeases exist for each MachineType.
+  """Ensures MachineType entities are correct, and MachineLease entities exist.
+
+  Updates MachineType entities based on the config and creates corresponding
+  MachineLease entities.
 
   Args:
     max_concurrent: Maximum number of concurrent asynchronous requests.
@@ -168,8 +196,24 @@ def ensure_entities_exist(max_concurrent=50):
   # Generate a few asynchronous requests at a time in order to prevent having
   # too many in flight at a time.
   futures = []
+  machine_types = bot_groups_config.fetch_machine_types().copy()
 
   for machine_type in MachineType.query(MachineType.enabled == True):
+    # Check the MachineType in the datastore against its config.
+    # If it no longer exists, just disable it here. If it exists but
+    # doesn't match, update it.
+    config = machine_types.pop(machine_type.key.id(), None)
+    if not config:
+      machine_type.enabled = False
+      futures.append(machine_type.put_async())
+      continue
+
+    config = machine_type_pb2_to_entity(config)
+    if machine_type != config:
+      logging.info('Updating MachineType: %s', config)
+      machine_type = config
+      futures.append(machine_type.put_async())
+
     cursor = 0
     while cursor < machine_type.target_size:
       while len(futures) < max_concurrent and cursor < machine_type.target_size:
@@ -181,6 +225,22 @@ def ensure_entities_exist(max_concurrent=50):
       # is not created, we will just create it the next time this is called,
       # converging to the desired state eventually.
       futures = [future for future in futures if not future.done()]
+
+  if machine_types:
+    machine_types = machine_types.values()
+
+  # Create MachineTypes that never existed before.
+  # The next iteration of this cron job will create their MachineLeases.
+  while machine_types:
+    num_futures = len(futures)
+    if num_futures < max_concurrent:
+      futures.extend([
+          machine_type_pb2_to_entity(machine_type).put_async()
+          for machine_type in machine_types[:max_concurrent - num_futures]
+      ])
+      machine_types = machine_types[max_concurrent - num_futures:]
+    ndb.Future.wait_any(futures)
+    futures = [future for future in futures if not future.done()]
 
   if futures:
     ndb.Future.wait_all(futures)

@@ -31,6 +31,8 @@ TEST_CONFIG = bots_pb2.BotsCfg(
     bots_pb2.BotGroup(
       bot_id=['other_bot'],
       bot_id_prefix=['bot'],
+      machine_type=[bots_pb2.MachineType(lease_duration_secs=1, name='mt',
+                                         mp_dimensions=['k:v'], target_size=1)],
       auth=bots_pb2.BotAuth(require_service_account='a@example.com')),
     bots_pb2.BotGroup(
       auth=bots_pb2.BotAuth(ip_whitelist='bots'),
@@ -125,11 +127,13 @@ class BotGroupsConfigTest(test_case.TestCase):
   def test_get_bot_group_config(self):
     self.mock_config(TEST_CONFIG)
     self.assertEquals(
-        EXPECTED_GROUP_1, bot_groups_config.get_bot_group_config('bot1'))
+        EXPECTED_GROUP_1, bot_groups_config.get_bot_group_config('bot1', None))
     self.assertEquals(
-        EXPECTED_GROUP_2, bot_groups_config.get_bot_group_config('botzzz'))
+        EXPECTED_GROUP_2, bot_groups_config.get_bot_group_config('botzz', 'mt'))
     self.assertEquals(
-        EXPECTED_GROUP_3, bot_groups_config.get_bot_group_config('unknown'))
+        EXPECTED_GROUP_3, bot_groups_config.get_bot_group_config('?', None))
+    self.assertEquals(
+        EXPECTED_GROUP_2, bot_groups_config.get_bot_group_config('?', 'mt'))
 
   def test_empty_config_is_valid(self):
     self.validator_test(bots_pb2.BotsCfg(), [])

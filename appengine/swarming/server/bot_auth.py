@@ -45,7 +45,7 @@ def validate_bot_id_and_fetch_config(bot_id, machine_type):
   """
   original_bot_id = bot_id
   bot_id = _extract_primary_hostname(bot_id)
-  cfg = bot_groups_config.get_bot_group_config(bot_id)
+  cfg = bot_groups_config.get_bot_group_config(bot_id, machine_type)
   if not cfg:
     logging.error(
         'bot_auth: unknown bot_id, not in the config\nbot_id: "%s", '

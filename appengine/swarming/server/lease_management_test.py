@@ -22,6 +22,7 @@ from test_support import test_case
 
 import bot_management
 import lease_management
+from proto import bots_pb2
 
 
 def rpc_to_json(rpc_message):
@@ -179,31 +180,90 @@ class EnsureEntitiesExistTest(test_case.TestCase):
     self.failIf(lease_management.MachineLease.query().count())
 
   def test_one_enabled_machine_type(self):
-    lease_management.MachineType(
+    def fetch_machine_types():
+      return {
+          'machine-type': bots_pb2.MachineType(
+              early_release_secs=0,
+              lease_duration_secs=1,
+              mp_dimensions=['disk_gb:100'],
+              name='machine-type',
+              target_size=1,
+          ),
+      }
+    self.mock(
+        lease_management.bot_groups_config,
+        'fetch_machine_types',
+        fetch_machine_types,
+    )
+
+    key = lease_management.MachineType(
+        id='machine-type',
         target_size=1,
     ).put()
 
     lease_management.ensure_entities_exist()
 
+    self.assertEqual(key.get().early_release_secs, 0)
+    self.assertEqual(key.get().lease_duration_secs, 1)
+    self.assertEqual(key.get().target_size, 1)
     self.assertEqual(lease_management.MachineLease.query().count(), 1)
 
   def test_two_enabled_machine_types(self):
+    def fetch_machine_types():
+      return {
+          'machine-type-a': bots_pb2.MachineType(
+              early_release_secs=0,
+              lease_duration_secs=1,
+              mp_dimensions=['disk_gb:100'],
+              name='machine-type-a',
+              target_size=1,
+          ),
+          'machine-type-b': bots_pb2.MachineType(
+              early_release_secs=0,
+              lease_duration_secs=1,
+              mp_dimensions=['disk_gb:100'],
+              name='machine-type-b',
+              target_size=1,
+          ),
+      }
+    self.mock(
+        lease_management.bot_groups_config,
+        'fetch_machine_types',
+        fetch_machine_types,
+    )
+
     lease_management.MachineType(
-        id='a',
+        id='machine-type-a',
         target_size=1,
     ).put()
     lease_management.MachineType(
-        id='b',
+        id='machine-type-b',
         target_size=1,
     ).put()
 
     lease_management.ensure_entities_exist()
 
     self.assertEqual(lease_management.MachineLease.query().count(), 2)
-    self.failUnless(lease_management.MachineLease.get_by_id('a-0'))
-    self.failUnless(lease_management.MachineLease.get_by_id('b-0'))
+    self.failUnless(lease_management.MachineLease.get_by_id('machine-type-a-0'))
+    self.failUnless(lease_management.MachineLease.get_by_id('machine-type-b-0'))
 
   def test_one_machine_type_multiple_batches(self):
+    def fetch_machine_types():
+      return {
+          'machine-type': bots_pb2.MachineType(
+              early_release_secs=0,
+              lease_duration_secs=1,
+              mp_dimensions=['disk_gb:100'],
+              name='machine-type',
+              target_size=5,
+          ),
+      }
+    self.mock(
+        lease_management.bot_groups_config,
+        'fetch_machine_types',
+        fetch_machine_types,
+    )
+
     lease_management.MachineType(
         id='machine-type',
         target_size=5,
@@ -221,16 +281,46 @@ class EnsureEntitiesExistTest(test_case.TestCase):
     self.failUnless(lease_management.MachineLease.get_by_id('machine-type-4'))
 
   def test_three_machine_types_multiple_batches(self):
+    def fetch_machine_types():
+      return {
+          'machine-type-a': bots_pb2.MachineType(
+              early_release_secs=0,
+              lease_duration_secs=1,
+              mp_dimensions=['disk_gb:100'],
+              name='machine-type-a',
+              target_size=2,
+          ),
+          'machine-type-b': bots_pb2.MachineType(
+              early_release_secs=0,
+              lease_duration_secs=1,
+              mp_dimensions=['disk_gb:100'],
+              name='machine-type-b',
+              target_size=2,
+          ),
+          'machine-type-c': bots_pb2.MachineType(
+              early_release_secs=0,
+              lease_duration_secs=1,
+              mp_dimensions=['disk_gb:100'],
+              name='machine-type-c',
+              target_size=1,
+          ),
+      }
+    self.mock(
+        lease_management.bot_groups_config,
+        'fetch_machine_types',
+        fetch_machine_types,
+    )
+
     lease_management.MachineType(
-        id='a',
+        id='machine-type-a',
         target_size=2,
     ).put()
     lease_management.MachineType(
-        id='b',
+        id='machine-type-b',
         target_size=2,
     ).put()
     lease_management.MachineType(
-        id='c',
+        id='machine-type-c',
         target_size=1,
     ).put()
 
@@ -239,11 +329,11 @@ class EnsureEntitiesExistTest(test_case.TestCase):
     lease_management.ensure_entities_exist(max_concurrent=3)
 
     self.assertEqual(lease_management.MachineLease.query().count(), 5)
-    self.failUnless(lease_management.MachineLease.get_by_id('a-0'))
-    self.failUnless(lease_management.MachineLease.get_by_id('a-1'))
-    self.failUnless(lease_management.MachineLease.get_by_id('b-0'))
-    self.failUnless(lease_management.MachineLease.get_by_id('b-1'))
-    self.failUnless(lease_management.MachineLease.get_by_id('c-0'))
+    self.failUnless(lease_management.MachineLease.get_by_id('machine-type-a-0'))
+    self.failUnless(lease_management.MachineLease.get_by_id('machine-type-a-1'))
+    self.failUnless(lease_management.MachineLease.get_by_id('machine-type-b-0'))
+    self.failUnless(lease_management.MachineLease.get_by_id('machine-type-b-1'))
+    self.failUnless(lease_management.MachineLease.get_by_id('machine-type-c-0'))
 
   def test_machine_lease_exists_mismatched_not_updated(self):
     key = lease_management.MachineType(
@@ -272,7 +362,24 @@ class EnsureEntitiesExistTest(test_case.TestCase):
     self.assertEqual(key.get().mp_dimensions.disk_gb, 200)
 
   def test_machine_lease_exists_mismatched_updated(self):
+    def fetch_machine_types():
+      return {
+          'machine-type': bots_pb2.MachineType(
+              early_release_secs=0,
+              lease_duration_secs=1,
+              mp_dimensions=['disk_gb:100'],
+              name='machine-type',
+              target_size=1,
+          ),
+      }
+    self.mock(
+        lease_management.bot_groups_config,
+        'fetch_machine_types',
+        fetch_machine_types,
+    )
+
     key = lease_management.MachineType(
+        id='machine-type',
         early_release_secs=0,
         lease_duration_secs=1,
         mp_dimensions=machine_provider.Dimensions(
