@@ -888,7 +888,7 @@ class UIHandler(auth.AuthenticatingHandler):
         # We strip it to get a "parent" path that we can put into CSP. Note that
         # whitelisting an entire display server domain is unnecessary wide.
         assert tmpl.startswith('https://'), tmpl
-        csp['child-src'].append(tmpl[:tmpl.rfind('/')])
+        csp['child-src'].append(tmpl[:tmpl.rfind('/')+1])
     return csp
 
 
