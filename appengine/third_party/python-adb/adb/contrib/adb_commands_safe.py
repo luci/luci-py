@@ -77,7 +77,8 @@ def KillADB():
 
   culprits = '\n'.join(p for p in processes if 'adb' in p)
   _LOG.error(
-      'KillADB() failed after %d attempts. Potential culprits: %s' % culprits)
+      'KillADB() failed after %d attempts. Potential culprits: %s',
+      attempts, culprits)
 
 
 class AdbCommandsSafe(object):
