@@ -117,31 +117,39 @@ class MachineType(ndb.Model):
 
 
 @ndb.transactional_tasklet
-def ensure_entity_exists(machine_type, n):
-  """Ensures the nth MachineLease for the given MachineType exists.
+def create_machine_lease(machine_lease_key, machine_type):
+  """Creates a MachineLease from the given MachineType and MachineLease key.
 
   Args:
+    machine_lease_key: ndb.Key for a MachineLease entity.
     machine_type: MachineType entity.
-    n: The MachineLease index.
   """
-  key = ndb.Key(MachineLease, '%s-%s' % (machine_type.key.id(), n))
-  machine_lease = yield key.get_async()
-
-  # If there is no MachineLease in the datastore at all, create one.
-  if not machine_lease:
-    yield MachineLease(
-        key=key,
-        lease_duration_secs=machine_type.lease_duration_secs,
-        early_release_secs=machine_type.early_release_secs,
-        machine_type=machine_type.key,
-        mp_dimensions=machine_type.mp_dimensions,
-    ).put_async()
+  machine_lease = yield machine_lease_key.get_async()
+  if machine_lease:
     return
 
-  # If there is a MachineLease, we may need to update it if the MachineType's
-  # lease properties have changed. It's only safe to update it if the current
-  # lease is fulfilled (indicated by the presence of lease_expiration_ts) so
-  # the changes only go into effect for the next lease request.
+  yield MachineLease(
+      key=machine_lease_key,
+      lease_duration_secs=machine_type.lease_duration_secs,
+      early_release_secs=machine_type.early_release_secs,
+      machine_type=machine_type.key,
+      mp_dimensions=machine_type.mp_dimensions,
+  ).put_async()
+
+
+@ndb.transactional_tasklet
+def update_machine_lease(machine_lease_key, machine_type):
+  """Updates the given MachineLease from the given MachineType.
+
+  Args:
+    machine_lease_key: ndb.Key for a MachineLease entity.
+    machine_type: MachineType entity.
+  """
+  machine_lease = yield machine_lease_key.get_async()
+  if not machine_lease:
+    logging.error('MachineLease not found:\nKey: %s', machine_lease_key)
+    return
+
   if machine_lease.lease_expiration_ts:
     put = False
 
@@ -159,6 +167,34 @@ def ensure_entity_exists(machine_type, n):
 
     if put:
       yield machine_lease.put_async()
+
+
+@ndb.tasklet
+def ensure_entity_exists(machine_type, n):
+  """Ensures the nth MachineLease for the given MachineType exists.
+
+  Args:
+    machine_type: MachineType entity.
+    n: The MachineLease index.
+  """
+  machine_lease_key = ndb.Key(
+      MachineLease, '%s-%s' % (machine_type.key.id(), n))
+  machine_lease = yield machine_lease_key.get_async()
+
+  if not machine_lease:
+    yield create_machine_lease(machine_lease_key, machine_type)
+    return
+
+  # If there is a MachineLease, we may need to update it if the MachineType's
+  # lease properties have changed. It's only safe to update it if the current
+  # lease is fulfilled (indicated by the presence of lease_expiration_ts) so
+  # the changes only go into effect for the next lease request.
+  if machine_lease.lease_expiration_ts and (
+      machine_lease.early_release_secs != machine_type.early_release_secs
+      or machine_lease.lease_duration_secs != machine_type.lease_duration_secs
+      or machine_lease.mp_dimensions != machine_type.mp_dimensions
+  ):
+    yield update_machine_lease(machine_lease_key, machine_type)
 
 
 def machine_type_pb2_to_entity(pb2):
