@@ -90,6 +90,8 @@ class MachineLease(ndb.Model):
       machine_provider.Dimensions, indexed=False)
   # Last request number used.
   request_count = ndb.IntegerProperty(default=0, required=True)
+  # Base string to use as the request ID.
+  request_id_base = ndb.StringProperty(indexed=False)
   # Task ID for the termination task scheduled for this machine.
   termination_task = ndb.StringProperty(indexed=False)
 
@@ -134,6 +136,9 @@ def create_machine_lease(machine_lease_key, machine_type):
       early_release_secs=machine_type.early_release_secs,
       machine_type=machine_type.key,
       mp_dimensions=machine_type.mp_dimensions,
+      # Deleting and recreating the MachineLease needs a unique base request ID,
+      # otherwise it will hit old requests.
+      request_id_base='%s-%s' % (machine_lease_key.id(), utils.time_time()),
   ).put_async()
 
 
@@ -461,8 +466,13 @@ def update_client_request_id(key):
     return
 
   machine_lease.request_count += 1
-  machine_lease.client_request_id = '%s-%s-%s' % (
-      machine_lease.machine_type.id(), key.id(), machine_lease.request_count)
+  # TODO(smut): Remove transitional code once all existing MachineLease entites
+  # have request_id_base filled in.
+  if not machine_lease.request_id_base:
+    machine_lease.request_id_base = '%s-%s' % (
+        machine_lease.machine_type.id(), utils.time_time())
+  machine_lease.client_request_id = '%s-%s' % (
+      machine_lease.request_id_base, machine_lease.request_count)
   machine_lease.put()
 
 
