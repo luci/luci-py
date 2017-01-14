@@ -116,7 +116,7 @@ class StatisticsFramework(object):
         now = utils.utcnow()
       return count
     except (
-        datastore_errors.TransactionFailedError,
+        datastore_errors.Error,
         logservice.Error,
         DeadlineExceededError) as e:
       msg = (

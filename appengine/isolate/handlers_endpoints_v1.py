@@ -383,7 +383,11 @@ class IsolateService(remote.Service):
             'Embedded digest does not match provided data: '
             '(digest, size): (%r, %r); expected: %r' % (
                 digest, size, hash_content(content, namespace)))
-      entry.put()
+      try:
+        entry.put()
+      except datastore_errors.Error as e:
+        raise endpoints.InternalServerErrorException(
+            'Unable to store the entity: %s.' % e.__class__.__name__)
     else:
       # Enqueue verification task transactionally as the entity is stored.
       try:

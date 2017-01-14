@@ -409,7 +409,7 @@ def get_app_version():
   """Returns currently running version (not necessary a default one)."""
   # Sadly, this causes an RPC and when called too frequently, throws quota
   # errors.
-  return modules.get_current_version_name()
+  return modules.get_current_version_name() or 'N/A'
 
 
 @cache
