@@ -351,10 +351,10 @@ class SwarmingTasksService(remote.Service):
       apply_property_defaults(request.properties)
       task_request.init_new_request(
           request, acl.can_schedule_high_priority_tasks(), secret_bytes)
+
+      result_summary = task_scheduler.schedule_request(request, secret_bytes)
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
-
-    result_summary = task_scheduler.schedule_request(request, secret_bytes)
 
     previous_result = None
     if result_summary.deduped_from:
