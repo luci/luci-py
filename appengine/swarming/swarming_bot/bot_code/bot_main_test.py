@@ -489,6 +489,7 @@ class TestBotMain(net_utils.TestCase):
         self2.returncode = None
         self2._out_file = os.path.join(
             self.root_dir, 'w', 'task_runner_out.json')
+        cmd = cmd[:]
         expected = [
           sys.executable, bot_main.THIS_FILE, 'task_runner',
           '--swarming-server', url,
@@ -496,21 +497,21 @@ class TestBotMain(net_utils.TestCase):
           os.path.join(self.root_dir, 'w', 'task_runner_in.json'),
           '--out-file', self2._out_file,
           '--cost-usd-hour', '3600.0', '--start', '100.0',
-          '--min-free-space',
-          str(int(
-            os_utilities.get_desired_free_space(bot_main.THIS_FILE)*1024*1024)),
+          '--bot-file',
         ]
-        self.assertEqual(cmd[15], '--bot-file')
-        self.assertTrue(cmd[16].endswith('.json'))
-        del cmd[15:17]
+        # After than there may be --bot-file and --auth-params-file. Then --
+        # will be used to mark the separation of flags meant to be sent to
+        # run_isolated.
+        self.assertEqual(cmd[:len(expected)], expected)
+        del cmd[:len(expected)]
+        self.assertTrue(cmd.pop(0).endswith('.json'))
         if expected_auth_params_json:
           auth_params_file = os.path.join(
               self.root_dir, 'w', 'bot_auth_params.json')
           with open(auth_params_file, 'rb') as f:
             actual_auth_params = json.load(f)
           self.assertEqual(expected_auth_params_json, actual_auth_params)
-          expected.extend(['--auth-params-file', auth_params_file])
-        self.assertEqual(expected, cmd)
+          self.assertEqual(cmd[:2], ['--auth-params-file', auth_params_file])
         self.assertEqual(True, detached)
         self.assertEqual(self.bot.base_dir, cwd)
         self.assertEqual('24', env['SWARMING_TASK_ID'])

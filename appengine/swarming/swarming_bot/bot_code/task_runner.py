@@ -85,7 +85,7 @@ def get_run_isolated():
 
 
 def get_isolated_args(is_grpc, work_dir, task_details, isolated_result,
-                      bot_file, min_free_space):
+                      bot_file, run_isolated_flags):
   """Returns the command to call run_isolated. Mocked in tests."""
   assert (bool(task_details.command) !=
           bool(task_details.isolated and task_details.isolated.get('input')))
@@ -146,11 +146,8 @@ def get_isolated_args(is_grpc, work_dir, task_details, isolated_result,
         #'--use-symlinks',
         '--json', isolated_result,
         '--log-file', os.path.join(bot_dir, 'logs', 'run_isolated.log'),
-        '--cache', os.path.join(bot_dir, 'isolated_cache'),
         '--root-dir', work_dir,
       ])
-  if min_free_space:
-    cmd.extend(('--min-free-space', str(min_free_space)))
   if bot_file:
     cmd.extend(('--bot-file', bot_file))
 
@@ -158,6 +155,8 @@ def get_isolated_args(is_grpc, work_dir, task_details, isolated_result,
     cmd.extend(('--hard-timeout', str(task_details.hard_timeout)))
   if task_details.grace_period:
     cmd.extend(('--grace-period', str(task_details.grace_period)))
+
+  cmd.extend(run_isolated_flags)
 
   # TODO(nodir): Pass the command line arguments via a response file.
   cmd.append('--')
@@ -224,7 +223,7 @@ class InternalError(Exception):
 
 def load_and_run(
     in_file, swarming_server, is_grpc, cost_usd_hour, start, out_file,
-    min_free_space, bot_file, auth_params_file):
+    run_isolated_flags, bot_file, auth_params_file):
   """Loads the task's metadata, prepares auth environment and executes the task.
 
   This may throw all sorts of exceptions in case of failure. It's up to the
@@ -295,7 +294,7 @@ def load_and_run(
       with luci_context.write(_tmpdir=work_dir, **context_edits):
         task_result = run_command(
             remote, task_details, work_dir, cost_usd_hour,
-            start, min_free_space, bot_file)
+            start, run_isolated_flags, bot_file)
   except (ExitSignal, InternalError) as e:
     # This normally means run_command() didn't get the chance to run, as it
     # itself traps exceptions and will report accordingly. In this case, we want
@@ -384,7 +383,7 @@ def fail_without_command(remote, bot_id, task_id, params, cost_usd_hour,
 
 
 def run_command(remote, task_details, work_dir, cost_usd_hour,
-                task_start, min_free_space, bot_file):
+                task_start, run_isolated_flags, bot_file):
   """Runs a command and sends packets to the server to stream results back.
 
   Implements both I/O and hard timeouts. Sends the packets numbered, so the
@@ -421,7 +420,7 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
   cmd = get_run_isolated()
   cmd.extend(['-a', args_path])
   args = get_isolated_args(remote.is_grpc(), work_dir, task_details,
-                           isolated_result, bot_file, min_free_space)
+                           isolated_result, bot_file, run_isolated_flags)
   # Hard timeout enforcement is deferred to run_isolated. Grace is doubled to
   # give one 'grace_period' slot to the child process and one slot to upload
   # the results back.
@@ -653,16 +652,13 @@ def main(args):
       '--cost-usd-hour', type='float', help='Cost of this VM in $/h')
   parser.add_option('--start', type='float', help='Time this task was started')
   parser.add_option(
-      '--min-free-space', type='int',
-      help='Value to send down to run_isolated')
-  parser.add_option(
       '--bot-file', help='Path to a file describing the state of the host.')
   parser.add_option(
       '--auth-params-file',
       help='Path to a file with bot authentication parameters')
 
   options, args = parser.parse_args(args)
-  if not options.in_file or not options.out_file or args:
+  if not options.in_file or not options.out_file:
     parser.error('task_runner is meant to be used by swarming_bot.')
 
   on_error.report_on_exception_exit(options.swarming_server)
@@ -676,7 +672,7 @@ def main(args):
     load_and_run(
         options.in_file, options.swarming_server, options.is_grpc,
         options.cost_usd_hour, options.start, options.out_file,
-        options.min_free_space, options.bot_file, options.auth_params_file)
+        args, options.bot_file, options.auth_params_file)
     return 0
   finally:
     logging.info('quitting')

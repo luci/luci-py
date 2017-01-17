@@ -197,7 +197,7 @@ class TestTaskRunner(TestTaskRunnerBase):
                                               False)
     return task_runner.run_command(
         remote, task_details, self.work_dir, 3600.,
-        start, 1, '/path/to/file')
+        start, ['--min-free-space', '1'], '/path/to/file')
 
   def test_load_and_run_raw(self):
     FakeAuthSystem.local_auth_context = {'rpc_port': 123, 'secret': 'abcdef'}
@@ -205,7 +205,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     def run_command(
         remote, task_details, work_dir,
-        cost_usd_hour, start, min_free_space, bot_file):
+        cost_usd_hour, start, run_isolated_flags, bot_file):
       self.assertTrue(remote.uses_auth) # mainly to avoid "unused arg" warning
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       # Necessary for OSX.
@@ -213,7 +213,7 @@ class TestTaskRunner(TestTaskRunnerBase):
           os.path.realpath(self.work_dir), os.path.realpath(work_dir))
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
-      self.assertEqual(1, min_free_space)
+      self.assertEqual(['--min-free-space', '1'], run_isolated_flags)
       self.assertEqual('/path/to/bot-file', bot_file)
       self.assertDictEqual(luci_context.read('local_auth'),
                            {'rpc_port': 123, 'secret': 'abcdef'})
@@ -243,8 +243,9 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     out_file = os.path.join(self.root_dir, 'w', 'task_runner_out.json')
     task_runner.load_and_run(
-        manifest, 'localhost:1', False, 3600., time.time(), out_file, 1,
-        '/path/to/bot-file', '/path/to/auth-params-file')
+        manifest, 'localhost:1', False, 3600., time.time(), out_file,
+        ['--min-free-space', '1'], '/path/to/bot-file',
+        '/path/to/auth-params-file')
     expected = {
       u'exit_code': 1,
       u'hard_timeout': False,
@@ -263,7 +264,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     def run_command(
         remote, task_details, work_dir,
-        cost_usd_hour, start, min_free_space, bot_file):
+        cost_usd_hour, start, run_isolated_flags, bot_file):
       self.assertTrue(remote.uses_auth) # mainly to avoid unused arg warning
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       # Necessary for OSX.
@@ -271,7 +272,7 @@ class TestTaskRunner(TestTaskRunnerBase):
           os.path.realpath(self.work_dir), os.path.realpath(work_dir))
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
-      self.assertEqual(1, min_free_space)
+      self.assertEqual(['--min-free-space', '1'], run_isolated_flags)
       self.assertEqual('/path/to/bot-file', bot_file)
       self.assertIsNone(luci_context.read('local_auth'))
       return {
@@ -304,8 +305,9 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     out_file = os.path.join(self.root_dir, 'w', 'task_runner_out.json')
     task_runner.load_and_run(
-        manifest, 'localhost:1', False, 3600., time.time(), out_file, 1,
-        '/path/to/bot-file', '/path/to/auth-params-file')
+        manifest, 'localhost:1', False, 3600., time.time(), out_file,
+        ['--min-free-space', '1'], '/path/to/bot-file',
+        '/path/to/auth-params-file')
     expected = {
       u'exit_code': 0,
       u'hard_timeout': False,
@@ -387,7 +389,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.mock(
         task_runner, 'get_isolated_args',
         lambda _is_grpc, _work_dir, _details, isolated_result,
-          bot_file, min_free_space:
+          bot_file, run_isolated_flags:
           [isolated_result])
     expected = {
       u'exit_code': 0,
@@ -614,14 +616,14 @@ class TestTaskRunner(TestTaskRunnerBase):
   def test_main(self):
     def load_and_run(
         manifest, swarming_server, is_grpc, cost_usd_hour, start,
-        json_file, min_free_space, bot_file, auth_params_file):
+        json_file, run_isolated_flags, bot_file, auth_params_file):
       self.assertEqual('foo', manifest)
       self.assertEqual('http://localhost', swarming_server)
       self.assertFalse(is_grpc)
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
       self.assertEqual('task_summary.json', json_file)
-      self.assertEqual(1, min_free_space)
+      self.assertEqual(['--min-free-space', '1'], run_isolated_flags)
       self.assertEqual('/path/to/bot-file', bot_file)
       self.assertEqual('/path/to/auth-params-file', auth_params_file)
 
@@ -632,23 +634,24 @@ class TestTaskRunner(TestTaskRunnerBase):
       '--out-file', 'task_summary.json',
       '--cost-usd-hour', '3600',
       '--start', str(time.time()),
-      '--min-free-space', '1',
       '--bot-file', '/path/to/bot-file',
       '--auth-params-file', '/path/to/auth-params-file',
+      '--',
+      '--min-free-space', '1',
     ]
     self.assertEqual(0, task_runner.main(cmd))
 
   def test_main_grpc(self):
     def load_and_run(
         manifest, swarming_server, is_grpc, cost_usd_hour, start,
-        json_file, min_free_space, bot_file, auth_params_file):
+        json_file, run_isolated_flags, bot_file, auth_params_file):
       self.assertEqual('foo', manifest)
       self.assertEqual('http://localhost', swarming_server)
       self.assertTrue(is_grpc)
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
       self.assertEqual('task_summary.json', json_file)
-      self.assertEqual(1, min_free_space)
+      self.assertEqual(['--min-free-space', '1'], run_isolated_flags)
       self.assertEqual('/path/to/bot-file', bot_file)
       self.assertEqual('/path/to/auth-params-file', auth_params_file)
 
@@ -659,10 +662,11 @@ class TestTaskRunner(TestTaskRunnerBase):
       '--out-file', 'task_summary.json',
       '--cost-usd-hour', '3600',
       '--start', str(time.time()),
-      '--min-free-space', '1',
       '--bot-file', '/path/to/bot-file',
       '--auth-params-file', '/path/to/auth-params-file',
       '--is-grpc',
+      '--',
+      '--min-free-space', '1',
     ]
     self.assertEqual(0, task_runner.main(cmd))
 
@@ -761,7 +765,8 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       json.dump(manifest, f)
     out_file = os.path.join(self.work_dir, 'task_runner_out.json')
     task_runner.load_and_run(
-        in_file, server, False, 3600., time.time(), out_file, 1, None, None)
+        in_file, server, False, 3600., time.time(), out_file,
+        ['--min-free-space', '1'], None, None)
     with open(out_file, 'rb') as f:
       return json.load(f)
 
@@ -770,8 +775,8 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     remote = remote_client.createRemoteClient('https://localhost:1', None,
                                               False)
     return task_runner.run_command(
-        remote, task_details, self.work_dir, 3600., time.time(), 1,
-        '/path/to/file')
+        remote, task_details, self.work_dir, 3600., time.time(),
+        ['--min-free-space', '1'], '/path/to/file')
 
   def test_hard(self):
     # Actually 0xc000013a
@@ -1199,6 +1204,8 @@ class TaskRunnerSmoke(unittest.TestCase):
       '--cost-usd-hour', '1',
       # Include the time taken to poll the task in the cost.
       '--start', str(time.time()),
+      '--',
+      '--cache', 'isolated_cache_party',
     ]
     logging.info('%s', cmd)
     proc = subprocess42.Popen(cmd, cwd=self.root_dir, detached=True)
@@ -1240,7 +1247,7 @@ class TaskRunnerSmoke(unittest.TestCase):
       'swarming_bot.1.zip',
       '4e019f31778ba7191f965469dc673280386bbd60-cacert.pem',
       'w',
-      'isolated_cache',
+      'isolated_cache_party',
       'logs',
       'c',
     }

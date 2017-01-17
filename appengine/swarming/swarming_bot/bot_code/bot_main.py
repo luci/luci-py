@@ -381,6 +381,18 @@ def cleanup_bot_directory(botobj):
           'Failed to remove %s from bot\'s directory: %s' % (i, e))
 
 
+def run_isolated_flags(botobj):
+  """Returns flags to pass to run_isolated.
+
+  These are not meant to be processed by task_runner.py.
+  """
+  return [
+    '--cache', os.path.join(botobj.base_dir, 'isolated_cache'),
+    '--min-free-space', str(get_desired_free_space(botobj)),
+    '--named-cache-root', os.path.join(botobj.base_dir, 'c'),
+  ]
+
+
 def clean_cache(botobj):
   """Asks run_isolated to clean its cache.
 
@@ -395,10 +407,8 @@ def clean_cache(botobj):
     sys.executable, THIS_FILE, 'run_isolated',
     '--clean',
     '--log-file', os.path.join(botobj.base_dir, 'logs', 'run_isolated.log'),
-    '--cache', os.path.join(botobj.base_dir, 'isolated_cache'),
-    '--named-cache-root', os.path.join(botobj.base_dir, 'c'),
-    '--min-free-space', str(get_desired_free_space(botobj)),
   ]
+  cmd.extend(run_isolated_flags(botobj))
   logging.info('Running: %s', cmd)
   try:
     # Intentionally do not use a timeout, it can take a while to hash 50gb but
@@ -734,13 +744,16 @@ def run_manifest(botobj, manifest, start):
       '--cost-usd-hour', str(botobj.state.get('cost_usd_hour') or 0.),
       # Include the time taken to poll the task in the cost.
       '--start', str(start),
-      '--min-free-space', str(get_desired_free_space(botobj)),
       '--bot-file', bot_file,
     ]
     if botobj.remote.uses_auth:
       command.extend(['--auth-params-file', auth_params_file])
     if is_grpc:
       command.append('--is-grpc')
+    # Flags for run_isolated.py are passed through by task_runner.py as-is
+    # without interpretation.
+    command.append('--')
+    command.extend(run_isolated_flags(botobj))
     logging.debug('Running command: %s', command)
 
     # Put the output file into the current working directory, which should be
