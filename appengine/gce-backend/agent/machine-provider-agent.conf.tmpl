@@ -8,7 +8,7 @@ start on net-device-up IFACE!=lo
 stop on shutdown
 
 script
-  /opt/machine-provider/agent/agent.py
+  ${agent}
 end script
 
 respawn
