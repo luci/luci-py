@@ -5,6 +5,7 @@
 
 """Machine Provider agent for GCE instances."""
 
+import argparse
 import base64
 import datetime
 import httplib2
@@ -15,6 +16,7 @@ import os
 import pwd
 import shutil
 import socket
+import string
 import subprocess
 import sys
 import tempfile
@@ -29,6 +31,10 @@ THIS_DIR = os.path.dirname(__file__)
 LOG_DIR = os.path.join(THIS_DIR, 'logs')
 LOG_FILE = os.path.join(LOG_DIR, '%s.log' % os.path.basename(__file__))
 
+AGENT_UPSTART_CONFIG_DEST = '/etc/init/machine-provider-agent.conf'
+AGENT_UPSTART_CONFIG_TMPL = os.path.join(
+    THIS_DIR, 'machine-provider-agent.conf.tmpl')
+AGENT_UPSTART_JOB = 'machine-provider-agent'
 CHROME_BOT = 'chrome-bot'
 LEASE_EXPIRATION_FILE = '/b/lease_expiration_ts'
 METADATA_BASE_URL = 'http://metadata/computeMetadata/v1'
@@ -209,10 +215,8 @@ class PubSub(object):
     return json.loads(content)
 
 
-def main():
+def listen():
   """Listens for Cloud Pub/Sub communication."""
-  configure_logging()
-
   # Attributes tell us what subscription has been created for us to listen to.
   project = get_metadata('instance/attributes/pubsub_subscription_project')
   service_account = get_metadata('instance/attributes/pubsub_service_account')
@@ -280,6 +284,49 @@ def main():
     if time.time() - start_time < 1:
       # Iterate at most once per second (chosen arbitrarily).
       time.sleep(1)
+
+
+def install():
+  """Installs Upstart config for the Machine Provider agent."""
+  with open(AGENT_UPSTART_CONFIG_TMPL) as f:
+    template = f.read()
+  config = string.Template(template).substitute(
+      agent=os.path.abspath(__file__))
+
+  if os.path.exists(AGENT_UPSTART_CONFIG_DEST):
+    with open(AGENT_UPSTART_CONFIG_DEST) as f:
+      existing_config = f.read()
+    if config == existing_config:
+      logging.info('Already installed: %s', AGENT_UPSTART_CONFIG_DEST)
+      return
+    else:
+      logging.info('Reinstalling: %s', AGENT_UPSTART_CONFIG_DEST)
+      os.remove(AGENT_UPSTART_CONFIG_DEST)
+  else:
+    logging.info('Installing: %s', AGENT_UPSTART_CONFIG_DEST)
+
+  with open(AGENT_UPSTART_CONFIG_DEST, 'wb') as f:
+    f.write(config)
+  subprocess.check_call(['initctl', 'reload-configuration'])
+  subprocess.check_call(['start', AGENT_UPSTART_JOB])
+
+
+def main():
+  configure_logging()
+
+  parser = argparse.ArgumentParser()
+  parser.add_argument(
+      '-i',
+      '--install',
+      action='store_true',
+      help='Install Upstart config for the Machine Provider agent.',
+  )
+  args = parser.parse_args()
+
+  if args.install:
+    return install()
+
+  return listen()
 
 
 if __name__ == '__main__':
