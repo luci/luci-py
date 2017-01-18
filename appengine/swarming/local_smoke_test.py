@@ -580,6 +580,74 @@ class Test(unittest.TestCase):
     finally:
       os.remove(tmp)
 
+  def test_local_cache(self):
+    # First task creates the cache, second copy the content to the output
+    # directory. Each time it's the exact same script.
+    script = '\n'.join((
+      'import os, shutil, sys',
+      'if not os.path.islink("p/b"):',
+      '  print("p/b is not a symlink")',
+      '  sys.exit(1)',
+      'p = "p/b/a.txt"',
+      'if not os.path.isfile(p):',
+      '  with open(p, "wb") as f:',
+      '    f.write("Yo!")',
+      'else:',
+      '  shutil.copy(p, sys.argv[1])',
+      'print "hi"'))
+    sizes = sorted([len(script), 200])
+    expected_summary = self.gen_expected(
+      name=u'cache_first',
+      performance_stats={
+        u'isolated_download': {
+          u'initial_number_items': u'0',
+          u'initial_size': u'0',
+          u'items_cold': sizes,
+          u'items_hot': [],
+        },
+        u'isolated_upload': {
+          u'items_cold': [],
+          u'items_hot': [],
+        },
+      },
+    )
+    self._run_isolated(
+        script, 'cache_first',
+        ['--named-cache', 'fuu', 'p/b', '--', '${ISOLATED_OUTDIR}/yo'],
+        expected_summary, {})
+
+    # Second run with a cache available.
+    out = {
+      u'isolated': u'63fc667fd217ebabdf60ca143fe25998b5ea5c77',
+      u'isolatedserver': u'http://localhost:10050',
+      u'namespace': u'default-gzip',
+      u'view_url':
+        u'http://localhost:10050/browse?namespace=default-gzip'
+          u'&hash=63fc667fd217ebabdf60ca143fe25998b5ea5c77',
+    }
+    expected_summary = self.gen_expected(
+      name=u'cache_second',
+      isolated_out=out,
+      outputs_ref=out,
+      performance_stats={
+        u'isolated_download': {
+          u'initial_number_items': unicode(len(sizes)),
+          u'initial_size': unicode(sum(sizes)),
+          u'items_cold': [],
+          u'items_hot': sizes,
+        },
+        u'isolated_upload': {
+          u'items_cold': [3, 110],
+          u'items_hot': [],
+        },
+      },
+    )
+    self._run_isolated(
+        script, 'cache_second',
+        ['--named-cache', 'fuu', 'p/b', '--', '${ISOLATED_OUTDIR}/yo'],
+        expected_summary,
+        {'0/yo': 'Yo!'})
+
   def _run_isolated(self, hello_world, name, args, expected_summary,
       expected_files):
     # Shared code for all test_isolated_* test cases.

@@ -6,6 +6,7 @@
 """Starts a local bot to connect to a local server."""
 
 import glob
+import logging
 import os
 import signal
 import socket
@@ -38,12 +39,13 @@ class LocalBot(object):
 
   def wipe_cache(self):
     """Blows away this bot's cache."""
-    cache_dir = os.path.join(self._tmpdir, 'isolated_cache')
-    if os.path.exists(cache_dir):
-      try:
-        file_path.rmtree(cache_dir)
-      except OSError:
-        pass
+    for i in ('c', 'isolated_cache'):
+      cache_dir = os.path.join(self._tmpdir, i)
+      if os.path.exists(cache_dir):
+        try:
+          file_path.rmtree(cache_dir)
+        except OSError:
+          logging.info('Failed to deleted %s', cache_dir)
 
   @property
   def bot_id(self):
