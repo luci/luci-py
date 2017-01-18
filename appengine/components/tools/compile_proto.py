@@ -22,7 +22,7 @@ THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 # Minimally required protoc version.
 MIN_SUPPORTED_PROTOC_VERSION = (3, 0, 0)
 # Maximally supported protoc version.
-MAX_SUPPORTED_PROTOC_VERSION = (3, 0, 0)
+MAX_SUPPORTED_PROTOC_VERSION = (3, 1, 0)
 
 
 # Printed if protoc is missing or too old.
