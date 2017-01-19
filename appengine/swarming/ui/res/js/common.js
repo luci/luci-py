@@ -6,6 +6,17 @@ this.swarming = this.swarming || function() {
 
   var swarming = {};
 
+  // return the longest string in an array
+  swarming.longest = function(arr) {
+      var most = "";
+      for(var i = 0; i < arr.length; i++) {
+        if (arr[i] && arr[i].length > most.length) {
+          most = arr[i];
+        }
+      }
+      return most;
+    };
+
   // naturalCompare tries to use natural sorting (e.g. sort ints by value).
   swarming.naturalCompare = function(a, b) {
     // Try numeric, aka "natural" sort and use it if ns is not NaN.

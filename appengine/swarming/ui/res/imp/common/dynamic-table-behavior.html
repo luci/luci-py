@@ -238,19 +238,19 @@
             var gpus = this._attribute(bot, "gpu", "none");
             var verbose = []
             var named = [];
-            // non-verbose mode has only the top level GPU info "e.g. NVidia"
-            // which is found by looking for gpu ids w/o a colon.
+            // non-verbose mode has only the top level full GPU names "e.g. NVidia GTX 660"
+            // which is found by looking for gpu ids w/ a colon.
             gpus.forEach(function(g){
               var alias = swarming.alias.gpu(g);
               if (alias === "unknown") {
                 verbose.push(g);
-                if (g.indexOf(":") === -1) {
+                if (g.indexOf(":") !== -1) {
                   named.push(g);
                 }
                 return;
               }
               verbose.push(swarming.alias.apply(g, alias));
-              if (g.indexOf(":") === -1) {
+              if (g.indexOf(":") !== -1) {
                 named.push(swarming.alias.apply(g, alias));
               }
             }.bind(this))
@@ -259,10 +259,17 @@
             }
             return named.join(" | ");
           },
+          os: function(bot) {
+            if (this._verbose) {
+              return this._attribute(bot, "os", "none").join(" | ");
+            }
+            return swarming.longest(this._attribute(bot, "os", "none"));
+          },
           pool: function(bot) {
             var pool = this._attribute(bot, "pool");
             return pool.join(" | ");
           },
+
         };
       },
 

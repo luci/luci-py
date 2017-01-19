@@ -328,7 +328,11 @@
         return "";
       },
       device_os: function(bot) {
-        return this._attribute(bot, "device_os", "none").join(" | ");
+        if (this._verbose) {
+          return this._attribute(bot, "device_os", "none").join(" | ");
+        }
+        // This assumes that all devices hooked up to a bot are the same OS.
+        return swarming.longest(this._attribute(bot, "device_os", "none"));
       },
       disk_space: function(bot) {
         var aliased = [];
