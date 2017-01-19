@@ -8,7 +8,15 @@
   background-color: #fff;
 }
 .tooltip-inner {
+  max-width: 400px;
   text-align: left;
+}
+.change-log-who {
+  display: inline-block;
+  width: 280px;
+  white-space: nowrap;
+  overflow:hidden !important;
+  text-overflow: ellipsis;
 }
 </style>
 
@@ -22,9 +30,9 @@ javascript library and not jinja2. #}
     <thead>
       <tr>
         <th style="width: 80px">Rev</th>
-        <th style="width: 260px">Change</th>
+        <th style="width: 250px">Change</th>
         <th style="width: 200px">When</th>
-        <th style="width: 260px">Who</th>
+        <th style="width: 280px">Who</th>
         <th>What</th>
       </tr>
     </thead>
@@ -42,7 +50,7 @@ javascript library and not jinja2. #}
           </div>
         </td>
         <td>{{when}}</td>
-        <td>{{who}}</td>
+        <td class="change-log-who">{{who}}</td>
         <td><a href="{{changeLogURL}}">{{targetTitle}}</a></td>
       </tr>
       {{/each}}
