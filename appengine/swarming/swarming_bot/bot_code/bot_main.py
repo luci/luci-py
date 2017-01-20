@@ -82,6 +82,25 @@ PASSLIST = (
   'swarming_bot.zip',
 )
 
+
+# These settings are documented in ../config/bot_config.py.
+# Keep in sync with ../config/bot_config.py. This is enforced by a unit test.
+DEFAULT_SETTINGS = {
+  'free_partition': {
+    'size': 4 * 1024*1024*1024,
+    'max_percent': 15.,
+    'min_percent': 5.,
+    'wiggle': 250 * 1024*1024,
+  },
+  'caches': {
+    'isolated': {
+      'size': 50 * 1024*1024*1024,
+      'items': 50*1024,
+    },
+  },
+}
+
+
 ### bot_config handler part.
 
 
@@ -148,6 +167,32 @@ def get_dimensions(botobj):
         }
 
 
+def get_settings(botobj):
+  """Returns settings for this bot.
+
+  The way used to make it work safely is to take the default settings, then
+  merge the custom settings. This way, a user can only specify a subset of the
+  desired settings.
+
+  The function won't alert on unknown settings. This is so bot_config.py can be
+  updated in advance before pushing new bot_main.py. The main drawback is that
+  it will make typos silently fail. CHECK FOR TYPOS in get_settings() in your
+  bot_config.py.
+  """
+  settings = None
+  try:
+    from config import bot_config
+    if hasattr(bot_config, 'get_settings'):
+      settings = bot_config.get_settings(botobj)
+      if not isinstance(settings, dict):
+        raise TypeError()
+    settings = dict_deep_merge(DEFAULT_SETTINGS, settings)
+  except Exception:
+    logging.exception('get_settings() failed')
+    return DEFAULT_SETTINGS
+  return settings
+
+
 @log_call()
 def get_state(botobj, sleep_streak):
   """Returns dict with a state of the bot reported to the server with each poll.
@@ -173,6 +218,41 @@ def get_state(botobj, sleep_streak):
     state['quarantined'] = 'Can\'t run from blacklisted directory'
 
   state['sleep_streak'] = sleep_streak
+  if not state.get('quarantined') and botobj:
+    # Quarantines when there's not enough free space on either root partition or
+    # the current partition the bot is running in.
+    settings = get_settings(botobj)['free_partition']
+    # On Windows, drive letters are always lower case.
+    root = 'c:\\' if sys.platform == 'win32' else '/'
+    # Reuse the data from 'state/disks'
+    disks = state.get(u'disks', {})
+
+    s = []
+    def check_for_quarantine(r, i):
+      min_free = min_free_disk(i, settings)
+      if int(i[u'free_mb']*1024*1024) < min_free:
+        s.append(
+            'Not enough free disk space on %s. %.1fmib < %.1fmib' %
+            (r, i[u'free_mb'], round(min_free / 1024. / 1024., 1)))
+
+    # root may be missing in the case of netbooted devices.
+    if root in disks:
+      check_for_quarantine(root, disks[root])
+    # Try again with the bot's base directory. It is frequent to run the bot
+    # from a secondary partition, to reduce the risk of OS failure due to full
+    # root partition.
+    # This code is similar to os_utilities.get_disk_size().
+    path = botobj.base_dir
+    case_insensitive = sys.platform in ('darwin', 'win32')
+    if case_insensitive:
+      path = path.lower()
+    for mount, infos in sorted(disks.iteritems(), key=lambda x: -len(x[0])):
+      if path.startswith(mount.lower() if case_insensitive else mount):
+        if mount != root:
+          check_for_quarantine(mount, infos)
+        break
+    if s:
+      state[u'quarantined'] = '\n'.join(s)
   return state
 
 
@@ -245,17 +325,47 @@ def get_authentication_headers(botobj):
 ### end of bot_config handler part.
 
 
+def min_free_disk(infos, settings):
+  """Returns the calculated minimum free disk space for this partition.
+
+  See get_settings() in ../config/bot_config.py for an explanation.
+  """
+  size = int(infos[u'size_mb']*1024*1024)
+  x1 = settings['size'] or 0
+  x2 = int(round(size * float(settings['max_percent'] or 0) * 0.01))
+  # Select the lowest non-zero value.
+  x = min(x1, x2) if (x1 and x2) else (x1 or x2)
+  # Select the maximum value.
+  return max(x, int(round(size * float(settings['min_percent'] or 0) * 0.01)))
+
+
+def dict_deep_merge(x, y):
+  """Returns the union of x and y.
+
+  y takes predescence.
+  """
+  if x is None:
+    return y
+  if y is None:
+    return x
+  if isinstance(x, dict):
+    if isinstance(y, dict):
+      return {k: dict_deep_merge(x.get(k), y.get(k)) for k in set(x).union(y)}
+    assert y is None, repr(y)
+    return x
+  if isinstance(y, dict):
+    assert x is None, repr(x)
+    return y
+  # y is overriding x.
+  return y
+
+
 def is_base_dir_ok(botobj):
   """Returns False if the bot must be quarantined at all cost."""
   if not botobj:
     # This can happen very early in the process lifetime.
     return os.path.dirname(THIS_FILE) != os.path.expanduser('~')
   return botobj.base_dir != os.path.expanduser('~')
-
-
-def get_desired_free_space(botobj):
-  """Returns free disk space needed (in bytes)."""
-  return int(os_utilities.get_desired_free_space(botobj.base_dir) * 1024 * 1024)
 
 
 def generate_version():
@@ -386,10 +496,18 @@ def run_isolated_flags(botobj):
 
   These are not meant to be processed by task_runner.py.
   """
+  settings = get_settings(botobj)
+  partition = settings['free_partition']
+  size = os_utilities.get_disk_size(THIS_FILE)
+  min_free = (
+      min_free_disk({'size_mb': size/1024./1024.}, partition) +
+      partition['wiggle'])
   return [
     '--cache', os.path.join(botobj.base_dir, 'isolated_cache'),
-    '--min-free-space', str(get_desired_free_space(botobj)),
+    '--min-free-space', str(min_free),
     '--named-cache-root', os.path.join(botobj.base_dir, 'c'),
+    '--max-cache-size', str(settings['caches']['isolated']['size']),
+    '--max-items', str(settings['caches']['isolated']['items']),
   ]
 
 

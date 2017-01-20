@@ -236,6 +236,10 @@ are classified by a few categories via their prefix:
         methods based on where it runs. This should match to what the server
         expects to see (as defined by bots.cfg, see `require_*` fields in
         [bots.proto](../proto/bots.proto)).
+    *   `get_settings` returns "settings" to setup specific settings, e.g.
+        minimum free space to keep, maximum number of items to keep in the
+        cache, etc. See [bot_config.py](../swarming_bot/config/bot_config.py)
+        default implementation for the keys.
 *   `setup_bot` is the only hook that is expected to modify its host. It is
     called on the initial startup and just before shutdown, to ensure the bot
     configured the host well so it will return properly upon host restart.

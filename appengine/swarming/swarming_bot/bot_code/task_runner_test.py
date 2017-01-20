@@ -927,8 +927,11 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
 
     def check_final(kwargs):
       # Warning: this modifies input arguments.
+      # Makes the diffing easier.
+      kwargs['data']['output'] = base64.b64decode(kwargs['data']['output'])
       self.assertLess(0, kwargs['data'].pop('cost_usd'))
-      self.assertLess(0, kwargs['data'].pop('bot_overhead'))
+      self.assertLess(
+          0, kwargs['data'].pop('bot_overhead', None), kwargs['data'])
       self.assertLess(0, kwargs['data'].pop('duration'))
       self.assertLess(
           0., kwargs['data']['isolated_stats']['download'].pop('duration'))
@@ -936,8 +939,6 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       # resolution, 15.6ms.
       self.assertLessEqual(
           0., kwargs['data']['isolated_stats']['upload'].pop('duration'))
-      # Makes the diffing easier.
-      kwargs['data']['output'] = base64.b64decode(kwargs['data']['output'])
       for k in ('download', 'upload'):
         for j in ('items_cold', 'items_hot'):
           kwargs['data']['isolated_stats'][k][j] = large.unpack(

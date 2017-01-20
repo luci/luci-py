@@ -55,6 +55,61 @@ def get_dimensions(bot):
   return os_utilities.get_dimensions()
 
 
+def get_settings(bot):
+  """Returns settings for this bot.
+
+  This function should be fast and mostly (preferably) constant.
+  """
+  # Here is the default values. Keep in sync with the default values in
+  # ../bot_code/bot_main.py.
+  return {
+    # Free partition (disk) space to keep and to self-quarantine on.
+    #
+    # The exact minimum free space can be calculated with:
+    #   max(disk_size * 'min_percent', min('size', disk_size * 'max_percent'))
+    # where 'min_percent' and 'percent' are relative to the total partition
+    # size. Setting any value to 0 disables this setting. In practice, with the
+    # default values:
+    # - For disks <27GB this will be "disk_size * max_percent"
+    # - For disks 27GB-80GB this will be 4GB
+    # - For disks >80GB this will be "disk_size * min_percent"
+    #
+    # When trimming the cache, 'wiggle' is added to the value selected above.
+    #
+    # The partitions checked for self-quarantine are the root partition (/ on
+    # POSIX, C:\ on Windows) and the partition containing swarming_bot.zip.
+    'free_partition': {
+      # Minimum free space in bytes to use, if lower than 'max_percent'.
+      'size': 4 * 1024*1024*1024,
+      # Maximum free space in percent to ensure to keep free, if lower than
+      # 'size'.
+      'max_percent': 15.,
+      # Minimum of of free space percentage, even if higher than 'size'.
+      'min_percent': 5.,
+      # Number of bytes to add to the minimum value selected above when
+      # calculating the isolated cache trimming. This is to ensure that system
+      # level processes writing logs and such do not cause to criss the
+      # self-quarantine line while the bot is idle.
+      'wiggle': 250 * 1024*1024,
+    },
+    # Local caches settings.
+    'caches': {
+      # Local isolated cache settings, used for isolated tasks. The cache actual
+      # size is bounded by the lesser of all 3:
+      # - The cache total size in bytes
+      # - The number of items in the cache
+      # - The cache is further trimmed until 'free_partition' value is
+      #   respected.
+      'isolated': {
+        # Maximum local isolated cache size in bytes.
+        'size': 50 * 1024*1024*1024,
+        # Maximum number of items in the local isolated cache.
+        'items': 50*1024,
+      },
+    },
+  }
+
+
 def get_state(bot):
   # pylint: disable=line-too-long
   """Returns dict with a state of the bot reported to the server with each poll.

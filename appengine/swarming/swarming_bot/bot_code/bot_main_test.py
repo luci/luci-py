@@ -142,6 +142,78 @@ class TestBotMain(net_utils.TestCase):
                      sorted(actual.pop('temp', {})))
     self.assertEqual(expected, actual)
 
+  def test_get_state_quarantine(self):
+    botobj = bot_main.get_bot()
+    root = u'c:\\' if sys.platform == 'win32' else u'/'
+    def get_state(_):
+      return {
+        u'disks': {
+          root: {
+            u'free_mb': 0.1,
+            u'size_mb': 1000,
+          },
+          botobj.base_dir: {
+            u'free_mb': 0.1,
+            u'size_mb': 1000,
+          },
+        },
+      }
+    # This uses the default get_settings() values. The threshold used is
+    # dependent on these values. This affects the error message below.
+    # 'size' == 4096Mb
+    # 'max_percent' == 15% * 1000Mb = 150Mb
+    # 'min_percent' == 5% of 1000Mb == 50Mb
+    # 'max_percent' is chosen.
+    from config import bot_config
+    self.mock(bot_config, 'get_state', get_state)
+    expected = {
+      u'disks': {
+        u'c:\\' if sys.platform == 'win32' else u'/': {
+          u'free_mb': 0.1,
+          u'size_mb': 1000,
+        },
+        botobj.base_dir: {
+          u'free_mb': 0.1,
+          u'size_mb': 1000,
+        },
+      },
+      u'quarantined':
+        (u'Not enough free disk space on %s. 0.1mib < 150.0mib\n'
+        u'Not enough free disk space on %s. 0.1mib < 150.0mib') %
+        (root, botobj.base_dir),
+      'sleep_streak': 1,
+    }
+    self.assertEqual(expected, bot_main.get_state(botobj, 1))
+
+  def test_default_settings(self):
+    # If this trigger, you either forgot to update bot_main.py or bot_config.py.
+    from config import bot_config
+    self.assertEqual(bot_main.DEFAULT_SETTINGS, bot_config.get_settings(None))
+
+  def test_dict_deep_merge(self):
+    a = {
+      'a': {
+        'a': 1,
+        'b': 2,
+      },
+    }
+    b = {
+      'a': {
+        'b': 3,
+        'c': 4,
+      },
+    }
+    expected = {
+      'a': {
+        'a': 1,
+        'b': 3,
+        'c': 4,
+      },
+    }
+    self.assertEqual(expected, bot_main.dict_deep_merge(a, b))
+    self.assertEqual(a, bot_main.dict_deep_merge(a, None))
+    self.assertEqual(a, bot_main.dict_deep_merge(None, a))
+
   def test_setup_bot(self):
     setup_bots = []
     def setup_bot(_bot):

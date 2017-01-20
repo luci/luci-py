@@ -44,43 +44,6 @@ from third_party.oauth2client import client
 cached = tools.cached
 
 
-# Global configurable values. These are meant to be the default values under
-# which the bot will self-quarantine when the disk size is too small. Setting
-# either of the following value to 0 or None disables self-quarantine.
-# Self-quarantine only happens when the free disk space is below the lower of
-# the two thresholds. It means that for sufficiently large disks THRESHOLD_MB is
-# the actual threshold (for them disk_size * THRESHOLD_RELATIVE > THRESHOLD_MB).
-
-# THRESHOLD_MB is the number of MiB below which the bot will quarantine itself
-# automatically.
-THRESHOLD_MB = 4*1024
-
-# THRESHOLD_RELATIVE is the minimum free space percentage under which the bot
-# will quarantine itself automatically.
-#
-# This threshold is effectively disabled for large disks (ones with
-# disk_size * THRESHOLD_RELATIVE > THRESHOLD_MB), since THRESHOLD_MB takes
-# precedence there (being smaller).
-THRESHOLD_RELATIVE = 0.15
-
-# DESIRED_FREE_DISK_SPACE is percentage of a disk to strive to keep available
-# (e.g. by trimming the isolate cache appropriately).
-#
-# If disk_size * DESIRED_FREE_DISK_SPACE is lower than self-quarantine threshold
-# (defined above), the self-quarantine threshold will be used instead. Will also
-# always add 250 MiB as an additional slack space for logs, temporary files etc.
-#
-# The goal is to always have some percentage of the disk available above
-# the self-quarantine threshold.
-#
-# The default values in practice mean:
-#   * For large disks (>27GB): try to keep 5%+250MB of disk free,
-#     self-quarantine if the free disk space is below 4GB.
-#   * For small disks (<27GB): try to keep 15%+250MB of disk free,
-#     self-quarantine if the free disk space is below 15%.
-DESIRED_FREE_DISK_SPACE = 0.05
-
-
 # https://cloud.google.com/compute/pricing#machinetype
 GCE_MACHINE_COST_HOUR_US = {
   u'n1-standard-1': 0.050,
@@ -393,25 +356,6 @@ def get_disk_size(path):
       return size_mb
   # We have no idea.
   return 0.
-
-
-@tools.cached
-def get_min_free_space(path):
-  """Returns the minimum free space (in MiB) required to not self-quarantine.
-
-  Returns 0 when disabled.
-  """
-  return min(THRESHOLD_MB or 0, get_disk_size(path) * THRESHOLD_RELATIVE or 0)
-
-
-@tools.cached
-def get_desired_free_space(path):
-  """Returns the disk space (in MiB) to strive to keep available."""
-  mb = get_disk_size(path) * DESIRED_FREE_DISK_SPACE  # this can be 0
-  threshold = get_min_free_space(path)
-  if mb < threshold:
-    mb = threshold
-  return mb + 250
 
 
 @tools.cached
@@ -948,7 +892,7 @@ def get_dimensions():
   return dimensions
 
 
-def get_state(skip=None):
+def get_state():
   """Returns dict with a state of the bot reported to the server with each poll.
 
   Supposed to be use only for dynamic state that changes while bot is running.
@@ -956,10 +900,6 @@ def get_state(skip=None):
   The server can not use this state for immediate scheduling purposes (use
   'dimensions' for that), but it can use it for maintenance and bookkeeping
   tasks.
-
-  Arguments:
-  - skip: list of partitions to skip for automatic quarantining on low free
-        space.
   """
   # TODO(vadimsh): Send number of open file descriptors, processes or any other
   # leaky resources. So that the server can decided to reboot the bot to clean
@@ -1008,35 +948,7 @@ def get_state(skip=None):
     state[u'quarantined'] = 'Failed to access TEMP (%s)' % tmpdir
   elif nb_files_in_temp > 1024:
     state[u'quarantined'] = '> 1024 files in TEMP (%s)' % tmpdir
-  auto_quarantine_on_low_space(state, skip)
   return state
-
-
-def auto_quarantine_on_low_space(state, skip=None):
-  """Quarantines when there's not enough free space on any partition.
-
-  It will quarantine only if both THRESHOLD_MB, as the total free space and
-  THRESHOLD_RELATIVE, as the free space fraction versus the total partition
-  size, are both underwater.
-
-  Modifies state in-place. Assumes state['free_disks'] is valid.
-  """
-  if state.get(u'quarantined'):
-    return
-  if skip is None:
-    # Do not check these mount points for low disk space.
-    skip = (u'/boot', u'/boot/efi')
-
-  s = []
-  for mount, infos in sorted(state[u'disks'].iteritems()):
-    if mount not in skip:
-      min_free = get_min_free_space(mount)
-      if infos[u'free_mb'] < min_free:
-        s.append(
-            'Not enough free disk space on %s. %.1fmib < %.1fmib' %
-            (mount, infos[u'free_mb'], min_free))
-  if s:
-    state[u'quarantined'] = '\n'.join(s)
 
 
 ## State mutating.
