@@ -4,7 +4,6 @@
 
 """This module defines Swarming Server endpoints handlers."""
 
-import datetime
 import logging
 import os
 

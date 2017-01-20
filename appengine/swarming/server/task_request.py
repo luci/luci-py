@@ -320,7 +320,7 @@ class SecretBytes(ndb.Model):
 
 
 class CipdPackage(ndb.Model):
-  """A CIPD package to install in $CIPD_PATH and $PATH before task execution.
+  """A CIPD package to install in the run dir before task execution.
 
   A part of TaskProperties.
   """
@@ -333,7 +333,7 @@ class CipdPackage(ndb.Model):
   version = ndb.StringProperty(
       indexed=False, validator=_validate_package_version)
   # Path to dir, relative to the run dir, where to install the package.
-  # If empty, the package will be installed in run dir.
+  # If empty, the package will be installed in the run dir.
   path = ndb.StringProperty(indexed=False, validator=_validate_package_path)
 
   def __str__(self):
@@ -360,7 +360,7 @@ class CipdInput(ndb.Model):
   # client_package.path must be None.
   client_package = ndb.LocalStructuredProperty(CipdPackage)
 
-  # List of packages to install in $CIPD_PATH prior task execution.
+  # List of packages to install.
   packages = ndb.LocalStructuredProperty(CipdPackage, repeated=True)
 
   def _pre_put_hook(self):

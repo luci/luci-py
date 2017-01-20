@@ -116,7 +116,7 @@ class FilesRef(messages.Message):
 
 
 class CipdPackage(messages.Message):
-  """A CIPD package to install in $CIPD_PATH and $PATH before task execution."""
+  """A CIPD package to install in the run dir before task execution."""
   # A template of a full CIPD package name, e.g.
   # "infra/tools/authutil/${platform}"
   # See also cipd.ALL_PARAMS.
@@ -131,11 +131,7 @@ class CipdPackage(messages.Message):
 
 
 class CipdInput(messages.Message):
-  """Defines CIPD packages to install in $CIPD_PATH.
-
-  A command may use $CIPD_PATH in its arguments. It will be expanded to the path
-  of the CIPD site root.
-  """
+  """Defines CIPD packages to install in task run directory."""
   # URL of the CIPD server. Must start with "https://" or "http://".
   # This field or its subfields are optional if default cipd client is defined
   # in the server config.
@@ -147,7 +143,7 @@ class CipdInput(messages.Message):
   # client_package.path must be empty.
   client_package = messages.MessageField(CipdPackage, 2)
 
-  # List of CIPD packages to install in $CIPD_PATH prior task execution.
+  # List of CIPD packages to install.
   packages = messages.MessageField(CipdPackage, 3, repeated=True)
 
 

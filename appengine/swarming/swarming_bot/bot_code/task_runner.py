@@ -14,7 +14,6 @@ up to the calling process (bot_main.py) to signal that there was an internal
 failure and to cancel this task run and ask the server to retry it.
 """
 
-import base64
 import json
 import logging
 import optparse
@@ -25,7 +24,6 @@ import time
 import traceback
 
 from utils import file_path
-from utils import net
 from utils import on_error
 from utils import subprocess42
 from utils import zip_package
@@ -122,9 +120,11 @@ def get_isolated_args(is_grpc, work_dir, task_details, isolated_result,
   for output in task_details.outputs:
     cmd.extend(['--output', output])
 
-  # CIPD options.
-  if task_details.cipd_input and task_details.cipd_input.get('packages'):
-    for pkg in task_details.cipd_input.get('packages'):
+  # CIPD options. Empty 'packages' list is fine. It means the task needs
+  # a bootstrapped CIPD client only.
+  if task_details.cipd_input:
+    cmd.append('--cipd-enabled')
+    for pkg in task_details.cipd_input.get('packages', []):
       cmd.extend([
         '--cipd-package',
         '%s:%s:%s' % (pkg['path'], pkg['package_name'], pkg['version'])])
