@@ -466,11 +466,6 @@ def update_client_request_id(key):
     return
 
   machine_lease.request_count += 1
-  # TODO(smut): Remove transitional code once all existing MachineLease entites
-  # have request_id_base filled in.
-  if not machine_lease.request_id_base:
-    machine_lease.request_id_base = '%s-%s' % (
-        machine_lease.machine_type.id(), utils.time_time())
   machine_lease.client_request_id = '%s-%s' % (
       machine_lease.request_id_base, machine_lease.request_count)
   machine_lease.put()
