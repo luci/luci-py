@@ -527,6 +527,12 @@ def ensure_bot_info_exists(machine_lease):
       and bot_info.lease_expiration_ts
       and bot_info.machine_type
   ):
+    logging.info(
+        'Creating BotEvent\nKey: %s\nHostname: %s\nBotInfo: %s',
+        machine_lease.key,
+        machine_lease.hostname,
+        bot_info,
+    )
     bot_management.bot_event(
         event_type='bot_leased',
         bot_id=machine_lease.hostname,
@@ -559,6 +565,12 @@ def ensure_bot_info_exists(machine_lease):
           bot_info,
       )
       return
+    logging.info(
+        'Put BotInfo\nKey: %s\nHostname: %s\nBotInfo: %s',
+        machine_lease.key,
+        machine_lease.hostname,
+        bot_info,
+    )
   associate_bot_id(machine_lease.key, machine_lease.hostname)
 
 
@@ -596,8 +608,9 @@ def handle_termination_task(machine_lease):
     shutdown_ts = last_shutdown_ts(machine_lease.hostname)
     if not shutdown_ts or shutdown_ts < task_result_summary.completed_ts:
       logging.info(
-          'Machine terminated but not yet shut down:\nKey: %s',
+          'Machine terminated but not yet shut down:\nKey: %s\nHostname: %s',
           machine_lease.key,
+          machine_lease.hostname,
       )
       return
 
@@ -617,7 +630,11 @@ def handle_termination_task(machine_lease):
             response['error'],
         )
         return
-    logging.info('MachineLease released: %s', machine_lease.key)
+    logging.info(
+        'MachineLease released:\nKey%s\nHostname: %s',
+        machine_lease.key,
+        machine_lease.hostname,
+    )
     clear_lease_request(machine_lease.key, machine_lease.client_request_id)
     bot_management.get_info_key(machine_lease.hostname).delete()
 
@@ -630,7 +647,11 @@ def handle_early_release(machine_lease):
   """
   if machine_lease.lease_expiration_ts <= utils.utcnow() + datetime.timedelta(
       seconds=machine_lease.early_release_secs):
-    logging.info('MachineLease ready to be released: %s', machine_lease.key)
+    logging.info(
+        'MachineLease ready to be released:\nKey: %s\nHostname: %s',
+        machine_lease.key,
+        machine_lease.hostname,
+    )
     task_result_summary = task_scheduler.schedule_request(
         task_request.create_termination_task(machine_lease.hostname, True),
         None,
@@ -657,7 +678,11 @@ def manage_leased_machine(machine_lease):
 
   # Handle an expired lease.
   if machine_lease.lease_expiration_ts <= utils.utcnow():
-    logging.info('MachineLease expired: %s', machine_lease.key)
+    logging.info(
+        'MachineLease expired:\nKey: %s\nHostname: %s',
+        machine_lease.key,
+        machine_lease.hostname,
+    )
     clear_lease_request(machine_lease.key, machine_lease.client_request_id)
     bot_management.get_info_key(machine_lease.hostname).delete()
     return
@@ -665,6 +690,12 @@ def manage_leased_machine(machine_lease):
   # Handle an active lease with a termination task scheduled.
   # TODO(smut): Check if the bot got terminated by some other termination task.
   if machine_lease.termination_task:
+    logging.info(
+        'MachineLease awaiting termination:\nKey: %s\nHostname: %s\Task ID: %s',
+        machine_lease.key,
+        machine_lease.hostname,
+        machine_lease.termination_task,
+    )
     handle_termination_task(machine_lease)
     return
 
