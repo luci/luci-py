@@ -386,6 +386,28 @@ class MachineProviderEndpoints(remote.Service):
   def _lease(self, request, user, request_hash):
     """Handles an incoming LeaseRequest."""
     metrics.lease_requests_received.increment()
+    if request.duration:
+      if request.lease_expiration_ts:
+        return rpc_messages.LeaseResponse(
+            client_request_id=request.request_id,
+            error=rpc_messages.LeaseRequestError.MUTUAL_EXCLUSION_ERROR,
+        )
+      if request.duration < 1:
+        return rpc_messages.LeaseResponse(
+            client_request_id=request.request_id,
+            error=rpc_messages.LeaseRequestError.NONPOSITIVE_DEADLINE,
+        )
+    elif request.lease_expiration_ts:
+      if request.lease_expiration_ts <= utils.time_time():
+        return rpc_messages.LeaseResponse(
+            client_request_id=request.request_id,
+            error=rpc_messages.LeaseRequestError.LEASE_EXPIRATION_TS_ERROR,
+        )
+    else:
+      return rpc_messages.LeaseResponse(
+          client_request_id=request.request_id,
+          error=rpc_messages.LeaseRequestError.LEASE_LENGTH_UNSPECIFIED,
+      )
     if request.pubsub_topic:
       if not pubsub.validate_topic(request.pubsub_topic):
         logging.warning(

@@ -379,7 +379,7 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
     app = handlers_endpoints.create_endpoints_app()
     self.app = webtest.TestApp(app)
 
-  def test_lease(self):
+  def test_lease_duration(self):
     lease_request = rpc_to_json(rpc_messages.LeaseRequest(
         dimensions=rpc_messages.Dimensions(
             os_family=rpc_messages.OSFamily.LINUX,
@@ -394,6 +394,118 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
         rpc_messages.LeaseResponse,
     )
     self.failIf(lease_response.error)
+
+  def test_lease_duration_zero(self):
+    lease_request = rpc_to_json(rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=0,
+        request_id='abc',
+    ))
+    auth_testing.mock_get_current_identity(self)
+
+    lease_response = jsonish_dict_to_rpc(
+        self.call_api('lease', lease_request).json,
+        rpc_messages.LeaseResponse,
+    )
+    self.assertEqual(
+        lease_response.error,
+        rpc_messages.LeaseRequestError.LEASE_LENGTH_UNSPECIFIED,
+    )
+
+  def test_lease_duration_negative(self):
+    lease_request = rpc_to_json(rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=-1,
+        request_id='abc',
+    ))
+    auth_testing.mock_get_current_identity(self)
+
+    lease_response = jsonish_dict_to_rpc(
+        self.call_api('lease', lease_request).json,
+        rpc_messages.LeaseResponse,
+    )
+    self.assertEqual(
+        lease_response.error,
+        rpc_messages.LeaseRequestError.NONPOSITIVE_DEADLINE,
+    )
+
+  def test_lease_duration_negative(self):
+    lease_request = rpc_to_json(rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=-1,
+        request_id='abc',
+    ))
+    auth_testing.mock_get_current_identity(self)
+
+    lease_response = jsonish_dict_to_rpc(
+        self.call_api('lease', lease_request).json,
+        rpc_messages.LeaseResponse,
+    )
+    self.assertEqual(
+        lease_response.error,
+        rpc_messages.LeaseRequestError.NONPOSITIVE_DEADLINE,
+    )
+
+  def test_lease_duration_and_lease_expiration_ts(self):
+    lease_request = rpc_to_json(rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=1,
+        lease_expiration_ts=9999999999,
+        request_id='abc',
+    ))
+    auth_testing.mock_get_current_identity(self)
+
+    lease_response = jsonish_dict_to_rpc(
+        self.call_api('lease', lease_request).json,
+        rpc_messages.LeaseResponse,
+    )
+    self.assertEqual(
+        lease_response.error,
+        rpc_messages.LeaseRequestError.MUTUAL_EXCLUSION_ERROR,
+    )
+
+  def test_lease_timestamp(self):
+    lease_request = rpc_to_json(rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        lease_expiration_ts=9999999999,
+        request_id='abc',
+    ))
+    auth_testing.mock_get_current_identity(self)
+
+    lease_response = jsonish_dict_to_rpc(
+        self.call_api('lease', lease_request).json,
+        rpc_messages.LeaseResponse,
+    )
+    self.failIf(lease_response.error)
+
+  def test_lease_timestamp_passed(self):
+    lease_request = rpc_to_json(rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        lease_expiration_ts=1,
+        request_id='abc',
+    ))
+    auth_testing.mock_get_current_identity(self)
+
+    lease_response = jsonish_dict_to_rpc(
+        self.call_api('lease', lease_request).json,
+        rpc_messages.LeaseResponse,
+    )
+    self.assertEqual(
+        lease_response.error,
+        rpc_messages.LeaseRequestError.LEASE_EXPIRATION_TS_ERROR,
+    )
 
   def test_duplicate(self):
     lease_request = rpc_to_json(rpc_messages.LeaseRequest(

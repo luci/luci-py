@@ -206,22 +206,6 @@ class CatalogMachineEntry(CatalogEntry):
   )
 
   @classmethod
-  def create_and_put(cls, dimensions, policies, state):
-    """Creates a new CatalogEntry entity and puts it in the datastore.
-
-    Args:
-      dimensions: rpc_messages.Dimensions describing this machine.
-      policies: rpc_messages.Policies governing this machine.
-      state: Element of CatalogMachineEntryState describing this machine.
-    """
-    cls(
-        dimensions=dimensions,
-        policies=policies,
-        state=state,
-        key=cls.generate_key(dimensions),
-    ).put()
-
-  @classmethod
   def generate_key(cls, dimensions):
     """Generates the key for a CatalogEntry with the given dimensions.
 

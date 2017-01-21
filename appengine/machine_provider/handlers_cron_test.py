@@ -33,7 +33,7 @@ class LeaseRequestProcessorTest(test_case.TestCase):
     self.app = webtest.TestApp(app)
     self.mock(utils, 'enqueue_task', lambda *args, **kwargs: True)
 
-  def test_one_request_one_matching_machine_entry(self):
+  def test_one_request_one_matching_machine_entry_duration(self):
     request = rpc_messages.LeaseRequest(
         dimensions=rpc_messages.Dimensions(
             os_family=rpc_messages.OSFamily.LINUX,
@@ -41,7 +41,7 @@ class LeaseRequestProcessorTest(test_case.TestCase):
         duration=1,
         request_id='fake-id',
     )
-    models.LeaseRequest(
+    key = models.LeaseRequest(
         deduplication_checksum=models.LeaseRequest.compute_deduplication_checksum(
             request,
         ),
@@ -53,25 +53,74 @@ class LeaseRequestProcessorTest(test_case.TestCase):
         request=request,
         response=rpc_messages.LeaseResponse(
             client_request_id='fake-id',
+            state=rpc_messages.LeaseRequestState.UNTRIAGED,
         ),
     ).put()
-    models.CatalogMachineEntry.create_and_put(
-        rpc_messages.Dimensions(
-            backend=rpc_messages.Backend.DUMMY,
-            hostname='fake-host',
-            os_family=rpc_messages.OSFamily.LINUX,
-        ),
-        rpc_messages.Policies(
-            backend_project='fake-project',
-            backend_topic='fake-topic',
-        ),
-        models.CatalogMachineEntryStates.AVAILABLE,
+    dimensions = rpc_messages.Dimensions(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+        os_family=rpc_messages.OSFamily.LINUX,
     )
+    models.CatalogMachineEntry(
+        key=models.CatalogMachineEntry.generate_key(dimensions),
+        dimensions=dimensions,
+        policies=rpc_messages.Policies(
+            machine_service_account='fake-service-account',
+        ),
+        pubsub_subscription='fake-subscription',
+        state=models.CatalogMachineEntryStates.AVAILABLE,
+    ).put()
 
     self.app.get(
         '/internal/cron/process-lease-requests',
         headers={'X-AppEngine-Cron': 'true'},
     )
+    self.failUnless(key.get().response.lease_expiration_ts)
+
+  def test_one_request_one_matching_machine_entry_lease_expiration_ts(self):
+    ts = int(utils.time_time())
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        lease_expiration_ts=ts,
+        request_id='fake-id',
+    )
+    key = models.LeaseRequest(
+        deduplication_checksum=models.LeaseRequest.compute_deduplication_checksum(
+            request,
+        ),
+        key=models.LeaseRequest.generate_key(
+            auth_testing.DEFAULT_MOCKED_IDENTITY.to_bytes(),
+            request,
+        ),
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=request,
+        response=rpc_messages.LeaseResponse(
+            client_request_id='fake-id',
+            state=rpc_messages.LeaseRequestState.UNTRIAGED,
+        ),
+    ).put()
+    dimensions = rpc_messages.Dimensions(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+        os_family=rpc_messages.OSFamily.LINUX,
+    )
+    models.CatalogMachineEntry(
+        key=models.CatalogMachineEntry.generate_key(dimensions),
+        dimensions=dimensions,
+        policies=rpc_messages.Policies(
+            machine_service_account='fake-service-account',
+        ),
+        pubsub_subscription='fake-subscription',
+        state=models.CatalogMachineEntryStates.AVAILABLE,
+    ).put()
+
+    self.app.get(
+        '/internal/cron/process-lease-requests',
+        headers={'X-AppEngine-Cron': 'true'},
+    )
+    self.assertEqual(key.get().response.lease_expiration_ts, ts)
 
 
 class MachineReclamationProcessorTest(test_case.TestCase):
@@ -114,7 +163,10 @@ class MachineReclamationProcessorTest(test_case.TestCase):
         dimensions=dimensions,
         key=models.CatalogMachineEntry.generate_key(dimensions),
         lease_id=lease.key.id(),
-        lease_expiration_ts=datetime.datetime.fromtimestamp(0),
+        lease_expiration_ts=datetime.datetime.utcfromtimestamp(1),
+        policies=rpc_messages.Policies(
+            machine_service_account='fake-service-account',
+        ),
         state=models.CatalogMachineEntryStates.AVAILABLE,
     ).put()
     lease.machine_id = machine.id()

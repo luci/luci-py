@@ -129,13 +129,15 @@ class LeaseRequest(messages.Message):
   # Dimensions instance specifying what sort of machine to lease.
   dimensions = messages.MessageField(Dimensions, 2, required=True)
   # Desired length of the lease in seconds.
-  duration = messages.IntegerField(3, required=True)
+  duration = messages.IntegerField(3)
   # Cloud Pub/Sub topic name to communicate on regarding this request.
   pubsub_topic = messages.StringField(4)
   # Cloud Pub/Sub project name to communicate on regarding this request.
   pubsub_project = messages.StringField(5)
   # Instructions to give the machine once it's been leased.
   on_lease = messages.MessageField(Instruction, 6)
+  # UTC seconds from epoch when lease should expire.
+  lease_expiration_ts = messages.IntegerField(7)
 
 
 class BatchedLeaseRequest(messages.Message):
@@ -159,6 +161,14 @@ class LeaseRequestError(messages.Enum):
   DEADLINE_EXCEEDED = 5
   # Miscellaneous transient error.
   TRANSIENT_ERROR = 6
+  # Mutually exclusive duration and lease_expiration_ts both specified.
+  MUTUAL_EXCLUSION_ERROR = 7
+  # Proposed duration was zero or negative.
+  NONPOSITIVE_DEADLINE = 8
+  # Proposed expiration time is not in the future.
+  LEASE_EXPIRATION_TS_ERROR = 9
+  # Neither duration nor lease_expiration_ts were specified.
+  LEASE_LENGTH_UNSPECIFIED = 10
 
 
 class LeaseRequestState(messages.Enum):

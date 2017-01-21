@@ -106,9 +106,13 @@ def lease_machine(machine_key, lease):
 
   logging.info('Leasing CatalogMachineEntry:\n%s', machine)
   lease.leased_ts = utils.utcnow()
-  lease_expiration_ts = lease.leased_ts + datetime.timedelta(
-      seconds=lease.request.duration,
-  )
+  if lease.request.lease_expiration_ts:
+    lease_expiration_ts = datetime.datetime.utcfromtimestamp(
+        lease.request.lease_expiration_ts)
+  else:
+    lease_expiration_ts = lease.leased_ts + datetime.timedelta(
+        seconds=lease.request.duration,
+    )
   lease.machine_id = machine.key.id()
   lease.response.hostname = machine.dimensions.hostname
   # datetime_to_timestamp returns microseconds, which are too fine grain.
