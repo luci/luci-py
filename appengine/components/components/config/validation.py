@@ -30,6 +30,7 @@ import collections
 import fnmatch
 import functools
 import re
+import urlparse
 
 # Pylint doesn't like relative wildcard imports.
 # pylint: disable=W0401,W0403
@@ -101,10 +102,13 @@ def is_valid_ref_name(ref):
 
 
 def is_valid_secure_url(url):
-  if url.startswith('http://'):
-    allowed = ('http://localhost:', 'http://127.0.0.1:', 'http://::1:')
-    return url.startswith(allowed)
-  return url.startswith('https://')
+  """Returns True if the URL is valid and secure, except for localhost."""
+  parsed = urlparse.urlparse(url)
+  if not parsed.netloc:
+    return False
+  if parsed.hostname in ('localhost', '127.0.0.1', '::1'):
+    return parsed.scheme in ('http', 'https')
+  return parsed.scheme == 'https'
 
 
 ConfigPattern = collections.namedtuple(

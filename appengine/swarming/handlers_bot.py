@@ -354,10 +354,9 @@ class _BotBaseHandler(_BotApiHandler):
         break
 
       if not all(
-          isinstance(key, unicode) and
-          re.match(task_request.DIMENSION_KEY_RE, key) and
+          config.validate_dimension_key(key) and
           isinstance(values, list) and
-          all(isinstance(value, unicode) for value in values)
+          all(config.validate_dimension_value(value) for value in values)
           for key, values in dimensions.iteritems()):
         quarantined_msg = (
             'Invalid dimensions type:\n%s' % json.dumps(dimensions,

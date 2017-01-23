@@ -31,16 +31,16 @@ class ConfigTest(test_case.TestCase):
 
   def test_validate_isolate_settings(self):
     self.validator_test(
-        config.validate_isolate_settings,
+        config._validate_isolate_settings,
         config_pb2.IsolateSettings(
             default_server='https://isolateserver.appspot.com'),
         [
-          ('either specify both default_server and default_namespace or '
-           'none'),
+          'either specify both default_server and default_namespace or '
+            'none',
         ])
 
     self.validator_test(
-        config.validate_isolate_settings,
+        config._validate_isolate_settings,
         config_pb2.IsolateSettings(
             default_server='isolateserver.appspot.com',
             default_namespace='abc',
@@ -50,7 +50,7 @@ class ConfigTest(test_case.TestCase):
         ])
 
     self.validator_test(
-        config.validate_isolate_settings,
+        config._validate_isolate_settings,
         config_pb2.IsolateSettings(
           default_server='https://isolateserver.appspot.com',
           default_namespace='abc',
@@ -58,13 +58,13 @@ class ConfigTest(test_case.TestCase):
         [])
 
     self.validator_test(
-        config.validate_isolate_settings,
+        config._validate_isolate_settings,
         config_pb2.IsolateSettings(),
         [])
 
   def test_validate_cipd_settings(self):
     self.validator_test(
-        config.validate_cipd_settings,
+        config._validate_cipd_settings,
         config_pb2.CipdSettings(),
         [
           'default_server is not set',
@@ -73,7 +73,7 @@ class ConfigTest(test_case.TestCase):
         ])
 
     self.validator_test(
-        config.validate_cipd_settings,
+        config._validate_cipd_settings,
         config_pb2.CipdSettings(
             default_server='chrome-infra-packages.appspot.com',
             default_client_package=config_pb2.CipdPackage(
@@ -85,7 +85,7 @@ class ConfigTest(test_case.TestCase):
         ])
 
     self.validator_test(
-        config.validate_cipd_settings,
+        config._validate_cipd_settings,
         config_pb2.CipdSettings(
             default_server='https://chrome-infra-packages.appspot.com',
             default_client_package=config_pb2.CipdPackage(
@@ -98,12 +98,12 @@ class ConfigTest(test_case.TestCase):
     entry = config_pb2.DimensionACLs.Entry
 
     self.validator_test(
-        config.validate_dimension_acls,
+        config._validate_dimension_acls,
         config_pb2.DimensionACLs(entry=[]),
         [])
 
     self.validator_test(
-        config.validate_dimension_acls,
+        config._validate_dimension_acls,
         config_pb2.DimensionACLs(entry=[
           entry(dimension=['pool:default'], usable_by='all'),
           entry(dimension=['stuff:*'], usable_by='all'),
@@ -111,7 +111,7 @@ class ConfigTest(test_case.TestCase):
         [])
 
     self.validator_test(
-        config.validate_dimension_acls,
+        config._validate_dimension_acls,
         config_pb2.DimensionACLs(entry=[entry()]),
         [
           'entry #1: at least one dimension is required',
@@ -119,24 +119,21 @@ class ConfigTest(test_case.TestCase):
         ])
 
     self.validator_test(
-        config.validate_dimension_acls,
+        config._validate_dimension_acls,
         config_pb2.DimensionACLs(entry=[
           entry(dimension=['not_kv_pair'], usable_by='all'),
         ]),
-        ['entry #1: dimension "not_kv_pair": not a "<key>:<value>" pair'])
+        [u'entry #1: dimension "not_kv_pair": not a valid dimension'])
 
     self.validator_test(
-        config.validate_dimension_acls,
+        config._validate_dimension_acls,
         config_pb2.DimensionACLs(entry=[
           entry(dimension=['@@@@:abc'], usable_by='all'),
         ]),
-        [
-          'entry #1: dimension "@@@@:abc": key u\'@@@@\' doesn\'t '
-          'match ^[a-zA-Z\\-\\_\\.]+$',
-        ])
+        [u'entry #1: dimension "@@@@:abc": not a valid dimension'])
 
     self.validator_test(
-        config.validate_dimension_acls,
+        config._validate_dimension_acls,
         config_pb2.DimensionACLs(entry=[
           entry(dimension=['pool:*'], usable_by='all'),
           entry(dimension=['pool:*'], usable_by='all'),
@@ -145,7 +142,7 @@ class ConfigTest(test_case.TestCase):
         ['entry #1: dimension "pool:*": was specified multiple times'])
 
     self.validator_test(
-        config.validate_dimension_acls,
+        config._validate_dimension_acls,
         config_pb2.DimensionACLs(entry=[
           entry(dimension=['pool:abc'], usable_by='all'),
           entry(dimension=['pool:abc'], usable_by='all'),
@@ -153,7 +150,7 @@ class ConfigTest(test_case.TestCase):
         ['entry #2: dimension "pool:abc": was already specified'])
 
     self.validator_test(
-        config.validate_dimension_acls,
+        config._validate_dimension_acls,
         config_pb2.DimensionACLs(entry=[
           entry(dimension=['pool:*'], usable_by='all'),
           entry(dimension=['pool:abc'], usable_by='all'),
@@ -161,7 +158,7 @@ class ConfigTest(test_case.TestCase):
         ['entry #2: dimension "pool:abc": was already specified via "pool:*"'])
 
     self.validator_test(
-        config.validate_dimension_acls,
+        config._validate_dimension_acls,
         config_pb2.DimensionACLs(entry=[
           entry(dimension=['pool:abc'], usable_by='@@@badgroup@@@'),
         ]),
@@ -170,7 +167,7 @@ class ConfigTest(test_case.TestCase):
 
   def test_validate_settings(self):
     self.validator_test(
-        config.validate_settings,
+        config._validate_settings,
         config_pb2.SettingsCfg(
             bot_death_timeout_secs=-1,
             reusable_task_age_secs=-1),
@@ -180,19 +177,19 @@ class ConfigTest(test_case.TestCase):
       ])
 
     self.validator_test(
-        config.validate_settings,
+        config._validate_settings,
         config_pb2.SettingsCfg(
-            bot_death_timeout_secs=config.SECONDS_IN_YEAR + 1,
-            reusable_task_age_secs=config.SECONDS_IN_YEAR + 1),
+            bot_death_timeout_secs=config._SECONDS_IN_YEAR + 1,
+            reusable_task_age_secs=config._SECONDS_IN_YEAR + 1),
       [
         'bot_death_timeout_secs cannot be more than a year',
         'reusable_task_age_secs cannot be more than a year',
       ])
 
-    self.validator_test(config.validate_settings, config_pb2.SettingsCfg(), [])
+    self.validator_test(config._validate_settings, config_pb2.SettingsCfg(), [])
 
     self.validator_test(
-        config.validate_settings,
+        config._validate_settings,
         config_pb2.SettingsCfg(
             mp=config_pb2.MachineProviderSettings(server='http://url')),
       [
@@ -200,7 +197,7 @@ class ConfigTest(test_case.TestCase):
       ])
 
     self.validator_test(
-        config.validate_settings,
+        config._validate_settings,
         config_pb2.SettingsCfg(
             mp=config_pb2.MachineProviderSettings(server='url')),
       [

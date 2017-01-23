@@ -19,54 +19,104 @@ from proto import config_pb2
 
 import cipd
 
-SETTINGS_CFG_FILENAME = 'settings.cfg'
-SECONDS_IN_YEAR = 60 * 60 * 24 * 365
 NAMESPACE_RE = re.compile(r'^[a-z0-9A-Z\-._]+$')
-
-# See also task_request.py.
-DIMENSION_KEY_RE = r'^[a-zA-Z\-\_\.]+$'
 
 
 ConfigApi = config.ConfigApi
 
 
-def validate_url(value, ctx):
+### Public code.
+
+
+def settings_info():
+  """Returns information about the settings file.
+
+  Returns a dict with keys:
+    'cfg': parsed SettingsCfg message
+    'rev': revision of cfg
+    'rev_url': URL of a human-consumable page that displays the config
+    'config_service_url': URL of the config_service.
+  """
+  rev, cfg = _get_settings()
+  rev_url = _gitiles_url(_get_configs_url(), rev, _SETTINGS_CFG_FILENAME)
+  cfg_service_hostname = config.config_service_hostname()
+  return {
+    'cfg': cfg,
+    'rev': rev,
+    'rev_url': rev_url,
+    'config_service_url': (
+        'https://%s' % cfg_service_hostname if cfg_service_hostname else ''
+    ),
+  }
+
+
+@utils.cache_with_expiration(60)
+def settings():
+  """Loads settings from an NDB-based cache or a default one if not present."""
+  return _get_settings()[1]
+
+
+def validate_flat_dimension(d):
+  """Return strue if a 'key:value' dimension is valid."""
+  key, _, val = d.partition(':')
+  return validate_dimension_value(val) and validate_dimension_key(key)
+
+
+def validate_dimension_key(key):
+  """Returns True if the dimension key is valid."""
+  return bool(isinstance(key, unicode) and re.match(_DIMENSION_KEY_RE, key))
+
+
+def validate_dimension_value(value):
+  """Returns True if the dimension key is valid."""
+  return bool(isinstance(value, unicode) and value and value.strip() == value)
+
+
+### Private code.
+
+
+_DIMENSION_KEY_RE = r'^[a-zA-Z\-\_\.]+$'
+_SETTINGS_CFG_FILENAME = 'settings.cfg'
+_SECONDS_IN_YEAR = 60 * 60 * 24 * 365
+
+
+def _validate_url(value, ctx):
   if not value:
     ctx.error('is not set')
   elif not validation.is_valid_secure_url(value):
     ctx.error('must start with "https://" or "http://localhost"')
 
 
-def validate_isolate_settings(cfg, ctx):
+def _validate_isolate_settings(cfg, ctx):
   if bool(cfg.default_server) != bool(cfg.default_namespace):
     ctx.error(
         'either specify both default_server and default_namespace or none')
   elif cfg.default_server:
     with ctx.prefix('default_server '):
-      validate_url(cfg.default_server, ctx)
+      _validate_url(cfg.default_server, ctx)
 
     if not NAMESPACE_RE.match(cfg.default_namespace):
       ctx.error('invalid namespace "%s"', cfg.default_namespace)
 
 
-def validate_cipd_package(cfg, ctx):
+def _validate_cipd_package(cfg, ctx):
   if not cipd.is_valid_package_name_template(cfg.package_name):
     ctx.error('invalid package_name "%s"', cfg.package_name)
   if not cipd.is_valid_version(cfg.version):
     ctx.error('invalid version "%s"', cfg.version)
 
 
-def validate_cipd_settings(cfg, ctx=None):
+def _validate_cipd_settings(cfg, ctx=None):
   """Validates CipdSettings message stored in settings.cfg."""
   ctx = ctx or validation.Context.raise_on_error()
   with ctx.prefix('default_server '):
-    validate_url(cfg.default_server, ctx)
+    _validate_url(cfg.default_server, ctx)
 
   with ctx.prefix('default_client_package: '):
-    validate_cipd_package(cfg.default_client_package, ctx)
+    _validate_cipd_package(cfg.default_client_package, ctx)
 
 
-def validate_dimension_acls(cfg, ctx):
+def _validate_dimension_acls(cfg, ctx):
   """Validates DimensionACLs message stored in settings.cfg."""
   ctx = ctx or validation.Context.raise_on_error()
 
@@ -90,11 +140,9 @@ def validate_dimension_acls(cfg, ctx):
         ctx.error('at least one dimension is required')
       for dim in e.dimension:
         with ctx.prefix('dimension "%s": ', dim):
+          if not validate_flat_dimension(dim):
+            ctx.error('not a valid dimension')
           key, _, val = dim.partition(':')
-          if not val:
-            ctx.error('not a "<key>:<value>" pair')
-          if not re.match(DIMENSION_KEY_RE, key):
-            ctx.error('key %r doesn\'t match %s' % (key, DIMENSION_KEY_RE))
           if val == '*':
             if dim in star_dups:
               ctx.error('was specified multiple times')
@@ -111,13 +159,13 @@ def validate_dimension_acls(cfg, ctx):
         ctx.error('"usable_by" specifies invalid group name "%s"' % e.usable_by)
 
 
-@validation.self_rule(SETTINGS_CFG_FILENAME, config_pb2.SettingsCfg)
-def validate_settings(cfg, ctx):
+@validation.self_rule(_SETTINGS_CFG_FILENAME, config_pb2.SettingsCfg)
+def _validate_settings(cfg, ctx):
   """Validates settings.cfg file against proto message schema."""
   def within_year(value):
     if value < 0:
       ctx.error('cannot be negative')
-    elif value > SECONDS_IN_YEAR:
+    elif value > _SECONDS_IN_YEAR:
       ctx.error('cannot be more than a year')
 
   with ctx.prefix('bot_death_timeout_secs '):
@@ -127,19 +175,19 @@ def validate_settings(cfg, ctx):
 
   if cfg.HasField('isolate'):
     with ctx.prefix('isolate: '):
-      validate_isolate_settings(cfg.isolate, ctx)
+      _validate_isolate_settings(cfg.isolate, ctx)
 
   if cfg.HasField('cipd'):
     with ctx.prefix('cipd: '):
-      validate_cipd_settings(cfg.cipd, ctx)
+      _validate_cipd_settings(cfg.cipd, ctx)
 
   if cfg.HasField('mp') and cfg.mp.HasField('server'):
     with ctx.prefix('mp.server '):
-      validate_url(cfg.mp.server, ctx)
+      _validate_url(cfg.mp.server, ctx)
 
   if cfg.HasField('dimension_acls'):
     with ctx.prefix('dimension_acls: '):
-      validate_dimension_acls(cfg.dimension_acls, ctx)
+      _validate_dimension_acls(cfg.dimension_acls, ctx)
 
 
 @utils.memcache('config:get_configs_url', time=60)
@@ -177,36 +225,8 @@ def _get_settings():
   # store_last_good=True tells config component to update the config file
   # in a cron job. Here we just read from the datastore.
   rev, cfg = config.get_self_config(
-      SETTINGS_CFG_FILENAME, config_pb2.SettingsCfg, store_last_good=True)
+      _SETTINGS_CFG_FILENAME, config_pb2.SettingsCfg, store_last_good=True)
   cfg = cfg or config_pb2.SettingsCfg()
   cfg.reusable_task_age_secs = cfg.reusable_task_age_secs or 7*24*60*60
   cfg.bot_death_timeout_secs = cfg.bot_death_timeout_secs or 10*60
   return rev, cfg
-
-
-def settings_info():
-  """Returns information about the settings file.
-
-  Returns a dict with keys:
-    'cfg': parsed SettingsCfg message
-    'rev': revision of cfg
-    'rev_url': URL of a human-consumable page that displays the config
-    'config_service_url': URL of the config_service.
-  """
-  rev, cfg = _get_settings()
-  rev_url = _gitiles_url(_get_configs_url(), rev, SETTINGS_CFG_FILENAME)
-  cfg_service_hostname = config.config_service_hostname()
-  return {
-    'cfg': cfg,
-    'rev': rev,
-    'rev_url': rev_url,
-    'config_service_url': (
-        'https://%s' % cfg_service_hostname if cfg_service_hostname else ''
-    ),
-  }
-
-
-@utils.cache_with_expiration(60)
-def settings():
-  """Loads settings from an NDB-based cache or a default one if not present."""
-  return _get_settings()[1]

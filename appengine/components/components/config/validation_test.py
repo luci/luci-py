@@ -148,6 +148,33 @@ class ValidationTestCase(test_case.TestCase):
     self.assertTrue(validation.compile_pattern('regex:^(\w+)c$')('abc'))
     self.assertFalse(validation.compile_pattern('regex:\d+')('a123b'))
 
+  def test_is_valid_secure_url(self):
+    true = [
+      'http://localhost',
+      'http://localhost/',
+      'http://localhost/yo',
+      'http://localhost:1',
+      'http://localhost:1/yo',
+      'https://localhost',
+      'https://localhost/',
+      'https://localhost/yo',
+      'https://localhost:1',
+      'https://localhost:1/yo',
+      'https://user@bar.com',
+      'https://user:pass@bar.com',
+    ]
+    for i in true:
+      self.assertTrue(validation.is_valid_secure_url(i), i)
+    false = [
+      'http://',
+      'http://#yo',
+      'http://evil.com',
+      'http://localhost:pwd@evil.com',
+      'https://',
+    ]
+    for i in false:
+      self.assertFalse(validation.is_valid_secure_url(i), i)
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

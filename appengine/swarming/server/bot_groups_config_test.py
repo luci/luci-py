@@ -148,8 +148,7 @@ class BotGroupsConfigTest(test_case.TestCase):
   def test_trusted_dimensions_invalid(self):
     cfg = bots_pb2.BotsCfg(trusted_dimensions=['pool:blah'])
     self.validator_test(cfg, [
-      'trusted_dimensions: invalid dimension key - "pool:blah", '
-      'must match ^[a-zA-Z\\-\\_\\.]+$'
+      u'trusted_dimensions: invalid dimension key u\'pool:blah\''
     ])
 
   def test_bad_bot_id(self):
@@ -257,7 +256,7 @@ class BotGroupsConfigTest(test_case.TestCase):
           dimensions=['not_kv_pair']),
       ])
     self.validator_test(cfg, [
-      'bot_group #0: bad dimension "not_kv_pair", not a key:value pair'
+      u'bot_group #0: bad dimension u\'not_kv_pair\''
     ])
 
   def test_bad_dimension_bad_dim_key(self):
@@ -269,8 +268,7 @@ class BotGroupsConfigTest(test_case.TestCase):
           dimensions=['blah####key:value:value']),
       ])
     self.validator_test(cfg, [
-      'bot_group #0: bad dimension key in "blah####key:value:value", '
-      'should match ^[a-zA-Z\\-\\_\\.]+$'
+      u'bot_group #0: bad dimension u\'blah####key:value:value\'',
     ])
 
   def test_intersecting_prefixes(self):

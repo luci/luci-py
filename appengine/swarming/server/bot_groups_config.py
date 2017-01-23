@@ -15,7 +15,7 @@ from components import utils
 from components.config import validation
 
 from proto import bots_pb2
-from server import task_request # for DIMENSION_KEY_RE
+from server import config as local_config
 
 
 BOTS_CFG_FILENAME = 'bots.cfg'
@@ -291,10 +291,8 @@ def validate_settings(cfg, ctx):
   """Validates bots.cfg file."""
   with ctx.prefix('trusted_dimensions: '):
     for dim_key in cfg.trusted_dimensions:
-      if not re.match(task_request.DIMENSION_KEY_RE, dim_key):
-        ctx.error(
-            'invalid dimension key - "%s", must match %s',
-            dim_key, task_request.DIMENSION_KEY_RE)
+      if not local_config.validate_dimension_key(dim_key):
+        ctx.error('invalid dimension key %r', dim_key)
 
   # Explicitly mentioned bot_id => index of a group where it was mentioned.
   bot_ids = {}
@@ -391,14 +389,8 @@ def validate_settings(cfg, ctx):
 
       # Validate 'dimensions'.
       for dim in entry.dimensions:
-        if ':' not in dim:
-          ctx.error('bad dimension "%s", not a key:value pair', dim)
-          continue
-        k, _ = dim.split(':', 1)
-        if not re.match(task_request.DIMENSION_KEY_RE, k):
-          ctx.error(
-              'bad dimension key in "%s", should match %s',
-              dim, task_request.DIMENSION_KEY_RE)
+        if not local_config.validate_flat_dimension(dim):
+          ctx.error('bad dimension %r', dim)
 
   # Now verify bot_id_prefix is never a prefix of other prefix. It causes
   # ambiguities.

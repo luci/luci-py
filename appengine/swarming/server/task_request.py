@@ -65,6 +65,7 @@ from components import auth
 from components import datastore_utils
 from components import pubsub
 from components import utils
+from components.config import validation
 
 from server import config
 from server import task_pack
@@ -74,10 +75,6 @@ import cipd
 
 # Maximum acceptable priority value, which is effectively the lowest priority.
 MAXIMUM_PRIORITY = 255
-
-
-# Enforced on both task request and bots.
-DIMENSION_KEY_RE = ur'^[a-zA-Z\-\_\.]+$'
 
 
 # One day in seconds. Add 10s to account for small jitter.
@@ -119,19 +116,9 @@ def _validate_isolated(prop, value):
 
 def _validate_url(prop, value):
   # pylint: disable=unused-argument
-  if value:
-    # It must be https://*.appspot.com or https?://*
-    parsed = urlparse.urlparse(value)
-    if not parsed.netloc:
-      raise datastore_errors.BadValueError(
-          '%s must be valid hostname, not %s' % (prop._name, value))
-    if parsed.netloc.endswith('appspot.com'):
-      if parsed.scheme != 'https':
-        raise datastore_errors.BadValueError(
-            '%s must be https://, not %s' % (prop._name, value))
-    elif parsed.scheme not in ('http', 'https'):
-        raise datastore_errors.BadValueError(
-            '%s must be https:// or http://, not %s' % (prop._name, value))
+  if value and not validation.is_valid_secure_url(value):
+    raise datastore_errors.BadValueError(
+        '%s must be valid HTTPS URL, not %s' % (prop._name, value))
 
 
 def _validate_namespace(prop, value):
@@ -163,10 +150,12 @@ def _validate_dimensions(prop, value):
   if not value:
     raise datastore_errors.BadValueError(u'%s must be specified' % prop._name)
   _validate_dict_of_strings(prop, value)
-  for key in value:
-    if not re.match(DIMENSION_KEY_RE, key):
+  for key, val in value.iteritems():
+    if not config.validate_dimension_key(key):
+      raise datastore_errors.BadValueError(u'dimension %r isn\'t valid' % key)
+    if not config.validate_dimension_value(val):
       raise datastore_errors.BadValueError(
-          u'key %r doesn\'t match %s' % (key, DIMENSION_KEY_RE))
+          u'dimension %r:%r isn\'t valid' % (key, val))
   if u'pool' not in value and u'id' not in value:
     raise datastore_errors.BadValueError(
         u'At least one of \'id\' or \'pool\' must be used as %s' % prop._name)
