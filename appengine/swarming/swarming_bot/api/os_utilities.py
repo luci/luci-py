@@ -340,7 +340,7 @@ def get_disks_info():
 
 @tools.cached
 def get_disk_size(path):
-  """Returns the partition size that is referenced by this path."""
+  """Returns the partition size that is referenced by this path in Mb."""
   # Find the disk for the path.
   path = os.path.realpath(path)
   paths = sorted(

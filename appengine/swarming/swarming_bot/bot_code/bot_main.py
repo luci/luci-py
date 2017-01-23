@@ -500,7 +500,7 @@ def run_isolated_flags(botobj):
   partition = settings['free_partition']
   size = os_utilities.get_disk_size(THIS_FILE)
   min_free = (
-      min_free_disk({'size_mb': size/1024./1024.}, partition) +
+      min_free_disk({'size_mb': size}, partition) +
       partition['wiggle'])
   return [
     '--cache', os.path.join(botobj.base_dir, 'isolated_cache'),
