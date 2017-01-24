@@ -151,6 +151,33 @@ def fetch(key):
 
 
 @ndb.transactional_tasklet
+def _ensure_entity_exists(key, url, instance_group_manager):
+  """Ensures an Instance entity exists.
+
+  Args:
+    key: ndb.Key for a models.Instance entity.
+    url: URL for the instance.
+    instance_group_manager: ndb.Key for the models.InstanceGroupManager the
+      instance was created from.
+
+  Returns:
+    True if an entity was written to the datastore, False otherwise.
+  """
+  instance = yield key.get_async()
+  if instance:
+    logging.info('Instance entity already exists: %s', key)
+    raise ndb.Return(False)
+
+  logging.info('Creating Instance entity: %s', key)
+  yield models.Instance(
+      key=key,
+      instance_group_manager=instance_group_manager,
+      url=url,
+  ).put_async()
+  raise ndb.Return(True)
+
+
+@ndb.tasklet
 def ensure_entity_exists(key, url, instance_group_manager):
   """Ensures an Instance entity exists.
 
@@ -162,16 +189,11 @@ def ensure_entity_exists(key, url, instance_group_manager):
   """
   instance = yield key.get_async()
   if instance:
-    logging.info('Instance entity already exists: %s', key)
     return
 
-  logging.info('Creating Instance entity: %s', key)
-  yield models.Instance(
-      key=key,
-      instance_group_manager=instance_group_manager,
-      url=url,
-  ).put_async()
-  metrics.send_machine_event('CREATED', gce.extract_instance_name(url))
+  put = yield _ensure_entity_exists(key, url, instance_group_manager)
+  if put:
+    metrics.send_machine_event('CREATED', gce.extract_instance_name(url))
 
 
 def ensure_entities_exist(key, max_concurrent=50):

@@ -77,7 +77,8 @@ class EnsureEntityExistsTest(test_case.TestCase):
         ),
     ).put()
 
-    future = instances.ensure_entity_exists(key, 'url')
+    future = instances.ensure_entity_exists(
+        key, 'url', instances.get_instance_group_manager_key(key))
     future.wait()
 
     self.failIf(key.get().url)
