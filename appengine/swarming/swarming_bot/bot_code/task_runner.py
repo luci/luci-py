@@ -287,15 +287,18 @@ def load_and_run(
         except bot_auth.AuthSystemError as e:
           raise InternalError('Failed to grab bot auth headers: %s' % e)
 
+      # Make a client that can send request to Swarming using bot auth headers.
+      remote = remote_client.createRemoteClient(
+          swarming_server, headers_cb, is_grpc)
+      remote.initialize()
+
       # Auth environment is up, start the command. task_result is dumped to
       # disk in 'finally' block.
-      remote = remote_client.createRemoteClient(swarming_server,
-                                                headers_cb, is_grpc)
       with luci_context.write(_tmpdir=work_dir, **context_edits):
         task_result = run_command(
             remote, task_details, work_dir, cost_usd_hour,
             start, run_isolated_flags, bot_file)
-  except (ExitSignal, InternalError) as e:
+  except (ExitSignal, InternalError, remote_client.InternalError) as e:
     # This normally means run_command() didn't get the chance to run, as it
     # itself traps exceptions and will report accordingly. In this case, we want
     # the parent process to send the message instead.
@@ -534,7 +537,9 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
             kill_sent = True
       logging.info('Waiting for process exit')
       exit_code = proc.wait()
-    except (ExitSignal, InternalError, IOError, OSError) as e:
+    except (
+        ExitSignal, InternalError, IOError,
+        OSError, remote_client.InternalError) as e:
       # Something wrong happened, try to kill the child process.
       must_signal_internal_failure = str(e.message or 'unknown error')
       exit_code = kill_and_wait(proc, task_details.grace_period, e.message)
@@ -622,7 +627,7 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     try:
       remote.post_task_update(
           task_id, bot_id, params, (stdout, output_chunk_start), exit_code)
-    except InternalError as e:
+    except remote_client.InternalError as e:
       logging.error('Internal error while finishing the task: %s', e)
       if not must_signal_internal_failure:
         must_signal_internal_failure = str(e.message or 'unknown error')

@@ -7,8 +7,6 @@
 
 import json
 import logging
-import math
-import random
 import time
 
 import grpc
@@ -46,7 +44,7 @@ class RemoteClientGrpc(object):
   def is_grpc(self):
     return True
 
-  def initialize(self, quit_bit):
+  def initialize(self, quit_bit=None):
     pass
 
   @property

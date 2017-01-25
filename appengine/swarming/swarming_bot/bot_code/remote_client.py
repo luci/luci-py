@@ -48,6 +48,9 @@ class RemoteClientNative(object):
   If the callback returns (*, None), disables authentication. This allows
   bot_config.py to disable strong authentication on machines that don't have any
   credentials (the server uses only IP whitelist check in this case).
+
+  If the callback returns (*, 0), effectively disables the caching of headers:
+  the callback will be called for each request.
   """
 
   def __init__(self, server, auth_headers_callback):
@@ -61,17 +64,18 @@ class RemoteClientNative(object):
   def is_grpc(self):
     return False
 
-  def initialize(self, quit_bit):
+  def initialize(self, quit_bit=None):
     """Grabs initial auth headers, retrying on errors a bunch of times.
 
     Disabled authentication (when auth_headers_callback returns None) is not
     an error. Retries only real exceptions raised by the callback.
 
     Raises InitializationError if all attempts fail. Aborts attempts and returns
-    if quit_bit is signaled.
+    if quit_bit is signaled. If quit_bit is None, retries until success or until
+    all attempts fail.
     """
     attempts = 30
-    while not quit_bit.is_set():
+    while not quit_bit or not quit_bit.is_set():
       try:
         logging.info('Fetching initial auth headers')
         headers = self._get_headers_or_throw()
@@ -110,14 +114,14 @@ class RemoteClientNative(object):
     if self._disabled:
       return {}
     with self._lock:
-      if (self._exp_ts is None or
+      if (not self._exp_ts or
           self._exp_ts - time.time() < AUTH_HEADERS_EXPIRATION_SEC):
         self._headers, self._exp_ts = self._auth_headers_callback()
         if self._exp_ts is None:
           logging.info('Headers callback returned None, disabling auth')
           self._disabled = True
           self._headers = {}
-        else:
+        elif self._exp_ts:
           next_check = max(
               0, self._exp_ts - AUTH_HEADERS_EXPIRATION_SEC - time.time())
           if self._headers:
@@ -130,6 +134,8 @@ class RemoteClientNative(object):
           else:
             logging.info(
                 'No headers available yet, next check in %d sec.', next_check)
+        else:
+          logging.info('Using auth headers (%s).', self._headers.keys())
       return self._headers or {}
 
   def _url_read_json(self, url_path, data=None):
