@@ -30,6 +30,7 @@
 
 import datetime
 import hashlib
+import logging
 
 from google.appengine.ext import ndb
 
@@ -354,7 +355,12 @@ def bot_event(
 
   # Retrieve the previous BotInfo and update it.
   info_key = get_info_key(bot_id)
-  bot_info = info_key.get() or BotInfo(key=info_key)
+  bot_info = info_key.get()
+  if bot_info:
+    logging.info('Updating BotInfo: %s', bot_info)
+  else:
+    bot_info = BotInfo(key=info_key)
+    logging.info('Creating BotInfo: %s', bot_info)
   bot_info.last_seen_ts = utils.utcnow()
   bot_info.external_ip = external_ip
   bot_info.authenticated_as = authenticated_as
@@ -376,6 +382,7 @@ def bot_event(
     bot_info.lease_expiration_ts = kwargs['lease_expiration_ts']
   if kwargs.get('machine_type') is not None:
     bot_info.machine_type = kwargs['machine_type']
+  logging.info('BotInfo: %s', bot_info)
 
   if event_type in ('request_sleep', 'task_update'):
     # Handle this specifically. It's not much of an even worth saving a BotEvent
