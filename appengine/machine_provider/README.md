@@ -1,11 +1,15 @@
 # Machine Provider
 
-Services that manages leasing VMs to clients based on desired characteristics.
+Service which provides machines using a leasing mechanism where a client can
+request a machine with certain characteristics for a desired duration.
+
+
+[Documentation](doc)
 
 
 ## Setting up
 
-*   Visit http://console.cloud.google.com and create a project. Replace
+*   Visit https://console.cloud.google.com and create a project. Replace
     `<appid>` below with your project id.
 *   Visit Google Cloud Console,
     *   IAM & Admin, click `Add Member` and add someone else so you can safely
