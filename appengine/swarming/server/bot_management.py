@@ -186,6 +186,7 @@ class BotInfo(_BotCommon):
     super(BotInfo, self)._pre_put_hook()
     if not self.task_id:
       self.task_name = None
+    logging.info('Pre-put BotInfo: %s', self)
 
 
 class BotEvent(_BotCommon):
