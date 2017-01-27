@@ -32,7 +32,7 @@ of its server configuration.
 
 ### config.proto
 
-Defines SettingsCfg, a protocol buffer with the enable\_ts\_monitoring field.
+Defines SettingsCfg, a protocol buffer with the `enable\_ts\_monitoring` field.
 Set to true to enable [ts\_mon](../../third_party/gae_ts_mon) integration and
 report various lease statistics \(see [metrics.py](../../metrics.py)\).
 
