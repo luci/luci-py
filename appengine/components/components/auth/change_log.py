@@ -40,9 +40,9 @@ def process_change(auth_db_rev):
 
 # Regexp for valid values of AuthDBChange.target property.
 TARGET_RE = re.compile(
-    r'^[0-9a-zA-Z_]{1,40}\$' +               # entity kind
-    r'[0-9a-zA-Z_\-\./ ]{1,300}' +           # entity ID (group, IP whitelist)
-    r'(\$[0-9a-zA-Z_@\-\./\:\* ]{1,200})?$') # optional subentity ID
+    r'^[0-9a-zA-Z_]{1,40}\$' +                # entity kind
+    r'[0-9a-zA-Z_\-\./ @]{1,300}' +           # entity ID (group, IP whitelist)
+    r'(\$[0-9a-zA-Z_@\-\./\:\* ]{1,200})?$')  # optional subentity ID
 
 
 class AuthDBLogRev(ndb.Model):
