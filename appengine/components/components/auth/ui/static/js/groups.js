@@ -652,7 +652,7 @@ var waitForResult = function(defer, groupChooser, form) {
 // Sets up jQuery.validate validators for group form fields.
 var registerFormValidators = function() {
   // Regular expressions for form fields.
-  var groupRe = /^[0-9a-zA-Z_\-\.\/]{3,80}$/;
+  var groupRe = /^[0-9a-zA-Z_\-\.\/@]{3,80}$/;
   var membersRe = /^((user|bot|service|anonymous)\:)?[\w\-\+\%\.\@\*\[\]]+$/;
 
   // Splits |value| on lines boundary and checks that each line matches 're'.
