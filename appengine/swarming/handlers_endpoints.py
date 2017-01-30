@@ -57,21 +57,15 @@ def get_request_and_result(task_id):
                                 TaskResultSummay.
   """
   try:
-    key = task_pack.unpack_result_summary_key(task_id)
-    request_key = task_pack.result_summary_key_to_request_key(key)
+    request_key, result_key = task_pack.get_request_and_result_keys(task_id)
+    request, result = ndb.get_multi((request_key, result_key))
+    if not request or not result:
+      raise endpoints.NotFoundException('%s not found.' % task_id)
+    if not acl.is_bot() and not request.has_access:
+      raise endpoints.ForbiddenException('%s is not accessible.' % task_id)
+    return request, result
   except ValueError:
-    try:
-      key = task_pack.unpack_run_result_key(task_id)
-      request_key = task_pack.result_summary_key_to_request_key(
-          task_pack.run_result_key_to_result_summary_key(key))
-    except ValueError:
-      raise endpoints.BadRequestException('%s is an invalid key.' % task_id)
-  request, result = ndb.get_multi((request_key, key))
-  if not request or not result:
-    raise endpoints.NotFoundException('%s not found.' % key.id())
-  if not acl.is_bot() and not request.has_access:
-    raise endpoints.ForbiddenException('%s is not accessible.' % key.id())
-  return request, result
+    raise endpoints.BadRequestException('%s is an invalid key.' % task_id)
 
 
 def get_or_raise(key):
@@ -441,6 +435,47 @@ class SwarmingTasksService(remote.Service):
     return swarming_rpcs.TaskRequests(
         cursor=cursor,
         items=[message_conversion.task_request_to_rpc(i) for i in items],
+        now=now)
+
+  @gae_ts_mon.instrument_endpoint()
+  @auth.endpoints_method(
+      swarming_rpcs.TasksCancelRequest, swarming_rpcs.TasksCancelResponse,
+      http_method='POST')
+  @auth.require(acl.is_admin)
+  def cancel(self, request):
+    """Cancel a subset of pending tasks based on the tags.
+
+    Cancellation happens asynchronously, so when this call returns,
+    cancellations will not have completed yet.
+    """
+    logging.info('%s', request)
+    if not request.tags:
+      # Prevent accidental cancellation of everything.
+      raise endpoints.BadRequestException(
+          'You must specify tags when cancelling multiple tasks.')
+
+    now = utils.utcnow()
+    query = task_result.TaskResultSummary.query(
+        task_result.TaskResultSummary.state == task_result.State.PENDING)
+    for tag in request.tags:
+      query = query.filter(task_result.TaskResultSummary.tags == tag)
+
+    tasks, cursor = datastore_utils.fetch_page(query, request.limit,
+                                               request.cursor)
+
+    if tasks:
+      ok = utils.enqueue_task('/internal/taskqueue/cancel-tasks',
+                              'cancel-tasks',
+                              payload=','.join(t.task_id for t in tasks))
+      if not ok:
+        raise endpoints.InternalServerErrorException(
+            'Could not enqueue cancel request, try again later')
+    else:
+      logging.info('No tasks to cancel.')
+
+    return swarming_rpcs.TasksCancelResponse(
+        cursor=cursor,
+        matched=len(tasks),
         now=now)
 
   @gae_ts_mon.instrument_endpoint()

@@ -23,6 +23,7 @@ from server import bot_management
 from server import config
 from server import lease_management
 from server import stats
+from server import task_pack
 from server import task_result
 from server import task_scheduler
 import ts_mon_metrics
@@ -158,6 +159,30 @@ class CronTasksTagsAggregationHandler(webapp2.RequestHandler):
         ts=now).put()
 
 
+class CancelTasksHandler(webapp2.RequestHandler):
+  """Cancels tasks given a list of their ids."""
+  @decorators.require_taskqueue('cancel-tasks')
+  def post(self):
+    ids = self.request.body.split(',')
+    logging.info('Cancelling tasks with ids %s', ids)
+    for task_id in ids:
+      if not task_id:
+        logging.error('Cannot cancel a blank task')
+        continue
+      request_key, result_key = task_pack.get_request_and_result_keys(task_id)
+      if not request_key or not result_key:
+        logging.error('Cannot search for a falsey key. Request: %s Result: %s',
+                      request_key, result_key)
+        continue
+      request_obj = request_key.get()
+      if not request_obj:
+        logging.error('Request for %s was not found.', request_key.id())
+        continue
+      ok, was_running = task_scheduler.cancel_task(request_obj, result_key)
+      logging.info('task %s canceled: %s was running: %s',
+                   task_id, ok, was_running)
+
+
 class TaskCleanupDataHandler(webapp2.RequestHandler):
   """Deletes orphaned blobs."""
 
@@ -236,6 +261,7 @@ def get_routes():
         CronMachineProviderManagementHandler),
 
     # Task queues.
+    ('/internal/taskqueue/cancel-tasks', CancelTasksHandler),
     ('/internal/taskqueue/cleanup_data', TaskCleanupDataHandler),
     (r'/internal/taskqueue/pubsub/<task_id:[0-9a-f]+>', TaskSendPubSubMessage),
     ('/internal/taskqueue/machine-provider-manage',

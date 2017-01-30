@@ -161,6 +161,10 @@ class TaskPackApiTest(test_case.TestCase):
     with self.assertRaises(ValueError):
       task_pack.unpack_run_result_key('bb80203')
 
+  def test_get_request_and_result_keys(self):
+    # Moved here, but tested in handlers_endpoints_test.py
+    pass
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

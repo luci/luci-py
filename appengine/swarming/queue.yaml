@@ -24,6 +24,9 @@ queue:
     task_retry_limit: 0
     task_age_limit: 1s
 
+- name: cancel-tasks
+  rate: 500/s
+
 - name: tsmon
   bucket_size: 10
   rate: 10/s

@@ -11,6 +11,8 @@ schema details to the user.
 
 from google.appengine.ext import ndb
 
+from server import acl
+
 
 # Mask to TaskRequest key ids so they become decreasing numbers.
 TASK_REQUEST_KEY_ID_MASK = int(2L**63-1)
@@ -73,6 +75,23 @@ def run_result_key_to_performance_stats_key(run_result_key):
 
 
 ### Packing and unpacking.
+
+
+def get_request_and_result_keys(task_id):
+  """Provides the key and TaskRequest corresponding to a task ID.
+
+  Returns:
+    tuple(request_key, result_key): ndb.Key that yield TaskRequest and either
+                                    (TaskRunResult or TaskResultSummay).
+  """
+  try:
+    key = unpack_result_summary_key(task_id)
+    request_key = result_summary_key_to_request_key(key)
+  except ValueError:
+    key = unpack_run_result_key(task_id)
+    request_key = result_summary_key_to_request_key(
+        run_result_key_to_result_summary_key(key))
+  return request_key, key
 
 
 def pack_request_key(request_key):

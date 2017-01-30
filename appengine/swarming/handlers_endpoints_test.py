@@ -795,6 +795,39 @@ class TasksApiTest(BaseTest):
     response = self.call_api('new', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
 
+  def test_mass_cancel(self):
+    notifies = []
+    def enqueue_task_mock(**kwargs):
+      notifies.append(kwargs)
+      return True
+    self.mock(utils, 'enqueue_task', enqueue_task_mock)
+
+    # Create two tasks.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    first, second, _, _, _, now_120 = self._gen_three_pending_tasks()
+    now_120_str = unicode(now_120.strftime(self.DATETIME_NO_MICRO))
+
+    expected = {
+      u'matched': u'2',
+      u'now': now_120_str,
+    }
+    self.set_as_admin()
+
+    def enqueue_task(*args, **kwargs):
+      self.assertEqual('%s,%s' % (second, first),
+                       kwargs.get('payload', ''))
+      # check URL
+      self.assertEqual('/internal/taskqueue/cancel-tasks', args[0])
+      # check task queue
+      self.assertEqual('cancel-tasks', args[1])
+      return True
+    self.mock(utils, 'enqueue_task', enqueue_task)
+
+    response = self.call_api('cancel', body={u'tags': [u'os:Win']})
+    self.assertEqual(expected, response.json)
+
+
+
   def test_list_ok(self):
     """Asserts that list requests all TaskResultSummaries."""
     first, second, str_now_120, start, end = self._gen_two_tasks()
@@ -1099,6 +1132,36 @@ class TasksApiTest(BaseTest):
     self.set_as_privileged_user()
     return first, second, str_now_120, start, end
 
+
+  def _gen_three_pending_tasks(self):
+    # Creates three pending tasks, spaced 1 minute apart
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+    self.mock(random, 'getrandbits', lambda _: 0x66)
+    _, first_id = self.client_create_task_raw(
+        name='first', tags=['project:yay', 'commit:abcd', 'os:Win'],
+        pubsub_topic='projects/abc/topics/def',
+        pubsub_userdata='1234',
+        properties=dict(idempotent=True))
+
+    now_60 = self.mock_now(now, 60)
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    _, second_id = self.client_create_task_raw(
+        name='second', user='jack@localhost',
+        pubsub_topic='projects/abc/topics/def',
+        pubsub_userdata='5678',
+        tags=['project:yay', 'commit:efgh', 'os:Win'],
+        properties=dict(idempotent=True))
+
+    now_120 = self.mock_now(now, 120)
+    _, third_id = self.client_create_task_raw(
+        name='third', user='jack@localhost',
+        pubsub_topic='projects/abc/topics/def',
+        pubsub_userdata='9000',
+        tags=['project:yay', 'commit:ijkhl', 'os:Linux'],
+        properties=dict(idempotent=True))
+
+    return first_id, second_id, third_id, now, now_60, now_120
 
 class TaskApiTest(BaseTest):
   api_service_cls = handlers_endpoints.SwarmingTaskService

@@ -276,6 +276,14 @@ class TasksRequest(messages.Message):
   include_performance_stats = messages.BooleanField(8, default=False)
 
 
+class TasksCancelRequest(messages.Message):
+  """Request to cancel some subset of pending tasks.
+  """
+  tags = messages.StringField(1, repeated=True)
+  cursor = messages.StringField(2)
+  limit = messages.IntegerField(3, default=100)
+
+
 class TasksCountRequest(messages.Message):
   """Request to count some subset of tasks."""
   # These should be DateTimeField but endpoints + protorpc have trouble encoding
@@ -313,6 +321,14 @@ class CancelResponse(messages.Message):
   """Result of a request to cancel a task."""
   ok = messages.BooleanField(1)
   was_running = messages.BooleanField(2)
+
+
+class TasksCancelResponse(messages.Message):
+  """Result of canceling some subset of pending tasks.
+  """
+  cursor = messages.StringField(1)
+  now = message_types.DateTimeField(2)
+  matched = messages.IntegerField(3)
 
 
 class TaskOutput(messages.Message):
