@@ -1589,6 +1589,7 @@ class BotsApiTest(BaseTest):
     bot1 = {
       u'authenticated_as': u'bot:whitelisted-ip',
       u'bot_id': u'id1',
+      u'deleted': False,
       u'dimensions': [
         {u'key': u'foo', u'value': [u'bar']},
         {u'key': u'id', u'value': [u'id1']},
@@ -1604,6 +1605,7 @@ class BotsApiTest(BaseTest):
     bot2 = {
       u'authenticated_as': u'bot:whitelisted-ip',
       u'bot_id': u'id2',
+      u'deleted': False,
       u'dimensions': [
         {u'key': u'foo', u'value': [u'bar']},
         {u'key': u'id', u'value': [u'id2']},
@@ -1619,6 +1621,7 @@ class BotsApiTest(BaseTest):
     bot3 = {
       u'authenticated_as': u'bot:whitelisted-ip',
       u'bot_id': u'id3',
+      u'deleted': False,
       u'dimensions': [
         {u'key': u'foo', u'value': [u'bar']},
         {u'key': u'id', u'value': [u'id3']},
@@ -1851,6 +1854,7 @@ class BotApiTest(BaseTest):
     expected = {
       u'authenticated_as': u'bot:whitelisted-ip',
       u'bot_id': u'id1',
+      u'deleted': False,
       u'dimensions': [
         {u'key': u'foo', u'value': [u'bar']},
         {u'key': u'id', u'value': [u'id1']},

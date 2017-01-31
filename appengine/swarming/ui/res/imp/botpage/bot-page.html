@@ -83,6 +83,11 @@
         margin-top: auto;
       }
 
+      .deleted {
+        text-align: center;
+        font-size: larger;
+      }
+
       paper-checkbox {
         --paper-checkbox-label-color: #fff;
         --paper-checkbox-checked-color: #fff;
@@ -155,6 +160,12 @@
         <div class="horizontal wrap layout">
           <div class="flex">
             <table>
+              <template is="dom-if" if="[[_bot.deleted]]">
+                <tr class="dead deleted" title="This bot was deleted.">
+                  <td colspan=3>THIS BOT WAS DELETED</td>
+                </td>
+              </tr>
+              </template>
               <tr class$="[[_isDead(_bot)]]" title="Last time the bot contacted the server.">
                 <td>Last Seen</td>
                 <td title="[[_bot.human_last_seen_ts]]">
@@ -441,15 +452,15 @@
       },
 
       _canCancel: function(bot, permissions) {
-        return bot && bot.task_id && permissions.cancel_task;
+        return bot && bot.task_id && permissions.cancel_task && !bot.deleted;
       },
 
       _canDelete: function(bot, permissions) {
-        return bot && bot.is_dead && permissions.delete_bot;
+        return bot && bot.is_dead && permissions.delete_bot && !bot.deleted;
       },
 
       _canShutdown: function(bot, permissions){
-        return bot && !bot.is_dead && permissions.terminate_bot;
+        return bot && !bot.is_dead && permissions.terminate_bot && !bot.deleted;
       },
 
       _classVersion: function(serverVersion, otherVersion) {
@@ -503,7 +514,7 @@
       },
 
       _isDead(bot){
-        if (bot && bot.is_dead) {
+        if (bot && bot.is_dead && !bot.deleted) {
           return "dead";
         }
         return "";

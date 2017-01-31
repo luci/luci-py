@@ -555,8 +555,35 @@ class SwarmingBotService(remote.Service):
     task.
     """
     logging.info('%s', request)
-    bot = get_or_raise(bot_management.get_info_key(request.bot_id))
-    return message_conversion.bot_info_to_rpc(bot, utils.utcnow())
+    bot_id = request.bot_id
+    bot = bot_management.get_info_key(bot_id).get()
+    deleted = False
+    if not bot:
+      # If there is not BotInfo, look if there are BotEvent child of this
+      # entity. If this is the case, it means the bot was deleted but it's
+      # useful to show information about it to the user even if the bot was
+      # deleted. For example, it could be an machine-provider bot.
+      events = bot_management.get_events_query(bot_id, True).fetch(1)
+      if not events:
+        raise endpoints.NotFoundException('%s not found.' % bot_id)
+      bot = bot_management.BotInfo(
+          key=bot_management.get_info_key(bot_id),
+          dimensions_flat=bot_management.dimensions_to_flat(
+              events[0].dimensions),
+          state=events[0].state,
+          external_ip=events[0].external_ip,
+          authenticated_as=events[0].authenticated_as,
+          version=events[0].version,
+          quarantined=events[0].quarantined,
+          task_id=events[0].task_id,
+          last_seen_ts=events[0].ts,
+          lease_id=events[0].lease_id,
+          lease_expiration_ts=events[0].lease_expiration_ts,
+          machine_type=events[0].machine_type)
+      deleted = True
+
+    return message_conversion.bot_info_to_rpc(bot, utils.utcnow(),
+                                              deleted=deleted)
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(

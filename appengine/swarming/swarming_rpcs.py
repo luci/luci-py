@@ -494,6 +494,7 @@ class BotInfo(messages.Message):
   state = messages.StringField(12)
   lease_id = messages.StringField(13)
   lease_expiration_ts = message_types.DateTimeField(14)
+  deleted = messages.BooleanField(15)
 
 
 class BotList(messages.Message):
