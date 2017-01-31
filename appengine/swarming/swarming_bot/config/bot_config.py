@@ -85,7 +85,7 @@ def get_settings(bot):
       # 'size'.
       'max_percent': 15.,
       # Minimum of of free space percentage, even if higher than 'size'.
-      'min_percent': 5.,
+      'min_percent': 7.,
       # Number of bytes to add to the minimum value selected above when
       # calculating the isolated cache trimming. This is to ensure that system
       # level processes writing logs and such do not cause to criss the

@@ -89,7 +89,7 @@ DEFAULT_SETTINGS = {
   'free_partition': {
     'size': 4 * 1024*1024*1024,
     'max_percent': 15.,
-    'min_percent': 5.,
+    'min_percent': 7.,
     'wiggle': 250 * 1024*1024,
   },
   'caches': {
