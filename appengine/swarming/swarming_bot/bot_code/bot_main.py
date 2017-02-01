@@ -71,6 +71,7 @@ SINGLETON = singleton.Singleton(os.path.dirname(THIS_FILE))
 # for more details.
 PASSLIST = (
   '*-cacert.pem',
+  'c',
   'cipd_cache',
   'isolated_cache',
   'logs',
