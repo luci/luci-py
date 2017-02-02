@@ -83,11 +83,12 @@ class ServerApiTest(BaseTest):
     response = self.call_api('permissions')
     expected = {
         u'cancel_task': False,
-        u'terminate_bot': False,
+        u'cancel_tasks': False,
         u'delete_bot': False,
+        u'get_bootstrap_token': False,
         u'get_configs': False,
         u'put_configs': False,
-        u'get_bootstrap_token': False,
+        u'terminate_bot': False,
     }
     self.assertEqual(expected, response.json)
 
@@ -97,11 +98,12 @@ class ServerApiTest(BaseTest):
     response = self.call_api('permissions')
     expected = {
         u'cancel_task': True,
-        u'terminate_bot': False,
+        u'cancel_tasks': False,
         u'delete_bot': False,
+        u'get_bootstrap_token': False,
         u'get_configs': True,
         u'put_configs': False,
-        u'get_bootstrap_token': False,
+        u'terminate_bot': False,
     }
     self.assertEqual(expected, response.json)
 
@@ -111,11 +113,12 @@ class ServerApiTest(BaseTest):
     response = self.call_api('permissions')
     expected = {
         u'cancel_task': True,
-        u'terminate_bot': True,
+        u'cancel_tasks': False,
         u'delete_bot': False,
+        u'get_bootstrap_token': False,
         u'get_configs': True,
         u'put_configs': False,
-        u'get_bootstrap_token': False,
+        u'terminate_bot': True,
     }
     self.assertEqual(expected, response.json)
 
@@ -125,11 +128,12 @@ class ServerApiTest(BaseTest):
     response = self.call_api('permissions')
     expected = {
         u'cancel_task': True,
-        u'terminate_bot': True,
+        u'cancel_tasks': True,
         u'delete_bot': True,
+        u'get_bootstrap_token': True,
         u'get_configs': True,
         u'put_configs': True,
-        u'get_bootstrap_token': True,
+        u'terminate_bot': True,
     }
     self.assertEqual(expected, response.json)
 

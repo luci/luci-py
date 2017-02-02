@@ -28,6 +28,7 @@
 <link rel="import" href="/res/imp/bower_components/iron-flex-layout/iron-flex-layout-classes.html">
 <link rel="import" href="/res/imp/bower_components/iron-icons/iron-icons.html">
 <link rel="import" href="/res/imp/bower_components/iron-selector/iron-selector.html">
+<link rel="import" href="/res/imp/bower_components/paper-button/paper-button.html">
 <link rel="import" href="/res/imp/bower_components/paper-checkbox/paper-checkbox.html">
 <link rel="import" href="/res/imp/bower_components/paper-icon-button/paper-icon-button.html">
 <link rel="import" href="/res/imp/bower_components/paper-input/paper-input.html">
@@ -45,6 +46,10 @@
       }
       .selector.wide {
         min-width: 275px;
+      }
+      .cancel-button {
+        display: block;
+        margin-top: 5px;
       }
     </style>
 
@@ -155,6 +160,11 @@
             value="{{_limit}}">
           </paper-input>
           <a href$="[[_matchingBotsLink(query_params,dimensions.*)]]">View Matching Bots</a>
+          <template is="dom-if" if="[[permissions.cancel_tasks]]">
+            <paper-button class="cancel-button" raised on-tap="_promptCancel">
+              Cancel All Tasks
+            </paper-button>
+          </template>
         </div>
       </div>
 
@@ -205,6 +215,10 @@
           type: Object,
           computed: "_extractQueryParams(_filters.*, _limit)",
           notify: true,
+        },
+
+        permissions: {
+          type: Object,
         },
 
         // for QueryColumnFilter
@@ -277,6 +291,14 @@
           }
         }.bind(this));
         return this._botListLink(dimensions, cols);
+      },
+
+      _promptCancel: function() {
+        if (!this.query_params.tags || !this.query_params.tags.length) {
+          sk.errorMessage("You can't batch cancel everything.  Specify some tags to filter by first.", 8000);
+          return;
+        }
+        this.fire('cancel-all',{tags:this.query_params.tags})
       },
 
       _showTagMessage: function(primarySelected, selectedItems) {

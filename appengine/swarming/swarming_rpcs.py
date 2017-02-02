@@ -85,8 +85,11 @@ class ClientPermissions(messages.Message):
   terminate_bot = messages.BooleanField(2)
   get_configs = messages.BooleanField(3)
   put_configs = messages.BooleanField(4)
+  # Cancel one single task
   cancel_task = messages.BooleanField(5)
   get_bootstrap_token = messages.BooleanField(6)
+  # Cancel multiple tasks at once, usually in emergencies.
+  cancel_tasks = messages.BooleanField(7)
 
 
 class FileContentRequest(messages.Message):

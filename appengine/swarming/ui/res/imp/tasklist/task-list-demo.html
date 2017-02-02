@@ -64,7 +64,8 @@
     server.respondWith("POST", /^\/api\/swarming\/v1\/task\/.+\/cancel/, cancel);
 
     var permissions = {
-      cancel_task: true
+      cancel_task: true,
+      cancel_tasks: true
     };
     server.respondWith("GET",  /^\/_ah\/api\/swarming\/v1\/server\/permissions/, JSON.stringify(permissions));
     server.respondWith("GET", /^\/api\/swarming\/v1\/server\/permissions/, JSON.stringify(permissions));
@@ -74,6 +75,34 @@
     };
     server.respondWith("GET", /^\/_ah\/api\/swarming\/v1\/server\/details/, JSON.stringify(details));
     server.respondWith("GET", /^\/api\/swarming\/v1\/server\/details/, JSON.stringify(details));
+
+    var countDetails = {
+      count: 450,
+    }
+    server.respondWith("GET", /^\/api\/swarming\/v1\/tasks\/count/, JSON.stringify(countDetails));
+
+    var cancelCount = 0;
+    server.respondWith("POST", /^\/api\/swarming\/v1\/tasks\/cancel/, function(request){
+      if (!request.requestHeaders.authorization) {
+        sinon.log("You must be logged in (check your Oauth?)");
+        request.respond(403, {}, "You must be logged in (check your Oauth?)");
+        return;
+      }
+      request.requestBody = JSON.parse(request.requestBody);
+      if (!request.requestBody.tags || !request.requestBody.tags.length) {
+        request.respond(400, {}, "Tags cannot be empty");
+        return;
+      }
+      var response = {
+        matched: "49",
+      };
+      if (cancelCount < 4) {
+        response.matched = "100";
+        response.cursor = "foobar" + cancelCount;
+      }
+      cancelCount++;
+      request.respond(200, {}, JSON.stringify(response));
+    });
     </script>
 
     <link rel="import" href="task-list.html">

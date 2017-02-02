@@ -169,6 +169,7 @@ class SwarmingServerService(remote.Service):
         get_configs = acl.is_user(),
         put_configs = acl.is_admin(),
         cancel_task = acl.is_user(),
+        cancel_tasks = acl.is_admin(),
         get_bootstrap_token = acl.is_bootstrapper(),
       )
 

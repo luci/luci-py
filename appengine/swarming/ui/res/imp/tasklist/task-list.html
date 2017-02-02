@@ -26,7 +26,6 @@
 
 <link rel="import" href="/res/imp/bower_components/iron-flex-layout/iron-flex-layout-classes.html">
 <link rel="import" href="/res/imp/bower_components/paper-button/paper-button.html">
-<link rel="import" href="/res/imp/bower_components/paper-button/paper-button.html">
 <link rel="import" href="/res/imp/bower_components/paper-dialog/paper-dialog.html">
 <link rel="import" href="/res/imp/bower_components/polymer/polymer.html">
 
@@ -39,6 +38,7 @@
 
 <link rel="import" href="task-filters.html">
 <link rel="import" href="task-list-data.html">
+<link rel="import" href="task-mass-cancel.html">
 
 <dom-module id="task-list">
   <template>
@@ -83,13 +83,16 @@
         <div class="horizontal layout">
           <task-filters
             dimensions="[[_dimensions]]"
+            permissions="[[_permissions]]"
             primary_map="[[_primary_map]]"
             primary_arr="[[_primary_arr]]"
             special_columns="[[_specialColumns]]"
 
             columns="{{_columns}}"
             query_params="{{_query_params}}"
-            filter="{{_filter}}">
+            filter="{{_filter}}"
+
+            on-cancel-all="_promptCancelAll">
           </task-filters>
         </div>
 
@@ -237,12 +240,30 @@
       </div>
     </swarming-app>
 
+    <!-- Paper dialogs must be on the "outside" of the DOM, that is, not inside of other elements, otherwise the shadow backdrop is weird.-->
     <paper-dialog id="prompt" modal on-iron-overlay-closed="_promptClosed">
       <h2>Are you sure?</h2>
       <div>Are you sure you want to [[_dialogPrompt]]?</div>
       <div class="buttons">
         <paper-button dialog-dismiss autofocus>No</paper-button>
         <paper-button dialog-confirm>Yes</paper-button>
+      </div>
+    </paper-dialog>
+
+    <paper-dialog id="cancel_all_dialog" modal>
+      <task-mass-cancel
+        id="mass_cancel"
+        auth_headers="[[_auth_headers]]"
+        started_canceling="{{_started_canceling}}"
+        finished_canceling="{{_finished_canceling}}">
+      </task-mass-cancel>
+      <div class="buttons" >
+        <paper-button dialog-dismiss autofocus hidden$="[[_started_canceling]]">
+          Go Back - Don't Cancel Anything
+        </paper-button>
+        <paper-button dialog-dismiss autofocus hidden$="[[!_finished_canceling]]">
+          Done
+        </paper-button>
       </div>
     </paper-dialog>
 
@@ -419,6 +440,16 @@
         this.set("_toCancel", task.task_id);
         this.set("_dialogPrompt", 'cancel task "'+ task.name +'"');
         this.$.prompt.open();
+      },
+
+      _promptCancelAll: function(e) {
+        this.$.mass_cancel.tags = e.detail.tags;
+        this.$.mass_cancel.prompt();
+        this.$.cancel_all_dialog.open();
+      },
+
+      _closeCancelAll: function() {
+        this.$.cancel_all_dialog.close();
       },
 
       reload: function() {
