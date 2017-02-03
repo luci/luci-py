@@ -46,8 +46,6 @@ def initialize(service_name):
       'appengine_name=%s', run_type, hostname, service_name, appengine_name)
 
 # The remaining lines are copied from infra_libs/event_mon/__init__.py.
-from infra_libs.event_mon.checkouts import get_revinfo, parse_revinfo
-
 from infra_libs.event_mon.config import add_argparse_options
 from infra_libs.event_mon.config import close
 from infra_libs.event_mon.config import set_default_event, get_default_event
