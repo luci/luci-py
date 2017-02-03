@@ -27,6 +27,7 @@
 <link rel="import" href="/res/imp/bower_components/iron-icon/iron-icon.html">
 <link rel="import" href="/res/imp/bower_components/iron-icons/iron-icons.html">
 <link rel="import" href="/res/imp/bower_components/paper-button/paper-button.html">
+<link rel="import" href="/res/imp/bower_components/paper-checkbox/paper-checkbox.html">
 <link rel="import" href="/res/imp/bower_components/paper-dialog/paper-dialog.html">
 <link rel="import" href="/res/imp/bower_components/paper-input/paper-input.html">
 <link rel="import" href="/res/imp/bower_components/paper-tabs/paper-tabs.html">
@@ -72,8 +73,12 @@
       }
 
       .stdout {
-        white-space: pre-line;
+        white-space: pre-wrap;
         padding: 2px;
+      }
+      .stdout.wide {
+        white-space: pre;
+        overflow-x: auto
       }
 
       .refresh_input {
@@ -103,6 +108,21 @@
         font-weight: bold;
         margin-left: 8px;
       }
+
+      .full-width {
+        min-width: 100%;
+      }
+
+      .full-width-container {
+        position: relative;
+      }
+
+      .full-width-container > paper-checkbox {
+        position: absolute;
+        bottom: 10px;
+        width: 140px;
+        left: 5px;
+      }
     </style>
 
     <url-param name="id"
@@ -116,6 +136,9 @@
     </url-param>
     <url-param name="show_raw"
       value="{{_show_raw}}">
+    </url-param>
+    <url-param name="wide_logs"
+      value="{{_wide_logs}}">
     </url-param>
     <url-param name="refresh"
       value="{{_refresh_interval}}"
@@ -500,7 +523,7 @@
             </div>
           </div>
 
-          <div class="flex right" hidden$="[[_not(_task_exists)]]">
+          <div class$="flex right [[_classRight(_wide_logs)]]" hidden$="[[_not(_task_exists)]]">
             <div class="horizontal layout">
               <div class="tabs">
                 <paper-tabs selected="{{_show_raw}}" no-bar>
@@ -519,6 +542,13 @@
                 max="1000"
                 pattern="[0-9]+">
               </paper-input>
+
+              <div class="full-width-container">
+                <paper-checkbox checked="{{_wide_logs}}">
+                    Full Width Logs
+                </paper-checkbox>
+              </div>
+
             </div>
 
             <template is="dom-if" if="[[_supportsMilo(_request,_show_raw)]]">
@@ -528,7 +558,7 @@
               <iframe id="miloFrame" class="milo tabbed" src$="[[_getDisplayServerLink(_server_details.display_server_url_template,task_id)]]"></iframe>
             </template>
             <template is="dom-if" if="[[_show_raw]]">
-              <div class="code stdout tabbed break-all">[[_rawOutput(_stdout,_result)]]</div>
+              <div class$="code stdout tabbed break-all [[_classStdout(_wide_logs)]]">[[_rawOutput(_stdout,_result)]]</div>
             </template>
           </div>
         </div>
@@ -655,6 +685,20 @@
           });
         });
         return packages;
+      },
+
+      _classRight: function(wide_logs) {
+        if (wide_logs) {
+          return "full-width";
+        }
+        return "";
+      },
+
+      _classStdout: function(wide_logs) {
+         if (wide_logs) {
+          return "wide";
+        }
+        return "";
       },
 
       _command: function(request) {
