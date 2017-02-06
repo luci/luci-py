@@ -157,6 +157,28 @@ class AssociateMetadataOperationTest(test_case.TestCase):
     checksum = key.get().active_metadata_update.checksum
     expected_url = 'url'
 
+    metadata.associate_metadata_operation(key, checksum, 'url')
+    self.assertEqual(key.get().active_metadata_update.url, expected_url)
+
+  def test_already_has_mismatched_url(self):
+    """Ensures nothing happens when an unexpected URL is already associated."""
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+        active_metadata_update=models.MetadataUpdate(
+            metadata={
+                'key': 'value',
+            },
+            url='url',
+        ),
+    ).put()
+    checksum = key.get().active_metadata_update.checksum
+    expected_url = 'url'
+
     metadata.associate_metadata_operation(key, checksum, 'new-url')
     self.assertEqual(key.get().active_metadata_update.url, expected_url)
 
@@ -180,6 +202,355 @@ class AssociateMetadataOperationTest(test_case.TestCase):
 
     metadata.associate_metadata_operation(key, checksum, 'url')
     self.assertEqual(key.get().active_metadata_update.url, expected_url)
+
+
+class ClearActiveMetadataUpdateTest(test_case.TestCase):
+  """Tests for metadata.clear_active_metadata_update."""
+
+  def test_not_found(self):
+    """Ensures nothing happens when the entity doesn't exist."""
+    key = ndb.Key(models.Instance, 'fake-key')
+    metadata.clear_active_metadata_update(key, 'url')
+    self.failIf(key.get())
+
+  def test_active_metadata_update_unspecified(self):
+    """Ensures nothing happens when an active metadata update is unspecified."""
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+        pending_metadata_updates=[
+            models.MetadataUpdate(metadata={'key2': 'value2'}),
+        ],
+    ).put()
+    expected_pending_metadata_updates = [
+        models.MetadataUpdate(metadata={'key2': 'value2'}),
+    ]
+
+    metadata.clear_active_metadata_update(key, 'url')
+    self.failIf(key.get().active_metadata_update)
+    self.assertEqual(
+        key.get().pending_metadata_updates, expected_pending_metadata_updates)
+
+  def test_url_mismatch(self):
+    """Ensures nothing happens when the URL is unexpected."""
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+        active_metadata_update=models.MetadataUpdate(
+            metadata={'key1': 'value1'},
+            url='expected-url',
+        ),
+        pending_metadata_updates=[
+            models.MetadataUpdate(metadata={'key2': 'value2'}),
+        ],
+    ).put()
+    expected_active_metadata_update = models.MetadataUpdate(
+        metadata={'key1': 'value1'},
+        url='expected-url',
+    )
+    expected_pending_metadata_updates = [
+        models.MetadataUpdate(metadata={'key2': 'value2'}),
+    ]
+
+    metadata.clear_active_metadata_update(key, 'url')
+    self.assertEqual(
+        key.get().active_metadata_update, expected_active_metadata_update)
+    self.assertEqual(
+        key.get().active_metadata_update.url,
+        expected_active_metadata_update.url,
+    )
+    self.assertEqual(
+        key.get().pending_metadata_updates, expected_pending_metadata_updates)
+
+  def test_cleared(self):
+    """Ensures an active metadata update is cleared."""
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+        active_metadata_update=models.MetadataUpdate(
+            metadata={'key1': 'value1'},
+            url='url',
+        ),
+        pending_metadata_updates=[
+            models.MetadataUpdate(metadata={'key2': 'value2'}),
+        ],
+    ).put()
+    expected_pending_metadata_updates = [
+        models.MetadataUpdate(metadata={'key2': 'value2'}),
+    ]
+
+    metadata.clear_active_metadata_update(key, 'url')
+    self.failIf(key.get().active_metadata_update)
+    self.assertEqual(
+        key.get().pending_metadata_updates, expected_pending_metadata_updates)
+
+
+class CheckTest(test_case.TestCase):
+  """Tests for metadata.check."""
+
+  def test_not_found(self):
+    """Ensures nothing happens when the entity doesn't exist."""
+    def json_request(*args, **kwargs):
+      self.fail('json_request called')
+    def send_machine_event(*args, **kwargs):
+      self.fail('send_machine_event called')
+    self.mock(metadata.net, 'json_request', json_request)
+    self.mock(metadata.metrics, 'send_machine_event', send_machine_event)
+
+    key = ndb.Key(models.Instance, 'fake-key')
+    metadata.check(key)
+    self.failIf(key.get())
+
+  def test_active_metadata_update_unspecified(self):
+    """Ensures nothing happens when a metadata update doesn't exist."""
+    def json_request(*args, **kwargs):
+      self.fail('json_request called')
+    def send_machine_event(*args, **kwargs):
+      self.fail('send_machine_event called')
+    self.mock(metadata.net, 'json_request', json_request)
+    self.mock(metadata.metrics, 'send_machine_event', send_machine_event)
+
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+    ).put()
+
+    metadata.check(key)
+    self.failIf(key.get().active_metadata_update)
+
+  def test_url_unspecified(self):
+    """Ensures nothing happens when the active metadata update has no URL."""
+    def json_request(*args, **kwargs):
+      self.fail('json_request called')
+    def send_machine_event(*args, **kwargs):
+      self.fail('send_machine_event called')
+    self.mock(metadata.net, 'json_request', json_request)
+    self.mock(metadata.metrics, 'send_machine_event', send_machine_event)
+
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+        active_metadata_update=models.MetadataUpdate(
+            metadata={'key': 'value'},
+        ),
+    ).put()
+    expected_active_metadata_update = models.MetadataUpdate(
+        metadata={'key': 'value'},
+    )
+
+    metadata.check(key)
+    self.assertEqual(
+        key.get().active_metadata_update, expected_active_metadata_update)
+
+  def test_not_done(self):
+    """Ensures nothing happens when the active metadata operation isn't done."""
+    def json_request(*args, **kwargs):
+      return {'status': 'not done'}
+    def send_machine_event(*args, **kwargs):
+      self.fail('send_machine_event called')
+    self.mock(metadata.net, 'json_request', json_request)
+    self.mock(metadata.metrics, 'send_machine_event', send_machine_event)
+
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+        active_metadata_update=models.MetadataUpdate(
+            metadata={'key': 'value'},
+            url='url',
+        ),
+    ).put()
+    expected_active_metadata_update = models.MetadataUpdate(
+        metadata={'key': 'value'},
+        url='url',
+    )
+
+    metadata.check(key)
+    self.assertEqual(
+        key.get().active_metadata_update, expected_active_metadata_update)
+
+  def test_done(self):
+    """Ensures the active metadata operation is cleared when done."""
+    def json_request(*args, **kwargs):
+      return {'status': 'DONE'}
+    def send_machine_event(*args, **kwargs):
+      pass
+    self.mock(metadata.net, 'json_request', json_request)
+    self.mock(metadata.metrics, 'send_machine_event', send_machine_event)
+
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+        active_metadata_update=models.MetadataUpdate(
+            metadata={'key1': 'value1'},
+            url='url',
+        ),
+        pending_metadata_updates=[
+            models.MetadataUpdate(metadata={'key2': 'value2'}),
+        ],
+    ).put()
+    expected_pending_metadata_updates = [
+        models.MetadataUpdate(metadata={'key2': 'value2'}),
+    ]
+
+    metadata.check(key)
+    self.failIf(key.get().active_metadata_update)
+    self.assertEqual(
+        key.get().pending_metadata_updates, expected_pending_metadata_updates)
+
+  def test_error(self):
+    """Ensures the active metadata operation is rescheduled on error."""
+    def json_request(*args, **kwargs):
+      return {'error': 'error', 'status': 'DONE'}
+    def send_machine_event(*args, **kwargs):
+      pass
+    self.mock(metadata.net, 'json_request', json_request)
+    self.mock(metadata.metrics, 'send_machine_event', send_machine_event)
+
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+        active_metadata_update=models.MetadataUpdate(
+            metadata={'key1': 'value1'},
+            url='url',
+        ),
+        pending_metadata_updates=[
+            models.MetadataUpdate(metadata={'key2': 'value2'}),
+        ],
+    ).put()
+    expected_active_metadata_update = models.MetadataUpdate(
+        metadata={'key1': 'value1', 'key2': 'value2'},
+    )
+
+    metadata.check(key)
+    self.assertEqual(
+        key.get().active_metadata_update, expected_active_metadata_update)
+    self.failIf(key.get().pending_metadata_updates)
+
+
+class CompressTest(test_case.TestCase):
+  """Tests for metadata.compress."""
+
+  def test_not_found(self):
+    """Ensures nothing happens when the entity doesn't exist."""
+    def send_machine_event(*args, **kwargs):
+      self.fail('send_machine_event called')
+    self.mock(metadata.metrics, 'send_machine_event', send_machine_event)
+
+    key = ndb.Key(models.Instance, 'fake-key')
+    metadata.compress(key)
+    self.failIf(key.get())
+
+  def test_active_metadata_update(self):
+    """Ensures nothing happens when a metadata update is already active."""
+    def send_machine_event(*args, **kwargs):
+      self.fail('send_machine_event called')
+    self.mock(metadata.metrics, 'send_machine_event', send_machine_event)
+
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+        active_metadata_update=models.MetadataUpdate(
+            metadata={'key1': 'value1'},
+        ),
+        pending_metadata_updates=[
+            models.MetadataUpdate(metadata={'key2': 'value2'}),
+        ],
+    ).put()
+    expected_active_metadata_update = models.MetadataUpdate(
+        metadata={'key1': 'value1'},
+    )
+    expected_pending_metadata_updates = [
+        models.MetadataUpdate(metadata={'key2': 'value2'}),
+    ]
+
+    metadata.compress(key)
+    self.assertEqual(
+        key.get().active_metadata_update, expected_active_metadata_update)
+    self.assertEqual(
+        key.get().pending_metadata_updates, expected_pending_metadata_updates)
+
+  def test_no_pending_metadata_updates(self):
+    """Ensures nothing happens when there are no pending metadata updates."""
+    def send_machine_event(*args, **kwargs):
+      self.fail('send_machine_event called')
+    self.mock(metadata.metrics, 'send_machine_event', send_machine_event)
+
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+    ).put()
+
+    metadata.compress(key)
+    self.failIf(key.get().active_metadata_update)
+    self.failIf(key.get().pending_metadata_updates)
+
+  def test_pending_metadata_update(self):
+    """Ensures a pending metadata update is activated."""
+    def send_machine_event(*args, **kwargs):
+      pass
+    self.mock(metadata.metrics, 'send_machine_event', send_machine_event)
+
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+        pending_metadata_updates=[
+            models.MetadataUpdate(metadata={'key': 'value'}),
+        ],
+    ).put()
+    expected_active_metadata_update = models.MetadataUpdate(
+        metadata={
+            'key': 'value',
+        },
+    )
+
+    metadata.compress(key)
+    self.assertEqual(
+        key.get().active_metadata_update, expected_active_metadata_update)
+    self.failIf(key.get().pending_metadata_updates)
 
 
 class CompressPendingMetadataUpdatesTest(test_case.TestCase):
@@ -288,6 +659,100 @@ class CompressPendingMetadataUpdatesTest(test_case.TestCase):
     self.failIf(key.get().pending_metadata_updates)
 
 
+class RescheduleActiveMetadataUpdateTest(test_case.TestCase):
+  """Tests for metadata.reschedule_active_metadata_update."""
+
+  def test_not_found(self):
+    """Ensures nothing happens when the entity doesn't exist."""
+    key = ndb.Key(models.Instance, 'fake-key')
+    metadata.reschedule_active_metadata_update(key, 'url')
+    self.failIf(key.get())
+
+  def test_active_metadata_update_unspecified(self):
+    """Ensures nothing happens when an active metadata update is unspecified."""
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+        pending_metadata_updates=[
+            models.MetadataUpdate(metadata={'key2': 'value2'}),
+        ],
+    ).put()
+    expected_pending_metadata_updates = [
+        models.MetadataUpdate(metadata={'key2': 'value2'}),
+    ]
+
+    metadata.reschedule_active_metadata_update(key, 'url')
+    self.failIf(key.get().active_metadata_update)
+    self.assertEqual(
+        key.get().pending_metadata_updates, expected_pending_metadata_updates)
+
+  def test_url_mismatch(self):
+    """Ensures nothing happens when the URL is unexpected."""
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+        active_metadata_update=models.MetadataUpdate(
+            metadata={'key1': 'value1'},
+            url='expected-url',
+        ),
+        pending_metadata_updates=[
+            models.MetadataUpdate(metadata={'key2': 'value2'}),
+        ],
+    ).put()
+    expected_active_metadata_update = models.MetadataUpdate(
+        metadata={'key1': 'value1'},
+        url='expected-url',
+    )
+    expected_pending_metadata_updates = [
+        models.MetadataUpdate(metadata={'key2': 'value2'}),
+    ]
+
+    metadata.reschedule_active_metadata_update(key, 'url')
+    self.assertEqual(
+        key.get().active_metadata_update, expected_active_metadata_update)
+    self.assertEqual(
+        key.get().active_metadata_update.url,
+        expected_active_metadata_update.url,
+    )
+    self.assertEqual(
+        key.get().pending_metadata_updates, expected_pending_metadata_updates)
+
+  def test_rescheduled(self):
+    """Ensures an active metadata update is rescheduled."""
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+        active_metadata_update=models.MetadataUpdate(
+            metadata={'key1': 'value1'},
+            url='url',
+        ),
+        pending_metadata_updates=[
+            models.MetadataUpdate(metadata={'key2': 'value2'}),
+        ],
+    ).put()
+    expected_active_metadata_update = models.MetadataUpdate(
+        metadata={'key1': 'value1', 'key2': 'value2'},
+    )
+
+    metadata.reschedule_active_metadata_update(key, 'url')
+    self.assertEqual(
+        key.get().active_metadata_update, expected_active_metadata_update)
+    self.failIf(key.get().active_metadata_update.url)
+    self.failIf(key.get().pending_metadata_updates)
+
+
 class UpdateTest(test_case.TestCase):
   """Tests for metadata.update."""
 
@@ -296,6 +761,56 @@ class UpdateTest(test_case.TestCase):
     key = ndb.Key(models.Instance, 'fake-key')
     metadata.update(key)
     self.failIf(key.get())
+
+  def test_no_active_metadata_update(self):
+    """Ensures nothing happens when there is no active metadata update."""
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    models.Instance(
+        key=key,
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+    ).put()
+    models.InstanceGroupManager(
+        key=instances.get_instance_group_manager_key(key),
+    ).put()
+    models.InstanceTemplateRevision(
+        key=instances.get_instance_group_manager_key(key).parent(),
+    ).put()
+
+    metadata.update(key)
+    self.failIf(key.get().active_metadata_update)
+
+  def test_has_url(self):
+    """Ensures nothing happens when the active metadata update has a URL."""
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    models.Instance(
+        key=key,
+        active_metadata_update=models.MetadataUpdate(
+            metadata={
+                'key': 'value',
+            },
+            url='url',
+        ),
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+    ).put()
+    models.InstanceGroupManager(
+        key=instances.get_instance_group_manager_key(key),
+    ).put()
+    models.InstanceTemplateRevision(
+        key=instances.get_instance_group_manager_key(key).parent(),
+    ).put()
+
+    metadata.update(key)
+    self.assertEqual(key.get().active_metadata_update.url, 'url')
 
   def test_parent_not_found(self):
     """Ensures nothing happens when the parent doesn't exist."""

@@ -45,7 +45,7 @@ def apply_metadata_update(items, metadata):
         result.append({'key': item['key'], 'value': value})
       else:
         # Referenced None value, omit.
-        pass
+        pass # pragma: no cover
 
   # Add new metadata.
   result.extend(

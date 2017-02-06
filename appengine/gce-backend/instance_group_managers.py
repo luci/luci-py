@@ -5,6 +5,7 @@
 """Utilities for operating on instance group managers."""
 
 import collections
+import json
 import logging
 
 from google.appengine.ext import ndb
@@ -250,6 +251,7 @@ def delete(key):
           url,
           result['targetLink'],
       )
+      return
   except net.Error as e:
     if e.status_code != 404:
       # If the instance group manager isn't found, assume it's already deleted.
@@ -318,6 +320,7 @@ def resize(key):
 
   if not instance_group_manager.url:
     logging.warning('InstanceGroupManager URL unspecified: %s', key)
+    return
 
   instance_template_revision = key.parent().get()
   if not instance_template_revision:

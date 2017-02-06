@@ -17,4 +17,4 @@ if __name__ == '__main__':
   sys.exit(run_coverage.main(
       APP_DIR,
       ('tools',),
-      'PRESUBMIT.py,components,mapreduce,*test*,tool*'))
+      'PRESUBMIT.py,components,handlers_*,mapreduce,*test*,tool*'))

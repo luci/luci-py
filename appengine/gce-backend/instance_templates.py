@@ -229,6 +229,7 @@ def delete(key):
           url,
           result['targetLink'],
       )
+      return
   except net.Error as e:
     if e.status_code != 404:
       # If the instance template isn't found, assume it's already deleted.

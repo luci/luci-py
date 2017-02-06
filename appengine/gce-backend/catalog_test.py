@@ -15,11 +15,231 @@ from google.appengine.ext import ndb
 
 from components import datastore_utils
 from components import machine_provider
+from components import net
 from test_support import test_case
 
 import catalog
 import instances
 import models
+
+
+class CatalogTest(test_case.TestCase):
+  """Tests for catalog.catalog."""
+
+  def test_not_found(self):
+    """Ensures nothing happens when the instance doesn't exist."""
+    def add_machine(*args, **kwargs):
+      self.fail('add_machine called')
+    self.mock(catalog.machine_provider, 'add_machine', add_machine)
+
+    catalog.catalog(ndb.Key(models.Instance, 'fake-instance'))
+
+  def test_already_cataloged(self):
+    """Ensures nothing happens when the instance is already cataloged."""
+    def add_machine(*args, **kwargs):
+      self.fail('add_machine called')
+    self.mock(catalog.machine_provider, 'add_machine', add_machine)
+
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        cataloged=True,
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+    ).put()
+
+    catalog.catalog(key)
+    self.failUnless(key.get().cataloged)
+
+  def test_pending_deletion(self):
+    """Ensures nothing happens when the instance is pending deletion."""
+    def add_machine(*args, **kwargs):
+      self.fail('add_machine called')
+    self.mock(catalog.machine_provider, 'add_machine', add_machine)
+
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+        pending_deletion=True,
+    ).put()
+
+    catalog.catalog(key)
+    self.failIf(key.get().cataloged)
+
+  def test_instance_group_manager_not_found(self):
+    """Ensures nothing happens when the instance group manager doesn't exist."""
+    def add_machine(*args, **kwargs):
+      self.fail('add_machine called')
+    self.mock(catalog.machine_provider, 'add_machine', add_machine)
+
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+    ).put()
+
+    catalog.catalog(key)
+    self.failIf(key.get().cataloged)
+
+  def test_instance_template_revision_not_found(self):
+    """Ensures nothing happens when instance template revision doesn't exist."""
+    def add_machine(*args, **kwargs):
+      self.fail('add_machine called')
+    self.mock(catalog.machine_provider, 'add_machine', add_machine)
+
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+    ).put()
+    models.InstanceGroupManager(
+        key=instances.get_instance_group_manager_key(key),
+    ).put()
+
+    catalog.catalog(key)
+    self.failIf(key.get().cataloged)
+
+  def test_service_account_not_found(self):
+    """Ensures nothing happens when a service account doesn't exist."""
+    def add_machine(*args, **kwargs):
+      self.fail('add_machine called')
+    self.mock(catalog.machine_provider, 'add_machine', add_machine)
+
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+    ).put()
+    models.InstanceGroupManager(
+        key=instances.get_instance_group_manager_key(key),
+    ).put()
+    models.InstanceTemplateRevision(
+        key=instances.get_instance_group_manager_key(key).parent(),
+    ).put()
+
+    catalog.catalog(key)
+    self.failIf(key.get().cataloged)
+
+  def test_cataloged(self):
+    """Ensures an instance can be cataloged."""
+    def add_machine(*args, **kwargs):
+      return {}
+    def send_machine_event(*args, **kwargs):
+      pass
+    self.mock(catalog.machine_provider, 'add_machine', add_machine)
+    self.mock(catalog.metrics, 'send_machine_event', send_machine_event)
+
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+    ).put()
+    models.InstanceGroupManager(
+        key=instances.get_instance_group_manager_key(key),
+    ).put()
+    models.InstanceTemplateRevision(
+        key=instances.get_instance_group_manager_key(key).parent(),
+        service_accounts=[
+            models.ServiceAccount(name='service-account'),
+        ],
+    ).put()
+
+    catalog.catalog(key)
+    self.failUnless(key.get().cataloged)
+
+  def test_cataloging_error(self):
+    """Ensures an instance isn't marked cataloged on error."""
+    def add_machine(*args, **kwargs):
+      return {'error': 'error'}
+    def send_machine_event(*args, **kwargs):
+      pass
+    self.mock(catalog.machine_provider, 'add_machine', add_machine)
+    self.mock(catalog.metrics, 'send_machine_event', send_machine_event)
+
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+    ).put()
+    models.InstanceGroupManager(
+        key=instances.get_instance_group_manager_key(key),
+    ).put()
+    models.InstanceTemplateRevision(
+        key=instances.get_instance_group_manager_key(key).parent(),
+        service_accounts=[
+            models.ServiceAccount(name='service-account'),
+        ],
+    ).put()
+
+    catalog.catalog(key)
+    self.failIf(key.get().cataloged)
+
+  def test_cataloging_error_hostname_reuse(self):
+    """Ensures an instance is marked cataloged on HOSTNAME_REUSE."""
+    def add_machine(*args, **kwargs):
+      return {'error': 'HOSTNAME_REUSE'}
+    def send_machine_event(*args, **kwargs):
+      pass
+    self.mock(catalog.machine_provider, 'add_machine', add_machine)
+    self.mock(catalog.metrics, 'send_machine_event', send_machine_event)
+
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+    ).put()
+    models.InstanceGroupManager(
+        key=instances.get_instance_group_manager_key(key),
+    ).put()
+    models.InstanceTemplateRevision(
+        key=instances.get_instance_group_manager_key(key).parent(),
+        service_accounts=[
+            models.ServiceAccount(name='service-account'),
+        ],
+    ).put()
+
+    catalog.catalog(key)
+    self.failUnless(key.get().cataloged)
 
 
 class ExtractDimensionsTest(test_case.TestCase):
@@ -77,6 +297,238 @@ class ExtractDimensionsTest(test_case.TestCase):
         catalog.extract_dimensions(instance, instance_template_revision),
         expected_dimensions,
     )
+
+
+class RemoveTest(test_case.TestCase):
+  """Tests for catalog.remove."""
+
+  def test_not_found(self):
+    """Ensures nothing happens when the instance doesn't exist."""
+    def delete_machine(*args, **kwargs):
+      self.fail('delete_machine called')
+    self.mock(catalog.machine_provider, 'delete_machine', delete_machine)
+
+    catalog.remove(ndb.Key(models.Instance, 'fake-instance'))
+
+  def test_not_cataloged(self):
+    """Ensures nothing happens when the instance is not cataloged."""
+    def delete_machine(*args, **kwargs):
+      self.fail('delete_machine called')
+    self.mock(catalog.machine_provider, 'delete_machine', delete_machine)
+
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        cataloged=False,
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+    ).put()
+
+    catalog.remove(key)
+    self.failIf(key.get().cataloged)
+
+  def test_removed(self):
+    """Ensures an instance can be removed."""
+    def delete_machine(*args, **kwargs):
+      return {}
+    self.mock(catalog.machine_provider, 'delete_machine', delete_machine)
+
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        cataloged=True,
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+    ).put()
+
+    catalog.remove(key)
+    self.failIf(key.get().cataloged)
+
+  def test_removal_error(self):
+    """Ensures an instance isn't marked removed on error."""
+    def delete_machine(*args, **kwargs):
+      return {'error': 'error'}
+    self.mock(catalog.machine_provider, 'delete_machine', delete_machine)
+
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        cataloged=True,
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+    ).put()
+
+    catalog.remove(key)
+    self.failUnless(key.get().cataloged)
+
+  def test_removal_error_entry_not_found(self):
+    """Ensures an instance is marked removed on ENTRY_NOT_FOUND."""
+    def delete_machine(*args, **kwargs):
+      return {'error': 'ENTRY_NOT_FOUND'}
+    self.mock(catalog.machine_provider, 'delete_machine', delete_machine)
+
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        cataloged=True,
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+    ).put()
+
+    catalog.remove(key)
+    self.failIf(key.get().cataloged)
+
+
+class SetCatalogedTest(test_case.TestCase):
+  """Tests for catalog.set_cataloged."""
+
+  def test_not_found(self):
+    """Ensures nothing happens when the instance doesn't exist."""
+    catalog.set_cataloged(ndb.Key(models.Instance, 'fake-instance'), True)
+
+  def test_cataloged(self):
+    """Ensures an instance can be cataloged."""
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        cataloged=False,
+    ).put()
+
+    catalog.set_cataloged(key, True)
+    self.failUnless(key.get().cataloged)
+
+
+class UpdateCatalogedEntryTest(test_case.TestCase):
+  """Tests for catalog.update_cataloged_entry."""
+
+  def test_not_found(self):
+    """Ensures nothing happens when the instance doesn't exist."""
+    def retrieve_machine(*args, **kwargs):
+      self.fail('retrieve_machine called')
+    self.mock(catalog.machine_provider, 'retrieve_machine', retrieve_machine)
+
+    catalog.update_cataloged_instance(ndb.Key(models.Instance, 'fake-instance'))
+
+  def test_not_cataloged(self):
+    """Ensures nothing happens when the instance is not cataloged."""
+    def retrieve_machine(*args, **kwargs):
+      self.fail('retrieve_machine called')
+    self.mock(catalog.machine_provider, 'retrieve_machine', retrieve_machine)
+
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        cataloged=False,
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+    ).put()
+
+    catalog.update_cataloged_instance(key)
+
+  def test_updated(self):
+    """Ensures an instance can be updated."""
+    def retrieve_machine(*args, **kwargs):
+      return {
+          'policies': {
+              'machine_service_account': 'service-account',
+          },
+          'pubsub_subscription': 'subscription',
+          'pubsub_subscription_project': 'project',
+      }
+    def send_machine_event(*args, **kwargs):
+      pass
+    self.mock(catalog.machine_provider, 'retrieve_machine', retrieve_machine)
+    self.mock(catalog.metrics, 'send_machine_event', send_machine_event)
+
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        cataloged=True,
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+    ).put()
+
+    catalog.update_cataloged_instance(key)
+    self.assertEqual(key.get().pubsub_service_account, 'service-account')
+    self.assertEqual(
+        key.get().pubsub_subscription,
+        'projects/project/subscriptions/subscription',
+    )
+    self.failUnless(key.get().pending_metadata_updates)
+
+  def test_retrieval_error(self):
+    """Ensures an instance isn't updated on retrieval error."""
+    def retrieve_machine(*args, **kwargs):
+      raise net.NotFoundError('404', 404, '404')
+    def send_machine_event(*args, **kwargs):
+      pass
+    self.mock(catalog.machine_provider, 'retrieve_machine', retrieve_machine)
+    self.mock(catalog.metrics, 'send_machine_event', send_machine_event)
+
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        cataloged=True,
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+    ).put()
+
+    catalog.update_cataloged_instance(key)
+    self.failUnless(key.get().pending_deletion)
+
+  def test_removal_error_entry_not_found(self):
+    """Ensures an instance is marked removed on ENTRY_NOT_FOUND."""
+    def delete_machine(*args, **kwargs):
+      return {'error': 'ENTRY_NOT_FOUND'}
+    self.mock(catalog.machine_provider, 'delete_machine', delete_machine)
+
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        cataloged=True,
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+    ).put()
+
+    catalog.remove(key)
+    self.failIf(key.get().cataloged)
 
 
 if __name__ == '__main__':

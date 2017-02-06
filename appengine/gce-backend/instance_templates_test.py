@@ -75,6 +75,7 @@ class CreateTest(test_case.TestCase):
             'revision',
         ),
         image_name='image',
+        image_project='project',
         metadata={
             'key': 'value',
         },
@@ -173,6 +174,24 @@ class DeleteTest(test_case.TestCase):
 
     instance_templates.delete(key)
     self.failIf(key.get().url)
+
+  def test_url_mismatch(self):
+    """Ensures nothing happens when the targetLink doesn't match."""
+    def json_request(*args, **kwargs):
+      return {'targetLink': 'mismatch'}
+    self.mock(instance_templates.net, 'json_request', json_request)
+
+    key = models.InstanceTemplateRevision(
+        key=instance_templates.get_instance_template_revision_key(
+            'base-name',
+            'revision',
+        ),
+        project='project',
+        url='url',
+    ).put()
+
+    instance_templates.delete(key)
+    self.assertEqual(key.get().url, 'url')
 
   def test_url_unspecified(self):
     """Ensures nothing happens when URL is unspecified."""
@@ -289,6 +308,57 @@ class GetInstanceTemplateToDeleteTest(test_case.TestCase):
         instance_templates.get_instance_template_to_delete(key), expected_url)
 
 
+class GetDrainedInstanceTemplateRevisions(test_case.TestCase):
+  """Tests for instance_templates.get_drained_instance_template_revisions."""
+
+  def test_no_instance_templates(self):
+    self.failIf(instance_templates.get_drained_instance_template_revisions())
+
+  def test_one_instance_template_no_drained_revisions(self):
+    models.InstanceTemplate().put()
+    expected = []
+
+    actual = instance_templates.get_drained_instance_template_revisions()
+    self.assertItemsEqual(actual, expected)
+
+  def test_one_instance_template_drained_revisions(self):
+    models.InstanceTemplate(
+        drained=[
+            ndb.Key(models.InstanceTemplateRevision, 'fake-key-1'),
+            ndb.Key(models.InstanceTemplateRevision, 'fake-key-2'),
+        ],
+    ).put()
+    expected = [
+        ndb.Key(models.InstanceTemplateRevision, 'fake-key-1'),
+        ndb.Key(models.InstanceTemplateRevision, 'fake-key-2'),
+    ]
+
+    actual = instance_templates.get_drained_instance_template_revisions()
+    self.assertItemsEqual(actual, expected)
+
+  def test_multiple_instance_templates_drained_revisions(self):
+    models.InstanceTemplate(
+        drained=[
+            ndb.Key(models.InstanceTemplateRevision, 'fake-key-1'),
+            ndb.Key(models.InstanceTemplateRevision, 'fake-key-2'),
+        ],
+    ).put()
+    models.InstanceTemplate(
+        active=ndb.Key(models.InstanceTemplateRevision, 'fake-key-3'),
+        drained=[
+            ndb.Key(models.InstanceTemplateRevision, 'fake-key-4'),
+        ],
+    ).put()
+    expected = [
+        ndb.Key(models.InstanceTemplateRevision, 'fake-key-1'),
+        ndb.Key(models.InstanceTemplateRevision, 'fake-key-2'),
+        ndb.Key(models.InstanceTemplateRevision, 'fake-key-4'),
+    ]
+
+    actual = instance_templates.get_drained_instance_template_revisions()
+    self.assertItemsEqual(actual, expected)
+
+
 class ScheduleCreationTest(test_case.TestCase):
   """Tests for instance_templates.schedule_creation."""
 
@@ -353,6 +423,56 @@ class ScheduleCreationTest(test_case.TestCase):
     self.failIf(key4.get())
     self.assertEqual(key5.get().url, key5.urlsafe())
 
+
+class UpdateURLTest(test_case.TestCase):
+  """Tests for instance_templates.update_url."""
+
+  def test_entity_doesnt_exist(self):
+    """Ensures nothing happens when the entity doesn't exist."""
+    key = ndb.Key(models.InstanceTemplateRevision, 'fake-key')
+    instance_templates.update_url(key, 'url')
+    self.failIf(key.get())
+
+  def test_url_matches(self):
+    """Ensures nothing happens when the URL already matches."""
+    key = models.InstanceTemplateRevision(
+        key=instance_templates.get_instance_template_revision_key(
+            'base-name',
+            'revision',
+        ),
+        url='url',
+    ).put()
+
+    instance_templates.update_url(key, 'url')
+
+    self.assertEqual(key.get().url, 'url')
+
+  def test_url_mismatch(self):
+    """Ensures the URL is updated when it doesn't match."""
+    key = models.InstanceTemplateRevision(
+        key=instance_templates.get_instance_template_revision_key(
+            'base-name',
+            'revision',
+        ),
+        url='old-url',
+    ).put()
+
+    instance_templates.update_url(key, 'new-url')
+
+    self.assertEqual(key.get().url, 'new-url')
+
+  def test_url_updated(self):
+    """Ensures the URL is updated."""
+    key = models.InstanceTemplateRevision(
+        key=instance_templates.get_instance_template_revision_key(
+            'base-name',
+            'revision',
+        ),
+    ).put()
+
+    instance_templates.update_url(key, 'url')
+
+    self.assertEqual(key.get().url, 'url')
 
 if __name__ == '__main__':
   unittest.main()

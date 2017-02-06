@@ -57,7 +57,7 @@ def set_instance_deleted(key, drained):
     return
 
   if not drained and not instance.pending_deletion:
-    logging.warning('Instance not drained or ending deletion: %s', key)
+    logging.warning('Instance not drained or pending deletion: %s', key)
     return
 
   if not instance.deleted:

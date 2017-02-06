@@ -270,7 +270,11 @@ class EnsureInstanceGroupManagersActiveTest(test_case.TestCase):
         parse.get_instance_group_manager_key(template_cfg, manager_cfgs[0]),
         parse.get_instance_group_manager_key(template_cfg, manager_cfgs[1]),
     ]
-    instance_template_revision = models.InstanceTemplateRevision()
+    instance_template_revision = models.InstanceTemplateRevision(
+        active=[
+            parse.get_instance_group_manager_key(template_cfg, manager_cfgs[1]),
+        ],
+    )
 
     self.failUnless(parse.ensure_instance_group_managers_active(
         template_cfg, manager_cfgs, instance_template_revision))
@@ -298,9 +302,16 @@ class EnsureInstanceGroupManagersActiveTest(test_case.TestCase):
         parse.get_instance_group_manager_key(template_cfg, manager_cfgs[0]),
         parse.get_instance_group_manager_key(template_cfg, manager_cfgs[1]),
     ]
+    expected_drained_keys = [
+        ndb.Key(models.InstanceGroupManager, 'fake-key-1'),
+        ndb.Key(models.InstanceGroupManager, 'fake-key-2'),
+    ]
     instance_template_revision = models.InstanceTemplateRevision(
         active=[
-            ndb.Key(models.InstanceGroupManager, 'fake-key'),
+            ndb.Key(models.InstanceGroupManager, 'fake-key-1'),
+        ],
+        drained=[
+            ndb.Key(models.InstanceGroupManager, 'fake-key-2'),
         ],
     )
 
@@ -308,8 +319,8 @@ class EnsureInstanceGroupManagersActiveTest(test_case.TestCase):
         template_cfg, manager_cfgs, instance_template_revision))
     self.assertItemsEqual(
         instance_template_revision.active, expected_active_keys)
-    self.assertEqual(len(instance_template_revision.drained), 1)
-    self.assertEqual(instance_template_revision.drained[0].id(), 'fake-key')
+    self.assertItemsEqual(
+        instance_template_revision.drained, expected_drained_keys)
 
   def test_reactivates(self):
     """Ensures that the drained instance group managers are reactivated."""

@@ -37,7 +37,7 @@ config_valid = gae_ts_mon.BooleanMetric(
 )
 
 
-def compute_global_metrics():
+def compute_global_metrics(): # pragma: no cover
   for name, count in instance_group_managers.count_instances().iteritems():
     logging.info('%s: %s', name, count)
     GLOBAL_METRICS['instances'].set(
@@ -49,13 +49,13 @@ def compute_global_metrics():
     )
 
 
-def initialize():
+def initialize(): # pragma: no cover
   gae_ts_mon.register_global_metrics(GLOBAL_METRICS.values())
   gae_ts_mon.register_global_metrics_callback(
       'callback', compute_global_metrics)
 
 
-def send_machine_event(state, hostname):
+def send_machine_event(state, hostname): # pragma: no cover
   """Sends an event_mon event about a GCE instance.
 
   Args:

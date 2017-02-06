@@ -20,6 +20,87 @@ import instance_group_managers
 import models
 
 
+class CountInstancesTest(test_case.TestCase):
+  """Tests for instance_group_managers.count_instances."""
+
+  def test_no_instance_group_managers(self):
+    self.failIf(instance_group_managers.count_instances())
+
+  def test_one_instance_group_manager_no_instances(self):
+    models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+    ).put()
+    expected = {'base-name': 0}
+
+    actual = instance_group_managers.count_instances()
+    self.assertEqual(actual, expected)
+
+  def test_one_instance_group_manager(self):
+    models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+        instances=[
+            ndb.Key(models.Instance, 'fake-key-1'),
+            ndb.Key(models.Instance, 'fake-key-2'),
+        ],
+    ).put()
+    expected = {'base-name': 2}
+
+    actual = instance_group_managers.count_instances()
+    self.assertEqual(actual, expected)
+
+  def test_several_instance_group_manager(self):
+    models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name-1',
+            'revision',
+            'zone-a',
+        ),
+        instances=[
+            ndb.Key(models.Instance, 'fake-key-1'),
+            ndb.Key(models.Instance, 'fake-key-2'),
+        ],
+    ).put()
+    models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name-1',
+            'revision',
+            'zone-b',
+        ),
+        instances=[
+            ndb.Key(models.Instance, 'fake-key-3'),
+        ],
+    ).put()
+    models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name-2',
+            'revision',
+            'zone',
+        ),
+        instances=[
+            ndb.Key(models.Instance, 'fake-key-4'),
+        ],
+    ).put()
+    models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name-3',
+            'revision',
+            'zone',
+        ),
+    ).put()
+    expected = {'base-name-1': 3, 'base-name-2': 1, 'base-name-3': 0}
+
+    actual = instance_group_managers.count_instances()
+    self.assertEqual(actual, expected)
+
+
 class CreateTest(test_case.TestCase):
   """Tests for instance_group_managers.create."""
 
@@ -205,6 +286,24 @@ class DeleteTest(test_case.TestCase):
 
     instance_group_managers.delete(key)
     self.failIf(key.get().url)
+
+  def test_target_link_mismatch(self):
+    """Ensures nothing happens when targetLink doesn't match."""
+    def json_request(*args, **kwargs):
+      return {'targetLink': 'mismatch'}
+    self.mock(instance_group_managers.net, 'json_request', json_request)
+
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+        url='url',
+    ).put()
+
+    instance_group_managers.delete(key)
+    self.assertEqual(key.get().url, 'url')
 
   def test_url_unspecified(self):
     """Ensures nothing happens when URL is unspecified."""
@@ -406,6 +505,164 @@ class GetInstanceGroupManagerToDeleteTest(test_case.TestCase):
 
 class ResizeTest(test_case.TestCase):
   """Tests for instance_group_managers.resize."""
+
+  def test_entity_doesnt_exist(self):
+    def get_instance_group_manager(*args, **kwargs):
+      self.fail('get_instance_group_manager called')
+
+    def resize_managed_instance_group(*args, **kwargs):
+      self.fail('resize_managed_instance_group called')
+
+    self.mock(
+        instance_group_managers.gce.Project,
+        'get_instance_group_manager',
+        get_instance_group_manager,
+    )
+    self.mock(
+        instance_group_managers.gce.Project,
+        'resize_managed_instance_group',
+        resize_managed_instance_group,
+    )
+
+    key = ndb.Key(models.InstanceGroupManager, 'fake-key')
+    instance_group_managers.resize(key)
+    self.failIf(key.get())
+
+  def test_no_url(self):
+    def get_instance_group_manager(*args, **kwargs):
+      self.fail('get_instance_group_manager called')
+
+    def resize_managed_instance_group(*args, **kwargs):
+      self.fail('resize_managed_instance_group called')
+
+    self.mock(
+        instance_group_managers.gce.Project,
+        'get_instance_group_manager',
+        get_instance_group_manager,
+    )
+    self.mock(
+        instance_group_managers.gce.Project,
+        'resize_managed_instance_group',
+        resize_managed_instance_group,
+    )
+
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+        minimum_size=10,
+    ).put()
+    models.InstanceTemplateRevision(
+        key=key.parent(),
+        project='fake-project',
+    ).put()
+    models.InstanceTemplate(key=key.parent().parent()).put()
+
+    instance_group_managers.resize(key)
+
+  def test_parent_doesnt_exist(self):
+    def get_instance_group_manager(*args, **kwargs):
+      self.fail('get_instance_group_manager called')
+
+    def resize_managed_instance_group(*args, **kwargs):
+      self.fail('resize_managed_instance_group called')
+
+    self.mock(
+        instance_group_managers.gce.Project,
+        'get_instance_group_manager',
+        get_instance_group_manager,
+    )
+    self.mock(
+        instance_group_managers.gce.Project,
+        'resize_managed_instance_group',
+        resize_managed_instance_group,
+    )
+
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+        minimum_size=10,
+        url='https://example.com',
+    ).put()
+    models.InstanceTemplate(key=key.parent().parent()).put()
+
+    instance_group_managers.resize(key)
+
+  def test_no_project(self):
+    def get_instance_group_manager(*args, **kwargs):
+      self.fail('get_instance_group_manager called')
+
+    def resize_managed_instance_group(*args, **kwargs):
+      self.fail('resize_managed_instance_group called')
+
+    self.mock(
+        instance_group_managers.gce.Project,
+        'get_instance_group_manager',
+        get_instance_group_manager,
+    )
+    self.mock(
+        instance_group_managers.gce.Project,
+        'resize_managed_instance_group',
+        resize_managed_instance_group,
+    )
+
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+        minimum_size=10,
+        url='https://example.com',
+    ).put()
+    models.InstanceTemplateRevision(
+        key=key.parent(),
+    ).put()
+    models.InstanceTemplate(key=key.parent().parent()).put()
+
+    instance_group_managers.resize(key)
+
+  def test_resize_no_actions(self):
+    def get_instance_group_manager(*args, **kwargs):
+      return {
+          'name': 'name',
+      }
+
+    def resize_managed_instance_group(*args, **kwargs):
+      self.fail('resize_managed_instance_group called')
+
+    self.mock(
+        instance_group_managers.gce.Project,
+        'get_instance_group_manager',
+        get_instance_group_manager,
+    )
+    self.mock(
+        instance_group_managers.gce.Project,
+        'resize_managed_instance_group',
+        resize_managed_instance_group,
+    )
+
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+        minimum_size=10,
+        url='https://example.com',
+    ).put()
+    models.InstanceTemplateRevision(
+        key=key.parent(),
+        project='fake-project',
+    ).put()
+    models.InstanceTemplate(key=key.parent().parent()).put()
+
+    instance_group_managers.resize(key)
 
   def test_resize_none_created(self):
     def get_instance_group_manager(*args, **kwargs):
@@ -797,6 +1054,60 @@ class ScheduleCreationTest(test_case.TestCase):
     instance_group_managers.schedule_creation()
 
     self.assertEqual(key.get().url, expected_url)
+
+
+class UpdateURLTest(test_case.TestCase):
+  """Tests for instance_group_managers.update_url."""
+
+  def test_entity_doesnt_exist(self):
+    """Ensures nothing happens when the entity doesn't exist."""
+    key = ndb.Key(models.InstanceGroupManager, 'fake-key')
+    instance_group_managers.update_url(key, 'url')
+    self.failIf(key.get())
+
+  def test_url_matches(self):
+    """Ensures nothing happens when the URL already matches."""
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+        url='url',
+    ).put()
+
+    instance_group_managers.update_url(key, 'url')
+
+    self.assertEqual(key.get().url, 'url')
+
+  def test_url_mismatch(self):
+    """Ensures the URL is updated when it doesn't match."""
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+        url='old-url',
+    ).put()
+
+    instance_group_managers.update_url(key, 'new-url')
+
+    self.assertEqual(key.get().url, 'new-url')
+
+  def test_url_updated(self):
+    """Ensures the URL is updated."""
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+    ).put()
+
+    instance_group_managers.update_url(key, 'url')
+
+    self.assertEqual(key.get().url, 'url')
 
 
 if __name__ == '__main__':
