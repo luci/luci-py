@@ -72,6 +72,7 @@ class ServerDetails(messages.Message):
   bot_version = messages.StringField(2)
   machine_provider_template = messages.StringField(3)
   display_server_url_template = messages.StringField(4)
+  luci_config = messages.StringField(5)
 
 
 class BootstrapToken(messages.Message):

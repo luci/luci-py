@@ -68,14 +68,18 @@ class ServerApiTest(BaseTest):
 
   def test_details(self):
     """Asserts that server_details returns the correct version."""
+    self.mock(config.config, 'config_service_hostname', lambda: 'a.server')
     response = self.call_api('details')
-    self.assertEqual({
-      'machine_provider_template':
+    expected = {
+      u'bot_version': unicode(
+          bot_code.get_bot_version('https://testbed.example.com')),
+      u'display_server_url_template': u'',
+      u'luci_config': u'a.server',
+      u'machine_provider_template':
           u'https://machine-provider.appspot.com/leases/%s',
-      'display_server_url_template': '',
-      'server_version': utils.get_app_version(),
-      'bot_version': bot_code.get_bot_version('https://testbed.example.com'),
-      }, response.json)
+      u'server_version': unicode(utils.get_app_version()),
+    }
+    self.assertEqual(expected, response.json)
 
   def test_public_permissions(self):
     """Asserts that permissions respond correctly to an unauthed user."""
