@@ -5,8 +5,8 @@
 """Defines access groups."""
 
 from components import auth
-from server import config
 from components import utils
+from server import config
 
 
 def is_admin():

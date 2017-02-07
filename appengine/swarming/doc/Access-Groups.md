@@ -8,13 +8,13 @@ your app. In a fresh instance, group names default to
 `administrators`, so only those can use the service.  To get started:
 
 * Configure the group names for each role in the configuration file;
-  see the
-  [`config_service`](https://github.com/luci/luci-py/tree/master/appengine/config_service)
-  for details, and AuthSettings in
-  [proto/config.proto](../proto/config.proto) for the schema.
+  see the [`config_service`](../../config_service) for details, and
+  AuthSettings in [proto/config.proto](../proto/config.proto) for the
+  schema.
 * Create the appropriate groups under `/auth`.
-* Add relevant users and IPs to the groups.  Make sure that users who have
-access to the swarming server also have equivalent access to the isolate server.
+* Add relevant users and IPs to the groups.  Make sure that users who
+  have access to the swarming server also have equivalent access to
+  the isolate server.
 
 
 ## Format
