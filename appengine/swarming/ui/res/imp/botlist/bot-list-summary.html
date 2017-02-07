@@ -10,13 +10,28 @@
     <bot-list-summary></bot-list-summary>
 
     This element summarizes and displays the results of the current query.
+    It links to some global queries (e.g. all quarantined bots) and some
+    sub queries (e.g. all quarantined bots that match the rest of the
+    specified dimensions.)
 
   Properties:
-    filtered_bots: Array<Object>, The bot list that is currently being shown
-        (after filtering). The alive, dead, etc bots in this will be counted up
-        for the summary.  See bot-list-data for a description of this data type.
+    // inputs
+    auth_headers: Object, the OAuth2 header to include in the request.  This
+        should come from swarming-app.
+    columns: Array<String>, the columns the user has selected. Used to create
+        the links.
+    count_params: Object, representing the query params sent to the server based
+        on all the filterable items (e.g. dimensions). See bot-filters for the
+        schema.
     fleet: Object, counts of all bots in the fleet.  Contains "alive", "busy",
         "idle", "dead", and "quarantined".
+    num_bots: Number, The number of bots shown (after filtering).
+    sort: String, the user's current sort string. Used to create the links.
+    verbose: Boolean, the users current verbosity selection. Used to create
+        the links.
+
+    // outputs
+    busy: Boolean, if there are any network requests pending.
   Methods:
     None.
 
@@ -57,37 +72,37 @@
     <table>
       <tr>
         <td class="right">
-          <a href$="[[_makeURL('','',columns.*,filtered_bots.*,sort,verbose)]]">All</a>:
+          <a href$="[[_makeURL('','',columns.*,sort,verbose)]]">All</a>:
         </td>
         <td class="left">[[fleet.all]]</td>
       </tr>
       <tr>
         <td class="right">
-          <a href$="[[_makeURL('alive','',columns.*,filtered_bots.*,sort,verbose)]]">Alive</a>:
+          <a href$="[[_makeURL('alive','',columns.*,sort,verbose)]]">Alive</a>:
         </td>
         <td class="left">[[fleet.alive]]</td>
       </tr>
       <tr>
         <td class="right">
-          <a href$="[[_makeURL('busy','',columns.*,filtered_bots.*,sort,verbose)]]">Busy</a>:
+          <a href$="[[_makeURL('busy','',columns.*,sort,verbose)]]">Busy</a>:
         </td>
         <td class="left">[[fleet.busy]]</td>
       </tr>
       <tr>
         <td class="right">
-          <a href$="[[_makeURL('idle','',columns.*,filtered_bots.*,sort,verbose)]]">Idle</a>:
+          <a href$="[[_makeURL('idle','',columns.*,sort,verbose)]]">Idle</a>:
         </td>
         <td class="left">[[fleet.idle]]</td>
       </tr>
       <tr>
         <td class="right">
-          <a href$="[[_makeURL('dead','',columns.*,filtered_bots.*,sort,verbose)]]">Dead</a>:
+          <a href$="[[_makeURL('dead','',columns.*,sort,verbose)]]">Dead</a>:
         </td>
         <td class="left">[[fleet.dead]]</td>
       </tr>
       <tr>
         <td class="right">
-          <a href$="[[_makeURL('quarantined','',columns.*,filtered_bots.*,sort,verbose)]]">Quarantined</a>:
+          <a href$="[[_makeURL('quarantined','',columns.*,sort,verbose)]]">Quarantined</a>:
         </td>
         <td class="left">[[fleet.quarantined]]</td>
       </tr>
@@ -99,7 +114,7 @@
         <td class="right">
           Displayed:
         </td>
-        <td class="left">[[_currentlyDisplayed(filtered_bots.*)]]</td>
+        <td class="left">[[num_bots]]</td>
       </tr>
       <tr>
         <td class="right">
@@ -109,31 +124,31 @@
       </tr>
       <tr>
         <td class="right">
-          <a href$="[[_makeURL('alive','true',columns.*,filtered_bots.*,sort,verbose)]]">Alive</a>:
+          <a href$="[[_makeURL('alive','true',columns.*,sort,verbose)]]">Alive</a>:
         </td>
         <td class="left">[[_computeAlive(_count_query.*)]]</td>
       </tr>
       <tr>
         <td class="right">
-          <a href$="[[_makeURL('busy','true',columns.*,filtered_bots.*,sort,verbose)]]">Busy</a>:
+          <a href$="[[_makeURL('busy','true',columns.*,sort,verbose)]]">Busy</a>:
         </td>
         <td class="left">[[_count_query.busy]]</td>
       </tr>
       <tr>
         <td class="right">
-          <a href$="[[_makeURL('idle','true',columns.*,filtered_bots.*,sort,verbose)]]">Idle</a>:
+          <a href$="[[_makeURL('idle','true',columns.*,sort,verbose)]]">Idle</a>:
         </td>
         <td class="left">[[_computeIdle(_count_query.*)]]</td>
       </tr>
       <tr>
         <td class="right">
-          <a href$="[[_makeURL('dead','true',columns.*,filtered_bots.*,sort,verbose)]]">Dead</a>:
+          <a href$="[[_makeURL('dead','true',columns.*,sort,verbose)]]">Dead</a>:
         </td>
         <td class="left">[[_count_query.dead]]</td>
       </tr>
       <tr>
         <td class="right">
-          <a href$="[[_makeURL('quarantined','true',columns.*,filtered_bots.*,sort,verbose)]]">Quarantined</a>:
+          <a href$="[[_makeURL('quarantined','true',columns.*,sort,verbose)]]">Quarantined</a>:
         </td>
         <td class="left">[[_count_query.quarantined]]</td>
       </tr>
@@ -150,28 +165,29 @@
         auth_headers: {
           type: Object,
         },
-        busy: {
-          type: Boolean,
-          value: false,
-          notify: true,
-        },
         columns: {
           type: Array,
         },
         count_params: {
           type: Object,
         },
-        filtered_bots: {
-          type: Array,
-        },
         fleet: {
           type: Object,
+        },
+        num_bots: {
+          type: Number,
         },
         sort: {
           type: String,
         },
         verbose: {
           type: Boolean,
+        },
+
+        busy: {
+          type: Boolean,
+          value: false,
+          notify: true,
         },
 
         _count_query: {
@@ -193,10 +209,6 @@
         return this._count_query.count - this._count_query.busy;
       },
 
-      _currentlyDisplayed: function(){
-        return this.filtered_bots && this.filtered_bots.length;
-      },
-
       _getFilterStr: function(filter) {
         if (!filter) {
           return "";
@@ -209,6 +221,9 @@
         }
       },
 
+      // _makeURL creates a bot-list url that keeps the columns and sort requirements the same
+      // while changing which state is represented. The preserveOthers signifies if other
+      // filtering parameters (e.g. dimensions) should be kept as well.
       _makeURL: function(filter, preserveOthers) {
         if (preserveOthers) {
           var fstr = encodeURIComponent(this._getFilterStr(filter));

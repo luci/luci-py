@@ -79,7 +79,11 @@
     var countDetails = {
       count: 450,
     }
-    server.respondWith("GET", /^\/api\/swarming\/v1\/tasks\/count/, JSON.stringify(countDetails));
+
+    server.respondWith("GET", /^\/api\/swarming\/v1\/tasks\/count/, function(request){
+      countDetails.count++;
+      request.respond(200, {}, JSON.stringify(countDetails));
+    });
 
     var cancelCount = 0;
     server.respondWith("POST", /^\/api\/swarming\/v1\/tasks\/cancel/, function(request){

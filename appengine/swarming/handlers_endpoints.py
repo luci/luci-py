@@ -490,8 +490,6 @@ class SwarmingTasksService(remote.Service):
     logging.info('%s', request)
     if not request.start:
       raise endpoints.BadRequestException('start (as epoch) is required')
-    if not request.end:
-      raise endpoints.BadRequestException('end (as epoch) is required')
     now = utils.utcnow()
     try:
       count = self._query_from_request(request, 'created_ts').count()

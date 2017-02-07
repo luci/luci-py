@@ -38,12 +38,13 @@
 
 <link rel="import" href="task-filters.html">
 <link rel="import" href="task-list-data.html">
+<link rel="import" href="task-list-summary.html">
 <link rel="import" href="task-mass-cancel.html">
 
 <dom-module id="task-list">
   <template>
     <style include="iron-flex iron-flex-alignment iron-positioning swarming-app-style dynamic-table-style task-style">
-      task-filters {
+      task-filters, task-list-summary {
         margin-bottom: 8px;
         margin-right: 10px;
       }
@@ -63,7 +64,7 @@
       auth_headers="{{_auth_headers}}"
       permissions="{{_permissions}}"
       signed_in="{{_signed_in}}"
-      busy="[[_or(_busy1,_busy2)]]"
+      busy="[[_or(_busy1,_busy2,_busy3)]]"
       name="Swarming Task List">
 
       <h2 hidden$="[[_signed_in]]">You must sign in to see anything useful.</h2>
@@ -94,6 +95,15 @@
 
             on-cancel-all="_promptCancelAll">
           </task-filters>
+
+           <task-list-summary
+            auth_headers="[[_auth_headers]]"
+            busy="{{_busy3}}"
+            columns="[[_columns]]"
+            count_params="[[_query_params]]"
+            num_tasks="[[_filteredSortedItems.length]]"
+            sort="[[_sortstr]]">
+          </task-list-summary>
         </div>
 
         <table class="task-list">

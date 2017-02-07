@@ -97,13 +97,14 @@
 
           <bot-list-summary
             auth_headers="[[_auth_headers]]"
-            busy="{{_busy3}}"
             columns="[[_columns]]"
             count_params="[[_query_params]]"
             fleet="[[_fleet]]"
-            filtered_bots="[[_filteredSortedItems]]"
+            num_bots="[[_filteredSortedItems.length]]"
             sort="[[_sortstr]]"
-            verbose="[[_verbose]]">
+            verbose="[[_verbose]]"
+
+            busy="{{_busy3}}">
           </bot-list-summary>
 
         </div>
