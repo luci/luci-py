@@ -21,14 +21,15 @@ Graph of schema:
                |    +--------------+ |   (task_request.py)
                |    |TaskProperties| |
                |    +--------------+ |
-               |    +--------------+ |
-               |    |SecretBytes   | |
-               |    +--------------+ |
                |id=<based on epoch>  |
                +---------------------+
-                          ^
-                          |
-                          |
+                     ^        ^
+                     |        |
+                     |   +-----------+
+                     |   |SecretBytes|   (task_request.py)
+                     |   |id=1       |
+                     |   +-----------+
+                     |
                   +-----------------+
                   |TaskResultSummary|
                   |  +--------+     |
@@ -38,7 +39,6 @@ Graph of schema:
                   |id=1             |
                   +-----------------+
                        ^          ^
-                       |          |
                        |          |
                +-------------+  +-------------+
                |TaskRunResult|  |TaskRunResult|

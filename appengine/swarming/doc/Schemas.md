@@ -40,16 +40,16 @@ block depends on the previous ones:
                |    +--------------+ |                           task_request.py
                |    |TaskProperties| |
                |    +--------------+ |
-               |    +--------------+ |
-               |    |SecretBytes   | |
-               |    +--------------+ |
                |id=<based on epoch>  |
                +---------------------+
-                    ^           ^
-                    |           |
-    +-----------------------+   |
-    |TaskToRun              |   |                                 task_to_run.py
-    |id=<hash of dimensions>|   |
+                    ^           ^  ^
+                    |           |  |
+                    |           | +-----------+
+                    |           | |SecretBytes|                  task_request.py
+                    |           | |id=1       |
+    +-----------------------+   | +-----------+
+    |TaskToRun              |   |
+    |id=<hash of dimensions>|   |                                 task_to_run.py
     +-----------------------+   |
                                 |
                   +-----------------+

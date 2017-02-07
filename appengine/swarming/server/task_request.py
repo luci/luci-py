@@ -36,15 +36,16 @@ Graph of the schema:
     |    |id=EMBEDDED   | |
     |    +--------------+ |
     |                     |
-    |    +--------------+ |
-    |    |SecretBytes   | |
-    |    |id=1          | |
-    |    +--------------+ |
-    |                     |
     |id=<based on epoch>  |
     +---------------------+
-               ^
-               |
+          ^        ^
+          |        |
+    +-----------+  |
+    |SecretBytes|  |
+    |id=1       |  |
+    +-----------+  |
+                   |
+                   |
     <See task_to_run.py and task_result.py>
 
 TaskProperties is embedded in TaskRequest. TaskProperties is still declared as a
@@ -305,7 +306,7 @@ class SecretBytes(ndb.Model):
   """
   _use_memcache = False
   secret_bytes = ndb.BlobProperty(
-      validator=_validate_length(1024), indexed=False)
+      validator=_validate_length(20*1024), indexed=False)
 
 
 class CipdPackage(ndb.Model):

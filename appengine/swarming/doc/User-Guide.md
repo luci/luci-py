@@ -45,7 +45,7 @@ outputs. The process can be simplified as _F(i, c, b)_ where _F()_ is the
 Swarming task, _i_ is the input files, _c_ the command execution environment,
 _b_ the bot selection (dimensions) description.
 
-Inputs can be a mix of all 3 of:
+Inputs can be a mix of all 4 of:
 
 *   Isolated tree: optionally includes a command. It's essentially a pointer
     (SHA1 digest) to a root of a [Merkle tree-like
@@ -59,6 +59,9 @@ Inputs can be a mix of all 3 of:
     resued by some later task that requests the exact same cache. Examples are
     local git clone caches, incremental build directories, etc. This adds
     transitivity to the task (non-determinism).
+*   Secret bytes. This data is sent to the task via
+    [LUCI_CONTEXT](../../../client/LUCI_CONTEXT.md) but is not otherwise
+    retrievable.
 
 Command execution environment is defined as:
 

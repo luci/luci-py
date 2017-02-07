@@ -727,6 +727,11 @@ class TaskRequestApiTest(TestCase):
         ndb.Key(task_request.TaskRequest, 0x7f14acec2fcfffff),
         task_request.request_id_to_key(0xeb5313d0300000))
 
+  def test_secret_bytes(self):
+    task_request.SecretBytes(secret_bytes='a'*(20*1024)).put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      task_request.SecretBytes(secret_bytes='a'*(20*1024+1)).put()
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
