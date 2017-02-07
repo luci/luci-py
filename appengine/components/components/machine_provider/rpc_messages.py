@@ -70,14 +70,6 @@ class CatalogMachineDeletionRequest(messages.Message):
   dimensions = messages.MessageField(Dimensions, 1, required=True)
 
 
-class CatalogCapacityModificationRequest(messages.Message):
-  """Represents a request to modify machine capacity in the catalog."""
-  # Dimensions instance specifying what sort of machine this is.
-  dimensions = messages.MessageField(Dimensions, 1, required=True)
-  # Amount of available capacity matching the specified dimensions.
-  count = messages.IntegerField(2, required=True)
-
-
 class CatalogManipulationRequestError(messages.Enum):
   """Represents an error in a catalog manipulation request."""
   # Per backend, hostnames must be unique in the catalog.
@@ -111,9 +103,6 @@ class CatalogManipulationResponse(messages.Message):
   # CatalogMachineDeletionRequest this response is in reference to.
   machine_deletion_request = messages.MessageField(
       CatalogMachineDeletionRequest, 3)
-  # CatalogCapacityModificationRequest this response is in reference to.
-  capacity_modification_request = messages.MessageField(
-      CatalogCapacityModificationRequest, 4)
 
 
 class CatalogBatchManipulationResponse(messages.Message):

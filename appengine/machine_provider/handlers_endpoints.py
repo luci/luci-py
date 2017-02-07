@@ -275,39 +275,6 @@ class CatalogEndpoints(remote.Service):
         machine_deletion_request=request,
     )
 
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      rpc_messages.CatalogCapacityModificationRequest,
-      rpc_messages.CatalogManipulationResponse,
-  )
-  @auth.require(acl.is_backend_service_or_catalog_admin)
-  def modify_capacity(self, request):
-    """Handles an incoming CatalogCapacityModificationRequest."""
-    user = auth.get_current_identity().to_bytes()
-    logging.info(
-        'Received CatalogCapacityModificationRequest:\nUser: %s\n%s',
-        user,
-        request,
-    )
-    error = self.check_backend(request)
-    if error:
-      return rpc_messages.CatalogManipulationResponse(
-          capacity_modification_request=request,
-          error=error,
-      )
-    return self._modify_capacity(request)
-
-  @ndb.transactional
-  def _modify_capacity(self, request):
-    """Handles datastore operations for CatalogCapacityModificationRequests."""
-    models.CatalogCapacityEntry.create_and_put(
-        request.dimensions,
-        request.count,
-    )
-    return rpc_messages.CatalogManipulationResponse(
-        capacity_modification_request=request,
-    )
-
 
 @auth.endpoints_api(name='machine_provider', version='v1')
 class MachineProviderEndpoints(remote.Service):

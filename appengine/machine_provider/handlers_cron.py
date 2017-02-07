@@ -140,43 +140,6 @@ def lease_machine(machine_key, lease):
   return True
 
 
-@ndb.transactional(xg=True)
-def provide_capacity(capacity_key, lease):
-  """Attempts to provide capacity for the given lease.
-
-  Args:
-    capacity_key: ndb.Key for a model.CatalogCapacityEntry instance.
-    lease: model.LeaseRequest instance.
-
-  Returns:
-    True if the capacity is being provided, otherwise False.
-  """
-  capacity = capacity_key.get()
-  lease = lease.key.get()
-  logging.info(
-      'Attempting to provide matching CatalogCapacityEntry:\n%s',
-      capacity,
-  )
-
-  if not can_fulfill(capacity, lease.request):
-    logging.warning('CatalogCapacityEntry no longer matches:\n%s', capacity)
-    return False
-  if capacity.count == 0:
-    logging.warning('CatalogCapacityEntry no longer available:\n%s', capacity)
-    return False
-  if lease.response.state != rpc_messages.LeaseRequestState.UNTRIAGED:
-    logging.warning('LeaseRequest no longer untriaged:\n%s', lease)
-    return False
-
-  logging.info('Preparing CatalogCapacityEntry:\n%s', capacity)
-  capacity.count -= 0
-  capacity.put()
-  lease.response.state = rpc_messages.LeaseRequestState.PENDING
-  lease.put()
-  return True
-  # TODO: Contact the backend to provision this capacity.
-
-
 class LeaseRequestProcessor(webapp2.RequestHandler):
   """Worker for processing lease requests."""
 
@@ -184,21 +147,9 @@ class LeaseRequestProcessor(webapp2.RequestHandler):
   def get(self):
     for lease in models.LeaseRequest.query_untriaged():
       filters = get_dimension_filters(lease.request)
-      fulfilled = False
-
-      # Prefer immediately available machines.
       for machine_key in models.CatalogMachineEntry.query_available(*filters):
         if lease_machine(machine_key, lease):
-          fulfilled = True
           metrics.lease_requests_fulfilled.increment()
-          break
-
-      if fulfilled:
-        continue
-
-      # Fall back on available capacity.
-      for capacity_key in models.CatalogCapacityEntry.query_available(*filters):
-        if provide_capacity(capacity_key, lease):
           break
 
 

@@ -354,21 +354,6 @@ class CatalogTest(test_case.EndpointsTestCase):
         rpc_messages.CatalogManipulationRequestError.HOSTNAME_REUSE,
     )
 
-  def test_modify(self):
-    request = rpc_to_json(rpc_messages.CatalogCapacityModificationRequest(
-        count=1,
-        dimensions=rpc_messages.Dimensions(
-            os_family=rpc_messages.OSFamily.OSX,
-        ),
-    ))
-    self.mock_get_current_backend()
-
-    response = jsonish_dict_to_rpc(
-        self.call_api('modify_capacity', request).json,
-        rpc_messages.CatalogManipulationResponse,
-    )
-    self.failIf(response.error)
-
 
 class MachineProviderLeaseTest(test_case.EndpointsTestCase):
   """Tests for handlers_endpoints.MachineProviderEndpoints.lease."""

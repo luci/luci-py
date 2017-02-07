@@ -109,66 +109,6 @@ class CatalogEntry(ndb.Model):
   last_modified_ts = ndb.DateTimeProperty(auto_now=True)
 
 
-class CatalogCapacityEntry(CatalogEntry):
-  """Datastore representation of machine capacity in the catalog.
-
-  Key:
-    id: Hash of the non-None dimensions, where backend is the only required
-      dimension. Used to enforce per-backend dimension uniqueness.
-    kind: CatalogCapacityEntry. This root entity does not reference any parents.
-  """
-  # The amount of capacity with these dimensions that can be provided.
-  count = ndb.IntegerProperty(indexed=True, required=True)
-  # Whether there is available capacity or not.
-  has_capacity = ndb.ComputedProperty(lambda self: self.count > 0)
-
-  @classmethod
-  def create_and_put(cls, dimensions, count):
-    """Creates a new CatalogEntry entity and puts it in the datastore.
-
-    Args:
-      dimensions: rpc_messages.Dimensions describing this capacity.
-      count: Amount of capacity with the given dimensions.
-    """
-    cls(
-        count=count,
-        dimensions=dimensions,
-        key=cls.generate_key(dimensions),
-    ).put()
-
-  @classmethod
-  def generate_key(cls, dimensions):
-    """Generates the key for a CatalogEntry with the given dimensions.
-
-    Args:
-      dimensions: rpc_messages.Dimensions describing this machine.
-
-    Returns:
-      An ndb.Key instance.
-    """
-    # Enforces per-backend dimension uniqueness.
-    assert dimensions.backend is not None
-    return ndb.Key(
-        cls,
-        hashlib.sha1(utils.fingerprint(dimensions)).hexdigest()
-    )
-
-  @classmethod
-  def query_available(cls, *filters):
-    """Queries for available capacity.
-
-    Args:
-      *filters: Any additional filters to include in the query.
-
-    Yields:
-      CatalogCapacityEntry keys in no guaranteed order.
-    """
-    for capacity in cls.query(cls.has_capacity == True, *filters).fetch(
-        keys_only=True,
-    ):
-      yield capacity
-
-
 CatalogMachineEntryStates = Enum(['AVAILABLE', 'LEASED', 'NEW'])
 
 
