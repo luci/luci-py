@@ -37,7 +37,7 @@ def settings_info():
     'rev_url': URL of a human-consumable page that displays the config
     'config_service_url': URL of the config_service.
   """
-  rev, cfg = _get_settings()
+  rev, cfg = _get_settings_with_defaults()
   rev_url = _gitiles_url(_get_configs_url(), rev, _SETTINGS_CFG_FILENAME)
   cfg_service_hostname = config.config_service_hostname()
   return {
@@ -53,7 +53,7 @@ def settings_info():
 @utils.cache_with_expiration(60)
 def settings():
   """Loads settings from an NDB-based cache or a default one if not present."""
-  return _get_settings()[1]
+  return _get_settings_with_defaults()[1]
 
 
 def validate_flat_dimension(d):
@@ -218,15 +218,36 @@ def _gitiles_url(configs_url, rev, path):
 def _get_settings():
   """Returns (rev, cfg) where cfg is a parsed SettingsCfg message.
 
+  If config does not exists, returns (None, None).
+
+  Mock this method in tests to inject changes to the defaults.
+  """
+  # store_last_good=True tells config component to update the config file
+  # in a cron job. Here we just read from the datastore.
+  return config.get_self_config(
+      _SETTINGS_CFG_FILENAME, config_pb2.SettingsCfg, store_last_good=True)
+
+
+def _get_settings_with_defaults():
+  """Returns (rev, cfg) where cfg is a parsed SettingsCfg message.
+
   If config does not exists, returns (None, <cfg with defaults>).
 
   The config is cached in the datastore.
   """
-  # store_last_good=True tells config component to update the config file
-  # in a cron job. Here we just read from the datastore.
-  rev, cfg = config.get_self_config(
-      _SETTINGS_CFG_FILENAME, config_pb2.SettingsCfg, store_last_good=True)
+  rev, cfg = _get_settings()
   cfg = cfg or config_pb2.SettingsCfg()
   cfg.reusable_task_age_secs = cfg.reusable_task_age_secs or 7*24*60*60
   cfg.bot_death_timeout_secs = cfg.bot_death_timeout_secs or 10*60
+
+  # TODO(sergeyberezin): update the defaults to 'administrators' once
+  # all instances and configs are updated, to limit a chance of
+  # accidental access grant.
+  cfg.auth.admins_group = cfg.auth.admins_group or 'swarming-admins'
+  cfg.auth.bot_bootstrap_group = cfg.auth.bot_bootstrap_group or \
+     'swarming-bot-bootstrap'
+  cfg.auth.privileged_users_group = cfg.auth.privileged_users_group or \
+     'swarming-privileged-users'
+  cfg.auth.users_group = cfg.auth.users_group or 'swarming-users'
+
   return rev, cfg

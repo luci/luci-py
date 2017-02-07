@@ -21,10 +21,12 @@ import swarming_rpcs
 from components import auth
 from components import auth_testing
 from components import stats_framework
+from components import utils
 import gae_ts_mon
 from test_support import test_case
 
-from server import acl
+from proto import config_pb2
+from server import config
 from server import large
 from server import stats
 
@@ -50,18 +52,30 @@ class AppTestBase(test_case.TestCase):
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
 
-    # Note that auth.ADMIN_GROUP != acl.ADMINS_GROUP.
+    admins_group = 'test_admins_group'
+    priv_users_group = 'test_priv_users_group'
+    users_group = 'test_users_group'
+
+    cfg = config_pb2.SettingsCfg(auth=config_pb2.AuthSettings(
+        admins_group=admins_group,
+        privileged_users_group=priv_users_group,
+        users_group=users_group,
+    ))
+    self.mock(config, '_get_settings', lambda: ('test_rev', cfg))
+    utils.clear_cache(config.settings)
+
+    # Note that auth.ADMIN_GROUP != admins_group.
     auth.bootstrap_group(
         auth.ADMIN_GROUP,
         [auth.Identity(auth.IDENTITY_USER, 'super-admin@example.com')])
     auth.bootstrap_group(
-        acl.ADMINS_GROUP,
+        admins_group,
         [auth.Identity(auth.IDENTITY_USER, 'admin@example.com')])
     auth.bootstrap_group(
-        acl.PRIVILEGED_USERS_GROUP,
+        priv_users_group,
         [auth.Identity(auth.IDENTITY_USER, 'priv@example.com')])
     auth.bootstrap_group(
-        acl.USERS_GROUP,
+        users_group,
         [auth.Identity(auth.IDENTITY_USER, 'user@example.com')])
 
     self.mock(stats_framework, 'add_entry', self._parse_line)

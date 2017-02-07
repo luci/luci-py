@@ -2,23 +2,32 @@
 
 ## Introduction
 
-This is the list of the access control groups. By default in a fresh instance
-all groups are empty and no one can do anything. Add relevant users and IPs in
-the following groups. Make sure that users that have access to the swarming
-server also have equivalent access to the isolate server.
+Access control in swarming is managed by roles that are defined by the
+access control groups, and are managed by going to the `/auth` URL of
+your app. In a fresh instance, group names default to
+`administrators`, so only those can use the service.  To get started:
+
+* Configure the group names for each role in the configuration file;
+  see the
+  [`config_service`](https://github.com/luci/luci-py/tree/master/appengine/config_service)
+  for details, and AuthSettings in
+  [proto/config.proto](../proto/config.proto) for the schema.
+* Create the appropriate groups under `/auth`.
+* Add relevant users and IPs to the groups.  Make sure that users who have
+access to the swarming server also have equivalent access to the isolate server.
 
 
 ## Format
 
-You can refer to the whitelisted IPs using `bots:*` in one of the group. You can
-refer to user accounts with `user@example.org` and can refer to all users in a
-domain with `*@chromium.org`.
+When specifying members of the auth groups, you can refer to the whitelisted IPs
+using `bots:*`. For individual user accounts simply use their email,
+e.g. `user@example.org`.  All users in a domain can be specified with a glob,
+e.g. `*@chromium.org`.
 
 
 ## Groups
 
-
-### swarming-users
+### `users_group`
 
 Members of this group can:
 
@@ -30,22 +39,24 @@ Members of this group can:
 Members has limited visibility over the whole system, cannot view other user
 tasks or bots.
 
-Make sure members of this group are also member of _isolate-access_.
+Make sure members of this group are also member of `isolate-access`.
 
+### `privileged_users_group`
 
-### swarming-privileged-users
-
-Members of this group can do everything that _swarming-users_ can do plus:
+Members of this group can do everything that members of the `users_group` can do
+plus:
 
 *   See other people's tasks.
 *   See all the bots connected.
 
+### `bot_bootstrap_group`
 
-### swarming-admins
+Members of this group can fetch swarming bot code and bootstrap bots.
 
-Members of this group can do everything that _swarming-privileged-users_ can do
-plus:
+### `admins_group`
+
+Members of this group can do all of the above plus:
 
 *   Cancel anyone's task.
 *   Delete bots.
-*   Update _bootstrap.py_ and _bot_config.py_.
+*   Update `bootstrap.py` and `bot_config.py`.

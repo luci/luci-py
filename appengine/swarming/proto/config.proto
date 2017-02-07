@@ -11,9 +11,11 @@ message SettingsCfg {
   optional string google_analytics = 1;
 
   // The number of seconds an old task can be deduped from.
+  // Default is one week: 7*24*60*60 = 604800
   optional int32 reusable_task_age_secs = 2;
 
   // The amount of time that has to pass before a machine is considered dead.
+  // Default is 600 (10 minutes).
   optional int32 bot_death_timeout_secs = 3;
 
   // Enable ts_mon based monitoring.
@@ -47,6 +49,9 @@ message SettingsCfg {
   // backoff. If missing, the task scheduler will provide the default maximum
   // (usually 60s, but see bot_code/task_scheduler.py for details).
   optional int32 max_bot_sleep_time = 12;
+
+  // Names of the authorization groups used by components/auth.
+  optional AuthSettings auth = 13;
 }
 
 
@@ -131,4 +136,25 @@ message DimensionACLs {
 
   // Entries with ACLs for individual dimensions. Order is irrelevant.
   repeated Entry entry = 1;
+}
+
+// Access control groups for the swarming service. Custom group names
+// allow several swarming instances to co-exist under the same "auth"
+// server. 
+//
+// All groups default to 'administrators'.
+//
+// See
+// https://github.com/luci/luci-py/blob/master/appengine/swarming/doc/Access-Groups.md
+// for more detail.
+
+message AuthSettings {
+  // Members of this group have full administrative access.
+  optional string admins_group = 1;
+  // Members of this group can fetch swarming bot code and bootstrap bots.
+  optional string bot_bootstrap_group = 2;
+  // Members of this group can schedule tasks and see everyone else's tasks.
+  optional string privileged_users_group = 3;
+  // Members of this group can schedule tasks and see only their own tasks.
+  optional string users_group = 4;
 }

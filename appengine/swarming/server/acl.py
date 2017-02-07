@@ -5,36 +5,29 @@
 """Defines access groups."""
 
 from components import auth
+from server import config
 from components import utils
 
 
-# Names of groups.
-# See
-# https://github.com/luci/luci-py/blob/master/appengine/swarming/doc/Access-Groups.md
-# for each level.
-#
-# TODO(vadimsh): Move them to the config.
-ADMINS_GROUP = 'swarming-admins'
-PRIVILEGED_USERS_GROUP = 'swarming-privileged-users'
-USERS_GROUP = 'swarming-users'
-BOT_BOOTSTRAP_GROUP = 'swarming-bot-bootstrap'
-
-
 def is_admin():
-  return auth.is_group_member(ADMINS_GROUP) or auth.is_admin()
+  admins = config.settings().auth.admins_group
+  return auth.is_group_member(admins) or auth.is_admin()
 
 
 def is_privileged_user():
-  return auth.is_group_member(PRIVILEGED_USERS_GROUP) or is_admin()
+  priv_users = config.settings().auth.privileged_users_group
+  return auth.is_group_member(priv_users) or is_admin()
 
 
 def is_user():
-  return auth.is_group_member(USERS_GROUP) or is_privileged_user()
+  users = config.settings().auth.users_group
+  return auth.is_group_member(users) or is_privileged_user()
 
 
 def is_bootstrapper():
   """Returns True if current user have access to bot code (for bootstrap)."""
-  return is_admin() or auth.is_group_member(BOT_BOOTSTRAP_GROUP)
+  bot_group = config.settings().auth.bot_bootstrap_group
+  return is_admin() or auth.is_group_member(bot_group)
 
 
 def is_ip_whitelisted_machine():
@@ -92,13 +85,19 @@ def bootstrap_dev_server_acls():
     return
 
   bots = auth.bootstrap_loopback_ips()
-  auth.bootstrap_group(USERS_GROUP, bots, 'Swarming users')
-  auth.bootstrap_group(BOT_BOOTSTRAP_GROUP, bots, 'Bot bootstrap')
+
+  auth_settings = config.settings().auth
+  admins_group = auth_settings.admins_group
+  users_group = auth_settings.users_group
+  bot_bootstrap_group = auth_settings.bot_bootstrap_group
+
+  auth.bootstrap_group(users_group, bots, 'Swarming users')
+  auth.bootstrap_group(bot_bootstrap_group, bots, 'Bot bootstrap')
 
   # Add a swarming admin. smoke-test@example.com is used in
   # server_smoke_test.py
   admin = auth.Identity(auth.IDENTITY_USER, 'smoke-test@example.com')
-  auth.bootstrap_group(ADMINS_GROUP, [admin], 'Swarming administrators')
+  auth.bootstrap_group(admins_group, [admin], 'Swarming administrators')
 
   # Add an instance admin (for easier manual testing when running dev server).
   auth.bootstrap_group(

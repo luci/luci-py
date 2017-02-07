@@ -11,6 +11,7 @@ import test_env
 test_env.setup_test_env()
 
 from components.config import validation
+from components import utils
 from test_support import test_case
 
 from proto import config_pb2
@@ -21,6 +22,11 @@ from server import config
 
 
 class ConfigTest(test_case.TestCase):
+  def setUp(self):
+    super(ConfigTest, self).setUp()
+
+    utils.clear_cache(config.settings)
+
   def validator_test(self, validator, cfg, messages):
     ctx = validation.Context()
     validator(cfg, ctx)
@@ -203,6 +209,18 @@ class ConfigTest(test_case.TestCase):
       [
         'mp.server must start with "https://" or "http://localhost"',
       ])
+
+  def test_get_settings_with_defaults_from_none(self):
+    """Make sure defaults are applied even if raw config is None."""
+    self.mock(config, '_get_settings', lambda: (None, None))
+    _, cfg = config._get_settings_with_defaults()
+    self.assertEqual(cfg.reusable_task_age_secs, 7*24*60*60)
+    self.assertEqual(cfg.bot_death_timeout_secs, 10*60)
+    self.assertEqual(cfg.auth.admins_group, 'swarming-admins')
+    self.assertEqual(cfg.auth.bot_bootstrap_group, 'swarming-bot-bootstrap')
+    self.assertEqual(cfg.auth.privileged_users_group,
+                     'swarming-privileged-users')
+    self.assertEqual(cfg.auth.users_group, 'swarming-users')
 
 
 if __name__ == '__main__':

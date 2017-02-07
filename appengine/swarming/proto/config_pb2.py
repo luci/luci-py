@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='config.proto',
   package='',
   syntax='proto2',
-  serialized_pb=_b('\n\x0c\x63onfig.proto\"\x98\x03\n\x0bSettingsCfg\x12\x18\n\x10google_analytics\x18\x01 \x01(\t\x12\x1e\n\x16reusable_task_age_secs\x18\x02 \x01(\x05\x12\x1e\n\x16\x62ot_death_timeout_secs\x18\x03 \x01(\x05\x12\x1c\n\x14\x65nable_ts_monitoring\x18\x04 \x01(\x08\x12!\n\x07isolate\x18\x05 \x01(\x0b\x32\x10.IsolateSettings\x12\x1b\n\x04\x63ipd\x18\x06 \x01(\x0b\x32\r.CipdSettings\x12$\n\x02mp\x18\x07 \x01(\x0b\x32\x18.MachineProviderSettings\x12,\n$force_bots_to_sleep_and_not_run_task\x18\x08 \x01(\x08\x12\x14\n\x0cui_client_id\x18\t \x01(\t\x12&\n\x0e\x64imension_acls\x18\n \x01(\x0b\x32\x0e.DimensionACLs\x12#\n\x1b\x64isplay_server_url_template\x18\x0b \x01(\t\x12\x1a\n\x12max_bot_sleep_time\x18\x0c \x01(\x05\"D\n\x0fIsolateSettings\x12\x16\n\x0e\x64\x65\x66\x61ult_server\x18\x01 \x01(\t\x12\x19\n\x11\x64\x65\x66\x61ult_namespace\x18\x02 \x01(\t\"4\n\x0b\x43ipdPackage\x12\x14\n\x0cpackage_name\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t\"T\n\x0c\x43ipdSettings\x12\x16\n\x0e\x64\x65\x66\x61ult_server\x18\x01 \x01(\t\x12,\n\x16\x64\x65\x66\x61ult_client_package\x18\x02 \x01(\x0b\x32\x0c.CipdPackage\":\n\x17MachineProviderSettings\x12\x0f\n\x07\x65nabled\x18\x01 \x01(\x08\x12\x0e\n\x06server\x18\x02 \x01(\t\"c\n\rDimensionACLs\x12#\n\x05\x65ntry\x18\x01 \x03(\x0b\x32\x14.DimensionACLs.Entry\x1a-\n\x05\x45ntry\x12\x11\n\tdimension\x18\x01 \x03(\t\x12\x11\n\tusable_by\x18\x02 \x01(\t')
+  serialized_pb=_b('\n\x0c\x63onfig.proto\"\xb5\x03\n\x0bSettingsCfg\x12\x18\n\x10google_analytics\x18\x01 \x01(\t\x12\x1e\n\x16reusable_task_age_secs\x18\x02 \x01(\x05\x12\x1e\n\x16\x62ot_death_timeout_secs\x18\x03 \x01(\x05\x12\x1c\n\x14\x65nable_ts_monitoring\x18\x04 \x01(\x08\x12!\n\x07isolate\x18\x05 \x01(\x0b\x32\x10.IsolateSettings\x12\x1b\n\x04\x63ipd\x18\x06 \x01(\x0b\x32\r.CipdSettings\x12$\n\x02mp\x18\x07 \x01(\x0b\x32\x18.MachineProviderSettings\x12,\n$force_bots_to_sleep_and_not_run_task\x18\x08 \x01(\x08\x12\x14\n\x0cui_client_id\x18\t \x01(\t\x12&\n\x0e\x64imension_acls\x18\n \x01(\x0b\x32\x0e.DimensionACLs\x12#\n\x1b\x64isplay_server_url_template\x18\x0b \x01(\t\x12\x1a\n\x12max_bot_sleep_time\x18\x0c \x01(\x05\x12\x1b\n\x04\x61uth\x18\r \x01(\x0b\x32\r.AuthSettings\"D\n\x0fIsolateSettings\x12\x16\n\x0e\x64\x65\x66\x61ult_server\x18\x01 \x01(\t\x12\x19\n\x11\x64\x65\x66\x61ult_namespace\x18\x02 \x01(\t\"4\n\x0b\x43ipdPackage\x12\x14\n\x0cpackage_name\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t\"T\n\x0c\x43ipdSettings\x12\x16\n\x0e\x64\x65\x66\x61ult_server\x18\x01 \x01(\t\x12,\n\x16\x64\x65\x66\x61ult_client_package\x18\x02 \x01(\x0b\x32\x0c.CipdPackage\":\n\x17MachineProviderSettings\x12\x0f\n\x07\x65nabled\x18\x01 \x01(\x08\x12\x0e\n\x06server\x18\x02 \x01(\t\"c\n\rDimensionACLs\x12#\n\x05\x65ntry\x18\x01 \x03(\x0b\x32\x14.DimensionACLs.Entry\x1a-\n\x05\x45ntry\x12\x11\n\tdimension\x18\x01 \x03(\t\x12\x11\n\tusable_by\x18\x02 \x01(\t\"v\n\x0c\x41uthSettings\x12\x14\n\x0c\x61\x64mins_group\x18\x01 \x01(\t\x12\x1b\n\x13\x62ot_bootstrap_group\x18\x02 \x01(\t\x12\x1e\n\x16privileged_users_group\x18\x03 \x01(\t\x12\x13\n\x0busers_group\x18\x04 \x01(\t')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -117,6 +117,13 @@ _SETTINGSCFG = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='auth', full_name='SettingsCfg.auth', index=12,
+      number=13, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -130,7 +137,7 @@ _SETTINGSCFG = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=17,
-  serialized_end=425,
+  serialized_end=454,
 )
 
 
@@ -167,8 +174,8 @@ _ISOLATESETTINGS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=427,
-  serialized_end=495,
+  serialized_start=456,
+  serialized_end=524,
 )
 
 
@@ -205,8 +212,8 @@ _CIPDPACKAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=497,
-  serialized_end=549,
+  serialized_start=526,
+  serialized_end=578,
 )
 
 
@@ -243,8 +250,8 @@ _CIPDSETTINGS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=551,
-  serialized_end=635,
+  serialized_start=580,
+  serialized_end=664,
 )
 
 
@@ -281,8 +288,8 @@ _MACHINEPROVIDERSETTINGS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=637,
-  serialized_end=695,
+  serialized_start=666,
+  serialized_end=724,
 )
 
 
@@ -319,8 +326,8 @@ _DIMENSIONACLS_ENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=751,
-  serialized_end=796,
+  serialized_start=780,
+  serialized_end=825,
 )
 
 _DIMENSIONACLS = _descriptor.Descriptor(
@@ -349,14 +356,67 @@ _DIMENSIONACLS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=697,
-  serialized_end=796,
+  serialized_start=726,
+  serialized_end=825,
+)
+
+
+_AUTHSETTINGS = _descriptor.Descriptor(
+  name='AuthSettings',
+  full_name='AuthSettings',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='admins_group', full_name='AuthSettings.admins_group', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='bot_bootstrap_group', full_name='AuthSettings.bot_bootstrap_group', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='privileged_users_group', full_name='AuthSettings.privileged_users_group', index=2,
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='users_group', full_name='AuthSettings.users_group', index=3,
+      number=4, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  syntax='proto2',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=827,
+  serialized_end=945,
 )
 
 _SETTINGSCFG.fields_by_name['isolate'].message_type = _ISOLATESETTINGS
 _SETTINGSCFG.fields_by_name['cipd'].message_type = _CIPDSETTINGS
 _SETTINGSCFG.fields_by_name['mp'].message_type = _MACHINEPROVIDERSETTINGS
 _SETTINGSCFG.fields_by_name['dimension_acls'].message_type = _DIMENSIONACLS
+_SETTINGSCFG.fields_by_name['auth'].message_type = _AUTHSETTINGS
 _CIPDSETTINGS.fields_by_name['default_client_package'].message_type = _CIPDPACKAGE
 _DIMENSIONACLS_ENTRY.containing_type = _DIMENSIONACLS
 _DIMENSIONACLS.fields_by_name['entry'].message_type = _DIMENSIONACLS_ENTRY
@@ -366,6 +426,7 @@ DESCRIPTOR.message_types_by_name['CipdPackage'] = _CIPDPACKAGE
 DESCRIPTOR.message_types_by_name['CipdSettings'] = _CIPDSETTINGS
 DESCRIPTOR.message_types_by_name['MachineProviderSettings'] = _MACHINEPROVIDERSETTINGS
 DESCRIPTOR.message_types_by_name['DimensionACLs'] = _DIMENSIONACLS
+DESCRIPTOR.message_types_by_name['AuthSettings'] = _AUTHSETTINGS
 
 SettingsCfg = _reflection.GeneratedProtocolMessageType('SettingsCfg', (_message.Message,), dict(
   DESCRIPTOR = _SETTINGSCFG,
@@ -416,6 +477,13 @@ DimensionACLs = _reflection.GeneratedProtocolMessageType('DimensionACLs', (_mess
   ))
 _sym_db.RegisterMessage(DimensionACLs)
 _sym_db.RegisterMessage(DimensionACLs.Entry)
+
+AuthSettings = _reflection.GeneratedProtocolMessageType('AuthSettings', (_message.Message,), dict(
+  DESCRIPTOR = _AUTHSETTINGS,
+  __module__ = 'config_pb2'
+  # @@protoc_insertion_point(class_scope:AuthSettings)
+  ))
+_sym_db.RegisterMessage(AuthSettings)
 
 
 # @@protoc_insertion_point(module_scope)
