@@ -58,34 +58,6 @@ class RestrictedConfigHandler(auth.AuthenticatingHandler):
         'swarming/restricted_config.html', config.settings_info()))
 
 
-class RestrictedCancelPendingHandler(auth.AuthenticatingHandler):
-  """Cancels all pending tasks."""
-  @auth.require(acl.is_admin)
-  def post(self):
-    # There's two ways to query, either with TaskToRun.queue_number or with
-    # TaskResultSummary.state.
-    canceled = 0
-    was_running = 0
-    q = task_result.TaskResultSummary.query(
-        task_result.TaskResultSummary.state == task_result.State.PENDING)
-    status = ''
-    try:
-      for result_key in q.iter(keys_only=True):
-        request_obj = task_pack.result_summary_key_to_request_key(
-            result_key).get()
-        ok, wr = task_scheduler.cancel_task(request_obj, result_key)
-        if ok:
-          canceled += 1
-        if wr:
-          was_running += 1
-      status = 'Success'
-    except runtime.DeadlineExceededError:
-      status = 'Deadline exceeded'
-    self.response.write(
-        'Canceled %d tasks.\n%d tasks were running.\n%s' %
-        (canceled, was_running, status))
-
-
 class UploadBotConfigHandler(auth.AuthenticatingHandler):
   """Stores a new bot_config.py script."""
 
@@ -339,7 +311,6 @@ def create_application(debug):
 
       # Admin pages.
       ('/restricted/config', RestrictedConfigHandler),
-      ('/restricted/cancel_pending', RestrictedCancelPendingHandler),
       ('/restricted/upload/bot_config', UploadBotConfigHandler),
       ('/restricted/upload/bootstrap', UploadBootstrapHandler),
 

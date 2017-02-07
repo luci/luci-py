@@ -38,15 +38,6 @@
     min-width: 600px;
   }
 </style>
-<script>
-  function confirmCancel() {
-    var r = window.prompt(
-        'This is disruptive; this cancel all pending tasks.\n' +
-        'This should only be used in case of emergencies.\n' +
-        'Are you sure? Type \'yes\' if so');
-    return r == 'yes';
-  }
-</script>
 {% endblock %}
 
 
@@ -129,16 +120,6 @@ python swarming_bot.zip</pre>
       {% endfor %}
     </ul>
     {% endif %}
-
-    <h3>Emergencies</h3>
-    <ul class="admin">
-      <li>
-        <form action="/restricted/cancel_pending" method="post" onsubmit="return confirmCancel()" >
-          <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
-          <button type="submit" {%if not is_admin%}disabled{%endif%}>Cancel all pending tasks</button>
-        </form>
-      </li>
-    </ul>
   </div>
   <stats-overview flex></stats-overview>
 </div>
