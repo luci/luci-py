@@ -33,10 +33,24 @@ Last updated on: <strong>{{cfg.updated_ts|datetimeformat}}</strong>.<br>
     <input type="text" name="default_expiration"
         value="{{cfg.default_expiration}}" size="60" />
   </div>
+
+  <h2>Access Control Lists</h2>
+  <div>
+    Full access group: <br />
+    <input type="text" name="full_access_group"
+           value="{{cfg.full_access_group}}" size="60" />
+  </div>
+  <br>
+  <div>
+    Read-only access group: <br />
+    <input type="text" name="readonly_access_group"
+           value="{{cfg.readonly_access_group}}" size="60" />
+  </div>
+
   <h2>Timeseries Monitoring</h2>
   <div>
    Enable: <input id="enable_ts_monitoring" type="checkbox" name="enable_ts_monitoring" value="True" onclick="onclick_ts_mon()" {% if cfg.enable_ts_monitoring %}checked{% endif %}>
-   <input id="enable_ts_monitoring_hidden" type="hidden" name="enable_ts_monitoring" value="False">
+   <input id="enable_ts_monitoring_hidden" type="hidden" name="enable_ts_monitoring" value="False" {% if cfg.enable_ts_monitoring %}disabled{% endif %}>
   </div>
   <h2>Google storage</h2>
   See this <a href="https://developers.google.com/storage/docs/accesscontrol#About-the-Client-ID">

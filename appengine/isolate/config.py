@@ -51,6 +51,14 @@ class GlobalConfig(config.GlobalConfig):
   # Enable ts_mon based monitoring.
   enable_ts_monitoring = ndb.BooleanProperty(indexed=False, default=False)
 
+  # Group with read and write access.
+  full_access_group = ndb.StringProperty(indexed=False,
+                                         default='isolate-access')
+
+  # Group with read-only access.
+  readonly_access_group = ndb.StringProperty(indexed=False,
+                                             default='isolate-readonly-access')
+
   def set_defaults(self):
     self.global_secret = os.urandom(16)
     self.gs_bucket = app_identity.get_application_id()

@@ -5,21 +5,19 @@
 from components import auth
 from components import utils
 
-
-# Group with read and write access.
-FULL_ACCESS_GROUP = 'isolate-access'
-# Group with read only access (in addition to isolate-access).
-READONLY_ACCESS_GROUP = 'isolate-readonly-access'
+import config
 
 
 def isolate_writable():
   """Returns True if current user can write to isolate."""
-  return auth.is_group_member(FULL_ACCESS_GROUP) or auth.is_admin()
+  full_access = auth.is_group_member(config.settings().full_access_group)
+  return full_access or auth.is_admin()
 
 
 def isolate_readable():
   """Returns True if current user can read from isolate."""
-  return auth.is_group_member(READONLY_ACCESS_GROUP) or isolate_writable()
+  read_only = config.settings().readonly_access_group
+  return auth.is_group_member(read_only) or isolate_writable()
 
 
 def get_user_type():
@@ -37,8 +35,8 @@ def bootstrap():
 
   # Allow local bots full access.
   bots = auth.bootstrap_loopback_ips()
-  auth.bootstrap_group(
-      FULL_ACCESS_GROUP, bots, 'Can read and write from/to Isolate')
+  full_access = config.settings().full_access_group
+  auth.bootstrap_group(full_access, bots, 'Can read and write from/to Isolate')
 
   # Add a fake admin for local dev server.
   auth.bootstrap_group(

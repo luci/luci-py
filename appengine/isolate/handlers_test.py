@@ -67,14 +67,17 @@ class MainTest(test_case.TestCase):
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
 
+    full_access_group = config.settings().full_access_group
+    readonly_access_group = config.settings().readonly_access_group
+
     auth.bootstrap_group(
         auth.ADMIN_GROUP,
         [auth.Identity(auth.IDENTITY_USER, 'admin@example.com')])
     auth.bootstrap_group(
-        acl.READONLY_ACCESS_GROUP,
+        readonly_access_group,
         [auth.Identity(auth.IDENTITY_USER, 'reader@example.com')])
     auth.bootstrap_group(
-        acl.FULL_ACCESS_GROUP,
+        full_access_group,
         [auth.Identity(auth.IDENTITY_USER, 'writer@example.com')])
     # TODO(maruel): Create a BOTS_GROUP.
 
