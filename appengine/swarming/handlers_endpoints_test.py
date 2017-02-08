@@ -72,7 +72,7 @@ class ServerApiTest(BaseTest):
     response = self.call_api('details')
     expected = {
       u'bot_version': unicode(
-          bot_code.get_bot_version('https://testbed.example.com')),
+          bot_code.get_bot_version('https://testbed.example.com')[0]),
       u'display_server_url_template': u'',
       u'luci_config': u'a.server',
       u'machine_provider_template':
@@ -141,7 +141,8 @@ class ServerApiTest(BaseTest):
     }
     self.assertEqual(expected, response.json)
 
-  def _test_file(self, name):
+  def _test_file(self, name, header):
+    # Tests either get_bootstrap/put_bootstrap or get_bot_config/put_bot_config.
     self.set_as_admin()
 
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
@@ -151,7 +152,7 @@ class ServerApiTest(BaseTest):
       content = f.read().decode('utf-8')
 
     expected = {
-      u'content': content,
+      u'content': header + content,
     }
     self.assertEqual(expected, self.call_api('get_' + name).json)
 
@@ -160,11 +161,11 @@ class ServerApiTest(BaseTest):
       u'when': u'2010-01-02T03:04:05',
       u'who': u'user:admin@example.com',
     }
-    response = self.call_api('put_' + name, {'content': u'hi ☀!'})
+    response = self.call_api('put_' + name, {'content': u'print(\'hi ☀!\')'})
     self.assertEqual(expected, response.json)
 
     expected = {
-      u'content': u'hi \u2600!',
+      u'content': header + u'print(\'hi \u2600!\')',
       u'version': u'0',
       u'when': u'2010-01-02T03:04:05',
       u'who': u'user:admin@example.com',
@@ -177,19 +178,20 @@ class ServerApiTest(BaseTest):
       u'when': u'2010-01-02T03:05:05',
       u'who': u'user:admin@example.com',
     }
-    response = self.call_api('put_' + name, {'content': u'hi ♕!'})
+    response = self.call_api('put_' + name, {'content': u'print(\'hi ♕!\')'})
     self.assertEqual(expected, response.json)
 
     expected = {
-      u'content': u'hi ♕!',
+      u'content': header + u'print(\'hi ♕!\')',
       u'version': u'1',
       u'when': u'2010-01-02T03:05:05',
       u'who': u'user:admin@example.com',
     }
     self.assertEqual(expected, self.call_api('get_' + name).json)
 
+    # Retrieve a previous version.
     expected = {
-      u'content': u'hi ☀!',
+      u'content': header + u'print(\'hi ☀!\')',
       u'version': u'0',
       u'when': u'2010-01-02T03:04:05',
       u'who': u'user:admin@example.com',
@@ -197,11 +199,40 @@ class ServerApiTest(BaseTest):
     response = self.call_api('get_' + name, {'version': '0'})
     self.assertEqual(expected, response.json)
 
+    # Define a script on the luci-config server.
+    def get_self_config_mock(path, revision=None, store_last_good=False):
+      self.assertEqual('scripts/%s.py' % name, path)
+      if revision:
+        self.assertEqual(False, store_last_good)
+        return revision, 'old code'
+      self.assertEqual(None, revision)
+      self.assertEqual(True, store_last_good)
+      return 'abc', 'foo bar'
+    def config_service_hostname_mock():
+      return 'localhost:1'
+    self.mock(bot_code.config, 'get_self_config', get_self_config_mock)
+    self.mock(
+        bot_code.config, 'config_service_hostname',
+        config_service_hostname_mock)
+
+    expected = {
+      u'content': header + u'foo bar',
+      u'version': u'abc',
+      u'who': u'localhost:1',
+    }
+    self.assertEqual(expected, self.call_api('get_' + name).json)
+
+    # Can't retrieve previous versions with the API (due to the way luci-config
+    # works).
+    self.call_api('get_' + name, {'version': 'old'}, status=400)
+
   def test_bootstrap(self):
-    self._test_file('bootstrap')
+    self._test_file(
+        'bootstrap',
+        '#!/usr/bin/env python\nhost_url = \'\'\nbootstrap_token = \'\'\n')
 
   def test_bot_config(self):
-    self._test_file('bot_config')
+    self._test_file('bot_config', '')
 
 
 class TasksApiTest(BaseTest):

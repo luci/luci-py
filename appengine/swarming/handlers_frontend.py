@@ -68,8 +68,9 @@ class UploadBotConfigHandler(auth.AuthenticatingHandler):
     params = {
       'content': bot_config.content.decode('utf-8'),
       'path': self.request.path,
+      'version': bot_config.version,
       'when': bot_config.when,
-      'who': bot_config.who,
+      'who': bot_config.who or 'N/A',
       'xsrf_token': self.generate_xsrf_token(),
     }
     self.response.write(
@@ -87,7 +88,7 @@ class UploadBotConfigHandler(auth.AuthenticatingHandler):
     if isinstance(script, str):
       script = script.decode('utf-8', 'replace')
     script = script.encode('utf-8')
-    bot_code.store_bot_config(script)
+    bot_code.store_bot_config(self.request.host_url, script)
     self.get()
 
 
@@ -101,8 +102,9 @@ class UploadBootstrapHandler(auth.AuthenticatingHandler):
     params = {
       'content': bootstrap.content.decode('utf-8'),
       'path': self.request.path,
+      'version': bootstrap.version,
       'when': bootstrap.when,
-      'who': bootstrap.who,
+      'who': bootstrap.who or 'N/A',
       'xsrf_token': self.generate_xsrf_token(),
     }
     self.response.write(

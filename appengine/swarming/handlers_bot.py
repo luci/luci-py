@@ -210,7 +210,7 @@ class BotCodeHandler(_BotAuthenticatingHandler):
     self.check_bot_code_access(
         bot_id=self.request.get('bot_id'), generate_token=False)
     if version:
-      expected = bot_code.get_bot_version(server)
+      expected, _ = bot_code.get_bot_version(server)
       if version != expected:
         # This can happen when the server is rapidly updated.
         logging.error('Requested Swarming bot %s, have %s', version, expected)
@@ -429,7 +429,7 @@ class BotHandshakeHandler(_BotBaseHandler):
         task_id='', task_name=None, message=res.quarantined_msg)
 
     data = {
-      'bot_version': bot_code.get_bot_version(self.get_bot_contact_server()),
+      'bot_version': bot_code.get_bot_version(self.get_bot_contact_server())[0],
       'server_version': utils.get_app_version(),
       'bot_group_cfg_version': res.bot_group_cfg.version,
       'bot_group_cfg': {
@@ -487,7 +487,8 @@ class BotPollHandler(_BotBaseHandler):
 
     # Bot version is host-specific because the host URL is embedded in
     # swarming_bot.zip
-    expected_version = bot_code.get_bot_version(self.get_bot_contact_server())
+    expected_version, _ = bot_code.get_bot_version(
+        self.get_bot_contact_server())
     if res.version != expected_version:
       bot_event('request_update')
       self._cmd_update(expected_version)

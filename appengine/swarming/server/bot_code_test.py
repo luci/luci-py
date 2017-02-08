@@ -21,6 +21,7 @@ from test_support import test_case
 
 from server import bot_archive
 from server import bot_code
+from components import config
 
 CLIENT_DIR = os.path.join(
     os.path.dirname(os.path.dirname(test_env.APP_DIR)), 'client')
@@ -39,20 +40,58 @@ class BotManagementTest(test_case.TestCase):
         auth, 'get_current_identity',
         lambda: auth.Identity(auth.IDENTITY_USER, 'joe@localhost'))
 
+  def test_get_bootstrap(self):
+    def get_self_config_mock(path, revision=None, store_last_good=False):
+      self.assertEqual('scripts/bootstrap.py', path)
+      self.assertEqual(None, revision)
+      self.assertEqual(True, store_last_good)
+      return None, 'foo bar'
+    self.mock(config, 'get_self_config', get_self_config_mock)
+    f = bot_code.get_bootstrap('localhost', 'token', None)
+    expected = (
+      '#!/usr/bin/env python\n'
+      'host_url = \'localhost\'\n'
+      'bootstrap_token = \'token\'\n'
+      'foo bar')
+    self.assertEqual(expected, f.content)
+
+  def test_get_bot_config(self):
+    def get_self_config_mock(path, revision=None, store_last_good=False):
+      self.assertEqual('scripts/bot_config.py', path)
+      self.assertEqual(None, revision)
+      self.assertEqual(True, store_last_good)
+      return None, 'foo bar'
+    self.mock(config, 'get_self_config', get_self_config_mock)
+    f = bot_code.get_bot_config(None)
+    self.assertEqual('foo bar', f.content)
+
   def test_store_bot_config(self):
     # When a new start bot script is uploaded, we should recalculate the
     # version hash since it will have changed.
-    v1 = bot_code.get_bot_version('http://localhost')
-    bot_code.store_bot_config('dummy_script')
-    v2 = bot_code.get_bot_version('http://localhost')
-    v3 = bot_code.get_bot_version('http://localhost:8080')
+    expected = {
+      'config/bot_config.py': bot_code.get_bot_config().content,
+    }
+    v1, additionals = bot_code.get_bot_version('http://localhost')
+    self.assertEqual(expected, additionals)
+    bot_code.store_bot_config('http://localhost', 'dummy_script')
+    # memcache timeout is 60 seconds, fake it by just clearing.
+    bot_code.memcache.flush_all()
+    v2, additionals = bot_code.get_bot_version('http://localhost')
+    expected = {'config/bot_config.py': 'dummy_script'}
+    self.assertEqual(expected, additionals)
+    v3, additionals = bot_code.get_bot_version('http://localhost:8080')
+    self.assertEqual(expected, additionals)
     self.assertNotEqual(v1, v2)
     self.assertNotEqual(v1, v3)
     self.assertNotEqual(v2, v3)
 
   def test_get_bot_version(self):
-    actual = bot_code.get_bot_version('http://localhost')
+    actual, additionals = bot_code.get_bot_version('http://localhost')
     self.assertTrue(re.match(r'^[0-9a-f]{40}$', actual), actual)
+    expected = {
+      'config/bot_config.py': bot_code.get_bot_config().content,
+    }
+    self.assertEqual(expected, additionals)
 
   def test_get_swarming_bot_zip(self):
     zipped_code = bot_code.get_swarming_bot_zip('http://localhost')
@@ -91,4 +130,6 @@ if __name__ == '__main__':
   fix_encoding.fix_encoding()
   logging.basicConfig(
       level=logging.DEBUG if '-v' in sys.argv else logging.ERROR)
+  if '-v' in sys.argv:
+    unittest.TestCase.maxDiff = None
   unittest.main()

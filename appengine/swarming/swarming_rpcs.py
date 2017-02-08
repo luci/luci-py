@@ -101,7 +101,7 @@ class FileContentRequest(messages.Message):
 class FileContent(messages.Message):
   """Content of a file."""
   content = messages.StringField(1)
-  version = messages.IntegerField(2)
+  version = messages.StringField(2)
   who = messages.StringField(3)
   when = message_types.DateTimeField(4)
 

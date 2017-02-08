@@ -8,7 +8,9 @@ It includes everything that is AppEngine specific. The non-GAE code is in
 bot_archive.py.
 """
 
+import ast
 import collections
+import hashlib
 import logging
 import os.path
 import urllib
@@ -17,6 +19,7 @@ from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
 from components import auth
+from components import config
 from components import datastore_utils
 from components import utils
 from server import bot_archive
@@ -70,17 +73,37 @@ class VersionedFile(ndb.Model):
 def get_bootstrap(host_url, bootstrap_token=None, version=None):
   """Returns the mangled version of the utility script bootstrap.py.
 
+  Try to find the content in the following order:
+  - get the file from luci-config
+  - get the file from VersionedFile in the DB
+  - return the default version
+
+  When using luci-config, version is ignored. This is because components/config
+  doesn't cache previous values locally, so requesting a file at a specific
+  version means a RPC to the luci-config instance, which can take several
+  seconds(!) to execute.
+
+  Eventually support for 'version' will be removed.
+
   Returns:
     File instance.
   """
-  host_url = host_url or ''
-  bootstrap_token = bootstrap_token or ''
-  header = ''
-  if host_url or bootstrap_token:
+  # Calculate the header to inject at the top of the file.
+  if bootstrap_token:
     quoted = urllib.quote_plus(bootstrap_token)
     assert bootstrap_token == quoted, bootstrap_token
-    header = 'host_url = %r\nbootstrap_token = %r\n' % (
-        host_url, bootstrap_token)
+  header = (
+      '#!/usr/bin/env python\n'
+      'host_url = %r\n'
+      'bootstrap_token = %r\n') % (host_url or '', bootstrap_token or '')
+
+  # Check in luci-config imported file if present.
+  rev, cfg = config.get_self_config(
+      'scripts/bootstrap.py', store_last_good=True)
+  if cfg:
+    return File(header + cfg, config.config_service_hostname(), None, rev)
+
+  # Look in the DB.
   if version is not None:
     obj = ndb.Key(
         VersionedFile, datastore_utils.HIGH_KEY_ID - version,
@@ -91,7 +114,9 @@ def get_bootstrap(host_url, bootstrap_token=None, version=None):
     obj = VersionedFile.fetch('bootstrap.py')
   if obj and obj.content:
     return File(
-        header + obj.content, obj.who, obj.created_ts, obj.version)
+        header + obj.content, obj.who.to_bytes(), obj.created_ts,
+        str(obj.version))
+
   # Fallback to the one embedded in the tree.
   path = os.path.join(ROOT_DIR, 'swarming_bot', 'config', 'bootstrap.py')
   with open(path, 'rb') as f:
@@ -103,15 +128,36 @@ def store_bootstrap(content):
 
   Returns the ndb.Key of the new stored entity.
   """
+  if not _validate_python(content):
+    raise ValueError('Invalid python')
   return VersionedFile(content=content).store('bootstrap.py')
 
 
 def get_bot_config(version=None):
-  """Returns the current version of bot_config.py and extra metadata.
+  """Returns the requested (or current) version of bot_config.py.
+
+  Try to find the content in the following order:
+  - get the file from luci-config
+  - get the file from VersionedFile in the DB
+  - return the default version
+
+  When using luci-config, version is ignored. This is because components/config
+  doesn't cache previous values locally, so requesting a file at a specific
+  version means a RPC to the luci-config instance, which can take several
+  seconds(!) to execute.
+
+  Eventually support for 'version' will be removed.
 
   Returns:
     File instance.
   """
+  # Check in luci-config imported file if present.
+  rev, cfg = config.get_self_config(
+      'scripts/bot_config.py', store_last_good=True)
+  if cfg:
+    return File(cfg, config.config_service_hostname(), None, rev)
+
+  # Look in the DB.
   if version is not None:
     obj = ndb.Key(
         VersionedFile, datastore_utils.HIGH_KEY_ID - version,
@@ -121,7 +167,8 @@ def get_bot_config(version=None):
   else:
     obj = VersionedFile.fetch('bot_config.py')
   if obj:
-    return File(obj.content, obj.who, obj.created_ts, obj.version)
+    return File(
+        obj.content, obj.who.to_bytes(), obj.created_ts, str(obj.version))
 
   # Fallback to the one embedded in the tree.
   path = os.path.join(ROOT_DIR, 'swarming_bot', 'config', 'bot_config.py')
@@ -129,45 +176,41 @@ def get_bot_config(version=None):
     return File(f.read(), None, None, None)
 
 
-def store_bot_config(content):
+def store_bot_config(host, content):
   """Stores a new version of bot_config.py.
 
   Returns the ndb.Key of the new stored entity.
   """
-  out = VersionedFile(content=content).store('bot_config.py')
-  # Clear the cached versions value since it has now changed.
-  memcache.delete('versions', namespace='bot_code')
-  return out
-
+  if not _validate_python(content):
+    raise ValueError('Invalid python')
+  # The memcache entry will be cleared out automatically after 60s. Try a best
+  # effort.
+  signature = _get_signature(host)
+  v = VersionedFile(content=content).store('bot_config.py')
+  memcache.delete('version-' + signature, namespace='bot_code')
+  return v
 
 def get_bot_version(host):
-  """Retrieves the bot version (SHA-1) loaded on this server.
+  """Retrieves the current bot version (SHA-1) loaded on this server.
 
   The memcache is first checked for the version, otherwise the value
   is generated and then stored in the memcache.
 
   Returns:
-    The hash of the current bot version.
+    tuple(hash of the current bot version, dict of additional files).
   """
-  # This is invalidate everything bot_config is uploaded.
-  bot_versions = memcache.get('versions', namespace='bot_code') or {}
-  # CURRENT_VERSION_ID is unique per upload so it can be trusted.
-  app_ver = host + '-' + os.environ['CURRENT_VERSION_ID']
-  bot_version = bot_versions.get(app_ver)
-  if bot_version:
-    return bot_version
+  signature = _get_signature(host)
+  version = memcache.get('version-' + signature, namespace='bot_code')
+  if version:
+    return version, None
 
   # Need to calculate it.
   additionals = {'config/bot_config.py': get_bot_config().content}
   bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
-  bot_version = bot_archive.get_swarming_bot_version(
+  version = bot_archive.get_swarming_bot_version(
       bot_dir, host, utils.get_app_version(), additionals)
-  if len(bot_versions) > 100:
-    # Lazy discard when too large.
-    bot_versions = {}
-  bot_versions[app_ver] = bot_version
-  memcache.set('versions', bot_versions, namespace='bot_code')
-  return bot_version
+  memcache.set('version-' + signature, version, namespace='bot_code', time=60)
+  return version, additionals
 
 
 def get_swarming_bot_zip(host):
@@ -176,21 +219,23 @@ def get_swarming_bot_zip(host):
   Returns:
     A string representing the zipped file's contents.
   """
-  bot_version = get_bot_version(host)
-  content = memcache.get('code-%s' + bot_version, namespace='bot_code')
+  version, additionals = get_bot_version(host)
+  content = memcache.get('code-' + version, namespace='bot_code')
   if content:
-    logging.debug(
-        'memcached bot code %s; %d bytes', bot_version, len(content))
+    logging.debug('memcached bot code %s; %d bytes', version, len(content))
     return content
 
   # Get the start bot script from the database, if present. Pass an empty
   # file if the files isn't present.
-  additionals = {'config/bot_config.py': get_bot_config().content}
+  additionals = additionals or {
+    'config/bot_config.py': get_bot_config().content,
+  }
   bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
-  content, bot_version = bot_archive.get_swarming_bot_zip(
+  content, version = bot_archive.get_swarming_bot_zip(
       bot_dir, host, utils.get_app_version(), additionals)
-  memcache.set('code-%s' + bot_version, content, namespace='bot_code')
-  logging.info('generated bot code %s; %d bytes', bot_version, len(content))
+  # This is immutable so not no need to set expiration time.
+  memcache.set('code-' + version, content, namespace='bot_code')
+  logging.info('generated bot code %s; %d bytes', version, len(content))
   return content
 
 
@@ -237,3 +282,31 @@ def validate_bootstrap_token(tok):
   except auth.InvalidTokenError as exc:
     logging.warning('Failed to validate bootstrap token: %s', exc)
     return None
+
+
+### Private code
+
+
+def _validate_python(content):
+  """Returns True if content is valid python script."""
+  try:
+    ast.parse(content)
+  except (SyntaxError, TypeError):
+    return False
+  return True
+
+
+def _get_signature(host):
+  # CURRENT_VERSION_ID is unique per appcfg.py upload so it can be trusted.
+  return hashlib.sha1(host + os.environ['CURRENT_VERSION_ID']).hexdigest()
+
+
+## Config validators
+
+
+@config.validation.self_rule('regex:scripts/.+\\.py')
+def _validate_scripts(content, ctx):
+  try:
+    ast.parse(content)
+  except (SyntaxError, TypeError) as e:
+    ctx.error('invalid %s: %s' % (ctx.path, e))

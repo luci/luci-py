@@ -170,6 +170,7 @@ class FrontendAdminTest(AppTestBase):
     with open(path, 'rb') as f:
       expected = f.read()
     header = (
+        u'#!/usr/bin/env python\n'
         'host_url = \'http://localhost\'\n'
         'bootstrap_token = \'bootstrap-token\'\n')
     self.assertEqual(header + expected, actual)
@@ -187,16 +188,20 @@ class FrontendAdminTest(AppTestBase):
         'it is either malformed or otherwise incorrect.\n\n No script uploaded'
         '  ', response.body)
 
+    script = u'print(\'script_bodé\')'
     response = self.app.post(
         '/restricted/upload/bootstrap?xsrf_token=%s' % xsrf_token,
-        upload_files=[('script', 'script', u'script_bodé'.encode('utf-8'))])
+        upload_files=[
+          ('script', 'script', script.encode('utf-8')),
+        ])
     self.assertIn(u'script_bodé'.encode('utf-8'), response.body)
 
     actual = self.app.get('/bootstrap').body
     header = (
+        u'#!/usr/bin/env python\n'
         u'host_url = \'http://localhost\'\n'
         u'bootstrap_token = \'bootstrap-token\'\n')
-    expected =  (header + u'script_bodé').encode('utf-8')
+    expected =  (header + script).encode('utf-8')
     self.assertEqual(expected, actual)
 
   def test_upload_bot_config(self):
@@ -213,7 +218,9 @@ class FrontendAdminTest(AppTestBase):
 
     response = self.app.post(
         '/restricted/upload/bot_config?xsrf_token=%s' % xsrf_token,
-        upload_files=[('script', 'script', u'script_bodé'.encode('utf-8'))])
+        upload_files=[
+          ('script', 'script', u'print(\'script_bodé\')'.encode('utf-8')),
+        ])
     self.assertIn(u'script_bodé'.encode('utf-8'), response.body)
     # TODO(maruel): Assert swarming_bot.zip now contains the new code.
 
