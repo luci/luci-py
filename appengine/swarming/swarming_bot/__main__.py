@@ -150,9 +150,9 @@ def CMDshell(args):
 def CMDstart_bot(args):
   """Starts the swarming bot."""
   logging_utils.prepare_logging(os.path.join('logs', 'swarming_bot.log'))
-  logging.info(
-      'importing bot_main: %s, %s', THIS_FILE, zip_package.generate_version())
   from bot_code import bot_main
+  logging.info(
+      'importing bot_main: %s, %s', THIS_FILE, bot_main.generate_version())
   adb_logger = logging.getLogger('adb')
   logging_utils.prepare_logging(os.path.join('logs', 'adb.log'),
                                 adb_logger)

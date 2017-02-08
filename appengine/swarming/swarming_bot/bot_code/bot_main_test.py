@@ -83,7 +83,7 @@ class TestBotMain(net_utils.TestCase):
         bot_main, 'THIS_FILE',
         os.path.join(test_env_bot_code.BOT_DIR, 'swarming_bot.zip'))
     # Need to disable this otherwise it'd kill the current checkout.
-    self.mock(bot_main, 'cleanup_bot_directory', lambda _: None)
+    self.mock(bot_main, '_cleanup_bot_directory', lambda _: None)
     # Test results shouldn't depend on where they run. And they should not use
     # real GCE tokens.
     self.mock(gce, 'is_gce', lambda: False)
@@ -108,7 +108,7 @@ class TestBotMain(net_utils.TestCase):
         self.root_dir, self.fail)
 
   def test_get_dimensions(self):
-    dimensions = set(bot_main.get_dimensions(None))
+    dimensions = set(bot_main._get_dimensions(None))
     dimensions.discard('hidpi')
     dimensions.discard('zone')  # Only set on GCE bots.
     expected = {'cores', 'cpu', 'gpu', 'id', 'machine_type', 'os', 'pool'}
@@ -118,7 +118,8 @@ class TestBotMain(net_utils.TestCase):
 
   def test_get_dimensions_load_test(self):
     os.environ['SWARMING_LOAD_TEST'] = '1'
-    self.assertEqual(['id', 'load_test'], sorted(bot_main.get_dimensions(None)))
+    self.assertEqual(
+        ['id', 'load_test'], sorted(bot_main._get_dimensions(None)))
 
   def test_generate_version(self):
     self.assertEqual('123', bot_main.generate_version())
@@ -131,7 +132,7 @@ class TestBotMain(net_utils.TestCase):
     # changed.
     for disk in expected['disks'].itervalues():
       self.assertGreater(disk.pop('free_mb'), 1.)
-    actual = bot_main.get_state(None, 12)
+    actual = bot_main._get_state(None, 12)
     for disk in actual['disks'].itervalues():
       self.assertGreater(disk.pop('free_mb'), 1.)
     self.assertGreater(actual.pop('nb_files_in_temp'), 0)
@@ -183,7 +184,7 @@ class TestBotMain(net_utils.TestCase):
         (root, botobj.base_dir),
       'sleep_streak': 1,
     }
-    self.assertEqual(expected, bot_main.get_state(botobj, 1))
+    self.assertEqual(expected, bot_main._get_state(botobj, 1))
 
   def test_default_settings(self):
     # If this trigger, you either forgot to update bot_main.py or bot_config.py.
@@ -210,9 +211,9 @@ class TestBotMain(net_utils.TestCase):
         'c': 4,
       },
     }
-    self.assertEqual(expected, bot_main.dict_deep_merge(a, b))
-    self.assertEqual(a, bot_main.dict_deep_merge(a, None))
-    self.assertEqual(a, bot_main.dict_deep_merge(None, a))
+    self.assertEqual(expected, bot_main._dict_deep_merge(a, b))
+    self.assertEqual(a, bot_main._dict_deep_merge(a, None))
+    self.assertEqual(a, bot_main._dict_deep_merge(None, a))
 
   def test_setup_bot(self):
     setup_bots = []
@@ -269,7 +270,7 @@ class TestBotMain(net_utils.TestCase):
           ),
         ])
     botobj = bot_main.get_bot()
-    self.assertEqual(True, bot_main.post_error_task(botobj, 'error', 23))
+    self.assertEqual(True, bot_main._post_error_task(botobj, 'error', 23))
 
   def test_run_bot(self):
     self.mock(threading, 'Event', FakeThreadingEvent)
@@ -285,7 +286,7 @@ class TestBotMain(net_utils.TestCase):
       if sleep_streak == 5:
         raise Exception('Jumping out of the loop')
       return False
-    self.mock(bot_main, 'poll_server', poll_server)
+    self.mock(bot_main, '_poll_server', poll_server)
 
     def post_error(botobj, e):
       self.assertEqual(self.url, botobj.server)
@@ -306,7 +307,7 @@ class TestBotMain(net_utils.TestCase):
         bot_main, 'get_config',
         lambda: {'server': self.url, 'server_version': '1', 'is_grpc': False})
     self.mock(
-        bot_main, 'get_dimensions', lambda _: self.attributes['dimensions'])
+        bot_main, '_get_dimensions', lambda _: self.attributes['dimensions'])
     self.mock(os_utilities, 'get_state', lambda *_: self.attributes['state'])
 
     # Method should have "self" as first argument - pylint: disable=E0213
@@ -366,7 +367,7 @@ class TestBotMain(net_utils.TestCase):
         ])
 
     with self.assertRaises(Foo):
-      bot_main.run_bot(None)
+      bot_main._run_bot(None)
     self.assertEqual(
         self.attributes['dimensions']['id'][0], os.environ['SWARMING_BOT_ID'])
 
@@ -381,8 +382,8 @@ class TestBotMain(net_utils.TestCase):
     slept = []
     bit = threading.Event()
     self.mock(bit, 'wait', slept.append)
-    self.mock(bot_main, 'run_manifest', self.fail)
-    self.mock(bot_main, 'update_bot', self.fail)
+    self.mock(bot_main, '_run_manifest', self.fail)
+    self.mock(bot_main, '_update_bot', self.fail)
     from config import bot_config
     called = []
     self.mock(bot_config, 'on_bot_idle', lambda _bot, _s: called.append(1))
@@ -403,7 +404,7 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertFalse(bot_main.poll_server(self.bot, bit, 2))
+    self.assertFalse(bot_main._poll_server(self.bot, bit, 2))
     self.assertEqual([1.24], slept)
     self.assertEqual([1], called)
 
@@ -411,8 +412,8 @@ class TestBotMain(net_utils.TestCase):
     slept = []
     bit = threading.Event()
     self.mock(bit, 'wait', slept.append)
-    self.mock(bot_main, 'run_manifest', self.fail)
-    self.mock(bot_main, 'update_bot', self.fail)
+    self.mock(bot_main, '_run_manifest', self.fail)
+    self.mock(bot_main, '_update_bot', self.fail)
 
     self.bot = self.make_bot(lambda: ({'A': 'a'}, time.time() + 3600))
 
@@ -432,7 +433,7 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertFalse(bot_main.poll_server(self.bot, bit, 0))
+    self.assertFalse(bot_main._poll_server(self.bot, bit, 0))
     self.assertEqual([1.24], slept)
 
   def test_poll_server_run(self):
@@ -440,10 +441,10 @@ class TestBotMain(net_utils.TestCase):
     clean = []
     bit = threading.Event()
     self.mock(bit, 'wait', self.fail)
-    self.mock(bot_main, 'run_manifest', lambda *args: manifest.append(args))
-    self.mock(bot_main, 'clean_cache',
+    self.mock(bot_main, '_run_manifest', lambda *args: manifest.append(args))
+    self.mock(bot_main, '_clean_cache',
               lambda *args: clean.append(args))
-    self.mock(bot_main, 'update_bot', self.fail)
+    self.mock(bot_main, '_update_bot', self.fail)
 
     self.expected_requests(
         [
@@ -461,7 +462,7 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertTrue(bot_main.poll_server(self.bot, bit, 0))
+    self.assertTrue(bot_main._poll_server(self.bot, bit, 0))
     expected = [(self.bot, {'foo': 'bar'}, time.time())]
     self.assertEqual(expected, manifest)
     expected = [(self.bot,)]
@@ -471,8 +472,8 @@ class TestBotMain(net_utils.TestCase):
     update = []
     bit = threading.Event()
     self.mock(bit, 'wait', self.fail)
-    self.mock(bot_main, 'run_manifest', self.fail)
-    self.mock(bot_main, 'update_bot', lambda *args: update.append(args))
+    self.mock(bot_main, '_run_manifest', self.fail)
+    self.mock(bot_main, '_update_bot', lambda *args: update.append(args))
 
     self.expected_requests(
         [
@@ -490,15 +491,15 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertTrue(bot_main.poll_server(self.bot, bit, 0))
+    self.assertTrue(bot_main._poll_server(self.bot, bit, 0))
     self.assertEqual([(self.bot, '123')], update)
 
   def test_poll_server_restart(self):
     restart = []
     bit = threading.Event()
     self.mock(bit, 'wait', self.fail)
-    self.mock(bot_main, 'run_manifest', self.fail)
-    self.mock(bot_main, 'update_bot', self.fail)
+    self.mock(bot_main, '_run_manifest', self.fail)
+    self.mock(bot_main, '_update_bot', self.fail)
     self.mock(self.bot, 'restart', lambda *args: restart.append(args))
 
     self.expected_requests(
@@ -517,15 +518,15 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertTrue(bot_main.poll_server(self.bot, bit, 0))
+    self.assertTrue(bot_main._poll_server(self.bot, bit, 0))
     self.assertEqual([('Please die now',)], restart)
 
   def test_poll_server_restart_load_test(self):
     os.environ['SWARMING_LOAD_TEST'] = '1'
     bit = threading.Event()
     self.mock(bit, 'wait', self.fail)
-    self.mock(bot_main, 'run_manifest', self.fail)
-    self.mock(bot_main, 'update_bot', self.fail)
+    self.mock(bot_main, '_run_manifest', self.fail)
+    self.mock(bot_main, '_update_bot', self.fail)
     self.mock(self.bot, 'restart', self.fail)
 
     self.expected_requests(
@@ -544,7 +545,7 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertTrue(bot_main.poll_server(self.bot, bit, 0))
+    self.assertTrue(bot_main._poll_server(self.bot, bit, 0))
 
   def _mock_popen(
       self, returncode=0, exit_code=0, url='https://localhost:1',
@@ -602,7 +603,7 @@ class TestBotMain(net_utils.TestCase):
     return result
 
   def test_run_manifest(self):
-    self.mock(bot_main, 'post_error_task', self.print_err_and_fail)
+    self.mock(bot_main, '_post_error_task', self.print_err_and_fail)
     def call_hook(botobj, name, *args):
       if name == 'on_after_task':
         failure, internal_failure, dimensions, summary = args
@@ -611,7 +612,7 @@ class TestBotMain(net_utils.TestCase):
         self.assertEqual(False, internal_failure)
         self.assertEqual({'os': 'Amiga', 'pool': 'default'}, dimensions)
         self.assertEqual(result, summary)
-    self.mock(bot_main, 'call_hook', call_hook)
+    self.mock(bot_main, '_call_hook', call_hook)
     result = self._mock_popen(url='https://localhost:3')
 
     manifest = {
@@ -623,13 +624,13 @@ class TestBotMain(net_utils.TestCase):
       'task_id': '24',
     }
     self.assertEqual(self.root_dir, self.bot.base_dir)
-    bot_main.run_manifest(self.bot, manifest, time.time())
+    bot_main._run_manifest(self.bot, manifest, time.time())
 
   def test_run_manifest_with_auth_headers(self):
     self.bot = self.make_bot(
         auth_headers_cb=lambda: ({'A': 'a'}, time.time() + 3600))
 
-    self.mock(bot_main, 'post_error_task', self.print_err_and_fail)
+    self.mock(bot_main, '_post_error_task', self.print_err_and_fail)
     def call_hook(botobj, name, *args):
       if name == 'on_after_task':
         failure, internal_failure, dimensions, summary = args
@@ -638,7 +639,7 @@ class TestBotMain(net_utils.TestCase):
         self.assertEqual(False, internal_failure)
         self.assertEqual({'os': 'Amiga', 'pool': 'default'}, dimensions)
         self.assertEqual(result, summary)
-    self.mock(bot_main, 'call_hook', call_hook)
+    self.mock(bot_main, '_call_hook', call_hook)
     result = self._mock_popen(
         url='https://localhost:3',
         expected_auth_params_json={
@@ -656,10 +657,10 @@ class TestBotMain(net_utils.TestCase):
       'task_id': '24',
     }
     self.assertEqual(self.root_dir, self.bot.base_dir)
-    bot_main.run_manifest(self.bot, manifest, time.time())
+    bot_main._run_manifest(self.bot, manifest, time.time())
 
   def test_run_manifest_task_failure(self):
-    self.mock(bot_main, 'post_error_task', self.print_err_and_fail)
+    self.mock(bot_main, '_post_error_task', self.print_err_and_fail)
     def call_hook(_botobj, name, *args):
       if name == 'on_after_task':
         failure, internal_failure, dimensions, summary = args
@@ -667,7 +668,7 @@ class TestBotMain(net_utils.TestCase):
         self.assertEqual(False, internal_failure)
         self.assertEqual({'pool': 'default'}, dimensions)
         self.assertEqual(result, summary)
-    self.mock(bot_main, 'call_hook', call_hook)
+    self.mock(bot_main, '_call_hook', call_hook)
     result = self._mock_popen(exit_code=1)
 
     manifest = {
@@ -678,11 +679,11 @@ class TestBotMain(net_utils.TestCase):
       'io_timeout': 60,
       'task_id': '24',
     }
-    bot_main.run_manifest(self.bot, manifest, time.time())
+    bot_main._run_manifest(self.bot, manifest, time.time())
 
   def test_run_manifest_internal_failure(self):
     posted = []
-    self.mock(bot_main, 'post_error_task', lambda *args: posted.append(args))
+    self.mock(bot_main, '_post_error_task', lambda *args: posted.append(args))
     def call_hook(_botobj, name, *args):
       if name == 'on_after_task':
         failure, internal_failure, dimensions, summary = args
@@ -690,7 +691,7 @@ class TestBotMain(net_utils.TestCase):
         self.assertEqual(True, internal_failure)
         self.assertEqual({'pool': 'default'}, dimensions)
         self.assertEqual(result, summary)
-    self.mock(bot_main, 'call_hook', call_hook)
+    self.mock(bot_main, '_call_hook', call_hook)
     result = self._mock_popen(returncode=1)
 
     manifest = {
@@ -701,7 +702,7 @@ class TestBotMain(net_utils.TestCase):
       'io_timeout': 60,
       'task_id': '24',
     }
-    bot_main.run_manifest(self.bot, manifest, time.time())
+    bot_main._run_manifest(self.bot, manifest, time.time())
     expected = [(self.bot, 'Execution failed: internal error (1).', '24')]
     self.assertEqual(expected, posted)
 
@@ -709,7 +710,7 @@ class TestBotMain(net_utils.TestCase):
     posted = []
     def post_error_task(botobj, msg, task_id):
       posted.append((botobj, msg.splitlines()[0], task_id))
-    self.mock(bot_main, 'post_error_task', post_error_task)
+    self.mock(bot_main, '_post_error_task', post_error_task)
     def call_hook(_botobj, name, *args):
       if name == 'on_after_task':
         failure, internal_failure, dimensions, summary = args
@@ -717,7 +718,7 @@ class TestBotMain(net_utils.TestCase):
         self.assertEqual(True, internal_failure)
         self.assertEqual({'pool': 'default'}, dimensions)
         self.assertEqual({}, summary)
-    self.mock(bot_main, 'call_hook', call_hook)
+    self.mock(bot_main, '_call_hook', call_hook)
     def raiseOSError(*_a, **_k):
       raise OSError('Dang')
     self.mock(subprocess42, 'Popen', raiseOSError)
@@ -729,7 +730,7 @@ class TestBotMain(net_utils.TestCase):
       'hard_timeout': 60,
       'task_id': '24',
     }
-    bot_main.run_manifest(self.bot, manifest, time.time())
+    bot_main._run_manifest(self.bot, manifest, time.time())
     expected = [(self.bot, 'Internal exception occured: Dang', '24')]
     self.assertEqual(expected, posted)
 
@@ -765,7 +766,7 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main.common, 'exec_python', exec_python)
 
     with self.assertRaises(SystemExit) as e:
-      bot_main.update_bot(self.bot, '123')
+      bot_main._update_bot(self.bot, '123')
     self.assertEqual(23, e.exception.code)
 
     self.assertEqual([[new_zip, 'start_slave', '--survive']], calls)
@@ -778,7 +779,7 @@ class TestBotMain(net_utils.TestCase):
     def run_bot(error):
       self.assertEqual(None, error)
       return 0
-    self.mock(bot_main, 'run_bot', run_bot)
+    self.mock(bot_main, '_run_bot', run_bot)
 
     class Singleton(object):
       # pylint: disable=no-self-argument

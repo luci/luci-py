@@ -114,7 +114,7 @@ def _in_load_test_mode():
   return os.environ.get('SWARMING_LOAD_TEST') == '1'
 
 
-def log_call(name=None):
+def _log_call(name=None):
   def gen(fn):
     def hook(*args, **kwargs):
       start = time.time()
@@ -128,8 +128,8 @@ def log_call(name=None):
   return gen
 
 
-@log_call()
-def get_dimensions(botobj):
+@_log_call()
+def _get_dimensions(botobj):
   """Returns bot_config.py's get_dimensions() dict."""
   # Importing this administrator provided script could have side-effects on
   # startup. That is why it is imported late.
@@ -168,7 +168,7 @@ def get_dimensions(botobj):
         }
 
 
-def get_settings(botobj):
+def _get_settings(botobj):
   """Returns settings for this bot.
 
   The way used to make it work safely is to take the default settings, then
@@ -187,15 +187,15 @@ def get_settings(botobj):
       settings = bot_config.get_settings(botobj)
       if not isinstance(settings, dict):
         raise TypeError()
-    settings = dict_deep_merge(DEFAULT_SETTINGS, settings)
+    settings = _dict_deep_merge(DEFAULT_SETTINGS, settings)
   except Exception:
     logging.exception('get_settings() failed')
     return DEFAULT_SETTINGS
   return settings
 
 
-@log_call()
-def get_state(botobj, sleep_streak):
+@_log_call()
+def _get_state(botobj, sleep_streak):
   """Returns dict with a state of the bot reported to the server with each poll.
   """
   try:
@@ -214,7 +214,7 @@ def get_state(botobj, sleep_streak):
       'quarantined': True,
     }
 
-  if not state.get('quarantined') and not is_base_dir_ok(botobj):
+  if not state.get('quarantined') and not _is_base_dir_ok(botobj):
     # Use super hammer in case of dangerous environment.
     state['quarantined'] = 'Can\'t run from blacklisted directory'
 
@@ -222,7 +222,7 @@ def get_state(botobj, sleep_streak):
   if not state.get('quarantined') and botobj:
     # Quarantines when there's not enough free space on either root partition or
     # the current partition the bot is running in.
-    settings = get_settings(botobj)['free_partition']
+    settings = _get_settings(botobj)['free_partition']
     # On Windows, drive letters are always lower case.
     root = 'c:\\' if sys.platform == 'win32' else '/'
     # Reuse the data from 'state/disks'
@@ -230,7 +230,7 @@ def get_state(botobj, sleep_streak):
 
     s = []
     def check_for_quarantine(r, i):
-      min_free = min_free_disk(i, settings)
+      min_free = _min_free_disk(i, settings)
       if int(i[u'free_mb']*1024*1024) < min_free:
         s.append(
             'Not enough free disk space on %s. %.1fmib < %.1fmib' %
@@ -257,8 +257,8 @@ def get_state(botobj, sleep_streak):
   return state
 
 
-@log_call(lambda _, name, *args: name)
-def call_hook(botobj, name, *args):
+@_log_call(lambda _, name, *args: name)
+def _call_hook(botobj, name, *args):
   """Calls a hook function in bot_config.py."""
   try:
     if _in_load_test_mode():
@@ -310,7 +310,7 @@ def setup_bot(skip_reboot):
     botobj.restart('Starting new swarming bot: %s' % THIS_FILE)
 
 
-def get_authentication_headers(botobj):
+def _get_authentication_headers(botobj):
   """Calls bot_config.get_authentication_headers() if it is defined.
 
   Doesn't catch exceptions.
@@ -326,10 +326,10 @@ def get_authentication_headers(botobj):
 ### end of bot_config handler part.
 
 
-def min_free_disk(infos, settings):
+def _min_free_disk(infos, settings):
   """Returns the calculated minimum free disk space for this partition.
 
-  See get_settings() in ../config/bot_config.py for an explanation.
+  See _get_settings() in ../config/bot_config.py for an explanation.
   """
   size = int(infos[u'size_mb']*1024*1024)
   x1 = settings['size'] or 0
@@ -340,7 +340,7 @@ def min_free_disk(infos, settings):
   return max(x, int(round(size * float(settings['min_percent'] or 0) * 0.01)))
 
 
-def dict_deep_merge(x, y):
+def _dict_deep_merge(x, y):
   """Returns the union of x and y.
 
   y takes predescence.
@@ -351,7 +351,7 @@ def dict_deep_merge(x, y):
     return x
   if isinstance(x, dict):
     if isinstance(y, dict):
-      return {k: dict_deep_merge(x.get(k), y.get(k)) for k in set(x).union(y)}
+      return {k: _dict_deep_merge(x.get(k), y.get(k)) for k in set(x).union(y)}
     assert y is None, repr(y)
     return x
   if isinstance(y, dict):
@@ -361,7 +361,7 @@ def dict_deep_merge(x, y):
   return y
 
 
-def is_base_dir_ok(botobj):
+def _is_base_dir_ok(botobj):
   """Returns False if the bot must be quarantined at all cost."""
   if not botobj:
     # This can happen very early in the process lifetime.
@@ -388,13 +388,13 @@ def get_attributes(botobj):
   - botobj: bot.Bot instance or None
   """
   return {
-    'dimensions': get_dimensions(botobj),
-    'state': get_state(botobj, 0),
+    'dimensions': _get_dimensions(botobj),
+    'state': _get_state(botobj, 0),
     'version': generate_version(),
   }
 
 
-def post_error_task(botobj, error, task_id):
+def _post_error_task(botobj, error, task_id):
   """Posts given error as failure cause for the task.
 
   This is used in case of internal code error, and this causes the task to
@@ -414,9 +414,9 @@ def post_error_task(botobj, error, task_id):
   return botobj.remote.post_task_error(task_id, botobj.id, error)
 
 
-def on_shutdown_hook(b):
+def _on_shutdown_hook(b):
   """Called when the bot is restarting."""
-  call_hook(b, 'on_bot_shutdown')
+  _call_hook(b, 'on_bot_shutdown')
   # Aggressively set itself up so we ensure the auto-reboot configuration is
   # fine before restarting the host. This is important as some tasks delete the
   # autorestart script (!)
@@ -449,7 +449,7 @@ def get_bot():
       config['server'],
       config['server_version'],
       base_dir,
-      on_shutdown_hook))
+      _on_shutdown_hook))
 
   # Make remote client callback use the returned bot object. We assume here
   # RemoteClient doesn't call its callback in the constructor (since 'botobj' is
@@ -457,23 +457,23 @@ def get_bot():
   botobj = bot.Bot(
       remote_client.createRemoteClient(
           config['server'],
-          lambda: get_authentication_headers(botobj),
+          lambda: _get_authentication_headers(botobj),
           config['is_grpc']),
       attributes,
       config['server'],
       config['server_version'],
       base_dir,
-      on_shutdown_hook)
+      _on_shutdown_hook)
   return botobj
 
 
-def cleanup_bot_directory(botobj):
+def _cleanup_bot_directory(botobj):
   """Delete anything not expected in the swarming bot directory.
 
   This helps with stale work directory or any unexpected junk that could cause
   this bot to self-quarantine. Do only this when running from the zip.
   """
-  if not is_base_dir_ok(botobj):
+  if not _is_base_dir_ok(botobj):
     # That's an important one-off check as cleaning the $HOME directory has
     # really bad effects on normal host.
     logging.error('Not cleaning root directory because of bad base directory')
@@ -492,16 +492,16 @@ def cleanup_bot_directory(botobj):
           'Failed to remove %s from bot\'s directory: %s' % (i, e))
 
 
-def run_isolated_flags(botobj):
+def _run_isolated_flags(botobj):
   """Returns flags to pass to run_isolated.
 
   These are not meant to be processed by task_runner.py.
   """
-  settings = get_settings(botobj)
+  settings = _get_settings(botobj)
   partition = settings['free_partition']
   size = os_utilities.get_disk_size(THIS_FILE)
   min_free = (
-      min_free_disk({'size_mb': size}, partition) +
+      _min_free_disk({'size_mb': size}, partition) +
       partition['wiggle'])
   return [
     '--cache', os.path.join(botobj.base_dir, 'isolated_cache'),
@@ -512,12 +512,12 @@ def run_isolated_flags(botobj):
   ]
 
 
-def clean_cache(botobj):
+def _clean_cache(botobj):
   """Asks run_isolated to clean its cache.
 
   This may take a while but it ensures that in the case of a run_isolated run
-  failed and it temporarily used more space than min_free_disk, it can cleans up
-  the mess properly.
+  failed and it temporarily used more space than _min_free_disk, it can cleans
+  up the mess properly.
 
   It will remove unexpected files, remove corrupted files, trim the cache size
   based on the policies and update state.json.
@@ -527,7 +527,7 @@ def clean_cache(botobj):
     '--clean',
     '--log-file', os.path.join(botobj.base_dir, 'logs', 'run_isolated.log'),
   ]
-  cmd.extend(run_isolated_flags(botobj))
+  cmd.extend(_run_isolated_flags(botobj))
   logging.info('Running: %s', cmd)
   try:
     # Intentionally do not use a timeout, it can take a while to hash 50gb but
@@ -549,7 +549,7 @@ def clean_cache(botobj):
         'swarming_bot.zip internal failure during run_isolated --clean')
 
 
-def run_bot(arg_error):
+def _run_bot(arg_error):
   """Runs the bot until it reboots or self-update or a signal is received.
 
   When a signal is received, simply exit.
@@ -603,15 +603,15 @@ def run_bot(arg_error):
       logging.info('Early quit 2')
       return 0
 
-    call_hook(botobj, 'on_bot_startup')
+    _call_hook(botobj, 'on_bot_startup')
 
     # Initial attributes passed to bot.Bot in get_bot above were constructed for
     # 'fake' bot ID ('none'). Refresh them to match the real bot ID, now that we
     # have fully initialize bot.Bot object. Note that 'get_dimensions' and
     # 'get_state' may depend on actions done by 'on_bot_startup' hook, that's
     # why we do it here and not in 'get_bot'.
-    botobj._update_dimensions(get_dimensions(botobj))
-    botobj._update_state(get_state(botobj, 0))
+    botobj._update_dimensions(_get_dimensions(botobj))
+    botobj._update_state(_get_state(botobj, 0))
 
     if quit_bit.is_set():
       logging.info('Early quit 3')
@@ -651,10 +651,10 @@ def run_bot(arg_error):
 
     # Let the bot to finish the initialization, now that it knows its server
     # defined dimensions.
-    call_hook(botobj, 'on_handshake')
+    _call_hook(botobj, 'on_handshake')
 
-    cleanup_bot_directory(botobj)
-    clean_cache(botobj)
+    _cleanup_bot_directory(botobj)
+    _clean_cache(botobj)
 
     if quit_bit.is_set():
       logging.info('Early quit 5')
@@ -667,16 +667,16 @@ def run_bot(arg_error):
     last_action = time.time()
     while not quit_bit.is_set():
       try:
-        botobj._update_dimensions(get_dimensions(botobj))
-        botobj._update_state(get_state(botobj, consecutive_sleeps))
-        did_something = poll_server(botobj, quit_bit, last_action)
+        botobj._update_dimensions(_get_dimensions(botobj))
+        botobj._update_state(_get_state(botobj, consecutive_sleeps))
+        did_something = _poll_server(botobj, quit_bit, last_action)
         if did_something:
           last_action = time.time()
           consecutive_sleeps = 0
         else:
           consecutive_sleeps += 1
       except Exception as e:
-        logging.exception('poll_server failed in a completely unexpected way')
+        logging.exception('_poll_server failed in a completely unexpected way')
         msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
         botobj.post_error(msg)
         consecutive_sleeps = 0
@@ -689,7 +689,7 @@ def run_bot(arg_error):
   return 0
 
 
-def poll_server(botobj, quit_bit, last_action):
+def _poll_server(botobj, quit_bit, last_action):
   """Polls the server to run one loop.
 
   Returns True if executed some action, False if server asked the bot to sleep.
@@ -707,7 +707,7 @@ def poll_server(botobj, quit_bit, last_action):
 
   if cmd == 'sleep':
     # Value is duration
-    call_hook(botobj, 'on_bot_idle', max(0, time.time() - last_action))
+    _call_hook(botobj, 'on_bot_idle', max(0, time.time() - last_action))
     quit_bit.wait(value)
     return False
 
@@ -726,17 +726,17 @@ def poll_server(botobj, quit_bit, last_action):
 
   if cmd == 'run':
     # Value is the manifest
-    if run_manifest(botobj, value, start):
+    if _run_manifest(botobj, value, start):
       # Completed a task successfully so update swarming_bot.zip if necessary.
-      update_lkgbc(botobj)
+      _update_lkgbc(botobj)
     # Clean up cache after a task
-    clean_cache(botobj)
+    _clean_cache(botobj)
     # TODO(maruel): Handle the case where quit_bit.is_set() happens here. This
     # is concerning as this means a signal (often SIGTERM) was received while
     # running the task. Make sure the host is properly restarting.
   elif cmd == 'update':
     # Value is the version
-    update_bot(botobj, value)
+    _update_bot(botobj, value)
   elif cmd == 'restart':
     # Value is the message to display while restarting
     if _in_load_test_mode():
@@ -749,7 +749,7 @@ def poll_server(botobj, quit_bit, last_action):
   return True
 
 
-def run_manifest(botobj, manifest, start):
+def _run_manifest(botobj, manifest, start):
   """Defers to task_runner.py.
 
   Return True if the task succeeded.
@@ -840,7 +840,7 @@ def run_manifest(botobj, manifest, start):
     handle, bot_file = tempfile.mkstemp(
         prefix='bot_file', suffix='.json', dir=work_dir)
     os.close(handle)
-    call_hook(botobj, 'on_before_task', bot_file)
+    _call_hook(botobj, 'on_before_task', bot_file)
     task_result_file = os.path.join(work_dir, 'task_runner_out.json')
     if os.path.exists(task_result_file):
       os.remove(task_result_file)
@@ -872,7 +872,7 @@ def run_manifest(botobj, manifest, start):
     # Flags for run_isolated.py are passed through by task_runner.py as-is
     # without interpretation.
     command.append('--')
-    command.extend(run_isolated_flags(botobj))
+    command.extend(_run_isolated_flags(botobj))
     logging.debug('Running command: %s', command)
 
     # Put the output file into the current working directory, which should be
@@ -930,7 +930,7 @@ def run_manifest(botobj, manifest, start):
   except Exception as e:
     # Failures include IOError when writing if the disk is full, OSError if
     # swarming_bot.zip doesn't exist anymore, etc.
-    logging.exception('run_manifest failed')
+    logging.exception('_run_manifest failed')
     msg = 'Internal exception occured: %s\n%s' % (
         e, traceback.format_exc()[-2048:])
     internal_failure = True
@@ -938,8 +938,8 @@ def run_manifest(botobj, manifest, start):
     if auth_params_dumper:
       auth_params_dumper.stop()
     if internal_failure:
-      post_error_task(botobj, msg, task_id)
-    call_hook(
+      _post_error_task(botobj, msg, task_id)
+    _call_hook(
         botobj, 'on_after_task', failure, internal_failure, task_dimensions,
         task_result)
     if os.path.isdir(work_dir):
@@ -950,13 +950,13 @@ def run_manifest(botobj, manifest, start):
             'Failed to delete work directory %s: %s' % (work_dir, e))
 
 
-def update_bot(botobj, version):
+def _update_bot(botobj, version):
   """Downloads the new version of the bot code and then runs it.
 
   Use alternating files; first load swarming_bot.1.zip, then swarming_bot.2.zip,
   never touching swarming_bot.zip which was the originally bootstrapped file.
 
-  LKGBC is handled by update_lkgbc().
+  LKGBC is handled by _update_lkgbc().
 
   Does not return.
   """
@@ -1015,7 +1015,7 @@ def update_bot(botobj, version):
   sys.exit(ret)
 
 
-def update_lkgbc(botobj):
+def _update_lkgbc(botobj):
   """Updates the Last Known Good Bot Code if necessary."""
   try:
     if not os.path.isfile(THIS_FILE):
@@ -1083,8 +1083,8 @@ def main(args):
   if len(args) != 0:
     error = 'Unexpected arguments: %s' % args
   try:
-    return run_bot(error)
+    return _run_bot(error)
   finally:
-    call_hook(
+    _call_hook(
         bot.Bot(None, None, None, None, base_dir, None), 'on_bot_shutdown')
     logging.info('main() returning')
