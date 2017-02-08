@@ -304,13 +304,13 @@ class Application(object):
     output, _ = proc.communicate(None)
     if proc.returncode:
       sys.stderr.write('\n' + output + '\n')
-      raise RuntimeError('Call %s failed with code %d' % (cmd, proc.returncode))
+      raise subprocess.CalledProcessError(proc.returncode, cmd, output)
     return output
 
   def run_appcfg(self, args):
     """Runs appcfg.py <args>, deserializes its output and returns it."""
     if not is_oauth_token_cached():
-      raise LoginRequiredError()
+      raise LoginRequiredError('Login first using \'login\' subcommand.')
     cmd = [
       sys.executable,
       os.path.join(gae_sdk_path(), 'appcfg.py'),
@@ -320,6 +320,13 @@ class Application(object):
       cmd.append('--verbose')
     cmd.extend(args)
     return yaml.safe_load(self.run_cmd(cmd))
+
+  def run_gcloud(self, args):
+    """Runs gcloud <args>."""
+    if not is_gcloud_oauth2_token_cached():
+      raise LoginRequiredError('Login first using \'gcloud auth login\'')
+    check_tool_in_path('gcloud')
+    return self.run_cmd(['gcloud'] + args)
 
   def list_versions(self):
     """List all uploaded versions.
@@ -485,26 +492,25 @@ class Application(object):
 
   def get_actives(self, modules=None):
     """Returns active version(s)."""
-    check_tool_in_path('gcloud')
-    cmd = [
-      'gcloud', 'app', 'versions', 'list',
+    args = [
+      'app', 'versions', 'list',
       '--project', self.app_id,
       '--format', 'json',
       '--hide-no-traffic',
     ]
-    raw = self.run_cmd(cmd)
+    raw = self.run_gcloud(args)
     try:
       data = json.loads(raw)
     except ValueError:
       sys.stderr.write('Failed to decode %r as JSON\n' % raw)
-      raise RuntimeError('Failed to query active version')
+      raise
     # TODO(maruel): Handle when traffic_split != 1.0.
     # TODO(maruel): There's a lot more data, decide what is generally useful in
     # there.
     return [
       {
-        'creationTime': service['version']['creationTime'].split('.', 1)[0],
-        'deployer': service['version']['deployer'],
+        'creationTime': service['version']['createTime'],
+        'deployer': service['version']['createdBy'],
         'id': service['id'],
         'service': service['service'],
       } for service in data if not modules or service['service'] in modules
@@ -630,6 +636,16 @@ def is_oauth_token_cached():
   """True if appcfg.py should be able to use OAuth2 without user interaction."""
   return os.path.exists(
       os.path.join(os.path.expanduser('~'), '.appcfg_oauth2_tokens'))
+
+
+def is_gcloud_oauth2_token_cached():
+  """Returns false if 'gcloud auth login' needs to be run."""
+  p = os.path.join(os.path.expanduser('~'), '.config', 'gcloud', 'credentials')
+  try:
+    with open(p) as f:
+      return len(json.load(f)['data']) != 0
+  except (KeyError, IOError, OSError, ValueError):
+    return False
 
 
 def get_authentication_function(bucket='gae_sdk_utils'):

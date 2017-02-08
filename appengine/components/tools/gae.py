@@ -463,11 +463,10 @@ def main(args):
   dispatcher = subcommand.CommandDispatcher(__name__)
   try:
     return dispatcher.execute(OptionParser(app_dir), args)
-  except gae_sdk_utils.BadEnvironmentConfig as e:
+  except (
+      gae_sdk_utils.BadEnvironmentConfig,
+      gae_sdk_utils.LoginRequiredError) as e:
     print >> sys.stderr, str(e)
-    return 1
-  except gae_sdk_utils.LoginRequiredError:
-    print >> sys.stderr, 'Login first using \'login\' subcommand.'
     return 1
   except KeyboardInterrupt:
     # Don't dump stack traces on Ctrl+C, it's expected flow in some commands.
