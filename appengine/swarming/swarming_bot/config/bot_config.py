@@ -16,8 +16,12 @@ This file shouldn't import from other scripts in this directory except
 os_utilities which is guaranteed to be usable as an API. It's fine to import
 from stdlib.
 
-Set the environment variable SWARMING_LOAD_TEST=1 to disable the use of
-server-provided bot_config.py. This permits safe load testing.
+There can be two copies of this file. The base file and a bot specific version:
+  - For get_*() functions, the bot specific version is called first,
+    and if missing, the general version is called.
+  - For on_*() functions, the hook in the general bot_config.py is called first,
+    then the hook in the bot specific bot_config.py is called.
+  - For setup_*(), the bot specific bot_config.py is never used.
 
 This file contains unicode to confirm UTF-8 encoded file is well supported.
 Here's a pile of poo: 💩

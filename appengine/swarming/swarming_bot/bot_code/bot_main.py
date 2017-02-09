@@ -9,9 +9,6 @@ is always up to date and executes a child process to run tasks and upload
 results back.
 
 It manages self-update and rebooting the host in case of problems.
-
-Set the environment variable SWARMING_LOAD_TEST=1 to disable the use of
-server-provided bot_config.py. This permits safe load testing.
 """
 
 import contextlib
@@ -26,6 +23,7 @@ import tempfile
 import threading
 import time
 import traceback
+import types
 import zipfile
 
 # Import _strptime before threaded code. datetime.datetime.strptime is
@@ -105,13 +103,49 @@ DEFAULT_SETTINGS = {
 ### bot_config handler part.
 
 
-def _in_load_test_mode():
-  """Returns True if the default values should be used instead of the server
-  provided bot_config.py.
+# Reference to the config/bot_config.py module inside the swarming_bot.zip file.
+# This variable is initialized inside _get_bot_config().
+_BOT_CONFIG = None
+# Reference to the second bot_config.py module injected by the server. This
+# variable is initialized inside _do_handshake().
+_EXTRA_BOT_CONFIG = None
+# Super Sticky quarantine string. This variable is initialized inside
+# _set_quarantined() and be set at various places when a hook throws an
+# exception. Restarting the bot will clear the quarantine, which includes
+# updated the bot due to new bot_config or new bot code.
+_QUARANTINED = None
 
-  This also disables server telling the bot to restart.
+
+def _set_quarantined(reason):
+  """Sets the Super Sticky Quarantine string."""
+  logging.error('_set_quarantined(%s)', reason)
+  global _QUARANTINED
+  _QUARANTINED = _QUARANTINED or reason
+
+
+def _get_bot_config():
+  """Returns the bot_config.py module. Imports it only once.
+
+  This file is called implicitly by _call_hook() and _call_hook_safe().
   """
-  return os.environ.get('SWARMING_LOAD_TEST') == '1'
+  global _BOT_CONFIG
+  if not _BOT_CONFIG:
+    from config import bot_config as _BOT_CONFIG
+  return _BOT_CONFIG
+
+
+def _register_extra_bot_config(content):
+  """Registers the server injected extra bot_config.py.
+
+  This file is called implicitly by _call_hook() and _call_hook_safe().
+  """
+  global _EXTRA_BOT_CONFIG
+  try:
+    compiled = compile(content, 'bot_config.py', 'exec')
+    _EXTRA_BOT_CONFIG  = types.ModuleType('bot_config')
+    exec(compiled, _EXTRA_BOT_CONFIG.__dict__)
+  except (SyntaxError, TypeError) as e:
+    _set_quarantined('handshake returned invalid bot_config: %s' % e)
 
 
 def _log_call(name=None):
@@ -128,44 +162,76 @@ def _log_call(name=None):
   return gen
 
 
-@_log_call()
+@_log_call(lambda _o, _b, name, *args: name)
+def _call_hook(chained, botobj, name, *args):
+  """Calls a hook function named `name` in bot_config.py.
+
+  If `chained` is True, calls the general bot_config.py then the injected
+  version.
+
+  If `chained` is False, the injected bot_config version is called first, and
+  only if not present the general bot_config version is called.
+  """
+  if not chained:
+    # Injected version has higher priority.
+    hook = getattr(_EXTRA_BOT_CONFIG, name, None)
+    if hook:
+      return hook(botobj, *args)
+    hook = getattr(_get_bot_config(), name, None)
+    if hook:
+      return hook(botobj, *args)
+    return
+
+  # Call both in order.
+  ret = None
+  hook = getattr(_get_bot_config(), name, None)
+  if hook:
+    ret = hook(botobj, *args)
+  hook = getattr(_EXTRA_BOT_CONFIG, name, None)
+  if hook:
+    # Ignores the previous return value.
+    return hook(botobj, *args)
+  return ret
+
+
+def _call_hook_safe(chained, botobj, name, *args):
+  """Calls a hook function in bot_config.py.
+
+  Like _call_hook() but traps most exceptions.
+  """
+  try:
+    return _call_hook(chained, botobj, name, *args)
+  except Exception as e:
+    logging.exception('%s() threw', name)
+    msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
+    botobj.post_error('Failed to call hook %s(): %s' % (name, msg))
+    _set_quarantined(msg)
+
+
 def _get_dimensions(botobj):
   """Returns bot_config.py's get_dimensions() dict."""
   # Importing this administrator provided script could have side-effects on
   # startup. That is why it is imported late.
-  try:
-    if _in_load_test_mode():
-      # Returns a minimal set of dimensions so it doesn't run tasks by error.
-      dimensions = os_utilities.get_dimensions()
-      return {
-        'id': dimensions['id'],
-        'load_test': ['1'],
-      }
-
-    from config import bot_config
-    out = bot_config.get_dimensions(botobj)
-    if not isinstance(out, dict):
-      raise ValueError('Unexpected type %s' % out.__class__)
+  out = _call_hook_safe(False, botobj, 'get_dimensions')
+  if isinstance(out, dict):
     return out
+  try:
+    _set_quarantined('get_dimensions(): expected a dict, got %r' % out)
+    out2 = os_utilities.get_dimensions()
+    out2['quarantined'] = ['1']
+    return out2
   except Exception as e:
-    logging.exception('get_dimensions() failed')
+    logging.exception('os.utilities.get_dimensions() failed')
     try:
-      out = os_utilities.get_dimensions()
-      out['error'] = [str(e)]
-      out['quarantined'] = ['1']
-      return out
-    except Exception as e:
-      logging.exception('os.utilities.get_dimensions() failed')
-      try:
-        botid = os_utilities.get_hostname_short()
-      except Exception as e2:
-        logging.exception('os.utilities.get_hostname_short() failed')
-        botid = 'error_%s' % str(e2)
-      return {
-          'id': [botid],
-          'error': ['%s\n%s' % (e, traceback.format_exc()[-2048:])],
-          'quarantined': ['1'],
-        }
+      botid = os_utilities.get_hostname_short()
+    except Exception as e2:
+      logging.exception('os.utilities.get_hostname_short() failed')
+      botid = 'error_%s' % str(e2)
+    return {
+        'id': [botid],
+        'error': ['%s\n%s' % (e, traceback.format_exc()[-2048:])],
+        'quarantined': ['1'],
+      }
 
 
 def _get_settings(botobj):
@@ -180,43 +246,29 @@ def _get_settings(botobj):
   it will make typos silently fail. CHECK FOR TYPOS in get_settings() in your
   bot_config.py.
   """
-  settings = None
+  settings = _call_hook_safe(False, botobj, 'get_settings')
   try:
-    from config import bot_config
-    if hasattr(bot_config, 'get_settings'):
-      settings = bot_config.get_settings(botobj)
-      if not isinstance(settings, dict):
-        raise TypeError()
-    settings = _dict_deep_merge(DEFAULT_SETTINGS, settings)
-  except Exception:
+    if isinstance(settings, dict):
+      return _dict_deep_merge(DEFAULT_SETTINGS, settings)
+  except (KeyError, TypeError, ValueError):
     logging.exception('get_settings() failed')
-    return DEFAULT_SETTINGS
-  return settings
+  return DEFAULT_SETTINGS
 
 
 @_log_call()
 def _get_state(botobj, sleep_streak):
   """Returns dict with a state of the bot reported to the server with each poll.
   """
-  try:
-    if _in_load_test_mode():
-      state = os_utilities.get_state()
-      state['dimensions'] = os_utilities.get_dimensions()
-    else:
-      from config import bot_config
-      state = bot_config.get_state(botobj)
-      if not isinstance(state, dict):
-        state = {'error': state}
-  except Exception as e:
-    logging.exception('get_state() failed')
-    state = {
-      'error': '%s\n%s' % (e, traceback.format_exc()[-2048:]),
-      'quarantined': True,
-    }
+  state = _call_hook_safe(False, botobj, 'get_state')
+  if not isinstance(state, dict):
+    _set_quarantined('get_state(): expected a dict, got %r' % state)
 
-  if not state.get('quarantined') and not _is_base_dir_ok(botobj):
-    # Use super hammer in case of dangerous environment.
-    state['quarantined'] = 'Can\'t run from blacklisted directory'
+  if not state.get('quarantined'):
+    if not _is_base_dir_ok(botobj):
+      # Use super hammer in case of dangerous environment.
+      _set_quarantined('Can\'t run from blacklisted directory')
+    if _QUARANTINED:
+      state['quarantined'] = _QUARANTINED
 
   state['sleep_streak'] = sleep_streak
   if not state.get('quarantined') and botobj:
@@ -257,23 +309,6 @@ def _get_state(botobj, sleep_streak):
   return state
 
 
-@_log_call(lambda _, name, *args: name)
-def _call_hook(botobj, name, *args):
-  """Calls a hook function in bot_config.py."""
-  try:
-    if _in_load_test_mode():
-      return
-
-    from config import bot_config
-    hook = getattr(bot_config, name, None)
-    if hook:
-      return hook(botobj, *args)
-  except Exception as e:
-    logging.exception('%s() threw', name)
-    msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
-    botobj.post_error('Failed to call hook %s(): %s' % (name, msg))
-
-
 def setup_bot(skip_reboot):
   """Calls bot_config.setup_bot() to have the bot self-configure itself.
 
@@ -284,9 +319,6 @@ def setup_bot(skip_reboot):
   case bot's autostart configuration is managed elsewhere, and we don't want
   the bot itself to interfere.
   """
-  if _in_load_test_mode():
-    return
-
   if os.environ.get('SWARMING_EXTERNAL_BOT_SETUP') == '1':
     logging.info('Skipping setup_bot, SWARMING_EXTERNAL_BOT_SETUP is set')
     return
@@ -315,12 +347,7 @@ def _get_authentication_headers(botobj):
 
   Doesn't catch exceptions.
   """
-  if _in_load_test_mode():
-    return (None, None)
-  logging.info('get_authentication_headers()')
-  from config import bot_config
-  func = getattr(bot_config, 'get_authentication_headers', None)
-  return func(botobj) if func else (None, None)
+  return _call_hook(False, botobj, 'get_authentication_headers')
 
 
 ### end of bot_config handler part.
@@ -416,7 +443,7 @@ def _post_error_task(botobj, error, task_id):
 
 def _on_shutdown_hook(b):
   """Called when the bot is restarting."""
-  _call_hook(b, 'on_bot_shutdown')
+  _call_hook_safe(True, b, 'on_bot_shutdown')
   # Aggressively set itself up so we ensure the auto-reboot configuration is
   # fine before restarting the host. This is important as some tasks delete the
   # autorestart script (!)
@@ -549,6 +576,40 @@ def _clean_cache(botobj):
         'swarming_bot.zip internal failure during run_isolated --clean')
 
 
+def _do_handshake(botobj, quit_bit):
+  """Connects to /handshake and reads the bot_config if specified."""
+  # This is the first authenticated request to the server. If the bot is
+  # misconfigured, the request may fail with HTTP 401 or HTTP 403. Instead of
+  # dying right away, spin in a loop, hoping the bot will "fix itself"
+  # eventually. Authentication errors in /handshake are logged on the server and
+  # generate error reports, so bots stuck in this state are discoverable.
+  sleep_time = 5
+  while not quit_bit.is_set():
+    resp = botobj.remote.do_handshake(botobj._attributes)
+    if resp:
+      logging.info('Connected to %s', resp.get('server_version'))
+      if resp.get('bot_version') != botobj._attributes['version']:
+        logging.warning(
+            'Found out we\'ll need to update: server said %s; we\'re %s',
+            resp.get('bot_version'), botobj._attributes['version'])
+      # Remember the server-provided per-bot configuration. '/handshake' is
+      # the only place where the server returns it. The bot will be sending
+      # the 'bot_group_cfg_version' back in each /poll (as part of 'state'),
+      # so that the server can instruct the bot to restart itself when
+      # config changes.
+      cfg_version = resp.get('bot_group_cfg_version')
+      if cfg_version:
+        botobj._update_bot_group_cfg(cfg_version, resp.get('bot_group_cfg'))
+      content = resp.get('bot_config')
+      if content:
+        _register_extra_bot_config(content)
+      break
+    logging.error(
+        'Failed to contact for handshake, retrying in %d sec...', sleep_time)
+    quit_bit.wait(sleep_time)
+    sleep_time = min(300, sleep_time * 2)
+
+
 def _run_bot(arg_error):
   """Runs the bot until it reboots or self-update or a signal is received.
 
@@ -603,7 +664,7 @@ def _run_bot(arg_error):
       logging.info('Early quit 2')
       return 0
 
-    _call_hook(botobj, 'on_bot_startup')
+    _call_hook_safe(True, botobj, 'on_bot_startup')
 
     # Initial attributes passed to bot.Bot in get_bot above were constructed for
     # 'fake' bot ID ('none'). Refresh them to match the real bot ID, now that we
@@ -617,33 +678,7 @@ def _run_bot(arg_error):
       logging.info('Early quit 3')
       return 0
 
-    # This is the first authenticated request to the server. If the bot is
-    # misconfigured, the request may fail with HTTP 401 or HTTP 403. Instead of
-    # dying right away, spin in a loop, hoping the bot will "fix itself"
-    # eventually. Authentication errors in /handshake are logged on the server
-    # and generate error reports, so bots stuck in this state are discoverable.
-    sleep_time = 5
-    while not quit_bit.is_set():
-      resp = botobj.remote.do_handshake(botobj._attributes)
-      if resp:
-        logging.info('Connected to %s', resp.get('server_version'))
-        if resp.get('bot_version') != botobj._attributes['version']:
-          logging.warning(
-              'Found out we\'ll need to update: server said %s; we\'re %s',
-              resp.get('bot_version'), botobj._attributes['version'])
-        # Remember the server-provided per-bot configuration. '/handshake' is
-        # the only place where the server returns it. The bot will be sending
-        # the 'bot_group_cfg_version' back in each /poll (as part of 'state'),
-        # so that the server can instruct the bot to restart itself when
-        # config changes.
-        cfg_version = resp.get('bot_group_cfg_version')
-        if cfg_version:
-          botobj._update_bot_group_cfg(cfg_version, resp.get('bot_group_cfg'))
-        break
-      logging.error(
-          'Failed to contact for handshake, retrying in %d sec...', sleep_time)
-      quit_bit.wait(sleep_time)
-      sleep_time = min(300, sleep_time * 2)
+    _do_handshake(botobj, quit_bit)
 
     if quit_bit.is_set():
       logging.info('Early quit 4')
@@ -651,7 +686,7 @@ def _run_bot(arg_error):
 
     # Let the bot to finish the initialization, now that it knows its server
     # defined dimensions.
-    _call_hook(botobj, 'on_handshake')
+    _call_hook_safe(True, botobj, 'on_handshake')
 
     _cleanup_bot_directory(botobj)
     _clean_cache(botobj)
@@ -707,7 +742,8 @@ def _poll_server(botobj, quit_bit, last_action):
 
   if cmd == 'sleep':
     # Value is duration
-    _call_hook(botobj, 'on_bot_idle', max(0, time.time() - last_action))
+    _call_hook_safe(
+        True, botobj, 'on_bot_idle', max(0, time.time() - last_action))
     quit_bit.wait(value)
     return False
 
@@ -739,10 +775,7 @@ def _poll_server(botobj, quit_bit, last_action):
     _update_bot(botobj, value)
   elif cmd == 'restart':
     # Value is the message to display while restarting
-    if _in_load_test_mode():
-      logging.warning('Would have restarted: %s' % value)
-    else:
-      botobj.restart(value)
+    botobj.restart(value)
   else:
     raise ValueError('Unexpected command: %s\n%s' % (cmd, value))
 
@@ -840,7 +873,7 @@ def _run_manifest(botobj, manifest, start):
     handle, bot_file = tempfile.mkstemp(
         prefix='bot_file', suffix='.json', dir=work_dir)
     os.close(handle)
-    _call_hook(botobj, 'on_before_task', bot_file)
+    _call_hook_safe(True, botobj, 'on_before_task', bot_file)
     task_result_file = os.path.join(work_dir, 'task_runner_out.json')
     if os.path.exists(task_result_file):
       os.remove(task_result_file)
@@ -939,9 +972,9 @@ def _run_manifest(botobj, manifest, start):
       auth_params_dumper.stop()
     if internal_failure:
       _post_error_task(botobj, msg, task_id)
-    _call_hook(
-        botobj, 'on_after_task', failure, internal_failure, task_dimensions,
-        task_result)
+    _call_hook_safe(
+        True, botobj, 'on_after_task', failure, internal_failure,
+        task_dimensions, task_result)
     if os.path.isdir(work_dir):
       try:
         file_path.rmtree(work_dir)
@@ -1085,6 +1118,7 @@ def main(args):
   try:
     return _run_bot(error)
   finally:
-    _call_hook(
-        bot.Bot(None, None, None, None, base_dir, None), 'on_bot_shutdown')
+    _call_hook_safe(
+        True, bot.Bot(None, None, None, None, base_dir, None),
+        'on_bot_shutdown')
     logging.info('main() returning')

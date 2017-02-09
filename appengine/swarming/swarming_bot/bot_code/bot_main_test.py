@@ -48,7 +48,6 @@ class TestBotMain(net_utils.TestCase):
 
   def setUp(self):
     super(TestBotMain, self).setUp()
-    os.environ.pop('SWARMING_LOAD_TEST', None)
     self.root_dir = tempfile.mkdtemp(prefix='bot_main')
     self.old_cwd = os.getcwd()
     os.chdir(self.root_dir)
@@ -88,6 +87,10 @@ class TestBotMain(net_utils.TestCase):
     # real GCE tokens.
     self.mock(gce, 'is_gce', lambda: False)
     self.mock(gce, 'oauth2_access_token', lambda *_args: 'fake-access-token')
+    # Ensures the global state is reset after each test case.
+    self.mock(bot_main, '_BOT_CONFIG', None)
+    self.mock(bot_main, '_EXTRA_BOT_CONFIG', None)
+    self.mock(bot_main, '_QUARANTINED', None)
 
   def tearDown(self):
     os.environ.pop('SWARMING_BOT_ID', None)
@@ -108,40 +111,42 @@ class TestBotMain(net_utils.TestCase):
         self.root_dir, self.fail)
 
   def test_get_dimensions(self):
-    dimensions = set(bot_main._get_dimensions(None))
-    dimensions.discard('hidpi')
-    dimensions.discard('zone')  # Only set on GCE bots.
-    expected = {'cores', 'cpu', 'gpu', 'id', 'machine_type', 'os', 'pool'}
-    if sys.platform == 'darwin':
-      expected.add('xcode_version')
-    self.assertEqual(expected, dimensions)
+    from config import bot_config
+    obj = self.make_bot()
+    def get_dimensions(botobj):
+      self.assertEqual(obj, botobj)
+      return {'yo': 'dawh'}
+    self.mock(bot_config, 'get_dimensions', get_dimensions)
+    self.assertEqual({'yo': 'dawh'}, bot_main._get_dimensions(obj))
 
-  def test_get_dimensions_load_test(self):
-    os.environ['SWARMING_LOAD_TEST'] = '1'
-    self.assertEqual(
-        ['id', 'load_test'], sorted(bot_main._get_dimensions(None)))
+  def test_get_dimensions_extra(self):
+    from config import bot_config
+    obj = self.make_bot()
+    def get_dimensions(botobj):
+      self.assertEqual(obj, botobj)
+      return {'yo': 'dawh'}
+    self.mock(bot_config, 'get_dimensions', get_dimensions)
+
+    # The extra version takes priority.
+    class extra(object):
+      def get_dimensions(self2, botobj): # pylint: disable=no-self-argument
+        self.assertEqual(obj, botobj)
+        return {'alternative': 'truth'}
+    self.mock(bot_main, '_EXTRA_BOT_CONFIG', extra())
+    self.assertEqual({'alternative': 'truth'}, bot_main._get_dimensions(obj))
 
   def test_generate_version(self):
     self.assertEqual('123', bot_main.generate_version())
 
   def test_get_state(self):
-    self.mock(time, 'time', lambda: 1470000000.0)
-    expected = os_utilities.get_state()
-    expected['sleep_streak'] = 12
-    # During the execution of this test case, the free disk space could have
-    # changed.
-    for disk in expected['disks'].itervalues():
-      self.assertGreater(disk.pop('free_mb'), 1.)
-    actual = bot_main._get_state(None, 12)
-    for disk in actual['disks'].itervalues():
-      self.assertGreater(disk.pop('free_mb'), 1.)
-    self.assertGreater(actual.pop('nb_files_in_temp'), 0)
-    self.assertGreater(expected.pop('nb_files_in_temp'), 0)
-    self.assertTrue(actual.pop('uptime') != 0)
-    self.assertTrue(expected.pop('uptime') != 0)
-    self.assertEqual(sorted(expected.pop('temp', {})),
-                     sorted(actual.pop('temp', {})))
-    self.assertEqual(expected, actual)
+    from config import bot_config
+    obj = self.make_bot()
+    def get_state(botobj):
+      self.assertEqual(obj, botobj)
+      return {'yo': 'dawh'}
+    self.mock(bot_config, 'get_state', get_state)
+    expected = {'sleep_streak': 0.1, 'yo': 'dawh'}
+    self.assertEqual(expected, bot_main._get_state(obj, 0.1))
 
   def test_get_state_quarantine(self):
     botobj = bot_main.get_bot()
@@ -185,6 +190,31 @@ class TestBotMain(net_utils.TestCase):
       'sleep_streak': 1,
     }
     self.assertEqual(expected, bot_main._get_state(botobj, 1))
+
+  def test_get_state_quarantine_sticky(self):
+    # A crash in get_dimensions() causes sticky quarantine in get_state.
+    from config import bot_config
+    obj = self.make_bot()
+    def get_dimensions(botobj):
+      self.assertEqual(obj, botobj)
+      return 'invalid'
+    self.mock(bot_config, 'get_dimensions', get_dimensions)
+    def get_dimensions_os():
+      return {'os': 'safe'}
+    self.mock(os_utilities, 'get_dimensions', get_dimensions_os)
+    def get_state(botobj):
+      self.assertEqual(obj, botobj)
+      return {'yo': 'dawh'}
+    self.mock(bot_config, 'get_state', get_state)
+
+    expected = {'os': 'safe', 'quarantined': ['1']}
+    self.assertEqual(expected, bot_main._get_dimensions(obj))
+    expected = {
+      'quarantined': "get_dimensions(): expected a dict, got 'invalid'",
+      'sleep_streak': 0.1,
+      'yo': 'dawh',
+    }
+    self.assertEqual(expected, bot_main._get_state(obj, 0.1))
 
   def test_default_settings(self):
     # If this trigger, you either forgot to update bot_main.py or bot_config.py.
@@ -272,6 +302,44 @@ class TestBotMain(net_utils.TestCase):
         ])
     botobj = bot_main.get_bot()
     self.assertEqual(True, bot_main._post_error_task(botobj, 'error', 23))
+
+  def test_do_handshake(self):
+    # Ensures the injected code was called.
+    quit_bit = threading.Event()
+    obj = self.make_bot()
+    def do_handshake(attributes):
+      return {
+        'bot_version': attributes['version'],
+        'bot_group_cfg_version': None,
+        'bot_group_cfg': None,
+        'bot_config':
+            'def get_dimensions(_): return {\'alternative\': \'truth\'}',
+      }
+    self.mock(obj.remote, 'do_handshake', do_handshake)
+    bot_main._do_handshake(obj, quit_bit)
+    self.assertFalse(quit_bit.is_set())
+    expected = {'alternative': 'truth'}
+    self.assertEqual(expected, bot_main._EXTRA_BOT_CONFIG.get_dimensions(obj))
+
+  def test_call_hook_both(self):
+    # Both hooks must be called.
+    first = threading.Event()
+    second = threading.Event()
+    from config import bot_config
+    obj = self.make_bot()
+    def on_bot_shutdown_1(botobj):
+      self.assertEqual(obj, botobj)
+      first.set()
+    self.mock(bot_config, 'on_bot_shutdown', on_bot_shutdown_1)
+
+    class extra(object):
+      def on_bot_shutdown(self2, botobj): # pylint: disable=no-self-argument
+        self.assertEqual(obj, botobj)
+        second.set()
+    self.mock(bot_main, '_EXTRA_BOT_CONFIG', extra())
+    bot_main._call_hook(True, obj, 'on_bot_shutdown')
+    self.assertTrue(first.is_set())
+    self.assertTrue(second.is_set())
 
   def test_run_bot(self):
     self.mock(threading, 'Event', FakeThreadingEvent)
@@ -521,32 +589,6 @@ class TestBotMain(net_utils.TestCase):
         ])
     self.assertTrue(bot_main._poll_server(self.bot, bit, 0))
     self.assertEqual([('Please die now',)], restart)
-
-  def test_poll_server_restart_load_test(self):
-    os.environ['SWARMING_LOAD_TEST'] = '1'
-    bit = threading.Event()
-    self.mock(bit, 'wait', self.fail)
-    self.mock(bot_main, '_run_manifest', self.fail)
-    self.mock(bot_main, '_update_bot', self.fail)
-    self.mock(self.bot, 'restart', self.fail)
-
-    self.expected_requests(
-        [
-          (
-            'https://localhost:1/swarming/api/v1/bot/poll',
-            {
-              'data': self.attributes,
-              'follow_redirects': False,
-              'headers': {},
-              'timeout': remote_client.NET_CONNECTION_TIMEOUT_SEC,
-            },
-            {
-              'cmd': 'restart',
-              'message': 'Please die now',
-            },
-          ),
-        ])
-    self.assertTrue(bot_main._poll_server(self.bot, bit, 0))
 
   def _mock_popen(
       self, returncode=0, exit_code=0, url='https://localhost:1',
