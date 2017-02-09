@@ -16,8 +16,6 @@ from protorpc.remote import protojson
 from components import auth
 from components.machine_provider import rpc_messages
 
-import utils
-
 
 class Enum(frozenset):
   def __getattr__(self, attr):

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # Copyright 2015 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -12,6 +12,8 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
+from google.appengine.ext import ndb
+
 from protorpc.remote import protojson
 import webtest
 
@@ -22,6 +24,342 @@ from test_support import test_case
 
 import handlers_cron
 import models
+
+
+class CanFulfillTest(test_case.TestCase):
+  """Tests for handlers_cron.can_fulfill."""
+
+  def test_exact_match(self):
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            disk_gb=100,
+            num_cpus=2,
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+    )
+    entry = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            disk_gb=100,
+            num_cpus=2,
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+    )
+
+    self.assertTrue(handlers_cron.can_fulfill(entry, request))
+
+  def test_subset_match(self):
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            disk_gb=100,
+            num_cpus=2,
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+    )
+    entry = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            disk_gb=100,
+            hostname='fake-host',
+            memory_gb=8.0,
+            num_cpus=2,
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+    )
+
+    self.assertTrue(handlers_cron.can_fulfill(entry, request))
+
+  def test_mismatch(self):
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            disk_gb=100,
+            num_cpus=4,
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+    )
+    entry = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            disk_gb=100,
+            hostname='fake-host',
+            memory_gb=8.0,
+            num_cpus=2,
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+    )
+
+    self.assertFalse(handlers_cron.can_fulfill(entry, request))
+
+
+class LeaseMachineTest(test_case.TestCase):
+  """Tests for handlers_cron.lease_machine."""
+
+  def test_leased(self):
+    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: True)
+
+    machine_key = models.CatalogMachineEntry(
+        id='machine-id',
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        policies=rpc_messages.Policies(
+            machine_service_account='service-account',
+        ),
+        pubsub_subscription='subscription',
+        state=models.CatalogMachineEntryStates.AVAILABLE,
+    ).put()
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=1,
+        request_id='request-id',
+    )
+    lease_request_key = models.LeaseRequest(
+        id='lease-id',
+        deduplication_checksum=
+            models.LeaseRequest.compute_deduplication_checksum(request),
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=request,
+        response=rpc_messages.LeaseResponse(
+            client_request_id='client-request-id',
+            state=rpc_messages.LeaseRequestState.UNTRIAGED,
+        ),
+    ).put()
+
+    handlers_cron.lease_machine(machine_key, lease_request_key.get())
+    self.assertEqual(lease_request_key.get().machine_id, machine_key.id())
+    self.assertEqual(
+        lease_request_key.get().response.state,
+        rpc_messages.LeaseRequestState.FULFILLED,
+    )
+    self.assertEqual(machine_key.get().lease_id, lease_request_key.id())
+    self.assertEqual(
+        machine_key.get().state,
+        models.CatalogMachineEntryStates.LEASED,
+    )
+
+  def test_cant_fulfill(self):
+    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: True)
+
+    machine_key = models.CatalogMachineEntry(
+        id='machine-id',
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.OSX,
+        ),
+        policies=rpc_messages.Policies(
+            machine_service_account='service-account',
+        ),
+        pubsub_subscription='subscription',
+        state=models.CatalogMachineEntryStates.AVAILABLE,
+    ).put()
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=1,
+        request_id='request-id',
+    )
+    lease_request_key = models.LeaseRequest(
+        id='lease-id',
+        deduplication_checksum=
+            models.LeaseRequest.compute_deduplication_checksum(request),
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=request,
+        response=rpc_messages.LeaseResponse(
+            client_request_id='client-request-id',
+            state=rpc_messages.LeaseRequestState.UNTRIAGED,
+        ),
+    ).put()
+
+    handlers_cron.lease_machine(machine_key, lease_request_key.get())
+    self.assertFalse(lease_request_key.get().machine_id)
+    self.assertEqual(
+        lease_request_key.get().response.state,
+        rpc_messages.LeaseRequestState.UNTRIAGED,
+    )
+    self.assertFalse(machine_key.get().lease_id)
+    self.assertEqual(
+        machine_key.get().state,
+        models.CatalogMachineEntryStates.AVAILABLE,
+    )
+
+  def test_machine_unavailable(self):
+    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: True)
+
+    machine_key = models.CatalogMachineEntry(
+        id='machine-id',
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        policies=rpc_messages.Policies(
+            machine_service_account='service-account',
+        ),
+        pubsub_subscription='subscription',
+        state=models.CatalogMachineEntryStates.LEASED,
+    ).put()
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=1,
+        request_id='request-id',
+    )
+    lease_request_key = models.LeaseRequest(
+        id='lease-id',
+        deduplication_checksum=
+            models.LeaseRequest.compute_deduplication_checksum(request),
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=request,
+        response=rpc_messages.LeaseResponse(
+            client_request_id='client-request-id',
+            state=rpc_messages.LeaseRequestState.UNTRIAGED,
+        ),
+    ).put()
+
+    handlers_cron.lease_machine(machine_key, lease_request_key.get())
+    self.assertFalse(lease_request_key.get().machine_id)
+    self.assertEqual(
+        lease_request_key.get().response.state,
+        rpc_messages.LeaseRequestState.UNTRIAGED,
+    )
+    self.assertFalse(machine_key.get().lease_id)
+    self.assertEqual(
+        machine_key.get().state,
+        models.CatalogMachineEntryStates.LEASED,
+    )
+
+  def test_request_triaged(self):
+    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: True)
+
+    machine_key = models.CatalogMachineEntry(
+        id='machine-id',
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        policies=rpc_messages.Policies(
+            machine_service_account='service-account',
+        ),
+        pubsub_subscription='subscription',
+        state=models.CatalogMachineEntryStates.AVAILABLE,
+    ).put()
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=1,
+        request_id='request-id',
+    )
+    lease_request_key = models.LeaseRequest(
+        id='lease-id',
+        deduplication_checksum=
+            models.LeaseRequest.compute_deduplication_checksum(request),
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=request,
+        response=rpc_messages.LeaseResponse(
+            client_request_id='client-request-id',
+            state=rpc_messages.LeaseRequestState.FULFILLED,
+        ),
+    ).put()
+
+    handlers_cron.lease_machine(machine_key, lease_request_key.get())
+    self.assertFalse(lease_request_key.get().machine_id)
+    self.assertEqual(
+        lease_request_key.get().response.state,
+        rpc_messages.LeaseRequestState.FULFILLED,
+    )
+    self.assertFalse(machine_key.get().lease_id)
+    self.assertEqual(
+        machine_key.get().state,
+        models.CatalogMachineEntryStates.AVAILABLE,
+    )
+
+  def test_no_subscription(self):
+    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: True)
+
+    machine_key = models.CatalogMachineEntry(
+        id='machine-id',
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        policies=rpc_messages.Policies(
+            machine_service_account='service-account',
+        ),
+        state=models.CatalogMachineEntryStates.AVAILABLE,
+    ).put()
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=1,
+        request_id='request-id',
+    )
+    lease_request_key = models.LeaseRequest(
+        id='lease-id',
+        deduplication_checksum=
+            models.LeaseRequest.compute_deduplication_checksum(request),
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=request,
+        response=rpc_messages.LeaseResponse(
+            client_request_id='client-request-id',
+            state=rpc_messages.LeaseRequestState.UNTRIAGED,
+        ),
+    ).put()
+
+    handlers_cron.lease_machine(machine_key, lease_request_key.get())
+    self.assertFalse(lease_request_key.get().machine_id)
+    self.assertEqual(
+        lease_request_key.get().response.state,
+        rpc_messages.LeaseRequestState.UNTRIAGED,
+    )
+    self.assertFalse(machine_key.get().lease_id)
+    self.assertEqual(
+        machine_key.get().state,
+        models.CatalogMachineEntryStates.AVAILABLE,
+    )
+
+  def test_leased_task_failed(self):
+    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: False)
+
+    machine_key = models.CatalogMachineEntry(
+        id='machine-id',
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        policies=rpc_messages.Policies(
+            machine_service_account='service-account',
+        ),
+        pubsub_subscription='subscription',
+        state=models.CatalogMachineEntryStates.AVAILABLE,
+    ).put()
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=1,
+        request_id='request-id',
+    )
+    lease_request_key = models.LeaseRequest(
+        id='lease-id',
+        deduplication_checksum=
+            models.LeaseRequest.compute_deduplication_checksum(request),
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=request,
+        response=rpc_messages.LeaseResponse(
+            client_request_id='client-request-id',
+            state=rpc_messages.LeaseRequestState.UNTRIAGED,
+        ),
+    ).put()
+
+    with self.assertRaises(handlers_cron.TaskEnqueuingError):
+      handlers_cron.lease_machine(machine_key, lease_request_key.get())
+    self.assertFalse(lease_request_key.get().machine_id)
+    self.assertEqual(
+        lease_request_key.get().response.state,
+        rpc_messages.LeaseRequestState.UNTRIAGED,
+    )
+    self.assertFalse(machine_key.get().lease_id)
+    self.assertEqual(
+        machine_key.get().state,
+        models.CatalogMachineEntryStates.AVAILABLE,
+    )
 
 
 class LeaseRequestProcessorTest(test_case.TestCase):
@@ -42,9 +380,8 @@ class LeaseRequestProcessorTest(test_case.TestCase):
         request_id='fake-id',
     )
     key = models.LeaseRequest(
-        deduplication_checksum=models.LeaseRequest.compute_deduplication_checksum(
-            request,
-        ),
+        deduplication_checksum=
+            models.LeaseRequest.compute_deduplication_checksum(request),
         key=models.LeaseRequest.generate_key(
             auth_testing.DEFAULT_MOCKED_IDENTITY.to_bytes(),
             request,
@@ -75,7 +412,7 @@ class LeaseRequestProcessorTest(test_case.TestCase):
         '/internal/cron/process-lease-requests',
         headers={'X-AppEngine-Cron': 'true'},
     )
-    self.failUnless(key.get().response.lease_expiration_ts)
+    self.assertTrue(key.get().response.lease_expiration_ts)
 
   def test_one_request_one_matching_machine_entry_lease_expiration_ts(self):
     ts = int(utils.time_time())
@@ -87,9 +424,8 @@ class LeaseRequestProcessorTest(test_case.TestCase):
         request_id='fake-id',
     )
     key = models.LeaseRequest(
-        deduplication_checksum=models.LeaseRequest.compute_deduplication_checksum(
-            request,
-        ),
+        deduplication_checksum=
+            models.LeaseRequest.compute_deduplication_checksum(request),
         key=models.LeaseRequest.generate_key(
             auth_testing.DEFAULT_MOCKED_IDENTITY.to_bytes(),
             request,
@@ -141,9 +477,8 @@ class MachineReclamationProcessorTest(test_case.TestCase):
         request_id='fake-id',
     )
     lease = models.LeaseRequest(
-        deduplication_checksum=models.LeaseRequest.compute_deduplication_checksum(
-            request,
-        ),
+        deduplication_checksum=
+            models.LeaseRequest.compute_deduplication_checksum(request),
         key=models.LeaseRequest.generate_key(
             auth_testing.DEFAULT_MOCKED_IDENTITY.to_bytes(),
             request,
@@ -176,6 +511,496 @@ class MachineReclamationProcessorTest(test_case.TestCase):
         '/internal/cron/process-machine-reclamations',
         headers={'X-AppEngine-Cron': 'true'},
     )
+
+
+class ReclaimMachineTest(test_case.TestCase):
+  """Tests for handlers_cron.reclaim_machine."""
+
+  def test_reclaimed(self):
+    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: True)
+
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            hostname='fake-host',
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=1,
+        pubsub_project='project',
+        pubsub_topic='topic',
+        request_id='fake-id',
+    )
+    lease_request_key = models.LeaseRequest(
+        id='id',
+        deduplication_checksum=
+            models.LeaseRequest.compute_deduplication_checksum(request),
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=request,
+        response=rpc_messages.LeaseResponse(
+            client_request_id='fake-id',
+            hostname='fake-host',
+        ),
+    ).put()
+    machine_key = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        lease_expiration_ts=utils.utcnow(),
+        lease_id=lease_request_key.id(),
+        policies=rpc_messages.Policies(
+            backend_attributes=[
+                rpc_messages.KeyValuePair(
+                    key='key',
+                    value='value',
+                ),
+            ],
+            machine_service_account='fake-service-account',
+        ),
+    ).put()
+
+    handlers_cron.reclaim_machine(machine_key, utils.utcnow())
+    self.assertFalse(lease_request_key.get().response.hostname)
+
+  def test_not_found(self):
+    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: True)
+
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            hostname='fake-host',
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=1,
+        request_id='fake-id',
+    )
+    lease_request_key = models.LeaseRequest(
+        id='id',
+        deduplication_checksum=
+            models.LeaseRequest.compute_deduplication_checksum(request),
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=request,
+        response=rpc_messages.LeaseResponse(
+            client_request_id='fake-id',
+            hostname='fake-host',
+        ),
+    ).put()
+    machine_key = ndb.Key(models.CatalogMachineEntry, 'fake-key')
+
+    handlers_cron.reclaim_machine(machine_key, utils.utcnow())
+    self.assertTrue(lease_request_key.get().response.hostname)
+
+  def test_no_expiration_ts(self):
+    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: True)
+
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            hostname='fake-host',
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=1,
+        request_id='fake-id',
+    )
+    lease_request_key = models.LeaseRequest(
+        id='id',
+        deduplication_checksum=
+            models.LeaseRequest.compute_deduplication_checksum(request),
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=request,
+        response=rpc_messages.LeaseResponse(
+            client_request_id='fake-id',
+            hostname='fake-host',
+        ),
+    ).put()
+    machine_key = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        lease_id=lease_request_key.id(),
+        policies=rpc_messages.Policies(
+            machine_service_account='fake-service-account',
+        ),
+    ).put()
+
+    handlers_cron.reclaim_machine(machine_key, utils.utcnow())
+    self.assertTrue(lease_request_key.get().response.hostname)
+
+  def test_not_expired(self):
+    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: True)
+
+    ts = utils.utcnow()
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            hostname='fake-host',
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=1,
+        request_id='fake-id',
+    )
+    lease_request_key = models.LeaseRequest(
+        id='id',
+        deduplication_checksum=
+            models.LeaseRequest.compute_deduplication_checksum(request),
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=request,
+        response=rpc_messages.LeaseResponse(
+            client_request_id='fake-id',
+            hostname='fake-host',
+        ),
+    ).put()
+    machine_key = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        lease_expiration_ts=utils.utcnow(),
+        lease_id=lease_request_key.id(),
+        policies=rpc_messages.Policies(
+            machine_service_account='fake-service-account',
+        ),
+    ).put()
+
+    handlers_cron.reclaim_machine(machine_key, ts)
+    self.assertTrue(lease_request_key.get().response.hostname)
+
+  def test_enqueue_failed(self):
+    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: False)
+
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            hostname='fake-host',
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=1,
+        request_id='fake-id',
+    )
+    lease_request_key = models.LeaseRequest(
+        id='id',
+        deduplication_checksum=
+            models.LeaseRequest.compute_deduplication_checksum(request),
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=request,
+        response=rpc_messages.LeaseResponse(
+            client_request_id='fake-id',
+            hostname='fake-host',
+        ),
+    ).put()
+    machine_key = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        lease_expiration_ts=utils.utcnow(),
+        lease_id=lease_request_key.id(),
+        policies=rpc_messages.Policies(
+            machine_service_account='fake-service-account',
+        ),
+    ).put()
+
+    with self.assertRaises(handlers_cron.TaskEnqueuingError):
+      handlers_cron.reclaim_machine(machine_key, utils.utcnow())
+    self.assertTrue(lease_request_key.get().response.hostname)
+
+
+class ReleaseLeaseTest(test_case.TestCase):
+  """Tests for handlers_cron.release_lease."""
+
+  def test_released(self):
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=1,
+        request_id='fake-id',
+    )
+    lease_key = models.LeaseRequest(
+        deduplication_checksum=
+            models.LeaseRequest.compute_deduplication_checksum(request),
+        machine_id='id',
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        released=True,
+        request=request,
+        response=rpc_messages.LeaseResponse(
+            client_request_id='fake-id',
+        ),
+    ).put()
+    machine_key = models.CatalogMachineEntry(
+        id='id',
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+    ).put()
+
+    handlers_cron.release_lease(lease_key)
+    self.assertFalse(lease_key.get().released)
+    self.assertEqual(
+        lease_key.get().response.lease_expiration_ts,
+        utils.datetime_to_timestamp(
+            machine_key.get().lease_expiration_ts) / 1000 / 1000,
+    )
+
+  def test_lease_not_found(self):
+    machine_key = models.CatalogMachineEntry(
+        id='id',
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+    ).put()
+
+    handlers_cron.release_lease(ndb.Key(models.LeaseRequest, 'fake-request'))
+    self.assertFalse(machine_key.get().lease_expiration_ts)
+
+  def test_not_released(self):
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=1,
+        request_id='fake-id',
+    )
+    lease_key = models.LeaseRequest(
+        deduplication_checksum=
+            models.LeaseRequest.compute_deduplication_checksum(request),
+        machine_id='id',
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        released=False,
+        request=request,
+        response=rpc_messages.LeaseResponse(
+            client_request_id='fake-id',
+        ),
+    ).put()
+    machine_key = models.CatalogMachineEntry(
+        id='id',
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+    ).put()
+
+    handlers_cron.release_lease(lease_key)
+    self.assertFalse(lease_key.get().response.lease_expiration_ts)
+    self.assertFalse(lease_key.get().released)
+    self.assertFalse(machine_key.get().lease_expiration_ts)
+
+  def test_no_machine_id(self):
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=1,
+        request_id='fake-id',
+    )
+    lease_key = models.LeaseRequest(
+        deduplication_checksum=
+            models.LeaseRequest.compute_deduplication_checksum(request),
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        released=True,
+        request=request,
+        response=rpc_messages.LeaseResponse(
+            client_request_id='fake-id',
+        ),
+    ).put()
+    machine_key = models.CatalogMachineEntry(
+        id='id',
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+    ).put()
+
+    handlers_cron.release_lease(lease_key)
+    self.assertFalse(lease_key.get().response.lease_expiration_ts)
+    self.assertFalse(lease_key.get().released)
+    self.assertFalse(machine_key.get().lease_expiration_ts)
+
+  def test_machine_doesnt_exist(self):
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=1,
+        request_id='fake-id',
+    )
+    lease_key = models.LeaseRequest(
+        deduplication_checksum=
+            models.LeaseRequest.compute_deduplication_checksum(request),
+        machine_id='id',
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        released=True,
+        request=request,
+        response=rpc_messages.LeaseResponse(
+            client_request_id='fake-id',
+        ),
+    ).put()
+
+    handlers_cron.release_lease(lease_key)
+    self.assertFalse(lease_key.get().response.lease_expiration_ts)
+    self.assertFalse(lease_key.get().released)
+
+
+class LeaseReleaseProcessorTest(test_case.TestCase):
+  """Tests for handlers_cron.LeaseReleaseProcessor."""
+
+  def setUp(self):
+    super(LeaseReleaseProcessorTest, self).setUp()
+    app = handlers_cron.create_cron_app()
+    self.app = webtest.TestApp(app)
+
+  def test_releases(self):
+    self.mock(handlers_cron, 'release_lease', lambda *args, **kwargs: True)
+
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=1,
+        request_id='fake-id',
+    )
+    key = models.LeaseRequest(
+        deduplication_checksum=
+            models.LeaseRequest.compute_deduplication_checksum(request),
+        key=models.LeaseRequest.generate_key(
+            auth_testing.DEFAULT_MOCKED_IDENTITY.to_bytes(),
+            request,
+        ),
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        released=True,
+        request=request,
+        response=rpc_messages.LeaseResponse(
+            client_request_id='fake-id',
+            state=rpc_messages.LeaseRequestState.UNTRIAGED,
+        ),
+    ).put()
+
+    self.app.get(
+        '/internal/cron/process-lease-releases',
+        headers={'X-AppEngine-Cron': 'true'},
+    )
+
+
+class CreateSubscriptionTest(test_case.TestCase):
+  """Tests for handlers_cron.create_subscription."""
+
+  def test_creates(self):
+    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: True)
+
+    key = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        policies=rpc_messages.Policies(
+            backend_attributes=[
+                rpc_messages.KeyValuePair(
+                    key='key',
+                    value='value',
+                ),
+            ],
+            backend_project='project',
+            backend_topic='topic',
+            machine_service_account='fake-service-account',
+        ),
+        state=models.CatalogMachineEntryStates.NEW,
+    ).put()
+
+    handlers_cron.create_subscription(key)
+
+  def test_machine_doesnt_exist(self):
+    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: False)
+
+    handlers_cron.create_subscription(
+        ndb.Key(models.CatalogMachineEntry, 'fake-key'))
+
+  def test_wrong_state(self):
+    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: False)
+
+    key = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        policies=rpc_messages.Policies(
+            machine_service_account='fake-service-account',
+        ),
+        state=models.CatalogMachineEntryStates.AVAILABLE,
+    ).put()
+
+    handlers_cron.create_subscription(key)
+
+  def test_no_service_account(self):
+    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: False)
+
+    key = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        policies=rpc_messages.Policies(
+        ),
+        state=models.CatalogMachineEntryStates.NEW,
+    ).put()
+
+    handlers_cron.create_subscription(key)
+
+  def test_already_subscribed(self):
+    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: False)
+
+    key = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        policies=rpc_messages.Policies(
+            machine_service_account='fake-service-account',
+        ),
+        pubsub_subscription='subscription',
+        state=models.CatalogMachineEntryStates.NEW,
+    ).put()
+
+    handlers_cron.create_subscription(key)
+
+  def test_task_enqueuing_error(self):
+    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: False)
+
+    key = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        policies=rpc_messages.Policies(
+            backend_attributes=[
+                rpc_messages.KeyValuePair(
+                    key='key',
+                    value='value',
+                ),
+            ],
+            backend_project='project',
+            backend_topic='topic',
+            machine_service_account='fake-service-account',
+        ),
+        state=models.CatalogMachineEntryStates.NEW,
+    ).put()
+
+    with self.assertRaises(handlers_cron.TaskEnqueuingError):
+      handlers_cron.create_subscription(key)
+
+
+class NewMachineProcessorTest(test_case.TestCase):
+  """Tests for handlers_cron.NewMachineProcessor."""
+
+  def setUp(self):
+    super(NewMachineProcessorTest, self).setUp()
+    app = handlers_cron.create_cron_app()
+    self.app = webtest.TestApp(app)
+
+  def test_subscribes(self):
+    self.mock(
+        handlers_cron, 'create_subscription', lambda *args, **kwargs: True)
+
+    key = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        policies=rpc_messages.Policies(
+            machine_service_account='fake-service-account',
+        ),
+        state=models.CatalogMachineEntryStates.NEW,
+    ).put()
+
+    self.app.get(
+        '/internal/cron/process-new-machines',
+        headers={'X-AppEngine-Cron': 'true'},
+    )
+
+    self.assertFalse(key.get().pubsub_subscription)
 
 
 if __name__ == '__main__':

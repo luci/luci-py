@@ -319,7 +319,6 @@ class MachineProviderEndpoints(remote.Service):
         try:
           responses.append(self._lease(request, user, request_hash))
         except (
-            datastore_errors.NotSavedError,
             datastore_errors.Timeout,
             runtime.apiproxy_errors.CancelledError,
             runtime.apiproxy_errors.DeadlineExceededError,
@@ -494,7 +493,6 @@ class MachineProviderEndpoints(remote.Service):
               request_hash=request_hash,
           ))
         except (
-            datastore_errors.NotSavedError,
             datastore_errors.Timeout,
             runtime.apiproxy_errors.CancelledError,
             runtime.apiproxy_errors.DeadlineExceededError,
