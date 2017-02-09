@@ -18,6 +18,7 @@ utils.fix_protobuf_package()
 from google import protobuf
 
 from components import auth
+from components import multiline_proto
 from components import utils
 from components.datastore_utils import config
 
@@ -96,8 +97,8 @@ def _convert_config(content, dest_type):
     return None
   msg = dest_type()
   try:
-    protobuf.text_format.Merge(content, msg)
-  except protobuf.text_format.ParseError as ex:
+    protobuf.text_format.Merge(multiline_proto.parse(content), msg)
+  except (multiline_proto.ParseError, protobuf.text_format.ParseError) as ex:
     raise ConfigFormatError(ex.message)
   return msg
 
