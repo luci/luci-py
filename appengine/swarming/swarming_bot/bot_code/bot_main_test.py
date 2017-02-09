@@ -222,6 +222,7 @@ class TestBotMain(net_utils.TestCase):
       return False
     from config import bot_config
     self.mock(bot_config, 'setup_bot', setup_bot)
+    self.mock(bot, '_make_stack', lambda: 'fake stack')
     restarts = []
     post_event = []
     self.mock(
@@ -240,8 +241,8 @@ class TestBotMain(net_utils.TestCase):
     self.assertEqual([1, 1], setup_bots)
     expected = [
       'Starting new swarming bot: %s' % bot_main.THIS_FILE,
-      'Bot is stuck restarting for: Starting new swarming bot: %s' %
-        bot_main.THIS_FILE,
+      ('Bot is stuck restarting for: Starting new swarming bot: %s\n'
+       'Calling stack:\nfake stack') % bot_main.THIS_FILE,
     ]
     self.assertEqual(expected, [i[0][2] for i in post_event])
 

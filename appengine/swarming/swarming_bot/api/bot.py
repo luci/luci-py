@@ -4,13 +4,70 @@
 
 """Bot interface used in bot_config.py."""
 
+import inspect
 import logging
 import os
+import sys
 import time
 
 import os_utilities
 
 # Method could be a function - pylint: disable=R0201
+
+
+def _get_stripper(paths):
+  """Returns a function to strip common path prefixes.
+
+  There are 3 kinds of paths:
+    - relative paths
+    - absolute paths
+    - absolute paths in stdlib
+  """
+  if not paths:
+    return lambda f: f
+
+  stdlib = os.path.dirname(os.__file__)
+  # Find the common root for paths not in stdlib and not relative.
+  split_paths = [
+    [c for c in p.split(os.path.sep) if c] for p in paths
+    if os.path.isabs(p) and not p.startswith(stdlib)
+  ]
+  common = None
+  if split_paths:
+    common = []
+    for c1, c2 in zip(min(split_paths), max(split_paths)):
+      if c1 != c2:
+        break
+      common.append(c1)
+    if common:
+      if sys.platform == 'win32':
+        common = os.path.sep.join(common)
+      else:
+        common = os.path.sep + os.path.sep.join(common)
+
+  def stripper(f):
+    if f.startswith(stdlib):
+      return f[len(stdlib)+1:]
+    if os.path.isabs(f) and common:
+      return f[len(common)+1:]
+    if f.startswith('./'):
+      return f[2:]
+    return f
+  return stripper
+
+
+def _make_stack():
+  """Returns a well formatted call stack."""
+  frame = inspect.currentframe().f_back
+  frames = []
+  while frame and len(frames) < 50:
+    frames.append(frame)
+    frame = frame.f_back
+  strip = _get_stripper(f.f_code.co_filename for f in frames)
+  return '\n'.join(
+      '  %-2d %s:%s:%s()' % (
+        i, strip(f.f_code.co_filename), f.f_lineno, f.f_code.co_name)
+      for i, f in enumerate(frames))
 
 
 class Bot(object):
@@ -130,12 +187,16 @@ class Bot(object):
     """Posts given string as a failure.
 
     This is used in case of internal code error. It traps exception.
+
+    Include a full stack trace, because sometimes the error is not sufficient
+    by itself.
     """
     logging.error('Error: %s\n%s', self._attributes, message)
+    stack = '\nCalling stack:\n%s' % _make_stack()
     try:
-      self.post_event('bot_error', message)
+      self.post_event('bot_error', '%s%s' % (message.rstrip(), stack))
     except Exception:
-      logging.exception('post_error(%s) failed.', message)
+      logging.exception('post_error(%s) failed.%s', message, stack)
 
   def restart(self, message):
     """Reboots the machine.
