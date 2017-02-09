@@ -380,6 +380,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
 
       'img-src': [
         "'self'",
+        'https://www.google-analytics.com',
         'https://*.googleusercontent.com',  # Google user avatars
       ],
 

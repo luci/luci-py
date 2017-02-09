@@ -205,6 +205,11 @@ class BrowseHandler(auth.AuthenticatingHandler):
         self.abort(404, 'Unable to retrieve the entry')
     self.response.write(template.render('isolate/browse.html', params))
 
+  def get_content_security_policy(self):
+    csp = super(BrowseHandler, self).get_content_security_policy()
+    csp.setdefault('child-src', []).append("'self'")
+    return csp
+
 
 class ContentHandler(auth.AuthenticatingHandler):
   @auth.autologin
