@@ -536,7 +536,8 @@ class Test(unittest.TestCase):
     expected_summary[u'try_number'] = 0
     expected_summary[u'properties_hash'] = None
     self._run_isolated(
-        hello_world, 'idempotent_reuse', ['--idempotent'], expected_summary, {})
+        hello_world, 'idempotent_reuse', ['--idempotent'], expected_summary, {},
+        deduped=True)
 
   def test_secret_bytes(self):
     hello_world = textwrap.dedent("""
@@ -649,7 +650,7 @@ class Test(unittest.TestCase):
         {'0/yo': 'Yo!'})
 
   def _run_isolated(self, hello_world, name, args, expected_summary,
-      expected_files):
+      expected_files, deduped=False):
     # Shared code for all test_isolated_* test cases.
     tmpdir = tempfile.mkdtemp(prefix='swarming_smoke')
     try:
@@ -663,14 +664,14 @@ class Test(unittest.TestCase):
       task_id = self.client.task_trigger_isolated(
           name, isolated_hash, extra=args)
       actual_summary, actual_files = self.client.task_collect(task_id)
-      self.assertResults(expected_summary, actual_summary)
+      self.assertResults(expected_summary, actual_summary, deduped=deduped)
       actual_files.pop('summary.json')
       self.assertEqual(expected_files, actual_files)
       return task_id
     finally:
       file_path.rmtree(tmpdir)
 
-  def assertResults(self, expected, result):
+  def assertResults(self, expected, result, deduped=False):
     self.assertEqual([u'shards'], result.keys())
     self.assertEqual(1, len(result[u'shards']))
     self.assertTrue(result[u'shards'][0])
@@ -709,7 +710,12 @@ class Test(unittest.TestCase):
     self.assertTrue(result.pop(u'created_ts'))
     self.assertTrue(result.pop(u'completed_ts'))
     self.assertLess(0, result.pop(u'durations'))
-    self.assertTrue(result.pop(u'id'))
+    task_id = result.pop(u'id')
+    run_id = result.pop(u'run_id')
+    self.assertTrue(task_id)
+    self.assertTrue(task_id.endswith('0'), task_id)
+    if not deduped:
+      self.assertEqual(task_id[:-1] + '1', run_id)
     self.assertTrue(result.pop(u'modified_ts'))
     self.assertTrue(result.pop(u'started_ts'))
 

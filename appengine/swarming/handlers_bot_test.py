@@ -316,6 +316,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'internal_failure': False,
       u'modified_ts': str_now,
       u'name': u'hi',
+      u'run_id': u'5cee488008811',
       u'server_versions': [u'v1a'],
       u'started_ts': str_now,
       u'state': u'RUNNING',
@@ -584,7 +585,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'isolatedserver': u'http://localhost:1',
         u'namespace': u'default-gzip',
       },
-      'cipd_pins': {
+      u'cipd_pins': {
         u'client_package': {
           u'package_name': u'infra/tools/cipd/windows-amd64',
           u'version': u'deadbeef'*5,
@@ -595,6 +596,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
           u'version': u'badc0fee'*5,
         }]
       },
+      u'run_id': u'5cee488008811',
       u'server_versions': [u'v1a'],
       u'started_ts': str_now,
       u'state': u'COMPLETED',
@@ -889,6 +891,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'internal_failure': False,
         u'modified_ts': str_now,
         u'name': u'hi',
+        u'run_id': u'5cee488008811',
         u'server_versions': [u'v1a'],
         u'started_ts': str_now,
         u'state': u'RUNNING',
@@ -1027,6 +1030,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'internal_failure': False,
       u'modified_ts': str_now,
       u'name': u'hi',
+      u'run_id': u'5cee488008811',
       u'server_versions': [u'v1a'],
       u'started_ts': str_now,
       u'state': u'COMPLETED',
@@ -1076,6 +1080,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'internal_failure': True,
       u'modified_ts': str_now,
       u'name': u'hi',
+      u'run_id': u'5cee488008811',
       u'server_versions': [u'v1a'],
       u'started_ts': str_now,
       u'state': u'BOT_DIED',

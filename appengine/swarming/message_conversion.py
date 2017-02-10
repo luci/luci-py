@@ -17,6 +17,7 @@ import json
 import swarming_rpcs
 
 from components import utils
+from server import task_pack
 from server import task_request
 from server import task_result
 
@@ -254,9 +255,13 @@ def task_result_to_rpc(entity, send_stats):
     kwargs['properties_hash'] = None
     kwargs['tags'] = []
     kwargs['user'] = None
+    kwargs['run_id'] = entity.task_id
   else:
     assert entity.__class__ is task_result.TaskResultSummary, entity
     kwargs['properties_hash'] = (
         entity.properties_hash.encode('hex')
         if entity.properties_hash else None)
+    # This returns the right value for deduped tasks too.
+    k = entity.run_result_key
+    kwargs['run_id'] = task_pack.pack_run_result_key(k) if k else None
   return _ndb_to_rpc(swarming_rpcs.TaskResult, entity, **kwargs)
