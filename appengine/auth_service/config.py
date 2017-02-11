@@ -386,6 +386,33 @@ def _validate_ip_whitelist_config(conf):
     if ident in idents:
       raise ValueError('Identity %s is specified twice' % assignment.identity)
     idents.append(ident)
+  # This raises ValueError on bad includes.
+  _resolve_ip_whitelist_includes(conf.ip_whitelists)
+
+
+def _resolve_ip_whitelist_includes(whitelists):
+  """Takes a list of IPWhitelist, returns map {name -> [subnets]}.
+
+  Subnets are returned as sorted list of strings.
+  """
+  by_name = {m.name: m for m in whitelists}
+
+  def resolve_one(wl, visiting):
+    if wl.name in visiting:
+      raise ValueError(
+          'IP whitelist %s is part of an include cycle %s' %
+          (wl.name, visiting + [wl.name]))
+    visiting.append(wl.name)
+    subnets = set(wl.subnets)
+    for inc in wl.includes:
+      if inc not in by_name:
+        raise ValueError(
+            'IP whitelist %s includes unknown whitelist %s' % (wl.name, inc))
+      subnets |= resolve_one(by_name[inc], visiting)
+    visiting.pop()
+    return subnets
+
+  return {m.name: sorted(resolve_one(m, [])) for m in whitelists}
 
 
 def _update_ip_whitelist_config(rev, conf):
@@ -398,28 +425,26 @@ def _update_ip_whitelist_config(rev, conf):
     for e in model.AuthIPWhitelist.query(ancestor=model.root_key())
   }
 
-  # Whitelists being imported (name => IPWhitelist proto msg).
-  imported_ip_whitelists = {msg.name: msg for msg in conf.ip_whitelists}
+  # Whitelists being imported (name => [list of subnets]).
+  imported_ip_whitelists = _resolve_ip_whitelist_includes(conf.ip_whitelists)
 
   to_put = []
   to_delete = []
 
   # New or modified IP whitelists.
-  for wl_proto in imported_ip_whitelists.itervalues():
-    # Convert proto magic list to a regular list.
-    subnets = list(wl_proto.subnets)
-    # Existing whitelist and it hasn't changed?
-    wl = existing_ip_whitelists.get(wl_proto.name)
+  for name, subnets in imported_ip_whitelists.iteritems():
+    # An existing whitelist and it hasn't changed?
+    wl = existing_ip_whitelists.get(name)
     if wl and wl.subnets == subnets:
       continue
-    # Update existing (to preserve auth_db_prev_rev) or create a new one.
+    # Update the existing (to preserve auth_db_prev_rev) or create a new one.
     if not wl:
       wl = model.AuthIPWhitelist(
-          key=model.ip_whitelist_key(wl_proto.name),
+          key=model.ip_whitelist_key(name),
           created_ts=now,
           created_by=model.get_service_self_identity())
     wl.subnets = subnets
-    wl.description = 'Imported from ip_whitelist.cfg at rev %s' % rev.revision
+    wl.description = 'Imported from ip_whitelist.cfg'
     to_put.append(wl)
 
   # Removed IP whitelists.

@@ -107,6 +107,8 @@ message IPWhitelistConfig {
     optional string name = 1;
     // List of subnets.
     repeated string subnets = 2;
+    // Names of other IPWhitelist entities to include.
+    repeated string includes = 3;
   }
 
   message Assignment {

@@ -101,7 +101,8 @@ class ConfigTest(test_case.TestCase):
               subnets=['127.0.0.1/32', '0.0.0.0/0']),
           config_pb2.IPWhitelistConfig.IPWhitelist(
               name='bots',
-              subnets=[]),
+              subnets=[],
+              includes=['abc']),
         ],
         assignments=[
           config_pb2.IPWhitelistConfig.Assignment(
@@ -180,6 +181,64 @@ class ConfigTest(test_case.TestCase):
     with self.assertRaises(ValueError):
       config._validate_ip_whitelist_config(conf)
 
+  def test_validate_ip_whitelist_unknown_include(self):
+    conf = config_pb2.IPWhitelistConfig(
+        ip_whitelists=[
+          config_pb2.IPWhitelistConfig.IPWhitelist(
+              name='abc',
+              subnets=[],
+              includes=['unknown']),
+        ])
+    with self.assertRaises(ValueError):
+      config._validate_ip_whitelist_config(conf)
+
+  def test_validate_ip_whitelist_include_cycle_1(self):
+    conf = config_pb2.IPWhitelistConfig(
+        ip_whitelists=[
+          config_pb2.IPWhitelistConfig.IPWhitelist(
+              name='abc',
+              subnets=[],
+              includes=['abc']),
+        ])
+    with self.assertRaises(ValueError):
+      config._validate_ip_whitelist_config(conf)
+
+  def test_validate_ip_whitelist_include_cycle_2(self):
+    conf = config_pb2.IPWhitelistConfig(
+        ip_whitelists=[
+          config_pb2.IPWhitelistConfig.IPWhitelist(
+              name='abc',
+              subnets=[],
+              includes=['def']),
+          config_pb2.IPWhitelistConfig.IPWhitelist(
+              name='def',
+              subnets=[],
+              includes=['abc']),
+        ])
+    with self.assertRaises(ValueError):
+      config._validate_ip_whitelist_config(conf)
+
+  def test_validate_ip_whitelist_include_diamond(self):
+    conf = config_pb2.IPWhitelistConfig(
+        ip_whitelists=[
+          config_pb2.IPWhitelistConfig.IPWhitelist(
+              name='abc',
+              subnets=[],
+              includes=['middle1', 'middle2']),
+          config_pb2.IPWhitelistConfig.IPWhitelist(
+              name='middle1',
+              subnets=[],
+              includes=['inner']),
+          config_pb2.IPWhitelistConfig.IPWhitelist(
+              name='middle2',
+              subnets=[],
+              includes=['inner']),
+          config_pb2.IPWhitelistConfig.IPWhitelist(
+              name='inner',
+              subnets=[]),
+        ])
+    config._validate_ip_whitelist_config(conf)
+
   def test_update_ip_whitelist_config(self):
     @ndb.transactional
     def run(conf):
@@ -252,7 +311,7 @@ class ConfigTest(test_case.TestCase):
             'created_by': 'service:sample-app',
             'created_ts': 1388631845000000,
             'description':
-                u'Imported from ip_whitelist.cfg at rev ip_whitelist_cfg_rev',
+                u'Imported from ip_whitelist.cfg',
             'modified_by': 'service:sample-app',
             'modified_ts': 1388631845000000,
             'subnets': [u'0.0.0.1/32'],
@@ -261,7 +320,7 @@ class ConfigTest(test_case.TestCase):
             'created_by': 'service:sample-app',
             'created_ts': 1388631845000000,
             'description':
-                u'Imported from ip_whitelist.cfg at rev ip_whitelist_cfg_rev',
+                u'Imported from ip_whitelist.cfg',
             'modified_by': 'service:sample-app',
             'modified_ts': 1388631845000000,
             'subnets': [u'0.0.0.2/32'],
@@ -270,7 +329,7 @@ class ConfigTest(test_case.TestCase):
             'created_by': 'service:sample-app',
             'created_ts': 1388631845000000,
             'description':
-                u'Imported from ip_whitelist.cfg at rev ip_whitelist_cfg_rev',
+                u'Imported from ip_whitelist.cfg',
             'modified_by': 'service:sample-app',
             'modified_ts': 1388631845000000,
             'subnets': [],
@@ -349,7 +408,7 @@ class ConfigTest(test_case.TestCase):
             'created_by': 'service:sample-app',
             'created_ts': 1388631845000000,
             'description':
-                u'Imported from ip_whitelist.cfg at rev ip_whitelist_cfg_rev',
+                u'Imported from ip_whitelist.cfg',
             'modified_by': 'service:sample-app',
             'modified_ts': 1393729445000000,
             'subnets': [u'0.0.0.3/32'],
@@ -358,7 +417,7 @@ class ConfigTest(test_case.TestCase):
             'created_by': 'service:sample-app',
             'created_ts': 1388631845000000,
             'description':
-                u'Imported from ip_whitelist.cfg at rev ip_whitelist_cfg_rev',
+                u'Imported from ip_whitelist.cfg',
             'modified_by': 'service:sample-app',
             'modified_ts': 1388631845000000,
             'subnets': [u'0.0.0.2/32'],
@@ -367,10 +426,81 @@ class ConfigTest(test_case.TestCase):
             'created_by': 'service:sample-app',
             'created_ts': 1393729445000000,
             'description':
-                u'Imported from ip_whitelist.cfg at rev ip_whitelist_cfg_rev',
+                u'Imported from ip_whitelist.cfg',
             'modified_by': 'service:sample-app',
             'modified_ts': 1393729445000000,
             'subnets': [],
+          },
+        },
+        {
+          x.key.id(): x.to_serializable_dict()
+          for x in model.AuthIPWhitelist.query(ancestor=model.root_key())
+        })
+
+  def test_update_ip_whitelist_config_with_includes(self):
+    @ndb.transactional
+    def run(conf):
+      return config._update_ip_whitelist_config(
+          config.Revision('ip_whitelist_cfg_rev', 'http://url'), conf)
+
+    conf = config_pb2.IPWhitelistConfig(
+        ip_whitelists=[
+          config_pb2.IPWhitelistConfig.IPWhitelist(
+              name='a',
+              subnets=['0.0.0.1/32']),
+          config_pb2.IPWhitelistConfig.IPWhitelist(
+              name='b',
+              subnets=['0.0.0.1/32', '0.0.0.2/32'],
+              includes=['a']),
+          config_pb2.IPWhitelistConfig.IPWhitelist(
+              name='c',
+              subnets=['0.0.0.3/32'],
+              includes=['a', 'b']),
+          config_pb2.IPWhitelistConfig.IPWhitelist(
+              name='d',
+              includes=['c']),
+        ])
+    self.mock_now(datetime.datetime(2014, 1, 2, 3, 4, 5))
+    self.assertTrue(run(conf))
+
+    # Verify everything is there.
+    self.assertEqual(
+        {
+          'a': {
+            'created_by': 'service:sample-app',
+            'created_ts': 1388631845000000,
+            'description':
+                u'Imported from ip_whitelist.cfg',
+            'modified_by': 'service:sample-app',
+            'modified_ts': 1388631845000000,
+            'subnets': [u'0.0.0.1/32'],
+          },
+          'b': {
+            'created_by': 'service:sample-app',
+            'created_ts': 1388631845000000,
+            'description':
+                u'Imported from ip_whitelist.cfg',
+            'modified_by': 'service:sample-app',
+            'modified_ts': 1388631845000000,
+            'subnets': [u'0.0.0.1/32', u'0.0.0.2/32'],
+          },
+          'c': {
+            'created_by': 'service:sample-app',
+            'created_ts': 1388631845000000,
+            'description':
+                u'Imported from ip_whitelist.cfg',
+            'modified_by': 'service:sample-app',
+            'modified_ts': 1388631845000000,
+            'subnets': [u'0.0.0.1/32', u'0.0.0.2/32', u'0.0.0.3/32'],
+          },
+          'd': {
+            'created_by': 'service:sample-app',
+            'created_ts': 1388631845000000,
+            'description':
+                u'Imported from ip_whitelist.cfg',
+            'modified_by': 'service:sample-app',
+            'modified_ts': 1388631845000000,
+            'subnets': [u'0.0.0.1/32', u'0.0.0.2/32', u'0.0.0.3/32'],
           },
         },
         {
