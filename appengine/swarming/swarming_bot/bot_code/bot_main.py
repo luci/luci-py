@@ -140,6 +140,10 @@ def _register_extra_bot_config(content):
   This file is called implicitly by _call_hook() and _call_hook_safe().
   """
   global _EXTRA_BOT_CONFIG
+  if isinstance(content, unicode):
+    # compile will throw if there's a '# coding: utf-8' line and the string is
+    # in unicode. <3 python.
+    content = content.encode('utf-8')
   try:
     compiled = compile(content, 'bot_config.py', 'exec')
     _EXTRA_BOT_CONFIG  = types.ModuleType('bot_config')
