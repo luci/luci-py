@@ -106,12 +106,12 @@ class RestrictedConfigHandler(auth.AuthenticatingHandler):
     self.common('Settings updated')
 
   def common(self, note):
-    params = {
-      'cfg': config.settings(fresh=True),
-      'note': note,
-      'path': self.request.path,
-      'xsrf_token': self.generate_xsrf_token(),
-    }
+    params = config.settings_info()
+    params.update({
+        'note': note,
+        'path': self.request.path,
+        'xsrf_token': self.generate_xsrf_token(),
+    })
     self.response.write(
         template.render('isolate/restricted_config.html', params))
 

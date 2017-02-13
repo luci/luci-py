@@ -38,7 +38,12 @@ def create_application():
 
   gae_ts_mon.initialize(frontend, is_enabled_fn=is_enabled_callback)
   # App that serves new endpoints API.
-  api = endpoints.api_server([handlers_endpoints_v1.IsolateService])
+  api = endpoints.api_server([
+      handlers_endpoints_v1.IsolateService,
+      # components.config endpoints for validation and configuring of
+      # luci-config service URL.
+      config.ConfigApi,
+  ])
   return frontend, api
 
 

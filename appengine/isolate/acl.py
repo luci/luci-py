@@ -10,13 +10,13 @@ import config
 
 def isolate_writable():
   """Returns True if current user can write to isolate."""
-  full_access = auth.is_group_member(config.settings().full_access_group)
+  full_access = auth.is_group_member(config.settings().auth.full_access_group)
   return full_access or auth.is_admin()
 
 
 def isolate_readable():
   """Returns True if current user can read from isolate."""
-  read_only = config.settings().readonly_access_group
+  read_only = config.settings().auth.readonly_access_group
   return auth.is_group_member(read_only) or isolate_writable()
 
 
@@ -35,7 +35,7 @@ def bootstrap():
 
   # Allow local bots full access.
   bots = auth.bootstrap_loopback_ips()
-  full_access = config.settings().full_access_group
+  full_access = config.settings().auth.full_access_group
   auth.bootstrap_group(full_access, bots, 'Can read and write from/to Isolate')
 
   # Add a fake admin for local dev server.

@@ -37,7 +37,7 @@ import model
 def make_private_key():
   new_key = RSA.generate(1024)
   pem_key = base64.b64encode(new_key.exportKey('PEM'))
-  config.settings().gs_private_key = pem_key
+  config.settings()._ds_cfg.gs_private_key = pem_key
 
 
 def hash_content(content):
@@ -123,7 +123,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     self.testbed.init_blobstore_stub()
     self.testbed.init_urlfetch_stub()
     admin = auth.Identity(auth.IDENTITY_USER, 'admin@example.com')
-    full_access_group = config.settings().full_access_group
+    full_access_group = config.settings().auth.full_access_group
     auth.bootstrap_group(full_access_group, [admin])
     auth_testing.mock_get_current_identity(self, admin)
     version = utils.get_app_version()

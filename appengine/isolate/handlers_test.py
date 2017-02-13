@@ -67,8 +67,8 @@ class MainTest(test_case.TestCase):
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
 
-    full_access_group = config.settings().full_access_group
-    readonly_access_group = config.settings().readonly_access_group
+    full_access_group = config.settings().auth.full_access_group
+    readonly_access_group = config.settings().auth.readonly_access_group
 
     auth.bootstrap_group(
         auth.ADMIN_GROUP,
@@ -166,7 +166,7 @@ class MainTest(test_case.TestCase):
     params = {
       'default_expiration': 123456,
       'google_analytics': 'foobar',
-      'keyid': str(config.settings().key.integer_id()),
+      'keyid': str(config.settings_info()['cfg'].key.integer_id()),
       'xsrf_token': self.get_xsrf_token(),
     }
     self.assertEqual('', config.settings().google_analytics)

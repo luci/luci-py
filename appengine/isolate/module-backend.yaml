@@ -27,6 +27,8 @@ includes:
 # https://developers.google.com/appengine/docs/python/tools/libraries27
 # As the doc says, serious applications should specify the third party versions.
 libraries:
+- name: endpoints
+  version: "1.0"
 - name: webapp2
   version: "2.5.2"
 - name: webob

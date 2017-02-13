@@ -26,3 +26,10 @@ cron:
 - description: Send ts_mon metrics
   url: /internal/cron/ts_mon/send
   schedule: every 1 minutes
+
+### luci-config
+
+- description: read luci-config configs
+  # Handled by inclusion of components/config in app.yaml.
+  url: /internal/cron/config/update
+  schedule: every 1 minutes
