@@ -70,7 +70,7 @@ class TestBotMain(net_utils.TestCase):
     self.mock(zip_package, 'generate_version', lambda: '123')
     self.bot = self.make_bot()
     self.mock(self.bot, 'post_error', self.fail)
-    self.mock(self.bot, 'restart', self.fail)
+    self.mock(os_utilities, 'host_reboot', self.fail)
     self.mock(subprocess42, 'call', self.fail)
     self.mock(time, 'time', lambda: 100.)
     config_path = os.path.join(
@@ -256,7 +256,7 @@ class TestBotMain(net_utils.TestCase):
     restarts = []
     post_event = []
     self.mock(
-        os_utilities, 'restart', lambda *a, **kw: restarts.append((a, kw)))
+        os_utilities, 'host_reboot', lambda *a, **kw: restarts.append((a, kw)))
     self.mock(
         bot.Bot, 'post_event', lambda *a, **kw: post_event.append((a, kw)))
     self.expected_requests([])
@@ -271,7 +271,7 @@ class TestBotMain(net_utils.TestCase):
     self.assertEqual([1, 1], setup_bots)
     expected = [
       'Starting new swarming bot: %s' % bot_main.THIS_FILE,
-      ('Bot is stuck restarting for: Starting new swarming bot: %s\n'
+      ('Host is stuck rebooting for: Starting new swarming bot: %s\n'
        'Calling stack:\nfake stack') % bot_main.THIS_FILE,
     ]
     self.assertEqual(expected, [i[0][2] for i in post_event])
@@ -569,7 +569,7 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bit, 'wait', self.fail)
     self.mock(bot_main, '_run_manifest', self.fail)
     self.mock(bot_main, '_update_bot', self.fail)
-    self.mock(self.bot, 'restart', lambda *args: restart.append(args))
+    self.mock(self.bot, 'host_reboot', lambda *args: restart.append(args))
 
     self.expected_requests(
         [
@@ -582,7 +582,7 @@ class TestBotMain(net_utils.TestCase):
               'timeout': remote_client.NET_CONNECTION_TIMEOUT_SEC,
             },
             {
-              'cmd': 'restart',
+              'cmd': 'host_reboot',
               'message': 'Please die now',
             },
           ),

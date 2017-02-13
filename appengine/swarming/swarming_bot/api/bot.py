@@ -209,7 +209,7 @@ class Bot(object):
     except Exception:
       logging.exception('post_error(%s) failed.%s', message, stack)
 
-  def restart(self, message):
+  def host_reboot(self, message):
     """Reboots the machine.
 
     If the reboot is successful, never returns: the process should just be
@@ -224,11 +224,12 @@ class Bot(object):
         self._shutdown_hook(self)
       except Exception as e:
         logging.exception('shutdown hook failed: %s', e)
-    # os_utilities.restart should never return, unless restart is not happening.
-    # If restart is taking longer than N minutes, it probably not going to
-    # finish at all. Report this to the server.
+    # os_utilities.host_reboot should never return, unless the reboot is not
+    # happening (e.g. sudo shutdown requires a password). If rebooting the host
+    # is taking longer than N minutes, it probably not going to finish at all.
+    # Report this to the server.
     try:
-      os_utilities.restart(message, timeout=15*60)
+      os_utilities.host_reboot(message, timeout=15*60)
     except LookupError:
       # This is a special case where OSX is deeply hosed. In that case the disk
       # is likely in read-only mode and there isn't much that can be done. This
@@ -237,7 +238,10 @@ class Bot(object):
       self.post_error('This host partition is bad; please fix the host')
       while True:
         time.sleep(1)
-    self.post_error('Bot is stuck restarting for: %s' % message)
+    self.post_error('Host is stuck rebooting for: %s' % message)
+
+  # Compatibility code. TODO(maruel): Remove once all call sites are updated.
+  restart = host_reboot
 
   def _update_bot_group_cfg(self, cfg_version, cfg):
     """Called internally to update server-provided per-bot config.

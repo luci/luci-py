@@ -240,7 +240,7 @@ class RemoteClientNative(object):
       return (cmd, resp['manifest'])
     if cmd == 'update':
       return (cmd, resp['version'])
-    if cmd == 'restart':
+    if cmd in ('restart', 'host_reboot'):
       return (cmd, resp['message'])
     raise PollError('Unexpected command: %s\n%s' % (cmd, resp))
 

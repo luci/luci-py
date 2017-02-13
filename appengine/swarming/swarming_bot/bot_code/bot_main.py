@@ -343,7 +343,7 @@ def setup_bot(skip_reboot):
     return
 
   if not should_continue and not skip_reboot:
-    botobj.restart('Starting new swarming bot: %s' % THIS_FILE)
+    botobj.host_reboot('Starting new swarming bot: %s' % THIS_FILE)
 
 
 def _get_authentication_headers(botobj):
@@ -779,9 +779,9 @@ def _poll_server(botobj, quit_bit, last_action):
   elif cmd == 'update':
     # Value is the version
     _update_bot(botobj, value)
-  elif cmd == 'restart':
-    # Value is the message to display while restarting
-    botobj.restart(value)
+  elif cmd in ('host_reboot', 'restart'):
+    # Value is the message to display while rebooting the host
+    botobj.host_reboot(value)
   else:
     raise ValueError('Unexpected command: %s\n%s' % (cmd, value))
 
@@ -1107,7 +1107,7 @@ def main(args):
           'Found a previous bot, %d rebooting as a workaround for '
           'https://crbug.com/569610.') % os.getpid()
       print >> sys.stderr, msg
-      os_utilities.restart(msg)
+      os_utilities.host_reboot(msg)
     else:
       print >> sys.stderr, 'Found a previous bot, %d exiting.' % os.getpid()
     return 1

@@ -7,7 +7,7 @@
 Includes code:
 - to declare the current system this code is running under.
 - to run a command on user login.
-- to restart the host.
+- to reboot the host.
 
 This file serves as an API to bot_config.py. bot_config.py can be replaced on
 the server to allow additional server-specific functionality.
@@ -1103,11 +1103,11 @@ def setup_auto_startup_autostart_desktop_linux(command, name='swarming'):
       filepath, platforms.linux.generate_autostart_desktop(command, name))
 
 
-def restart(message=None, timeout=None):
-  """Restarts this machine.
+def host_reboot(message=None, timeout=None):
+  """Reboots this machine.
 
   If it fails to reboot the host, it loops until timeout. This function does
-  not return on successful restart, or returns False if machine wasn't
+  not return on successful host reboot, or returns False if machine wasn't
   restarted within |timeout| seconds.
   """
   # The shutdown process sends SIGTERM and waits for processes to exit. It's
@@ -1116,7 +1116,7 @@ def restart(message=None, timeout=None):
 
   deadline = time.time() + timeout if timeout else None
   while True:
-    restart_and_return(message)
+    host_reboot_and_return(message)
     # Sleep for 300 seconds to ensure we don't try to do anymore work while the
     # OS is preparing to shutdown.
     duration = min(300, deadline - time.time()) if timeout else 300
@@ -1125,12 +1125,12 @@ def restart(message=None, timeout=None):
       time.sleep(duration)
     if timeout and time.time() >= deadline:
       logging.warning(
-          'Waited for host to restart for too long (%s); aborting', timeout)
+          'Waited for host to reboot for too long (%s); aborting', timeout)
       return False
 
 
-def restart_and_return(message=None):
-  """Tries to restart this host and immediately return to the caller.
+def host_reboot_and_return(message=None):
+  """Tries to reboot this host and immediately return to the caller.
 
   This is mostly useful when done via remote shell, like via ssh, where it is
   not worth waiting for the TCP connection to tear down.
@@ -1176,6 +1176,11 @@ def restart_and_return(message=None):
     else:
       success = True
   return success
+
+
+# Compatibility code. TODO(maruel): Remove once all call sites are updated.
+restart = host_reboot
+restart_and_return = host_reboot_and_return
 
 
 def roll_log(name):

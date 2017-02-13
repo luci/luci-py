@@ -233,9 +233,6 @@ def on_after_task(bot, failure, internal_failure, dimensions, summary):
 
   It is an excellent place to do post-task cleanup of temporary files.
 
-  The default implementation restarts after a task failure or an internal
-  failure.
-
   Arguments:
   - bot: bot.Bot instance. See ../api/bot.py.
   - failure: bool, True if the task failed.
@@ -245,9 +242,9 @@ def on_after_task(bot, failure, internal_failure, dimensions, summary):
   """
   # Example code:
   #if failure:
-  #  bot.restart('Task failure')
+  #  bot.host_reboot('Task failure')
   #elif internal_failure:
-  #  bot.restart('Internal failure')
+  #  bot.host_reboot('Internal failure')
 
 
 def on_bot_idle(bot, since_last_action):

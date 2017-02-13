@@ -108,7 +108,7 @@ class TestOsUtilities(auto_stub.TestCase):
     # TODO(maruel): Figure out a way to test properly.
     pass
 
-  def test_restart(self):
+  def test_host_reboot(self):
     class Foo(Exception):
       pass
 
@@ -119,17 +119,17 @@ class TestOsUtilities(auto_stub.TestCase):
     self.mock(time, 'sleep', lambda _: raise_exception(Foo()))
     self.mock(logging, 'error', lambda *_: None)
     with self.assertRaises(Foo):
-      os_utilities.restart()
+      os_utilities.host_reboot()
 
-  def test_restart_and_return(self):
+  def test_host_reboot_and_return(self):
     self.mock(subprocess, 'check_call', lambda _: None)
-    self.assertIs(True, os_utilities.restart_and_return())
+    self.assertIs(True, os_utilities.host_reboot_and_return())
 
-  def test_restart_and_return_with_message(self):
+  def test_host_reboot_and_return_with_message(self):
     self.mock(subprocess, 'check_call', lambda _: None)
-    self.assertIs(True, os_utilities.restart_and_return(message='Boo'))
+    self.assertIs(True, os_utilities.host_reboot_and_return(message='Boo'))
 
-  def test_restart_with_timeout(self):
+  def test_host_reboot_with_timeout(self):
     self.mock(subprocess, 'check_call', lambda _: None)
     self.mock(logging, 'error', lambda *_: None)
 
@@ -139,7 +139,7 @@ class TestOsUtilities(auto_stub.TestCase):
     self.mock(time, 'sleep', mock_sleep)
     self.mock(time, 'time', lambda: now[0])
 
-    self.assertFalse(os_utilities.restart(timeout=60))
+    self.assertFalse(os_utilities.host_reboot(timeout=60))
     self.assertEqual(time.time(), 60)
 
 

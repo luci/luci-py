@@ -84,13 +84,13 @@ def CMDis_fine(_args):
   return 0
 
 
-def CMDrestart(_args):
+def CMDreboot(_args):
   """Utility subcommand that hides the difference between each OS to reboot
   the host."""
   logging_utils.prepare_logging(None)
   import os_utilities
   # This function doesn't return.
-  os_utilities.restart()
+  os_utilities.host_reboot()
   # Should never reach here.
   return 1
 
@@ -223,7 +223,8 @@ def main():
   fix_encoding.fix_encoding()
 
   if os.path.basename(THIS_FILE) == 'swarming_bot.zip':
-    # Self-replicate itself right away as swarming_bot.1.zip and restart as it.
+    # Self-replicate itself right away as swarming_bot.1.zip and restart the bot
+    # process as this copy. This enables LKGBC logic.
     print >> sys.stderr, 'Self replicating pid:%d.' % os.getpid()
     if os.path.isfile('swarming_bot.1.zip'):
       os.remove('swarming_bot.1.zip')

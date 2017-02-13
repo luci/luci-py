@@ -139,8 +139,8 @@ class RemoteClientGrpc(object):
       return 'terminate', response.terminate_taskid
 
     if response.cmd == swarming_bot_pb2.PollResponse.RESTART:
-      logging.info('Restarting: %s', response.restart_message)
-      return 'restart', response.restart_message
+      logging.info('Rebooting the host: %s', response.restart_message)
+      return 'host_reboot', response.restart_message
 
     if response.cmd == swarming_bot_pb2.PollResponse.RUN:
       protoManifest = response.manifest
