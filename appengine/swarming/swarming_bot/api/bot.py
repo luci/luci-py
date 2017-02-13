@@ -4,10 +4,12 @@
 
 """Bot interface used in bot_config.py."""
 
+import copy
 import inspect
 import logging
 import os
 import sys
+import threading
 import time
 
 import os_utilities
@@ -76,14 +78,18 @@ class Bot(object):
       shutdown_hook):
     # Do not expose attributes for now, as attributes may be refactored.
     assert server is None or not server.endswith('/'), server
-    self._attributes = attributes or {}
+    # Immutable.
     self._base_dir = base_dir
-    self._bot_group_cfg_ver = None
     self._remote = remote
     self._server = server
-    self._server_side_dimensions = {}
     self._server_version = server_version
     self._shutdown_hook = shutdown_hook
+
+    # Mutable.
+    self._lock = threading.Lock()
+    self._attributes = attributes or {}
+    self._bot_group_cfg_ver = None
+    self._server_side_dimensions = {}
 
   @property
   def base_dir(self):
@@ -119,12 +125,14 @@ class Bot(object):
     itself to a different pool. By forcefully overriding dimensions on the
     server side we can use them as security boundaries.
     """
-    return self._attributes.get('dimensions', {}).copy()
+    with self._lock:
+      return copy.deepcopy(self._attributes.get('dimensions', {}))
 
   @property
   def id(self):
     """Returns the bot's ID."""
-    return self.dimensions.get('id', ['unknown'])[0]
+    with self._lock:
+      return self._attributes.get('dimensions', {}).get('id', ['unknown'])[0]
 
   @property
   def remote(self):
@@ -164,7 +172,8 @@ class Bot(object):
 
     The state may change often, but it can't be used in scheduling decisions.
     """
-    return self._attributes.get('state', {}).copy()
+    with self._lock:
+      return copy.deepcopy(self._attributes.get('state', {}))
 
   @property
   def swarming_bot_zip(self):
@@ -181,7 +190,9 @@ class Bot(object):
 
   def post_event(self, event_type, message):
     """Posts an event to the server."""
-    self._remote.post_bot_event(event_type, message, self._attributes)
+    with self._lock:
+      attr = copy.deepcopy(self._attributes)
+    self._remote.post_bot_event(event_type, message, attr)
 
   def post_error(self, message):
     """Posts given string as a failure.
@@ -191,7 +202,7 @@ class Bot(object):
     Include a full stack trace, because sometimes the error is not sufficient
     by itself.
     """
-    logging.error('Error: %s\n%s', self._attributes, message)
+    logging.error('post_error(%s)', message)
     stack = '\nCalling stack:\n%s' % _make_stack()
     try:
       self.post_event('bot_error', '%s%s' % (message.rstrip(), stack))
@@ -239,11 +250,12 @@ class Bot(object):
 
     See docs for '/handshake' call for the format of 'cfg' dict.
     """
-    self._bot_group_cfg_ver = cfg_version
-    self._server_side_dimensions = (cfg or {}).get('dimensions')
-    # Apply changes to 'self._attributes'.
-    self._update_dimensions(self._attributes.get('dimensions') or {})
-    self._update_state(self._attributes.get('state') or {})
+    with self._lock:
+      self._bot_group_cfg_ver = cfg_version
+      self._server_side_dimensions = (cfg or {}).get('dimensions')
+      # Apply changes to 'self._attributes'.
+      self._update_dimensions(self._attributes.get('dimensions') or {})
+      self._update_state(self._attributes.get('state') or {})
 
   def _update_dimensions(self, new_dimensions):
     """Called internally to update Bot.dimensions."""
