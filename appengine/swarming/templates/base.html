@@ -22,34 +22,38 @@ that can be found in the LICENSE file. -->
   {% endblock %}
 </head>
 <body>
-  <div class="top_right_links">
-    <a href="{{signin_link|safe }}">{{nickname}}</a><br>
-    {{now|datetimeformat}}<br>
-    {% block floating %}
-    {% endblock %}
-  </div>
-
-  {% block body %}
-  {% endblock %}
-
-  <div style="width:100%">
-    <hr>
-    <div style="float: left;"><p>
-      <a target="_blank" href="https://cloud.google.com/appengine/"><img border="0"
-      src="/third_party/appengine-noborder-120x30.gif"
-      alt="Powered by Google App Engine" /></a></p>
+  <div class="container" style="margin-top: 20px;">
+    <div class="top_right_links" style="padding-right: 10px;">
+      <a href="{{signin_link|safe }}">{{nickname}}</a><br>
+      {{now|datetimeformat}}<br>
+      {% block floating %}
+      {% endblock %}
     </div>
-    <div style="float: right; text-align: right;">
-      <div style="margin-top: 1.2em; color: #777; font-size: 14px;">
-        Server version
-        {% if app_revision_url %}
-          <a href="{{app_revision_url}}" target="_blank">{{app_version}}</a>
-        {% else %}
-          {{app_version}}
-        {% endif %}
+
+    <div id="main-content-pane">
+      {% block body %}
+      {% endblock %}
+    </div>
+
+    <div style="width:100%">
+      <hr>
+      <div style="float: left;"><p>
+        <a target="_blank" href="https://cloud.google.com/appengine/"><img border="0"
+        src="/third_party/appengine-noborder-120x30.gif"
+        alt="Powered by Google App Engine" /></a></p>
+      </div>
+      <div style="float: right; text-align: right;">
+        <div style="margin-top: 1.2em; color: #777; font-size: 14px;">
+          Server version
+          {% if app_revision_url %}
+            <a href="{{app_revision_url}}" target="_blank">{{app_version}}</a>
+          {% else %}
+            {{app_version}}
+          {% endif %}
+        </div>
       </div>
     </div>
-  </div>
+  </div> <!-- end container -->
 
   {% if google_analytics %}
     <script>
