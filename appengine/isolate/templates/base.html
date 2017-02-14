@@ -27,14 +27,17 @@ that can be found in the LICENSE file. -->
   {% endblock %}
 </head>
 <body {% if onload is defined %}onload="{{onload}}"{% endif %}>
-  <div class="top_right_links">
+  <div class="container" style="margin-top: 20px;">
+  <div class="top_right_links" style="padding-right: 10px;">
     <a href="{{signin_link|safe }}">{{nickname}}</a><br>
     {{now|datetimeformat}}<br>
     {% block floating %}
     {% endblock %}
   </div>
-  {% block body %}
-  {% endblock %}
+  <div id="main-content-pane">
+    {% block body %}
+    {% endblock %}
+  </div>
   <div style="width:100%">
     <hr>
     <div style="float: left;"><p>
@@ -52,6 +55,7 @@ that can be found in the LICENSE file. -->
         {% endif %}
       </div>
     </div>
+  </div>
   </div>
 
   {% if google_analytics %}

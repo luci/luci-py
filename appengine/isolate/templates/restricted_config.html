@@ -1,169 +1,221 @@
 {% set title = 'Isolate global config' %}
 {% extends "isolate/base.html" %}
 
-{% block headers %}
-<script>
-function onclick_ts_mon() {
-  document.getElementById("enable_ts_monitoring_hidden").disabled =
-    document.getElementById("enable_ts_monitoring").checked;
-  }
-</script>
-{% endblock %}
-
 {% block body %}
-<h1>Server global config</h1>
-
-Last updated by:
-<strong>{% if cfg.updated_by %}{{cfg.updated_by.to_bytes()}}{% else%}N/A{%endif%}
-  </strong>.<br>
-Last updated on: <strong>{{cfg.updated_ts|datetimeformat}}</strong>.<br>
-
-{% if note %}
-<span style="color: red; font-style: italic">{{note}}</span><p>
-{% endif %}
-
-<form method="post" action="{{path}}">
-  <h2>General</h2>
-  Google Analytics ID:
-  <input name="google_analytics" value="{{cfg.google_analytics}}"/><br>
-
-  <h2>Cache</h2>
-  <div>
-    Default expiration (secs):<br />
-    <input type="text" name="default_expiration"
-        value="{{cfg.default_expiration}}" size="60" />
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <h1>Server global config</h1>
   </div>
 
-  <h2>Access Control Lists</h2>
-  <div>
-    Full access group: <br />
-    <input type="text" name="full_access_group"
-           value="{{cfg.full_access_group}}" size="60" />
-  </div>
-  <br>
-  <div>
-    Read-only access group: <br />
-    <input type="text" name="readonly_access_group"
-           value="{{cfg.readonly_access_group}}" size="60" />
-  </div>
+  <div class="panel-body">
+    Last updated by:
+    <strong>{% if cfg.updated_by %}{{cfg.updated_by.to_bytes()}}{% else%}N/A{%endif%}
+      </strong>.<br>
+    Last updated on: <strong>{{cfg.updated_ts|datetimeformat}}</strong>.<br>
 
-  <h2>Timeseries Monitoring</h2>
-  <div>
-   Enable: <input id="enable_ts_monitoring" type="checkbox" name="enable_ts_monitoring" value="True" onclick="onclick_ts_mon()" {% if cfg.enable_ts_monitoring %}checked{% endif %}>
-   <input id="enable_ts_monitoring_hidden" type="hidden" name="enable_ts_monitoring" value="False" {% if cfg.enable_ts_monitoring %}disabled{% endif %}>
-  </div>
-  <h2>Google storage</h2>
-  See this <a href="https://developers.google.com/storage/docs/accesscontrol#About-the-Client-ID">
-  page</a> for instructions on how to setup Service account for API Access to
-  Google Storage.
-  <p>
-  <div>
-    Google Storage Bucket:<br />
-    <input type="text" name="gs_bucket" value="{{cfg.gs_bucket}}" size="60" />
-  </div>
-  <br>
-  <div>
-    API access client email address:<br />
-    <input type="text" name="gs_client_id_email"
-        value="{{cfg.gs_client_id_email}}" size="60" />
-  </div>
-  <br>
-  <div>
-    API access base64 encoded *.der private key:<br />
-    <textarea rows="14" cols="80"
-        name="gs_private_key">{{cfg.gs_private_key}}</textarea>
-  </div>
-  <br>
-  <input type="hidden" name="keyid" value="{{cfg.key.integer_id()}}" />
-  <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
-  <input type="submit" value="Submit" />
-</form>
-<br>
-
-<hr>
-
-<h1>NOT YET USED, FYI ONLY: Server global config backed by luci-config</h1>
-{% if not config_service_url %}
-  Config service URL is not configured for this instance of swarming.
-  Configure it using
-  <a href="/_ah/api/explorer#p/config/v1/config.settings">configuration api</a>.
-  Using default values.
-{% else %}
-  This config is distributed by
-  <a href="{{config_service_url}}">luci-config</a>.
-  {% if not rev %}
-    Config file was not imported. Using default values.
-  {% else %}
-    {% if rev_url %}
-      Using revision <a href="{{rev_url}}">{{rev}}</a>.
-    {% else %}
-      Using revision {{rev}}.
+    {% if note %}
+    <span style="color: red; font-style: italic">{{note}}</span><p>
     {% endif %}
-  {% endif %}
-{% endif %}
 
-  <h2>General</h2>
-  Google Analytics ID:
-  <input name="google_analytics" value="{{luci_cfg.google_analytics}}" disabled/><br>
+    <form class="form-horizontal" method="post" action="{{path}}">
+      <h2>General</h2>
+      <div class="form-group">
+        <label class="col-sm-3 control-label">Google Analytics ID:</label>
+        <div class="col-sm-9">
+          <input class="form-control" name="google_analytics" value="{{cfg.google_analytics}}"/>
+        </div>
+      </div>
 
-  <h2>Cache</h2>
-  <div>
-    Default expiration (secs):<br />
-    <input type="text" name="default_expiration"
-        value="{{luci_cfg.default_expiration}}" size="60" disabled/>
+      <div class="form-group">
+        <label class="col-sm-3 control-label">Default cache expiration (secs):</label>
+        <div class="col-sm-9">
+        <input class="form-control" type="text" name="default_expiration"
+            value="{{cfg.default_expiration}}"/>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="col-sm-3 control-label">Timeseries Monitoring:</label>
+        <div class="col-sm-9">
+          <select class="form-control" name="enable_ts_monitoring">
+            <option value="True" {% if cfg.enable_ts_monitoring %}selected="selected"{% endif %}>Enabled</option>
+            <option value="False" {% if not cfg.enable_ts_monitoring %}selected="selected"{% endif %}>Disabled</option>
+          </select>
+        </div>
+      </div>
+
+      <h2>Access Control Lists</h2>
+
+      <div class="form-group">
+        <label class="col-sm-3 control-label">Full access group:</label>
+        <div class="col-sm-9">
+        <input class="form-control" type="text" name="full_access_group"
+            value="{{cfg.full_access_group}}"/>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="col-sm-3 control-label">Read-only access group:</label>
+        <div class="col-sm-9">
+        <input class="form-control" type="text" name="readonly_access_group"
+            value="{{cfg.readonly_access_group}}"/>
+        </div>
+      </div>
+
+      <h2>Google storage</h2>
+      <div class="form-group">
+        <div class="col-sm-12">
+          See this <a href="https://developers.google.com/storage/docs/accesscontrol#About-the-Client-ID">
+          page</a> for instructions on how to setup Service account for
+          API Access to Google Storage.
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="col-sm-3 control-label">Google Storage bucket:</label>
+        <div class="col-sm-9">
+        <input class="form-control" type="text" name="gs_bucket"
+            value="{{cfg.gs_bucket}}"/>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="col-sm-3 control-label">API access client email address:</label>
+        <div class="col-sm-9">
+        <input class="form-control" type="text" name="gs_client_id_email"
+            value="{{cfg.gs_client_id_email}}"/>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="col-sm-3 control-label">API access base64 encoded *.der private key:</label>
+        <div class="col-sm-9">
+        <textarea class="form-control" rows="14" cols="80"
+            name="gs_private_key">{{cfg.gs_private_key}}</textarea>
+        </div>
+      </div>
+
+      <input type="hidden" name="keyid" value="{{cfg.key.integer_id()}}" />
+      <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
+      <input type="submit" value="Submit" />
+    </form>
+  </div> <!-- end of panel-body -->
+</div> <!-- end of panel -->
+
+<div class="panel panel-default">
+  <div class="panel-heading">
+    <h1>NOT YET USED: Server global config backed by luci-config</h1>
   </div>
 
-  <h2>Access Control Lists</h2>
-  <p>Authorization groups are managed by the <a href="/auth">auth
-  service</a>.</p>
-  <div>
-    Full access group: <br />
-    <input type="text" name="full_access_group"
-           value="{{luci_cfg.auth.full_access_group}}" size="60" disabled/>
-  </div>
-  <br>
-  <div>
-    Read-only access group: <br />
-    <input type="text" name="readonly_access_group"
-           value="{{luci_cfg.auth.readonly_access_group}}" size="60" disabled/>
-  </div>
+  <div class="panel-body">
+    {% if not config_service_url %}
+    Config service URL is not configured for this instance of swarming.
+    Configure it using
+    <a href="/_ah/api/explorer#p/config/v1/config.settings">configuration api</a>.
+    Using default values.
+    {% else %}
+    This config is distributed by
+    <a href="{{config_service_url}}">luci-config</a>.
+    {% if not rev %}
+    Config file was not imported. Using default values.
+    {% else %}
+    {% if rev_url %}
+    Using revision <a href="{{rev_url}}">{{rev}}</a>.
+    {% else %}
+    Using revision {{rev}}.
+    {% endif %}
+    {% endif %}
+    {% endif %}
 
-  <h2>Timeseries Monitoring</h2>
-  <div>
-   Enable: <input id="enable_ts_monitoring" type="checkbox" name="enable_ts_monitoring" value="True" onclick="onclick_ts_mon()" {% if luci_cfg.enable_ts_monitoring %}checked{% endif %} disabled/>
-  </div>
-  <h2>Google storage</h2>
-  See this <a href="https://developers.google.com/storage/docs/accesscontrol#About-the-Client-ID">
-  page</a> for instructions on how to setup Service account for API Access to
-  Google Storage.
-  <p>
-  <div>
-    Google Storage Bucket:<br />
-    <input type="text" name="gs_bucket" value="{{luci_cfg.gs_bucket}}"
-           size="60" disabled/>
-  </div>
-  <br>
-  <div>
-    API access client email address:<br />
-    <input type="text" name="gs_client_id_email"
-        value="{{luci_cfg.gs_client_id_email}}" size="60" disabled/>
-  </div>
-<br>
+    <div class="form-horizontal">
+      <h2>General</h2>
+      <div class="form-group">
+        <label class="col-sm-3 control-label">Google Analytics ID:</label>
+        <div class="col-sm-9">
+          <input class="form-control" name="google_analytics" value="{{luci_cfg.google_analytics}}" disabled/>
+        </div>
+      </div>
 
-<hr>
+      <div class="form-group">
+        <label class="col-sm-3 control-label">Default cache expiration (secs):</label>
+        <div class="col-sm-9">
+          <input class="form-control" type="text" name="default_expiration"
+                 value="{{luci_cfg.default_expiration}}" disabled/>
+        </div>
+      </div>
 
-<p>To convert secret.p12 key generated by API Console into base64 encoded
-*.der key use this script:
-<pre>
-  # Convert *.p12 to *.pem. Use password 'notasecret'.
-  openssl pkcs12 -in secret.p12 -nodes -nocerts > secret.pem
-  # Convert *.pem into *.der.
-  openssl rsa -in secret.pem -inform PEM -out secret.der -outform DER
-  # Base64 encode *.der and copy-paste it into the form above.
-  cat secret.der | base64
-  # Remove temp files.
-  rm secret.der secret.pem
-</pre>
-</p>
+      <div class="form-group">
+        <label class="col-sm-3 control-label">Timeseries Monitoring:</label>
+        <div class="col-sm-9">
+          <select class="form-control" name="enable_ts_monitoring" disabled>
+            <option value="True" {% if luci_cfg.enable_ts_monitoring %}selected="selected"{% endif %}>Enabled</option>
+            <option value="False" {% if not luci_cfg.enable_ts_monitoring %}selected="selected"{% endif %}>Disabled</option>
+          </select>
+        </div>
+      </div>
+
+      <h2>Access Control Lists</h2>
+
+      <div class="form-group">
+        <label class="col-sm-3 control-label">Full access group:</label>
+        <div class="col-sm-9">
+          <input class="form-control" type="text" name="full_access_group"
+                 value="{{luci_cfg.auth.full_access_group}}" disabled/>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="col-sm-3 control-label">Read-only access group:</label>
+        <div class="col-sm-9">
+          <input class="form-control" type="text" name="readonly_access_group"
+                 value="{{luci_cfg.auth.readonly_access_group}}" disabled/>
+        </div>
+      </div>
+
+      <h2>Google storage</h2>
+      <div class="form-group">
+        <div class="col-sm-12">
+          See this <a href="https://developers.google.com/storage/docs/accesscontrol#About-the-Client-ID">
+            page</a> for instructions on how to setup Service account for
+          API Access to Google Storage.
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="col-sm-3 control-label">Google Storage bucket:</label>
+        <div class="col-sm-9">
+          <input class="form-control" type="text" name="gs_bucket"
+                 value="{{luci_cfg.gs_bucket}}" disabled/>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="col-sm-3 control-label">API access client email address:</label>
+        <div class="col-sm-9">
+          <input class="form-control" type="text" name="gs_client_id_email"
+                 value="{{luci_cfg.gs_client_id_email}}" disabled/>
+        </div>
+      </div>
+    </div> <!-- end of form-horizontal -->
+  </div> <!-- end of panel-body -->
+</div> <!-- end of panel -->
+
+<div class="panel panel-default">
+  <div class="panel-body">
+  <p>To convert secret.p12 key generated by API Console into base64 encoded
+  *.der key use this script:
+  <pre>
+    # Convert *.p12 to *.pem. Use password 'notasecret'.
+    openssl pkcs12 -in secret.p12 -nodes -nocerts > secret.pem
+    # Convert *.pem into *.der.
+    openssl rsa -in secret.pem -inform PEM -out secret.der -outform DER
+    # Base64 encode *.der and copy-paste it into the form above.
+    cat secret.der | base64
+    # Remove temp files.
+    rm secret.der secret.pem
+  </pre>
+  </p>
+  </div>
+</div>
 
 {% endblock %}
