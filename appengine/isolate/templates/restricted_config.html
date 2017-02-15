@@ -44,6 +44,14 @@
         </div>
       </div>
 
+      <div class="form-group">
+        <label class="col-sm-3 control-label">Sharding letters [0..5]:</label>
+        <div class="col-sm-9">
+        <input class="form-control" type="text" name="sharding_letters"
+            value="{{cfg.sharding_letters}}"/>
+        </div>
+      </div>
+
       <h2>Access Control Lists</h2>
 
       <div class="form-group">
@@ -151,6 +159,14 @@
             <option value="True" {% if luci_cfg.enable_ts_monitoring %}selected="selected"{% endif %}>Enabled</option>
             <option value="False" {% if not luci_cfg.enable_ts_monitoring %}selected="selected"{% endif %}>Disabled</option>
           </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="col-sm-3 control-label">Sharding letters [0..5]:</label>
+        <div class="col-sm-9">
+        <input class="form-control" type="text" name="sharding_letters"
+            value="{{luci_cfg.sharding_letters}}" disabled/>
         </div>
       </div>
 

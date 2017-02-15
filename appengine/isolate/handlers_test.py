@@ -165,14 +165,17 @@ class MainTest(test_case.TestCase):
     # TODO(maruel): Use beautifulsoup?
     params = {
       'default_expiration': 123456,
+      'sharding_letters': 3,
       'google_analytics': 'foobar',
       'keyid': str(config.settings_info()['cfg'].key.integer_id()),
       'xsrf_token': self.get_xsrf_token(),
     }
     self.assertEqual('', config.settings().google_analytics)
+    self.assertNotEqual(3, config.settings().sharding_letters)
     resp = self.app_frontend.post('/restricted/config', params)
     self.assertNotIn('Update conflict', resp)
     self.assertEqual('foobar', config.settings().google_analytics)
+    self.assertEqual(3, config.settings().sharding_letters)
     self.assertIn('foobar', self.app_frontend.get('/').body)
 
   def test_config_conflict(self):
