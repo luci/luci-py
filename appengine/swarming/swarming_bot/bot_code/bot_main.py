@@ -675,9 +675,11 @@ def _run_bot(arg_error):
     # have fully initialize bot.Bot object. Note that 'get_dimensions' and
     # 'get_state' may depend on actions done by 'on_bot_startup' hook, that's
     # why we do it here and not in 'get_bot'.
+    dims = _get_dimensions(botobj)
+    states = _get_state(botobj, 0)
     with botobj._lock:
-      botobj._update_dimensions(_get_dimensions(botobj))
-      botobj._update_state(_get_state(botobj, 0))
+      botobj._update_dimensions(dims)
+      botobj._update_state(states)
 
     if quit_bit.is_set():
       logging.info('Early quit 3')
@@ -707,9 +709,11 @@ def _run_bot(arg_error):
     last_action = time.time()
     while not quit_bit.is_set():
       try:
+        dims = _get_dimensions(botobj)
+        states = _get_state(botobj, consecutive_sleeps)
         with botobj._lock:
-          botobj._update_dimensions(_get_dimensions(botobj))
-          botobj._update_state(_get_state(botobj, consecutive_sleeps))
+          botobj._update_dimensions(dims)
+          botobj._update_state(states)
         did_something = _poll_server(botobj, quit_bit, last_action)
         if did_something:
           last_action = time.time()
