@@ -176,26 +176,32 @@ def _call_hook(chained, botobj, name, *args):
   If `chained` is False, the injected bot_config version is called first, and
   only if not present the general bot_config version is called.
   """
-  if not chained:
-    # Injected version has higher priority.
-    hook = getattr(_EXTRA_BOT_CONFIG, name, None)
-    if hook:
-      return hook(botobj, *args)
+  try:
+    if not chained:
+      # Injected version has higher priority.
+      hook = getattr(_EXTRA_BOT_CONFIG, name, None)
+      if hook:
+        return hook(botobj, *args)
+      hook = getattr(_get_bot_config(), name, None)
+      if hook:
+        return hook(botobj, *args)
+    # Call both in order.
+    ret = None
     hook = getattr(_get_bot_config(), name, None)
     if hook:
-      return hook(botobj, *args)
-    return
-
-  # Call both in order.
-  ret = None
-  hook = getattr(_get_bot_config(), name, None)
-  if hook:
-    ret = hook(botobj, *args)
-  hook = getattr(_EXTRA_BOT_CONFIG, name, None)
-  if hook:
-    # Ignores the previous return value.
-    return hook(botobj, *args)
-  return ret
+      ret = hook(botobj, *args)
+    hook = getattr(_EXTRA_BOT_CONFIG, name, None)
+    if hook:
+      # Ignores the previous return value.
+      ret = hook(botobj, *args)
+    return ret
+  finally:
+    # TODO(maruel): Handle host_reboot() request the same way.
+    if botobj:
+      msg = botobj.bot_restart_msg()
+      if msg:
+        # The hook requested a bot restart. Do it right after the hook call.
+        _bot_restart(botobj, msg)
 
 
 def _call_hook_safe(chained, botobj, name, *args):
@@ -208,7 +214,8 @@ def _call_hook_safe(chained, botobj, name, *args):
   except Exception as e:
     logging.exception('%s() threw', name)
     msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
-    botobj.post_error('Failed to call hook %s(): %s' % (name, msg))
+    if botobj:
+      botobj.post_error('Failed to call hook %s(): %s' % (name, msg))
     _set_quarantined(msg)
 
 
@@ -259,13 +266,13 @@ def _get_settings(botobj):
   return DEFAULT_SETTINGS
 
 
-@_log_call()
 def _get_state(botobj, sleep_streak):
   """Returns dict with a state of the bot reported to the server with each poll.
   """
   state = _call_hook_safe(False, botobj, 'get_state')
   if not isinstance(state, dict):
     _set_quarantined('get_state(): expected a dict, got %r' % state)
+    state = {'broken': state}
 
   if not state.get('quarantined'):
     if not _is_base_dir_ok(botobj):
@@ -335,6 +342,8 @@ def setup_bot(skip_reboot):
     botobj.post_error('bot_config.py is bad: %s' % msg)
     return
 
+  # TODO(maruel): Convert the should_continue return value to the hook calling
+  # botobj.host_reboot() by itself.
   try:
     should_continue = bot_config.setup_bot(botobj)
   except Exception as e:
@@ -615,12 +624,18 @@ def _do_handshake(botobj, quit_bit):
 
 
 def _run_bot(arg_error):
-  """Runs the bot until it reboots or self-update or a signal is received.
+  """Runs the bot until an event occurs.
 
-  When a signal is received, simply exit.
+  One of the three following even can occur:
+  - host reboots
+  - bot process restarts (this includes self-update)
+  - bot process shuts down (this includes a signal is received)
   """
+  # The quit_bit is to signal that the bot process must shutdown. It is
+  # different from a request to restart the bot process or reboot the host.
   quit_bit = threading.Event()
   def handler(sig, _):
+    # A signal terminates the bot process, it doesn't cause it to restart.
     logging.info('Got signal %s', sig)
     quit_bit.set()
 
@@ -734,6 +749,14 @@ def _run_bot(arg_error):
   return 0
 
 
+def _should_have_exited_but_didnt(reason):
+  """Something super sad happened, set the sticky quarantine bit before polling
+  again and sleep a bit to prevent busy-loop/DDoS.
+  """
+  time.sleep(2)
+  _set_quarantined(reason)
+
+
 def _poll_server(botobj, quit_bit, last_action):
   """Polls the server to run one loop.
 
@@ -783,9 +806,15 @@ def _poll_server(botobj, quit_bit, last_action):
   elif cmd == 'update':
     # Value is the version
     _update_bot(botobj, value)
+    _should_have_exited_but_didnt('Failed to self-update the bot')
   elif cmd in ('host_reboot', 'restart'):
     # Value is the message to display while rebooting the host
     botobj.host_reboot(value)
+    _should_have_exited_but_didnt('Failed to reboot the host')
+  elif cmd == 'bot_restart':
+    # Value is the message to display while restarting
+    _bot_restart(botobj, value)
+    _should_have_exited_but_didnt('Failed to restart the bot process')
   else:
     raise ValueError('Unexpected command: %s\n%s' % (cmd, value))
 
@@ -1014,27 +1043,32 @@ def _update_bot(botobj, version):
     botobj.remote.get_bot_code(new_zip, version, botobj.id)
   except remote_client.BotCodeError as e:
     botobj.post_error(str(e))
-    # Poll again, this may work next time. To prevent busy-loop, sleep a little.
-    time.sleep(2)
-    return
+  else:
+    _bot_restart(botobj, 'Updating to %s' % version, filepath=new_zip)
 
-  s = os.stat(new_zip)
-  logging.info('Restarting to %s; %d bytes.', new_zip, s.st_size)
+
+def _bot_restart(botobj, message, filepath=None):
+  """Restarts the bot process, optionally in a new file.
+
+  The function will return if the new bot code is not valid.
+  """
+  filepath = filepath or THIS_FILE
+  s = os.stat(filepath)
+  logging.info('Restarting to %s; %d bytes.', filepath, s.st_size)
   sys.stdout.flush()
   sys.stderr.flush()
 
   proc = subprocess42.Popen(
-     [sys.executable, new_zip, 'is_fine'],
+     [sys.executable, filepath, 'is_fine'],
      stdout=subprocess42.PIPE, stderr=subprocess42.STDOUT)
   output, _ = proc.communicate()
   if proc.returncode:
     botobj.post_error(
         'New bot code is bad: proc exit = %s. stdout:\n%s' %
         (proc.returncode, output))
-    # Poll again, the server may have better code next time. To prevent
-    # busy-loop, sleep a little.
-    time.sleep(2)
     return
+
+  botobj.post_event('bot_shutdown', 'About to restart: %s' % message)
 
   # Don't forget to release the singleton before restarting itself.
   SINGLETON.release()
@@ -1044,7 +1078,7 @@ def _update_bot(botobj, version):
   # to outlive the new code child process. Launchd really wants the main process
   # to survive, and it'll restart it if it disappears. os.exec*() replaces the
   # process so this is fine.
-  ret = common.exec_python([new_zip, 'start_slave', '--survive'])
+  ret = common.exec_python([filepath, 'start_slave', '--survive'])
   if ret in (1073807364, -1073741510):
     # 1073807364 is returned when the process is killed due to shutdown. No need
     # to alert anyone in that case.

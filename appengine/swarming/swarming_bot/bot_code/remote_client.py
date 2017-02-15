@@ -242,6 +242,8 @@ class RemoteClientNative(object):
       return (cmd, resp['version'])
     if cmd in ('restart', 'host_reboot'):
       return (cmd, resp['message'])
+    if cmd == 'bot_restart':
+      return (cmd, resp['message'])
     raise PollError('Unexpected command: %s\n%s' % (cmd, resp))
 
   def get_bot_code(self, new_zip_path, bot_version, bot_id):

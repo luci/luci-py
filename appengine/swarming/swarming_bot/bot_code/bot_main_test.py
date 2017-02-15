@@ -3,6 +3,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import copy
 import json
 import logging
 import os
@@ -32,7 +33,7 @@ from utils import subprocess42
 from utils import zip_package
 
 
-# Access to a protected member XX of a client class - pylint: disable=W0212
+# pylint: disable=no-self-argument
 
 
 class FakeThreadingEvent(object):
@@ -43,16 +44,12 @@ class FakeThreadingEvent(object):
     pass
 
 
-class TestBotMain(net_utils.TestCase):
-  maxDiff = 2000
-
+class TestBotBase(net_utils.TestCase):
   def setUp(self):
-    super(TestBotMain, self).setUp()
+    super(TestBotBase, self).setUp()
     self.root_dir = tempfile.mkdtemp(prefix='bot_main')
     self.old_cwd = os.getcwd()
     os.chdir(self.root_dir)
-    # __main__ does it for us.
-    os.mkdir('logs')
     self.url = 'https://localhost:1'
     self.attributes = {
       'dimensions': {
@@ -67,8 +64,30 @@ class TestBotMain(net_utils.TestCase):
       },
       'version': '123',
     }
-    self.mock(zip_package, 'generate_version', lambda: '123')
     self.bot = self.make_bot()
+
+  def tearDown(self):
+    os.chdir(self.old_cwd)
+    file_path.rmtree(self.root_dir)
+    super(TestBotBase, self).tearDown()
+
+  def make_bot(self, auth_headers_cb=None):
+    return bot.Bot(
+        remote_client.createRemoteClient('https://localhost:1',
+                                         auth_headers_cb,
+                                         False),
+        copy.deepcopy(self.attributes), 'https://localhost:1', 'version1',
+        self.root_dir, self.fail)
+
+
+class TestBotMain(TestBotBase):
+  maxDiff = 2000
+
+  def setUp(self):
+    super(TestBotMain, self).setUp()
+    # __main__ does it for us.
+    os.mkdir('logs')
+    self.mock(zip_package, 'generate_version', lambda: '123')
     self.mock(self.bot, 'post_error', self.fail)
     self.mock(os_utilities, 'host_reboot', self.fail)
     self.mock(subprocess42, 'call', self.fail)
@@ -78,6 +97,7 @@ class TestBotMain(net_utils.TestCase):
     with open(config_path, 'rb') as f:
       config = json.load(f)
     self.mock(bot_main, 'get_config', lambda: config)
+    self.mock(bot_main, '_bot_restart', self.fail)
     self.mock(
         bot_main, 'THIS_FILE',
         os.path.join(test_env_bot_code.BOT_DIR, 'swarming_bot.zip'))
@@ -91,24 +111,30 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, '_BOT_CONFIG', None)
     self.mock(bot_main, '_EXTRA_BOT_CONFIG', None)
     self.mock(bot_main, '_QUARANTINED', None)
+    self.mock(bot_main, 'SINGLETON', None)
 
   def tearDown(self):
     os.environ.pop('SWARMING_BOT_ID', None)
-    os.chdir(self.old_cwd)
-    file_path.rmtree(self.root_dir)
     super(TestBotMain, self).tearDown()
 
   def print_err_and_fail(self, _bot, msg, _task_id):
     print msg
     self.fail('post_error_task was called')
 
-  def make_bot(self, auth_headers_cb=None):
-    return bot.Bot(
-        remote_client.createRemoteClient('https://localhost:1',
-                                         auth_headers_cb,
-                                         False),
-        self.attributes, 'https://localhost:1', 'version1',
-        self.root_dir, self.fail)
+  def test_hook_restart(self):
+    from config import bot_config
+    obj = self.make_bot()
+    def get_dimensions(botobj):
+      self.assertEqual(obj, botobj)
+      obj.bot_restart('Yo')
+      return {'id': ['foo'], 'pool': ['bar']}
+    self.mock(bot_config, 'get_dimensions', get_dimensions)
+    restarts = []
+    self.mock(bot_main, '_bot_restart', lambda *args: restarts.append(args))
+    self.assertEqual(
+        {'id': ['foo'], 'pool': ['bar']}, bot_main._get_dimensions(obj))
+    self.assertEqual('Yo', obj.bot_restart_msg())
+    self.assertEqual([(obj, 'Yo')], restarts)
 
   def test_get_dimensions(self):
     from config import bot_config
@@ -318,6 +344,7 @@ class TestBotMain(net_utils.TestCase):
     self.mock(obj.remote, 'do_handshake', do_handshake)
     bot_main._do_handshake(obj, quit_bit)
     self.assertFalse(quit_bit.is_set())
+    self.assertEqual(None, obj.bot_restart_msg())
     expected = {'alternative': 'truth'}
     self.assertEqual(expected, bot_main._EXTRA_BOT_CONFIG.get_dimensions(obj))
 
@@ -379,7 +406,6 @@ class TestBotMain(net_utils.TestCase):
         bot_main, '_get_dimensions', lambda _: self.attributes['dimensions'])
     self.mock(os_utilities, 'get_state', lambda *_: self.attributes['state'])
 
-    # Method should have "self" as first argument - pylint: disable=E0213
     # pylint: disable=unused-argument
     class Popen(object):
       def __init__(
@@ -536,6 +562,7 @@ class TestBotMain(net_utils.TestCase):
     self.assertEqual(expected, manifest)
     expected = [(self.bot,)]
     self.assertEqual(expected, clean)
+    self.assertEqual(None, self.bot.bot_restart_msg())
 
   def test_poll_server_update(self):
     update = []
@@ -562,14 +589,44 @@ class TestBotMain(net_utils.TestCase):
         ])
     self.assertTrue(bot_main._poll_server(self.bot, bit, 0))
     self.assertEqual([(self.bot, '123')], update)
+    self.assertEqual(None, self.bot.bot_restart_msg())
 
   def test_poll_server_restart(self):
-    restart = []
+    restarts = []
     bit = threading.Event()
     self.mock(bit, 'wait', self.fail)
     self.mock(bot_main, '_run_manifest', self.fail)
     self.mock(bot_main, '_update_bot', self.fail)
-    self.mock(self.bot, 'host_reboot', lambda *args: restart.append(args))
+    self.mock(self.bot, 'host_reboot', self.fail)
+    self.mock(bot_main, '_bot_restart', lambda obj, x: restarts.append(x))
+
+    self.expected_requests(
+        [
+          (
+            'https://localhost:1/swarming/api/v1/bot/poll',
+            {
+              'data': self.attributes,
+              'follow_redirects': False,
+              'headers': {},
+              'timeout': remote_client.NET_CONNECTION_TIMEOUT_SEC,
+            },
+            {
+              'cmd': 'bot_restart',
+              'message': 'Please restart now',
+            },
+          ),
+        ])
+    self.assertTrue(bot_main._poll_server(self.bot, bit, 0))
+    self.assertEqual(['Please restart now'], restarts)
+    self.assertEqual(None, self.bot.bot_restart_msg())
+
+  def test_poll_server_reboot(self):
+    reboots = []
+    bit = threading.Event()
+    self.mock(bit, 'wait', self.fail)
+    self.mock(bot_main, '_run_manifest', self.fail)
+    self.mock(bot_main, '_update_bot', self.fail)
+    self.mock(self.bot, 'host_reboot', lambda *args: reboots.append(args))
 
     self.expected_requests(
         [
@@ -588,7 +645,8 @@ class TestBotMain(net_utils.TestCase):
           ),
         ])
     self.assertTrue(bot_main._poll_server(self.bot, bit, 0))
-    self.assertEqual([('Please die now',)], restart)
+    self.assertEqual([('Please die now',)], reboots)
+    self.assertEqual(None, self.bot.bot_restart_msg())
 
   def _mock_popen(
       self, returncode=0, exit_code=0, url='https://localhost:1',
@@ -778,10 +836,12 @@ class TestBotMain(net_utils.TestCase):
     self.assertEqual(expected, posted)
 
   def test_update_bot(self):
-    # In a real case 'update_bot' never exits and doesn't call 'post_error'.
-    # Under the test however forever-blocking calls finish, and post_error is
-    # called.
-    self.mock(self.bot, 'post_error', lambda *_: None)
+    restarts = []
+    def bot_restart(_botobj, message, filepath):
+      self.assertEqual('Updating to 123', message)
+      self.assertEqual(new_zip, filepath)
+      restarts.append(1)
+    self.mock(bot_main, '_bot_restart', bot_restart)
     # Mock the file to download in the temporary directory.
     self.mock(
         bot_main, 'THIS_FILE',
@@ -801,18 +861,8 @@ class TestBotMain(net_utils.TestCase):
         z.writestr('__main__.py', 'print("hi")')
       return True
     self.mock(net, 'url_retrieve', url_retrieve)
-
-    calls = []
-    def exec_python(args):
-      calls.append(args)
-      return 23
-    self.mock(bot_main.common, 'exec_python', exec_python)
-
-    with self.assertRaises(SystemExit) as e:
-      bot_main._update_bot(self.bot, '123')
-    self.assertEqual(23, e.exception.code)
-
-    self.assertEqual([[new_zip, 'start_slave', '--survive']], calls)
+    bot_main._update_bot(self.bot, '123')
+    self.assertEqual([1], restarts)
 
   def test_main(self):
     def check(x):
@@ -833,6 +883,34 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, 'SINGLETON', Singleton())
 
     self.assertEqual(0, bot_main.main([]))
+
+
+class TestBotNotMocked(TestBotBase):
+  def test_bot_restart(self):
+    calls = []
+    def exec_python(args):
+      calls.append(args)
+      return 23
+    self.mock(bot_main.common, 'exec_python', exec_python)
+    # pylint: disable=unused-argument
+    class Popen(object):
+      def __init__(self2, cmd, stdout, stderr):
+        self2.returncode = None
+        expected = [sys.executable, bot_main.THIS_FILE, 'is_fine']
+        self.assertEqual(expected, cmd)
+        self.assertEqual(subprocess42.PIPE, stdout)
+        self.assertEqual(subprocess42.STDOUT, stderr)
+
+      def communicate(self2):
+        self2.returncode = 0
+        return '', None
+    self.mock(subprocess42, 'Popen', Popen)
+
+    with self.assertRaises(SystemExit) as e:
+      bot_main._bot_restart(self.bot, 'Yo', bot_main.THIS_FILE)
+    self.assertEqual(23, e.exception.code)
+
+    self.assertEqual([[bot_main.THIS_FILE, 'start_slave', '--survive']], calls)
 
 
 if __name__ == '__main__':

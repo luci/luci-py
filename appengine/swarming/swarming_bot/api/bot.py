@@ -90,6 +90,7 @@ class Bot(object):
     self._attributes = attributes or {}
     self._bot_group_cfg_ver = None
     self._server_side_dimensions = {}
+    self._bot_restart_msg = None
 
   @property
   def base_dir(self):
@@ -242,6 +243,26 @@ class Bot(object):
 
   # Compatibility code. TODO(maruel): Remove once all call sites are updated.
   restart = host_reboot
+
+  def bot_restart(self, message):
+    """Instructs the bot to restart its own process as soon as possible.
+
+    This can be done when the dimensions need to be updated in a way that cannot
+    be done within the process lifetime.
+
+    This is done asynchronously.
+    """
+    assert isinstance(message, basestring), message
+    with self._lock:
+      if self._bot_restart_msg:
+        self._bot_restart_msg += '\n' + message
+      else:
+        self._bot_restart_msg = message
+
+  def bot_restart_msg(self):
+    """Returns the current reason to restart the bot process, if any."""
+    with self._lock:
+      return self._bot_restart_msg
 
   def _update_bot_group_cfg(self, cfg_version, cfg):
     """Called internally to update server-provided per-bot config.

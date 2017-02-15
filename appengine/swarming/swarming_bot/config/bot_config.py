@@ -280,6 +280,9 @@ def setup_bot(bot):
   Returns True if it's fine to start the bot right away. Otherwise, the calling
   script should exit.
 
+  TODO(maruel): Have the user call bot.host_reboot() or bot.bot_restart()
+  instead of returning a value.
+
   This is an excellent place to drop a README file in the bot directory, to give
   more information about the purpose of this bot.
 
