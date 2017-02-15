@@ -96,8 +96,9 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     self.assertEqual('OK', app.get('/request').body)
 
   def test_ip_whitelist_bot(self):
-    """Requests from client in "bots" IP whitelist are authenticated as bot."""
-    model.bootstrap_ip_whitelist('bots', ['192.168.1.100/32'])
+    """Requests from client in bots IP whitelist are authenticated as bot."""
+    model.bootstrap_ip_whitelist(
+        model.bots_ip_whitelist(), ['192.168.1.100/32'])
 
     class Handler(handler.AuthenticatingHandler):
       @api.public
@@ -114,7 +115,8 @@ class AuthenticatingHandlerTest(test_case.TestCase):
 
   def test_ip_whitelist_bot_disabled(self):
     """Same as test_ip_whitelist_bot, but IP whitelist auth is disabled."""
-    model.bootstrap_ip_whitelist('bots', ['192.168.1.100/32'])
+    model.bootstrap_ip_whitelist(
+        model.bots_ip_whitelist(), ['192.168.1.100/32'])
 
     class Handler(handler.AuthenticatingHandler):
       use_bots_ip_whitelist = False

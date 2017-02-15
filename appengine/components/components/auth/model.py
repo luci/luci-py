@@ -86,7 +86,7 @@ __all__ = [
   'bootstrap_group',
   'bootstrap_ip_whitelist',
   'bootstrap_loopback_ips',
-  'BOTS_IP_WHITELIST',
+  'bots_ip_whitelist',
   'configure_as_primary',
   'find_group_dependency_cycle',
   'find_referencing_groups',
@@ -117,9 +117,6 @@ __all__ = [
 # Name of a group whose members have access to Group management UI. It's the
 # only group needed to bootstrap everything else.
 ADMIN_GROUP = 'administrators'
-
-# Name of AuthIPWhitelist with bots IP ranges. See AuthIPWhitelist.
-BOTS_IP_WHITELIST = 'bots'
 
 # No identity information is provided. Identity name is always 'anonymous'.
 IDENTITY_ANONYMOUS = 'anonymous'
@@ -252,7 +249,7 @@ Anonymous = Identity(IDENTITY_ANONYMOUS, 'anonymous')
 
 
 # Identity assigned to callers that make unauthenticated calls from IPs
-# belonging to 'bots' IP whitelist. Note that same bot may appear to use
+# belonging to '<appid>-bots' IP whitelist. Note that same bot may appear to use
 # different IP addresses (happens with some NATs), thus we can't put IP
 # address into the bot identity string and instead hardcode some arbitrary
 # name (defined here).
@@ -1076,11 +1073,6 @@ class AuthIPWhitelist(
   and IP whitelists is stored in AuthIPWhitelistAssignments.
 
   Entity id is a name of the whitelist. Parent entity is root_key().
-
-  There's a special IP whitelist named 'bots' that can be used to list
-  IP addresses of machines the service trusts unconditionally. Requests from
-  such machines doesn't have to have any additional credentials attached.
-  Requests will be authenticated as coming from identity 'bot:<IP address>'.
   """
   # Disable useless in-process per-request cache.
   _use_cache = False
@@ -1127,6 +1119,17 @@ def is_valid_ip_whitelist_name(name):
   return bool(IP_WHITELIST_NAME_RE.match(name))
 
 
+def bots_ip_whitelist():
+  """Returns a name of a special IP whitelist that controls IP-based auth.
+
+  Requests without authentication headers coming from IPs in this whitelist
+  are authenticated as coming from IP_WHITELISTED_BOT_ID ('bot:whitelisted-ip').
+
+  DEPRECATED.
+  """
+  return '%s-bots' % app_identity.get_application_id()
+
+
 @ndb.transactional
 def bootstrap_ip_whitelist(name, subnets, description=''):
   """Adds subnets to an IP whitelist if not there yet.
@@ -1171,7 +1174,7 @@ def bootstrap_ip_whitelist(name, subnets, description=''):
 
 
 def bootstrap_loopback_ips():
-  """Adds 127.0.0.1 and ::1 to 'bots' IP whitelist.
+  """Adds 127.0.0.1 and ::1 to '<appid>-bots' IP whitelist.
 
   Useful on local dev server and in tests. Must not be used in production.
 
@@ -1179,12 +1182,9 @@ def bootstrap_loopback_ips():
   """
   # See api.py, AuthDB.verify_ip_whitelisted for IP -> Identity conversion.
   assert utils.is_local_dev_server()
-  bootstrap_ip_whitelist(BOTS_IP_WHITELIST, ['127.0.0.1', '::1'], 'Local bots')
-  return [
-    Identity(IDENTITY_BOT, 'whitelisted-ip'),
-    Identity(IDENTITY_BOT, '127.0.0.1'),
-    Identity(IDENTITY_BOT, '0-0-0-0-0-0-0-1'),
-  ]
+  bootstrap_ip_whitelist(
+      bots_ip_whitelist(), ['127.0.0.1', '::1'], 'Local bots')
+  return [IP_WHITELISTED_BOT_ID]
 
 
 @ndb.transactional

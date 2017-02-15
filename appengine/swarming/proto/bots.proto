@@ -23,7 +23,7 @@ syntax = "proto2";
 //
 //  bot_group {
 //    auth {
-//      ip_whitelist: "bots"
+//      ip_whitelist: "<swarming-app-id>-bots"
 //    }
 //  }
 message BotsCfg {

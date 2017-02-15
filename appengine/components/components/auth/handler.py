@@ -101,7 +101,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
 
   # A method used to authenticate this request, see get_auth_methods().
   auth_method = None
-  # If True, allow to use 'bots' IP whitelist to authenticate anonymous calls.
+  # If True, allow to use '<appid>-bots' IP whitelist to auth anonymous calls.
   use_bots_ip_whitelist = True
 
   def dispatch(self):
@@ -166,7 +166,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     # to service accounts.
     if self.use_bots_ip_whitelist:
       if (identity.is_anonymous and
-          api.is_in_ip_whitelist(model.BOTS_IP_WHITELIST, ip)):
+          api.is_in_ip_whitelist(model.bots_ip_whitelist(), ip, False)):
         identity = model.IP_WHITELISTED_BOT_ID
 
     ctx.peer_identity = identity

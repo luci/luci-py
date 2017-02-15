@@ -365,7 +365,7 @@ class AuthDB(object):
     entity = self.secrets[secret_key.scope][secret_key.name]
     return list(entity.values)
 
-  def is_in_ip_whitelist(self, whitelist_name, ip):
+  def is_in_ip_whitelist(self, whitelist_name, ip, warn_if_missing=True):
     """Returns True if the given IP belongs to the given IP whitelist.
 
     Missing IP whitelists are considered empty.
@@ -373,10 +373,12 @@ class AuthDB(object):
     Args:
       whitelist_name: name of the IP whitelist (e.g. 'bots').
       ip: instance of ipaddr.IP.
+      warn_if_missing: if True and IP whitelist is missing, logs a warning.
     """
     whitelist = self.ip_whitelists.get(whitelist_name)
     if not whitelist:
-      logging.error('Unknown IP whitelist: %s', whitelist_name)
+      if warn_if_missing:
+        logging.error('Unknown IP whitelist: %s', whitelist_name)
       return False
     return whitelist.is_ip_whitelisted(ip)
 
@@ -1036,14 +1038,18 @@ def get_secret(secret_key):
   return get_request_cache().auth_db.get_secret(secret_key)
 
 
-def is_in_ip_whitelist(whitelist_name, ip):
+def is_in_ip_whitelist(whitelist_name, ip, warn_if_missing=True):
   """Returns True if the given IP belongs to the given IP whitelist.
+
+  Missing IP whitelists are considered empty.
 
   Args:
     whitelist_name: name of the IP whitelist (e.g. 'bots').
     ip: instance of ipaddr.IP.
+    warn_if_missing: if True and IP whitelist is missing, logs a warning.
   """
-  return get_request_cache().auth_db.is_in_ip_whitelist(whitelist_name, ip)
+  return get_request_cache().auth_db.is_in_ip_whitelist(
+      whitelist_name, ip, warn_if_missing)
 
 
 def verify_ip_whitelisted(identity, ip):

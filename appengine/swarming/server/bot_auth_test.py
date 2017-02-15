@@ -61,7 +61,8 @@ class BotAuthTest(test_case.TestCase):
     self.logs = []
     self.mock(logging, 'error', lambda l, *_args: self.logs.append(l % _args))
 
-    auth.bootstrap_ip_whitelist(auth.BOTS_IP_WHITELIST, ['1.2.3.4', '1.2.3.5'])
+    auth.bootstrap_ip_whitelist(
+        auth.bots_ip_whitelist(), ['1.2.3.4', '1.2.3.5'])
     auth.bootstrap_ip_whitelist('ip_whitelist', ['1.1.1.1', '1.2.3.4'])
 
     auth_testing.reset_local_state()

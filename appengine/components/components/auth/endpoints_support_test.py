@@ -57,8 +57,9 @@ class EndpointsAuthTest(test_case.TestCase):
     return api.get_current_identity().to_bytes()
 
   def test_ip_whitelist_bot(self):
-    """Requests from client in "bots" IP whitelist are authenticated as bot."""
-    model.bootstrap_ip_whitelist('bots', ['192.168.1.100/32'])
+    """Requests from client in bots IP whitelist are authenticated as bot."""
+    model.bootstrap_ip_whitelist(
+        model.bots_ip_whitelist(), ['192.168.1.100/32'])
     self.assertEqual('bot:whitelisted-ip', self.call('192.168.1.100', None))
     self.assertEqual('anonymous:anonymous', self.call('127.0.0.1', None))
 

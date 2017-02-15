@@ -89,7 +89,7 @@ class MainTest(test_case.TestCase):
 
   def set_as_anonymous(self):
     self.testbed.setup_env(USER_EMAIL='', overwrite=True)
-    auth.ip_whitelist_key(auth.BOTS_IP_WHITELIST).delete()
+    auth.ip_whitelist_key(auth.bots_ip_whitelist()).delete()
     auth_testing.reset_local_state()
 
   def set_as_admin(self):

@@ -61,7 +61,8 @@ _BotGroups = collections.namedtuple('_BotGroups', [
 
 
 # Default config to use on unconfigured server.
-_DEFAULT_BOT_GROUPS = _BotGroups(
+def _default_bot_groups():
+  return _BotGroups(
     direct_matches={},
     prefix_matches=[],
     machine_types={},
@@ -69,7 +70,7 @@ _DEFAULT_BOT_GROUPS = _BotGroups(
         version='default',
         require_luci_machine_token=False,
         require_service_account=None,
-        ip_whitelist=auth.BOTS_IP_WHITELIST,
+        ip_whitelist=auth.bots_ip_whitelist(),
         owners=(),
         dimensions={}))
 
@@ -243,7 +244,7 @@ def _fetch_bot_groups():
   cfg = _fetch_bots_config()
   if not cfg:
     logging.info('Didn\'t find bots.cfg, using default')
-    return _DEFAULT_BOT_GROUPS
+    return _default_bot_groups()
 
   direct_matches = {}
   prefix_matches = []

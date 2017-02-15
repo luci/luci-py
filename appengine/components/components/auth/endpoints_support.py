@@ -244,7 +244,7 @@ def initialize_request_auth(remote_address, headers):
   # to service accounts.
   assert identity is not None
   if (identity.is_anonymous and
-      api.is_in_ip_whitelist(model.BOTS_IP_WHITELIST, ip)):
+      api.is_in_ip_whitelist(model.bots_ip_whitelist(), ip, False)):
     identity = model.IP_WHITELISTED_BOT_ID
 
   auth_context.peer_ip = ip

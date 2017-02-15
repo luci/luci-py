@@ -33,7 +33,8 @@ corresponds to a method used to authenticate the caller.
 Supported identity types:
   - user:**email** - users using OAuth2 or GAE cookies to authenticate, e.g.
     user:joe@example.com.
-  - bot:**ip-whitelist-id** - bots with whitelisted IPs, e.g. bot:gce.
+  - bot:**hostname** - bots that use special machine tokens for auth.
+  - bot:whitelisted-ip - bots with whitelisted IPs (deprecated).
   - service:**app-id** - some GAE application, e.g. service:isolate-server.
   - anonymous:anonymous - no authentication information was provided.
 

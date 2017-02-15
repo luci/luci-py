@@ -35,7 +35,7 @@ def is_ip_whitelisted_machine():
   # TODO(vadimsh): Get rid of this. It's blocked on fixing /bot_code calls in
   # bootstrap code everywhere to use service accounts and switching all Swarming
   # Tasks API calls made from bots to use proper authentication.
-  return auth.is_in_ip_whitelist(auth.BOTS_IP_WHITELIST, auth.get_peer_ip())
+  return auth.is_in_ip_whitelist(auth.bots_ip_whitelist(), auth.get_peer_ip())
 
 
 def is_bot():
