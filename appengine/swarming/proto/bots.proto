@@ -116,6 +116,9 @@ message BotGroup {
   //
   // Each dimension is a "<key>:<value>" pair.
   repeated string dimensions = 22;
+
+  // Additional config script to inject into the swarming bot upon handshake.
+  optional string bot_config_script = 23;
 }
 
 
