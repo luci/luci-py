@@ -358,9 +358,12 @@ def setup_bot(skip_reboot):
 def _get_authentication_headers(botobj):
   """Calls bot_config.get_authentication_headers() if it is defined.
 
-  Doesn't catch exceptions.
+  See remote_client.RemoteClient doc for the expected format of the return
+  value.
+
+  Doesn't catch exceptions. RemoteClient knows how to deal with them.
   """
-  return _call_hook(False, botobj, 'get_authentication_headers')
+  return _call_hook(False, botobj, 'get_authentication_headers') or (None, None)
 
 
 ### end of bot_config handler part.
