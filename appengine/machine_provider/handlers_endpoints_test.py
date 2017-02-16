@@ -17,7 +17,6 @@ from google.appengine import runtime
 from protorpc.remote import protojson
 import webtest
 
-from components import auth_testing
 from components import utils
 from components.machine_provider import rpc_messages
 from test_support import test_case
@@ -561,6 +560,9 @@ class MachineProviderReleaseTest(test_case.EndpointsTestCase):
     self.app = webtest.TestApp(app)
 
   def test_release(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
     self.mock(
         handlers_endpoints.MachineProviderEndpoints,
         '_release',
@@ -570,7 +572,6 @@ class MachineProviderReleaseTest(test_case.EndpointsTestCase):
     request = rpc_to_json(rpc_messages.LeaseReleaseRequest(
         request_id='request-id',
     ))
-    auth_testing.mock_get_current_identity(self)
 
     response = jsonish_dict_to_rpc(
         self.call_api('release', request).json,
@@ -590,6 +591,9 @@ class MachineProviderBatchedReleaseTest(test_case.EndpointsTestCase):
     self.app = webtest.TestApp(app)
 
   def test_batch(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
     ts = utils.utcnow()
     self.mock(utils, 'utcnow', lambda *args, **kwargs: ts)
 
@@ -600,7 +604,6 @@ class MachineProviderBatchedReleaseTest(test_case.EndpointsTestCase):
             ),
         ],
     ))
-    auth_testing.mock_get_current_identity(self)
 
     release_responses = jsonish_dict_to_rpc(
         self.call_api('batched_release', release_requests).json,
@@ -615,6 +618,9 @@ class MachineProviderBatchedReleaseTest(test_case.EndpointsTestCase):
     )
 
   def test_deadline_exceeded(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
     class utcnow(object):
       def __init__(self, init_ts):
         self.last_ts = init_ts
@@ -630,7 +636,6 @@ class MachineProviderBatchedReleaseTest(test_case.EndpointsTestCase):
             ),
         ],
     ))
-    auth_testing.mock_get_current_identity(self)
 
     release_responses = jsonish_dict_to_rpc(
         self.call_api('batched_release', release_requests).json,
@@ -645,6 +650,9 @@ class MachineProviderBatchedReleaseTest(test_case.EndpointsTestCase):
     )
 
   def test_exception(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
     ts = utils.utcnow()
     self.mock(utils, 'utcnow', lambda *args, **kwargs: ts)
 
@@ -659,7 +667,6 @@ class MachineProviderBatchedReleaseTest(test_case.EndpointsTestCase):
             ),
         ],
     ))
-    auth_testing.mock_get_current_identity(self)
 
     release_responses = jsonish_dict_to_rpc(
         self.call_api('batched_release', release_requests).json,
@@ -684,6 +691,9 @@ class MachineProviderBatchedLeaseTest(test_case.EndpointsTestCase):
     self.app = webtest.TestApp(app)
 
   def test_batch(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
     ts = utils.utcnow()
     self.mock(utils, 'utcnow', lambda *args, **kwargs: ts)
 
@@ -696,7 +706,6 @@ class MachineProviderBatchedLeaseTest(test_case.EndpointsTestCase):
             request_id='request-id',
         ),
     ]))
-    auth_testing.mock_get_current_identity(self)
 
     lease_responses = jsonish_dict_to_rpc(
         self.call_api('batched_lease', lease_requests).json,
@@ -708,6 +717,9 @@ class MachineProviderBatchedLeaseTest(test_case.EndpointsTestCase):
     self.assertFalse(lease_responses.responses[0].error)
 
   def test_deadline_exceeded(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
     class utcnow(object):
       def __init__(self, init_ts):
         self.last_ts = init_ts
@@ -725,7 +737,6 @@ class MachineProviderBatchedLeaseTest(test_case.EndpointsTestCase):
             request_id='request-id',
         ),
     ]))
-    auth_testing.mock_get_current_identity(self)
 
     lease_responses = jsonish_dict_to_rpc(
         self.call_api('batched_lease', lease_requests).json,
@@ -740,6 +751,9 @@ class MachineProviderBatchedLeaseTest(test_case.EndpointsTestCase):
     )
 
   def test_exception(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
     ts = utils.utcnow()
     self.mock(utils, 'utcnow', lambda *args, **kwargs: ts)
 
@@ -756,7 +770,6 @@ class MachineProviderBatchedLeaseTest(test_case.EndpointsTestCase):
             request_id='request-id',
         ),
     ]))
-    auth_testing.mock_get_current_identity(self)
 
     lease_responses = jsonish_dict_to_rpc(
         self.call_api('batched_lease', lease_requests).json,
@@ -781,6 +794,9 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
     self.app = webtest.TestApp(app)
 
   def test_lease_duration(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
     lease_request = rpc_to_json(rpc_messages.LeaseRequest(
         dimensions=rpc_messages.Dimensions(
             os_family=rpc_messages.OSFamily.LINUX,
@@ -789,7 +805,6 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
         request_id='abc',
         pubsub_topic='topic',
     ))
-    auth_testing.mock_get_current_identity(self)
 
     lease_response = jsonish_dict_to_rpc(
         self.call_api('lease', lease_request).json,
@@ -798,6 +813,9 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
     self.assertFalse(lease_response.error)
 
   def test_lease_duration_zero(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
     lease_request = rpc_to_json(rpc_messages.LeaseRequest(
         dimensions=rpc_messages.Dimensions(
             os_family=rpc_messages.OSFamily.LINUX,
@@ -805,7 +823,6 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
         duration=0,
         request_id='abc',
     ))
-    auth_testing.mock_get_current_identity(self)
 
     lease_response = jsonish_dict_to_rpc(
         self.call_api('lease', lease_request).json,
@@ -817,6 +834,9 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
     )
 
   def test_lease_duration_negative(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
     lease_request = rpc_to_json(rpc_messages.LeaseRequest(
         dimensions=rpc_messages.Dimensions(
             os_family=rpc_messages.OSFamily.LINUX,
@@ -824,26 +844,6 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
         duration=-1,
         request_id='abc',
     ))
-    auth_testing.mock_get_current_identity(self)
-
-    lease_response = jsonish_dict_to_rpc(
-        self.call_api('lease', lease_request).json,
-        rpc_messages.LeaseResponse,
-    )
-    self.assertEqual(
-        lease_response.error,
-        rpc_messages.LeaseRequestError.NONPOSITIVE_DEADLINE,
-    )
-
-  def test_lease_duration_negative(self):
-    lease_request = rpc_to_json(rpc_messages.LeaseRequest(
-        dimensions=rpc_messages.Dimensions(
-            os_family=rpc_messages.OSFamily.LINUX,
-        ),
-        duration=-1,
-        request_id='abc',
-    ))
-    auth_testing.mock_get_current_identity(self)
 
     lease_response = jsonish_dict_to_rpc(
         self.call_api('lease', lease_request).json,
@@ -855,6 +855,9 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
     )
 
   def test_lease_duration_and_lease_expiration_ts(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
     lease_request = rpc_to_json(rpc_messages.LeaseRequest(
         dimensions=rpc_messages.Dimensions(
             os_family=rpc_messages.OSFamily.LINUX,
@@ -863,7 +866,6 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
         lease_expiration_ts=9999999999,
         request_id='abc',
     ))
-    auth_testing.mock_get_current_identity(self)
 
     lease_response = jsonish_dict_to_rpc(
         self.call_api('lease', lease_request).json,
@@ -875,6 +877,9 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
     )
 
   def test_lease_timestamp(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
     lease_request = rpc_to_json(rpc_messages.LeaseRequest(
         dimensions=rpc_messages.Dimensions(
             os_family=rpc_messages.OSFamily.LINUX,
@@ -882,7 +887,6 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
         lease_expiration_ts=9999999999,
         request_id='abc',
     ))
-    auth_testing.mock_get_current_identity(self)
 
     lease_response = jsonish_dict_to_rpc(
         self.call_api('lease', lease_request).json,
@@ -891,6 +895,9 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
     self.assertFalse(lease_response.error)
 
   def test_lease_timestamp_passed(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
     lease_request = rpc_to_json(rpc_messages.LeaseRequest(
         dimensions=rpc_messages.Dimensions(
             os_family=rpc_messages.OSFamily.LINUX,
@@ -898,7 +905,6 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
         lease_expiration_ts=1,
         request_id='abc',
     ))
-    auth_testing.mock_get_current_identity(self)
 
     lease_response = jsonish_dict_to_rpc(
         self.call_api('lease', lease_request).json,
@@ -910,6 +916,9 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
     )
 
   def test_duplicate(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
     lease_request = rpc_to_json(rpc_messages.LeaseRequest(
         dimensions=rpc_messages.Dimensions(
             os_family=rpc_messages.OSFamily.OSX,
@@ -917,7 +926,6 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
         duration=3,
         request_id='asdf',
     ))
-    auth_testing.mock_get_current_identity(self)
 
     lease_response_1 = jsonish_dict_to_rpc(
         self.call_api('lease', lease_request).json,
@@ -935,6 +943,9 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
     )
 
   def test_request_id_reuse(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
     lease_request_1 = rpc_to_json(rpc_messages.LeaseRequest(
         dimensions=rpc_messages.Dimensions(
             os_family=rpc_messages.OSFamily.WINDOWS,
@@ -949,7 +960,6 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
         duration=189,
         request_id='qwerty',
     ))
-    auth_testing.mock_get_current_identity(self)
 
     lease_response_1 = jsonish_dict_to_rpc(
         self.call_api('lease', lease_request_1).json,
@@ -970,6 +980,9 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
     )
 
   def test_invalid_topic(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
     lease_request = rpc_to_json(rpc_messages.LeaseRequest(
         dimensions=rpc_messages.Dimensions(
             os_family=rpc_messages.OSFamily.WINDOWS,
@@ -978,7 +991,6 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
         pubsub_topic='../../a-different-project/topics/my-topic',
         request_id='123',
     ))
-    auth_testing.mock_get_current_identity(self)
 
     lease_response = jsonish_dict_to_rpc(
         self.call_api('lease', lease_request).json,
@@ -990,6 +1002,9 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
     )
 
   def test_invalid_project(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
     lease_request = rpc_to_json(rpc_messages.LeaseRequest(
         dimensions=rpc_messages.Dimensions(
             os_family=rpc_messages.OSFamily.WINDOWS,
@@ -999,7 +1014,6 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
         pubsub_project='../../a-different-project/topics/my-other-topic',
         request_id='123',
     ))
-    auth_testing.mock_get_current_identity(self)
 
     lease_response = jsonish_dict_to_rpc(
         self.call_api('lease', lease_request).json,
@@ -1011,6 +1025,9 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
     )
 
   def test_project_without_topic(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
     lease_request = rpc_to_json(rpc_messages.LeaseRequest(
         dimensions=rpc_messages.Dimensions(
             os_family=rpc_messages.OSFamily.WINDOWS,
@@ -1019,7 +1036,6 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
         pubsub_project='my-project',
         request_id='123',
     ))
-    auth_testing.mock_get_current_identity(self)
 
     lease_response = jsonish_dict_to_rpc(
         self.call_api('lease', lease_request).json,

@@ -52,4 +52,4 @@ def is_backend_service_or_catalog_admin():
 
 def can_issue_lease_requests():
   """Returns whether the current user may issue lease requests."""
-  return is_logged_in()
+  return auth.is_group_member('machine-provider-users')
