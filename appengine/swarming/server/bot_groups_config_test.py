@@ -28,12 +28,14 @@ TEST_CONFIG = bots_pb2.BotsCfg(
       owners=['owner@example.com'],
       dimensions=['pool:A', 'pool:B', 'other:D'],
     ),
+    # This group includes an injected bot_config.
     bots_pb2.BotGroup(
       bot_id=['other_bot'],
       bot_id_prefix=['bot'],
       machine_type=[bots_pb2.MachineType(lease_duration_secs=1, name='mt',
                                          mp_dimensions=['k:v'], target_size=1)],
-      auth=bots_pb2.BotAuth(require_service_account='a@example.com')),
+      auth=bots_pb2.BotAuth(require_service_account='a@example.com'),
+      bot_config_script='foo.py'),
     bots_pb2.BotGroup(
       auth=bots_pb2.BotAuth(ip_whitelist='bots'),
       dimensions=['pool:default']),
@@ -46,21 +48,27 @@ EXPECTED_GROUP_1 = bot_groups_config._make_bot_group_config(
     require_service_account=u'',
     ip_whitelist=u'',
     owners=(u'owner@example.com',),
-    dimensions={u'pool': [u'A', u'B'], u'other': [u'D']})
+    dimensions={u'pool': [u'A', u'B'], u'other': [u'D']},
+    bot_config_script='',
+    bot_config_script_content='')
 
 EXPECTED_GROUP_2 = bot_groups_config._make_bot_group_config(
     require_luci_machine_token=False,
     require_service_account=u'a@example.com',
     ip_whitelist=u'',
     owners=(),
-    dimensions={u'pool': []})
+    dimensions={u'pool': []},
+    bot_config_script='foo.py',
+    bot_config_script_content='print "Hi"')
 
 EXPECTED_GROUP_3 = bot_groups_config._make_bot_group_config(
     require_luci_machine_token=False,
     require_service_account=u'',
     ip_whitelist=u'bots',
     owners=(),
-    dimensions={u'pool': [u'default']})
+    dimensions={u'pool': [u'default']},
+    bot_config_script='',
+    bot_config_script_content='')
 
 
 DEFAULT_AUTH_CFG = bots_pb2.BotAuth(ip_whitelist='bots')
@@ -76,16 +84,20 @@ class BotGroupsConfigTest(test_case.TestCase):
     ])
 
   def mock_config(self, cfg):
-    def get_self_config_mock(path, cls, **_kwargs):
-      self.assertEquals('bots.cfg', path)
-      self.assertEquals(cls, bots_pb2.BotsCfg)
-      return None, cfg
+    def get_self_config_mock(path, cls=None, **kwargs):
+      self.assertEqual({'store_last_good': True}, kwargs)
+      if path == 'bots.cfg':
+        self.assertEqual(cls, bots_pb2.BotsCfg)
+        return '123', cfg
+      self.assertEqual('scripts/foo.py', path)
+      return '123', 'print "Hi"'
+
     self.mock(config, 'get_self_config', get_self_config_mock)
     utils.clear_cache(bot_groups_config._fetch_bot_groups)
 
   def test_version(self):
-    self.assertEqual('hash:4564ed4cc34544', EXPECTED_GROUP_1.version)
-    self.assertEqual('hash:18206c33fffaa8', EXPECTED_GROUP_2.version)
+    self.assertEqual('hash:be689c69320bcf', EXPECTED_GROUP_1.version)
+    self.assertEqual('hash:97cfccc0d3f7d0', EXPECTED_GROUP_2.version)
 
   def test_expand_bot_id_expr_success(self):
     def check(expected, expr):
@@ -116,10 +128,10 @@ class BotGroupsConfigTest(test_case.TestCase):
     cfg = bot_groups_config._fetch_bot_groups()
 
     self.assertEquals({
-      'bot1': EXPECTED_GROUP_1,
-      'bot2': EXPECTED_GROUP_1,
-      'bot3': EXPECTED_GROUP_1,
-      'other_bot': EXPECTED_GROUP_2,
+      u'bot1': EXPECTED_GROUP_1,
+      u'bot2': EXPECTED_GROUP_1,
+      u'bot3': EXPECTED_GROUP_1,
+      u'other_bot': EXPECTED_GROUP_2,
     }, cfg.direct_matches)
     self.assertEquals([('bot', EXPECTED_GROUP_2)], cfg.prefix_matches)
     self.assertEquals(EXPECTED_GROUP_3, cfg.default_group)

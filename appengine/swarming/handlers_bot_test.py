@@ -224,7 +224,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     params['state']['bot_group_cfg_version'] = 'badversion'
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     expected = {
-      u'cmd': u'restart',
+      u'cmd': u'bot_restart',
       u'message': u'Restarting to pick up new bots.cfg config',
     }
     self.assertEqual(expected, response)
@@ -245,8 +245,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     params = self.do_handshake()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     expected = {
-      u'cmd': u'restart',
-      u'message': 'Mocked restart message',
+      u'cmd': u'host_reboot',
+      u'message': u'Mocked restart message',
     }
     self.assertEqual(expected, response)
 
@@ -435,7 +435,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
         require_service_account=None,
         ip_whitelist=None,
         owners=None,
-        dimensions={u'pool': [u'server-side']})
+        dimensions={u'pool': [u'server-side']},
+        bot_config_script=None,
+        bot_config_script_content=None)
     self.mock(bot_auth, 'validate_bot_id_and_fetch_config',
               lambda *args, **kwargs: cfg)
 
@@ -461,6 +463,22 @@ class BotApiTest(test_env_handlers.AppTestBase):
             u'pool': [u'server-side'],
         },
     }], actions)
+
+  def test_poll_extra_bot_config(self):
+    cfg = bot_groups_config.BotGroupConfig(
+        version='default',
+        require_luci_machine_token=False,
+        require_service_account=None,
+        ip_whitelist=None,
+        owners=None,
+        dimensions={},
+        bot_config_script='foo.py',
+        bot_config_script_content='print "Hi";import sys; sys.exit(1)')
+    self.mock(bot_auth, 'validate_bot_id_and_fetch_config',
+              lambda *args, **kwargs: cfg)
+    params = self.do_handshake()
+    self.assertEqual(
+        u'print "Hi";import sys; sys.exit(1)', params['bot_config'])
 
   def test_complete_task_isolated(self):
     # Successfully poll a task.

@@ -437,6 +437,12 @@ class BotHandshakeHandler(_BotBaseHandler):
         'dimensions': res.bot_group_cfg.dimensions,
       },
     }
+    if res.bot_group_cfg.bot_config_script_content:
+      logging.info(
+          'Injecting %s: %d bytes',
+          res.bot_group_cfg.bot_config_script,
+          len(res.bot_group_cfg.bot_config_script_content))
+      data['bot_config'] = res.bot_group_cfg.bot_config_script_content
     self.send_response(data)
 
 
@@ -505,7 +511,7 @@ class BotPollHandler(_BotBaseHandler):
     cur_bot_cfg_ver = res.state.get('bot_group_cfg_version')
     if cur_bot_cfg_ver and cur_bot_cfg_ver != res.bot_group_cfg.version:
       bot_event('request_restart')
-      self._cmd_restart('Restarting to pick up new bots.cfg config')
+      self._cmd_bot_restart('Restarting to pick up new bots.cfg config')
       return
 
     #
@@ -514,13 +520,15 @@ class BotPollHandler(_BotBaseHandler):
     # pushed to the server, so be diligent about it.
     #
 
+    # TODO(maruel): Remove this and migrate all use cases in bot_config.py
+    # on_bot_idle().
     # Bot may need a reboot if it is running for too long. We do not reboot
     # quarantined bots.
     needs_restart, restart_message = bot_management.should_restart_bot(
         res.bot_id, res.state)
     if needs_restart:
       bot_event('request_restart')
-      self._cmd_restart(restart_message)
+      self._cmd_host_reboot(restart_message)
       return
 
     # The bot is in good shape. Try to grab a task.
@@ -624,10 +632,18 @@ class BotPollHandler(_BotBaseHandler):
     }
     self.send_response(out)
 
-  def _cmd_restart(self, message):
-    logging.info('Rebooting bot: %s', message)
+  def _cmd_host_reboot(self, message):
+    logging.info('Rebooting host: %s', message)
     out = {
-      'cmd': 'restart',
+      'cmd': 'host_reboot',
+      'message': message,
+    }
+    self.send_response(out)
+
+  def _cmd_bot_restart(self, message):
+    logging.info('Restarting bot: %s', message)
+    out = {
+      'cmd': 'bot_restart',
       'message': message,
     }
     self.send_response(out)

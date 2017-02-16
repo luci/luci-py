@@ -7,6 +7,7 @@
 import collections
 import hashlib
 import logging
+import os
 import re
 
 from components import auth
@@ -47,6 +48,14 @@ BotGroupConfig = collections.namedtuple('BotGroupConfig', [
   # dimension from that set, the list of value for it will be empty. Key and
   # values are unicode strings.
   'dimensions',
+
+  # Name of the supplemental bot_config.py to inject to the bot during
+  # handshake.
+  'bot_config_script',
+
+  # Content of the supplemental bot_config.py to inject to the bot during
+  # handshake.
+  'bot_config_script_content',
 ])
 
 
@@ -72,7 +81,9 @@ def _default_bot_groups():
         require_service_account=None,
         ip_whitelist=auth.bots_ip_whitelist(),
         owners=(),
-        dimensions={}))
+        dimensions={},
+        bot_config_script='',
+        bot_config_script_content=''))
 
 
 def _gen_version(fields):
@@ -141,12 +152,26 @@ def _bot_group_proto_to_tuple(msg, trusted_dimensions):
 
   auth_cfg = msg.auth or bots_pb2.BotAuth()
 
+  content = ''
+  if msg.bot_config_script:
+    rev, content = config.get_self_config(
+        'scripts/' + msg.bot_config_script,
+        store_last_good=True)
+    if not rev or not content:
+      # The entry is invalid. It points to a non existing file. It could be
+      # because of a typo in the file name. An empty file is an invalid file,
+      # log an error to alert the admins.
+      logging.error(
+          'Configuration referenced non existing bot_config file %r\n%s',
+          msg.bot_config_script, msg)
   return _make_bot_group_config(
     require_luci_machine_token=auth_cfg.require_luci_machine_token,
     require_service_account=auth_cfg.require_service_account,
     ip_whitelist=auth_cfg.ip_whitelist,
     owners=tuple(msg.owners),
-    dimensions={k: sorted(v) for k, v in dimensions.iteritems()})
+    dimensions={k: sorted(v) for k, v in dimensions.iteritems()},
+    bot_config_script=msg.bot_config_script or '',
+    bot_config_script_content=content or '')
 
 
 def _expand_bot_id_expr(expr):
@@ -392,6 +417,19 @@ def validate_settings(cfg, ctx):
       for dim in entry.dimensions:
         if not local_config.validate_flat_dimension(dim):
           ctx.error('bad dimension %r', dim)
+
+      # Validate 'bot_config_script': the supplemental bot_config.py.
+      if entry.bot_config_script:
+        # Another check in bot_code.py confirms that the script itself is valid
+        # python.
+        if not entry.bot_config_script.endswith('.py'):
+          ctx.error('Invalid bot_config_script name: must end with .py')
+        if os.path.basename(entry.bot_config_script) != entry.bot_config_script:
+          ctx.error(
+              'Invalid bot_config_script name: must not contain path entry')
+        # We can't validate that the file exists here. It'll fail in
+        # _bot_group_proto_to_tuple() which is called by _fetch_bot_groups() and
+        # cached for 60 seconds.
 
   # Now verify bot_id_prefix is never a prefix of other prefix. It causes
   # ambiguities.
