@@ -107,6 +107,51 @@ class UpdateConfigTest(test_case.TestCase):
     self.failIf(config.Configuration.cached().manager_config)
     self.failIf(config.Configuration.cached().revision)
 
+  def test_too_many_instance_templates(self):
+    template_config = config_pb2.InstanceTemplateConfig(
+      templates=[
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                base_name='base-name-1',
+            ),
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                base_name='base-name-2',
+            ),
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                base_name='base-name-3',
+            ),
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                base_name='base-name-4',
+            ),
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                base_name='base-name-5',
+            ),
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                base_name='base-name-6',
+            ),
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                base_name='base-name-7',
+            ),
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                base_name='base-name-8',
+            ),
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                base_name='base-name-9',
+            ),
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                base_name='base-name-10',
+            ),
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                base_name='base-name-11',
+            ),
+      ],
+    )
+    self.install_mock(template_config=template_config)
+
+    config.update_template_configs()
+    self.failIf(config.Configuration.cached().template_config)
+    self.failIf(config.Configuration.cached().manager_config)
+    self.failIf(config.Configuration.cached().revision)
+
   def test_repeated_zone_different_base_name(self):
     """Ensures repeated zones in different base names are valid."""
     manager_config = config_pb2.InstanceGroupManagerConfig(
@@ -145,6 +190,43 @@ class UpdateConfigTest(test_case.TestCase):
                 zone='us-central1-b',
             ),
             config_pb2.InstanceGroupManagerConfig.InstanceGroupManager(
+                template_base_name='base-name-1',
+                zone='us-central1-a',
+            ),
+        ],
+    )
+    self.install_mock(manager_config=manager_config)
+
+    config.update_template_configs()
+    self.failIf(config.Configuration.cached().template_config)
+    self.failIf(config.Configuration.cached().manager_config)
+    self.failIf(config.Configuration.cached().revision)
+
+  def test_minimum_size_exceeds_maximum_size(self):
+    """Ensures repeated zones in a base name reject the entire config."""
+    manager_config = config_pb2.InstanceGroupManagerConfig(
+        managers=[
+            config_pb2.InstanceGroupManagerConfig.InstanceGroupManager(
+                maximum_size=1,
+                minimum_size=2,
+                template_base_name='base-name-1',
+                zone='us-central1-a',
+            ),
+        ],
+    )
+    self.install_mock(manager_config=manager_config)
+
+    config.update_template_configs()
+    self.failIf(config.Configuration.cached().template_config)
+    self.failIf(config.Configuration.cached().manager_config)
+    self.failIf(config.Configuration.cached().revision)
+
+  def test_maximum_size_exceeds_maximum_allowed(self):
+    """Ensures repeated zones in a base name reject the entire config."""
+    manager_config = config_pb2.InstanceGroupManagerConfig(
+        managers=[
+            config_pb2.InstanceGroupManagerConfig.InstanceGroupManager(
+                maximum_size=9999,
                 template_base_name='base-name-1',
                 zone='us-central1-a',
             ),

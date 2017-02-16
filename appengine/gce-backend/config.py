@@ -131,6 +131,9 @@ def validate_template_config(config, context):
       valid = False
     else:
       base_names.add(template.base_name)
+  if len(base_names) > 10:
+    context.error('Too many instance templates.')
+    valid = False
   metrics.config_valid.set(valid, fields={'config': TEMPLATES_CFG_FILENAME})
 
 
@@ -152,6 +155,21 @@ def validate_manager_config(config, context):
       valid = False
     else:
       zones[manager.template_base_name].add(manager.zone)
+    if manager.minimum_size > manager.maximum_size:
+      context.error(
+          'minimum_size > maximum_size for zone %s in template %s.',
+          manager.zone,
+          manager.template_base_name,
+      )
+      valid = False
+    if manager.maximum_size > 1000:
+      # A GCE InstanceGroup is limited to 1000 instances.
+      context.error(
+          'maximum_size > 1000 for zone %s in template %s.',
+          manager.zone,
+          manager.template_base_name,
+      )
+      valid = False
   metrics.config_valid.set(valid, fields={'config': MANAGERS_CFG_FILENAME})
 
 
