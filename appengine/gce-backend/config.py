@@ -82,28 +82,40 @@ def update_template_configs():
     return
 
   stored_config = Configuration.cached()
-  if stored_config.revision != template_revision:
-    context = config.validation_context.Context.logging()
-    if template_config:
-      validate_template_config(template_config, context)
-    if context.result().has_errors:
-      logging.warning(
-          'Not updating configuration due to errors in templates.cfg')
-      return
 
-    context = config.validation_context.Context.logging()
-    if manager_config:
-      validate_manager_config(manager_config, context)
-    if context.result().has_errors:
-      logging.error('Not updating configuration due to errors in managers.cfg')
-      return
+  if stored_config.revision == template_revision:
+    # Config is up-to-date so just report validity.
+    # The stored_config will always be valid.
+    metrics.config_valid.set(True, fields={'config': TEMPLATES_CFG_FILENAME})
+    metrics.config_valid.set(True, fields={'config': MANAGERS_CFG_FILENAME})
+    return
 
-    logging.info('Updating configuration to %s', template_revision)
-    stored_config.modify(
-        manager_config = protobuf.text_format.MessageToString(manager_config),
-        revision = template_revision,
-        template_config = protobuf.text_format.MessageToString(template_config),
-    )
+  errors = False
+
+  context = config.validation_context.Context.logging()
+  if template_config:
+    validate_template_config(template_config, context)
+  if context.result().has_errors:
+    logging.warning(
+        'Not updating configuration due to errors in templates.cfg')
+    errors = True
+
+  context = config.validation_context.Context.logging()
+  if manager_config:
+    validate_manager_config(manager_config, context)
+  if context.result().has_errors:
+    logging.error('Not updating configuration due to errors in managers.cfg')
+    errors = True
+
+  if errors:
+    return
+
+  logging.info('Updating configuration to %s', template_revision)
+  stored_config.modify(
+      manager_config = protobuf.text_format.MessageToString(manager_config),
+      revision = template_revision,
+      template_config = protobuf.text_format.MessageToString(template_config),
+  )
 
 
 @validation.self_rule(TEMPLATES_CFG_FILENAME, config_pb2.InstanceTemplateConfig)
@@ -119,7 +131,6 @@ def validate_template_config(config, context):
       valid = False
     else:
       base_names.add(template.base_name)
-
   metrics.config_valid.set(valid, fields={'config': TEMPLATES_CFG_FILENAME})
 
 
@@ -141,7 +152,6 @@ def validate_manager_config(config, context):
       valid = False
     else:
       zones[manager.template_base_name].add(manager.zone)
-
   metrics.config_valid.set(valid, fields={'config': MANAGERS_CFG_FILENAME})
 
 
