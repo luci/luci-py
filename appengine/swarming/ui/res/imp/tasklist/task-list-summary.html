@@ -69,7 +69,7 @@
       <div class="column">
         <table>
           <thead>
-            <th class="header right" colspan=2>Selected</th>
+            <th class="header right" colspan=2>Selected Tasks</th>
           </thead>
           <tr>
             <td class="right">
@@ -94,39 +94,11 @@
         </table>
       </div>
 
-      <div class="left column">
-        <table>
-          <thead>
-            <th class="header right" colspan=2>All Tasks in last 24h</th>
-          </thead>
-          <template is="dom-repeat" items="[[_all_summary]]" as="item" index-as="idx">
-            <tr title="These counts are all from the last 24 hours">
-              <td class="right">
-                <a href$="[[_makeURL(item.name,'',columns.*,sort)]]">[[item.human]]</a>:
-              </td>
-              <td class="left">[[_idx(_all_counts, idx, _all_counts.*)]]</td>
-            </tr>
-          </template>
-        </table>
-      </div>
-
     </div>
 
   </template>
   <script>
   (function(){
-    var ALL_TASKS_SUMMARY = [
-      {name:"ALL", human:"All"},
-      {name:"BOT_DIED", human:"Bot Died"},
-      {name:"CANCELED", human:"Canceled"},
-      {name:"COMPLETED_SUCCESS", human:"Completed (Success)"},
-      {name:"COMPLETED_FAILURE", human:"Completed (Failure)"},
-      {name:"DEDUPED", human:"Deduplicated"},
-      {name:"EXPIRED", human:"Expired"},
-      {name:"PENDING", human:"Pending"},
-      {name:"RUNNING", human:"Running"},
-      {name:"TIMED_OUT", human:"Timed Out"},
-    ];
     var SELECTED_TASKS_SUMMARY = [
       {name:"BOT_DIED", human:"Bot Died"},
       {name:"CANCELED", human:"Canceled"},
@@ -149,7 +121,7 @@
         },
         busy: {
           type: Boolean,
-          computed: "_anyBusy(_busyArr1.*,_busyArr2.*,_busy3)",
+          computed: "_anyBusy(_busyArr1.*,_busy3)",
           notify: true,
         },
         count_params: {
@@ -171,27 +143,9 @@
             return [];
           }
         },
-        _busyArr2: {
-          type:Array,
-          value: function() {
-            return [];
-          }
-        },
         _busy3: {
           type: Boolean,
           value: false,
-        },
-        _all_counts: {
-          type: Array,
-          value: function() {
-            return [];
-          }
-        },
-        _all_summary: {
-          type: Array,
-          value: function() {
-            return ALL_TASKS_SUMMARY;
-          }
         },
         _selected_counts: {
           type: Array,
@@ -222,11 +176,6 @@
             return true;
           }
         }
-        for (var i = 0; i<this._busyArr2.length; i++) {
-          if (this._busyArr2[i].status) {
-            return true;
-          }
-        }
         return this._busy3;
       },
 
@@ -241,29 +190,8 @@
         if (!this.auth_headers || !this.count_params) {
           return;
         }
-        // We round 24 hours ago down to the nearest minute to mirror what
-        // the UI can select. Additionally, this may allow for easier
-        // server-side caching.
-        var now = new Date();
-        now.setSeconds(0);
-        now.setMilliseconds(0);
-        // convert to seconds because API uses seconds.
-        var last24hrs = now.getTime()/1000 - 24 * 60 * 60;
 
-        var queryObj = {
-          start: [last24hrs],
-        };
-        // ALL_TASKS summary is always the last 24 hours
-        for (var i = 0; i < ALL_TASKS_SUMMARY.length; i++) {
-          if (this._all_counts.length < ALL_TASKS_SUMMARY.length) {
-            this.push("_all_counts", {});
-          }
-          queryObj.state = [ALL_TASKS_SUMMARY[i].name];
-          this._getJsonAsyncArr(i, "_all_counts","/api/swarming/v1/tasks/count","_busyArr1",
-          this.auth_headers, queryObj);
-        }
-
-        queryObj = JSON.parse(JSON.stringify(this.count_params));
+        var queryObj = JSON.parse(JSON.stringify(this.count_params));
         this._getJsonAsync("_selected_exact","/api/swarming/v1/tasks/count","_busy3",
           this.auth_headers, queryObj);
 
@@ -272,15 +200,14 @@
             this.push("_selected_counts", {});
           }
           queryObj.state = [SELECTED_TASKS_SUMMARY[j].name];
-          this._getJsonAsyncArr(j, "_selected_counts","/api/swarming/v1/tasks/count","_busyArr2",
+          this._getJsonAsyncArr(j, "_selected_counts","/api/swarming/v1/tasks/count","_busyArr1",
           this.auth_headers, queryObj);
         }
       },
 
       // _makeURL creates a task-list url that keeps the columns and sort requirements the same
-      // while changing which state is represented. The preserveOthers signifies if other
-      // filtering parameters (e.g. tags) should be kept as well.
-      _makeURL: function(state, preserveOthers) {
+      // while changing which state is represented.
+      _makeURL: function(state) {
         var fstr = "state:"+state;
         var cp = this.count_params;
         var params = {
@@ -301,15 +228,11 @@
         if (state) {
           params.f.push(fstr);
         }
-        if (preserveOthers && cp.tags) {
+        if (cp.tags) {
           cp.tags.forEach(function(t){
             params.f.push(t);
           });
         }
-        if (!preserveOthers) {
-          params.n = [true];
-        }
-
         return window.location.href.split('?')[0] + '?' + sk.query.fromParamSet(params);
       },
 
