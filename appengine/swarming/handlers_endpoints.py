@@ -8,7 +8,9 @@ import logging
 import os
 
 from google.appengine.api import datastore_errors
+from google.appengine.api import memcache
 from google.appengine.ext import ndb
+
 import endpoints
 import gae_ts_mon
 from protorpc import messages
@@ -510,12 +512,24 @@ class SwarmingTasksService(remote.Service):
     if not request.start:
       raise endpoints.BadRequestException('start (as epoch) is required')
     now = utils.utcnow()
+    mem_key = self._memcache_key(request, now)
+    count = memcache.get(mem_key, namespace='tasks_count')
+    if count is not None:
+      return swarming_rpcs.TasksCount(count=count, now=now)
+
     try:
       count = self._query_from_request(request, 'created_ts').count()
+      memcache.add(mem_key, count, 24*60*60, namespace='tasks_count')
     except ValueError as e:
       raise endpoints.BadRequestException(
           'Inappropriate filter for tasks/count: %s' % e)
     return swarming_rpcs.TasksCount(count=count, now=now)
+
+  def _memcache_key(self, request, now):
+    # Floor now to minute to account for empty "end"
+    end = request.end or now.replace(second=0, microsecond=0)
+    request.tags.sort()
+    return '%s|%s|%s|%s' % (request.tags, request.state, request.start, end)
 
   def _query_from_request(self, request, sort=None):
     """Returns a TaskResultSummary query."""
