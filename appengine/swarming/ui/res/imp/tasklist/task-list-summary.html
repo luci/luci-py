@@ -77,16 +77,16 @@
             </td>
             <td class="left">[[num_tasks]]</td>
           </tr>
-          <tr title="By default, these counts are from the last 24 hours">
+          <tr title="These counts reflect the time period selected">
             <td class="right" >
               Total:
             </td>
             <td class="left">[[_selected_exact.count]]</td>
           </tr>
           <template is="dom-repeat" items="[[_selected_summary]]" as="item" index-as="idx">
-            <tr title="By default, these counts are from the last 24 hours">
+            <tr title="These counts reflect the time period selected">
               <td class="right">
-                <a href$="[[_makeURL(item.name,'true',columns.*,sort)]]">[[item.human]]</a>:
+                <a href$="[[_makeURL(item.name,'true',columns.*,sort,count_params.*)]]">[[item.human]]</a>:
               </td>
               <td class="left">[[_idx(_selected_counts, idx, _selected_counts.*)]]</td>
             </tr>
@@ -97,11 +97,10 @@
       <div class="left column">
         <table>
           <thead>
-            <!-- TODO(kjlubick) when user can update time, use the human readable value instead of 12h-->
             <th class="header right" colspan=2>All Tasks in last 24h</th>
           </thead>
           <template is="dom-repeat" items="[[_all_summary]]" as="item" index-as="idx">
-            <tr title="By default, this is the last 24 hours">
+            <tr title="These counts are all from the last 24 hours">
               <td class="right">
                 <a href$="[[_makeURL(item.name,'',columns.*,sort)]]">[[item.human]]</a>:
               </td>
@@ -242,16 +241,19 @@
         if (!this.auth_headers || !this.count_params) {
           return;
         }
+        // We round 24 hours ago down to the nearest minute to mirror what
+        // the UI can select. Additionally, this may allow for easier
+        // server-side caching.
+        var now = new Date();
+        now.setSeconds(0);
+        now.setMilliseconds(0);
         // convert to seconds because API uses seconds.
-        var now = (new Date()).getTime()/1000;
-        var last2Days = now - 24 * 60 * 60;
-
-        // TODO(kjlubick): Once users can specify their own times, respect those limits here.
+        var last24hrs = now.getTime()/1000 - 24 * 60 * 60;
 
         var queryObj = {
-          start: [last2Days],
+          start: [last24hrs],
         };
-
+        // ALL_TASKS summary is always the last 24 hours
         for (var i = 0; i < ALL_TASKS_SUMMARY.length; i++) {
           if (this._all_counts.length < ALL_TASKS_SUMMARY.length) {
             this.push("_all_counts", {});
@@ -262,7 +264,6 @@
         }
 
         queryObj = JSON.parse(JSON.stringify(this.count_params));
-        queryObj.start = [last2Days];
         this._getJsonAsync("_selected_exact","/api/swarming/v1/tasks/count","_busy3",
           this.auth_headers, queryObj);
 
@@ -281,26 +282,32 @@
       // filtering parameters (e.g. tags) should be kept as well.
       _makeURL: function(state, preserveOthers) {
         var fstr = "state:"+state;
-        if (preserveOthers) {
-          var fstr = encodeURIComponent(fstr);
-          var url = window.location.href;
-          if (url.indexOf(fstr+"&") !== -1) {
-            // The state filter is already on the list.
-            return undefined;
-          }
-          if (url.indexOf("f=state") === -1) {
-            return url + "&f=" + fstr;
-          }
-          // Things can't be in multiple states at once - so replace it.
-          // %3A is url encoded colon (:)
-          return url.replace(/f=state%3A[A-Z_]+/, `f=state%3A${fstr}`);
-        }
+        var cp = this.count_params;
         var params = {
           s: [this.sort],
           c: this.columns,
+          f: [],
+        }
+        if (cp.start && cp.start[0]) {
+          // timestamps gleaned from count_params are in seconds, so we convert back to ms.
+          params.st = [cp.start[0] + "000"];
+        }
+        if (cp.end && cp.end[0]) {
+          // timestamps gleaned from count_params are in seconds, so we convert back to ms.
+          params.et = [cp.end[0] + "000"];
+        } else {
+          params.n = [true];
         }
         if (state) {
-          params["f"] = [fstr];
+          params.f.push(fstr);
+        }
+        if (preserveOthers && cp.tags) {
+          cp.tags.forEach(function(t){
+            params.f.push(t);
+          });
+        }
+        if (!preserveOthers) {
+          params.n = [true];
         }
 
         return window.location.href.split('?')[0] + '?' + sk.query.fromParamSet(params);

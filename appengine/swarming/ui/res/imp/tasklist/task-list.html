@@ -27,6 +27,8 @@
 <link rel="import" href="/res/imp/bower_components/iron-flex-layout/iron-flex-layout-classes.html">
 <link rel="import" href="/res/imp/bower_components/paper-button/paper-button.html">
 <link rel="import" href="/res/imp/bower_components/paper-dialog/paper-dialog.html">
+<link rel="import" href="/res/imp/bower_components/paper-time-picker/paper-time-picker.html">
+<link rel="import" href="/res/imp/bower_components/polymer-paper-date-picker/paper-date-picker.html">
 <link rel="import" href="/res/imp/bower_components/polymer/polymer.html">
 
 <link rel="import" href="/res/imp/common/dynamic-table-behavior.html">
@@ -83,6 +85,7 @@
 
         <div class="horizontal layout">
           <task-filters
+            id="task_filters"
             dimensions="[[_dimensions]]"
             permissions="[[_permissions]]"
             primary_map="[[_primary_map]]"
@@ -93,7 +96,9 @@
             query_params="{{_query_params}}"
             filter="{{_filter}}"
 
-            on-cancel-all="_promptCancelAll">
+            on-cancel-all="_promptCancelAll"
+            on-prompt-date="_promptDate"
+            on-prompt-time="_promptTime">
           </task-filters>
 
            <task-list-summary
@@ -274,6 +279,22 @@
         <paper-button dialog-dismiss autofocus hidden$="[[!_finished_canceling]]">
           Done
         </paper-button>
+      </div>
+    </paper-dialog>
+
+    <paper-dialog id="date_picker_dialog" modal on-iron-overlay-closed="_setDate">
+      <paper-date-picker id="date_picker"></paper-date-picker>
+      <div class="buttons">
+        <paper-button dialog-dismiss>Cancel</paper-button>
+        <paper-button dialog-confirm>OK</paper-button>
+      </div>
+    </paper-dialog>
+
+    <paper-dialog id="time_picker_dialog" modal on-iron-overlay-closed="_setTime">
+      <paper-time-picker id="time_picker"></paper-time-picker>
+      <div class="buttons">
+        <paper-button dialog-dismiss>Cancel</paper-button>
+        <paper-button dialog-confirm>OK</paper-button>
       </div>
     </paper-dialog>
 
@@ -460,6 +481,48 @@
 
       _closeCancelAll: function() {
         this.$.cancel_all_dialog.close();
+      },
+
+      _promptDate: function(e) {
+        this.$.date_picker.date = e.detail.date;
+        this.$.date_picker.name = e.detail.name;
+        this.$.date_picker_dialog.open();
+      },
+
+      _setDate: function(e) {
+        if (!e.detail.confirmed) {
+          return;
+        }
+        var date = this.$.date_picker.date;
+        var y = date.getFullYear();
+        var m = date.getMonth();
+        var d = date.getDate();
+        if ("start" === this.$.date_picker.name) {
+          this.$.task_filters.setStartDate(y,m,d);
+        } else {
+          this.$.task_filters.setEndDate(y,m,d);
+        }
+      },
+
+      _promptTime: function(e) {
+        this.$.time_picker.date = e.detail.date;
+        this.$.time_picker.hour = e.detail.date.getHours();
+        this.$.time_picker.minute = e.detail.date.getMinutes();
+        this.$.time_picker.name = e.detail.name;
+        this.$.time_picker_dialog.open();
+      },
+
+      _setTime: function(e) {
+        if (!e.detail.confirmed) {
+          return;
+        }
+        var h = this.$.time_picker.hour;
+        var m = this.$.time_picker.minute;
+        if ("start" === this.$.time_picker.name) {
+          this.$.task_filters.setStartTime(h,m,0);
+        } else {
+          this.$.task_filters.setEndTime(h,m,0);
+        }
       },
 
       reload: function() {

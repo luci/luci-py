@@ -18,10 +18,34 @@
         current filters.
 
   Methods:
-    None.
+    setEndDate(y, m, d): Sets the end date using the years, months and days. This is
+        expected to be the response after a prompt-date event is fired and the user has
+        made their choice.
+    setEndTime(h, m, s): Sets the end time using the hours, minutes and seconds.
+        This is expected to be the response after a prompt-date event is fired and
+        the user has made their choice.
+    setStartDate(y, m, d): Sets the start date using the years, months and days. This is
+        expected to be the response after a prompt-date event is fired and the user has
+        made their choice.
+    setStartTime(h, m, s): Sets the start time using the hours, minutes and seconds.
+        This is expected to be the response after a prompt-date event is fired and
+        the user has made their choice.
 
   Events:
-    None.
+  The events this element fires are to work around the fact that modal paper-dialog
+  elements need to be outside all other elements on the DOM.
+
+    cancel-all: The user wishes to cancel all tags. The parent is expected to
+        show a paper-dialog and confirm the details.  The event's details is
+        {tags: {Array:String}} of the tags of tasks that need be canceled.
+    prompt-date: The user wishes to change the filter date. The parent is expected to
+        show a paper-dialog that lets the user pick a date.  The event's details
+        is {name: String, date: Date} naming the element to which the result will
+        go and the starting date.
+    cancel-all: The user wishes to change the filter time. The parent is expected to
+        show a paper-dialog that lets the user pick a time.  The event's details
+        is {name: String, date: Date} naming the element to which the result will
+        go and the starting date.
 -->
 
 <link rel="import" href="/res/imp/bower_components/iron-a11y-keys/iron-a11y-keys.html">
@@ -47,9 +71,36 @@
       .selector.wide {
         min-width: 275px;
       }
+      .selector.narrow {
+        min-width: 250px;
+      }
       .cancel-button {
         display: block;
         margin-top: 5px;
+      }
+      .settings {
+        margin-left: 5px;
+      }
+      :host {
+        min-width: 850px;
+      }
+      .bold {
+        font-weight: bold
+      }
+      .end.date_time {
+        margin-top: 5px;
+      }
+
+       .pickable > span {
+        padding: 3px;
+        border: 1px solid black;
+        display: inline-block;
+        cursor: pointer;
+      }
+
+      .pickable.disabled > span {
+        color: #AAA;
+        cursor: default;
       }
     </style>
 
@@ -70,6 +121,15 @@
     <url-param name="l"
       default_value="50"
       value="{{_limit}}">
+    </url-param>
+    <url-param name="st"
+      value="{{_start_ts}}">
+    </url-param>
+    <url-param name="et"
+      value="{{_end_ts}}">
+    </url-param>
+    <url-param name="n"
+      value="{{_use_now}}">
     </url-param>
 
     <div class="container horizontal layout">
@@ -134,7 +194,7 @@
           </template>
         </div>
 
-        <div class="selector side-by-side"
+        <div class="narrow selector side-by-side"
             title="These tag filters are AND'd together and applied to all tasks.">
           <template is="dom-repeat" items="[[_filters]]" as="fil">
             <div class="item horizontal layout" label="[[fil]]">
@@ -150,7 +210,7 @@
           </template>
         </div>
 
-        <div class="side-by-side">
+        <div class="side-by-side settings">
           <paper-input id="_limit"
             label="Limit Results"
             auto-validate
@@ -166,6 +226,25 @@
             </paper-button>
           </template>
         </div>
+
+        <div class="side-by-side settings">
+          <div class="end date_time">
+            <div class="bold" title="Should be earlier than end">Start:</div>
+            <div class="pickable">
+              <span on-click="_promptStartDate">[[_dateString(_start_ts)]]</span>
+              <span on-click="_promptStartTime">[[_timeString(_start_ts)]]</span>
+            </div>
+          </div>
+
+          <div class="end date_time">
+            <div class="bold" title="Should be later than start">End:</div>
+            <div class$="pickable [[_isEnabled(_use_now)]]">
+              <span on-click="_promptEndDate">[[_dateString(_end_ts)]]</span>
+              <span on-click="_promptEndTime">[[_timeString(_end_ts)]]</span>
+            </div>
+          </div>
+          <paper-checkbox checked="{{_use_now}}">Now</paper-checkbox>
+        </div>
       </div>
 
     </div>
@@ -173,6 +252,11 @@
   </template>
   <script>
   (function(){
+    function _parseTS(ts) {
+      ts = ts || "1";
+      ts = parseInt(ts);
+      return new Date(ts);
+    }
     // see query-column-filter for more documentation on these properties.
     var filterMap = {
       state: function(task, s) {
@@ -213,12 +297,26 @@
         },
         query_params: {
           type: Object,
-          computed: "_extractQueryParams(_filters.*, _limit)",
+          computed: "_extractQueryParams(_filters.*, _limit, _start_ts, _end_ts, _use_now)",
           notify: true,
         },
 
         permissions: {
           type: Object,
+        },
+        // Because url params and the Swarming API queries deal with time stamps
+        // it is easiest to store the date as time stamps and not the native
+        // JS Date object. The time stamp will always be in UTC, although we
+        // display dates/times to the user in their own locale and timezone.
+        _end_ts: {
+          type: String,
+        },
+        _start_ts: {
+          type: String
+        },
+        // If we should use now() as the end time.
+        _use_now: {
+          type: Boolean
         },
 
         // for QueryColumnFilter
@@ -234,10 +332,29 @@
         }
       },
 
+      ready: function() {
+        var now = new Date();
+        now.setSeconds(0);
+        now.setMilliseconds(0);
+        if (!this._end_ts && !this._use_now) {
+          this._use_now = true;
+        }
+        if (!this._end_ts) {
+          this._setEndTS(now.getTime());
+        }
+        if (!this._start_ts) {
+          this._setStartTS(now.getTime() - 24*60*60*1000);
+        }
+      },
+
       _cantToggleColumn: function(col) {
         // Don't allow the name column to be removed, as the task list is
         // basically meaningless without it.
         return !col || col === "name" ;
+      },
+
+      _dateString: function(ts) {
+        return _parseTS(ts).toLocaleDateString();
       },
 
       _extractQueryParams: function() {
@@ -259,6 +376,16 @@
           }
         }.bind(this));
         params["tags"] = tags;
+
+        // The server expects these in epoch seconds, so we trim off the last 3
+        // digits representing milliseconds.
+        if (this._start_ts) {
+          params["start"] = [this._start_ts.substring(0, this._start_ts.length - 3)];
+        }
+
+        if (!this._use_now && this._end_ts) {
+          params["end"] = [this._end_ts.substring(0, this._end_ts.length - 3)];
+        }
         var lim = parseInt(this._limit);
         if (Number.isInteger(lim)) {
           // Clamp the limit
@@ -271,6 +398,13 @@
           }
         }
         return params;
+      },
+
+      _isEnabled: function(use_now) {
+        if (use_now) {
+          return "disabled";
+        }
+        return "";
       },
 
       _matchingBotsLink: function(queryParams) {
@@ -301,9 +435,83 @@
         this.fire('cancel-all',{tags:this.query_params.tags})
       },
 
+      _promptEndDate: function(e) {
+        if (!this._use_now) {
+          this._promptDate(_parseTS(this._end_ts), 'end');
+        }
+      },
+      _promptStartDate: function(e) {
+        this._promptDate(_parseTS(this._start_ts), 'start');
+      },
+
+      _promptDate: function(date, name) {
+        this.fire('prompt-date',{date:date, name:name})
+      },
+
+      _promptEndTime: function(e) {
+        if (!this._use_now) {
+          this._promptTime(_parseTS(this._end_ts), 'end');
+        }
+      },
+      _promptStartTime: function(e) {
+        this._promptTime(_parseTS(this._start_ts), 'start');
+      },
+
+      _promptTime: function(date, name) {
+        this.fire('prompt-time',{date:date, name:name})
+      },
+
+      _setEndTS: function(ts) {
+        // Make sure ts is a string. _parseTS() depends on it being a string.
+        this._end_ts = "" + ts;
+      },
+
+      setEndDate: function(y,m,days) {
+        var d = _parseTS(this._end_ts);
+        d.setFullYear(y);
+        d.setMonth(m);
+        d.setDate(days);
+        this._setEndTS(d.getTime());
+      },
+
+      setEndTime: function(h,m,s) {
+        var d = _parseTS(this._end_ts);
+        d.setHours(h);
+        d.setMinutes(m);
+        d.setSeconds(s);
+        d.setMilliseconds(0);
+        this._setEndTS(d.getTime());
+      },
+
+      _setStartTS: function(ts) {
+        // Make sure ts is a string. _parseTS() depends on it being a string.
+        this._start_ts = "" + ts;
+      },
+
+      setStartDate: function(y,m,days) {
+        var d = _parseTS(this._start_ts);
+        d.setFullYear(y);
+        d.setMonth(m);
+        d.setDate(days);
+        this._setStartTS(d.getTime());
+      },
+
+      setStartTime: function(h,m,s) {
+        var d = _parseTS(this._start_ts);
+        d.setHours(h);
+        d.setMinutes(m);
+        d.setSeconds(s);
+        d.setMilliseconds(0);
+        this._setStartTS(d.getTime());
+      },
+
       _showTagMessage: function(primarySelected, selectedItems) {
         return primarySelected && primarySelected !== "name" && !selectedItems;
-      }
+      },
+
+      _timeString: function(ts) {
+        return _parseTS(ts).toLocaleTimeString();
+      },
 
     });
   })();

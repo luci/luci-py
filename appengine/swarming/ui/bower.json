@@ -15,7 +15,9 @@
     "google-web-components": "GoogleWebComponents/google-web-components#^1.1.0",
     "iron-elements": "PolymerElements/iron-elements#~1.0.0",
     "paper-elements": "PolymerElements/paper-elements#~1.0.0",
-    "polymer": "Polymer/polymer#^1.0.0"
+    "paper-time-picker": "bendavis78/paper-time-picker#~1.1.0",
+    "polymer": "Polymer/polymer#^1.0.0",
+    "polymer-paper-date-picker": "bendavis78/paper-date-picker#~1.1.0"
   },
   "resolutions": {
     "firebase": "^2.3.1"
