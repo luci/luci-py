@@ -26,16 +26,14 @@ GLOBAL_TARGET_FIELDS = {
 GLOBAL_METRICS = {
     'instances': gae_ts_mon.GaugeMetric(
         'machine_provider/gce_backend/instances',
-        'Current count of the number of instances.',
-        [gae_ts_mon.StringField('instance_template')]
+        description='Current count of the number of instances.',
     ),
 }
 
 
 config_valid = gae_ts_mon.BooleanMetric(
     'machine_provider/gce_backend/config/valid',
-    'Whether or not the current config is valid.',
-    [gae_ts_mon.StringField('config')],
+    description='Whether or not the current config is valid.',
 )
 
 

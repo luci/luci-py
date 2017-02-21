@@ -37,7 +37,7 @@ TARGET_FIELDS = {
 # A custom bucketer with 12% resolution in the range of 1..10**5.
 # Used for job cycle times.
 _bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.05,
-                                         num_finite_buckets=100)
+                                     num_finite_buckets=100)
 
 # Regular (instance-local) metrics: jobs/completed and jobs/durations.
 # Both have the following metric fields:
@@ -48,23 +48,12 @@ _bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.05,
 # - result: one of 'success', 'failure', or 'infra-failure'.
 jobs_completed = gae_ts_mon.CounterMetric(
     'jobs/completed',
-    'Number of completed jobs.', [
-        gae_ts_mon.StringField('spec_name'),
-        gae_ts_mon.StringField('project_id'),
-        gae_ts_mon.StringField('subproject_id'),
-        gae_ts_mon.StringField('result'),
-    ])
+    description='Number of completed jobs.')
 
 
 jobs_durations = gae_ts_mon.CumulativeDistributionMetric(
-    'jobs/durations',
-    'Cycle times of completed jobs, in seconds.', [
-        gae_ts_mon.StringField('spec_name'),
-        gae_ts_mon.StringField('project_id'),
-        gae_ts_mon.StringField('subproject_id'),
-        gae_ts_mon.StringField('result'),
-    ],
-    bucketer=_bucketer)
+    'jobs/durations', bucketer=_bucketer,
+    description='Cycle times of completed jobs, in seconds.')
 
 
 # Similar to jobs/completed and jobs/duration, but with a dedup field.
@@ -75,12 +64,7 @@ jobs_durations = gae_ts_mon.CumulativeDistributionMetric(
 # - deduped: boolean describing whether the job was deduped or not.
 jobs_requested = gae_ts_mon.CounterMetric(
     'jobs/requested',
-    'Number of requested jobs over time.', [
-        gae_ts_mon.StringField('spec_name'),
-        gae_ts_mon.StringField('project_id'),
-        gae_ts_mon.StringField('subproject_id'),
-        gae_ts_mon.BooleanField('deduped'),
-    ])
+    description='Number of requested jobs over time.')
 
 
 # Swarming-specific metric. Metric fields:
@@ -90,11 +74,7 @@ jobs_requested = gae_ts_mon.CounterMetric(
 #     for buildbot jobs.
 tasks_expired = gae_ts_mon.CounterMetric(
     'swarming/tasks/expired',
-    'Number of expired tasks', [
-        gae_ts_mon.StringField('spec_name'),
-        gae_ts_mon.StringField('project_id'),
-        gae_ts_mon.StringField('subproject_id'),
-    ])
+    description='Number of expired tasks')
 
 # Global metric. Metric fields:
 # - project_id: e.g. 'chromium'
@@ -108,11 +88,7 @@ tasks_expired = gae_ts_mon.CounterMetric(
 # send this metric.
 jobs_running = gae_ts_mon.BooleanMetric(
     'jobs/running',
-    'Presence metric for a running job.', [
-        gae_ts_mon.StringField('spec_name'),
-        gae_ts_mon.StringField('project_id'),
-        gae_ts_mon.StringField('subproject_id'),
-    ])
+    description='Presence metric for a running job.')
 
 # Global metric. Metric fields:
 # - project_id: e.g. 'chromium'
@@ -122,19 +98,13 @@ jobs_running = gae_ts_mon.BooleanMetric(
 # - status: 'pending' or 'running'.
 jobs_active = gae_ts_mon.GaugeMetric(
     'jobs/active',
-    'Number of running, pending or otherwise active jobs.', [
-        gae_ts_mon.StringField('spec_name'),
-        gae_ts_mon.StringField('project_id'),
-        gae_ts_mon.StringField('subproject_id'),
-        gae_ts_mon.StringField('status'),
-    ])
+    description='Number of running, pending or otherwise active jobs.')
 
 
 # Global metric. Target field: hostname = 'autogen:<executor_id>' (bot id).
 executors_pool = gae_ts_mon.StringMetric(
     'executors/pool',
-    'Pool name for a given job executor.',
-    None)
+    description='Pool name for a given job executor.')
 
 
 # Global metric. Target fields:
@@ -144,8 +114,7 @@ executors_pool = gae_ts_mon.StringMetric(
 # 'dead'.
 executors_status = gae_ts_mon.StringMetric(
     'executors/status',
-    'Status of a job executor.',
-    None)
+    description=('Status of a job executor.'))
 
 
 # Global metric. Target fields:
@@ -156,14 +125,8 @@ executors_status = gae_ts_mon.StringMetric(
 # Note that 'running' will report data as long as the job is running,
 # so it is best to restrict data to status == 'pending.'
 jobs_pending_durations = gae_ts_mon.NonCumulativeDistributionMetric(
-    'jobs/pending_durations',
-    'Pending times of active jobs, in seconds.', [
-        gae_ts_mon.StringField('spec_name'),
-        gae_ts_mon.StringField('project_id'),
-        gae_ts_mon.StringField('subproject_id'),
-        gae_ts_mon.StringField('status'),
-    ],
-    bucketer=_bucketer)
+    'jobs/pending_durations', bucketer=_bucketer,
+    description='Pending times of active jobs, in seconds.')
 
 
 # Global metric. Target fields:
@@ -175,12 +138,7 @@ jobs_pending_durations = gae_ts_mon.NonCumulativeDistributionMetric(
 # so it is best to restrict data to status == 'pending.'
 jobs_max_pending_duration = gae_ts_mon.FloatMetric(
     'jobs/max_pending_duration',
-    'Maximum pending seconds of pending jobs.', [
-        gae_ts_mon.StringField('spec_name'),
-        gae_ts_mon.StringField('project_id'),
-        gae_ts_mon.StringField('subproject_id'),
-        gae_ts_mon.StringField('status'),
-    ])
+    description='Maximum pending seconds of pending jobs.')
 
 
 def pool_from_dimensions(dimensions):

@@ -186,7 +186,7 @@ def initialize(app=None, is_enabled_fn=None, cron_module='default',
     logging.info('Using pubsub monitor %s/%s', shared.PUBSUB_PROJECT,
                  shared.PUBSUB_TOPIC)
     interface.state.global_monitor = monitors.PubSubMonitor(
-        monitors.AppengineCredentials(), shared.PUBSUB_PROJECT,
+        monitors.APPENGINE_CREDENTIALS, shared.PUBSUB_PROJECT,
         shared.PUBSUB_TOPIC)
 
   shared.register_global_metrics([shared.appengine_default_version])

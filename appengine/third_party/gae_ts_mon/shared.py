@@ -22,20 +22,17 @@ INTERNAL_CALLBACK_NAME = '__gae_ts_mon_callback'
 
 appengine_default_version = metrics.StringMetric(
     'appengine/default_version',
-    'Name of the version currently marked as default.',
-    None)
+    description='Name of the version currently marked as default.')
 started_counter = metrics.CounterMetric(
     'appengine/instances/started',
-    'Count the number of GAE instance initializations.',
-    None)
+    description='Count the number of GAE instance initializations.')
 shutdown_counter = metrics.CounterMetric(
     'appengine/instances/shutdown',
-    'Count the number of GAE instance shutdowns.',
-    None)
+    description='Count the number of GAE instance shutdowns.')
 expired_counter = metrics.CounterMetric(
     'appengine/instances/expired',
-    'Count the number of GAE instance expirations due to inactivity.',
-    None)
+    description=('Count the number of GAE instance expirations '
+                 'due to inactivity.'))
 
 
 global_metrics = {}
