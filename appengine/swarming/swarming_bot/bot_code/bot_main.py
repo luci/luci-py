@@ -216,7 +216,8 @@ def _call_hook_safe(chained, botobj, name, *args):
     msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
     if botobj:
       botobj.post_error('Failed to call hook %s(): %s' % (name, msg))
-    _set_quarantined(msg)
+    # TODO(maruel): Disabled because of https://crbug.com/694327
+    #_set_quarantined(msg)
 
 
 def _get_dimensions(botobj):
