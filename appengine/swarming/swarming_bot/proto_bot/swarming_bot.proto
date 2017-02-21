@@ -14,11 +14,17 @@ syntax = "proto3";
 package luci.swarming.bot;
 import "google/protobuf/struct.proto";
 
+// BotService exposes operations for interacting with remote bots/workers.
 service BotService {
+  // Handshake implements the initial handshake from a bot to Swarming.
   rpc Handshake(HandshakeRequest) returns (HandshakeResponse);
+  // BotUpdate requests a version of the bot code.
   rpc BotUpdate(BotUpdateRequest) returns (BotUpdateResponse);
+  // Poll is called by a bot to request additional work.
   rpc Poll(PollRequest) returns (PollResponse);
+  // TaskUpdate updates the state of a remote action.
   rpc TaskUpdate(TaskUpdateRequest) returns (TaskUpdateResponse);
+  // TaskError marks a remote action as failed.
   rpc TaskError(TaskErrorRequest) returns (TaskErrorResponse);
 }
 

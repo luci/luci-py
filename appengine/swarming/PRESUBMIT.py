@@ -53,6 +53,7 @@ def CommonChecks(input_api, output_api):
     ] + sys.path
     black_list = list(input_api.DEFAULT_BLACK_LIST) + [
       r'.*_pb2\.py$',
+      r'.*_pb2_grpc\.py$',
     ]
     disabled_warnings = [
       'relative-import',

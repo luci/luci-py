@@ -1446,188 +1446,251 @@ _MANIFEST_DIMENSIONSENTRY.has_options = True
 _MANIFEST_DIMENSIONSENTRY._options = _descriptor._ParseOptions(descriptor_pb2.MessageOptions(), _b('8\001'))
 _MANIFEST_ENVENTRY.has_options = True
 _MANIFEST_ENVENTRY._options = _descriptor._ParseOptions(descriptor_pb2.MessageOptions(), _b('8\001'))
-import grpc
-from grpc.beta import implementations as beta_implementations
-from grpc.beta import interfaces as beta_interfaces
-from grpc.framework.common import cardinality
-from grpc.framework.interfaces.face import utilities as face_utilities
+try:
+  # THESE ELEMENTS WILL BE DEPRECATED.
+  # Please use the generated *_pb2_grpc.py files instead.
+  import grpc
+  from grpc.framework.common import cardinality
+  from grpc.framework.interfaces.face import utilities as face_utilities
+  from grpc.beta import implementations as beta_implementations
+  from grpc.beta import interfaces as beta_interfaces
 
 
-class BotServiceStub(object):
-
-  def __init__(self, channel):
-    """Constructor.
-
-    Args:
-      channel: A grpc.Channel.
+  class BotServiceStub(object):
+    """BotService exposes operations for interacting with remote bots/workers.
     """
-    self.Handshake = channel.unary_unary(
-        '/luci.swarming.bot.BotService/Handshake',
-        request_serializer=HandshakeRequest.SerializeToString,
-        response_deserializer=HandshakeResponse.FromString,
-        )
-    self.BotUpdate = channel.unary_unary(
-        '/luci.swarming.bot.BotService/BotUpdate',
-        request_serializer=BotUpdateRequest.SerializeToString,
-        response_deserializer=BotUpdateResponse.FromString,
-        )
-    self.Poll = channel.unary_unary(
-        '/luci.swarming.bot.BotService/Poll',
-        request_serializer=PollRequest.SerializeToString,
-        response_deserializer=PollResponse.FromString,
-        )
-    self.TaskUpdate = channel.unary_unary(
-        '/luci.swarming.bot.BotService/TaskUpdate',
-        request_serializer=TaskUpdateRequest.SerializeToString,
-        response_deserializer=TaskUpdateResponse.FromString,
-        )
-    self.TaskError = channel.unary_unary(
-        '/luci.swarming.bot.BotService/TaskError',
-        request_serializer=TaskErrorRequest.SerializeToString,
-        response_deserializer=TaskErrorResponse.FromString,
-        )
+
+    def __init__(self, channel):
+      """Constructor.
+
+      Args:
+        channel: A grpc.Channel.
+      """
+      self.Handshake = channel.unary_unary(
+          '/luci.swarming.bot.BotService/Handshake',
+          request_serializer=HandshakeRequest.SerializeToString,
+          response_deserializer=HandshakeResponse.FromString,
+          )
+      self.BotUpdate = channel.unary_unary(
+          '/luci.swarming.bot.BotService/BotUpdate',
+          request_serializer=BotUpdateRequest.SerializeToString,
+          response_deserializer=BotUpdateResponse.FromString,
+          )
+      self.Poll = channel.unary_unary(
+          '/luci.swarming.bot.BotService/Poll',
+          request_serializer=PollRequest.SerializeToString,
+          response_deserializer=PollResponse.FromString,
+          )
+      self.TaskUpdate = channel.unary_unary(
+          '/luci.swarming.bot.BotService/TaskUpdate',
+          request_serializer=TaskUpdateRequest.SerializeToString,
+          response_deserializer=TaskUpdateResponse.FromString,
+          )
+      self.TaskError = channel.unary_unary(
+          '/luci.swarming.bot.BotService/TaskError',
+          request_serializer=TaskErrorRequest.SerializeToString,
+          response_deserializer=TaskErrorResponse.FromString,
+          )
 
 
-class BotServiceServicer(object):
+  class BotServiceServicer(object):
+    """BotService exposes operations for interacting with remote bots/workers.
+    """
 
-  def Handshake(self, request, context):
-    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-    context.set_details('Method not implemented!')
-    raise NotImplementedError('Method not implemented!')
+    def Handshake(self, request, context):
+      """Handshake implements the initial handshake from a bot to Swarming.
+      """
+      context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+      context.set_details('Method not implemented!')
+      raise NotImplementedError('Method not implemented!')
 
-  def BotUpdate(self, request, context):
-    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-    context.set_details('Method not implemented!')
-    raise NotImplementedError('Method not implemented!')
+    def BotUpdate(self, request, context):
+      """BotUpdate requests a version of the bot code.
+      """
+      context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+      context.set_details('Method not implemented!')
+      raise NotImplementedError('Method not implemented!')
 
-  def Poll(self, request, context):
-    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-    context.set_details('Method not implemented!')
-    raise NotImplementedError('Method not implemented!')
+    def Poll(self, request, context):
+      """Poll is called by a bot to request additional work.
+      """
+      context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+      context.set_details('Method not implemented!')
+      raise NotImplementedError('Method not implemented!')
 
-  def TaskUpdate(self, request, context):
-    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-    context.set_details('Method not implemented!')
-    raise NotImplementedError('Method not implemented!')
+    def TaskUpdate(self, request, context):
+      """TaskUpdate updates the state of a remote action.
+      """
+      context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+      context.set_details('Method not implemented!')
+      raise NotImplementedError('Method not implemented!')
 
-  def TaskError(self, request, context):
-    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-    context.set_details('Method not implemented!')
-    raise NotImplementedError('Method not implemented!')
-
-
-def add_BotServiceServicer_to_server(servicer, server):
-  rpc_method_handlers = {
-      'Handshake': grpc.unary_unary_rpc_method_handler(
-          servicer.Handshake,
-          request_deserializer=HandshakeRequest.FromString,
-          response_serializer=HandshakeResponse.SerializeToString,
-      ),
-      'BotUpdate': grpc.unary_unary_rpc_method_handler(
-          servicer.BotUpdate,
-          request_deserializer=BotUpdateRequest.FromString,
-          response_serializer=BotUpdateResponse.SerializeToString,
-      ),
-      'Poll': grpc.unary_unary_rpc_method_handler(
-          servicer.Poll,
-          request_deserializer=PollRequest.FromString,
-          response_serializer=PollResponse.SerializeToString,
-      ),
-      'TaskUpdate': grpc.unary_unary_rpc_method_handler(
-          servicer.TaskUpdate,
-          request_deserializer=TaskUpdateRequest.FromString,
-          response_serializer=TaskUpdateResponse.SerializeToString,
-      ),
-      'TaskError': grpc.unary_unary_rpc_method_handler(
-          servicer.TaskError,
-          request_deserializer=TaskErrorRequest.FromString,
-          response_serializer=TaskErrorResponse.SerializeToString,
-      ),
-  }
-  generic_handler = grpc.method_handlers_generic_handler(
-      'luci.swarming.bot.BotService', rpc_method_handlers)
-  server.add_generic_rpc_handlers((generic_handler,))
+    def TaskError(self, request, context):
+      """TaskError marks a remote action as failed.
+      """
+      context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+      context.set_details('Method not implemented!')
+      raise NotImplementedError('Method not implemented!')
 
 
-class BetaBotServiceServicer(object):
-  def Handshake(self, request, context):
-    context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
-  def BotUpdate(self, request, context):
-    context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
-  def Poll(self, request, context):
-    context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
-  def TaskUpdate(self, request, context):
-    context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
-  def TaskError(self, request, context):
-    context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
+  def add_BotServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+        'Handshake': grpc.unary_unary_rpc_method_handler(
+            servicer.Handshake,
+            request_deserializer=HandshakeRequest.FromString,
+            response_serializer=HandshakeResponse.SerializeToString,
+        ),
+        'BotUpdate': grpc.unary_unary_rpc_method_handler(
+            servicer.BotUpdate,
+            request_deserializer=BotUpdateRequest.FromString,
+            response_serializer=BotUpdateResponse.SerializeToString,
+        ),
+        'Poll': grpc.unary_unary_rpc_method_handler(
+            servicer.Poll,
+            request_deserializer=PollRequest.FromString,
+            response_serializer=PollResponse.SerializeToString,
+        ),
+        'TaskUpdate': grpc.unary_unary_rpc_method_handler(
+            servicer.TaskUpdate,
+            request_deserializer=TaskUpdateRequest.FromString,
+            response_serializer=TaskUpdateResponse.SerializeToString,
+        ),
+        'TaskError': grpc.unary_unary_rpc_method_handler(
+            servicer.TaskError,
+            request_deserializer=TaskErrorRequest.FromString,
+            response_serializer=TaskErrorResponse.SerializeToString,
+        ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+        'luci.swarming.bot.BotService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
 
 
-class BetaBotServiceStub(object):
-  def Handshake(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
-    raise NotImplementedError()
-  Handshake.future = None
-  def BotUpdate(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
-    raise NotImplementedError()
-  BotUpdate.future = None
-  def Poll(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
-    raise NotImplementedError()
-  Poll.future = None
-  def TaskUpdate(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
-    raise NotImplementedError()
-  TaskUpdate.future = None
-  def TaskError(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
-    raise NotImplementedError()
-  TaskError.future = None
+  class BetaBotServiceServicer(object):
+    """The Beta API is deprecated for 0.15.0 and later.
+
+    It is recommended to use the GA API (classes and functions in this
+    file not marked beta) for all further purposes. This class was generated
+    only to ease transition from grpcio<0.15.0 to grpcio>=0.15.0."""
+    """BotService exposes operations for interacting with remote bots/workers.
+    """
+    def Handshake(self, request, context):
+      """Handshake implements the initial handshake from a bot to Swarming.
+      """
+      context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
+    def BotUpdate(self, request, context):
+      """BotUpdate requests a version of the bot code.
+      """
+      context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
+    def Poll(self, request, context):
+      """Poll is called by a bot to request additional work.
+      """
+      context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
+    def TaskUpdate(self, request, context):
+      """TaskUpdate updates the state of a remote action.
+      """
+      context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
+    def TaskError(self, request, context):
+      """TaskError marks a remote action as failed.
+      """
+      context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
 
 
-def beta_create_BotService_server(servicer, pool=None, pool_size=None, default_timeout=None, maximum_timeout=None):
-  request_deserializers = {
-    ('luci.swarming.bot.BotService', 'BotUpdate'): BotUpdateRequest.FromString,
-    ('luci.swarming.bot.BotService', 'Handshake'): HandshakeRequest.FromString,
-    ('luci.swarming.bot.BotService', 'Poll'): PollRequest.FromString,
-    ('luci.swarming.bot.BotService', 'TaskError'): TaskErrorRequest.FromString,
-    ('luci.swarming.bot.BotService', 'TaskUpdate'): TaskUpdateRequest.FromString,
-  }
-  response_serializers = {
-    ('luci.swarming.bot.BotService', 'BotUpdate'): BotUpdateResponse.SerializeToString,
-    ('luci.swarming.bot.BotService', 'Handshake'): HandshakeResponse.SerializeToString,
-    ('luci.swarming.bot.BotService', 'Poll'): PollResponse.SerializeToString,
-    ('luci.swarming.bot.BotService', 'TaskError'): TaskErrorResponse.SerializeToString,
-    ('luci.swarming.bot.BotService', 'TaskUpdate'): TaskUpdateResponse.SerializeToString,
-  }
-  method_implementations = {
-    ('luci.swarming.bot.BotService', 'BotUpdate'): face_utilities.unary_unary_inline(servicer.BotUpdate),
-    ('luci.swarming.bot.BotService', 'Handshake'): face_utilities.unary_unary_inline(servicer.Handshake),
-    ('luci.swarming.bot.BotService', 'Poll'): face_utilities.unary_unary_inline(servicer.Poll),
-    ('luci.swarming.bot.BotService', 'TaskError'): face_utilities.unary_unary_inline(servicer.TaskError),
-    ('luci.swarming.bot.BotService', 'TaskUpdate'): face_utilities.unary_unary_inline(servicer.TaskUpdate),
-  }
-  server_options = beta_implementations.server_options(request_deserializers=request_deserializers, response_serializers=response_serializers, thread_pool=pool, thread_pool_size=pool_size, default_timeout=default_timeout, maximum_timeout=maximum_timeout)
-  return beta_implementations.server(method_implementations, options=server_options)
+  class BetaBotServiceStub(object):
+    """The Beta API is deprecated for 0.15.0 and later.
+
+    It is recommended to use the GA API (classes and functions in this
+    file not marked beta) for all further purposes. This class was generated
+    only to ease transition from grpcio<0.15.0 to grpcio>=0.15.0."""
+    """BotService exposes operations for interacting with remote bots/workers.
+    """
+    def Handshake(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
+      """Handshake implements the initial handshake from a bot to Swarming.
+      """
+      raise NotImplementedError()
+    Handshake.future = None
+    def BotUpdate(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
+      """BotUpdate requests a version of the bot code.
+      """
+      raise NotImplementedError()
+    BotUpdate.future = None
+    def Poll(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
+      """Poll is called by a bot to request additional work.
+      """
+      raise NotImplementedError()
+    Poll.future = None
+    def TaskUpdate(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
+      """TaskUpdate updates the state of a remote action.
+      """
+      raise NotImplementedError()
+    TaskUpdate.future = None
+    def TaskError(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
+      """TaskError marks a remote action as failed.
+      """
+      raise NotImplementedError()
+    TaskError.future = None
 
 
-def beta_create_BotService_stub(channel, host=None, metadata_transformer=None, pool=None, pool_size=None):
-  request_serializers = {
-    ('luci.swarming.bot.BotService', 'BotUpdate'): BotUpdateRequest.SerializeToString,
-    ('luci.swarming.bot.BotService', 'Handshake'): HandshakeRequest.SerializeToString,
-    ('luci.swarming.bot.BotService', 'Poll'): PollRequest.SerializeToString,
-    ('luci.swarming.bot.BotService', 'TaskError'): TaskErrorRequest.SerializeToString,
-    ('luci.swarming.bot.BotService', 'TaskUpdate'): TaskUpdateRequest.SerializeToString,
-  }
-  response_deserializers = {
-    ('luci.swarming.bot.BotService', 'BotUpdate'): BotUpdateResponse.FromString,
-    ('luci.swarming.bot.BotService', 'Handshake'): HandshakeResponse.FromString,
-    ('luci.swarming.bot.BotService', 'Poll'): PollResponse.FromString,
-    ('luci.swarming.bot.BotService', 'TaskError'): TaskErrorResponse.FromString,
-    ('luci.swarming.bot.BotService', 'TaskUpdate'): TaskUpdateResponse.FromString,
-  }
-  cardinalities = {
-    'BotUpdate': cardinality.Cardinality.UNARY_UNARY,
-    'Handshake': cardinality.Cardinality.UNARY_UNARY,
-    'Poll': cardinality.Cardinality.UNARY_UNARY,
-    'TaskError': cardinality.Cardinality.UNARY_UNARY,
-    'TaskUpdate': cardinality.Cardinality.UNARY_UNARY,
-  }
-  stub_options = beta_implementations.stub_options(host=host, metadata_transformer=metadata_transformer, request_serializers=request_serializers, response_deserializers=response_deserializers, thread_pool=pool, thread_pool_size=pool_size)
-  return beta_implementations.dynamic_stub(channel, 'luci.swarming.bot.BotService', cardinalities, options=stub_options)
+  def beta_create_BotService_server(servicer, pool=None, pool_size=None, default_timeout=None, maximum_timeout=None):
+    """The Beta API is deprecated for 0.15.0 and later.
+
+    It is recommended to use the GA API (classes and functions in this
+    file not marked beta) for all further purposes. This function was
+    generated only to ease transition from grpcio<0.15.0 to grpcio>=0.15.0"""
+    request_deserializers = {
+      ('luci.swarming.bot.BotService', 'BotUpdate'): BotUpdateRequest.FromString,
+      ('luci.swarming.bot.BotService', 'Handshake'): HandshakeRequest.FromString,
+      ('luci.swarming.bot.BotService', 'Poll'): PollRequest.FromString,
+      ('luci.swarming.bot.BotService', 'TaskError'): TaskErrorRequest.FromString,
+      ('luci.swarming.bot.BotService', 'TaskUpdate'): TaskUpdateRequest.FromString,
+    }
+    response_serializers = {
+      ('luci.swarming.bot.BotService', 'BotUpdate'): BotUpdateResponse.SerializeToString,
+      ('luci.swarming.bot.BotService', 'Handshake'): HandshakeResponse.SerializeToString,
+      ('luci.swarming.bot.BotService', 'Poll'): PollResponse.SerializeToString,
+      ('luci.swarming.bot.BotService', 'TaskError'): TaskErrorResponse.SerializeToString,
+      ('luci.swarming.bot.BotService', 'TaskUpdate'): TaskUpdateResponse.SerializeToString,
+    }
+    method_implementations = {
+      ('luci.swarming.bot.BotService', 'BotUpdate'): face_utilities.unary_unary_inline(servicer.BotUpdate),
+      ('luci.swarming.bot.BotService', 'Handshake'): face_utilities.unary_unary_inline(servicer.Handshake),
+      ('luci.swarming.bot.BotService', 'Poll'): face_utilities.unary_unary_inline(servicer.Poll),
+      ('luci.swarming.bot.BotService', 'TaskError'): face_utilities.unary_unary_inline(servicer.TaskError),
+      ('luci.swarming.bot.BotService', 'TaskUpdate'): face_utilities.unary_unary_inline(servicer.TaskUpdate),
+    }
+    server_options = beta_implementations.server_options(request_deserializers=request_deserializers, response_serializers=response_serializers, thread_pool=pool, thread_pool_size=pool_size, default_timeout=default_timeout, maximum_timeout=maximum_timeout)
+    return beta_implementations.server(method_implementations, options=server_options)
+
+
+  def beta_create_BotService_stub(channel, host=None, metadata_transformer=None, pool=None, pool_size=None):
+    """The Beta API is deprecated for 0.15.0 and later.
+
+    It is recommended to use the GA API (classes and functions in this
+    file not marked beta) for all further purposes. This function was
+    generated only to ease transition from grpcio<0.15.0 to grpcio>=0.15.0"""
+    request_serializers = {
+      ('luci.swarming.bot.BotService', 'BotUpdate'): BotUpdateRequest.SerializeToString,
+      ('luci.swarming.bot.BotService', 'Handshake'): HandshakeRequest.SerializeToString,
+      ('luci.swarming.bot.BotService', 'Poll'): PollRequest.SerializeToString,
+      ('luci.swarming.bot.BotService', 'TaskError'): TaskErrorRequest.SerializeToString,
+      ('luci.swarming.bot.BotService', 'TaskUpdate'): TaskUpdateRequest.SerializeToString,
+    }
+    response_deserializers = {
+      ('luci.swarming.bot.BotService', 'BotUpdate'): BotUpdateResponse.FromString,
+      ('luci.swarming.bot.BotService', 'Handshake'): HandshakeResponse.FromString,
+      ('luci.swarming.bot.BotService', 'Poll'): PollResponse.FromString,
+      ('luci.swarming.bot.BotService', 'TaskError'): TaskErrorResponse.FromString,
+      ('luci.swarming.bot.BotService', 'TaskUpdate'): TaskUpdateResponse.FromString,
+    }
+    cardinalities = {
+      'BotUpdate': cardinality.Cardinality.UNARY_UNARY,
+      'Handshake': cardinality.Cardinality.UNARY_UNARY,
+      'Poll': cardinality.Cardinality.UNARY_UNARY,
+      'TaskError': cardinality.Cardinality.UNARY_UNARY,
+      'TaskUpdate': cardinality.Cardinality.UNARY_UNARY,
+    }
+    stub_options = beta_implementations.stub_options(host=host, metadata_transformer=metadata_transformer, request_serializers=request_serializers, response_deserializers=response_deserializers, thread_pool=pool, thread_pool_size=pool_size)
+    return beta_implementations.dynamic_stub(channel, 'luci.swarming.bot.BotService', cardinalities, options=stub_options)
+except ImportError:
+  pass
 # @@protoc_insertion_point(module_scope)

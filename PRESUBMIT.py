@@ -32,6 +32,7 @@ def CommonChecks(input_api, output_api):
     r'.+/build/.+(js|html)$',
     r'/test',
     r'.+_pb2\.py$',
+    r'.+_pb2_grpc\.py$',
     r'.*third_party.*',
   ]
   return input_api.canned_checks.PanProjectChecks(
