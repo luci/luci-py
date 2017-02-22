@@ -106,17 +106,17 @@ def initialize(pub_key, priv_key):
   return high.Initialize(pub_key, priv_key)
 
 
-def get_devices(bot, endpoints=None, enable_resets=False):
+# TODO(bpastene): Remove bot arg when call site has been updated.
+def get_devices(bot=None, endpoints=None, enable_resets=False):
+  # pylint: disable=unused-argument
   devices = []
   if not gce.is_gce():
     devices += high.GetLocalDevices(
-      'swarming', 10000, 10000, on_error=bot.post_error if bot else None,
-      as_root=False, enable_resets=enable_resets)
+      'swarming', 10000, 10000, as_root=False, enable_resets=enable_resets)
 
   if endpoints:
     devices += high.GetRemoteDevices(
-        'swarming', endpoints, 10000, 10000,
-        on_error=bot.post_error if bot else None, as_root=False)
+        'swarming', endpoints, 10000, 10000, as_root=False)
 
   return devices
 
