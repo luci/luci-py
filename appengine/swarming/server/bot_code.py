@@ -23,6 +23,7 @@ from components import config
 from components import datastore_utils
 from components import utils
 from server import bot_archive
+from server import config as local_config
 
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -208,7 +209,8 @@ def get_bot_version(host):
   additionals = {'config/bot_config.py': get_bot_config().content}
   bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
   version = bot_archive.get_swarming_bot_version(
-      bot_dir, host, utils.get_app_version(), additionals)
+      bot_dir, host, utils.get_app_version(), additionals,
+      local_config.settings().enable_ts_monitoring)
   memcache.set('version-' + signature, version, namespace='bot_code', time=60)
   return version, additionals
 
@@ -232,7 +234,8 @@ def get_swarming_bot_zip(host):
   }
   bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
   content, version = bot_archive.get_swarming_bot_zip(
-      bot_dir, host, utils.get_app_version(), additionals)
+      bot_dir, host, utils.get_app_version(), additionals,
+      local_config.settings().enable_ts_monitoring)
   # This is immutable so not no need to set expiration time.
   memcache.set('code-' + version, content, namespace='bot_code')
   logging.info('generated bot code %s; %d bytes', version, len(content))

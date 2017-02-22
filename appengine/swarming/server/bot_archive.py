@@ -341,7 +341,8 @@ def resolve_symlink(path):
   return os.path.normpath(os.path.sep.join(parts))
 
 
-def yield_swarming_bot_files(root_dir, host, host_version, additionals):
+def yield_swarming_bot_files(
+    root_dir, host, host_version, additionals, enable_ts_monitoring):
   """Yields all the files to map as tuple(filename, content).
 
   config.json is injected with json data about the server.
@@ -356,6 +357,7 @@ def yield_swarming_bot_files(root_dir, host, host_version, additionals):
   items = {i: None for i in FILES}
   items.update(additionals)
   config = {
+    'enable_ts_monitoring': enable_ts_monitoring,
     'is_grpc': is_grpc,
     'server': host.rstrip('/'),
     'server_version': host_version,
@@ -369,7 +371,8 @@ def yield_swarming_bot_files(root_dir, host, host_version, additionals):
         yield item, f.read()
 
 
-def get_swarming_bot_zip(root_dir, host, host_version, additionals):
+def get_swarming_bot_zip(
+    root_dir, host, host_version, additionals, enable_ts_monitoring):
   """Returns a zipped file of all the files a bot needs to run.
 
   Arguments:
@@ -377,6 +380,8 @@ def get_swarming_bot_zip(root_dir, host, host_version, additionals):
     additionals: dict(filepath: content) of additional items to put into the zip
         file, in addition to FILES and MAPPED. In practice, it's going to be a
         custom bot_config.py.
+    enable_ts_monitoring: bool if ts_mon should be enabled on the bot.
+
   Returns:
     Tuple(str being the zipped file's content, bot version (SHA-1) it
     represents).
@@ -385,7 +390,7 @@ def get_swarming_bot_zip(root_dir, host, host_version, additionals):
   h = hashlib.sha1()
   with zipfile.ZipFile(zip_memory_file, 'w', zipfile.ZIP_DEFLATED) as zip_file:
     for name, content in yield_swarming_bot_files(
-        root_dir, host, host_version, additionals):
+        root_dir, host, host_version, additionals, enable_ts_monitoring):
       zip_file.writestr(name, content)
       h.update(str(len(name)))
       h.update(name)
@@ -400,12 +405,14 @@ def get_swarming_bot_zip(root_dir, host, host_version, additionals):
   return data, bot_version
 
 
-def get_swarming_bot_version(root_dir, host, host_version, additionals):
+def get_swarming_bot_version(
+    root_dir, host, host_version, additionals, enable_ts_monitoring):
   """Returns the SHA1 hash of the bot code, representing the version.
 
   Arguments:
     root_dir: directory swarming_bot.
     additionals: See get_swarming_bot_zip's doc.
+    enable_ts_monitoring: bool if ts_mon should be enabled on the bot.
 
   Returns:
     The SHA1 hash of the bot code.
@@ -414,7 +421,7 @@ def get_swarming_bot_version(root_dir, host, host_version, additionals):
   try:
     # TODO(maruel): Deduplicate from zip_package.genereate_version().
     for name, content in yield_swarming_bot_files(
-        root_dir, host, host_version, additionals):
+        root_dir, host, host_version, additionals, enable_ts_monitoring):
       h.update(str(len(name)))
       h.update(name)
       h.update(str(len(content)))

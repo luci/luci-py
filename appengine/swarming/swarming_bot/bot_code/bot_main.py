@@ -41,6 +41,7 @@ import singleton
 from api import bot
 from api import os_utilities
 from api import platforms
+from infra_libs import ts_mon
 from utils import file_path
 from utils import on_error
 from utils import tools
@@ -101,6 +102,42 @@ DEFAULT_SETTINGS = {
   },
 }
 
+### Monitoring
+
+
+_bucketer = ts_mon.GeometricBucketer(growth_factor=10**0.05,
+                                     num_finite_buckets=100)
+
+hooks_durations = ts_mon.CumulativeDistributionMetric(
+    'swarming/bots/hooks/durations', bucketer=_bucketer,
+    description='Duration of bot hook calls.',
+    units=ts_mon.MetricsDataUnits.SECONDS)
+
+
+def _flatten_dimensions(dimensions):
+  """Return a canonical string of flattened dimensions."""
+  iterables = (['%s:%s' % (key, x) for x in values]
+               for key, values in dimensions.iteritems()
+               if key not in ('android_devices', 'id'))
+  return '|'.join(sorted(itertools.chain(*iterables)))
+
+
+def monitor_call(func):
+  """Decorates a functions and reports the runtime to ts_mon."""
+  def hook(chained, botobj, name, *args, **kwargs):
+    start = time.time()
+    try:
+      return func(chained, botobj, name, *args, **kwargs)
+    finally:
+      duration = max(0, time.time() - start)
+      if botobj and botobj.dimensions:
+        flat_dims = _flatten_dimensions(botobj.dimensions)
+        if flat_dims:
+          hooks_durations.add(
+              duration, fields={'hookname': name, 'pool': flat_dims})
+      logging.info('%s(): %gs', name, round(duration, 3))
+  return hook
+
 
 ### bot_config handler part.
 
@@ -154,22 +191,8 @@ def _register_extra_bot_config(content):
     _set_quarantined('handshake returned invalid bot_config: %s' % e)
 
 
-def _log_call(name=None):
-  def gen(fn):
-    def hook(*args, **kwargs):
-      start = time.time()
-      fnname = name(*args) if name else fn.__name__
-      logging.info('%s()', fnname)
-      try:
-        return fn(*args, **kwargs)
-      finally:
-        logging.info('%s() took %.1fs', fnname, round(time.time() - start, 1))
-    return hook
-  return gen
-
-
-@_log_call(lambda _o, _b, name, *args: name)
-def _call_hook(chained, botobj, name, *args):
+@monitor_call
+def _call_hook(chained, botobj, name, *args, **kwargs):
   """Calls a hook function named `name` in bot_config.py.
 
   If `chained` is True, calls the general bot_config.py then the injected
@@ -183,19 +206,19 @@ def _call_hook(chained, botobj, name, *args):
       # Injected version has higher priority.
       hook = getattr(_EXTRA_BOT_CONFIG, name, None)
       if hook:
-        return hook(botobj, *args)
+        return hook(botobj, *args, **kwargs)
       hook = getattr(_get_bot_config(), name, None)
       if hook:
-        return hook(botobj, *args)
+        return hook(botobj, *args, **kwargs)
     # Call both in order.
     ret = None
     hook = getattr(_get_bot_config(), name, None)
     if hook:
-      ret = hook(botobj, *args)
+      ret = hook(botobj, *args, **kwargs)
     hook = getattr(_EXTRA_BOT_CONFIG, name, None)
     if hook:
       # Ignores the previous return value.
-      ret = hook(botobj, *args)
+      ret = hook(botobj, *args, **kwargs)
     return ret
   finally:
     # TODO(maruel): Handle host_reboot() request the same way.
@@ -644,6 +667,21 @@ def _run_bot(arg_error):
     return _run_bot_inner(arg_error, quit_bit)
 
 
+def _init_ts_mon():
+  """Initializes ts_mon."""
+  parser = argparse.ArgumentParser(description=sys.modules[__name__].__doc__)
+  ts_mon.add_argparse_options(parser)
+  parser.set_defaults(
+      ts_mon_target_type='task',
+      ts_mon_task_service_name='swarming-bot',
+      ts_mon_task_job_name='default',
+      ts_mon_flush='auto',
+      ts_mon_ca_certs=tools.get_cacerts_bundle(),
+  )
+  args = parser.parse_args([])
+  ts_mon.process_argparse_options(args)
+
+
 def _run_bot_inner(arg_error, quit_bit):
   """Runs the bot until an event occurs.
 
@@ -653,6 +691,8 @@ def _run_bot_inner(arg_error, quit_bit):
   - bot process shuts down (this includes a signal is received)
   """
   config = get_config()
+  if config['enable_ts_monitoring']:
+    _init_ts_mon()
   try:
     # First thing is to get an arbitrary url. This also ensures the network is
     # up and running, which is necessary before trying to get the FQDN below.
@@ -1131,6 +1171,7 @@ def get_config():
   except (IOError, OSError, TypeError, ValueError):
     logging.exception('Invalid config.json!')
     config = {
+      'enable_ts_monitoring': False,
       'is_grpc': False,
       'server': '',
       'server_version': 'version1',

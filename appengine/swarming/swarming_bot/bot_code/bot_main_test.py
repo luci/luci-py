@@ -402,6 +402,7 @@ class TestBotMain(TestBotBase):
     self.mock(
         bot_main, 'get_config',
         lambda: {
+          'enable_ts_monitoring': False,
           'is_grpc': False,
           'server': self.url,
           'server_version': '1',

@@ -21,7 +21,7 @@ def read_config():
   config_path = os.path.join(ROOT_DIR, 'swarming_bot', 'config', 'config.json')
   with open(config_path, 'rb') as f:
     config = json.load(f) or {}
-  expected = ['is_grpc', 'server', 'server_version']
+  expected = ['enable_ts_monitoring', 'is_grpc', 'server', 'server_version']
   actual = sorted(config)
   if expected != actual:
     raise ValueError(
@@ -31,14 +31,15 @@ def read_config():
 
 
 def get_swarming_bot_zip():
-  host = read_config()['server']
+  config = read_config()
   bot_config_path = os.path.join(
       ROOT_DIR, 'swarming_bot', 'config', 'bot_config.py')
   with open(bot_config_path, 'rb') as f:
     additionals = {'config/bot_config.py': f.read()}
   from server import bot_archive
   return bot_archive.get_swarming_bot_zip(
-      os.path.join(ROOT_DIR, 'swarming_bot'), host, '1', additionals)
+      os.path.join(ROOT_DIR, 'swarming_bot'), config['server'], '1',
+      additionals, config['enable_ts_monitoring'])
 
 
 def main():
