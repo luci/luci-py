@@ -105,13 +105,13 @@ DEFAULT_SETTINGS = {
 ### Monitoring
 
 
-_bucketer = ts_mon.GeometricBucketer(growth_factor=10**0.05,
+_bucketer = ts_mon.GeometricBucketer(growth_factor=10**0.07,
                                      num_finite_buckets=100)
 
 hooks_durations = ts_mon.CumulativeDistributionMetric(
     'swarming/bots/hooks/durations', bucketer=_bucketer,
-    description='Duration of bot hook calls.',
-    units=ts_mon.MetricsDataUnits.SECONDS)
+    description='Duration of bot hook calls in ms',
+    units=ts_mon.MetricsDataUnits.MILLISECONDS)
 
 
 def _flatten_dimensions(dimensions):
@@ -129,7 +129,7 @@ def monitor_call(func):
     try:
       return func(chained, botobj, name, *args, **kwargs)
     finally:
-      duration = max(0, time.time() - start)
+      duration = max(0, (time.time() - start) * 1000)
       if botobj and botobj.dimensions:
         flat_dims = _flatten_dimensions(botobj.dimensions)
         if flat_dims:
