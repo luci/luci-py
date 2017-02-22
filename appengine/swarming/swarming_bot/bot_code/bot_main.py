@@ -11,11 +11,12 @@ results back.
 It manages self-update and rebooting the host in case of problems.
 """
 
+import argparse
 import contextlib
 import fnmatch
+import itertools
 import json
 import logging
-import optparse
 import os
 import shutil
 import sys
@@ -42,6 +43,7 @@ from api import os_utilities
 from api import platforms
 from utils import file_path
 from utils import on_error
+from utils import tools
 from utils import subprocess42
 from utils import zip_package
 
@@ -335,7 +337,7 @@ def setup_bot(skip_reboot):
     logging.info('Skipping setup_bot, SWARMING_EXTERNAL_BOT_SETUP is set')
     return
 
-  botobj = get_bot()
+  botobj = get_bot(get_config())
   try:
     from config import bot_config
   except Exception as e:
@@ -467,10 +469,12 @@ def _on_shutdown_hook(b):
   setup_bot(True)
 
 
-def get_bot():
+def get_bot(config):
   """Returns a valid Bot instance.
 
   Should only be called once in the process lifetime.
+
+  It can be called by ../__main__.py, something to keep in mind.
   """
   # This variable is used to bootstrap the initial bot.Bot object, which then is
   # used to get the dimensions and state.
@@ -479,9 +483,6 @@ def get_bot():
     'state': {},
     'version': generate_version(),
   }
-  config = get_config()
-  assert not config['server'].endswith('/'), config
-
   base_dir = os.path.dirname(THIS_FILE)
   # Use temporary Bot object to call get_attributes. Attributes are needed to
   # construct the "real" bot.Bot.
@@ -628,13 +629,7 @@ def _do_handshake(botobj, quit_bit):
 
 
 def _run_bot(arg_error):
-  """Runs the bot until an event occurs.
-
-  One of the three following even can occur:
-  - host reboots
-  - bot process restarts (this includes self-update)
-  - bot process shuts down (this includes a signal is received)
-  """
+  """Runs _run_bot_inner() with a signal handler."""
   # The quit_bit is to signal that the bot process must shutdown. It is
   # different from a request to restart the bot process or reboot the host.
   quit_bit = threading.Event()
@@ -646,108 +641,117 @@ def _run_bot(arg_error):
   # TODO(maruel): Set quit_bit when stdin is closed on Windows.
 
   with subprocess42.set_signal_handler(subprocess42.STOP_SIGNALS, handler):
-    config = get_config()
+    return _run_bot_inner(arg_error, quit_bit)
+
+
+def _run_bot_inner(arg_error, quit_bit):
+  """Runs the bot until an event occurs.
+
+  One of the three following even can occur:
+  - host reboots
+  - bot process restarts (this includes self-update)
+  - bot process shuts down (this includes a signal is received)
+  """
+  config = get_config()
+  try:
+    # First thing is to get an arbitrary url. This also ensures the network is
+    # up and running, which is necessary before trying to get the FQDN below.
+    # There's no need to do error handling here - the "ping" is just to "wake
+    # up" the network; if there's something seriously wrong, the handshake will
+    # fail and we'll handle it there.
+    remote = remote_client.createRemoteClient(config['server'], None,
+                                              config['is_grpc'])
+    remote.ping()
+  except Exception:
+    # url_read() already traps pretty much every exceptions. This except
+    # clause is kept there "just in case".
+    logging.exception('server_ping threw')
+
+  # If we are on GCE, we want to make sure GCE metadata server responds, since
+  # we use the metadata to derive bot ID, dimensions and state.
+  if platforms.is_gce():
+    logging.info('Running on GCE, waiting for the metadata server')
+    platforms.gce.wait_for_metadata(quit_bit)
+    if quit_bit.is_set():
+      logging.info('Early quit 1')
+      return 0
+
+  # Next we make sure the bot can make authenticated calls by grabbing the auth
+  # headers, retrying on errors a bunch of times. We don't give up if it fails
+  # though (maybe the bot will "fix itself" later).
+  botobj = get_bot(config)
+  try:
+    botobj.remote.initialize(quit_bit)
+  except remote_client.InitializationError as exc:
+    botobj.post_error('failed to grab auth headers: %s' % exc.last_error)
+    logging.error('Can\'t grab auth headers, continuing anyway...')
+
+  if arg_error:
+    botobj.post_error('Bootstrapping error: %s' % arg_error)
+
+  if quit_bit.is_set():
+    logging.info('Early quit 2')
+    return 0
+
+  _call_hook_safe(True, botobj, 'on_bot_startup')
+
+  # Initial attributes passed to bot.Bot in get_bot above were constructed for
+  # 'fake' bot ID ('none'). Refresh them to match the real bot ID, now that we
+  # have fully initialize bot.Bot object. Note that 'get_dimensions' and
+  # 'get_state' may depend on actions done by 'on_bot_startup' hook, that's why
+  # we do it here and not in 'get_bot'.
+  dims = _get_dimensions(botobj)
+  states = _get_state(botobj, 0)
+  with botobj._lock:
+    botobj._update_dimensions(dims)
+    botobj._update_state(states)
+
+  if quit_bit.is_set():
+    logging.info('Early quit 3')
+    return 0
+
+  _do_handshake(botobj, quit_bit)
+
+  if quit_bit.is_set():
+    logging.info('Early quit 4')
+    return 0
+
+  # Let the bot to finish the initialization, now that it knows its server
+  # defined dimensions.
+  _call_hook_safe(True, botobj, 'on_handshake')
+
+  _cleanup_bot_directory(botobj)
+  _clean_cache(botobj)
+
+  if quit_bit.is_set():
+    logging.info('Early quit 5')
+    return 0
+
+  # This environment variable is accessible to the tasks executed by this bot.
+  os.environ['SWARMING_BOT_ID'] = botobj.id.encode('utf-8')
+
+  consecutive_sleeps = 0
+  last_action = time.time()
+  while not quit_bit.is_set():
     try:
-      # First thing is to get an arbitrary url. This also ensures the network is
-      # up and running, which is necessary before trying to get the FQDN below.
-      # There's no need to do error handling here - the "ping" is just to "wake
-      # up" the network; if there's something seriously wrong, the handshake
-      # will fail and we'll handle it there.
-      remote = remote_client.createRemoteClient(config['server'], None,
-                                                config['is_grpc'])
-      remote.ping()
-    except Exception as e:
-      # url_read() already traps pretty much every exceptions. This except
-      # clause is kept there "just in case".
-      logging.exception('server_ping threw')
-
-    # If we are on GCE, we want to make sure GCE metadata server responds, since
-    # we use the metadata to derive bot ID, dimensions and state.
-    if platforms.is_gce():
-      logging.info('Running on GCE, waiting for the metadata server')
-      platforms.gce.wait_for_metadata(quit_bit)
-      if quit_bit.is_set():
-        logging.info('Early quit 1')
-        return 0
-
-    # Next we make sure the bot can make authenticated calls by grabbing
-    # the auth headers, retrying on errors a bunch of times. We don't give up
-    # if it fails though (maybe the bot will "fix itself" later).
-    botobj = get_bot()
-    try:
-      botobj.remote.initialize(quit_bit)
-    except remote_client.InitializationError as exc:
-      botobj.post_error('failed to grab auth headers: %s' % exc.last_error)
-      logging.error('Can\'t grab auth headers, continuing anyway...')
-
-    if arg_error:
-      botobj.post_error('Bootstrapping error: %s' % arg_error)
-
-    if quit_bit.is_set():
-      logging.info('Early quit 2')
-      return 0
-
-    _call_hook_safe(True, botobj, 'on_bot_startup')
-
-    # Initial attributes passed to bot.Bot in get_bot above were constructed for
-    # 'fake' bot ID ('none'). Refresh them to match the real bot ID, now that we
-    # have fully initialize bot.Bot object. Note that 'get_dimensions' and
-    # 'get_state' may depend on actions done by 'on_bot_startup' hook, that's
-    # why we do it here and not in 'get_bot'.
-    dims = _get_dimensions(botobj)
-    states = _get_state(botobj, 0)
-    with botobj._lock:
-      botobj._update_dimensions(dims)
-      botobj._update_state(states)
-
-    if quit_bit.is_set():
-      logging.info('Early quit 3')
-      return 0
-
-    _do_handshake(botobj, quit_bit)
-
-    if quit_bit.is_set():
-      logging.info('Early quit 4')
-      return 0
-
-    # Let the bot to finish the initialization, now that it knows its server
-    # defined dimensions.
-    _call_hook_safe(True, botobj, 'on_handshake')
-
-    _cleanup_bot_directory(botobj)
-    _clean_cache(botobj)
-
-    if quit_bit.is_set():
-      logging.info('Early quit 5')
-      return 0
-
-    # This environment variable is accessible to the tasks executed by this bot.
-    os.environ['SWARMING_BOT_ID'] = botobj.id.encode('utf-8')
-
-    consecutive_sleeps = 0
-    last_action = time.time()
-    while not quit_bit.is_set():
-      try:
-        dims = _get_dimensions(botobj)
-        states = _get_state(botobj, consecutive_sleeps)
-        with botobj._lock:
-          botobj._update_dimensions(dims)
-          botobj._update_state(states)
-        did_something = _poll_server(botobj, quit_bit, last_action)
-        if did_something:
-          last_action = time.time()
-          consecutive_sleeps = 0
-        else:
-          consecutive_sleeps += 1
-      except Exception as e:
-        logging.exception('_poll_server failed in a completely unexpected way')
-        msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
-        botobj.post_error(msg)
+      dims = _get_dimensions(botobj)
+      states = _get_state(botobj, consecutive_sleeps)
+      with botobj._lock:
+        botobj._update_dimensions(dims)
+        botobj._update_state(states)
+      did_something = _poll_server(botobj, quit_bit, last_action)
+      if did_something:
+        last_action = time.time()
         consecutive_sleeps = 0
-        # Sleep a bit as a precaution to avoid hammering the server.
-        quit_bit.wait(10)
-    logging.info('Quitting')
-
+      else:
+        consecutive_sleeps += 1
+    except Exception as e:
+      logging.exception('_poll_server failed in a completely unexpected way')
+      msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
+      botobj.post_error(msg)
+      consecutive_sleeps = 0
+      # Sleep a bit as a precaution to avoid hammering the server.
+      quit_bit.wait(10)
   # Tell the server we are going away.
   botobj.post_event('bot_shutdown', 'Signal was received')
   return 0
@@ -1119,18 +1123,25 @@ def _update_lkgbc(botobj):
 def get_config():
   """Returns the data from config.json."""
   global _ERROR_HANDLER_WAS_REGISTERED
-
-  with contextlib.closing(zipfile.ZipFile(THIS_FILE, 'r')) as f:
-    config = json.load(f.open('config/config.json', 'r'))
-
-  server = config.get('server', '')
-  if not _ERROR_HANDLER_WAS_REGISTERED and server:
-    on_error.report_on_exception_exit(server)
+  try:
+    with contextlib.closing(zipfile.ZipFile(THIS_FILE, 'r')) as f:
+      config = json.load(f.open('config/config.json', 'r'))
+    if config['server'].endswith('/'):
+      raise ValueError('Invalid server entry %r' % config['server'])
+  except (IOError, OSError, TypeError, ValueError):
+    logging.exception('Invalid config.json!')
+    config = {
+      'is_grpc': False,
+      'server': '',
+      'server_version': 'version1',
+    }
+  if not _ERROR_HANDLER_WAS_REGISTERED and config['server']:
+    on_error.report_on_exception_exit(config['server'])
     _ERROR_HANDLER_WAS_REGISTERED = True
   return config
 
 
-def main(args):
+def main(argv):
   subprocess42.inhibit_os_error_reporting()
   # Add SWARMING_HEADLESS into environ so subcommands know that they are running
   # in a headless (non-interactive) mode.
@@ -1138,8 +1149,9 @@ def main(args):
 
   # The only reason this is kept is to enable the unit test to use --help to
   # quit the process.
-  parser = optparse.OptionParser(description=sys.modules[__name__].__doc__)
-  _, args = parser.parse_args(args)
+  parser = argparse.ArgumentParser(description=sys.modules[__name__].__doc__)
+  parser.add_argument('unsupported', nargs='*', help=argparse.SUPPRESS)
+  args = parser.parse_args(argv)
 
   # Enforces that only one process with a bot in this directory can be run on
   # this host at once.
@@ -1161,7 +1173,7 @@ def main(args):
     os_utilities.trim_rolled_log(log_path)
 
   error = None
-  if len(args) != 0:
+  if len(args.unsupported) != 0:
     error = 'Unexpected arguments: %s' % args
   try:
     return _run_bot(error)

@@ -175,7 +175,7 @@ class TestBotMain(TestBotBase):
     self.assertEqual(expected, bot_main._get_state(obj, 0.1))
 
   def test_get_state_quarantine(self):
-    botobj = bot_main.get_bot()
+    botobj = bot_main.get_bot(bot_main.get_config())
     root = u'c:\\' if sys.platform == 'win32' else u'/'
     def get_state(_):
       return {
@@ -326,7 +326,7 @@ class TestBotMain(TestBotBase):
             {'resp': 1},
           ),
         ])
-    botobj = bot_main.get_bot()
+    botobj = bot_main.get_bot(bot_main.get_config())
     self.assertEqual(True, bot_main._post_error_task(botobj, 'error', 23))
 
   def test_do_handshake(self):
@@ -394,14 +394,18 @@ class TestBotMain(TestBotBase):
 
     orig = bot_main.get_bot
     botobj = [None]
-    def get_bot():
-      botobj[0] = orig()
+    def get_bot(config):
+      botobj[0] = orig(config)
       return botobj[0]
     self.mock(bot_main, 'get_bot', get_bot)
 
     self.mock(
         bot_main, 'get_config',
-        lambda: {'server': self.url, 'server_version': '1', 'is_grpc': False})
+        lambda: {
+          'is_grpc': False,
+          'server': self.url,
+          'server_version': '1',
+        })
     self.mock(
         bot_main, '_get_dimensions', lambda _: self.attributes['dimensions'])
     self.mock(os_utilities, 'get_state', lambda *_: self.attributes['state'])
