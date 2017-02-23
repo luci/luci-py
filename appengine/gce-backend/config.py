@@ -65,6 +65,22 @@ class Configuration(datastore_utils.config.GlobalConfig):
     return template_cfg, manager_cfg
 
 
+def count_instances():
+  """Counts the numbers of instances configured by each instance template.
+
+  Returns:
+    A dict mapping instance template name to a list of (min, max).
+  """
+  # Aggregate the numbers of instances configured in each instance group manager
+  # created for each instance template.
+  totals = collections.defaultdict(lambda: [0, 0])
+  _, manager_cfg = Configuration.load()
+  for manager in manager_cfg.managers:
+    totals[manager.template_base_name][0] += manager.minimum_size
+    totals[manager.template_base_name][1] += manager.maximum_size
+  return totals
+
+
 def update_template_configs():
   """Updates the local template configuration from the config service.
 

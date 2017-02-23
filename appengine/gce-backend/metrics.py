@@ -9,6 +9,7 @@ import logging
 import gae_event_mon
 import gae_ts_mon
 
+import config
 import instance_group_managers
 
 
@@ -24,6 +25,14 @@ GLOBAL_TARGET_FIELDS = {
 
 
 GLOBAL_METRICS = {
+    'config_max_instances': gae_ts_mon.GaugeMetric(
+        'machine_provider/gce_backend/config/instances/max',
+        description='Maximum number of instances currently configured.',
+    ),
+    'config_min_instances': gae_ts_mon.GaugeMetric(
+        'machine_provider/gce_backend/config/instances/min',
+        description='Minimum number of instances currently configured.',
+    ),
     'instances': gae_ts_mon.GaugeMetric(
         'machine_provider/gce_backend/instances',
         description='Current count of the number of instances.',
@@ -38,6 +47,24 @@ config_valid = gae_ts_mon.BooleanMetric(
 
 
 def compute_global_metrics(): # pragma: no cover
+  for name, counts in config.count_instances().iteritems():
+    logging.info('%s min: %s', name, counts[0])
+    GLOBAL_METRICS['config_min_instances'].set(
+        counts[0],
+        fields={
+            'instance_template': name,
+        },
+        target_fields=GLOBAL_TARGET_FIELDS,
+    )
+    logging.info('%s max: %s', name, counts[1])
+    GLOBAL_METRICS['config_max_instances'].set(
+        counts[1],
+        fields={
+            'instance_template': name,
+        },
+        target_fields=GLOBAL_TARGET_FIELDS,
+    )
+
   for name, count in instance_group_managers.count_instances().iteritems():
     logging.info('%s: %s', name, count)
     GLOBAL_METRICS['instances'].set(
