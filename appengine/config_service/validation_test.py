@@ -478,6 +478,11 @@ class ValidationTestCase(test_case.TestCase):
         ],
     )
 
+  def test_validate_json_files(self):
+    with self.assertRaises(ValueError):
+      config.validation.DEFAULT_RULE_SET.validate(
+          'services/luci-config', 'a.json', '[1,]')
+
 
 if __name__ == '__main__':
   test_env.main()

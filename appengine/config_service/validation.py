@@ -3,6 +3,7 @@
 # that can be found in the LICENSE file.
 
 import base64
+import json
 import logging
 import posixpath
 import re
@@ -378,3 +379,11 @@ def validate_config(*args, **kwargs):
 def is_url_relative(url):
   parsed = urlparse.urlparse(url)
   return bool(not parsed.scheme and not parsed.netloc and parsed.path)
+
+
+@validation.rule('regex:.+', 'regex:.+\.json')
+def validate_json_files(cfg, ctx):
+  try:
+    json.loads(cfg)
+  except ValueError as ex:
+    ctx.error('Invalid JSON file: %s', ex)
