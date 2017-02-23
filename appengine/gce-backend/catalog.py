@@ -13,12 +13,12 @@ from protorpc.remote import protojson
 from components import gce
 from components import machine_provider
 from components import net
-from components import utils
 
 import instances
 import instance_group_managers
 import metrics
 import models
+import utilities
 
 
 def get_policies(key, service_account):
@@ -165,15 +165,7 @@ def schedule_catalog():
               instance = instance_key.get()
               if instance:
                 if not instance.cataloged and not instance.pending_deletion:
-                  if not utils.enqueue_task(
-                      '/internal/queues/catalog-instance',
-                      'catalog-instance',
-                      params={
-                          'key': instance.key.urlsafe(),
-                      },
-                  ):
-                    logging.warning(
-                        'Failed to enqueue task for Instance: %s', instance.key)
+                  utilities.enqueue_task('catalog-instance', instance.key)
 
 
 def remove(key):
@@ -212,15 +204,7 @@ def schedule_removal():
       for instance_key in instance_group_manager.instances:
         instance = instance_key.get()
         if instance and instance.cataloged:
-          if not utils.enqueue_task(
-              '/internal/queues/remove-cataloged-instance',
-              'remove-cataloged-instance',
-              params={
-                  'key': instance.key.urlsafe(),
-              },
-          ):
-            logging.warning(
-                'Failed to enqueue task for Instance: %s', instance.key)
+          utilities.enqueue_task('remove-cataloged-instance', instance.key)
 
 
 def update_cataloged_instance(key):
@@ -256,11 +240,4 @@ def schedule_cataloged_instance_update():
   """Enqueues tasks to update information about cataloged instances."""
   for instance in models.Instance.query():
     if instance.cataloged:
-      if not utils.enqueue_task(
-          '/internal/queues/update-cataloged-instance',
-          'update-cataloged-instance',
-          params={
-              'key': instance.key.urlsafe(),
-          },
-      ):
-        logging.warning('Failed to enqueue task for Instance: %s', instance.key)
+      utilities.enqueue_task('update-cataloged-instance', instance.key)

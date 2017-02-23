@@ -11,7 +11,6 @@ from google.appengine.ext import ndb
 
 from components import gce
 from components import net
-from components import utils
 
 import metrics
 import models
@@ -321,11 +320,5 @@ def schedule_metadata_tasks():
     elif instance.pending_metadata_updates:
       # Enqueue task to compress a list of desired metadata updates.
       queue = 'compress-instance-metadata-updates'
-    if queue and not utils.enqueue_task(
-        '/internal/queues/%s' % queue,
-        queue,
-        params={
-            'key': instance.key.urlsafe(),
-        },
-    ):
-      logging.warning('Failed to enqueue task for Instance: %s', instance.key)
+    if queue:
+      utilities.enqueue_task(queue, instance.key)

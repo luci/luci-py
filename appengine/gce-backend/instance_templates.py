@@ -10,9 +10,9 @@ from google.appengine.ext import ndb
 
 from components import gce
 from components import net
-from components import utils
 
 import models
+import utilities
 
 
 def get_instance_template_key(base_name):
@@ -163,17 +163,8 @@ def schedule_creation():
     if instance_template.active:
       instance_template_revision = instance_template.active.get()
       if instance_template_revision and not instance_template_revision.url:
-        if not utils.enqueue_task(
-            '/internal/queues/create-instance-template',
-            'create-instance-template',
-            params={
-                'key': instance_template.active.urlsafe(),
-            },
-        ):
-          logging.warning(
-              'Failed to enqueue task for InstanceTemplateRevision: %s',
-              instance_template.active,
-          )
+        utilities.enqueue_task(
+            'create-instance-template', instance_template.active)
 
 
 def get_instance_template_to_delete(key):
@@ -257,12 +248,4 @@ def schedule_deletion():
     instance_template = key.get()
     if instance_template and instance_template.url:
       if not instance_template.active and not instance_template.drained:
-        if not utils.enqueue_task(
-            '/internal/queues/delete-instance-template',
-            'delete-instance-template',
-            params={
-                'key': key.urlsafe(),
-            },
-        ):
-          logging.warning(
-              'Failed to enqueue task for InstanceTemplateRevision: %s', key)
+        utilities.enqueue_task('delete-instance-template', key)

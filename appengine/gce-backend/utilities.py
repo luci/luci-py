@@ -9,6 +9,8 @@ import json
 
 from google.appengine.ext import ndb
 
+from components import utils
+
 
 def batch_process_async(items, f, max_concurrent=50):
   """Processes asynchronous calls in parallel, but batched.
@@ -33,3 +35,19 @@ def batch_process_async(items, f, max_concurrent=50):
 def compute_checksum(json_encodable):
   """Computes a checksum from a JSON-encodable dict or list."""
   return hashlib.sha1(json.dumps(json_encodable, sort_keys=True)).hexdigest()
+
+
+def enqueue_task(taskqueue, key):
+  """Enqueues a task for the specified task queue to process the given key.
+
+  Args:
+    taskqueue: Name of the task queue.
+    key: ndb.Key to pass as a parameter to the task queue.
+  """
+  utils.enqueue_task(
+      '/internal/queues/%s' % taskqueue,
+      taskqueue,
+      params={
+          'key': key.urlsafe(),
+      },
+  )

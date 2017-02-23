@@ -12,10 +12,10 @@ from google.appengine.ext import ndb
 
 from components import gce
 from components import net
-from components import utils
 
 import instance_templates
 import models
+import utilities
 
 
 def get_instance_group_manager_key(base_name, revision, zone):
@@ -191,17 +191,8 @@ def schedule_creation():
         for instance_group_manager_key in instance_template_revision.active:
           instance_group_manager = instance_group_manager_key.get()
           if instance_group_manager and not instance_group_manager.url:
-            if not utils.enqueue_task(
-                '/internal/queues/create-instance-group-manager',
-                'create-instance-group-manager',
-                params={
-                    'key': instance_group_manager_key.urlsafe(),
-                },
-            ):
-              logging.warning(
-                  'Failed to enqueue task for InstanceGroupManager: %s',
-                  instance_group_manager_key,
-              )
+            utilities.enqueue_task(
+                'create-instance-group-manager', instance_group_manager_key)
 
 
 def get_instance_group_manager_to_delete(key):
@@ -290,15 +281,7 @@ def schedule_deletion():
     instance_group_manager = key.get()
     if instance_group_manager:
       if instance_group_manager.url and not instance_group_manager.instances:
-        if not utils.enqueue_task(
-            '/internal/queues/delete-instance-group-manager',
-            'delete-instance-group-manager',
-            params={
-                'key': key.urlsafe(),
-            },
-        ):
-          logging.warning(
-            'Failed to enqueue task for InstanceGroupManager: %s', key)
+        utilities.enqueue_task('delete-instance-group-manager', key)
 
 
 def resize(key):
@@ -387,17 +370,8 @@ def schedule_resize():
       instance_template_revision = instance_template.active.get()
       if instance_template_revision:
         for instance_group_manager_key in instance_template_revision.active:
-          if not utils.enqueue_task(
-              '/internal/queues/resize-instance-group',
-              'resize-instance-group',
-              params={
-                  'key': instance_group_manager_key.urlsafe(),
-              },
-          ):
-            logging.warning(
-                'Failed to enqueue task for InstanceGroupManager: %s',
-                instance_group_manager_key,
-            )
+          utilities.enqueue_task(
+              'resize-instance-group', instance_group_manager_key)
 
 
 def count_instances():

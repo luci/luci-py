@@ -887,15 +887,14 @@ class ScheduleCreationTest(test_case.TestCase):
   """Tests for instance_group_managers.schedule_creation."""
 
   def setUp(self, *args, **kwargs):
-    def enqueue_task(*args, **kwargs):
-      self.failUnless(kwargs.get('params', {}).get('key'))
-      entity = ndb.Key(urlsafe=kwargs['params']['key']).get()
-      entity.url = kwargs['params']['key']
+    def enqueue_task(taskqueue, key):
+      entity = key.get()
+      entity.url = key.urlsafe()
       entity.put()
       return True
 
     super(ScheduleCreationTest, self).setUp(*args, **kwargs)
-    self.mock(instance_group_managers.utils, 'enqueue_task', enqueue_task)
+    self.mock(instance_group_managers.utilities, 'enqueue_task', enqueue_task)
 
   def test_enqueues_task(self):
     """Ensures a task is enqueued."""

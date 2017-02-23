@@ -12,7 +12,6 @@ from google.appengine.ext import ndb
 from components import gce
 from components import net
 from components import pubsub
-from components import utils
 
 import instance_group_managers
 import metrics
@@ -231,17 +230,7 @@ def schedule_fetch():
   """Enqueues tasks to fetch instances."""
   for instance_group_manager in models.InstanceGroupManager.query():
     if instance_group_manager.url:
-      if not utils.enqueue_task(
-          '/internal/queues/fetch-instances',
-          'fetch-instances',
-          params={
-              'key': instance_group_manager.key.urlsafe(),
-          },
-      ):
-        logging.warning(
-            'Failed to enqueue task for InstanceGroupManager: %s',
-            instance_group_manager.key,
-        )
+      utilities.enqueue_task('fetch-instances', instance_group_manager.key)
 
 
 def _delete(instance_template_revision, instance_group_manager, instance):
@@ -322,14 +311,7 @@ def schedule_pending_deletion():
   """Enqueues tasks to delete instances."""
   for instance in models.Instance.query():
     if instance.pending_deletion and not instance.deleted:
-      if not utils.enqueue_task(
-          '/internal/queues/delete-instance-pending-deletion',
-          'delete-instance-pending-deletion',
-          params={
-              'key': instance.key.urlsafe(),
-          },
-      ):
-        logging.warning('Failed to enqueue task for Instance: %s', instance.key)
+      utilities.enqueue_task('delete-instance-pending-deletion', instance.key)
 
 
 def delete_drained(key):
@@ -399,12 +381,4 @@ def schedule_drained_deletion():
       for instance_key in instance_group_manager.instances:
         instance = instance_key.get()
         if instance and not instance.cataloged:
-          if not utils.enqueue_task(
-              '/internal/queues/delete-drained-instance',
-              'delete-drained-instance',
-              params={
-                  'key': instance.key.urlsafe(),
-              },
-          ):
-            logging.warning(
-              'Failed to enqueue task for Instance: %s', instance.key)
+          utilities.enqueue_task('delete-drained-instance', instance.key)

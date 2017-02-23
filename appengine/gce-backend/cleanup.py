@@ -228,14 +228,7 @@ def schedule_deleted_instance_check():
   """Enqueues tasks to check for deleted instances."""
   for instance in models.Instance.query():
     if instance.pending_deletion and not instance.deleted:
-      if not utils.enqueue_task(
-          '/internal/queues/check-deleted-instance',
-          'check-deleted-instance',
-          params={
-              'key': instance.key.urlsafe(),
-          },
-      ):
-        logging.warning('Failed to enqueue task for Instance: %s', instance.key)
+      utilities.enqueue_task('check-deleted-instance', instance.key)
 
 
 @ndb.transactional
@@ -273,14 +266,7 @@ def schedule_deleted_instance_cleanup():
 
   for instance in models.Instance.query():
     if instance.deleted and (now - instance.last_updated).seconds > THRESHOLD:
-      if not utils.enqueue_task(
-          '/internal/queues/cleanup-deleted-instance',
-          'cleanup-deleted-instance',
-          params={
-              'key': instance.key.urlsafe(),
-          },
-      ):
-        logging.warning('Failed to enqueue task for Instance: %s', instance.key)
+      utilities.enqueue_task('cleanup-deleted-instance', instance.key)
 
 
 def cleanup_drained_instance(key):
@@ -340,12 +326,4 @@ def schedule_drained_instance_cleanup():
       for instance_key in instance_group_manager.instances:
         instance = instance_key.get()
         if instance and not instance.cataloged:
-          if not utils.enqueue_task(
-              '/internal/queues/cleanup-drained-instance',
-              'cleanup-drained-instance',
-              params={
-                  'key': instance.key.urlsafe(),
-              },
-          ):
-            logging.warning(
-              'Failed to enqueue task for Instance: %s', instance.key)
+          utilities.enqueue_task('cleanup-drained-instance', instance.key)
