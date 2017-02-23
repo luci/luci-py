@@ -135,7 +135,7 @@ def monitor_call(func):
         if flat_dims:
           hooks_durations.add(
               duration, fields={'hookname': name, 'pool': flat_dims})
-      logging.info('%s(): %gs', name, round(duration, 3))
+      logging.info('%s(): %gs', name, round(duration/1000., 3))
   return hook
 
 
