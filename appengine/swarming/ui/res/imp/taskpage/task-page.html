@@ -123,6 +123,10 @@
         width: 140px;
         left: 5px;
       }
+
+      .italic {
+        font-style: italic;
+      }
     </style>
 
     <url-param name="id"
@@ -209,16 +213,27 @@
                 <template is="dom-if" if="[[_eq(_result.state,'PENDING')]]">
                   <tr>
                     <td><b>Why Pending?</b></td>
-                    <td>[[_otherPending(_other_pending)]] similar pending tasks, [[_other_running.count]] similar running tasks</td>
+                    <td>
+                      <span class$="[[_it(_other_pending.count)]]">[[_otherPending(_other_pending)]]</span>
+                      similar pending tasks,
+                      <span class$="[[_it(_other_running.count)]]">[[_other_running.count]]</span>
+                      similar running tasks
+                    </td>
                   </tr>
                 </template>
                 <tr>
                   <td>Fleet Capacity</td>
-                  <td>[[_bots_count.count]]
-                  <a
-                      title="The list of bots that matches the list of dimensions"
-                      href$="[[_botListLink(_request.properties.dimensions)]]">bots</a>
-                  can run this task ([[_bots_count.dead]] dead, [[_bots_count.quarantined]] quarantined)</td>
+                  <td>
+                    <span class$="[[_it(_bots_count.count)]]">[[_bots_count.count]]</span>
+                    <a
+                        title="The list of bots that matches the list of dimensions"
+                        href$="[[_botListLink(_request.properties.dimensions)]]">bots</a>
+                    can run this task
+                    (<span class$="[[_it(_bots_count.dead)]]">[[_bots_count.dead]]</span>
+                    dead,
+                    <span class$="[[_it(_bots_count.dead)]]">[[_bots_count.quarantined]]</span>
+                    quarantined)
+                  </td>
                 </tr>
                 <tr>
                   <td>Created</td>
@@ -617,9 +632,9 @@
           type: Object,
           value: function() {
             return {
-              count: -1,
-              dead: -1,
-              quarantined: -1,
+              count: "<counting>",
+              dead: "<counting>",
+              quarantined: "<counting>",
             };
           },
         },
@@ -656,13 +671,13 @@
         _other_pending: {
           type: Object,
           value: function(){
-            return {count: -1};
+            return {count: "<counting>"};
           }
         },
         _other_running: {
           type: Object,
           value: function(){
-            return {count: -1};
+            return {count: "<counting>"};
           }
         },
         _refresh_interval: {
@@ -840,6 +855,14 @@
         return taskId && taskId.endsWith(0);
       },
 
+      // makes text italic unless it's numbers (i.e. when loading)
+      _it: function(s) {
+        if (!s || (s[0] === "<")) {
+          return "italic";
+        }
+        return "";
+      },
+
       _noMilo: function(result) {
         return !this._tag(result, "allow_milo");
       },
@@ -849,7 +872,7 @@
           // subtract 1 from this count, because that's this task.
           return other_pending.count - 1;
         }
-        return -1;
+        return "<counting>";
       },
 
       _pending: function(result) {
