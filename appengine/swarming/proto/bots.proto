@@ -53,6 +53,29 @@ message BotsCfg {
 }
 
 
+// A daily schedule for Machine Provider leases.
+//
+// Allows a MachineType to be enabled during specific UTC hours.
+message DailySchedule {
+  // UTC time to enable the MachineType.
+  //
+  // Formatted as "<hour>:<minute>".
+  optional string start = 1;
+
+  // UTC time to disable the MachineType.
+  //
+  // Formatted as "<hour>:<minute>". Must be strictly later than start.
+  optional string end = 2;
+}
+
+
+// A schedule for Machine Provider leases.
+message Schedule {
+  // Schedule to repeat every day.
+  repeated DailySchedule daily = 1;
+}
+
+
 // A type of machine to lease from the Machine Provider.
 message MachineType {
   // Name for this type of machine. Must be globally unique.
@@ -74,6 +97,9 @@ message MachineType {
 
   // Target number of machines of this type to have leased at once.
   optional int32 target_size = 6;
+
+  // Schedule for machines of this type.
+  optional Schedule schedule = 7;
 }
 
 

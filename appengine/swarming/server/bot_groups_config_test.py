@@ -444,6 +444,305 @@ class BotGroupsConfigTest(test_case.TestCase):
       'bot_group #0: machine_type #0: target_size must be positive'
     ])
 
+  def test_machine_type_daily_schedule_no_end(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='1:00',
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0:'
+      ' daily schedule must have a start and end time'
+    ])
+
+  def test_machine_type_daily_schedule_no_start(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   end='1:00',
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0:'
+      ' daily schedule must have a start and end time'
+    ])
+
+  def test_machine_type_daily_schedule_invalid_format(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='now',
+                                   end='later',
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0:'
+      ' start and end times must be formatted as %H:%M'
+    ])
+
+  def test_machine_type_daily_schedule_too_specific(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='1:00:20',
+                                   end='1:00:30',
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0:'
+      ' start and end times must be formatted as %H:%M'
+    ])
+
+  def test_machine_type_daily_schedule_start_hour_negative(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='-1:00',
+                                   end='1:00',
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0:'
+      ' start and end times must be formatted as %H:%M'
+    ])
+
+  def test_machine_type_daily_schedule_start_minute_negative(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='1:-01',
+                                   end='1:00',
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0:'
+      ' start and end times must be formatted as %H:%M'
+    ])
+
+  def test_machine_type_daily_schedule_end_hour_negative(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='1:00',
+                                   end='-1:00',
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0:'
+      ' start and end times must be formatted as %H:%M'
+    ])
+
+  def test_machine_type_daily_schedule_end_minute_negative(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='1:00',
+                                   end='1:-01',
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0:'
+      ' start and end times must be formatted as %H:%M'
+    ])
+
+  def test_machine_type_daily_schedule_start_hour_too_large(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='24:00',
+                                   end='1:00',
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0:'
+      ' start and end times must be formatted as %H:%M'
+    ])
+
+  def test_machine_type_daily_schedule_start_minute_too_large(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='1:60',
+                                   end='1:00',
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0:'
+      ' start and end times must be formatted as %H:%M'
+    ])
+
+  def test_machine_type_daily_schedule_end_hour_too_large(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='1:00',
+                                   end='24:00',
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0:'
+      ' start and end times must be formatted as %H:%M'
+    ])
+
+  def test_machine_type_daily_schedule_end_minute_too_large(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='1:00',
+                                   end='1:60',
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0:'
+      ' start and end times must be formatted as %H:%M'
+    ])
+
+  def test_machine_type_daily_schedule_end_hour_before_start_hour(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='1:00',
+                                   end='0:00',
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0:'
+      ' end time "0:00" must be later than start time "1:00"'
+    ])
+
+  def test_machine_type_daily_schedule_end_time_before_start_time(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='1:30',
+                                   end='1:00',
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0:'
+      ' end time "1:00" must be later than start time "1:30"'
+    ])
+
+  def test_machine_type_daily_schedule_end_time_equals_start_time(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='1:30',
+                                   end='1:30',
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0:'
+      ' end time "1:30" must be later than start time "1:30"'
+    ])
+
+  def test_machine_type_daily_schedule(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='1:30',
+                                   end='1:45',
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [])
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

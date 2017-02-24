@@ -385,6 +385,30 @@ def validate_settings(cfg, ctx):
           if machine_type.target_size < 0:
             ctx.error('target_size must be positive')
             continue
+          if machine_type.schedule:
+            for daily_schedule in machine_type.schedule.daily:
+              if not daily_schedule.start or not daily_schedule.end:
+                ctx.error('daily schedule must have a start and end time')
+                continue
+              try:
+                h1, m1 = map(int, daily_schedule.start.split(':'))
+                h2, m2 = map(int, daily_schedule.end.split(':'))
+              except ValueError:
+                ctx.error('start and end times must be formatted as %%H:%%M')
+                continue
+              if m1 < 0 or m1 > 59 or m2 < 0 or m2 > 59:
+                ctx.error('start and end times must be formatted as %%H:%%M')
+                continue
+              if h1 < 0 or h1 > 23 or h2 < 0 or h2 > 23:
+                ctx.error('start and end times must be formatted as %%H:%%M')
+                continue
+              if h1 * 60 + m1 >= h2 * 60 + m2:
+                ctx.error(
+                    'end time "%s" must be later than start time "%s"',
+                    daily_schedule.end,
+                    daily_schedule.start,
+                )
+                continue
 
       # Validate 'auth' field.
       a = entry.auth

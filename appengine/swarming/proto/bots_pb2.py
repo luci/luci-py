@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='bots.proto',
   package='',
   syntax='proto2',
-  serialized_pb=_b('\n\nbots.proto\"C\n\x07\x42otsCfg\x12\x1a\n\x12trusted_dimensions\x18\x01 \x03(\t\x12\x1c\n\tbot_group\x18\x02 \x03(\x0b\x32\t.BotGroup\"\x95\x01\n\x0bMachineType\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x1a\n\x12\x65\x61rly_release_secs\x18\x03 \x01(\x05\x12\x1b\n\x13lease_duration_secs\x18\x04 \x01(\x05\x12\x15\n\rmp_dimensions\x18\x05 \x03(\t\x12\x13\n\x0btarget_size\x18\x06 \x01(\x05\"\xac\x01\n\x08\x42otGroup\x12\x0e\n\x06\x62ot_id\x18\x01 \x03(\t\x12\x15\n\rbot_id_prefix\x18\x02 \x03(\t\x12\"\n\x0cmachine_type\x18\x03 \x03(\x0b\x32\x0c.MachineType\x12\x16\n\x04\x61uth\x18\x14 \x01(\x0b\x32\x08.BotAuth\x12\x0e\n\x06owners\x18\x15 \x03(\t\x12\x12\n\ndimensions\x18\x16 \x03(\t\x12\x19\n\x11\x62ot_config_script\x18\x17 \x01(\t\"d\n\x07\x42otAuth\x12\"\n\x1arequire_luci_machine_token\x18\x01 \x01(\x08\x12\x1f\n\x17require_service_account\x18\x02 \x01(\t\x12\x14\n\x0cip_whitelist\x18\x03 \x01(\t')
+  serialized_pb=_b('\n\nbots.proto\"C\n\x07\x42otsCfg\x12\x1a\n\x12trusted_dimensions\x18\x01 \x03(\t\x12\x1c\n\tbot_group\x18\x02 \x03(\x0b\x32\t.BotGroup\"+\n\rDailySchedule\x12\r\n\x05start\x18\x01 \x01(\t\x12\x0b\n\x03\x65nd\x18\x02 \x01(\t\")\n\x08Schedule\x12\x1d\n\x05\x64\x61ily\x18\x01 \x03(\x0b\x32\x0e.DailySchedule\"\xb2\x01\n\x0bMachineType\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x1a\n\x12\x65\x61rly_release_secs\x18\x03 \x01(\x05\x12\x1b\n\x13lease_duration_secs\x18\x04 \x01(\x05\x12\x15\n\rmp_dimensions\x18\x05 \x03(\t\x12\x13\n\x0btarget_size\x18\x06 \x01(\x05\x12\x1b\n\x08schedule\x18\x07 \x01(\x0b\x32\t.Schedule\"\xac\x01\n\x08\x42otGroup\x12\x0e\n\x06\x62ot_id\x18\x01 \x03(\t\x12\x15\n\rbot_id_prefix\x18\x02 \x03(\t\x12\"\n\x0cmachine_type\x18\x03 \x03(\x0b\x32\x0c.MachineType\x12\x16\n\x04\x61uth\x18\x14 \x01(\x0b\x32\x08.BotAuth\x12\x0e\n\x06owners\x18\x15 \x03(\t\x12\x12\n\ndimensions\x18\x16 \x03(\t\x12\x19\n\x11\x62ot_config_script\x18\x17 \x01(\t\"d\n\x07\x42otAuth\x12\"\n\x1arequire_luci_machine_token\x18\x01 \x01(\x08\x12\x1f\n\x17require_service_account\x18\x02 \x01(\t\x12\x14\n\x0cip_whitelist\x18\x03 \x01(\t')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -61,6 +61,75 @@ _BOTSCFG = _descriptor.Descriptor(
   ],
   serialized_start=14,
   serialized_end=81,
+)
+
+
+_DAILYSCHEDULE = _descriptor.Descriptor(
+  name='DailySchedule',
+  full_name='DailySchedule',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='start', full_name='DailySchedule.start', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='end', full_name='DailySchedule.end', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  syntax='proto2',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=83,
+  serialized_end=126,
+)
+
+
+_SCHEDULE = _descriptor.Descriptor(
+  name='Schedule',
+  full_name='Schedule',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='daily', full_name='Schedule.daily', index=0,
+      number=1, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  syntax='proto2',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=128,
+  serialized_end=169,
 )
 
 
@@ -113,6 +182,13 @@ _MACHINETYPE = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='schedule', full_name='MachineType.schedule', index=6,
+      number=7, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -125,8 +201,8 @@ _MACHINETYPE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=84,
-  serialized_end=233,
+  serialized_start=172,
+  serialized_end=350,
 )
 
 
@@ -198,8 +274,8 @@ _BOTGROUP = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=236,
-  serialized_end=408,
+  serialized_start=353,
+  serialized_end=525,
 )
 
 
@@ -243,14 +319,18 @@ _BOTAUTH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=410,
-  serialized_end=510,
+  serialized_start=527,
+  serialized_end=627,
 )
 
 _BOTSCFG.fields_by_name['bot_group'].message_type = _BOTGROUP
+_SCHEDULE.fields_by_name['daily'].message_type = _DAILYSCHEDULE
+_MACHINETYPE.fields_by_name['schedule'].message_type = _SCHEDULE
 _BOTGROUP.fields_by_name['machine_type'].message_type = _MACHINETYPE
 _BOTGROUP.fields_by_name['auth'].message_type = _BOTAUTH
 DESCRIPTOR.message_types_by_name['BotsCfg'] = _BOTSCFG
+DESCRIPTOR.message_types_by_name['DailySchedule'] = _DAILYSCHEDULE
+DESCRIPTOR.message_types_by_name['Schedule'] = _SCHEDULE
 DESCRIPTOR.message_types_by_name['MachineType'] = _MACHINETYPE
 DESCRIPTOR.message_types_by_name['BotGroup'] = _BOTGROUP
 DESCRIPTOR.message_types_by_name['BotAuth'] = _BOTAUTH
@@ -261,6 +341,20 @@ BotsCfg = _reflection.GeneratedProtocolMessageType('BotsCfg', (_message.Message,
   # @@protoc_insertion_point(class_scope:BotsCfg)
   ))
 _sym_db.RegisterMessage(BotsCfg)
+
+DailySchedule = _reflection.GeneratedProtocolMessageType('DailySchedule', (_message.Message,), dict(
+  DESCRIPTOR = _DAILYSCHEDULE,
+  __module__ = 'bots_pb2'
+  # @@protoc_insertion_point(class_scope:DailySchedule)
+  ))
+_sym_db.RegisterMessage(DailySchedule)
+
+Schedule = _reflection.GeneratedProtocolMessageType('Schedule', (_message.Message,), dict(
+  DESCRIPTOR = _SCHEDULE,
+  __module__ = 'bots_pb2'
+  # @@protoc_insertion_point(class_scope:Schedule)
+  ))
+_sym_db.RegisterMessage(Schedule)
 
 MachineType = _reflection.GeneratedProtocolMessageType('MachineType', (_message.Message,), dict(
   DESCRIPTOR = _MACHINETYPE,
