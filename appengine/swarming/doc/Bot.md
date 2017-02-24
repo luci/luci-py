@@ -376,9 +376,13 @@ request from there.
 
 Run is the primary purpose of the bot; the server tells the bot to run a task.
 To reduce the likelihood of bugs, bot_main starts a child process task_runner to
-handle the task. task_runner contains all the logic to download, execute and
-report back the task results. task_runner implements the timeouts. In addition,
-bot_main implements its own timeout in case task_runner would fail in any way.
+handle the task. task_runner contains all the logic to execute a task and
+report back the task result metadata back (e.g. exit code, duration) and stdout.
+task_runner implements the I/O timeout. In addition, bot_main implements its own
+timeout in case task_runner would fail in any way.
+
+task_runner starts run_isolated. run_isolated handles the download of inputs
+(isolated, CIPD) and upload of output files (isolated).
 
 Inside the manifest describing the task to run, the server adds the versioned
 URL of the server to use for the lifetime of the task, so that the bot is not
@@ -408,18 +412,12 @@ orderly shut itself down. The bot simply exits.
 
 #### task_runner.py
 
-[task_runner.py](../swarming_bot/bot_code/task_runner.py) can run two types of
-task: raw command or isolated task.
+[task_runner.py](../swarming_bot/bot_code/task_runner.py) lives for the duration
+of exactly one task. task_runner creates a temporary directory `work` to use as
+the current working directory when running the child process.
 
-For raw command, it runs the command as is and streams the stdout out. Using
-this assumes the bot state is known and that the command is preinstalled.
-
-For isolated task, task_runner defers the actual task execution to
-[run_isolated.py](../../../client/run_isolated.py).  task_runner knows how to
-translate the isolated Swarming task to run_isolated command line arguments.
-
-In any case, task_runner creates a temporary directory `work` to use as the
-current working directory when running the child process.
+task_runner defers the actual task execution to
+[run_isolated.py](../../../client/run_isolated.py).
 
 
 #### Isolated task
