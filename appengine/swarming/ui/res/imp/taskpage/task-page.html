@@ -153,7 +153,7 @@
       server_details="{{_server_details}}"
       signed_in="{{_signed_in}}"
 
-      busy="[[_or(_busy1,busy2)]]"
+      busy="[[_or(_busyPageData,_busyTaskDisambiguation,_busyRunningCount,_busyPendingCount,_busyBotCount)]]"
       name="Swarming Task Page">
 
       <h2 hidden$="[[_signed_in]]">You must sign in to see anything useful.</h2>
@@ -165,7 +165,7 @@
           auth_headers="[[_auth_headers]]"
           task_id="[[task_id]]"
 
-          busy="{{_busy1}}"
+          busy="{{_busyPageData}}"
           request="{{_request}}"
           result="{{_result}}"
           stdout="{{_stdout}}"
@@ -189,7 +189,7 @@
             <template is="dom-if" if="[[_disambiguate(task_id,_result)]]">
               <h2>Displaying a summary for a task with multiple tries</h2>
               <task-disambiguation
-                busy="{{busy2}}"
+                busy="{{_busyTaskDisambiguation}}"
                 auth_headers="[[_auth_headers]]"
                 task_id="[[task_id]]"
                 summary_result="[[_result]]">
@@ -205,6 +205,20 @@
                 <tr>
                   <td>State</td>
                   <td class$="[[_stateClass(_result)]]">[[state(_result)]]</td>
+                </tr>
+                <template is="dom-if" if="[[_eq(_result.state,'PENDING')]]">
+                  <tr>
+                    <td><b>Why Pending?</b></td>
+                    <td>[[_otherPending(_other_pending)]] similar pending tasks, [[_other_running.count]] similar running tasks</td>
+                  </tr>
+                </template>
+                <tr>
+                  <td>Fleet Capacity</td>
+                  <td>[[_bots_count.count]]
+                  <a
+                      title="The list of bots that matches the list of dimensions"
+                      href$="[[_botListLink(_request.properties.dimensions)]]">bots</a>
+                  can run this task ([[_bots_count.dead]] dead, [[_bots_count.quarantined]] quarantined)</td>
                 </tr>
                 <tr>
                   <td>Created</td>
@@ -596,6 +610,39 @@
           type: String,
         },
 
+        _auth_headers: {
+          type: Object,
+        },
+        _bots_count: {
+          type: Object,
+          value: function() {
+            return {
+              count: -1,
+              dead: -1,
+              quarantined: -1,
+            };
+          },
+        },
+        _busyPageData: {
+          type: Boolean,
+          value: false,
+        },
+        _busyTaskDisambiguation: {
+          type: Boolean,
+          value: false,
+        },
+        _busyRunningCount: {
+          type: Boolean,
+          value: false,
+        },
+        _busyPendingCount: {
+          type: Boolean,
+          value: false,
+        },
+        _busyBotCount: {
+          type: Boolean,
+          value: false,
+        },
         _dialog_prompt: {
           type: String,
           value: "",
@@ -604,6 +651,18 @@
           type: String,
           value: function(){
             return window.location.hostname;
+          }
+        },
+        _other_pending: {
+          type: Object,
+          value: function(){
+            return {count: -1};
+          }
+        },
+        _other_running: {
+          type: Object,
+          value: function(){
+            return {count: -1};
           }
         },
         _refresh_interval: {
@@ -626,6 +685,9 @@
           type: String,
         }
       },
+
+      observers: [
+        "_whyPending(_request,_result,_auth_headers)"],
 
       _alias: function(dim) {
         var values = dim.value;
@@ -720,6 +782,10 @@
         return !array || array.length == 0;
       },
 
+      _eq: function(a,b) {
+        return a === b;
+      },
+
       _expires: function(request) {
         var delta = parseInt(request.expiration_secs);
         if (delta) {
@@ -776,6 +842,14 @@
 
       _noMilo: function(result) {
         return !this._tag(result, "allow_milo");
+      },
+
+      _otherPending: function(other_pending) {
+        if (other_pending && other_pending.count > 0) {
+          // subtract 1 from this count, because that's this task.
+          return other_pending.count - 1;
+        }
+        return -1;
       },
 
       _pending: function(result) {
@@ -900,6 +974,42 @@
       _wasNotPickedUp: function(result) {
         return result && !this._wasPickedUp(result);
       },
+
+      _whyPending: function() {
+        if (!this._request || !this._result || !this._auth_headers) {
+          return;
+        }
+        var result = this._result;
+        var request = this._request;
+        var botCountParams = {
+          dimensions: []
+        };
+        var dims = (request.properties && request.properties.dimensions) || [];
+        dims.forEach(function(d){
+          botCountParams.dimensions.push(`${d.key}:${d.value}`);
+        });
+        this._getJsonAsync("_bots_count", "/api/swarming/v1/bots/count", "_busyBotCount", this._auth_headers, botCountParams);
+
+        if (result && result.state === "PENDING") {
+          var start = new Date();
+          start.setSeconds(0);
+          // go back 24 hours, rounded to the nearest minute for better caching.
+          start = "" + (start.getTime() - 24*60*60*1000);
+          // convert to seconds, because that's what the API expects.
+          start = start.substring(0, start.length-3);
+
+          var taskCountParams = {
+            start: [start],
+            state: ["RUNNING"],
+            tags: botCountParams.dimensions,
+          };
+
+          this._getJsonAsync("_other_running", "/api/swarming/v1/tasks/count", "_busyRunningCount", this._auth_headers, taskCountParams);
+          // change running to pending
+          taskCountParams.state = ["PENDING"];
+          this._getJsonAsync("_other_pending", "/api/swarming/v1/tasks/count", "_busyPendingCount", this._auth_headers, taskCountParams);
+        }
+      }
     });
   })();
   </script>

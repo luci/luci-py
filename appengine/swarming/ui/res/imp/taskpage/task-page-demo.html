@@ -93,6 +93,15 @@
     server.respondWith("POST", /^\/_ah\/api\/swarming\/v1\/task\/.+\/cancel/, cancel);
     server.respondWith("POST", /^\/api\/swarming\/v1\/task\/.+\/cancel/, cancel);
 
+    var countDetails = {
+      count: 780,
+    }
+
+    server.respondWith("GET", /^\/api\/swarming\/v1\/tasks\/count/, function(request){
+      countDetails.count++;
+      request.respond(200, {}, JSON.stringify(countDetails));
+    });
+
     var newTask = function(request) {
       console.log("retry requested");
       request.respond(200, {"Content-Type":"application/json"}, JSON.stringify(newResponse));
@@ -100,6 +109,14 @@
 
     server.respondWith("POST", /^\/_ah\/api\/swarming\/v1\/tasks\/new/, newTask);
     server.respondWith("POST", /^\/api\/swarming\/v1\/tasks\/new/, newTask);
+
+    var count = {
+      count: 905,
+      busy: 581,
+      dead: 10,
+      quarantined: 0,
+    }
+    server.respondWith("GET", /^\/api\/swarming\/v1\/bots\/count.*/, JSON.stringify(count));
     </script>
 
     <link rel="import" href="task-page.html">
