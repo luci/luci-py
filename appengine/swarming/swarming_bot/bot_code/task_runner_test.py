@@ -98,6 +98,8 @@ class TestTaskRunnerBase(net_utils.TestCase):
     os.environ.pop('SWARMING_AUTH_PARAMS', None)
     os.environ.pop('SWARMING_BOT_ID', None)
     os.environ.pop('SWARMING_TASK_ID', None)
+    os.environ.pop('SWARMING_SERVER', None)
+    os.environ.pop('ISOLATE_SERVER', None)
 
   def tearDown(self):
     os.chdir(test_env_bot_code.BOT_DIR)

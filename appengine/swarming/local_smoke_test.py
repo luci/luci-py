@@ -781,6 +781,8 @@ def main():
 
   # So that we don't get goofed up when running this test on swarming :)
   os.environ.pop('SWARMING_TASK_ID', None)
+  os.environ.pop('SWARMING_SERVER', None)
+  os.environ.pop('ISOLATE_SERVER', None)
 
   bot = None
   client = None
