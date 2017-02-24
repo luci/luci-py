@@ -158,6 +158,8 @@ class LeaseRequestError(messages.Enum):
   LEASE_EXPIRATION_TS_ERROR = 9
   # Neither duration nor lease_expiration_ts were specified.
   LEASE_LENGTH_UNSPECIFIED = 10
+  # Requested lease duration is too long.
+  LEASE_TOO_LONG = 11
 
 
 class LeaseRequestState(messages.Enum):
