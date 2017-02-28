@@ -527,7 +527,6 @@ class TestTaskRunner(TestTaskRunnerBase):
         {
           'data': {
             'cost_usd': 10.,
-            'duration': 0.,
             'id': 'localhost',
             'output': base64.b64encode('hi!\n' * 100002),
             'output_chunk_start': 0,

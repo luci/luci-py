@@ -361,7 +361,6 @@ class RunState(object):
     # Last time a packet was sent. Ultimately to determine if a keep-alive
     # should be sent.
     self._last_packet = self._proc_start
-    self._first_post = True
 
     # Externally modifiable:
     self.had_io_timeout = False
@@ -483,16 +482,12 @@ class RunState(object):
       # Cost of the task up to now, based on the $/hr of the worker.
       'cost_usd': self._cost_usd_hour * self.task_duration(now) / 60. / 60.,
     }
-    if self._first_post:
-      self._first_post = False
-    else:
-      # duration here is the runtime of run_isolated. This is fixed in the final
-      # message to be the runtime of the child process.
-      params['duration'] = now - self._proc_start
     if self.had_io_timeout or 'exit_code' in kwargs:
       params['io_timeout'] = self.had_io_timeout
     if self.had_hard_timeout or 'exit_code' in kwargs:
       params['hard_timeout'] = self.had_hard_timeout
+    if self._exit_code is not None:
+      kwargs.setdefault('duration', now - self._proc_start)
     params.update(kwargs)
     ret = self._remote.post_task_update(
         self._task_details.task_id, self._task_details.bot_id, params,
