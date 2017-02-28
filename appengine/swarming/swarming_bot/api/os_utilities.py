@@ -837,6 +837,7 @@ def get_dimensions():
   os_name = get_os_name()
   cpu_type = get_cpu_type()
   cpu_bitness = get_cpu_bitness()
+  cpuinfo = get_cpuinfo()
   dimensions = {
     u'cores': [unicode(get_num_processors())],
     u'cpu': [
@@ -848,8 +849,10 @@ def get_dimensions():
     u'os': [os_name],
     u'pool': [u'default'],
   }
-  if u'avx2' in get_cpuinfo().get(u'flags', []):
+  if u'avx2' in cpuinfo.get(u'flags', []):
     dimensions[u'cpu'].append(cpu_type + u'-' + cpu_bitness + u'-avx2')
+  if any(u'avx512' in x for x in cpuinfo.get(u'flags', [])):
+    dimensions[u'cpu'].append(cpu_type + u'-' + cpu_bitness + u'-avx512')
   if sys.platform == 'win32':
     dimensions[u'os'].extend(
         u'%s-%s' % (os_name, n) for n in platforms.win.get_os_version_names())
