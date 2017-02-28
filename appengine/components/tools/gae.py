@@ -5,7 +5,7 @@
 
 """Wrapper around GAE SDK tools to simplify working with multi module apps."""
 
-__version__ = '1.1'
+__version__ = '1.2'
 
 import atexit
 import code
@@ -42,6 +42,34 @@ from depot_tools import subcommand
 
 from tool_support import gae_sdk_utils
 from tools import calculate_version
+from tools import log_since
+
+
+def print_version_log(app, to_version):
+  """Queries the server active version and prints the log between the active
+  version and the new version.
+  """
+  from_versions = set(service['id'] for service in app.get_actives())
+  if len(from_versions) > 1:
+    print >> sys.stderr, (
+        'Error: found multiple modules with different active versions. Use '
+        '"gae active" to get the curent list of active version. Please use the '
+        'Web UI to fix. Aborting.')
+    return 1
+  if from_versions:
+    from_version = list(from_versions)[0]
+    start = int(from_version.split('-', 1)[0])
+    end = int(to_version.split('-', 1)[0])
+    if start < end:
+      pseudo_revision, mergebase = calculate_version.get_pseudo_revision(
+          app.app_dir, 'origin/master')
+      logs, _ = log_since.get_logs(
+          app.app_dir, pseudo_revision, mergebase, start, end)
+      print('\nLogs between %s and %s:' % (from_version, to_version))
+      print('%s\n' % logs)
+
+
+##
 
 
 def CMDactive(parser, args):
@@ -265,6 +293,7 @@ def CMDswitch(parser, args):
   The version must be uploaded already. If no version is provided via command
   line, will ask interactively.
   """
+  parser.add_switch_option()
   parser.add_force_option()
   parser.allow_positional_args = True
   app, options, version = parser.parse_args(args)
@@ -289,13 +318,12 @@ def CMDswitch(parser, args):
       print('No such version.')
       return 1
 
+  print_version_log(app, version)
   # Switching a default version is disruptive operation. Require confirmation.
-  if not options.force:
-    ok = gae_sdk_utils.confirm('Switch default version?', app, version)
-    if not ok:
-      print('Aborted.')
-      return 1
-
+  if (not options.force and
+      not gae_sdk_utils.confirm('Switch default version?', app, version)):
+    print('Aborted.')
+    return 1
   app.set_default_version(version)
   return 0
 
@@ -314,6 +342,9 @@ def CMDupload(parser, args):
   subcommand to change default serving version.
   """
   parser.add_tag_option()
+  parser.add_option(
+      '-x', '--switch', action='store_true',
+      help='Switch version after uploading new code')
   parser.add_switch_option()
   parser.add_force_option()
   parser.allow_positional_args = True
@@ -353,14 +384,15 @@ def CMDupload(parser, args):
         app.app_id)
   print('-' * 80)
 
-  if options.switch:
-    if 'tainted-' in version:
-      print('')
-      print >> sys.stderr, 'Can\'t use --switch with a tainted version!'
-      return 1
-    print('Switching as default version')
-    app.set_default_version(version)
-
+  if not options.switch:
+    return 0
+  if 'tainted-' in version:
+    print('')
+    print >> sys.stderr, 'Can\'t use --switch with a tainted version!'
+    return 1
+  print_version_log(app, version)
+  print('Switching as default version')
+  app.set_default_version(version)
   return 0
 
 
@@ -398,8 +430,9 @@ class OptionParser(optparse.OptionParser):
 
   def add_switch_option(self):
     self.add_option(
-        '-x', '--switch', action='store_true',
-        help='Switch version after uploading new code')
+        '-n', '--no-log', action='store_true',
+        help='Do not print logs from the current server active version to the '
+             'one being switched to')
 
   def add_force_option(self):
     self.add_option(
