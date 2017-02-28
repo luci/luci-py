@@ -34,57 +34,16 @@ class Config(object):
     self._cfg = cfg
 
   def __getattr__(self, name):
-    if hasattr(self._ds_cfg, name):
-      return getattr(self._ds_cfg, name)
-    return getattr(self._cfg, name)
+    if hasattr(self._cfg, name):
+      return getattr(self._cfg, name)
+    return getattr(self._ds_cfg, name)
 
 
-# TODO(sergeyberezin): remove all fields except gs_private_key. Switch
-# the other fields to use luci-config.
 class GlobalConfig(ds_config.GlobalConfig):
   """Application wide settings."""
-  # The number of seconds a cache entry must be kept for before it is evicted.
-  default_expiration = ndb.IntegerProperty(indexed=False, default=30*24*60*60)
-
-  # This determines the number of initial letters from the ContentEntry hash
-  # value to use as buckets in ContentShard. This is to even out writes across
-  # multiple entity groups. The goal is to get into the range of ~1 write per
-  # second per bucket.
-  #
-  # Each letter represent 4 bits of information, so the number of ContentShard
-  # will be 16**N. Nominal values are:
-  #   1: 16 buckets
-  #   2: 256 buckets
-  #   3: 4096 buckets
-  #   4: 65536 buckets
-  sharding_letters = ndb.IntegerProperty(indexed=False, default=4)
-
-  # The Google Cloud Storage bucket where to save the data. By default it's the
-  # name of the application instance.
-  gs_bucket = ndb.StringProperty(indexed=False)
-
-  # Email address of Service account used to access Google Storage.
-  gs_client_id_email = ndb.StringProperty(indexed=False, default='')
 
   # Secret key used to sign Google Storage URLs: base64 encoded *.der file.
   gs_private_key = ndb.StringProperty(indexed=False, default='')
-
-  # id to inject into pages if applicable.
-  google_analytics = ndb.StringProperty(indexed=False, default='')
-
-  # Enable ts_mon based monitoring.
-  enable_ts_monitoring = ndb.BooleanProperty(indexed=False, default=False)
-
-  # Group with read and write access.
-  full_access_group = ndb.StringProperty(indexed=False,
-                                         default='isolate-access')
-
-  # Group with read-only access.
-  readonly_access_group = ndb.StringProperty(indexed=False,
-                                             default='isolate-readonly-access')
-
-  def set_defaults(self):
-    self.gs_bucket = app_identity.get_application_id()
 
 
 def settings(fresh=False):
@@ -98,9 +57,6 @@ def settings(fresh=False):
   else:
     cfg = _get_settings_cached()
   ds_cfg = GlobalConfig.cached()
-
-  cfg.auth.full_access_group = ds_cfg.full_access_group
-  cfg.auth.readonly_access_group = ds_cfg.readonly_access_group
 
   return Config(ds_cfg, cfg)
 
@@ -221,9 +177,9 @@ def _get_settings_with_defaults():
   cfg.default_expiration = cfg.default_expiration or 30*24*60*60
   cfg.sharding_letters = cfg.sharding_letters or 4
   cfg.gs_bucket = cfg.gs_bucket or app_identity.get_application_id()
-  cfg.auth.full_access_group = cfg.auth.full_access_group or 'isolate-access'
+  cfg.auth.full_access_group = cfg.auth.full_access_group or 'administrators'
   cfg.auth.readonly_access_group = \
-      cfg.auth.readonly_access_group or 'isolate-readonly-access'
+      cfg.auth.readonly_access_group or 'administrators'
   return rev, cfg
 
 

@@ -93,8 +93,6 @@ class RestrictedConfigHandler(auth.AuthenticatingHandler):
     if cfg.key.integer_id() != keyid:
       self.common('Update conflict %s != %s' % (cfg.key.integer_id(), keyid))
       return
-    params['default_expiration'] = int(params['default_expiration'])
-    params['sharding_letters'] = int(params['sharding_letters'])
     cfg.populate(**params)
     try:
       # Ensure key is correct, it's easy to make a mistake when creating it.

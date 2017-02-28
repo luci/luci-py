@@ -163,20 +163,16 @@ class MainTest(test_case.TestCase):
     self.set_as_admin()
     resp = self.app_frontend.get('/restricted/config')
     # TODO(maruel): Use beautifulsoup?
+    priv_key = 'test private key'
     params = {
-      'default_expiration': 123456,
-      'sharding_letters': 3,
-      'google_analytics': 'foobar',
+      'gs_private_key': priv_key,
       'keyid': str(config.settings_info()['cfg'].key.integer_id()),
       'xsrf_token': self.get_xsrf_token(),
     }
-    self.assertEqual('', config.settings().google_analytics)
-    self.assertNotEqual(3, config.settings().sharding_letters)
+    self.assertEqual('', config.settings().gs_private_key)
     resp = self.app_frontend.post('/restricted/config', params)
     self.assertNotIn('Update conflict', resp)
-    self.assertEqual('foobar', config.settings().google_analytics)
-    self.assertEqual(3, config.settings().sharding_letters)
-    self.assertIn('foobar', self.app_frontend.get('/').body)
+    self.assertEqual(priv_key, config.settings().gs_private_key)
 
   def test_config_conflict(self):
     self.set_as_admin()
