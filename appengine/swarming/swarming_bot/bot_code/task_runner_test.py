@@ -189,7 +189,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       }
       if outputs_ref:
         expected['data']['outputs_ref'] = outputs_ref
-      self.assertEqual(expected, kwargs, kwargs)
+      self.assertEqual(expected, kwargs)
     return check_final
 
   def _run_command(self, task_details, headers_cb=None):
@@ -527,6 +527,7 @@ class TestTaskRunner(TestTaskRunnerBase):
         {
           'data': {
             'cost_usd': 10.,
+            'duration': 0.,
             'id': 'localhost',
             'output': base64.b64encode('hi!\n' * 100002),
             'output_chunk_start': 0,
