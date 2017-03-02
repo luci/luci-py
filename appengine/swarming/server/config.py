@@ -240,14 +240,11 @@ def _get_settings_with_defaults():
   cfg.reusable_task_age_secs = cfg.reusable_task_age_secs or 7*24*60*60
   cfg.bot_death_timeout_secs = cfg.bot_death_timeout_secs or 10*60
 
-  # TODO(sergeyberezin): update the defaults to 'administrators' once
-  # all instances and configs are updated, to limit a chance of
-  # accidental access grant.
-  cfg.auth.admins_group = cfg.auth.admins_group or 'swarming-admins'
+  cfg.auth.admins_group = cfg.auth.admins_group or 'administrators'
   cfg.auth.bot_bootstrap_group = cfg.auth.bot_bootstrap_group or \
-     'swarming-bot-bootstrap'
+     'administrators'
   cfg.auth.privileged_users_group = cfg.auth.privileged_users_group or \
-     'swarming-privileged-users'
-  cfg.auth.users_group = cfg.auth.users_group or 'swarming-users'
+     'administrators'
+  cfg.auth.users_group = cfg.auth.users_group or 'administrators'
 
   return rev, cfg

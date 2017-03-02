@@ -216,11 +216,10 @@ class ConfigTest(test_case.TestCase):
     _, cfg = config._get_settings_with_defaults()
     self.assertEqual(cfg.reusable_task_age_secs, 7*24*60*60)
     self.assertEqual(cfg.bot_death_timeout_secs, 10*60)
-    self.assertEqual(cfg.auth.admins_group, 'swarming-admins')
-    self.assertEqual(cfg.auth.bot_bootstrap_group, 'swarming-bot-bootstrap')
-    self.assertEqual(cfg.auth.privileged_users_group,
-                     'swarming-privileged-users')
-    self.assertEqual(cfg.auth.users_group, 'swarming-users')
+    self.assertEqual(cfg.auth.admins_group, 'administrators')
+    self.assertEqual(cfg.auth.bot_bootstrap_group, 'administrators')
+    self.assertEqual(cfg.auth.privileged_users_group, 'administrators')
+    self.assertEqual(cfg.auth.users_group, 'administrators')
 
 
 if __name__ == '__main__':

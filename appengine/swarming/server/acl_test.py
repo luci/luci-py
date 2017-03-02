@@ -23,10 +23,10 @@ import acl
 
 
 # Default names of authorization groups.
-ADMINS_GROUP = 'swarming-admins'
-PRIVILEGED_USERS_GROUP = 'swarming-privileged-users'
-USERS_GROUP = 'swarming-users'
-BOT_BOOTSTRAP_GROUP = 'swarming-bot-bootstrap'
+ADMINS_GROUP = 'administrators'
+PRIVILEGED_USERS_GROUP = ADMINS_GROUP
+USERS_GROUP = ADMINS_GROUP
+BOT_BOOTSTRAP_GROUP = ADMINS_GROUP
 
 
 class AclTest(test_case.TestCase):
@@ -75,7 +75,7 @@ class AclTest(test_case.TestCase):
   def test_is_privileged_user_default_group(self):
     self.add_to_group(PRIVILEGED_USERS_GROUP)
     self.assertTrue(acl.is_privileged_user())
-    self.assertEqual(acl.get_user_type(), 'privileged user')
+    self.assertEqual(acl.get_user_type(), 'admin')
 
   def test_is_privileged_user_custom_group(self):
     self.mock_auth_config(privileged_users_group='test_group')
@@ -85,19 +85,20 @@ class AclTest(test_case.TestCase):
 
   def test_is_privileged_user_wrong_group(self):
     self.mock_auth_config(privileged_users_group='test_group')
-    self.add_to_group(PRIVILEGED_USERS_GROUP)
+    self.add_to_group('wrong_test_group')
     self.assertFalse(acl.is_privileged_user())
     self.assertIsNone(acl.get_user_type())
 
   def test_is_user_privileged(self):
-    self.add_to_group(PRIVILEGED_USERS_GROUP)
+    self.mock_auth_config(privileged_users_group='test_group')
+    self.add_to_group('test_group')
     self.assertTrue(acl.is_user())
     self.assertEqual(acl.get_user_type(), 'privileged user')
 
   def test_is_user_default_group(self):
     self.add_to_group(USERS_GROUP)
     self.assertTrue(acl.is_user())
-    self.assertEqual(acl.get_user_type(), 'user')
+    self.assertEqual(acl.get_user_type(), 'admin')
 
   def test_is_user_custom_group(self):
     self.mock_auth_config(users_group='test_group')
@@ -107,7 +108,7 @@ class AclTest(test_case.TestCase):
 
   def test_is_user_wrong_group(self):
     self.mock_auth_config(users_group='test_group')
-    self.add_to_group(USERS_GROUP)
+    self.add_to_group('wrong_test_group')
     self.assertFalse(acl.is_user())
     self.assertIsNone(acl.get_user_type())
 
@@ -119,7 +120,7 @@ class AclTest(test_case.TestCase):
   def test_is_bootstrapper_default_group(self):
     self.add_to_group(BOT_BOOTSTRAP_GROUP)
     self.assertTrue(acl.is_bootstrapper())
-    self.assertIsNone(acl.get_user_type())
+    self.assertEqual(acl.get_user_type(), 'admin')
 
   def test_is_bootstrapper_custom_group(self):
     self.mock_auth_config(bot_bootstrap_group='test_group')
@@ -128,10 +129,11 @@ class AclTest(test_case.TestCase):
     self.assertIsNone(acl.get_user_type())
 
   def test_is_bootstrapper_wrong_group(self):
-    self.mock_auth_config(privileged_users_group='test_group')
-    self.add_to_group(PRIVILEGED_USERS_GROUP)
+    self.mock_auth_config(privileged_users_group='test_wrong_group',
+                          bot_bootstrap_group='test_correct_group')
+    self.add_to_group('test_wrong_group')
     self.assertFalse(acl.is_bootstrapper())
-    self.assertIsNone(acl.get_user_type())
+    self.assertEqual(acl.get_user_type(), 'privileged user')
 
 
 if __name__ == '__main__':
