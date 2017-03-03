@@ -189,7 +189,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       }
       if outputs_ref:
         expected['data']['outputs_ref'] = outputs_ref
-      self.assertEqual(expected, kwargs)
+      self.assertEqual(expected, kwargs, kwargs)
     return check_final
 
   def _run_command(self, task_details, headers_cb=None):

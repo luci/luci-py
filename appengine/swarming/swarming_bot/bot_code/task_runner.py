@@ -168,11 +168,6 @@ def get_isolated_args(is_grpc, work_dir, task_details, isolated_result,
 
 
 class TaskDetails(object):
-  """All the metadata to execute the task as reported by the Swarming server.
-
-  This is not exactly the same as the TaskRequest the client submitted, since it
-  only contains the information the bot needs to know about.
-  """
   def __init__(self, data):
     logging.info('TaskDetails(%s)', data)
     if not isinstance(data, dict):
@@ -327,6 +322,38 @@ def load_and_run(
       json.dump(task_result, f)
 
 
+def should_post_update(stdout, now, last_packet):
+  """Returns True if it's time to send a task_update packet via post_update().
+
+  Sends a packet when one of this condition is met:
+  - more than MAX_CHUNK_SIZE of stdout is buffered.
+  - last packet was sent more than MIN_PACKET_INTERNAL seconds ago and there was
+    stdout.
+  - last packet was sent more than MAX_PACKET_INTERVAL seconds ago.
+  """
+  packet_interval = MIN_PACKET_INTERNAL if stdout else MAX_PACKET_INTERVAL
+  return len(stdout) >= MAX_CHUNK_SIZE or (now - last_packet) > packet_interval
+
+
+def calc_yield_wait(task_details, start, last_io, timed_out, stdout):
+  """Calculates the maximum number of seconds to wait in yield_any()."""
+  now = monotonic_time()
+  if timed_out:
+    # Give a |grace_period| seconds delay.
+    if task_details.grace_period:
+      return max(now - timed_out - task_details.grace_period, 0.)
+    return 0.
+
+  out = MIN_PACKET_INTERNAL if stdout else MAX_PACKET_INTERVAL
+  if task_details.hard_timeout:
+    out = min(out, start + task_details.hard_timeout - now)
+  if task_details.io_timeout:
+    out = min(out, last_io + task_details.io_timeout - now)
+  out = max(out, 0)
+  logging.debug('calc_yield_wait() = %d', out)
+  return out
+
+
 def kill_and_wait(proc, grace_period, reason):
   logging.warning('SIGTERM finally due to %s', reason)
   proc.terminate()
@@ -340,244 +367,22 @@ def kill_and_wait(proc, grace_period, reason):
   return exit_code
 
 
-class RunState(object):
-  """Run state of the task.
-
-  This also includes the logic to handle RPCs to the server for task updates.
-  """
-  def __init__(self, remote, task_details, cost_usd_hour, task_start):
-    # Immutable.
-    self._cost_usd_hour = cost_usd_hour
-    self._proc_start = monotonic_time()
-    self._remote = remote
-    self._task_details = task_details
-    self._task_start = task_start
-
-    # Mutable
-    self._exit_code = None
-    # Counts the offset at which it's streaming stdout.
-    self._output_chunk_start = 0
-    self._pending_stdout = None
-    # Last time a packet was sent. Ultimately to determine if a keep-alive
-    # should be sent.
-    self._last_packet = self._proc_start
-
-    # Externally modifiable:
-    self.had_io_timeout = False
-    self.had_hard_timeout = False
-    self.last_io = self._proc_start
-    self.must_signal_internal_failure = None
-    self.timed_out = None
-
-  ## Accessors.
-
-  @property
-  def grace_period(self):
-    """Returns the number of seconds to wait between SIGTERM and SIGKILL.
-
-    See
-    https://github.com/luci/luci-py/blob/master/appengine/swarming/doc/Bot.md#graceful-termination-aka-the-sigterm-and-sigkill-dance
-    for more details.
-
-    Hard timeout enforcement is deferred to run_isolated. Grace is doubled to
-    give one 'grace_period' slot to the child process and one slot to upload the
-    results back.
-    """
-    g = self._task_details.grace_period
-    return g * 2 if g else g
-
-  def maxsize(self):
-    """Maximum number of bytes that can be pulled from stdout without
-    overflowing our internal buffer.
-    """
-    return MAX_CHUNK_SIZE - len(self._pending_stdout or '')
-
-  def task_duration(self, now):
-    """Task duration up to now. This includes more overhead than proc_duration.
-    """
-    return now - self._task_start
-
-  def should_post_update(self):
-    """Returns True if it's time to send a task_update packet via post_update().
-
-    Sends a packet when one of this condition is met:
-    - more than MAX_CHUNK_SIZE of stdout is buffered.
-    - last packet was sent more than MIN_PACKET_INTERNAL seconds ago and there
-      was stdout.
-    - last packet was sent more than MAX_PACKET_INTERVAL seconds ago.
-    """
-    now = self.last_io
-    packet_interval = (
-        MIN_PACKET_INTERNAL if self._pending_stdout else MAX_PACKET_INTERVAL)
-    return (
-        len(self._pending_stdout or '') >= MAX_CHUNK_SIZE or
-        (now - self._last_packet) > packet_interval)
-
-  def calc_yield_wait(self):
-    """Calculates the maximum number of seconds to wait in yield_any()."""
-    now = monotonic_time()
-    if self.timed_out:
-      # Give a |grace_period| seconds delay.
-      if self._task_details.grace_period:
-        return max(now - self.timed_out - self._task_details.grace_period, 0.)
-      return 0.
-
-    out = MIN_PACKET_INTERNAL if self._pending_stdout else MAX_PACKET_INTERVAL
-    if self._task_details.hard_timeout:
-      out = min(out, self._proc_start + self._task_details.hard_timeout - now)
-    if self._task_details.io_timeout:
-      out = min(out, self.last_io + self._task_details.io_timeout - now)
-    out = max(out, 0)
-    logging.debug('calc_yield_wait() = %d', out)
-    return out
-
-  def return_data(self):
-    """Data returned to bot_main."""
-    return {
-      u'exit_code': self._exit_code if self._exit_code is not None else -1,
-      u'hard_timeout': self.had_hard_timeout,
-      u'io_timeout': self.had_io_timeout,
-      u'must_signal_internal_failure': self.must_signal_internal_failure,
-      u'version': OUT_VERSION,
-    }
-
-  ## Mutators.
-
-  def enqueue_stdout(self, stdout):
-    """Adds data retrieved from the stdout pipes into the internal buffer.
-
-    This data is eventually sent to the server as an RPC.
-    """
-    self._pending_stdout = (self._pending_stdout or '') + stdout
-    self.last_io = monotonic_time()
-
-  def post(self):
-    """See _post()."""
-    return self._post()
-
-  def the_end(self, exit_code, **kwargs):
-    """Posts the *last* update to the server.
-
-    Doesn't return anything since it's the end anyway and the task_runner
-    process will immediately terminate after this RPC completes.
-    """
-    self._exit_code = exit_code
-    self._post(exit_code=exit_code, **kwargs)
-
-  def _post(self, **kwargs):
-    """Posts an update to the server, an RPC.
-
-    If using the JSON RPC API, the URL is /swarming/api/v1/bot/task_update. See
-    ../../handlers_bot.py for this handler for more details.
-
-    If using the gRPC API, the API format is processed via remote_client_grpc.py
-    from message defined in ../proto_bot/swarming_bot.proto.
-
-    Returns:
-      The decoded data from the RPC.
-    """
-    assert bool('exit_code' in kwargs) == (self._exit_code is not None)
-    now = monotonic_time()
-    params = {
-      # Cost of the task up to now, based on the $/hr of the worker.
-      'cost_usd': self._cost_usd_hour * self.task_duration(now) / 60. / 60.,
-    }
-    if self.had_io_timeout or 'exit_code' in kwargs:
-      params['io_timeout'] = self.had_io_timeout
-    if self.had_hard_timeout or 'exit_code' in kwargs:
-      params['hard_timeout'] = self.had_hard_timeout
-    if self._exit_code is not None:
-      kwargs.setdefault('duration', now - self._proc_start)
-    params.update(kwargs)
-    ret = self._remote.post_task_update(
-        self._task_details.task_id, self._task_details.bot_id, params,
-        (self._pending_stdout, self._output_chunk_start), self._exit_code)
-    self._output_chunk_start += len(self._pending_stdout or '')
-    self._pending_stdout = ''
-    self._last_packet = monotonic_time()
-    return ret
-
-
-def process_isolated_result(isolated_result, state, exit_code):
-  """Loads isolated_result file and convert it to a dict to send to the server.
-  """
-  params = {}
-  try:
-    if not os.path.isfile(isolated_result):
-      # It's possible if
-      # - run_isolated.py did not start
-      # - run_isolated.py started, but arguments were invalid
-      # - host in a situation unable to fork
-      # - grand child process outliving the child process deleting everything
-      #   it can
-      # Do not create an internal error, just send back the (partial)
-      # view as task_runner saw it, for example the real exit_code is
-      # unknown.
-      logging.warning('there\'s no result file')
-    else:
-      # See run_isolated.py for the format.
-      with open(isolated_result, 'rb') as f:
-        run_isolated_result = json.load(f)
-      logging.debug('run_isolated:\n%s', run_isolated_result)
-      # Grab statistics (cache hit rate, data downloaded, mapping time, etc)
-      # from run_isolated and push them to the server.
-      if run_isolated_result['outputs_ref']:
-        params['outputs_ref'] = run_isolated_result['outputs_ref']
-      state.had_hard_timeout = run_isolated_result['had_hard_timeout']
-      if not state.had_io_timeout and not state.had_hard_timeout:
-        if run_isolated_result['internal_failure']:
-          state.must_signal_internal_failure = (
-              run_isolated_result['internal_failure'])
-          logging.error('%s', state.must_signal_internal_failure)
-        elif exit_code:
-          # TODO(maruel): Grab stdout from run_isolated.
-          state.must_signal_internal_failure = (
-              'run_isolated internal failure %d' % exit_code)
-          logging.error('%s', state.must_signal_internal_failure)
-      # Override run_isolated exit code with the actual child process exit code.
-      exit_code = run_isolated_result['exit_code']
-      params['bot_overhead'] = 0.
-      if run_isolated_result.get('duration') is not None:
-        # Calculate the real task duration as measured by run_isolated and
-        # calculate the remaining overhead.
-        params['duration'] = run_isolated_result['duration']
-        params['bot_overhead'] = max(0,
-            state.task_duration(monotonic_time()) -
-            run_isolated_result['duration'] -
-            run_isolated_result.get('download', {}).get('duration', 0) -
-            run_isolated_result.get('upload', {}).get('duration', 0) -
-            run_isolated_result.get('cipd', {}).get('duration', 0))
-      isolated_stats = run_isolated_result.get('stats', {}).get('isolated')
-      if isolated_stats:
-        params['isolated_stats'] = isolated_stats
-      cipd_stats = run_isolated_result.get('stats', {}).get('cipd')
-      if cipd_stats:
-        params['cipd_stats'] = cipd_stats
-      cipd_pins = run_isolated_result.get('cipd_pins')
-      if cipd_pins:
-        params['cipd_pins'] = cipd_pins
-  except (IOError, OSError, ValueError) as e:
-    logging.error('Swallowing error: %s', e)
-    if not state.must_signal_internal_failure:
-      state.must_signal_internal_failure = '%s\n%s' % (
-          e, traceback.format_exc()[-2048:])
-  return params, exit_code
-
-
-def get_env(task_details):
-  """Returns the updated environment variables for the child process."""
-  # TODO(maruel): This should be applied to run_isolated's child process, not
-  # run_isolated itself!
-  # The current process is task_runner. The child process is run_isolated. The
-  # grand-child process is the task. The problem is that the env is set to
-  # run_isolated process, not its child process. I plan to do it later.
-  env = os.environ.copy()
-  for key, value in (task_details.env or {}).iteritems():
-    if not value:
-      env.pop(key, None)
-    else:
-      env[key] = value
-  return env
+def fail_without_command(remote, bot_id, task_id, params, cost_usd_hour,
+                         task_start, exit_code, stdout):
+  now = monotonic_time()
+  params['cost_usd'] = cost_usd_hour * (now - task_start) / 60. / 60.
+  params['duration'] = now - task_start
+  params['io_timeout'] = False
+  params['hard_timeout'] = False
+  # Ignore server reply to stop.
+  remote.post_task_update(task_id, bot_id, params, (stdout, 0), 1)
+  return {
+    u'exit_code': exit_code,
+    u'hard_timeout': False,
+    u'io_timeout': False,
+    u'must_signal_internal_failure': None,
+    u'version': OUT_VERSION,
+  }
 
 
 def run_command(remote, task_details, work_dir, cost_usd_hour,
@@ -594,11 +399,24 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     ExitSignal if caught some signal when starting or stopping.
     InternalError on unexpected internal errors.
   """
-  state = RunState(remote, task_details, cost_usd_hour, task_start)
+  # TODO(maruel): This function is incomprehensible, split and refactor.
+
   # Signal the command is about to be started.
-  if not state.post():
+  last_packet = start = now = monotonic_time()
+  task_id = task_details.task_id
+  bot_id = task_details.bot_id
+  params = {
+    'cost_usd': cost_usd_hour * (now - task_start) / 60. / 60.,
+  }
+  if not remote.post_task_update(task_id, bot_id, params):
     # Don't even bother, the task was already canceled.
-    return state.return_data()
+    return {
+      u'exit_code': -1,
+      u'hard_timeout': False,
+      u'io_timeout': False,
+      u'must_signal_internal_failure': None,
+      u'version': OUT_VERSION,
+    }
 
   isolated_result = os.path.join(work_dir, 'isolated_result.json')
   args_path = os.path.join(work_dir, 'run_isolated_args.json')
@@ -606,13 +424,28 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
   cmd.extend(['-a', args_path])
   args = get_isolated_args(remote.is_grpc(), work_dir, task_details,
                            isolated_result, bot_file, run_isolated_flags)
+  # Hard timeout enforcement is deferred to run_isolated. Grace is doubled to
+  # give one 'grace_period' slot to the child process and one slot to upload
+  # the results back.
+  task_details.hard_timeout = 0
+  if task_details.grace_period:
+    task_details.grace_period *= 2
+
   try:
     # TODO(maruel): Support both channels independently and display stderr in
     # red.
-    env = get_env(task_details)
+    env = os.environ.copy()
+    for key, value in (task_details.env or {}).iteritems():
+      if not value:
+        env.pop(key, None)
+      else:
+        env[key] = value
     logging.info('cmd=%s', cmd)
     logging.info('cwd=%s', work_dir)
     logging.info('env=%s', env)
+    fail_on_start = lambda exit_code, stdout: fail_without_command(
+        remote, bot_id, task_id, params, cost_usd_hour, task_start,
+        exit_code, stdout)
 
     # We write args to a file since there may be more of them than the OS
     # can handle.
@@ -620,12 +453,11 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
       with open(args_path, 'w') as f:
         json.dump(args, f)
     except (IOError, OSError) as e:
-      state.the_end(
-          None,
-          internal_failure='Could not write args to %s: %s' % (args_path, e))
-      return state.return_data()
+      return fail_on_start(
+          -1,
+          'Could not write args to %s: %s' % (args_path, e))
 
-    # Start the command.
+    # Start the command
     try:
       assert cmd and all(isinstance(a, basestring) for a in cmd)
       proc = subprocess42.Popen(
@@ -637,49 +469,61 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
           stderr=subprocess42.STDOUT,
           stdin=subprocess42.PIPE)
     except OSError as e:
-      state.enqueue_stdout(
+      return fail_on_start(
+          1,
           'Command "%s" failed to start.\nError: %s' % (' '.join(cmd), e))
-      # TODO(maruel): Use the OS code if any.
-      state.the_end(-1)
-      return state.return_data()
 
-    # Monitor the task.
-    # First exit_code is set to run_isolated exit code, then
-    # process_isolated_result() retrieves the underlying exit code that we want
-    # to surface as the task exit code.
+    # Monitor the task
+    output_chunk_start = 0
+    stdout = ''
     exit_code = None
+    had_io_timeout = False
+    must_signal_internal_failure = None
     kill_sent = False
+    timed_out = None
     try:
-      for _, new_data in proc.yield_any(
-          maxsize=state.maxsize, timeout=state.calc_yield_wait):
+      calc = lambda: calc_yield_wait(
+          task_details, start, last_io, timed_out, stdout)
+      maxsize = lambda: MAX_CHUNK_SIZE - len(stdout)
+      last_io = monotonic_time()
+      for _, new_data in proc.yield_any(maxsize=maxsize, timeout=calc):
         now = monotonic_time()
         if new_data:
-          state.enqueue_stdout(new_data)
+          stdout += new_data
+          last_io = now
 
         # Post update if necessary.
-        if state.should_post_update():
-          if not state.post():
+        if should_post_update(stdout, now, last_packet):
+          last_packet = monotonic_time()
+          params['cost_usd'] = (
+              cost_usd_hour * (last_packet - task_start) / 60. / 60.)
+          if not remote.post_task_update(
+              task_id, bot_id,
+              params, (stdout, output_chunk_start)):
             # Server is telling us to stop. Normally task cancellation.
             if not kill_sent:
               logging.warning('Server induced stop; sending SIGKILL')
               proc.kill()
               kill_sent = True
 
+          output_chunk_start += len(stdout)
+          stdout = ''
+
         # Send signal on timeout if necessary. Both are failures, not
         # internal_failures.
         # Eventually kill but return 0 so bot_main.py doesn't cancel the task.
-        if not state.timed_out:
+        if not timed_out:
           if (task_details.io_timeout and
-              now - state.last_io > task_details.io_timeout):
-            state.had_io_timeout = True
+              now - last_io > task_details.io_timeout):
+            had_io_timeout = True
             logging.warning(
                 'I/O timeout is %.3fs; no update for %.3fs sending SIGTERM',
-                task_details.io_timeout, now - state.last_io)
+                task_details.io_timeout, now - last_io)
             proc.terminate()
-            state.timed_out = monotonic_time()
+            timed_out = monotonic_time()
         else:
           # During grace period.
-          if (not kill_sent and now - state.timed_out >= state.grace_period):
+          if not kill_sent and now - timed_out >= task_details.grace_period:
             # Now kill for real. The user can distinguish between the following
             # states:
             # - signal but process exited within grace period,
@@ -688,7 +532,7 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
             # - processed exited late, exit code will be -9 on posix.
             logging.warning(
                 'Grace of %.3fs exhausted at %.3fs; sending SIGKILL',
-                state.grace_period, now - state.timed_out)
+                task_details.grace_period, now - timed_out)
             proc.kill()
             kill_sent = True
       logging.info('Waiting for process exit')
@@ -697,23 +541,104 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         ExitSignal, InternalError, IOError,
         OSError, remote_client.InternalError) as e:
       # Something wrong happened, try to kill the child process.
-      state.must_signal_internal_failure = str(e.message or 'unknown error')
-      exit_code = kill_and_wait(proc, state.grace_period, e.message)
+      must_signal_internal_failure = str(e.message or 'unknown error')
+      exit_code = kill_and_wait(proc, task_details.grace_period, e.message)
 
     # This is the very last packet for this command. It if was an isolated task,
     # include the output reference to the archived .isolated file.
-    params, exit_code = process_isolated_result(
-        isolated_result, state, exit_code)
+    now = monotonic_time()
+    params['cost_usd'] = cost_usd_hour * (now - task_start) / 60. / 60.
+    params['duration'] = now - start
+    params['io_timeout'] = had_io_timeout
+    had_hard_timeout = False
+    try:
+      if not os.path.isfile(isolated_result):
+        # It's possible if
+        # - run_isolated.py did not start
+        # - run_isolated.py started, but arguments were invalid
+        # - host in a situation unable to fork
+        # - grand child process outliving the child process deleting everything
+        #   it can
+        # Do not create an internal error, just send back the (partial)
+        # view as task_runner saw it, for example the real exit_code is
+        # unknown.
+        logging.warning('there\'s no result file')
+        if exit_code is None:
+          exit_code = -1
+      else:
+        # See run_isolated.py for the format.
+        with open(isolated_result, 'rb') as f:
+          run_isolated_result = json.load(f)
+        logging.debug('run_isolated:\n%s', run_isolated_result)
+        # TODO(maruel): Grab statistics (cache hit rate, data downloaded,
+        # mapping time, etc) from run_isolated and push them to the server.
+        if run_isolated_result['outputs_ref']:
+          params['outputs_ref'] = run_isolated_result['outputs_ref']
+        had_hard_timeout = run_isolated_result['had_hard_timeout']
+        if not had_io_timeout and not had_hard_timeout:
+          if run_isolated_result['internal_failure']:
+            must_signal_internal_failure = (
+                run_isolated_result['internal_failure'])
+            logging.error('%s', must_signal_internal_failure)
+          elif exit_code:
+            # TODO(maruel): Grab stdout from run_isolated.
+            must_signal_internal_failure = (
+                'run_isolated internal failure %d' % exit_code)
+            logging.error('%s', must_signal_internal_failure)
+        exit_code = run_isolated_result['exit_code']
+        params['bot_overhead'] = 0.
+        if run_isolated_result.get('duration') is not None:
+          # Calculate the real task duration as measured by run_isolated and
+          # calculate the remaining overhead.
+          params['bot_overhead'] = params['duration']
+          params['duration'] = run_isolated_result['duration']
+          params['bot_overhead'] -= params['duration']
+          params['bot_overhead'] -= run_isolated_result.get(
+              'download', {}).get('duration', 0)
+          params['bot_overhead'] -= run_isolated_result.get(
+              'upload', {}).get('duration', 0)
+          params['bot_overhead'] -= run_isolated_result.get(
+              'cipd', {}).get('duration', 0)
+          if params['bot_overhead'] < 0:
+            params['bot_overhead'] = 0
+        isolated_stats = run_isolated_result.get('stats', {}).get('isolated')
+        if isolated_stats:
+          params['isolated_stats'] = isolated_stats
+        cipd_stats = run_isolated_result.get('stats', {}).get('cipd')
+        if cipd_stats:
+          params['cipd_stats'] = cipd_stats
+        cipd_pins = run_isolated_result.get('cipd_pins')
+        if cipd_pins:
+          params['cipd_pins'] = cipd_pins
+    except (IOError, OSError, ValueError) as e:
+      logging.error('Swallowing error: %s', e)
+      if not must_signal_internal_failure:
+        must_signal_internal_failure = '%s\n%s' % (
+            e, traceback.format_exc()[-2048:])
+
+    # TODO(maruel): Send the internal failure here instead of sending it through
+    # bot_main, this causes a race condition.
+    if exit_code is None:
+      exit_code = -1
+    params['hard_timeout'] = had_hard_timeout
+
     # Ignore server reply to stop. Also ignore internal errors here if we are
     # already handling some.
     try:
-      state.the_end(exit_code, **params)
+      remote.post_task_update(
+          task_id, bot_id, params, (stdout, output_chunk_start), exit_code)
     except remote_client.InternalError as e:
       logging.error('Internal error while finishing the task: %s', e)
-      # That's too late, send it via bot_main.
-      if not state.must_signal_internal_failure:
-        state.must_signal_internal_failure = str(e.message or 'unknown error')
-    return state.return_data()
+      if not must_signal_internal_failure:
+        must_signal_internal_failure = str(e.message or 'unknown error')
+
+    return {
+      u'exit_code': exit_code,
+      u'hard_timeout': had_hard_timeout,
+      u'io_timeout': had_io_timeout,
+      u'must_signal_internal_failure': must_signal_internal_failure,
+      u'version': OUT_VERSION,
+    }
   finally:
     file_path.try_remove(unicode(isolated_result))
 
