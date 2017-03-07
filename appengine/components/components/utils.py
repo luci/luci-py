@@ -533,17 +533,17 @@ def enqueue_task_async(
     headers = None
     if use_dedicated_module:
       headers = {'Host': get_task_queue_host()}
-      # Note that just using 'target=module' here would redirect task request to
-      # a default version of a module, not the curently executing one.
-      task = taskqueue.Task(
-          url=url,
-          params=params,
-          payload=payload,
-          name=name,
-          countdown=countdown,
-          headers=headers)
-      yield task.add_async(queue_name=queue_name, transactional=transactional)
-      raise ndb.Return(True)
+    # Note that just using 'target=module' here would redirect task request to
+    # a default version of a module, not the curently executing one.
+    task = taskqueue.Task(
+        url=url,
+        params=params,
+        payload=payload,
+        name=name,
+        countdown=countdown,
+        headers=headers)
+    yield task.add_async(queue_name=queue_name, transactional=transactional)
+    raise ndb.Return(True)
   except (taskqueue.TombstonedTaskError, taskqueue.TaskAlreadyExistsError):
     logging.info(
         'Task %r deduplicated (already exists in queue %r)',
