@@ -128,7 +128,10 @@ def path_handler(api_class, api_method, service_path):
           if isinstance(res, message_types.VoidMessage):
             self.response.set_status(204)
 
-      self.response.content_type = 'application/json; charset=utf-8'
+      if self.response.status_code != 204:
+        self.response.content_type = 'application/json; charset=utf-8'
+      else:
+        self.response.content_type = ''
       self.response.out.write(response_body)
 
   return Handler
