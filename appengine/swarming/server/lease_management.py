@@ -225,6 +225,37 @@ def machine_type_pb2_to_entity(pb2):
   )
 
 
+def should_be_enabled(config, now=None):
+  """Returns whether or not the configured MachineType should be enabled.
+
+  Args:
+    machine_type: A proto.bots_pb2.MachineType proto.
+    now: datetime.datetime to use as the time to check if the MachineType
+     should be enabled. Defaults to the current time if unspecified.
+
+  Returns:
+    True if the MachineType should be enabled, False otherwise.
+  """
+  now = now or utils.utcnow()
+  if config.schedule and config.schedule.daily:
+    # Daily schedule means the MachineType may need to be enabled or disabled.
+    # For now only consider the first element of the schedule.
+    h, m = map(int, config.schedule.daily[0].start.split(':'))
+    start = datetime.datetime(now.year, now.month, now.day, h, m)
+    h, m = map(int, config.schedule.daily[0].end.split(':'))
+    end = datetime.datetime(now.year, now.month, now.day, h, m)
+
+    # If the current time is outside the schedule, disable the MachineType.
+    if now < start or now > end:
+      return False
+
+    # If the current time is within the schedule, enable the MachineType.
+    if start < now < end:
+      return True
+
+  return True
+
+
 def ensure_entities_exist(max_concurrent=50):
   """Ensures MachineType entities are correct, and MachineLease entities exist.
 
@@ -234,27 +265,62 @@ def ensure_entities_exist(max_concurrent=50):
   Args:
     max_concurrent: Maximum number of concurrent asynchronous requests.
   """
+  now = utils.utcnow()
+
   # Generate a few asynchronous requests at a time in order to prevent having
   # too many in flight at a time.
   futures = []
   machine_types = bot_groups_config.fetch_machine_types().copy()
 
-  for machine_type in MachineType.query(MachineType.enabled == True):
+  for machine_type in MachineType.query():
     # Check the MachineType in the datastore against its config.
     # If it no longer exists, just disable it here. If it exists but
     # doesn't match, update it.
     config = machine_types.pop(machine_type.key.id(), None)
+
+    # If there is no config, disable the MachineType.
     if not config:
-      machine_type.enabled = False
-      futures.append(machine_type.put_async())
+      if machine_type.enabled:
+        machine_type.enabled = False
+        futures.append(machine_type.put_async())
+        logging.info('Disabling deleted MachineType: %s', machine_type)
       continue
 
+    put = False
+
+    # Handle scheduled config changes.
+    if should_be_enabled(config, now=now):
+      # If the MachineType is not currently enabled, enable it.
+      if not machine_type.enabled:
+        machine_type.enabled = True
+        put = True
+        logging.info('Enabling MachineType: %s', machine_type)
+    else:
+      # If the MachineType is currently enabled, disable it.
+      if machine_type.enabled:
+        machine_type.enabled = False
+        put = True
+        logging.info('Disabling MachineType: %s', machine_type)
+
+    # If the MachineType does not match the config, update it. Copy the
+    # enabled value so we can compare the MachineType to the config
+    # to check for differences in all other fields except "enabled".
     config = machine_type_pb2_to_entity(config)
+    config.enabled = machine_type.enabled
     if machine_type != config:
       logging.info('Updating MachineType: %s', config)
       machine_type = config
+      put = True
+
+    # If there's anything to update, update it once here.
+    if put:
       futures.append(machine_type.put_async())
 
+    # If the MachineType isn't enabled, don't create MachineLease entities.
+    if not machine_type.enabled:
+      continue
+
+    # Ensure the existence of MachineLease entities.
     cursor = 0
     while cursor < machine_type.target_size:
       while len(futures) < max_concurrent and cursor < machine_type.target_size:
@@ -267,11 +333,11 @@ def ensure_entities_exist(max_concurrent=50):
       # converging to the desired state eventually.
       futures = [future for future in futures if not future.done()]
 
+  # Create MachineTypes that never existed before.
+  # The next iteration of this cron job will create their MachineLeases.
   if machine_types:
     machine_types = machine_types.values()
 
-  # Create MachineTypes that never existed before.
-  # The next iteration of this cron job will create their MachineLeases.
   while machine_types:
     num_futures = len(futures)
     if num_futures < max_concurrent:

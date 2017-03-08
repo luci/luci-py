@@ -405,6 +405,143 @@ class EnsureEntitiesExistTest(test_case.TestCase):
     self.assertEqual(key.get().lease_duration_secs, 1)
     self.assertEqual(key.get().mp_dimensions.disk_gb, 100)
 
+  def test_daily_schedule_enable(self):
+    def fetch_machine_types():
+      return {
+          'machine-type': bots_pb2.MachineType(
+              early_release_secs=0,
+              lease_duration_secs=1,
+              mp_dimensions=['disk_gb:100'],
+              name='machine-type',
+              target_size=1,
+              schedule=bots_pb2.Schedule(
+                  daily=[bots_pb2.DailySchedule(
+                      start='0:00',
+                      end='1:00',
+                  )],
+              ),
+          ),
+      }
+    self.mock(
+        lease_management.bot_groups_config,
+        'fetch_machine_types',
+        fetch_machine_types,
+    )
+    self.mock(
+        lease_management.utils,
+        'utcnow',
+        lambda: datetime.datetime(1969, 1, 1, 0, 30),
+    )
+
+    key = lease_management.MachineType(
+        id='machine-type',
+        early_release_secs=0,
+        enabled=False,
+        lease_duration_secs=1,
+        mp_dimensions=machine_provider.Dimensions(
+            disk_gb=100,
+        ),
+        target_size=1,
+    ).put()
+
+    lease_management.ensure_entities_exist()
+
+    self.assertEqual(lease_management.MachineLease.query().count(), 1)
+    self.failUnless(key.get().enabled)
+
+  def test_daily_schedule_disable(self):
+    def fetch_machine_types():
+      return {
+          'machine-type': bots_pb2.MachineType(
+              early_release_secs=0,
+              lease_duration_secs=1,
+              mp_dimensions=['disk_gb:100'],
+              name='machine-type',
+              target_size=1,
+              schedule=bots_pb2.Schedule(
+                  daily=[bots_pb2.DailySchedule(
+                      start='0:00',
+                      end='1:00',
+                  )],
+              ),
+          ),
+      }
+    self.mock(
+        lease_management.bot_groups_config,
+        'fetch_machine_types',
+        fetch_machine_types,
+    )
+    self.mock(
+        lease_management.utils,
+        'utcnow',
+        lambda: datetime.datetime(1969, 1, 1, 2),
+    )
+
+    key = lease_management.MachineType(
+        id='machine-type',
+        early_release_secs=0,
+        enabled=True,
+        lease_duration_secs=1,
+        mp_dimensions=machine_provider.Dimensions(
+            disk_gb=100,
+        ),
+        target_size=1,
+    ).put()
+
+    lease_management.ensure_entities_exist()
+
+    self.failIf(lease_management.MachineLease.query().count())
+    self.failIf(key.get().enabled)
+
+
+class ShouldBeEnabledTest(test_case.TestCase):
+  """Tests for lease_management.should_be_enabled."""
+
+  def test_no_schedule(self):
+    config = bots_pb2.MachineType()
+    now = None
+
+    self.failUnless(lease_management.should_be_enabled(config, now=now))
+
+  def test_no_daily_schedule(self):
+    config = bots_pb2.MachineType(schedule=bots_pb2.Schedule())
+    now = None
+
+    self.failUnless(lease_management.should_be_enabled(config, now=now))
+
+  def test_should_be_enabled(self):
+    config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
+        daily=[bots_pb2.DailySchedule(
+            start='1:00',
+            end='2:00',
+        )],
+    ))
+    now = datetime.datetime(1969, 1, 1, 1, 30)
+
+    self.failUnless(lease_management.should_be_enabled(config, now=now))
+
+  def test_should_be_disabled_too_early(self):
+    config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
+        daily=[bots_pb2.DailySchedule(
+            start='1:00',
+            end='2:00',
+        )],
+    ))
+    now = datetime.datetime(1969, 1, 1)
+
+    self.failIf(lease_management.should_be_enabled(config, now=now))
+
+  def test_should_be_disabled_too_late(self):
+    config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
+        daily=[bots_pb2.DailySchedule(
+            start='1:00',
+            end='2:00',
+        )],
+    ))
+    now = datetime.datetime(1969, 1, 1, 3)
+
+    self.failIf(lease_management.should_be_enabled(config, now=now))
+
 
 if __name__ == '__main__':
   unittest.main()
