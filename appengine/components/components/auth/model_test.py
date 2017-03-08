@@ -51,6 +51,8 @@ class IdentityTest(test_case.TestCase):
     ok_identities = (
       (unicode(model.IDENTITY_USER), 'joe@example.com'),
       (model.IDENTITY_USER, u'joe@example.com'),
+      (model.IDENTITY_USER, r'abc%def.com@zzz.com'),
+      (model.IDENTITY_USER, r'ABC_DEF@ABC_DEF.com'),
       (model.IDENTITY_SERVICE, 'domain.com:app-id'),
     )
     for kind, name in ok_identities:

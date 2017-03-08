@@ -132,7 +132,7 @@ ALLOWED_IDENTITY_KINDS = {
   IDENTITY_ANONYMOUS: re.compile(r'^anonymous$'),
   IDENTITY_BOT: re.compile(r'^[0-9a-zA-Z_\-\.@]+$'),
   IDENTITY_SERVICE: re.compile(r'^[0-9a-zA-Z_\-\:\.]+$'),
-  IDENTITY_USER: re.compile(r'^[0-9a-zA-Z_\-\.\+]+@[0-9a-z_\-\.]+$'),
+  IDENTITY_USER: re.compile(r'^[0-9a-zA-Z_\-\.\+\%]+@[0-9a-zA-Z_\-\.]+$'),
 }
 
 # Regular expression that matches group names. ASCII only, no leading or
