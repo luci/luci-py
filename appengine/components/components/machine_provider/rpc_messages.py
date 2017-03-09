@@ -237,3 +237,33 @@ class LeaseReleaseResponse(messages.Message):
 class BatchedLeaseReleaseResponse(messages.Message):
   """Represents responses to a batched set of lease release requests."""
   responses = messages.MessageField(LeaseReleaseResponse, 1, repeated=True)
+
+
+class MachineInstructionRequest(messages.Message):
+  """Represents a request to send an instruction to a leased machine."""
+  # Request ID for the fulfilled LeaseRequest whose machine should be
+  # instructed.
+  request_id = messages.StringField(1, required=True)
+  # Instruction to send the leased machine.
+  instruction = messages.MessageField(Instruction, 2)
+
+
+class MachineInstructionError(messages.Enum):
+  """Represents an error in a MachineInstructionRequest."""
+  # Request ID referred to an unfulfilled request.
+  NOT_FULFILLED = 1
+  # Request ID referred to a fulfilled request whose machine was
+  # already reclaimed.
+  ALREADY_RECLAIMED = 2
+  # Invalid instruction for the machine.
+  INVALID_INSTRUCTION = 3
+
+
+class MachineInstructionResponse(messages.Message):
+  """Represents a response to a MachineInstructionRequest."""
+  # Request ID used by the client to generate the LeaseRequest for the
+  # machine being instructed.
+  client_request_id = messages.StringField(1, required=True)
+  # MachineInstructionError indicating an error with the request, or None
+  # if there is no error.
+  error = messages.EnumField(MachineInstructionError, 2)

@@ -17,6 +17,7 @@ from google.appengine import runtime
 from protorpc.remote import protojson
 import webtest
 
+from components import auth_testing
 from components import utils
 from components.machine_provider import rpc_messages
 from test_support import test_case
@@ -1087,6 +1088,400 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
         lease_response.error,
         rpc_messages.LeaseRequestError.UNSPECIFIED_TOPIC,
     )
+
+
+class MachineProviderInstructTest(test_case.EndpointsTestCase):
+  """Tests for handlers_endpoints.MachineProviderEndpoints.instruct."""
+  api_service_cls = handlers_endpoints.MachineProviderEndpoints
+
+  def setUp(self):
+    super(MachineProviderInstructTest, self).setUp()
+    app = handlers_endpoints.create_endpoints_app()
+    self.app = webtest.TestApp(app)
+
+  def test_lease_request_not_found(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    def publish(_, message, attributes):
+      self.fail('publish called')
+    auth_testing.mock_get_current_identity(self)
+    self.mock(acl.auth, 'is_group_member', is_group_member)
+    self.mock(handlers_endpoints.pubsub, 'publish', publish)
+
+    request = rpc_messages.MachineInstructionRequest(
+        request_id='request-id',
+        instruction=rpc_messages.Instruction(
+            swarming_server='example.com',
+        ),
+    )
+    models.CatalogMachineEntry(
+        id='machine',
+        dimensions=rpc_messages.Dimensions(
+            backend=rpc_messages.Backend.DUMMY,
+        ),
+        lease_expiration_ts=datetime.datetime.fromtimestamp(9999999999),
+        lease_id='request-id',
+        pubsub_topic='topic',
+        pubsub_topic_project='project',
+    ).put()
+    request = rpc_to_json(request)
+
+    with self.assertRaises(webtest.app.AppError):
+      response = jsonish_dict_to_rpc(
+          self.call_api('instruct', request).json,
+          rpc_messages.MachineInstructionResponse,
+      )
+
+  def test_lease_request_not_fulfilled(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    def publish(*args, **kwargs):
+      self.fail('publish called')
+    auth_testing.mock_get_current_identity(self)
+    self.mock(acl.auth, 'is_group_member', is_group_member)
+    self.mock(handlers_endpoints.pubsub, 'publish', publish)
+
+    request = rpc_messages.MachineInstructionRequest(
+        request_id='request-id',
+        instruction=rpc_messages.Instruction(
+            swarming_server='example.com',
+        ),
+    )
+    models.LeaseRequest(
+        key=models.LeaseRequest.generate_key(
+            auth_testing.DEFAULT_MOCKED_IDENTITY.to_bytes(),
+            request,
+        ),
+        deduplication_checksum='checksum',
+        machine_id='machine',
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=rpc_messages.LeaseRequest(
+            dimensions=rpc_messages.Dimensions(),
+            request_id='request-id',
+        ),
+        response=rpc_messages.LeaseResponse(
+            client_request_id='request-id',
+            state=rpc_messages.LeaseRequestState.UNTRIAGED,
+        ),
+    ).put()
+    models.CatalogMachineEntry(
+        id='machine',
+        dimensions=rpc_messages.Dimensions(
+            backend=rpc_messages.Backend.DUMMY,
+        ),
+        lease_expiration_ts=datetime.datetime.fromtimestamp(9999999999),
+        lease_id='request-id',
+        pubsub_topic='topic',
+        pubsub_topic_project='project',
+    ).put()
+    request = rpc_to_json(request)
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('instruct', request).json,
+        rpc_messages.MachineInstructionResponse,
+    )
+    self.assertEqual(
+        response.error, rpc_messages.MachineInstructionError.NOT_FULFILLED)
+
+  def test_lease_request_already_reclaimed(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    def publish(*args, **kwargs):
+      self.fail('publish called')
+    auth_testing.mock_get_current_identity(self)
+    self.mock(acl.auth, 'is_group_member', is_group_member)
+    self.mock(handlers_endpoints.pubsub, 'publish', publish)
+
+    request = rpc_messages.MachineInstructionRequest(
+        request_id='request-id',
+        instruction=rpc_messages.Instruction(
+            swarming_server='example.com',
+        ),
+    )
+    models.LeaseRequest(
+        key=models.LeaseRequest.generate_key(
+            auth_testing.DEFAULT_MOCKED_IDENTITY.to_bytes(),
+            request,
+        ),
+        deduplication_checksum='checksum',
+        machine_id='machine',
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=rpc_messages.LeaseRequest(
+            dimensions=rpc_messages.Dimensions(),
+            request_id='request-id',
+        ),
+        response=rpc_messages.LeaseResponse(
+            client_request_id='request-id',
+            state=rpc_messages.LeaseRequestState.FULFILLED,
+        ),
+    ).put()
+    models.CatalogMachineEntry(
+        id='machine',
+        dimensions=rpc_messages.Dimensions(
+            backend=rpc_messages.Backend.DUMMY,
+        ),
+        lease_expiration_ts=datetime.datetime.fromtimestamp(9999999999),
+        lease_id='request-id',
+        pubsub_topic='topic',
+        pubsub_topic_project='project',
+    ).put()
+    request = rpc_to_json(request)
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('instruct', request).json,
+        rpc_messages.MachineInstructionResponse,
+    )
+    self.assertEqual(
+        response.error, rpc_messages.MachineInstructionError.ALREADY_RECLAIMED)
+
+  def test_machine_not_found(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    def publish(*args, **kwargs):
+      self.fail('publish called')
+    auth_testing.mock_get_current_identity(self)
+    self.mock(acl.auth, 'is_group_member', is_group_member)
+    self.mock(handlers_endpoints.pubsub, 'publish', publish)
+
+    request = rpc_messages.MachineInstructionRequest(
+        request_id='request-id',
+        instruction=rpc_messages.Instruction(
+            swarming_server='example.com',
+        ),
+    )
+    models.LeaseRequest(
+        key=models.LeaseRequest.generate_key(
+            auth_testing.DEFAULT_MOCKED_IDENTITY.to_bytes(),
+            request,
+        ),
+        deduplication_checksum='checksum',
+        machine_id='machine',
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=rpc_messages.LeaseRequest(
+            dimensions=rpc_messages.Dimensions(),
+            request_id='request-id',
+        ),
+        response=rpc_messages.LeaseResponse(
+            client_request_id='request-id',
+            hostname='fake-host',
+            state=rpc_messages.LeaseRequestState.FULFILLED,
+        ),
+    ).put()
+    request = rpc_to_json(request)
+
+    with self.assertRaises(webtest.app.AppError):
+      response = jsonish_dict_to_rpc(
+          self.call_api('instruct', request).json,
+          rpc_messages.MachineInstructionResponse,
+      )
+
+  def test_machine_not_fulfilled(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    def publish(*args, **kwargs):
+      self.fail('publish called')
+    auth_testing.mock_get_current_identity(self)
+    self.mock(acl.auth, 'is_group_member', is_group_member)
+    self.mock(handlers_endpoints.pubsub, 'publish', publish)
+
+    request = rpc_messages.MachineInstructionRequest(
+        request_id='request-id',
+        instruction=rpc_messages.Instruction(
+            swarming_server='example.com',
+        ),
+    )
+    models.LeaseRequest(
+        key=models.LeaseRequest.generate_key(
+            auth_testing.DEFAULT_MOCKED_IDENTITY.to_bytes(),
+            request,
+        ),
+        deduplication_checksum='checksum',
+        machine_id='machine',
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=rpc_messages.LeaseRequest(
+            dimensions=rpc_messages.Dimensions(),
+            request_id='request-id',
+        ),
+        response=rpc_messages.LeaseResponse(
+            client_request_id='request-id',
+            hostname='fake-host',
+            state=rpc_messages.LeaseRequestState.FULFILLED,
+        ),
+    ).put()
+    models.CatalogMachineEntry(
+        id='machine',
+        dimensions=rpc_messages.Dimensions(
+            backend=rpc_messages.Backend.DUMMY,
+        ),
+        lease_expiration_ts=datetime.datetime.fromtimestamp(9999999999),
+        pubsub_topic='topic',
+        pubsub_topic_project='project',
+    ).put()
+    request = rpc_to_json(request)
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('instruct', request).json,
+        rpc_messages.MachineInstructionResponse,
+    )
+    self.assertEqual(
+        response.error, rpc_messages.MachineInstructionError.NOT_FULFILLED)
+
+  def test_machine_already_reclaimed(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    def publish(*args, **kwargs):
+      self.fail('publish called')
+    auth_testing.mock_get_current_identity(self)
+    self.mock(acl.auth, 'is_group_member', is_group_member)
+    self.mock(handlers_endpoints.pubsub, 'publish', publish)
+
+    request = rpc_messages.MachineInstructionRequest(
+        request_id='request-id',
+        instruction=rpc_messages.Instruction(
+            swarming_server='example.com',
+        ),
+    )
+    models.LeaseRequest(
+        key=models.LeaseRequest.generate_key(
+            auth_testing.DEFAULT_MOCKED_IDENTITY.to_bytes(),
+            request,
+        ),
+        deduplication_checksum='checksum',
+        machine_id='machine',
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=rpc_messages.LeaseRequest(
+            dimensions=rpc_messages.Dimensions(),
+            request_id='request-id',
+        ),
+        response=rpc_messages.LeaseResponse(
+            client_request_id='request-id',
+            hostname='fake-host',
+            state=rpc_messages.LeaseRequestState.FULFILLED,
+        ),
+    ).put()
+    models.CatalogMachineEntry(
+        id='machine',
+        dimensions=rpc_messages.Dimensions(
+            backend=rpc_messages.Backend.DUMMY,
+        ),
+        lease_expiration_ts=datetime.datetime.fromtimestamp(1),
+        lease_id='request-id',
+        pubsub_topic='topic',
+        pubsub_topic_project='project',
+    ).put()
+    request = rpc_to_json(request)
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('instruct', request).json,
+        rpc_messages.MachineInstructionResponse,
+    )
+    self.assertEqual(
+        response.error, rpc_messages.MachineInstructionError.ALREADY_RECLAIMED)
+
+  def test_invalid_instruction(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    def publish(*args, **kwargs):
+      self.fail('publish called')
+    auth_testing.mock_get_current_identity(self)
+    self.mock(acl.auth, 'is_group_member', is_group_member)
+    self.mock(handlers_endpoints.pubsub, 'publish', publish)
+
+    request = rpc_messages.MachineInstructionRequest(
+        request_id='request-id',
+        instruction=rpc_messages.Instruction(
+        ),
+    )
+    models.LeaseRequest(
+        key=models.LeaseRequest.generate_key(
+            auth_testing.DEFAULT_MOCKED_IDENTITY.to_bytes(),
+            request,
+        ),
+        deduplication_checksum='checksum',
+        machine_id='machine',
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=rpc_messages.LeaseRequest(
+            dimensions=rpc_messages.Dimensions(),
+            request_id='request-id',
+        ),
+        response=rpc_messages.LeaseResponse(
+            client_request_id='request-id',
+            hostname='fake-host',
+            state=rpc_messages.LeaseRequestState.FULFILLED,
+        ),
+    ).put()
+    models.CatalogMachineEntry(
+        id='machine',
+        dimensions=rpc_messages.Dimensions(
+            backend=rpc_messages.Backend.DUMMY,
+        ),
+        lease_expiration_ts=datetime.datetime.fromtimestamp(9999999999),
+        lease_id='request-id',
+        pubsub_topic='topic',
+        pubsub_topic_project='project',
+    ).put()
+    request = rpc_to_json(request)
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('instruct', request).json,
+        rpc_messages.MachineInstructionResponse,
+    )
+    self.assertEqual(
+        response.error,
+        rpc_messages.MachineInstructionError.INVALID_INSTRUCTION,
+    )
+
+  def test_instructed(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    def publish(_, message, attributes):
+      self.assertEqual(message, 'CONNECT')
+      self.assertEqual(attributes, {'swarming_server': 'example.com'})
+    auth_testing.mock_get_current_identity(self)
+    self.mock(acl.auth, 'is_group_member', is_group_member)
+    self.mock(handlers_endpoints.pubsub, 'publish', publish)
+
+    request = rpc_messages.MachineInstructionRequest(
+        request_id='request-id',
+        instruction=rpc_messages.Instruction(
+            swarming_server='example.com',
+        ),
+    )
+    models.LeaseRequest(
+        key=models.LeaseRequest.generate_key(
+            auth_testing.DEFAULT_MOCKED_IDENTITY.to_bytes(),
+            request,
+        ),
+        deduplication_checksum='checksum',
+        machine_id='machine',
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=rpc_messages.LeaseRequest(
+            dimensions=rpc_messages.Dimensions(),
+            request_id='request-id',
+        ),
+        response=rpc_messages.LeaseResponse(
+            client_request_id='request-id',
+            hostname='fake-host',
+            state=rpc_messages.LeaseRequestState.FULFILLED,
+        ),
+    ).put()
+    models.CatalogMachineEntry(
+        id='machine',
+        dimensions=rpc_messages.Dimensions(
+            backend=rpc_messages.Backend.DUMMY,
+        ),
+        lease_expiration_ts=datetime.datetime.fromtimestamp(9999999999),
+        lease_id='request-id',
+        pubsub_topic='topic',
+        pubsub_topic_project='project',
+    ).put()
+    request = rpc_to_json(request)
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('instruct', request).json,
+        rpc_messages.MachineInstructionResponse,
+    )
+    self.failIf(response.error)
 
 
 if __name__ == '__main__':

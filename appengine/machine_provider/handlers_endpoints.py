@@ -578,6 +578,60 @@ class MachineProviderEndpoints(remote.Service):
     request.released = True
     request.put()
 
+  @gae_ts_mon.instrument_endpoint()
+  @auth.endpoints_method(
+      rpc_messages.MachineInstructionRequest,
+      rpc_messages.MachineInstructionResponse,
+  )
+  @auth.require(acl.can_issue_lease_requests)
+  def instruct(self, request):
+    """Handles an incoming MachineInstructionRequest."""
+    user = auth.get_current_identity().to_bytes()
+    if not request.instruction or not request.instruction.swarming_server:
+      # For now only one type of instruction is supported.
+      return rpc_messages.MachineInstructionResponse(
+          client_request_id=request.request_id,
+          error=rpc_messages.MachineInstructionError.INVALID_INSTRUCTION,
+      )
+    request_hash = models.LeaseRequest.generate_key(user, request).id()
+
+    lease = models.LeaseRequest.get_by_id(request_hash)
+    if not lease:
+      raise endpoints.NotFoundException('LeaseRequest not found')
+    if lease.response.state != rpc_messages.LeaseRequestState.FULFILLED:
+      return rpc_messages.MachineInstructionResponse(
+          client_request_id=request.request_id,
+          error=rpc_messages.MachineInstructionError.NOT_FULFILLED,
+      )
+    if not lease.response.hostname:
+      return rpc_messages.MachineInstructionResponse(
+          client_request_id=request.request_id,
+          error=rpc_messages.MachineInstructionError.ALREADY_RECLAIMED,
+      )
+
+    machine = models.CatalogMachineEntry.get_by_id(lease.machine_id)
+    if not machine:
+      raise endpoints.NotFoundException('CatalogMachineEntry not found')
+    if machine.lease_id != request.request_id:
+      return rpc_messages.MachineInstructionResponse(
+          client_request_id=request.request_id,
+          error=rpc_messages.MachineInstructionError.NOT_FULFILLED,
+      )
+    if machine.lease_expiration_ts <= utils.utcnow():
+      return rpc_messages.MachineInstructionResponse(
+          client_request_id=request.request_id,
+          error=rpc_messages.MachineInstructionError.ALREADY_RECLAIMED,
+      )
+
+    topic = pubsub.full_topic_name(
+        machine.pubsub_topic_project, machine.pubsub_topic)
+    attributes = {'swarming_server': request.instruction.swarming_server}
+    pubsub.publish(topic, 'CONNECT', attributes)
+    metrics.pubsub_messages_sent.increment(fields={'target': 'machine'})
+
+    return rpc_messages.MachineInstructionResponse(
+        client_request_id=request.request_id)
+
 
 def get_routes():
   return endpoints_webapp2.api_routes(config.ConfigApi)
