@@ -41,6 +41,8 @@ from google.appengine.ext import ndb
 from google.appengine.ext.ndb import msgprop
 from protorpc.remote import protojson
 
+import ts_mon_metrics
+
 from components import machine_provider
 from components import pubsub
 from components import utils
@@ -901,3 +903,16 @@ def manage_lease(key):
 
   # Manage an uninitiated, drained lease request.
   delete_machine_lease(key)
+
+
+def set_global_metrics():
+  """Set global Machine Provider-related ts_mon metrics."""
+  for machine_type in MachineType.query():
+    ts_mon_metrics.machine_types_target_size.set(
+        machine_type.target_size,
+        fields={
+            'enabled': machine_type.enabled,
+            'machine_type': machine_type.key.id(),
+        },
+        target_fields=ts_mon_metrics.TARGET_FIELDS,
+    )

@@ -141,6 +141,14 @@ jobs_max_pending_duration = gae_ts_mon.FloatMetric(
     description='Maximum pending seconds of pending jobs.')
 
 
+# Global metric. Target fields:
+# - machine_type = server.lease_management.MachineType.key.id().
+# - enabled = server.lease_management.MachineType.enabled.
+machine_types_target_size = gae_ts_mon.GaugeMetric(
+    'swarming/machine_types/target_size',
+    description='Target size of each MachineType leased from Machine Provider.')
+
+
 def pool_from_dimensions(dimensions):
   """Return a canonical string of flattened dimensions."""
   iterables = (map(lambda x: '%s:%s' % (key, x), values)
@@ -359,6 +367,8 @@ def _set_global_metrics():
   utils.enqueue_task(url='/internal/taskqueue/tsmon/jobs', queue_name='tsmon')
   utils.enqueue_task(url='/internal/taskqueue/tsmon/executors',
                      queue_name='tsmon')
+  utils.enqueue_task(url='/internal/taskqueue/tsmon/machine_types',
+                     queue_name='tsmon')
 
 
 def initialize():
@@ -369,5 +379,6 @@ def initialize():
       jobs_max_pending_duration,
       jobs_pending_durations,
       jobs_running,
+      machine_types_target_size,
   ])
   gae_ts_mon.register_global_metrics_callback('callback', _set_global_metrics)
