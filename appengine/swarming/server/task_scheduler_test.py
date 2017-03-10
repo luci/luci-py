@@ -1308,6 +1308,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     request = _gen_request(
         properties={
           'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
+          'idempotent': True,
         },
         created_ts=now,
         expiration_ts=now+datetime.timedelta(seconds=600),
@@ -1387,6 +1388,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     request = _gen_request(
         properties={
           'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
+          'idempotent': True,
         },
         created_ts=now,
         expiration_ts=now+datetime.timedelta(seconds=600),
@@ -1399,7 +1401,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       u'foo': u'bar',
       u'pool': u'default',
     }
-    _request, _, run_result = task_scheduler.bot_reap_task(
+    request, _, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc', None)
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(task_result.State.RUNNING, run_result.state)
@@ -1510,7 +1512,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'modified_ts': now_2,
       'name': u'Request name',
       'outputs_ref': None,
-      'properties_hash': None,
+      'properties_hash': request.properties_hash.encode('hex'),
       'server_versions': [u'v1a'],
       'started_ts': now_2,
       'state': task_result.State.COMPLETED,
@@ -1538,6 +1540,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     request = _gen_request(
         properties={
           'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
+          'idempotent': True,
         },
         created_ts=now,
         expiration_ts=now+datetime.timedelta(seconds=600))
@@ -1631,6 +1634,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     request = _gen_request(
         properties={
           'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
+          'idempotent': True,
         },
         created_ts=now,
         expiration_ts=now+datetime.timedelta(seconds=600))
