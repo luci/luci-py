@@ -124,15 +124,18 @@ def path_handler(api_class, api_method, service_path):
           response_body = json.dumps({'error': {'message': ex.message}})
           self.response.set_status(ex.http_status)
         else:
-          response_body = PROTOCOL.encode_message(res)
           if isinstance(res, message_types.VoidMessage):
             self.response.set_status(204)
+            response_body = None
+          else:
+            response_body = PROTOCOL.encode_message(res)
 
       if self.response.status_code != 204:
         self.response.content_type = 'application/json; charset=utf-8'
+        self.response.out.write(response_body)
       else:
+        # webob sets content_type to text/html by default.
         self.response.content_type = ''
-      self.response.out.write(response_body)
 
   return Handler
 
