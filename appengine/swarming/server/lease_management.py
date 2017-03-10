@@ -759,7 +759,7 @@ def manage_leased_machine(machine_lease):
   # TODO(smut): Check if the bot got terminated by some other termination task.
   if machine_lease.termination_task:
     logging.info(
-        'MachineLease awaiting termination:\nKey: %s\nHostname: %s\Task ID: %s',
+        'MachineLease pending termination:\nKey: %s\nHostname: %s\nTask ID: %s',
         machine_lease.key,
         machine_lease.hostname,
         machine_lease.termination_task,
@@ -853,6 +853,11 @@ def manage_pending_lease_request(machine_lease):
   """
   assert machine_lease.client_request_id, machine_lease.key
 
+  logging.info(
+      'Sending lease request: %s\nRequest ID: %s',
+      machine_lease.key,
+      machine_lease.client_request_id,
+  )
   response = machine_provider.lease_machine(
       machine_provider.LeaseRequest(
           dimensions=machine_lease.mp_dimensions,
