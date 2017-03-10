@@ -978,6 +978,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
             performance_stats=None))
 
   def test_bot_update_pubsub_error(self):
+    self.mock_pub_sub()
     request = _gen_request(
         properties={
           'dimensions': {u'OS': u'Windows-3.1.1', u'pool': u'default'},
@@ -1135,6 +1136,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     result_summary = task_scheduler.schedule_request(request, None)
     reaped_request, _, run_result = task_scheduler.bot_reap_task(
         {'OS': 'Windows-3.1.1', u'pool': u'default'}, 'localhost', 'abc', None)
+    self.assertEqual(1, len(pub_sub_calls)) # PENDING -> RUNNING
 
     self.assertEqual(
         None, task_scheduler.bot_kill_task(run_result.key, 'localhost'))
@@ -1196,7 +1198,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'try_number': 1,
     }
     self.assertEqual(expected, run_result.key.get().to_dict())
-    self.assertEqual(1, len(pub_sub_calls)) # notification sent
+    self.assertEqual(2, len(pub_sub_calls)) # RUNNING -> BOT_DIED
 
   def test_bot_kill_task_wrong_bot(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -1246,7 +1248,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(True, was_running)
     result_summary = result_summary.key.get()
     self.assertEqual(task_result.State.RUNNING, result_summary.state)
-    self.assertEqual(0, len(pub_sub_calls)) # no notifications
+    self.assertEqual(1, len(pub_sub_calls)) # PENDING -> RUNNING
 
   def test_cron_abort_expired_task_to_run(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -1325,13 +1327,13 @@ class TaskSchedulerApiTest(test_case.TestCase):
     }
     _request, _, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc', None)
+    self.assertEqual(1, len(pub_sub_calls)) # PENDING -> RUNNING
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
     self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died('f.local'))
     self.assertEqual(task_result.State.BOT_DIED, run_result.key.get().state)
     self.assertEqual(
         task_result.State.PENDING, run_result.result_summary_key.get().state)
-    # No PubSub notifications yet.
-    self.assertEqual(0, len(pub_sub_calls))
+    self.assertEqual(2, len(pub_sub_calls)) # RUNNING -> PENDING
 
     # BOT_DIED is kept instead of EXPIRED.
     abandoned_ts = self.mock_now(self.now, request.expiration_secs+1)
@@ -1376,8 +1378,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     }
     self.assertEqual(expected, result_summary.key.get().to_dict())
 
-    # PubSub notification is sent.
-    self.assertEqual(1, len(pub_sub_calls))
+    self.assertEqual(3, len(pub_sub_calls)) # PENDING -> BOT_DIED
 
   def test_cron_handle_bot_died(self):
     pub_sub_calls = self.mock_pub_sub()
@@ -1401,12 +1402,17 @@ class TaskSchedulerApiTest(test_case.TestCase):
       u'foo': u'bar',
       u'pool': u'default',
     }
+    self.assertEqual(0, len(pub_sub_calls))
     request, _, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc', None)
+    self.assertEqual(
+        task_result.State.RUNNING, run_result.result_summary_key.get().state)
+    self.assertEqual(1, len(pub_sub_calls)) # PENDING -> RUNNING
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(task_result.State.RUNNING, run_result.state)
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
     self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died('f.local'))
+    self.assertEqual(2, len(pub_sub_calls)) # RUNNING -> PENDING
 
     # Refresh and compare:
     expected = {
@@ -1468,13 +1474,11 @@ class TaskSchedulerApiTest(test_case.TestCase):
     }
     self.assertEqual(expected, run_result.result_summary_key.get().to_dict())
 
-    # No PubSub notifications yet.
-    self.assertEqual(0, len(pub_sub_calls))
-
     # Task was retried.
     now_2 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 2)
     _request, _, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost-second', 'abc', None)
+    self.assertEqual(3, len(pub_sub_calls)) # PENDING -> RUNNING
     logging.info('%s', [t.to_dict() for t in task_to_run.TaskToRun.query()])
     self.assertEqual(2, run_result.try_number)
     self.assertEqual(
@@ -1530,8 +1534,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(expected, run_result.result_summary_key.get().to_dict())
     self.assertEqual(0.1, run_result.key.get().cost_usd)
 
-    # PubSub notification is sent.
-    self.assertEqual(1, len(pub_sub_calls))
+    self.assertEqual(4, len(pub_sub_calls)) # RUNNING -> COMPLETED
 
   def test_cron_handle_bot_died_same_bot_denied(self):
     # Test first retry, then success.

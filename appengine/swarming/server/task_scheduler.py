@@ -118,6 +118,7 @@ def _reap_task(to_run_key, request, bot_id, bot_version, bot_dimensions):
       secret_bytes_future = request.secret_bytes_key.get_async()
     to_run = to_run_future.get_result()
     result_summary = result_summary_future.get_result()
+    orig_summary_state = result_summary.state
     secret_bytes = None
     if request.properties.has_secret_bytes:
       secret_bytes = secret_bytes_future.get_result()
@@ -142,6 +143,8 @@ def _reap_task(to_run_key, request, bot_id, bot_version, bot_dimensions):
     run_result.modified_ts = now
     result_summary.set_from_run_result(run_result, request)
     ndb.put_multi([to_run, run_result, result_summary])
+    if result_summary.state != orig_summary_state:
+      _maybe_pubsub_notify_via_tq(result_summary, request)
     return run_result, secret_bytes
 
   # The bot will reap the next available task in case of failure, no big deal.
@@ -219,7 +222,7 @@ def _handle_dead_bot(run_result_key):
     run_result.signal_server_version(server_version)
     run_result.modified_ts = now
 
-    notify = False
+    orig_summary_state = result_summary.state
     if result_summary.try_number != run_result.try_number:
       # Not updating correct run_result, cancel it without touching
       # result_summary.
@@ -249,11 +252,11 @@ def _handle_dead_bot(run_result_key):
       run_result.internal_failure = True
       run_result.abandoned_ts = now
       result_summary.set_from_run_result(run_result, request)
-      notify = True
       task_is_retried = False
 
     futures = ndb.put_multi_async(to_put)
-    if notify:
+    # if result_summary.state != orig_summary_state:
+    if orig_summary_state != result_summary.state:
       _maybe_pubsub_notify_via_tq(result_summary, request)
     for f in futures:
       f.check_success()
@@ -332,8 +335,7 @@ def _maybe_pubsub_notify_via_tq(result_summary, request):
   assert isinstance(
       result_summary, task_result.TaskResultSummary), result_summary
   assert isinstance(request, task_request.TaskRequest), request
-  if (result_summary.state in task_result.State.STATES_NOT_RUNNING and
-      request.pubsub_topic):
+  if request.pubsub_topic:
     task_id = task_pack.pack_result_summary_key(result_summary.key)
     ok = utils.enqueue_task(
         url='/internal/taskqueue/pubsub/%s' % task_id,
@@ -346,7 +348,7 @@ def _maybe_pubsub_notify_via_tq(result_summary, request):
           'userdata': request.pubsub_userdata,
         }))
     if not ok:
-      raise datastore_utils.CommitError('Failed to enqueue task queue task')
+      raise datastore_utils.CommitError('Failed to enqueue task')
 
 
 def _pubsub_notify(task_id, topic, auth_token, userdata):
