@@ -1248,7 +1248,8 @@ class TaskRunnerSmoke(unittest.TestCase):
     self.assertEqual(expected, tasks)
     expected = {
       'swarming_bot.1.zip',
-      '4e019f31778ba7191f965469dc673280386bbd60-cacert.pem',
+      'e2bfe61c8f0dc89e72a854f4afb14f4b662ea6301fc5652ebe03f80fa2b06263-cacert.'
+          'pem',
       'w',
       'isolated_cache_party',
       'logs',

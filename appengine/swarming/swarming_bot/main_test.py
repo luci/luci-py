@@ -71,7 +71,7 @@ class SimpleMainTest(TestCase):
         [sys.executable, self._zip_file, 'version'], stderr=subprocess42.PIPE)
     lines = version.strip().split()
     self.assertEqual(1, len(lines), lines)
-    self.assertTrue(re.match(r'^[0-9a-f]{40}$', lines[0]), lines[0])
+    self.assertTrue(re.match(r'^[0-9a-f]{64}$', lines[0]), lines[0])
 
 
 class MainTest(TestCase):

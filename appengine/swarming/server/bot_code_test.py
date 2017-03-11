@@ -87,7 +87,7 @@ class BotManagementTest(test_case.TestCase):
 
   def test_get_bot_version(self):
     actual, additionals = bot_code.get_bot_version('http://localhost')
-    self.assertTrue(re.match(r'^[0-9a-f]{40}$', actual), actual)
+    self.assertTrue(re.match(r'^[0-9a-f]{64}$', actual), actual)
     expected = {
       'config/bot_config.py': bot_code.get_bot_config().content,
     }

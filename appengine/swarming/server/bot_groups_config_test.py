@@ -96,8 +96,8 @@ class BotGroupsConfigTest(test_case.TestCase):
     utils.clear_cache(bot_groups_config._fetch_bot_groups)
 
   def test_version(self):
-    self.assertEqual('hash:be689c69320bcf', EXPECTED_GROUP_1.version)
-    self.assertEqual('hash:97cfccc0d3f7d0', EXPECTED_GROUP_2.version)
+    self.assertEqual('hash:73d6757642a8ae', EXPECTED_GROUP_1.version)
+    self.assertEqual('hash:4fd80203102d64', EXPECTED_GROUP_2.version)
 
   def test_expand_bot_id_expr_success(self):
     def check(expected, expr):

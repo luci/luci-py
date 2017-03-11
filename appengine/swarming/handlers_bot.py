@@ -918,7 +918,10 @@ def get_routes():
   routes = [
       ('/bootstrap', BootstrapHandler),
       ('/bot_code', BotCodeHandler),
-      ('/swarming/api/v1/bot/bot_code/<version:[0-9a-f]{40}>', BotCodeHandler),
+      # 40 for old sha1 digest so old bot can still update, 64 for current
+      # sha256 digest.
+      ('/swarming/api/v1/bot/bot_code/<version:[0-9a-f]{40,64}>',
+          BotCodeHandler),
       ('/swarming/api/v1/bot/event', BotEventHandler),
       ('/swarming/api/v1/bot/handshake', BotHandshakeHandler),
       ('/swarming/api/v1/bot/poll', BotPollHandler),

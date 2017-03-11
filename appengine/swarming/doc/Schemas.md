@@ -90,9 +90,13 @@ reduce DB contention.
     detail.
   - TaskResultSummary has key id = 1.
   - TaskRunResult has monotonically increasing key id starting at 1.
-  - TaskToRun has the key id as the first 32 bits of the SHA-1 of the
+  - TaskToRun has the key id as the first 32 bits of the MD5 of the
     TaskRequest.properties.dimensions.
   - PerformanceStats has key id = 1.
+
+It is important to note that MD5 use is fine here, because it is only used for
+performance reason as a quick broad filtering pass; the actual dimensions are
+checked for validity every single time.
 
 
 ### Notes

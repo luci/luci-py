@@ -19,6 +19,9 @@ from test_support import test_case
 from server import bot_management
 
 
+_VERSION = hashlib.sha256().hexdigest()
+
+
 class BotManagementTest(test_case.TestCase):
   def test_all_apis_are_tested(self):
     actual = frozenset(i[5:] for i in dir(self) if i.startswith('test_'))
@@ -41,11 +44,11 @@ class BotManagementTest(test_case.TestCase):
         event_type='bot_connected', bot_id='id1',
         external_ip='8.8.4.4', authenticated_as='bot:id1.domain',
         dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
-        version=hashlib.sha1().hexdigest(), quarantined=False, task_id=None,
+        version=hashlib.sha256().hexdigest(), quarantined=False, task_id=None,
         task_name=None)
 
     expected = {
-      'authenticated_as': 'bot:id1.domain',
+      'authenticated_as': u'bot:id1.domain',
       'composite': [8, 2],
       'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
       'external_ip': u'8.8.4.4',
@@ -59,7 +62,7 @@ class BotManagementTest(test_case.TestCase):
       'state': {u'ram': 65},
       'task_id': None,
       'task_name': None,
-      'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',
+      'version': _VERSION,
     }
     self.assertEqual(
         expected, bot_management.get_info_key('id1').get().to_dict())
@@ -71,11 +74,11 @@ class BotManagementTest(test_case.TestCase):
         event_type='bot_connected', bot_id='id1',
         external_ip='8.8.4.4', authenticated_as='bot:id1.domain',
         dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
-        version=hashlib.sha1().hexdigest(), quarantined=False, task_id=None,
+        version=hashlib.sha256().hexdigest(), quarantined=False, task_id=None,
         task_name=None)
     expected = [
       {
-        'authenticated_as': 'bot:id1.domain',
+        'authenticated_as': u'bot:id1.domain',
         'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
         'event_type': u'bot_connected',
         'external_ip': u'8.8.4.4',
@@ -87,7 +90,7 @@ class BotManagementTest(test_case.TestCase):
         'state': {u'ram': 65},
         'task_id': None,
         'ts': now,
-        'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',
+        'version': _VERSION,
       },
     ]
     self.assertEqual(
@@ -101,12 +104,12 @@ class BotManagementTest(test_case.TestCase):
         event_type='request_sleep', bot_id='id1',
         external_ip='8.8.4.4', authenticated_as='bot:id1.domain',
         dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
-        version=hashlib.sha1().hexdigest(), quarantined=True, task_id=None,
+        version=hashlib.sha256().hexdigest(), quarantined=True, task_id=None,
         task_name=None)
 
     # Assert that BotInfo was updated too.
     expected = {
-      'authenticated_as': 'bot:id1.domain',
+      'authenticated_as': u'bot:id1.domain',
       'composite': [4, 2],
       'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
       'external_ip': u'8.8.4.4',
@@ -120,7 +123,7 @@ class BotManagementTest(test_case.TestCase):
       'state': {u'ram': 65},
       'task_id': None,
       'task_name': None,
-      'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',
+      'version': _VERSION,
     }
     bot_info = bot_management.get_info_key('id1').get()
     self.assertEqual(expected, bot_info.to_dict())
@@ -135,11 +138,11 @@ class BotManagementTest(test_case.TestCase):
         event_type='request_task', bot_id='id1',
         external_ip='8.8.4.4', authenticated_as='bot:id1.domain',
         dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
-        version=hashlib.sha1().hexdigest(), quarantined=False, task_id='12311',
-        task_name='yo')
+        version=hashlib.sha256().hexdigest(), quarantined=False,
+        task_id='12311', task_name='yo')
 
     expected = {
-      'authenticated_as': 'bot:id1.domain',
+      'authenticated_as': u'bot:id1.domain',
       'composite': [8, 1],
       'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
       'external_ip': u'8.8.4.4',
@@ -153,14 +156,14 @@ class BotManagementTest(test_case.TestCase):
       'state': {u'ram': 65},
       'task_id': u'12311',
       'task_name': u'yo',
-      'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',
+      'version': _VERSION,
     }
     bot_info = bot_management.get_info_key('id1').get()
     self.assertEqual(expected, bot_info.to_dict())
 
     expected = [
       {
-        'authenticated_as': 'bot:id1.domain',
+        'authenticated_as': u'bot:id1.domain',
         'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
         'event_type': u'request_task',
         'external_ip': u'8.8.4.4',
@@ -172,7 +175,7 @@ class BotManagementTest(test_case.TestCase):
         'state': {u'ram': 65},
         'task_id': u'12311',
         'ts': now,
-        'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',
+        'version': _VERSION,
       },
     ]
     self.assertEqual(
@@ -208,7 +211,7 @@ class BotManagementTest(test_case.TestCase):
   def test_should_restart_bot(self):
     state = {
       'periodic_reboot_secs': 100,
-      'running_time': 105,
+      'running_time': 107,  # Affected by BOT_REBOOT_PERIOD_RANDOMIZATION_MARGIN
       'started_ts': 1410989556.174,
     }
     needs_reboot, message = bot_management.should_restart_bot('id', state)
@@ -219,7 +222,7 @@ class BotManagementTest(test_case.TestCase):
     # Mostly for code coverage.
     self.mock(bot_management, 'BOT_REBOOT_PERIOD_RANDOMIZATION_MARGIN', 0.1)
     state = {'periodic_reboot_secs': 1000, 'started_ts': 1234}
-    self.assertEqual(935, bot_management.get_bot_reboot_period('bot', state))
+    self.assertEqual(980, bot_management.get_bot_reboot_period('bot', state))
     # Make sure the margin is respected.
     periods = set()
     for i in xrange(0, 1350):

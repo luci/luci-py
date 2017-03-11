@@ -192,7 +192,7 @@ def store_bot_config(host, content):
   return v
 
 def get_bot_version(host):
-  """Retrieves the current bot version (SHA-1) loaded on this server.
+  """Retrieves the current bot version (SHA256) loaded on this server.
 
   The memcache is first checked for the version, otherwise the value
   is generated and then stored in the memcache.
@@ -301,7 +301,7 @@ def _validate_python(content):
 
 def _get_signature(host):
   # CURRENT_VERSION_ID is unique per appcfg.py upload so it can be trusted.
-  return hashlib.sha1(host + os.environ['CURRENT_VERSION_ID']).hexdigest()
+  return hashlib.sha256(host + os.environ['CURRENT_VERSION_ID']).hexdigest()
 
 
 ## Config validators

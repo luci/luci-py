@@ -229,16 +229,16 @@ class TaskRequestApiTest(TestCase):
       'caches': [],
       'cipd_input': {
         'client_package': {
-          'package_name': 'infra/tools/cipd/${platform}',
+          'package_name': u'infra/tools/cipd/${platform}',
           'path': None,
-          'version': 'git_revision:deadbeef',
+          'version': u'git_revision:deadbeef',
         },
         'packages': [{
-          'package_name': 'rm',
-          'path': 'bin',
-          'version': 'git_revision:deadbeef',
+          'package_name': u'rm',
+          'path': u'bin',
+          'version': u'git_revision:deadbeef',
         }],
-        'server': 'https://chrome-infra-packages.appspot.com'
+        'server': u'https://chrome-infra-packages.appspot.com'
       },
       'command': [u'command1', u'arg1'],
       'dimensions': {
@@ -253,8 +253,8 @@ class TaskRequestApiTest(TestCase):
       'idempotent': True,
       'inputs_ref': {
         'isolated': None,
-        'isolatedserver': 'https://isolateserver.appspot.com',
-        'namespace': 'default-gzip',
+        'isolatedserver': u'https://isolateserver.appspot.com',
+        'namespace': u'default-gzip',
       },
       'io_timeout_secs': None,
       'outputs': [],
@@ -268,7 +268,8 @@ class TaskRequestApiTest(TestCase):
       'properties': expected_properties,
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
-      'properties_hash': '902aaa4d27a7a9e3edb7e06206fdb1126dd71b2c',
+      'properties_hash':
+          '258e0894f2589a7bc2b46bd563d01f64300ae08938fb14b3d750baff94ba714e',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'service_account': u'none',
@@ -307,16 +308,16 @@ class TaskRequestApiTest(TestCase):
       'caches': [],
       'cipd_input': {
         'client_package': {
-          'package_name': 'infra/tools/cipd/${platform}',
+          'package_name': u'infra/tools/cipd/${platform}',
           'path': None,
-          'version': 'git_revision:deadbeef',
+          'version': u'git_revision:deadbeef',
         },
         'packages': [{
-          'package_name': 'rm',
-          'path': 'bin',
-          'version': 'git_revision:deadbeef',
+          'package_name': u'rm',
+          'path': u'bin',
+          'version': u'git_revision:deadbeef',
         }],
-        'server': 'https://chrome-infra-packages.appspot.com'
+        'server': u'https://chrome-infra-packages.appspot.com'
       },
       'command': [u'command1', u'arg1'],
       'dimensions': {
@@ -331,8 +332,8 @@ class TaskRequestApiTest(TestCase):
       'idempotent': True,
       'inputs_ref': {
         'isolated': None,
-        'isolatedserver': 'https://isolateserver.appspot.com',
-        'namespace': 'default-gzip',
+        'isolatedserver': u'https://isolateserver.appspot.com',
+        'namespace': u'default-gzip',
       },
       'io_timeout_secs': None,
       'outputs': [],
@@ -346,7 +347,8 @@ class TaskRequestApiTest(TestCase):
       'properties': expected_properties,
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
-      'properties_hash': '7973bfdbfe5cdcb9ea50a8f91cee03cd8f98edfd',
+      'properties_hash':
+          '693715e9539552e2ece434e25a665d437cfe4685504a3c7bad6356f9feffee2a',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'service_account': u'none',
@@ -388,7 +390,8 @@ class TaskRequestApiTest(TestCase):
     # Other unit tests should use the calculated value.
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        'b335fc59351bd95e52d840b57f252ab6a0a50112', as_dict['properties_hash'])
+        'c7445927612637c589b72dd47c4657b166a53ac6ecdfd08c167539331a7890d3',
+        as_dict['properties_hash'])
 
   def test_init_new_request_bot_service_account(self):
     request = mkreq(_gen_request(service_account_token='bot'))
@@ -628,16 +631,16 @@ class TaskRequestApiTest(TestCase):
       'caches': [],
       'cipd_input': {
         'client_package': {
-          'package_name': 'infra/tools/cipd/${platform}',
+          'package_name': u'infra/tools/cipd/${platform}',
           'path': None,
-          'version': 'git_revision:deadbeef',
+          'version': u'git_revision:deadbeef',
         },
         'packages': [{
-          'package_name': 'rm',
-          'path': 'bin',
-          'version': 'git_revision:deadbeef',
+          'package_name': u'rm',
+          'path': u'bin',
+          'version': u'git_revision:deadbeef',
         }],
-        'server': 'https://chrome-infra-packages.appspot.com'
+        'server': u'https://chrome-infra-packages.appspot.com'
       },
       'command': [u'command1', u'arg1'],
       'dimensions': {
@@ -652,8 +655,8 @@ class TaskRequestApiTest(TestCase):
       'idempotent': False,
       'inputs_ref': {
         'isolated': None,
-        'isolatedserver': 'https://isolateserver.appspot.com',
-        'namespace': 'default-gzip',
+        'isolatedserver': u'https://isolateserver.appspot.com',
+        'namespace': u'default-gzip',
       },
       'io_timeout_secs': None,
       'outputs': [],

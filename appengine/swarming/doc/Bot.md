@@ -532,9 +532,9 @@ have different digests.
 #### Versioning
 
 Except the very first bootstrap, all `swarming_bot.zip` download requests are
-done via a versioned URL, which includes the expected digest (SHA-1) of the bot.
-It has the form `/swarming/api/v1/bot/bot_code/<sha1 digest>` If there is a
-digest mismatch, an error is reported to the server administrators.
+done via a versioned URL, which includes the expected digest (SHA256) of the
+bot.  It has the form `/swarming/api/v1/bot/bot_code/<SHA256 digest>` If there
+is a digest mismatch, an error is reported to the server administrators.
 
 Everytime the bot polls the server for more tasks, it sends along the request
 its digest. If there's a mismath, the server tells the bot to self-update.
@@ -617,8 +617,8 @@ is fairly large.
             itself, effectively telling the server to *not* hand tasks to it.
     *   Bot version fleet management, it's hard to know which slave runs which
         version of the code.
-        *   The Swarming bot version is the digest (SHA-1) of the content of its
-            code and it is reported to the server so there's no ambiguity.
+        *   The Swarming bot version is the digest (SHA256) of the content of
+            its code and it is reported to the server so there's no ambiguity.
     *   State management, the slave could create and delete local files.
         *   The Swarming bot has almost no state. The _checkout_ is deleted
             after every single task.

@@ -103,7 +103,7 @@ def _gen_version(fields):
   # Just hash JSON representation (with sorted keys). Assumes it is stable
   # enough. Add a prefix and trim a bit, to clarify that is it not git hash or
   # anything like that, but just a dumb hash of the actual config.
-  digest = hashlib.sha1(utils.encode_to_json(fields)).hexdigest()
+  digest = hashlib.sha256(utils.encode_to_json(fields)).hexdigest()
   return 'hash:' + digest[:14]
 
 

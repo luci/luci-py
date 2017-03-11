@@ -426,7 +426,7 @@ def get_bot_reboot_period(bot_id, state):
   # Seed stays constant during lifetime of a swarming_bot process, but changes
   # whenever bot is restarted. That way all bots on average restart every
   # periodic_reboot_secs.
-  seed_bytes = hashlib.sha1(
+  seed_bytes = hashlib.sha256(
       '%s%s' % (bot_id, state.get('started_ts'))).digest()[:2]
   seed = ord(seed_bytes[0]) + 256 * ord(seed_bytes[1])
   factor = 2 * (seed - 32768) / 65536.0 * BOT_REBOOT_PERIOD_RANDOMIZATION_MARGIN

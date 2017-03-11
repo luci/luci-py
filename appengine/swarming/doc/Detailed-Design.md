@@ -138,7 +138,7 @@ If a task is marked as idempotent, e.g. `--idempotent` is used, the client
 certifies that the task do not have side effects. This means that running the
 task twice shall return the same results (pending flakiness).
 
-The way it works internally is by calculating the SHA-1 of !TaskProperties when
+The way it works internally is by calculating the SHA256 of !TaskProperties when
 marked as idempotent. When a !TaskResultSummary succeeds that was also
 idempotent, it sets a property to tell that its values can be reused.
 
@@ -213,7 +213,7 @@ automate the bot bootstraping process.
 
 The bot keeps itself up to date with what the server provides.
 
-   - At each poll, the bot hands to the server the SHA-1 of the contents of
+   - At each poll, the bot hands to the server the SHA256 of the contents of
      swarming_bot.zip. If it mismatches what the server expects, it is told to
      auto-update;
      - The bot downloads the new bot code to swarming_bot.2.zip or

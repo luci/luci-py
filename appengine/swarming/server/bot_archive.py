@@ -383,11 +383,11 @@ def get_swarming_bot_zip(
     enable_ts_monitoring: bool if ts_mon should be enabled on the bot.
 
   Returns:
-    Tuple(str being the zipped file's content, bot version (SHA-1) it
+    Tuple(str being the zipped file's content, bot version (SHA256) it
     represents).
   """
   zip_memory_file = StringIO.StringIO()
-  h = hashlib.sha1()
+  h = hashlib.sha256()
   with zipfile.ZipFile(zip_memory_file, 'w', zipfile.ZIP_DEFLATED) as zip_file:
     for name, content in yield_swarming_bot_files(
         root_dir, host, host_version, additionals, enable_ts_monitoring):
@@ -407,7 +407,7 @@ def get_swarming_bot_zip(
 
 def get_swarming_bot_version(
     root_dir, host, host_version, additionals, enable_ts_monitoring):
-  """Returns the SHA1 hash of the bot code, representing the version.
+  """Returns the SHA256 hash of the bot code, representing the version.
 
   Arguments:
     root_dir: directory swarming_bot.
@@ -415,9 +415,9 @@ def get_swarming_bot_version(
     enable_ts_monitoring: bool if ts_mon should be enabled on the bot.
 
   Returns:
-    The SHA1 hash of the bot code.
+    The SHA256 hash of the bot code.
   """
-  h = hashlib.sha1()
+  h = hashlib.sha256()
   try:
     # TODO(maruel): Deduplicate from zip_package.genereate_version().
     for name, content in yield_swarming_bot_files(

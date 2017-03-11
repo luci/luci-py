@@ -559,7 +559,7 @@ class TaskRequest(ndb.Model):
   This model is immutable.
   """
   # Hashing algorithm used to hash TaskProperties to create its key.
-  HASHING_ALGO = hashlib.sha1
+  HASHING_ALGO = hashlib.sha256
 
   # Time this request was registered. It is set manually instead of using
   # auto_now_add=True so that expiration_ts can be set very precisely relative

@@ -82,7 +82,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         sorted(response))
     self.assertEqual({u'dimensions': {}}, response['bot_group_cfg'])
     self.assertEqual('default', response['bot_group_cfg_version'])
-    self.assertEqual(40, len(response['bot_version']))
+    self.assertEqual(64, len(response['bot_version']))
     self.assertEqual(u'v1a', response['server_version'])
     self.assertEqual([], errors)
 
@@ -103,7 +103,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
           u'server_version',
         ],
         sorted(response))
-    self.assertEqual(40, len(response['bot_version']))
+    self.assertEqual(64, len(response['bot_version']))
     self.assertEqual(u'v1a', response['server_version'])
     expected = [
       'Quarantined Bot\nhttps://None/restricted/bot/None\n'
@@ -142,7 +142,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
           u'server_version',
         ],
         sorted(response))
-    self.assertEqual(40, len(response['bot_version']))
+    self.assertEqual(64, len(response['bot_version']))
     self.assertEqual(u'v1a', response['server_version'])
     expected = [
       u'Quarantined Bot\nhttps://None/restricted/bot/bot1\n'
