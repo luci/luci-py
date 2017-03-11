@@ -6,6 +6,7 @@
 """Unit tests for catalog.py."""
 
 import collections
+import datetime
 import unittest
 
 import test_env
@@ -16,6 +17,7 @@ from google.appengine.ext import ndb
 from components import datastore_utils
 from components import machine_provider
 from components import net
+from components import utils
 from test_support import test_case
 
 import catalog
@@ -450,8 +452,8 @@ class UpdateCatalogedEntryTest(test_case.TestCase):
 
     catalog.update_cataloged_instance(key)
 
-  def test_updated(self):
-    """Ensures an instance can be updated."""
+  def test_updated_metadata(self):
+    """Ensures an instance can be updated with a pending metadata update."""
     def retrieve_machine(*args, **kwargs):
       return {
           'policies': {
@@ -484,6 +486,33 @@ class UpdateCatalogedEntryTest(test_case.TestCase):
         'projects/project/subscriptions/subscription',
     )
     self.failUnless(key.get().pending_metadata_updates)
+
+  def test_updated_lease_expiration_ts(self):
+    """Ensures an instance can be updated with a lease_expiration_ts."""
+    now = int(utils.time_time())
+    def retrieve_machine(*args, **kwargs):
+      return {
+          'lease_expiration_ts': str(now),
+      }
+    self.mock(catalog.machine_provider, 'retrieve_machine', retrieve_machine)
+
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        cataloged=True,
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+    ).put()
+
+    self.failIf(key.get().leased)
+    catalog.update_cataloged_instance(key)
+    self.assertEqual(
+        key.get().lease_expiration_ts, datetime.datetime.utcfromtimestamp(now))
+    self.failUnless(key.get().leased)
 
   def test_retrieval_error(self):
     """Ensures an instance isn't updated on retrieval error."""

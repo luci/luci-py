@@ -102,6 +102,32 @@ def add_subscription_metadata(
   instance.put()
 
 
+@ndb.transactional
+def add_lease_expiration_ts(key, lease_expiration_ts):
+  """Adds the lease expiration time to the instance.
+
+  Args:
+    key: ndb.Key for a models.Instance entity.
+    lease_expiration_ts: datetime.datetime indicating when the lease on this
+      machine expires.
+  """
+  instance = key.get()
+  if not instance:
+    logging.warning('Instance does not exist: %s', key)
+    return
+
+  if instance.lease_expiration_ts == lease_expiration_ts:
+    return
+
+  logging.info(
+      'Updating lease_expiration_ts (%s -> %s)',
+      instance.lease_expiration_ts,
+      lease_expiration_ts,
+  )
+  instance.lease_expiration_ts = lease_expiration_ts
+  instance.put()
+
+
 def fetch(key):
   """Gets instances created by the given instance group manager.
 

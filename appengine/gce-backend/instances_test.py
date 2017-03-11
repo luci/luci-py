@@ -13,11 +13,74 @@ test_env.setup_test_env()
 from google.appengine.ext import ndb
 
 from components import net
+from components import utils
 from test_support import test_case
 
 import instance_group_managers
 import instances
 import models
+
+
+class AddLeaseExpirationTsTest(test_case.TestCase):
+  """Tests for instances.add_lease_expiration_ts."""
+
+  def test_entity_not_found(self):
+    """Ensures nothing happens when the entity doesn't exist."""
+    key = ndb.Key(models.Instance, 'fake-instance')
+
+    instances.add_lease_expiration_ts(key, utils.utcnow())
+
+    self.failIf(key.get())
+
+  def test_lease_expiration_ts_added(self):
+    now = utils.utcnow()
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+    ).put()
+
+    instances.add_lease_expiration_ts(key, now)
+
+    self.assertEqual(key.get().lease_expiration_ts, now)
+    self.failUnless(key.get().leased)
+
+  def test_lease_expiration_ts_matches(self):
+    now = utils.utcnow()
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+        lease_expiration_ts=now,
+    ).put()
+
+    instances.add_lease_expiration_ts(key, now)
+
+    self.assertEqual(key.get().lease_expiration_ts, now)
+    self.failUnless(key.get().leased)
+
+  def test_lease_expiration_ts_updated(self):
+    now = utils.utcnow()
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+        lease_expiration_ts=utils.utcnow(),
+    ).put()
+
+    instances.add_lease_expiration_ts(key, now)
+
+    self.assertEqual(key.get().lease_expiration_ts, now)
+    self.failUnless(key.get().leased)
 
 
 class AddSubscriptionMetadataTest(test_case.TestCase):

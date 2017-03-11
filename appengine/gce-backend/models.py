@@ -59,6 +59,11 @@ class Instance(ndb.Model):
   instance_group_manager = ndb.KeyProperty(indexed=True)
   # Last modification to this entity.
   last_updated = ndb.DateTimeProperty(auto_now=True, indexed=True)
+  # Whether or not this instance has been leased out by Machine Provider.
+  leased = ndb.ComputedProperty(
+      lambda self: bool(self.lease_expiration_ts), indexed=True)
+  # DateTime indicating when the lease on this machine expires.
+  lease_expiration_ts = ndb.DateTimeProperty(indexed=False)
   # Whether or not this instance is pending deletion.
   pending_deletion = ndb.BooleanProperty(indexed=True)
   # Pending metadata operations.

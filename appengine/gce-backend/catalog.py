@@ -4,6 +4,7 @@
 
 """Utilities for interacting with the Machine Provider catalog."""
 
+import datetime
 import json
 import logging
 
@@ -232,6 +233,11 @@ def update_cataloged_instance(key):
           response['policies']['machine_service_account'],
       )
       metrics.send_machine_event('METADATA_UPDATE_PROPOSED', instance.hostname)
+    if response.get('lease_expiration_ts'):
+      lease_expiration_ts = datetime.datetime.utcfromtimestamp(
+          int(response['lease_expiration_ts']))
+      if instance.lease_expiration_ts != lease_expiration_ts:
+        instances.add_lease_expiration_ts(key, lease_expiration_ts)
   except net.NotFoundError:
     instances.mark_for_deletion(key)
 
