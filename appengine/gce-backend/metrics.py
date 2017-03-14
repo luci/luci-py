@@ -27,22 +27,26 @@ GLOBAL_TARGET_FIELDS = {
 GLOBAL_METRICS = {
     'config_max_instances': gae_ts_mon.GaugeMetric(
         'machine_provider/gce_backend/config/instances/max',
-        description='Maximum number of instances currently configured.',
+        'Maximum number of instances currently configured.',
+        [gae_ts_mon.StringField('instance_template')]
     ),
     'config_min_instances': gae_ts_mon.GaugeMetric(
         'machine_provider/gce_backend/config/instances/min',
-        description='Minimum number of instances currently configured.',
+        'Minimum number of instances currently configured.',
+        [gae_ts_mon.StringField('instance_template')]
     ),
     'instances': gae_ts_mon.GaugeMetric(
         'machine_provider/gce_backend/instances',
-        description='Current count of the number of instances.',
+        'Current count of the number of instances.',
+        [gae_ts_mon.StringField('instance_template')]
     ),
 }
 
 
 config_valid = gae_ts_mon.BooleanMetric(
     'machine_provider/gce_backend/config/valid',
-    description='Whether or not the current config is valid.',
+    'Whether or not the current config is valid.',
+    [gae_ts_mon.StringField('config')],
 )
 
 

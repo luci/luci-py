@@ -109,8 +109,12 @@ _bucketer = ts_mon.GeometricBucketer(growth_factor=10**0.07,
                                      num_finite_buckets=100)
 
 hooks_durations = ts_mon.CumulativeDistributionMetric(
-    'swarming/bots/hooks/durations', bucketer=_bucketer,
-    description='Duration of bot hook calls in ms',
+    'swarming/bots/hooks/durations',
+    'Duration of bot hook calls in ms', [
+        ts_mon.StringField('hookname'),
+        ts_mon.StringField('pool'),
+    ],
+    bucketer=_bucketer,
     units=ts_mon.MetricsDataUnits.MILLISECONDS)
 
 
