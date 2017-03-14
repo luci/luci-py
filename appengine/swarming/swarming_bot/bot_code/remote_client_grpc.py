@@ -5,6 +5,7 @@
 # This is a reimplementation of RemoteClientNative but it uses (will use)
 # a gRPC method to communicate with a server instead of REST.
 
+import copy
 import json
 import logging
 import time
@@ -32,6 +33,10 @@ MAX_GRPC_SLEEP = 10.
 
 class RemoteClientGrpc(object):
   """RemoteClientGrpc knows how to make calls via gRPC.
+
+  Any non-scalar value that is returned that references values from the proto
+  messages should be deepcopy'd since protos make use of weak references and
+  might be garbage-collected before the values are used.
   """
 
   def __init__(self, server):
@@ -117,7 +122,7 @@ class RemoteClientGrpc(object):
         },
     }
     logging.info('Completed handshake: %s', resp)
-    return resp
+    return copy.deepcopy(resp)
 
   def poll(self, attributes):
     request = swarming_bot_pb2.PollRequest()
@@ -174,7 +179,7 @@ class RemoteClientGrpc(object):
       }
       logging.info('Received job manifest: %s', manifest)
       self._log_is_asleep = False
-      return 'run', manifest
+      return 'run', copy.deepcopy(manifest)
 
     raise PollError('Unknown command in response: %s' % response)
 
