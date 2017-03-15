@@ -1068,11 +1068,14 @@ class MarkForDeletionTest(test_case.TestCase):
             'zone',
             'instance-name',
         ),
+        lease_expiration_ts=utils.utcnow(),
     ).put()
 
     instances.mark_for_deletion(key)
 
     self.failUnless(key.get().pending_deletion)
+    self.failIf(key.get().lease_expiration_ts)
+    self.failIf(key.get().leased)
 
 
 if __name__ == '__main__':

@@ -185,6 +185,7 @@ class CreateTest(test_case.TestCase):
             'zone',
         ),
         minimum_size=2,
+        maximum_size=2,
     ).put()
     models.InstanceTemplateRevision(
         key=key.parent(),
@@ -220,6 +221,7 @@ class CreateTest(test_case.TestCase):
             'zone',
         ),
         minimum_size=2,
+        maximum_size=2,
     ).put()
     models.InstanceTemplateRevision(
         key=key.parent(),
@@ -248,6 +250,7 @@ class CreateTest(test_case.TestCase):
             'zone',
         ),
         minimum_size=2,
+        maximum_size=2,
     ).put()
     models.InstanceTemplateRevision(
         key=key.parent(),
@@ -553,6 +556,7 @@ class ResizeTest(test_case.TestCase):
             'zone',
         ),
         minimum_size=10,
+        maximum_size=10,
     ).put()
     models.InstanceTemplateRevision(
         key=key.parent(),
@@ -587,6 +591,7 @@ class ResizeTest(test_case.TestCase):
             'zone',
         ),
         minimum_size=10,
+        maximum_size=10,
         url='https://example.com',
     ).put()
     models.InstanceTemplate(key=key.parent().parent()).put()
@@ -618,6 +623,7 @@ class ResizeTest(test_case.TestCase):
             'zone',
         ),
         minimum_size=10,
+        maximum_size=10,
         url='https://example.com',
     ).put()
     models.InstanceTemplateRevision(
@@ -654,6 +660,7 @@ class ResizeTest(test_case.TestCase):
             'zone',
         ),
         minimum_size=10,
+        maximum_size=10,
         url='https://example.com',
     ).put()
     models.InstanceTemplateRevision(
@@ -671,6 +678,7 @@ class ResizeTest(test_case.TestCase):
               'none': 0,
           },
           'name': 'name',
+          'targetSize': 0,
       }
 
     def resize_managed_instance_group(_, name, zone, size):
@@ -696,6 +704,7 @@ class ResizeTest(test_case.TestCase):
             'zone',
         ),
         minimum_size=10,
+        maximum_size=10,
         url='https://example.com',
     ).put()
     models.InstanceTemplateRevision(
@@ -713,6 +722,7 @@ class ResizeTest(test_case.TestCase):
               'none': 3,
           },
           'name': 'name',
+          'targetSize': 3,
       }
 
     def resize_managed_instance_group(_, name, zone, size):
@@ -738,6 +748,7 @@ class ResizeTest(test_case.TestCase):
             'zone',
         ),
         minimum_size=1000,
+        maximum_size=1000,
         url='https://example.com',
     ).put()
     models.InstanceTemplateRevision(
@@ -755,6 +766,7 @@ class ResizeTest(test_case.TestCase):
               'none': 10,
           },
           'name': 'name',
+          'targetSize': 10,
       }
 
     def resize_managed_instance_group(_, name, zone, size):
@@ -778,6 +790,7 @@ class ResizeTest(test_case.TestCase):
             'zone',
         ),
         minimum_size=10,
+        maximum_size=10,
         url='https://example.com',
     ).put()
     models.InstanceTemplateRevision(
@@ -795,6 +808,7 @@ class ResizeTest(test_case.TestCase):
               'none': 2,
           },
           'name': 'name',
+	  'targetSize': 2,
       }
 
     def resize_managed_instance_group(_, name, zone, size):
@@ -818,6 +832,7 @@ class ResizeTest(test_case.TestCase):
             'zone',
         ),
         minimum_size=1,
+        maximum_size=1,
         url='https://example.com',
     ).put()
     models.InstanceTemplateRevision(
@@ -835,6 +850,7 @@ class ResizeTest(test_case.TestCase):
               'none': 0,
           },
           'name': 'name',
+	  'targetSize': 0,
       }
 
     def resize_managed_instance_group(_, name, zone, size):
@@ -860,6 +876,7 @@ class ResizeTest(test_case.TestCase):
             'zone',
         ),
         minimum_size=7,
+        maximum_size=7,
         url='https://example.com',
     ).put()
     models.InstanceGroupManager(

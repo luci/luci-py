@@ -295,6 +295,8 @@ def resize(key):
   # instance group to reach its target size. Cron timing together with
   # this limit controls the rate at which instances are created.
   RESIZE_LIMIT = 100
+  # Ratio of total instances to leased instances.
+  THRESHOLD = 1.1
 
   instance_group_manager = key.get()
   if not instance_group_manager:
@@ -314,7 +316,7 @@ def resize(key):
     logging.warning('InstanceTemplateRevision project unspecified: %s', key)
     return
 
-  # Determine how many total VMs exist for all other revisions of this
+  # Determine how many total instances exist for all other revisions of this
   # InstanceGroupManager. Different revisions will all have the same
   # ancestral InstanceTemplate.
   instance_template_key = instance_template_revision.key.parent()
@@ -329,38 +331,54 @@ def resize(key):
         )
         other_revision_total_size += igm.current_size
 
+  # Determine how many total instances for this revision of the
+  # InstanceGroupManager have been leased out by the Machine Provider
+  leased = 0
+  for instance in models.Instance.query(
+      models.Instance.instance_group_manager == key):
+    if instance.leased:
+      leased += 1
+
   api = gce.Project(instance_template_revision.project)
   response = api.get_instance_group_manager(
       get_name(instance_group_manager), key.id())
 
-  # Find out how many VMs are idle (i.e. not currently being created
+  # Find out how many instances are idle (i.e. not currently being created
   # or deleted). This helps avoid doing too many VM actions simultaneously.
   current_size = response.get('currentActions', {}).get('none')
   if current_size is None:
     logging.error('Unexpected response: %s', json.dumps(response, indent=2))
     return
 
-  # Try to reach the configured size less the number that exist in other
-  # revisions of the InstanceGroupManager, but avoid increasing the number of
-  # instances by more than the resize limit. For now, the target size
-  # is just the minimum size.
-  target_size = min(
-      instance_group_manager.minimum_size - other_revision_total_size,
+  # Ensure there are at least as many instances as needed, but not more than
+  # the total allowed at this time.
+  new_target_size = min(
+      # Minimum size to aim for. At least THRESHOLD times more than the number
+      # of instances already leased out, but not less than the minimum
+      # configured size.
+      max(instance_group_manager.minimum_size, int(leased * THRESHOLD)),
+      # Total number of instances for this instance group allowed at this time.
+      # Ensures that a config change waits for instances of the old revision to
+      # be deleted before bringing up instances of the new revision.
+      instance_group_manager.maximum_size - other_revision_total_size,
+      # Maximum amount the size is allowed to be increased each iteration.
       current_size + RESIZE_LIMIT,
   )
   logging.info(
-      'Key: %s\nSize: %s\nTarget: %s\nMin: %s\nMax: %s\nOther revisions: %s',
+      ('Key: %s\nSize: %s\nOld target: %s\nNew target: %s\nMin: %s\nMax: %s'
+       '\nOther revisions: %s'),
       key,
       current_size,
-      target_size,
+      response['targetSize'],
+      new_target_size,
       instance_group_manager.minimum_size,
       instance_group_manager.maximum_size,
       other_revision_total_size,
   )
-  if target_size <= current_size:
+  if new_target_size <= min(current_size, response['targetSize']):
     return
 
-  api.resize_managed_instance_group(response['name'], key.id(), target_size)
+  api.resize_managed_instance_group(response['name'], key.id(), new_target_size)
 
 
 def schedule_resize():

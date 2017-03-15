@@ -62,6 +62,7 @@ def mark_for_deletion(key):
 
   if not instance.pending_deletion:
     logging.info('Marking Instance for deletion: %s', key)
+    instance.lease_expiration_ts = None
     instance.pending_deletion = True
     instance.put()
     metrics.send_machine_event('DELETION_PROPOSED', instance.hostname)
