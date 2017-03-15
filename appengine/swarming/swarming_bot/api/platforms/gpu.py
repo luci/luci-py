@@ -17,7 +17,8 @@ _VENDOR_MAPPING = {
     {
       # http://developer.amd.com/resources/ati-catalyst-pc-vendor-id-1002-li/
       u'6613': u'Radeon R7 240',   # The table is incorrect
-      u'6779': u'AMD Radeon HD 6450/7450/8450',
+      u'6646': u'Radeon R9 M280X',
+      u'6779': u'Radeon HD 6450/7450/8450',
       u'6821': u'Radeon R8 M370X', # 'HD 8800M' or 'R7 M380' based on rev_id
       u'683d': u'Radeon HD 7700',
       u'9830': u'Radeon HD 8400',
@@ -31,14 +32,17 @@ _VENDOR_MAPPING = {
       u'0166': u'Ivy Bridge HD Graphics 4000',
       u'0412': u'Haswell HD Graphics 4600',
       u'041a': u'Haswell HD Graphics',
+      u'0a26': u'Haswell HD Graphics 5000',
       u'0a2e': u'Haswell Iris Graphics 5100',
       u'0d26': u'Haswell Iris Pro Graphics 5200',
+      u'0f31': u'Bay Trail HD Graphics',
       u'1616': u'Broadwell HD Graphics 5500',
       u'161e': u'Broadwell HD Graphics 5300',
       u'1626': u'Broadwell HD Graphics 6000',
       u'162b': u'Broadwell Iris Graphics 6100',
       u'1912': u'Skylake HD Graphics 530',
       u'1926': u'Skylake Iris 540/550',
+      u'193b': u'Skylake Iris Pro 580',
       u'22b1': u'Braswell HD Graphics',
     }),
   MAXTROX: (
@@ -59,7 +63,7 @@ _VENDOR_MAPPING = {
       u'0df8': u'Quadro 600',
       u'0fd5': u'GeForce GT 650M',
       u'0fe9': u'GeForce GT 750M Mac Edition',
-      u'0ffa': u'NVIDIA Quadro K600',
+      u'0ffa': u'Quadro K600',
       u'104a': u'GeForce GT 610',
       u'11c0': u'GeForce GTX 660',
       u'1244': u'GeForce GTX 550 Ti',

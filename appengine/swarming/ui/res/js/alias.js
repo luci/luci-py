@@ -32,6 +32,7 @@ this.swarming.alias = this.swarming.alias || (function(){
   var GPU_ALIASES = {
     "1002":      "AMD",
     "1002:6613": "AMD Radeon R7 240",
+    "1002:6646": "AMD Radeon R9 M280X",
     "1002:6779": "AMD Radeon HD 6450/7450/8450",
     "1002:6821": "AMD Radeon HD 8870M",
     "1002:683d": "AMD Radeon HD 7770/8760",
@@ -57,14 +58,17 @@ this.swarming.alias = this.swarming.alias || (function(){
     "8086:0166": "Intel Ivy Bridge HD Graphics 4000",
     "8086:0412": "Intel Haswell HD Graphics 4600",
     "8086:041a": "Intel Haswell HD Graphics",
+    "8086:0a26": "Intel Haswell HD Graphics 5000",
     "8086:0a2e": "Intel Haswell Iris Graphics 5100",
     "8086:0d26": "Intel Haswell Iris Pro Graphics 5200",
+    "8086:0f31": "Intel Bay Trail HD Graphics",
     "8086:1616": "Intel Broadwell HD Graphics 5500",
     "8086:161e": "Intel Broadwell HD Graphics 5300",
     "8086:1626": "Intel Broadwell HD Graphics 6000",
     "8086:162b": "Intel Broadwell Iris Graphics 6100",
     "8086:1912": "Intel Skylake HD Graphics 530",
     "8086:1926": "Intel Skylake Iris 540/550",
+    "8086:193b": "Intel Skylake Iris Pro 580",
     "8086:22b1": "Intel Braswell HD Graphics",
   }
 
