@@ -23,6 +23,8 @@ class MetadataUpdate(ndb.Model):
   # Metadata to modify. Keys present will overwrite existing metadata.
   # Use null values to delete keys.
   metadata = ndb.JsonProperty()
+  # Time this operation was started.
+  operation_ts = ndb.DateTimeProperty(indexed=False)
   # URL for the pending operation to apply this metadata update.
   url = ndb.StringProperty(indexed=False)
 
@@ -52,6 +54,8 @@ class Instance(ndb.Model):
   cataloged = ndb.BooleanProperty(indexed=True)
   # Whether or not this instance has been deleted.
   deleted = ndb.BooleanProperty(indexed=True)
+  # Time that the deletion request for this instance was initiated.
+  deletion_ts = ndb.DateTimeProperty(indexed=False)
   # Name of this instance.
   hostname = ndb.ComputedProperty(
       lambda self: self.key.id().split()[-1], indexed=True)

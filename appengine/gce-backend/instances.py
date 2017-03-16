@@ -12,6 +12,7 @@ from google.appengine.ext import ndb
 from components import gce
 from components import net
 from components import pubsub
+from components import utils
 
 import instance_group_managers
 import metrics
@@ -260,6 +261,25 @@ def schedule_fetch():
       utilities.enqueue_task('fetch-instances', instance_group_manager.key)
 
 
+@ndb.transactional
+def set_deletion_time(key, ts):
+  """Sets the time the deletion RPC was sent for this Instance entity.
+
+  Args:
+    key: ndb.Key for a models.Instance entity.
+    ts: datetime.datetime when the RPC was sent.
+  """
+  instance = key.get()
+  if not instance:
+    return
+
+  if instance.deletion_ts:
+    return
+
+  instance.deletion_ts = ts
+  instance.put()
+
+
 def _delete(instance_template_revision, instance_group_manager, instance):
   """Deletes the given instance.
 
@@ -268,8 +288,12 @@ def _delete(instance_template_revision, instance_group_manager, instance):
     instance_group_manager: models.InstanceGroupManager.
     instance: models.Instance
   """
+  if instance.deletion_ts:
+    return
+
   api = gce.Project(instance_template_revision.project)
   try:
+    now = utils.utcnow()
     result = api.delete_instances(
         instance_group_managers.get_name(instance_group_manager),
         instance_group_manager.key.id(),
@@ -282,9 +306,11 @@ def _delete(instance_template_revision, instance_group_manager, instance):
           json.dumps(result, indent=2),
       )
     else:
+      set_deletion_time(instance.key, now)
       metrics.send_machine_event('DELETION_SCHEDULED', instance.hostname)
   except net.Error as e:
     if e.status_code == 400:
+      set_deletion_time(instance.key, now)
       metrics.send_machine_event('DELETION_SUCCEEDED', instance.hostname)
     else:
       raise
@@ -298,6 +324,9 @@ def delete_pending(key):
   """
   instance = key.get()
   if not instance:
+    return
+
+  if instance.deletion_ts:
     return
 
   if not instance.pending_deletion:
@@ -337,7 +366,7 @@ def delete_pending(key):
 def schedule_pending_deletion():
   """Enqueues tasks to delete instances."""
   for instance in models.Instance.query():
-    if instance.pending_deletion and not instance.deleted:
+    if instance.pending_deletion and not instance.deletion_ts:
       utilities.enqueue_task('delete-instance-pending-deletion', instance.key)
 
 
@@ -350,6 +379,9 @@ def delete_drained(key):
   instance = key.get()
   if not instance:
     logging.warning('Instance does not exist: %s', key)
+    return
+
+  if instance.deletion_ts:
     return
 
   if instance.cataloged:
@@ -407,5 +439,5 @@ def schedule_drained_deletion():
     if instance_group_manager:
       for instance_key in instance_group_manager.instances:
         instance = instance_key.get()
-        if instance and not instance.cataloged:
+        if instance and not instance.cataloged and not instance.deletion_ts:
           utilities.enqueue_task('delete-drained-instance', instance.key)

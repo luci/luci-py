@@ -14,6 +14,7 @@ test_env.setup_test_env()
 from google.appengine.ext import ndb
 
 from components import datastore_utils
+from components import utils
 from test_support import test_case
 
 import instances
@@ -101,12 +102,14 @@ class AssociateMetadataOperationTest(test_case.TestCase):
 
   def test_not_found(self):
     """Ensures nothing happens when the entity doesn't exist."""
+    now = utils.utcnow()
     key = ndb.Key(models.Instance, 'fake-key')
-    metadata.associate_metadata_operation(key, 'checksum', 'url')
+    metadata.associate_metadata_operation(key, 'checksum', 'url', now)
     self.failIf(key.get())
 
   def test_no_active_metadata_update(self):
     """Ensures nothing happens when active metadata update is unspecified."""
+    now = utils.utcnow()
     key = models.Instance(
         key=instances.get_instance_key(
             'base-name',
@@ -116,11 +119,12 @@ class AssociateMetadataOperationTest(test_case.TestCase):
         ),
     ).put()
 
-    metadata.associate_metadata_operation(key, 'checksum', 'url')
+    metadata.associate_metadata_operation(key, 'checksum', 'url', now)
     self.failIf(key.get().active_metadata_update)
 
   def test_checksum_mismatch(self):
     """Ensures nothing happens when the metadata checksum doesn't match."""
+    now = utils.utcnow()
     key = models.Instance(
         key=instances.get_instance_key(
             'base-name',
@@ -135,11 +139,12 @@ class AssociateMetadataOperationTest(test_case.TestCase):
         ),
     ).put()
 
-    metadata.associate_metadata_operation(key, 'checksum', 'url')
+    metadata.associate_metadata_operation(key, 'checksum', 'url', now)
     self.failIf(key.get().active_metadata_update.url)
 
   def test_already_has_url(self):
     """Ensures nothing happens when a URL is already associated."""
+    now = utils.utcnow()
     key = models.Instance(
         key=instances.get_instance_key(
             'base-name',
@@ -157,11 +162,13 @@ class AssociateMetadataOperationTest(test_case.TestCase):
     checksum = key.get().active_metadata_update.checksum
     expected_url = 'url'
 
-    metadata.associate_metadata_operation(key, checksum, 'url')
+    metadata.associate_metadata_operation(key, checksum, 'url', now)
     self.assertEqual(key.get().active_metadata_update.url, expected_url)
+    self.assertNotEqual(key.get().active_metadata_update.operation_ts, now)
 
   def test_already_has_mismatched_url(self):
     """Ensures nothing happens when an unexpected URL is already associated."""
+    now = utils.utcnow()
     key = models.Instance(
         key=instances.get_instance_key(
             'base-name',
@@ -179,11 +186,13 @@ class AssociateMetadataOperationTest(test_case.TestCase):
     checksum = key.get().active_metadata_update.checksum
     expected_url = 'url'
 
-    metadata.associate_metadata_operation(key, checksum, 'new-url')
+    metadata.associate_metadata_operation(key, checksum, 'new-url', now)
     self.assertEqual(key.get().active_metadata_update.url, expected_url)
+    self.assertNotEqual(key.get().active_metadata_update.operation_ts, now)
 
   def test_associates_url(self):
     """Ensures a URL is associated."""
+    now = utils.utcnow()
     key = models.Instance(
         key=instances.get_instance_key(
             'base-name',
@@ -200,8 +209,9 @@ class AssociateMetadataOperationTest(test_case.TestCase):
     checksum = key.get().active_metadata_update.checksum
     expected_url = 'url'
 
-    metadata.associate_metadata_operation(key, checksum, 'url')
+    metadata.associate_metadata_operation(key, checksum, 'url', now)
     self.assertEqual(key.get().active_metadata_update.url, expected_url)
+    self.assertEqual(key.get().active_metadata_update.operation_ts, now)
 
 
 class ClearActiveMetadataUpdateTest(test_case.TestCase):

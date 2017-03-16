@@ -11,6 +11,7 @@ from google.appengine.ext import ndb
 
 from components import gce
 from components import net
+from components import utils
 
 import metrics
 import models
@@ -116,13 +117,14 @@ def compress(key):
 
 
 @ndb.transactional
-def associate_metadata_operation(key, checksum, url):
+def associate_metadata_operation(key, checksum, url, ts):
   """Associates the metadata operation with the active metadata update.
 
   Args:
     key: ndb.Key for a models.Instance entity.
     checksum: Metadata checksum the operation is associated with.
     url: URL for the the zone operation.
+    ts: datetime.datetime the operation was started.
   """
   instance = key.get()
   if not instance:
@@ -143,6 +145,7 @@ def associate_metadata_operation(key, checksum, url):
     logging.warning('Instance has associated metadata operation: %s', key)
     return
 
+  instance.active_metadata_update.operation_ts = ts
   instance.active_metadata_update.url = url
   instance.put()
 
@@ -190,6 +193,7 @@ def update(key):
 
   result = net.json_request(instance.url, scopes=gce.AUTH_SCOPES)
   api = gce.Project(instance_template_revision.project)
+  now = utils.utcnow()
   operation = api.set_metadata(
       instance_group_manager.key.id(),
       instance.hostname,
@@ -205,6 +209,7 @@ def update(key):
       key,
       utilities.compute_checksum(instance.active_metadata_update.metadata),
       operation.url,
+      now,
   )
 
 

@@ -151,6 +151,37 @@ class DeleteDrainedTest(test_case.TestCase):
 
     self.failIf(key.get())
 
+  def test_deletion_ts(self):
+    """Ensures nothing happens when the entity is already deleted."""
+    def json_request(*args, **kwargs):
+      self.fail('json_request called')
+    self.mock(instances.net, 'json_request', json_request)
+
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        deletion_ts=utils.utcnow(),
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+        url='url',
+    ).put()
+    models.InstanceGroupManager(
+        key=instances.get_instance_group_manager_key(key),
+    ).put()
+    models.InstanceTemplateRevision(
+        key=instances.get_instance_group_manager_key(key).parent(),
+        project='project',
+    ).put()
+    models.InstanceTemplate(
+        key=instances.get_instance_group_manager_key(key).parent().parent(),
+    ).put()
+
+    instances.delete_drained(key)
+
   def test_cataloged(self):
     """Ensures nothing happens when the entity is cataloged."""
     def json_request(*args, **kwargs):
@@ -435,6 +466,38 @@ class DeletePendingTest(test_case.TestCase):
     instances.delete_pending(key)
 
     self.failIf(key.get())
+
+  def test_deletion_ts(self):
+    """Ensures nothing happens when the instance is already deleted."""
+    def json_request(*args, **kwargs):
+      self.fail('json_request called')
+    def send_machine_event(*args, **kwargs):
+      self.fail('send_machine_event called')
+    self.mock(instances.net, 'json_request', json_request)
+    self.mock(instances.metrics, 'send_machine_event', send_machine_event)
+
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        deletion_ts=utils.utcnow(),
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+        pending_deletion=True,
+        url='url',
+    ).put()
+    models.InstanceGroupManager(
+        key=instances.get_instance_group_manager_key(key),
+    ).put()
+    models.InstanceTemplateRevision(
+        key=instances.get_instance_group_manager_key(key).parent(),
+        project='project',
+    ).put()
+
+    instances.delete_pending(key)
 
   def test_not_pending_deletion(self):
     """Ensures nothing happens when the instance isn't pending deletion."""
@@ -1076,6 +1139,50 @@ class MarkForDeletionTest(test_case.TestCase):
     self.failUnless(key.get().pending_deletion)
     self.failIf(key.get().lease_expiration_ts)
     self.failIf(key.get().leased)
+
+
+class SetDeletionTime(test_case.TestCase):
+  """Tests for instances.set_deletion_time."""
+
+  def test_not_found(self):
+    """Ensures nothing happens when the Instance doesn't exist."""
+    now = utils.utcnow()
+    key = ndb.Key(models.Instance, 'fake-instance')
+
+    instances.set_deletion_time(key, now)
+    self.failIf(key.get())
+
+  def test_already_set(self):
+    """Ensures nothing happens when the the deletion_ts is already set."""
+    now = utils.utcnow()
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+        deletion_ts=utils.utcnow(),
+    ).put()
+
+    instances.set_deletion_time(key, now)
+    self.failUnless(key.get().deletion_ts)
+    self.assertNotEqual(key.get().deletion_ts, now)
+
+  def test_sets(self):
+    """Ensures the deletion_ts can be set."""
+    now = utils.utcnow()
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+    ).put()
+
+    instances.set_deletion_time(key, now)
+    self.assertEqual(key.get().deletion_ts, now)
 
 
 if __name__ == '__main__':
