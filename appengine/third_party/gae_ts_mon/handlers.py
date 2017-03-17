@@ -73,9 +73,7 @@ class SendHandler(webapp2.RequestHandler):
     with shared.instance_namespace_context():
       _assign_task_num()
 
-    for name, callback in shared.global_metrics_callbacks.iteritems():
-      logging.debug('Invoking callback %s', name)
-      callback()
+    interface.invoke_global_callbacks()
 
 
 app = webapp2.WSGIApplication([

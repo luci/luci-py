@@ -99,7 +99,7 @@ def _flush_metrics(time_now):
 
   interface.flush()
 
-  for metric in shared.global_metrics.itervalues():
+  for metric in interface.state.global_metrics.itervalues():
     metric.reset()
 
   entity_deferred.get_result()
@@ -183,15 +183,22 @@ def initialize(app=None, is_enabled_fn=None, cron_module='default',
     logging.info('Using debug monitor')
     interface.state.global_monitor = monitors.DebugMonitor()
   else:
-    logging.info('Using pubsub monitor %s/%s', shared.PUBSUB_PROJECT,
-                 shared.PUBSUB_TOPIC)
-    interface.state.global_monitor = monitors.PubSubMonitor(
-        monitors.AppengineCredentials(), shared.PUBSUB_PROJECT,
-        shared.PUBSUB_TOPIC)
+    logging.info('Using https monitor %s with %s', shared.PRODXMON_ENDPOINT,
+                 shared.PRODXMON_SERVICE_ACCOUNT_EMAIL)
+    interface.state.global_monitor = monitors.HttpsMonitor(
+        shared.PRODXMON_ENDPOINT,
+        monitors.DelegateServiceAccountCredentials(
+            shared.PRODXMON_SERVICE_ACCOUNT_EMAIL,
+            monitors.AppengineCredentials()))
+    interface.state.use_new_proto = True
 
-  shared.register_global_metrics([shared.appengine_default_version])
-  shared.register_global_metrics_callback(
+  interface.register_global_metrics([shared.appengine_default_version])
+  interface.register_global_metrics_callback(
       shared.INTERNAL_CALLBACK_NAME, _internal_callback)
+
+  # We invoke global callbacks once for the whole application in the cron
+  # handler.  Leaving this set to True would invoke them once per task.
+  interface.state.invoke_global_callbacks_on_flush = False
 
   standard_metrics.init()
 
@@ -354,5 +361,4 @@ class DjangoMiddleware(object):
 
 
 def reset_for_unittest(disable=False):
-  shared.reset_for_unittest()
   interface.reset_for_unittest(disable=disable)

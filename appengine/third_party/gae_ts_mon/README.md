@@ -53,20 +53,19 @@
         def your_method(self, request):
           ...
 
-1.  Give your app's service account permission to send metrics to the API.  You
-    can find the name of your service account on the `Permissions` page of your
-    project in the cloud console - it'll look something like
-    `app-id@appspot.gserviceaccount.com`.  Or search the default module's logs
-    for `"Initializing with service account"`.  Add it as a "Publisher" of the
-    "monacq" PubSub topic in the
-    [chrome-infra-mon-pubsub project](https://console.developers.google.com/project/chrome-infra-mon-pubsub/cloudpubsub/topicList)
-    by selecting it from the list and clicking "Permissions". If you see an
-    error "You do not have viewing permissions for the selected resource.", then
-    please ask sergeyberezin@chromium.org (AMER) or sergiyb@chromium.org (EMEA)
-    to do it for you.
+1.  Give your app's service account permission to send metrics to the API.
+    You need the email address of your app's "App Engine default service
+    account" from the `IAM & Admin` page in the cloud console.  It'll look
+    something like `app-id@appspot.gserviceaccount.com`.
+    Add it as a "Service Account Actor" of the "App Engine Metric Publishers"
+    service account in the
+    (google.com:prodx-mon-chrome-infra project)[https://console.developers.google.com/iam-admin/serviceaccounts/project?project=google.com:prodx-mon-chrome-infra&organizationId=433637338589]
+    by selecting it from the list and clicking "Permissions".
+    If you see an error "You do not have viewing permissions for the selected
+    resource.", then please ask the current chrome-trooper to do it for you.
 
-1.  You also need to enable the Google Cloud Pub/Sub API for your project if
-    it's not enabled already.
+1.  You also need to enable the Google Identity and Access Management (IAM) API
+    for your project if it's not enabled already.
 
 You're done!  You can now use ts_mon metrics exactly as you normally would using
 the infra_libs.ts_mon module. Here's a quick example, but see the
