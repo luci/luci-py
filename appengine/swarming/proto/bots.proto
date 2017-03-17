@@ -66,6 +66,11 @@ message DailySchedule {
   //
   // Formatted as "<hour>:<minute>". Must be strictly later than start.
   optional string end = 2;
+
+  // Days of the week to enable the MachineType.
+  //
+  // 0 - 6 (Mon - Sun).
+  repeated int32 days_of_the_week = 3;
 }
 
 

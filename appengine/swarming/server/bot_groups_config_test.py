@@ -444,6 +444,43 @@ class BotGroupsConfigTest(test_case.TestCase):
       'bot_group #0: machine_type #0: target_size must be positive'
     ])
 
+  def test_machine_type_daily_schedule_days_of_the_week(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='1:30',
+                                   end='1:45',
+                                   days_of_the_week=xrange(7),
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [])
+
+  def test_machine_type_daily_schedule_invalid_day(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='1:30',
+                                   end='1:45',
+                                   days_of_the_week=xrange(8),
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0: days of the week must be between 0 (Mon)'
+      ' and 6 (Sun)'
+    ])
+
   def test_machine_type_daily_schedule_no_end(self):
     cfg = bots_pb2.BotsCfg(
       bot_group=[

@@ -418,6 +418,7 @@ class EnsureEntitiesExistTest(test_case.TestCase):
                   daily=[bots_pb2.DailySchedule(
                       start='0:00',
                       end='1:00',
+                      days_of_the_week=xrange(7),
                   )],
               ),
           ),
@@ -509,11 +510,31 @@ class ShouldBeEnabledTest(test_case.TestCase):
 
     self.failUnless(lease_management.should_be_enabled(config, now=now))
 
+  def test_should_be_disabled_wrong_day(self):
+    # self.mock can't install mocks for built-in datetime.datetime.
+    class MockDateTime(datetime.datetime):
+      def __init__(self, *args, **kwargs):
+        super(MockDateTime, self).__init__(*args, **kwargs)
+      def weekday(self):
+        return 5
+
+    config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
+        daily=[bots_pb2.DailySchedule(
+            start='1:00',
+            end='2:00',
+            days_of_the_week=xrange(5),
+        )],
+    ))
+    now = MockDateTime(1969, 1, 1)
+
+    self.failIf(lease_management.should_be_enabled(config, now=now))
+
   def test_should_be_enabled(self):
     config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
         daily=[bots_pb2.DailySchedule(
             start='1:00',
             end='2:00',
+            days_of_the_week=xrange(7),
         )],
     ))
     now = datetime.datetime(1969, 1, 1, 1, 30)
@@ -525,6 +546,7 @@ class ShouldBeEnabledTest(test_case.TestCase):
         daily=[bots_pb2.DailySchedule(
             start='1:00',
             end='2:00',
+            days_of_the_week=xrange(7),
         )],
     ))
     now = datetime.datetime(1969, 1, 1)
@@ -536,6 +558,7 @@ class ShouldBeEnabledTest(test_case.TestCase):
         daily=[bots_pb2.DailySchedule(
             start='1:00',
             end='2:00',
+            days_of_the_week=xrange(7),
         )],
     ))
     now = datetime.datetime(1969, 1, 1, 3)

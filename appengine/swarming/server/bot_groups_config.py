@@ -387,6 +387,10 @@ def validate_settings(cfg, ctx):
             continue
           if machine_type.schedule:
             for daily_schedule in machine_type.schedule.daily:
+              for day in daily_schedule.days_of_the_week:
+                if day < 0 or day > 6:
+                  ctx.error(
+                      'days of the week must be between 0 (Mon) and 6 (Sun)')
               if not daily_schedule.start or not daily_schedule.end:
                 ctx.error('daily schedule must have a start and end time')
                 continue

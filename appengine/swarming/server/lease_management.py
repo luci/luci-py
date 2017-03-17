@@ -247,6 +247,13 @@ def should_be_enabled(config, now=None):
     h, m = map(int, config.schedule.daily[0].end.split(':'))
     end = datetime.datetime(now.year, now.month, now.day, h, m)
 
+    # If the current day is outside the schedule, disable the MachineType.
+    # If the schedule does not specify days, skip this check (i.e. not
+    # specifying any days of the week is the same as specifying them all).
+    if config.schedule.daily[0].days_of_the_week:
+      if now.weekday() not in config.schedule.daily[0].days_of_the_week:
+        return False
+
     # If the current time is outside the schedule, disable the MachineType.
     if now < start or now > end:
       return False
