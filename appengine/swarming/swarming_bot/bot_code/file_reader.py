@@ -22,7 +22,7 @@ class FileReaderThread(object):
   The instance is not reusable (i.e. once stopped, cannot be started again).
   """
 
-  def __init__(self, path, interval_sec=60, max_attempts=100):
+  def __init__(self, path, interval_sec=15, max_attempts=100):
     self._path = path
     self._interval_sec = interval_sec
     self._max_attempts = max_attempts
@@ -74,7 +74,9 @@ class FileReaderThread(object):
         with open(self._path, 'rb') as f:
           body = json.load(f)
         with self._lock:
-          self._last_value = body
+          if self._last_value != body:
+            logging.info('Read %s', self._path)
+            self._last_value = body
         return True # success!
       except (IOError, OSError, ValueError) as e:
         last_error = 'Failed to read auth headers from %s: %s' % (self._path, e)

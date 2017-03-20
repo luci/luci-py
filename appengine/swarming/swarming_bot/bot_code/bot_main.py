@@ -972,6 +972,9 @@ def _run_manifest(botobj, manifest, start):
     # Start a thread that periodically puts authentication headers and other
     # authentication related information to a file on disk. task_runner reads it
     # from there before making authenticated HTTP calls.
+    #
+    # TODO(vadimsh): Switch to pipes or local sockets if the latency tokens
+    # propagation here becomes an issue.
     auth_params_file = os.path.join(work_dir, 'bot_auth_params.json')
     if botobj.remote.uses_auth:
       auth_params_dumper = file_refresher.FileRefresherThread(

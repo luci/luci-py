@@ -13,7 +13,7 @@ from utils import file_path
 class FileRefresherThread(object):
   """Represents a thread that periodically dumps result of a callback to a file.
 
-  Used by bot_main to send authnetication headers to task_runner. task_runner
+  Used by bot_main to send authentication headers to task_runner. task_runner
   reads them from the file when making HTTP calls.
 
   Uses JSON for serialization. Doesn't delete the file when stopped.
@@ -21,7 +21,7 @@ class FileRefresherThread(object):
   The instance is not reusable (i.e. once stopped, cannot be started again).
   """
 
-  def __init__(self, path, producer_callback, interval_sec=60):
+  def __init__(self, path, producer_callback, interval_sec=15):
     self._path = path
     self._producer_callback = producer_callback
     self._interval_sec = interval_sec

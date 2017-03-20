@@ -19,7 +19,19 @@ from remote_client_errors import PollError
 
 # RemoteClient will attempt to refresh the authentication headers once they are
 # this close to the expiration.
-AUTH_HEADERS_EXPIRATION_SEC = 3*60
+#
+# The total possible delay between the headers are checked and used is the sum:
+#  1) FileRefresherThread update interval (15 sec).
+#  2) FileReaderThread update interval (15 sec).
+#  3) NET_CONNECTION_TIMEOUT_SEC, when resending requests on errors (3 min).
+#
+# AUTH_HEADERS_EXPIRATION_SEC must be larger than this sum.
+#
+# Additionally, there's an upper limit: AUTH_HEADERS_EXPIRATION_SEC must be less
+# than the minimum expiration time of headers produced by bot_config's
+# get_authentication_headers hook (otherwise we'll be calling this hook all the
+# time). On GCE machines it is usually 5 min.
+AUTH_HEADERS_EXPIRATION_SEC = 4*60+30
 
 
 # How long to wait for a response from the server. Must not be greater than
