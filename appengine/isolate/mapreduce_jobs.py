@@ -19,8 +19,6 @@ import config
 import gcs
 
 
-# Base path to the mapreduce pipeline.
-MAPREDUCE_PIPELINE_BASE_PATH = '/internal/mapreduce/pipeline'
 # Task queue name to run all map reduce jobs on.
 MAPREDUCE_TASK_QUEUE = 'mapreduce-jobs'
 
@@ -29,16 +27,16 @@ MAPREDUCE_TASK_QUEUE = 'mapreduce-jobs'
 MAPREDUCE_JOBS = {
   'find_missing_gs_files': {
     'job_name': 'Report missing GS files',
-    'mapper_spec': 'find_missing_gs_files',
+    'mapper_spec': 'mapreduce_jobs.find_missing_gs_files',
     'mapper_params': {
-      'entity_kind': 'handlers.ContentEntry',
+      'entity_kind': 'model.ContentEntry',
     },
   },
   'delete_broken_entries': {
     'job_name': 'Delete entries that do not have corresponding GS files',
-    'mapper_spec': 'delete_broken_entries',
+    'mapper_spec': 'mapreduce_jobs.delete_broken_entries',
     'mapper_params': {
-      'entity_kind': 'handlers.ContentEntry',
+      'entity_kind': 'model.ContentEntry',
     },
   },
 }
@@ -63,8 +61,7 @@ def launch_job(job_id):
     job_def['params'] = job_def.pop('mapper_params')
     pipeline = mapreduce_pipeline.MapPipeline(**job_def)
 
-  pipeline.start(
-      base_path=MAPREDUCE_PIPELINE_BASE_PATH, queue_name=MAPREDUCE_TASK_QUEUE)
+  pipeline.start(queue_name=MAPREDUCE_TASK_QUEUE)
   logging.info('Pipeline ID: %s', pipeline.pipeline_id)
   return pipeline.pipeline_id
 

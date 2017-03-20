@@ -16,7 +16,7 @@ handlers:
   script: main_frontend.endpoints_app
   secure: always
 
-- url: /restricted/mapreduce(/.*)?
+- url: /mapreduce(/.*)?
   script: mapreduce.main.APP
   secure: always
   login: admin

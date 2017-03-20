@@ -175,7 +175,7 @@ class RestrictedLaunchMapReduceJob(auth.AuthenticatingHandler):
         use_dedicated_module=not utils.is_local_dev_server())
     # New tasks should show up on the status page.
     if success:
-      self.redirect('/restricted/mapreduce/status')
+      self.redirect('/mapreduce/status')
     else:
       self.abort(500, 'Failed to launch the job')
 
