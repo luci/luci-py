@@ -8,6 +8,7 @@ this.swarming = this.swarming || {};
 this.swarming.alias = this.swarming.alias || (function(){
   var ANDROID_ALIASES = {
     "angler": "Nexus 6p",
+    "athene": "Moto G4",
     "bullhead": "Nexus 5X",
     "dragon": "Pixel C",
     "flo": "Nexus 7 (2013)",
@@ -15,9 +16,12 @@ this.swarming.alias = this.swarming.alias || (function(){
     "foster": "NVIDIA Shield",
     "fugu": "Nexus Player",
     "gce_x86": "Android on GCE",
+    "goyawifi": "Galaxy Tab 3",
     "grouper": "Nexus 7 (2012)",
     "hammerhead": "Nexus 5",
-    "heroqlteatt": "Galaxy S7",
+    "herolte": "Galaxy S7 (Global)",
+    "heroqlteatt": "Galaxy S7 (AT&T)",
+    "j5xnlte": "Galaxy J5",
     "m0": "Galaxy S3",
     "mako": "Nexus 4",
     "manta": "Nexus 10",
@@ -25,6 +29,7 @@ this.swarming.alias = this.swarming.alias || (function(){
     "sailfish": "Pixel",
     "shamu": "Nexus 6",
     "sprout": "Android One",
+    "zerofltetmo": "Galaxy S6",
   };
 
   var UNKNOWN = "unknown";
