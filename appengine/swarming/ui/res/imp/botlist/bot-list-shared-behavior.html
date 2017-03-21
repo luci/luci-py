@@ -39,7 +39,7 @@
       },
 
       _devices: function(bot) {
-        return bot.state.devices;
+        return bot.state.devices || [];
       },
 
       // _deviceType returns the codename of a given Android device.

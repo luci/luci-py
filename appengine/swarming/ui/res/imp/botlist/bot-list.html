@@ -404,6 +404,18 @@
           if (msg === UNKNOWN || msg === "true" || msg === true) {
             msg = this._attribute(bot, "error");
           }
+          var errs = [];
+          // Show all the errors that are active on devices to make it more
+          // clear if this is a transient error (e.g. device is too hot)
+          // or if it is requires human interaction (e.g. device is unauthorized)
+          this._devices(bot).forEach(function(d){
+            if (d.state !== "available") {
+              errs.push(d.state);
+            }
+          });
+          if (errs.length) {
+            msg += " ["+errs.join(",")+"]";
+          }
           return "Quarantined: " + msg;
         }
         return "Alive";
