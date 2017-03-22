@@ -420,8 +420,10 @@ class CheckTest(test_case.TestCase):
         ),
         active_metadata_update=models.MetadataUpdate(
             metadata={'key1': 'value1'},
+            operation_ts=utils.utcnow(),
             url='url',
         ),
+        instance_group_manager=ndb.Key(models.InstanceGroupManager, 'key'),
         pending_metadata_updates=[
             models.MetadataUpdate(metadata={'key2': 'value2'}),
         ],
@@ -453,8 +455,10 @@ class CheckTest(test_case.TestCase):
         ),
         active_metadata_update=models.MetadataUpdate(
             metadata={'key1': 'value1'},
+            operation_ts=utils.utcnow(),
             url='url',
         ),
+        instance_group_manager=ndb.Key(models.InstanceGroupManager, 'key'),
         pending_metadata_updates=[
             models.MetadataUpdate(metadata={'key2': 'value2'}),
         ],

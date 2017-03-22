@@ -219,8 +219,16 @@ def check_deleted_instance(key):
     logging.warning('Instance URL unspecified: %s', key)
     return
 
+  now = utils.utcnow()
   if not exists(instance.url):
     # When the instance isn't found, assume it's deleted.
+    if instance.deletion_ts:
+      metrics.instance_deletion_time.add(
+          (now - instance.deletion_ts).total_seconds(),
+          fields={
+              'zone': instance.instance_group_manager.id(),
+          },
+      )
     set_instance_deleted(key, False)
 
 
@@ -312,8 +320,16 @@ def cleanup_drained_instance(key):
       logging.warning('Instance is not drained: %s', key)
       return
 
+  now = utils.utcnow()
   if not exists(instance.url):
     # When the instance isn't found, assume it's deleted.
+    if instance.deletion_ts:
+      metrics.instance_deletion_time.add(
+          (now - instance.deletion_ts).total_seconds(),
+          fields={
+              'zone': instance.instance_group_manager.id(),
+          },
+      )
     set_instance_deleted(key, True)
 
 

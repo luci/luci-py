@@ -289,6 +289,7 @@ def check(key):
         'Instance active metadata operation URL unspecified: %s', key)
     return
 
+  now = utils.utcnow()
   result = net.json_request(
       instance.active_metadata_update.url, scopes=gce.AUTH_SCOPES)
   if result['status'] != 'DONE':
@@ -300,10 +301,24 @@ def check(key):
         key,
         json.dumps(result, indent=2),
     )
+    metrics.instance_set_metadata_time.add(
+        (now - instance.active_metadata_update.operation_ts).total_seconds(),
+        fields={
+            'success': False,
+            'zone': instance.instance_group_manager.id(),
+        },
+    )
     metrics.send_machine_event('METADATA_UPDATE_FAILED', instance.hostname)
     reschedule_active_metadata_update(key, instance.active_metadata_update.url)
     metrics.send_machine_event('METADATA_UPDATE_READY', instance.hostname)
   else:
+    metrics.instance_set_metadata_time.add(
+        (now - instance.active_metadata_update.operation_ts).total_seconds(),
+        fields={
+            'success': True,
+            'zone': instance.instance_group_manager.id(),
+        },
+    )
     metrics.send_machine_event('METADATA_UPDATE_SUCCEEDED', instance.hostname)
     clear_active_metadata_update(key, instance.active_metadata_update.url)
 
