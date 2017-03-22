@@ -21,7 +21,7 @@
   }
   iframe.use_all_space {
     margin: 0;
-    min-height: 80%;
+    min-height: 800px;
     overflow-y: hidden;
     padding: 0;
     width: 100%;
@@ -44,6 +44,14 @@ Enter the namespace and digest of an object:<br>
 <hr>
 
 <div id="iframe-entry"></div>
-<iframe id="content" class="use_all_space" sandbox="allow-same-origin allow-popups" src="/content?namespace={{namespace}}&digest={{digest}}">
+<script>
+function fixHeight(){
+  var i = document.getElementById("content");
+  // We only have access to the iframe's inner content because it is a same-origin
+  // request. Add 40 pixels to avoid a nested horizontal scroll bar.
+  i.height = i.contentWindow.document.body.scrollHeight + 40;
+}
+</script>
+<iframe id="content" class="use_all_space" sandbox="allow-same-origin allow-popups" src="/content?namespace={{namespace}}&digest={{digest}}" onload="fixHeight()">
 </iframe>
 {% endblock %}
