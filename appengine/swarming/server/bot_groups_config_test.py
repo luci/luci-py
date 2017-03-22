@@ -444,6 +444,59 @@ class BotGroupsConfigTest(test_case.TestCase):
       'bot_group #0: machine_type #0: target_size must be positive'
     ])
 
+  def test_machine_type_daily_schedule_target_size_positive(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='1:30',
+                                   end='1:45',
+                                   target_size=1,
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [])
+
+  def test_machine_type_daily_schedule_target_size_zero(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='1:30',
+                                   end='1:45',
+                                   target_size=0,
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [])
+
+  def test_machine_type_daily_schedule_target_size_negative(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='1:30',
+                                   end='1:45',
+                                   target_size=-1,
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0: target size must be non-negative or None'
+    ])
+
   def test_machine_type_daily_schedule_days_of_the_week(self):
     cfg = bots_pb2.BotsCfg(
       bot_group=[
@@ -763,6 +816,69 @@ class BotGroupsConfigTest(test_case.TestCase):
       'bot_group #0: machine_type #0:'
       ' end time "1:30" must be later than start time "1:30"'
     ])
+
+  def test_machine_type_two_intervals_intersecting(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='1:30',
+                                   end='2:00',
+                                   days_of_the_week=[0]),
+                                   bots_pb2.DailySchedule(
+                                     start='1:45',
+                                     end='2:15',
+                                     days_of_the_week=[0],
+                                   ),
+                                 ]))
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0: intervals must be disjoint'
+    ])
+
+  def test_machine_type_two_intervals_different_days(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='1:30',
+                                   end='2:00',
+                                   days_of_the_week=[0]),
+                                   bots_pb2.DailySchedule(
+                                     start='1:45',
+                                     end='2:15',
+                                     days_of_the_week=[1],
+                                   ),
+                                 ]))
+        ]),
+    ])
+    self.validator_test(cfg, [])
+
+  def test_machine_type_two_intervals(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 daily=[bots_pb2.DailySchedule(
+                                   start='1:30',
+                                   end='1:45'),
+                                   bots_pb2.DailySchedule(
+                                     start='2:15',
+                                     end='2:30',
+                                   ),
+                                 ]))
+        ]),
+    ])
+    self.validator_test(cfg, [])
 
   def test_machine_type_daily_schedule(self):
     cfg = bots_pb2.BotsCfg(

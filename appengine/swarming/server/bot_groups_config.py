@@ -386,11 +386,14 @@ def validate_settings(cfg, ctx):
             ctx.error('target_size must be positive')
             continue
           if machine_type.schedule:
+            # Maps day of the week to a list of 2-tuples (start time in minutes,
+            # end time in minutes). Used to ensure intervals do not intersect.
+            daily_schedules = {day: [] for day in xrange(7)}
+
             for daily_schedule in machine_type.schedule.daily:
-              for day in daily_schedule.days_of_the_week:
-                if day < 0 or day > 6:
-                  ctx.error(
-                      'days of the week must be between 0 (Mon) and 6 (Sun)')
+              if daily_schedule.target_size and daily_schedule.target_size < 0:
+                # TODO(smut): Require target_size once configs are updated.
+                ctx.error('target size must be non-negative or None')
               if not daily_schedule.start or not daily_schedule.end:
                 ctx.error('daily schedule must have a start and end time')
                 continue
@@ -406,13 +409,38 @@ def validate_settings(cfg, ctx):
               if h1 < 0 or h1 > 23 or h2 < 0 or h2 > 23:
                 ctx.error('start and end times must be formatted as %%H:%%M')
                 continue
-              if h1 * 60 + m1 >= h2 * 60 + m2:
+              start = h1 * 60 + m1
+              end = h2 * 60 + m2
+              if daily_schedule.days_of_the_week:
+                for day in daily_schedule.days_of_the_week:
+                  if day < 0 or day > 6:
+                    ctx.error(
+                        'days of the week must be between 0 (Mon) and 6 (Sun)')
+                  else:
+                    daily_schedules[day].append((start, end))
+              else:
+                # Unspecified means all days.
+                for day in xrange(7):
+                  daily_schedules[day].append((start, end))
+              if start >= end:
                 ctx.error(
                     'end time "%s" must be later than start time "%s"',
                     daily_schedule.end,
                     daily_schedule.start,
                 )
                 continue
+
+            # Detect intersections. For each day of the week, sort by start time
+            # and ensure that the end of each interval is earlier than the start
+            # of the next interval.
+            for intervals in daily_schedules.itervalues():
+              intervals.sort(key=lambda i: i[0])
+              for i in xrange(len(intervals) - 1):
+                current_end = intervals[i][1]
+                next_start = intervals[i + 1][0]
+                if current_end >= next_start:
+                  ctx.error('intervals must be disjoint')
+                  continue
 
       # Validate 'auth' field.
       a = entry.auth

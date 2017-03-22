@@ -227,11 +227,50 @@ def machine_type_pb2_to_entity(pb2):
   )
 
 
+def get_target_size(schedule, default, now=None):
+  """Returns the current target size for the MachineType.
+
+  Args:
+    schedule: A proto.bots_pb2.Schedule proto.
+    default: A default to return if now is not within any of config's intervals.
+    now: datetime.datetime to use as the time to check what the MachineType's
+      target size currently is. Defaults to use the current time if unspecified.
+
+  Returns:
+    Target size.
+  """
+  # Only daily schedules are supported right now.
+  assert schedule.daily
+  now = now or utils.utcnow()
+
+  # The validator ensures the given time will fall in at most one interval,
+  # because intervals are not allowed to intersect. So just search linearly
+  # for a matching interval.
+  # TODO(smut): Improve linear search if we end up with many intervals.
+  for i in schedule.daily:
+    # If the days of the week given by this interval do not include the current
+    # day, move on to the next interval. If no days of the week are given by
+    # this interval at all, then the interval applies every day.
+    if i.days_of_the_week and now.weekday() not in i.days_of_the_week:
+      continue
+
+    # Get the start and end times of this interval relative to the current day.
+    h, m = map(int, i.start.split(':'))
+    start = datetime.datetime(now.year, now.month, now.day, h, m)
+    h, m = map(int, i.end.split(':'))
+    end = datetime.datetime(now.year, now.month, now.day, h, m)
+
+    if start <= now <= end:
+      return i.target_size
+
+  return default
+
+
 def should_be_enabled(config, now=None):
   """Returns whether or not the configured MachineType should be enabled.
 
   Args:
-    machine_type: A proto.bots_pb2.MachineType proto.
+    config: A proto.bots_pb2.MachineType proto.
     now: datetime.datetime to use as the time to check if the MachineType
      should be enabled. Defaults to the current time if unspecified.
 
@@ -298,24 +337,45 @@ def ensure_entities_exist(max_concurrent=50):
     put = False
 
     # Handle scheduled config changes.
-    if should_be_enabled(config, now=now):
-      # If the MachineType is not currently enabled, enable it.
-      if not machine_type.enabled:
-        machine_type.enabled = True
-        put = True
-        logging.info('Enabling MachineType: %s', machine_type)
-    else:
-      # If the MachineType is currently enabled, disable it.
-      if machine_type.enabled:
-        machine_type.enabled = False
-        put = True
-        logging.info('Disabling MachineType: %s', machine_type)
+    if config.schedule and config.schedule.daily:
+      # TODO(smut): Remove this check once configs are updated.
+      if not config.schedule.daily[0].target_size:
+        # Backwards compatibility codepath. The old configs have no target_size,
+        # so if target_size is zero, use the old should_be_enabled logic to
+        # simply enable/disable the MachineType.
+        if should_be_enabled(config, now=now):
+          # If the MachineType is not currently enabled, enable it.
+          if not machine_type.enabled:
+            machine_type.enabled = True
+            put = True
+            logging.info('Enabling MachineType: %s', machine_type)
+        else:
+          # If the MachineType is currently enabled, disable it.
+          if machine_type.enabled:
+            machine_type.enabled = False
+            put = True
+            logging.info('Disabling MachineType: %s', machine_type)
+      else:
+        # New codepath. If target_size is given, then use it.
+        target_size = get_target_size(
+            config.schedule, machine_type.target_size, now=now)
+        if machine_type.target_size != target_size:
+          logging.info(
+              'Adjusting target_size (%s -> %s) for MachineType: %s',
+              machine_type.target_size,
+              target_size,
+              machine_type,
+          )
+          machine_type.target_size = target_size
+          put = True
 
-    # If the MachineType does not match the config, update it. Copy the
-    # enabled value so we can compare the MachineType to the config
-    # to check for differences in all other fields except "enabled".
+    # If the MachineType does not match the config, update it. Copy the enabled
+    # and target_size values so we can compare the MachineType to the config to
+    # check for differences in all other fields except "enabled" and
+    # "target_size" which can vary due to scheduled changes.
     config = machine_type_pb2_to_entity(config)
     config.enabled = machine_type.enabled
+    config.target_size = machine_type.target_size
     if machine_type != config:
       logging.info('Updating MachineType: %s', config)
       machine_type = config

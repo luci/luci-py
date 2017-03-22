@@ -55,22 +55,25 @@ message BotsCfg {
 
 // A daily schedule for Machine Provider leases.
 //
-// Allows a MachineType to be enabled during specific UTC hours.
+// Allows a MachineType to be resized during specific UTC hours.
 message DailySchedule {
-  // UTC time to enable the MachineType.
+  // UTC time to resize the MachineType.
   //
   // Formatted as "<hour>:<minute>".
   optional string start = 1;
 
-  // UTC time to disable the MachineType.
+  // UTC time to resize the MachineType.
   //
   // Formatted as "<hour>:<minute>". Must be strictly later than start.
   optional string end = 2;
 
-  // Days of the week to enable the MachineType.
+  // Days of the week to resize the MachineType.
   //
   // 0 - 6 (Mon - Sun).
   repeated int32 days_of_the_week = 3;
+
+  // Target size to set this MachineType to.
+  optional int32 target_size = 4;
 }
 
 

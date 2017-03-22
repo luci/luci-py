@@ -494,6 +494,142 @@ class EnsureEntitiesExistTest(test_case.TestCase):
     self.failIf(lease_management.MachineLease.query().count())
     self.failIf(key.get().enabled)
 
+  def test_daily_schedule_resize(self):
+    def fetch_machine_types():
+      return {
+          'machine-type': bots_pb2.MachineType(
+              early_release_secs=0,
+              lease_duration_secs=1,
+              mp_dimensions=['disk_gb:100'],
+              name='machine-type',
+              target_size=1,
+              schedule=bots_pb2.Schedule(
+                  daily=[bots_pb2.DailySchedule(
+                      start='0:00',
+                      end='1:00',
+                      days_of_the_week=xrange(7),
+                      target_size=3,
+                  )],
+              ),
+          ),
+      }
+    self.mock(
+        lease_management.bot_groups_config,
+        'fetch_machine_types',
+        fetch_machine_types,
+    )
+    self.mock(
+        lease_management.utils,
+        'utcnow',
+        lambda: datetime.datetime(1969, 1, 1, 0, 30),
+    )
+
+    key = lease_management.MachineType(
+        id='machine-type',
+        early_release_secs=0,
+        lease_duration_secs=1,
+        mp_dimensions=machine_provider.Dimensions(
+            disk_gb=100,
+        ),
+        target_size=1,
+    ).put()
+
+    lease_management.ensure_entities_exist()
+
+    self.assertEqual(lease_management.MachineLease.query().count(), 3)
+    self.assertEqual(key.get().target_size, 3)
+
+  def test_daily_schedule_resize_to_default(self):
+    def fetch_machine_types():
+      return {
+          'machine-type': bots_pb2.MachineType(
+              early_release_secs=0,
+              lease_duration_secs=1,
+              mp_dimensions=['disk_gb:100'],
+              name='machine-type',
+              target_size=1,
+              schedule=bots_pb2.Schedule(
+                  daily=[bots_pb2.DailySchedule(
+                      start='0:00',
+                      end='1:00',
+                      days_of_the_week=xrange(7),
+                      target_size=3,
+                  )],
+              ),
+          ),
+      }
+    self.mock(
+        lease_management.bot_groups_config,
+        'fetch_machine_types',
+        fetch_machine_types,
+    )
+    self.mock(
+        lease_management.utils,
+        'utcnow',
+        lambda: datetime.datetime(1969, 1, 1, 2),
+    )
+
+    key = lease_management.MachineType(
+        id='machine-type',
+        early_release_secs=0,
+        lease_duration_secs=1,
+        mp_dimensions=machine_provider.Dimensions(
+            disk_gb=100,
+        ),
+        target_size=1,
+    ).put()
+
+    lease_management.ensure_entities_exist()
+
+    self.assertEqual(lease_management.MachineLease.query().count(), 1)
+    self.assertEqual(key.get().target_size, 1)
+
+
+class GetTargetSize(test_case.TestCase):
+  """Tests for lease_management.get_target_size."""
+
+  def test_no_daily_schedule(self):
+    config = bots_pb2.MachineType(schedule=bots_pb2.Schedule())
+    now = None
+
+    with self.assertRaises(AssertionError):
+      lease_management.get_target_size(config.schedule, 2, now=now)
+
+  def test_wrong_day(self):
+    # self.mock can't install mocks for built-in datetime.datetime.
+    class MockDateTime(datetime.datetime):
+      def __init__(self, *args, **kwargs):
+        super(MockDateTime, self).__init__(*args, **kwargs)
+      def weekday(self):
+        return 5
+
+    config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
+        daily=[bots_pb2.DailySchedule(
+            start='1:00',
+            end='2:00',
+            days_of_the_week=xrange(5),
+            target_size=3,
+        )],
+    ))
+    now = MockDateTime(1969, 1, 1, 1, 2)
+
+    self.assertEqual(
+        lease_management.get_target_size(config.schedule, 2, now=now), 2)
+
+  def test_right_day(self):
+    config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
+        daily=[bots_pb2.DailySchedule(
+            start='1:00',
+            end='2:00',
+            days_of_the_week=xrange(7),
+            target_size=3,
+        )],
+    ))
+    now = datetime.datetime(1969, 1, 1, 1, 2)
+
+    self.assertEqual(
+        lease_management.get_target_size(config.schedule, 2, now=now), 3)
+
 
 class ShouldBeEnabledTest(test_case.TestCase):
   """Tests for lease_management.should_be_enabled."""
