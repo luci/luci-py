@@ -8,6 +8,20 @@
 
     <bot-page-summary></bot-page-summary>
 
+    This element shows a summary of all the tasks run on this bot. It attempts to
+    find commonalities in the names and shorten them to save screen space.
+
+    For example, if the there are two tasks:
+    Performance-Linux-Foo-Clang
+    Performance-Linux-Bar-GCC
+
+    The summary will (optionally) truncate these to
+    ...Foo-Clang
+    ...Bar-GCC
+
+    The summary includes information like total number of failures, average duration,
+    and more.
+
   Properties:
     None.
 
@@ -330,7 +344,7 @@
         if (this._sort.direction === "desc") {
           dir = -1;
         }
-        return dir * swarming.naturalCompare(a[this._sort.name], b[this._sort.name]);
+        return dir * naturalSort(a[this._sort.name], b[this._sort.name]);
       },
 
       _countTasks: function(){

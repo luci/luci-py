@@ -37,14 +37,14 @@ clean:
 	mkdir -p ./build/js
 
 .PHONY: vulcanize
-vulcanize: clean default common_strings
+vulcanize: clean default common_strings natural_sort
 	./node_modules/.bin/vulcanize --inline-css --inline-scripts --strip-comments --abspath=./ elements.html | ./node_modules/.bin/html-minifier -o ./build/elements.html --minify-css --minify-js --remove-comments --collapse-whitespace --conservative-collapse
-	cat ./res/imp/bower_components/webcomponentsjs/webcomponents-lite.min.js ./build/js/common-strings.js ./node_modules/skia-common-js/common.js ./res/js/common.js ./res/js/alias.js | ./node_modules/.bin/uglifyjs -o ./build/js/js.js
+	cat ./res/imp/bower_components/webcomponentsjs/webcomponents-lite.min.js ./build/js/common-strings.js ./node_modules/skia-common-js/common.js ./build/js/natural-sort.js ./res/js/common.js ./res/js/alias.js | ./node_modules/.bin/uglifyjs -o ./build/js/js.js
 
 .PHONY: debug_build
-debug_build: clean default common_strings
+debug_build: clean default common_strings natural_sort
 	cp elements.html ./build/elements.html
-	cat ./res/imp/bower_components/webcomponentsjs/webcomponents-lite.min.js ./build/js/common-strings.js ./node_modules/skia-common-js/common.js ./res/js/common.js ./res/js/alias.js > ./build/js/js.js
+	cat ./res/imp/bower_components/webcomponentsjs/webcomponents-lite.min.js ./build/js/common-strings.js ./node_modules/skia-common-js/common.js ./build/js/natural-sort.js ./res/js/common.js ./res/js/alias.js > ./build/js/js.js
 	ln -s ../res/imp/ ./build/
 
 .PHONY: common_strings
@@ -61,6 +61,10 @@ common_strings:
 	sed -i -e 's/var BinarySearchTree = require.*/ /g' ./build/js/common-strings.js
 	sed -i -e 's/module.exports = SuffixTrie;/ /g' ./build/js/common-strings.js
 
+.PHONY: natural_sort
+natural_sort:
+	cat node_modules/javascript-natural-sort/naturalSort.js > ./build/js/natural-sort.js
+	sed -i -e 's/module.exports = function naturalSort/window.naturalSort = function/g' ./build/js/natural-sort.js
 
 .PHONY: dev_deploy
 dev_deploy: vulcanize

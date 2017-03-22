@@ -5,3 +5,4 @@ bower_components
 *sample.html
 /build/imp
 /build/js/common-strings.js
+/build/js/natural-sort.js

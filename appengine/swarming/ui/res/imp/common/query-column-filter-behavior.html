@@ -442,7 +442,7 @@
             }
             // neither column was special, fallback to alphabetical sorting.
           }
-          return swarming.naturalCompare(a, b);
+          return naturalSort(a, b);
         }.bind(this));
         return arr;
       },
@@ -467,7 +467,7 @@
             var aMatch = matchFilter(a, query, false);
             var bMatch = matchFilter(b, query, false);
             if (aMatch === bMatch) {
-              return swarming.naturalCompare(a,b);
+              return naturalSort(a,b);
             }
             // true == 1 and false == 0.  So, put the one that matches first.
             return bMatch - aMatch;
@@ -479,7 +479,7 @@
             var aMatch = matchPartCaseInsensitive(a, query).idx !== -1;
             var bMatch = matchPartCaseInsensitive(b, query).idx !== -1;
             if (aMatch === bMatch) {
-              return swarming.naturalCompare(a,b);
+              return naturalSort(a,b);
             }
             // true == 1 and false == 0.  So, put the one that matches first.
             return bMatch - aMatch;

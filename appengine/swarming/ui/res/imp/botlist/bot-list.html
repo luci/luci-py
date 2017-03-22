@@ -499,7 +499,7 @@
           v = parseFloat(swarming.alias.unapply(v)) || 0;
           avgB += v / devsB.length;
         }.bind(this));
-        return dir * swarming.naturalCompare(avgA, avgB);
+        return dir * naturalSort(avgA, avgB);
       };
     }
 
@@ -511,7 +511,7 @@
         // counts just devices ready for work.
         var botACol = this._devices(botA).length;
         var botBCol = this._devices(botB).length;
-        return dir * swarming.naturalCompare(botACol, botBCol);
+        return dir * naturalSort(botACol, botBCol);
       },
 
       battery_health: deviceAverage("battery_health"),
@@ -525,33 +525,33 @@
         // Sort by average temperature.
         var botACol = botA.state.temp.average || 0;
         var botBCol = botB.state.temp.average || 0;
-        return dir * swarming.naturalCompare(botACol, botBCol);
+        return dir * naturalSort(botACol, botBCol);
       },
       disk_space: function(dir, botA, botB) {
         // We sort based on the raw number of MB of the first disk.
         var botACol = botA.disks[0].mb;
         var botBCol = botB.disks[0].mb;
-        return dir * swarming.naturalCompare(botACol, botBCol);
+        return dir * naturalSort(botACol, botBCol);
       },
       first_seen: function(dir, botA, botB) {
         var botACol = botA.first_seen_ts;
         var botBCol = botB.first_seen_ts;
-        return dir * swarming.naturalCompare(botACol, botBCol);
+        return dir * naturalSort(botACol, botBCol);
       },
       last_seen: function(dir, botA, botB) {
         var botACol = botA.last_seen_ts;
         var botBCol = botB.last_seen_ts;
-        return dir * swarming.naturalCompare(botACol, botBCol)
+        return dir * naturalSort(botACol, botBCol)
       },
       running_time: function(dir, botA, botB) {
         var botACol = this._state(botA, "running_time") || 0;
         var botBCol = this._state(botB, "running_time") || 0;
-        return dir * swarming.naturalCompare(botACol, botBCol)
+        return dir * naturalSort(botACol, botBCol)
       },
       uptime: function(dir, botA, botB) {
         var botACol = this._state(botA, "uptime") || 0;
         var botBCol = this._state(botB, "uptime") || 0;
-        return dir * swarming.naturalCompare(botACol, botBCol)
+        return dir * naturalSort(botACol, botBCol)
       },
     };
 

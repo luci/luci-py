@@ -17,18 +17,6 @@ this.swarming = this.swarming || function() {
       return most;
     };
 
-  // naturalCompare tries to use natural sorting (e.g. sort ints by value).
-  swarming.naturalCompare = function(a, b) {
-    // Try numeric, aka "natural" sort and use it if ns is not NaN.
-    // Javascript will try to corece these to numbers or return NaN.
-    var ns = a - b;
-    if (!isNaN(ns)) {
-      return ns;
-    }
-    return String(a).localeCompare(b);
-  };
-
-
   swarming.stableSort = function(arr, comp) {
     if (!arr || !comp) {
       console.log("missing arguments to stableSort", arr, comp);
