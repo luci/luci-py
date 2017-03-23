@@ -43,6 +43,7 @@
 <link rel="import" href="bot-page-data.html">
 <link rel="import" href="bot-page-shared-behavior.html">
 <link rel="import" href="bot-page-summary.html">
+<link rel="import" href="device-summary.html">
 
 
 <dom-module id="bot-page">
@@ -255,6 +256,8 @@
                 </tr>
               </template>
             </table>
+
+            <device-summary state="[[_bot.state]]"></device-summary>
 
             <span class="title">State</span>
 
