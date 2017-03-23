@@ -73,6 +73,8 @@ message DailySchedule {
   repeated int32 days_of_the_week = 3;
 
   // Target size to set this MachineType to.
+  //
+  // If omitted, defaults to zero.
   optional int32 target_size = 4;
 }
 

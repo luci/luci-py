@@ -391,9 +391,8 @@ def validate_settings(cfg, ctx):
             daily_schedules = {day: [] for day in xrange(7)}
 
             for daily_schedule in machine_type.schedule.daily:
-              if daily_schedule.target_size and daily_schedule.target_size < 0:
-                # TODO(smut): Require target_size once configs are updated.
-                ctx.error('target size must be non-negative or None')
+              if daily_schedule.target_size < 0:
+                ctx.error('target size must be non-negative')
               if not daily_schedule.start or not daily_schedule.end:
                 ctx.error('daily schedule must have a start and end time')
                 continue

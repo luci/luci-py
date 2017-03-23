@@ -494,7 +494,7 @@ class BotGroupsConfigTest(test_case.TestCase):
         ]),
     ])
     self.validator_test(cfg, [
-      'bot_group #0: machine_type #0: target size must be non-negative or None'
+      'bot_group #0: machine_type #0: target size must be non-negative'
     ])
 
   def test_machine_type_daily_schedule_days_of_the_week(self):

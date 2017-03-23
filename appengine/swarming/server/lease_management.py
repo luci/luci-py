@@ -266,44 +266,6 @@ def get_target_size(schedule, default, now=None):
   return default
 
 
-def should_be_enabled(config, now=None):
-  """Returns whether or not the configured MachineType should be enabled.
-
-  Args:
-    config: A proto.bots_pb2.MachineType proto.
-    now: datetime.datetime to use as the time to check if the MachineType
-     should be enabled. Defaults to the current time if unspecified.
-
-  Returns:
-    True if the MachineType should be enabled, False otherwise.
-  """
-  now = now or utils.utcnow()
-  if config.schedule and config.schedule.daily:
-    # Daily schedule means the MachineType may need to be enabled or disabled.
-    # For now only consider the first element of the schedule.
-    h, m = map(int, config.schedule.daily[0].start.split(':'))
-    start = datetime.datetime(now.year, now.month, now.day, h, m)
-    h, m = map(int, config.schedule.daily[0].end.split(':'))
-    end = datetime.datetime(now.year, now.month, now.day, h, m)
-
-    # If the current day is outside the schedule, disable the MachineType.
-    # If the schedule does not specify days, skip this check (i.e. not
-    # specifying any days of the week is the same as specifying them all).
-    if config.schedule.daily[0].days_of_the_week:
-      if now.weekday() not in config.schedule.daily[0].days_of_the_week:
-        return False
-
-    # If the current time is outside the schedule, disable the MachineType.
-    if now < start or now > end:
-      return False
-
-    # If the current time is within the schedule, enable the MachineType.
-    if start < now < end:
-      return True
-
-  return True
-
-
 def ensure_entities_exist(max_concurrent=50):
   """Ensures MachineType entities are correct, and MachineLease entities exist.
 
@@ -338,36 +300,17 @@ def ensure_entities_exist(max_concurrent=50):
 
     # Handle scheduled config changes.
     if config.schedule and config.schedule.daily:
-      # TODO(smut): Remove this check once configs are updated.
-      if not config.schedule.daily[0].target_size:
-        # Backwards compatibility codepath. The old configs have no target_size,
-        # so if target_size is zero, use the old should_be_enabled logic to
-        # simply enable/disable the MachineType.
-        if should_be_enabled(config, now=now):
-          # If the MachineType is not currently enabled, enable it.
-          if not machine_type.enabled:
-            machine_type.enabled = True
-            put = True
-            logging.info('Enabling MachineType: %s', machine_type)
-        else:
-          # If the MachineType is currently enabled, disable it.
-          if machine_type.enabled:
-            machine_type.enabled = False
-            put = True
-            logging.info('Disabling MachineType: %s', machine_type)
-      else:
-        # New codepath. If target_size is given, then use it.
-        target_size = get_target_size(
-            config.schedule, machine_type.target_size, now=now)
-        if machine_type.target_size != target_size:
-          logging.info(
-              'Adjusting target_size (%s -> %s) for MachineType: %s',
-              machine_type.target_size,
-              target_size,
-              machine_type,
-          )
-          machine_type.target_size = target_size
-          put = True
+      target_size = get_target_size(
+          config.schedule, machine_type.target_size, now=now)
+      if machine_type.target_size != target_size:
+        logging.info(
+            'Adjusting target_size (%s -> %s) for MachineType: %s',
+            machine_type.target_size,
+            target_size,
+            machine_type,
+        )
+        machine_type.target_size = target_size
+        put = True
 
     # If the MachineType does not match the config, update it. Copy the enabled
     # and target_size values so we can compare the MachineType to the config to
