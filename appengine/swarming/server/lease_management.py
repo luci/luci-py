@@ -301,7 +301,7 @@ def ensure_entities_exist(max_concurrent=50):
     # Handle scheduled config changes.
     if config.schedule and config.schedule.daily:
       target_size = get_target_size(
-          config.schedule, machine_type.target_size, now=now)
+          config.schedule, config.target_size, now=now)
       if machine_type.target_size != target_size:
         logging.info(
             'Adjusting target_size (%s -> %s) for MachineType: %s',
