@@ -408,6 +408,7 @@ def schedule_lease_management():
     # management job to check on it. If there is a bot_id, then don't bother
     # scheduling the management job until it's time to release the machine.
     if (not machine_lease.bot_id
+        or machine_lease.drained
         or machine_lease.lease_expiration_ts <= now + datetime.timedelta(
             seconds=machine_lease.early_release_secs)):
       if not utils.enqueue_task(
@@ -723,8 +724,10 @@ def handle_early_release(machine_lease):
   Args:
     machine_lease: MachineLease instance.
   """
-  if machine_lease.lease_expiration_ts <= utils.utcnow() + datetime.timedelta(
-      seconds=machine_lease.early_release_secs):
+  early_expiration_ts = machine_lease.lease_expiration_ts - datetime.timedelta(
+      seconds=machine_lease.early_release_secs)
+
+  if machine_lease.drained or early_expiration_ts <= utils.utcnow():
     logging.info(
         'MachineLease ready to be released:\nKey: %s\nHostname: %s',
         machine_lease.key,
@@ -778,7 +781,7 @@ def manage_leased_machine(machine_lease):
     return
 
   # Handle a lease ready for early release.
-  if machine_lease.early_release_secs:
+  if machine_lease.early_release_secs or machine_lease.drained:
     handle_early_release(machine_lease)
     return
 
