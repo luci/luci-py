@@ -152,12 +152,21 @@ class MainTest(test_case.TestCase):
     self.set_as_reader()
     hashhex = self.gen_content()
     self.app_frontend.get('/browse?namespace=default&hash=%s' % hashhex)
+    self.app_frontend.get(
+      '/browse?namespace=default&hash=%s&as=file1.txt' % hashhex)
 
   def test_browse_missing(self):
     self.set_as_reader()
     hashhex = '0123456780123456780123456789990123456789'
     self.app_frontend.get(
-        '/browse?namespace=default&hash=%s' % hashhex, status=404)
+      '/browse?namespace=default&digest=%s' % hashhex, status=404)
+
+  def test_content(self):
+    self.set_as_reader()
+    hashhex = self.gen_content()
+    self.app_frontend.get('/content?namespace=default-gzip&hash=%s' % hashhex)
+    self.app_frontend.get(
+      '/content?namespace=default-gzip&hash=%s&as=file1.txt' % hashhex)
 
   def test_config(self):
     self.set_as_admin()

@@ -52,6 +52,8 @@ function fixHeight(){
   i.height = i.contentWindow.document.body.scrollHeight + 40;
 }
 </script>
-<iframe id="content" class="use_all_space" sandbox="allow-same-origin allow-popups" src="/content?namespace={{namespace}}&digest={{digest}}" onload="fixHeight()">
+<iframe id="content" class="use_all_space" sandbox="allow-same-origin allow-popups"
+        src="/content?namespace={{namespace}}&digest={{digest}}{% if as is defined %}&as={{as}}{% endif %}"
+        onload="fixHeight()">
 </iframe>
 {% endblock %}

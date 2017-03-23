@@ -25,6 +25,10 @@ NON_BREAKING_HYPHEN = u'\u2011'
 ### Private stuff.
 
 
+def _basename(filepath):
+  return os.path.basename(filepath)
+
+
 def _datetimeformat(value, f='%Y-%m-%d %H:%M:%S'):
   if not value:
     return NON_BREAKING_HYPHEN + NON_BREAKING_HYPHEN
@@ -85,6 +89,7 @@ def _utf8(s):
 
 # Filters available by default.
 _DEFAULT_GLOBAL_FILTERS = {
+  'basename': _basename,
   'datetimeformat': _datetimeformat,
   'encode_to_json': utils.encode_to_json,
   'epochformat': _epochformat,

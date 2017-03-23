@@ -5,10 +5,13 @@
 """This module defines Isolate Server frontend url handlers."""
 
 import cgi
+import collections
 import datetime
 import json
 import logging
+import os
 import re
+import urllib
 
 import webapp2
 
@@ -56,6 +59,16 @@ _GVIZ_COLUMNS_ORDER = (
   'uploads_bytes',
   'downloads_bytes',
   'contains_lookups',
+)
+
+_ISOLATED_ROOT_MEMBERS = (
+  'algo',
+  'command',
+  'files',
+  'includes',
+  'read_only',
+  'relative_cwd',
+  'version',
 )
 
 
@@ -190,7 +203,9 @@ class BrowseHandler(auth.AuthenticatingHandler):
     namespace = self.request.get('namespace', 'default-gzip')
     # Support 'hash' for compatibility with old links. To remove eventually.
     digest = self.request.get('digest', '') or self.request.get('hash', '')
+    save_as = self.request.get('as', '')
     params = {
+      u'as': unicode(save_as),
       u'digest': unicode(digest),
       u'namespace': unicode(namespace),
     }
@@ -257,32 +272,33 @@ class ContentHandler(auth.AuthenticatingHandler):
         '    python isolateserver.py download -I %s --namespace %s -f %s %s'
         % (sizeInMib, host, namespace, digest, digest))
       else:
-        self.response.headers['Content-Disposition'] = str('filename=%s'
-                                                            % digest)
-        if content.startswith('{'):
-          # Try to format as JSON.
-          try:
-            content = json.dumps(
-                json.loads(content), sort_keys=True, indent=2,
-                separators=(',', ': '))
-            content = cgi.escape(content)
-            # If we don't wrap this in html, browsers will put content in a pre
-            # tag which is also styled with monospace/pre-wrap.  We can't use
-            # anchor tags in <pre>, so we force it to be a <div>, which happily
-            # accepts links.
-            content = (
-              '<div style="font-family:monospace;white-space:pre-wrap;">%s'
-              '</div>' % content)
-            # Linkify things that look like hashes
-            content = re.sub(r'([0-9a-f]{40})',
-              r'<a target="_blank" href="/browse?namespace=%s' % namespace +
-                r'&digest=\1">\1</a>',
-              content)
+        self.response.headers['Content-Disposition'] = str(
+          'filename=%s' % self.request.get('as') or digest)
+        try:
+          json_data = json.loads(content)
+          if self._is_isolated_format(json_data):
             self.response.headers['Content-Type'] = 'text/html; charset=utf-8'
-          except ValueError:
-            pass
+            json_data['files'] = collections.OrderedDict(
+              sorted(
+                json_data['files'].items(),
+                key=lambda (filepath, data): filepath))
+            params = {
+              'namespace': namespace,
+              'isolated': json_data,
+            }
+            content = template.render('isolate/isolated.html', params)
+        except ValueError:
+          pass
 
     self.response.write(content)
+
+  @staticmethod
+  def _is_isolated_format(json_data):
+    """Checks if json_data is a valid .isolated format."""
+    if not isinstance(json_data, dict):
+      return False
+    actual = set(json_data)
+    return actual.issubset(_ISOLATED_ROOT_MEMBERS) and 'files' in actual
 
 
 class StatsHandler(webapp2.RequestHandler):
