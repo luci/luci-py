@@ -181,6 +181,7 @@ class PubSub(object):
     Raises:
       NotFoundError: If the subscription and/or topic can't be found.
     """
+    logging.info('Acknowledging %s', ', '.join(ack_ids))
     response, content = self._http.request(
         '%s/%s/subscriptions/%s:acknowledge' % (
             PUBSUB_BASE_URL, project, subscription),
@@ -233,8 +234,9 @@ def listen():
       attributes = message['message'].get('attributes', {})
       message = base64.b64decode(message['message'].get('data', ''))
       logging.info(
-          'Received message: %s\nAttributes: %s',
+          'Received message: %s\nID: %s\nAttributes: %s',
           message,
+          message['ackId'],
           json.dumps(attributes, indent=2),
       )
 

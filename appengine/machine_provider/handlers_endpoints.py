@@ -623,6 +623,7 @@ class MachineProviderEndpoints(remote.Service):
           error=rpc_messages.MachineInstructionError.ALREADY_RECLAIMED,
       )
 
+    logging.info('Sending CONNECT message to %s', machine.dimensions.hostname)
     topic = pubsub.full_topic_name(
         machine.pubsub_topic_project, machine.pubsub_topic)
     attributes = {'swarming_server': request.instruction.swarming_server}

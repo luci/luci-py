@@ -90,6 +90,7 @@ class LeaseRequestFulfiller(webapp2.RequestHandler):
         'LEASED': {'lease_expiration_ts': str(response['lease_expiration_ts'])}
     }
     if request.get('on_lease', {}).get('swarming_server'):
+      logging.info('Sending CONNECT message to %s', response['hostname'])
       messages['CONNECT'] = {
           'swarming_server': request['on_lease']['swarming_server']
       }
