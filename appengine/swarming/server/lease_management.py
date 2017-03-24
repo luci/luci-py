@@ -483,7 +483,7 @@ def associate_termination_task(key, hostname, task_id):
     )
     return
 
-  if machine_lease.termination_task == task_id:
+  if machine_lease.termination_task:
     return
 
   machine_lease.termination_task = task_id
@@ -784,6 +784,8 @@ def handle_early_release(machine_lease):
   Args:
     machine_lease: MachineLease instance.
   """
+  assert not machine_lease.termination_task, machine_lease.termination_task
+
   early_expiration_ts = machine_lease.lease_expiration_ts - datetime.timedelta(
       seconds=machine_lease.early_release_secs)
 
