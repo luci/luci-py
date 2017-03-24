@@ -13,6 +13,7 @@ import test_env
 test_env.setup_test_env()
 
 from google.appengine import runtime
+from google.appengine.ext import ndb
 
 from protorpc.remote import protojson
 import webtest
@@ -1120,7 +1121,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
             backend=rpc_messages.Backend.DUMMY,
         ),
         lease_expiration_ts=datetime.datetime.fromtimestamp(9999999999),
-        lease_id='request-id',
+        lease_id=ndb.Key(models.LeaseRequest, 'id').id(),
         pubsub_topic='topic',
         pubsub_topic_project='project',
     ).put()
@@ -1147,7 +1148,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
             swarming_server='example.com',
         ),
     )
-    models.LeaseRequest(
+    lease_key = models.LeaseRequest(
         key=models.LeaseRequest.generate_key(
             auth_testing.DEFAULT_MOCKED_IDENTITY.to_bytes(),
             request,
@@ -1170,7 +1171,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
             backend=rpc_messages.Backend.DUMMY,
         ),
         lease_expiration_ts=datetime.datetime.fromtimestamp(9999999999),
-        lease_id='request-id',
+        lease_id=lease_key.id(),
         pubsub_topic='topic',
         pubsub_topic_project='project',
     ).put()
@@ -1198,7 +1199,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
             swarming_server='example.com',
         ),
     )
-    models.LeaseRequest(
+    lease_key = models.LeaseRequest(
         key=models.LeaseRequest.generate_key(
             auth_testing.DEFAULT_MOCKED_IDENTITY.to_bytes(),
             request,
@@ -1221,7 +1222,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
             backend=rpc_messages.Backend.DUMMY,
         ),
         lease_expiration_ts=datetime.datetime.fromtimestamp(9999999999),
-        lease_id='request-id',
+        lease_id=lease_key.id(),
         pubsub_topic='topic',
         pubsub_topic_project='project',
     ).put()
@@ -1341,7 +1342,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
             swarming_server='example.com',
         ),
     )
-    models.LeaseRequest(
+    lease_key = models.LeaseRequest(
         key=models.LeaseRequest.generate_key(
             auth_testing.DEFAULT_MOCKED_IDENTITY.to_bytes(),
             request,
@@ -1365,7 +1366,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
             backend=rpc_messages.Backend.DUMMY,
         ),
         lease_expiration_ts=datetime.datetime.fromtimestamp(1),
-        lease_id='request-id',
+        lease_id=lease_key.id(),
         pubsub_topic='topic',
         pubsub_topic_project='project',
     ).put()
@@ -1392,7 +1393,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
         instruction=rpc_messages.Instruction(
         ),
     )
-    models.LeaseRequest(
+    lease_key = models.LeaseRequest(
         key=models.LeaseRequest.generate_key(
             auth_testing.DEFAULT_MOCKED_IDENTITY.to_bytes(),
             request,
@@ -1416,7 +1417,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
             backend=rpc_messages.Backend.DUMMY,
         ),
         lease_expiration_ts=datetime.datetime.fromtimestamp(9999999999),
-        lease_id='request-id',
+        lease_id=lease_key.id(),
         pubsub_topic='topic',
         pubsub_topic_project='project',
     ).put()
@@ -1447,7 +1448,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
             swarming_server='example.com',
         ),
     )
-    models.LeaseRequest(
+    lease_key = models.LeaseRequest(
         key=models.LeaseRequest.generate_key(
             auth_testing.DEFAULT_MOCKED_IDENTITY.to_bytes(),
             request,
@@ -1471,7 +1472,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
             backend=rpc_messages.Backend.DUMMY,
         ),
         lease_expiration_ts=datetime.datetime.fromtimestamp(9999999999),
-        lease_id='request-id',
+        lease_id=lease_key.id(),
         pubsub_topic='topic',
         pubsub_topic_project='project',
     ).put()

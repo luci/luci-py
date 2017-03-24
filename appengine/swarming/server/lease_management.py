@@ -79,6 +79,8 @@ class MachineLease(ndb.Model):
   early_release_secs = ndb.IntegerProperty(indexed=False)
   # Hostname of the machine currently allocated for this request.
   hostname = ndb.StringProperty()
+  # DateTime indicating when the instruction to join the server was sent.
+  instruction_ts = ndb.DateTimeProperty()
   # Duration to lease for.
   lease_duration_secs = ndb.IntegerProperty(indexed=False)
   # DateTime indicating lease expiration time.
@@ -451,6 +453,7 @@ def clear_lease_request(key, request_id):
   machine_lease.bot_id = None
   machine_lease.client_request_id = None
   machine_lease.hostname = None
+  machine_lease.instruction_ts = None
   machine_lease.lease_expiration_ts = None
   machine_lease.lease_id = None
   machine_lease.termination_task = None
@@ -653,6 +656,63 @@ def ensure_bot_info_exists(machine_lease):
   associate_bot_id(machine_lease.key, machine_lease.hostname)
 
 
+@ndb.transactional
+def associate_instruction_ts(key, instruction_ts):
+  """Associates an instruction time with the given machine lease.
+
+  Args:
+    key: ndb.Key for a MachineLease entity.
+    bot_id: ID for a bot.
+  """
+  machine_lease = key.get()
+  if not machine_lease:
+    logging.error('MachineLease does not exist\nKey: %s', key)
+    return
+
+  if machine_lease.instruction_ts:
+    return
+
+  machine_lease.instruction_ts = instruction_ts
+  machine_lease.put()
+
+
+def send_connection_instruction(machine_lease):
+  """Sends an instruction to the given machine to connect to the server.
+
+  Args:
+    machine_lease: MachineLease instance.
+  """
+  now = utils.utcnow()
+  response = machine_provider.instruct_machine(
+      machine_lease.client_request_id,
+      'https://%s' % app_identity.get_default_version_hostname(),
+  )
+  if not response:
+    logging.error(
+        'MachineLease instruction got empty response:\nKey: %s\nHostname: %s',
+        machine_lease.key,
+        machine_lease.hostname,
+    )
+  elif not response.get('error'):
+    associate_instruction_ts(machine_lease.key, now)
+  elif response['error'] == 'ALREADY_RECLAIMED':
+    # Can happen if lease duration is very short or there is a significant delay
+    # in creating the BotInfo or instructing the machine. Consider it an error.
+    logging.error(
+        'MachineLease expired before machine connected:\nKey: %s\nHostname: %s',
+        machine_lease.key,
+        machine_lease.hostname,
+    )
+    clear_lease_request(machine_lease.key, machine_lease.client_request_id)
+  else:
+    logging.warning(
+        'MachineLease instruction error:\nKey: %s\nHostname: %s\nError: %s',
+        machine_lease.key,
+        machine_lease.hostname,
+        response['error'],
+    )
+
+
 def last_shutdown_ts(hostname):
   """Returns the time the given bot posted a final bot_shutdown event.
 
@@ -756,6 +816,10 @@ def manage_leased_machine(machine_lease):
   # Handle a newly leased machine.
   if not machine_lease.bot_id:
     ensure_bot_info_exists(machine_lease)
+
+  # Once BotInfo is created, send the instruction to join the server.
+  if not machine_lease.instruction_ts:
+    send_connection_instruction(machine_lease)
 
   # Handle an expired lease.
   if machine_lease.lease_expiration_ts <= utils.utcnow():
@@ -876,9 +940,6 @@ def manage_pending_lease_request(machine_lease):
           dimensions=machine_lease.mp_dimensions,
           # TODO(smut): Vary duration so machines don't expire all at once.
           duration=machine_lease.lease_duration_secs,
-          on_lease=machine_provider.Instruction(
-              swarming_server='https://%s' % (
-                  app_identity.get_default_version_hostname())),
           request_id=machine_lease.client_request_id,
       ),
   )

@@ -87,6 +87,28 @@ def delete_machine(dimensions):
   )
 
 
+def instruct_machine(request_id, swarming_server):
+  """Instruct a leased machine to connect to a Swarming server.
+
+  Args:
+    request_id: Request ID for the fulfilled lease whose machine to send
+      the instruction to.
+    swarming_server: URL of the Swarming server to connect to.
+  """
+  return net.json_request(
+      '%s/_ah/api/machine_provider/v1/instruct' %
+          MachineProviderConfiguration.get_instance_url(),
+      method='POST',
+      payload=utils.to_json_encodable({
+          'instruction': {
+              'swarming_server': swarming_server,
+          },
+          'request_id': request_id,
+      }),
+      scopes=MACHINE_PROVIDER_SCOPES,
+  )
+
+
 def lease_machine(request):
   """Lease a machine from the Machine Provider.
 

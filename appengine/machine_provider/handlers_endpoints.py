@@ -612,7 +612,7 @@ class MachineProviderEndpoints(remote.Service):
     machine = models.CatalogMachineEntry.get_by_id(lease.machine_id)
     if not machine:
       raise endpoints.NotFoundException('CatalogMachineEntry not found')
-    if machine.lease_id != request.request_id:
+    if machine.lease_id != request_hash:
       return rpc_messages.MachineInstructionResponse(
           client_request_id=request.request_id,
           error=rpc_messages.MachineInstructionError.NOT_FULFILLED,
