@@ -36,8 +36,8 @@ def init_symlinks(root):
 def setup_test_env():
   """Sets up the environment for bot tests."""
   init_symlinks(BOT_DIR)
-  client_tests = os.path.normpath(
-      os.path.join(BOT_DIR, '..', '..', '..', 'client', 'tests'))
+  client = os.path.normpath(os.path.join(BOT_DIR, '..', '..', '..', 'client'))
+  client_tests = os.path.join(client, 'tests')
   sys.path.insert(0, client_tests)
 
   tp = os.path.join(BOT_DIR, 'third_party')
@@ -53,3 +53,19 @@ def setup_test_env():
   # For python-rsa.
   sys.path.insert(0, os.path.join(tp, 'rsa'))
   sys.path.insert(0, os.path.join(tp, 'pyasn1'))
+
+  # Protobuf is now used in the bot itself.
+  # See fix_protobuf_package() in appengine/components/components/utils.py
+  # but until this code, the version under client is used.
+  if 'google' in sys.modules:
+    # It may be in lib/python2.7/site-packages/google, take not chance and flush
+    # it out.
+    del sys.modules['google']
+  # This should import client/third_party/google
+  import google
+  google_pkg = os.path.join(client, 'third_party', 'google')
+  if google_pkg not in google.__path__:
+    google.__path__.insert(0, google_pkg)
+  six_path = os.path.join(client, 'third_party', 'six')
+  if six_path not in sys.path:
+    sys.path.insert(0, six_path)
