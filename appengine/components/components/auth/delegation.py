@@ -7,6 +7,7 @@
 See delegation.proto for general idea behind it.
 """
 
+import binascii
 import collections
 import datetime
 import hashlib
@@ -112,6 +113,17 @@ def get_trusted_signers():
 
 
 ## Low level API for components.auth and services that know what they are doing.
+
+
+def get_token_fingerprint(blob):
+  """Given a blob with signed token returns first 16 bytes of its SHA256 as hex.
+
+  It can be used to identify this particular token in logs.
+  """
+  assert isinstance(blob, basestring)
+  if isinstance(blob, unicode):
+    blob = blob.encode('ascii', 'ignore')
+  return binascii.hexlify(hashlib.sha256(blob).digest()[:16])
 
 
 def serialize_token(tok):
@@ -248,7 +260,10 @@ def _authenticated_request_async(url, method='GET', payload=None, params=None):
   """
   scope = 'https://www.googleapis.com/auth/userinfo.email'
   access_token = service_account.get_access_token(scope)[0]
-  headers = {'Authorization': 'Bearer %s' % access_token}
+  headers = {
+    'Accept': 'application/json; charset=utf-8',
+    'Authorization': 'Bearer %s' % access_token,
+  }
 
   if payload is not None:
     assert method in ('CREATE', 'POST', 'PUT'), method
@@ -276,15 +291,20 @@ def _authenticated_request_async(url, method='GET', payload=None, params=None):
     raise DelegationTokenCreationError(str(e))
 
   if res.status_code in (401, 403):
+    logging.error('Token server HTTP %d: %s', res.status_code, res.content)
     raise DelegationAuthorizationError(
-      'HTTP response status code: %s' % res.status_code)
+        'HTTP %d: %s' % (res.status_code, res.content))
 
   if res.status_code >= 300:
+    logging.error('Token server HTTP %d: %s', res.status_code, res.content)
     raise DelegationTokenCreationError(
-      'HTTP response status code: %s' % res.status_code)
+        'HTTP %d: %s' % (res.status_code, res.content))
 
   try:
-    json_res = json.loads(res.content)
+    content = res.content
+    if content.startswith(")]}'\n"):
+      content = content[5:]
+    json_res = json.loads(content)
   except ValueError as e:
     raise DelegationTokenCreationError('Bad JSON response: %s' % e)
   raise ndb.Return(json_res)
@@ -292,40 +312,39 @@ def _authenticated_request_async(url, method='GET', payload=None, params=None):
 
 @ndb.tasklet
 def delegate_async(
-    audience=None,
-    services=None,
+    audience,
+    services,
     min_validity_duration_sec=5*60,
-    max_validity_duration_sec=60*60*10,
+    max_validity_duration_sec=60*60*3,
     impersonate=None,
-    auth_service_url=None):
-  """Creates a delegation token.
+    token_server_url=None):
+  """Creates a delegation token by contacting the token server.
 
-  An RPC. Memcaches the token.
+  Memcaches the token.
 
   Args:
     audience (list of (str or Identity)): to WHOM caller's identity is
-      delegated; a list of identities, groups or symbol '*' (which means ANY).
-      If None (default), the token can be used by anyone.
-      Example: ['user:def@example.com', 'group:abcdef']
+      delegated; a list of identities or groups, a string "REQUESTOR" (to
+      indicate the current service) or symbol '*' (which means ANY).
+      Example: ['user:def@example.com', 'group:abcdef', 'REQUESTOR'].
     services (list of (str or Identity)): WHERE token is accepted.
-      If None (default), the token is accepted everywhere.
-      Each list element must be an identity of 'service' kind, or symbol '*'.
-      Example: ['service:gae-app1', 'service:gae-app2']
+      Each list element must be an identity of 'service' kind, a root URL of a
+      service (e.g. 'https://....'), or symbol '*'.
+      Example: ['service:gae-app1', 'https://gae-app2.appspot.com']
     min_validity_duration_sec (int): minimally acceptable lifetime of the token.
       If there's existing token cached locally that have TTL
       min_validity_duration_sec or more, it will be returned right away.
       Default is 5 min.
     max_validity_duration_sec (int): defines lifetime of a new token.
       It will bet set as tokens' TTL if there's no existing cached tokens with
-      sufficiently long lifetime. Default is 10 hours.
-    impersonate (str or Identity): a caller can mint a delegation token on some
-      else's behalf (effectively impersonating them).
-      Only a privileged set of callers can do that.
-      If impersonation is allowed, token's delegated_identity field will contain
-      whatever is in 'impersonate' field.
+      sufficiently long lifetime. Default is 3 hours.
+    impersonate (str or Identity): a caller can mint a delegation token on
+      someone else's behalf (effectively impersonating them). Only a privileged
+      set of callers can do that. If impersonation is allowed, token's
+      delegated_identity field will contain whatever is in 'impersonate' field.
       Example: 'user:abc@example.com'
-    auth_service_url (str): the URL for the authentication service that will
-      mint the token. Defaults to the URL of the primary if this is a replica.
+    token_server_url (str): the URL for the token service that will mint the
+      token. Defaults to the URL provided by the primary auth service.
 
   Returns:
     DelegationToken as ndb.Future.
@@ -335,31 +354,39 @@ def delegate_async(
     DelegationTokenCreationError if could not create a token.
     DelegationAuthorizationError on HTTP 403 response from auth service.
   """
-  assert audience is None or isinstance(audience, list), audience
-  assert services is None or isinstance(services, list), services
+  assert isinstance(audience, list), audience
+  assert isinstance(services, list), services
 
   id_to_str = lambda i: i.to_bytes() if isinstance(i, model.Identity) else i
 
   # Validate audience.
-  if audience is None or '*' in audience:
+  if '*' in audience:
     audience = ['*']
   else:
     if not audience:
       raise ValueError('audience can\'t be empty')
     for a in audience:
-      assert isinstance(a, (basestring, model.Identity)), a
-      if isinstance(a, basestring) and not a.startswith('group:'):
-        model.Identity.from_bytes(a)  # May raise ValueError.
+      if isinstance(a, model.Identity):
+        continue # identities are already validated
+      if not isinstance(a, basestring):
+        raise ValueError('expecting a string or Identity')
+      if a == 'REQUESTOR' or a.startswith('group:'):
+        continue
+      # The only remaining option is a string that represents an identity.
+      # Validate it. from_bytes may raise ValueError.
+      model.Identity.from_bytes(a)
     audience = sorted(map(id_to_str, audience))
 
   # Validate services.
-  if services is None or '*' in services:
+  if '*' in services:
     services = ['*']
   else:
     if not services:
       raise ValueError('services can\'t be empty')
     for s in services:
       if isinstance(s, basestring):
+        if s.startswith('https://'):
+          continue  # an URL, the token server knows how to handle it
         s = model.Identity.from_bytes(s)
       assert isinstance(s, model.Identity), s
       assert s.kind == model.IDENTITY_SERVICE, s
@@ -377,30 +404,35 @@ def delegate_async(
     assert isinstance(impersonate, (basestring, model.Identity)), impersonate
     impersonate = id_to_str(impersonate)
 
-  # Validate auth_service_url.
-  if auth_service_url is None:
-    auth_service_url = api.get_request_auth_db().primary_url
-    if not auth_service_url:
-      raise ValueError(
-          'auth_service_url is unspecified and this is not a replica')
+  # Grab the token service URL.
+  if not token_server_url:
+    token_server_url = api.get_request_auth_db().token_server_url
+    if not token_server_url:
+      raise DelegationTokenCreationError('Token server URL is not configured')
 
   # End of validation.
 
+  # See MintDelegationTokenRequest in
+  # https://github.com/luci/luci-go/blob/master/tokenserver/api/minter/v1/token_minter.proto.
   req = {
+    'delegatedIdentity': impersonate or 'REQUESTOR',
+    'validityDuration': max_validity_duration_sec,
     'audience': audience,
     'services': services,
-    'validity_duration': max_validity_duration_sec,
-    'impersonate': impersonate,
   }
 
   # Get from cache.
-  cache_key_hash = hashlib.sha1(json.dumps(req, sort_keys=True)).hexdigest()
-  cache_key = 'delegation_token/v1/%s' % cache_key_hash
+  cache_key_hash = hashlib.sha256(
+      token_server_url + '\n' + json.dumps(req, sort_keys=True)).hexdigest()
+  cache_key = 'delegation_token/v2/%s' % cache_key_hash
   ctx = ndb.get_context()
   token = yield ctx.memcache_get(cache_key)
   min_validity_duration = datetime.timedelta(seconds=min_validity_duration_sec)
   now = utils.utcnow()
   if token and token.expiry - min_validity_duration > now:
+    logging.info(
+        'Fetched cached delegation token: fingerprint=%s',
+        get_token_fingerprint(token.token))
     raise ndb.Return(token)
 
   # Request a new one.
@@ -408,32 +440,52 @@ def delegate_async(
       'Minting a delegation token for %r',
       {k: v for k, v in req.iteritems() if v},
   )
-
-  # TODO(vadimsh): Use the token server API (via token_server_url) instead.
   res = yield _authenticated_request_async(
-      '%s/auth_service/api/v1/delegation/token/create' % auth_service_url,
+      '%s/prpc/tokenserver.minter.TokenMinter/MintDelegationToken' %
+          token_server_url,
       method='POST',
       payload=req)
-  actual_validity_duration_sec = res.get('validity_duration')
-  if not isinstance(actual_validity_duration_sec, int):
+
+  signed_token = res.get('token')
+  if not signed_token or not isinstance(signed_token, basestring):
+    logging.error('Bad MintDelegationToken response: %s', res)
+    raise DelegationTokenCreationError('Bad response, no token')
+
+  token_struct = res.get('delegationSubtoken')
+  if not token_struct or not isinstance(token_struct, dict):
+    logging.error('Bad MintDelegationToken response: %s', res)
+    raise DelegationTokenCreationError('Bad response, no delegationSubtoken')
+
+  if token_struct.get('kind') != 'BEARER_DELEGATION_TOKEN':
+    logging.error('Bad MintDelegationToken response: %s', res)
     raise DelegationTokenCreationError(
-        'Unexpected response, validity_duration is absent '
-        'or not a number: %s' % res)
+        'Bad response, not BEARER_DELEGATION_TOKEN')
+
+  actual_validity_duration_sec = token_struct.get('validityDuration')
+  if not isinstance(actual_validity_duration_sec, (int, float)):
+    logging.error('Bad MintDelegationToken response: %s', res)
+    raise DelegationTokenCreationError(
+        'Unexpected response, validityDuration is absent or not a number')
 
   token = DelegationToken(
-      token=res.get('delegation_token'),
+      token=str(signed_token),
       expiry=now + datetime.timedelta(seconds=actual_validity_duration_sec),
   )
-  if not token.token:
-    raise DelegationTokenCreationError(
-      'Unexpected response, no delegation_token: %s' % res)
+
+  logging.info(
+      'Token server "%s" generated token (subtoken_id=%s, fingerprint=%s):\n%s',
+      res.get('serviceVersion'),
+      token_struct.get('subtokenId'),
+      get_token_fingerprint(token.token),
+      json.dumps(
+          res.get('delegationSubtoken'),
+          sort_keys=True, indent=2, separators=(',', ': ')))
 
   # Put to cache. Refresh the token 10 sec in advance.
   if actual_validity_duration_sec > 10:
     yield ctx.memcache_add(
         cache_key, token, time=actual_validity_duration_sec - 10)
 
-  logging.debug('Got delegation token: subtoken_id=%s', res.get('subtoken_id'))
   raise ndb.Return(token)
 
 
@@ -570,11 +622,13 @@ def check_bearer_delegation_token(token, peer_identity):
     BadTokenError if token is invalid.
     TransientError if token can't be verified due to transient errors.
   """
+  logging.info(
+      'Checking delegation token: fingerprint=%s', get_token_fingerprint(token))
   subtoken = unseal_token(deserialize_token(token))
   if subtoken.kind not in _ACCEPTABLE_DELEGATION_TOKEN_KINDS:
     raise BadTokenError('Not a valid delegation token kind: %s' % subtoken.kind)
   ident = check_subtoken(subtoken, peer_identity)
-  logging.debug(
+  logging.info(
       'Using delegation token: subtoken_id=%s, delegated_identity=%s',
       subtoken.subtoken_id, ident.to_bytes())
   return ident

@@ -205,6 +205,11 @@ class FullRoundtripTest(test_case.TestCase):
         blob, make_id('user:final@a.com'))
     self.assertEqual(make_id('user:initial@a.com'), ident)
 
+  def test_get_token_fingerprint(self):
+    self.assertEqual(
+        '8b7df143d91c716ecfa5fc1730022f6b',
+        delegation.get_token_fingerprint(u'blah'))
+
 
 class CreateTokenTest(test_case.TestCase):
 
@@ -218,24 +223,32 @@ class CreateTokenTest(test_case.TestCase):
       urlfetch.called = True
       self.assertEqual(
           url,
-          'https://example.com/auth_service/api/v1/delegation/token/create')
+          'https://tokens.example.com/prpc/tokenserver.minter.TokenMinter/'
+              'MintDelegationToken')
       payload = json.loads(payload)
       self.assertEqual(payload, urlfetch.expected_payload)
       res = {
-        'delegation_token': 'deadbeef',
-        'validity_duration': payload['validity_duration'],
+        'token': 'deadbeef',
+        'serviceVersion': 'app-id/version-id',
+        'delegationSubtoken': {
+          'kind': 'BEARER_DELEGATION_TOKEN',
+          'validityDuration': payload['validityDuration'],
+          'subtokenId': '12345',
+        },
       }
-      raise ndb.Return(self.Response(200, json.dumps(res, sort_keys=True)))
+      raise ndb.Return(
+          self.Response(200, ")]}'\n" + json.dumps(res, sort_keys=True)))
 
     urlfetch.expected_payload = {
-      'audience': [
-        'group:g',
-        'user:a1@example.com',
-        'user:a2@example.com',
+      u'audience': [
+        u'REQUESTOR',
+        u'group:g',
+        u'user:a1@example.com',
+        u'user:a2@example.com',
       ],
-      'services': ['service:1', 'service:2'],
-      'validity_duration': 3000,
-      'impersonate': 'user:i@example.com',
+      u'services': [u'https://example.com', u'service:1', u'service:2'],
+      u'delegatedIdentity': u'user:i@example.com',
+      u'validityDuration': 3000,
     }
     urlfetch.called = False
 
@@ -243,8 +256,12 @@ class CreateTokenTest(test_case.TestCase):
 
     model.AuthReplicationState(
         key=model.replication_state_key(),
-        primary_url='https://example.com',
+        primary_url='https://auth.example.com',
         primary_id='example-app-id',
+    ).put()
+    model.AuthGlobalConfig(
+        key=model.root_key(),
+        token_server_url='https://tokens.example.com',
     ).put()
 
     args = {
@@ -252,10 +269,12 @@ class CreateTokenTest(test_case.TestCase):
         'user:a1@example.com',
         model.Identity('user', 'a2@example.com'),
         'group:g',
+        'REQUESTOR',
       ],
       'services': [
         'service:1',
-        model.Identity('service', '2')
+        model.Identity('service', '2'),
+        'https://example.com',
       ],
       'max_validity_duration_sec': 3000,
       'impersonate': model.Identity('user', 'i@example.com'),
@@ -268,14 +287,14 @@ class CreateTokenTest(test_case.TestCase):
 
     # Get from cache.
     urlfetch.called = False
-    delegation.delegate(**args)  # must not increase urlfetch.call_count
+    delegation.delegate(**args)
     self.assertFalse(urlfetch.called)
 
     # Get from cache with larger validity duration.
     urlfetch.called = False
     args['min_validity_duration_sec'] = 5000
     args['max_validity_duration_sec'] = 5000
-    urlfetch.expected_payload['validity_duration'] = 5000
+    urlfetch.expected_payload['validityDuration'] = 5000
     result = delegation.delegate(**args)
     self.assertTrue(urlfetch.called)
     self.assertEqual(result.token, 'deadbeef')
@@ -289,7 +308,10 @@ class CreateTokenTest(test_case.TestCase):
     self.mock(delegation, '_urlfetch_async', lambda  **_k: res)
 
     with self.assertRaises(delegation.DelegationTokenCreationError):
-      delegation.delegate(auth_service_url='https://example.com')
+      delegation.delegate(
+        audience=['*'],
+        services=['*'],
+        token_server_url='https://example.com')
 
   def test_http_403(self):
     res = ndb.Future()
@@ -297,7 +319,10 @@ class CreateTokenTest(test_case.TestCase):
     self.mock(delegation, '_urlfetch_async', lambda  **_k: res)
 
     with self.assertRaises(delegation.DelegationAuthorizationError):
-      delegation.delegate(auth_service_url='https://example.com')
+      delegation.delegate(
+        audience=['*'],
+        services=['*'],
+        token_server_url='https://example.com')
 
 
 if __name__ == '__main__':
