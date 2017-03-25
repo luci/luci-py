@@ -278,6 +278,8 @@ def ensure_entities_exist(max_concurrent=50):
     max_concurrent: Maximum number of concurrent asynchronous requests.
   """
   now = utils.utcnow()
+  # Seconds and microseconds are too granular for determining scheduling.
+  now = datetime.datetime(now.year, now.month, now.day, now.hour, now.minute)
 
   # Generate a few asynchronous requests at a time in order to prevent having
   # too many in flight at a time.
