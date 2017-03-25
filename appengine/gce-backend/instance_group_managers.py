@@ -366,13 +366,14 @@ def resize(key):
   )
   logging.info(
       ('Key: %s\nSize: %s\nOld target: %s\nNew target: %s\nMin: %s\nMax: %s'
-       '\nOther revisions: %s'),
+       '\nLeased: %s\nOther revisions: %s'),
       key,
       current_size,
       response['targetSize'],
       new_target_size,
       instance_group_manager.minimum_size,
       instance_group_manager.maximum_size,
+      leased,
       other_revision_total_size,
   )
   if new_target_size <= min(current_size, response['targetSize']):

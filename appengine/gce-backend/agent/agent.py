@@ -236,7 +236,7 @@ def listen():
       logging.info(
           'Received message: %s\nID: %s\nAttributes: %s',
           message,
-          message['ackId'],
+          ack_ids[-1],
           json.dumps(attributes, indent=2),
       )
 
