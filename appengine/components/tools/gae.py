@@ -454,28 +454,41 @@ def find_app_dir(search_dir):
   Starts by examining search_dir, then its parent, and so on, until it discovers
   git repository root or filesystem root.
 
-  A directory is a suspect for an app root if it looks like an app root, but its
-  parent directory does not. It allows to detect multi-module Go apps. Their
-  default module directory usually contains app.yaml and looks similar to
-  one-module GAE app. By looking at the parent we can figure out that it's
-  indeed just one module of multi-module app.
+  A directory is a suspect for an app root if it looks like an app root (has
+  app.yaml or some of its subdir have app.yaml), but its parent directory does
+  NOT look like an app root.
+
+  It allows to detect multi-module Go apps. Their default module directory
+  usually contains app.yaml, and this directory by itself looks like one-module
+  GAE app. By looking at the parent we can detect that it's indeed just one
+  module of multi-module app.
+
+  This logic gives false positives if multiple different one-module GAE apps are
+  located in sibling directories of some root directory (e.g. appengine/<app1>,
+  appengine/<app2). To prevent this directory to be incorrectly used as an app
+  root, we forbid root directories of this kind to directly contains apps.
+
+  A root directory is denoted either by presence of '.git' subdir, or 'ROOT'
+  file.
   """
+  def is_root(p):
+    return (
+        os.path.isdir(os.path.join(p, '.git')) or
+        os.path.isfile(os.path.join(p, 'ROOT')) or
+        os.path.dirname(p) == p)
+
   cached_check = {}
   def is_app_dir(p):
     if p not in cached_check:
-      cached_check[p] = gae_sdk_utils.is_app_dir(p)
+      cached_check[p] = not is_root(p) and gae_sdk_utils.is_app_dir(p)
     return cached_check[p]
 
-  def is_root(p):
-    return os.path.isdir(os.path.join(p, '.git')) or os.path.dirname(p) == p
-
-  while True:
-    if is_root(search_dir):
-      return search_dir if is_app_dir(search_dir) else None
+  while not is_root(search_dir):
     parent = os.path.dirname(search_dir)
     if is_app_dir(search_dir) and not is_app_dir(parent):
       return search_dir
     search_dir = parent
+  return None
 
 
 def main(args):
