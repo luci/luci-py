@@ -927,11 +927,12 @@ weekdays:"星期日_星期一_星期二_星期三_星期四_星期五_星期六"
             var d = this.state.devices[id];
             var device = {
               id: id,
-              battery: d.battery.level,
-              state: d.state,
+              state: d.state || "???",
             };
+            device.battery = (d.battery && d.battery.level) || "???"
             var count = 0;
             var totalTemp = 0;
+            d.temp = d.temp || [];
             for (var t in d.temp) {
               totalTemp += parseFloat(d.temp[t]);
               count++;
@@ -939,6 +940,8 @@ weekdays:"星期日_星期一_星期二_星期三_星期四_星期五_星期六"
             // Report the average temperature of all sensors.
             if (count) {
               device.temp = (totalTemp/count).toFixed(1);
+            } else {
+              device.temp == "???";
             }
             arr.push(device);
           }
