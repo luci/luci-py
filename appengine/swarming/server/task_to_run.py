@@ -187,6 +187,122 @@ def _lookup_cache_is_taken(task_key):
   return bool(memcache.get(key, namespace='task_to_run'))
 
 
+class _QueryStats(object):
+  """Statistics for a yield_next_available_task_to_dispatch() loop."""
+  broken = 0
+  cache_lookup = 0
+  expired = 0
+  hash_mismatch = 0
+  ignored = 0
+  no_queue = 0
+  real_mismatch = 0
+  too_long = 0
+  total = 0
+
+  def __str__(self):
+    return (
+        '%d total, %d exp %d no_queue, %d hash mismatch, %d cache negative, '
+        '%d dimensions mismatch, %d ignored, %d broken, '
+        '%d not executable by deadline (UTC %s)') % (
+        self.total,
+        self.expired,
+        self.no_queue,
+        self.hash_mismatch,
+        self.cache_lookup,
+        self.real_mismatch,
+        self.ignored,
+        self.broken,
+        self.too_long,
+        self.deadline)
+
+
+def _validate_query_item(
+    bot_dimensions, deadline, stats, accepted_dimensions_hash, now, task_key):
+  """Validates the TaskToRun and update stats.
+
+  Returns:
+    None if the task_key cannot be reaped by this bot.
+    tuple(TaskRequest, TaskToRun) if this is a good candidate to reap.
+  """
+  stats.total += 1
+  # Verify TaskToRun is what is expected. Play defensive here.
+  try:
+    validate_to_run_key(task_key)
+  except ValueError as e:
+    logging.error(str(e))
+    stats.broken += 1
+    return
+
+  # integer_id() == dimensions_hash.
+  if task_key.integer_id() not in accepted_dimensions_hash:
+    stats.hash_mismatch += 1
+    return
+
+  # Do this after the basic weeding out but before fetching TaskRequest.
+  if _lookup_cache_is_taken(task_key):
+    stats.cache_lookup += 1
+
+  # Ok, it's now worth taking a real look at the entity.
+  task = task_key.get(use_cache=False)
+
+  # DB operations are slow, double check memcache again.
+  if _lookup_cache_is_taken(task_key):
+    stats.cache_lookup += 1
+
+  # It is possible for the index to be inconsistent since it is not executed in
+  # a transaction, no problem.
+  if not task.queue_number:
+    stats.no_queue += 1
+    return
+
+  # It expired. A cron job will cancel it eventually. Since 'now' is saved
+  # before the query, an expired task may still be reaped even if technically
+  # expired if the query is very slow. This is on purpose so slow queries do not
+  # cause exagerate expirations.
+  if task.expiration_ts < now:
+    stats.expired += 1
+    return
+
+  # The hash may have conflicts. Ensure the dimensions actually match by
+  # verifying the TaskRequest. There's a probability of 2**-31 of conflicts,
+  # which is low enough for our purpose. The reason use_cache=False is otherwise
+  # it'll create a buffer bloat.
+  request = task.request_key.get(use_cache=False)
+  if not match_dimensions(request.properties.dimensions, bot_dimensions):
+    stats.real_mismatch += 1
+    return
+
+  # If the bot has a deadline, don't allow it to reap the task unless it can be
+  # completed before the deadline. We have to assume the task takes the
+  # theoretical maximum amount of time possible, which is governed by
+  # execution_timeout_secs. An isolated task's download phase is not subject to
+  # this limit, so we need to add io_timeout_secs. When a task is signalled that
+  # it's about to be killed, it receives a grace period as well.
+  # grace_period_secs is given by run_isolated to the task execution process, by
+  # task_runner to run_isolated, and by bot_main to the task_runner. Lastly, add
+  # a few seconds to account for any overhead.
+  #
+  # Give an exemption to the special terminate task because it doesn't actually
+  # run anything.
+  if deadline is not None and not request.properties.is_terminate:
+    if not request.properties.execution_timeout_secs:
+      # Task never times out, so it cannot be accepted.
+      stats.too_long += 1
+      return
+    max_task_time = (utils.time_time() +
+                      request.properties.execution_timeout_secs +
+                      (request.properties.io_timeout_secs or 600) +
+                      3 * (request.properties.grace_period_secs or 30) +
+                      10)
+    if deadline <= max_task_time:
+      stats.too_long += 1
+      return
+
+  # It's a valid task! Note that in the meantime, another bot may have reaped
+  # it.
+  return request, task
+
+
 ### Public API.
 
 
@@ -309,15 +425,7 @@ def yield_next_available_task_to_dispatch(bot_dimensions, deadline):
       _hash_dimensions(utils.encode_to_json(i))
       for i in _powerset(bot_dimensions))
   now = utils.utcnow()
-  broken = 0
-  cache_lookup = 0
-  expired = 0
-  hash_mismatch = 0
-  ignored = 0
-  no_queue = 0
-  real_mismatch = 0
-  too_long = 0
-  total = 0
+  stats = _QueryStats()
   # Be very aggressive in fetching the largest amount of items as possible. Note
   # that we use the default ndb.EVENTUAL_CONSISTENCY so stale items may be
   # returned. It's handled specifically.
@@ -348,110 +456,24 @@ def yield_next_available_task_to_dispatch(bot_dimensions, deadline):
         # Stop searching after too long, since the odds of the request blowing
         # up right after succeeding in reaping a task is not worth the dangling
         # task request that will stay in limbo until the cron job reaps it and
-        # retry it. The current handlers are given 60s to complete. By using
-        # 40s, it gives 20s to complete the reaping and complete the HTTP
-        # request.
+        # retry it. The current handlers are given 60s to complete. By limiting
+        # search to 40s, it gives 20s to complete the reaping and complete the
+        # HTTP request.
         return
-
-      total += 1
-      # Verify TaskToRun is what is expected. Play defensive here.
-      try:
-        validate_to_run_key(task_key)
-      except ValueError as e:
-        logging.error(str(e))
-        broken += 1
-        continue
-
-      # integer_id() == dimensions_hash.
-      if task_key.integer_id() not in accepted_dimensions_hash:
-        hash_mismatch += 1
-        continue
-
-      # Do this after the basic weeding out but before fetching TaskRequest.
-      if _lookup_cache_is_taken(task_key):
-        cache_lookup += 1
-        continue
-
-      # Ok, it's now worth taking a real look at the entity.
-      task = task_key.get(use_cache=False)
-
-      # DB operations are slow, double check memcache again.
-      if _lookup_cache_is_taken(task_key):
-        cache_lookup += 1
-        continue
-
-      # It is possible for the index to be inconsistent since it is not executed
-      # in a transaction, no problem.
-      if not task.queue_number:
-        no_queue += 1
-        continue
-
-      # It expired. A cron job will cancel it eventually. Since 'now' is saved
-      # before the query, an expired task may still be reaped even if
-      # technically expired if the query is very slow. This is on purpose so
-      # slow queries do not cause exagerate expirations.
-      if task.expiration_ts < now:
-        expired += 1
-        continue
-
-      # The hash may have conflicts. Ensure the dimensions actually match by
-      # verifying the TaskRequest. There's a probability of 2**-31 of conflicts,
-      # which is low enough for our purpose. The reason use_cache=False is
-      # otherwise it'll create a buffer bloat.
-      request = task.request_key.get(use_cache=False)
-      if not match_dimensions(request.properties.dimensions, bot_dimensions):
-        real_mismatch += 1
-        continue
-
-      # If the bot has a deadline, don't allow it to reap the task unless it can
-      # be completed before the deadline. We have to assume the task takes the
-      # theoretical maximum amount of time possible, which is governed by
-      # execution_timeout_secs. An isolated task's download phase is not subject
-      # to this limit, so we need to add io_timeout_secs. When a task is
-      # signalled that it's about to be killed, it receives a grace period as
-      # well. grace_period_secs is given by run_isolated to the task execution
-      # process, by task_runner to run_isolated, and by bot_main to the
-      # task_runner. Lastly, add a few seconds to account for any overhead.
-      #
-      # Give an exemption to the special terminate task because it doesn't
-      # actually run anything.
-      if deadline is not None and not request.properties.is_terminate:
-        if not request.properties.execution_timeout_secs:
-          # Task never times out, so it cannot be accepted.
-          too_long += 1
-          continue
-        max_task_time = (utils.time_time() +
-                         request.properties.execution_timeout_secs +
-                         (request.properties.io_timeout_secs or 600) +
-                         3 * (request.properties.grace_period_secs or 30) +
-                         10)
-        if deadline <= max_task_time:
-          too_long += 1
-          continue
-
-      # It's a valid task! Note that in the meantime, another bot may have
-      # reaped it.
-      yield request, task
-      ignored += 1
+      # _validate_query_item() returns (request, task) if it's worth reaping.
+      item = _validate_query_item(
+          bot_dimensions, deadline, stats, accepted_dimensions_hash, now,
+          task_key)
+      if item:
+        yield item[0], item[1]
+        # If the code is still executed, it means that the task reaping wasn't
+        # successful.
+        stats.ignored += 1
   finally:
     duration = (utils.utcnow() - now).total_seconds()
     logging.info(
-        '%d/%s in %5.2fs: %d total, %d exp %d no_queue, %d hash mismatch, '
-        '%d cache negative, %d dimensions mismatch, %d ignored, %d broken, '
-        '%d not executable by deadline (UTC %s)',
-        opts.batch_size,
-        opts.prefetch_size,
-        duration,
-        total,
-        expired,
-        no_queue,
-        hash_mismatch,
-        cache_lookup,
-        real_mismatch,
-        ignored,
-        broken,
-        too_long,
-        deadline)
+        '%d/%s in %5.2fs: %s',
+        opts.batch_size, opts.prefetch_size, duration, stats)
 
 
 def yield_expired_task_to_run():
