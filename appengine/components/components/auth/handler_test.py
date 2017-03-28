@@ -23,6 +23,7 @@ from components.auth import delegation
 from components.auth import handler
 from components.auth import ipaddr
 from components.auth import model
+from components.auth import tokens
 from components.auth.proto import delegation_pb2
 from test_support import test_case
 
@@ -59,6 +60,8 @@ class AuthenticatingHandlerMetaclassTest(test_case.TestCase):
 class AuthenticatingHandlerTest(test_case.TestCase):
   """Tests for AuthenticatingHandler class."""
 
+  # pylint: disable=unused-argument
+
   def setUp(self):
     super(AuthenticatingHandlerTest, self).setUp()
     # Reset global config of auth library before each test.
@@ -70,6 +73,15 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     self.logged_warnings = []
     self.mock(handler.logging, 'warning',
         lambda *args, **kwargs: self.logged_warnings.append((args, kwargs)))
+    # Don't actually check delegation token signatures.
+    self.mock(delegation, 'get_trusted_signers', self.mock_get_trusted_signers)
+
+  def mock_get_trusted_signers(self):
+    return {'user:token-server@example.com': self}
+
+  # Implements CertificateBundle interface, as used in mock_get_trusted_signers.
+  def check_signature(self, blob, key_name, signature):
+    return True
 
   def make_test_app(self, path, request_handler):
     """Returns webtest.TestApp with single route."""
@@ -423,14 +435,20 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     self.assertEqual(
         {u'cur_id': u'user:peer@a.com', u'peer_id': u'user:peer@a.com'}, call())
 
-    # TODO(vadimsh): Mint token via some high-level function call.
+    # Grab a fake-signed delegation token.
     subtoken = delegation_pb2.Subtoken(
         delegated_identity='user:delegated@a.com',
+        kind=delegation_pb2.Subtoken.BEARER_DELEGATION_TOKEN,
         audience=['*'],
         services=['*'],
         creation_time=int(utils.time_time()),
         validity_duration=3600)
-    tok = delegation.serialize_token(delegation.seal_token(subtoken))
+    tok_pb = delegation_pb2.DelegationToken(
+      serialized_subtoken=subtoken.SerializeToString(),
+      signer_id='user:token-server@example.com',
+      signing_key_id='signing-key',
+      pkcs1_sha256_sig='fake-signature')
+    tok = tokens.base64_encode(tok_pb.SerializeToString())
 
     # With valid delegation token.
     self.assertEqual(

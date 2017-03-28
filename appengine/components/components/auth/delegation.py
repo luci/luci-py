@@ -75,41 +75,38 @@ DelegationToken = collections.namedtuple('DelegationToken', [
 ])
 
 
-@utils.cache_with_expiration(expiration_sec=300)
+@utils.cache_with_expiration(expiration_sec=900)
 def get_trusted_signers():
   """Returns dict {signer_id => CertificateBundle} with all signers we trust.
 
   Keys are identity strings (e.g. 'service:<app-id>' and 'user:<email>'), values
   are CertificateBundle with certificates to use when verifying signatures.
   """
-  bundles = {}
   auth_db = api.get_request_auth_db()
 
+  # We currently trust only the token server, as provided by the primary.
   if not auth_db.primary_url:
-    # A primary or standalone service trusts itself.
-    own_app_id = model.get_service_self_identity().to_bytes()
-    bundles[own_app_id] = signature.get_own_public_certificates()
-  else:
-    # Services linked to some primary auth_service trust that primary.
-    prim_app_id = model.Identity('service', auth_db.primary_id).to_bytes()
-    bundles[prim_app_id] = signature.get_service_public_certificates(
+    logging.warning(
+        'Delegation is not supported, not linked to an auth service')
+    return {}
+  if not auth_db.token_server_url:
+    logging.warning(
+        'Delegation is not supported, the token server URL is not set by %s',
         auth_db.primary_url)
+    return {}
 
-  # Services trust the token server specified in the config.
-  if auth_db.token_server_url:
-    certs = signature.get_service_public_certificates(auth_db.token_server_url)
-    if certs.service_account_name:
-      # Construct Identity to ensure service_account_name is a valid email.
-      tok_server_id = model.Identity('user', certs.service_account_name)
-      bundles[tok_server_id.to_bytes()] = certs
-    else:
-      # This can happen if the token server is too old (pre v1.2.9). Just skip
-      # it then.
-      logging.warning(
-          'The token server at %r didn\'t provide its service account name. '
-          'Old version? Ignoring it.', auth_db.token_server_url)
+  certs = signature.get_service_public_certificates(auth_db.token_server_url)
+  if certs.service_account_name:
+    # Construct Identity to ensure service_account_name is a valid email.
+    tok_server_id = model.Identity('user', certs.service_account_name)
+    return {tok_server_id.to_bytes(): certs}
 
-  return bundles
+  # This can happen if the token server is too old (pre v1.2.9). Just skip
+  # it then.
+  logging.warning(
+      'The token server at %r didn\'t provide its service account name. '
+      'Old version? Ignoring it.', auth_db.token_server_url)
+  return {}
 
 
 ## Low level API for components.auth and services that know what they are doing.
@@ -124,19 +121,6 @@ def get_token_fingerprint(blob):
   if isinstance(blob, unicode):
     blob = blob.encode('ascii', 'ignore')
   return binascii.hexlify(hashlib.sha256(blob).digest()[:16])
-
-
-def serialize_token(tok):
-  """Converts delegation_pb2.DelegationToken to urlsafe base64 text.
-
-  Raises:
-    BadTokenError if token is too large.
-  """
-  assert isinstance(tok, delegation_pb2.DelegationToken)
-  as_bytes = tok.SerializeToString()
-  if len(as_bytes) > MAX_TOKEN_SIZE:
-    raise BadTokenError('Unexpectedly huge token (%d bytes)' % len(as_bytes))
-  return tokens.base64_encode(as_bytes)
 
 
 def deserialize_token(blob):
@@ -157,25 +141,6 @@ def deserialize_token(blob):
     return delegation_pb2.DelegationToken.FromString(as_bytes)
   except message.DecodeError as exc:
     raise BadTokenError('Bad proto: %s' % exc)
-
-
-def seal_token(subtoken):
-  """Serializes Subtoken and signs it using current service's key.
-
-  Args:
-    subtoken: delegation_pb2.Subtoken message.
-
-  Returns:
-    delegation_pb2.DelegationToken message ready for serialization.
-  """
-  assert isinstance(subtoken, delegation_pb2.Subtoken)
-  serialized = subtoken.SerializeToString()
-  signing_key_id, pkcs1_sha256_sig = signature.sign_blob(serialized, 0.5)
-  return delegation_pb2.DelegationToken(
-      serialized_subtoken=serialized,
-      signer_id=model.get_service_self_identity().to_bytes(),
-      signing_key_id=signing_key_id,
-      pkcs1_sha256_sig=pkcs1_sha256_sig)
 
 
 def unseal_token(tok):
@@ -598,14 +563,6 @@ def check_subtoken_audience(subtoken, current_identity):
 ## High level API to parse, validate and traverse delegation token.
 
 
-# TODO(vadimsh): Remove UNKNOWN_KIND from here when all services generate
-# tokens with BEARER_DELEGATION_TOKEN.
-_ACCEPTABLE_DELEGATION_TOKEN_KINDS = (
-  delegation_pb2.Subtoken.UNKNOWN_KIND,
-  delegation_pb2.Subtoken.BEARER_DELEGATION_TOKEN,
-)
-
-
 def check_bearer_delegation_token(token, peer_identity):
   """Decodes the token, checks its validity, extracts delegated Identity.
 
@@ -625,7 +582,7 @@ def check_bearer_delegation_token(token, peer_identity):
   logging.info(
       'Checking delegation token: fingerprint=%s', get_token_fingerprint(token))
   subtoken = unseal_token(deserialize_token(token))
-  if subtoken.kind not in _ACCEPTABLE_DELEGATION_TOKEN_KINDS:
+  if subtoken.kind != delegation_pb2.Subtoken.BEARER_DELEGATION_TOKEN:
     raise BadTokenError('Not a valid delegation token kind: %s' % subtoken.kind)
   ident = check_subtoken(subtoken, peer_identity)
   logging.info(

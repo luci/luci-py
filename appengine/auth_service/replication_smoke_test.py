@@ -61,7 +61,6 @@ class ReplicationTest(unittest.TestCase):
     self.check_group_replication()
     self.check_ip_whitelist_replication()
     self.check_snapshot_endpoint()
-    self.check_delegation_token_usage()
 
   def link_replica_to_primary(self):
     """Links replica to primary."""
@@ -244,44 +243,6 @@ class ReplicationTest(unittest.TestCase):
     deflated = base64.b64decode(latest['deflated_body'])
     self.assertEqual(
         latest['sha256'], hashlib.sha256(zlib.decompress(deflated)).hexdigest())
-
-  def check_delegation_token_usage(self):
-    logging.info('Generating delegation token for test@example.com')
-
-    response = self.auth_service.client.json_request(
-        resource='/auth_service/api/v1/delegation/token/create',
-        body={
-          'audience': ['user:a@example.com'],
-          'services': ['service:%s' % self.replica.app_id],
-        },
-        headers={'X-XSRF-Token': self.auth_service.client.xsrf_token})
-    self.assertEqual(201, response.http_code)
-    delegation_token = response.body['delegation_token']
-    logging.info('Delegation token size is %d bytes', len(delegation_token))
-
-    def get_self_id(headers=None):
-      return self.replica.client.json_request(
-          '/auth/api/v1/accounts/self', headers=headers)
-
-    try:
-      self.replica.client.login_as_admin('a@example.com')
-      # Without delegation token seen as a@.
-      resp = get_self_id()
-      self.assertEqual('user:a@example.com', resp.body['identity'])
-      # With delegation token seen as test@.
-      resp = get_self_id({'X-Delegation-Token-V1': delegation_token})
-      self.assertEqual('user:test@example.com', resp.body['identity'])
-      # Attempting to use as b@ doesn't work (wrong audience).
-      self.replica.client.login_as_admin('b@example.com')
-      resp = get_self_id({'X-Delegation-Token-V1': delegation_token})
-      self.assertEqual(403, resp.http_code)
-      self.assertEqual({
-        u'text': u'Bad delegation token: user:b@example.com '
-            u'is not allowed to use the token'
-        }, resp.body)
-    finally:
-      # Restore the original state.
-      self.replica.client.login_as_admin('test@example.com')
 
 
 if __name__ == '__main__':

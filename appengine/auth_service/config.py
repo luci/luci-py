@@ -75,27 +75,6 @@ def get_config_revision(path):
 
 
 @utils.cache_with_expiration(expiration_sec=60)
-def get_delegation_config():
-  """Returns imported config_pb2.DelegationConfig (or empty one if missing)."""
-  text = _get_service_config('delegation.cfg')
-  if not text:
-    return config_pb2.DelegationConfig()
-  # The config MUST be valid, since we do validation before storing it.
-  # Nevertheless, handle the unexpected.
-  try:
-    msg = config_pb2.DelegationConfig()
-    protobuf.text_format.Merge(text, msg)
-  except protobuf.text_format.ParseError as ex:
-    logging.error('Invalid delegation.cfg: %s', ex)
-    return config_pb2.DelegationConfig()
-  ctx = validation_context.Context.logging()
-  validate_delegation_config(msg, ctx)
-  if ctx.result().has_errors:
-    return config_pb2.DelegationConfig()
-  return msg
-
-
-@utils.cache_with_expiration(expiration_sec=60)
 def get_settings():
   """Returns auth service own settings (from settings.cfg) as SettingsCfg proto.
 
@@ -159,57 +138,6 @@ def refetch_config(force=False):
 
 
 ### Integration with config validation framework.
-
-
-@validation.self_rule('delegation.cfg', config_pb2.DelegationConfig)
-def validate_delegation_config(conf, ctx):
-  def validate_service_list(name, lst):
-    if not lst:
-      ctx.error('missing %s field', name)
-      return
-    for uid in lst:
-      if uid == '*':
-        continue
-      try:
-        ident = model.Identity.from_bytes(uid)
-        if ident.kind != 'service':
-          ctx.error('%s: expecting "service:" identity, got "%s"', name, uid)
-      except ValueError as exc:
-        ctx.error('%s: bad identity string "%s": %s', name, uid, exc)
-    if '*' in lst and len(lst) != 1:
-      ctx.warning('redundant entries in %s, it has "*"" already', name)
-
-  def validate_principal_list(name, lst, required=False):
-    if required and not lst:
-      ctx.error('missing %s field', name)
-      return
-    for p in lst:
-      if p == '*':
-        continue
-      if p.startswith('group:'):
-        group = p[len('group:'):]
-        if not model.is_valid_group_name(group):
-          ctx.error('%s: not a valid group name: %s', name, group)
-        continue
-      if '*' in p:
-        try:
-          model.IdentityGlob.from_bytes(p)
-        except ValueError as exc:
-          ctx.error('%s: not a valid identity glob "%s": %s', name, p, exc)
-        continue
-      try:
-        model.Identity.from_bytes(p)
-      except ValueError as exc:
-        ctx.error('%s: not a valid identity "%s": %s', name, p, exc)
-
-  for idx, r in enumerate(conf.rules):
-    with ctx.prefix('rules #%d: ', idx):
-      validate_service_list('target_service', r.target_service)
-      validate_principal_list('user_id', r.user_id, required=True)
-      validate_principal_list(
-          'allowed_to_impersonate', r.allowed_to_impersonate)
-      if r.max_validity_duration <= 0:
-        ctx.error('max_validity_duration must be a positive integer')
 
 
 @validation.self_rule('settings.cfg', config_pb2.SettingsCfg)
@@ -549,12 +477,6 @@ def _update_oauth_config(rev, conf):
 #   'default': Default config value to use if the config file is missing.
 # }
 _CONFIG_SCHEMAS = {
-  'delegation.cfg': {
-    'proto_class': None, # delegation configs are stored as text in datastore
-    'revision_getter': lambda: _get_service_config_rev('delegation.cfg'),
-    'updater': lambda rev, c: _update_service_config('delegation.cfg', rev, c),
-    'use_authdb_transaction': False,
-  },
   'imports.cfg': {
     'proto_class': None, # importer configs are stored as text
     'revision_getter': _get_imports_config_revision,

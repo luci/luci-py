@@ -18,6 +18,7 @@ from components import utils
 from components.auth import api
 from components.auth import delegation
 from components.auth import model
+from components.auth import signature
 from components.auth import tokens
 from components.auth.proto import delegation_pb2
 
@@ -38,6 +39,7 @@ def fake_token_proto():
 
 def fake_subtoken_proto(delegated_identity='user:abc@example.com', **kwargs):
   kwargs['delegated_identity'] = delegated_identity
+  kwargs.setdefault('kind', delegation_pb2.Subtoken.BEARER_DELEGATION_TOKEN)
   kwargs.setdefault('audience', ['*'])
   kwargs.setdefault('services', ['*'])
   kwargs.setdefault('creation_time', int(utils.time_time()))
@@ -45,17 +47,25 @@ def fake_subtoken_proto(delegated_identity='user:abc@example.com', **kwargs):
   return delegation_pb2.Subtoken(**kwargs)
 
 
+def serialize_token(tok):
+  return tokens.base64_encode(tok.SerializeToString())
+
+
+def seal_token(subtoken):
+  serialized = subtoken.SerializeToString()
+  signing_key_id, pkcs1_sha256_sig = signature.sign_blob(serialized, 0.5)
+  return delegation_pb2.DelegationToken(
+      serialized_subtoken=serialized,
+      signer_id=model.get_service_self_identity().to_bytes(),
+      signing_key_id=signing_key_id,
+      pkcs1_sha256_sig=pkcs1_sha256_sig)
+
+
 class SerializationTest(test_case.TestCase):
   def test_serialization_works(self):
     msg = fake_token_proto()
-    tok = delegation.serialize_token(msg)
+    tok = serialize_token(msg)
     self.assertEqual(msg, delegation.deserialize_token(tok))
-
-  def test_serialize_huge(self):
-    msg = fake_token_proto()
-    msg.serialized_subtoken = 'huge' * 10000
-    with self.assertRaises(delegation.BadTokenError):
-      delegation.serialize_token(msg)
 
   def test_deserialize_huge(self):
     msg = fake_token_proto()
@@ -66,7 +76,7 @@ class SerializationTest(test_case.TestCase):
 
   def test_deserialize_not_base64(self):
     msg = fake_token_proto()
-    tok = delegation.serialize_token(msg)
+    tok = serialize_token(msg)
     tok += 'not base 64'
     with self.assertRaises(delegation.BadTokenError):
       delegation.deserialize_token(tok)
@@ -81,13 +91,31 @@ class SignatureTest(test_case.TestCase):
   def setUp(self):
     super(SignatureTest, self).setUp()
     api.reset_local_state()  # to clear request-cached AuthDB
+    self.mock(delegation, 'get_trusted_signers', self.mock_get_trusted_signers)
 
-  def test_round_trip(self):
+  def mock_get_trusted_signers(self):
+    # We use testbed own identity in tests, see 'seal_token'.
+    own_app_id = model.get_service_self_identity().to_bytes()
+    return {own_app_id: signature.get_own_public_certificates()}
+
+  def test_seal_round_trip(self):
     tok = fake_subtoken_proto()
-    self.assertEqual(tok, delegation.unseal_token(delegation.seal_token(tok)))
+    self.assertEqual(tok, delegation.unseal_token(seal_token(tok)))
+
+  def test_full_round_trip_works(self):
+    # Subtoken proto.
+    tok = fake_subtoken_proto(
+        'user:initial@a.com', audience=['user:final@a.com'])
+    # Sign, serialize.
+    blob = serialize_token(seal_token(tok))
+    # Deserialize, check sig, validate.
+    make_id = model.Identity.from_bytes
+    ident = delegation.check_bearer_delegation_token(
+        blob, make_id('user:final@a.com'))
+    self.assertEqual(make_id('user:initial@a.com'), ident)
 
   def test_bad_signer_id(self):
-    msg = delegation.seal_token(fake_subtoken_proto())
+    msg = seal_token(fake_subtoken_proto())
     msg.signer_id = 'not an identity'
     with self.assertRaises(delegation.BadTokenError):
       delegation.unseal_token(msg)
@@ -96,16 +124,16 @@ class SignatureTest(test_case.TestCase):
     # Empty dict, no trusted signers.
     self.mock(delegation, 'get_trusted_signers', lambda: {})
     with self.assertRaises(delegation.BadTokenError):
-      delegation.unseal_token(delegation.seal_token(fake_subtoken_proto()))
+      delegation.unseal_token(seal_token(fake_subtoken_proto()))
 
   def test_unknown_signing_key_id(self):
-    msg = delegation.seal_token(fake_subtoken_proto())
+    msg = seal_token(fake_subtoken_proto())
     msg.signing_key_id = 'blah'
     with self.assertRaises(delegation.BadTokenError):
       delegation.unseal_token(msg)
 
   def test_bad_signature(self):
-    msg = delegation.seal_token(fake_subtoken_proto())
+    msg = seal_token(fake_subtoken_proto())
     msg.pkcs1_sha256_sig = msg.pkcs1_sha256_sig[:-1] + 'A'
     with self.assertRaises(delegation.BadTokenError):
       delegation.unseal_token(msg)
@@ -191,20 +219,7 @@ class ValidationTest(test_case.TestCase):
       delegation.check_subtoken(tok, make_id('user:c@c.com'))
 
 
-class FullRoundtripTest(test_case.TestCase):
-  def test_works(self):
-    api.reset_local_state()  # to clear request-cached AuthDB
-    # Subtoken proto.
-    tok = fake_subtoken_proto(
-        'user:initial@a.com', audience=['user:final@a.com'])
-    # Sign, serialize.
-    blob = delegation.serialize_token(delegation.seal_token(tok))
-    # Deserialize, check sig, validate.
-    make_id = model.Identity.from_bytes
-    ident = delegation.check_bearer_delegation_token(
-        blob, make_id('user:final@a.com'))
-    self.assertEqual(make_id('user:initial@a.com'), ident)
-
+class FingerprintTest(test_case.TestCase):
   def test_get_token_fingerprint(self):
     self.assertEqual(
         '8b7df143d91c716ecfa5fc1730022f6b',

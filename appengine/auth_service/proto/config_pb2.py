@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='config.proto',
   package='auth_service',
   syntax='proto2',
-  serialized_pb=_b('\n\x0c\x63onfig.proto\x12\x0c\x61uth_service\"+\n\x0bSettingsCfg\x12\x1c\n\x14\x65nable_ts_monitoring\x18\x01 \x01(\x08\"\x93\x04\n\x13GroupImporterConfig\x12?\n\x07tarball\x18\x01 \x03(\x0b\x32..auth_service.GroupImporterConfig.TarballEntry\x12\x43\n\tplainlist\x18\x02 \x03(\x0b\x32\x30.auth_service.GroupImporterConfig.PlainlistEntry\x12L\n\x0etarball_upload\x18\x03 \x03(\x0b\x32\x34.auth_service.GroupImporterConfig.TarballUploadEntry\x1a\x62\n\x0cTarballEntry\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x14\n\x0coauth_scopes\x18\x02 \x03(\t\x12\x0e\n\x06\x64omain\x18\x03 \x01(\t\x12\x0f\n\x07systems\x18\x04 \x03(\t\x12\x0e\n\x06groups\x18\x05 \x03(\t\x1ap\n\x12TarballUploadEntry\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x1b\n\x13\x61uthorized_uploader\x18\x02 \x03(\t\x12\x0e\n\x06\x64omain\x18\x03 \x01(\t\x12\x0f\n\x07systems\x18\x04 \x03(\t\x12\x0e\n\x06groups\x18\x05 \x03(\t\x1aR\n\x0ePlainlistEntry\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x14\n\x0coauth_scopes\x18\x02 \x03(\t\x12\x0e\n\x06\x64omain\x18\x03 \x01(\t\x12\r\n\x05group\x18\x04 \x01(\t\"u\n\x0bOAuthConfig\x12\x19\n\x11primary_client_id\x18\x01 \x01(\t\x12\x1d\n\x15primary_client_secret\x18\x02 \x01(\t\x12\x12\n\nclient_ids\x18\x03 \x03(\t\x12\x18\n\x10token_server_url\x18\x04 \x01(\t\"\x93\x02\n\x11IPWhitelistConfig\x12\x42\n\rip_whitelists\x18\x01 \x03(\x0b\x32+.auth_service.IPWhitelistConfig.IPWhitelist\x12?\n\x0b\x61ssignments\x18\x02 \x03(\x0b\x32*.auth_service.IPWhitelistConfig.Assignment\x1a>\n\x0bIPWhitelist\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07subnets\x18\x02 \x03(\t\x12\x10\n\x08includes\x18\x03 \x03(\t\x1a\x39\n\nAssignment\x12\x10\n\x08identity\x18\x01 \x01(\t\x12\x19\n\x11ip_whitelist_name\x18\x02 \x01(\t\"\xb6\x01\n\x10\x44\x65legationConfig\x12\x32\n\x05rules\x18\x01 \x03(\x0b\x32#.auth_service.DelegationConfig.Rule\x1an\n\x04Rule\x12\x0f\n\x07user_id\x18\x01 \x03(\t\x12\x16\n\x0etarget_service\x18\x02 \x03(\t\x12\x1d\n\x15max_validity_duration\x18\x03 \x01(\x05\x12\x1e\n\x16\x61llowed_to_impersonate\x18\x04 \x03(\t')
+  serialized_pb=_b('\n\x0c\x63onfig.proto\x12\x0c\x61uth_service\"+\n\x0bSettingsCfg\x12\x1c\n\x14\x65nable_ts_monitoring\x18\x01 \x01(\x08\"\x93\x04\n\x13GroupImporterConfig\x12?\n\x07tarball\x18\x01 \x03(\x0b\x32..auth_service.GroupImporterConfig.TarballEntry\x12\x43\n\tplainlist\x18\x02 \x03(\x0b\x32\x30.auth_service.GroupImporterConfig.PlainlistEntry\x12L\n\x0etarball_upload\x18\x03 \x03(\x0b\x32\x34.auth_service.GroupImporterConfig.TarballUploadEntry\x1a\x62\n\x0cTarballEntry\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x14\n\x0coauth_scopes\x18\x02 \x03(\t\x12\x0e\n\x06\x64omain\x18\x03 \x01(\t\x12\x0f\n\x07systems\x18\x04 \x03(\t\x12\x0e\n\x06groups\x18\x05 \x03(\t\x1ap\n\x12TarballUploadEntry\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x1b\n\x13\x61uthorized_uploader\x18\x02 \x03(\t\x12\x0e\n\x06\x64omain\x18\x03 \x01(\t\x12\x0f\n\x07systems\x18\x04 \x03(\t\x12\x0e\n\x06groups\x18\x05 \x03(\t\x1aR\n\x0ePlainlistEntry\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x14\n\x0coauth_scopes\x18\x02 \x03(\t\x12\x0e\n\x06\x64omain\x18\x03 \x01(\t\x12\r\n\x05group\x18\x04 \x01(\t\"u\n\x0bOAuthConfig\x12\x19\n\x11primary_client_id\x18\x01 \x01(\t\x12\x1d\n\x15primary_client_secret\x18\x02 \x01(\t\x12\x12\n\nclient_ids\x18\x03 \x03(\t\x12\x18\n\x10token_server_url\x18\x04 \x01(\t\"\x93\x02\n\x11IPWhitelistConfig\x12\x42\n\rip_whitelists\x18\x01 \x03(\x0b\x32+.auth_service.IPWhitelistConfig.IPWhitelist\x12?\n\x0b\x61ssignments\x18\x02 \x03(\x0b\x32*.auth_service.IPWhitelistConfig.Assignment\x1a>\n\x0bIPWhitelist\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07subnets\x18\x02 \x03(\t\x12\x10\n\x08includes\x18\x03 \x03(\t\x1a\x39\n\nAssignment\x12\x10\n\x08identity\x18\x01 \x01(\t\x12\x19\n\x11ip_whitelist_name\x18\x02 \x01(\t')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -439,88 +439,6 @@ _IPWHITELISTCONFIG = _descriptor.Descriptor(
   serialized_end=1004,
 )
 
-
-_DELEGATIONCONFIG_RULE = _descriptor.Descriptor(
-  name='Rule',
-  full_name='auth_service.DelegationConfig.Rule',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='user_id', full_name='auth_service.DelegationConfig.Rule.user_id', index=0,
-      number=1, type=9, cpp_type=9, label=3,
-      has_default_value=False, default_value=[],
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='target_service', full_name='auth_service.DelegationConfig.Rule.target_service', index=1,
-      number=2, type=9, cpp_type=9, label=3,
-      has_default_value=False, default_value=[],
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='max_validity_duration', full_name='auth_service.DelegationConfig.Rule.max_validity_duration', index=2,
-      number=3, type=5, cpp_type=1, label=1,
-      has_default_value=False, default_value=0,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='allowed_to_impersonate', full_name='auth_service.DelegationConfig.Rule.allowed_to_impersonate', index=3,
-      number=4, type=9, cpp_type=9, label=3,
-      has_default_value=False, default_value=[],
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  options=None,
-  is_extendable=False,
-  syntax='proto2',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=1079,
-  serialized_end=1189,
-)
-
-_DELEGATIONCONFIG = _descriptor.Descriptor(
-  name='DelegationConfig',
-  full_name='auth_service.DelegationConfig',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='rules', full_name='auth_service.DelegationConfig.rules', index=0,
-      number=1, type=11, cpp_type=10, label=3,
-      has_default_value=False, default_value=[],
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-  ],
-  extensions=[
-  ],
-  nested_types=[_DELEGATIONCONFIG_RULE, ],
-  enum_types=[
-  ],
-  options=None,
-  is_extendable=False,
-  syntax='proto2',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=1007,
-  serialized_end=1189,
-)
-
 _GROUPIMPORTERCONFIG_TARBALLENTRY.containing_type = _GROUPIMPORTERCONFIG
 _GROUPIMPORTERCONFIG_TARBALLUPLOADENTRY.containing_type = _GROUPIMPORTERCONFIG
 _GROUPIMPORTERCONFIG_PLAINLISTENTRY.containing_type = _GROUPIMPORTERCONFIG
@@ -531,13 +449,10 @@ _IPWHITELISTCONFIG_IPWHITELIST.containing_type = _IPWHITELISTCONFIG
 _IPWHITELISTCONFIG_ASSIGNMENT.containing_type = _IPWHITELISTCONFIG
 _IPWHITELISTCONFIG.fields_by_name['ip_whitelists'].message_type = _IPWHITELISTCONFIG_IPWHITELIST
 _IPWHITELISTCONFIG.fields_by_name['assignments'].message_type = _IPWHITELISTCONFIG_ASSIGNMENT
-_DELEGATIONCONFIG_RULE.containing_type = _DELEGATIONCONFIG
-_DELEGATIONCONFIG.fields_by_name['rules'].message_type = _DELEGATIONCONFIG_RULE
 DESCRIPTOR.message_types_by_name['SettingsCfg'] = _SETTINGSCFG
 DESCRIPTOR.message_types_by_name['GroupImporterConfig'] = _GROUPIMPORTERCONFIG
 DESCRIPTOR.message_types_by_name['OAuthConfig'] = _OAUTHCONFIG
 DESCRIPTOR.message_types_by_name['IPWhitelistConfig'] = _IPWHITELISTCONFIG
-DESCRIPTOR.message_types_by_name['DelegationConfig'] = _DELEGATIONCONFIG
 
 SettingsCfg = _reflection.GeneratedProtocolMessageType('SettingsCfg', (_message.Message,), dict(
   DESCRIPTOR = _SETTINGSCFG,
@@ -606,21 +521,6 @@ IPWhitelistConfig = _reflection.GeneratedProtocolMessageType('IPWhitelistConfig'
 _sym_db.RegisterMessage(IPWhitelistConfig)
 _sym_db.RegisterMessage(IPWhitelistConfig.IPWhitelist)
 _sym_db.RegisterMessage(IPWhitelistConfig.Assignment)
-
-DelegationConfig = _reflection.GeneratedProtocolMessageType('DelegationConfig', (_message.Message,), dict(
-
-  Rule = _reflection.GeneratedProtocolMessageType('Rule', (_message.Message,), dict(
-    DESCRIPTOR = _DELEGATIONCONFIG_RULE,
-    __module__ = 'config_pb2'
-    # @@protoc_insertion_point(class_scope:auth_service.DelegationConfig.Rule)
-    ))
-  ,
-  DESCRIPTOR = _DELEGATIONCONFIG,
-  __module__ = 'config_pb2'
-  # @@protoc_insertion_point(class_scope:auth_service.DelegationConfig)
-  ))
-_sym_db.RegisterMessage(DelegationConfig)
-_sym_db.RegisterMessage(DelegationConfig.Rule)
 
 
 # @@protoc_insertion_point(module_scope)

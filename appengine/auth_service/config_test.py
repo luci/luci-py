@@ -26,7 +26,6 @@ import config
 class ConfigTest(test_case.TestCase):
   def setUp(self):
     super(ConfigTest, self).setUp()
-    utils.clear_cache(config.get_delegation_config)
 
   def test_refetch_config(self):
     # Mock of "current known revision" state.
@@ -596,112 +595,6 @@ class ConfigTest(test_case.TestCase):
         'https://not-gitiles',
         config._gitiles_url('https://not-gitiles', 'aaa', 'b/c.cfg'))
 
-  @staticmethod
-  def call_validate_delegation_config(r):
-    ctx = validation_context.Context()
-    conf = config_pb2.DelegationConfig(rules=[r])
-    config.validate_delegation_config(conf, ctx)
-    return [m.text for m in ctx.messages]
-
-  def test_validate_delegation_config_ok(self):
-    # Good one.
-    msg = self.call_validate_delegation_config(
-        config_pb2.DelegationConfig.Rule(
-            user_id=['service:abc', 'group:group'],
-            target_service=['service:def'],
-            max_validity_duration=3600,
-            allowed_to_impersonate=['user:a@a.com', 'bot:*', 'group:abc']))
-    self.assertEqual([], msg)
-
-  def test_validate_delegation_config_user_id(self):
-    # Empty user_id list.
-    msg = self.call_validate_delegation_config(
-        config_pb2.DelegationConfig.Rule(
-            target_service=['service:def'],
-            max_validity_duration=3600,
-            allowed_to_impersonate=['user:a@a.com', 'bot:*', 'group:abc']))
-    self.assertEqual(['rules #0: missing user_id field'], msg)
-
-    # Bad user_id.
-    msg = self.call_validate_delegation_config(
-        config_pb2.DelegationConfig.Rule(
-            user_id=['wat'],
-            target_service=['service:def'],
-            max_validity_duration=3600,
-            allowed_to_impersonate=['user:a@a.com', 'bot:*', 'group:abc']))
-    self.assertEqual([
-      'rules #0: user_id: not a valid identity "wat": '
-      'Missing \':\' separator in Identity string'
-    ], msg)
-
-  def test_validate_delegation_config_target_service(self):
-    # Empty target_service list.
-    msg = self.call_validate_delegation_config(
-        config_pb2.DelegationConfig.Rule(
-            user_id=['service:abc'],
-            max_validity_duration=3600,
-            allowed_to_impersonate=['user:a@a.com', 'bot:*', 'group:abc']))
-    self.assertEqual(['rules #0: missing target_service field'], msg)
-
-    # Bad target_service.
-    msg = self.call_validate_delegation_config(
-        config_pb2.DelegationConfig.Rule(
-            user_id=['service:abc'],
-            target_service=['wat'],
-            max_validity_duration=3600,
-            allowed_to_impersonate=['user:a@a.com', 'bot:*', 'group:abc']))
-    self.assertEqual([
-      'rules #0: target_service: bad identity string "wat": '
-      'Missing \':\' separator in Identity string'
-    ], msg)
-
-    # Star + redundant entries.
-    msg = self.call_validate_delegation_config(
-        config_pb2.DelegationConfig.Rule(
-            user_id=['service:abc'],
-            target_service=['*', 'service:def'],
-            max_validity_duration=3600,
-            allowed_to_impersonate=['user:a@a.com', 'bot:*', 'group:abc']))
-    self.assertEqual(
-        ['rules #0: redundant entries in target_service, it has "*"" already'],
-        msg)
-
-  def test_validate_delegation_config_max_validity_duration(self):
-    msg = self.call_validate_delegation_config(
-        config_pb2.DelegationConfig.Rule(
-            user_id=['service:abc'],
-            target_service=['service:def'],
-            max_validity_duration=-3600,
-            allowed_to_impersonate=['user:a@a.com', 'bot:*', 'group:abc']))
-    self.assertEqual(
-        ['rules #0: max_validity_duration must be a positive integer'], msg)
-
-  def test_validate_delegation_config_allowed_to_impersonate(self):
-    def call(uid):
-      return self.call_validate_delegation_config(
-          config_pb2.DelegationConfig.Rule(
-              user_id=['*'],
-              target_service=['*'],
-              max_validity_duration=3600,
-              allowed_to_impersonate=[uid]))
-    # Good cases.
-    self.assertEqual([], call('group:abc'))
-    self.assertEqual([], call('group:external/abc'))
-    self.assertEqual([], call('user:*'))
-    self.assertEqual([], call('service:abc'))
-    # Bad cases.
-    self.assertEqual(
-        ['rules #0: allowed_to_impersonate: not a valid group name: bad\\name'],
-        call('group:bad\\name'))
-    self.assertEqual([
-      'rules #0: allowed_to_impersonate: not a valid identity glob "hmm:*": '
-      'Invalid Identity kind: hmm'
-    ], call('hmm:*'))
-    self.assertEqual([
-      'rules #0: allowed_to_impersonate: not a valid identity "a@a.com": '
-      'Missing \':\' separator in Identity string'
-    ], call('a@a.com'))
-
   def test_update_service_config(self):
     # Missing.
     self.assertIsNone(config._get_service_config('abc.cfg'))
@@ -715,22 +608,6 @@ class ConfigTest(test_case.TestCase):
     rev2 = config.Revision('rev2', 'url')
     self.assertFalse(config._update_service_config('abc.cfg', rev2, 'body'))
     self.assertEqual(rev2, config._get_service_config_rev('abc.cfg'))
-
-  def test_get_delegation_config(self):
-    # Missing -> returns empty proto.
-    proto = config.get_delegation_config()
-    self.assertFalse(proto.rules)
-    # Add some.
-    body = """rules {
-      user_id: "service:abc"
-      target_service: "*"
-      max_validity_duration: 3600
-    }"""
-    config._update_service_config(
-        'delegation.cfg', config.Revision('rev', 'url'), body)
-    utils.clear_cache(config.get_delegation_config)
-    proto = config.get_delegation_config()
-    self.assertEqual(1, len(proto.rules))
 
   def test_settings_updates(self):
     # Fetch only settings.cfg in this test case.
