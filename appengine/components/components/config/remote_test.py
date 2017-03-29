@@ -20,6 +20,8 @@ from components import net
 from components.config import remote
 from test_support import test_case
 
+import test_config_pb2
+
 
 class RemoteTestCase(test_case.TestCase):
   def setUp(self):
@@ -42,10 +44,20 @@ class RemoteTestCase(test_case.TestCase):
         'content_hash': 'deadbeef',
         'revision': 'aaaabbbb',
       })
+    if url == URL_PREFIX + 'config_sets/services%2Ffoo/config/baz.cfg':
+      assert kwargs['params']['hash_only']
+      raise ndb.Return({
+        'content_hash': 'badcoffee',
+        'revision': 'aaaabbbb',
+      })
 
     if url == URL_PREFIX + 'config/deadbeef':
       raise ndb.Return({
         'content':  base64.b64encode('a config'),
+      })
+    if url == URL_PREFIX + 'config/badcoffee':
+      raise ndb.Return({
+        'content':  base64.b64encode('param: "qux"'),
       })
 
     if url == URL_PREFIX + 'projects':
@@ -184,6 +196,9 @@ class RemoteTestCase(test_case.TestCase):
   def test_cron_update_last_good_configs(self):
     self.provider.get_async(
         'services/foo', 'bar.cfg', store_last_good=True).get_result()
+    self.provider.get_async(
+        'services/foo', 'baz.cfg', dest_type=test_config_pb2.Config,
+        store_last_good=True).get_result()
 
     # Will be removed.
     old_cfg = remote.LastGoodConfig(
@@ -195,10 +210,21 @@ class RemoteTestCase(test_case.TestCase):
 
     remote.cron_update_last_good_configs()
 
-    revision, content = self.provider.get_async(
+    revision, config = self.provider.get_async(
         'services/foo', 'bar.cfg', store_last_good=True).get_result()
     self.assertEqual(revision, 'aaaabbbb')
-    self.assertEqual(content, 'a config')
+    self.assertEqual(config, 'a config')
+
+    revision, config = self.provider.get_async(
+        'services/foo', 'baz.cfg', dest_type=test_config_pb2.Config,
+        store_last_good=True).get_result()
+    self.assertEqual(revision, 'aaaabbbb')
+    self.assertEqual(config.param, 'qux')
+
+    baz_cfg = remote.LastGoodConfig.get_by_id(id='services/foo:baz.cfg')
+    self.assertIsNotNone(baz_cfg)
+    self.assertEquals(baz_cfg.content_binary, config.SerializeToString())
+
     self.assertIsNone(old_cfg.key.get())
 
 

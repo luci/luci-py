@@ -28,7 +28,7 @@ class Provider(object):
     self.root = root
 
   @ndb.tasklet
-  def get_async(self, config_set, path, **kwargs):
+  def get_async(self, config_set, path, dest_type=None, **kwargs):
     """Reads a (revision, config) from a file, where revision is always None.
 
     Kwargs are not used, but reported as warnings.
@@ -50,7 +50,8 @@ class Provider(object):
     if os.path.exists(filename):
       with open(filename, 'r') as f:
         content = f.read()
-    raise ndb.Return((None, content))
+    config = common._convert_config(content, dest_type)
+    raise ndb.Return(None, config)
 
   def get_project_ids(self):
     # A project_id cannot contain a slash, so recursion is not needed.

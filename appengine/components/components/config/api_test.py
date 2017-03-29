@@ -33,7 +33,7 @@ class ApiTestCase(test_case.TestCase):
     self.mock(config.api, '_get_config_provider_async', lambda: provider_future)
     self.provider.get_async.return_value = ndb.Future()
     self.provider.get_async.return_value.set_result(
-        ('deadbeef', 'param: "value"'))
+        ('deadbeef', test_config_pb2.Config(param='value')))
 
   def test_get(self):
     revision, cfg = config.get(
@@ -53,14 +53,10 @@ class ApiTestCase(test_case.TestCase):
     self.assertEqual(cfg.param, 'value')
 
   def test_get_ref_config(self):
-    revision, cfg = config.get_ref_config('foo', 'refs/x', 'bar.cfg')
+    revision, cfg = config.get_ref_config(
+        'foo', 'refs/x', 'bar.cfg', test_config_pb2.Config)
     self.assertEqual(revision, 'deadbeef')
-    self.assertEqual(cfg, 'param: "value"')
-
-  def test_cannot_load_config(self):
-    self.provider.get_async.side_effect = ValueError
-    with self.assertRaises(config.CannotLoadConfigError):
-      config.get('services/foo', 'bar.cfg')
+    self.assertEqual(cfg, test_config_pb2.Config(param='value'))
 
   def test_get_projects(self):
     self.provider.get_projects_async.return_value = ndb.Future()

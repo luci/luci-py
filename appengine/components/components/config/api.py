@@ -79,7 +79,6 @@ def get_async(
     NotImplementedError if |dest_type| is not supported.
     ValueError on invalid parameter.
     ConfigFormatError if config could not be converted to |dest_type|.
-    CannotLoadConfigError if could not load a config.
   """
   assert config_set
   assert path
@@ -92,9 +91,10 @@ def get_async(
           'specified')
 
   provider = yield _get_config_provider_async()
-  revision, config = yield provider.get_async(
-      config_set, path, revision=revision, store_last_good=store_last_good)
-  raise ndb.Return((revision, common._convert_config(config, dest_type)))
+  result = yield provider.get_async(
+      config_set, path, revision=revision, dest_type=dest_type,
+      store_last_good=store_last_good)
+  raise ndb.Return(result)
 
 
 def get(*args, **kwargs):
