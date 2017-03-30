@@ -628,7 +628,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
     _, task_id = self.client_create_task_raw()
     self.assertEqual('0', task_id[-1])
     params = self.do_handshake()
-    params['state']['lease_expiration_ts'] = 0
+    bot_info = bot_management.get_info_key('bot1').get()
+    bot_info.lease_expiration_ts = datetime.datetime(1969, 1, 1)
+    bot_info.put()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     expected = {
       u'cmd': u'sleep',
@@ -645,8 +647,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
     _, task_id = self.client_create_task_isolated()
     self.assertEqual('0', task_id[-1])
     params = self.do_handshake()
-    params['state']['lease_expiration_ts'] = (
-        int(utils.time_time()) + 3600 + 1200 + 3 * 30 + 10 + 1)
+    bot_info = bot_management.get_info_key('bot1').get()
+    bot_info.lease_expiration_ts = datetime.datetime(3000, 1, 1)
+    bot_info.put()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     # Convert TaskResultSummary reference to TaskRunResult.
     task_id = task_id[:-1] + '1'

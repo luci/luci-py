@@ -633,7 +633,8 @@ class TaskToRunApiTest(TestCase):
         properties=dict(dimensions=request_dimensions))
     # Bot declares exactly same dimensions so it matches.
     bot_dimensions = request_dimensions
-    actual = _yield_next_available_task_to_dispatch(bot_dimensions, 0)
+    actual = _yield_next_available_task_to_dispatch(
+        bot_dimensions, datetime.datetime(1969, 1, 1))
     self.failIf(actual)
 
   def test_yield_next_available_task_to_run_task_meets_deadline(self):
@@ -648,7 +649,7 @@ class TaskToRunApiTest(TestCase):
     # Bot declares exactly same dimensions so it matches.
     bot_dimensions = request_dimensions
     actual = _yield_next_available_task_to_dispatch(
-        bot_dimensions, utils.time_time() + 86400 + 600 + 3 * 30 + 10 + 1)
+        bot_dimensions, datetime.datetime(3000, 1, 1))
     expected = [
       {
         'dimensions_hash': _hash_dimensions(request_dimensions),

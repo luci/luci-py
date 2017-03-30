@@ -179,7 +179,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       u'pool': u'default',
     }
     actual_request, _, run_result  = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost', 'abc', 0)
+        bot_dimensions, 'localhost', 'abc', datetime.datetime(1969, 1, 1))
     self.failIf(actual_request)
     self.failIf(run_result)
     self.failUnless(task_to_run.TaskToRun.query().get().queue_number)
@@ -198,8 +198,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       u'pool': u'default',
     }
     actual_request, _, run_result  = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost', 'abc',
-        utils.time_time() + 86400 + 600 + 3 * 30 + 10 + 1)
+        bot_dimensions, 'localhost', 'abc', datetime.datetime(3000, 1, 1))
     self.assertEqual(request, actual_request)
     self.assertEqual('localhost', run_result.bot_id)
     self.failIf(task_to_run.TaskToRun.query().get().queue_number)

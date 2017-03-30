@@ -191,6 +191,7 @@ class _QueryStats(object):
   """Statistics for a yield_next_available_task_to_dispatch() loop."""
   broken = 0
   cache_lookup = 0
+  deadline = None
   expired = 0
   hash_mismatch = 0
   ignored = 0
@@ -289,12 +290,11 @@ def _validate_query_item(
       # Task never times out, so it cannot be accepted.
       stats.too_long += 1
       return
-    max_task_time = (utils.time_time() +
-                      request.properties.execution_timeout_secs +
-                      (request.properties.io_timeout_secs or 600) +
-                      3 * (request.properties.grace_period_secs or 30) +
-                      10)
-    if deadline <= max_task_time:
+    max_task_time = (request.properties.execution_timeout_secs +
+                     (request.properties.io_timeout_secs or 600) +
+                     3 * (request.properties.grace_period_secs or 30) +
+                     10)
+    if deadline <= utils.utcnow() + datetime.timedelta(seconds=max_task_time):
       stats.too_long += 1
       return
 
@@ -426,6 +426,7 @@ def yield_next_available_task_to_dispatch(bot_dimensions, deadline):
       for i in _powerset(bot_dimensions))
   now = utils.utcnow()
   stats = _QueryStats()
+  stats.deadline = deadline
   # Be very aggressive in fetching the largest amount of items as possible. Note
   # that we use the default ndb.EVENTUAL_CONSISTENCY so stale items may be
   # returned. It's handled specifically.

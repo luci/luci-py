@@ -242,6 +242,9 @@ class _ProcessResult(object):
   bot_group_cfg = None
   # Bot quarantine message (or None if the bot is not in a quarantine).
   quarantined_msg = None
+  # DateTime indicating UTC time when bot will be reclaimed by Machine Provider,
+  # or None if this is not a Machine Provider bot.
+  lease_expiration_ts = None
 
   def __init__(self, **kwargs):
     for k, v in kwargs.iteritems():
@@ -287,12 +290,14 @@ class _BotBaseHandler(_BotApiHandler):
           and isinstance(dimension_id[0], unicode)):
         bot_id = dimensions['id'][0]
 
+    lease_expiration_ts = None
     machine_type = None
     if bot_id:
       bot_info, bot_settings = ndb.get_multi([
           bot_management.get_info_key(bot_id),
           bot_management.get_settings_key(bot_id)])
       if bot_info:
+        lease_expiration_ts = bot_info.lease_expiration_ts
         machine_type = bot_info.machine_type
 
     # Make sure bot self-reported ID matches the authentication token. Raises
@@ -322,7 +327,8 @@ class _BotBaseHandler(_BotApiHandler):
         version=version,
         state=state,
         dimensions=dimensions,
-        bot_group_cfg=bot_group_cfg)
+        bot_group_cfg=bot_group_cfg,
+        lease_expiration_ts=lease_expiration_ts)
 
     # The bot may decide to "self-quarantine" itself. Accept both via
     # dimensions or via state. See bot_management._BotCommon.quarantined for
@@ -366,13 +372,6 @@ class _BotBaseHandler(_BotApiHandler):
       dimensions_count = task_to_run.dimensions_powerset_count(dimensions)
       if dimensions_count > task_to_run.MAX_DIMENSIONS:
         quarantined_msg = 'Dimensions product %d is too high' % dimensions_count
-        break
-
-      if not isinstance(
-          state.get('lease_expiration_ts'), (None.__class__, int)):
-        quarantined_msg = (
-            'lease_expiration_ts (%r) must be int or None' % (
-                state['lease_expiration_ts']))
         break
 
     if quarantined_msg:
@@ -535,8 +534,7 @@ class BotPollHandler(_BotBaseHandler):
     try:
       # This is a fairly complex function call, exceptions are expected.
       request, secret_bytes, run_result = task_scheduler.bot_reap_task(
-          res.dimensions, res.bot_id, res.version,
-          res.state.get('lease_expiration_ts'))
+          res.dimensions, res.bot_id, res.version, res.lease_expiration_ts)
       if not request:
         # No task found, tell it to sleep a bit.
         bot_event('request_sleep')
