@@ -92,14 +92,16 @@ class ApiTestCase(test_case.TestCase):
     self.provider.get_project_configs_async.return_value.set_result({
       'projects/chromium': ('deadbeef', 'param: "value"'),
       'projects/v8': ('aaaabbbb', 'param: "value2"'),
-      'projects/skia': ('deadbeef', 'invalid config'),
+      'projects/skia': ('badcoffee', 'invalid config'),
     })
 
-    expected = {
-      'chromium': ('deadbeef', test_config_pb2.Config(param='value')),
-      'v8': ('aaaabbbb', test_config_pb2.Config(param='value2')),
-    }
     actual = config.get_project_configs('bar.cfg', test_config_pb2.Config)
+    self.assertIsInstance(actual['skia'][2], config.ConfigFormatError)
+    expected = {
+      'chromium': ('deadbeef', test_config_pb2.Config(param='value'), None),
+      'v8': ('aaaabbbb', test_config_pb2.Config(param='value2'), None),
+      'skia': ('badcoffee', None, actual['skia'][2]),
+    }
     self.assertEqual(expected, actual)
 
   def test_get_ref_configs(self):
@@ -108,19 +110,31 @@ class ApiTestCase(test_case.TestCase):
       'projects/chromium/refs/heads/master': ('dead', 'param: "master"'),
       'projects/chromium/refs/non-branch': ('beef', 'param: "ref"'),
       'projects/v8/refs/heads/master': ('aaaa', 'param: "value2"'),
-      'projects/skia/refs/heads/master': ('deadbeef', 'invalid config'),
+      'projects/skia/refs/heads/master': ('badcoffee', 'invalid config'),
     })
 
+    actual = config.get_ref_configs('bar.cfg', test_config_pb2.Config)
+    self.assertIsInstance(
+        actual['skia']['refs/heads/master'][2], config.ConfigFormatError)
     expected = {
       'chromium': {
-        'refs/heads/master': ('dead', test_config_pb2.Config(param='master')),
-        'refs/non-branch': ('beef', test_config_pb2.Config(param='ref')),
+        'refs/heads/master': (
+          'dead', test_config_pb2.Config(param='master'), None),
+        'refs/non-branch': (
+          'beef', test_config_pb2.Config(param='ref'), None),
       },
       'v8': {
-        'refs/heads/master': ('aaaa', test_config_pb2.Config(param='value2')),
+        'refs/heads/master': (
+          'aaaa', test_config_pb2.Config(param='value2'), None),
       },
+      'skia': {
+        'refs/heads/master': (
+          'badcoffee',
+          None,
+          actual['skia']['refs/heads/master'][2],
+        ),
+      }
     }
-    actual = config.get_ref_configs('bar.cfg', test_config_pb2.Config)
     self.assertEqual(expected, actual)
 
   def set_up_identity(self):

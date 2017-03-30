@@ -159,8 +159,9 @@ def get_project_configs_async(path, dest_type=None):
       be converted, the exception will be logged, but not raised.
 
   Returns:
-    {project_id -> (revision, config)} map. In file system mode, revision is
-    None.
+    {project_id -> (revision, config, exception)} map.
+    In file system mode, revision is None.
+    If config is invalid, config is None and exception is not.
   """
   assert path
   common._validate_dest_type(dest_type)
@@ -174,12 +175,13 @@ def get_project_configs_async(path, dest_type=None):
     assert project_id
     try:
       config = common._convert_config(content, dest_type)
-    except common.ConfigFormatError:
+    except common.ConfigFormatError as ex:
       logging.exception(
           'Could not parse config at %s in config set %s: %r',
           path, config_set, content)
-      continue
-    result[project_id] = (revision, config)
+      result[project_id] = (revision, None, ex)
+    else:
+      result[project_id] = (revision, config, None)
   raise ndb.Return(result)
 
 
@@ -200,8 +202,10 @@ def get_ref_configs_async(path, dest_type=None):
       be converted, the exception will be logged, but not raised.
 
   Returns:
-    A map {project -> {ref -> (revision, config)}}. Here ref is a str that
-    always starts with 'ref/'. In file system mode, revision is None.
+    A map {project -> {ref -> (revision, config, exception)}}.
+    Here ref is a str that always starts with 'ref/'.
+    In file system mode, revision is None.
+    If config is invalid, config is None and exception is not.
   """
   assert path
   common._validate_dest_type(dest_type)
@@ -215,12 +219,14 @@ def get_ref_configs_async(path, dest_type=None):
     assert ref
     try:
       config = common._convert_config(content, dest_type)
-    except common.ConfigFormatError:
+    except common.ConfigFormatError as ex:
       logging.exception(
           'Could not parse config at %s in config set %s: %r',
           path, config_set, content)
-      continue
-    result.setdefault(project_id, {})[ref] = (revision, config)
+      ref_value = (revision, None, ex)
+    else:
+      ref_value = (revision, config, None)
+    result.setdefault(project_id, {})[ref] = ref_value
   raise ndb.Return(result)
 
 
