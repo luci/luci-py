@@ -106,7 +106,7 @@ class TestMetrics(test_case.TestCase):
     fields = {
         'project_id': 'test_project',
         'subproject_id': 'test_subproject',
-        'spec_name': 'test_master:test_builder:some_tests',
+        'spec_name': 'test_master:test_builder',
     }
     summary = _gen_task_result_summary(self.now, 1, tags=tags)
     summary.exit_code = 0 # sets failure = False.
@@ -206,7 +206,7 @@ class TestMetrics(test_case.TestCase):
     jobs_fields = {
         'project_id': 'test_project',
         'subproject_id': 'test_subproject',
-        'spec_name': 'test_master:test_builder:some_tests',
+        'spec_name': 'test_master:test_builder',
     }
     jobs_target_fields = dict(ts_mon_metrics.TARGET_FIELDS)
     jobs_target_fields['hostname'] = 'autogen:test_bot1'

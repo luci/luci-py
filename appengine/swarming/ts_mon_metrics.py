@@ -43,7 +43,7 @@ _bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.05,
 # Both have the following metric fields:
 # - project_id: e.g. 'chromium'
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
-# - spec_name: name of a job specification, e.g. '<master>:<builder>:<test>'
+# - spec_name: name of a job specification, e.g. '<master>:<builder>'
 #     for buildbot jobs.
 # - result: one of 'success', 'failure', or 'infra-failure'.
 jobs_completed = gae_ts_mon.CounterMetric(
@@ -70,7 +70,7 @@ jobs_durations = gae_ts_mon.CumulativeDistributionMetric(
 # Similar to jobs/completed and jobs/duration, but with a dedup field.
 # - project_id: e.g. 'chromium'
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
-# - spec_name: name of a job specification, e.g. '<master>:<builder>:<test>'
+# - spec_name: name of a job specification, e.g. '<master>:<builder>'
 #     for buildbot jobs.
 # - deduped: boolean describing whether the job was deduped or not.
 jobs_requested = gae_ts_mon.CounterMetric(
@@ -86,7 +86,7 @@ jobs_requested = gae_ts_mon.CounterMetric(
 # Swarming-specific metric. Metric fields:
 # - project_id: e.g. 'chromium'
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
-# - spec_name: name of a job specification, e.g. '<master>:<builder>:<test>'
+# - spec_name: name of a job specification, e.g. '<master>:<builder>'
 #     for buildbot jobs.
 tasks_expired = gae_ts_mon.CounterMetric(
     'swarming/tasks/expired',
@@ -99,7 +99,7 @@ tasks_expired = gae_ts_mon.CounterMetric(
 # Global metric. Metric fields:
 # - project_id: e.g. 'chromium'
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
-# - spec_name: name of a job specification, e.g. '<master>:<builder>:<test>'
+# - spec_name: name of a job specification, e.g. '<master>:<builder>'
 #     for buildbot jobs.
 # Override target field:
 # - hostname: 'autogen:<executor_id>': name of the bot that executed a job,
@@ -117,7 +117,7 @@ jobs_running = gae_ts_mon.BooleanMetric(
 # Global metric. Metric fields:
 # - project_id: e.g. 'chromium'
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
-# - spec_name: name of a job specification, e.g. '<master>:<builder>:<test>'
+# - spec_name: name of a job specification, e.g. '<master>:<builder>'
 #     for buildbot jobs.
 # - status: 'pending' or 'running'.
 jobs_active = gae_ts_mon.GaugeMetric(
@@ -218,10 +218,9 @@ def extract_job_fields(tags):
 
   spec_name = tags_dict.get('spec_name')
   if not spec_name:
-    spec_name = '%s:%s:%s' % (
+    spec_name = '%s:%s' % (
         tags_dict.get('master', ''),
-        tags_dict.get('buildername', ''),
-        tags_dict.get('name', ''))
+        tags_dict.get('buildername', ''))
 
   fields = {
       'project_id': tags_dict.get('project', ''),
