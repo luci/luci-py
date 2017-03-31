@@ -36,7 +36,6 @@ AGENT_UPSTART_CONFIG_TMPL = os.path.join(
     THIS_DIR, 'machine-provider-agent.conf.tmpl')
 AGENT_UPSTART_JOB = 'machine-provider-agent'
 CHROME_BOT = 'chrome-bot'
-LEASE_EXPIRATION_FILE = '/b/lease_expiration_ts'
 METADATA_BASE_URL = 'http://metadata/computeMetadata/v1'
 PUBSUB_BASE_URL = 'https://pubsub.googleapis.com/v1/projects'
 SWARMING_BOT_DIR = '/b/s'
@@ -262,21 +261,6 @@ def listen():
         with open(SWARMING_BOT_ZIP, 'w') as fd:
           fd.write(bot_code)
         os.chown(SWARMING_BOT_ZIP, chrome_bot.pw_uid, chrome_bot.pw_gid)
-
-        pubsub.acknowledge(subscription, project, ack_ids)
-        subprocess.check_call(['/sbin/shutdown', '-r', 'now'])
-
-      elif message == 'LEASED' and attributes.get('lease_expiration_ts'):
-        with open(LEASE_EXPIRATION_FILE, 'w') as f:
-          f.write(attributes['lease_expiration_ts'])
-
-      elif message == 'RECLAIMED':
-        if os.path.exists(SWARMING_BOT_ZIP):
-          # Delete just the zip, not the whole directory so logs are kept.
-          os.remove(SWARMING_BOT_ZIP)
-
-        if os.path.exists(SWARMING_UPSTART_CONFIG_DEST):
-          os.remove(SWARMING_UPSTART_CONFIG_DEST)
 
         pubsub.acknowledge(subscription, project, ack_ids)
         subprocess.check_call(['/sbin/shutdown', '-r', 'now'])
