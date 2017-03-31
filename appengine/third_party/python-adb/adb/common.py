@@ -107,7 +107,7 @@ class UsbHandle(Handle):
   """
 
   _HANDLE_CACHE = {}
-  _HANDLE_CACHE_LOCK = threading.Lock()
+  _HANDLE_CACHE_LOCK = threading.RLock()
 
   def __init__(self, device, setting, usb_info=None, timeout_ms=None):
     """Initialize USB Handle.
