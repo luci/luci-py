@@ -463,6 +463,35 @@ def clear_lease_request(key, request_id):
 
 
 @ndb.transactional
+def clear_termination_task(key, task_id):
+  """Clears the termination task associated with the given lease request.
+
+  Args:
+    key: ndb.Key for a MachineLease entity.
+    task_id: ID for a termination task.
+  """
+  machine_lease = key.get()
+  if not machine_lease:
+    logging.error('MachineLease does not exist\nKey: %s', key)
+    return
+
+  if not machine_lease.termination_task:
+    return
+
+  if task_id != machine_lease.termination_task:
+    logging.error(
+        'Task ID mismatch\nKey: %s\nExpected: %s\nActual: %s',
+        key,
+        task_id,
+        machine_lease.task_id,
+    )
+    return
+
+  machine_lease.termination_task = None
+  machine_lease.put()
+
+
+@ndb.transactional
 def associate_termination_task(key, hostname, task_id):
   """Associates a termination task with the given lease request.
 
@@ -741,6 +770,17 @@ def handle_termination_task(machine_lease):
 
   task_result_summary = task_pack.unpack_result_summary_key(
       machine_lease.termination_task).get()
+  if task_result_summary.state in task_result.State.STATES_EXCEPTIONAL:
+    logging.info(
+        'Termination failed:\nKey: %s\nHostname: %s\nTask ID: %s\nState: %s',
+        machine_lease.key,
+        machine_lease.hostname,
+        machine_lease.termination_task,
+        task_result.State.to_string(task_result_summary.state),
+    )
+    clear_termination_task(machine_lease.key, machine_lease.termination_task)
+    return
+
   if task_result_summary.state == task_result.State.COMPLETED:
     # There is a race condition where the bot reports the termination task as
     # completed but hasn't exited yet. The last thing it does before exiting
