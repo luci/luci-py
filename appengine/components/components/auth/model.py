@@ -66,7 +66,6 @@ log.
 """
 
 import collections
-import fnmatch
 import logging
 import os
 import re
@@ -77,6 +76,7 @@ from google.appengine.ext import ndb
 from components import datastore_utils
 from components import utils
 
+from . import globmatch
 from . import ipaddr
 
 # Part of public API of 'auth' component, exposed by this module.
@@ -277,6 +277,8 @@ class IdentityGlob(
   defines pattern that identity names' should match. For example, IdentityGlob
   that matches all bots is (IDENTITY_BOT, '*') which is also can be written
   as 'bot:*'.
+
+  The pattern language only supports '*' currently.
   """
 
   # See comment for Identity.__new__ regarding use of __new__ here.
@@ -288,6 +290,8 @@ class IdentityGlob(
         raise ValueError('Invalid IdentityGlob pattern: only ASCII is allowed')
     if not pattern:
       raise ValueError('No pattern is given')
+    if '\n' in pattern:
+      raise ValueError('Multi-line patterns are not allowed')
     if kind not in ALLOWED_IDENTITY_KINDS:
       raise ValueError('Invalid Identity kind: %s' % kind)
     return super(IdentityGlob, cls).__new__(cls, str(kind), pattern)
@@ -308,7 +312,7 @@ class IdentityGlob(
     """Return True if |identity| matches this pattern."""
     if identity.kind != self.kind:
       return False
-    return fnmatch.fnmatchcase(identity.name, self.pattern)
+    return globmatch.match(identity.name, self.pattern)
 
 
 class IdentityGlobProperty(datastore_utils.BytesSerializableProperty):
