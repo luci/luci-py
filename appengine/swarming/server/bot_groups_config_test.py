@@ -416,9 +416,7 @@ class BotGroupsConfigTest(test_case.TestCase):
                                mp_dimensions=['key:value']),
         ]),
     ])
-    self.validator_test(cfg, [
-      'bot_group #0: machine_type #0: target_size is required'
-    ])
+    self.validator_test(cfg, [])
 
   def test_machine_type_target_size_zero(self):
     cfg = bots_pb2.BotsCfg(
@@ -428,9 +426,7 @@ class BotGroupsConfigTest(test_case.TestCase):
                                mp_dimensions=['key:value'], target_size=0),
         ]),
     ])
-    self.validator_test(cfg, [
-      'bot_group #0: machine_type #0: target_size is required'
-    ])
+    self.validator_test(cfg, [])
 
   def test_machine_type_target_size_negative(self):
     cfg = bots_pb2.BotsCfg(

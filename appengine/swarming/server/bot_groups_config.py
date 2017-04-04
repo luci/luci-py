@@ -379,9 +379,6 @@ def validate_settings(cfg, ctx):
               if ':' not in dim:
                 ctx.error('bad dimension "%s", not a key:value pair', dim)
                 continue
-          if not machine_type.target_size:
-            ctx.error('target_size is required')
-            continue
           if machine_type.target_size < 0:
             ctx.error('target_size must be positive')
             continue
