@@ -80,6 +80,7 @@ def _flush_metrics(time_now):
     # ts_mon is not configured.
     return False
 
+  logging.info('ts_mon: fetching TSMonInstance entity')
   datetime_now = datetime.datetime.utcfromtimestamp(time_now)
   entity = shared.get_instance_entity()
   if entity.task_num < 0:
@@ -91,18 +92,26 @@ def _flush_metrics(time_now):
     if updated_sec_ago > shared.INSTANCE_EXPECTED_TO_HAVE_TASK_NUM_SEC:
       logging.warning('Instance %s is %d seconds old with no task_num.',
                       shared.instance_key_id(), updated_sec_ago)
+    logging.info('ts_mon: skipping the flush, no task_num')
     return False
   interface.state.target.task_num = entity.task_num
 
+  logging.info('ts_mon: initiating TSMonInstance entity update')
   entity.last_updated = datetime_now
   entity_deferred = entity.put_async()
 
+  logging.info('ts_mon: doing the flush')
+  started = time.time()
   interface.flush()
+  logging.info(
+      'ts_mon: flush finished in %d ms', (time.time() - started) * 1000)
 
   for metric in interface.state.global_metrics.itervalues():
     metric.reset()
 
+  logging.info('ts_mon: waiting for TSMonInstance entity update to finish')
   entity_deferred.get_result()
+  logging.info('ts_mon: flush is done')
   return True
 
 
@@ -213,6 +222,7 @@ def _instrumented_dispatcher(dispatcher, request, response, time_fn=time.time):
   flush_thread = None
   time_now = time_fn()
   if need_to_flush_metrics(time_now):
+    logging.info('ts_mon: starting flush thread')
     flush_thread = threading.Thread(target=_flush_metrics, args=(time_now,))
     flush_thread.start()
   try:
@@ -229,7 +239,12 @@ def _instrumented_dispatcher(dispatcher, request, response, time_fn=time.time):
     response_status = response.status_int
   finally:
     if flush_thread:
+      start_waiting = time_fn()
+      logging.info('ts_mon: joining flush thread')
       flush_thread.join()
+      logging.info(
+          'ts_mon: flush threads is done, waited %d ms',
+          (time_fn() - start_waiting) * 1000)
     elapsed_ms = int((time_fn() - start_time) * 1000)
 
     # Use the route template regex, not the request path, to prevent an
