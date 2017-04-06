@@ -19,16 +19,28 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
 
 from components import ereporter2
+from components import utils
 
+import event_mon_metrics
+import handlers_backend
 import handlers_endpoints
 import handlers_frontend
-import event_mon_metrics
+import template
 import ts_mon_metrics
 from server import config
+from server import acl
 
 
+# pylint: disable=redefined-outer-name
 def create_application():
   ereporter2.register_formatter()
+  utils.set_task_queue_module('backend')
+  template.bootstrap()
+
+  # If running on a local dev server, allow bots to connect without prior
+  # groups configuration. Useful when running smoke test.
+  if utils.is_local_dev_server():
+    acl.bootstrap_dev_server_acls()
 
   def is_enabled_callback():
     return config.settings().enable_ts_monitoring
@@ -36,6 +48,11 @@ def create_application():
   # App that serves HTML pages and old API.
   frontend_app = handlers_frontend.create_application(False)
   gae_ts_mon.initialize(frontend_app, is_enabled_fn=is_enabled_callback)
+
+  # App that contains crons and task queues.
+  backend_app = handlers_backend.create_application(False)
+  gae_ts_mon.initialize(backend_app, is_enabled_fn=is_enabled_callback)
+
   # Local import, because it instantiates the mapreduce app.
   from mapreduce import main
   gae_ts_mon.initialize(main.APP, is_enabled_fn=is_enabled_callback)
@@ -50,7 +67,7 @@ def create_application():
 
   event_mon_metrics.initialize()
   ts_mon_metrics.initialize()
-  return frontend_app, api, main.APP
+  return frontend_app, api, backend_app, main.APP
 
 
-app, endpoints_app, mapreduce_app = create_application()
+app, endpoints_app, backend_app, mapreduce_app = create_application()

@@ -18,12 +18,7 @@ handlers:
   script: main.endpoints_app
   secure: always
 
-- url: /internal/mapreduce(/.*)?
-  script: main.mapreduce_app
-  secure: always
-  login: admin
-
-- url: /restricted/mapreduce(/.*)?
+- url: /(internal|restricted)/mapreduce(/.*)?
   script: main.mapreduce_app
   secure: always
   login: admin
@@ -66,9 +61,10 @@ handlers:
   secure: always
   login: required
 
-# TODO(maruel): Move /internal/ to module-backend.yaml.
+# TODO(vadimsh): Get rid of this route after confirming it's not used on
+# default module. Old task queue tasks may potentially target 'default' module.
 - url: /internal/.+
-  script: main.app
+  script: main.backend_app
   secure: always
   login: admin
 
@@ -86,7 +82,6 @@ handlers:
   secure: always
 
 builtins:
-- deferred: on
 - remote_api: on
 
 inbound_services:
@@ -98,7 +93,6 @@ includes:
 - components/config
 - components/ereporter2
 - components/static_third_party.yaml
-- gae_ts_mon
 
 libraries:
 - name: endpoints

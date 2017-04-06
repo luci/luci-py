@@ -5,11 +5,9 @@
 # that can be found in the LICENSE file.
 
 import datetime
-import itertools
 import json
 import logging
 import os
-import re
 import sys
 import unittest
 import urllib
@@ -19,22 +17,25 @@ import test_env_handlers
 
 import webtest
 
-from google.appengine.ext import deferred
-
+import handlers_backend
 import handlers_frontend
-from components import template
+import template
 from server import bot_code
 from server import bot_management
 from server import task_result
 
+
 class AppTestBase(test_env_handlers.AppTestBase):
+  @staticmethod
+  def wsgi_app():
+    return None
+
   def setUp(self):
     super(AppTestBase, self).setUp()
+    template.bootstrap()
     # By default requests in tests are coming from bot with fake IP.
-    app = handlers_frontend.create_application(True)
-    app.router.add(('/_ah/queue/deferred', deferred.TaskHandler))
     self.app = webtest.TestApp(
-        app,
+        self.wsgi_app(),
         extra_environ={
           'REMOTE_ADDR': self.source_ip,
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
@@ -48,6 +49,9 @@ class AppTestBase(test_env_handlers.AppTestBase):
 
 
 class FrontendTest(AppTestBase):
+  @staticmethod
+  def wsgi_app():
+    return handlers_frontend.create_application(True)
 
   def test_root(self):
     response = self.app.get('/', status=200)
@@ -161,6 +165,10 @@ class FrontendTest(AppTestBase):
 
 
 class FrontendAdminTest(AppTestBase):
+  @staticmethod
+  def wsgi_app():
+    return handlers_frontend.create_application(True)
+
   # Admin-specific management pages.
   def test_bootstrap_default(self):
     self.set_as_bot()
@@ -230,6 +238,10 @@ class FrontendAdminTest(AppTestBase):
 
 
 class BackendTest(AppTestBase):
+  @staticmethod
+  def wsgi_app():
+    return handlers_backend.create_application(True)
+
   def _GetRoutes(self):
     """Returns the list of all routes handled."""
     return [
@@ -311,17 +323,6 @@ class BackendTest(AppTestBase):
         ts=now)
     self.assertEqual(expected, actual)
 
-  def testCronTriggerTask(self):
-    triggers = (
-      '/internal/cron/trigger_cleanup_data',
-    )
-
-    for url in triggers:
-      response = self.app.get(
-          url, headers={'X-AppEngine-Cron': 'true'}, status=200)
-      self.assertEqual('Success.', response.body)
-      self.assertEqual(1, self.execute_tasks())
-
   def testTaskQueueUrls(self):
     # Tests all the task queue tasks are securely handled.
     # TODO(maruel): Test mapreduce.
@@ -332,7 +333,6 @@ class BackendTest(AppTestBase):
     # Format: (<queue-name>, <base-url>, <argument>).
     task_queues = [
       ('cancel-tasks', '/internal/taskqueue/cancel-tasks', ''),
-      ('cleanup', '/internal/taskqueue/cleanup_data', ''),
       ('machine-provider-manage',
        '/internal/taskqueue/machine-provider-manage', ''),
       ('pubsub', '/internal/taskqueue/pubsub/', 'abcabcabc'),

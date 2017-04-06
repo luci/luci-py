@@ -1,54 +1,58 @@
-# TODO(maruel): Use a backend and use everywhere:
-#  target: backend
 cron:
-- description: Trigger the cleanup of old data and orphaned blobs
-  url: /internal/cron/trigger_cleanup_data
-  schedule: every 6 hours
-
 - description: Gathers statistics from the logs
   url: /internal/cron/stats/update
   schedule: every 1 minutes
+  target: backend
 
 - description:
     Catch TaskRunResult's where the bot died and failed sending updates.
   url: /internal/cron/abort_bot_died
   schedule: every 1 minutes
+  target: backend
 
 - description: Catch TaskToRun's that are expired.
   url: /internal/cron/abort_expired_task_to_run
   schedule: every 1 minutes
+  target: backend
 
 - description: Configure Machine Provider leases.
   url: /internal/cron/machine_provider_config
   schedule: every 1 minutes
+  target: backend
 
 - description: Manage Machine Provider leases.
   url: /internal/cron/machine_provider_manage
   schedule: every 1 minutes synchronized
+  target: backend
 
 - description: Aggregate all bots dimensions for easier sorting.
   url: /internal/cron/aggregate_bots_dimensions
   schedule: every 5 minutes
+  target: backend
 
 - description: Aggregate all tasks tags for easier sorting.
   url: /internal/cron/aggregate_tasks_tags
   schedule: every 1 hours
+  target: backend
 
 ### ereporter2
 
 - description: ereporter2 cleanup
   url: /internal/cron/ereporter2/cleanup
   schedule: every 1 hours
+  target: backend
 
 - description: ereporter2 mail exception report
   url: /internal/cron/ereporter2/mail
   schedule: every 1 hours synchronized
+  target: backend
 
 ### gae_ts_mon
 
 - description: Send ts_mon metrics
   url: /internal/cron/ts_mon/send
   schedule: every 1 minutes
+  target: backend
 
 
 ### luci-config
@@ -57,3 +61,4 @@ cron:
   # Handled by inclusion of components/config in app.yaml.
   url: /internal/cron/config/update
   schedule: every 1 minutes
+  target: backend

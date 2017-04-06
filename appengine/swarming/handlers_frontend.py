@@ -9,34 +9,20 @@ implemented using the webapp2 framework.
 """
 
 import collections
-import datetime
-import itertools
 import os
 
 import webapp2
 
-from google.appengine import runtime
-from google.appengine.api import users
-from google.appengine.datastore import datastore_query
-from google.appengine.ext import ndb
-
 import handlers_bot
-import handlers_backend
 import handlers_endpoints
 import mapreduce_jobs
 import template
 from components import auth
-from components import datastore_utils
 from components import utils
 from server import acl
 from server import bot_code
-from server import bot_management
 from server import config
 from server import stats_gviz
-from server import task_pack
-from server import task_request
-from server import task_result
-from server import task_scheduler
 
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -292,10 +278,7 @@ class EmailHandler(webapp2.RequestHandler):
     pass
 
 
-def create_application(debug):
-  template.bootstrap()
-  utils.set_task_queue_module('default')
-
+def get_routes():
   routes = [
       # Frontend pages. They return HTML.
       # Public pages.
@@ -328,14 +311,12 @@ def create_application(debug):
       ('/_ah/mail/<to:.+>', EmailHandler),
       ('/_ah/warmup', WarmupHandler),
   ]
-  routes = [webapp2.Route(*i) for i in routes]
+  return [webapp2.Route(*i) for i in routes]
 
-  # If running on a local dev server, allow bots to connect without prior
-  # groups configuration. Useful when running smoke test.
-  if utils.is_local_dev_server():
-    acl.bootstrap_dev_server_acls()
 
-  routes.extend(handlers_backend.get_routes())
+def create_application(debug):
+  routes = []
+  routes.extend(get_routes())
   routes.extend(handlers_bot.get_routes())
   routes.extend(handlers_endpoints.get_routes())
   return webapp2.WSGIApplication(routes, debug=debug)

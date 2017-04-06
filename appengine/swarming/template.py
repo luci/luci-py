@@ -14,6 +14,10 @@ def bootstrap():
   template.bootstrap({'swarming': os.path.join(ROOT_DIR, 'templates')})
 
 
+def reset():
+  template.reset()
+
+
 def render(name, params=None):
   """Shorthand to render a template."""
   out = {

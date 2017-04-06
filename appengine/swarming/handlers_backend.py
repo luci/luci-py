@@ -10,7 +10,6 @@ import logging
 
 import webapp2
 from google.appengine.api import datastore_errors
-from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
 
 from components import utils
@@ -49,17 +48,6 @@ class CronAbortExpiredShardToRunHandler(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
     task_scheduler.cron_abort_expired_task_to_run(self.request.host_url)
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
-
-
-class CronTriggerCleanupDataHandler(webapp2.RequestHandler):
-  """Triggers task to delete orphaned blobs."""
-
-  @decorators.require_cronjob
-  def get(self):
-    taskqueue.add(method='POST', url='/internal/taskqueue/cleanup_data',
-                  queue_name='cleanup')
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 
@@ -183,17 +171,6 @@ class CancelTasksHandler(webapp2.RequestHandler):
                    task_id, ok, was_running)
 
 
-class TaskCleanupDataHandler(webapp2.RequestHandler):
-  """Deletes orphaned blobs."""
-
-  @decorators.silence(datastore_errors.Timeout)
-  @decorators.require_taskqueue('cleanup')
-  def post(self):
-    # TODO(maruel): Clean up old TaskRequest after a cut-off date.
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
-
-
 class TaskSendPubSubMessage(webapp2.RequestHandler):
   """Sends PubSub notification about task completion."""
 
@@ -254,7 +231,6 @@ def get_routes():
         CronAbortExpiredShardToRunHandler),
 
     ('/internal/cron/stats/update', stats.InternalStatsUpdateHandler),
-    ('/internal/cron/trigger_cleanup_data', CronTriggerCleanupDataHandler),
     ('/internal/cron/aggregate_bots_dimensions',
         CronBotsDimensionAggregationHandler),
     ('/internal/cron/aggregate_tasks_tags',
@@ -268,7 +244,6 @@ def get_routes():
 
     # Task queues.
     ('/internal/taskqueue/cancel-tasks', CancelTasksHandler),
-    ('/internal/taskqueue/cleanup_data', TaskCleanupDataHandler),
     (r'/internal/taskqueue/pubsub/<task_id:[0-9a-f]+>', TaskSendPubSubMessage),
     ('/internal/taskqueue/machine-provider-manage',
         TaskMachineProviderManagementHandler),
@@ -279,3 +254,7 @@ def get_routes():
       InternalLaunchMapReduceJobWorkerHandler),
   ]
   return [webapp2.Route(*a) for a in routes]
+
+
+def create_application(debug):
+  return webapp2.WSGIApplication(get_routes(), debug=debug)

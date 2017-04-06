@@ -10,7 +10,6 @@ import itertools
 import json
 import logging
 
-from google.appengine.ext import ndb
 from google.appengine.datastore.datastore_query import Cursor
 
 from components import utils

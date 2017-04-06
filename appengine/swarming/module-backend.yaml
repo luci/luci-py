@@ -1,0 +1,59 @@
+application: swarmingserver
+module: backend
+version: 1
+runtime: python27
+api_version: 1
+threadsafe: true
+
+instance_class: F4
+
+handlers:
+- url: /(internal|restricted)/mapreduce(/.*)?
+  script: main.mapreduce_app
+  secure: always
+  login: admin
+
+- url: /internal/.+
+  script: main.backend_app
+  secure: always
+  login: admin
+
+includes:
+- components/auth
+- components/config
+- components/ereporter2
+- gae_ts_mon
+
+libraries:
+- name: endpoints
+  version: "1.0"
+- name: pycrypto
+  version: "2.6"
+- name: webapp2
+  version: "2.5.2"
+- name: webob
+  version: "1.2.3"
+- name: yaml
+  version: "3.10"
+
+skip_files:
+# Test and tools.
+- support/
+- ^tests/
+- ^tools/
+- test_.+
+- .+_test\.py$
+# Junk files.
+- ^(.*/)?\..*
+- .+\.orig$
+- .+\.rej$
+- .+\.zip$
+- ^(.*/)?#.*#
+- .+~
+- .+\.py[co]
+# Doc, readme and license.
+- ^doc/
+- ^[A-Z]+$
+- ^[A-Z]+\.[a-z]+$
+- ui/node_modules/
+- ui/res/imp/bower_components/

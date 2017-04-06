@@ -13,7 +13,6 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
-from google.appengine.ext import deferred
 from google.appengine.ext import ndb
 
 import webtest
@@ -108,12 +107,6 @@ class TaskSchedulerApiTest(test_case.TestCase):
     super(TaskSchedulerApiTest, self).setUp()
     self.now = datetime.datetime(2014, 1, 2, 3, 4, 5, 6)
     self.mock_now(self.now)
-    self.app = webtest.TestApp(
-        deferred.application,
-        extra_environ={
-          'REMOTE_ADDR': '1.0.1.2',
-          'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
-        })
     self.mock(stats_framework, 'add_entry', self._parse_line)
     auth_testing.mock_get_current_identity(self)
     event_mon_metrics.initialize()

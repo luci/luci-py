@@ -14,7 +14,6 @@ import test_env
 test_env.setup_test_env()
 
 from google.appengine.api import datastore_errors
-from google.appengine.ext import deferred
 from google.appengine.ext import ndb
 
 import webtest
@@ -89,12 +88,6 @@ class TaskResultApiTest(TestCase):
     self.now = datetime.datetime(2014, 1, 2, 3, 4, 5, 6)
     self.mock_now(self.now)
     self.mock(random, 'getrandbits', lambda _: 0x88)
-    self.app = webtest.TestApp(
-        deferred.application,
-        extra_environ={
-          'REMOTE_ADDR': '1.0.1.2',
-          'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
-        })
 
   def assertEntities(self, expected, entity_model):
     self.assertEqual(expected, get_entities(entity_model))
