@@ -412,9 +412,9 @@ def get_cost_hour():
   machine_type = get_machine_type()
   if platforms.is_gce():
     if platforms.gce.get_zone().startswith('us-'):
-      machine_cost = GCE_MACHINE_COST_HOUR_US[machine_type]
+      machine_cost = GCE_MACHINE_COST_HOUR_US.get(machine_type, 0.)
     else:
-      machine_cost = GCE_MACHINE_COST_HOUR_EUROPE_ASIA[machine_type]
+      machine_cost = GCE_MACHINE_COST_HOUR_EUROPE_ASIA.get(machine_type, 0.)
   else:
     # Guess an equivalent machine_type.
     machine_cost = GCE_MACHINE_COST_HOUR_US.get(machine_type, 0.)
