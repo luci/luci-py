@@ -267,10 +267,7 @@ class _BotBaseHandler(_BotApiHandler):
   REQUIRED_STATE_KEYS = {u'running_time', u'sleep_streak'}
 
   def _process(self):
-    """Returns True if the bot has invalid parameter and should be automatically
-    quarantined.
-
-    Does one DB synchronous GET.
+    """Fetches bot info and settings, does authorization and quarantine checks.
 
     Returns:
       _ProcessResult instance, see its fields for more info.
@@ -293,6 +290,7 @@ class _BotBaseHandler(_BotApiHandler):
     lease_expiration_ts = None
     machine_type = None
     if bot_id:
+      logging.debug('Fetching bot info and settings')
       bot_info, bot_settings = ndb.get_multi([
           bot_management.get_info_key(bot_id),
           bot_management.get_settings_key(bot_id)])
@@ -302,6 +300,7 @@ class _BotBaseHandler(_BotApiHandler):
 
     # Make sure bot self-reported ID matches the authentication token. Raises
     # auth.AuthorizationError if not.
+    logging.debug('Fetching bot group config')
     bot_group_cfg = bot_auth.validate_bot_id_and_fetch_config(
         bot_id, machine_type)
 
@@ -465,6 +464,7 @@ class BotPollHandler(_BotBaseHandler):
 
     It makes recovery of the fleet in case of catastrophic failure much easier.
     """
+    logging.debug('Request started')
     if config.settings().force_bots_to_sleep_and_not_run_task:
       # Ignore everything, just sleep. Tell the bot it is quarantined to inform
       # it that it won't be running anything anyway. Use a large streak so it
@@ -475,6 +475,8 @@ class BotPollHandler(_BotBaseHandler):
     res = self._process()
     sleep_streak = res.state.get('sleep_streak', 0)
     quarantined = bool(res.quarantined_msg)
+
+    logging.debug('Updating stats')
 
     # Note bot existence at two places, one for stats at 1 minute resolution,
     # the other for the list of known bots.
@@ -492,6 +494,7 @@ class BotPollHandler(_BotBaseHandler):
 
     # Bot version is host-specific because the host URL is embedded in
     # swarming_bot.zip
+    logging.debug('Fetching bot code version')
     expected_version, _ = bot_code.get_bot_version(
         self.get_bot_contact_server())
     if res.version != expected_version:
@@ -533,6 +536,7 @@ class BotPollHandler(_BotBaseHandler):
     # The bot is in good shape. Try to grab a task.
     try:
       # This is a fairly complex function call, exceptions are expected.
+      logging.debug('Reaping task')
       request, secret_bytes, run_result = task_scheduler.bot_reap_task(
           res.dimensions, res.bot_id, res.version, res.lease_expiration_ts)
       if not request:
