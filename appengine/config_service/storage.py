@@ -223,7 +223,6 @@ def get_latest_multi_async(config_sets, path, hashes_only=False):
   raise ndb.Return(results)
 
 
-@utils.memcache_async('latest_message', ['config_set', 'path'], time=60)
 @ndb.tasklet
 def get_latest_as_message_async(config_set, path, message_factory):
   """Reads latest config file as a text-formatted protobuf message.
@@ -235,9 +234,17 @@ def get_latest_as_message_async(config_set, path, message_factory):
   Memcaches results.
   """
   msg = message_factory()
+  cache_key = 'get_latest_as_message(%r, %r)' % (config_set, path)
+  ctx = ndb.get_context()
+  cached = yield ctx.memcache_get(cache_key)
+  if cached:
+    msg.ParseFromString(cached)
+    raise ndb.Return(msg)
+
   text = yield get_latest_async(config_set, path)
   if text:
     text_format.Merge(text, msg)
+  yield ctx.memcache_set(cache_key, msg.SerializeToString(), time=60)
   raise ndb.Return(msg)
 
 

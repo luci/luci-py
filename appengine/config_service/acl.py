@@ -15,7 +15,6 @@ import services
 import storage
 
 
-@utils.memcache('acl.cfg', time=60)
 def read_acl_cfg():
   return storage.get_self_config_async(
       common.ACL_FILENAME, service_config_pb2.AclCfg).get_result()

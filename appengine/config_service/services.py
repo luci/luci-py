@@ -68,7 +68,6 @@ def _dict_to_dynamic_metadata(data):
   return metadata
 
 
-@utils.memcache_async('service_metadata', ['service_id'], time=60)
 @ndb.tasklet
 def get_metadata_async(service_id):
   """Returns service dynamic metadata.
@@ -79,6 +78,14 @@ def get_metadata_async(service_id):
     ServiceNotFoundError if service |service_id| is not found.
     DynamicMetadataError if metadata endpoint response is bad.
   """
+  cache_key = 'get_metadata(%r)' % service_id
+  ctx = ndb.get_context()
+  cached = yield ctx.memcache_get(cache_key)
+  if cached:
+    msg = service_config_pb2.ServiceDynamicMetadata()
+    msg.ParseFromString(cached)
+    raise ndb.Return(msg)
+
   service = yield get_service_async(service_id)
   if service is None:
     raise ServiceNotFoundError('Service "%s" not found', service_id)
@@ -91,4 +98,6 @@ def get_metadata_async(service_id):
         service.metadata_url, scopes=net.EMAIL_SCOPE)
   except net.Error as ex:
     raise DynamicMetadataError('Net error: %s' % ex.message)
-  raise ndb.Return(_dict_to_dynamic_metadata(res))
+  msg = _dict_to_dynamic_metadata(res)
+  yield ctx.memcache_set(cache_key, msg.SerializeToString(), time=60)
+  raise ndb.Return(msg)
