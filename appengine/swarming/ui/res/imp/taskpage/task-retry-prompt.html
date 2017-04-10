@@ -1,0 +1,109 @@
+<!--
+  This in an HTML Import-able file that contains the definition
+  of the following elements:
+
+    <task-retry-prompt>
+
+  To use this file import it:
+
+    <link href="/res/imp/task-retry-prompt" rel="import" />
+
+  Usage:
+
+    <task-retry-prompt></task-retry-prompt>
+
+  Properties:
+    None.
+
+  Methods:
+    setDimensions(Array): Set the dimensions to show the user for editing.
+  Events:
+    None.
+-->
+
+<link rel="import" href="/res/imp/bower_components/paper-input/paper-input.html">
+
+<dom-module id="task-retry-prompt">
+  <template>
+    <style>
+      :host {
+        display: block;
+      }
+      th, td{
+        font-size: 16px;
+      }
+      paper-input {
+        --paper-input-container-input: {
+          font-family: sans-serif;
+        };
+      }
+    </style>
+
+  <h2>Are you sure you want to retry task [[task_id]]?</h2>
+
+  <div>If you want to modify any dimensions (e.g. specify a bot's id), do so now.</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Key</th>
+        <th>Value</th>
+      </tr>
+    </thead>
+    <tbody>
+    <template is="dom-repeat" items="[[task_dimensions]]" as="dim">
+      <tr>
+        <td>
+          <paper-input
+            no-label-float=true
+            value="[[dim.key]]"
+            on-change="_updateKey">
+          </paper-input>
+        </td>
+        <td>
+          <paper-input
+            no-label-float=true
+            value="[[dim.value]]"
+            on-change="_updateValue">
+          </paper-input>
+        </td>
+      </tr>
+    </template>
+
+    </tbody>
+  </table>
+
+  </template>
+  <script>
+    Polymer({
+      is: "task-retry-prompt",
+      properties: {
+        task_id: {
+          type: String,
+        },
+        task_dimensions: {
+          type: Array,
+          notify: true,
+        }
+      },
+
+      setDimensions: function(dims) {
+        dims = dims || [];
+        while (dims.length < 6) {
+          dims.push({key:"", value: ""});
+        }
+        this.set("task_dimensions", dims);
+      },
+
+      _updateKey: function(e) {
+        this.set("task_dimensions."+e.model.index+".key",
+                 e.currentTarget.value)
+      },
+
+      _updateValue: function(e) {
+        this.set("task_dimensions."+e.model.index+".value",
+                 e.currentTarget.value)
+      }
+    });
+  </script>
+</dom-module>

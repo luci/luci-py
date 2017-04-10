@@ -30,7 +30,7 @@
     sinon.log = function(message) {console.log(message);};
     var server = sinon.fakeServer.create();
     server.autoRespond = true;
-     server.autoRespondAfter = 7000;
+    server.autoRespondAfter = 500;
 
     var genResponse = function(arr) {
       return function(request){

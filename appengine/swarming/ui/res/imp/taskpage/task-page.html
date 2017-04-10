@@ -41,6 +41,7 @@
 <link rel="import" href="/res/imp/common/url-param.html">
 
 <link rel="import" href="task-page-data.html">
+<link rel="import" href="task-retry-prompt.html">
 <link rel="import" href="task-disambiguation.html">
 
 <dom-module id="task-page">
@@ -603,6 +604,17 @@
       </div>
     </paper-dialog>
 
+    <paper-dialog id="retry_task" modal on-iron-overlay-closed="_retryClosed">
+      <task-retry-prompt id="retry_task_prompt"
+        task_id="[[task_id]]"
+        task_dimensions="{{_retry_dimensions}}">
+      </task-retry-prompt>
+      <div class="buttons">
+        <paper-button dialog-dismiss>Cancel</paper-button>
+        <paper-button dialog-confirm>OK</paper-button>
+      </div>
+    </paper-dialog>
+
     <interval-timer period="[[_refresh_interval]]" on-trigger="_softRefresh">
     </interval-timer>
 
@@ -692,6 +704,9 @@
         },
         _result: {
           type: Object,
+        },
+        _retry_dimensions: {
+          type: Array,
         },
         _server_details: {
           type: Object,
@@ -889,11 +904,7 @@
 
       _promptClosed: function(e) {
         if (e.detail.confirmed) {
-          if (this._dialog_prompt.startsWith("cancel")) {
-            this._cancelTask();
-          } else {
-            this._retryTask();
-          }
+          this._cancelTask();
         }
       },
 
@@ -903,8 +914,50 @@
       },
 
       _promptRetry: function() {
-        this.set("_dialog_prompt", "retry task "+this.task_id);
-        this.$.prompt.open();
+        this.$.retry_task_prompt.setDimensions(this._request.properties.dimensions);
+        this.$.retry_task.open();
+      },
+
+      _retryClosed: function(e) {
+        if (!this._request) {
+          sk.errorMessage("Task not yet loaded", 3000);
+          return;
+        }
+        if (!e.detail.confirmed) {
+          return;
+        }
+        var newTask = {
+          expiration_secs: this._request.expiration_secs,
+          name: this._request.name +" (retry)",
+          parent_task_id: this._request.parent_task_id,
+          priority: this._request.priority,
+          properties:this._request.properties,
+          tags: this._request.tags,
+          user: this._profile.email,
+          service_account: this._request.service_account,
+        }
+        newTask.properties.dimensions = this._retry_dimensions.filter(function(d){
+          return d && d.key && d.value;
+        });
+        if (!newTask.properties.dimensions || !newTask.properties.dimensions.length) {
+          sk.errorMessage("Your retried task must specify dimensions", 5000);
+          return;
+        }
+        console.log("Retrying with dimensions", newTask.properties.dimensions);
+        newTask.properties.idempotent = false;
+        swarming.postWithToast("/api/swarming/v1/tasks/new", "Retrying task " + this.task_id,
+          this._auth_headers, newTask)
+        .then(function(response) {
+            response = JSON.parse(response);
+            if (response && response.task_id) {
+              var state = {id: this.task_id};
+              history.pushState(state, "Task Page");
+              this.set("task_id", response.task_id);
+            }
+          }.bind(this), function(e) {
+            console.log("Task could not be retried", e);
+          }
+        );
       },
 
       _rawOutput: function(stdout, result) {
@@ -935,39 +988,9 @@
         this.$.data.reload();
         var miloFrame = this.$$("iframe")
         if (miloFrame) {
-          miloFrame.src = this._getDisplayServerLink(this._server_details.display_server_url_template,this.task_id);
+          var templ = this._server_details.display_server_url_template;
+          miloFrame.src = this._getDisplayServerLink(templ, this.task_id);
         }
-      },
-
-      _retryTask: function() {
-        if (!this._request) {
-          sk.errorMessage("Task not yet loaded", 3000);
-          return;
-        }
-        var newTask = {
-          expiration_secs: this._request.expiration_secs,
-          name: this._request.name +" (retry)",
-          parent_task_id: this._request.parent_task_id,
-          priority: this._request.priority,
-          properties:this._request.properties,
-          tags: this._request.tags,
-          user: this._profile.email,
-          service_account: this._request.service_account,
-        }
-        newTask.properties.idempotent = false;
-        swarming.postWithToast("/api/swarming/v1/tasks/new", "Retrying task " + this.task_id,
-          this._auth_headers, newTask)
-        .then(function(response) {
-            response = JSON.parse(response);
-            if (response && response.task_id) {
-              var state = {id: this.task_id};
-              history.pushState(state, "Task Page");
-              this.set("task_id", response.task_id);
-            }
-          }.bind(this), function(e) {
-            console.log("Task could not be retried", e);
-          }
-        );
       },
 
       _rowspan: function(dims) {
