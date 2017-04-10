@@ -65,8 +65,8 @@ def notify_gitiles_rejection(config_set, location, validation_result):
   Sends a notification per location only once.
 
   Args:
-    location (gitiles.Location): an absolute gitiles location that could not be
-      imported.
+    location (gitiles.Location): an absolute gitiles location of the config set
+      that could not be imported.
     validation_result (components.config.validation_context.Result).
   """
   assert RE_GIT_HASH.match(location.treeish), location

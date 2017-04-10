@@ -164,7 +164,7 @@ class GitilesImportTestCase(test_case.TestCase):
     self.assertEqual(len(saved_attempt.validation_messages), 1)
     val_msg = saved_attempt.validation_messages[0]
     self.assertEqual(val_msg.severity, config.Severity.ERROR)
-    self.assertEqual(val_msg.text, 'bad config!')
+    self.assertEqual(val_msg.text, 'test_archive/x: bad config!')
 
   def mock_get_log(self):
     self.mock(gitiles, 'get_log', mock.Mock())
