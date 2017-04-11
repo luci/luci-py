@@ -94,6 +94,20 @@ class LeaseRequest(ndb.Model):
       yield request
 
 
+InstructionStates = Enum(['PENDING', 'RECEIVED', 'EXECUTED'])
+
+
+class Instruction(ndb.Model):
+  """Datastore representation of an instruction for a machine.
+
+  Standalone instances should not be present in the datastore.
+  """
+  # Instruction to execute.
+  instruction = msgprop.MessageProperty(rpc_messages.Instruction)
+  # State of the instruction.
+  state = ndb.StringProperty(choices=InstructionStates)
+
+
 class CatalogEntry(ndb.Model):
   """Datastore representation of an entry in the catalog."""
   # rpc_messages.Dimensions describing this machine.
@@ -118,6 +132,8 @@ class CatalogMachineEntry(CatalogEntry):
       hostname uniqueness.
     kind: CatalogMachineEntry. This root entity does not reference any parents.
   """
+  # Instruction for this machine.
+  instruction = ndb.LocalStructuredProperty(Instruction)
   # ID of the LeaseRequest this machine is provided for.
   lease_id = ndb.StringProperty()
   # DateTime indicating lease expiration time.

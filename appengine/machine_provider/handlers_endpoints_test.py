@@ -1115,7 +1115,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
             swarming_server='example.com',
         ),
     )
-    models.CatalogMachineEntry(
+    machine_key = models.CatalogMachineEntry(
         id='machine',
         dimensions=rpc_messages.Dimensions(
             backend=rpc_messages.Backend.DUMMY,
@@ -1132,6 +1132,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
           self.call_api('instruct', request).json,
           rpc_messages.MachineInstructionResponse,
       )
+    self.failIf(machine_key.get().instruction)
 
   def test_lease_request_not_fulfilled(self):
     def is_group_member(group):
@@ -1165,7 +1166,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
             state=rpc_messages.LeaseRequestState.UNTRIAGED,
         ),
     ).put()
-    models.CatalogMachineEntry(
+    machine_key = models.CatalogMachineEntry(
         id='machine',
         dimensions=rpc_messages.Dimensions(
             backend=rpc_messages.Backend.DUMMY,
@@ -1183,6 +1184,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
     )
     self.assertEqual(
         response.error, rpc_messages.MachineInstructionError.NOT_FULFILLED)
+    self.failIf(machine_key.get().instruction)
 
   def test_lease_request_already_reclaimed(self):
     def is_group_member(group):
@@ -1216,7 +1218,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
             state=rpc_messages.LeaseRequestState.FULFILLED,
         ),
     ).put()
-    models.CatalogMachineEntry(
+    machine_key = models.CatalogMachineEntry(
         id='machine',
         dimensions=rpc_messages.Dimensions(
             backend=rpc_messages.Backend.DUMMY,
@@ -1234,6 +1236,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
     )
     self.assertEqual(
         response.error, rpc_messages.MachineInstructionError.ALREADY_RECLAIMED)
+    self.failIf(machine_key.get().instruction)
 
   def test_machine_not_found(self):
     def is_group_member(group):
@@ -1309,7 +1312,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
             state=rpc_messages.LeaseRequestState.FULFILLED,
         ),
     ).put()
-    models.CatalogMachineEntry(
+    machine_key = models.CatalogMachineEntry(
         id='machine',
         dimensions=rpc_messages.Dimensions(
             backend=rpc_messages.Backend.DUMMY,
@@ -1326,6 +1329,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
     )
     self.assertEqual(
         response.error, rpc_messages.MachineInstructionError.NOT_FULFILLED)
+    self.failIf(machine_key.get().instruction)
 
   def test_machine_already_reclaimed(self):
     def is_group_member(group):
@@ -1360,7 +1364,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
             state=rpc_messages.LeaseRequestState.FULFILLED,
         ),
     ).put()
-    models.CatalogMachineEntry(
+    machine_key = models.CatalogMachineEntry(
         id='machine',
         dimensions=rpc_messages.Dimensions(
             backend=rpc_messages.Backend.DUMMY,
@@ -1378,6 +1382,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
     )
     self.assertEqual(
         response.error, rpc_messages.MachineInstructionError.ALREADY_RECLAIMED)
+    self.failIf(machine_key.get().instruction)
 
   def test_invalid_instruction(self):
     def is_group_member(group):
@@ -1411,7 +1416,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
             state=rpc_messages.LeaseRequestState.FULFILLED,
         ),
     ).put()
-    models.CatalogMachineEntry(
+    machine_key = models.CatalogMachineEntry(
         id='machine',
         dimensions=rpc_messages.Dimensions(
             backend=rpc_messages.Backend.DUMMY,
@@ -1431,6 +1436,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
         response.error,
         rpc_messages.MachineInstructionError.INVALID_INSTRUCTION,
     )
+    self.failIf(machine_key.get().instruction)
 
   def test_instructed(self):
     def is_group_member(group):
@@ -1466,7 +1472,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
             state=rpc_messages.LeaseRequestState.FULFILLED,
         ),
     ).put()
-    models.CatalogMachineEntry(
+    machine_key = models.CatalogMachineEntry(
         id='machine',
         dimensions=rpc_messages.Dimensions(
             backend=rpc_messages.Backend.DUMMY,
@@ -1483,6 +1489,12 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
         rpc_messages.MachineInstructionResponse,
     )
     self.failIf(response.error)
+    self.assertEqual(
+        machine_key.get().instruction.instruction.swarming_server,
+        'example.com',
+    )
+    self.assertEqual(
+        machine_key.get().instruction.state, models.InstructionStates.PENDING)
 
 
 if __name__ == '__main__':

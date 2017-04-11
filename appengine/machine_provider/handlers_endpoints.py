@@ -623,6 +623,8 @@ class MachineProviderEndpoints(remote.Service):
           error=rpc_messages.MachineInstructionError.ALREADY_RECLAIMED,
       )
 
+    self._instruct(machine.key, request.instruction)
+
     logging.info('Sending CONNECT message to %s', machine.dimensions.hostname)
     topic = pubsub.full_topic_name(
         machine.pubsub_topic_project, machine.pubsub_topic)
@@ -632,6 +634,23 @@ class MachineProviderEndpoints(remote.Service):
 
     return rpc_messages.MachineInstructionResponse(
         client_request_id=request.request_id)
+
+  @staticmethod
+  @ndb.transactional
+  def _instruct(machine_key, instruction):
+    """Stores an instruction for a machine."""
+    # Probably not worth double-checking that the machine is still leased
+    # because the CatalogMachineEntry will be deleted at the end of the lease.
+    # If the entity still exists then it's likely still leased.
+    machine = machine_key.get()
+    if not machine:
+      raise endpoints.NotFoundException('CatalogMachineEntry not found')
+
+    # Currently there is only one type of instruction, an instruction to connect
+    # to a Swarming server. Just overwrite any previous instruction.
+    machine.instruction = models.Instruction(
+        instruction=instruction, state=models.InstructionStates.PENDING)
+    machine.put()
 
 
 def get_routes():
