@@ -17,6 +17,11 @@
     |id=info|    |id=settings|    |id=fffff| |if=ffffe| ... |id=00000|
     +-------+    +-----------+    +--------+ +--------+     +--------+
 
+    +--------Root--------+
+    |DimensionAggregation|
+    |id='current'        |
+    +--------------------+
+
 - BotEvent is a monotonically inserted entity that is added for each event
   happening for the bot.
 - BotInfo is a 'dump-only' entity used for UI, it permits quickly show the
@@ -58,11 +63,6 @@ class _BotCommon(ndb.Model):
   # State is purely informative. It is completely free form.
   state = datastore_utils.DeterministicJsonProperty(json_type=dict)
 
-  # TODO(maruel): For previous entities. Delete as soon as all old dead bots
-  # have been deleted.
-  dimensions_old = datastore_utils.DeterministicJsonProperty(
-      json_type=dict, name='dimensions')
-
   # IP address as seen by the HTTP handler.
   external_ip = ndb.StringProperty(indexed=False)
 
@@ -97,8 +97,6 @@ class _BotCommon(ndb.Model):
   @property
   def dimensions(self):
     """Returns a dict representation of self.dimensions_flat."""
-    if self.dimensions_old:
-      return self.dimensions_old
     out = {}
     for i in self.dimensions_flat:
       k, v = i.split(':', 1)
@@ -112,14 +110,13 @@ class _BotCommon(ndb.Model):
     return task_pack.unpack_run_result_key(self.task_id)
 
   def to_dict(self, exclude=None):
-    exclude = ['dimensions_flat', 'dimensions_old'] + (exclude or [])
+    exclude = ['dimensions_flat'] + (exclude or [])
     out = super(_BotCommon, self).to_dict(exclude=exclude)
     out['dimensions'] = self.dimensions
     return out
 
   def _pre_put_hook(self):
     super(_BotCommon, self)._pre_put_hook()
-    self.dimensions_old = None
     self.dimensions_flat.sort()
 
 
@@ -186,7 +183,7 @@ class BotInfo(_BotCommon):
     super(BotInfo, self)._pre_put_hook()
     if not self.task_id:
       self.task_name = None
-    logging.info('Pre-put BotInfo: %s', self)
+    logging.info('Pre-put: %s', self)
 
 
 class BotEvent(_BotCommon):
@@ -236,12 +233,19 @@ class BotSettings(ndb.Model):
 
 
 class DimensionValues(ndb.Model):
+  """Inlined into DimensionAggregation, never stored standalone."""
   dimension = ndb.StringProperty()
   values = ndb.StringProperty(repeated=True)
 
 
 class DimensionAggregation(ndb.Model):
-  """Has all dimensions that are currently in use."""
+  """Has all dimensions that are currently exposed by the bots.
+
+  There's a single root entity stored with id 'current', see KEY below.
+
+  This entity is updated via cron job /internal/cron/aggregate_bots_dimensions
+  updated every hour.
+  """
   dimensions = ndb.LocalStructuredProperty(DimensionValues, repeated=True)
 
   ts = ndb.DateTimeProperty()
@@ -358,10 +362,10 @@ def bot_event(
   info_key = get_info_key(bot_id)
   bot_info = info_key.get()
   if bot_info:
-    logging.info('Updating BotInfo: %s', bot_info)
+    logging.info('Updating: %s', bot_info)
   else:
     bot_info = BotInfo(key=info_key)
-    logging.info('Creating BotInfo: %s', bot_info)
+    logging.info('Creating: %s', bot_info)
   bot_info.last_seen_ts = utils.utcnow()
   bot_info.external_ip = external_ip
   bot_info.authenticated_as = authenticated_as
@@ -383,7 +387,7 @@ def bot_event(
     bot_info.lease_expiration_ts = kwargs['lease_expiration_ts']
   if kwargs.get('machine_type') is not None:
     bot_info.machine_type = kwargs['machine_type']
-  logging.info('BotInfo: %s', bot_info)
+  logging.info('after processing: %s', bot_info)
 
   if event_type in ('request_sleep', 'task_update'):
     # Handle this specifically. It's not much of an even worth saving a BotEvent

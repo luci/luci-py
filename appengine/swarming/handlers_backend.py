@@ -97,7 +97,7 @@ class CronBotsDimensionAggregationHandler(webapp2.RequestHandler):
         if k != 'id':
           seen.setdefault(k, set()).add(v)
     dims = [
-      bot_management.DimensionValues(dimension=k,values=sorted(values))
+      bot_management.DimensionValues(dimension=k, values=sorted(values))
       for k, values in sorted(seen.iteritems())
     ]
 
