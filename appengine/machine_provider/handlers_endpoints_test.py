@@ -12,6 +12,8 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
+import endpoints
+
 from google.appengine import runtime
 from google.appengine.ext import ndb
 
@@ -550,6 +552,322 @@ class CatalogTest(test_case.EndpointsTestCase):
         response_3.error,
         rpc_messages.CatalogManipulationRequestError.HOSTNAME_REUSE,
     )
+
+
+class MachineTest(test_case.EndpointsTestCase):
+  """Tests for handlers_endpoints.MachineEndpoints."""
+  api_service_cls = handlers_endpoints.MachineEndpoints
+
+  def setUp(self):
+    super(MachineTest, self).setUp()
+    app = handlers_endpoints.create_endpoints_app()
+    self.app = webtest.TestApp(app)
+
+  def test_update_instruction_state_not_found(self):
+    machine_key = ndb.Key(models.CatalogMachineEntry, 'fake-machine')
+
+    with self.assertRaises(endpoints.NotFoundException):
+      handlers_endpoints.MachineEndpoints._update_instruction_state(
+          machine_key, models.InstructionStates.EXECUTED)
+
+    self.failIf(machine_key.get())
+
+  def test_update_instruction_state_no_instruction(self):
+    machine_key = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            backend=rpc_messages.Backend.DUMMY,
+        ),
+    ).put()
+
+    handlers_endpoints.MachineEndpoints._update_instruction_state(
+        machine_key, models.InstructionStates.EXECUTED)
+
+    self.failIf(machine_key.get().instruction)
+
+  def test_update_instruction_state_already_updated(self):
+    machine_key = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            backend=rpc_messages.Backend.DUMMY,
+        ),
+        instruction=models.Instruction(
+            state=models.InstructionStates.EXECUTED
+        ),
+    ).put()
+
+    handlers_endpoints.MachineEndpoints._update_instruction_state(
+        machine_key, models.InstructionStates.EXECUTED)
+
+    self.assertEqual(
+        machine_key.get().instruction.state, models.InstructionStates.EXECUTED)
+
+  def test_update_instruction_state_invalid_new_state(self):
+    machine_key = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            backend=rpc_messages.Backend.DUMMY,
+        ),
+        instruction=models.Instruction(
+            state=models.InstructionStates.EXECUTED
+        ),
+    ).put()
+
+    handlers_endpoints.MachineEndpoints._update_instruction_state(
+        machine_key, models.InstructionStates.PENDING)
+
+    self.assertEqual(
+        machine_key.get().instruction.state, models.InstructionStates.EXECUTED)
+
+  def test_update_instruction_state_invalid_transition(self):
+    machine_key = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            backend=rpc_messages.Backend.DUMMY,
+        ),
+        instruction=models.Instruction(
+            state=models.InstructionStates.EXECUTED
+        ),
+    ).put()
+
+    handlers_endpoints.MachineEndpoints._update_instruction_state(
+        machine_key, models.InstructionStates.RECEIVED)
+
+    self.assertEqual(
+        machine_key.get().instruction.state, models.InstructionStates.EXECUTED)
+
+  def test_update_instruction_state(self):
+    machine_key = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            backend=rpc_messages.Backend.DUMMY,
+        ),
+        instruction=models.Instruction(
+            state=models.InstructionStates.PENDING
+        ),
+    ).put()
+
+    handlers_endpoints.MachineEndpoints._update_instruction_state(
+        machine_key, models.InstructionStates.RECEIVED)
+
+    self.assertEqual(
+        machine_key.get().instruction.state, models.InstructionStates.RECEIVED)
+
+  def test_poll_anonymous(self):
+    request = rpc_to_json(rpc_messages.PollRequest(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    ))
+    dimensions = rpc_messages.Dimensions(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    )
+    machine_key = models.CatalogMachineEntry(
+        key=models.CatalogMachineEntry.generate_key(dimensions),
+        dimensions=dimensions,
+        instruction=models.Instruction(
+            instruction=rpc_messages.Instruction(swarming_server='example.com'),
+            state=models.InstructionStates.PENDING,
+        ),
+        lease_id='fake-id',
+        policies=rpc_messages.Policies(
+            machine_service_account=auth_testing.DEFAULT_MOCKED_IDENTITY.name,
+        ),
+    ).put()
+
+    with self.assertRaises(webtest.app.AppError):
+      response = jsonish_dict_to_rpc(
+          self.call_api('poll', request).json,
+          rpc_messages.PollResponse,
+      )
+
+  def test_poll_backend_omitted(self):
+    auth_testing.mock_get_current_identity(self)
+
+    request = rpc_to_json(rpc_messages.PollRequest(
+        hostname='fake-host',
+    ))
+    dimensions = rpc_messages.Dimensions(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    )
+    machine_key = models.CatalogMachineEntry(
+        key=models.CatalogMachineEntry.generate_key(dimensions),
+        dimensions=dimensions,
+        instruction=models.Instruction(
+            instruction=rpc_messages.Instruction(swarming_server='example.com'),
+            state=models.InstructionStates.PENDING,
+        ),
+        lease_id='fake-id',
+        policies=rpc_messages.Policies(
+            machine_service_account=auth_testing.DEFAULT_MOCKED_IDENTITY.name,
+        ),
+    ).put()
+
+    with self.assertRaises(webtest.app.AppError):
+      response = jsonish_dict_to_rpc(
+          self.call_api('poll', request).json,
+          rpc_messages.PollResponse,
+      )
+
+  def test_poll_entry_not_found(self):
+    auth_testing.mock_get_current_identity(self)
+
+    request = rpc_to_json(rpc_messages.PollRequest(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    ))
+
+    with self.assertRaises(webtest.app.AppError):
+      response = jsonish_dict_to_rpc(
+          self.call_api('poll', request).json,
+          rpc_messages.PollResponse,
+      )
+
+  def test_poll_unauthorized(self):
+    auth_testing.mock_get_current_identity(self)
+
+    request = rpc_to_json(rpc_messages.PollRequest(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    ))
+    dimensions = rpc_messages.Dimensions(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    )
+    machine_key = models.CatalogMachineEntry(
+        key=models.CatalogMachineEntry.generate_key(dimensions),
+        dimensions=dimensions,
+        instruction=models.Instruction(
+            instruction=rpc_messages.Instruction(swarming_server='example.com'),
+            state=models.InstructionStates.PENDING,
+        ),
+        lease_id='fake-id',
+    ).put()
+
+    with self.assertRaises(webtest.app.AppError):
+      response = jsonish_dict_to_rpc(
+          self.call_api('poll', request).json,
+          rpc_messages.PollResponse,
+      )
+
+  def test_poll_not_leased(self):
+    auth_testing.mock_get_current_identity(self)
+
+    request = rpc_to_json(rpc_messages.PollRequest(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    ))
+    dimensions = rpc_messages.Dimensions(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    )
+    machine_key = models.CatalogMachineEntry(
+        key=models.CatalogMachineEntry.generate_key(dimensions),
+        dimensions=dimensions,
+        instruction=models.Instruction(
+            instruction=rpc_messages.Instruction(swarming_server='example.com'),
+            state=models.InstructionStates.PENDING,
+        ),
+        policies=rpc_messages.Policies(
+            machine_service_account=auth_testing.DEFAULT_MOCKED_IDENTITY.name,
+        ),
+    ).put()
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('poll', request).json,
+        rpc_messages.PollResponse,
+    )
+    self.failIf(response.instruction)
+    self.assertEqual(
+        machine_key.get().instruction.state, models.InstructionStates.PENDING)
+
+  def test_poll_no_instruction(self):
+    auth_testing.mock_get_current_identity(self)
+
+    request = rpc_to_json(rpc_messages.PollRequest(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    ))
+    dimensions = rpc_messages.Dimensions(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    )
+    machine_key = models.CatalogMachineEntry(
+        key=models.CatalogMachineEntry.generate_key(dimensions),
+        dimensions=dimensions,
+        lease_id='fake-id',
+        policies=rpc_messages.Policies(
+            machine_service_account=auth_testing.DEFAULT_MOCKED_IDENTITY.name,
+        ),
+    ).put()
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('poll', request).json,
+        rpc_messages.PollResponse,
+    )
+    self.failIf(response.instruction)
+    self.failIf(machine_key.get().instruction)
+
+  def test_poll_implied_backend(self):
+    def is_group_member(group):
+      return group == 'machine-provider-dummy-backend'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
+    auth_testing.mock_get_current_identity(self)
+
+    request = rpc_to_json(rpc_messages.PollRequest(
+        hostname='fake-host',
+    ))
+    dimensions = rpc_messages.Dimensions(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    )
+    machine_key = models.CatalogMachineEntry(
+        key=models.CatalogMachineEntry.generate_key(dimensions),
+        dimensions=dimensions,
+        instruction=models.Instruction(
+            instruction=rpc_messages.Instruction(swarming_server='example.com'),
+            state=models.InstructionStates.PENDING,
+        ),
+        lease_id='fake-id',
+    ).put()
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('poll', request).json,
+        rpc_messages.PollResponse,
+    )
+    self.assertEqual(response.instruction.swarming_server, 'example.com')
+    self.assertEqual(response.state, models.InstructionStates.PENDING)
+    self.assertEqual(
+        machine_key.get().instruction.state, models.InstructionStates.PENDING)
+
+  def test_poll(self):
+    auth_testing.mock_get_current_identity(self)
+
+    request = rpc_to_json(rpc_messages.PollRequest(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    ))
+    dimensions = rpc_messages.Dimensions(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    )
+    machine_key = models.CatalogMachineEntry(
+        key=models.CatalogMachineEntry.generate_key(dimensions),
+        dimensions=dimensions,
+        instruction=models.Instruction(
+            instruction=rpc_messages.Instruction(swarming_server='example.com'),
+            state=models.InstructionStates.PENDING,
+        ),
+        lease_id='fake-id',
+        policies=rpc_messages.Policies(
+            machine_service_account=auth_testing.DEFAULT_MOCKED_IDENTITY.name,
+        ),
+    ).put()
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('poll', request).json,
+        rpc_messages.PollResponse,
+    )
+    self.assertEqual(response.instruction.swarming_server, 'example.com')
+    self.assertEqual(response.state, models.InstructionStates.PENDING)
+    self.assertEqual(
+        machine_key.get().instruction.state, models.InstructionStates.RECEIVED)
 
 
 class MachineProviderReleaseTest(test_case.EndpointsTestCase):

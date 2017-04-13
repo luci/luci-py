@@ -267,3 +267,19 @@ class MachineInstructionResponse(messages.Message):
   # MachineInstructionError indicating an error with the request, or None
   # if there is no error.
   error = messages.EnumField(MachineInstructionError, 2)
+
+
+class PollRequest(messages.Message):
+  """Represents a request to poll for instructions given to a machine."""
+  # Hostname of the machine whose instructions to retrieve.
+  hostname = messages.StringField(1, required=True)
+  # Backend the machine belongs to. Generally required.
+  backend = messages.EnumField(Backend, 2)
+
+
+class PollResponse(messages.Message):
+  """Represents a response to a request for instructions given to a machine."""
+  # Instruction given to the machine.
+  instruction = messages.MessageField(Instruction, 1)
+  # State of the instruction.
+  state = messages.StringField(2)

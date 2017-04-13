@@ -276,6 +276,114 @@ class CatalogEndpoints(remote.Service):
     )
 
 
+@auth.endpoints_api(name='machine', version='v1')
+class MachineEndpoints(remote.Service):
+  """Implements cloud endpoints for Machine Provider's machines."""
+
+  # The endpoints only allow a subset of possible instruction state
+  # transitions. poll only allows PENDING -> RECEIVED, and the (unimplemented)
+  # ack only allows * -> EXECUTED.
+  ALLOWED_TRANSITIONS = (
+      (models.InstructionStates.PENDING, models.InstructionStates.RECEIVED),
+      (models.InstructionStates.PENDING, models.InstructionStates.EXECUTED),
+      (models.InstructionStates.RECEIVED, models.InstructionStates.EXECUTED),
+  )
+
+  @staticmethod
+  @ndb.transactional
+  def _update_instruction_state(machine_key, new_state):
+    """Updates the state of the instruction for the given machine.
+
+    The only updates allowed are:
+      PENDING -> RECEIVED
+      PENDING -> EXECUTED
+      RECEIVED -> EXECUTED
+
+    Args:
+      machine_key: ndb.Key for a models.CatalogMachineEntry.
+      new_state: One of models.InstructionStates, but not
+        models.InstructionStates.PENDING.
+    """
+    machine = machine_key.get()
+    if not machine:
+      raise endpoints.NotFoundException('CatalogMachineEntry not found')
+
+    if not machine.instruction or machine.instruction.state == new_state:
+      return
+
+    transition = (machine.instruction.state, new_state)
+    if transition not in MachineEndpoints.ALLOWED_TRANSITIONS:
+      logging.error(
+          'Invalid instruction state transition (%s -> %s): %s',
+          machine.instruction.state,
+          new_state,
+          machine_key,
+      )
+      return
+
+    logging.info(
+        'Updating instruction state (%s -> %s): %s',
+        machine.instruction.state,
+        new_state,
+        machine_key,
+    )
+    machine.instruction.state = new_state
+    machine.put()
+
+
+  @gae_ts_mon.instrument_endpoint()
+  @auth.endpoints_method(rpc_messages.PollRequest, rpc_messages.PollResponse)
+  @auth.require(acl.is_logged_in)
+  def poll(self, request):
+    """Handles an incoming PollRequest."""
+    user = auth.get_current_identity()
+    if not request.backend:
+      if acl.is_backend_service():
+        # Backends may omit this field to mean backend == self.
+        request.backend = acl.get_current_backend()
+      else:
+        # Anyone else omitting the backend field is an error.
+        raise endpoints.BadRequestException('Backend unspecified')
+
+    entry = models.CatalogMachineEntry.get(request.backend, request.hostname)
+    if not entry:
+      raise endpoints.NotFoundException('CatalogMachineEntry not found')
+
+    # Determine authorization. User must be the known service account for the
+    # machine, the backend service that owns the machine, or an administrator.
+    machine_service_account = None
+    if entry.policies:
+      machine_service_account = entry.policies.machine_service_account
+    if user.name != machine_service_account:
+      if entry.dimensions.backend != acl.get_current_backend():
+        if not acl.is_catalog_admin():
+          # It's found, but raise 404 so we don't reveal the existence of
+          # machines to unauthorized users.
+          logging.warning(
+              'Unauthorized poll\nUser: %s\nMachine: %s',
+              user.to_bytes(),
+              entry,
+          )
+          raise endpoints.NotFoundException('CatalogMachineEntry not found')
+
+    # Authorized request, return the current instruction for the machine.
+    if not entry.lease_id or not entry.instruction:
+      return rpc_messages.PollResponse()
+
+    # Only the machine itself polling for its own instructions causes
+    # the state of the instruction to be updated. Only update the state
+    # if it's PENDING.
+    if entry.instruction.state == models.InstructionStates.PENDING:
+      if user.name == machine_service_account:
+        self._update_instruction_state(
+            entry.key, models.InstructionStates.RECEIVED)
+
+    return rpc_messages.PollResponse(
+        instruction=entry.instruction.instruction,
+        state=entry.instruction.state,
+    )
+
+
 @auth.endpoints_api(name='machine_provider', version='v1')
 class MachineProviderEndpoints(remote.Service):
   """Implements cloud endpoints for the Machine Provider."""
@@ -660,6 +768,7 @@ def get_routes():
 def create_endpoints_app():
   return endpoints.api_server([
       CatalogEndpoints,
+      MachineEndpoints,
       MachineProviderEndpoints,
       config.ConfigApi,
   ])
