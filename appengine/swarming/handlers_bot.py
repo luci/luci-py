@@ -26,6 +26,7 @@ from server import bot_management
 from server import config
 from server import stats
 from server import task_pack
+from server import task_queues
 from server import task_request
 from server import task_result
 from server import task_scheduler
@@ -386,6 +387,7 @@ class _BotBaseHandler(_BotApiHandler):
       result.quarantined_msg = 'Quarantined by admin'
       return result
 
+    task_queues.assert_bot(dimensions)
     return result
 
   def get_bot_contact_server(self):
@@ -538,7 +540,7 @@ class BotPollHandler(_BotBaseHandler):
       # This is a fairly complex function call, exceptions are expected.
       logging.debug('Reaping task')
       request, secret_bytes, run_result = task_scheduler.bot_reap_task(
-          res.dimensions, res.bot_id, res.version, res.lease_expiration_ts)
+          res.dimensions, res.version, res.lease_expiration_ts)
       if not request:
         # No task found, tell it to sleep a bit.
         bot_event('request_sleep')

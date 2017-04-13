@@ -26,6 +26,7 @@ from server import acl
 from server import config
 from server import stats
 from server import task_pack
+from server import task_queues
 from server import task_request
 from server import task_result
 from server import task_to_run
@@ -98,15 +99,15 @@ def _expire_task(to_run_key, request):
   return success
 
 
-def _reap_task(to_run_key, request, bot_id, bot_version, bot_dimensions):
+def _reap_task(bot_dimensions, bot_version, to_run_key, request):
   """Reaps a task and insert the results entity.
 
   Returns:
     (TaskRunResult, SecretBytes) if successful, (None, None) otherwise.
   """
-  assert bot_id, bot_id
   assert request.key == task_to_run.task_to_run_key_to_request_key(to_run_key)
   result_summary_key = task_pack.request_key_to_result_summary_key(request.key)
+  bot_id = bot_dimensions[u'id'][0]
 
   now = utils.utcnow()
 
@@ -504,6 +505,8 @@ def schedule_request(request, secret_bytes, check_acls=True):
   if check_acls:
     _check_dimension_acls(request)
 
+  task_queues.assert_task(request)
+
   now = utils.utcnow()
   request.key = task_request.new_request_key()
   task = task_to_run.new_task_to_run(request)
@@ -594,7 +597,7 @@ def schedule_request(request, secret_bytes, check_acls=True):
   return result_summary
 
 
-def bot_reap_task(dimensions, bot_id, bot_version, deadline):
+def bot_reap_task(bot_dimensions, bot_version, deadline):
   """Reaps a TaskToRun if one is available.
 
   The process is to find a TaskToRun where its .queue_number is set, then
@@ -604,8 +607,9 @@ def bot_reap_task(dimensions, bot_id, bot_version, deadline):
     tuple of (TaskRequest, SecretBytes, TaskRunResult) for the task that was
     reaped.  The TaskToRun involved is not returned.
   """
-  assert bot_id
-  q = task_to_run.yield_next_available_task_to_dispatch(dimensions, deadline)
+  bot_id = bot_dimensions[u'id'][0]
+  q = task_to_run.yield_next_available_task_to_dispatch(
+      bot_dimensions, deadline)
   # When a large number of bots try to reap hundreds of tasks simultaneously,
   # they'll constantly fail to call reap_task_to_run() as they'll get preempted
   # by other bots. So randomly jump farther in the queue when the number of
@@ -620,7 +624,7 @@ def bot_reap_task(dimensions, bot_id, bot_version, deadline):
       continue
 
     run_result, secret_bytes = _reap_task(
-        to_run.key, request, bot_id, bot_version, dimensions)
+        bot_dimensions, bot_version, to_run.key, request)
     if not run_result:
       failures += 1
       # Every 3 failures starting on the very first one, jump randomly ahead of
