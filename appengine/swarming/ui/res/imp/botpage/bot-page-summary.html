@@ -306,10 +306,18 @@
         // Turn the map into the array and compute total time percent.
         var names = Object.keys(taskAgg);
         var taskStats = [];
+        var namesCleaned = [];
         names.forEach(function(n) {
           taskAgg[n].avg_duration = taskAgg[n].total_time / taskAgg[n].total;
           taskAgg[n].total_time_percent = (taskAgg[n].total_time * 100 /totalStats.total_time).toFixed(1);
           taskStats.push(taskAgg[n]);
+          // For the purposes of finding substrings in the tasks, the fact that a task was retried only
+          // muddies the results, so we remove them.
+          n = n.replace(/ \(retry\)/g, "");
+          // The substrings function works decent on long strings, but we want to prevent the page from
+          // hanging if really long names are used.
+          n = n.substring(0, Math.min(100, n.length));
+          namesCleaned.push(n);
         });
 
         // Shorten names if possible by finding the longest common substring
@@ -318,10 +326,10 @@
         // n-1 seems to be good to avoid not finding decent matches if there
         // is an oddball task.
         var substrings = new Substrings({
-          minOccurrence: Math.max(2, names.length-1),
+          minOccurrence: Math.max(2, namesCleaned.length-1),
           minLength: 6,
         });
-        substrings.build(names);
+        substrings.build(namesCleaned);
         var result = substrings.weighByAverage() || [];
         // result is an Array<{name:String, source:Array<int>} where the
         // ints in source are the indices of names that have the substring.
