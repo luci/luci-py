@@ -35,7 +35,7 @@ AGENT_UPSTART_CONFIG_DEST = '/etc/init/machine-provider-agent.conf'
 AGENT_UPSTART_CONFIG_TMPL = os.path.join(
     THIS_DIR, 'machine-provider-agent.conf.tmpl')
 AGENT_UPSTART_JOB = 'machine-provider-agent'
-CHROME_BOT = 'chrome-bot'
+CHROME_BOT = 'chrome-bot' # TODO(smut): Convert to passed --argument.
 METADATA_BASE_URL = 'http://metadata/computeMetadata/v1'
 PUBSUB_BASE_URL = 'https://pubsub.googleapis.com/v1/projects'
 SWARMING_BOT_DIR = '/b/s'
@@ -56,11 +56,6 @@ class RequestError(Error):
 
 # 404
 class NotFoundError(RequestError):
-  pass
-
-
-# 409
-class ConflictError(RequestError):
   pass
 
 
@@ -163,51 +158,56 @@ class AuthorizedHTTPRequest(httplib2.Http):
     return super(AuthorizedHTTPRequest, self).request(*args, **kwargs)
 
 
-class PubSub(object):
-  """Class for interacting with Cloud Pub/Sub."""
+class MachineProvider(object):
+  """Class for interacting with Machine Provider."""
 
-  def __init__(self, service_account='default'):
+  def __init__(self, server, service_account='default'):
+    """Initializes a new instance of the MachineProvider class.
+
+    Args:
+      server: URL of the Machine Provider server to talk to.
+      service_account: Service account to authenticate requests with.
+    """
+    self._server = server
     self._http = AuthorizedHTTPRequest(service_account=service_account)
 
-  def acknowledge(self, subscription, project, ack_ids):
-    """Acknowledges the receipt of messages on a Cloud Pub/Sub subscription.
+  def ack(self, hostname, backend):
+    """Acknowledges the receipt and execution of an instruction.
 
     Args:
-      subscription: Name of the subscription.
-      project: Project the subscription exists in.
-      ack_ids: IDs of messages to acknowledge.
+      hostname: Hostname of the machine whose instruction to acknowledge.
+      backend: Backend the machine belongs to.
 
     Raises:
-      NotFoundError: If the subscription and/or topic can't be found.
+      NotFoundError: If there is no such instruction.
     """
-    logging.info('Acknowledging %s', ', '.join(ack_ids))
     response, content = self._http.request(
-        '%s/%s/subscriptions/%s:acknowledge' % (
-            PUBSUB_BASE_URL, project, subscription),
-        body=json.dumps({'ackIds': ack_ids}),
+        '%s/_ah/api/machine/v1/ack' % self._server,
+        body=json.dumps({'backend': backend, 'hostname': hostname}),
+        headers={'Content-Type': 'application/json'},
         method='POST',
     )
     if response['status'] == '404':
-      raise NotFoundError(response, json.loads(content))
-    return json.loads(content)
+      raise NotFoundError(response, content)
+    return content
 
-  def pull(self, subscription, project):
-    """Polls for new messages on a Cloud Pub/Sub pull subscription.
+  def poll(self, hostname, backend):
+    """Polls Machine Provider for instructions.
 
     Args:
-      subscription: Name of the pull subscription.
-      project: Project the pull subscription exists in.
+      hostname: Hostname of the machine whose instructions to poll for.
+      backend: Backend the machine belongs to.
 
     Returns:
-      A JSON response from the Pub/Sub service.
+      A JSON response from the Machine Provider.
 
     Raises:
-      NotFoundError: If the subscription and/or topic can't be found.
+      NotFoundError: If there is no such instruction.
     """
     response, content = self._http.request(
-        '%s/%s/subscriptions/%s:pull' % (
-            PUBSUB_BASE_URL, project, subscription),
-        body=json.dumps({'maxMessages': 1, 'returnImmediately': False}),
+        '%s/_ah/api/machine/v1/poll' % self._server,
+        body=json.dumps({'backend': backend, 'hostname': hostname}),
+        headers={'Content-Type': 'application/json'},
         method='POST',
     )
     if response['status'] == '404':
@@ -215,61 +215,62 @@ class PubSub(object):
     return json.loads(content)
 
 
-def listen():
-  """Listens for Cloud Pub/Sub communication."""
-  # Attributes tell us what subscription has been created for us to listen to.
-  project = get_metadata('instance/attributes/pubsub_subscription_project')
-  service_account = get_metadata('instance/attributes/pubsub_service_account')
-  subscription = get_metadata('instance/attributes/pubsub_subscription')
-  pubsub = PubSub(service_account=service_account)
+def connect_to_swarming(service_account, swarming_server, user):
+  """Connects to the given Swarming server. Sets up auto-connect on reboot.
+
+  Args:
+    service_account: Service account to authenticate with to Swarming with.
+    swarming_server: URL of the Swarming server to connect to.
+    user: Username that Swarming bot process will run as.
+  """
+  if os.path.exists(SWARMING_UPSTART_CONFIG_DEST):
+    os.remove(SWARMING_UPSTART_CONFIG_DEST)
+  shutil.copy2(SWARMING_UPSTART_CONFIG_SRC, SWARMING_UPSTART_CONFIG_DEST)
+
+  if not os.path.exists(SWARMING_BOT_DIR):
+    os.mkdir(SWARMING_BOT_DIR)
+  user = pwd.getpwnam(user)
+  os.chown(SWARMING_BOT_DIR, user.pw_uid, user.pw_gid)
+
+  if os.path.exists(SWARMING_BOT_ZIP):
+    # Delete just the zip, not the whole directory so logs are kept.
+    os.remove(SWARMING_BOT_ZIP)
+
+  http = AuthorizedHTTPRequest(service_account=service_account)
+  _, bot_code = http.request(
+    urlparse.urljoin(swarming_server, 'bot_code'),
+    method='GET',
+  )
+  with open(SWARMING_BOT_ZIP, 'w') as fd:
+    fd.write(bot_code)
+  os.chown(SWARMING_BOT_ZIP, user.pw_uid, user.pw_gid)
+
+
+def poll():
+  """Polls Machine Provider for instructions."""
+  # Metadata tells us which Machine Provider instance to talk to.
+  hostname = get_metadata('instance/name')
+  server = get_metadata('instance/attributes/machine_provider_server')
+  service_account = get_metadata('instance/attributes/machine_service_account')
+  user = CHROME_BOT
+  mp = MachineProvider(server=server, service_account=service_account)
 
   while True:
-    logging.info('Polling for new messages')
-    ack_ids = []
+    logging.info('Polling for instructions')
     start_time = time.time()
-    response = pubsub.pull(subscription, project)
-    for message in response.get('receivedMessages', []):
-      ack_ids.append(message['ackId'])
-      attributes = message['message'].get('attributes', {})
-      message = base64.b64decode(message['message'].get('data', ''))
-      logging.info(
-          'Received message: %s\nID: %s\nAttributes: %s',
-          message,
-          ack_ids[-1],
-          json.dumps(attributes, indent=2),
-      )
-
-      if message == 'CONNECT' and attributes.get('swarming_server'):
-        if os.path.exists(SWARMING_UPSTART_CONFIG_DEST):
-          os.remove(SWARMING_UPSTART_CONFIG_DEST)
-        shutil.copy2(SWARMING_UPSTART_CONFIG_SRC, SWARMING_UPSTART_CONFIG_DEST)
-
-        if not os.path.exists(SWARMING_BOT_DIR):
-          os.mkdir(SWARMING_BOT_DIR)
-        chrome_bot = pwd.getpwnam(CHROME_BOT)
-        os.chown(SWARMING_BOT_DIR, chrome_bot.pw_uid, chrome_bot.pw_gid)
-
-        if os.path.exists(SWARMING_BOT_ZIP):
-          # Delete just the zip, not the whole directory so logs are kept.
-          os.remove(SWARMING_BOT_ZIP)
-
-        http = AuthorizedHTTPRequest(service_account=service_account)
-        _, bot_code = http.request(
-            urlparse.urljoin(attributes['swarming_server'], 'bot_code'),
-            method='GET',
-        )
-        with open(SWARMING_BOT_ZIP, 'w') as fd:
-          fd.write(bot_code)
-        os.chown(SWARMING_BOT_ZIP, chrome_bot.pw_uid, chrome_bot.pw_gid)
-
-        pubsub.acknowledge(subscription, project, ack_ids)
-        subprocess.check_call(['/sbin/shutdown', '-r', 'now'])
-
-    if ack_ids:
-      pubsub.acknowledge(subscription, project, ack_ids)
-    if time.time() - start_time < 1:
-      # Iterate at most once per second (chosen arbitrarily).
-      time.sleep(1)
+    try:
+      response = mp.poll(hostname, 'GCE')
+      if response and response.get('state') != 'EXECUTED':
+        logging.info(
+            'Received new instruction: %s', json.dumps(response, indent=2))
+        if response.get('instruction', {}).get('swarming_server'):
+          connect_to_swarming(
+              service_account, response['instruction']['swarming_server'], user)
+          mp.ack(hostname, 'GCE')
+          subprocess.check_call(['/sbin/shutdown', '-r', 'now'])
+    except NotFoundError:
+      logging.info('Found no instruction')
+    time.sleep(60)
 
 
 def install():
@@ -312,7 +313,7 @@ def main():
   if args.install:
     return install()
 
-  return listen()
+  return poll()
 
 
 if __name__ == '__main__':
