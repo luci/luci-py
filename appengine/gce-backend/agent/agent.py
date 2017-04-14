@@ -35,7 +35,7 @@ AGENT_UPSTART_CONFIG_DEST = '/etc/init/machine-provider-agent.conf'
 AGENT_UPSTART_CONFIG_TMPL = os.path.join(
     THIS_DIR, 'machine-provider-agent.conf.tmpl')
 AGENT_UPSTART_JOB = 'machine-provider-agent'
-CHROME_BOT = 'chrome-bot' # TODO(smut): Convert to passed --argument.
+CHROME_BOT = 'chrome-bot' # TODO(smut): Remove after configs pass --user.
 METADATA_BASE_URL = 'http://metadata/computeMetadata/v1'
 PUBSUB_BASE_URL = 'https://pubsub.googleapis.com/v1/projects'
 SWARMING_BOT_DIR = '/b/s'
@@ -246,21 +246,20 @@ def connect_to_swarming(service_account, swarming_server, user):
   os.chown(SWARMING_BOT_ZIP, user.pw_uid, user.pw_gid)
 
 
-def poll():
+def poll(user):
   """Polls Machine Provider for instructions."""
   # Metadata tells us which Machine Provider instance to talk to.
   hostname = get_metadata('instance/name')
   server = get_metadata('instance/attributes/machine_provider_server')
   service_account = get_metadata('instance/attributes/machine_service_account')
-  user = CHROME_BOT
+  user = user or CHROME_BOT
   mp = MachineProvider(server=server, service_account=service_account)
 
   while True:
     logging.info('Polling for instructions')
-    start_time = time.time()
     try:
       response = mp.poll(hostname, 'GCE')
-      if response and response.get('state') != 'EXECUTED':
+      if response.get('instruction') and response.get('state') != 'EXECUTED':
         logging.info(
             'Received new instruction: %s', json.dumps(response, indent=2))
         if response.get('instruction', {}).get('swarming_server'):
@@ -269,7 +268,7 @@ def poll():
           mp.ack(hostname, 'GCE')
           subprocess.check_call(['/sbin/shutdown', '-r', 'now'])
     except NotFoundError:
-      logging.info('Found no instruction')
+      logging.warning('Invalid hostname for GCE backend, or unauthorized')
     time.sleep(60)
 
 
@@ -308,12 +307,17 @@ def main():
       action='store_true',
       help='Install Upstart config for the Machine Provider agent.',
   )
+  parser.add_argument(
+      '-u',
+      '--user',
+      help='User to set up Swarming for.',
+  )
   args = parser.parse_args()
 
   if args.install:
     return install()
 
-  return poll()
+  return poll(args.user)
 
 
 if __name__ == '__main__':
