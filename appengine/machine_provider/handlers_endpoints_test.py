@@ -869,6 +869,93 @@ class MachineTest(test_case.EndpointsTestCase):
     self.assertEqual(
         machine_key.get().instruction.state, models.InstructionStates.RECEIVED)
 
+  def test_ack_entry_not_found(self):
+    auth_testing.mock_get_current_identity(self)
+
+    request = rpc_to_json(rpc_messages.AckRequest(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    ))
+
+    with self.assertRaises(webtest.app.AppError):
+      self.call_api('ack', request)
+
+  def test_ack_unauthorized(self):
+    auth_testing.mock_get_current_identity(self)
+
+    request = rpc_to_json(rpc_messages.AckRequest(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    ))
+    dimensions = rpc_messages.Dimensions(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    )
+    machine_key = models.CatalogMachineEntry(
+        key=models.CatalogMachineEntry.generate_key(dimensions),
+        dimensions=dimensions,
+        instruction=models.Instruction(
+            instruction=rpc_messages.Instruction(swarming_server='example.com'),
+            state=models.InstructionStates.RECEIVED,
+        ),
+        lease_id='fake-id',
+        policies=rpc_messages.Policies(),
+    ).put()
+
+    with self.assertRaises(webtest.app.AppError):
+      self.call_api('ack', request)
+
+  def test_ack_no_instruction(self):
+    auth_testing.mock_get_current_identity(self)
+
+    request = rpc_to_json(rpc_messages.AckRequest(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    ))
+    dimensions = rpc_messages.Dimensions(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    )
+    machine_key = models.CatalogMachineEntry(
+        key=models.CatalogMachineEntry.generate_key(dimensions),
+        dimensions=dimensions,
+        lease_id='fake-id',
+        policies=rpc_messages.Policies(
+            machine_service_account=auth_testing.DEFAULT_MOCKED_IDENTITY.name,
+        ),
+    ).put()
+
+    with self.assertRaises(webtest.app.AppError):
+      self.call_api('ack', request)
+
+  def test_ack(self):
+    auth_testing.mock_get_current_identity(self)
+
+    request = rpc_to_json(rpc_messages.AckRequest(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    ))
+    dimensions = rpc_messages.Dimensions(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    )
+    machine_key = models.CatalogMachineEntry(
+        key=models.CatalogMachineEntry.generate_key(dimensions),
+        dimensions=dimensions,
+        instruction=models.Instruction(
+            instruction=rpc_messages.Instruction(swarming_server='example.com'),
+            state=models.InstructionStates.RECEIVED,
+        ),
+        lease_id='fake-id',
+        policies=rpc_messages.Policies(
+            machine_service_account=auth_testing.DEFAULT_MOCKED_IDENTITY.name,
+        ),
+    ).put()
+
+    self.call_api('ack', request)
+    self.assertEqual(
+        machine_key.get().instruction.state, models.InstructionStates.EXECUTED)
+
 
 class MachineProviderReleaseTest(test_case.EndpointsTestCase):
   """Tests for handlers_endpoints.MachineProviderEndpoints.release."""

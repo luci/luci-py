@@ -283,3 +283,11 @@ class PollResponse(messages.Message):
   instruction = messages.MessageField(Instruction, 1)
   # State of the instruction.
   state = messages.StringField(2)
+
+
+class AckRequest(messages.Message):
+  """Represents a request to ack an instruction received by a machine."""
+  # Hostname of the machine whose instruction to ack.
+  hostname = messages.StringField(1, required=True)
+  # Backend the machine belongs to.
+  backend = messages.EnumField(Backend, 2)

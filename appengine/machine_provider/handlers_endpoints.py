@@ -15,6 +15,7 @@ from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
+from protorpc import message_types
 from protorpc import protobuf
 from protorpc import remote
 
@@ -330,7 +331,6 @@ class MachineEndpoints(remote.Service):
     machine.instruction.state = new_state
     machine.put()
 
-
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(rpc_messages.PollRequest, rpc_messages.PollResponse)
   @auth.require(acl.is_logged_in)
@@ -382,6 +382,26 @@ class MachineEndpoints(remote.Service):
         instruction=entry.instruction.instruction,
         state=entry.instruction.state,
     )
+
+  @gae_ts_mon.instrument_endpoint()
+  @auth.endpoints_method(rpc_messages.AckRequest)
+  @auth.require(acl.is_logged_in)
+  def ack(self, request):
+    """Handles an incoming AckRequest."""
+    user = auth.get_current_identity()
+    entry = models.CatalogMachineEntry.get(request.backend, request.hostname)
+    if (not entry or not entry.policies
+        or entry.policies.machine_service_account != user.name):
+      raise endpoints.NotFoundException('CatalogMachineEntry not found')
+
+    if not entry.lease_id or not entry.instruction:
+      raise endpoints.BadRequestException('Machine has no instruction')
+
+    if entry.instruction.state != models.InstructionStates.EXECUTED:
+      self._update_instruction_state(
+          entry.key, models.InstructionStates.EXECUTED)
+
+    return message_types.VoidMessage()
 
 
 @auth.endpoints_api(name='machine_provider', version='v1')
