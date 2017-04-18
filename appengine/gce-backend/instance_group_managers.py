@@ -7,6 +7,7 @@
 import collections
 import json
 import logging
+import math
 
 from google.appengine.ext import ndb
 
@@ -352,18 +353,19 @@ def resize(key):
 
   # Ensure there are at least as many instances as needed, but not more than
   # the total allowed at this time.
-  new_target_size = min(
+  new_target_size = int(min(
       # Minimum size to aim for. At least THRESHOLD times more than the number
       # of instances already leased out, but not less than the minimum
-      # configured size.
-      max(instance_group_manager.minimum_size, int(leased * THRESHOLD)),
+      # configured size. If the THRESHOLD suggests we need a fraction of an
+      # instance, we need to provide at least one additional whole instance.
+      max(instance_group_manager.minimum_size, math.ceil(leased * THRESHOLD)),
       # Total number of instances for this instance group allowed at this time.
       # Ensures that a config change waits for instances of the old revision to
       # be deleted before bringing up instances of the new revision.
       instance_group_manager.maximum_size - other_revision_total_size,
       # Maximum amount the size is allowed to be increased each iteration.
       current_size + RESIZE_LIMIT,
-  )
+  ))
   logging.info(
       ('Key: %s\nSize: %s\nOld target: %s\nNew target: %s\nMin: %s\nMax: %s'
        '\nLeased: %s\nOther revisions: %s'),
