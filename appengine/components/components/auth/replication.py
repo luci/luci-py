@@ -33,7 +33,7 @@ LINKING_ERRORS = {
 # Returned by new_auth_db_snapshot.
 AuthDBSnapshot = collections.namedtuple(
     'AuthDBSnapshot',
-    'global_config, groups, secrets, ip_whitelists, ip_whitelist_assignments')
+    'global_config, groups, ip_whitelists, ip_whitelist_assignments')
 
 
 class ProtocolError(Exception):
@@ -127,8 +127,6 @@ def new_auth_db_snapshot():
   state_future = model.replication_state_key().get_async()
   config_future = model.root_key().get_async()
   groups_future = model.AuthGroup.query(ancestor=model.root_key()).fetch_async()
-  secrets_future = model.AuthSecret.query(
-      ancestor=model.secret_scope_key('global')).fetch_async()
 
   # It's fine to block here as long as it's the last fetch.
   ip_whitelist_assignments, ip_whitelists = model.fetch_ip_whitelists()
@@ -137,7 +135,6 @@ def new_auth_db_snapshot():
       config_future.get_result() or model.AuthGlobalConfig(
           key=model.root_key()),
       groups_future.get_result(),
-      secrets_future.get_result(),
       ip_whitelists,
       ip_whitelist_assignments)
   return state_future.get_result(), snapshot
@@ -176,13 +173,6 @@ def auth_db_snapshot_to_proto(snapshot, auth_db_proto=None):
     msg.modified_ts = utils.datetime_to_timestamp(ent.modified_ts)
     msg.modified_by = ent.modified_by.to_bytes()
     msg.owners = ent.owners
-
-  for ent in snapshot.secrets:
-    msg = auth_db_proto.secrets.add()
-    msg.name = ent.key.id()
-    msg.values.extend(ent.values)
-    msg.modified_ts = utils.datetime_to_timestamp(ent.modified_ts)
-    msg.modified_by = ent.modified_by.to_bytes()
 
   for ent in snapshot.ip_whitelists:
     msg = auth_db_proto.ip_whitelists.add()
@@ -232,16 +222,6 @@ def proto_to_auth_db_snapshot(auth_db_proto):
     for msg in auth_db_proto.groups
   ]
 
-  secrets = [
-    model.AuthSecret(
-        id=msg.name,
-        parent=model.secret_scope_key('global'),
-        values=list(msg.values),
-        modified_ts=utils.timestamp_to_datetime(msg.modified_ts),
-        modified_by=model.Identity.from_bytes(msg.modified_by))
-    for msg in auth_db_proto.secrets
-  ]
-
   ip_whitelists = [
     model.AuthIPWhitelist(
         key=model.ip_whitelist_key(msg.name),
@@ -268,7 +248,7 @@ def proto_to_auth_db_snapshot(auth_db_proto):
   )
 
   return AuthDBSnapshot(
-      global_config, groups, secrets, ip_whitelists, ip_whitelist_assignments)
+      global_config, groups, ip_whitelists, ip_whitelist_assignments)
 
 
 def get_changed_entities(new_entity_list, old_entity_list):
@@ -307,9 +287,6 @@ def replace_auth_db(auth_db_rev, modified_ts, snapshot):
     Tuple (True if update was applied, current AuthReplicationState value).
   """
   assert model.is_replica()
-  assert all(
-      secret.key.parent() == model.secret_scope_key('global')
-      for secret in snapshot.secrets), 'Only global secrets can be replaced'
 
   # Quickly check current auth_db rev before doing heavy calls.
   current_state = model.get_replication_state()
@@ -324,7 +301,6 @@ def replace_auth_db(auth_db_rev, modified_ts, snapshot):
   if snapshot.global_config.to_dict() != current.global_config.to_dict():
     entites_to_put.append(snapshot.global_config)
   entites_to_put.extend(get_changed_entities(snapshot.groups, current.groups))
-  entites_to_put.extend(get_changed_entities(snapshot.secrets, current.secrets))
   entites_to_put.extend(
       get_changed_entities(snapshot.ip_whitelists, current.ip_whitelists))
   new_ips = snapshot.ip_whitelist_assignments
@@ -335,7 +311,6 @@ def replace_auth_db(auth_db_rev, modified_ts, snapshot):
   # Keys of entities that needs to be removed.
   keys_to_delete = []
   keys_to_delete.extend(get_deleted_keys(snapshot.groups, current.groups))
-  keys_to_delete.extend(get_deleted_keys(snapshot.secrets, current.secrets))
   keys_to_delete.extend(
       get_deleted_keys(snapshot.ip_whitelists, current.ip_whitelists))
 

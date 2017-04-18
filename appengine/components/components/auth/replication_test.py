@@ -31,7 +31,6 @@ def snapshot_to_dict(snapshot):
   result = {
     'global_config': entity_to_dict(snapshot.global_config),
     'groups': [entity_to_dict(g) for g in snapshot.groups],
-    'secrets': [entity_to_dict(s) for s in snapshot.secrets],
     'ip_whitelists': [entity_to_dict(l) for l in snapshot.ip_whitelists],
     'ip_whitelist_assignments':
         entity_to_dict(snapshot.ip_whitelist_assignments),
@@ -42,14 +41,13 @@ def snapshot_to_dict(snapshot):
 
 
 def make_snapshot_obj(
-    global_config=None, groups=None, secrets=None,
+    global_config=None, groups=None,
     ip_whitelists=None, ip_whitelist_assignments=None):
   """Returns AuthDBSnapshot with omitted fields set to default values."""
   return replication.AuthDBSnapshot(
       global_config=global_config or model.AuthGlobalConfig(
           key=model.root_key()),
       groups=groups or [],
-      secrets=secrets or [],
       ip_whitelists=ip_whitelists or [],
       ip_whitelist_assignments=(
           ip_whitelist_assignments or
@@ -78,7 +76,6 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
         'token_server_url': u'',
       },
       'groups': [],
-      'secrets': [],
       'ip_whitelists': [],
       'ip_whitelist_assignments': {
         '__id__': 'default',
@@ -227,17 +224,6 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
           'owners': u'owning-group',
         },
       ],
-      'secrets': [
-        {
-          '__id__': 'global_secret',
-          '__parent__': ndb.Key(
-              'AuthGlobalConfig', 'root', 'AuthSecretScope', 'global'),
-          'modified_by': model.Identity(
-              kind='user', name='modifier@example.com'),
-          'modified_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
-          'values': ['1234', '5678'],
-        },
-      ],
       'ip_whitelists': [
         {
           '__id__': 'bots',
@@ -317,17 +303,6 @@ class SnapshotToProtoConversionTest(test_case.TestCase):
         modified_by=model.Identity.from_bytes('user:modifier@example.com'),
     )
     snapshot = make_snapshot_obj(groups=[group])
-    self.assert_serialization_works(snapshot)
-
-  def test_secret_serialization(self):
-    """Serializing snapshot with non-trivial AuthSecret."""
-    secret = model.AuthSecret(
-        id='secret key',
-        parent=model.secret_scope_key('global'),
-        values=['\x00' * 100, ''],
-        modified_ts=utils.utcnow(),
-        modified_by=model.Identity.from_bytes('user:modifier@example.com'))
-    snapshot = make_snapshot_obj(secrets=[secret])
     self.assert_serialization_works(snapshot)
 
   def test_ip_whitelists_serialization(self):
@@ -444,11 +419,6 @@ class ReplaceAuthDbTest(test_case.TestCase):
           group('Modify', description='blah', owners='some-other-owners'),
           group('Keep'),
         ],
-        secrets=[
-          secret('new', 'global'),
-          secret('modify', 'global', values=['1234']),
-          secret('keep', 'global'),
-        ],
         ip_whitelists=[
           ip_whitelist('new', subnets=['1.1.1.1/32']),
           ip_whitelist('modify', subnets=['127.0.0.1/32', '192.168.0.1/32']),
@@ -542,32 +512,6 @@ class ReplaceAuthDbTest(test_case.TestCase):
           'owners': u'administrators',
         },
       ],
-      'secrets': [
-        {
-          '__id__': 'keep',
-          '__parent__': ndb.Key(
-              'AuthGlobalConfig', 'root', 'AuthSecretScope', 'global'),
-          'modified_by': None,
-          'modified_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
-          'values': [],
-        },
-        {
-          '__id__': 'modify',
-          '__parent__': ndb.Key(
-              'AuthGlobalConfig', 'root', 'AuthSecretScope', 'global'),
-          'modified_by': None,
-          'modified_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
-          'values': ['1234'],
-        },
-        {
-          '__id__': 'new',
-          '__parent__': ndb.Key(
-              'AuthGlobalConfig', 'root', 'AuthSecretScope', 'global'),
-          'modified_by': None,
-          'modified_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
-          'values': [],
-        },
-      ],
       'ip_whitelists': [
         {
           '__id__': 'keep',
@@ -639,22 +583,6 @@ class ReplaceAuthDbTest(test_case.TestCase):
       },
     }
     self.assertEqual(expected_auth_db, snapshot_to_dict(current_snapshot))
-
-    # Ensure local secret was left intact.
-    local_secrets = model.AuthSecret.query(
-        ancestor=model.secret_scope_key('local'))
-    expected_local_secrets = [
-      {
-        '__id__': 'local',
-        '__parent__': ndb.Key(
-            'AuthGlobalConfig', 'root', 'AuthSecretScope', 'local'),
-        'modified_by': None,
-        'modified_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
-        'values': [],
-      },
-    ]
-    self.assertEqual(
-        expected_local_secrets, [entity_to_dict(s) for s in local_secrets])
 
   def test_old_rev(self):
     """Refuses to push with old auth_db revision."""
