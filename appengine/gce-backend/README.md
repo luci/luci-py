@@ -98,8 +98,7 @@ not pending deletion is added to the catalog.
 ## update-cataloged-instances
 
 Checks the state of the instance in the Machine Provider catalog. If the Machine
-Provider has created a Pub/Sub topic for the instance, schedules a metadata
-operation to add Pub/Sub subscription information to the instance. If the
+Provider has leased the instance, that instance is marked as leased. If the
 Machine Provider has reclaimed the instance after lease expiration, schedules
 an operation to delete the GCE instance.
 

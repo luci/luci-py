@@ -37,7 +37,6 @@ AGENT_UPSTART_CONFIG_TMPL = os.path.join(
 AGENT_UPSTART_JOB = 'machine-provider-agent'
 CHROME_BOT = 'chrome-bot' # TODO(smut): Remove after configs pass --user.
 METADATA_BASE_URL = 'http://metadata/computeMetadata/v1'
-PUBSUB_BASE_URL = 'https://pubsub.googleapis.com/v1/projects'
 SWARMING_BOT_DIR = '/b/s'
 SWARMING_BOT_ZIP = os.path.join(SWARMING_BOT_DIR, 'swarming_bot.zip')
 SWARMING_UPSTART_CONFIG_DEST = '/etc/init/swarming-start-bot.conf'

@@ -11,7 +11,6 @@ from google.appengine.ext import ndb
 
 from components import gce
 from components import net
-from components import pubsub
 from components import utils
 
 import instance_group_managers
@@ -67,41 +66,6 @@ def mark_for_deletion(key):
     instance.pending_deletion = True
     instance.put()
     metrics.send_machine_event('DELETION_PROPOSED', instance.hostname)
-
-
-@ndb.transactional
-def add_subscription_metadata(
-      key, subscription_project, subscription, service_account):
-  """Queues the addition of subscription metadata.
-
-  Args:
-    key: ndb.Key for a models.Instance entity.
-    subscription_project: Project containing the Pub/Sub subscription.
-    subscription: Name of the Pub/Sub subscription that Machine Provider will
-      communicate with the instance on.
-    service_account: Service account authorized to read the Pub/Sub
-      subscription.
-  """
-  instance = key.get()
-  if not instance:
-    logging.warning('Instance does not exist: %s', key)
-    return
-
-  if instance.pubsub_subscription:
-    return
-
-  logging.info('Instance Pub/Sub subscription received: %s', key)
-  instance.pending_metadata_updates.append(models.MetadataUpdate(
-      metadata={
-          'pubsub_service_account': service_account,
-          'pubsub_subscription': subscription,
-          'pubsub_subscription_project': subscription_project,
-      },
-  ))
-  instance.pubsub_service_account = service_account
-  instance.pubsub_subscription = pubsub.full_subscription_name(
-      subscription_project, subscription)
-  instance.put()
 
 
 @ndb.transactional

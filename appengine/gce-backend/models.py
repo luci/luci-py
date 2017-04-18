@@ -73,10 +73,6 @@ class Instance(ndb.Model):
   # Pending metadata operations.
   pending_metadata_updates = ndb.LocalStructuredProperty(
       MetadataUpdate, repeated=True)
-  # Service account authorized to read the Pub/Sub subscription.
-  pubsub_service_account = ndb.StringProperty(indexed=False)
-  # Pub/Sub subscription used by Machine provider to signal this instance.
-  pubsub_subscription = ndb.StringProperty(indexed=False)
   # URL of the instance.
   url = ndb.StringProperty(indexed=False)
 

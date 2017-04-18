@@ -224,15 +224,6 @@ def update_cataloged_instance(key):
 
   try:
     response = machine_provider.retrieve_machine(instance.hostname)
-    if response.get('pubsub_subscription') and not instance.pubsub_subscription:
-      metrics.send_machine_event('SUBSCRIPTION_RECEIVED', instance.hostname)
-      instances.add_subscription_metadata(
-          key,
-          response['pubsub_subscription_project'],
-          response['pubsub_subscription'],
-          response['policies']['machine_service_account'],
-      )
-      metrics.send_machine_event('METADATA_UPDATE_PROPOSED', instance.hostname)
     if response.get('lease_expiration_ts'):
       lease_expiration_ts = datetime.datetime.utcfromtimestamp(
           int(response['lease_expiration_ts']))

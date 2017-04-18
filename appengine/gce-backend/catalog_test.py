@@ -452,41 +452,6 @@ class UpdateCatalogedEntryTest(test_case.TestCase):
 
     catalog.update_cataloged_instance(key)
 
-  def test_updated_metadata(self):
-    """Ensures an instance can be updated with a pending metadata update."""
-    def retrieve_machine(*args, **kwargs):
-      return {
-          'policies': {
-              'machine_service_account': 'service-account',
-          },
-          'pubsub_subscription': 'subscription',
-          'pubsub_subscription_project': 'project',
-      }
-    def send_machine_event(*args, **kwargs):
-      pass
-    self.mock(catalog.machine_provider, 'retrieve_machine', retrieve_machine)
-    self.mock(catalog.metrics, 'send_machine_event', send_machine_event)
-
-    key = instances.get_instance_key(
-        'base-name',
-        'revision',
-        'zone',
-        'instance-name',
-    )
-    key = models.Instance(
-        key=key,
-        cataloged=True,
-        instance_group_manager=instances.get_instance_group_manager_key(key),
-    ).put()
-
-    catalog.update_cataloged_instance(key)
-    self.assertEqual(key.get().pubsub_service_account, 'service-account')
-    self.assertEqual(
-        key.get().pubsub_subscription,
-        'projects/project/subscriptions/subscription',
-    )
-    self.failUnless(key.get().pending_metadata_updates)
-
   def test_updated_lease_expiration_ts(self):
     """Ensures an instance can be updated with a lease_expiration_ts."""
     now = int(utils.time_time())

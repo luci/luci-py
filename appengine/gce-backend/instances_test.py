@@ -83,59 +83,6 @@ class AddLeaseExpirationTsTest(test_case.TestCase):
     self.failUnless(key.get().leased)
 
 
-class AddSubscriptionMetadataTest(test_case.TestCase):
-  """Tests for instances.add_subscription_metadata."""
-
-  def test_entity_not_found(self):
-    """Ensures nothing happens when the entity doesn't exist."""
-    key = ndb.Key(models.Instance, 'fake-instance')
-
-    instances.add_subscription_metadata(
-        key, 'project', 'subscription', 'service-account')
-
-    self.failIf(key.get())
-
-  def test_pubsub_subscription_specified(self):
-    """Ensures nothing happens when the entity already has a subscription."""
-    key = models.Instance(
-        key=instances.get_instance_key(
-            'base-name',
-            'revision',
-            'zone',
-            'instance-name',
-        ),
-        pubsub_subscription='original-subscription',
-    ).put()
-
-    instances.add_subscription_metadata(
-        key, 'project', 'new-subscription', 'service-account')
-
-    self.failIf(key.get().pending_metadata_updates)
-    self.failIf(key.get().pubsub_service_account)
-    self.assertEqual(key.get().pubsub_subscription, 'original-subscription')
-
-  def test_metadata_added(self):
-    """Ensures metadata update is scheduled."""
-    key = models.Instance(
-        key=instances.get_instance_key(
-            'base-name',
-            'revision',
-            'zone',
-            'instance-name',
-        ),
-    ).put()
-
-    instances.add_subscription_metadata(
-        key, 'project', 'subscription', 'service-account')
-
-    self.failUnless(key.get().pending_metadata_updates)
-    self.assertEqual(key.get().pubsub_service_account, 'service-account')
-    self.assertEqual(
-        key.get().pubsub_subscription,
-        'projects/project/subscriptions/subscription',
-    )
-
-
 class DeleteDrainedTest(test_case.TestCase):
   """Tests for instances.delete_drained."""
 
