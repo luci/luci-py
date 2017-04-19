@@ -107,10 +107,6 @@ class CatalogEndpoints(remote.Service):
     response = rpc_messages.CatalogMachineRetrievalResponse(
         dimensions=entry.dimensions,
         policies=entry.policies,
-        pubsub_subscription=entry.pubsub_subscription,
-        pubsub_subscription_project=entry.pubsub_subscription_project,
-        pubsub_topic=entry.pubsub_topic,
-        pubsub_topic_project=entry.pubsub_topic,
         state=entry.state,
     )
     if entry.lease_expiration_ts:
@@ -137,40 +133,6 @@ class CatalogEndpoints(remote.Service):
     if error:
       return rpc_messages.CatalogManipulationResponse(
           error=error,
-          machine_addition_request=request,
-      )
-    if request.policies.backend_topic:
-      if not pubsub.validate_topic(request.policies.backend_topic):
-        logging.warning(
-            'Invalid topic for Cloud Pub/Sub: %s',
-            request.policies.backend_topic,
-        )
-        return rpc_messages.CatalogManipulationResponse(
-            error=rpc_messages.CatalogManipulationRequestError.INVALID_TOPIC,
-            machine_addition_request=request,
-        )
-      if not request.policies.backend_project:
-        logging.info(
-            'Cloud Pub/Sub project unspecified, using default: %s',
-            PUBSUB_DEFAULT_PROJECT,
-        )
-        request.policies.backend_project = PUBSUB_DEFAULT_PROJECT
-      if not pubsub.validate_project(request.policies.backend_project):
-        logging.warning(
-            'Invalid project for Cloud Pub/Sub: %s',
-            request.policies.backend_project,
-        )
-        return rpc_messages.CatalogManipulationResponse(
-            error=rpc_messages.CatalogManipulationRequestError.INVALID_PROJECT,
-            machine_addition_request=request,
-        )
-    elif request.policies.backend_project:
-      logging.warning(
-          'Cloud Pub/Sub project specified without specifying topic: %s',
-          request.policies.backend_project,
-      )
-      return rpc_messages.CatalogManipulationResponse(
-          error=rpc_messages.CatalogManipulationRequestError.UNSPECIFIED_TOPIC,
           machine_addition_request=request,
       )
 
@@ -224,10 +186,8 @@ class CatalogEndpoints(remote.Service):
     models.CatalogMachineEntry(
         key=models.CatalogMachineEntry.generate_key(request.dimensions),
         dimensions=request.dimensions,
-        pubsub_subscription_project=PUBSUB_DEFAULT_PROJECT,
-        pubsub_topic_project=PUBSUB_DEFAULT_PROJECT,
         policies=request.policies,
-        state=models.CatalogMachineEntryStates.NEW,
+        state=models.CatalogMachineEntryStates.AVAILABLE,
     ).put()
     return rpc_messages.CatalogManipulationResponse(
         machine_addition_request=request,
@@ -752,13 +712,6 @@ class MachineProviderEndpoints(remote.Service):
       )
 
     self._instruct(machine.key, request.instruction)
-
-    logging.info('Sending CONNECT message to %s', machine.dimensions.hostname)
-    topic = pubsub.full_topic_name(
-        machine.pubsub_topic_project, machine.pubsub_topic)
-    attributes = {'swarming_server': request.instruction.swarming_server}
-    pubsub.publish(topic, 'CONNECT', attributes)
-    metrics.pubsub_messages_sent.increment(fields={'target': 'machine'})
 
     return rpc_messages.MachineInstructionResponse(
         client_request_id=request.request_id)

@@ -271,50 +271,6 @@ class LeaseMachineTest(test_case.TestCase):
         models.CatalogMachineEntryStates.AVAILABLE,
     )
 
-  def test_no_subscription(self):
-    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: True)
-
-    machine_key = models.CatalogMachineEntry(
-        id='machine-id',
-        dimensions=rpc_messages.Dimensions(
-            os_family=rpc_messages.OSFamily.LINUX,
-        ),
-        policies=rpc_messages.Policies(
-            machine_service_account='service-account',
-        ),
-        state=models.CatalogMachineEntryStates.AVAILABLE,
-    ).put()
-    request = rpc_messages.LeaseRequest(
-        dimensions=rpc_messages.Dimensions(
-            os_family=rpc_messages.OSFamily.LINUX,
-        ),
-        duration=1,
-        request_id='request-id',
-    )
-    lease_request_key = models.LeaseRequest(
-        id='lease-id',
-        deduplication_checksum=
-            models.LeaseRequest.compute_deduplication_checksum(request),
-        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
-        request=request,
-        response=rpc_messages.LeaseResponse(
-            client_request_id='client-request-id',
-            state=rpc_messages.LeaseRequestState.UNTRIAGED,
-        ),
-    ).put()
-
-    handlers_cron.lease_machine(machine_key, lease_request_key.get())
-    self.assertFalse(lease_request_key.get().machine_id)
-    self.assertEqual(
-        lease_request_key.get().response.state,
-        rpc_messages.LeaseRequestState.UNTRIAGED,
-    )
-    self.assertFalse(machine_key.get().lease_id)
-    self.assertEqual(
-        machine_key.get().state,
-        models.CatalogMachineEntryStates.AVAILABLE,
-    )
-
   def test_leased_task_failed(self):
     self.mock(utils, 'enqueue_task', lambda *args, **kwargs: False)
 
@@ -871,108 +827,6 @@ class LeaseReleaseProcessorTest(test_case.TestCase):
     )
 
 
-class CreateSubscriptionTest(test_case.TestCase):
-  """Tests for handlers_cron.create_subscription."""
-
-  def test_creates(self):
-    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: True)
-
-    key = models.CatalogMachineEntry(
-        dimensions=rpc_messages.Dimensions(
-            os_family=rpc_messages.OSFamily.LINUX,
-        ),
-        policies=rpc_messages.Policies(
-            backend_attributes=[
-                rpc_messages.KeyValuePair(
-                    key='key',
-                    value='value',
-                ),
-            ],
-            backend_project='project',
-            backend_topic='topic',
-            machine_service_account='fake-service-account',
-        ),
-        state=models.CatalogMachineEntryStates.NEW,
-    ).put()
-
-    handlers_cron.create_subscription(key)
-
-  def test_machine_doesnt_exist(self):
-    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: False)
-
-    handlers_cron.create_subscription(
-        ndb.Key(models.CatalogMachineEntry, 'fake-key'))
-
-  def test_wrong_state(self):
-    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: False)
-
-    key = models.CatalogMachineEntry(
-        dimensions=rpc_messages.Dimensions(
-            os_family=rpc_messages.OSFamily.LINUX,
-        ),
-        policies=rpc_messages.Policies(
-            machine_service_account='fake-service-account',
-        ),
-        state=models.CatalogMachineEntryStates.AVAILABLE,
-    ).put()
-
-    handlers_cron.create_subscription(key)
-
-  def test_no_service_account(self):
-    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: False)
-
-    key = models.CatalogMachineEntry(
-        dimensions=rpc_messages.Dimensions(
-            os_family=rpc_messages.OSFamily.LINUX,
-        ),
-        policies=rpc_messages.Policies(
-        ),
-        state=models.CatalogMachineEntryStates.NEW,
-    ).put()
-
-    handlers_cron.create_subscription(key)
-
-  def test_already_subscribed(self):
-    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: False)
-
-    key = models.CatalogMachineEntry(
-        dimensions=rpc_messages.Dimensions(
-            os_family=rpc_messages.OSFamily.LINUX,
-        ),
-        policies=rpc_messages.Policies(
-            machine_service_account='fake-service-account',
-        ),
-        pubsub_subscription='subscription',
-        state=models.CatalogMachineEntryStates.NEW,
-    ).put()
-
-    handlers_cron.create_subscription(key)
-
-  def test_task_enqueuing_error(self):
-    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: False)
-
-    key = models.CatalogMachineEntry(
-        dimensions=rpc_messages.Dimensions(
-            os_family=rpc_messages.OSFamily.LINUX,
-        ),
-        policies=rpc_messages.Policies(
-            backend_attributes=[
-                rpc_messages.KeyValuePair(
-                    key='key',
-                    value='value',
-                ),
-            ],
-            backend_project='project',
-            backend_topic='topic',
-            machine_service_account='fake-service-account',
-        ),
-        state=models.CatalogMachineEntryStates.NEW,
-    ).put()
-
-    with self.assertRaises(handlers_cron.TaskEnqueuingError):
-      handlers_cron.create_subscription(key)
-
-
 class NewMachineProcessorTest(test_case.TestCase):
   """Tests for handlers_cron.NewMachineProcessor."""
 
@@ -982,9 +836,6 @@ class NewMachineProcessorTest(test_case.TestCase):
     self.app = webtest.TestApp(app)
 
   def test_subscribes(self):
-    self.mock(
-        handlers_cron, 'create_subscription', lambda *args, **kwargs: True)
-
     key = models.CatalogMachineEntry(
         dimensions=rpc_messages.Dimensions(
             os_family=rpc_messages.OSFamily.LINUX,
@@ -1000,7 +851,8 @@ class NewMachineProcessorTest(test_case.TestCase):
         headers={'X-AppEngine-Cron': 'true'},
     )
 
-    self.assertFalse(key.get().pubsub_subscription)
+    self.assertEqual(
+        key.get().state, models.CatalogMachineEntryStates.AVAILABLE)
 
 
 if __name__ == '__main__':

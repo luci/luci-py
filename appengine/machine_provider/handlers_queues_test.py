@@ -141,40 +141,5 @@ class ReclaimTest(test_case.TestCase):
     self.assertFalse(machine_key.get())
 
 
-class SetAvailableTest(test_case.TestCase):
-  """Tests for handlers_queues.set_available."""
-
-  def test_not_found(self):
-    key = ndb.Key(models.CatalogMachineEntry, 'fake-key')
-    handlers_queues.set_available(key, 'topic', 'subscription')
-    self.assertFalse(key.get())
-
-  def test_new(self):
-    key = models.CatalogMachineEntry(
-        dimensions=rpc_messages.Dimensions(),
-        state=models.CatalogMachineEntryStates.NEW,
-    ).put()
-
-    handlers_queues.set_available(key, 'topic', 'subscription')
-    self.assertEqual(key.get().pubsub_subscription, 'subscription')
-    self.assertEqual(key.get().pubsub_topic, 'topic')
-    self.assertEqual(
-        key.get().state, models.CatalogMachineEntryStates.AVAILABLE)
-
-  def test_available(self):
-    key = models.CatalogMachineEntry(
-        dimensions=rpc_messages.Dimensions(),
-        pubsub_subscription='old-subscription',
-        pubsub_topic='old-topic',
-        state=models.CatalogMachineEntryStates.AVAILABLE,
-    ).put()
-
-    handlers_queues.set_available(key, 'new-topic', 'new-subscription')
-    self.assertEqual(key.get().pubsub_subscription, 'old-subscription')
-    self.assertEqual(key.get().pubsub_topic, 'old-topic')
-    self.assertEqual(
-        key.get().state, models.CatalogMachineEntryStates.AVAILABLE)
-
-
 if __name__ == '__main__':
   unittest.main()

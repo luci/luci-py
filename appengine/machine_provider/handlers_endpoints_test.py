@@ -194,27 +194,6 @@ class CatalogTest(test_case.EndpointsTestCase):
         rpc_messages.CatalogManipulationRequestError.UNSPECIFIED_BACKEND,
     )
 
-  def test_add_project_no_topic(self):
-    request = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
-        dimensions=rpc_messages.Dimensions(
-            hostname='fake-host',
-            os_family=rpc_messages.OSFamily.LINUX,
-        ),
-        policies=rpc_messages.Policies(
-            backend_project='fake-project',
-        ),
-    ))
-    self.mock_get_current_backend()
-
-    response = jsonish_dict_to_rpc(
-        self.call_api('add_machine', request).json,
-        rpc_messages.CatalogManipulationResponse,
-    )
-    self.assertEqual(
-        response.error,
-        rpc_messages.CatalogManipulationRequestError.UNSPECIFIED_TOPIC,
-    )
-
   def test_add_no_hostname(self):
     request = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
         dimensions=rpc_messages.Dimensions(
@@ -234,50 +213,6 @@ class CatalogTest(test_case.EndpointsTestCase):
     self.assertEqual(
       response.error,
       rpc_messages.CatalogManipulationRequestError.UNSPECIFIED_HOSTNAME,
-    )
-
-  def test_add_invalid_topic(self):
-    request = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
-        dimensions=rpc_messages.Dimensions(
-            hostname='fake-host',
-            os_family=rpc_messages.OSFamily.LINUX,
-        ),
-        policies=rpc_messages.Policies(
-            backend_project='fake-project',
-            backend_topic='../../a-different-project/topics/my-topic',
-        ),
-    ))
-    self.mock_get_current_backend()
-
-    response = jsonish_dict_to_rpc(
-        self.call_api('add_machine', request).json,
-        rpc_messages.CatalogManipulationResponse,
-    )
-    self.assertEqual(
-      response.error,
-      rpc_messages.CatalogManipulationRequestError.INVALID_TOPIC,
-    )
-
-  def test_add_invalid_project(self):
-    request = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
-        dimensions=rpc_messages.Dimensions(
-            hostname='fake-host',
-            os_family=rpc_messages.OSFamily.LINUX,
-        ),
-        policies=rpc_messages.Policies(
-            backend_topic='my-topic',
-            backend_project='my-project/topics/my-other-topic',
-        ),
-    ))
-    self.mock_get_current_backend()
-
-    response = jsonish_dict_to_rpc(
-        self.call_api('add_machine', request).json,
-        rpc_messages.CatalogManipulationResponse,
-    )
-    self.assertEqual(
-      response.error,
-      rpc_messages.CatalogManipulationRequestError.INVALID_PROJECT,
     )
 
   def test_add_duplicate(self):
@@ -1428,73 +1363,6 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
         lease_response_2.request_hash,
     )
 
-  def test_invalid_topic(self):
-    def is_group_member(group):
-      return group == 'machine-provider-users'
-    self.mock(acl.auth, 'is_group_member', is_group_member)
-    lease_request = rpc_to_json(rpc_messages.LeaseRequest(
-        dimensions=rpc_messages.Dimensions(
-            os_family=rpc_messages.OSFamily.WINDOWS,
-        ),
-        duration=9,
-        pubsub_topic='../../a-different-project/topics/my-topic',
-        request_id='123',
-    ))
-
-    lease_response = jsonish_dict_to_rpc(
-        self.call_api('lease', lease_request).json,
-        rpc_messages.LeaseResponse,
-    )
-    self.assertEqual(
-        lease_response.error,
-        rpc_messages.LeaseRequestError.INVALID_TOPIC,
-    )
-
-  def test_invalid_project(self):
-    def is_group_member(group):
-      return group == 'machine-provider-users'
-    self.mock(acl.auth, 'is_group_member', is_group_member)
-    lease_request = rpc_to_json(rpc_messages.LeaseRequest(
-        dimensions=rpc_messages.Dimensions(
-            os_family=rpc_messages.OSFamily.WINDOWS,
-        ),
-        duration=9,
-        pubsub_topic='my-topic',
-        pubsub_project='../../a-different-project/topics/my-other-topic',
-        request_id='123',
-    ))
-
-    lease_response = jsonish_dict_to_rpc(
-        self.call_api('lease', lease_request).json,
-        rpc_messages.LeaseResponse,
-    )
-    self.assertEqual(
-        lease_response.error,
-        rpc_messages.LeaseRequestError.INVALID_PROJECT,
-    )
-
-  def test_project_without_topic(self):
-    def is_group_member(group):
-      return group == 'machine-provider-users'
-    self.mock(acl.auth, 'is_group_member', is_group_member)
-    lease_request = rpc_to_json(rpc_messages.LeaseRequest(
-        dimensions=rpc_messages.Dimensions(
-            os_family=rpc_messages.OSFamily.WINDOWS,
-        ),
-        duration=9,
-        pubsub_project='my-project',
-        request_id='123',
-    ))
-
-    lease_response = jsonish_dict_to_rpc(
-        self.call_api('lease', lease_request).json,
-        rpc_messages.LeaseResponse,
-    )
-    self.assertEqual(
-        lease_response.error,
-        rpc_messages.LeaseRequestError.UNSPECIFIED_TOPIC,
-    )
-
 
 class MachineProviderInstructTest(test_case.EndpointsTestCase):
   """Tests for handlers_endpoints.MachineProviderEndpoints.instruct."""
@@ -1508,11 +1376,8 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
   def test_lease_request_not_found(self):
     def is_group_member(group):
       return group == 'machine-provider-users'
-    def publish(_, message, attributes):
-      self.fail('publish called')
     auth_testing.mock_get_current_identity(self)
     self.mock(acl.auth, 'is_group_member', is_group_member)
-    self.mock(handlers_endpoints.pubsub, 'publish', publish)
 
     request = rpc_messages.MachineInstructionRequest(
         request_id='request-id',
@@ -1542,11 +1407,8 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
   def test_lease_request_not_fulfilled(self):
     def is_group_member(group):
       return group == 'machine-provider-users'
-    def publish(*args, **kwargs):
-      self.fail('publish called')
     auth_testing.mock_get_current_identity(self)
     self.mock(acl.auth, 'is_group_member', is_group_member)
-    self.mock(handlers_endpoints.pubsub, 'publish', publish)
 
     request = rpc_messages.MachineInstructionRequest(
         request_id='request-id',
@@ -1594,11 +1456,8 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
   def test_lease_request_already_reclaimed(self):
     def is_group_member(group):
       return group == 'machine-provider-users'
-    def publish(*args, **kwargs):
-      self.fail('publish called')
     auth_testing.mock_get_current_identity(self)
     self.mock(acl.auth, 'is_group_member', is_group_member)
-    self.mock(handlers_endpoints.pubsub, 'publish', publish)
 
     request = rpc_messages.MachineInstructionRequest(
         request_id='request-id',
@@ -1646,11 +1505,8 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
   def test_machine_not_found(self):
     def is_group_member(group):
       return group == 'machine-provider-users'
-    def publish(*args, **kwargs):
-      self.fail('publish called')
     auth_testing.mock_get_current_identity(self)
     self.mock(acl.auth, 'is_group_member', is_group_member)
-    self.mock(handlers_endpoints.pubsub, 'publish', publish)
 
     request = rpc_messages.MachineInstructionRequest(
         request_id='request-id',
@@ -1687,11 +1543,8 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
   def test_machine_not_fulfilled(self):
     def is_group_member(group):
       return group == 'machine-provider-users'
-    def publish(*args, **kwargs):
-      self.fail('publish called')
     auth_testing.mock_get_current_identity(self)
     self.mock(acl.auth, 'is_group_member', is_group_member)
-    self.mock(handlers_endpoints.pubsub, 'publish', publish)
 
     request = rpc_messages.MachineInstructionRequest(
         request_id='request-id',
@@ -1739,11 +1592,8 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
   def test_machine_already_reclaimed(self):
     def is_group_member(group):
       return group == 'machine-provider-users'
-    def publish(*args, **kwargs):
-      self.fail('publish called')
     auth_testing.mock_get_current_identity(self)
     self.mock(acl.auth, 'is_group_member', is_group_member)
-    self.mock(handlers_endpoints.pubsub, 'publish', publish)
 
     request = rpc_messages.MachineInstructionRequest(
         request_id='request-id',
@@ -1792,11 +1642,8 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
   def test_invalid_instruction(self):
     def is_group_member(group):
       return group == 'machine-provider-users'
-    def publish(*args, **kwargs):
-      self.fail('publish called')
     auth_testing.mock_get_current_identity(self)
     self.mock(acl.auth, 'is_group_member', is_group_member)
-    self.mock(handlers_endpoints.pubsub, 'publish', publish)
 
     request = rpc_messages.MachineInstructionRequest(
         request_id='request-id',
@@ -1846,12 +1693,8 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
   def test_instructed(self):
     def is_group_member(group):
       return group == 'machine-provider-users'
-    def publish(_, message, attributes):
-      self.assertEqual(message, 'CONNECT')
-      self.assertEqual(attributes, {'swarming_server': 'example.com'})
     auth_testing.mock_get_current_identity(self)
     self.mock(acl.auth, 'is_group_member', is_group_member)
-    self.mock(handlers_endpoints.pubsub, 'publish', publish)
 
     request = rpc_messages.MachineInstructionRequest(
         request_id='request-id',

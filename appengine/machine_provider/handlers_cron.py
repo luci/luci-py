@@ -100,9 +100,6 @@ def lease_machine(machine_key, lease):
   if lease.response.state != rpc_messages.LeaseRequestState.UNTRIAGED:
     logging.warning('LeaseRequest no longer untriaged:\n%s', lease)
     return False
-  if not machine.pubsub_subscription:
-    logging.warning('CatalogMachineEntry not subscribed to Pub/Sub yet')
-    return False
 
   logging.info('Leasing CatalogMachineEntry:\n%s', machine)
   lease.leased_ts = utils.utcnow()
@@ -127,8 +124,6 @@ def lease_machine(machine_key, lease):
       'policies': protojson.encode_message(machine.policies),
       'request_json': protojson.encode_message(lease.request),
       'response_json': protojson.encode_message(lease.response),
-      'machine_project': machine.pubsub_topic_project,
-      'machine_topic': machine.pubsub_topic,
   }
   if not utils.enqueue_task(
       '/internal/queues/fulfill-lease-request',
@@ -190,10 +185,6 @@ def reclaim_machine(machine_key, reclamation_ts):
   params = {
       'hostname': hostname,
       'machine_key': machine.key.urlsafe(),
-      'machine_subscription': machine.pubsub_subscription,
-      'machine_subscription_project': machine.pubsub_subscription_project,
-      'machine_topic': machine.pubsub_topic,
-      'machine_topic_project': machine.pubsub_topic_project,
       'policies': protojson.encode_message(machine.policies),
       'request_json': protojson.encode_message(lease.request),
       'response_json': protojson.encode_message(lease.response),
@@ -279,56 +270,14 @@ class LeaseReleaseProcessor(webapp2.RequestHandler):
       release_lease(lease_key)
 
 
+# TODO(smut): Remove. See comment in NewMachineProcessor.get.
 @ndb.transactional
-def create_subscription(machine_key):
-  """Creates a Cloud Pub/Sub subscription for machine communication.
-
-  Args:
-    machine_key: ndb.Key for the machine whose subscription should be created.
-  """
+def make_available(machine_key):
   machine = machine_key.get()
-  logging.info('Attempting to subscribe CatalogMachineEntry:\n%s', machine)
-
-  if not machine:
-    logging.warning('CatalogMachineEntry no longer exists: %s', machine_key)
+  if not machine or machine.state != models.CatalogMachineEntryStates.NEW:
     return
-
-  if machine.state != models.CatalogMachineEntryStates.NEW:
-    logging.warning('CatalogMachineEntry no longer new:\n%s', machine)
-    return
-
-  if not machine.policies.machine_service_account:
-    logging.warning(
-        'CatalogMachineEntry has no machine service account:\n%s', machine)
-    return
-
-  if machine.pubsub_subscription:
-    logging.info('CatalogMachineEntry already subscribed:\n%s', machine)
-    return
-
-  params = {
-      'hostname': machine.dimensions.hostname,
-      'machine_id': machine.key.id(),
-      'machine_service_account': machine.policies.machine_service_account,
-      'machine_subscription': 'subscription-%s' % machine.key.id(),
-      'machine_subscription_project': machine.pubsub_subscription_project,
-      'machine_topic': 'topic-%s' % machine.key.id(),
-      'machine_topic_project': machine.pubsub_topic_project,
-  }
-  backend_attributes = {}
-  for attribute in machine.policies.backend_attributes:
-    backend_attributes[attribute.key] = attribute.value
-  params['backend_attributes'] = utils.encode_to_json(backend_attributes)
-  if machine.policies.backend_topic:
-    params['backend_topic'] = machine.policies.backend_topic
-    params['backend_project'] = machine.policies.backend_project
-  if not utils.enqueue_task(
-      '/internal/queues/subscribe-machine',
-      'subscribe-machine',
-      params=params,
-      transactional=True,
-  ):
-    raise TaskEnqueuingError('subscribe-machine')
+  machine.state = models.CatalogMachineEntryStates.AVAILABLE
+  machine.put()
 
 
 class NewMachineProcessor(webapp2.RequestHandler):
@@ -339,7 +288,15 @@ class NewMachineProcessor(webapp2.RequestHandler):
     for machine_key in models.CatalogMachineEntry.query(
         models.CatalogMachineEntry.state==models.CatalogMachineEntryStates.NEW,
     ).fetch(keys_only=True):
-      create_subscription(machine_key)
+      # TODO(smut): Remove this.
+      # Machines used to be added in state AVAILABLE. When Pub/Sub was
+      # introduced, handlers_endpoints.py was changed to add machines
+      # in state NEW, and once the Pub/Sub subscription was created they'd
+      # be moved to AVAILABLE. Now that Pub/Sub is being removed, they're
+      # added in state AVAILABLE again. Keep this worker to move any old
+      # machines added in state NEW to AVAILABLE, and remove once no machines
+      # in state NEW exist.
+      make_available(machine_key)
 
 
 def create_cron_app():
