@@ -61,7 +61,9 @@ def configure_ui(app_name, ui_tabs=None, env_callback=None):
 def get_ui_routes():
   """Returns a list of routes with auth UI handlers."""
   # Routes for registered navbar tabs.
-  routes = [webapp2.Route(cls.navbar_tab_url, cls) for cls in _ui_navbar_tabs]
+  routes = []
+  for cls in _ui_navbar_tabs:
+    routes.extend(cls.get_webapp2_routes())
   # Routes to OpenID login flow.
   if config.ensure_configured().USE_OPENID:
     routes.extend(openid.get_ui_routes())
@@ -322,8 +324,10 @@ class LinkToPrimaryHandler(UIHandler):
 
 class UINavbarTabHandler(UIHandler):
   """Handler for a navbar tab page."""
+  # List of routes to register, default is [navbar_tab_url].
+  routes = []
   # URL to the tab (relative to site root).
-  nvabar_tab_url = None
+  navbar_tab_url = None
   # ID of the tab, will be used in DOM.
   navbar_tab_id = None
   # Title of the tab, will be used in tab title and page title.
@@ -337,7 +341,7 @@ class UINavbarTabHandler(UIHandler):
 
   @redirect_ui_on_replica
   @api.require(acl.has_access)
-  def get(self):
+  def get(self, **_params):
     """Renders page HTML to HTTP response stream."""
     env = {
       'css_file': self.css_file,
@@ -346,6 +350,11 @@ class UINavbarTabHandler(UIHandler):
       'page_title': self.navbar_tab_title,
     }
     self.reply(self.template_file, env)
+
+  @classmethod
+  def get_webapp2_routes(cls):
+    routes = cls.routes or [cls.navbar_tab_url]
+    return [webapp2.Route(r, cls) for r in routes]
 
   @classmethod
   def is_visible(cls):
@@ -359,6 +368,10 @@ class UINavbarTabHandler(UIHandler):
 
 class GroupsHandler(UINavbarTabHandler):
   """Page with Groups management."""
+  routes = [
+    '/auth/groups',
+    '/auth/groups/<group:.*>',  # 'group' is handled by js code
+  ]
   navbar_tab_url = '/auth/groups'
   navbar_tab_id = 'groups'
   navbar_tab_title = 'Groups'

@@ -26,7 +26,7 @@ javascript library and not jinja2. #}
 {% raw %}
 
 <script id="group-chooser-item-template" type="text/x-handlebars-template">
-  <a href="#{{name}}" class="list-group-item {{#unless caller_can_modify}}readonly-group{{/unless}}">
+  <a href="{{href}}" class="list-group-item {{#unless caller_can_modify}}readonly-group{{/unless}}">
     <h5 class="list-group-item-heading">{{name}}</h5>
     {{#if isExternal}}
     <small class="list-group-item-text">External</small>
@@ -40,7 +40,7 @@ javascript library and not jinja2. #}
 </script>
 
 <script id="group-chooser-button-template" type="text/x-handlebars-template">
-  <a href="#new!" class="list-group-item">
+  <a href="{{href}}" class="list-group-item">
     <b>Create a new group</b>
   </a>
 </script>

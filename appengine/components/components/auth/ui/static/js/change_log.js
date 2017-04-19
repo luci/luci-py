@@ -31,7 +31,7 @@ var parseTarget = function(t) {
   var targetURL = null;
   switch (kind) {
     case 'AuthGroup':
-      targetURL = '/auth/groups#' + name;
+      targetURL = '/auth/groups/' + name;
       break;
     case 'AuthIPWhitelist':
       targetURL = '/auth/ip_whitelists';

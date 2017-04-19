@@ -12,6 +12,10 @@ var exports = {};
 // Utility functions.
 
 
+// Root URL of this page.
+var GROUPS_ROOT_URL = '/auth/groups/';
+
+
 // True if group name starts with '<something>/' prefix.
 function isExternalGroupName(name) {
   return name.indexOf('/') != -1;
@@ -134,6 +138,7 @@ GroupChooser.prototype.setGroupList = function(groups) {
   self.groupToItemMap = {};
   self.groupNames = [];
   _.each(self.groupList, function(group) {
+    group.href = GROUPS_ROOT_URL + group.name;
     group.isExternal = isExternalGroupName(group.name);
     group.descriptionTrimmed = trimGroupDescription(group.description);
     self.groupMap[group.name] = group;
@@ -157,8 +162,9 @@ GroupChooser.prototype.setGroupList = function(groups) {
         common.render('group-chooser-item-template', group), group.name);
   });
   if (this.allowCreateGroup) {
+    var templateArgs = {'href': GROUPS_ROOT_URL + NEW_GROUP_PLACEHOLDER};
     self.groupToItemMap[null] = addElement(
-        common.render('group-chooser-button-template'), null);
+        common.render('group-chooser-button-template', templateArgs), null);
   }
 
   // Setup click event handlers. Clicks change selection.
@@ -355,9 +361,9 @@ ContentFrame.prototype.loadContent = function(content) {
 // Common code for 'New group' and 'Edit group' forms.
 
 
-var GroupForm = function($element, anchor) {
+var GroupForm = function($element, groupName) {
   this.$element = $element;
-  this.anchor = anchor;
+  this.groupName = groupName;
   this.visible = false;
   this.readOnly = false;
 };
@@ -367,8 +373,8 @@ var GroupForm = function($element, anchor) {
 GroupForm.prototype.show = function($parent) {
   this.visible = true;
   this.$element.appendTo($parent);
-  if (this.anchor) {
-    common.setAnchor(this.anchor);
+  if (this.groupName) {
+    setCurrentGroupInURL(this.groupName);
   }
 };
 
@@ -587,13 +593,13 @@ EditGroupForm.prototype.buildForm = function(group, lastModified) {
 
 
 // It must be an invalid group name (to avoid collisions).
-var NEW_GROUP_ANCHOR = 'new!';
+var NEW_GROUP_PLACEHOLDER = 'new!';
 
 
 var NewGroupForm = function(onSubmitGroup) {
   // Call parent constructor.
   GroupForm.call(
-      this, $(common.render('new-group-form-template')), NEW_GROUP_ANCHOR);
+      this, $(common.render('new-group-form-template')), NEW_GROUP_PLACEHOLDER);
 
   // Add validation and submit handler.
   this.setupSubmitHandler(function(group) {
@@ -604,6 +610,51 @@ var NewGroupForm = function(onSubmitGroup) {
 
 // Inherit from GroupForm.
 NewGroupForm.prototype = Object.create(GroupForm.prototype);
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Address bar manipulation (to put the currently selected group in URL).
+
+
+var initializeGroupInURL = function() {
+  // This code serves two purposes:
+  //  1. It converts old-style anchor-based URLs into new ones.
+  //  2. It initializes {'group': ...} entry in the history.
+  var groupName = getCurrentGroupInURL() || common.getAnchor();
+  if (groupName) {
+    window.history.replaceState(
+      {'group': groupName}, null, GROUPS_ROOT_URL + groupName);
+  }
+};
+
+
+var getCurrentGroupInURL = function() {
+  var p = window.location.pathname;
+  if (p.startsWith(GROUPS_ROOT_URL)) {
+    return p.slice(GROUPS_ROOT_URL.length);
+  }
+  return '';
+};
+
+
+var setCurrentGroupInURL = function(groupName) {
+  if (getCurrentGroupInURL() != groupName) {
+    console.log('Pushing to history', groupName);
+    window.history.pushState(
+      {'group': groupName}, null, GROUPS_ROOT_URL + groupName);
+  }
+};
+
+
+var onCurrentGroupInURLChange = function(cb) {
+  window.onpopstate = function(event) {
+    var s = event.state;
+    if (s && s.hasOwnProperty('group')) {
+      console.log('Navigated back to', s.group);
+      cb(s.group);
+    };
+  };
+};
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -773,13 +824,17 @@ exports.onContentLoaded = function() {
     }
   });
 
-  // Helper function that selects a group specified in location anchor.
-  var jumpToAnchor = function(selectDefault) {
-    var anchor = common.getAnchor();
-    if (anchor == NEW_GROUP_ANCHOR) {
+  // Converts ".../groups#groupName" to ".../groups/groupName", to make sure
+  // old-style URLs still work.
+  initializeGroupInURL();
+
+  // Helper function that selects a group based on current URL.
+  var jumpToCurrentGroup = function(selectDefault) {
+    var current = getCurrentGroupInURL();
+    if (current == NEW_GROUP_PLACEHOLDER) {
       groupChooser.setSelection(null, null);
-    } else if (groupChooser.isKnownGroup(anchor)) {
-      groupChooser.setSelection(anchor, null);
+    } else if (groupChooser.isKnownGroup(current)) {
+      groupChooser.setSelection(current, null);
     } else if (selectDefault) {
       groupChooser.selectDefault();
     }
@@ -787,10 +842,10 @@ exports.onContentLoaded = function() {
 
   // Load and show data.
   groupChooser.refetchGroups().then(function() {
-    // Show a group specified in anchor (or a default one).
-    jumpToAnchor(true);
-    // Only start paying attention to anchor changes when the state is loaded.
-    common.onAnchorChange(function() { jumpToAnchor(false); });
+    // Show a group specified in the URL (or a default one).
+    jumpToCurrentGroup(true);
+    // Only start paying attention to URL changes when the state is loaded.
+    onCurrentGroupInURLChange(function() { jumpToCurrentGroup(false); });
   }, function(error) {
     common.presentError(error.text);
   });
