@@ -49,7 +49,7 @@ class BotManagementTest(test_case.TestCase):
 
     expected = {
       'authenticated_as': u'bot:id1.domain',
-      'composite': [8, 2],
+      'composite': [32, 8, 2],
       'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
       'external_ip': u'8.8.4.4',
       'first_seen_ts': now,
@@ -110,7 +110,7 @@ class BotManagementTest(test_case.TestCase):
     # Assert that BotInfo was updated too.
     expected = {
       'authenticated_as': u'bot:id1.domain',
-      'composite': [4, 2],
+      'composite': [32, 4, 2],
       'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
       'external_ip': u'8.8.4.4',
       'first_seen_ts': now,
@@ -143,7 +143,7 @@ class BotManagementTest(test_case.TestCase):
 
     expected = {
       'authenticated_as': u'bot:id1.domain',
-      'composite': [8, 1],
+      'composite': [32, 8, 1],
       'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
       'external_ip': u'8.8.4.4',
       'first_seen_ts': now,

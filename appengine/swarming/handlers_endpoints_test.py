@@ -1618,7 +1618,8 @@ class BotsApiTest(BaseTest):
         event_type='bot_connected', bot_id='id3',
         external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
         dimensions={'foo': ['bar'], 'id': ['id3']}, state={'ram': 65},
-        version='123456789', quarantined=False, task_id=None, task_name=None)
+        version='123456789', quarantined=False, task_id=None, task_name=None,
+        machine_type='mt')
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     now_str = unicode(now.strftime(self.DATETIME_FORMAT))
     self.mock_now(now)
@@ -1754,6 +1755,16 @@ class BotsApiTest(BaseTest):
         quarantined=swarming_rpcs.ThreeStateBool.FALSE)
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
+    # only bot3 is a machine provider bot
+    expected[u'items'] = [bot3]
+    request = swarming_rpcs.BotsRequest(is_mp=swarming_rpcs.ThreeStateBool.TRUE)
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+    expected[u'items'] = [bot1, bot2]
+    request = swarming_rpcs.BotsRequest(
+        is_mp=swarming_rpcs.ThreeStateBool.FALSE)
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
     # not:existing is a dimension that doesn't exist, nothing returned.
     request = swarming_rpcs.BotsRequest(dimensions=['not:existing'])
     response = self.call_api('list', body=message_to_dict(request))
@@ -1769,6 +1780,11 @@ class BotsApiTest(BaseTest):
     # still work
     request = swarming_rpcs.BotsRequest(
         is_dead=swarming_rpcs.ThreeStateBool.TRUE, dimensions=['not:exist'])
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+    # is_mp:true can be paired with other non-existing dimensions and still work
+    request = swarming_rpcs.BotsRequest(
+        is_mp=swarming_rpcs.ThreeStateBool.TRUE, dimensions=['not:exist'])
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
     # No bot is both dead and quarantined

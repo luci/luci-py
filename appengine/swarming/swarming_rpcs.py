@@ -440,6 +440,7 @@ class BotsRequest(messages.Message):
   quarantined = messages.EnumField(ThreeStateBool, 4, default='NONE')
   is_dead = messages.EnumField(ThreeStateBool, 5, default='NONE')
   is_busy = messages.EnumField(ThreeStateBool, 6, default='NONE')
+  is_mp = messages.EnumField(ThreeStateBool, 7, default='NONE')
 
 
 class BotsCountRequest(messages.Message):
