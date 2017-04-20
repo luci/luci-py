@@ -211,6 +211,9 @@ def check_deleted_instance(key):
   if not instance:
     return
 
+  if instance.deleted:
+    return
+
   if not instance.pending_deletion:
     logging.warning('Instance not pending deletion: %s', key)
     return
@@ -230,6 +233,7 @@ def check_deleted_instance(key):
           },
       )
     set_instance_deleted(key, False)
+    metrics.send_machine_event('DELETION_SUCCEEDED', instance.hostname)
 
 
 def schedule_deleted_instance_check():
@@ -287,6 +291,9 @@ def cleanup_drained_instance(key):
   if not instance:
     return
 
+  if instance.deleted:
+    return
+
   if not instance.url:
     logging.warning('Instance URL unspecified: %s', key)
     return
@@ -331,6 +338,7 @@ def cleanup_drained_instance(key):
           },
       )
     set_instance_deleted(key, True)
+    metrics.send_machine_event('DELETION_SUCCEEDED', instance.hostname)
 
 
 def schedule_drained_instance_cleanup():

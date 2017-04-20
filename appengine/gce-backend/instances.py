@@ -227,7 +227,7 @@ def schedule_fetch():
 
 @ndb.transactional
 def set_deletion_time(key, ts):
-  """Sets the time the deletion RPC was sent for this Instance entity.
+  """Sets the time the deletion RPC was first sent for this Instance entity.
 
   Args:
     key: ndb.Key for a models.Instance entity.
@@ -252,8 +252,10 @@ def _delete(instance_template_revision, instance_group_manager, instance):
     instance_group_manager: models.InstanceGroupManager.
     instance: models.Instance
   """
-  if instance.deletion_ts:
-    return
+  # We don't check if there are any pending deletion calls because we don't
+  # care. We just want the instance to be deleted, so we make repeated calls
+  # until the instance is no longer detected. However, we do care how long
+  # it takes, so we only write instance.deletion_ts once.
 
   api = gce.Project(instance_template_revision.project)
   try:
@@ -264,18 +266,23 @@ def _delete(instance_template_revision, instance_group_manager, instance):
         [instance.url],
     )
     if result['status'] != 'DONE':
+      # This is not the status of the instance deletion, it's the status of
+      # scheduling the instance deletions in the managed instance group. If
+      # it's not DONE, the deletions won't even be attempted. If it is DONE,
+      # the actual deletions may still fail.
       logging.warning(
           'Instance group manager operation failed: %s\n%s',
           instance_group_manager.key,
           json.dumps(result, indent=2),
       )
     else:
-      set_deletion_time(instance.key, now)
-      metrics.send_machine_event('DELETION_SCHEDULED', instance.hostname)
+      if not instance.deletion_ts:
+        set_deletion_time(instance.key, now)
+        metrics.send_machine_event('DELETION_SCHEDULED', instance.hostname)
   except net.Error as e:
     if e.status_code == 400:
-      set_deletion_time(instance.key, now)
-      metrics.send_machine_event('DELETION_SUCCEEDED', instance.hostname)
+      if not instance.deletion_ts:
+        set_deletion_time(instance.key, now)
     else:
       raise
 
@@ -288,9 +295,6 @@ def delete_pending(key):
   """
   instance = key.get()
   if not instance:
-    return
-
-  if instance.deletion_ts:
     return
 
   if not instance.pending_deletion:
@@ -330,7 +334,7 @@ def delete_pending(key):
 def schedule_pending_deletion():
   """Enqueues tasks to delete instances."""
   for instance in models.Instance.query():
-    if instance.pending_deletion and not instance.deletion_ts:
+    if instance.pending_deletion and not instance.deleted:
       utilities.enqueue_task('delete-instance-pending-deletion', instance.key)
 
 
@@ -343,9 +347,6 @@ def delete_drained(key):
   instance = key.get()
   if not instance:
     logging.warning('Instance does not exist: %s', key)
-    return
-
-  if instance.deletion_ts:
     return
 
   if instance.cataloged:
@@ -403,5 +404,5 @@ def schedule_drained_deletion():
     if instance_group_manager:
       for instance_key in instance_group_manager.instances:
         instance = instance_key.get()
-        if instance and not instance.cataloged and not instance.deletion_ts:
+        if instance and not instance.cataloged and not instance.deleted:
           utilities.enqueue_task('delete-drained-instance', instance.key)

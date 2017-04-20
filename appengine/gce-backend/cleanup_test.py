@@ -90,7 +90,10 @@ class CheckDeletedInstanceTest(test_case.TestCase):
     """Ensures the entity is marked deleted when the instance doesn't exists."""
     def json_request(*args, **kwargs):
       raise net.NotFoundError('404', 404, '404')
+    def send_machine_event(*args, **kwargs):
+      pass
     self.mock(cleanup.net, 'json_request', json_request)
+    self.mock(cleanup.metrics, 'send_machine_event', send_machine_event)
 
     key = models.Instance(
         key=instances.get_instance_key(
@@ -316,7 +319,10 @@ class CleanupDrainedInstanceTest(test_case.TestCase):
     """Ensures the entity is marked deleted when the parent is drained."""
     def json_request(*args, **kwargs):
       raise net.NotFoundError('404', 404, '404')
+    def send_machine_event(*args, **kwargs):
+      pass
     self.mock(cleanup.net, 'json_request', json_request)
+    self.mock(cleanup.metrics, 'send_machine_event', send_machine_event)
 
     key = instances.get_instance_key(
         'base-name',
@@ -350,7 +356,10 @@ class CleanupDrainedInstanceTest(test_case.TestCase):
     """Ensures the entity is marked deleted when the grandparent is drained."""
     def json_request(*args, **kwargs):
       raise net.NotFoundError('404', 404, '404')
+    def send_machine_event(*args, **kwargs):
+      pass
     self.mock(cleanup.net, 'json_request', json_request)
+    self.mock(cleanup.metrics, 'send_machine_event', send_machine_event)
 
     key = instances.get_instance_key(
         'base-name',

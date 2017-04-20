@@ -414,38 +414,6 @@ class DeletePendingTest(test_case.TestCase):
 
     self.failIf(key.get())
 
-  def test_deletion_ts(self):
-    """Ensures nothing happens when the instance is already deleted."""
-    def json_request(*args, **kwargs):
-      self.fail('json_request called')
-    def send_machine_event(*args, **kwargs):
-      self.fail('send_machine_event called')
-    self.mock(instances.net, 'json_request', json_request)
-    self.mock(instances.metrics, 'send_machine_event', send_machine_event)
-
-    key = instances.get_instance_key(
-        'base-name',
-        'revision',
-        'zone',
-        'instance-name',
-    )
-    key = models.Instance(
-        key=key,
-        deletion_ts=utils.utcnow(),
-        instance_group_manager=instances.get_instance_group_manager_key(key),
-        pending_deletion=True,
-        url='url',
-    ).put()
-    models.InstanceGroupManager(
-        key=instances.get_instance_group_manager_key(key),
-    ).put()
-    models.InstanceTemplateRevision(
-        key=instances.get_instance_group_manager_key(key).parent(),
-        project='project',
-    ).put()
-
-    instances.delete_pending(key)
-
   def test_not_pending_deletion(self):
     """Ensures nothing happens when the instance isn't pending deletion."""
     def json_request(*args, **kwargs):
@@ -622,6 +590,40 @@ class DeletePendingTest(test_case.TestCase):
     ).put()
 
     instances.delete_pending(key)
+
+  def test_deletion_ts(self):
+    """Ensures deletion_ts is not overwritten, but deletion call is repeated."""
+    def json_request(*args, **kwargs):
+      return {'status': 'DONE'}
+    def send_machine_event(*args, **kwargs):
+      pass
+    self.mock(instances.net, 'json_request', json_request)
+    self.mock(instances.metrics, 'send_machine_event', send_machine_event)
+
+    now = utils.utcnow()
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        deletion_ts=now,
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+        pending_deletion=True,
+        url='url',
+    ).put()
+    models.InstanceGroupManager(
+        key=instances.get_instance_group_manager_key(key),
+    ).put()
+    models.InstanceTemplateRevision(
+        key=instances.get_instance_group_manager_key(key).parent(),
+        project='project',
+    ).put()
+
+    instances.delete_pending(key)
+    self.assertEqual(key.get().deletion_ts, now)
 
   def test_deleted_not_done(self):
     """Ensures nothing happens when instance deletion status is not DONE."""

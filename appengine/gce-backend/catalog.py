@@ -223,6 +223,7 @@ def update_cataloged_instance(key):
     return
 
   try:
+    logging.info('Retrieving cataloged instance: %s', key)
     response = machine_provider.retrieve_machine(instance.hostname)
     if response.get('lease_expiration_ts'):
       lease_expiration_ts = datetime.datetime.utcfromtimestamp(
@@ -230,6 +231,7 @@ def update_cataloged_instance(key):
       if instance.lease_expiration_ts != lease_expiration_ts:
         instances.add_lease_expiration_ts(key, lease_expiration_ts)
   except net.NotFoundError:
+    logging.info('Instance not found in catalog: %s', key)
     instances.mark_for_deletion(key)
 
 

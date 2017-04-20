@@ -54,7 +54,7 @@ class Instance(ndb.Model):
   cataloged = ndb.BooleanProperty(indexed=True)
   # Whether or not this instance has been deleted.
   deleted = ndb.BooleanProperty(indexed=True)
-  # Time that the deletion request for this instance was initiated.
+  # Time that the deletion request for this instance was first initiated.
   deletion_ts = ndb.DateTimeProperty(indexed=False)
   # Name of this instance.
   hostname = ndb.ComputedProperty(
