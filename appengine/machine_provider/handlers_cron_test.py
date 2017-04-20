@@ -102,7 +102,6 @@ class LeaseMachineTest(test_case.TestCase):
         policies=rpc_messages.Policies(
             machine_service_account='service-account',
         ),
-        pubsub_subscription='subscription',
         state=models.CatalogMachineEntryStates.AVAILABLE,
     ).put()
     request = rpc_messages.LeaseRequest(
@@ -147,7 +146,6 @@ class LeaseMachineTest(test_case.TestCase):
         policies=rpc_messages.Policies(
             machine_service_account='service-account',
         ),
-        pubsub_subscription='subscription',
         state=models.CatalogMachineEntryStates.AVAILABLE,
     ).put()
     request = rpc_messages.LeaseRequest(
@@ -192,7 +190,6 @@ class LeaseMachineTest(test_case.TestCase):
         policies=rpc_messages.Policies(
             machine_service_account='service-account',
         ),
-        pubsub_subscription='subscription',
         state=models.CatalogMachineEntryStates.LEASED,
     ).put()
     request = rpc_messages.LeaseRequest(
@@ -237,7 +234,6 @@ class LeaseMachineTest(test_case.TestCase):
         policies=rpc_messages.Policies(
             machine_service_account='service-account',
         ),
-        pubsub_subscription='subscription',
         state=models.CatalogMachineEntryStates.AVAILABLE,
     ).put()
     request = rpc_messages.LeaseRequest(
@@ -282,7 +278,6 @@ class LeaseMachineTest(test_case.TestCase):
         policies=rpc_messages.Policies(
             machine_service_account='service-account',
         ),
-        pubsub_subscription='subscription',
         state=models.CatalogMachineEntryStates.AVAILABLE,
     ).put()
     request = rpc_messages.LeaseRequest(
@@ -360,7 +355,6 @@ class LeaseRequestProcessorTest(test_case.TestCase):
         policies=rpc_messages.Policies(
             machine_service_account='fake-service-account',
         ),
-        pubsub_subscription='fake-subscription',
         state=models.CatalogMachineEntryStates.AVAILABLE,
     ).put()
 
@@ -404,7 +398,6 @@ class LeaseRequestProcessorTest(test_case.TestCase):
         policies=rpc_messages.Policies(
             machine_service_account='fake-service-account',
         ),
-        pubsub_subscription='fake-subscription',
         state=models.CatalogMachineEntryStates.AVAILABLE,
     ).put()
 
@@ -481,8 +474,6 @@ class ReclaimMachineTest(test_case.TestCase):
             os_family=rpc_messages.OSFamily.LINUX,
         ),
         duration=1,
-        pubsub_project='project',
-        pubsub_topic='topic',
         request_id='fake-id',
     )
     lease_request_key = models.LeaseRequest(
@@ -825,34 +816,6 @@ class LeaseReleaseProcessorTest(test_case.TestCase):
         '/internal/cron/process-lease-releases',
         headers={'X-AppEngine-Cron': 'true'},
     )
-
-
-class NewMachineProcessorTest(test_case.TestCase):
-  """Tests for handlers_cron.NewMachineProcessor."""
-
-  def setUp(self):
-    super(NewMachineProcessorTest, self).setUp()
-    app = handlers_cron.create_cron_app()
-    self.app = webtest.TestApp(app)
-
-  def test_subscribes(self):
-    key = models.CatalogMachineEntry(
-        dimensions=rpc_messages.Dimensions(
-            os_family=rpc_messages.OSFamily.LINUX,
-        ),
-        policies=rpc_messages.Policies(
-            machine_service_account='fake-service-account',
-        ),
-        state=models.CatalogMachineEntryStates.NEW,
-    ).put()
-
-    self.app.get(
-        '/internal/cron/process-new-machines',
-        headers={'X-AppEngine-Cron': 'true'},
-    )
-
-    self.assertEqual(
-        key.get().state, models.CatalogMachineEntryStates.AVAILABLE)
 
 
 if __name__ == '__main__':

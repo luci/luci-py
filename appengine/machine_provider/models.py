@@ -140,14 +140,6 @@ class CatalogMachineEntry(CatalogEntry):
   lease_expiration_ts = ndb.DateTimeProperty()
   # rpc_messages.Policies governing this machine.
   policies = msgprop.MessageProperty(rpc_messages.Policies)
-  # Cloud Pub/Sub subscription the machine must listen to for instructions.
-  pubsub_subscription = ndb.StringProperty(indexed=False)
-  # Project the Cloud Pub/Sub subscription exists in.
-  pubsub_subscription_project = ndb.StringProperty(indexed=False)
-  # Cloud Pub/Sub topic the machine must be subscribed to.
-  pubsub_topic = ndb.StringProperty(indexed=False)
-  # Project the Cloud Pub/Sub topic exists in.
-  pubsub_topic_project = ndb.StringProperty(indexed=False)
   # Determines sorted order relative to other CatalogMachineEntries.
   sort_ordering = ndb.ComputedProperty(lambda self: '%s:%s' % (
       self.dimensions.backend, self.dimensions.hostname))

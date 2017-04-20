@@ -270,39 +270,9 @@ class LeaseReleaseProcessor(webapp2.RequestHandler):
       release_lease(lease_key)
 
 
-# TODO(smut): Remove. See comment in NewMachineProcessor.get.
-@ndb.transactional
-def make_available(machine_key):
-  machine = machine_key.get()
-  if not machine or machine.state != models.CatalogMachineEntryStates.NEW:
-    return
-  machine.state = models.CatalogMachineEntryStates.AVAILABLE
-  machine.put()
-
-
-class NewMachineProcessor(webapp2.RequestHandler):
-  """Worker for processing new machines."""
-
-  @decorators.require_cronjob
-  def get(self):
-    for machine_key in models.CatalogMachineEntry.query(
-        models.CatalogMachineEntry.state==models.CatalogMachineEntryStates.NEW,
-    ).fetch(keys_only=True):
-      # TODO(smut): Remove this.
-      # Machines used to be added in state AVAILABLE. When Pub/Sub was
-      # introduced, handlers_endpoints.py was changed to add machines
-      # in state NEW, and once the Pub/Sub subscription was created they'd
-      # be moved to AVAILABLE. Now that Pub/Sub is being removed, they're
-      # added in state AVAILABLE again. Keep this worker to move any old
-      # machines added in state NEW to AVAILABLE, and remove once no machines
-      # in state NEW exist.
-      make_available(machine_key)
-
-
 def create_cron_app():
   return webapp2.WSGIApplication([
       ('/internal/cron/process-lease-requests', LeaseRequestProcessor),
       ('/internal/cron/process-machine-reclamations', MachineReclamationProcessor),
       ('/internal/cron/process-lease-releases', LeaseReleaseProcessor),
-      ('/internal/cron/process-new-machines', NewMachineProcessor),
   ])

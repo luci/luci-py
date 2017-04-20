@@ -1145,7 +1145,6 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
         ),
         duration=1,
         request_id='abc',
-        pubsub_topic='topic',
     ))
 
     lease_response = jsonish_dict_to_rpc(
@@ -1392,8 +1391,6 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
         ),
         lease_expiration_ts=datetime.datetime.fromtimestamp(9999999999),
         lease_id=ndb.Key(models.LeaseRequest, 'id').id(),
-        pubsub_topic='topic',
-        pubsub_topic_project='project',
     ).put()
     request = rpc_to_json(request)
 
@@ -1440,8 +1437,6 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
         ),
         lease_expiration_ts=datetime.datetime.fromtimestamp(9999999999),
         lease_id=lease_key.id(),
-        pubsub_topic='topic',
-        pubsub_topic_project='project',
     ).put()
     request = rpc_to_json(request)
 
@@ -1489,8 +1484,6 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
         ),
         lease_expiration_ts=datetime.datetime.fromtimestamp(9999999999),
         lease_id=lease_key.id(),
-        pubsub_topic='topic',
-        pubsub_topic_project='project',
     ).put()
     request = rpc_to_json(request)
 
@@ -1576,8 +1569,6 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
             backend=rpc_messages.Backend.DUMMY,
         ),
         lease_expiration_ts=datetime.datetime.fromtimestamp(9999999999),
-        pubsub_topic='topic',
-        pubsub_topic_project='project',
     ).put()
     request = rpc_to_json(request)
 
@@ -1626,8 +1617,6 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
         ),
         lease_expiration_ts=datetime.datetime.fromtimestamp(1),
         lease_id=lease_key.id(),
-        pubsub_topic='topic',
-        pubsub_topic_project='project',
     ).put()
     request = rpc_to_json(request)
 
@@ -1675,8 +1664,6 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
         ),
         lease_expiration_ts=datetime.datetime.fromtimestamp(9999999999),
         lease_id=lease_key.id(),
-        pubsub_topic='topic',
-        pubsub_topic_project='project',
     ).put()
     request = rpc_to_json(request)
 
@@ -1727,8 +1714,6 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
         ),
         lease_expiration_ts=datetime.datetime.fromtimestamp(9999999999),
         lease_id=lease_key.id(),
-        pubsub_topic='topic',
-        pubsub_topic_project='project',
     ).put()
     request = rpc_to_json(request)
 
