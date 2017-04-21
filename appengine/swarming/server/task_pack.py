@@ -95,7 +95,7 @@ def get_request_and_result_keys(task_id):
 
 
 def pack_request_key(request_key):
-  """Returns a task_id as a string from a TaskRequest ndb.Key."""
+  """Returns a request_id as a string from a TaskRequest ndb.Key."""
   key_id = request_key.integer_id()
   # It's 0xE instead of 0x1 in the DB because of the XOR.
   if (key_id & 0xF) != 0xE:
@@ -122,7 +122,7 @@ def pack_run_result_key(run_result_key):
   return pack_request_key(request_key) + '%x' % try_id
 
 
-def unpack_request_key(task_id):
+def unpack_request_key(request_id):
   """Returns the ndb.Key for a TaskRequest id with the try number stripped.
 
   If you find yourself the need to unpack a task id as a ndb Key to use the
@@ -134,18 +134,18 @@ def unpack_request_key(task_id):
   for this request, replace 1234 with the number printed by the commands above:
       SELECT * WHERE __key__ HAS ANCESTOR ndb.Key(TaskRequest, 1234)
   """
-  assert isinstance(task_id, basestring)
-  if not task_id:
+  assert isinstance(request_id, basestring)
+  if not request_id:
     raise ValueError('Invalid null key')
-  c = task_id[-1]
+  c = request_id[-1]
   if c == '1':
     # The key id is the reverse of the value.
-    task_id_int = int(task_id, 16)
+    task_id_int = int(request_id, 16)
     if task_id_int < 0:
       raise ValueError('Invalid task id (overflowed)')
     return ndb.Key('TaskRequest', task_id_int ^ TASK_REQUEST_KEY_ID_MASK)
   else:
-    raise ValueError('Invalid key %s' % task_id)
+    raise ValueError('Invalid key %r' % request_id)
 
 
 def unpack_result_summary_key(packed_key):

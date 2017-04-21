@@ -518,11 +518,13 @@ def schedule_request(request, secret_bytes, check_acls=True):
   def get_new_keys():
     # Warning: this assumes knowledge about the hierarchy of each entity.
     key = task_request.new_request_key()
-    task.key.parent = key
+    task.key = ndb.Key(task.key.kind(), task.key.id(), parent=key)
     if secret_bytes:
-      secret_bytes.key.parent = key
+      secret_bytes.key = ndb.Key(
+          secret_bytes.key.kind(), secret_bytes.key.id(), parent=key)
     old = result_summary.task_id
-    result_summary.parent = key
+    result_summary.key = ndb.Key(
+        result_summary.key.kind(), result_summary.key.id(), parent=key)
     logging.info('%s conflicted, using %s', old, result_summary.task_id)
     return key
 

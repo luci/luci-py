@@ -425,7 +425,7 @@ class TaskToRunApiTest(TestCase):
           'dimensions': {u'os': u'Windows-3.1.1', u'pool': u'default'},
         })
     # Bot declares no dimensions, so it will fail to match.
-    bot_dimensions = {u'id': [u'bot1']}
+    bot_dimensions = {u'id': [u'bot1'], u'pool': [u'default']}
     actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
     self.assertEqual([], actual)
 
@@ -684,6 +684,7 @@ class TaskToRunApiTest(TestCase):
     self.assertTrue(task.key.parent().get().properties.is_terminate)
     # Bot declares exactly same dimensions so it matches.
     bot_dimensions = {k: [v] for k, v in request_dimensions.iteritems()}
+    bot_dimensions[u'pool'] = [u'default']
     actual = _yield_next_available_task_to_dispatch(bot_dimensions, 0)
     expected = [
       {

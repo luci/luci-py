@@ -1,7 +1,30 @@
 queue:
+
+## Tasks
+
 - name: cleanup
   max_concurrent_requests: 1
   rate: 1/m
+
+- name: cancel-tasks
+  rate: 500/s
+
+- name: pubsub
+  rate: 500/s
+
+
+## MP
+
+- name: machine-provider-manage
+  rate: 500/s
+  # Cron will reschedule, so don't retry on failure.
+  # Need both limits, since AE semantics is "AND", not "OR".
+  retry_parameters:
+    task_retry_limit: 0
+    task_age_limit: 1s
+
+
+## General
 
 - name: mapreduce-jobs
   bucket_size: 500
@@ -12,20 +35,6 @@ queue:
     task_age_limit: 2h
     min_backoff_seconds: 1
     max_backoff_seconds: 600
-
-- name: pubsub
-  rate: 500/s
-
-- name: machine-provider-manage
-  rate: 500/s
-  # Cron will reschedule, so don't retry on failure.
-  # Need both limits, since AE semantics is "AND", not "OR".
-  retry_parameters:
-    task_retry_limit: 0
-    task_age_limit: 1s
-
-- name: cancel-tasks
-  rate: 500/s
 
 - name: tsmon
   bucket_size: 10

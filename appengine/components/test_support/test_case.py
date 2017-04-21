@@ -125,7 +125,7 @@ class TestCase(auto_stub.TestCase):
     self.mail_stub._CacheMessage(request)
     return self.old_send_to_admins(request, *args, **kwargs)
 
-  def execute_tasks(self):
+  def execute_tasks(self, **kwargs):
     """Executes enqueued tasks that are ready to run and return the number run.
 
     A task may trigger another task.
@@ -152,7 +152,8 @@ class TestCase(auto_stub.TestCase):
           headers = dict(task['headers'])
           headers['Content-Length'] = str(len(body))
           try:
-            response = self.app.post(task['url'], body, headers=headers)
+            response = self.app.post(
+                task['url'], body, headers=headers, **kwargs)
           except:
             logging.error(task)
             raise
