@@ -1677,6 +1677,7 @@ class BotsApiTest(BaseTest):
       u'first_seen_ts': then_str,
       u'is_dead': True,
       u'last_seen_ts': then_str,
+      u'machine_type': u'mt',
       u'quarantined': False,
       u'state': u'{"ram":65}',
       u'version': u'123456789',

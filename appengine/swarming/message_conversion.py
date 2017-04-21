@@ -76,10 +76,11 @@ def bot_info_to_rpc(entity, now, deleted=False):
   return _ndb_to_rpc(
       swarming_rpcs.BotInfo,
       entity,
-      dimensions=_string_list_pairs_from_dict(entity.dimensions),
-      is_dead=entity.is_dead(now),
       bot_id=entity.id,
       deleted=deleted,
+      dimensions=_string_list_pairs_from_dict(entity.dimensions),
+      is_dead=entity.is_dead(now),
+      machine_type=entity.machine_type,
       state=json.dumps(entity.state, sort_keys=True, separators=(',', ':')))
 
 

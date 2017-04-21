@@ -507,6 +507,7 @@ class BotInfo(messages.Message):
   lease_id = messages.StringField(13)
   lease_expiration_ts = message_types.DateTimeField(14)
   deleted = messages.BooleanField(15)
+  machine_type = messages.StringField(16)
 
 
 class BotList(messages.Message):
