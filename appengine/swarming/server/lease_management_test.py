@@ -37,6 +37,83 @@ def rpc_to_json(rpc_message):
   return json.loads(protojson.encode_message(rpc_message))
 
 
+class ComputeUtilizationTest(test_case.TestCase):
+  """Tests for lease_management.compute_utilization."""
+
+  def test_no_machine_provider_bots(self):
+    bots = [
+    ]
+    def fetch_page(*_args, **_kwargs):
+      return bots, None
+    self.mock(lease_management.datastore_utils, 'fetch_page', fetch_page)
+
+    lease_management.MachineType(
+        id='machine-type',
+        target_size=1,
+    ).put()
+    key = ndb.Key(lease_management.MachineTypeUtilization, 'machine-type')
+
+    lease_management.compute_utilization()
+
+    self.failIf(key.get())
+
+  def test_machine_provider_bots(self):
+    bots = [
+        bot_management.BotInfo(
+            machine_type='machine-type-1',
+        ),
+        bot_management.BotInfo(
+            machine_type='machine-type-1',
+        ),
+        bot_management.BotInfo(
+            machine_type='machine-type-2',
+            task_id='task',
+        ),
+        bot_management.BotInfo(
+            machine_type='machine-type-3',
+            task_id='task',
+        ),
+        bot_management.BotInfo(
+            machine_type='machine-type-3',
+        ),
+        bot_management.BotInfo(
+            machine_type='machine-type-3',
+            task_id='task',
+        ),
+    ]
+    def fetch_page(*_args, **_kwargs):
+      return bots, None
+    self.mock(lease_management.datastore_utils, 'fetch_page', fetch_page)
+
+    lease_management.MachineType(
+        id='machine-type-1',
+        target_size=2,
+    ).put()
+    key1 = ndb.Key(lease_management.MachineTypeUtilization, 'machine-type-1')
+    lease_management.MachineType(
+        id='machine-type-2',
+        target_size=1,
+    ).put()
+    key2 = ndb.Key(lease_management.MachineTypeUtilization, 'machine-type-2')
+    lease_management.MachineType(
+        id='machine-type-3',
+        target_size=1,
+    ).put()
+    key3 = ndb.Key(lease_management.MachineTypeUtilization, 'machine-type-3')
+
+    lease_management.compute_utilization()
+
+    self.assertEqual(key1.get().busy, 0)
+    self.assertEqual(key1.get().idle, 2)
+    self.failUnless(key1.get().last_updated_ts)
+    self.assertEqual(key2.get().busy, 1)
+    self.assertEqual(key2.get().idle, 0)
+    self.failUnless(key2.get().last_updated_ts)
+    self.assertEqual(key3.get().busy, 2)
+    self.assertEqual(key3.get().idle, 1)
+    self.failUnless(key3.get().last_updated_ts)
+
+
 class DrainExcessTest(test_case.TestCase):
   """Tests for lease_management.drain_excess."""
 

@@ -15,6 +15,11 @@ cron:
   schedule: every 1 minutes
   target: backend
 
+- description: Compute Machine Provider bot utilization.
+  url: /internal/cron/machine_provider_bot_usage
+  schedule: every 1 minutes
+  target: backend
+
 - description: Configure Machine Provider leases.
   url: /internal/cron/machine_provider_config
   schedule: every 1 minutes

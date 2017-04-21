@@ -52,6 +52,18 @@ class CronAbortExpiredShardToRunHandler(webapp2.RequestHandler):
     self.response.out.write('Success.')
 
 
+class CronMachineProviderBotsUtilizationHandler(webapp2.RequestHandler):
+  """Determines Machine Provider bot utilization."""
+
+  @decorators.require_cronjob
+  def get(self):
+    if not config.settings().mp.enabled:
+      logging.info('MP support is disabled')
+      return
+
+    lease_management.compute_utilization()
+
+
 class CronMachineProviderConfigHandler(webapp2.RequestHandler):
   """Configures entities to lease bots from the Machine Provider."""
 
@@ -237,6 +249,8 @@ def get_routes():
         CronTasksTagsAggregationHandler),
 
     # Machine Provider.
+    ('/internal/cron/machine_provider_bot_usage',
+        CronMachineProviderBotsUtilizationHandler),
     ('/internal/cron/machine_provider_config',
         CronMachineProviderConfigHandler),
     ('/internal/cron/machine_provider_manage',

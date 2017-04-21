@@ -32,6 +32,7 @@ release the lease immediately (as long as the bot is not mid-task).
 """
 
 import base64
+import collections
 import datetime
 import json
 import logging
@@ -43,6 +44,7 @@ from protorpc.remote import protojson
 
 import ts_mon_metrics
 
+from components import datastore_utils
 from components import machine_provider
 from components import pubsub
 from components import utils
@@ -120,6 +122,21 @@ class MachineType(ndb.Model):
       machine_provider.Dimensions, indexed=False)
   # Target number of machines of this type to have leased at once.
   target_size = ndb.IntegerProperty(indexed=False, required=True)
+
+
+class MachineTypeUtilization(ndb.Model):
+  """Utilization numbers for a MachineType.
+
+  Key:
+    id: Name of the MachineType these utilization numbers are associated with.
+    kind: MachineTypeUtilization. Is a root entity.
+  """
+  # Number of busy bots created from this machine type.
+  busy = ndb.IntegerProperty(indexed=False)
+  # Number of idle bots created from this machine type.
+  idle = ndb.IntegerProperty(indexed=False)
+  # DateTime indicating when busy/idle numbers were last computed.
+  last_updated_ts = ndb.DateTimeProperty()
 
 
 @ndb.transactional_tasklet
@@ -316,10 +333,9 @@ def ensure_entities_exist(max_concurrent=50):
         machine_type.target_size = target_size
         put = True
 
-    # If the MachineType does not match the config, update it. Copy the enabled
-    # and target_size values so we can compare the MachineType to the config to
-    # check for differences in all other fields except "enabled" and
-    # "target_size" which can vary due to scheduled changes.
+    # If the MachineType does not match the config, update it. Copy the values
+    # of certain fields so we can compare the MachineType to the config to check
+    # for differences in all other fields.
     config = machine_type_pb2_to_entity(config)
     config.enabled = machine_type.enabled
     config.target_size = machine_type.target_size
@@ -1028,8 +1044,42 @@ def manage_lease(key):
   delete_machine_lease(key)
 
 
+def compute_utilization(batch_size=50):
+  """Computes bot utilization per machine type.
+
+  Args:
+    batch_size: Number of bots to query for at a time.
+  """
+  # TODO(smut): Determine if this needs to be sharded when there are many bots.
+  # Maps machine types to [busy, idle] bot counts.
+  machine_types = collections.defaultdict(lambda: [0, 0])
+  now = utils.utcnow()
+  q = bot_management.BotInfo.query()
+  q = bot_management.filter_availability(q, False, False, now, None, True)
+  cursor = ''
+  while cursor is not None:
+    bots, cursor = datastore_utils.fetch_page(q, batch_size, cursor)
+    for bot in bots:
+      if bot.task_id:
+        machine_types[bot.machine_type][0] += 1
+      else:
+        machine_types[bot.machine_type][1] += 1
+
+  for machine_type, (busy, idle) in machine_types.iteritems():
+    logging.info('Utilization for %s: %s/%s', machine_type, busy, busy + idle)
+    MachineTypeUtilization(
+        id=machine_type,
+        busy=busy,
+        idle=idle,
+        last_updated_ts=now,
+    ).put()
+  # TODO(smut): Use this computation for autoscaling.
+
+
 def set_global_metrics():
   """Set global Machine Provider-related ts_mon metrics."""
+  # Consider utilization metrics over 2 minutes old to be outdated.
+  outdated = utils.utcnow() - datetime.timedelta(minutes=2)
   for machine_type in MachineType.query():
     ts_mon_metrics.machine_types_target_size.set(
         machine_type.target_size,
@@ -1039,3 +1089,21 @@ def set_global_metrics():
         },
         target_fields=ts_mon_metrics.TARGET_FIELDS,
     )
+    utilization = ndb.Key(MachineTypeUtilization, machine_type.key.id()).get()
+    if utilization and utilization.last_updated_ts > outdated:
+      ts_mon_metrics.machine_types_actual_size.set(
+          utilization.busy,
+          fields={
+              'busy': True,
+              'machine_type': machine_type.key.id(),
+          },
+          target_fields=ts_mon_metrics.TARGET_FIELDS,
+      )
+      ts_mon_metrics.machine_types_actual_size.set(
+          utilization.idle,
+          fields={
+              'busy': False,
+              'machine_type': machine_type.key.id(),
+          },
+          target_fields=ts_mon_metrics.TARGET_FIELDS,
+      )
