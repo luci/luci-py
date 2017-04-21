@@ -4,20 +4,13 @@
 
 """This module defines Isolate Server frontend url handlers."""
 
-import cgi
 import collections
 import datetime
 import json
-import logging
-import os
-import re
-import urllib
 
 import webapp2
 
-from google.appengine.api import memcache
 from google.appengine.api import modules
-from google.appengine.api import users
 
 import acl
 import config
@@ -114,7 +107,7 @@ class RestrictedConfigHandler(auth.AuthenticatingHandler):
       # TODO(maruel): Handling Exception is too generic. And add self.abort(400)
       self.response.write('Bad private key: %s' % exc)
       return
-    cfg.store()
+    cfg.store(updated_by=auth.get_current_identity().to_bytes())
     self.common('Settings updated')
 
   def common(self, note):

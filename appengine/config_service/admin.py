@@ -16,7 +16,6 @@ import logging
 from google.appengine.ext import ndb
 from google.appengine.ext.ndb import msgprop
 from protorpc import messages
-from protorpc import message_types
 from protorpc import remote
 
 from components import auth
@@ -64,6 +63,7 @@ class AdminApi(remote.Service):
       conf = GlobalConfig()
 
     changed = conf.modify(
+        updated_by=auth.get_current_identity().to_bytes(),
         services_config_storage_type=request.services_config_storage_type,
         services_config_location=request.services_config_location)
 

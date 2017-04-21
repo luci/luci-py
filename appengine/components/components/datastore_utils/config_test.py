@@ -12,7 +12,6 @@ test_env.setup_test_env()
 
 from google.appengine.ext import ndb
 
-from components import auth
 from components.datastore_utils import config
 from test_support import test_case
 
@@ -41,7 +40,7 @@ class ConfigTest(test_case.TestCase):
     self.assertIsNotNone(conf)
     conf.param = '1234'
     now = self.mock_now(datetime.datetime(2010, 1, 1))
-    conf.store(updated_by=auth.Anonymous)
+    conf.store(updated_by='someone')
     self.mock_now(datetime.datetime(2010, 1, 1), 100)
     conf = Config.fetch()
     self.assertEqual('1234', conf.param)
@@ -59,7 +58,7 @@ class ConfigTest(test_case.TestCase):
     # fetch-update cycle, necessary to avoid modifying cached copy in-place.
     conf = Config.fetch()
     conf.param = 'new-value'
-    conf.store(updated_by=auth.Anonymous)
+    conf.store(updated_by='someone')
 
     # Right before expiration.
     self.mock_now(datetime.datetime(2014, 1, 2, 3, 4, 5, 6), 59)

@@ -78,7 +78,7 @@ class CronMachineProviderConfigHandler(webapp2.RequestHandler):
       current_config = machine_provider.MachineProviderConfiguration().cached()
       if new_server != current_config.instance_url:
         logging.info('Updating Machine Provider server to %s', new_server)
-        current_config.modify(instance_url=new_server)
+        current_config.modify(updated_by='', instance_url=new_server)
 
     lease_management.ensure_entities_exist()
     lease_management.drain_excess()

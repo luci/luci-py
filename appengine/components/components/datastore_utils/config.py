@@ -21,16 +21,12 @@ Example usage:
 
   def modify():
     conf = MyConfig.fetch()
-    conf.modify(param1='123')
+    conf.modify(updated_by='user:abc@example.com', param1='123')
 
 
 Advantages over regular ndb.Entity with predefined key:
   1. All changes are logged (see datastore_utils.store_new_version).
   2. In-memory process-wide cache.
-
-TODO: Get rid of components.auth dependency. It creates circular import between
-components.auth and components.datastore_utils. components.datastore_utils is on
-"lower" level than components.auth and must not depend on it.
 """
 
 # Pylint fails to recognize that ndb.Model.key is defined in ndb.Model.
@@ -41,7 +37,6 @@ import threading
 
 from google.appengine.ext import ndb
 
-from components import auth
 from components import datastore_utils
 from components import utils
 
@@ -54,8 +49,8 @@ class GlobalConfig(ndb.Model):
 
   # When this revision of configuration was created.
   updated_ts = ndb.DateTimeProperty(indexed=False, auto_now_add=True)
-  # Who created this revision of configuration.
-  updated_by = auth.IdentityProperty(indexed=False)
+  # Who created this revision of configuration (as identity string).
+  updated_by = ndb.StringProperty(indexed=False, default='')
 
   @classmethod
   def cached_async(cls):
@@ -85,7 +80,7 @@ class GlobalConfig(ndb.Model):
         if not conf:
           conf = cls()
           conf.set_defaults()
-          yield conf.store_async(updated_by=auth.get_service_self_identity())
+          yield conf.store_async(updated_by='')
 
         with fetcher.cache_lock:
           fetcher.cache_expiry = utils.utcnow() + datetime.timedelta(minutes=1)
@@ -121,17 +116,17 @@ class GlobalConfig(ndb.Model):
 
   fetch = utils.sync_of(fetch_async)
 
-  def store_async(self, updated_by=None):
+  def store_async(self, updated_by):
     """Stores a new version of the config entity."""
     # Create an incomplete key, to be completed by 'store_new_version'.
     self.key = ndb.Key(self.__class__, None, parent=self._get_root_key())
-    self.updated_by = updated_by or auth.get_current_identity()
+    self.updated_by = updated_by
     self.updated_ts = utils.utcnow()
     return datastore_utils.store_new_version_async(self, self._get_root_model())
 
   store = utils.sync_of(store_async)
 
-  def modify(self, updated_by=None, **kwargs):
+  def modify(self, updated_by, **kwargs):
     """Applies |kwargs| dict to the entity and stores the entity if changed."""
     dirty = False
     for k, v in kwargs.iteritems():
@@ -140,7 +135,7 @@ class GlobalConfig(ndb.Model):
         setattr(self, k, v)
         dirty = True
     if dirty:
-      self.store(updated_by=updated_by)
+      self.store(updated_by)
     return dirty
 
   def set_defaults(self):

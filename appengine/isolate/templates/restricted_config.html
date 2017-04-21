@@ -115,7 +115,7 @@
 
   <div class="panel-body">
     Last updated by:
-    <strong>{% if cfg.updated_by %}{{cfg.updated_by.to_bytes()}}{% else%}N/A{%endif%}
+    <strong>{% if cfg.updated_by %}{{cfg.updated_by}}{% else%}N/A{%endif%}
       </strong>.<br>
     Last updated on: <strong>{{cfg.updated_ts|datetimeformat}}</strong>.<br>
 

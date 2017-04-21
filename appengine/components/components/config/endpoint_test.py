@@ -3,8 +3,6 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-import base64
-import datetime
 import logging
 import sys
 import unittest
@@ -13,14 +11,11 @@ from test_support import test_env
 test_env.setup_test_env()
 
 from test_support import test_case
-import mock
 
 from components import auth
 from components.config import common
 from components.config import endpoint
-from components.config import test_config_pb2
 from components.config import validation
-from test_support import test_case
 
 
 class EndpointTestCase(test_case.EndpointsTestCase):
@@ -60,6 +55,7 @@ class EndpointTestCase(test_case.EndpointsTestCase):
     self.assertFalse(endpoint.is_trusted_requester())
 
     common.ConfigSettings().modify(
+        updated_by='unit-test',
         service_hostname='luci-config.appspot.com',
         trusted_config_account=auth.Identity(
             'user', 'luci-config@appspot.gserviceaccount.com'),

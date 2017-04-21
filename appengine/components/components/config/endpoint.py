@@ -119,7 +119,9 @@ class ConfigApi(remote.Service):
             'Invalid trusted_config_account %s: %s' % (
               request.trusted_config_account,
               ex.message))
-    changed = settings.modify(**delta)
+    changed = settings.modify(
+        updated_by=auth.get_current_identity().to_bytes(),
+        **delta)
     if changed:
       logging.warning('Updated config settings')
     settings = common.ConfigSettings.fetch() or settings

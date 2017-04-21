@@ -128,9 +128,10 @@ def update_template_configs():
 
   logging.info('Updating configuration to %s', template_revision)
   stored_config.modify(
-      manager_config = protobuf.text_format.MessageToString(manager_config),
-      revision = template_revision,
-      template_config = protobuf.text_format.MessageToString(template_config),
+      updated_by='',  # this is called from cron, there's no user here
+      manager_config=protobuf.text_format.MessageToString(manager_config),
+      revision=template_revision,
+      template_config=protobuf.text_format.MessageToString(template_config),
   )
 
 
@@ -209,7 +210,7 @@ def _get_settings():
     current_config = machine_provider.MachineProviderConfiguration.cached()
     if cfg.mp_server != current_config.instance_url:
       logging.info('Updating Machine Provider server to %s', cfg.mp_server)
-      current_config.modify(instance_url=cfg.mp_server)
+      current_config.modify(updated_by='', instance_url=cfg.mp_server)
   return rev, cfg
 
 
