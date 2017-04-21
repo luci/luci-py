@@ -1050,7 +1050,9 @@ def compute_utilization(batch_size=50):
   Args:
     batch_size: Number of bots to query for at a time.
   """
-  # TODO(smut): Determine if this needs to be sharded when there are many bots.
+  # Records entities we've seen already. Used for debug logging. The query is
+  # returning more entities than expected on some servers.
+  seen = {}
   # Maps machine types to [busy, idle] bot counts.
   machine_types = collections.defaultdict(lambda: [0, 0])
   now = utils.utcnow()
@@ -1060,6 +1062,14 @@ def compute_utilization(batch_size=50):
   while cursor is not None:
     bots, cursor = datastore_utils.fetch_page(q, batch_size, cursor)
     for bot in bots:
+      if bot.key.parent().id() in seen:
+        logging.warning(
+            'Saw duplicate bot: %s\nPrevious task ID: %s\nCurrent task ID: %s',
+            bot.key.parent().id(),
+            seen[bot.key.parent().id()],
+            bot.task_id,
+        )
+      seen[bot.key.parent().id()] = bot.task_id
       if bot.task_id:
         machine_types[bot.machine_type][0] += 1
       else:

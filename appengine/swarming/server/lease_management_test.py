@@ -60,23 +60,29 @@ class ComputeUtilizationTest(test_case.TestCase):
   def test_machine_provider_bots(self):
     bots = [
         bot_management.BotInfo(
+            key=bot_management.get_info_key('bot1'),
             machine_type='machine-type-1',
         ),
         bot_management.BotInfo(
+            key=bot_management.get_info_key('bot2'),
             machine_type='machine-type-1',
         ),
         bot_management.BotInfo(
+            key=bot_management.get_info_key('bot3'),
             machine_type='machine-type-2',
             task_id='task',
         ),
         bot_management.BotInfo(
+            key=bot_management.get_info_key('bot4'),
             machine_type='machine-type-3',
             task_id='task',
         ),
         bot_management.BotInfo(
+            key=bot_management.get_info_key('bot5'),
             machine_type='machine-type-3',
         ),
         bot_management.BotInfo(
+            key=bot_management.get_info_key('bot6'),
             machine_type='machine-type-3',
             task_id='task',
         ),
