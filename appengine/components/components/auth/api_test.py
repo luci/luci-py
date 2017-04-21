@@ -184,6 +184,7 @@ class AuthDBTest(test_case.TestCase):
     self.assertFalse(warnings)
 
   def test_is_allowed_oauth_client_id(self):
+    self.mock(api, '_additional_client_ids_cb', lambda: ['local'])
     global_config = model.AuthGlobalConfig(
         oauth_client_id='1',
         oauth_additional_client_ids=['2', '3'])
@@ -192,6 +193,9 @@ class AuthDBTest(test_case.TestCase):
     self.assertTrue(auth_db.is_allowed_oauth_client_id('1'))
     self.assertTrue(auth_db.is_allowed_oauth_client_id('2'))
     self.assertTrue(auth_db.is_allowed_oauth_client_id('3'))
+    self.assertTrue(auth_db.is_allowed_oauth_client_id('local'))
+    self.assertTrue(
+        auth_db.is_allowed_oauth_client_id(api.API_EXPLORER_CLIENT_ID))
     self.assertFalse(auth_db.is_allowed_oauth_client_id('4'))
 
   def test_fetch_auth_db_lazy_bootstrap(self):

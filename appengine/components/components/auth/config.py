@@ -42,6 +42,8 @@ _config = lib_config.register(
       'PROCESS_CHANGE_TASK_QUEUE': 'default',
       # True to use OpenID based login instead of default GAE one.
       'USE_OPENID': False,
+      # A callback that returns a list of OAuth client IDs to accept.
+      'OAUTH_CLIENT_IDS_PROVIDER': None,
     })
 
 
@@ -60,9 +62,11 @@ def ensure_configured():
 
   # Import lazily to avoid module reference cycle.
   from .ui import ui
+  from . import api
 
   with _config_lock:
     if not _config_called:
+      api.configure_client_ids_provider(_config.OAUTH_CLIENT_IDS_PROVIDER)
       # Customize auth UI to show where it's running.
       if not _config.UI_CUSTOM_CONFIG:
         ui.configure_ui(_config.UI_APP_NAME)

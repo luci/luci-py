@@ -60,6 +60,10 @@ __all__ = [
 ]
 
 
+# A callback (configured through appengine_config.py mechanism) that returns
+# a list of additional OAuth client IDs we trust in this GAE application.
+_additional_client_ids_cb = None
+
 # How soon process-global AuthDB cache expires, sec.
 _process_cache_expiration_sec = 30
 # True if fetch_auth_db was called at least once and created all root entities.
@@ -187,6 +191,17 @@ class AuthDB(object):
           created_by=entity.created_by,
           modified_ts=entity.modified_ts,
           modified_by=entity.modified_by)
+
+    # A set of all allowed client IDs (as provided via config and the callback).
+    client_ids = []
+    if self.global_config.oauth_client_id:
+      client_ids.append(self.global_config.oauth_client_id)
+    if self.global_config.oauth_additional_client_ids:
+      client_ids.extend(self.global_config.oauth_additional_client_ids)
+    client_ids.append(API_EXPLORER_CLIENT_ID)
+    if _additional_client_ids_cb:
+      client_ids.extend(_additional_client_ids_cb())
+    self.allowed_client_ids = set(c for c in client_ids if c)
 
   @property
   def auth_db_rev(self):
@@ -413,14 +428,7 @@ class AuthDB(object):
 
   def is_allowed_oauth_client_id(self, client_id):
     """True if given OAuth2 client_id can be used to authenticate the user."""
-    if not client_id:
-      return False
-    allowed = set()
-    if self.global_config.oauth_client_id:
-      allowed.add(self.global_config.oauth_client_id)
-    if self.global_config.oauth_additional_client_ids:
-      allowed.update(self.global_config.oauth_additional_client_ids)
-    return client_id in allowed
+    return client_id in self.allowed_client_ids
 
   def get_oauth_config(self):
     """Returns a tuple with OAuth2 config.
@@ -437,6 +445,22 @@ class AuthDB(object):
 
 ################################################################################
 ## OAuth token check.
+
+
+def configure_client_ids_provider(cb):
+  """Sets a callback that returns a list of additional client IDs to trust.
+
+  This list is used in additional to a global list of trusted client IDs,
+  distributed by the auth service.
+
+  This list usually includes "local" client ID, used only by the UI of the
+  current service.
+
+  Args:
+    cb: argumentless function returning an iterable of client_ids.
+  """
+  global _additional_client_ids_cb
+  _additional_client_ids_cb = cb
 
 
 def attempt_oauth_initialization(scope):
@@ -509,7 +533,6 @@ def extract_oauth_caller_identity():
   # since email address uniquely identifies credentials used.
   good = (
       email.endswith('.gserviceaccount.com') or
-      client_id == API_EXPLORER_CLIENT_ID or
       get_request_auth_db().is_allowed_oauth_client_id(client_id))
 
   if not good:
