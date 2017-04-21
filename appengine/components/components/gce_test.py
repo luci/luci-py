@@ -290,7 +290,7 @@ class GceTest(test_case.TestCase):
 
   def test_get_network_interfaces(self):
     expected_interfaces_ext  = [{'network': 'global/networks/default',
-                                 'accessConfigs': [{}]}]
+                                 'accessConfigs': [{'type': 'ONE_TO_ONE_NAT'}]}]
     expected_interfaces_int  = [{'network': 'global/networks/default'}]
     self.assertEqual(expected_interfaces_int,
                      gce.get_network_interfaces('project',

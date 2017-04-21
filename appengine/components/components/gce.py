@@ -550,7 +550,7 @@ def get_network_interfaces(project_id, network_url, auto_assign_external_ip):
   if auto_assign_external_ip:
     # This creates a single accessConfig instance and uses default values for
     # all fields to enable external network with auto-assigned IP.
-    network_interfaces[0]['accessConfigs'] = [{}]
+    network_interfaces[0]['accessConfigs'] = [{'type': 'ONE_TO_ONE_NAT'}]
   return network_interfaces
 
 
