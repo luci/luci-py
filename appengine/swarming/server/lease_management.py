@@ -1053,6 +1053,9 @@ def compute_utilization(batch_size=50):
   # Records entities we've seen already. Used for debug logging. The query is
   # returning more entities than expected on some servers.
   seen = {}
+  # Tracks the current page of results. Used to see if duplicate entities
+  # are being seen on the same page, or just different pages.
+  i = 0
   # Maps machine types to [busy, idle] bot counts.
   machine_types = collections.defaultdict(lambda: [0, 0])
   now = utils.utcnow()
@@ -1064,16 +1067,19 @@ def compute_utilization(batch_size=50):
     for bot in bots:
       if bot.key.parent().id() in seen:
         logging.warning(
-            'Saw duplicate bot: %s\nPrevious task ID: %s\nCurrent task ID: %s',
+            'Saw duplicate bot: %s\nPrevious page: %s\nCurrent page: %s',
             bot.key.parent().id(),
             seen[bot.key.parent().id()],
-            bot.task_id,
+            i,
         )
-      seen[bot.key.parent().id()] = bot.task_id
+        if seen[bot.key.parent().id()] == i:
+          logging.warning('Duplicate occurred on the same page of results')
+      seen[bot.key.parent().id()] = i
       if bot.task_id:
         machine_types[bot.machine_type][0] += 1
       else:
         machine_types[bot.machine_type][1] += 1
+    i += 1
 
   for machine_type, (busy, idle) in machine_types.iteritems():
     logging.info('Utilization for %s: %s/%s', machine_type, busy, busy + idle)
