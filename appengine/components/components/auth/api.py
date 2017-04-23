@@ -150,6 +150,7 @@ class AuthDB(object):
       secrets=None,
       ip_whitelist_assignments=None,
       ip_whitelists=None,
+      additional_client_ids=None,
       entity_group_version=None):
     """
     Args:
@@ -157,8 +158,9 @@ class AuthDB(object):
       global_config: instance of AuthGlobalConfig entity.
       groups: list of AuthGroup entities.
       secrets: list of AuthSecret entities ('local' and 'global' in same list).
-      ip_whitelists: list of AuthIPWhitelist entities.
       ip_whitelist_assignments: AuthIPWhitelistAssignments entity.
+      ip_whitelists: list of AuthIPWhitelist entities.
+      additional_client_ids: an additional list of OAuth2 client IDs to trust.
       entity_group_version: version of AuthGlobalConfig entity group at the
           moment when entities were fetched from it.
     """
@@ -199,8 +201,8 @@ class AuthDB(object):
     if self.global_config.oauth_additional_client_ids:
       client_ids.extend(self.global_config.oauth_additional_client_ids)
     client_ids.append(API_EXPLORER_CLIENT_ID)
-    if _additional_client_ids_cb:
-      client_ids.extend(_additional_client_ids_cb())
+    if additional_client_ids:
+      client_ids.extend(additional_client_ids)
     self.allowed_client_ids = set(c for c in client_ids if c)
 
   @property
@@ -803,8 +805,10 @@ def fetch_auth_db(known_version=None):
   # Entity group root. To reduce amount of typing.
   root_key = model.root_key()
 
+  additional_client_ids = []
+
   @ndb.non_transactional
-  def bootstrap():
+  def prepare():
     # Assumption that root entities always exist make code simpler by removing
     # 'is not None' checks. So make sure they do, by running bootstrap code
     # at most once per lifetime of an instance. We do it lazily here (instead of
@@ -815,6 +819,9 @@ def fetch_auth_db(known_version=None):
     if not _lazy_bootstrap_ran:
       model.AuthGlobalConfig.get_or_insert(root_key.string_id())
       _lazy_bootstrap_ran = True
+    # Call the user-supplied callback in non-transactional context.
+    if _additional_client_ids_cb:
+      additional_client_ids.extend(_additional_client_ids_cb())
 
   @ndb.transactional(propagation=ndb.TransactionOptions.INDEPENDENT)
   def fetch():
@@ -851,11 +858,12 @@ def fetch_auth_db(known_version=None):
         global_config=global_config_future.get_result(),
         groups=groups_future.get_result(),
         secrets=secrets_future.get_result(),
-        ip_whitelists=ip_whitelists,
         ip_whitelist_assignments=ip_whitelist_assignments,
+        ip_whitelists=ip_whitelists,
+        additional_client_ids=additional_client_ids,
         entity_group_version=current_version)
 
-  bootstrap()
+  prepare()  # non-transactional work
   return fetch()
 
 

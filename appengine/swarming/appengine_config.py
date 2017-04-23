@@ -9,8 +9,14 @@ https://developers.google.com/appengine/docs/python/tools/appengineconfig
 
 import os
 
+from server import config
+
 
 components_auth_UI_APP_NAME = 'Swarming'
+
+# Used to make components.auth trust the client ID used by the web UI. This is
+# a lazily-called callback (called once per minute, when initializing AuthDB).
+components_auth_OAUTH_CLIENT_IDS_PROVIDER = lambda: [config.get_ui_client_id()]
 
 
 def hack_windows():

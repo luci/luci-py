@@ -184,11 +184,12 @@ class AuthDBTest(test_case.TestCase):
     self.assertFalse(warnings)
 
   def test_is_allowed_oauth_client_id(self):
-    self.mock(api, '_additional_client_ids_cb', lambda: ['local'])
     global_config = model.AuthGlobalConfig(
         oauth_client_id='1',
         oauth_additional_client_ids=['2', '3'])
-    auth_db = api.AuthDB(global_config=global_config)
+    auth_db = api.AuthDB(
+        global_config=global_config,
+        additional_client_ids=['local'])
     self.assertFalse(auth_db.is_allowed_oauth_client_id(None))
     self.assertTrue(auth_db.is_allowed_oauth_client_id('1'))
     self.assertTrue(auth_db.is_allowed_oauth_client_id('2'))
@@ -210,6 +211,9 @@ class AuthDBTest(test_case.TestCase):
     self.assertTrue(model.root_key().get())
 
   def test_fetch_auth_db(self):
+    # Client IDs callback.
+    self.mock(api, '_additional_client_ids_cb', lambda: ['', 'cb_client_id'])
+
     # Create AuthGlobalConfig.
     global_config = model.AuthGlobalConfig(key=model.root_key())
     global_config.oauth_client_id = '1'
@@ -270,6 +274,9 @@ class AuthDBTest(test_case.TestCase):
     self.assertEqual(
         {'bots': bots_ip_whitelist, 'some ip whitelist': some_ip_whitelist},
         auth_db.ip_whitelists)
+    self.assertTrue(auth_db.is_allowed_oauth_client_id('1'))
+    self.assertTrue(auth_db.is_allowed_oauth_client_id('cb_client_id'))
+    self.assertFalse(auth_db.is_allowed_oauth_client_id(''))
 
   def test_get_secret(self):
     # Make AuthDB with two secrets.

@@ -20,6 +20,7 @@ from test_support import test_case
 from proto import bots_pb2
 from server import bot_auth
 from server import bot_groups_config
+from server import config as srv_cfg
 
 
 TEST_CONFIG = bots_pb2.BotsCfg(
@@ -57,6 +58,9 @@ TEST_CONFIG = bots_pb2.BotsCfg(
 class BotAuthTest(test_case.TestCase):
   def setUp(self):
     super(BotAuthTest, self).setUp()
+
+    # Mock this out, otherwise it tries to fetch settings.cfg.
+    self.mock(srv_cfg, 'get_ui_client_id', lambda: None)
 
     self.logs = []
     self.mock(logging, 'error', lambda l, *_args: self.logs.append(l % _args))

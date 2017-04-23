@@ -56,6 +56,14 @@ def settings():
   return _get_settings_with_defaults()[1]
 
 
+def get_ui_client_id():
+  """Returns OAuth client ID to use for web UI.
+
+  Used as OAUTH_CLIENT_IDS_PROVIDER in appengien_config.py. Mocked in tests.
+  """
+  return settings().ui_client_id
+
+
 def validate_flat_dimension(d):
   """Return strue if a 'key:value' dimension is valid."""
   key, _, val = d.partition(':')
