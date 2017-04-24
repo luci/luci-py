@@ -21,6 +21,7 @@ from google.appengine.ext import ndb
 from components.auth import api
 from components.auth import ipaddr
 from components.auth import model
+from components import utils
 from test_support import test_case
 
 
@@ -213,6 +214,7 @@ class AuthDBTest(test_case.TestCase):
   def test_fetch_auth_db(self):
     # Client IDs callback.
     self.mock(api, '_additional_client_ids_cb', lambda: ['', 'cb_client_id'])
+    self.mock(api, 'get_web_client_id', lambda: 'web_client_id')
 
     # Create AuthGlobalConfig.
     global_config = model.AuthGlobalConfig(key=model.root_key())
@@ -276,6 +278,7 @@ class AuthDBTest(test_case.TestCase):
         auth_db.ip_whitelists)
     self.assertTrue(auth_db.is_allowed_oauth_client_id('1'))
     self.assertTrue(auth_db.is_allowed_oauth_client_id('cb_client_id'))
+    self.assertTrue(auth_db.is_allowed_oauth_client_id('web_client_id'))
     self.assertFalse(auth_db.is_allowed_oauth_client_id(''))
 
   def test_get_secret(self):
@@ -789,6 +792,15 @@ class OAuthAccountsTest(test_case.TestCase):
     self.mock_all('email@email.com', 'some-client-id')
     with self.assertRaises(api.AuthorizationError):
       api.extract_oauth_caller_identity()
+
+
+class AuthWebUIConfigTest(test_case.TestCase):
+  def test_works(self):
+    utils.clear_cache(api.get_web_client_id)
+    self.assertEqual('', api.get_web_client_id_uncached())
+    api.set_web_client_id('zzz')
+    self.assertEqual('zzz', api.get_web_client_id_uncached())
+    self.assertEqual('zzz', api.get_web_client_id())
 
 
 if __name__ == '__main__':

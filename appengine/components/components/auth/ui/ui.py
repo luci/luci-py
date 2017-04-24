@@ -71,6 +71,7 @@ def get_ui_routes():
   routes.extend([
     webapp2.Route(r'/auth', MainHandler),
     webapp2.Route(r'/auth/bootstrap', BootstrapHandler, name='bootstrap'),
+    webapp2.Route(r'/auth/bootstrap/oauth', BootstrapOAuthHandler),
     webapp2.Route(r'/auth/link', LinkToPrimaryHandler),
   ])
   return routes
@@ -236,7 +237,9 @@ class BootstrapHandler(UIHandler):
   """Creates Administrators group (if necessary) and adds current caller to it.
 
   Requires Appengine level Admin access for its handlers, since Administrators
-  group may not exist yet. Used to bootstrap a new service instance.
+  group may not exist yet.
+
+  Used during bootstrap of a new service instance.
   """
 
   @classmethod
@@ -267,6 +270,40 @@ class BootstrapHandler(UIHandler):
       'return_url': self.request.get('return_url') or '',
     }
     self.reply('auth/bootstrap_done.html', env)
+
+
+class BootstrapOAuthHandler(UIHandler):
+  """Page to set OAuth2 client ID used by the main web UI.
+
+  Requires Appengine level Admin access for its handlers, since without client
+  ID there's no UI yet to configure Administrators group.
+
+  Used during bootstrap of a new service instance. Unlike /auth/bootstrap, it is
+  also available after the service is linked to some primary Auth service.
+  """
+
+  @classmethod
+  def get_auth_methods(cls, conf):
+    # This method sets 'is_superuser' bit for GAE-level admins.
+    return [handler.gae_cookie_authentication]
+
+  @api.require(api.is_superuser)
+  def get(self):
+    self.show_page(web_client_id=api.get_web_client_id_uncached())
+
+  @api.require(api.is_superuser)
+  def post(self):
+    web_client_id = self.request.POST['web_client_id']
+    api.set_web_client_id(web_client_id)
+    self.show_page(web_client_id=web_client_id, saved=True)
+
+  def show_page(self, web_client_id, saved=False):
+    env = {
+      'page_title': 'OAuth2 web client ID',
+      'web_client_id': web_client_id or '',
+      'saved': saved,
+    }
+    self.reply('auth/bootstrap_oauth.html', env)
 
 
 class LinkToPrimaryHandler(UIHandler):

@@ -29,6 +29,7 @@ from google.appengine.ext import ndb
 from google.appengine.ext.ndb import metadata
 from google.appengine.runtime import apiproxy_errors
 
+from components.datastore_utils import config as ds_config
 from components import utils
 
 from . import config
@@ -47,6 +48,7 @@ __all__ = [
   'get_peer_ip',
   'get_process_cache_expiration_sec',
   'get_secret',
+  'get_web_client_id',
   'is_admin',
   'is_group_member',
   'is_in_ip_whitelist',
@@ -446,6 +448,41 @@ class AuthDB(object):
 
 
 ################################################################################
+## OAuth client configuration for the web UI.
+
+
+class AuthWebUIConfig(ds_config.GlobalConfig):
+  """Configuration of web UI (updated through /auth/bootstrap/oauth).
+
+  See BootstrapOAuthHandler in ui/ui.py for where this config is updated.
+  """
+  web_client_id = ndb.StringProperty(indexed=False, default='')
+
+
+@utils.cache_with_expiration(300)
+def get_web_client_id():
+  """Returns OAuth2 client ID for the web UI (if configured) or '' (if not).
+
+  Can be used by components.auth API users to inject a web client ID into pages.
+  """
+  return get_web_client_id_uncached()
+
+
+def get_web_client_id_uncached():
+  """Fetches web client ID from the datastore (slow, use get_web_client_id)."""
+  cfg = AuthWebUIConfig.fetch()
+  return cfg.web_client_id if cfg else ''
+
+
+def set_web_client_id(web_client_id):
+  """Changes the configured OAuth2 client ID for the web UI."""
+  cfg = AuthWebUIConfig.fetch() or AuthWebUIConfig()
+  cfg.modify(
+      updated_by=get_current_identity().to_bytes(),
+      web_client_id=web_client_id)
+
+
+################################################################################
 ## OAuth token check.
 
 
@@ -819,9 +856,12 @@ def fetch_auth_db(known_version=None):
     if not _lazy_bootstrap_ran:
       model.AuthGlobalConfig.get_or_insert(root_key.string_id())
       _lazy_bootstrap_ran = True
-    # Call the user-supplied callback in non-transactional context.
+    # Call the user-supplied callbacks in non-transactional context.
     if _additional_client_ids_cb:
       additional_client_ids.extend(_additional_client_ids_cb())
+    web_id = get_web_client_id()
+    if web_id:
+      additional_client_ids.append(web_id)
 
   @ndb.transactional(propagation=ndb.TransactionOptions.INDEPENDENT)
   def fetch():
