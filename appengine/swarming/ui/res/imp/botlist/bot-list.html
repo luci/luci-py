@@ -143,13 +143,6 @@
               array (we are listening to all subproperties). The element returned is
               not of much use, so we'll ignore it in _hide() and use this._columns.
               -->
-              <th hidden$="[[_hide('cloud_console_link', _columns.*)]]">
-                <span>Bot in Cloud Console</span>
-                <sort-toggle
-                    name="cloud_console_link"
-                    current="[[_sort]]">
-                </sort-toggle>
-              </th>
               <th hidden$="[[_hide('mp_lease_id', _columns.*)]]">
                 <span>Machine Provider Lease Id</span>
                 <sort-toggle
@@ -197,9 +190,6 @@
                       [[bot.bot_id]]
                   </a>
                 </td>
-                <td hidden$="[[_hide('cloud_console_link', _columns.*)]]">
-                  <a href$="[[_ccLink(bot)]]">[[_ccText(bot)]]</a>
-                </td>
                 <td hidden$="[[_hide('mp_lease_id', _columns.*)]]">
                   <a href$="[[_mpLink(bot, _server_details.machine_provider_template)]]">
                     [[_column('mp_lease_id', bot,_verbose)]]
@@ -227,7 +217,6 @@
                     hidden$="[[_hide('android_devices', _columns.*)]]"
                     class$="[[_deviceClass(device,index)]]">
                   <td></td>
-                  <td hidden$="[[_hide('cloud_console_link', _columns.*)]]"></td>
                   <td hidden$="[[_hide('mp_lease_id', _columns.*)]]"></td>
                   <td hidden$="[[_hide('task', _columns.*)]]"></td>
                   <template
@@ -260,7 +249,7 @@
     var UNKNOWN = "unknown";
     // see dynamic-table for more information on specialColumns, headerMap,
     // columnMap, and specialSort
-    var specialColumns = ["id", "cloud_console_link", "mp_lease_id", "task"];
+    var specialColumns = ["id", "mp_lease_id", "task"];
 
     var deviceColumns = ["battery_health", "battery_level", "battery_status", "battery_temperature", "battery_voltage", "device_temperature"];
 
@@ -634,22 +623,6 @@
           classes += "old_version";
         }
         return classes;
-      },
-
-      _ccLink: function(bot){
-        var z = this._attribute(bot, "zone")[0];
-        if (z === "unknown") {
-          return undefined;
-        }
-        return this._cloudConsoleLink(z, bot.bot_id);
-      },
-
-      _ccText: function(bot){
-        var z = this._attribute(bot, "zone")[0];
-        if (z === "unknown") {
-          return "Not on GCE";
-        }
-        return "View Bot";
       },
 
       _checkDeviceColumns: function() {

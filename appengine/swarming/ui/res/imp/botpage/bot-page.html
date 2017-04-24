@@ -136,11 +136,6 @@
 
         <div class="header horizontal layout">
           <paper-input class="id_input" label="Bot id" value="{{bot_id}}"></paper-input>
-          <template is="dom-if" if="[[_ccLink(_bot)]]">
-            <div class="vertical layout">
-              <a href$="[[_ccLink(_bot)]]" class="cloud">Cloud Console</a>
-            </div>
-          </template>
           <button on-click="_refresh">
             <iron-icon class="refresh" icon="icons:refresh"></iron-icon>
           </button>
@@ -469,22 +464,6 @@
         this.$.page_tasks.clear();
         this.$.page_events.clear();
         this._reload();
-      },
-
-      _ccLink: function(bot) {
-        // We create a link to this bot in cloud console if we detect it is
-        // on GCE.  We look for the zone dimension and create the link using
-        // that.
-        if (!bot || !bot.dimensions) {
-          return false;
-        }
-        var link;
-        bot.dimensions.forEach(function(d){
-          if (d.key === "zone") {
-            link = this._cloudConsoleLink(d.value[0], bot.bot_id);
-          }
-        }.bind(this))
-        return link;
       },
 
       _concat: function(arr) {

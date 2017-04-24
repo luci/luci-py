@@ -59,13 +59,6 @@
         return "/botlist?" + sk.query.fromParamSet(obj);
       },
 
-      // Create a link to a bot in Google Cloud Console. Cloud console will try
-      // to find the bot in the last project the user was logged in as, which
-      // is the best we can do atm.
-      _cloudConsoleLink: function(zone, bot_id) {
-        return `http://console.cloud.google.com/compute/instancesDetail/zones/${zone}/instances/${bot_id}`
-      },
-
       // _getJsonAsync makes an XHR to a url, parses the response as JSON
       // and sticks the resulting object into the property with the name given
       // by "bindTo". If busy is defined, the property with that name will be
