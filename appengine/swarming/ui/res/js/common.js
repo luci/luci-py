@@ -72,5 +72,28 @@ this.swarming = this.swarming || function() {
     });
   }
 
+  // sanitizeAndHumanizeTime parses a date string or ms_since_epoch into a JS
+  // Date object, assuming UTC time. It also creates a human readable form in
+  // the obj under a key with a human_ prefix.  E.g.
+  // swarming.sanitizeAndHumanizeTime(foo, "some_ts")
+  // parses the string/int at foo["some_ts"] such that foo["some_ts"] is now a
+  // Date object and foo["human_some_ts"] is the human formated version from
+  // sk.human.localeTime.
+  swarming.sanitizeAndHumanizeTime = function(obj, key) {
+    if (obj[key]) {
+      if (obj[key].endsWith && !obj[key].endsWith('Z')) {
+        // Timestamps from the server are missing the 'Z' that specifies Zulu
+        // (UTC) time. If that's not the case, add the Z. Otherwise, some
+        // browsers interpret this as local time, which throws off everything.
+        // TODO(kjlubick): Should the server output milliseconds since the
+        // epoch?  That would be more consistent.
+        // See http://crbug.com/714599
+        obj[key] += 'Z';
+      }
+      obj[key] = new Date(obj[key]);
+      obj["human_"+key] = sk.human.localeTime(obj[key]);
+    }
+  }
+
   return swarming;
 }();

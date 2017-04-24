@@ -250,10 +250,7 @@
           t.tagMap = tagMap;
 
           TIMES.forEach(function(time) {
-            if (t[time]) {
-              t[time] = new Date(t[time]);
-              t["human_"+time] = sk.human.localeTime(t[time]);
-            }
+            swarming.sanitizeAndHumanizeTime(t, time);
           });
           // Running tasks have no duration set, so we can figure it out.
           if (!t.duration && t.state === this.RUNNING && t.started_ts){

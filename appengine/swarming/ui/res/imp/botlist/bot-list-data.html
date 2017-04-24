@@ -60,6 +60,8 @@
     var AVAILABLE = "available";
     var BLACKLIST_DIMENSIONS = ["quarantined", "error"];
 
+    var BOT_TIMES = ["first_seen_ts", "last_seen_ts", "lease_expiration_ts"];
+
     function aggregateTemps(temps) {
       if (!temps) {
         return {};
@@ -206,15 +208,9 @@
           }
           bot.state.devices = devices;
 
-          if (bot.last_seen_ts) {
-            bot.last_seen_ts = new Date(bot.last_seen_ts);
-          }
-          if (bot.first_seen_ts) {
-            bot.first_seen_ts = new Date(bot.first_seen_ts);
-          }
-          if (bot.lease_expiration_ts) {
-            bot.lease_expiration_ts = new Date(bot.lease_expiration_ts);
-          }
+          BOT_TIMES.forEach(function(time) {
+            swarming.sanitizeAndHumanizeTime(bot, time);
+          });
 
         }.bind(this));
         return json.items;

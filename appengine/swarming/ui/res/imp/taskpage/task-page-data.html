@@ -169,10 +169,7 @@
         });
 
         TIMES.forEach(function(time) {
-          if (request[time]) {
-            request[time] = new Date(request[time]);
-            request["human_"+time] = sk.human.localeTime(request[time]);
-          }
+          swarming.sanitizeAndHumanizeTime(request, time);
         });
         return request;
       },
@@ -183,10 +180,7 @@
         }
         var now = new Date();
         TIMES.forEach(function(time) {
-          if (result[time]) {
-            result[time] = new Date(result[time]);
-            result["human_"+time] = sk.human.localeTime(result[time]);
-          }
+          swarming.sanitizeAndHumanizeTime(result, time);
         });
         // Running tasks have no duration set, so we can figure it out.
         if (!result.duration && result.state === this.RUNNING && result.started_ts){

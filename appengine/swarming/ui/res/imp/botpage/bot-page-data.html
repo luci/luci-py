@@ -58,18 +58,6 @@
     var BOT_TIMES = ["first_seen_ts", "last_seen_ts", "lease_expiration_ts"];
     var TASK_TIMES = ["started_ts", "completed_ts", "abandoned_ts", "modified_ts"];
 
-    var timezone;
-    function formatDate(date) {
-      if (!timezone) {
-        // Date.toString() looks like "Mon Aug 29 2016 09:03:41 GMT-0400 (EDT)"
-        // we want to extract the time zone part and append it to the
-        // locale time.
-        var str = date.toString();
-        timezone = str.substring(str.indexOf("("));
-      }
-      return date.toLocaleString() + " " + timezone;
-    }
-
     Polymer({
       is: 'bot-page-data',
 
@@ -184,10 +172,7 @@
         });
 
         BOT_TIMES.forEach(function(time) {
-          if (bot[time]) {
-            bot[time] = new Date(bot[time]);
-            bot["human_"+time] = formatDate(bot[time]);
-          }
+          swarming.sanitizeAndHumanizeTime(bot, time);
         });
         return bot;
       },
@@ -199,10 +184,7 @@
         var events = events.items;
         events.forEach(function(event){
           // Do any preprocessing here
-          if (event.ts) {
-            event.ts = new Date(event.ts);
-            event.human_ts = formatDate(event.ts);
-          }
+          swarming.sanitizeAndHumanizeTime(event, "ts");
         });
 
         // Sort the most recent events first.
@@ -222,10 +204,7 @@
         tasks.forEach(function(task){
           // Do any preprocessing here
           TASK_TIMES.forEach(function(time) {
-            if (task[time]) {
-              task[time] = new Date(task[time]);
-              task["human_"+time] = formatDate(task[time]);
-            }
+            swarming.sanitizeAndHumanizeTime(task, time);
           });
 
           if (task.duration) {
