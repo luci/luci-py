@@ -1050,14 +1050,10 @@ def compute_utilization(batch_size=50):
   Args:
     batch_size: Number of bots to query for at a time.
   """
-  # Records entities we've seen already. Used for debug logging. The query is
-  # returning more entities than expected on some servers.
-  seen = {}
-  # Tracks the current page of results. Used to see if duplicate entities
-  # are being seen on the same page, or just different pages.
-  i = 0
-  # Maps machine types to [busy, idle] bot counts.
-  machine_types = collections.defaultdict(lambda: [0, 0])
+  # A query that requires multiple batches may produce duplicate results. To
+  # ensure each bot is only counted once, map machine types to [busy, idle]
+  # sets of bots.
+  machine_types = collections.defaultdict(lambda: [set(), set()])
   now = utils.utcnow()
   q = bot_management.BotInfo.query()
   q = bot_management.filter_availability(q, False, False, now, None, True)
@@ -1065,23 +1061,17 @@ def compute_utilization(batch_size=50):
   while cursor is not None:
     bots, cursor = datastore_utils.fetch_page(q, batch_size, cursor)
     for bot in bots:
-      if bot.key.parent().id() in seen:
-        logging.warning(
-            'Saw duplicate bot: %s\nPrevious page: %s\nCurrent page: %s',
-            bot.key.parent().id(),
-            seen[bot.key.parent().id()],
-            i,
-        )
-        if seen[bot.key.parent().id()] == i:
-          logging.warning('Duplicate occurred on the same page of results')
-      seen[bot.key.parent().id()] = i
+      bot_id = bot.key.parent().id()
       if bot.task_id:
-        machine_types[bot.machine_type][0] += 1
+        machine_types[bot.machine_type][0].add(bot_id)
+        machine_types[bot.machine_type][1].discard(bot_id)
       else:
-        machine_types[bot.machine_type][1] += 1
-    i += 1
+        machine_types[bot.machine_type][0].discard(bot_id)
+        machine_types[bot.machine_type][1].add(bot_id)
 
   for machine_type, (busy, idle) in machine_types.iteritems():
+    busy = len(busy)
+    idle = len(idle)
     logging.info('Utilization for %s: %s/%s', machine_type, busy, busy + idle)
     MachineTypeUtilization(
         id=machine_type,
