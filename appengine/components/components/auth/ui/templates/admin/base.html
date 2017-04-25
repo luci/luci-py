@@ -9,7 +9,6 @@ that can be found in the LICENSE file. -->
   <link href="/third_party/bootstrap/css/bootstrap-3.1.0.min.css" rel="stylesheet">
   <link href="/auth/static/css/common.css" rel="stylesheet">
   <script src="/third_party/jquery/jquery-1.11.0.min.js"></script>
-  <script src="/auth/static/js/common.js"></script>
 </head>
 
 <body>
@@ -18,8 +17,11 @@ that can be found in the LICENSE file. -->
   {% endblock %}
   </div>
   <script type="text/javascript" nonce="{{csp_nonce}}">
-    // Expose 'config' as global js variable.
-    var config = {{config|safe}};
+    function redirectToLogout() {
+      if (confirm('You\'ll be signed out from ALL your google accounts!')) {
+        window.location = {{logout_url|safe}};
+      }
+    };
   </script>
 </body>
 

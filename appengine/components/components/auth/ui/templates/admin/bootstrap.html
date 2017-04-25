@@ -1,4 +1,4 @@
-{% extends 'auth/base_minimal.html' %}
+{% extends 'auth/admin/base.html' %}
 {% block content %}
 
 <h2>Add you to {{admin_group}} group?</h2>
@@ -23,7 +23,7 @@ access protected pages.</p>
   });
 
   $('#logout-btn').click(function(e) {
-    common.logout();
+    redirectToLogout();
     e.preventDefault();
   });
 </script>
