@@ -23,6 +23,7 @@ from google.appengine.ext import ndb
 import webapp2
 import webtest
 
+import handlers_backend
 import handlers_bot
 from components import ereporter2
 from components import utils
@@ -54,6 +55,18 @@ class BotApiTest(test_env_handlers.AppTestBase):
         lambda *args, **kwargs: self.fail('%s, %s' % (args, kwargs)))
     # Bot API test cases run by default as bot.
     self.set_as_bot()
+    self._enqueue_task_orig = self.mock(
+        utils, 'enqueue_task', self._enqueue_task)
+
+  @ndb.non_transactional
+  def _enqueue_task(self, url, queue_name, **kwargs):
+    if queue_name == 'task-dimensions':
+      # Call directly into it, ignores any current transaction.
+      handlers_backend.TaskDimensionsHandler.tidy_stale(kwargs['payload'])
+      return True
+    if queue_name == 'pubsub':
+      return True
+    self.fail(url)
 
   def test_handshake(self):
     errors = []

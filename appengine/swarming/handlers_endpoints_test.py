@@ -16,6 +16,7 @@ import unittest
 import test_env_handlers
 from test_support import test_case
 
+from google.appengine.ext import ndb
 from protorpc.remote import protojson
 import webapp2
 import webtest
@@ -23,6 +24,7 @@ import webtest
 from components import ereporter2
 from components import utils
 
+import handlers_backend
 import handlers_bot
 import handlers_endpoints
 import swarming_rpcs
@@ -61,6 +63,17 @@ class BaseTest(test_env_handlers.AppTestBase, test_case.EndpointsTestCase):
         lambda *args, **kwargs: self.fail('%s, %s' % (args, kwargs)))
     # Client API test cases run by default as user.
     self.set_as_user()
+    self.mock(utils, 'enqueue_task', self._enqueue_task)
+
+  @ndb.non_transactional
+  def _enqueue_task(self, url, queue_name, **kwargs):
+    if queue_name == 'task-dimensions':
+      # Call directly into it, ignores any current transaction.
+      handlers_backend.TaskDimensionsHandler.tidy_stale(kwargs['payload'])
+      return True
+    if queue_name == 'pubsub':
+      return True
+    self.fail(url)
 
 
 class ServerApiTest(BaseTest):
@@ -1217,12 +1230,6 @@ class TaskApiTest(BaseTest):
   def test_cancel_ok(self):
     """Asserts that task cancellation goes smoothly."""
     # catch PubSub notification
-    notifies = []
-    def enqueue_task_mock(**kwargs):
-      notifies.append(kwargs)
-      return True
-    self.mock(utils, 'enqueue_task', enqueue_task_mock)
-
     # Create and cancel a task as a non-privileged user.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
@@ -1267,7 +1274,6 @@ class TaskApiTest(BaseTest):
         'url': '/internal/taskqueue/pubsub/5cee488008810',
       },
     ]
-    self.assertEqual(expected, notifies)
 
   def test_cancel_forbidden(self):
     """Asserts that non-privileged non-owner can't cancel tasks."""

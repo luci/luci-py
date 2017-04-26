@@ -20,6 +20,7 @@ import webtest
 import handlers_backend
 import handlers_frontend
 import template
+from components import utils
 from server import bot_code
 from server import bot_management
 from server import task_result
@@ -247,6 +248,14 @@ class BackendTest(AppTestBase):
     return [
         r.template for r in self.app.app.router.match_routes
     ]
+
+  def setUp(self):
+    super(BackendTest, self).setUp()
+    self._enqueue_task_orig = self.mock(
+        utils, 'enqueue_task', self._enqueue_task)
+
+  def _enqueue_task(self, **kwargs):
+    return self._enqueue_task_orig(use_dedicated_module=False, **kwargs)
 
   def testCronJobTasks(self):
     # Tests all the cron tasks are securely handled.

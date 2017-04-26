@@ -12,10 +12,16 @@ import sys
 import timeit
 import unittest
 
-import test_env
-test_env.setup_test_env()
+# Setups environment.
+APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, APP_DIR)
+import test_env_handlers
+
+import webtest
 
 from google.appengine.ext import ndb
+
+import handlers_backend
 
 from components import auth_testing
 from components import utils
@@ -80,13 +86,11 @@ def _hash_dimensions(dimensions):
   return task_to_run._hash_dimensions(utils.encode_to_json(dimensions))
 
 
-class TestCase(test_case.TestCase):
+class TaskToRunPrivateTest(test_case.TestCase):
   def setUp(self):
-    super(TestCase, self).setUp()
+    super(TaskToRunPrivateTest, self).setUp()
     auth_testing.mock_get_current_identity(self)
 
-
-class TaskToRunPrivateTest(TestCase):
   def test_powerset(self):
     # tuples of (input, expected).
     # TODO(maruel): We'd want the code to deterministically try 'Windows-6.1'
@@ -248,15 +252,27 @@ class TaskToRunPrivateTest(TestCase):
     self.assertEqual(16384, len(items))
 
 
-class TaskToRunApiTest(TestCase):
+class TaskToRunApiTest(test_env_handlers.AppTestBase):
   def setUp(self):
     super(TaskToRunApiTest, self).setUp()
     self.now = datetime.datetime(2014, 01, 02, 03, 04, 05, 06)
     self.mock_now(self.now)
+    auth_testing.mock_get_current_identity(self)
     # The default expiration_secs for _gen_request().
     self.expiration_ts = self.now + datetime.timedelta(seconds=60)
+    # Setup the backend to handle task queues for 'task-dimensions'.
+    self.app = webtest.TestApp(
+        handlers_backend.create_application(True),
+        extra_environ={
+          'REMOTE_ADDR': self.source_ip,
+          'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
+        })
+    self._enqueue_orig = self.mock(utils, 'enqueue_task', self._enqueue)
 
-  def mkreq(self, req, nb_tasks=0):
+  def _enqueue(self, *args, **kwargs):
+    return self._enqueue_orig(*args, use_dedicated_module=False, **kwargs)
+
+  def mkreq(self, req, nb_task=0):
     """Stores a new initialized TaskRequest.
 
     nb_task is 1 or 0. It is 1 when the request.properties.dimensions was new
@@ -264,7 +280,7 @@ class TaskToRunApiTest(TestCase):
     """
     task_request.init_new_request(req, True, None)
     task_queues.assert_task(req)
-    self.assertEqual(nb_tasks, self.execute_tasks())
+    self.assertEqual(nb_task, self.execute_tasks())
     req.key = task_request.new_request_key()
     req.put()
     return req
@@ -359,7 +375,7 @@ class TaskToRunApiTest(TestCase):
         priority=10,
         created_ts=now,
         expiration_ts=now+datetime.timedelta(seconds=31))
-    task_to_run.new_task_to_run(self.mkreq(data, nb_tasks=0)).put()
+    task_to_run.new_task_to_run(self.mkreq(data, nb_task=0)).put()
 
     expected = [
       {
@@ -616,7 +632,7 @@ class TaskToRunApiTest(TestCase):
     request = self.mkreq(
         _gen_request(
             properties=dict(dimensions=request_dimensions_2), priority=10),
-        nb_tasks=0)
+        nb_task=0)
     task_to_run.new_task_to_run(request).put()
 
     # It should return them all, in the expected order.

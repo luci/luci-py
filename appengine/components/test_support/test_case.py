@@ -152,13 +152,10 @@ class TestCase(auto_stub.TestCase):
           headers = dict(task['headers'])
           headers['Content-Length'] = str(len(body))
           try:
-            response = self.app.post(
-                task['url'], body, headers=headers, **kwargs)
+            self.app.post(task['url'], body, headers=headers, **kwargs)
           except:
             logging.error(task)
             raise
-          # TODO(maruel): Implement task failure.
-          self.assertEqual(200, response.status_code)
           self._taskqueue_stub.DeleteTask(queue['name'], task['name'])
           ran += 1
       if not ran:
