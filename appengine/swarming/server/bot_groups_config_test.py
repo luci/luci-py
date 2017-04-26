@@ -892,6 +892,57 @@ class BotGroupsConfigTest(test_case.TestCase):
     ])
     self.validator_test(cfg, [])
 
+  def test_machine_type_minimum_size_greater_than_maximum_size(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 load_based=[bots_pb2.LoadBased(
+                                   maximum_size=1,
+                                   minimum_size=2,
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [
+        'bot_group #0: machine_type #0:'
+        ' maximum size cannot be less than minimum size'
+    ])
+
+  def test_machine_type_minimum_size_equals_maximum_size(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 load_based=[bots_pb2.LoadBased(
+                                   maximum_size=3,
+                                   minimum_size=3,
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [])
+
+  def test_machine_type_load_based(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1,
+                               schedule=bots_pb2.Schedule(
+                                 load_based=[bots_pb2.LoadBased(
+                                   maximum_size=4,
+                                   minimum_size=2,
+                                 ),
+                               ]))
+        ]),
+    ])
+    self.validator_test(cfg, [])
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

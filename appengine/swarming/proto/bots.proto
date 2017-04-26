@@ -78,11 +78,28 @@ message DailySchedule {
   optional int32 target_size = 4;
 }
 
+// A load-based schedule for Machine Provider leases.
+//
+// Allows a MachineType to be resized according to Swarming bot utilization.
+message LoadBased {
+  // Minimum size the MachineType may be resized to.
+  //
+  // If omitted, defaults to zero.
+  optional int32 minimum_size = 1;
+
+  // Maximum size the MachineType may be resized to.
+  //
+  // If omitted, defaults to zero.
+  optional int32 maximum_size = 2;
+}
+
 
 // A schedule for Machine Provider leases.
 message Schedule {
   // Schedule to repeat every day.
   repeated DailySchedule daily = 1;
+  // Load-based schedule.
+  repeated LoadBased load_based = 2;
 }
 
 
