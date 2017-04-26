@@ -224,7 +224,10 @@ def connect_to_swarming(service_account, swarming_server, user):
   """
   if os.path.exists(SWARMING_UPSTART_CONFIG_DEST):
     os.remove(SWARMING_UPSTART_CONFIG_DEST)
-  shutil.copy2(SWARMING_UPSTART_CONFIG_SRC, SWARMING_UPSTART_CONFIG_DEST)
+  with open(SWARMING_UPSTART_CONFIG_SRC) as f:
+    swarming_upstart_config = f.read().format(user=user)
+  with open(SWARMING_UPSTART_CONFIG_DEST, "w") as g:
+    g.write(swarming_upstart_config)
 
   if not os.path.exists(SWARMING_BOT_DIR):
     os.mkdir(SWARMING_BOT_DIR)
