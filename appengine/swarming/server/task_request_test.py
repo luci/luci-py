@@ -444,6 +444,13 @@ class TaskRequestApiTest(TestCase):
       mkreq(_gen_request(properties=dict(command='python')))
     mkreq(_gen_request(properties=dict(command=['python'])))
     mkreq(_gen_request(properties=dict(command=[u'python'])))
+    # command and inputs_ref.
+    mkreq(_gen_request(properties=dict(
+        command=['python'],
+        inputs_ref=task_request.FilesRef(
+            isolated='deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+            isolatedserver='http://localhost:1',
+            namespace='default-gzip'))))
 
     # CIPD.
     def mkcipdreq(idempotent=False, **cipd_input):

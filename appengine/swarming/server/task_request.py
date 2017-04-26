@@ -508,9 +508,9 @@ class TaskProperties(ndb.Model):
             'commands is not supported anymore')
     if not self.is_terminate:
       isolated_input = self.inputs_ref and self.inputs_ref.isolated
-      if bool(self.command) == bool(isolated_input):
+      if not self.command and not isolated_input:
         raise datastore_errors.BadValueError(
-            'use one of command or inputs_ref.isolated')
+            'use at least one of command or inputs_ref.isolated')
       if self.extra_args and not isolated_input:
         raise datastore_errors.BadValueError(
             'extra_args require inputs_ref.isolated')
