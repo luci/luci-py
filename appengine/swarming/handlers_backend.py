@@ -23,6 +23,7 @@ from server import config
 from server import lease_management
 from server import stats
 from server import task_pack
+from server import task_queues
 from server import task_result
 from server import task_scheduler
 import ts_mon_metrics
@@ -48,6 +49,14 @@ class CronAbortExpiredShardToRunHandler(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
     task_scheduler.cron_abort_expired_task_to_run(self.request.host_url)
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    self.response.out.write('Success.')
+
+
+class CronTaskQueues(webapp2.RequestHandler):
+  @decorators.require_cronjob
+  def get(self):
+    task_queues.tidy_stale()
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 
@@ -183,6 +192,21 @@ class CancelTasksHandler(webapp2.RequestHandler):
                    task_id, ok, was_running)
 
 
+class TaskDimensionsHandler(webapp2.RequestHandler):
+  @decorators.require_taskqueue('task-dimensions')
+  def post(self):
+    self.tidy_stale(self.request.body)
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    self.response.out.write('Success.')
+
+  @staticmethod
+  def tidy_stale(body):
+    payload = body.split('\n')
+    dimensions_hash = int(payload[0])
+    dimensions_flat = payload[1:]
+    task_queues.rebuild_task_cache(dimensions_hash, dimensions_flat)
+
+
 class TaskSendPubSubMessage(webapp2.RequestHandler):
   """Sends PubSub notification about task completion."""
 
@@ -235,12 +259,11 @@ def get_routes():
   """Returns internal urls that should only be accessible via the backend."""
   routes = [
     # Cron jobs.
-    # TODO(maruel): Rename cron.yaml job url. Doing so is a bit annoying since
-    # the app version has to be running an already compatible version already.
     ('/internal/cron/abort_bot_died', CronBotDiedHandler),
     ('/internal/cron/handle_bot_died', CronBotDiedHandler),
     ('/internal/cron/abort_expired_task_to_run',
         CronAbortExpiredShardToRunHandler),
+    ('/internal/cron/task_queues_tidy', CronTaskQueues),
 
     ('/internal/cron/stats/update', stats.InternalStatsUpdateHandler),
     ('/internal/cron/aggregate_bots_dimensions',
@@ -258,6 +281,7 @@ def get_routes():
 
     # Task queues.
     ('/internal/taskqueue/cancel-tasks', CancelTasksHandler),
+    ('/internal/taskqueue/task-dimensions', TaskDimensionsHandler),
     (r'/internal/taskqueue/pubsub/<task_id:[0-9a-f]+>', TaskSendPubSubMessage),
     ('/internal/taskqueue/machine-provider-manage',
         TaskMachineProviderManagementHandler),

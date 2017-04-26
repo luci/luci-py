@@ -336,6 +336,7 @@ class BackendTest(AppTestBase):
       ('machine-provider-manage',
        '/internal/taskqueue/machine-provider-manage', ''),
       ('pubsub', '/internal/taskqueue/pubsub/', 'abcabcabc'),
+      ('task-dimensions', '/internal/taskqueue/task-dimensions', ''),
       ('tsmon', '/internal/taskqueue/tsmon/', 'executors'),
     ]
     self.assertEqual(len(task_queues), len(task_queue_urls))

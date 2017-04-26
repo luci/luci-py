@@ -12,6 +12,9 @@ queue:
 - name: pubsub
   rate: 500/s
 
+- name: task-dimensions
+  rate: 500/s
+
 
 ## MP
 

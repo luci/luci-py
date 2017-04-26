@@ -9,13 +9,21 @@
           |id=bot_id|
           +---------+
                |
-        +------+-------+---------------+---------+----- ... -----+
-        |              |               |         |               |
-        v              v               v         v               v
-    +-------+    +-----------+    +--------+ +--------+     +--------+
-    |BotInfo|    |BotSettings|    |BotEvent| |BotEvent| ... |BotEvent|
-    |id=info|    |id=settings|    |id=fffff| |if=ffffe| ... |id=00000|
-    +-------+    +-----------+    +--------+ +--------+     +--------+
+        +-----++-------+---------------+---------+----- ... -----+
+        |      |        |               |         |               |
+        v      |        v               v         v               v
+    +-------+  |  +-----------+    +--------+ +--------+     +--------+
+    |BotInfo|  |  |BotSettings|    |BotEvent| |BotEvent| ... |BotEvent|
+    |id=info|  |  |id=settings|    |id=fffff| |if=ffffe| ... |id=00000|
+    +-------+  |  +-----------+    +--------+ +--------+     +--------+
+               |
+               +--------------------+
+               |                    |
+               v                    v
+    +-------------------+     +-------------------+
+    |BotTaskDimensions  | ... |BotTaskDimensions  |
+    |id=<dimension_hash>| ... |id=<dimension_hash>|  <task_queues.py>
+    +-------------------+     +-------------------+
 
     +--------Root--------+
     |DimensionAggregation|

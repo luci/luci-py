@@ -21,13 +21,19 @@ cron:
   schedule: every 1 minutes
   target: backend
 
-- description: Compute Machine Provider bot utilization.
-  url: /internal/cron/machine_provider_bot_usage
-  schedule: every 1 minutes
+- description:
+    Clean up stale BotTaskDimensions and TaskDimensions so no composite indexes are needed.
+  url: /internal/cron/task_queues_tidy
+  schedule: every 10 minutes
   target: backend
 
 
 ### MP
+
+- description: Compute Machine Provider bot utilization.
+  url: /internal/cron/machine_provider_bot_usage
+  schedule: every 1 minutes
+  target: backend
 
 - description: Configure Machine Provider leases.
   url: /internal/cron/machine_provider_config

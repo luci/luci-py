@@ -1175,7 +1175,6 @@ class TasksApiTest(BaseTest):
     self.set_as_privileged_user()
     return first, second, str_now_120, start, end
 
-
   def _gen_three_pending_tasks(self):
     # Creates three pending tasks, spaced 1 minute apart
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
@@ -1205,6 +1204,7 @@ class TasksApiTest(BaseTest):
         properties=dict(idempotent=True))
 
     return first_id, second_id, third_id, now, now_60, now_120
+
 
 class TaskApiTest(BaseTest):
   api_service_cls = handlers_endpoints.SwarmingTaskService
