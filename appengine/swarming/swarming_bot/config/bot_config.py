@@ -211,7 +211,7 @@ def on_handshake(bot):
   pass
 
 
-def on_before_task(bot, bot_file=None):
+def on_before_task(bot, bot_file):
   """Hook function called before running a task.
 
   It shouldn't do much, since it can't cancel the task so it shouldn't do
@@ -223,7 +223,6 @@ def on_before_task(bot, bot_file=None):
               This file can be used to pass certain info about the bot
               to tasks, such as which connected android devices to run on. See
               https://github.com/luci/luci-py/tree/master/appengine/swarming/doc/Magic-Values.md#run_isolated
-              TODO(bpastene): Remove default value None.
   """
   pass
 

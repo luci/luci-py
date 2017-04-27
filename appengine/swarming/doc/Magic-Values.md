@@ -24,7 +24,7 @@ the `command` section of the .isolate file.
     temporary directory that is uploaded back to the server after the task
     execution. This causes `run_isolated` to print a `[run_isolated_out_hack]`
     statement after the task.
-  -  ${SWARMING_BOT_FILE} : If found on command line argument, replaced by a
+  - `${SWARMING_BOT_FILE}`: If found on command line argument, replaced by a
     file written to by the swarming bot's on_before_task() hook in the swarming
     server's custom bot_config.py. This is used by a swarming bot to communicate
     state of the bot to tasks.
