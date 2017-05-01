@@ -16,7 +16,6 @@ from google.appengine.ext import ndb
 from components import config as config_component
 from components import utils
 from components.auth import model
-from components.config import validation_context
 from test_support import test_case
 
 from proto import config_pb2
@@ -28,25 +27,30 @@ class ConfigTest(test_case.TestCase):
     super(ConfigTest, self).setUp()
 
   def test_refetch_config(self):
-    # Mock of "current known revision" state.
-    revs = {
+    initial_revs = {
       'a.cfg': config.Revision('old_a_rev', 'urla'),
       'b.cfg': config.Revision('old_b_rev', 'urlb'),
       'c.cfg': config.Revision('old_c_rev', 'urlc'),
     }
 
+    revs = initial_revs.copy()
     bumps = []
+
     def bump_rev(pkg, rev, conf):
       revs[pkg] = rev
       bumps.append((pkg, rev, conf, ndb.in_transaction()))
       return True
+
+    @ndb.tasklet
+    def get_rev_async(pkg):
+      raise ndb.Return(revs[pkg])
 
     self.mock(config, 'is_remote_configured', lambda: True)
     self.mock(config, '_CONFIG_SCHEMAS', {
       # Will be updated outside of auth db transaction.
       'a.cfg': {
         'proto_class': None,
-        'revision_getter': lambda: revs['a.cfg'],
+        'revision_getter': lambda: get_rev_async('a.cfg'),
         'validator': lambda body: self.assertEqual(body, 'new a body'),
         'updater': lambda rev, conf: bump_rev('a.cfg', rev, conf),
         'use_authdb_transaction': False,
@@ -54,7 +58,7 @@ class ConfigTest(test_case.TestCase):
       # Will not be changed.
       'b.cfg': {
         'proto_class': None,
-        'revision_getter': lambda: revs['b.cfg'],
+        'revision_getter': lambda: get_rev_async('b.cfg'),
         'validator': lambda _body: True,
         'updater': lambda rev, conf: bump_rev('b.cfg', rev, conf),
         'use_authdb_transaction': False,
@@ -62,17 +66,23 @@ class ConfigTest(test_case.TestCase):
       # Will be updated inside auth db transaction.
       'c.cfg': {
         'proto_class': None,
-        'revision_getter': lambda: revs['c.cfg'],
+        'revision_getter': lambda: get_rev_async('c.cfg'),
         'validator': lambda body: self.assertEqual(body, 'new c body'),
         'updater': lambda rev, conf: bump_rev('c.cfg', rev, conf),
         'use_authdb_transaction': True,
       },
     })
-    self.mock(config, '_fetch_configs', lambda _: {
+
+    # _fetch_configs is called by config.refetch_config().
+    configs_to_fetch = {
       'a.cfg': (config.Revision('new_a_rev', 'urla'), 'new a body'),
       'b.cfg': (config.Revision('old_b_rev', 'urlb'), 'old b body'),
       'c.cfg': (config.Revision('new_c_rev', 'urlc'), 'new c body'),
-    })
+    }
+    self.mock(config, '_fetch_configs', lambda _: configs_to_fetch)
+
+    # Old revisions initially.
+    self.assertEqual(initial_revs, config.get_revisions())
 
     # Initial update.
     config.refetch_config()
@@ -82,6 +92,11 @@ class ConfigTest(test_case.TestCase):
     ], bumps)
     del bumps[:]
 
+    # Updated revisions now.
+    self.assertEqual(
+        {k: v[0] for k, v in configs_to_fetch.iteritems()},
+        config.get_revisions())
+
     # Refetch, nothing new.
     config.refetch_config()
     self.assertFalse(bumps)
@@ -90,7 +105,8 @@ class ConfigTest(test_case.TestCase):
     new_rev = config.Revision('rev', 'url')
     body = 'tarball{url:"a" systems:"b"}'
     self.assertTrue(config._update_imports_config(new_rev, body))
-    self.assertEqual(new_rev, config._get_imports_config_revision())
+    self.assertEqual(
+        new_rev, config._get_imports_config_revision_async().get_result())
 
   def test_validate_ip_whitelist_config_ok(self):
     conf = config_pb2.IPWhitelistConfig(
@@ -598,16 +614,19 @@ class ConfigTest(test_case.TestCase):
   def test_update_service_config(self):
     # Missing.
     self.assertIsNone(config._get_service_config('abc.cfg'))
-    self.assertIsNone(config._get_service_config_rev('abc.cfg'))
+    self.assertIsNone(
+        config._get_service_config_rev_async('abc.cfg').get_result())
     # Updated.
     rev = config.Revision('rev', 'url')
     self.assertTrue(config._update_service_config('abc.cfg', rev, 'body'))
     self.assertEqual('body', config._get_service_config('abc.cfg'))
-    self.assertEqual(rev, config._get_service_config_rev('abc.cfg'))
+    self.assertEqual(
+        rev, config._get_service_config_rev_async('abc.cfg').get_result())
     # Same body, returns False, though updates rev.
     rev2 = config.Revision('rev2', 'url')
     self.assertFalse(config._update_service_config('abc.cfg', rev2, 'body'))
-    self.assertEqual(rev2, config._get_service_config_rev('abc.cfg'))
+    self.assertEqual(
+        rev2, config._get_service_config_rev_async('abc.cfg').get_result())
 
   def test_settings_updates(self):
     # Fetch only settings.cfg in this test case.

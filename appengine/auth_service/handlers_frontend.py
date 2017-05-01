@@ -70,23 +70,22 @@ class ServicesHandler(ui.UINavbarTabHandler):
   template_file = 'auth_service/services.html'
 
 
-def get_additional_ui_environment(handler):
+def get_additional_ui_data():
   """Gets injected into Jinja and Javascript environment."""
-  # See config._CONFIG_SCHEMAS for where these paths are defined.
-  if isinstance(handler, ConfigHandler):
-    path = 'imports.cfg'
-  elif isinstance(handler, ui.IPWhitelistsHandler):
-    path = 'ip_whitelist.cfg'
-  elif isinstance(handler, ui.OAuthConfigHandler):
-    path = 'oauth.cfg'
-  else:
-    return {'auth_service_config_locked': config.is_remote_configured()}
-  rev = config.get_config_revision(path)
+  if not config.is_remote_configured():
+    return {'auth_service_config_locked': False}
+  config_revisions = {}
+  for path, rev in config.get_revisions().iteritems():
+    config_revisions[path] = {
+      'rev': rev.revision if rev else 'none',
+      'url': rev.url if rev else 'about:blank',
+    }
   return {
-    'auth_service_config_locked': config.is_remote_configured(),
-    'auth_service_config_remote_url': config.get_remote_url(),
-    'auth_service_config_rev': rev.revision if rev else 'none',
-    'auth_service_config_url': rev.url if rev else 'about:blank',
+    'auth_service_config_locked': True,
+    'auth_service_configs': {
+      'remote_url': config.get_remote_url(),
+      'revisions': config_revisions,
+    },
   }
 
 
@@ -440,7 +439,7 @@ def create_application(debug):
         ConfigHandler,
         ui.ApiDocHandler,
       ],
-      env_callback=get_additional_ui_environment)
+      ui_data_callback=get_additional_ui_data)
   template.bootstrap({'auth_service': TEMPLATES_DIR})
 
   # Add a fake admin for local dev server.

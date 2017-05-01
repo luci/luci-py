@@ -34,7 +34,6 @@ from components import utils
 from components.auth import ipaddr
 from components.auth import model
 from components.config import validation
-from components.config import validation_context
 
 from proto import config_pb2
 import importer
@@ -68,10 +67,17 @@ def get_remote_url():
   return None
 
 
-def get_config_revision(path):
+def get_revisions():
+  """Returns a mapping {config file name => Revision instance or None}."""
+  futures = {p: _get_config_revision_async(p) for p in _CONFIG_SCHEMAS}
+  return {p: f.get_result() for p, f in futures.iteritems()}
+
+
+def _get_config_revision_async(path):
   """Returns tuple with info about last imported config revision."""
+  assert path in _CONFIG_SCHEMAS, path
   schema = _CONFIG_SCHEMAS.get(path)
-  return schema['revision_getter']() if schema else None
+  return schema['revision_getter']()
 
 
 @utils.cache_with_expiration(expiration_sec=60)
@@ -115,7 +121,7 @@ def refetch_config(force=False):
   dirty_in_authdb = {}
   for path, (new_rev, conf) in sorted(configs.iteritems()):
     assert path in _CONFIG_SCHEMAS, path
-    cur_rev = get_config_revision(path)
+    cur_rev = _get_config_revision_async(path).get_result()
     if cur_rev != new_rev or force:
       if _CONFIG_SCHEMAS[path]['use_authdb_transaction']:
         dirty_in_authdb[path] = (new_rev, conf)
@@ -193,10 +199,11 @@ class _AuthServiceConfig(ndb.Model):
   url = ndb.StringProperty(indexed=False)
 
 
-def _get_service_config_rev(cfg_name):
+@ndb.tasklet
+def _get_service_config_rev_async(cfg_name):
   """Returns last processed Revision of given config."""
-  e = _AuthServiceConfig.get_by_id(cfg_name)
-  return Revision(e.revision, e.url) if e else None
+  e = yield _AuthServiceConfig.get_by_id_async(cfg_name)
+  raise ndb.Return(Revision(e.revision, e.url) if e else None)
 
 
 def _get_service_config(cfg_name):
@@ -222,13 +229,14 @@ def _update_service_config(cfg_name, rev, conf):
 ### Group importer config implementation details.
 
 
-def _get_imports_config_revision():
+@ndb.tasklet
+def _get_imports_config_revision_async():
   """Returns Revision of last processed imports.cfg config."""
-  e = importer.config_key().get()
+  e = yield importer.config_key().get_async()
   if not e or not isinstance(e.config_revision, dict):
-    return None
+    raise ndb.Return(None)
   desc = e.config_revision
-  return Revision(desc.get('rev'), desc.get('url'))
+  raise ndb.Return(Revision(desc.get('rev'), desc.get('url')))
 
 
 def _update_imports_config(rev, conf):
@@ -255,15 +263,16 @@ def _imported_config_revisions_key():
   return ndb.Key(_ImportedConfigRevisions, 'self', parent=model.root_key())
 
 
-def _get_authdb_config_rev(path):
+@ndb.tasklet
+def _get_authdb_config_rev_async(path):
   """Returns Revision of last processed config given its name."""
-  mapping = _imported_config_revisions_key().get()
+  mapping = yield _imported_config_revisions_key().get_async()
   if not mapping or not isinstance(mapping.revisions, dict):
-    return None
+    raise ndb.Return(None)
   desc = mapping.revisions.get(path)
   if not isinstance(desc, dict):
-    return None
-  return Revision(desc.get('rev'), desc.get('url'))
+    raise ndb.Return(None)
+  raise ndb.Return(Revision(desc.get('rev'), desc.get('url')))
 
 
 @datastore_utils.transactional
@@ -470,7 +479,7 @@ def _update_oauth_config(rev, conf):
 
 # Config file name -> {
 #   'proto_class': protobuf class of the config or None to keep it as text,
-#   'revision_getter': lambda: <latest imported Revision>,
+#   'revision_getter': lambda: ndb.Future with <latest imported Revision>
 #   'validator': lambda config: <raises ValueError on invalid format>
 #   'updater': lambda rev, config: True if applied, False if not.
 #   'use_authdb_transaction': True to call 'updater' in AuthDB transaction.
@@ -479,26 +488,26 @@ def _update_oauth_config(rev, conf):
 _CONFIG_SCHEMAS = {
   'imports.cfg': {
     'proto_class': None, # importer configs are stored as text
-    'revision_getter': _get_imports_config_revision,
+    'revision_getter': _get_imports_config_revision_async,
     'updater': _update_imports_config,
     'use_authdb_transaction': False,
   },
   'ip_whitelist.cfg': {
     'proto_class': config_pb2.IPWhitelistConfig,
-    'revision_getter': lambda: _get_authdb_config_rev('ip_whitelist.cfg'),
+    'revision_getter': lambda: _get_authdb_config_rev_async('ip_whitelist.cfg'),
     'updater': _update_ip_whitelist_config,
     'use_authdb_transaction': True,
   },
   'oauth.cfg': {
     'proto_class': config_pb2.OAuthConfig,
-    'revision_getter': lambda: _get_authdb_config_rev('oauth.cfg'),
+    'revision_getter': lambda: _get_authdb_config_rev_async('oauth.cfg'),
     'updater': _update_oauth_config,
     'use_authdb_transaction': True,
   },
   'settings.cfg': {
     'proto_class': None, # settings are stored as text in datastore
     'default': '',  # it's fine if config file is not there
-    'revision_getter': lambda: _get_service_config_rev('settings.cfg'),
+    'revision_getter': lambda: _get_service_config_rev_async('settings.cfg'),
     'updater': lambda rev, c: _update_service_config('settings.cfg', rev, c),
     'use_authdb_transaction': False,
   },

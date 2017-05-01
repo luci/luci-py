@@ -46,13 +46,14 @@ that can be found in the LICENSE file. -->
 {% endraw %}
 
 {# Used on auth_service if config_service is managing configs #}
-{% macro render_config_locked() -%}
+{% macro render_config_locked(config_path) -%}
+{% set rev = auth_service_configs['revisions'][config_path] %}
 <hr>
 <p>
 The configuration is distributed by
-<a target="_blank" href="{{auth_service_config_remote_url}}">luci-config</a>.
-Using revision <a target="_blank" href="{{auth_service_config_url}}"
-style="font-family:monospace;">{{auth_service_config_rev}}</a>.
+<a target="_blank" href="{{auth_service_configs['remote_url']}}">luci-config</a>.
+Using revision <a target="_blank" href="{{rev['url']}}"
+style="font-family:monospace;">{{rev['rev']}}</a>.
 </p>
 {%- endmacro %}
 

@@ -47,7 +47,7 @@
           </div>
           {% if auth_service_config_locked %}
           <div class="form-group">
-            {{ render_config_locked() }}
+            {{ render_config_locked("ip_whitelist.cfg") }}
           </div>
           {% endif %}
         </form>

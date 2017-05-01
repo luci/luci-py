@@ -90,7 +90,7 @@
           <div class="form-group">
             {% if auth_service_config_locked %}
               <div class="col-sm-12">
-                {{ render_config_locked() }}
+                {{ render_config_locked("oauth.cfg") }}
               </div>
             {% else %}
               {% if is_admin %}
