@@ -638,7 +638,7 @@ class HighDevice(object):
         # TODO(maruel): Support cold temperatures below 0°C.
         continue
       sensor_type = self.PullContent(path + '/type')
-      if sensor_type and not sensor_type.startswith('tsens_tz_sensor'):
+      if sensor_type:
         out[sensor_type.strip()] = value
     # Filter out unnecessary stuff.
     return out
