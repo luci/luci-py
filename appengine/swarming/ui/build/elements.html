@@ -1188,7 +1188,7 @@ weekdays:"星期日_星期一_星期二_星期三_星期四_星期五_星期六"
       },
 
       _noMilo: function(result) {
-        return !this._tag(result, "allow_milo");
+        return !(this._tag(result, "allow_milo") || this._tag(result, "luci_project"));
       },
 
       _otherPending: function(other_pending) {
@@ -1308,7 +1308,7 @@ weekdays:"星期日_星期一_星期二_星期三_星期四_星期五_星期六"
       },
 
       _supportsMilo: function(request, showRaw) {
-        return !showRaw && request && this._tag(request, "allow_milo");
+        return !showRaw && request && !this._noMilo(request);
       },
 
       _toggleDetails: function() {

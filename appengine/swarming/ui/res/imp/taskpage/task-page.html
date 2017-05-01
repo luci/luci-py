@@ -879,7 +879,7 @@
       },
 
       _noMilo: function(result) {
-        return !this._tag(result, "allow_milo");
+        return !(this._tag(result, "allow_milo") || this._tag(result, "luci_project"));
       },
 
       _otherPending: function(other_pending) {
@@ -999,7 +999,7 @@
       },
 
       _supportsMilo: function(request, showRaw) {
-        return !showRaw && request && this._tag(request, "allow_milo");
+        return !showRaw && request && !this._noMilo(request);
       },
 
       _toggleDetails: function() {
