@@ -96,6 +96,16 @@ this.swarming.alias = this.swarming.alias || (function(){
     5: "Full",
   }
 
+  // Created from experience and cross-referenced with
+  // https://www.theiphonewiki.com/wiki/Models
+  var DEVICE_ALIASES = {
+    "iPad4,1":   "iPad Air",
+    "iPad5,1":   "iPad mini 4",
+    "iPad6,3":   "iPad Pro (9.7 in)",
+    "iPhone7,2": "iPhone 6",
+    "iPhone9,1": "iPhone 7",
+  }
+
   // For consistency, all aliases are displayed like:
   // Nexus 5X (bullhead)
   // This regex matches a string like "ALIAS (ORIG)", with ORIG as group 1.
@@ -103,7 +113,7 @@ this.swarming.alias = this.swarming.alias || (function(){
 
   var alias = {};
 
-  alias.DIMENSIONS_WITH_ALIASES = ["device_type", "gpu", "battery_health"];
+  alias.DIMENSIONS_WITH_ALIASES = ["device_type", "gpu", "battery_health", "battery_status", "device"];
 
   alias.android = function(dt) {
     return ANDROID_ALIASES[dt] || UNKNOWN;
@@ -116,6 +126,15 @@ this.swarming.alias = this.swarming.alias || (function(){
   alias.battery_status = function(bs) {
     return BATTERY_STATUS_ALIASES[bs] || UNKNOWN;
   };
+
+  alias.device = function(dt) {
+    return DEVICE_ALIASES[dt] || UNKNOWN;
+  };
+
+  alias.gpu = function(gpu) {
+    return GPU_ALIASES[gpu] || UNKNOWN;
+  };
+
 
   // alias.apply tries to alias the string "orig" based on what "type" it is.
   // If type is in DIMENSIONS_WITH_ALIASES, the appropriate alias (e.g. gpu)
@@ -139,10 +158,6 @@ this.swarming.alias = this.swarming.alias || (function(){
     return !!aliasMap[type];
   };
 
-  alias.gpu = function(gpu) {
-    return GPU_ALIASES[gpu] || UNKNOWN;
-  };
-
   // alias.unapply will return the base dimension/state with its alias removed
   // if it had one.  This is handy for sorting and filtering.
   alias.unapply = function(str) {
@@ -154,10 +169,11 @@ this.swarming.alias = this.swarming.alias || (function(){
   };
 
   var aliasMap = {
-    "device_type": alias.android,
-    "gpu": alias.gpu,
     "battery_health": alias.battery_health,
     "battery_status": alias.battery_status,
+    "device": alias.device,
+    "device_type": alias.android,
+    "gpu": alias.gpu,
   }
 
   return alias;

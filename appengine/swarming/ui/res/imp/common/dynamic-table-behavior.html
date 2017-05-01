@@ -225,6 +225,15 @@
       _commonColumns: function() {
         // return a fresh object so all elements have their own copy
         return {
+          device: function(bot) {
+            var dt = this._attribute(bot, "device", "none");
+            dt = dt[0];
+            var alias = swarming.alias.device(dt);
+            if (alias === "unknown") {
+              return dt;
+            }
+            return swarming.alias.apply(dt, alias);
+          },
           device_type: function(bot) {
             var dt = this._attribute(bot, "device_type", "none");
             dt = dt[0];
