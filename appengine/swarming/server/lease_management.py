@@ -36,6 +36,7 @@ import collections
 import datetime
 import json
 import logging
+import math
 
 from google.appengine.api import app_identity
 from google.appengine.ext import ndb
@@ -246,20 +247,20 @@ def machine_type_pb2_to_entity(pb2):
   )
 
 
-def get_target_size(schedule, default, now=None):
+def get_target_size(schedule, machine_type, default, now=None):
   """Returns the current target size for the MachineType.
 
   Args:
     schedule: A proto.bots_pb2.Schedule proto.
-    default: A default to return if now is not within any of config's intervals.
+    machine_type: ID of the key for the MachineType to get a target size for.
+    default: A default to return if now is not within any of config's intervals
+      or the last-known utilization is not set.
     now: datetime.datetime to use as the time to check what the MachineType's
       target size currently is. Defaults to use the current time if unspecified.
 
   Returns:
     Target size.
   """
-  # Only daily schedules are supported right now.
-  assert schedule.daily
   now = now or utils.utcnow()
 
   # The validator ensures the given time will fall in at most one interval,
@@ -281,6 +282,28 @@ def get_target_size(schedule, default, now=None):
 
     if start <= now <= end:
       return i.target_size
+
+  # Fall back on load-based scheduling. This allows combining scheduled changes
+  # with load-based changes occurring outside any explicitly given intervals.
+  # Only one load-based schedule is supported.
+  if schedule.load_based:
+    utilization = ndb.Key(MachineTypeUtilization, machine_type).get()
+    if not utilization:
+      return default
+    logging.info(
+        'Last known utilization for MachineType %s: %s/%s (computed at %s)',
+        machine_type,
+        utilization.busy,
+        utilization.busy + utilization.idle,
+        utilization.last_updated_ts,
+    )
+    # Target 10% more than the number of busy bots, but not more than the
+    # configured maximum and not less than the configured minimum.
+    # TODO(smut): Tune this algorithm. 10% extra may not be a good fit.
+    return int(math.ceil(max(
+        schedule.load_based[0].minimum_size,
+        min(schedule.load_based[0].maximum_size, utilization.busy * 1.1),
+    )))
 
   return default
 
@@ -320,9 +343,9 @@ def ensure_entities_exist(max_concurrent=50):
     put = False
 
     # Handle scheduled config changes.
-    if config.schedule and config.schedule.daily:
+    if config.schedule:
       target_size = get_target_size(
-          config.schedule, config.target_size, now=now)
+          config.schedule, machine_type.key.id(), config.target_size, now=now)
       if machine_type.target_size != target_size:
         logging.info(
             'Adjusting target_size (%s -> %s) for MachineType: %s',
@@ -1079,7 +1102,6 @@ def compute_utilization(batch_size=50):
         idle=idle,
         last_updated_ts=now,
     ).put()
-  # TODO(smut): Use this computation for autoscaling.
 
 
 def set_global_metrics():

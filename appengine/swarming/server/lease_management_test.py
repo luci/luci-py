@@ -627,21 +627,13 @@ class EnsureEntitiesExistTest(test_case.TestCase):
 class GetTargetSize(test_case.TestCase):
   """Tests for lease_management.get_target_size."""
 
-  def test_no_daily_schedule(self):
+  def test_no_schedules(self):
     config = bots_pb2.MachineType(schedule=bots_pb2.Schedule())
-    now = None
 
-    with self.assertRaises(AssertionError):
-      lease_management.get_target_size(config.schedule, 2, now=now)
+    self.assertEqual(
+        lease_management.get_target_size(config.schedule, 'mt', 2), 2)
 
   def test_wrong_day(self):
-    # self.mock can't install mocks for built-in datetime.datetime.
-    class MockDateTime(datetime.datetime):
-      def __init__(self, *args, **kwargs):
-        super(MockDateTime, self).__init__(*args, **kwargs)
-      def weekday(self):
-        return 5
-
     config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
         daily=[bots_pb2.DailySchedule(
             start='1:00',
@@ -650,10 +642,10 @@ class GetTargetSize(test_case.TestCase):
             target_size=3,
         )],
     ))
-    now = MockDateTime(1969, 1, 1, 1, 2)
+    now = datetime.datetime(2012, 1, 1, 1, 2)
 
     self.assertEqual(
-        lease_management.get_target_size(config.schedule, 2, now=now), 2)
+        lease_management.get_target_size(config.schedule, 'mt', 2, now=now), 2)
 
   def test_right_day(self):
     config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
@@ -664,11 +656,60 @@ class GetTargetSize(test_case.TestCase):
             target_size=3,
         )],
     ))
-    now = datetime.datetime(1969, 1, 1, 1, 2)
+    now = datetime.datetime(2012, 1, 1, 1, 2)
 
     self.assertEqual(
-        lease_management.get_target_size(config.schedule, 2, now=now), 3)
+        lease_management.get_target_size(config.schedule, 'mt', 2, now=now), 3)
 
+  def test_no_utilization(self):
+    config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
+        load_based=[bots_pb2.LoadBased(
+            maximum_size=5,
+            minimum_size=3,
+        )],
+    ))
+
+    self.assertEqual(
+        lease_management.get_target_size(config.schedule, 'mt', 4), 4)
+
+  def test_utilization(self):
+    config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
+        load_based=[bots_pb2.LoadBased(
+            maximum_size=6,
+            minimum_size=2,
+        )],
+    ))
+    lease_management.MachineTypeUtilization(
+        id='mt',
+        busy=4,
+        idle=0,
+    ).put()
+
+    self.assertEqual(
+        lease_management.get_target_size(config.schedule, 'mt', 3), 5)
+
+  def test_load_based_fallback(self):
+    config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
+        daily=[bots_pb2.DailySchedule(
+            start='1:00',
+            end='2:00',
+            days_of_the_week=xrange(5),
+            target_size=3,
+        )],
+        load_based=[bots_pb2.LoadBased(
+            maximum_size=6,
+            minimum_size=2,
+        )],
+    ))
+    lease_management.MachineTypeUtilization(
+        id='mt',
+        busy=4,
+        idle=0,
+    ).put()
+    now = datetime.datetime(2012, 1, 1, 1, 2)
+
+    self.assertEqual(
+        lease_management.get_target_size(config.schedule, 'mt', 3, now=now), 5)
 
 
 if __name__ == '__main__':
