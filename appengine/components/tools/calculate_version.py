@@ -34,7 +34,7 @@ def chdir(path):
     os.chdir(orig)
 
 
-def get_pseudo_revision(root, remote):
+def get_head_pseudo_revision(root, remote):
   """Returns the pseudo revision number and commit hash describing
   the base upstream commit this branch is based on.
 
@@ -55,6 +55,28 @@ def get_pseudo_revision(root, remote):
     - upstream commit hash this branch is based of.
   """
   mergebase = git(['merge-base', 'HEAD', remote], cwd=root).rstrip()
+  with chdir(root):
+    targets = git_common.parse_commitrefs(mergebase)
+    git_number.load_generation_numbers(targets)
+    git_number.finalize(targets)
+    return git_number.get_num(targets[0]), mergebase
+
+
+def get_remote_pseudo_revision(root, remote):
+  """Returns the pseudo revision number and commit hash describing
+  the base upstream commit the remote branch is based on.
+
+  The base upstream commit hash is determined by 'git rev-parse'. See the man
+  page for more information.
+
+  See get_head_pseudo_revision for more info about the pseudo revision.
+
+  Returns:
+    tuple of:
+    - pseudo revision number as a int
+    - upstream commit hash this branch is based of.
+  """
+  mergebase = git(['rev-parse', remote], cwd=root).rstrip()
   with chdir(root):
     targets = git_common.parse_commitrefs(mergebase)
     git_number.load_generation_numbers(targets)
@@ -83,7 +105,7 @@ def calculate_version(root, tag):
   on, the abbreviated commit hash. Adds -tainted-<username> if the code is not
   pristine and optionally adds a tag to further describe it.
   """
-  pseudo_revision, mergebase = get_pseudo_revision(root, 'origin/master')
+  pseudo_revision, mergebase = get_head_pseudo_revision(root, 'origin/master')
   pristine = is_pristine(root, mergebase)
   # Trim it to 7 characters like 'git describe' does. 40 characters is
   # overwhelming!

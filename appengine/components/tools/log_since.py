@@ -43,7 +43,7 @@ def get_logs(root, pseudo_revision, mergebase, start, end):
 
 def main():
   root = calculate_version.checkout_root('.')
-  pseudo_revision, mergebase = calculate_version.get_pseudo_revision(
+  pseudo_revision, mergebase = calculate_version.get_head_pseudo_revision(
       root, 'origin/master')
   is_pristine = calculate_version.is_pristine(root, mergebase)
 

@@ -61,7 +61,7 @@ def print_version_log(app, to_version):
     start = int(from_version.split('-', 1)[0])
     end = int(to_version.split('-', 1)[0])
     if start < end:
-      pseudo_revision, mergebase = calculate_version.get_pseudo_revision(
+      pseudo_revision, mergebase = calculate_version.get_remote_pseudo_revision(
           app.app_dir, 'origin/master')
       logs, _ = log_since.get_logs(
           app.app_dir, pseudo_revision, mergebase, start, end)
