@@ -236,7 +236,7 @@ class Application(object):
     for yaml_path in find_app_yamls(self._app_dir):
       with open(yaml_path) as f:
         data = yaml.load(f)
-        module_id = data.get('module', 'default')
+        module_id = data.get('service', data.get('module', 'default'))
         if module_id in self._modules:
           raise ValueError(
               'Multiple *.yaml files define same module %s: %s and %s' %
@@ -249,6 +249,9 @@ class Application(object):
 
     if 'default' not in self._modules:
       raise ValueError('Default module is missing')
+    if not self.app_id:
+      raise ValueError('application id is neither specified in default module, '
+                       'nor provided explicitly')
 
   @property
   def app_dir(self):
@@ -258,7 +261,7 @@ class Application(object):
   @property
   def app_id(self):
     """Application ID as passed to constructor, or as read from app.yaml."""
-    return self._app_id or self._modules['default'].data['application']
+    return self._app_id or self._modules['default'].data.get('application')
 
   @property
   def modules(self):
