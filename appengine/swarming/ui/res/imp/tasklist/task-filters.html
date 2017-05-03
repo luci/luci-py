@@ -372,7 +372,10 @@
               // it is more user friendly.
               rest = "";
             }
-            tags.push(col + this.FILTER_SEP + swarming.alias.unapply(rest))
+            if (swarming.alias.DIMENSIONS_WITH_ALIASES.indexOf(col) !== -1) {
+              rest = swarming.alias.unapply(rest);
+            }
+            tags.push(col + this.FILTER_SEP + rest);
           }
         }.bind(this));
         params["tags"] = tags;

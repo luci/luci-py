@@ -276,7 +276,10 @@ the fleet.">
           var col = split[0];
           if (this.dimensions.indexOf(col) !== -1) {
             var rest = f.substring(col.length + this.FILTER_SEP.length);
-            dims.push(col + this.FILTER_SEP + swarming.alias.unapply(rest))
+            if (swarming.alias.DIMENSIONS_WITH_ALIASES.indexOf(col) !== -1) {
+              rest = swarming.alias.unapply(rest);
+            }
+            dims.push(col + this.FILTER_SEP + rest)
           } else if (col === "status") {
             var rest = f.substring(col.length + this.FILTER_SEP.length);
             if (rest === "alive") {
