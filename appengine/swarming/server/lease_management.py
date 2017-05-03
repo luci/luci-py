@@ -76,6 +76,8 @@ class MachineLease(ndb.Model):
   bot_id = ndb.StringProperty(indexed=False)
   # Request ID used to generate this request.
   client_request_id = ndb.StringProperty(indexed=True)
+  # DateTime indicating when the bot first connected to the server.
+  connection_ts = ndb.DateTimeProperty()
   # Whether or not this MachineLease should issue lease requests.
   drained = ndb.BooleanProperty(indexed=True)
   # Number of seconds ahead of lease_expiration_ts to release leases.
@@ -447,10 +449,10 @@ def schedule_lease_management():
   """Schedules task queues to process each MachineLease."""
   now = utils.utcnow()
   for machine_lease in MachineLease.query():
-    # If there's no known bot_id, we're waiting on a lease so schedule the
-    # management job to check on it. If there is a bot_id, then don't bother
-    # scheduling the management job until it's time to release the machine.
-    if (not machine_lease.bot_id
+    # If there's no connection_ts, we're waiting on a bot so schedule the
+    # management job to check on it. If there is a connection_ts, then don't
+    # schedule the management job until it's time to release the machine.
+    if (not machine_lease.connection_ts
         or machine_lease.drained
         or machine_lease.lease_expiration_ts <= now + datetime.timedelta(
             seconds=machine_lease.early_release_secs)):
@@ -493,6 +495,7 @@ def clear_lease_request(key, request_id):
 
   machine_lease.bot_id = None
   machine_lease.client_request_id = None
+  machine_lease.connection_ts = None
   machine_lease.hostname = None
   machine_lease.instruction_ts = None
   machine_lease.lease_expiration_ts = None
@@ -732,7 +735,7 @@ def associate_instruction_ts(key, instruction_ts):
 
   Args:
     key: ndb.Key for a MachineLease entity.
-    bot_id: ID for a bot.
+    instruction_ts: DateTime indicating when the leased machine was instructed.
   """
   machine_lease = key.get()
   if not machine_lease:
@@ -783,6 +786,53 @@ def send_connection_instruction(machine_lease):
     )
 
 
+@ndb.transactional
+def associate_connection_ts(key, connection_ts):
+  """Associates a connection time with the given machine lease.
+
+  Args:
+    key: ndb.Key for a MachineLease entity.
+    connection_ts: DateTime indicating when the bot first connected.
+  """
+  machine_lease = key.get()
+  if not machine_lease:
+    logging.error('MachineLease does not exist\nKey: %s', key)
+    return
+
+  if machine_lease.connection_ts:
+    return
+
+  machine_lease.connection_ts = connection_ts
+  machine_lease.put()
+
+
+def check_for_connection(machine_lease):
+  """Checks for a bot_connected event.
+
+  Args:
+    machine_lease: MachineLease instance.
+  """
+  assert machine_lease.instruction_ts
+
+  # Technically this query is wrong because it looks at events in reverse
+  # chronological order. The connection time we find here is actually the
+  # most recent connection when we want the earliest. However, this function
+  # is only called for new bots and stops being called once the connection
+  # time is recorded, so the connection time we record should end up being the
+  # first connection anyways. Iterating in the correct order would require
+  # building a new, large index.
+  for event in bot_management.get_events_query(machine_lease.bot_id, True):
+    if event.event_type == 'bot_connected':
+      logging.info(
+          'Bot connected:\nKey: %s\nHostname: %s\nTime: %s',
+          machine_lease.key,
+          machine_lease.hostname,
+          event.ts,
+      )
+      associate_connection_ts(machine_lease.key, event.ts)
+      return
+
+
 def last_shutdown_ts(hostname):
   """Returns the time the given bot posted a final bot_shutdown event.
 
@@ -825,7 +875,7 @@ def handle_termination_task(machine_lease):
     # completed but hasn't exited yet. The last thing it does before exiting
     # is post a bot_shutdown event. Check for the presence of a bot_shutdown
     # event which occurred after the termination task was completed.
-    shutdown_ts = last_shutdown_ts(machine_lease.hostname)
+    shutdown_ts = last_shutdown_ts(machine_lease.bot_id)
     if not shutdown_ts or shutdown_ts < task_result_summary.completed_ts:
       logging.info(
           'Machine terminated but not yet shut down:\nKey: %s\nHostname: %s',
@@ -903,6 +953,11 @@ def manage_leased_machine(machine_lease):
   # Once BotInfo is created, send the instruction to join the server.
   if not machine_lease.instruction_ts:
     send_connection_instruction(machine_lease)
+    return
+
+  # Once the instruction is sent, check for connection.
+  if not machine_lease.connection_ts:
+    check_for_connection(machine_lease)
 
   # Handle an expired lease.
   if machine_lease.lease_expiration_ts <= utils.utcnow():
