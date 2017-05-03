@@ -37,6 +37,121 @@ def rpc_to_json(rpc_message):
   return json.loads(protojson.encode_message(rpc_message))
 
 
+class CheckForConnectionTest(test_case.TestCase):
+  """Tests for lease_management.check_for_connection."""
+
+  def test_not_connected(self):
+    machine_lease = lease_management.MachineLease(
+        bot_id='bot-id',
+        client_request_id='req-id',
+        hostname='bot-id',
+        instruction_ts=utils.utcnow(),
+    )
+    machine_lease.put()
+    bot_management.bot_event(
+        event_type='bot_leased',
+        bot_id=machine_lease.hostname,
+        external_ip=None,
+        authenticated_as=None,
+        dimensions=None,
+        state=None,
+        version=None,
+        quarantined=False,
+        task_id='',
+        task_name=None,
+    )
+
+    lease_management.check_for_connection(machine_lease)
+    self.failUnless(bot_management.get_info_key(machine_lease.bot_id).get())
+    self.failUnless(machine_lease.key.get().client_request_id)
+    self.failIf(machine_lease.key.get().connection_ts)
+
+  def test_connected(self):
+    machine_lease = lease_management.MachineLease(
+        bot_id='bot-id',
+        client_request_id='req-id',
+        hostname='bot-id',
+        instruction_ts=utils.utcnow(),
+    )
+    machine_lease.put()
+    bot_management.bot_event(
+        event_type='bot_leased',
+        bot_id=machine_lease.hostname,
+        external_ip=None,
+        authenticated_as=None,
+        dimensions=None,
+        state=None,
+        version=None,
+        quarantined=False,
+        task_id='',
+        task_name=None,
+    )
+    bot_management.bot_event(
+        event_type='bot_connected',
+        bot_id=machine_lease.hostname,
+        external_ip=None,
+        authenticated_as=None,
+        dimensions=None,
+        state=None,
+        version=None,
+        quarantined=False,
+        task_id='',
+        task_name=None,
+    )
+
+    lease_management.check_for_connection(machine_lease)
+    self.failUnless(bot_management.get_info_key(machine_lease.bot_id).get())
+    self.failUnless(machine_lease.key.get().client_request_id)
+    self.failUnless(machine_lease.key.get().connection_ts)
+
+  def test_missing(self):
+    self.mock(lease_management, 'release', lambda *args, **kwargs: True)
+
+    machine_lease = lease_management.MachineLease(
+        bot_id='bot-id',
+        client_request_id='req-id',
+        hostname='bot-id',
+        instruction_ts=utils.utcnow(),
+    )
+    machine_lease.put()
+
+    lease_management.check_for_connection(machine_lease)
+    self.failIf(bot_management.get_info_key(machine_lease.bot_id).get())
+    self.failIf(machine_lease.key.get().client_request_id)
+    self.failIf(machine_lease.key.get().connection_ts)
+
+  def test_dead(self):
+    def is_dead(_self, _now):
+      return True
+    self.mock(bot_management.BotInfo, 'is_dead', is_dead)
+    self.mock(lease_management, 'release', lambda *args, **kwargs: True)
+
+    machine_lease = lease_management.MachineLease(
+        bot_id='bot-id',
+        client_request_id='req-id',
+        hostname='bot-id',
+        instruction_ts=utils.utcnow(),
+    )
+    machine_lease.put()
+    bot_management.bot_event(
+        event_type='bot_leased',
+        bot_id=machine_lease.hostname,
+        external_ip=None,
+        authenticated_as=None,
+        dimensions=None,
+        state=None,
+        version=None,
+        quarantined=False,
+        task_id='',
+        task_name=None,
+    )
+
+    lease_management.check_for_connection(machine_lease)
+    self.failIf(bot_management.get_info_key(machine_lease.bot_id).get())
+    self.failIf(machine_lease.key.get().client_request_id)
+    self.failIf(machine_lease.key.get().connection_ts)
+
+
 class ComputeUtilizationTest(test_case.TestCase):
   """Tests for lease_management.compute_utilization."""
 

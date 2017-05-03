@@ -832,6 +832,27 @@ def check_for_connection(machine_lease):
       associate_connection_ts(machine_lease.key, event.ts)
       return
 
+  # The bot hasn't connected yet. If it's dead or missing, release the lease.
+  bot_info = bot_management.get_info_key(machine_lease.hostname).get()
+  if not bot_info:
+    logging.error(
+        'BotInfo missing:\nKey: %s\nHostname: %s',
+        machine_lease.key,
+        machine_lease.hostname,
+    )
+    if release(machine_lease):
+      clear_lease_request(machine_lease.key, machine_lease.client_request_id)
+    return
+  if bot_info.is_dead(utils.utcnow()):
+    logging.warning(
+        'Bot failed to connect in time:\nKey: %s\nHostname: %s',
+        machine_lease.key,
+        machine_lease.hostname,
+    )
+    if release(machine_lease):
+      clear_lease_request(machine_lease.key, machine_lease.client_request_id)
+      bot_info.key.delete()
+
 
 def last_shutdown_ts(hostname):
   """Returns the time the given bot posted a final bot_shutdown event.
@@ -847,6 +868,38 @@ def last_shutdown_ts(hostname):
   bot_event = bot_management.get_events_query(hostname, True).get()
   if bot_event and bot_event.event_type == 'bot_shutdown':
     return bot_event.ts
+
+
+def release(machine_lease):
+  """Releases the given lease.
+
+  Args:
+    machine_lease: MachineLease instance.
+
+  Returns:
+    True if the lease was released, False otherwise.
+  """
+  response = machine_provider.release_machine(machine_lease.client_request_id)
+  if response.get('error'):
+    error = machine_provider.LeaseReleaseRequestError.lookup_by_name(
+        response['error'])
+    if error not in (
+        machine_provider.LeaseReleaseRequestError.ALREADY_RECLAIMED,
+        machine_provider.LeaseReleaseRequestError.NOT_FOUND,
+    ):
+      logging.error(
+          'Lease release failed\nKey: %s\nRequest ID: %s\nError: %s',
+          machine_lease.key,
+          response['client_request_id'],
+          response['error'],
+      )
+      return False
+  logging.info(
+      'MachineLease released:\nKey%s\nHostname: %s',
+      machine_lease.key,
+      machine_lease.hostname,
+  )
+  return True
 
 
 def handle_termination_task(machine_lease):
@@ -884,29 +937,9 @@ def handle_termination_task(machine_lease):
       )
       return
 
-    response = machine_provider.release_machine(
-        machine_lease.client_request_id)
-    if response.get('error'):
-      error = machine_provider.LeaseReleaseRequestError.lookup_by_name(
-          response['error'])
-      if error not in (
-          machine_provider.LeaseReleaseRequestError.ALREADY_RECLAIMED,
-          machine_provider.LeaseReleaseRequestError.NOT_FOUND,
-      ):
-        logging.error(
-            'Lease release failed\nKey: %s\nRequest ID: %s\nError: %s',
-            machine_lease.key,
-            response['client_request_id'],
-            response['error'],
-        )
-        return
-    logging.info(
-        'MachineLease released:\nKey%s\nHostname: %s',
-        machine_lease.key,
-        machine_lease.hostname,
-    )
-    clear_lease_request(machine_lease.key, machine_lease.client_request_id)
-    bot_management.get_info_key(machine_lease.hostname).delete()
+    if release(machine_lease):
+      clear_lease_request(machine_lease.key, machine_lease.client_request_id)
+      bot_management.get_info_key(machine_lease.hostname).delete()
 
 
 def handle_early_release(machine_lease):
