@@ -1210,10 +1210,9 @@ def autologin(func):
   """Decorator that autologin anonymous users via the web UI.
 
   This is meant to to used on handlers that require a non-anonymous user via
-  @require(), so that the user is not served a 403 simply because he didn't have
-  the cookie set yet. Do not use this decorator on APIs using anything else than
-  AppEngine's user authentication mechanism or OpenID cookies mechanism provided
-  by components.auth.
+  @require(), so that the user is not served a 403 simply because they didn't
+  have the cookie set yet. Do not use this decorator on APIs or anything other
+  than handlers that serve HTML.
 
   Usage example:
 

@@ -4,20 +4,14 @@
 
 """Endpoints version of is_member API."""
 
-import logging
-import re
-
 import endpoints
 from protorpc import messages
 from protorpc import remote
-
-from google.appengine.ext import ndb
 
 from . import acl
 from .. import api
 from .. import endpoints_support
 from .. import model
-from .. import openid
 
 
 ### ProtoRPC Messages
@@ -30,12 +24,6 @@ class MembershipRequest(messages.Message):
 
 class MembershipResponse(messages.Message):
   is_member = messages.BooleanField(1)
-
-
-class OpenIDConfig(messages.Message):
-  client_id = messages.StringField(1)
-  client_secret = messages.StringField(2)
-  redirect_uri = messages.StringField(3)
 
 
 ### API
@@ -60,24 +48,3 @@ class AuthService(remote.Service):
       raise endpoints.BadRequestException('Invalid identity: %s.' % e)
     is_member = api.is_group_member(request.group, identity)
     return MembershipResponse(is_member=is_member)
-
-  @endpoints_support.endpoints_method(
-      OpenIDConfig, OpenIDConfig,
-      http_method='POST',
-      path='/admin/openid/config')
-  @api.require(api.is_superuser)
-  def configure_openid(self, request):
-    @ndb.transactional
-    def txn():
-      conf = openid.get_config()
-      conf.populate(
-          client_id=request.client_id or conf.client_id,
-          client_secret=request.client_secret or conf.client_secret,
-          redirect_uri=request.redirect_uri or conf.redirect_uri)
-      conf.put()
-      return conf
-    conf = txn()
-    return OpenIDConfig(
-        client_id=conf.client_id,
-        client_secret='*****' if conf.client_secret else '',
-        redirect_uri=conf.redirect_uri)

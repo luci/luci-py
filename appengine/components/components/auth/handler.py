@@ -20,7 +20,6 @@ from . import config
 from . import delegation
 from . import ipaddr
 from . import model
-from . import openid
 from . import tokens
 
 # Part of public API of 'auth' component, exposed by this module.
@@ -30,7 +29,6 @@ __all__ = [
   'gae_cookie_authentication',
   'get_authenticated_routes',
   'oauth_authentication',
-  'openid_cookie_authentication',
   'require_xsrf_token_request',
   'service_to_service_authentication',
 ]
@@ -229,7 +227,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       self.authorization_error(err)
 
   @classmethod
-  def get_auth_methods(cls, conf):
+  def get_auth_methods(cls, conf):  # pylint: disable=unused-argument
     """Returns an enumerable of functions to use to authenticate request.
 
     The handler will try to apply auth methods sequentially one by one by until
@@ -255,11 +253,10 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     Args:
       conf: components.auth GAE config, see config.py.
     """
-    if conf.USE_OPENID:
-      cookie_auth = openid_cookie_authentication
-    else:
-      cookie_auth = gae_cookie_authentication
-    return oauth_authentication, cookie_auth, service_to_service_authentication
+    return (
+        oauth_authentication,
+        gae_cookie_authentication,
+        service_to_service_authentication)
 
   def generate_xsrf_token(self, xsrf_token_data=None):
     """Returns new XSRF token that embeds |xsrf_token_data|.
@@ -436,7 +433,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
         error, api.get_peer_identity().to_bytes(), self.request.remote_addr)
     self.abort(403, detail=str(error))
 
-  ### Wrappers around Users API or its OpenID equivalent.
+  ### Wrappers around Users API or its equivalent.
 
   def get_current_user(self):
     """When cookie auth is used returns instance of CurrentUser or None."""
@@ -451,7 +448,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     return self._get_users_api().create_logout_url(self.request, dest_url)
 
   def _get_users_api(self):
-    """Returns GAEUsersAPI, OpenIDAPI or raises NotImplementedError.
+    """Returns a Users API implementation or raises NotImplementedError.
 
     Chooses based on what auth_method was used of what methods are available.
     """
@@ -556,16 +553,6 @@ def gae_cookie_authentication(_request):
   return ident, users.is_current_user_admin()
 
 
-def openid_cookie_authentication(request):
-  """Cookie based authentication that uses OpenID flow for login."""
-  user = openid.get_current_user(request)
-  try:
-    ident = model.Identity(model.IDENTITY_USER, user.email) if user else None
-  except ValueError:
-    raise api.AuthenticationError('Unsupported user email: %s' % user.email)
-  return ident, False
-
-
 def oauth_authentication(request):
   """OAuth2 based authentication via access tokens."""
   if not request.headers.get('Authorization'):
@@ -588,7 +575,7 @@ def service_to_service_authentication(request):
 
 
 ################################################################################
-## API wrapper on top of Users API and OpenID API to make them similar.
+## API wrapper for generating login and logout URLs.
 
 
 class CurrentUser(object):
@@ -636,23 +623,7 @@ class GAEUsersAPI(object):
     return users.create_logout_url(dest_url)
 
 
-class OpenIDAPI(object):
-  @staticmethod
-  def get_current_user(request):
-    user = openid.get_current_user(request)
-    return CurrentUser(user.sub, user.email, user.picture) if user else None
-
-  @staticmethod
-  def create_login_url(request, dest_url):
-    return openid.create_login_url(request, dest_url)
-
-  @staticmethod
-  def create_logout_url(request, dest_url):
-    return openid.create_logout_url(request, dest_url)
-
-
 # See AuthenticatingHandler._get_users_api().
 _METHOD_TO_USERS_API = {
   gae_cookie_authentication: GAEUsersAPI,
-  openid_cookie_authentication: OpenIDAPI,
 }

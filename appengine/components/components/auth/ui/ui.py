@@ -18,10 +18,8 @@ from . import rest_api
 
 from .. import api
 from .. import change_log
-from .. import config
 from .. import handler
 from .. import model
-from .. import openid
 from .. import replication
 
 
@@ -64,9 +62,6 @@ def get_ui_routes():
   routes = []
   for cls in _ui_navbar_tabs:
     routes.extend(cls.get_webapp2_routes())
-  # Routes to OpenID login flow.
-  if config.ensure_configured().USE_OPENID:
-    routes.extend(openid.get_ui_routes())
   # Routes for everything else.
   routes.extend([
     webapp2.Route(r'/auth', MainHandler),

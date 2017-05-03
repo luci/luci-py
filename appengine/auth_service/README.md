@@ -31,23 +31,6 @@ installations. For one-off experimentation, this is not strictly necessary.
 *   Upload the code with: `./tools/gae upl -x -A <appid>`
     *   The very first upload may fail, try a second time.
 *   Visit https://\<appid\>.appspot.com/auth/bootstrap and click Proceed.
-*   Visit Google Cloud Console,
-    *   API Manager, Credentials, OAuth consent screen:
-        *   Type something in 'Product name shown to users'.
-    *   API Manager, Credentials, click Create credentials:
-        *   Choose `OAuth client ID`.
-        *   Choose `Web application`, use name `service`, use `Authorized
-            redirect URIs`,
-            "_https://\<appid\>.appspot.com/auth/openid/callback_", click
-            `Create`.
-        *   In a new tab, visit https://\<appid\>.appspot.com/_ah/api/explorer,
-            click `auth API`, click `auth.configure_openid`:
-            *   Click `Request body`, set `client_id` and `client_secret` to the
-                values from the previous tab, use for request_uri
-                "_https://\<appid\>.appspot.com/auth/openid/callback_".
-        *   TODO(vadimsh): Make UI to simplify this flow, e.g. visit
-            https://\<appid\>.appspot.com/auth/oauth_config and add the service
-            private data.
 *   Wait up to 5 minutes.
 *   Visit "_https://\<appid\>.appspot.com_" and make sure you can access the
     service before connecting [Isolate](../isolate) and [Swarming](../swarming)
