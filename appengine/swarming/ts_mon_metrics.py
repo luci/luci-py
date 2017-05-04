@@ -182,9 +182,9 @@ jobs_max_pending_duration = gae_ts_mon.FloatMetric(
     ])
 
 
-# Global metric. Target fields:
+# Global metric. Metric fields:
 # - busy = Whether or not the count is for machines that are busy.
-# - machine_type - server.lease_management.MachineType.key.id().
+# - machine_type = server.lease_management.MachineType.key.id().
 machine_types_actual_size = gae_ts_mon.GaugeMetric(
     'swarming/machine_types/actual_size',
     'Actual number of Machine Provider bots per MachineType.', [
@@ -193,13 +193,22 @@ machine_types_actual_size = gae_ts_mon.GaugeMetric(
   ])
 
 
-# Global metric. Target fields:
+# Global metric. Metric fields:
 # - machine_type = server.lease_management.MachineType.key.id().
 # - enabled = server.lease_management.MachineType.enabled.
 machine_types_target_size = gae_ts_mon.GaugeMetric(
     'swarming/machine_types/target_size',
     'Target number of Machine Provider bots per MachineType.', [
         gae_ts_mon.BooleanField('enabled'),
+        gae_ts_mon.StringField('machine_type'),
+    ])
+
+
+# Instance metric. Metric fields:
+# - machine_type = server.lease_managment.MachineType.key.id().
+machine_types_connection_time = gae_ts_mon.CumulativeDistributionMetric(
+    'swarming/machine_types/connection_time',
+    'Time between bot_leased and bot_connected events.', [
         gae_ts_mon.StringField('machine_type'),
     ])
 

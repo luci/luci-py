@@ -46,6 +46,7 @@ class CheckForConnectionTest(test_case.TestCase):
         client_request_id='req-id',
         hostname='bot-id',
         instruction_ts=utils.utcnow(),
+        machine_type=ndb.Key(lease_management.MachineType, 'mt'),
     )
     machine_lease.put()
     bot_management.bot_event(
@@ -72,6 +73,7 @@ class CheckForConnectionTest(test_case.TestCase):
         client_request_id='req-id',
         hostname='bot-id',
         instruction_ts=utils.utcnow(),
+        machine_type=ndb.Key(lease_management.MachineType, 'mt'),
     )
     machine_lease.put()
     bot_management.bot_event(
@@ -112,6 +114,7 @@ class CheckForConnectionTest(test_case.TestCase):
         client_request_id='req-id',
         hostname='bot-id',
         instruction_ts=utils.utcnow(),
+        machine_type=ndb.Key(lease_management.MachineType, 'mt'),
     )
     machine_lease.put()
 
@@ -131,6 +134,7 @@ class CheckForConnectionTest(test_case.TestCase):
         client_request_id='req-id',
         hostname='bot-id',
         instruction_ts=utils.utcnow(),
+        machine_type=ndb.Key(lease_management.MachineType, 'mt'),
     )
     machine_lease.put()
     bot_management.bot_event(

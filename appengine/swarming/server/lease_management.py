@@ -836,6 +836,12 @@ def check_for_connection(machine_lease):
           event.ts,
       )
       associate_connection_ts(machine_lease.key, event.ts)
+      ts_mon_metrics.machine_types_connection_time.add(
+          (event.ts - machine_lease.instruction_ts).total_seconds(),
+          fields={
+              'machine_type': machine_lease.machine_type.id(),
+          },
+      )
       return
 
   # The bot hasn't connected yet. If it's dead or missing, release the lease.
