@@ -563,7 +563,7 @@ def associate_termination_task(key, hostname, task_id):
       'Associating termination task\nKey: %s\nHostname: %s\nTask ID: %s',
       key,
       machine_lease.hostname,
-      machine_lease.termination_task,
+      task_id,
   )
   machine_lease.termination_task = task_id
   machine_lease.put()
