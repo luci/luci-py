@@ -559,6 +559,12 @@ def associate_termination_task(key, hostname, task_id):
   if machine_lease.termination_task:
     return
 
+  logging.info(
+      'Associating termination task\nKey: %s\nHostname: %s\nTask ID: %s',
+      key,
+      machine_lease.hostname,
+      machine_lease.termination_task,
+  )
   machine_lease.termination_task = task_id
   machine_lease.put()
 
