@@ -410,6 +410,43 @@ def ensure_entities_exist(max_concurrent=50):
     ndb.Future.wait_all(futures)
 
 
+@ndb.transactional_tasklet
+def drain_entity(key):
+  """Drains the given MachineLease.
+
+  Args:
+    key: ndb.Key for a MachineLease entity.
+  """
+  machine_lease = yield key.get_async()
+  if not machine_lease:
+    logging.error('MachineLease does not exist\nKey: %s', key)
+    return
+
+  if machine_lease.drained:
+    return
+
+  logging.info(
+      'Draining MachineLease:\nKey: %s\nHostname: %s',
+      key,
+      machine_lease.hostname,
+  )
+  machine_lease.drained = True
+  yield machine_lease.put_async()
+
+
+@ndb.tasklet
+def ensure_entity_drained(machine_lease):
+  """Ensures the given MachineLease is drained.
+
+  Args:
+    machine_lease: MachineLease entity.
+  """
+  if machine_lease.drained:
+    return
+
+  yield drain_entity(machine_lease.key)
+
+
 def drain_excess(max_concurrent=50):
   """Marks MachineLeases beyond what is needed by their MachineType as drained.
 
@@ -438,8 +475,7 @@ def drain_excess(max_concurrent=50):
         if len(futures) == max_concurrent:
           ndb.Future.wait_any(futures)
           futures = [future for future in futures if not future.done()]
-        machine_lease.drained = True
-        futures.append(machine_lease.put_async())
+        futures.append(ensure_entity_drained(machine_lease))
 
   if futures:
     ndb.Future.wait_all(futures)
