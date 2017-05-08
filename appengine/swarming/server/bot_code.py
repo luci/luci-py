@@ -247,7 +247,7 @@ def get_swarming_bot_zip(host):
 
 class BootstrapToken(auth.TokenKind):
   expiration_sec = 3600
-  secret_key = auth.SecretKey('bot_bootstrap_token', scope='local')
+  secret_key = auth.SecretKey('bot_bootstrap_token')
   version = 1
 
 

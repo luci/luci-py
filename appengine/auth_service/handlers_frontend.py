@@ -96,7 +96,7 @@ def get_additional_ui_data():
 class LinkTicketToken(auth.TokenKind):
   """Parameters for ServiceLinkTicket.ticket token."""
   expiration_sec = 24 * 3600
-  secret_key = auth.SecretKey('link_ticket_token', scope='local')
+  secret_key = auth.SecretKey('link_ticket_token')
   version = 1
 
 

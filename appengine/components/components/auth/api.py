@@ -113,9 +113,8 @@ class AuthorizationError(Error):
 ## AuthDB.
 
 
-# Name of a secret. Can be service-local (scope == 'local') or global across
-# all services (scope == 'global'). Used by 'get_secret' function.
-SecretKey = collections.namedtuple('SecretKey', ['name', 'scope'])
+# Name of a secret. Used by 'get_secret' function.
+SecretKey = collections.namedtuple('SecretKey', ['name'])
 
 
 # The representation of AuthGroup used by AuthDB, preprocessed for faster
@@ -137,8 +136,7 @@ CachedGroup = collections.namedtuple('CachedGroup', [
 class AuthDB(object):
   """A read only in-memory database of auth configuration of a service.
 
-  Holds user groups, all secret keys (local and global) and OAuth2
-  configuration.
+  Holds user groups, all secret keys and OAuth2 configuration.
 
   Each instance process holds AuthDB object in memory and shares it between all
   requests, occasionally refetching it from Datastore.
@@ -159,7 +157,7 @@ class AuthDB(object):
       replication_state: instance of AuthReplicationState entity.
       global_config: instance of AuthGlobalConfig entity.
       groups: list of AuthGroup entities.
-      secrets: list of AuthSecret entities ('local' and 'global' in same list).
+      secrets: list of AuthSecret entities.
       ip_whitelist_assignments: AuthIPWhitelistAssignments entity.
       ip_whitelists: list of AuthIPWhitelist entities.
       additional_client_ids: an additional list of OAuth2 client IDs to trust.
@@ -168,18 +166,15 @@ class AuthDB(object):
     """
     self.replication_state = replication_state or model.AuthReplicationState()
     self.global_config = global_config or model.AuthGlobalConfig()
-    self.secrets = {'local': {}, 'global': {}}
+    self.secrets = {}
     self.ip_whitelists = {e.key.string_id(): e for e in (ip_whitelists or [])}
     self.ip_whitelist_assignments = (
         ip_whitelist_assignments or model.AuthIPWhitelistAssignments())
     self.entity_group_version = entity_group_version
 
-    # Split |secrets| into local and global ones based on parent key id.
     for secret in (secrets or []):
-      scope = secret.key.parent().string_id()
-      assert scope in self.secrets, scope
-      assert secret.key.string_id() not in self.secrets[scope], secret.key
-      self.secrets[scope][secret.key.string_id()] = secret
+      assert secret.key.string_id() not in self.secrets, secret.key
+      self.secrets[secret.key.string_id()] = secret
 
     # Preprocess groups for faster membership checks. Throw away original
     # entities to reduce memory usage.
@@ -363,25 +358,21 @@ class AuthDB(object):
     """Returns a sorted list of group names that start with the given prefix."""
     return sorted(g for g in self.groups if g.startswith(prefix))
 
-  def get_secret(self, secret_key):
+  def get_secret(self, key):
     """Returns list of strings with last known values of a secret.
 
     If secret doesn't exist yet, it will be created.
 
     Args:
-      secret_key: instance of SecretKey with name of a secret and a scope
-          ('local' or 'global', see doc string for AuthSecretScope).
+      secret_key: instance of SecretKey with name of a secret.
     """
-    if secret_key.scope not in self.secrets:
-      raise ValueError('Invalid secret key scope: %s' % secret_key.scope)
     # There's a race condition here: multiple requests, that share same AuthDB
     # object, fetch same missing secret key. It's rare (since key bootstrap
     # process is rare) and not harmful (since AuthSecret.bootstrap is
     # implemented with transaction inside). We ignore it.
-    if secret_key.name not in self.secrets[secret_key.scope]:
-      self.secrets[secret_key.scope][secret_key.name] = (
-          model.AuthSecret.bootstrap(secret_key.name, secret_key.scope))
-    entity = self.secrets[secret_key.scope][secret_key.name]
+    if key.name not in self.secrets:
+      self.secrets[key.name] = model.AuthSecret.bootstrap(key.name)
+    entity = self.secrets[key.name]
     return list(entity.values)
 
   def is_in_ip_whitelist(self, whitelist_name, ip, warn_if_missing=True):

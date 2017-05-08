@@ -230,14 +230,14 @@ class TokenEncodeDecodeTest(test_case.TestCase):
 
 
 class SimpleToken(tokens.TokenKind):
-  secret_key = api.SecretKey('secret', 'local')
+  secret_key = api.SecretKey('secret')
   expiration_sec = 3600
 
 
 class GoodToken(tokens.TokenKind):
   algo = 'hmac-sha256'
   expiration_sec = 3600
-  secret_key = api.SecretKey('local', 'local')
+  secret_key = api.SecretKey('local')
   version = 1
 
 
@@ -282,12 +282,12 @@ class TestToken(test_case.TestCase):
 
   def test_checks_version(self):
     class TokenV1(tokens.TokenKind):
-      secret_key = api.SecretKey('secret', 'local')
+      secret_key = api.SecretKey('secret')
       expiration_sec = 3600
       version = 1
 
     class TokenV2(tokens.TokenKind):
-      secret_key = api.SecretKey('secret', 'local')
+      secret_key = api.SecretKey('secret')
       expiration_sec = 3600
       version = 2
 

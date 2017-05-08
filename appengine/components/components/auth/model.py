@@ -941,37 +941,24 @@ def find_group_dependency_cycle(group):
 ## Secrets store.
 
 
+# TODO(vadimsh): Move secrets outside of AuthGlobalConfig entity group and
+# encrypt them.
+
+
 class AuthSecretScope(ndb.Model):
   """Entity to act as parent entity for AuthSecret.
 
   Parent is AuthGlobalConfig entity keyed at root_key().
 
   Id of this entity defines scope of secret keys that have this entity as
-  a parent. Possible scopes are 'local' and 'global'.
-
-  Secrets in 'local' scope never leave Datastore they are stored in and they
-  are different for each service (even for Replicas). Only service that
-  generated a local secret knows it.
-
-  Secrets in 'global' scope are known to all services (via Primary -> Replica
-  DB replication mechanism). Source of truth for global secrets is in Primary's
-  Datastore.
+  a parent. Always 'local' currently.
   """
-
-
-def secret_scope_key(scope):
-  """Key of AuthSecretScope entity for a given scope ('global' or 'local')."""
-  return ndb.Key(AuthSecretScope, scope, parent=root_key())
 
 
 class AuthSecret(ndb.Model):
   """Some service-wide named secret blob.
 
-  Entity can be a child of:
-    * Key(AuthSecretScope, 'global', parent=root_key()):
-        Global secrets replicated across all services.
-    * Key(AuthSecretScope, 'local', parent=root_key()):
-        Secrets local to the current service.
+  Parent entity is always Key(AuthSecretScope, 'local', parent=root_key()) now.
 
   There should be only very limited number of AuthSecret entities around. AuthDB
   fetches them all at once. Do not use this entity for per-user secrets.
@@ -993,13 +980,11 @@ class AuthSecret(ndb.Model):
   modified_by = IdentityProperty()
 
   @classmethod
-  def bootstrap(cls, name, scope, length=32):
+  def bootstrap(cls, name, length=32):
     """Creates a secret if it doesn't exist yet.
 
     Args:
       name: name of the secret.
-      scope: 'local' or 'global', see doc string for AuthSecretScope. 'global'
-          scope should only be used on Primary service.
       length: length of the secret to generate if secret doesn't exist yet.
 
     Returns:
@@ -1008,9 +993,9 @@ class AuthSecret(ndb.Model):
     # Note that 'get_or_insert' is a bad fit here. With 'get_or_insert' we'd
     # have to call os.urandom every time we want to get a key. It's a waste of
     # time and entropy.
-    if scope not in ('local', 'global'):
-      raise ValueError('Invalid secret scope: %s' % scope)
-    key = ndb.Key(cls, name, parent=secret_scope_key(scope))
+    key = ndb.Key(
+        cls, name,
+        parent=ndb.Key(AuthSecretScope, 'local', parent=root_key()))
     entity = key.get()
     if entity is not None:
       return entity
@@ -1019,18 +1004,12 @@ class AuthSecret(ndb.Model):
       entity = key.get()
       if entity is not None:
         return entity
-      logging.info('Creating new secret key %s in %s scope', name, scope)
-      # Global keys can only be created on Primary or Standalone service.
-      if scope == 'global' and is_replica():
-        raise ValueError('Can\'t bootstrap global key on Replica')
+      logging.info('Creating new secret key %s', name)
       entity = cls(
           key=key,
           values=[os.urandom(length)],
           modified_by=get_service_self_identity())
       entity.put()
-      # Only global keys are part of replicated state.
-      if scope == 'global':
-        replicate_auth_db()
       return entity
     return create()
 

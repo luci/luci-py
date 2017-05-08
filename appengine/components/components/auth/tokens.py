@@ -42,7 +42,7 @@ class TokenKind(object):
     1) Define token class, configuring its expiration, name of a secret:
       class MyToken(auth.TokenKind):
         expiration_sec = 3600
-        secret_key = auth.SecretKey('my_secret', scope='local')
+        secret_key = auth.SecretKey('my_secret')
 
     2) Use it to generate a token that embeds and\or signs some data:
       token = MyToken.generate('message to authenticate', {'data': 'public'})

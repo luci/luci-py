@@ -127,23 +127,6 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
         nested=['Some group'])
     another.put()
 
-    global_secret = model.AuthSecret(
-        id='global_secret',
-        parent=model.secret_scope_key('global'),
-        values=['1234', '5678'],
-        modified_ts=utils.utcnow(),
-        modified_by=model.Identity.from_bytes('user:modifier@example.com'))
-    global_secret.put()
-
-    # Local secret should not appear in a snapshot.
-    local_secret = model.AuthSecret(
-        id='local_secret',
-        parent=model.secret_scope_key('local'),
-        values=['1234', '5678'],
-        modified_ts=utils.utcnow(),
-        modified_by=model.Identity.from_bytes('user:modifier@example.com'))
-    local_secret.put()
-
     ip_whitelist = model.AuthIPWhitelist(
         key=model.ip_whitelist_key('bots'),
         subnets=['127.0.0.1/32'],
@@ -371,14 +354,6 @@ class ReplaceAuthDbTest(test_case.TestCase):
     group('Modify').put()
     group('Delete').put()
     group('Keep').put()
-
-    def secret(name, scope, **kwargs):
-      return model.AuthSecret(
-          id=name, parent=model.secret_scope_key(scope), **kwargs)
-    secret('modify', 'global').put()
-    secret('delete', 'global').put()
-    secret('keep', 'global').put()
-    secret('local', 'local').put()
 
     def ip_whitelist(name, **kwargs):
       return model.AuthIPWhitelist(

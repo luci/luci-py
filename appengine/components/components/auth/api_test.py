@@ -231,13 +231,8 @@ class AuthDBTest(test_case.TestCase):
     for group in groups:
       group.put()
 
-    # And a bunch of secrets (local and global).
-    local_secrets = [
-        model.AuthSecret.bootstrap('local%d' % i, 'local') for i in (0, 1, 2)
-    ]
-    global_secrets = [
-        model.AuthSecret.bootstrap('global%d' % i, 'global') for i in (0, 1, 2)
-    ]
+    # And a bunch of secrets.
+    secrets = [model.AuthSecret.bootstrap('local%d' % i) for i in (0, 1, 2)]
 
     # And IP whitelist.
     ip_whitelist_assignments = model.AuthIPWhitelistAssignments(
@@ -265,11 +260,8 @@ class AuthDBTest(test_case.TestCase):
         set(g.key.id() for g in groups),
         set(auth_db.groups))
     self.assertEqual(
-        set(s.key.id() for s in local_secrets),
-        set(auth_db.secrets['local']))
-    self.assertEqual(
-        set(s.key.id() for s in global_secrets),
-        set(auth_db.secrets['global']))
+        set(s.key.id() for s in secrets),
+        set(auth_db.secrets))
     self.assertEqual(
         ip_whitelist_assignments,
         auth_db.ip_whitelist_assignments)
@@ -283,38 +275,30 @@ class AuthDBTest(test_case.TestCase):
 
   def test_get_secret(self):
     # Make AuthDB with two secrets.
-    local_secret = model.AuthSecret.bootstrap('local_secret', 'local')
-    global_secret = model.AuthSecret.bootstrap('global_secret', 'global')
-    auth_db = api.AuthDB(secrets=[local_secret, global_secret])
+    secret = model.AuthSecret.bootstrap('some_secret')
+    auth_db = api.AuthDB(secrets=[secret])
 
     # Ensure they are accessible via get_secret.
     self.assertEqual(
-        local_secret.values,
-        auth_db.get_secret(api.SecretKey('local_secret', 'local')))
-    self.assertEqual(
-        global_secret.values,
-        auth_db.get_secret(api.SecretKey('global_secret', 'global')))
+        secret.values,
+        auth_db.get_secret(api.SecretKey('some_secret')))
 
   def test_get_secret_bootstrap(self):
     # Mock AuthSecret.bootstrap to capture calls to it.
     original = api.model.AuthSecret.bootstrap
     calls = []
     @classmethod
-    def mocked_bootstrap(cls, name, scope):
-      calls.append((name, scope))
-      result = original(name, scope)
+    def mocked_bootstrap(cls, name):
+      calls.append(name)
+      result = original(name)
       result.values = ['123']
       return result
     self.mock(api.model.AuthSecret, 'bootstrap', mocked_bootstrap)
 
     auth_db = api.AuthDB()
-    got = auth_db.get_secret(api.SecretKey('local_secret', 'local'))
+    got = auth_db.get_secret(api.SecretKey('some_secret'))
     self.assertEqual(['123'], got)
-    self.assertEqual([('local_secret', 'local')], calls)
-
-  def test_get_secret_bad_scope(self):
-    with self.assertRaises(ValueError):
-      api.AuthDB().get_secret(api.SecretKey('some', 'bad-scope'))
+    self.assertEqual(['some_secret'], calls)
 
   @staticmethod
   def make_auth_db_with_ip_whitelist():

@@ -47,7 +47,7 @@ def require_xsrf_token_request(f):
 class XSRFToken(tokens.TokenKind):
   """XSRF token parameters."""
   expiration_sec = 4 * 3600
-  secret_key = api.SecretKey('xsrf_token', scope='local')
+  secret_key = api.SecretKey('xsrf_token')
   version = 1
 
 

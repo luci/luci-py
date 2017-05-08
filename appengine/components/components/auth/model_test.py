@@ -184,19 +184,15 @@ class AuthSecretTest(test_case.TestCase):
 
   def test_bootstrap_works(self):
     # Creating it for a first time.
-    ent1 = model.AuthSecret.bootstrap('test_secret', 'local', length=127)
+    ent1 = model.AuthSecret.bootstrap('test_secret', length=127)
     self.assertTrue(ent1)
     self.assertEqual(ent1.key.string_id(), 'test_secret')
     self.assertEqual(ent1.key.parent().string_id(), 'local')
     self.assertEqual(1, len(ent1.values))
     self.assertEqual(127, len(ent1.values[0]))
     # Getting same one.
-    ent2 = model.AuthSecret.bootstrap('test_secret', 'local')
+    ent2 = model.AuthSecret.bootstrap('test_secret')
     self.assertEqual(ent1, ent2)
-
-  def test_bad_key_scope(self):
-    with self.assertRaises(ValueError):
-      model.AuthSecret.bootstrap('test_secret', 'bad-scope')
 
 
 def make_group(group_id, nested=(), owners=model.ADMIN_GROUP, store=True):

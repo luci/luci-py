@@ -126,7 +126,7 @@ UPLOAD_MESSAGES = ['datastore', 'gs']
 class TokenSigner(auth.TokenKind):
   """Used to create upload tickets."""
   expiration_sec = DEFAULT_LINK_EXPIRATION.total_seconds()
-  secret_key = auth.SecretKey('isolate_upload_token', scope='local')
+  secret_key = auth.SecretKey('isolate_upload_token')
 
 
 @ndb.transactional
