@@ -28,12 +28,13 @@
     // outputs
     columns: Array<String>, the columns that should be displayed.
     query_params: Object, The query params that will filter the query
-        server-side.  This can have dimensions:Array<String>, quarantined:String
-        and is_dead: String. For example:
+        server-side.  This can have dimensions:Array<String>, quarantined:String,
+        is_dead: String and is_mp: String. For example:
         {
           "dimensions": ["pool:Skia", "device_type:Sprout"],
           "quarantined": "FALSE",  // optional
           "is_dead": "TRUE",       // optional
+          "is_mp": "TRUE",         // optional
         }
         For a full list of dimensions in the fleet, see the API call:
         https://[swarming_url]/api/swarming/v1/bots/dimensions
@@ -190,12 +191,20 @@ the fleet.">
   </template>
   <script>
   (function(){
-    // See query-column-filter for more documentation on these properties.
+    // See SwarmingBehaviors.QueryColumnFilter for more documentation on these properties.
     var filterMap = {
       disk_space: function(bot, space) {
         return true;
       },
       id: function(bot, id) {
+        return true;
+      },
+      is_mp_bot: function(bot, match) {
+        if (match === "true") {
+          return !!bot.lease_id;
+        } else if (match === "false") {
+          return !bot.lease_id;
+        }
         return true;
       },
       status: function(bot, status) {
@@ -274,14 +283,13 @@ the fleet.">
         this._filters.forEach(function(f) {
           var split = f.split(this.FILTER_SEP, 1)
           var col = split[0];
+          var rest = f.substring(col.length + this.FILTER_SEP.length);
           if (this.dimensions.indexOf(col) !== -1) {
-            var rest = f.substring(col.length + this.FILTER_SEP.length);
             if (swarming.alias.DIMENSIONS_WITH_ALIASES.indexOf(col) !== -1) {
               rest = swarming.alias.unapply(rest);
             }
             dims.push(col + this.FILTER_SEP + rest)
           } else if (col === "status") {
-            var rest = f.substring(col.length + this.FILTER_SEP.length);
             if (rest === "alive") {
               params["is_dead"] = ["FALSE"];
               params["quarantined"] = ["FALSE"];
@@ -290,6 +298,13 @@ the fleet.">
             } else if (rest === "dead") {
               params["is_dead"] = ["TRUE"];
             }
+          } else if (col === "is_mp_bot") {
+            if (rest === "true") {
+              params["is_mp"] = ["TRUE"];
+            } else if (rest === "false") {
+              params["is_mp"] = ["FALSE"];
+            }
+            // else if -- may be malformed, don't do anything.
           }
         }.bind(this));
         params["dimensions"] = dims;
