@@ -5,29 +5,15 @@
 """Set of functions to work with GAE SDK tools."""
 
 import collections
-import getpass
 import glob
-import hashlib
 import json
 import logging
 import os
 import re
-import socket
 import subprocess
 import sys
 import time
 
-try:
-  # https://pypi.python.org/pypi/keyring
-  import keyring
-except ImportError:
-  keyring = None
-
-try:
-  # Keyring doesn't has native "unlock keyring" support.
-  import gnomekeyring
-except ImportError:
-  gnomekeyring = None
 
 # 'setup_gae_sdk' loads 'yaml' module and modifies this variable.
 yaml = None
@@ -571,11 +557,6 @@ def add_sdk_options(parser, app_dir=None):
   parser.add_option('-v', '--verbose', action='store_true')
 
 
-def app_sdk_options(parser, app_dir=None):
-  """Legacy pass-through to add_sdk_options."""
-  add_sdk_options(parser, app_dir)
-
-
 def process_sdk_options(parser, options, app_dir):
   """Handles values of options added by 'add_sdk_options'.
 
@@ -649,126 +630,6 @@ def is_gcloud_oauth2_token_cached():
       return len(json.load(f)['data']) != 0
   except (KeyError, IOError, OSError, ValueError):
     return False
-
-
-def get_authentication_function(bucket='gae_sdk_utils'):
-  """Returns a function that ask user for email/password.
-
-  If keyring module is present, keyring will be used to remember the password.
-
-  Args:
-    bucket: a string that defines where to store the password in keyring,
-        ignored if keyring is not supported.
-
-  Returns:
-    Function that accepts no arguments and returns tuple (email, password).
-  """
-  if keyring:
-    auth = KeyringAuth('%s:%s' % (bucket, socket.getfqdn()))
-  else:
-    auth = DefaultAuth()
-  return auth.auth_func
-
-
-class DefaultAuth(object):
-  """Simple authentication support based on getpass.getpass().
-
-  Used by 'get_authentication_function' internally.
-  """
-
-  def __init__(self):
-    self._last_key = os.environ.get('EMAIL_ADDRESS')
-
-  def _retrieve_password(self):  # pylint: disable=R0201
-    return getpass.getpass('Please enter the password: ' )
-
-  def auth_func(self):
-    if self._last_key:
-      result = raw_input('Username (default: %s): ' % self._last_key)
-      if result:
-        self._last_key = result
-    else:
-      self._last_key = raw_input('Username: ')
-    return self._last_key, self._retrieve_password()
-
-
-class KeyringAuth(DefaultAuth):
-  """Enhanced password support based on keyring.
-
-  Used by 'get_authentication_function' internally.
-  """
-
-  def __init__(self, bucket):
-    super(KeyringAuth, self).__init__()
-    self._bucket = bucket
-    self._unlocked = False
-    self._keys = set()
-
-  def _retrieve_password(self):
-    """Returns the password for the corresponding key.
-
-    'key' is retrieved from self._last_key.
-
-    The key is salted and hashed so the direct mapping between an email address
-    and its password is not stored directly in the keyring.
-    """
-    assert keyring, 'Requires keyring module'
-
-    # Create a salt out of the bucket name.
-    salt = hashlib.sha512('1234' + self._bucket + '1234').digest()
-    # Create a salted hash from the key.
-    key = self._last_key
-    actual_key = hashlib.sha512(salt + key).hexdigest()
-
-    if key in self._keys:
-      # It was already tried. Clear up keyring if any value was set.
-      try:
-        logging.info('Clearing password for key %s (%s)', key, actual_key)
-        keyring.set_password(self._bucket, actual_key, '')
-      except Exception as e:
-        print >> sys.stderr, 'Failed to erase in keyring: %s' % e
-    else:
-      self._keys.add(key)
-      try:
-        logging.info('Getting password for key %s (%s)', key, actual_key)
-        value = keyring.get_password(self._bucket, actual_key)
-        if value:
-          return value
-      except Exception as e:
-        print >> sys.stderr, 'Failed to get password from keyring: %s' % e
-        if self._unlock_keyring():
-          # Unlocking worked, try getting the password again.
-          try:
-            value = keyring.get_password(self._bucket, actual_key)
-            if value:
-              return value
-          except Exception as e:
-            print >> sys.stderr, 'Failed to get password from keyring: %s' % e
-
-    # At this point, it failed to get the password from keyring. Ask the user.
-    value = super(KeyringAuth, self)._retrieve_password()
-
-    answer = raw_input('Store password in system keyring (y/N)? ').strip()
-    if answer == 'y':
-      try:
-        logging.info('Saving password for key %s (%s)', key, actual_key)
-        keyring.set_password(self._bucket, actual_key, value)
-      except Exception as e:
-        print >> sys.stderr, 'Failed to save in keyring: %s' % e
-
-    return value
-
-  @staticmethod
-  def _unlock_keyring():
-    """Tries to unlock the gnome keyring. Returns True on success."""
-    if not os.environ.get('DISPLAY') or not gnomekeyring:
-      return False
-    try:
-      gnomekeyring.unlock_sync(None, getpass.getpass('Keyring password: '))
-      return True
-    except Exception as e:
-      print >> sys.stderr, 'Failed to unlock keyring: %s' % e
-      return False
 
 
 def setup_gae_env():
