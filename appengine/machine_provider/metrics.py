@@ -10,28 +10,41 @@ import gae_ts_mon
 lease_requests_deduped = gae_ts_mon.CounterMetric(
     'machine_provider/lease_requests/deduped',
     'Number of lease requests deduplicated.',
-    None)
+    None,
+)
 
 
 lease_requests_expired = gae_ts_mon.CounterMetric(
     'machine_provider/lease_requests/expired',
     'Number of lease requests expired.',
-    None)
+    None,
+)
 
 
 lease_requests_fulfilled = gae_ts_mon.CounterMetric(
     'machine_provider/lease_requests/fulfilled',
     'Number of lease requests fulfilled.',
-    None)
+    None,
+)
+
+
+lease_requests_fulfilled_time = gae_ts_mon.CumulativeDistributionMetric(
+    'machine_provider/lease_requests/fulfilled/time',
+    'Time taken to fulfill a lease request.',
+    None,
+    bucketer=gae_ts_mon.GeometricBucketer(growth_factor=10**0.04),
+)
 
 
 lease_requests_received = gae_ts_mon.CounterMetric(
     'machine_provider/lease_requests/received',
     'Number of lease requests received.',
-    None)
+    None,
+)
 
 
 pubsub_messages_sent = gae_ts_mon.CounterMetric(
     'machine_provider/pubsub_messages/sent',
     'Number of Pub/Sub messages sent.',
-    [gae_ts_mon.StringField('target')])
+    [gae_ts_mon.StringField('target')],
+)

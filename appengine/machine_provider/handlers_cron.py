@@ -145,6 +145,8 @@ class LeaseRequestProcessor(webapp2.RequestHandler):
       for machine_key in models.CatalogMachineEntry.query_available(*filters):
         if lease_machine(machine_key, lease):
           metrics.lease_requests_fulfilled.increment()
+          metrics.lease_requests_fulfilled_time.add(
+              (utils.utcnow() - lease.created_ts).total_seconds())
           break
 
 
