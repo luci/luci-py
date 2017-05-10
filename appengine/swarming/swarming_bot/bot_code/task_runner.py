@@ -85,8 +85,6 @@ def get_run_isolated():
 def get_isolated_args(is_grpc, work_dir, task_details, isolated_result,
                       bot_file, run_isolated_flags):
   """Returns the command to call run_isolated. Mocked in tests."""
-  assert (bool(task_details.command) !=
-          bool(task_details.isolated and task_details.isolated.get('input')))
   bot_dir = os.path.dirname(work_dir)
   if os.path.isfile(isolated_result):
     os.remove(isolated_result)

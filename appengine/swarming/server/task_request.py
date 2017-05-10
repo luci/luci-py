@@ -292,6 +292,8 @@ class FilesRef(ndb.Model):
   namespace = ndb.StringProperty(validator=_validate_namespace, indexed=False)
 
   def _pre_put_hook(self):
+    # TODO(maruel): Get default value from config
+    # IsolateSettings.default_server.
     super(FilesRef, self)._pre_put_hook()
     if not self.isolatedserver or not self.namespace:
       raise datastore_errors.BadValueError(
@@ -511,6 +513,9 @@ class TaskProperties(ndb.Model):
       if not self.command and not isolated_input:
         raise datastore_errors.BadValueError(
             'use at least one of command or inputs_ref.isolated')
+      if self.command and self.extra_args:
+        raise datastore_errors.BadValueError(
+            'can\'t use both command and extra_args')
       if self.extra_args and not isolated_input:
         raise datastore_errors.BadValueError(
             'extra_args require inputs_ref.isolated')

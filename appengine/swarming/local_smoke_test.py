@@ -74,6 +74,24 @@ RESULT_HEY_OUTPUTS_REF = {
     '&hash=5c64883277eb00bceafe3659f182e194cffc5d96',
 }
 
+RESULT_HEY2_ISOLATED_OUT = {
+  u'isolated': u'0616f86b24065a0595e58088925567ae54a8157c',
+  u'isolatedserver': u'http://localhost:10050',
+  u'namespace': u'default-gzip',
+  u'view_url':
+    u'http://localhost:10050/browse?namespace=default-gzip'
+    '&hash=0616f86b24065a0595e58088925567ae54a8157c',
+}
+
+RESULT_HEY2_OUTPUTS_REF = {
+  u'isolated': u'0616f86b24065a0595e58088925567ae54a8157c',
+  u'isolatedserver': u'http://localhost:10050',
+  u'namespace': u'default-gzip',
+  u'view_url':
+    u'http://localhost:10050/browse?namespace=default-gzip'
+    '&hash=0616f86b24065a0595e58088925567ae54a8157c',
+}
+
 RESULT_SECRET_OUTPUT = {
   u'isolated': u'd2eca4d860e4f1728272f6a736fd1c9ac6e98c4f',
   u'isolatedserver': u'http://localhost:10050',
@@ -136,7 +154,7 @@ class SwarmingClient(object):
         '--task-name', name,
         '-I',  self._isolate_server,
         '--namespace', 'default-gzip',
-        isolated_hash,
+        '-s', isolated_hash,
       ]
       if extra:
         cmd.extend(extra)
@@ -274,6 +292,7 @@ class Test(unittest.TestCase):
     super(Test, self).setUp()
     # Reset the bot's cache at the start of each task, so that the cache reuse
     # data becomes deterministic.
+    # Main caveat is 'isolated_upload' as the isolate server is not cleared.
     self.bot.wipe_cache()
 
   def gen_expected(self, **kwargs):
@@ -408,7 +427,7 @@ class Test(unittest.TestCase):
           u'isolated_download': {
             u'initial_number_items': u'0',
             u'initial_size': u'0',
-            u'items_cold': [112, 200],
+            u'items_cold': sorted([len(hello_world), 200]),
             u'items_hot': [],
           },
           u'isolated_upload': {
@@ -422,6 +441,38 @@ class Test(unittest.TestCase):
     self._run_isolated(
         hello_world, 'isolated_task', ['--', '${ISOLATED_OUTDIR}'],
         expected_summary, expected_files)
+
+  def test_isolated_command(self):
+    # Command is specified in Swarming task, still with isolated file.
+    hello_world = '\n'.join((
+        'import os',
+        'import sys',
+        'print(\'hi\')',
+        'with open(os.path.join(sys.argv[1], \'result.txt\'), \'wb\') as f:',
+        '  f.write(\'hey2\')'))
+    expected_summary = self.gen_expected(
+        name=u'separate_cmd',
+        isolated_out=RESULT_HEY2_ISOLATED_OUT,
+        performance_stats={
+          u'isolated_download': {
+            u'initial_number_items': u'0',
+            u'initial_size': u'0',
+            u'items_cold': sorted([len(hello_world), 157]),
+            u'items_hot': [],
+          },
+          u'isolated_upload': {
+            u'items_cold': [4, 118],
+            u'items_hot': [],
+          },
+        },
+        outputs=[u'hi\n'],
+        outputs_ref=RESULT_HEY2_OUTPUTS_REF)
+    expected_files = {os.path.join('0', 'result.txt'): 'hey2'}
+    self._run_isolated(
+        hello_world, 'separate_cmd',
+        ['--raw-cmd', '--', 'python', 'hello_world.py', '${ISOLATED_OUTDIR}'],
+        expected_summary, expected_files,
+        isolated_content={'variables': {'files': ['hello_world.py']}})
 
   def test_isolated_hard_timeout(self):
     # Make an isolated file, archive it, have it time out. Similar to
@@ -444,7 +495,7 @@ class Test(unittest.TestCase):
           u'isolated_download': {
             u'initial_number_items': u'0',
             u'initial_size': u'0',
-            u'items_cold': [172, 200],
+            u'items_cold': sorted([len(hello_world), 200]),
             u'items_hot': [],
           },
           u'isolated_upload': {
@@ -490,7 +541,7 @@ class Test(unittest.TestCase):
           u'isolated_download': {
             u'initial_number_items': u'0',
             u'initial_size': u'0',
-            u'items_cold': [200, 407],
+            u'items_cold': sorted([200, len(hello_world)]),
             u'items_hot': [],
           },
           u'isolated_upload': {
@@ -517,7 +568,7 @@ class Test(unittest.TestCase):
         u'isolated_download': {
           u'initial_number_items': u'0',
           u'initial_size': u'0',
-          u'items_cold': [11, 199],
+          u'items_cold': sorted([len(hello_world), 199]),
           u'items_hot': [],
         },
         u'isolated_upload': {
@@ -561,7 +612,7 @@ class Test(unittest.TestCase):
         u'isolated_download': {
           u'initial_number_items': u'0',
           u'initial_size': u'0',
-          u'items_cold': [200, 241],
+          u'items_cold': sorted([200, len(hello_world)]),
           u'items_hot': [],
         },
         u'isolated_upload': {
@@ -651,14 +702,15 @@ class Test(unittest.TestCase):
         {'0/yo': 'Yo!'})
 
   def _run_isolated(self, hello_world, name, args, expected_summary,
-      expected_files, deduped=False):
+      expected_files, deduped=False, isolated_content=None):
+    """Runs hello_world.py as an isolated file."""
     # Shared code for all test_isolated_* test cases.
     tmpdir = tempfile.mkdtemp(prefix='swarming_smoke')
     try:
       isolate_path = os.path.join(tmpdir, 'i.isolate')
       isolated_path = os.path.join(tmpdir, 'i.isolated')
       with open(isolate_path, 'wb') as f:
-        json.dump(ISOLATE_HELLO_WORLD, f)
+        json.dump(isolated_content or ISOLATE_HELLO_WORLD, f)
       with open(os.path.join(tmpdir, 'hello_world.py'), 'wb') as f:
         f.write(hello_world)
       isolated_hash = self.client.isolate(isolate_path, isolated_path)
