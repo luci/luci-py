@@ -27,6 +27,9 @@ class ValidationContextTestCase(test_case.TestCase):
     with ctx.prefix('prefix %d ', 3):
       ctx.warning('warning %s', 2)
 
+    with ctx.prefix('non-ascii %s', u'\xf0\x9f\x90\xb1'):
+      ctx.error('no cat')
+
     self.assertEqual(
       ctx.result(),
       validation_context.Result(
@@ -35,8 +38,10 @@ class ValidationContextTestCase(test_case.TestCase):
               severity=logging.ERROR, text='hello world'),
           validation_context.Message(
               severity=logging.WARNING, text='prefix 3 warning 2'),
-        ]
-      )
+          validation_context.Message(
+              severity=logging.ERROR, text='non-ascii no cat'),
+        ],
+      ),
     )
 
   def test_raise_on_error(self):

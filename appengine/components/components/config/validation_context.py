@@ -81,6 +81,10 @@ class Context(object):
         if foo % 2 == 1:
           ctx.error('must be an even number')  # 'foo: must be an even number'
     """
+    args = tuple(
+        a.encode('ascii', 'ignore') if isinstance(a, unicode) else a
+        for a in args
+    )
     new_prefix = '%s%s' % (self.prefixes[-1], str(prefix) % args)
     self.prefixes.append(new_prefix)
     try:
