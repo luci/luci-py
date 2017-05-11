@@ -257,10 +257,26 @@ def get_cpuinfo():
 
 @tools.cached
 def get_monitor_hidpi():
-  """Returns True if the monitor is hidpi."""
+  """Returns True if the monitor is hidpi.
+
+  On 10.12.3 and earlier, the following could be used to detect an hidpi
+  display:
+    <key>spdisplays_retina</key>
+    <string>spdisplays_yes</string>
+
+  On 10.12.4 and later, the key above doesn't exist anymore. Fall back to search
+  for:
+    <key>spdisplays_display_type</key>
+    <string>spdisplays_built-in_retinaLCD</string>
+  """
+  def is_hidpi(displays):
+    return any(
+        d.get('spdisplays_retina') == 'spdisplays_yes' or
+        'retina' in d.get('spdisplays_display_type', '').lower()
+        for d in displays)
+
   hidpi = any(
-    any(m.get('spdisplays_retina') == 'spdisplays_yes'
-        for m in card['spdisplays_ndrvs'])
+    is_hidpi(card['spdisplays_ndrvs'])
     for card in _get_system_profiler('SPDisplaysDataType')
     if 'spdisplays_ndrvs' in card)
   return str(int(hidpi))
