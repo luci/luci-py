@@ -638,9 +638,6 @@ class Test(unittest.TestCase):
     # directory. Each time it's the exact same script.
     script = '\n'.join((
       'import os, shutil, sys',
-      'if not os.path.islink("p/b"):',
-      '  print("p/b is not a symlink")',
-      '  sys.exit(1)',
       'p = "p/b/a.txt"',
       'if not os.path.isfile(p):',
       '  with open(p, "wb") as f:',

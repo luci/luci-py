@@ -5,6 +5,7 @@
 # that can be found in the LICENSE file.
 
 import base64
+import contextlib
 import json
 import logging
 import os
@@ -28,8 +29,9 @@ from utils import logging_utils
 from utils import subprocess42
 from libs import luci_context
 import bot_auth
-import remote_client
 import fake_swarming
+import named_cache
+import remote_client
 import task_runner
 
 CLIENT_DIR = os.path.normpath(
@@ -587,17 +589,31 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.assertEqual(expected, self._run_command(task_details))
 
   def test_run_command_caches(self):
+    # Put a file into a named cache.
+    cache_manager = named_cache.CacheManager(os.path.join(self.root_dir, u'c'))
+    install_dir = os.path.join(self.root_dir, u'install')
+
+    with cache_manager.open():
+      cache_manager.install(install_dir, 'foo')
+      with open(os.path.join(install_dir, 'bar'), 'wb') as f:
+        f.write('thecache')
+      cache_manager.uninstall(install_dir, 'foo')
+
     # This runs the command for real.
-    self.requests(cost_usd=1, exit_code=0);
+    self.requests(cost_usd=1, exit_code=0)
     script = (
       'import os\n'
       'print "hi"\n'
-      'with open("../../result", "w") as f:\n'
-      '  print >> f, os.path.abspath(os.readlink("git_cache"))'
+      'with open("cache_foo/bar", "rb") as f:\n'
+      '  cached = f.read()\n'
+      'with open("../../result", "wb") as f:\n'
+      '  f.write(cached)\n'
+      'with open("cache_foo/bar", "wb") as f:\n'
+      '  f.write("updated_cache")\n'
     )
     task_details = self.get_task_details(
         script,
-        caches=[{'name': 'git_chromium', 'path': 'git_cache'}])
+        caches=[{'name': 'foo', 'path': 'cache_foo'}])
     expected = {
       u'exit_code': 0,
       u'hard_timeout': False,
@@ -607,13 +623,14 @@ class TestTaskRunner(TestTaskRunnerBase):
     }
     self.assertEqual(expected, self._run_command(task_details))
 
-    with open(os.path.join(self.root_dir, 'result')) as f:
-      rundir_cache_path = f.read().strip()
-    named_caches = os.path.join(self.root_dir, 'c', 'named')
-    self.assertTrue(os.path.isdir(named_caches))
-    named_cache_path = os.path.abspath(
-        os.readlink(os.path.join(named_caches, 'git_chromium')))
-    self.assertEqual(rundir_cache_path, named_cache_path)
+    with open(os.path.join(self.root_dir, 'result'), 'rb') as f:
+      self.assertEqual('thecache', f.read())
+
+    with cache_manager.open():
+      cache_manager.install(install_dir, 'foo')
+      with open(os.path.join(install_dir, 'bar'), 'rb') as f:
+        self.assertEqual('updated_cache', f.read())
+      cache_manager.uninstall(install_dir, 'foo')
 
   def test_main(self):
     def load_and_run(
