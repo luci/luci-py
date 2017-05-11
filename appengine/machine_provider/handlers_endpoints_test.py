@@ -599,9 +599,19 @@ class MachineTest(test_case.EndpointsTestCase):
             instruction=rpc_messages.Instruction(swarming_server='example.com'),
             state=models.InstructionStates.PENDING,
         ),
+        lease_expiration_ts=utils.utcnow() + datetime.timedelta(hours=24),
         lease_id='fake-id',
         policies=rpc_messages.Policies(
             machine_service_account=auth_testing.DEFAULT_MOCKED_IDENTITY.name,
+        ),
+    ).put()
+    models.LeaseRequest(
+        id='fake-id',
+        deduplication_checksum='checksum',
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=rpc_messages.LeaseRequest(
+            dimensions=rpc_messages.Dimensions(),
+            request_id='request-id',
         ),
     ).put()
 
@@ -628,9 +638,19 @@ class MachineTest(test_case.EndpointsTestCase):
             instruction=rpc_messages.Instruction(swarming_server='example.com'),
             state=models.InstructionStates.PENDING,
         ),
+        lease_expiration_ts=utils.utcnow() + datetime.timedelta(hours=24),
         lease_id='fake-id',
         policies=rpc_messages.Policies(
             machine_service_account=auth_testing.DEFAULT_MOCKED_IDENTITY.name,
+        ),
+    ).put()
+    models.LeaseRequest(
+        id='fake-id',
+        deduplication_checksum='checksum',
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=rpc_messages.LeaseRequest(
+            dimensions=rpc_messages.Dimensions(),
+            request_id='request-id',
         ),
     ).put()
 
@@ -647,6 +667,15 @@ class MachineTest(test_case.EndpointsTestCase):
         backend=rpc_messages.Backend.DUMMY,
         hostname='fake-host',
     ))
+    models.LeaseRequest(
+        id='fake-id',
+        deduplication_checksum='checksum',
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=rpc_messages.LeaseRequest(
+            dimensions=rpc_messages.Dimensions(),
+            request_id='request-id',
+        ),
+    ).put()
 
     with self.assertRaises(webtest.app.AppError):
       response = jsonish_dict_to_rpc(
@@ -672,7 +701,17 @@ class MachineTest(test_case.EndpointsTestCase):
             instruction=rpc_messages.Instruction(swarming_server='example.com'),
             state=models.InstructionStates.PENDING,
         ),
+        lease_expiration_ts=utils.utcnow() + datetime.timedelta(hours=24),
         lease_id='fake-id',
+    ).put()
+    models.LeaseRequest(
+        id='fake-id',
+        deduplication_checksum='checksum',
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=rpc_messages.LeaseRequest(
+            dimensions=rpc_messages.Dimensions(),
+            request_id='request-id',
+        ),
     ).put()
 
     with self.assertRaises(webtest.app.AppError):
@@ -703,6 +742,15 @@ class MachineTest(test_case.EndpointsTestCase):
             machine_service_account=auth_testing.DEFAULT_MOCKED_IDENTITY.name,
         ),
     ).put()
+    models.LeaseRequest(
+        id='fake-id',
+        deduplication_checksum='checksum',
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=rpc_messages.LeaseRequest(
+            dimensions=rpc_messages.Dimensions(),
+            request_id='request-id',
+        ),
+    ).put()
 
     response = jsonish_dict_to_rpc(
         self.call_api('poll', request).json,
@@ -726,6 +774,90 @@ class MachineTest(test_case.EndpointsTestCase):
     machine_key = models.CatalogMachineEntry(
         key=models.CatalogMachineEntry.generate_key(dimensions),
         dimensions=dimensions,
+        lease_expiration_ts=utils.utcnow() + datetime.timedelta(hours=24),
+        lease_id='fake-id',
+        policies=rpc_messages.Policies(
+            machine_service_account=auth_testing.DEFAULT_MOCKED_IDENTITY.name,
+        ),
+    ).put()
+    models.LeaseRequest(
+        id='fake-id',
+        deduplication_checksum='checksum',
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=rpc_messages.LeaseRequest(
+            dimensions=rpc_messages.Dimensions(),
+            request_id='request-id',
+        ),
+    ).put()
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('poll', request).json,
+        rpc_messages.PollResponse,
+    )
+    self.failIf(response.instruction)
+    self.failIf(machine_key.get().instruction)
+
+  def test_poll_expired(self):
+    auth_testing.mock_get_current_identity(self)
+
+    request = rpc_to_json(rpc_messages.PollRequest(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    ))
+    dimensions = rpc_messages.Dimensions(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    )
+    machine_key = models.CatalogMachineEntry(
+        key=models.CatalogMachineEntry.generate_key(dimensions),
+        dimensions=dimensions,
+        instruction=models.Instruction(
+            instruction=rpc_messages.Instruction(swarming_server='example.com'),
+            state=models.InstructionStates.PENDING,
+        ),
+        lease_expiration_ts=utils.utcnow(),
+        lease_id='fake-id',
+        policies=rpc_messages.Policies(
+            machine_service_account=auth_testing.DEFAULT_MOCKED_IDENTITY.name,
+        ),
+    ).put()
+    models.LeaseRequest(
+        id='fake-id',
+        deduplication_checksum='checksum',
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=rpc_messages.LeaseRequest(
+            dimensions=rpc_messages.Dimensions(),
+            request_id='request-id',
+        ),
+    ).put()
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('poll', request).json,
+        rpc_messages.PollResponse,
+    )
+    self.failIf(response.instruction)
+    self.assertEqual(
+        machine_key.get().instruction.state, models.InstructionStates.PENDING)
+
+  def test_poll_no_lease(self):
+    auth_testing.mock_get_current_identity(self)
+
+    request = rpc_to_json(rpc_messages.PollRequest(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    ))
+    dimensions = rpc_messages.Dimensions(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    )
+    machine_key = models.CatalogMachineEntry(
+        key=models.CatalogMachineEntry.generate_key(dimensions),
+        dimensions=dimensions,
+        instruction=models.Instruction(
+            instruction=rpc_messages.Instruction(swarming_server='example.com'),
+            state=models.InstructionStates.PENDING,
+        ),
+        lease_expiration_ts=utils.utcnow() + datetime.timedelta(hours=24),
         lease_id='fake-id',
         policies=rpc_messages.Policies(
             machine_service_account=auth_testing.DEFAULT_MOCKED_IDENTITY.name,
@@ -737,7 +869,51 @@ class MachineTest(test_case.EndpointsTestCase):
         rpc_messages.PollResponse,
     )
     self.failIf(response.instruction)
-    self.failIf(machine_key.get().instruction)
+    self.assertEqual(
+        machine_key.get().instruction.state, models.InstructionStates.PENDING)
+
+  def test_poll_no_lease_released(self):
+    auth_testing.mock_get_current_identity(self)
+
+    request = rpc_to_json(rpc_messages.PollRequest(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    ))
+    dimensions = rpc_messages.Dimensions(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+    )
+    machine_key = models.CatalogMachineEntry(
+        key=models.CatalogMachineEntry.generate_key(dimensions),
+        dimensions=dimensions,
+        instruction=models.Instruction(
+            instruction=rpc_messages.Instruction(swarming_server='example.com'),
+            state=models.InstructionStates.PENDING,
+        ),
+        lease_expiration_ts=utils.utcnow() + datetime.timedelta(hours=24),
+        lease_id='fake-id',
+        policies=rpc_messages.Policies(
+            machine_service_account=auth_testing.DEFAULT_MOCKED_IDENTITY.name,
+        ),
+    ).put()
+    models.LeaseRequest(
+        id='fake-id',
+        deduplication_checksum='checksum',
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        released=True,
+        request=rpc_messages.LeaseRequest(
+            dimensions=rpc_messages.Dimensions(),
+            request_id='request-id',
+        ),
+    ).put()
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('poll', request).json,
+        rpc_messages.PollResponse,
+    )
+    self.failIf(response.instruction)
+    self.assertEqual(
+        machine_key.get().instruction.state, models.InstructionStates.PENDING)
 
   def test_poll_implied_backend(self):
     def is_group_member(group):
@@ -759,7 +935,17 @@ class MachineTest(test_case.EndpointsTestCase):
             instruction=rpc_messages.Instruction(swarming_server='example.com'),
             state=models.InstructionStates.PENDING,
         ),
+        lease_expiration_ts=utils.utcnow() + datetime.timedelta(hours=24),
         lease_id='fake-id',
+    ).put()
+    models.LeaseRequest(
+        id='fake-id',
+        deduplication_checksum='checksum',
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=rpc_messages.LeaseRequest(
+            dimensions=rpc_messages.Dimensions(),
+            request_id='request-id',
+        ),
     ).put()
 
     response = jsonish_dict_to_rpc(
@@ -789,9 +975,19 @@ class MachineTest(test_case.EndpointsTestCase):
             instruction=rpc_messages.Instruction(swarming_server='example.com'),
             state=models.InstructionStates.PENDING,
         ),
+        lease_expiration_ts=utils.utcnow() + datetime.timedelta(hours=24),
         lease_id='fake-id',
         policies=rpc_messages.Policies(
             machine_service_account=auth_testing.DEFAULT_MOCKED_IDENTITY.name,
+        ),
+    ).put()
+    models.LeaseRequest(
+        id='fake-id',
+        deduplication_checksum='checksum',
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=rpc_messages.LeaseRequest(
+            dimensions=rpc_messages.Dimensions(),
+            request_id='request-id',
         ),
     ).put()
 

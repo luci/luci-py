@@ -330,6 +330,17 @@ class MachineEndpoints(remote.Service):
     if not entry.lease_id or not entry.instruction:
       return rpc_messages.PollResponse()
 
+    # The cron job which processes expired leases may not have run yet. Check
+    # the lease expiration time to make sure this lease is still active.
+    if entry.lease_expiration_ts <= utils.utcnow():
+      return rpc_messages.PollResponse()
+
+    # The cron job which processes early lease releases may not have run yet.
+    # Check the LeaseRequest to make sure this lease is still active.
+    lease = models.LeaseRequest.get_by_id(entry.lease_id)
+    if not lease or lease.released:
+      return rpc_messages.PollResponse()
+
     # Only the machine itself polling for its own instructions causes
     # the state of the instruction to be updated. Only update the state
     # if it's PENDING.
