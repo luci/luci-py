@@ -132,9 +132,11 @@ class SwarmingServerService(remote.Service):
     """Returns information about the server."""
     host = 'https://' + os.environ['HTTP_HOST']
 
+    cfg = config.settings()
+
     mpp = ''
-    if config.settings().mp and config.settings().mp.server:
-      mpp = config.settings().mp.server
+    if cfg.mp and cfg.mp.server:
+      mpp = cfg.mp.server
     # as a fallback, try pulling from datastore
     if not mpp:
       mpp = machine_provider.MachineProviderConfiguration.get_instance_url()
@@ -145,9 +147,10 @@ class SwarmingServerService(remote.Service):
         bot_version=bot_code.get_bot_version(host)[0],
         server_version=utils.get_app_version(),
         machine_provider_template=mpp,
-        display_server_url_template=
-            config.settings().display_server_url_template,
-        luci_config=config.config.config_service_hostname())
+        display_server_url_template=cfg.display_server_url_template,
+        luci_config=config.config.config_service_hostname(),
+        default_isolate_server=cfg.isolate.default_server,
+        default_isolate_namespace=cfg.isolate.default_namespace)
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(

@@ -82,12 +82,20 @@ class ServerApiTest(BaseTest):
   def test_details(self):
     """Asserts that server_details returns the correct version."""
     self.mock(config.config, 'config_service_hostname', lambda: 'a.server')
+
+    cfg = config.settings()
+    cfg.isolate.default_server = 'https://isolateserver.appspot.com'
+    cfg.isolate.default_namespace = 'default-gzip'
+    self.mock(config, 'settings', lambda: cfg)
+
     response = self.call_api('details')
     expected = {
       u'bot_version': unicode(
           bot_code.get_bot_version('https://testbed.example.com')[0]),
       u'display_server_url_template': u'',
       u'luci_config': u'a.server',
+      u'default_isolate_server': u'https://isolateserver.appspot.com',
+      u'default_isolate_namespace': u'default-gzip',
       u'machine_provider_template':
           u'https://machine-provider.appspot.com/leases/%s',
       u'server_version': unicode(utils.get_app_version()),
