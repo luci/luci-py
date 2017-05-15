@@ -13,15 +13,19 @@
 
   Properties:
     //input
-    auth_headers:
+    auth_headers: Object, the OAuth2 header to include in the request.  This
+        should come from swarming-app.
     tags: Array<String> the tags that match the tasks being canceled.
 
     // output
-    started_canceling: Boolean, If the user has hit the big red button to start canceling tasks.
-    finished_canceling: Boolean, If the dialog has finished canceling all the tasks.
+    started_canceling: Boolean, If the user has hit the big red button to start
+      canceling tasks.
+    finished_canceling: Boolean, If the dialog has finished canceling all the
+      tasks.
 
   Methods:
-    prompt() Set up the dialog, resetting started_canceling and finished_canceling to false.
+    prompt() Set up the dialog, resetting started_canceling and
+      finished_canceling to false.
 
   Events:
     None.
@@ -71,7 +75,7 @@
       </paper-button>
 
       <div >
-        <div hidden$="[[!started_canceling]]">Progress: [[_canceled_count]] queued for cancelation</div>
+        <div hidden$="[[!started_canceling]]">Progress: [[_canceled_count]] queued for cancellation</div>
         <div>Note: tasks queued for cancellation will be canceled as soon as possible, but there may be some delay between when this dialog box is closed and all tasks actually being canceled.</div>
       </div>
 
@@ -82,7 +86,7 @@
   (function(){
     var CANCEL_BATCH_SIZE = 100;
     Polymer({
-      is: 'task-mass-cancel',
+      is: "task-mass-cancel",
 
       properties: {
         // input

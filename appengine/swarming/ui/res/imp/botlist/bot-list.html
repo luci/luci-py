@@ -25,6 +25,7 @@
 -->
 
 <link rel="import" href="/res/imp/bower_components/iron-flex-layout/iron-flex-layout-classes.html">
+<link rel="import" href="/res/imp/bower_components/paper-dialog/paper-dialog.html">
 <link rel="import" href="/res/imp/bower_components/polymer/polymer.html">
 
 <link rel="import" href="/res/imp/common/dynamic-table-behavior.html">
@@ -37,6 +38,7 @@
 <link rel="import" href="bot-list-data.html">
 <link rel="import" href="bot-list-shared-behavior.html">
 <link rel="import" href="bot-list-summary.html">
+<link rel="import" href="bot-mass-delete.html">
 
 <dom-module id="bot-list">
   <template>
@@ -71,6 +73,7 @@
     <swarming-app
       client_id="[[client_id]]"
       auth_headers="{{_auth_headers}}"
+      permissions="{{_permissions}}"
       signed_in="{{_signed_in}}"
       server_details="{{_server_details}}"
 
@@ -88,11 +91,14 @@
             primary_map="[[_primary_map]]"
             primary_arr="[[_primary_arr]]"
             special_columns="[[_specialColumns]]"
+            permissions="[[_permissions]]"
 
             columns="{{_columns}}"
             query_params="{{_query_params}}"
             filter="{{_filter}}"
-            verbose="{{_verbose}}">
+            verbose="{{_verbose}}"
+
+            on-delete-all="_promptDeleteAll">
           </bot-filters>
 
           <bot-list-summary
@@ -243,6 +249,23 @@
 
     </swarming-app>
 
+     <!-- Paper dialogs must be on the "outside" of the DOM, that is, not inside of other elements, otherwise the shadow backdrop is weird.-->
+    <paper-dialog id="delete_all_dialog" modal>
+      <bot-mass-delete
+        id="mass_delete"
+        auth_headers="[[_auth_headers]]"
+        started_deleting="{{_started_deleting}}"
+        finished_deleting="{{_finished_deleting}}">
+      </bot-mass-delete>
+      <div class="buttons" >
+        <paper-button dialog-dismiss autofocus hidden$="[[_started_deleting]]">
+          Go Back - Don't Delete Anything
+        </paper-button>
+        <paper-button dialog-dismiss autofocus hidden$="[[!_finished_deleting]]" on-tap="_reload">
+          Done
+        </paper-button>
+      </div>
+    </paper-dialog>
   </template>
   <script>
   (function(){
@@ -387,11 +410,19 @@
               " ago";
         }
         if (bot.quarantined) {
-          var msg = this._state(bot, "quarantined")[0];
+          var msg = this._state(bot, "quarantined");
+          if (msg) {
+            msg = msg[0];
+          };
           // Sometimes, the quarantined message is actually in "error".  This
           // happens when the bot code has thrown an exception.
-          if (msg === UNKNOWN || msg === "true" || msg === true) {
-            msg = this._attribute(bot, "error");
+          if (!msg || msg === "true" || msg === true) {
+            msg = this._attribute(bot, "error")[0];
+          }
+          // Othertimes, the bot has reported it is quarantined by setting the
+          // dimension "quarantined" to be something.
+          if (msg === UNKNOWN) {
+            msg = this._dimension(bot, "quarantined") || UNKNOWN;
           }
           var errs = [];
           // Show all the errors that are active on devices to make it more
@@ -665,6 +696,12 @@
           return false;
         }
         return template.replace("%s", bot.lease_id);
+      },
+
+      _promptDeleteAll: function(e) {
+        this.$.mass_delete.dimensions = e.detail.dimensions;
+        this.$.mass_delete.prompt();
+        this.$.delete_all_dialog.open();
       },
 
       _reload: function() {

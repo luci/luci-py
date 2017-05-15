@@ -35,14 +35,14 @@
   The events this element fires are to work around the fact that modal paper-dialog
   elements need to be outside all other elements on the DOM.
 
-    cancel-all: The user wishes to cancel all tags. The parent is expected to
+    cancel-all: The user wishes to cancel all tasks. The parent is expected to
         show a paper-dialog and confirm the details.  The event's details is
         {tags: {Array:String}} of the tags of tasks that need be canceled.
     prompt-date: The user wishes to change the filter date. The parent is expected to
         show a paper-dialog that lets the user pick a date.  The event's details
         is {name: String, date: Date} naming the element to which the result will
         go and the starting date.
-    cancel-all: The user wishes to change the filter time. The parent is expected to
+    prompt-time: The user wishes to change the filter time. The parent is expected to
         show a paper-dialog that lets the user pick a time.  The event's details
         is {name: String, date: Date} naming the element to which the result will
         go and the starting date.
@@ -435,33 +435,33 @@
           sk.errorMessage("You can't batch cancel everything.  Specify some tags to filter by first.", 8000);
           return;
         }
-        this.fire('cancel-all',{tags:this.query_params.tags})
+        this.fire("cancel-all",{tags:this.query_params.tags});
       },
 
       _promptEndDate: function(e) {
         if (!this._use_now) {
-          this._promptDate(_parseTS(this._end_ts), 'end');
+          this._promptDate(_parseTS(this._end_ts), "end");
         }
       },
       _promptStartDate: function(e) {
-        this._promptDate(_parseTS(this._start_ts), 'start');
+        this._promptDate(_parseTS(this._start_ts), "start");
       },
 
       _promptDate: function(date, name) {
-        this.fire('prompt-date',{date:date, name:name})
+        this.fire("prompt-date",{date:date, name:name});
       },
 
       _promptEndTime: function(e) {
         if (!this._use_now) {
-          this._promptTime(_parseTS(this._end_ts), 'end');
+          this._promptTime(_parseTS(this._end_ts), "end");
         }
       },
       _promptStartTime: function(e) {
-        this._promptTime(_parseTS(this._start_ts), 'start');
+        this._promptTime(_parseTS(this._start_ts), "start");
       },
 
       _promptTime: function(date, name) {
-        this.fire('prompt-time',{date:date, name:name})
+        this.fire("prompt-time",{date:date, name:name});
       },
 
       _setEndTS: function(ts) {
