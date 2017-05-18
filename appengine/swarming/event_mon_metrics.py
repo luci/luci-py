@@ -129,7 +129,11 @@ def _task_summary_to_proto(summary, event):
     event.proto.swarming_task_event.server_versions.append(v)
 
   event.proto.swarming_task_event.internal_failure = summary.internal_failure
-  event.proto.swarming_task_event.exit_code = summary.exit_code
+  if summary.exit_code is not None:
+    event.proto.swarming_task_event.exit_code = summary.exit_code
+  else:
+    # Default value is 0, use -1 so it is not considered a success by accident.
+    event.proto.swarming_task_event.exit_code = -1
   if summary.started_ts:
     event.proto.swarming_task_event.started_ts = _to_timestamp(
         summary.started_ts)
