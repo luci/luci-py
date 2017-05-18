@@ -1,12 +1,5 @@
 cron:
 
-### Old broken stats
-
-- description: Gathers statistics from the logs
-  url: /internal/cron/stats/update
-  schedule: every 1 minutes
-  target: backend
-
 
 ### tasks
 

@@ -439,7 +439,6 @@ def yield_next_available_task_to_dispatch(bot_dimensions, deadline):
   # - Median time, which we should optimize.
   # - Abusing batching will slow down this query.
   #
-  # TODO(maruel): Measure query performance with stats_framework!!
   # TODO(maruel): Use fetch_page_async() + ndb.get_multi_async() +
   # memcache.get_multi_async() to do pipelined processing. Should greatly reduce
   # the effect of latency on the total duration of this function. I also suspect

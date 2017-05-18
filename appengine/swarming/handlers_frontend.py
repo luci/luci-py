@@ -22,7 +22,6 @@ from components import utils
 from server import acl
 from server import bot_code
 from server import config
-from server import stats_gviz
 
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -283,7 +282,6 @@ def get_routes():
       # Frontend pages. They return HTML.
       # Public pages.
       ('/oldui', OldUIHandler),
-      ('/stats', stats_gviz.StatsSummaryHandler),
       ('/<page:(bot|botlist|task|tasklist|)>', UIHandler),
 
       # Task pages. Redirects to Polymer UI
@@ -301,12 +299,6 @@ def get_routes():
 
       # Mapreduce related urls.
       (r'/restricted/launch_mapreduce', RestrictedLaunchMapReduceJob),
-
-      # The new APIs:
-      ('/swarming/api/v1/stats/summary/<resolution:[a-z]+>',
-        stats_gviz.StatsGvizSummaryHandler),
-      ('/swarming/api/v1/stats/dimensions/<dimensions:.+>/<resolution:[a-z]+>',
-        stats_gviz.StatsGvizDimensionsHandler),
 
       ('/_ah/mail/<to:.+>', EmailHandler),
       ('/_ah/warmup', WarmupHandler),

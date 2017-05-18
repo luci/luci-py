@@ -24,7 +24,6 @@ import ts_mon_metrics
 
 from server import acl
 from server import config
-from server import stats
 from server import task_pack
 from server import task_queues
 from server import task_request
@@ -159,35 +158,6 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request):
   return run_result, secret_bytes
 
 
-def _update_stats(run_result, bot_id, request, completed):
-  """Updates stats after a bot task update notification."""
-  if completed:
-    runtime_ms = 0
-    if run_result.duration_as_seen_by_server:
-      runtime_ms = _secs_to_ms(
-          run_result.duration_as_seen_by_server.total_seconds())
-    pending_ms = 0
-    if run_result.started_ts:
-      pending_ms = _secs_to_ms(
-            (run_result.started_ts - request.created_ts).total_seconds())
-    stats.add_run_entry(
-        'run_completed', run_result.key,
-        bot_id=bot_id,
-        dimensions=request.properties.dimensions,
-        runtime_ms=runtime_ms,
-        user=request.user)
-    stats.add_task_entry(
-        'task_completed',
-        task_pack.request_key_to_result_summary_key(request.key),
-        dimensions=request.properties.dimensions,
-        pending_ms=pending_ms,
-        user=request.user)
-  else:
-    stats.add_run_entry(
-        'run_updated', run_result.key, bot_id=bot_id,
-        dimensions=request.properties.dimensions)
-
-
 def _handle_dead_bot(run_result_key):
   """Handles TaskRunResult where its bot has stopped showing sign of life.
 
@@ -262,24 +232,18 @@ def _handle_dead_bot(run_result_key):
     for f in futures:
       f.check_success()
 
-    return task_is_retried, run_result.bot_id
+    return task_is_retried
 
   try:
-    task_is_retried, bot_id = datastore_utils.transaction(run)
+    task_is_retried = datastore_utils.transaction(run)
   except datastore_utils.CommitError:
-    task_is_retried, bot_id = None, None
+    task_is_retried = None
   if task_is_retried is not None:
     task_to_run.set_lookup_cache(to_run_key, task_is_retried)
-    if not task_is_retried:
-      stats.add_run_entry(
-          'run_bot_died', run_result_key,
-          bot_id=bot_id[0],
-          dimensions=request.properties.dimensions,
-          user=request.user)
-    else:
+    if task_is_retried:
       logging.info('Retried %s', packed)
   else:
-    logging.info('Ignored %s', packed)
+    logging.debug('Ignored %s', packed)
   return task_is_retried
 
 
@@ -591,10 +555,6 @@ def schedule_request(request, secret_bytes, check_acls=True):
     # job, which would remove this code from the critical path.
     datastore_utils.transaction(run_parent)
 
-  stats.add_task_entry(
-      'task_enqueued', result_summary.key,
-      dimensions=request.properties.dimensions,
-      user=request.user)
   ts_mon_metrics.update_jobs_requested_metrics(result_summary, deduped)
   return result_summary
 
@@ -609,7 +569,6 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
     tuple of (TaskRequest, SecretBytes, TaskRunResult) for the task that was
     reaped.  The TaskToRun involved is not returned.
   """
-  bot_id = bot_dimensions[u'id'][0]
   q = task_to_run.yield_next_available_task_to_dispatch(
       bot_dimensions, deadline)
   # When a large number of bots try to reap hundreds of tasks simultaneously,
@@ -645,14 +604,6 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
 
     # Try to optimize these values but do not add as formal stats (yet).
     logging.info('failed %d, skipped %d', failures, total_skipped)
-
-    pending_time = run_result.started_ts - request.created_ts
-    stats.add_run_entry(
-        'run_started', run_result.key,
-        bot_id=bot_id,
-        dimensions=request.properties.dimensions,
-        pending_ms=_secs_to_ms(pending_time.total_seconds()),
-        user=request.user)
     return request, secret_bytes, run_result
   if failures:
     logging.info(
@@ -820,7 +771,6 @@ def bot_update_task(
   task_completed = run_result.state != task_result.State.RUNNING
   if not _maybe_pubsub_notify_now(smry, request):
     return None
-  _update_stats(run_result, bot_id, request, task_completed)
   if task_completed:
     event_mon_metrics.send_task_event(smry)
     ts_mon_metrics.update_jobs_completed_metrics(smry)
@@ -845,12 +795,12 @@ def bot_kill_task(run_result_key, bot_id):
     run_result, result_summary = ndb.get_multi(
         (run_result_key, result_summary_key))
     if bot_id and run_result.bot_id != bot_id:
-      return None, 'Bot %s sent task kill for task %s owned by bot %s' % (
+      return 'Bot %s sent task kill for task %s owned by bot %s' % (
           bot_id, packed, run_result.bot_id)
 
     if run_result.state == task_result.State.BOT_DIED:
       # Ignore this failure.
-      return None, None
+      return None
 
     run_result.signal_server_version(server_version)
     run_result.state = task_result.State.BOT_DIED
@@ -864,21 +814,14 @@ def bot_kill_task(run_result_key, bot_id):
     for f in futures:
       f.check_success()
 
-    return run_result, None
+    return None
 
   try:
-    run_result, msg = datastore_utils.transaction(run)
+    msg = datastore_utils.transaction(run)
   except datastore_utils.CommitError as e:
     # At worst, the task will be tagged as BOT_DIED after BOT_PING_TOLERANCE
     # seconds passed on the next cron_handle_bot_died cron job.
     return 'Failed killing task %s: %s' % (packed, e)
-
-  if run_result:
-    stats.add_run_entry(
-        'run_bot_died', run_result.key,
-        bot_id=run_result.bot_id,
-        dimensions=request.properties.dimensions,
-        user=request.user)
   return msg
 
 
@@ -919,7 +862,7 @@ def cancel_task(request, result_key):
     return 'Failed killing task %s: %s' % (packed, e)
   # Add it to the negative cache.
   task_to_run.set_lookup_cache(to_run_key, False)
-  # TODO(maruel): Add stats.
+  # TODO(maruel): Add paper trail.
   return ok, was_running
 
 
@@ -954,11 +897,6 @@ def cron_abort_expired_task_to_run(host):
         killed.append(request)
         ts_mon_metrics.tasks_expired.increment(
             fields=ts_mon_metrics.extract_job_fields(request.tags))
-        stats.add_task_entry(
-            'task_request_expired',
-            task_pack.request_key_to_result_summary_key(request.key),
-            dimensions=request.properties.dimensions,
-            user=request.user)
       else:
         # It's not a big deal, the bot will continue running.
         skipped += 1
@@ -970,7 +908,6 @@ def cron_abort_expired_task_to_run(host):
           '\n'.join(
             '  %s/user/task/%s  %s' % (host, i.task_id, i.properties.dimensions)
             for i in killed))
-    # TODO(maruel): Use stats_framework.
     logging.info('Killed %d task, skipped %d', len(killed), skipped)
   return [i.task_id for i in killed]
 
@@ -999,7 +936,6 @@ def cron_handle_bot_died(host):
           'BOT_DIED!\n%d tasks:\n%s',
           len(killed),
           '\n'.join('  %s/user/task/%s' % (host, i) for i in killed))
-    # TODO(maruel): Use stats_framework.
     logging.info(
         'Killed %d; retried %d; ignored: %d', len(killed), retried, ignored)
   return killed, retried, ignored

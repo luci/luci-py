@@ -24,7 +24,6 @@ from server import bot_auth
 from server import bot_code
 from server import bot_management
 from server import config
-from server import stats
 from server import task_pack
 from server import task_queues
 from server import task_request
@@ -478,12 +477,8 @@ class BotPollHandler(_BotBaseHandler):
     sleep_streak = res.state.get('sleep_streak', 0)
     quarantined = bool(res.quarantined_msg)
 
-    logging.debug('Updating stats')
-
     # Note bot existence at two places, one for stats at 1 minute resolution,
     # the other for the list of known bots.
-    action = 'bot_inactive' if quarantined else 'bot_active'
-    stats.add_entry(action=action, bot_id=res.bot_id, dimensions=res.dimensions)
 
     def bot_event(event_type, task_id=None, task_name=None):
       bot_management.bot_event(

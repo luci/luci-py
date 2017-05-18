@@ -77,13 +77,9 @@ class FrontendTest(AppTestBase):
       '/api/config/v1/validate',
       '/auth',
       '/ereporter2/api/v1/on_error',
-      '/stats',
       '/api/swarming/v1/server/permissions',
       '/swarming/api/v1/client/list',
       '/swarming/api/v1/bot/server_ping',
-      '/swarming/api/v1/stats/summary/<resolution:[a-z]+>',
-      '/swarming/api/v1/stats/dimensions/<dimensions:.+>/<resolution:[a-z]+>',
-      '/swarming/api/v1/stats/user/<user:.+>/<resolution:[a-z]+>',
       '/user/tasks',
       '/restricted/bots',
     ])
@@ -136,23 +132,6 @@ class FrontendTest(AppTestBase):
         continue
       CheckProtected(route, 'GET')
       CheckProtected(route, 'POST')
-
-  def testStatsUrls(self):
-    quoted = urllib.quote('{"os":"amiga"}')
-    urls = (
-      '/stats',
-      '/swarming/api/v1/stats/summary/days',
-      '/swarming/api/v1/stats/summary/hours',
-      '/swarming/api/v1/stats/summary/minutes',
-      '/swarming/api/v1/stats/dimensions/%s/days' % quoted,
-      '/swarming/api/v1/stats/dimensions/%s/hours' % quoted,
-      '/swarming/api/v1/stats/dimensions/%s/minutes' % quoted,
-    )
-    for url in urls:
-      self.app.get(url, status=403)
-    self.set_as_user()
-    for url in urls:
-      self.app.get(url, status=200)
 
   def test_task_redirect(self):
     self.set_as_anonymous()

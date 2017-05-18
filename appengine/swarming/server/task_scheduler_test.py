@@ -26,13 +26,11 @@ from components import auth
 from components import auth_testing
 from components import datastore_utils
 from components import pubsub
-from components import stats_framework
 from components import utils
 from test_support import test_case
 
 from server import bot_management
 from server import config
-from server import stats
 from server import task_pack
 from server import task_queues
 from server import task_request
@@ -69,7 +67,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     super(TaskSchedulerApiTest, self).setUp()
     self.now = datetime.datetime(2014, 1, 2, 3, 4, 5, 6)
     self.mock_now(self.now)
-    self.mock(stats_framework, 'add_entry', self._parse_line)
     auth_testing.mock_get_current_identity(self)
     event_mon_metrics.initialize()
     # Setup the backend to handle task queues for 'task-dimensions'.
@@ -93,11 +90,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(16, bits)
     self._random += 1
     return self._random
-
-  def _parse_line(self, line):
-    # pylint: disable=W0212
-    actual = stats._parse_line(line, stats._Snapshot(), {}, {}, {})
-    self.assertIs(True, actual, line)
 
   def mock_pub_sub(self):
     self.assertFalse(self._pub_sub_mocked)

@@ -40,18 +40,6 @@ handlers:
     Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
     X-Frame-Options: deny
 
-- url: /ui/polymer05/([^/]+\-build)\.(html|js)
-  static_files: ui/polymer05/\1.\2
-  upload: ui/polymer05/([^/]+\-build)\.(html|js)
-  secure: always
-  http_headers:
-    # TODO(maruel): Unsure about polymer if it is inline-style free.
-    # TODO(maruel): Polymer abuses eval() and http://crbug.com/277857 gets in
-    # the way.
-    Content-Security-Policy: "default-src https: 'self' 'unsafe-inline' 'unsafe-eval'"
-    Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
-    X-Frame-Options: deny
-
 - url: /api/.*
   script: main.app
   secure: always

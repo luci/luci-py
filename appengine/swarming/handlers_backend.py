@@ -21,7 +21,6 @@ from components import machine_provider
 from server import bot_management
 from server import config
 from server import lease_management
-from server import stats
 from server import task_pack
 from server import task_queues
 from server import task_result
@@ -265,7 +264,6 @@ def get_routes():
         CronAbortExpiredShardToRunHandler),
     ('/internal/cron/task_queues_tidy', CronTaskQueues),
 
-    ('/internal/cron/stats/update', stats.InternalStatsUpdateHandler),
     ('/internal/cron/aggregate_bots_dimensions',
         CronBotsDimensionAggregationHandler),
     ('/internal/cron/aggregate_tasks_tags',

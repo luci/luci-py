@@ -20,7 +20,6 @@ import handlers_endpoints
 import swarming_rpcs
 from components import auth
 from components import auth_testing
-from components import stats_framework
 from components import utils
 import gae_ts_mon
 from test_support import test_case
@@ -28,7 +27,6 @@ from test_support import test_case
 from proto import config_pb2
 from server import config
 from server import large
-from server import stats
 
 
 class AppTestBase(test_case.TestCase):
@@ -77,13 +75,6 @@ class AppTestBase(test_case.TestCase):
     auth.bootstrap_group(
         users_group,
         [auth.Identity(auth.IDENTITY_USER, 'user@example.com')])
-
-    self.mock(stats_framework, 'add_entry', self._parse_line)
-
-  def _parse_line(self, line):
-    # pylint: disable=W0212
-    actual = stats._parse_line(line, stats._Snapshot(), {}, {}, {})
-    self.assertEqual(True, actual, line)
 
   def set_as_anonymous(self):
     """Removes all IPs from the whitelist."""
