@@ -287,7 +287,7 @@ class SwarmingTaskService(remote.Service):
 
     A summary ID ends with '0', a run ID ends with '1' or '2'.
     """
-    logging.info('%s', request)
+    logging.debug('%s', request)
     _, result = get_request_and_result(request.task_id)
     return message_conversion.task_result_to_rpc(
         result, request.include_performance_stats)
@@ -301,7 +301,7 @@ class SwarmingTaskService(remote.Service):
   @auth.require(acl.is_bot_or_user)
   def request(self, request):
     """Returns the task request corresponding to a task ID."""
-    logging.info('%s', request)
+    logging.debug('%s', request)
     request_obj, _ = get_request_and_result(request.task_id)
     return message_conversion.task_request_to_rpc(request_obj)
 
@@ -316,7 +316,7 @@ class SwarmingTaskService(remote.Service):
 
     If a bot was running the task, the bot will forcibly cancel the task.
     """
-    logging.info('%s', request)
+    logging.debug('%s', request)
     request_obj, result = get_request_and_result(request.task_id)
     ok, was_running = task_scheduler.cancel_task(request_obj, result.key)
     return swarming_rpcs.CancelResponse(ok=ok, was_running=was_running)
@@ -334,7 +334,7 @@ class SwarmingTaskService(remote.Service):
     # v1.
     # TODO(maruel): Send as raw content instead of encoded. This is not
     # supported by cloud endpoints.
-    logging.info('%s', request)
+    logging.debug('%s', request)
     _, result = get_request_and_result(request.task_id)
     output = result.get_output()
     if output:
@@ -360,7 +360,7 @@ class SwarmingTasksService(remote.Service):
           if request.properties is not None else None)
     if sb is not None:
       request.properties.secret_bytes = "HIDDEN"
-    logging.info('%s', request)
+    logging.debug('%s', request)
     if sb is not None:
       request.properties.secret_bytes = sb
 
@@ -398,7 +398,7 @@ class SwarmingTasksService(remote.Service):
     """
     # TODO(maruel): Rename 'list' to 'results'.
     # TODO(maruel): Rename 'TaskList' to 'TaskResults'.
-    logging.info('%s', request)
+    logging.debug('%s', request)
     now = utils.utcnow()
     try:
       items, cursor = datastore_utils.fetch_page(
@@ -434,7 +434,7 @@ class SwarmingTasksService(remote.Service):
     This endpoint is slightly slower than 'list'. Use 'list' or 'count' when
     possible.
     """
-    logging.info('%s', request)
+    logging.debug('%s', request)
     if request.include_performance_stats:
       raise endpoints.BadRequestException(
           'Can\'t set include_performance_stats for tasks/list')
@@ -474,7 +474,7 @@ class SwarmingTasksService(remote.Service):
     Cancellation happens asynchronously, so when this call returns,
     cancellations will not have completed yet.
     """
-    logging.info('%s', request)
+    logging.debug('%s', request)
     if not request.tags:
       # Prevent accidental cancellation of everything.
       raise endpoints.BadRequestException(
@@ -511,7 +511,7 @@ class SwarmingTasksService(remote.Service):
   @auth.require(acl.is_privileged_user)
   def count(self, request):
     """Counts number of tasks in a given state."""
-    logging.info('%s', request)
+    logging.debug('%s', request)
     if not request.start:
       raise endpoints.BadRequestException('start (as epoch) is required')
     now = utils.utcnow()
@@ -590,7 +590,7 @@ class SwarmingBotService(remote.Service):
     This includes its state and dimensions, and if it is currently running a
     task.
     """
-    logging.info('%s', request)
+    logging.debug('%s', request)
     bot_id = request.bot_id
     bot = bot_management.get_info_key(bot_id).get()
     deleted = False
@@ -638,7 +638,7 @@ class SwarmingBotService(remote.Service):
     e.g. the VM was shut down already. Use 'terminate' instead of the bot is
     still alive.
     """
-    logging.info('%s', request)
+    logging.debug('%s', request)
     bot_key = bot_management.get_info_key(request.bot_id)
     get_or_raise(bot_key)  # raises 404 if there is no such bot
     bot_key.delete()
@@ -653,7 +653,7 @@ class SwarmingBotService(remote.Service):
   @auth.require(acl.is_privileged_user)
   def events(self, request):
     """Returns events that happened on a bot."""
-    logging.info('%s', request)
+    logging.debug('%s', request)
     try:
       now = utils.utcnow()
       start = message_conversion.epoch_to_datetime(request.start)
@@ -698,7 +698,7 @@ class SwarmingBotService(remote.Service):
     # TODO(maruel): Disallow a terminate task when there's one currently
     # pending or if the bot is considered 'dead', e.g. no contact since 10
     # minutes.
-    logging.info('%s', request)
+    logging.debug('%s', request)
     bot_id = unicode(request.bot_id)
     bot_key = bot_management.get_info_key(bot_id)
     get_or_raise(bot_key)  # raises 404 if there is no such bot
@@ -729,7 +729,7 @@ class SwarmingBotService(remote.Service):
     It is impossible to search by both tags and bot id. If there's a need,
     TaskRunResult.tags will be added (via a copy from TaskRequest.tags).
     """
-    logging.info('%s', request)
+    logging.debug('%s', request)
     try:
       start = message_conversion.epoch_to_datetime(request.start)
       end = message_conversion.epoch_to_datetime(request.end)
@@ -768,7 +768,7 @@ class SwarmingBotsService(remote.Service):
 
     Deleted bots will not be listed.
     """
-    logging.info('%s', request)
+    logging.debug('%s', request)
     now = utils.utcnow()
     q = bot_management.BotInfo.query()
     try:
@@ -795,7 +795,7 @@ class SwarmingBotsService(remote.Service):
   @auth.require(acl.is_privileged_user)
   def count(self, request):
     """Counts number of bots with given dimensions."""
-    logging.info('%s', request)
+    logging.debug('%s', request)
     now = utils.utcnow()
     q = bot_management.BotInfo.query()
     try:

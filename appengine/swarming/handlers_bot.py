@@ -157,7 +157,7 @@ class _BotAuthenticatingHandler(auth.AuthenticatingHandler):
       payload = bot_code.validate_bootstrap_token(existing_token)
       if payload is None:
         raise auth.AuthorizationError('Invalid bootstrap token')
-      logging.info('Using bootstrap token %r', payload)
+      logging.debug('Using bootstrap token %r', payload)
       return existing_token
 
     machine_type = None
@@ -533,7 +533,6 @@ class BotPollHandler(_BotBaseHandler):
     # The bot is in good shape. Try to grab a task.
     try:
       # This is a fairly complex function call, exceptions are expected.
-      logging.debug('Reaping task')
       request, secret_bytes, run_result = task_scheduler.bot_reap_task(
           res.dimensions, res.version, res.lease_expiration_ts)
       if not request:

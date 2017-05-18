@@ -194,7 +194,6 @@ class BotInfo(_BotCommon):
     super(BotInfo, self)._pre_put_hook()
     if not self.task_id:
       self.task_name = None
-    logging.info('Pre-put: %s', self)
 
 
 class BotEvent(_BotCommon):
@@ -378,11 +377,8 @@ def bot_event(
   # Retrieve the previous BotInfo and update it.
   info_key = get_info_key(bot_id)
   bot_info = info_key.get()
-  if bot_info:
-    logging.info('Updating: %s', bot_info)
-  else:
+  if not bot_info:
     bot_info = BotInfo(key=info_key)
-    logging.info('Creating: %s', bot_info)
   bot_info.last_seen_ts = utils.utcnow()
   bot_info.external_ip = external_ip
   bot_info.authenticated_as = authenticated_as
@@ -404,7 +400,6 @@ def bot_event(
     bot_info.lease_expiration_ts = kwargs['lease_expiration_ts']
   if kwargs.get('machine_type') is not None:
     bot_info.machine_type = kwargs['machine_type']
-  logging.info('after processing: %s', bot_info)
 
   if event_type in ('request_sleep', 'task_update'):
     # Handle this specifically. It's not much of an even worth saving a BotEvent
