@@ -750,7 +750,7 @@ class GetTargetSize(test_case.TestCase):
     config = bots_pb2.MachineType(schedule=bots_pb2.Schedule())
 
     self.assertEqual(
-        lease_management.get_target_size(config.schedule, 'mt', 2), 2)
+        lease_management.get_target_size(config.schedule, 'mt', 1, 2), 2)
 
   def test_wrong_day(self):
     config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
@@ -764,7 +764,7 @@ class GetTargetSize(test_case.TestCase):
     now = datetime.datetime(2012, 1, 1, 1, 2)
 
     self.assertEqual(
-        lease_management.get_target_size(config.schedule, 'mt', 2, now=now), 2)
+        lease_management.get_target_size(config.schedule, 'mt', 1, 2, now), 2)
 
   def test_right_day(self):
     config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
@@ -778,7 +778,7 @@ class GetTargetSize(test_case.TestCase):
     now = datetime.datetime(2012, 1, 1, 1, 2)
 
     self.assertEqual(
-        lease_management.get_target_size(config.schedule, 'mt', 2, now=now), 3)
+        lease_management.get_target_size(config.schedule, 'mt', 1, 2, now), 3)
 
   def test_no_utilization(self):
     config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
@@ -789,7 +789,7 @@ class GetTargetSize(test_case.TestCase):
     ))
 
     self.assertEqual(
-        lease_management.get_target_size(config.schedule, 'mt', 4), 4)
+        lease_management.get_target_size(config.schedule, 'mt', 1, 4), 4)
 
   def test_utilization(self):
     config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
@@ -805,7 +805,7 @@ class GetTargetSize(test_case.TestCase):
     ).put()
 
     self.assertEqual(
-        lease_management.get_target_size(config.schedule, 'mt', 3), 5)
+        lease_management.get_target_size(config.schedule, 'mt', 1, 3), 5)
 
   def test_load_based_fallback(self):
     config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
@@ -828,7 +828,55 @@ class GetTargetSize(test_case.TestCase):
     now = datetime.datetime(2012, 1, 1, 1, 2)
 
     self.assertEqual(
-        lease_management.get_target_size(config.schedule, 'mt', 3, now=now), 5)
+        lease_management.get_target_size(config.schedule, 'mt', 1, 3, now), 5)
+
+  def test_upper_bound(self):
+    config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
+        load_based=[bots_pb2.LoadBased(
+            maximum_size=4,
+            minimum_size=2,
+        )],
+    ))
+    lease_management.MachineTypeUtilization(
+        id='mt',
+        busy=4,
+        idle=0,
+    ).put()
+
+    self.assertEqual(
+        lease_management.get_target_size(config.schedule, 'mt', 1, 3), 4)
+
+  def test_drop_dampening(self):
+    config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
+        load_based=[bots_pb2.LoadBased(
+            maximum_size=100,
+            minimum_size=1,
+        )],
+    ))
+    lease_management.MachineTypeUtilization(
+        id='mt',
+        busy=80,
+        idle=20,
+    ).put()
+
+    self.assertEqual(
+        lease_management.get_target_size(config.schedule, 'mt', 100, 50), 99)
+
+  def test_lower_bound(self):
+    config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
+        load_based=[bots_pb2.LoadBased(
+            maximum_size=4,
+            minimum_size=2,
+        )],
+    ))
+    lease_management.MachineTypeUtilization(
+        id='mt',
+        busy=0,
+        idle=4,
+    ).put()
+
+    self.assertEqual(
+        lease_management.get_target_size(config.schedule, 'mt', 1, 3), 2)
 
 
 if __name__ == '__main__':

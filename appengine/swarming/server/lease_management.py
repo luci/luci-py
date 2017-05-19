@@ -249,12 +249,14 @@ def machine_type_pb2_to_entity(pb2):
   )
 
 
-def get_target_size(schedule, machine_type, default, now=None):
+def get_target_size(schedule, machine_type, current, default, now=None):
   """Returns the current target size for the MachineType.
 
   Args:
     schedule: A proto.bots_pb2.Schedule proto.
     machine_type: ID of the key for the MachineType to get a target size for.
+    current: The current target_size. Used to ensure load-based target size
+      recommendations don't drop too quickly.
     default: A default to return if now is not within any of config's intervals
       or the last-known utilization is not set.
     now: datetime.datetime to use as the time to check what the MachineType's
@@ -300,12 +302,22 @@ def get_target_size(schedule, machine_type, default, now=None):
         utilization.last_updated_ts,
     )
     # Target 10% more than the number of busy bots, but not more than the
-    # configured maximum and not less than the configured minimum.
-    # TODO(smut): Tune this algorithm. 10% extra may not be a good fit.
-    return int(math.ceil(max(
-        schedule.load_based[0].minimum_size,
-        min(schedule.load_based[0].maximum_size, utilization.busy * 1.1),
-    )))
+    # configured maximum and not less than the configured minimum. In order
+    # to prevent drastic drops, do not allow the target size to fall below 99%
+    # of current capacity. Note that this dampens scale downs as a function of
+    # the frequency with which this function runs, which is currently every
+    # minute controlled by cron job. Tweak these numbers if the cron frequency
+    # changes.
+    # TODO(smut): Tune this algorithm.
+    # TODO(smut): Move algorithm parameters to luci-config.
+    target = int(math.ceil(utilization.busy * 1.1))
+    if target >= schedule.load_based[0].maximum_size:
+      return schedule.load_based[0].maximum_size
+    if target < int(0.99 * current):
+      target = int(0.99 * current)
+    if target < schedule.load_based[0].minimum_size:
+      target = schedule.load_based[0].minimum_size
+    return target
 
   return default
 
@@ -347,7 +359,12 @@ def ensure_entities_exist(max_concurrent=50):
     # Handle scheduled config changes.
     if config.schedule:
       target_size = get_target_size(
-          config.schedule, machine_type.key.id(), config.target_size, now=now)
+          config.schedule,
+          machine_type.key.id(),
+          machine_type.target_size,
+          config.target_size,
+          now=now,
+      )
       if machine_type.target_size != target_size:
         logging.info(
             'Adjusting target_size (%s -> %s) for MachineType: %s',

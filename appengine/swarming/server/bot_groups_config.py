@@ -441,6 +441,8 @@ def validate_settings(cfg, ctx):
             for load_based in machine_type.schedule.load_based:
               if load_based.maximum_size < load_based.minimum_size:
                 ctx.error('maximum size cannot be less than minimum size')
+              if load_based.minimum_size < 1:
+                ctx.error('minimum size must be positive')
 
       # Validate 'auth' field.
       a = entry.auth
