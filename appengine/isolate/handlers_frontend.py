@@ -7,9 +7,11 @@
 import collections
 import datetime
 import json
+import logging
 
 import webapp2
 
+import cloudstorage
 from google.appengine.api import modules
 
 import acl
@@ -225,63 +227,72 @@ class ContentHandler(auth.AuthenticatingHandler):
     namespace = self.request.get('namespace', 'default-gzip')
     digest = self.request.get('digest', '')
     content = None
+    if not digest:
+      self.abort(400, 'Missing digest')
+    if not namespace:
+      self.abort(400, 'Missing namespace')
 
-    if digest and namespace:
+    try:
+      raw_data, entity = model.get_content(namespace, digest)
+    except ValueError:
+      self.abort(400, 'Invalid key')
+    except LookupError:
+      self.abort(404, 'Unable to retrieve the entry')
+
+    logging.info('%s', entity)
+    if not raw_data:
       try:
-        raw_data, entity = model.get_content(namespace, digest)
-      except ValueError:
-        self.abort(400, 'Invalid key')
-      except LookupError:
-        self.abort(404, 'Unable to retrieve the entry')
-
-      if not raw_data:
         stream = gcs.read_file(config.settings().gs_bucket, entity.key.id())
-      else:
-        stream = [raw_data]
-      content = ''.join(model.expand_content(namespace, stream))
+        content = ''.join(model.expand_content(namespace, stream))
+      except cloudstorage.NotFoundError:
+        logging.error('Entity in DB but not in GCS: deleting entity in DB')
+        entity.key.delete()
+        self.abort(404, 'Unable to retrieve the file from GCS')
+    else:
+      content = ''.join(model.expand_content(namespace, [raw_data]))
 
-      self.response.headers['X-Frame-Options'] = 'SAMEORIGIN'
-      # We delete Content-Type before storing to it to avoid having two (yes,
-      # two) Content-Type headers.
-      del self.response.headers['Content-Type']
+    self.response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    # We delete Content-Type before storing to it to avoid having two (yes,
+    # two) Content-Type headers.
+    del self.response.headers['Content-Type']
 
-      # Apparently, setting the content type to text/plain encourages the
-      # browser (Chrome, at least) to sniff the mime type and display
-      # things like images.  Images are autowrapped in <img> and text is
-      # wrapped in <pre>.
-      self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    # Apparently, setting the content type to text/plain encourages the
+    # browser (Chrome, at least) to sniff the mime type and display
+    # things like images.  Images are autowrapped in <img> and text is
+    # wrapped in <pre>.
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
 
-      # App Engine puts a limit of 33554432 bytes on a request, which includes
-      # headers. Headers are ~150 bytes.  If the content + headers might
-      # exceed that limit, we give the user an option to workround getting
-      # their file.
-      if len(content) > 33554000:
-        host = modules.get_hostname(module='default', version='default')
-        # host is something like default.default.myisolateserver.appspot.com
-        host = host.replace('default.default.','')
-        sizeInMib = len(content) / (1024.0 * 1024.0)
-        content = ('Sorry, your file is %1.1f MiB big, which exceeds the 32 MiB'
-        ' App Engine limit.\nTo work around this, run the following command:\n'
-        '    python isolateserver.py download -I %s --namespace %s -f %s %s'
-        % (sizeInMib, host, namespace, digest, digest))
-      else:
-        self.response.headers['Content-Disposition'] = str(
-          'filename=%s' % self.request.get('as') or digest)
-        try:
-          json_data = json.loads(content)
-          if self._is_isolated_format(json_data):
-            self.response.headers['Content-Type'] = 'text/html; charset=utf-8'
-            json_data['files'] = collections.OrderedDict(
-              sorted(
-                json_data['files'].items(),
-                key=lambda (filepath, data): filepath))
-            params = {
-              'namespace': namespace,
-              'isolated': json_data,
-            }
-            content = template.render('isolate/isolated.html', params)
-        except ValueError:
-          pass
+    # App Engine puts a limit of 33554432 bytes on a request, which includes
+    # headers. Headers are ~150 bytes.  If the content + headers might
+    # exceed that limit, we give the user an option to workround getting
+    # their file.
+    if len(content) > 33554000:
+      host = modules.get_hostname(module='default', version='default')
+      # host is something like default.default.myisolateserver.appspot.com
+      host = host.replace('default.default.','')
+      sizeInMib = len(content) / (1024.0 * 1024.0)
+      content = ('Sorry, your file is %1.1f MiB big, which exceeds the 32 MiB'
+      ' App Engine limit.\nTo work around this, run the following command:\n'
+      '    python isolateserver.py download -I %s --namespace %s -f %s %s'
+      % (sizeInMib, host, namespace, digest, digest))
+    else:
+      self.response.headers['Content-Disposition'] = str(
+        'filename=%s' % self.request.get('as') or digest)
+      try:
+        json_data = json.loads(content)
+        if self._is_isolated_format(json_data):
+          self.response.headers['Content-Type'] = 'text/html; charset=utf-8'
+          json_data['files'] = collections.OrderedDict(
+            sorted(
+              json_data['files'].items(),
+              key=lambda (filepath, data): filepath))
+          params = {
+            'namespace': namespace,
+            'isolated': json_data,
+          }
+          content = template.render('isolate/isolated.html', params)
+      except ValueError:
+        pass
 
     self.response.write(content)
 

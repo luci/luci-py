@@ -9,10 +9,12 @@ import logging
 import os
 import sys
 import unittest
+import zlib
 
 import test_env
 test_env.setup_test_env()
 
+import cloudstorage
 from google.appengine.ext import ndb
 
 import webtest
@@ -25,6 +27,7 @@ from test_support import test_case
 
 import acl
 import config
+import gcs
 import handlers_backend
 import handlers_frontend
 import model
@@ -125,7 +128,7 @@ class MainTest(test_case.TestCase):
           key=handler.minute_key(timestamp), values_compressed=s).put()
 
   @staticmethod
-  def gen_content(namespace='default', content='Foo'):
+  def gen_content_inline(namespace='default', content='Foo'):
     hashhex = hashlib.sha1(content).hexdigest()
     key = model.get_entry_key(namespace, hashhex)
     model.new_content_entry(
@@ -150,10 +153,10 @@ class MainTest(test_case.TestCase):
 
   def test_browse(self):
     self.set_as_reader()
-    hashhex = self.gen_content()
-    self.app_frontend.get('/browse?namespace=default&hash=%s' % hashhex)
+    hashhex = self.gen_content_inline()
+    self.app_frontend.get('/browse?namespace=default&digest=%s' % hashhex)
     self.app_frontend.get(
-      '/browse?namespace=default&hash=%s&as=file1.txt' % hashhex)
+      '/browse?namespace=default&digest=%s&as=file1.txt' % hashhex)
 
   def test_browse_missing(self):
     self.set_as_reader()
@@ -163,10 +166,67 @@ class MainTest(test_case.TestCase):
 
   def test_content(self):
     self.set_as_reader()
-    hashhex = self.gen_content()
-    self.app_frontend.get('/content?namespace=default-gzip&hash=%s' % hashhex)
+    hashhex = self.gen_content_inline(content='Foo')
+    resp = self.app_frontend.get(
+        '/content?namespace=default&digest=%s' % hashhex)
+    self.assertEqual('Foo', resp.body)
+    resp = self.app_frontend.get(
+        '/content?namespace=default&digest=%s&as=file1.txt' % hashhex)
+    self.assertEqual('Foo', resp.body)
+
+  def test_content_gcs(self):
+    content = 'Foo'
+    compressed = zlib.compress(content)
+    namespace = 'default-gzip'
+    hashhex = hashlib.sha1(content).hexdigest()
+
+    def read_file(bucket, key):
+      self.assertEqual(u'sample-app', bucket)
+      self.assertEqual(namespace + '/' + hashhex, key)
+      return [compressed]
+    self.mock(gcs, 'read_file', read_file)
+
+    key = model.get_entry_key(namespace, hashhex)
+    model.new_content_entry(
+        key,
+        is_isolated=False,
+        compressed_size=len(compressed),
+        expanded_size=len(content),
+        is_verified=True).put()
+
+    self.set_as_reader()
+    resp = self.app_frontend.get(
+        '/content?namespace=default-gzip&digest=%s' % hashhex)
+    self.assertEqual(content, resp.body)
+    resp = self.app_frontend.get(
+      '/content?namespace=default-gzip&digest=%s&as=file1.txt' % hashhex)
+    self.assertEqual(content, resp.body)
+    self.assertNotEqual(None, key.get())
+
+  def test_content_gcs_missing(self):
+    content = 'Foo'
+    compressed = zlib.compress(content)
+    namespace = 'default-gzip'
+    hashhex = hashlib.sha1(content).hexdigest()
+
+    def read_file(bucket, key):
+      self.assertEqual(u'sample-app', bucket)
+      self.assertEqual(namespace + '/' + hashhex, key)
+      raise cloudstorage.NotFoundError('Someone deleted the file from GCS')
+    self.mock(gcs, 'read_file', read_file)
+
+    key = model.get_entry_key(namespace, hashhex)
+    model.new_content_entry(
+        key,
+        is_isolated=False,
+        compressed_size=len(compressed),
+        expanded_size=len(content),
+        is_verified=True).put()
+
+    self.set_as_reader()
     self.app_frontend.get(
-      '/content?namespace=default-gzip&hash=%s&as=file1.txt' % hashhex)
+        '/content?namespace=default-gzip&digest=%s' % hashhex, status=404)
+    self.assertEqual(None, key.get())
 
   def test_config(self):
     self.set_as_admin()
