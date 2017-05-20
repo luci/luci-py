@@ -272,7 +272,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
   def _enqueue(self, *args, **kwargs):
     return self._enqueue_orig(*args, use_dedicated_module=False, **kwargs)
 
-  def mkreq(self, req, nb_task=0):
+  def mkreq(self, req, nb_task=1):
     """Stores a new initialized TaskRequest.
 
     nb_task is 1 or 0. It is 1 when the request.properties.dimensions was new

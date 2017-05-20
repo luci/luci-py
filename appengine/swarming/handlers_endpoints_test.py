@@ -858,12 +858,6 @@ class TasksApiTest(BaseTest):
     self.assertEqual(expected, response.json)
 
   def test_mass_cancel(self):
-    notifies = []
-    def enqueue_task_mock(**kwargs):
-      notifies.append(kwargs)
-      return True
-    self.mock(utils, 'enqueue_task', enqueue_task_mock)
-
     # Create two tasks.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     first, second, _, _, _, now_120 = self._gen_three_pending_tasks()
@@ -1285,13 +1279,6 @@ class TaskApiTest(BaseTest):
 
   def test_cancel_forbidden(self):
     """Asserts that non-privileged non-owner can't cancel tasks."""
-    # catch PubSub notification
-    notifies = []
-    def enqueue_task_mock(**kwargs):
-      notifies.append(kwargs)
-      return True
-    self.mock(utils, 'enqueue_task', enqueue_task_mock)
-
     # Create a task as an admin.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)

@@ -233,8 +233,8 @@ class BackendTest(AppTestBase):
     self._enqueue_task_orig = self.mock(
         utils, 'enqueue_task', self._enqueue_task)
 
-  def _enqueue_task(self, **kwargs):
-    return self._enqueue_task_orig(use_dedicated_module=False, **kwargs)
+  def _enqueue_task(self, url, **kwargs):
+    return self._enqueue_task_orig(url, use_dedicated_module=False, **kwargs)
 
   def testCronJobTasks(self):
     # Tests all the cron tasks are securely handled.
@@ -291,7 +291,9 @@ class BackendTest(AppTestBase):
     self.mock_now(now)
 
     self.client_create_task_raw(tags=['alpha:beta', 'gamma:delta'])
+    self.assertEqual(1, self.execute_tasks())
     self.client_create_task_raw(tags=['alpha:epsilon', 'zeta:theta'])
+    self.assertEqual(1, self.execute_tasks())
 
     self.app.get('/internal/cron/aggregate_tasks_tags',
         headers={'X-AppEngine-Cron': 'true'}, status=200)

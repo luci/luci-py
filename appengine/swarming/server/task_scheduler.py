@@ -465,6 +465,8 @@ def schedule_request(request, secret_bytes, check_acls=True):
   if check_acls:
     _check_dimension_acls(request)
 
+  # This does a DB GET, occasionally triggers a task queue. May throw, which is
+  # surfaced to the user but it is safe as the task request wasn't stored yet.
   task_queues.assert_task(request)
 
   now = utils.utcnow()
