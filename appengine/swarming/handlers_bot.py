@@ -29,6 +29,7 @@ from server import task_queues
 from server import task_request
 from server import task_result
 from server import task_scheduler
+from server import task_to_run
 
 
 def has_unexpected_subset_keys(expected_keys, minimum_keys, actual_keys, name):
@@ -367,6 +368,11 @@ class _BotBaseHandler(_BotApiHandler):
               sort_keys=True, indent=2, separators=(',', ': ')))
         break
 
+      dimensions_count = task_to_run.dimensions_powerset_count(dimensions)
+      if dimensions_count > task_to_run.MAX_DIMENSIONS:
+        quarantined_msg = 'Dimensions product %d is too high' % dimensions_count
+        break
+
     if quarantined_msg:
       line = 'Quarantined Bot\nhttps://%s/restricted/bot/%s\n%s' % (
           app_identity.get_default_version_hostname(), bot_id,
@@ -560,7 +566,6 @@ class BotPollHandler(_BotBaseHandler):
       self.abort(500, 'Deadline')
 
   def _cmd_run(self, request, secret_bytes, run_result_key, bot_id):
-    logging.info('Run: %s', request.task_id)
     cmd = None
     if request.properties.commands:
       cmd = request.properties.commands[0]
@@ -604,19 +609,14 @@ class BotPollHandler(_BotBaseHandler):
     self.send_response(utils.to_json_encodable(out))
 
   def _cmd_sleep(self, sleep_streak, quarantined):
-    duration = task_scheduler.exponential_backoff(sleep_streak)
-    logging.debug(
-        'Sleep: streak: %d; duration: %ds; quarantined: %s',
-        sleep_streak, duration, quarantined)
     out = {
       'cmd': 'sleep',
-      'duration': duration,
+      'duration': task_scheduler.exponential_backoff(sleep_streak),
       'quarantined': quarantined,
     }
     self.send_response(out)
 
   def _cmd_terminate(self, task_id):
-    logging.info('Terminate: %s', task_id)
     out = {
       'cmd': 'terminate',
       'task_id': task_id,
@@ -624,7 +624,6 @@ class BotPollHandler(_BotBaseHandler):
     self.send_response(out)
 
   def _cmd_update(self, expected_version):
-    logging.info('Update: %s', expected_version)
     out = {
       'cmd': 'update',
       'version': expected_version,

@@ -4,10 +4,12 @@
 # that can be found in the LICENSE file.
 
 import datetime
+import hashlib
 import logging
 import os
 import random
 import sys
+import timeit
 import unittest
 
 # Setups environment.
@@ -81,8 +83,173 @@ def _yield_next_available_task_to_dispatch(bot_dimensions, deadline):
 
 
 def _hash_dimensions(dimensions):
-  return task_queues.hash_dimensions(dimensions)
+  return task_to_run._hash_dimensions(utils.encode_to_json(dimensions))
 
+
+class TaskToRunPrivateTest(test_case.TestCase):
+  def setUp(self):
+    super(TaskToRunPrivateTest, self).setUp()
+    auth_testing.mock_get_current_identity(self)
+
+  def test_powerset(self):
+    # tuples of (input, expected).
+    # TODO(maruel): We'd want the code to deterministically try 'Windows-6.1'
+    # before 'Windows'. Probably do a reverse() on the values?
+    data = [
+      ({'OS': 'Windows'}, [{'OS': 'Windows'}, {}]),
+      (
+        {'OS': ['Windows', 'Windows-6.1']},
+        [{'OS': 'Windows'}, {'OS': 'Windows-6.1'}, {}],
+      ),
+      (
+        {'OS': ['Windows', 'Windows-6.1'], 'hostname': 'foo'},
+        [
+          {'OS': 'Windows', 'hostname': 'foo'},
+          {'OS': 'Windows-6.1', 'hostname': 'foo'},
+          {'OS': 'Windows'},
+          {'OS': 'Windows-6.1'},
+          {'hostname': 'foo'},
+          {},
+        ],
+      ),
+      (
+        {'OS': ['Windows', 'Windows-6.1'], 'hostname': 'foo', 'bar': [2, 3]},
+        [
+         {'OS': 'Windows', 'bar': 2, 'hostname': 'foo'},
+          {'OS': 'Windows', 'bar': 3, 'hostname': 'foo'},
+          {'OS': 'Windows-6.1', 'bar': 2, 'hostname': 'foo'},
+          {'OS': 'Windows-6.1', 'bar': 3, 'hostname': 'foo'},
+          {'OS': 'Windows', 'bar': 2},
+          {'OS': 'Windows', 'bar': 3},
+          {'OS': 'Windows-6.1', 'bar': 2},
+          {'OS': 'Windows-6.1', 'bar': 3},
+          {'OS': 'Windows', 'hostname': 'foo'},
+          {'OS': 'Windows-6.1', 'hostname': 'foo'},
+          {'bar': 2, 'hostname': 'foo'},
+          {'bar': 3, 'hostname': 'foo'},
+          {'OS': 'Windows'},
+          {'OS': 'Windows-6.1'},
+          {'bar': 2},
+          {'bar': 3},
+          {'hostname': 'foo'},
+          {},
+        ],
+      ),
+    ]
+    for inputs, expected in data:
+      actual = list(task_to_run._powerset(inputs))
+      self.assertEquals(expected, actual)
+
+  def test_timeit_generation(self):
+    # The hash table generation is done once per poll request, so it's a cost
+    # latency wise and CPU wise.
+    setup = (
+      "import task_to_run\n"
+      "from components import utils\n"
+      # Test with 1024 combinations.
+      "dimensions = {str(k): '01234567890123456789' for k in xrange(10)}")
+
+    statement = (
+      "items = tuple(sorted("
+      "  task_to_run._hash_dimensions(utils.encode_to_json(i))"
+      "  for i in task_to_run._powerset(dimensions)))\n"
+      "del items")
+    _perf_tuple = timeit.timeit(statement, setup, number=10)
+
+    statement = (
+      "items = frozenset("
+      "  task_to_run._hash_dimensions(utils.encode_to_json(i))"
+      "  for i in task_to_run._powerset(dimensions))\n"
+      "del items")
+    _perf_frozenset = timeit.timeit(statement, setup, number=10)
+
+    # Creating the frozenset is fairly consistently faster by ~5%. Because the
+    # difference is so low, the following assert could fail under load because
+    # timeit is not very accurate.
+    #self.assertGreater(perf_tuple, perf_frozenset)
+    # For reference, numbers locally were: tuple: 0.6295s  frozenset:  0.5753s
+    # Enable to get actual numbers on your workstation:
+    #print('\ntuple: %.4fs  frozenset: %.4fs' % (perf_tuple, perf_frozenset))
+
+  def test_timeit_lookup(self):
+    # Lookups are done much more often than generation under normal utilization.
+    # That's what we want to optimize for.
+    setup = (
+      "import task_to_run\n"
+      "from components import utils\n"
+      # Test with 1024 combinations.
+      "dimensions = {str(k): '01234567890123456789' for k in xrange(10)}\n"
+      "items = tuple(sorted("
+      "  task_to_run._hash_dimensions(utils.encode_to_json(i))"
+      "  for i in task_to_run._powerset(dimensions)))\n")
+
+    statement = (
+      # Simulating 10000 pending tasks. Normally, a single poll will not search
+      # this many items, simply because the DB is not fast enough.
+      "for _ in xrange(10000):"
+      "  1 in items")
+    # TODO(maruel): This is a linear search instead of a binary search, so this
+    # test is a tad unfair. But it's very unlikely that even a binary search can
+    # beat the frozenset.
+    perf_tuple = timeit.timeit(statement, setup, number=10)
+    setup = (
+      "import task_to_run\n"
+      "from components import utils\n"
+      # Test with 1024 combinations.
+      "dimensions = {str(k): '01234567890123456789' for k in xrange(10)}\n"
+      "items = frozenset("
+      "  task_to_run._hash_dimensions(utils.encode_to_json(i))"
+      "  for i in task_to_run._powerset(dimensions))\n")
+    perf_frozenset = timeit.timeit(statement, setup, number=10)
+
+    # Creating the frozenset is fairly consistently faster by 333% (really).
+    self.assertGreater(perf_tuple, perf_frozenset)
+    # For reference, numbers locally were: tuple: 1.4612s  frozenset: 0.0043s
+    # Enable to get actual numbers on your workstation:
+    #print('\ntuple: %.4fs  frozenset: %.4fs' % (perf_tuple, perf_frozenset))
+
+  def test_hash_dimensions(self):
+    dimensions = 'this is not json'
+    as_hex = hashlib.md5(dimensions).digest()[:4].encode('hex')
+    actual = task_to_run._hash_dimensions(dimensions)
+    # It is exactly the same bytes reversed (little endian). It's positive even
+    # with bit 31 set because python stores it internally as a int64.
+    self.assertEqual('711d0bf1', as_hex)
+    self.assertEqual(0xf10b1d71, actual)
+
+  def test_dimensions_search_sizing_10_1(self):
+    dimensions = {str(k): '01234567890123456789' for k in xrange(10)}
+    items = tuple(sorted(
+        task_to_run._hash_dimensions(utils.encode_to_json(i))
+        for i in task_to_run._powerset(dimensions)))
+    self.assertEqual(1024, len(items))
+
+  def test_dimensions_search_sizing_1_20(self):
+    # Multi-value dimensions must *always* be prefered to split variables. They
+    # are much quicker to search.
+    dimensions = {'0': ['01234567890123456789' * i for i in xrange(1, 20)]}
+    items = tuple(sorted(
+        task_to_run._hash_dimensions(utils.encode_to_json(i))
+        for i in task_to_run._powerset(dimensions)))
+    self.assertEqual(20, len(items))
+
+  def test_dimensions_search_sizing_7_4(self):
+    # Likely maximum permitted; 7 keys of 4 items each.
+    dimensions = {
+      str(k): ['01234567890123456789' * i for i in xrange(1, 4)]
+      for k in xrange(7)
+    }
+    items = tuple(sorted(
+        task_to_run._hash_dimensions(utils.encode_to_json(i))
+        for i in task_to_run._powerset(dimensions)))
+    self.assertEqual(16384, len(items))
+
+  def test_dimensions_search_sizing_14_1(self):
+    dimensions = {str(k): '01234567890123456789' for k in xrange(14)}
+    items = tuple(sorted(
+        task_to_run._hash_dimensions(utils.encode_to_json(i))
+        for i in task_to_run._powerset(dimensions)))
+    self.assertEqual(16384, len(items))
 
 
 class TaskToRunApiTest(test_env_handlers.AppTestBase):
@@ -145,7 +312,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     request = self.mkreq(_gen_request())
     # Ensures that the hash value is constant for the same input.
     self.assertEqual(
-        ndb.Key('TaskRequest', 0x7e296460f77ff77e, 'TaskToRun', 1260396639),
+        ndb.Key('TaskRequest', 0x7e296460f77ff77e, 'TaskToRun', 3420117132),
         task_to_run.request_to_task_to_run_key(request))
 
   def test_validate_to_run_key(self):
@@ -157,31 +324,27 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
 
   def test_gen_queue_number(self):
     # tuples of (input, expected).
-    # 0x3fc00000 is the priority mask.
+    # 2**47 / 365 / 24 / 60 / 60 / 1000. = 4462.756
     data = [
-      ((1, '1970-01-01 00:00:00.000',   0),          '0x0000000080000000'),
-      ((1, '1970-01-01 00:00:00.000', 255),          '0x00000000bfc00000'),
-      ((0xffffffff, '1970-01-01 00:00:00.000', 255), '0x7fffffffbfc00000'),
-      ((1, '1970-01-01 00:00:00.040',   0), '0x0000000080000000'),
-      ((1, '1970-01-01 00:00:00.050',   0), '0x0000000080000001'),
-      ((1, '1970-01-01 00:00:00.100',   0), '0x0000000080000001'),
-      ((1, '1970-01-01 00:00:00.900',   0), '0x0000000080000009'),
-      ((1, '1970-01-01 00:00:01.000',   0), '0x000000008000000a'),
-      ((1, '1970-01-01 00:00:00.000',   1), '0x0000000080400000'),
-      ((1, '1970-01-01 00:00:00.000',   2), '0x0000000080800000'),
-      ((1, '2010-01-02 03:04:05.060',   0), '0x00000000800ede73'), # 10
-      ((1, '2010-01-02 03:04:05.060',   1), '0x00000000804ede73'),
-      ((1, '2010-12-31 23:59:59.999',   0), '0x0000000092cc0300'),
+      (('1970-01-01 00:00:00.000',   0), '0x0000000000000000'),
+      (('1970-01-01 00:00:00.000', 255), '0x001c91dd87cc2000'),
+      (('1970-01-01 00:00:00.040',   0), '0x0000000000009c40'),
+      (('1970-01-01 00:00:00.050',   0), '0x000000000000c350'),
+      (('1970-01-01 00:00:00.100',   0), '0x00000000000186a0'),
+      (('1970-01-01 00:00:00.900',   0), '0x00000000000dbba0'),
+      (('1970-01-01 00:00:01.000',   0), '0x00000000000f4240'),
+      (('1970-01-01 00:00:00.000',   1), '0x00001cae8c13e000'),
+      (('1970-01-01 00:00:00.000',   2), '0x0000395d1827c000'),
+      (('2010-01-02 03:04:05.060',   0), '0x00047c25bdb25da0'),
+      (('2010-01-02 03:04:05.060',   1), '0x000498d449c63da0'),
       # It's the end of the world as we know it...
-      ((1, '9999-12-31 23:59:59.999',   0), '0x0000000092cc0300'),
-      ((1, '9999-12-31 23:59:59.999', 255), '0x00000000d28c0300'),
-      ((1, '9999-12-31 23:59:59.999', 255), '0x00000000d28c0300'),
+      (('9999-12-31 23:59:59.999',   0), '0x0384440ccc735c20'),
+      (('9999-12-31 23:59:59.999', 255), '0x03a0d5ea543f7c20'),
+      (('9999-12-31 23:59:59.999', 255), '0x03a0d5ea543f7c20'),
     ]
-    for i, ((dimensions_hash, timestamp, priority), expected) in enumerate(
-        data):
+    for i, ((timestamp, priority), expected) in enumerate(data):
       d = datetime.datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S.%f')
-      actual = '0x%016x' % task_to_run._gen_queue_number(
-          dimensions_hash, d, priority)
+      actual = '0x%016x' % task_to_run._gen_queue_number(d, priority)
       self.assertEquals((i, expected), (i, actual))
 
   def test_new_task_to_run(self):
@@ -220,13 +383,13 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         'expiration_ts': self.now + datetime.timedelta(seconds=31),
         'request_key': '0x7e296460f77ffdce',
         # Lower priority value means higher priority.
-        'queue_number': '0x1a3aa663028ede72',
+        'queue_number': '0x00060dc5849f1346',
       },
       {
         'dimensions_hash': _hash_dimensions(request_dimensions),
         'expiration_ts': self.now + datetime.timedelta(seconds=31),
         'request_key': '0x7e296460f77ffede',
-        'queue_number': '0x1a3aa663050ede72',
+        'queue_number': '0x00072c96fd65d346',
       },
     ]
 
@@ -240,6 +403,16 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     # Ensure they come out in expected order.
     q = task_to_run.TaskToRun.query().order(task_to_run.TaskToRun.queue_number)
     self.assertEqual(expected, map(flatten, q.fetch()))
+
+  def test_dimensions_powerset_count(self):
+    dimensions = {
+      'a': ['1', '2'],
+      'b': 'code',
+      'd': ['3', '4'],
+    }
+    self.assertEqual(
+        task_to_run.dimensions_powerset_count(dimensions),
+        len(list(task_to_run._powerset(dimensions))))
 
   def test_match_dimensions(self):
     data_true = (
@@ -304,7 +477,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'dimensions_hash': _hash_dimensions(request_dimensions),
         'expiration_ts': self.expiration_ts,
-        'queue_number': '0x613fbb330c8ede72',
+        'queue_number': '0x000a890b67ba1346',
       },
     ]
     self.assertEqual(expected, actual)
@@ -327,7 +500,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'dimensions_hash': _hash_dimensions(request_dimensions),
         'expiration_ts': self.expiration_ts,
-        'queue_number': '0x1a3aa6630c8ede72',
+        'queue_number': '0x000a890b67ba1346',
       },
     ]
     self.assertEqual(expected, actual)
@@ -345,7 +518,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'dimensions_hash': _hash_dimensions(request_dimensions),
         'expiration_ts': self.expiration_ts,
-        'queue_number': '0x1a3aa6630c8ede72',
+        'queue_number': '0x000a890b67ba1346',
       },
     ]
     self.assertEqual(expected, actual)
@@ -368,7 +541,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'dimensions_hash': _hash_dimensions(request_dimensions),
         'expiration_ts': self.expiration_ts,
-        'queue_number': '0x1a3aa6630c8ede72',
+        'queue_number': '0x000a890b67ba1346',
       },
     ]
     self.assertEqual(expected, actual)
@@ -398,16 +571,15 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'dimensions_hash': _hash_dimensions(request_dimensions_1),
         'expiration_ts': self.expiration_ts,
-        'queue_number': '0x613fbb330c8ede72',
+        'queue_number': '0x000a890b67ba1346',
       },
       {
         'dimensions_hash': _hash_dimensions(request_dimensions_2),
         'expiration_ts': self.expiration_ts + datetime.timedelta(seconds=1),
-        'queue_number': '0x5385bf748c8ede7c',
+        'queue_number': '0x000a890b67c95586',
       },
     ]
-    # There is a significant risk of non-determinism.
-    self.assertEqual(sorted(expected), sorted(actual))
+    self.assertEqual(expected, actual)
 
   def test_yield_next_available_task_to_dispatch_clock_skew(self):
     # Asserts that a TaskToRun added later in the DB (with a Key with an higher
@@ -436,19 +608,18 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
     expected = [
       {
-        'dimensions_hash': _hash_dimensions(request_dimensions_1),
-        'expiration_ts': self.expiration_ts,
-        'queue_number': '0x613fbb330c8ede72',
-      },
-      {
         'dimensions_hash': _hash_dimensions(request_dimensions_2),
         # Due to time being late on the second requester frontend.
         'expiration_ts': self.expiration_ts - datetime.timedelta(seconds=1),
-        'queue_number': '0x5385bf748c8ede68',
+        'queue_number': '0x000a890b67aad106',
+      },
+      {
+        'dimensions_hash': _hash_dimensions(request_dimensions_1),
+        'expiration_ts': self.expiration_ts,
+        'queue_number': '0x000a890b67ba1346',
       },
     ]
-    # There is a significant risk of non-determinism.
-    self.assertEqual(sorted(expected), sorted(actual))
+    self.assertEqual(expected, actual)
 
   def test_yield_next_available_task_to_dispatch_priority(self):
     # Task added later but with higher priority are returned first.
@@ -469,12 +640,12 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'dimensions_hash': _hash_dimensions(request_dimensions_1),
         'expiration_ts': datetime.datetime(2014, 1, 2, 3, 6, 5, 6),
-        'queue_number': '0x1a3aa663028ee0ca',
+        'queue_number': '0x00060dc588329a46',
       },
       {
         'dimensions_hash': _hash_dimensions(request_dimensions_2),
         'expiration_ts': datetime.datetime(2014, 1, 2, 3, 5, 5, 6),
-        'queue_number': '0x1a3aa6630c8ede72',
+        'queue_number': '0x000a890b67ba1346',
       },
     ]
     bot_dimensions = {
@@ -517,7 +688,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'dimensions_hash': _hash_dimensions(request_dimensions),
         'expiration_ts': self.expiration_ts,
-        'queue_number': '0x3f6b0f050c8ede72',
+        'queue_number': '0x000a890b67ba1346',
       },
     ]
     self.assertEqual(expected, actual)
@@ -540,7 +711,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       {
         'dimensions_hash': _hash_dimensions(request_dimensions),
         'expiration_ts': self.expiration_ts,
-        'queue_number': '0x54795e3c800ede72',
+        'queue_number': '0x0004eef40bd85346',
       },
     ]
     self.assertEqual(expected, actual)
