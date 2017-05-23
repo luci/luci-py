@@ -509,9 +509,7 @@ def main(args):
   dispatcher = subcommand.CommandDispatcher(__name__)
   try:
     return dispatcher.execute(OptionParser(app_dir), args)
-  except (
-      gae_sdk_utils.BadEnvironmentConfig,
-      gae_sdk_utils.LoginRequiredError) as e:
+  except gae_sdk_utils.Error as e:
     print >> sys.stderr, str(e)
     return 1
   except KeyboardInterrupt:

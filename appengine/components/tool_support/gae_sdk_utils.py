@@ -33,23 +33,38 @@ RUNTIME_TO_SDK = {
   'python27': PYTHON_GAE_SDK,
 }
 
-# Exe name => instructions how to install it.
-KNOWN_TOOLS = {
-  'gcloud':
-      'Download and install the Google Cloud SDK from '
-      'https://cloud.google.com/sdk/',
-  'aedeploy':
-      'Install with: go install '
-      'google.golang.org/appengine/cmd/aedeploy',
-}
-
-
 # Path to a current SDK, set in setup_gae_sdk, accessible by gae_sdk_path.
 _GAE_SDK_PATH = None
 
 
-class BadEnvironmentConfig(Exception):
+class Error(Exception):
+  """Base class for a fatal error."""
+
+
+class BadEnvironmentError(Error):
   """Raised when required tools or environment are missing."""
+
+
+class UnsupportedModuleError(Error):
+  """Raised when trying to deploy MVM or Flex module."""
+
+
+class LoginRequiredError(Error):
+  """Raised by Application methods if use has to go through login flow."""
+
+
+def find_gcloud():
+  """Searches for 'gcloud' binary in PATH and returns absolute path to it.
+
+  Raises BadEnvironmentError error if it's not there.
+  """
+  for path in os.environ['PATH'].split(os.pathsep):
+    exe_file = os.path.join(path, 'gcloud')
+    if os.path.isfile(exe_file) and os.access(exe_file, os.X_OK):
+      return exe_file
+  raise BadEnvironmentError(
+      'Can\'t find "gcloud" in PATH. Install the Google Cloud SDK from '
+      'https://cloud.google.com/sdk/')
 
 
 def find_gae_sdk(sdk_name=PYTHON_GAE_SDK, search_dir=TOOLS_DIR):
@@ -190,10 +205,6 @@ def gae_sdk_path():
   return _GAE_SDK_PATH
 
 
-class LoginRequiredError(Exception):
-  """Raised by Application methods if use has to go through login flow."""
-
-
 ModuleFile = collections.namedtuple('ModuleFile', ['path', 'data'])
 
 
@@ -283,14 +294,18 @@ class Application(object):
     return subprocess.call(cmd, cwd=self._app_dir) == 0
 
   def run_cmd(self, cmd, cwd=None):
-    """Runs subprocess, capturing the output."""
+    """Runs subprocess, capturing the output.
+
+    Doesn't close stdin, since gcloud may be asking for user input. If this is
+    undesirable (e.g when gae.py is used from scripts), close 'stdin' of gae.py
+    process itself.
+    """
     logging.debug('Running %s', cmd)
     proc = subprocess.Popen(
         cmd,
         cwd=cwd or self._app_dir,
-        stdout=subprocess.PIPE,
-        stdin=subprocess.PIPE)
-    output, _ = proc.communicate(None)
+        stdout=subprocess.PIPE)
+    output, _ = proc.communicate()
     if proc.returncode:
       sys.stderr.write('\n' + output + '\n')
       raise subprocess.CalledProcessError(proc.returncode, cmd, output)
@@ -312,10 +327,10 @@ class Application(object):
 
   def run_gcloud(self, args):
     """Runs gcloud <args>."""
+    gcloud = find_gcloud()
     if not is_gcloud_oauth2_token_cached():
       raise LoginRequiredError('Login first using \'gcloud auth login\'')
-    check_tool_in_path('gcloud')
-    return self.run_cmd(['gcloud'] + args)
+    return self.run_cmd([gcloud] + args)
 
   def list_versions(self):
     """List all uploaded versions.
@@ -349,27 +364,23 @@ class Application(object):
 
     Supports deploying modules both with Managed VMs and AppEngine v1 runtime.
     """
-    reg_modules = []
-    mvm_modules = []
+    mods = []
     try:
       for m in sorted(modules or self.modules):
         mod = self._modules[m]
         if mod.data.get('vm'):
-          mvm_modules.append(mod)
-        else:
-          reg_modules.append(mod)
+          raise UnsupportedModuleError('MVM is not supported: %s' % m)
+        if mod.data.get('env') == 'flex':
+          raise UnsupportedModuleError('Flex is not supported yet: %s' % m)
         if mod.data.get('runtime') == 'go' and not os.environ.get('GOROOT'):
-          raise BadEnvironmentConfig('GOROOT must be set when deploying Go app')
+          raise BadEnvironmentError('GOROOT must be set when deploying Go app')
+        mods.append(mod)
     except KeyError as e:
       raise ValueError('Unknown module: %s' % e)
-    if reg_modules:
-      # Always make 'default' the first module to be uploaded.
-      reg_modules.sort(key=lambda x: '' if x == 'default' else x)
-      self.run_appcfg(
-          ['update'] + [m.path for m in reg_modules] + ['--version', version])
-    # Go modules have to be deployed one at a time, based on docs.
-    for m in mvm_modules:
-      self.deploy_mvm_module(m, version)
+    # Always make 'default' the first module to be uploaded.
+    mods.sort(key=lambda x: '' if x == 'default' else x)
+    self.run_appcfg(
+        ['update'] + [m.path for m in mods] + ['--version', version])
 
   def update_indexes(self):
     """Deploys new index.yaml."""
@@ -458,27 +469,6 @@ class Application(object):
         return -1
     return sorted(actual_versions, key=extract_version_num)
 
-  def deploy_mvm_module(self, mod, version):
-    """Uses gcloud to upload MVM module using remote docker build.
-
-    Assumes 'gcloud' and 'aedeploy' are in PATH.
-    """
-    # 'aedeploy' requires cwd to be set to module path.
-    check_tool_in_path('gcloud')
-    cmd = [
-      'gcloud', 'app', 'deploy', os.path.basename(mod.path),
-      '--project', self.app_id,
-      '--version', version,
-      '--docker-build', 'remote',
-      '--no-promote', '--force',
-    ]
-    if self._verbose:
-      cmd.extend(['--verbosity', 'debug'])
-    if mod.data.get('runtime') == 'go':
-      check_tool_in_path('aedeploy')
-      cmd = ['aedeploy'] + cmd
-    self.run_cmd(cmd, cwd=os.path.dirname(mod.path))
-
   def get_actives(self, modules=None):
     """Returns active version(s)."""
     args = [
@@ -504,18 +494,6 @@ class Application(object):
         'service': service['service'],
       } for service in data if not modules or service['service'] in modules
     ]
-
-
-def check_tool_in_path(tool):
-  """Raises BadEnvironmentConfig error if no such executable in PATH."""
-  for path in os.environ['PATH'].split(os.pathsep):
-    exe_file = os.path.join(path, tool)
-    if os.path.isfile(exe_file) and os.access(exe_file, os.X_OK):
-      return
-  msg = 'Can\'t find "%s" in PATH.' % tool
-  if tool in KNOWN_TOOLS:
-    msg += ' ' + KNOWN_TOOLS[tool]
-  raise BadEnvironmentConfig(msg)
 
 
 def setup_env(app_dir, app_id, version, module_id, remote_api=False):
@@ -578,7 +556,7 @@ def process_sdk_options(parser, options, app_dir):
 
   try:
     runtime = get_app_runtime(find_app_yamls(app_dir))
-  except (BadEnvironmentConfig, ValueError) as exc:
+  except (Error, ValueError) as exc:
     parser.error(str(exc))
 
   sdk_path = options.sdk_path or find_gae_sdk(RUNTIME_TO_SDK[runtime], app_dir)
@@ -589,7 +567,7 @@ def process_sdk_options(parser, options, app_dir):
 
   try:
     return Application(app_dir, options.app_id, options.verbose)
-  except (BadEnvironmentConfig, ValueError) as e:
+  except (Error, ValueError) as e:
     parser.error(str(e))
 
 
@@ -636,5 +614,5 @@ def setup_gae_env():
   """Sets up App Engine Python test environment."""
   sdk_path = find_gae_sdk(PYTHON_GAE_SDK)
   if not sdk_path:
-    raise BadEnvironmentConfig('Couldn\'t find GAE SDK.')
+    raise BadEnvironmentError('Couldn\'t find GAE SDK.')
   setup_gae_sdk(sdk_path)
