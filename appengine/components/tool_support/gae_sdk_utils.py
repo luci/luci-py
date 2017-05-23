@@ -281,18 +281,6 @@ class Application(object):
     """
     return os.path.dirname(self._modules['default'].path)
 
-  def login(self):
-    """Runs OAuth2 login flow and returns true on success."""
-    # HACK: Call a command with no side effect to launch the flow.
-    cmd = [
-      sys.executable,
-      os.path.join(gae_sdk_path(), 'appcfg.py'),
-      '--application', self.app_id,
-      '--noauth_local_webserver',
-      'list_versions',
-    ]
-    return subprocess.call(cmd, cwd=self._app_dir) == 0
-
   def run_cmd(self, cmd, cwd=None):
     """Runs subprocess, capturing the output.
 
@@ -313,8 +301,8 @@ class Application(object):
 
   def run_appcfg(self, args):
     """Runs appcfg.py <args>, deserializes its output and returns it."""
-    if not is_oauth_token_cached():
-      raise LoginRequiredError('Login first using \'login\' subcommand.')
+    if not is_gcloud_oauth2_token_cached():
+      raise LoginRequiredError('Login first using \'gcloud auth login\'.')
     cmd = [
       sys.executable,
       os.path.join(gae_sdk_path(), 'appcfg.py'),
@@ -592,12 +580,6 @@ def confirm(text, app, version, modules=None, default_yes=False):
     return raw_input('Continue? [Y/n] ') not in ('n', 'N')
   else:
     return raw_input('Continue? [y/N] ') in ('y', 'Y')
-
-
-def is_oauth_token_cached():
-  """True if appcfg.py should be able to use OAuth2 without user interaction."""
-  return os.path.exists(
-      os.path.join(os.path.expanduser('~'), '.appcfg_oauth2_tokens'))
 
 
 def is_gcloud_oauth2_token_cached():

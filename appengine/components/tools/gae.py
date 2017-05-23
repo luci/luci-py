@@ -189,12 +189,6 @@ def CMDdevserver(parser, args):
   return app.run_dev_appserver(args, options.open)
 
 
-def CMDlogin(parser, args):
-  """Initiates OAuth2 login flow if cached OAuth2 token is missing."""
-  app, _, _ = parser.parse_args(args)
-  return int(not gae_sdk_utils.is_oauth_token_cached() and not app.login())
-
-
 @subcommand.usage('[module_id version_id]')
 def CMDshell(parser, args):
   """Opens interactive remote shell with app's GAE environment.
