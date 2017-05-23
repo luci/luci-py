@@ -35,6 +35,7 @@ from server import bot_management
 from server import config
 from server import large
 from server import task_pack
+from server import task_queues
 from server import task_request
 from server import task_result
 
@@ -68,8 +69,8 @@ class BaseTest(test_env_handlers.AppTestBase, test_case.EndpointsTestCase):
   @ndb.non_transactional
   def _enqueue_task(self, url, queue_name, **kwargs):
     if queue_name == 'task-dimensions':
-      # Call directly into it, ignores any current transaction.
-      handlers_backend.TaskDimensionsHandler.tidy_stale(kwargs['payload'])
+      # Call directly into it.
+      task_queues.rebuild_task_cache(kwargs['payload'])
       return True
     if queue_name == 'pubsub':
       return True

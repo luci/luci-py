@@ -194,16 +194,10 @@ class CancelTasksHandler(webapp2.RequestHandler):
 class TaskDimensionsHandler(webapp2.RequestHandler):
   @decorators.require_taskqueue('task-dimensions')
   def post(self):
-    self.tidy_stale(self.request.body)
+    task_queues.rebuild_task_cache(self.request.body)
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 
-  @staticmethod
-  def tidy_stale(body):
-    payload = body.split('\n')
-    dimensions_hash = int(payload[0])
-    dimensions_flat = payload[1:]
-    task_queues.rebuild_task_cache(dimensions_hash, dimensions_flat)
 
 
 class TaskSendPubSubMessage(webapp2.RequestHandler):

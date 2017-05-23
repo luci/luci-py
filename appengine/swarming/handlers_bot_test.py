@@ -32,6 +32,7 @@ from server import bot_auth
 from server import bot_code
 from server import bot_groups_config
 from server import bot_management
+from server import task_queues
 
 
 DATETIME_FORMAT = u'%Y-%m-%dT%H:%M:%S'
@@ -60,8 +61,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
   @ndb.non_transactional
   def _enqueue_task(self, url, queue_name, **kwargs):
     if queue_name == 'task-dimensions':
-      # Call directly into it, ignores any current transaction.
-      handlers_backend.TaskDimensionsHandler.tidy_stale(kwargs['payload'])
+      # Call directly into it.
+      task_queues.rebuild_task_cache(kwargs['payload'])
       return True
     if queue_name == 'pubsub':
       return True

@@ -73,7 +73,10 @@ def get_json(request, response, handler, resolution, description, order):
   """
   tqx_args = process_tqx(request.params.get('tqx', ''))
   duration = utils.get_request_as_int(request, 'duration', 120, 1, 256)
-  now = utils.get_request_as_datetime(request, 'now')
+  now = None
+  now_text = request.params.get('now')
+  if now_text:
+    now = utils.parse_datetime(now_text)
 
   table = stats_framework.get_stats(handler, resolution, now, duration, True)
   return get_json_raw(request, response, table, description, order, tqx_args)

@@ -293,7 +293,7 @@ class BackendTest(AppTestBase):
     self.client_create_task_raw(tags=['alpha:beta', 'gamma:delta'])
     self.assertEqual(1, self.execute_tasks())
     self.client_create_task_raw(tags=['alpha:epsilon', 'zeta:theta'])
-    self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(0, self.execute_tasks())
 
     self.app.get('/internal/cron/aggregate_tasks_tags',
         headers={'X-AppEngine-Cron': 'true'}, status=200)

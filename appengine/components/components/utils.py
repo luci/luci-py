@@ -123,14 +123,13 @@ def get_request_as_int(request, key, default, min_value, max_value):
   return min(max_value, max(min_value, value))
 
 
-def get_request_as_datetime(request, key):
-  value_text = request.params.get(key)
-  if value_text:
-    for f in VALID_DATETIME_FORMATS:
-      try:
-        return datetime.datetime.strptime(value_text, f)
-      except ValueError:
-        continue
+def parse_datetime(text):
+  """Converts text to datetime.datetime instance or None."""
+  for f in VALID_DATETIME_FORMATS:
+    try:
+      return datetime.datetime.strptime(text, f)
+    except ValueError:
+      continue
   return None
 
 

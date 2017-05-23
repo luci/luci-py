@@ -38,6 +38,7 @@ Used to optimize scheduling.
 
 import datetime
 import hashlib
+import json
 import logging
 import random
 import struct
@@ -134,7 +135,7 @@ class TaskDimensionsRoot(ndb.Model):
   This root entity is not stored in the DB.
 
   id is either 'id:<value>' or 'pool:<value>'. For a request dimensions set that
-  specifies both keys, one TaskDimensions is listed in each root.
+  specifies both keys, TaskDimensions is listed under 'id:<value>'.
   """
   pass
 
@@ -366,7 +367,7 @@ def _rebuild_bot_cache(bot_dimensions, bot_root_key):
         s = task_dimensions.match_bot(bot_dimensions)
         if not s:
           continue
-        if s.valid_until_ts <= now:
+        if s.valid_until_ts < now:
           # Stale TaskDimensionsSet.
           continue
         dimensions_hash = task_dimensions.key.id()
@@ -417,12 +418,12 @@ def _remove_old_entity(key, now):
     True if the entity was deleted.
   """
   obj = key.get()
-  if not obj or obj.valid_until_ts > now:
+  if not obj or obj.valid_until_ts >= now:
     return False
 
   def tx():
     obj = key.get()
-    if obj and obj.valid_until_ts <= now:
+    if obj and obj.valid_until_ts < now:
       key.delete()
       return True
     return False
@@ -473,7 +474,7 @@ def _refresh_BotTaskDimensions(
   need_memcache_clear = True
   need_db_store = True
   if bot_task and set(bot_task.dimensions_flat) == set(dimensions_flat):
-    need_memcache_clear = bot_task.valid_until_ts <= cutoff
+    need_memcache_clear = bot_task.valid_until_ts < cutoff
     # Skip storing if the validity period was already updated.
     need_db_store = bot_task.valid_until_ts < valid_until_ts
 
@@ -573,9 +574,12 @@ def assert_task(request):
   # We can't use the request ID since the request was not stored yet, so embed
   # all the necessary information.
   url = '/internal/taskqueue/task-dimensions'
-  dimensions_flat = sorted(
-      u'%s:%s' % (k, v) for k, v in request.properties.dimensions.iteritems())
-  payload = '\n'.join([str(dimensions_hash)] + dimensions_flat)
+  data = {
+    u'dimensions': request.properties.dimensions,
+    u'dimensions_hash': str(dimensions_hash),
+    u'valid_until_ts': request.expiration_ts + _ADVANCE,
+  }
+  payload = utils.encode_to_json(data)
   if not utils.enqueue_task(url, queue_name='task-dimensions', payload=payload):
     logging.error('Failed to enqueue TaskDimensions update %x', dimensions_hash)
     # Technically we'd want to raise a endpoints.InternalServerErrorException.
@@ -610,7 +614,7 @@ def get_queues(bot_id):
   return data
 
 
-def rebuild_task_cache(dimensions_hash, dimensions_flat):
+def rebuild_task_cache(payload):
   """Rebuilds the TaskDimensions cache.
 
   This function is called in two cases:
@@ -629,15 +633,24 @@ def rebuild_task_cache(dimensions_hash, dimensions_flat):
   via BotInfo.dimensions_flat filtering. As there can be tens of thousands of
   bots that can run the task, this can take a long time to store all the
   entities on a new kind of request. As such, it must be called in the backend.
+
+  Arguments:
+  - payload: dict as created in assert_task() with:
+    - 'dimensions': dict of task dimensions to refresh
+    - 'dimensions_hash': precalculated hash for dimensions
+    - 'valid_until_ts': expiration_ts + _ADVANCE for how long this cache is
+      valid
   """
+  data = json.loads(payload)
+  dimensions = data[u'dimensions']
+  dimensions_hash = int(data[u'dimensions_hash'])
+  valid_until_ts = utils.parse_datetime(data[u'valid_until_ts'])
+  dimensions_flat = sorted(u'%s:%s' % (k, v) for k, v in dimensions.iteritems())
+
   now = utils.utcnow()
   updated = 0
   viable = 0
-  dimensions = dict(
-      i.split(':', 1) for i in dimensions_flat
-      if i.startswith(('id:', 'pool:')))
   try:
-    valid_until_ts = now + _ADVANCE
     pending = set()
     for bot_task_key in _yield_BotTaskDimensions_keys(
         dimensions_hash, dimensions_flat):
@@ -686,14 +699,13 @@ def tidy_stale():
   try:
     # pylint is confused by the lambda.
     # pylint: disable=undefined-loop-variable
-    q = TaskDimensions.query().filter(TaskDimensions.valid_until_ts <= now)
+    q = TaskDimensions.query().filter(TaskDimensions.valid_until_ts < now)
     for key in q.iter(batch_size=100, keys_only=True):
       td_found += 1
       if _remove_old_entity(key, now):
         td_deleted += 1
 
-    q = BotTaskDimensions.query().filter(
-        BotTaskDimensions.valid_until_ts <= now)
+    q = BotTaskDimensions.query().filter(BotTaskDimensions.valid_until_ts < now)
     for key in q.iter(batch_size=100, keys_only=True):
       btd_found += 1
       if _remove_old_entity(key, now):
