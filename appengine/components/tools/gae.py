@@ -231,7 +231,11 @@ def CMDshell(parser, args):
     # Open the connection.
     from google.appengine.ext.remote_api import remote_api_stub
     try:
-      print('Connecting...')
+      print('If asked to login, run:\n')
+      print(
+          'gcloud auth application-default login '
+          '--scopes=https://www.googleapis.com/auth/appengine.apis,'
+          'https://www.googleapis.com/auth/userinfo.email\n')
       remote_api_stub.ConfigureRemoteApiForOAuth(
           options.host, '/_ah/remote_api')
     except urllib2.URLError:
@@ -359,14 +363,7 @@ def CMDupload(parser, args):
       print('Aborted.')
       return 1
 
-  # 'appcfg.py update <list of modules>' does not update the rest of app engine
-  # app like 'appcfg.py update <app dir>' does. It updates only modules. So do
-  # index, queues, etc. updates manually afterwards.
-  app.update_modules(version, modules)
-  app.update_indexes()
-  app.update_queues()
-  app.update_cron()
-  app.update_dispatch()
+  app.update(version, modules)
 
   print('-' * 80)
   print('New version:')
