@@ -310,7 +310,7 @@ def get_target_size(schedule, machine_type, current, default, now=None):
     # changes.
     # TODO(smut): Tune this algorithm.
     # TODO(smut): Move algorithm parameters to luci-config.
-    target = int(math.ceil(utilization.busy * 1.1))
+    target = int(math.ceil(utilization.busy * 1.5))
     if target >= schedule.load_based[0].maximum_size:
       return schedule.load_based[0].maximum_size
     if target < int(0.99 * current):

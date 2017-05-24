@@ -805,7 +805,7 @@ class GetTargetSize(test_case.TestCase):
     ).put()
 
     self.assertEqual(
-        lease_management.get_target_size(config.schedule, 'mt', 1, 3), 5)
+        lease_management.get_target_size(config.schedule, 'mt', 1, 3), 6)
 
   def test_load_based_fallback(self):
     config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
@@ -828,7 +828,7 @@ class GetTargetSize(test_case.TestCase):
     now = datetime.datetime(2012, 1, 1, 1, 2)
 
     self.assertEqual(
-        lease_management.get_target_size(config.schedule, 'mt', 1, 3, now), 5)
+        lease_management.get_target_size(config.schedule, 'mt', 1, 3, now), 6)
 
   def test_upper_bound(self):
     config = bots_pb2.MachineType(schedule=bots_pb2.Schedule(
@@ -855,7 +855,7 @@ class GetTargetSize(test_case.TestCase):
     ))
     lease_management.MachineTypeUtilization(
         id='mt',
-        busy=80,
+        busy=60,
         idle=20,
     ).put()
 
