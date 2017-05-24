@@ -192,7 +192,7 @@ class CancelTasksHandler(webapp2.RequestHandler):
 
 
 class TaskDimensionsHandler(webapp2.RequestHandler):
-  @decorators.require_taskqueue('task-dimensions')
+  @decorators.require_taskqueue('rebuild-task-cache')
   def post(self):
     task_queues.rebuild_task_cache(self.request.body)
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
@@ -273,7 +273,7 @@ def get_routes():
 
     # Task queues.
     ('/internal/taskqueue/cancel-tasks', CancelTasksHandler),
-    ('/internal/taskqueue/task-dimensions', TaskDimensionsHandler),
+    ('/internal/taskqueue/rebuild-task-cache', TaskDimensionsHandler),
     (r'/internal/taskqueue/pubsub/<task_id:[0-9a-f]+>', TaskSendPubSubMessage),
     ('/internal/taskqueue/machine-provider-manage',
         TaskMachineProviderManagementHandler),

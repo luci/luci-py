@@ -555,32 +555,34 @@ def assert_task(request):
       if s.valid_until_ts >= valid_until_ts:
         # Cache hit. It is important to reconfirm the dimensions because a hash
         # can be conflicting.
+        logging.debug('assert_task(%d): hit', dimensions_hash)
         return
       else:
         logging.info(
             'assert_task(%d): set.valid_until_ts(%s) < expected(%s); '
-            'triggering task-dimensions',
+            'triggering rebuild-task-cache',
             dimensions_hash, s.valid_until_ts, valid_until_ts)
     else:
       logging.info(
           'assert_task(%d): failed to match the dimensions; triggering '
-          'task-dimensions',
+          'rebuild-task-cache',
           dimensions_hash)
   else:
     logging.info(
-        'assert_task(%d): new request kind; triggering task-dimensions',
+        'assert_task(%d): new request kind; triggering rebuild-task-cache',
         dimensions_hash)
 
   # We can't use the request ID since the request was not stored yet, so embed
   # all the necessary information.
-  url = '/internal/taskqueue/task-dimensions'
+  url = '/internal/taskqueue/rebuild-task-cache'
   data = {
     u'dimensions': request.properties.dimensions,
     u'dimensions_hash': str(dimensions_hash),
     u'valid_until_ts': request.expiration_ts + _ADVANCE,
   }
   payload = utils.encode_to_json(data)
-  if not utils.enqueue_task(url, queue_name='task-dimensions', payload=payload):
+  if not utils.enqueue_task(
+      url, queue_name='rebuild-task-cache', payload=payload):
     logging.error('Failed to enqueue TaskDimensions update %x', dimensions_hash)
     # Technically we'd want to raise a endpoints.InternalServerErrorException.
     # Raising anything that is not TypeError or ValueError is fine.
@@ -595,7 +597,8 @@ def get_queues(bot_id):
   data = memcache.get(bot_id, namespace='task_queues')
   if data is not None:
     logging.debug(
-        'get_queues(%s): can run from %d queues (memcache)', bot_id, len(data))
+        'get_queues(%s): can run from %d queues (memcache)\n%s',
+        bot_id, len(data), data)
     return data
 
   # Retrieve all the dimensions_hash that this bot could run that have
@@ -609,8 +612,8 @@ def get_queues(bot_id):
       if obj.valid_until_ts >= now)
   memcache.set(bot_id, data, namespace='task_queues')
   logging.info(
-      'get_queues(%s): Query in %.3fs: can run from %d queues',
-      bot_id, (utils.utcnow()-now).total_seconds(), len(data))
+      'get_queues(%s): Query in %.3fs: can run from %d queues\n%s',
+      bot_id, (utils.utcnow()-now).total_seconds(), len(data), data)
   return data
 
 
@@ -642,6 +645,7 @@ def rebuild_task_cache(payload):
       valid
   """
   data = json.loads(payload)
+  logging.debug('rebuild_task_cache(%s)', data)
   dimensions = data[u'dimensions']
   dimensions_hash = int(data[u'dimensions_hash'])
   valid_until_ts = utils.parse_datetime(data[u'valid_until_ts'])
@@ -700,11 +704,14 @@ def tidy_stale():
     # pylint is confused by the lambda.
     # pylint: disable=undefined-loop-variable
     q = TaskDimensions.query().filter(TaskDimensions.valid_until_ts < now)
+    logging.debug('TaskDimensions:')
     for key in q.iter(batch_size=100, keys_only=True):
       td_found += 1
       if _remove_old_entity(key, now):
         td_deleted += 1
+        logging.debug('- %d', key.id())
 
+    logging.debug('BotTaskDimensions:')
     q = BotTaskDimensions.query().filter(BotTaskDimensions.valid_until_ts < now)
     for key in q.iter(batch_size=100, keys_only=True):
       btd_found += 1
@@ -712,6 +719,7 @@ def tidy_stale():
         btd_deleted += 1
         bot_id = key.parent().id()
         memcache.delete(bot_id, namespace='task_queues')
+        logging.debug('- %d for bot %s', key.id(), bot_id)
   finally:
     logging.info(
         'tidy_stale() in %.3fs; TaskDimensions: found %d, deleted %d; '

@@ -60,7 +60,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
   @ndb.non_transactional
   def _enqueue_task(self, url, queue_name, **kwargs):
-    if queue_name == 'task-dimensions':
+    if queue_name == 'rebuild-task-cache':
       # Call directly into it.
       task_queues.rebuild_task_cache(kwargs['payload'])
       return True
