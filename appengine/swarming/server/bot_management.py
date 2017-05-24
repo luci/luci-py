@@ -4,30 +4,46 @@
 
 """Swarming bot management, e.g. list of known bots and their state.
 
-          +---------+
-          |BotRoot  |
-          |id=bot_id|
-          +---------+
-               |
-        +-----++-------+---------------+---------+----- ... -----+
-        |      |        |               |         |               |
-        v      |        v               v         v               v
-    +-------+  |  +-----------+    +--------+ +--------+     +--------+
-    |BotInfo|  |  |BotSettings|    |BotEvent| |BotEvent| ... |BotEvent|
-    |id=info|  |  |id=settings|    |id=fffff| |if=ffffe| ... |id=00000|
-    +-------+  |  +-----------+    +--------+ +--------+     +--------+
-               |
-               +--------------------+
-               |                    |
-               v                    v
+    +-----------+
+    |BotRoot    |
+    |id=<bot_id>|
+    +-----------+
+        |
+        +------+--------------+
+        |      |              |
+        |      v              v
+        |  +-----------+  +-------+
+        |  |BotSettings|  |BotInfo|
+        |  |id=settings|  |id=info|
+        |  +-----------+  +-------+
+        |
+        +------+-----------+----- ... ----+
+        |      |           |              |
+        |      v           v              v
+        |  +--------+  +--------+     +--------+
+        |  |BotEvent|  |BotEvent| ... |BotEvent|
+        |  |id=fffff|  |if=ffffe| ... |id=00000|
+        |  +--------+  +--------+     +--------+
+        |
+        +------+
+        |      |
+        |      v
+        |  +-------------+
+        |  |BotDimensions|                                        task_queues.py
+        |  |id=1         |
+        |  +-------------+
+        |
+        +--------------- ... -----+
+        |                         |
+        v                         v
     +-------------------+     +-------------------+
-    |BotTaskDimensions  | ... |BotTaskDimensions  |
-    |id=<dimension_hash>| ... |id=<dimension_hash>|  <task_queues.py>
+    |BotTaskDimensions  | ... |BotTaskDimensions  |               task_queues.py
+    |id=<dimension_hash>| ... |id=<dimension_hash>|
     +-------------------+     +-------------------+
 
     +--------Root--------+
     |DimensionAggregation|
-    |id='current'        |
+    |id=current          |
     +--------------------+
 
 - BotEvent is a monotonically inserted entity that is added for each event

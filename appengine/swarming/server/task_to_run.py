@@ -10,19 +10,22 @@ to be scheduled.
 
 Graph of the schema:
 
-    +--------Root---------+
-    |TaskRequest          |  (task_request.py)
-    |    +--------------+ |
-    |    |TaskProperties| |
-    |    +--------------+ |
-    |id=<based on epoch>  |
-    +---------------------+
-               ^
-               |
-    +-----------------------+
-    |TaskToRun              |
-    |id=<hash of dimensions>|
-    +-----------------------+
+    +--------Root-------+
+    |TaskRequest        |                                        task_request.py
+    |  +--------------+ |
+    |  |TaskProperties| |
+    |  |  +--------+  | |
+    |  |  |FilesRef|  | |
+    |  |  +--------+  | |
+    |  +--------------+ |
+    |id=<based on epoch>|
+    +-------------------+
+        |
+        v
+    +--------------------+
+    |TaskToRun           |
+    |id=<dimensions_hash>|
+    +--------------------+
 """
 
 import datetime

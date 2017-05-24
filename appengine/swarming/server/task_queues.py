@@ -10,30 +10,42 @@ task with the exact set of dimensions is triggered anymore.
 
 Used to optimize scheduling.
 
-          +---------+
-          |BotRoot  |     <bot_management.py>
-          |id=bot_id|
-          +---------+
-              |
-              |
-              +--------------------+-----------------------+
-              |                    |                       |
-              v                    v                       v
-    +-------------------+     +-------------------+    +-------------+
-    |BotTaskDimensions  | ... |BotTaskDimensions  |    |BotDimensions|
-    |id=<dimension_hash>| ... |id=<dimension_hash>|    |id=1         |
-    +-------------------+     +-------------------+    +-------------+
+    +---------+
+    |BotRoot  |                                                bot_management.py
+    |id=bot_id|
+    +---------+
+        |
+        +------+
+        |      |
+        |      v
+        |  +-------------+
+        |  |BotDimensions|
+        |  |id=1         |
+        |  +-------------+
+        |
+        +---------------- ... ----+
+        |                         |
+        v                         v
+    +-------------------+     +-------------------+
+    |BotTaskDimensions  | ... |BotTaskDimensions  |
+    |id=<dimension_hash>| ... |id=<dimension_hash>|
+    +-------------------+     +-------------------+
 
     +-------Root------------+
     |TaskDimensionsRoot     |  (not stored)
     |id=<pool:foo or id:foo>|
     +-----------------------+
-              |
-              v
-    +-------------------+
-    |TaskDimensions     |
-    |id=<dimension_hash>|
-    +-------------------+
+        |
+        +---------------- ... -------+
+        |                            |
+        v                            v
+    +----------------------+     +----------------------+
+    |TaskDimensions        | ... |TaskDimensions        |
+    |  +-----------------+ | ... |  +-----------------+ |
+    |  |TaskDimensionsSet| |     |  |TaskDimensionsSet| |
+    |  +-----------------+ |     |  +-----------------+ |
+    |id=<dimension_hash>   |     |id=<dimension_hash>   |
+    +----------------------+     +----------------------+
 """
 
 import datetime

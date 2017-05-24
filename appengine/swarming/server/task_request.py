@@ -25,27 +25,24 @@ Overview of transactions:
 
 Graph of the schema:
 
-    +--------Root---------+
-    |TaskRequest          |
-    |    +--------------+ |
-    |    |TaskProperties| |
-    |    |              | |
-    |    |   +--------+ | |
-    |    |   |FilesRef| | |
-    |    |   +--------+ | |
-    |    |id=EMBEDDED   | |
-    |    +--------------+ |
-    |                     |
-    |id=<based on epoch>  |
-    +---------------------+
-          ^        ^
-          |        |
+    +--------Root-------+
+    |TaskRequest        |
+    |  +--------------+ |
+    |  |TaskProperties| |
+    |  |  +--------+  | |
+    |  |  |FilesRef|  | |
+    |  |  +--------+  | |
+    |  +--------------+ |
+    |id=<based on epoch>|
+    +-------------------+
+        |          |
+        v          |
     +-----------+  |
     |SecretBytes|  |
     |id=1       |  |
     +-----------+  |
                    |
-                   |
+                   v
     <See task_to_run.py and task_result.py>
 
 TaskProperties is embedded in TaskRequest. TaskProperties is still declared as a
