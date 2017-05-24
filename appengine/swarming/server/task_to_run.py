@@ -26,20 +26,18 @@ Graph of the schema:
 """
 
 import datetime
-import hashlib
-import itertools
 import logging
-import struct
+import time
 
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
 from components import utils
+from server import task_queues
 from server import task_request
 
 
-# Maximum product search space for dimensions for a bot.
-MAX_DIMENSIONS = 16384
+### Models.
 
 
 class TaskToRun(ndb.Model):
@@ -56,7 +54,7 @@ class TaskToRun(ndb.Model):
   - all the ones currently active are fetched at once in a cron job.
 
   The key id is the value of 'dimensions_hash' that is generated with
-  _hash_dimensions(), parent is TaskRequest.
+  task_queues.hash_dimensions(), parent is TaskRequest.
   """
   # Moment by which the task has to be requested by a bot. Copy of TaskRequest's
   # TaskRequest.expiration_ts to enable queries when cleaning up stale jobs.
@@ -88,90 +86,51 @@ class TaskToRun(ndb.Model):
     return out
 
 
-def _gen_queue_number(
-    timestamp, priority, scale_factor_us=365*24*60*60*1000*1000):
+### Private functions.
+
+
+def _gen_queue_number(dimensions_hash, timestamp, priority):
   """Generates a 64 bit packed value used for TaskToRun.queue_number.
 
-  The lower value the higher importance.
-
   Arguments:
+  - dimensions_hash: 31 bit integer to classify in a queue.
   - timestamp: datetime.datetime when the TaskRequest was filed in. This value
-        at 1µs is used for the FIFO ordering.
+        is used for FIFO ordering with a 100ms granularity; the year is ignored.
   - priority: priority of the TaskRequest. It's a 8 bit integer. Lower is higher
         priority.
-  - scale_factor_us: multiplicative factor of the priority versus time. Higher
-        values means that priority will become a strict stack of FIFO queues.
-        Lower values means a blend between priority and time, where lower
-        priority tasks (higher `priority` value) will slowly preempt higher
-        priority tasks (lower `priority` value) when they waited long enough.
-        Default is each priority increment is worth one year.
 
   Returns:
-    queue_number is a 63 bit integer with timestamp at µs resolution plus
-    priority scaled with scale_factor_us as a delay factor.
+    queue_number is a 63 bit integer with dimension_hash, timestamp at 100ms
+    resolution plus priority.
   """
-  assert isinstance(timestamp, datetime.datetime), '%r' % timestamp
-  assert isinstance(priority, int), '%r' % priority
-  assert isinstance(scale_factor_us, (int, long)), '%r' % scale_factor_us
+  assert isinstance(dimensions_hash, (int, long)), repr(dimensions_hash)
+  assert dimensions_hash > 0 and dimensions_hash <= 0xFFFFFFFF, hex(
+      dimensions_hash)
+  assert isinstance(timestamp, datetime.datetime), repr(timestamp)
+  assert isinstance(priority, int), repr(priority)
   task_request.validate_priority(priority)
   assert 0 <= priority <= 255, 'Just for clarity, validate_priority() checks it'
-  if not 0 <= scale_factor_us <= 2**54:
-    raise ValueError('Invalid scale_factor_us (%s)' % scale_factor_us)
 
-  value = int(round((timestamp - utils.EPOCH).total_seconds() * 1000. * 1000.))
-  assert 0 <= value < 2**58, hex(value)
-  return value + priority * scale_factor_us
+  # Ignore the year.
+  year_start = datetime.datetime(timestamp.year, 1, 1)
+  t = int(round((timestamp - year_start).total_seconds() * 10.))
+  assert t >= 0 and t <= 0x7FFFFFFF, (
+      hex(t), dimensions_hash, timestamp, priority)
+  # 31-22 == 9, leaving room for overflow with the addition.
+  # 0x3fc00000 is the priority mask.
+  # It is important that priority mixed with time is an addition, not a bitwise
+  # or.
+  low_part = (priority << 22) + t
+  high_part = dimensions_hash << 31
+  return high_part | low_part
 
 
-def _explode_list(values):
-  """Yields all the combinations in the dict values for items which are list.
+def _queue_number_priority(q):
+  """Returns the number to be used as a comparision for priority.
 
-  Examples:
-  - values={'a': [1, 2]} yields {'a': 1}, {'a': 2}
-  - values={'a': [1, 2], 'b': [3, 4]} yields {'a': 1, 'b': 3}, {'a': 2, 'b': 3},
-    {'a': 1, 'b': 4}, {'a': 2, 'b': 4}
+  The higher the more important.
   """
-  key_has_list = frozenset(
-      k for k, v in values.iteritems() if isinstance(v, list))
-  if not key_has_list:
-    yield values
-    return
-
-  all_keys = frozenset(values)
-  key_others = all_keys - key_has_list
-  non_list_dict = {k: values[k] for k in key_others}
-  options = [[(k, v) for v in values[k]] for k in sorted(key_has_list)]
-  for i in itertools.product(*options):
-    out = non_list_dict.copy()
-    out.update(i)
-    yield out
-
-
-def _powerset(dimensions):
-  """Yields the product of all the possible combinations in dimensions.
-
-  Starts with the most restrictive set and goes down to the less restrictive
-  ones. See unit test TaskToRunPrivateTest.test_powerset for examples.
-  """
-  keys = sorted(dimensions)
-  for i in itertools.chain.from_iterable(
-      itertools.combinations(keys, r) for r in xrange(len(keys), -1, -1)):
-    for i in _explode_list({k: dimensions[k] for k in i}):
-      yield i
-
-
-def _hash_dimensions(dimensions_json):
-  """Returns a 32 bits int that is a hash of the dimensions specified.
-
-  dimensions_json must already be encoded as json.
-
-  The return value is guaranteed to be non-zero so it can be used as a key id in
-  a ndb.Key.
-  """
-  digest = hashlib.md5(dimensions_json).digest()
-  # Note that 'L' means C++ unsigned long which is (usually) 32 bits and
-  # python's int is 64 bits.
-  return int(struct.unpack('<L', digest[:4])[0]) or 1
+  return q & 0x7FFFFFFF
 
 
 def _memcache_to_run_key(task_key):
@@ -217,8 +176,7 @@ class _QueryStats(object):
         self.deadline)
 
 
-def _validate_query_item(
-    bot_dimensions, deadline, stats, accepted_dimensions_hash, now, task_key):
+def _validate_query_item(bot_dimensions, deadline, stats, now, task_key):
   """Validates the TaskToRun and update stats.
 
   Returns:
@@ -232,11 +190,6 @@ def _validate_query_item(
   except ValueError as e:
     logging.error(str(e))
     stats.broken += 1
-    return
-
-  # integer_id() == dimensions_hash.
-  if task_key.integer_id() not in accepted_dimensions_hash:
-    stats.hash_mismatch += 1
     return
 
   # Do this after the basic weeding out but before fetching TaskRequest.
@@ -303,15 +256,110 @@ def _validate_query_item(
   return request, task
 
 
+def _yield_pages_async(q, size):
+  """Given a ndb.Query, yields ndb.Future that returns pages of results
+  asynchronously.
+  """
+  next_cursor = [None]
+  should_continue = [True]
+  def fire(page, result):
+    results, cursor, more = page.get_result()
+    result.set_result(results)
+    next_cursor[0] = cursor
+    should_continue[0] = more
+
+  while should_continue[0]:
+    page_future = q.fetch_page_async(size, start_cursor=next_cursor[0])
+    result_future = ndb.Future()
+    page_future.add_immediate_callback(fire, page_future, result_future)
+    yield result_future
+    result_future.get_result()
+
+
+def _get_task_to_run_query(dimensions_hash):
+  """Returns a ndb.Query of TaskToRun within this dimensions_hash queue."""
+  opts = ndb.QueryOptions(keys_only=True, deadline=3)
+  return TaskToRun.query(default_options=opts).order(
+          TaskToRun.queue_number).filter(
+              TaskToRun.queue_number >= (dimensions_hash << 31),
+              TaskToRun.queue_number < ((dimensions_hash+1) << 31))
+
+
+def _yield_potential_tasks(bot_id):
+  """Queries all the known task queues in parallel and yields the task in order
+  of priority.
+
+  The ordering is opportunistic, not strict. There's a risk of not returning
+  exactly in the priority order depending on index staleness and query execution
+  latency. The number of queries is unbounded.
+
+  Yields:
+    TaskToRun entities, trying to yield the highest priority one first.  To have
+    finite execution time, starts yielding results once one of these conditions
+    are met:
+    - 1 second elapsed; in this case, continue iterating in the background
+    - First page of every query returned
+    - All queries exhausted
+  """
+  potential_dimensions_hashes = task_queues.get_queues(bot_id)
+  # Note that the default ndb.EVENTUAL_CONSISTENCY is used so stale items may be
+  # returned. It's handled specifically by consumers of this function.
+  start = time.time()
+  queries = [_get_task_to_run_query(d) for d in potential_dimensions_hashes]
+  yielders = [_yield_pages_async(q, 10) for q in queries]
+  # We do care about the first page of each query so we cannot merge all the
+  # results of every query insensibly.
+  futures = []
+
+  for y in yielders:
+    futures.append(next(y, None))
+
+  while (time.time() - start) < 1 and not all(f.done() for f in futures if f):
+    r = ndb.eventloop.run0()
+    if r is None:
+      break
+    time.sleep(r)
+  logging.debug(
+      'Waited %.3fs for %d futures, %d completed',
+      time.time() - start, sum(1 for f in futures if f.done()), len(futures))
+  items = []
+  for i, f in enumerate(futures):
+    if f and f.done():
+      items.extend(f.get_result())
+      futures[i] = next(yielders[i], None)
+  items.sort(key=lambda k: _queue_number_priority(k.id()), reverse=True)
+
+  # It is possible that there is no items yet, in case all futures are taking
+  # more than 1 second.
+  # It is possible that all futures are done if every queue has less than 10
+  # task pending.
+  while any(futures) or items:
+    if items:
+      yield items[0]
+      items = items[1:]
+    else:
+      # Let activity happen.
+      ndb.eventloop.run1()
+
+    # Continue iteration.
+    changed = False
+    for i, f in enumerate(futures):
+      if f and f.done():
+        items.extend(f.get_result())
+        futures[i] = next(yielders[i], None)
+        changed = True
+    if changed:
+      items.sort(key=lambda k: _queue_number_priority(k.id()), reverse=True)
+
+
 ### Public API.
 
 
 def request_to_task_to_run_key(request):
   """Returns the ndb.Key for a TaskToRun from a TaskRequest."""
-  assert isinstance(request, task_request.TaskRequest), request
-  dimensions_json = utils.encode_to_json(request.properties.dimensions)
   return ndb.Key(
-      TaskToRun, _hash_dimensions(dimensions_json), parent=request.key)
+      TaskToRun, task_queues.hash_dimensions(request.properties.dimensions),
+      parent=request.key)
 
 
 def task_to_run_key_to_request_key(task_key):
@@ -322,8 +370,14 @@ def task_to_run_key_to_request_key(task_key):
 
 
 def gen_queue_number(request):
-  """Returns the value to use for TaskToRun.queue_number based on request."""
-  return _gen_queue_number(request.created_ts, request.priority)
+  """Returns the value to use for TaskToRun.queue_number based on request.
+
+  It is exported so a task can be retried by task_scheduler.
+  """
+  return _gen_queue_number(
+      task_queues.hash_dimensions(request.properties.dimensions),
+      request.created_ts,
+      request.priority)
 
 
 def new_task_to_run(request):
@@ -348,21 +402,6 @@ def validate_to_run_key(task_key):
         'TaskToRun key id should be between 1 and 2**32, found %s' %
         task_key.id())
   task_request.validate_request_key(request_key)
-
-
-def dimensions_powerset_count(dimensions):
-  """Returns the number of combinations possible with the dimensions."""
-  out = 1
-  for i in dimensions.itervalues():
-    if isinstance(i, basestring):
-      # When a dimension value is a string, it can be in two states: "present"
-      # or "not present", so the product is 2.
-      out *= 2
-    else:
-      # When a dimension value is a list, it can be in len(values) + 1 states:
-      # one of each state or "not present".
-      out *= len(i) + 1
-  return out
 
 
 def match_dimensions(request_dimensions, bot_dimensions):
@@ -420,37 +459,14 @@ def yield_next_available_task_to_dispatch(bot_dimensions, deadline):
   - deadline: UTC timestamp (as an int) that the bot must be able to
       complete the task by. None if there is no such deadline.
   """
+  assert len(bot_dimensions['id']) == 1, bot_dimensions
   # List of all the valid dimensions hashed.
-  accepted_dimensions_hash = frozenset(
-      _hash_dimensions(utils.encode_to_json(i))
-      for i in _powerset(bot_dimensions))
   now = utils.utcnow()
   stats = _QueryStats()
   stats.deadline = deadline
-  # Be very aggressive in fetching the largest amount of items as possible. Note
-  # that we use the default ndb.EVENTUAL_CONSISTENCY so stale items may be
-  # returned. It's handled specifically.
-  # - 100/200 gives 2s~40s of query time for 1275 items.
-  # - 250/500 gives 2s~50s of query time for 1275 items.
-  # - 50/500 gives 3s~20s of query time for 1275 items. (Slower but less
-  #   variance). Spikes in 20s~40s are rarer.
-  # The problem here are:
-  # - Outliers, some shards are simply slower at executing the query.
-  # - Median time, which we should optimize.
-  # - Abusing batching will slow down this query.
-  #
-  # TODO(maruel): Use fetch_page_async() + ndb.get_multi_async() +
-  # memcache.get_multi_async() to do pipelined processing. Should greatly reduce
-  # the effect of latency on the total duration of this function. I also suspect
-  # using ndb.get_multi() will return fresher objects than what is returned by
-  # the query.
-  opts = ndb.QueryOptions(batch_size=50, prefetch_size=500, keys_only=True)
+  bot_id = bot_dimensions[u'id'][0]
   try:
-    # Interestingly, the filter on .queue_number>0 is required otherwise all the
-    # None items are returned first.
-    q = TaskToRun.query(default_options=opts).order(
-        TaskToRun.queue_number).filter(TaskToRun.queue_number > 0)
-    for task_key in q:
+    for task_key in _yield_potential_tasks(bot_id):
       duration = (utils.utcnow() - now).total_seconds()
       if duration > 40.:
         # Stop searching after too long, since the odds of the request blowing
@@ -462,22 +478,25 @@ def yield_next_available_task_to_dispatch(bot_dimensions, deadline):
         return
       # _validate_query_item() returns (request, task) if it's worth reaping.
       item = _validate_query_item(
-          bot_dimensions, deadline, stats, accepted_dimensions_hash, now,
-          task_key)
+          bot_dimensions, deadline, stats, now, task_key)
       if item:
         yield item[0], item[1]
         # If the code is still executed, it means that the task reaping wasn't
         # successful.
         stats.ignored += 1
   finally:
-    duration = (utils.utcnow() - now).total_seconds()
-    logging.info(
-        '%d/%s in %5.2fs: %s',
-        opts.batch_size, opts.prefetch_size, duration, stats)
+    logging.debug(
+        'yield_next_available_task_to_dispatch(%s) in %.3fs: %s',
+        bot_id, (utils.utcnow() - now).total_seconds(), stats)
 
 
 def yield_expired_task_to_run():
   """Yields all the expired TaskToRun still marked as available."""
+  # The reason it is done this way as an iteration over all the pending entities
+  # instead of using a composite index with 'queue_number' and 'expiration_ts'
+  # is that TaskToRun entities are very hot and it is important to not require
+  # composite indexes on it. It is expected that the number of pending task is
+  # 'relatively low', in the orders of 100,000 entities.
   now = utils.utcnow()
   for task in TaskToRun.query(TaskToRun.queue_number > 0):
     if task.expiration_ts < now:

@@ -11,6 +11,7 @@ import datetime
 import logging
 import math
 import random
+import time
 
 from google.appengine.ext import ndb
 
@@ -151,6 +152,7 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request):
   try:
     run_result, secret_bytes = datastore_utils.transaction(run, retries=0)
   except datastore_utils.CommitError:
+    logging.info('CommitError; reaping failed')
     run_result = None
     secret_bytes = None
   if run_result:
@@ -565,48 +567,34 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
 
   Returns:
     tuple of (TaskRequest, SecretBytes, TaskRunResult) for the task that was
-    reaped.  The TaskToRun involved is not returned.
+    reaped. The TaskToRun involved is not returned.
   """
-  q = task_to_run.yield_next_available_task_to_dispatch(
-      bot_dimensions, deadline)
-  # When a large number of bots try to reap hundreds of tasks simultaneously,
-  # they'll constantly fail to call reap_task_to_run() as they'll get preempted
-  # by other bots. So randomly jump farther in the queue when the number of
-  # failures is too large.
+  start = time.time()
+  bot_id = bot_dimensions[u'id'][0]
+  iterated = 0
   failures = 0
-  to_skip = 0
-  total_skipped = 0
-  for request, to_run in q:
-    if to_skip:
-      to_skip -= 1
-      total_skipped += 1
-      continue
+  try:
+    q = task_to_run.yield_next_available_task_to_dispatch(
+        bot_dimensions, deadline)
+    for request, to_run in q:
+      iterated += 1
+      run_result, secret_bytes = _reap_task(
+          bot_dimensions, bot_version, to_run.key, request)
+      if not run_result:
+        failures += 1
+        # Sad thing is that there is not way here to know the try number.
+        logging.info(
+            'failed to reap: %s0',
+            task_pack.pack_request_key(to_run.request_key))
+        continue
 
-    run_result, secret_bytes = _reap_task(
-        bot_dimensions, bot_version, to_run.key, request)
-    if not run_result:
-      failures += 1
-      # Every 3 failures starting on the very first one, jump randomly ahead of
-      # the pack. This reduces the contention where hundreds of bots fight for
-      # exactly the same task while there's many ready to be run waiting in the
-      # queue.
-      if (failures % 3) == 1:
-        # TODO(maruel): Choose curve that makes the most sense. The tricky part
-        # is finding a good heuristic to guess the load without much information
-        # available in this content. When 'failures' is high, this means a lot
-        # of bots are reaping tasks like crazy, which means there is a good flow
-        # of tasks going on. On the other hand, skipping too much is useless. So
-        # it should have an initial bump but then slow down on skipping.
-        to_skip = min(int(round(random.gammavariate(3, 1))), 30)
-      continue
-
-    # Try to optimize these values but do not add as formal stats (yet).
-    logging.info('failed %d, skipped %d', failures, total_skipped)
-    return request, secret_bytes, run_result
-  if failures:
-    logging.info(
-        'Chose nothing (failed %d, skipped %d)', failures, total_skipped)
-  return None, None, None
+      logging.info('Reaped: %s', run_result.task_id)
+      return request, secret_bytes, run_result
+    return None, None, None
+  finally:
+    logging.debug(
+        'bot_reap_task(%s) in %.3fs: %d iterated, %d failure',
+        bot_id, time.time()-start, iterated, failures)
 
 
 def bot_update_task(
