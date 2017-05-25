@@ -584,15 +584,23 @@ def assert_task(request):
         'assert_task(%d): new request kind; triggering rebuild-task-cache',
         dimensions_hash)
 
-  # We can't use the request ID since the request was not stored yet, so embed
-  # all the necessary information.
-  url = '/internal/taskqueue/rebuild-task-cache'
   data = {
     u'dimensions': request.properties.dimensions,
     u'dimensions_hash': str(dimensions_hash),
     u'valid_until_ts': request.expiration_ts + _ADVANCE,
   }
   payload = utils.encode_to_json(data)
+
+  # If this task specifies an 'id' value, updates the cache inline since we know
+  # there's only one bot that can run it, so it won't take long. This permits
+  # tasks like 'terminate' tasks to execute faster.
+  if request.properties.dimensions.get(u'id'):
+    rebuild_task_cache(payload)
+    return
+
+  # We can't use the request ID since the request was not stored yet, so embed
+  # all the necessary information.
+  url = '/internal/taskqueue/rebuild-task-cache'
   if not utils.enqueue_task(
       url, queue_name='rebuild-task-cache', payload=payload):
     logging.error('Failed to enqueue TaskDimensions update %x', dimensions_hash)

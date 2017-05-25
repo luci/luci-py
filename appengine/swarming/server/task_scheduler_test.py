@@ -128,7 +128,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     return ret
 
   def _quick_schedule(self, dims, nb_task=1):
-    """Schedules a task."""
+    """Schedules a task.
+
+    nb_task is 1 if a GAE task queue rebuild-task-cache was enqueued.
+    """
     request = self._gen_request(properties={'dimensions': dims})
     result_summary = task_scheduler.schedule_request(request, None)
     self.assertEqual(nb_task, self.execute_tasks())
@@ -901,7 +904,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     with self.assertRaises(auth.AuthorizationError):
       self._quick_schedule({u'id': u'abc'})
     auth_testing.mock_is_admin(self)
-    self._quick_schedule({u'id': u'abc'})
+    self._quick_schedule({u'id': u'abc'}, nb_task=0)
 
   def test_schedule_request_id_and_pool(self):
     self.mock_dim_acls({u'pool:good': u'mocked'})
@@ -913,8 +916,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       return False
     self.mock(auth, 'is_group_member', mocked_is_group_member)
 
-    self._quick_schedule({u'id': u'abc', u'pool': u'unknown'})
-    self._quick_schedule({u'id': u'abc', u'pool': u'good'})
+    self._quick_schedule({u'id': u'abc', u'pool': u'unknown'}, nb_task=0)
+    self._quick_schedule({u'id': u'abc', u'pool': u'good'}, nb_task=0)
     with self.assertRaises(auth.AuthorizationError):
       self._quick_schedule({u'id': u'abc', u'pool': u'bad'})
 

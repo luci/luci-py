@@ -42,7 +42,7 @@ def _assert_bot(dimensions=None):
   task_queues.assert_bot(bot_dimensions)
 
 
-def _gen_request():
+def _gen_request(properties=None):
   """Creates a TaskRequest that expires in 24h."""
   props = {
     'command': [u'command1'],
@@ -55,6 +55,7 @@ def _gen_request():
     'execution_timeout_secs': 24*60*60,
     'io_timeout_secs': None,
   }
+  props.update(properties or {})
   now = utils.utcnow()
   args = {
     'created_ts': now,
@@ -231,6 +232,19 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
     self.assertEqual([2980491642], task_queues.get_queues(u'bot1'))
+
+  def test_assert_bot_then_task_with_id(self):
+    # Assert a task that includes an 'id' dimension. No task queue is triggered
+    # in this case, rebuild_task_cache() is called inlined.
+    _assert_bot()
+    request = _gen_request(properties={u'dimensions': {u'id': u'bot1'}})
+    task_request.init_new_request(request, True, None)
+    task_queues.assert_task(request)
+    self.assertEqual(0, self.execute_tasks())
+    self.assert_count(1, bot_management.BotInfo)
+    self.assert_count(1, task_queues.BotDimensions)
+    self.assert_count(1, task_queues.BotTaskDimensions)
+    self.assert_count(1, task_queues.TaskDimensions)
 
   def test_assert_bot_dimensions_changed(self):
     # Ensure that stale BotTaskDimensions are deleted when the bot dimensions

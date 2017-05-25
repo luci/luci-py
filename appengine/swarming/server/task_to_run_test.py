@@ -108,8 +108,10 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
   def mkreq(self, req, nb_task=1):
     """Stores a new initialized TaskRequest.
 
-    nb_task is 1 or 0. It is 1 when the request.properties.dimensions was new
-    (unseen before) and 0 otherwise.
+    nb_task is 1 or 0. It represents the number of GAE task queue
+    rebuild-task-cache enqueued. It is 1 when the request.properties.dimensions
+    is new (unseen before) and a GAE task queue was enqueued to process it, 0
+    otherwise.
     """
     task_request.init_new_request(req, True, None)
     task_queues.assert_task(req)
@@ -118,9 +120,9 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     req.put()
     return req
 
-  def _gen_new_task_to_run(self, **kwargs):
+  def _gen_new_task_to_run(self, nb_task=1, **kwargs):
     """Returns a TaskToRun saved in the DB."""
-    request = self.mkreq(_gen_request(**kwargs))
+    request = self.mkreq(_gen_request(**kwargs), nb_task=nb_task)
     to_run = task_to_run.new_task_to_run(request)
     to_run.put()
     return to_run
@@ -385,7 +387,8 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     # It's normally time ordered.
     self.mock_now(self.now, 1)
     request_dimensions_2 = {u'id': u'localhost', u'pool': u'default'}
-    self._gen_new_task_to_run(properties=dict(dimensions=request_dimensions_2))
+    self._gen_new_task_to_run(
+        properties=dict(dimensions=request_dimensions_2), nb_task=0)
 
     bot_dimensions = {
       u'foo': [u'bar'],
@@ -425,7 +428,8 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     # desynchronized clock. It'll have higher priority.
     self.mock_now(self.now, -1)
     request_dimensions_2 = {u'id': u'localhost', u'pool': u'default'}
-    self._gen_new_task_to_run(properties=dict(dimensions=request_dimensions_2))
+    self._gen_new_task_to_run(
+        properties=dict(dimensions=request_dimensions_2), nb_task=0)
 
     bot_dimensions = {
       u'foo': [u'bar'],
@@ -493,7 +497,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       u'pool': u'default',
     }
     self._gen_new_task_to_run(
-        properties=dict(dimensions=request_dimensions))
+        properties=dict(dimensions=request_dimensions), nb_task=0)
     # Bot declares exactly same dimensions so it matches.
     bot_dimensions = {k: [v] for k, v in request_dimensions.iteritems()}
     actual = _yield_next_available_task_to_dispatch(
@@ -508,7 +512,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       u'pool': u'default',
     }
     self._gen_new_task_to_run(
-        properties=dict(dimensions=request_dimensions))
+        properties=dict(dimensions=request_dimensions), nb_task=0)
     # Bot declares exactly same dimensions so it matches.
     bot_dimensions = {k: [v] for k, v in request_dimensions.iteritems()}
     actual = _yield_next_available_task_to_dispatch(
@@ -530,7 +534,8 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         priority=0,
         properties=dict(
             command=[], dimensions=request_dimensions, execution_timeout_secs=0,
-            grace_period_secs=0))
+            grace_period_secs=0),
+        nb_task=0)
     self.assertTrue(task.key.parent().get().properties.is_terminate)
     # Bot declares exactly same dimensions so it matches.
     bot_dimensions = {k: [v] for k, v in request_dimensions.iteritems()}
