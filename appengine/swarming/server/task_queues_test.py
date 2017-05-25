@@ -246,6 +246,16 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
 
+  def test_cleanup_after_bot(self):
+    _assert_bot()
+    self._assert_task()
+    task_queues.cleanup_after_bot('bot1')
+    # BotInfo is deleted separately.
+    self.assert_count(1, bot_management.BotInfo)
+    self.assert_count(0, task_queues.BotDimensions)
+    self.assert_count(0, task_queues.BotTaskDimensions)
+    self.assert_count(1, task_queues.TaskDimensions)
+
   def test_assert_bot_dimensions_changed(self):
     # Ensure that stale BotTaskDimensions are deleted when the bot dimensions
     # changes.

@@ -51,6 +51,7 @@ from components import pubsub
 from components import utils
 from server import bot_groups_config
 from server import bot_management
+from server import task_queues
 from server import task_request
 from server import task_result
 from server import task_pack
@@ -915,8 +916,14 @@ def check_for_connection(machine_lease):
         machine_lease.hostname,
     )
     if release(machine_lease):
-      clear_lease_request(machine_lease.key, machine_lease.client_request_id)
-      bot_info.key.delete()
+      cleanup_bot(machine_lease)
+
+
+def cleanup_bot(machine_lease):
+  """Cleans up entities after a bot is removed."""
+  task_queues.cleanup_after_bot(machine_lease.hostname)
+  bot_management.get_info_key(machine_lease.hostname).delete()
+  clear_lease_request(machine_lease.key, machine_lease.client_request_id)
 
 
 def last_shutdown_ts(hostname):
@@ -1003,8 +1010,7 @@ def handle_termination_task(machine_lease):
       return
 
     if release(machine_lease):
-      clear_lease_request(machine_lease.key, machine_lease.client_request_id)
-      bot_management.get_info_key(machine_lease.hostname).delete()
+      cleanup_bot(machine_lease)
 
 
 def handle_early_release(machine_lease):
@@ -1064,8 +1070,7 @@ def manage_leased_machine(machine_lease):
         machine_lease.key,
         machine_lease.hostname,
     )
-    clear_lease_request(machine_lease.key, machine_lease.client_request_id)
-    bot_management.get_info_key(machine_lease.hostname).delete()
+    cleanup_bot(machine_lease)
     return
 
   # Handle an active lease with a termination task scheduled.

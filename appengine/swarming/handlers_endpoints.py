@@ -31,6 +31,7 @@ from server import bot_code
 from server import bot_management
 from server import config
 from server import task_pack
+from server import task_queues
 from server import task_request
 from server import task_result
 from server import task_scheduler
@@ -641,6 +642,8 @@ class SwarmingBotService(remote.Service):
     logging.debug('%s', request)
     bot_key = bot_management.get_info_key(request.bot_id)
     get_or_raise(bot_key)  # raises 404 if there is no such bot
+    # TODO(maruel): If the bot was a MP, call lease_management.cleanup_bot()?
+    task_queues.cleanup_after_bot(request.bot_id)
     bot_key.delete()
     return swarming_rpcs.DeletedResponse(deleted=True)
 

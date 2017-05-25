@@ -539,6 +539,25 @@ def assert_bot(bot_dimensions):
   _rebuild_bot_cache(bot_dimensions, bot_root_key)
 
 
+def cleanup_after_bot(bot_id):
+  """Removes all BotDimensions and BotTaskDimensions for this bot.
+
+  Do not clean up TaskDimensions. There could be pending tasks and there's a
+  possibility that a bot with the same ID could come up afterward (low chance in
+  practice but it's a possibility). In this case, if TaskDimensions is deleted,
+  the pending task would not be correctly run even when a bot comes back online
+  as assert_bot() would fail to create the corresponding BotTaskDimensions.
+  """
+  bot_root_key = bot_management.get_root_key(bot_id)
+
+  q = BotTaskDimensions.query(ancestor=bot_root_key).iter(keys_only=True)
+  futures = ndb.delete_multi_async(q)
+  futures.append(ndb.Key(BotDimensions, 1, parent=bot_root_key).delete_async())
+
+  for f in futures:
+    f.check_success()
+
+
 def assert_task(request):
   """Makes sure the TaskRequest dimensions are listed as a known queue.
 
