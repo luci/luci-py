@@ -890,8 +890,14 @@ def check_for_connection(machine_lease):
           event.ts,
       )
       associate_connection_ts(machine_lease.key, event.ts)
+      delay = (event.ts - machine_lease.instruction_ts).total_seconds()
+      if delay <= 0:
+        logging.error(
+            'Negative connection time for %s\nEvent: %s\nInstruction: %s',
+            machine_lease.bot_id, event.ts, machine_lease.instruction_ts)
+        delay = 0
       ts_mon_metrics.machine_types_connection_time.add(
-          (event.ts - machine_lease.instruction_ts).total_seconds(),
+          delay,
           fields={
               'machine_type': machine_lease.machine_type.id(),
           },
