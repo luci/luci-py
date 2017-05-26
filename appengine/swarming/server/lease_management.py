@@ -882,6 +882,11 @@ def check_for_connection(machine_lease):
   # first connection anyways. Iterating in the correct order would require
   # building a new, large index.
   for event in bot_management.get_events_query(machine_lease.bot_id, True):
+    # We don't want to find a bot_connected event from before we sent the
+    # connection instruction (e.g. in the event of hostname reuse), so do not
+    # look at events from before the connection instruction was sent.
+    if event.ts < machine_lease.instruction_ts:
+      break
     if event.event_type == 'bot_connected':
       logging.info(
           'Bot connected:\nKey: %s\nHostname: %s\nTime: %s',
@@ -890,14 +895,8 @@ def check_for_connection(machine_lease):
           event.ts,
       )
       associate_connection_ts(machine_lease.key, event.ts)
-      delay = (event.ts - machine_lease.instruction_ts).total_seconds()
-      if delay <= 0:
-        logging.error(
-            'Negative connection time for %s\nEvent: %s\nInstruction: %s',
-            machine_lease.bot_id, event.ts, machine_lease.instruction_ts)
-        delay = 0
       ts_mon_metrics.machine_types_connection_time.add(
-          delay,
+          (event.ts - machine_lease.instruction_ts).total_seconds(),
           fields={
               'machine_type': machine_lease.machine_type.id(),
           },

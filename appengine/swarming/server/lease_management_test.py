@@ -106,6 +106,45 @@ class CheckForConnectionTest(test_case.TestCase):
     self.failUnless(machine_lease.key.get().client_request_id)
     self.failUnless(machine_lease.key.get().connection_ts)
 
+  def test_connected_earlier_than_instructed(self):
+    bot_management.bot_event(
+        event_type='bot_connected',
+        bot_id='bot-id',
+        external_ip=None,
+        authenticated_as=None,
+        dimensions=None,
+        state=None,
+        version=None,
+        quarantined=False,
+        task_id='',
+        task_name=None,
+    )
+    machine_lease = lease_management.MachineLease(
+        bot_id='bot-id',
+        client_request_id='req-id',
+        hostname='bot-id',
+        instruction_ts=utils.utcnow(),
+        machine_type=ndb.Key(lease_management.MachineType, 'mt'),
+    )
+    machine_lease.put()
+    bot_management.bot_event(
+        event_type='bot_leased',
+        bot_id=machine_lease.hostname,
+        external_ip=None,
+        authenticated_as=None,
+        dimensions=None,
+        state=None,
+        version=None,
+        quarantined=False,
+        task_id='',
+        task_name=None,
+    )
+
+    lease_management.check_for_connection(machine_lease)
+    self.failUnless(bot_management.get_info_key(machine_lease.bot_id).get())
+    self.failUnless(machine_lease.key.get().client_request_id)
+    self.failIf(machine_lease.key.get().connection_ts)
+
   def test_missing(self):
     self.mock(lease_management, 'release', lambda *args, **kwargs: True)
 
