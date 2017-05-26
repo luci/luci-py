@@ -120,7 +120,7 @@ class ImporterTest(test_case.TestCase):
     self.assertEqual(expected, out)
 
   def test_load_group_file_ok(self):
-    body = '\n'.join(['', 'b', 'a', ''])
+    body = '\n'.join(['', 'b', 'a', 'a', ''])
     expected = [
       auth.Identity.from_bytes('user:a@example.com'),
       auth.Identity.from_bytes('user:b@example.com'),
@@ -278,7 +278,7 @@ class ImporterTest(test_case.TestCase):
       'https://fake_tarball': build_tar_gz({
         'ldap/new': 'a\nb',
       }),
-      'https://fake_external_1': 'abc@test.com\ndef@test.com\n',
+      'https://fake_external_1': 'abc@test.com\ndef@test.com\nabc@test.com',
       'https://fake_external_2': '123\n456',
     })
 

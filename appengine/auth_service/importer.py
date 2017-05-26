@@ -459,7 +459,7 @@ def load_group_file(body, domain):
 
   Raises BundleBadFormatError if group file is malformed.
   """
-  members = []
+  members = set()
   for uid in body.strip().splitlines():
     email = '%s@%s' % (uid, domain) if domain else uid
     if email.endswith('@gtempaccount.com'):
@@ -467,7 +467,7 @@ def load_group_file(body, domain):
       # like 'name%domain@gtempaccount.com'. We convert them to 'name@domain'.
       email = email[:-len('@gtempaccount.com')].replace('%', '@')
     try:
-      members.append(auth.Identity(auth.IDENTITY_USER, email))
+      members.add(auth.Identity(auth.IDENTITY_USER, email))
     except ValueError as exc:
       raise BundleBadFormatError(exc)
   return sorted(members, key=lambda x: x.to_bytes())
