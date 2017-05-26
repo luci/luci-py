@@ -73,21 +73,22 @@ def extract_dimensions(instance, instance_template_revision):
 
 
 @ndb.transactional
-def set_cataloged(key, cataloged):
-  """Sets the cataloged field of the given instance.
+def set_cataloged(key):
+  """Marks the given instance as cataloged.
 
   Args:
     key: ndb.Key for a models.Instance entity.
-    cataloged: True or False.
   """
   instance = key.get()
   if not instance:
     logging.warning('Instance does not exist: %s', key)
     return
 
-  if instance.cataloged != cataloged:
-    instance.cataloged = cataloged
-    instance.put()
+  if instance.cataloged:
+    return
+
+  instance.cataloged = True
+  instance.put()
 
 
 def catalog(key):
@@ -146,7 +147,7 @@ def catalog(key):
     )
     return
 
-  set_cataloged(key, True)
+  set_cataloged(key)
   metrics.send_machine_event('CATALOGED', instance.hostname)
 
 
@@ -180,7 +181,7 @@ def remove(key):
     logging.warning('Instance does not exist: %s', key)
     return
 
-  if not instance.cataloged:
+  if instance.pending_deletion:
     return
 
   response = machine_provider.delete_machine({'hostname': instance.hostname})
@@ -193,7 +194,7 @@ def remove(key):
     )
     return
 
-  set_cataloged(key, False)
+  instances.mark_for_deletion(key)
 
 
 def schedule_removal():
@@ -204,7 +205,7 @@ def schedule_removal():
     if instance_group_manager:
       for instance_key in instance_group_manager.instances:
         instance = instance_key.get()
-        if instance and instance.cataloged:
+        if instance and not instance.pending_deletion:
           utilities.enqueue_task('remove-cataloged-instance', instance.key)
 
 
@@ -220,6 +221,9 @@ def update_cataloged_instance(key):
     return
 
   if not instance.cataloged:
+    return
+
+  if instance.pending_deletion:
     return
 
   try:
@@ -238,5 +242,5 @@ def update_cataloged_instance(key):
 def schedule_cataloged_instance_update():
   """Enqueues tasks to update information about cataloged instances."""
   for instance in models.Instance.query():
-    if instance.cataloged:
+    if instance.cataloged and not instance.pending_deletion:
       utilities.enqueue_task('update-cataloged-instance', instance.key)

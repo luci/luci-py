@@ -35,6 +35,7 @@ class CatalogTest(test_case.TestCase):
     self.mock(catalog.machine_provider, 'add_machine', add_machine)
 
     catalog.catalog(ndb.Key(models.Instance, 'fake-instance'))
+    self.failIf(models.Instance.query().get())
 
   def test_already_cataloged(self):
     """Ensures nothing happens when the instance is already cataloged."""
@@ -311,12 +312,16 @@ class RemoveTest(test_case.TestCase):
     self.mock(catalog.machine_provider, 'delete_machine', delete_machine)
 
     catalog.remove(ndb.Key(models.Instance, 'fake-instance'))
+    self.failIf(models.Instance.query().get())
 
   def test_not_cataloged(self):
-    """Ensures nothing happens when the instance is not cataloged."""
+    """Ensures an instance is set for deletion when not cataloged."""
     def delete_machine(*args, **kwargs):
-      self.fail('delete_machine called')
+      return {'error': 'ENTRY_NOT_FOUND'}
+    def send_machine_event(*args, **kwargs):
+      pass
     self.mock(catalog.machine_provider, 'delete_machine', delete_machine)
+    self.mock(catalog.metrics, 'send_machine_event', send_machine_event)
 
     key = instances.get_instance_key(
         'base-name',
@@ -332,12 +337,16 @@ class RemoveTest(test_case.TestCase):
 
     catalog.remove(key)
     self.failIf(key.get().cataloged)
+    self.failUnless(key.get().pending_deletion)
 
   def test_removed(self):
     """Ensures an instance can be removed."""
     def delete_machine(*args, **kwargs):
       return {}
+    def send_machine_event(*args, **kwargs):
+      pass
     self.mock(catalog.machine_provider, 'delete_machine', delete_machine)
+    self.mock(catalog.metrics, 'send_machine_event', send_machine_event)
 
     key = instances.get_instance_key(
         'base-name',
@@ -352,10 +361,11 @@ class RemoveTest(test_case.TestCase):
     ).put()
 
     catalog.remove(key)
-    self.failIf(key.get().cataloged)
+    self.failUnless(key.get().cataloged)
+    self.failUnless(key.get().pending_deletion)
 
   def test_removal_error(self):
-    """Ensures an instance isn't marked removed on error."""
+    """Ensures an instance isn't set for deletion on error."""
     def delete_machine(*args, **kwargs):
       return {'error': 'error'}
     self.mock(catalog.machine_provider, 'delete_machine', delete_machine)
@@ -374,27 +384,7 @@ class RemoveTest(test_case.TestCase):
 
     catalog.remove(key)
     self.failUnless(key.get().cataloged)
-
-  def test_removal_error_entry_not_found(self):
-    """Ensures an instance is marked removed on ENTRY_NOT_FOUND."""
-    def delete_machine(*args, **kwargs):
-      return {'error': 'ENTRY_NOT_FOUND'}
-    self.mock(catalog.machine_provider, 'delete_machine', delete_machine)
-
-    key = instances.get_instance_key(
-        'base-name',
-        'revision',
-        'zone',
-        'instance-name',
-    )
-    key = models.Instance(
-        key=key,
-        cataloged=True,
-        instance_group_manager=instances.get_instance_group_manager_key(key),
-    ).put()
-
-    catalog.remove(key)
-    self.failIf(key.get().cataloged)
+    self.failIf(key.get().pending_deletion)
 
 
 class SetCatalogedTest(test_case.TestCase):
@@ -402,7 +392,8 @@ class SetCatalogedTest(test_case.TestCase):
 
   def test_not_found(self):
     """Ensures nothing happens when the instance doesn't exist."""
-    catalog.set_cataloged(ndb.Key(models.Instance, 'fake-instance'), True)
+    catalog.set_cataloged(ndb.Key(models.Instance, 'fake-instance'))
+    self.failIf(models.Instance.query().get())
 
   def test_cataloged(self):
     """Ensures an instance can be cataloged."""
@@ -417,7 +408,7 @@ class SetCatalogedTest(test_case.TestCase):
         cataloged=False,
     ).put()
 
-    catalog.set_cataloged(key, True)
+    catalog.set_cataloged(key)
     self.failUnless(key.get().cataloged)
 
 
@@ -431,6 +422,7 @@ class UpdateCatalogedEntryTest(test_case.TestCase):
     self.mock(catalog.machine_provider, 'retrieve_machine', retrieve_machine)
 
     catalog.update_cataloged_instance(ndb.Key(models.Instance, 'fake-instance'))
+    self.failIf(models.Instance.query().get())
 
   def test_not_cataloged(self):
     """Ensures nothing happens when the instance is not cataloged."""
@@ -451,6 +443,9 @@ class UpdateCatalogedEntryTest(test_case.TestCase):
     ).put()
 
     catalog.update_cataloged_instance(key)
+    self.failIf(key.get().cataloged)
+    self.failIf(key.get().leased)
+    self.failIf(key.get().pending_deletion)
 
   def test_updated_lease_expiration_ts(self):
     """Ensures an instance can be updated with a lease_expiration_ts."""
@@ -475,12 +470,14 @@ class UpdateCatalogedEntryTest(test_case.TestCase):
 
     self.failIf(key.get().leased)
     catalog.update_cataloged_instance(key)
+    self.failUnless(key.get().cataloged)
     self.assertEqual(
         key.get().lease_expiration_ts, datetime.datetime.utcfromtimestamp(now))
     self.failUnless(key.get().leased)
+    self.failIf(key.get().pending_deletion)
 
   def test_retrieval_error(self):
-    """Ensures an instance isn't updated on retrieval error."""
+    """Ensures an instance is set for deletion when not found."""
     def retrieve_machine(*args, **kwargs):
       raise net.NotFoundError('404', 404, '404')
     def send_machine_event(*args, **kwargs):
@@ -501,28 +498,9 @@ class UpdateCatalogedEntryTest(test_case.TestCase):
     ).put()
 
     catalog.update_cataloged_instance(key)
+    self.failUnless(key.get().cataloged)
+    self.failIf(key.get().leased)
     self.failUnless(key.get().pending_deletion)
-
-  def test_removal_error_entry_not_found(self):
-    """Ensures an instance is marked removed on ENTRY_NOT_FOUND."""
-    def delete_machine(*args, **kwargs):
-      return {'error': 'ENTRY_NOT_FOUND'}
-    self.mock(catalog.machine_provider, 'delete_machine', delete_machine)
-
-    key = instances.get_instance_key(
-        'base-name',
-        'revision',
-        'zone',
-        'instance-name',
-    )
-    key = models.Instance(
-        key=key,
-        cataloged=True,
-        instance_group_manager=instances.get_instance_group_manager_key(key),
-    ).put()
-
-    catalog.remove(key)
-    self.failIf(key.get().cataloged)
 
 
 if __name__ == '__main__':
