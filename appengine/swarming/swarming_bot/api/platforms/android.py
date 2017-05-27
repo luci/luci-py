@@ -91,6 +91,7 @@ KNOWN_APPS = frozenset([
     'jp.co.omronsoft.iwnnime.ml',
     'jp.co.omronsoft.iwnnime.ml.kbd.white',
     'org.codeaurora.ims',
+    'org.simalliance.openmobileapi.service',
 ])
 
 
