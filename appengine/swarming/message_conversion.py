@@ -119,18 +119,11 @@ def task_request_to_rpc(entity):
         swarming_rpcs.FilesRef, entity.properties.inputs_ref)
 
   props = entity.properties
-  cmd = None
-  if props.commands:
-    cmd = props.commands[0]
-  elif props.command:
-    cmd = props.command
-
   properties = _ndb_to_rpc(
       swarming_rpcs.TaskProperties,
       props,
       caches=[_ndb_to_rpc(swarming_rpcs.CacheEntry, c) for c in props.caches],
       cipd_input=cipd_input,
-      command=cmd,
       secret_bytes='<REDACTED>' if props.has_secret_bytes else None,
       dimensions=_string_pairs_from_dict(props.dimensions),
       env=_string_pairs_from_dict(props.env),
@@ -185,8 +178,6 @@ def new_task_request_from_rpc(msg, now):
       cipd_input=cipd_input,
       # Passing command=None is supported at API level but not at NDB level.
       command=props.command or [],
-      # Legacy, ignored.
-      commands=None,
       has_secret_bytes=secret_bytes is not None,
       secret_bytes=None, # ignore this, it's handled out of band
       dimensions={i.key: i.value for i in props.dimensions},

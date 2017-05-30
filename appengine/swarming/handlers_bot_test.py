@@ -511,7 +511,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
           }],
           u'server': u'https://chrome-infra-packages.appspot.com',
         },
-        u'command': None,
+        u'command': [],
         u'dimensions': {
           u'os': u'Amiga',
           u'pool': u'default',
@@ -670,7 +670,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
           }],
           u'server': u'https://chrome-infra-packages.appspot.com',
         },
-        u'command': None,
+        u'command': [],
         u'dimensions': {
           u'os': u'Amiga',
           u'pool': u'default',

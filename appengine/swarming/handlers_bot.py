@@ -561,11 +561,6 @@ class BotPollHandler(_BotBaseHandler):
 
   def _cmd_run(self, request, secret_bytes, run_result_key, bot_id):
     logging.info('Run: %s', request.task_id)
-    cmd = None
-    if request.properties.commands:
-      cmd = request.properties.commands[0]
-    elif request.properties.command:
-      cmd = request.properties.command
     out = {
       'cmd': 'run',
       'manifest': {
@@ -581,7 +576,7 @@ class BotPollHandler(_BotBaseHandler):
           ],
           'server': request.properties.cipd_input.server,
         } if request.properties.cipd_input else None,
-        'command': cmd,
+        'command': request.properties.command,
         'dimensions': request.properties.dimensions,
         'env': request.properties.env,
         'extra_args': request.properties.extra_args,

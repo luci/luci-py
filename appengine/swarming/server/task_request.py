@@ -414,13 +414,7 @@ class TaskProperties(ndb.Model):
 
   caches = ndb.LocalStructuredProperty(CacheEntry, repeated=True)
 
-  # Commands to run. It is a list of 1 item, the command to run.
-  # TODO(maruel): Remove after 2016-06-01.
-  commands = datastore_utils.DeterministicJsonProperty(
-      json_type=list, indexed=False)
-  # Command to run. This is only relevant when self.inputs_ref.isolated is None.
-  # This is what is called 'raw commands', in the sense that no inputs files are
-  # declared.
+  # Command to run. This overrides the command in the isolated file if any.
   command = ndb.StringProperty(repeated=True, indexed=False)
 
   # Isolate server, namespace and input isolate hash.
@@ -484,7 +478,6 @@ class TaskProperties(ndb.Model):
   def is_terminate(self):
     """If True, it is a terminate request."""
     return (
-        not self.commands and
         not self.command and
         self.dimensions.keys() == [u'id'] and
         not (self.inputs_ref and self.inputs_ref.isolated) and
@@ -495,16 +488,8 @@ class TaskProperties(ndb.Model):
         not self.io_timeout_secs and
         not self.idempotent)
 
-  def to_dict(self):
-    out = super(TaskProperties, self).to_dict(exclude=['commands'])
-    out['command'] = self.commands[0] if self.commands else self.command
-    return out
-
   def _pre_put_hook(self):
     super(TaskProperties, self)._pre_put_hook()
-    if self.commands:
-        raise datastore_errors.BadValueError(
-            'commands is not supported anymore')
     if not self.is_terminate:
       isolated_input = self.inputs_ref and self.inputs_ref.isolated
       if not self.command and not isolated_input:
