@@ -281,7 +281,7 @@ def _yield_pages_async(q, size):
 
 def _get_task_to_run_query(dimensions_hash):
   """Returns a ndb.Query of TaskToRun within this dimensions_hash queue."""
-  opts = ndb.QueryOptions(keys_only=True, deadline=3)
+  opts = ndb.QueryOptions(keys_only=True, deadline=15)
   return TaskToRun.query(default_options=opts).order(
           TaskToRun.queue_number).filter(
               TaskToRun.queue_number >= (dimensions_hash << 31),
