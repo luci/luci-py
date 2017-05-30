@@ -83,8 +83,7 @@ class ValidationTestCase(test_case.TestCase):
         config.self_config_set(), 'acl.cfg', cfg)
     self.assertEqual(len(result.messages), 1)
     self.assertEqual(result.messages[0].severity, logging.ERROR)
-    self.assertTrue(
-        result.messages[0].text.startswith('Could not parse config'))
+    self.assertTrue('no field named "invalid_field"' in result.messages[0].text)
 
     cfg = '''
       project_access_group: "admins"
