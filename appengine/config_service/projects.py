@@ -82,12 +82,15 @@ def project_exists(project_id):
   return any(p.id == project_id for p in get_projects())
 
 
-def get_repo(project_id):
-  """Returns tuple (repo_type, repo_url) for a project."""
-  info = ProjectImportInfo.get_by_id(project_id)
-  if info:
-    return info.repo_type, info.repo_url
-  return None, None
+def get_repos(project_ids):
+  """Returns list of tuples (repo_type, repo_url) for each project."""
+  keys = [ndb.Key(ProjectImportInfo, pid) for pid in project_ids]
+  results = []
+  empty = ProjectImportInfo()
+  for info in ndb.get_multi(keys):
+    info = info or empty
+    results.append((info.repo_type, info.repo_url))
+  return results
 
 
 def get_metadata(project_id):

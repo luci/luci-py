@@ -43,9 +43,10 @@ class ApiTest(test_case.EndpointsTestCase):
     ]
     self.mock(projects, 'get_metadata', mock.Mock())
     projects.get_metadata.return_value = project_config_pb2.ProjectCfg()
-    self.mock(projects, 'get_repo', mock.Mock())
-    projects.get_repo.return_value = (
-        projects.RepositoryType.GITILES, 'https://localhost/project')
+    self.mock(projects, 'get_repos', mock.Mock())
+    projects.get_repos.return_value = [
+      (projects.RepositoryType.GITILES, 'https://localhost/project'),
+    ]
 
   def mock_config(self):
     self.mock(storage, 'get_config_hash_async', mock.Mock())
@@ -501,7 +502,7 @@ class ApiTest(test_case.EndpointsTestCase):
       project_config_pb2.ProjectCfg(access='all'),
       project_config_pb2.ProjectCfg(access='administrators'),
     ]
-    projects.get_repo.side_effect = [
+    projects.get_repos.return_value = [
       (projects.RepositoryType.GITILES, 'http://localhost/chromium'),
       (projects.RepositoryType.GITILES, 'http://localhost/v8'),
       (None, None),

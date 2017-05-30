@@ -71,15 +71,15 @@ class ProjectsTestCase(test_case.TestCase):
     self.assertEqual(projects.get_refs('chromium'), None)
 
   def test_repo_info(self):
-    self.assertEqual(projects.get_repo('x'), (None, None))
+    self.assertEqual(projects.get_repos(['x']), [(None, None)])
     projects.update_import_info(
         'x', projects.RepositoryType.GITILES, 'http://localhost/x')
     # Second time for coverage.
     projects.update_import_info(
         'x', projects.RepositoryType.GITILES, 'http://localhost/x')
     self.assertEqual(
-        projects.get_repo('x'),
-        (projects.RepositoryType.GITILES, 'http://localhost/x'))
+        projects.get_repos(['x']),
+        [(projects.RepositoryType.GITILES, 'http://localhost/x')])
 
     # Change it
     projects.update_import_info(

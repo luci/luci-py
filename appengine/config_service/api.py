@@ -396,8 +396,9 @@ def get_projects():
   Caches results in memcache for 10 min.
   """
   result = []
-  for p in projects.get_projects():
-    repo_type, repo_url = projects.get_repo(p.id)
+  projs = projects.get_projects()
+  repos = projects.get_repos(p.id for p in projs)
+  for p, (repo_type, repo_url) in zip(projs, repos):
     if repo_type is None:
       # Not yet consistent.
       continue
