@@ -132,7 +132,7 @@ def unpack_request_key(request_id):
 
   Then create a GQL query in the web UI that retrieves all the entities stored
   for this request, replace 1234 with the number printed by the commands above:
-      SELECT * WHERE __key__ HAS ANCESTOR ndb.Key(TaskRequest, 1234)
+      SELECT * WHERE __key__ HAS ANCESTOR KEY(TaskRequest, 1234)
   """
   assert isinstance(request_id, basestring)
   if not request_id:
