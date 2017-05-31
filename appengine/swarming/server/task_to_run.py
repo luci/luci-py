@@ -110,9 +110,7 @@ def _gen_queue_number(dimensions_hash, timestamp, priority):
   assert dimensions_hash > 0 and dimensions_hash <= 0xFFFFFFFF, hex(
       dimensions_hash)
   assert isinstance(timestamp, datetime.datetime), repr(timestamp)
-  assert isinstance(priority, int), repr(priority)
   task_request.validate_priority(priority)
-  assert 0 <= priority <= 255, 'Just for clarity, validate_priority() checks it'
 
   # Ignore the year.
   year_start = datetime.datetime(timestamp.year, 1, 1)

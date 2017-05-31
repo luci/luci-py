@@ -99,10 +99,24 @@ _BEGINING_OF_THE_WORLD = datetime.datetime(2010, 1, 1, 0, 0, 0, 0)
 _HASH_CHARS = frozenset('0123456789abcdef')
 
 # Keep synced with named_cache.py
-CACHE_NAME_RE = re.compile(ur'^[a-z0-9_]{1,4096}$')
+_CACHE_NAME_RE = re.compile(ur'^[a-z0-9_]{1,4096}$')
+
+
+# Early verification of environment variable key name.
+_ENV_KEY_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
 
 
 ### Properties validators must come before the models.
+
+
+def _validate_length(prop, value, maximum):
+  if len(value) > maximum:
+    raise datastore_errors.BadValueError(
+        'too long %s: %d > %d' % (prop._name, len(value), maximum))
+
+
+def _get_validate_length(maximum):
+  return lambda prop, value: _validate_length(prop, value, maximum)
 
 
 def _validate_isolated(prop, value):
@@ -113,27 +127,21 @@ def _validate_isolated(prop, value):
 
 
 def _validate_url(prop, value):
-  # pylint: disable=unused-argument
+  _validate_length(prop, value, 8192)
   if value and not validation.is_valid_secure_url(value):
     raise datastore_errors.BadValueError(
         '%s must be valid HTTPS URL, not %s' % (prop._name, value))
 
 
 def _validate_namespace(prop, value):
+  _validate_length(prop, value, 128)
   if not config.NAMESPACE_RE.match(value):
     raise datastore_errors.BadValueError('malformed %s' % prop._name)
 
 
-def _validate_length(maximum):
-  def _inner(prop, value):
-    if len(value) > maximum:
-      raise datastore_errors.BadValueError('too long %s: %d > %d', prop._name,
-                                           len(value), maximum)
-  return _inner
-
-
 def _validate_dict_of_strings(prop, value):
   """Validates TaskProperties.env."""
+  # pylint: disable=W0212
   if not all(
          isinstance(k, unicode) and isinstance(v, unicode)
          for k, v in value.iteritems()):
@@ -157,6 +165,30 @@ def _validate_dimensions(prop, value):
   if u'pool' not in value and u'id' not in value:
     raise datastore_errors.BadValueError(
         u'At least one of \'id\' or \'pool\' must be used as %s' % prop._name)
+  if len(value) > 64:
+    raise datastore_errors.BadValueError(
+        '%s can have up to 64 keys' % prop._name)
+
+
+def _validate_env(prop, value):
+  _validate_dict_of_strings(prop, value)
+  maxlen = 1024
+  for k, v in value.iteritems():
+    if not k:
+      raise datastore_errors.BadValueError(
+          'valid key are required in %s' % prop._name)
+    if len(k) > maxlen:
+      raise datastore_errors.BadValueError(
+          'key in %s is too long: %d > %d' % (prop._name, len(k), maxlen))
+    if not _ENV_KEY_RE.match(k):
+      raise datastore_errors.BadValueError(
+          'key in %s is invalid: %r' % (prop._name, k))
+    if len(v) > maxlen:
+      raise datastore_errors.BadValueError(
+          'key in %s is too long: %d > %d' % (prop._name, len(v), maxlen))
+  if len(value) > 64:
+    raise datastore_errors.BadValueError(
+        '%s can have up to 64 keys' % prop._name)
 
 
 def _validate_expiration(prop, value):
@@ -173,10 +205,10 @@ def _validate_expiration(prop, value):
 
 def _validate_grace(prop, value):
   """Validates grace_period_secs in TaskProperties."""
-  if not (0 <= value <= _ONE_DAY_SECS):
+  if not (0 <= value <= 60*60):
     # pylint: disable=W0212
     raise datastore_errors.BadValueError(
-        '%s (%ds) must be between %ds and one day' % (prop._name, value, 0))
+        '%s (%ds) must be between 0s and one hour' % (prop._name, value))
 
 
 def _validate_priority(_prop, value):
@@ -203,15 +235,26 @@ def _validate_timeout(prop, value):
 
 
 def _validate_tags(prop, value):
-  """Validates and sorts TaskRequest.tags."""
-  if not ':' in value:
+  """Validates TaskRequest.tags."""
+  _validate_length(prop, value, 1024)
+  if ':' not in value:
     # pylint: disable=W0212
     raise datastore_errors.BadValueError(
         '%s must be key:value form, not %s' % (prop._name, value))
 
 
+def _validate_pubsub_topic(prop, value):
+  """Validates TaskRequest.pubsub_topic."""
+  _validate_length(prop, value, 1024)
+  # pylint: disable=W0212
+  if value and '/' not in value:
+    raise datastore_errors.BadValueError(
+        '%s must be a well formatted pubsub topic' % (prop._name))
+
+
 def _validate_package_name_template(prop, value):
   """Validates a CIPD package name template."""
+  _validate_length(prop, value, 1024)
   if not cipd.is_valid_package_name_template(value):
     raise datastore_errors.BadValueError(
         '%s must be a valid CIPD package name template "%s"' % (
@@ -220,25 +263,41 @@ def _validate_package_name_template(prop, value):
 
 def _validate_package_version(prop, value):
   """Validates a CIPD package version."""
+  _validate_length(prop, value, 1024)
   if not cipd.is_valid_version(value):
     raise datastore_errors.BadValueError(
         '%s must be a valid package version "%s"' % (prop._name, value))
 
 
-def _validate_package_path(_prop, path):
+def _validate_cache_name(prop, value):
+  _validate_length(prop, value, 1024)
+  if not _CACHE_NAME_RE.match(value):
+    raise datastore_errors.BadValueError(
+        '%s %r does not match %s' % (prop._name, value, _CACHE_NAME_RE.pattern))
+
+
+def _validate_cache_path(prop, value):
+  _validate_length(prop, value, 1024)
+  _validate_rel_path('Cache path', value)
+
+
+def _validate_package_path(prop, value):
   """Validates a CIPD installation path."""
-  if not path:
+  _validate_length(prop, value, 1024)
+  if not value:
     raise datastore_errors.BadValueError(
         'CIPD package path is required. Use "." to install to run dir.')
-  _validate_rel_path('CIPD package path', path)
+  _validate_rel_path('CIPD package path', value)
 
 
-def _validate_output_path(_prop, value):
+def _validate_output_path(prop, value):
   """Validates a path for an output file."""
+  _validate_length(prop, value, 1024)
   _validate_rel_path('output file', value)
 
 
 def _validate_rel_path(value_name, path):
+  """Validates a relative path to be valid."""
   if not path:
     raise datastore_errors.BadValueError(
         'No argument provided for %s.' % value_name)
@@ -260,6 +319,7 @@ def _validate_rel_path(value_name, path):
 
 def _validate_service_account(prop, value):
   """Validates that 'service_account' field is 'bot', 'none' or email."""
+  _validate_length(prop, value, 1024)
   if not value:
     return None
   if value in ('bot', 'none') or '@' in value:
@@ -305,7 +365,7 @@ class SecretBytes(ndb.Model):
   """
   _use_memcache = False
   secret_bytes = ndb.BlobProperty(
-      validator=_validate_length(20*1024), indexed=False)
+      validator=_get_validate_length(20*1024), indexed=False)
 
 
 class CipdPackage(ndb.Model):
@@ -364,6 +424,9 @@ class CipdInput(ndb.Model):
     if not self.packages:
       raise datastore_errors.BadValueError(
           'cipd_input cannot have an empty package list')
+    if len(self.packages) > 64:
+      raise datastore_errors.BadValueError(
+          'Up to 64 CIPD packages can be listed for a task')
 
     package_names = set()
     for p in self.packages:
@@ -380,17 +443,12 @@ class CipdInput(ndb.Model):
 
 class CacheEntry(ndb.Model):
   """Describes a named cache that should be present on the bot."""
-  name = ndb.StringProperty()
-  path = ndb.StringProperty()
+  name = ndb.StringProperty(validator=_validate_cache_name)
+  path = ndb.StringProperty(validator=_validate_cache_path)
 
   def _pre_put_hook(self):
     if not self.name:
       raise datastore_errors.BadValueError('name is not specified')
-    if not CACHE_NAME_RE.match(self.name):
-      raise datastore_errors.BadValueError(
-          'name "%s" does not match %s' % (self.name, CACHE_NAME_RE.pattern))
-
-    _validate_rel_path('Cache path', self.path)
 
 
 class TaskProperties(ndb.Model):
@@ -437,7 +495,7 @@ class TaskProperties(ndb.Model):
 
   # Environment variables. Encoded as json. Optional.
   env = datastore_utils.DeterministicJsonProperty(
-      validator=_validate_dict_of_strings, json_type=dict, indexed=False)
+      validator=_validate_env, json_type=dict, indexed=False)
 
   # Maximum duration the bot can take to run this task. It's named hard_timeout
   # in the bot.
@@ -478,62 +536,83 @@ class TaskProperties(ndb.Model):
   def is_terminate(self):
     """If True, it is a terminate request."""
     return (
+        not self.caches and
         not self.command and
         self.dimensions.keys() == [u'id'] and
         not (self.inputs_ref and self.inputs_ref.isolated) and
+        not self.cipd_input and
         not self.env and
         not self.execution_timeout_secs and
         not self.extra_args and
         not self.grace_period_secs and
         not self.io_timeout_secs and
-        not self.idempotent)
+        not self.idempotent and
+        not self.outputs and
+        not self.has_secret_bytes)
 
   def _pre_put_hook(self):
     super(TaskProperties, self)._pre_put_hook()
-    if not self.is_terminate:
-      isolated_input = self.inputs_ref and self.inputs_ref.isolated
-      if not self.command and not isolated_input:
-        raise datastore_errors.BadValueError(
-            'use at least one of command or inputs_ref.isolated')
-      if self.command and self.extra_args:
-        raise datastore_errors.BadValueError(
-            'can\'t use both command and extra_args')
-      if self.extra_args and not isolated_input:
-        raise datastore_errors.BadValueError(
-            'extra_args require inputs_ref.isolated')
-      if self.inputs_ref:
-        self.inputs_ref._pre_put_hook()
+    if self.is_terminate:
+      # Most values are not valid with a terminate task. self.is_terminate
+      # already check those.
+      return
 
-      # Validate caches.
-      cache_names = set()
-      cache_paths = set()
-      for c in self.caches:
-        c._pre_put_hook()
-        if c.name in cache_names:
-          raise datastore_errors.BadValueError(
-              'Cache name %s is used more than once' % c.name)
-        if c.path in cache_paths:
-          raise datastore_errors.BadValueError(
-              'Cache path "%s" is mapped more than once' % c.path)
-        cache_names.add(c.name)
-        cache_paths.add(c.path)
-      self.caches.sort(key=lambda c: c.name)
+    isolated_input = self.inputs_ref and self.inputs_ref.isolated
+    if not self.command and not isolated_input:
+      raise datastore_errors.BadValueError(
+          'use at least one of command or inputs_ref.isolated')
+    if self.command and self.extra_args:
+      raise datastore_errors.BadValueError(
+          'can\'t use both command and extra_args')
+    if self.extra_args and not isolated_input:
+      raise datastore_errors.BadValueError(
+          'extra_args require inputs_ref.isolated')
+    if self.inputs_ref:
+      self.inputs_ref._pre_put_hook()
+    if len(self.command) > 256:
+      raise datastore_errors.BadValueError(
+          'command can have up to 256 arguments')
+    if len(self.extra_args) > 256:
+      raise datastore_errors.BadValueError(
+          'extra_args can have up to 256 arguments')
 
-      # Validate CIPD Input.
-      if self.cipd_input:
-        self.cipd_input._pre_put_hook()
-        for p in self.cipd_input.packages:
-          if p.path in cache_paths:
-            raise datastore_errors.BadValueError(
-                'Path "%s" is mapped to a named cache and cannot be a target '
-                'of CIPD installation' % p.path)
-        if self.idempotent:
-          pinned = lambda p: cipd.is_pinned_version(p.version)
-          assert self.cipd_input.packages  # checked by cipd_input._pre_put_hook
-          if any(not pinned(p) for p in self.cipd_input.packages):
-            raise datastore_errors.BadValueError(
-                'an idempotent task cannot have unpinned packages; '
-                'use tags or instance IDs as package versions')
+    # Validate caches.
+    if len(self.caches) > 64:
+      raise datastore_errors.BadValueError(
+          'Up to 64 caches can be listed for a task')
+    cache_names = set()
+    cache_paths = set()
+    for c in self.caches:
+      c._pre_put_hook()
+      if c.name in cache_names:
+        raise datastore_errors.BadValueError(
+            'Cache name %s is used more than once' % c.name)
+      if c.path in cache_paths:
+        raise datastore_errors.BadValueError(
+            'Cache path "%s" is mapped more than once' % c.path)
+      cache_names.add(c.name)
+      cache_paths.add(c.path)
+    self.caches.sort(key=lambda c: c.name)
+
+    # Validate CIPD Input.
+    if self.cipd_input:
+      self.cipd_input._pre_put_hook()
+      for p in self.cipd_input.packages:
+        if p.path in cache_paths:
+          raise datastore_errors.BadValueError(
+              'Path "%s" is mapped to a named cache and cannot be a target '
+              'of CIPD installation' % p.path)
+      if self.idempotent:
+        pinned = lambda p: cipd.is_pinned_version(p.version)
+        assert self.cipd_input.packages  # checked by cipd_input._pre_put_hook
+        if any(not pinned(p) for p in self.cipd_input.packages):
+          raise datastore_errors.BadValueError(
+              'an idempotent task cannot have unpinned packages; '
+              'use tags or instance IDs as package versions')
+
+    if len(self.outputs) > 64:
+      raise datastore_errors.BadValueError(
+          'Up to 64 outputs can be listed for a task')
 
 
 class TaskRequest(ndb.Model):
@@ -604,13 +683,15 @@ class TaskRequest(ndb.Model):
   parent_task_id = ndb.StringProperty(validator=_validate_task_run_id)
 
   # PubSub topic to send task completion notification to.
-  pubsub_topic = ndb.StringProperty(indexed=False)
+  pubsub_topic = ndb.StringProperty(
+      indexed=False, validator=_validate_pubsub_topic)
 
   # Secret token to send as 'auth_token' attribute with PubSub messages.
   pubsub_auth_token = ndb.StringProperty(indexed=False)
 
   # Data to send in 'userdata' field of PubSub messages.
-  pubsub_userdata = ndb.StringProperty(indexed=False)
+  pubsub_userdata = ndb.StringProperty(
+      indexed=False, validator=_get_validate_length(1024))
 
   # This stores the computed properties_hash for this Task's properties object.
   # It is set in init_new_request. It is None for non-idempotent tasks.
@@ -668,6 +749,10 @@ class TaskRequest(ndb.Model):
     elif self.priority == 0:
       raise datastore_errors.BadValueError(
           'priority 0 can only be used for terminate request')
+
+    if len(self.tags) > 256:
+      raise datastore_errors.BadValueError(
+          'up to 256 tags can be specified for a task request')
 
     if (self.pubsub_topic and
         not pubsub.validate_full_name(self.pubsub_topic, 'topics')):

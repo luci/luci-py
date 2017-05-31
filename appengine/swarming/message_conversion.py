@@ -171,6 +171,11 @@ def new_task_request_from_rpc(msg, now):
   if props.secret_bytes:
     secret_bytes = task_request.SecretBytes(secret_bytes=props.secret_bytes)
 
+  if len(set(i.key for i in props.dimensions)) != len(props.dimensions):
+    raise ValueError('same dimension key cannot be specified twice')
+  if len(set(i.key for i in props.env)) != len(props.env):
+    raise ValueError('same environment variable key cannot be specified twice')
+
   properties = _rpc_to_ndb(
       task_request.TaskProperties,
       props,

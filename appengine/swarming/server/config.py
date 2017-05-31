@@ -72,12 +72,20 @@ def validate_flat_dimension(d):
 
 def validate_dimension_key(key):
   """Returns True if the dimension key is valid."""
-  return bool(isinstance(key, unicode) and re.match(_DIMENSION_KEY_RE, key))
+  return (
+      bool(isinstance(key, unicode) and
+      key and
+      len(key) <= 256 and
+      re.match(_DIMENSION_KEY_RE, key)))
 
 
 def validate_dimension_value(value):
   """Returns True if the dimension key is valid."""
-  return bool(isinstance(value, unicode) and value and value.strip() == value)
+  return (
+      bool(isinstance(value, unicode) and
+      value and
+      len(value) <= 256 and
+      value.strip() == value))
 
 
 ### Private code.
