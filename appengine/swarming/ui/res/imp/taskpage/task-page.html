@@ -491,6 +491,10 @@
                   <td class$="[[_internalClass(_result.internal_failure)]]">[[_result.internal_failure]]</td>
                 </tr>
                 <tr>
+                  <td>Cost (USD)</td>
+                  <td>$[[_cost(_result)]]</td>
+                </tr>
+                <tr>
                   <td>Isolated Outputs</td>
                   <td>
                     <a href$="[[_isolateLink(_result.outputs_ref)]]">
@@ -799,6 +803,13 @@
         }
         var args = request.properties.command || [];
         return args.join(" ");
+      },
+
+      _cost: function(result) {
+        if (!result || !result.costs_usd || !result.costs_usd.length) {
+          return 0;
+        }
+        return result.costs_usd[0].toFixed(4);
       },
 
       _disambiguate: function(taskId, result) {
