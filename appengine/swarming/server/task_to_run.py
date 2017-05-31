@@ -122,6 +122,8 @@ def _gen_queue_number(dimensions_hash, timestamp, priority):
   # It is important that priority mixed with time is an addition, not a bitwise
   # or.
   low_part = (priority << 22) + t
+  assert low_part >= 0 and low_part <= 0xFFFFFFFF, '0x%X is out of band' % (
+      low_part)
   high_part = dimensions_hash << 31
   return high_part | low_part
 
@@ -280,6 +282,7 @@ def _yield_pages_async(q, size):
 def _get_task_to_run_query(dimensions_hash):
   """Returns a ndb.Query of TaskToRun within this dimensions_hash queue."""
   opts = ndb.QueryOptions(keys_only=True, deadline=15)
+  # See _gen_queue_number() as of why << 31.
   return TaskToRun.query(default_options=opts).order(
           TaskToRun.queue_number).filter(
               TaskToRun.queue_number >= (dimensions_hash << 31),
