@@ -257,9 +257,7 @@
             t.duration = (now - t.started_ts) / 1000;
           }
           // Make the duration human readable
-          if (t.duration){
-            t.human_duration = this._humanDuration(t.duration);
-          }
+          t.human_duration = this._humanDuration(t.duration);
         }.bind(this));
         return json.items;
       }

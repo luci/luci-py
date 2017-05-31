@@ -187,9 +187,7 @@
           result.duration = (now - result.started_ts) / 1000;
         }
         // Make the duration human readable
-        if (result.duration){
-          result.human_duration = this._humanDuration(result.duration);
-        }
+        result.human_duration = this._humanDuration(result.duration);
         return result;
       },
 
