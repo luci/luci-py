@@ -34,16 +34,21 @@
         default will be used (see _column()).
     _headerMap: Object, a mapping of column name to the displayed text for a column.
     _specialColumns, Array<String> A list of "special" column names, that is, columns which will
-        have html in them, provided by the client. non-special (i.e. plain colunns) just contain
+        have html in them, provided by the client. non-special (i.e. plain columns) just contain
         text and will have their content provided by _attribute (see below).
     _specialSort, Object, A mapping of column name to a function that implements custom sorting
         rules.  The function will be given (dir, a, b) and is expected to return an int, as a normal
         sort comparison function would. Otherwise, natural comparison of a and b is used
         (see _compare()).
 
+  A client may define the following properties:
+    _priorityColumns: Array<String> A list of "priority" column names, that is, plain columns which
+        should be sorted in the given order, before all other plain columns. If left blank, there
+        will be no priority columns.
+
   A client must define the following methods:
     _attribute(i, col, default): Given the item i, return an array of values for the column "col",
-        or an array containting just the default, if not. This is only used as a default when a
+        or an array containing just the default, if not. This is only used as a default when a
         column does not appear in _columnMap.
 
   This behavior provides the following properties:
@@ -218,7 +223,24 @@
       _stripSpecial: function(){
         return this._columns.filter(function(c) {
           return this._specialColumns.indexOf(c) === -1;
-        }.bind(this)).sort();
+        }.bind(this)).sort(function(a, b) {
+          if (!this._priorityColumns ||
+                (this._priorityColumns.indexOf(a) === -1 &&
+                 this._priorityColumns.indexOf(b) === -1)) {
+            return a.localeCompare(b);
+          } else {
+            var idxA = this._priorityColumns.indexOf(a);
+            if (idxA === -1) {
+              idxA = 1000;
+            }
+            var idxB = this._priorityColumns.indexOf(b);
+            if (idxB === -1) {
+              idxB = 1000;
+            };
+            return idxA - idxB;
+          }
+        }.bind(this));
+
       },
 
       // Common columns shared between tasklist and botlist

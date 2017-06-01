@@ -347,6 +347,7 @@
     var headerMap = {
       "abandoned_ts": "Abandoned On",
       "completed_ts": "Completed On",
+      "costs_usd": "Cost (USD)",
       "created_ts": "Created On",
       "duration": "Duration",
       "modified_ts": "Last Modified",
@@ -375,9 +376,10 @@
       modified_ts: sortableTime("modified_ts"),
       started_ts: sortableTime("started_ts"),
     };
+    var priorityColumns = ["created_ts", "started_ts", "abandoned_ts", "completed_ts", "modified_ts", "duration"];
 
     Polymer({
-      is: 'task-list',
+      is: "task-list",
       behaviors: [
           SwarmingBehaviors.DynamicTableBehavior,
           SwarmingBehaviors.TaskBehavior,
@@ -421,6 +423,10 @@
         _headerMap: {
           type: Object,
           value: headerMap,
+        },
+        _priorityColumns: {
+          type: Array,
+          value: priorityColumns
         },
         _specialColumns: {
           type: Array,

@@ -265,7 +265,7 @@
         if (!second) {
           second = new Date();
         }
-        return this._humanDuration((second.getTime() - first.getTime())/1000);
+        return sk.human.strDuration((second.getTime() - first.getTime())/1000);
       },
 
       _truthy: function(a){

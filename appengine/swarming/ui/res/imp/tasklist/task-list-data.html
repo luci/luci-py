@@ -248,6 +248,13 @@
             tagMap[key] = rest;
           });
           t.tagMap = tagMap;
+          if (!t.costs_usd || !Array.isArray(t.costs_usd)) {
+            t.costs_usd = "none";
+          } else {
+            t.costs_usd.forEach(function(c, idx) {
+              t.costs_usd[idx] = c.toFixed(4);
+            });
+          }
 
           TIMES.forEach(function(time) {
             swarming.sanitizeAndHumanizeTime(t, time);
