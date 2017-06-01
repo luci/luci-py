@@ -36,6 +36,7 @@ from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
 from components import utils
+from server import task_pack
 from server import task_queues
 from server import task_request
 
@@ -179,36 +180,43 @@ class _QueryStats(object):
         self.deadline)
 
 
-def _validate_query_item(bot_dimensions, deadline, stats, now, task_key):
+def _validate_task(bot_dimensions, deadline, stats, now, task_key):
   """Validates the TaskToRun and update stats.
 
   Returns:
     None if the task_key cannot be reaped by this bot.
     tuple(TaskRequest, TaskToRun) if this is a good candidate to reap.
   """
+  # TODO(maruel): Create one TaskToRun per TaskRunResult.
+  packed = task_pack.pack_request_key(task_key.parent()) + '0'
   stats.total += 1
   # Verify TaskToRun is what is expected. Play defensive here.
   try:
     validate_to_run_key(task_key)
   except ValueError as e:
-    logging.error(str(e))
+    logging.error('_validate_task(%s): validation error: %s', packed, e)
     stats.broken += 1
     return
 
   # Do this after the basic weeding out but before fetching TaskRequest.
   if _lookup_cache_is_taken(task_key):
+    logging.debug('_validate_task(%s): negative cache pre-fetch', packed)
     stats.cache_lookup += 1
+    return
 
   # Ok, it's now worth taking a real look at the entity.
-  task = task_key.get(use_cache=False)
+  task = task_key.get()
 
   # DB operations are slow, double check memcache again.
   if _lookup_cache_is_taken(task_key):
+    logging.debug('_validate_task(%s): negative cache post-fetch', packed)
     stats.cache_lookup += 1
+    return
 
   # It is possible for the index to be inconsistent since it is not executed in
   # a transaction, no problem.
   if not task.queue_number:
+    logging.debug('_validate_task(%s): no queue_number', packed)
     stats.no_queue += 1
     return
 
@@ -217,15 +225,17 @@ def _validate_query_item(bot_dimensions, deadline, stats, now, task_key):
   # expired if the query is very slow. This is on purpose so slow queries do not
   # cause exagerate expirations.
   if task.expiration_ts < now:
+    logging.debug(
+        '_validate_task(%s): expired %s < %s', packed, task.expiration_ts, now)
     stats.expired += 1
     return
 
   # The hash may have conflicts. Ensure the dimensions actually match by
   # verifying the TaskRequest. There's a probability of 2**-31 of conflicts,
-  # which is low enough for our purpose. The reason use_cache=False is otherwise
-  # it'll create a buffer bloat.
-  request = task.request_key.get(use_cache=False)
+  # which is low enough for our purpose.
+  request = task.request_key.get()
   if not match_dimensions(request.properties.dimensions, bot_dimensions):
+    logging.debug('_validate_task(%s): dimensions mismatch', packed)
     stats.real_mismatch += 1
     return
 
@@ -244,13 +254,21 @@ def _validate_query_item(bot_dimensions, deadline, stats, now, task_key):
   if deadline is not None and not request.properties.is_terminate:
     if not request.properties.execution_timeout_secs:
       # Task never times out, so it cannot be accepted.
+      logging.debug(
+          '_validate_task(%s): deadline %s but no execution timeout',
+          packed, deadline)
       stats.too_long += 1
       return
-    max_task_time = (request.properties.execution_timeout_secs +
-                     (request.properties.io_timeout_secs or 600) +
-                     3 * (request.properties.grace_period_secs or 30) +
-                     10)
-    if deadline <= utils.utcnow() + datetime.timedelta(seconds=max_task_time):
+    hard = request.properties.execution_timeout_secs
+    grace = 3 * (request.properties.grace_period_secs or 30)
+    # Allowance buffer for overheads (scheduling and isolation)
+    overhead = 300
+    max_schedule = now + datetime.timedelta(seconds=hard + grace + overhead)
+    if deadline <= max_schedule:
+      logging.debug(
+          '_validate_task(%s): deadline and too late %s > %s (%s + %d + %d + '
+          '%d)',
+          packed, deadline, max_schedule, now, hard, grace, overhead)
       stats.too_long += 1
       return
 
@@ -480,9 +498,8 @@ def yield_next_available_task_to_dispatch(bot_dimensions, deadline):
         # search to 40s, it gives 20s to complete the reaping and complete the
         # HTTP request.
         return
-      # _validate_query_item() returns (request, task) if it's worth reaping.
-      item = _validate_query_item(
-          bot_dimensions, deadline, stats, now, task_key)
+      # _validate_task() returns (request, task) if it's worth reaping.
+      item = _validate_task(bot_dimensions, deadline, stats, now, task_key)
       if item:
         yield item[0], item[1]
         # If the code is still executed, it means that the task reaping wasn't
