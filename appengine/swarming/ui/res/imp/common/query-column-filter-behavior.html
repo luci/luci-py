@@ -534,6 +534,10 @@
             var o = this._attribute(bot, "device_type", "none");
             return o.indexOf(swarming.alias.unapply(dt)) !== -1;
           },
+          device: function(bot, dt) {
+            var o = this._attribute(bot, "device", "none");
+            return o.indexOf(swarming.alias.unapply(dt)) !== -1;
+          },
           gpu: function(bot, gpu) {
             var o = this._attribute(bot, "gpu", "none");
             return o.indexOf(swarming.alias.unapply(gpu)) !== -1;
