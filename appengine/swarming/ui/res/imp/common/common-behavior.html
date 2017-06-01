@@ -216,6 +216,8 @@
       //     {key:String, value:Array<String>}. If Array<String>, the Strings
       //     should be valid filters (e.g. "foo:bar").
       // columns - Array<String> , the the column names that should be shown.
+      // Any trailing args after columns will be assumed to be strings that
+      // should be treated as valid filters.
       _taskListLink: function(filters, columns) {
         filters = filters || [];
         columns = columns || [];
@@ -233,6 +235,10 @@
             fArr.push(f);
           }
         });
+        // can't use .foreach, as arguments isn't really an Array.
+        for (var i = 2; i < arguments.length; i++) {
+          fArr.push(arguments[i]);
+        }
         var obj = {
           f: fArr,
           c: columns,

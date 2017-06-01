@@ -211,17 +211,28 @@
                   <td>State</td>
                   <td class$="[[_stateClass(_result)]]">[[state(_result)]]</td>
                 </tr>
-                <template is="dom-if" if="[[_eq(_result.state,'PENDING')]]">
+
                   <tr>
-                    <td><b>Why Pending?</b></td>
                     <td>
-                      <span class$="[[_it(_other_pending.count)]]">[[_otherPending(_other_pending)]]</span>
-                      similar pending tasks,
+                      <template is="dom-if" if="[[_eq(_result.state,'PENDING')]]">
+                        <b>Why Pending?</b>
+                      </template>
+                      <template is="dom-if" if="[[_neq(_result.state,'PENDING')]]">
+                        Similar Load
+                      </template>
+                      </td>
+                    <td>
+                      <span class$="[[_it(_other_pending.count)]]">[[_other_pending.count]]</span>
+                      <a
+                        title="The list of pending tasks that matches the list of dimensions"
+                        href$='[[_taskListLink(_request.properties.dimensions,"","state:PENDING")]]'>similar pending tasks</a>,
                       <span class$="[[_it(_other_running.count)]]">[[_other_running.count]]</span>
-                      similar running tasks
+                      <a
+                        title="The list of running tasks that matches the list of dimensions"
+                        href$='[[_taskListLink(_request.properties.dimensions,"","state:RUNNING")]]'>similar running tasks</a>
                     </td>
                   </tr>
-                </template>
+
                 <tr>
                   <td>Fleet Capacity</td>
                   <td>
@@ -320,11 +331,13 @@
                 </template>
                 <tr>
                   <td rowspan$="[[_rowspan(_request.properties.dimensions)]]">
+                    Dimensions <br/>
                     <a
                         title="The list of bots that matches the list of dimensions"
-                        href$="[[_botListLink(_request.properties.dimensions)]]">
-                      Requested Dimensions
-                    </a>
+                        href$="[[_botListLink(_request.properties.dimensions)]]">Bots</a>
+                     <a
+                        title="The list of tasks that matches the list of dimensions"
+                        href$="[[_taskListLink(_request.properties.dimensions)]]">Tasks</a>
                   </td>
                 </tr>
                 <template is="dom-repeat" items="{{_request.properties.dimensions}}" as="dimension">
@@ -721,7 +734,7 @@
       },
 
       observers: [
-        "_whyPending(_request,_result,_auth_headers)"],
+        "_similarLoad(_request,_result,_auth_headers)"],
 
       _alias: function(dim) {
         var values = dim.value;
@@ -889,16 +902,12 @@
         return "";
       },
 
-      _noMilo: function(result) {
-        return !(this._tag(result, "allow_milo") || this._tag(result, "luci_project"));
+      _neq: function(a,b) {
+        return a !== b;
       },
 
-      _otherPending: function(other_pending) {
-        if (other_pending && other_pending.count > 0) {
-          // subtract 1 from this count, because that's this task.
-          return other_pending.count - 1;
-        }
-        return "<counting>";
+      _noMilo: function(result) {
+        return !(this._tag(result, "allow_milo") || this._tag(result, "luci_project"));
       },
 
       _pending: function(result) {
@@ -1032,7 +1041,7 @@
         return result && !this._wasPickedUp(result);
       },
 
-      _whyPending: function() {
+      _similarLoad: function() {
         if (!this._request || !this._result || !this._auth_headers) {
           return;
         }
@@ -1047,25 +1056,23 @@
         });
         this._getJsonAsync("_bots_count", "/api/swarming/v1/bots/count", "_busyBotCount", this._auth_headers, botCountParams);
 
-        if (result && result.state === "PENDING") {
-          var start = new Date();
-          start.setSeconds(0);
-          // go back 24 hours, rounded to the nearest minute for better caching.
-          start = "" + (start.getTime() - 24*60*60*1000);
-          // convert to seconds, because that's what the API expects.
-          start = start.substring(0, start.length-3);
+        var start = new Date();
+        start.setSeconds(0);
+        // go back 24 hours, rounded to the nearest minute for better caching.
+        start = "" + (start.getTime() - 24*60*60*1000);
+        // convert to seconds, because that's what the API expects.
+        start = start.substring(0, start.length-3);
 
-          var taskCountParams = {
-            start: [start],
-            state: ["RUNNING"],
-            tags: botCountParams.dimensions,
-          };
+        var taskCountParams = {
+          start: [start],
+          state: ["RUNNING"],
+          tags: botCountParams.dimensions,
+        };
 
-          this._getJsonAsync("_other_running", "/api/swarming/v1/tasks/count", "_busyRunningCount", this._auth_headers, taskCountParams);
-          // change running to pending
-          taskCountParams.state = ["PENDING"];
-          this._getJsonAsync("_other_pending", "/api/swarming/v1/tasks/count", "_busyPendingCount", this._auth_headers, taskCountParams);
-        }
+        this._getJsonAsync("_other_running", "/api/swarming/v1/tasks/count", "_busyRunningCount", this._auth_headers, taskCountParams);
+        // change running to pending
+        taskCountParams.state = ["PENDING"];
+        this._getJsonAsync("_other_pending", "/api/swarming/v1/tasks/count", "_busyPendingCount", this._auth_headers, taskCountParams);
       }
     });
   })();
