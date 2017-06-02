@@ -181,11 +181,11 @@ def get_os_version_number():
   """Returns the normalized OS version number as a string.
 
   Returns:
-    10.7, 10.8, etc.
+    Version as a string like '10.12.4'
   """
   version_parts = platform.mac_ver()[0].split('.')
   assert len(version_parts) >= 2, 'Unable to determine Mac version'
-  return u'.'.join(version_parts[:2])
+  return u'.'.join(version_parts)
 
 
 @tools.cached

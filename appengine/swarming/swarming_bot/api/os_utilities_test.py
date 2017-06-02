@@ -22,11 +22,6 @@ import os_utilities
 
 
 class TestOsUtilities(auto_stub.TestCase):
-  def test_get_os_version(self):
-    version = os_utilities.get_os_version_number()
-    self.assertTrue(version)
-    self.assertTrue(re.match(r'^\d+\.\d+$', version), version)
-
   def test_get_os_name(self):
     expected = (u'Linux', u'Mac', u'Raspbian', u'Ubuntu', u'Windows')
     self.assertIn(os_utilities.get_os_name(), expected)

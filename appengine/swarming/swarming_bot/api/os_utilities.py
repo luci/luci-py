@@ -143,26 +143,30 @@ def _safe_read(filepath):
 
 
 @tools.cached
-def get_os_version_number():
-  """Returns the normalized OS version number as a string.
-
-  Returns:
-    The format depends on the OS:
-    - Windows: 5.1, 6.1, etc. There is no way to distinguish between Windows 7
-          and Windows Server 2008R2 since they both report 6.1.
-    - OSX: 10.7, 10.8, etc.
-    - Ubuntu: 12.04, 10.04, etc.
-    Others will return None.
-  """
-  if sys.platform in ('cygwin', 'win32'):
-    return platforms.win.get_os_version_number()
-  if sys.platform == 'darwin':
-    return platforms.osx.get_os_version_number()
-  if sys.platform == 'linux2':
-    return platforms.linux.get_os_version_number()
-
-  logging.error('Unable to determine platform version')
-  return None
+def get_os_values():
+  """Returns the values to use for 'os' dimension."""
+  os_name = get_os_name()
+  out = [os_name]
+  if sys.platform == 'win32':
+    # On Windows, do not use the version numbers, use the marketing name
+    # instead.
+    names = platforms.win.get_os_version_names()
+    out.extend(u'%s-%s' % (os_name, n) for n in names)
+  elif sys.platform == 'cygwin':
+    # ... except on cygwin.
+    out.append(u'%s-%s' % (os_name, platforms.win.get_os_version_number()))
+  elif sys.platform == 'darwin':
+    # Expects '10.a.b'. Add both '10.a' and '10.a.b'.
+    number = platforms.osx.get_os_version_number()
+    out.append(u'%s-%s' % (os_name, number.rsplit('.', 1)[0]))
+    out.append(u'%s-%s' % (os_name, number))
+  else:
+    # TODO(maruel): Get rid of this, Linux is not an OS, it's a kernel.
+    out.append(u'Linux')
+    number = platforms.linux.get_os_version_number()
+    out.append(u'%s-%s' % (os_name, number))
+  out.sort()
+  return out
 
 
 @tools.cached
@@ -176,6 +180,7 @@ def get_os_name():
   """
   value = {
     'cygwin': u'Windows',
+    # TODO(maruel): 'Mac' is an historical accident, it should be named 'OSX'.
     'darwin': u'Mac',
     'win32': u'Windows',
   }.get(sys.platform)
@@ -834,7 +839,6 @@ def get_state_all_devices_android(devices):
 
 def get_dimensions():
   """Returns the default dimensions."""
-  os_name = get_os_name()
   cpu_type = get_cpu_type()
   cpu_bitness = get_cpu_bitness()
   cpuinfo = get_cpuinfo()
@@ -846,18 +850,14 @@ def get_dimensions():
     ],
     u'gpu': get_gpu()[0],
     u'id': [get_hostname_short()],
-    u'os': [os_name],
+    u'os': get_os_values(),
+    # This value is frequently overridden by bots.cfg via luci-config.
     u'pool': [u'default'],
   }
   if u'avx2' in cpuinfo.get(u'flags', []):
     dimensions[u'cpu'].append(cpu_type + u'-' + cpu_bitness + u'-avx2')
   if any(u'avx512' in x for x in cpuinfo.get(u'flags', [])):
     dimensions[u'cpu'].append(cpu_type + u'-' + cpu_bitness + u'-avx512')
-  if sys.platform == 'win32':
-    dimensions[u'os'].extend(
-        u'%s-%s' % (os_name, n) for n in platforms.win.get_os_version_names())
-  else:
-    dimensions[u'os'].append(u'%s-%s' % (os_name, get_os_version_number()))
   if u'none' not in dimensions[u'gpu']:
     hidpi = get_monitor_hidpi()
     if hidpi:
@@ -874,10 +874,6 @@ def get_dimensions():
     dimensions[u'cpu'].append(u'arm-' + cpu_bitness)
     dimensions[u'cpu'].sort()
 
-  if sys.platform == 'linux2':
-    dimensions[u'os'].append(u'Linux')
-    dimensions[u'os'].sort()
-
   if sys.platform == 'darwin':
     udids = platforms.osx.get_ios_device_ids()
     device_types = set()
@@ -885,6 +881,7 @@ def get_dimensions():
       version = platforms.osx.get_ios_version(udid)
       if version:
         dimensions[u'os'].append('iOS-%s' % version)
+        dimensions[u'os'].sort()
       device_type = platforms.osx.get_ios_device_type(udid)
       if device_type:
         device_types.add(device_type)
