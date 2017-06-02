@@ -7,6 +7,9 @@
 default:
 	bower install
 
+node_modules:
+	npm install
+
 # Run a local HTTP server for the demo pages.
 .PHONY: run
 run: default common_strings
@@ -48,7 +51,7 @@ debug_build: clean default common_strings natural_sort
 	ln -s ../res/imp/ ./build/
 
 .PHONY: common_strings
-common_strings:
+common_strings: node_modules
 	echo "(function(){var customUtils = {};" > ./build/js/common-strings.js
 	cat node_modules/common-substrings/lib/customUtils.js node_modules/common-substrings/lib/bst.js node_modules/common-substrings/lib/commonSubstrings.js >> ./build/js/common-strings.js
 	echo "window.Substrings = SuffixTrie;})();" >> ./build/js/common-strings.js
@@ -62,7 +65,7 @@ common_strings:
 	sed -i -e 's/module.exports = SuffixTrie;/ /g' ./build/js/common-strings.js
 
 .PHONY: natural_sort
-natural_sort:
+natural_sort: node_modules
 	cat node_modules/javascript-natural-sort/naturalSort.js > ./build/js/natural-sort.js
 	sed -i -e 's/module.exports = function naturalSort/window.naturalSort = function/g' ./build/js/natural-sort.js
 
