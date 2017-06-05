@@ -19,6 +19,7 @@ import socket
 import sys
 import tempfile
 import textwrap
+import time
 import unittest
 import urllib
 
@@ -208,6 +209,14 @@ class SwarmingClient(object):
       file_path.rmtree(self._tmpdir)
       self._tmpdir = None
 
+  def query_bot(self):
+    """Returns the bot's properties."""
+    data = json.loads(self._capture('query', ['bots/list', '--limit', '10']))
+    if not data.get('items'):
+      return None
+    assert len(data['items']) == 1
+    return data['items'][0]
+
   def dump_log(self):
     print >> sys.stderr, '-' * 60
     print >> sys.stderr, 'Client calls'
@@ -240,6 +249,13 @@ class SwarmingClient(object):
           cmd, stdout=f, stderr=subprocess42.STDOUT, cwd=CLIENT_DIR)
       p.communicate()
       return p.returncode
+
+  def _capture(self, command, args):
+    cmd = [
+      sys.executable, 'swarming.py', command, '-S', self._swarming_server,
+    ] + args
+    p = subprocess42.Popen(cmd, stdout=subprocess42.PIPE, cwd=CLIENT_DIR)
+    return p.communicate()[0]
 
 
 def gen_expected(**kwargs):
@@ -280,20 +296,41 @@ def gen_expected(**kwargs):
 class Test(unittest.TestCase):
   maxDiff = None
   client = None
-  dimensions = None
   servers = None
   bot = None
 
-  @classmethod
-  def setUpClass(cls):
-    cls.dimensions = os_utilities.get_dimensions()
-
   def setUp(self):
     super(Test, self).setUp()
-    # Reset the bot's cache at the start of each task, so that the cache reuse
-    # data becomes deterministic.
-    # Main caveat is 'isolated_upload' as the isolate server is not cleared.
-    self.bot.wipe_cache()
+    self.dimensions = os_utilities.get_dimensions()
+    # Reset the bot's isolated cache at the start of each task, so that the
+    # cache reuse data becomes deterministic. Only restart the bot when it had a
+    # named cache because it takes multiple seconds to to restart the bot. :(
+    #
+    # TODO(maruel): 'isolated_upload' is not deterministic because the isolate
+    # server not cleared.
+    old = self.client.query_bot()
+    started_ts = json.loads(old['state'])['started_ts'] if old else None
+    logging.info('setUp: started_ts was %s', started_ts)
+    had_cache = any(
+        u'caches' == i['key'] for i in old['dimensions']) if old else False
+    self.bot.wipe_cache(had_cache)
+    # The bot restarts due to wipe_cache() so wait for the bot to come back
+    # online. It may takes a few loop.
+    while True:
+      state = self.client.query_bot()
+      if not state:
+        time.sleep(0.1)
+        continue
+      if not had_cache:
+        break
+      new_started_ts = json.loads(state['state'])['started_ts']
+      logging.info('setUp: new_started_ts is %s', new_started_ts)
+      # This assumes that starting the bot and running the previous test case
+      # took more than 1s.
+      if not started_ts or new_started_ts != started_ts:
+        dimensions = {i['key']: i['value'] for i in state['dimensions']}
+        self.assertNotIn(u'caches', dimensions)
+        break
 
   def gen_expected(self, **kwargs):
     return gen_expected(bot_dimensions=self.dimensions, **kwargs)
@@ -636,6 +673,10 @@ class Test(unittest.TestCase):
   def test_local_cache(self):
     # First task creates the cache, second copy the content to the output
     # directory. Each time it's the exact same script.
+    dimensions = {
+        i['key']: i['value'] for i in self.client.query_bot()['dimensions']}
+    self.assertEqual(set(self.dimensions), set(dimensions))
+    self.assertNotIn(u'cache', set(dimensions))
     script = '\n'.join((
       'import os, shutil, sys',
       'p = "p/b/a.txt"',
@@ -692,11 +733,22 @@ class Test(unittest.TestCase):
         },
       },
     )
+    # The previous task caused the bot to have a named cache.
+    expected_summary['bot_dimensions'] = (
+        expected_summary['bot_dimensions'].copy())
+    expected_summary['bot_dimensions'][u'caches'] = [u'fuu']
     self._run_isolated(
         script, 'cache_second',
         ['--named-cache', 'fuu', 'p/b', '--', '${ISOLATED_OUTDIR}/yo'],
         expected_summary,
         {'0/yo': 'Yo!'})
+
+    # Check that the bot now has a cache dimension by independently querying.
+    expected = set(self.dimensions)
+    expected.add(u'caches')
+    dimensions = {
+        i['key']: i['value'] for i in self.client.query_bot()['dimensions']}
+    self.assertEqual(expected, set(dimensions))
 
   def _run_isolated(self, hello_world, name, args, expected_summary,
       expected_files, deduped=False, isolated_content=None):
@@ -817,6 +869,8 @@ def main():
   verbose = '-v' in sys.argv
   leak = bool('--leak' in sys.argv)
   if leak:
+    # Note that --leak will not guarantee that 'c' and 'isolated_cache' are
+    # kept. Only the last test case will leak these two directories.
     sys.argv.remove('--leak')
   if verbose:
     logging.basicConfig(level=logging.INFO)

@@ -1,3 +1,4 @@
+# coding: utf-8
 # Copyright 2014 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -519,6 +520,31 @@ def get_uptime():
   return platforms.linux.get_uptime()
 
 
+def get_named_caches():
+  """Returns the list of named caches."""
+  # Strictly speaking, this is a layering violation. This data is managed by
+  # run_isolated.py but this is valuable to expose this as a Swarming bot
+  # dimensions so ¯\_(ツ)_/¯
+  #
+  # Assumptions:
+  # - ../__main__.py calls os.chdir(__file__)
+  # - ../bot_code/bot_main.py specifies
+  #   --named-cache-root os.path.join(botobj.base_dir, 'c') to run_isolated.
+  # - ../client/named_cache.py behavior
+  #
+  # A better implementation would require:
+  # - Access to bot.Bot instance to query bot.base_dir
+  # - Access to named_cache.py to load state.json
+  # - Access to --named-cache-root hardcoded in bot_main.py
+  #
+  # but hey, the following code is 5 lines...
+  try:
+    with open(os.path.join(u'c', u'state.json'), 'rb') as f:
+      return sorted(i[0] for i in json.load(f)['items'])
+  except (IOError, KeyError, OSError):
+    return []
+
+
 class AuthenticatedHttpRequestFailure(Exception):
   pass
 
@@ -854,6 +880,9 @@ def get_dimensions():
     # This value is frequently overridden by bots.cfg via luci-config.
     u'pool': [u'default'],
   }
+  caches = get_named_caches()
+  if caches:
+    dimensions[u'caches'] = caches
   if u'avx2' in cpuinfo.get(u'flags', []):
     dimensions[u'cpu'].append(cpu_type + u'-' + cpu_bitness + u'-avx2')
   if any(u'avx512' in x for x in cpuinfo.get(u'flags', [])):

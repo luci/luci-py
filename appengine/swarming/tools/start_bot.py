@@ -24,6 +24,14 @@ from utils import subprocess42
 sys.path.pop(0)
 
 
+def _safe_rm(path):
+  if os.path.exists(path):
+    try:
+      file_path.rmtree(path)
+    except OSError as e:
+      logging.error('Failed to delete %s: %s', path, e)
+
+
 class LocalBot(object):
   """A local running Swarming bot.
 
@@ -31,21 +39,32 @@ class LocalBot(object):
   locally.
   """
   def __init__(self, swarming_server_url, redirect=True):
-    self._tmpdir = tempfile.mkdtemp(prefix='swarming_bot')
+    # It is deleted in self.stop(False).
+    self._botdir = tempfile.mkdtemp(prefix='swarming_bot')
     self._swarming_server_url = swarming_server_url
     self._proc = None
     self._logs = {}
     self._redirect = redirect
 
-  def wipe_cache(self):
-    """Blows away this bot's cache."""
-    for i in ('c', 'isolated_cache'):
-      cache_dir = os.path.join(self._tmpdir, i)
-      if os.path.exists(cache_dir):
-        try:
-          file_path.rmtree(cache_dir)
-        except OSError:
-          logging.info('Failed to deleted %s', cache_dir)
+  def wipe_cache(self, restart):
+    """Blows away this bot's cache and restart it.
+
+    There's just too much risk of the bot failing over so it's not worth not
+    restarting it.
+    """
+    if restart:
+      logging.info('wipe_cache(): Restarting the bot')
+      self.stop(True)
+      # Deletion needs to happen while the bot is not running to ensure no side
+      # effect.
+      # These values are from ./swarming_bot/bot_code/bot_main.py.
+      _safe_rm(os.path.join(self._botdir, 'c'))
+      _safe_rm(os.path.join(self._botdir, 'isolated_cache'))
+      self.start()
+    else:
+      logging.info('wipe_cache(): wiping cache without telling the bot')
+      _safe_rm(os.path.join(self._botdir, 'c'))
+      _safe_rm(os.path.join(self._botdir, 'isolated_cache'))
 
   @property
   def bot_id(self):
@@ -60,18 +79,18 @@ class LocalBot(object):
   def start(self):
     """Starts the local Swarming bot."""
     assert not self._proc
-    bot_zip = os.path.join(self._tmpdir, 'swarming_bot.zip')
+    bot_zip = os.path.join(self._botdir, 'swarming_bot.zip')
     urllib.urlretrieve(self._swarming_server_url + '/bot_code', bot_zip)
     cmd = [sys.executable, bot_zip, 'start_slave']
     if self._redirect:
-      logs = os.path.join(self._tmpdir, 'logs')
+      logs = os.path.join(self._botdir, 'logs')
       if not os.path.isdir(logs):
         os.mkdir(logs)
       with open(os.path.join(logs, 'bot_stdout.log'), 'wb') as f:
         self._proc = subprocess42.Popen(
-            cmd, cwd=self._tmpdir, stdout=f, stderr=f, detached=True)
+            cmd, cwd=self._botdir, stdout=f, stderr=f, detached=True)
     else:
-      self._proc = subprocess42.Popen(cmd, cwd=self._tmpdir, detached=True)
+      self._proc = subprocess42.Popen(cmd, cwd=self._botdir, detached=True)
 
   def stop(self, leak):
     """Stops the local Swarming bot. Returns the process exit code."""
@@ -85,25 +104,26 @@ class LocalBot(object):
       except OSError:
         pass
     exit_code = self._proc.returncode
-    if self._tmpdir:
-      for i in sorted(glob.glob(os.path.join(self._tmpdir, 'logs', '*.log'))):
+    if self._botdir:
+      for i in sorted(glob.glob(os.path.join(self._botdir, 'logs', '*.log'))):
         self._read_log(i)
       if not leak:
         try:
-          file_path.rmtree(self._tmpdir)
+          file_path.rmtree(self._botdir)
         except OSError:
-          print >> sys.stderr, 'Leaking %s' % self._tmpdir
-      self._tmpdir = None
+          print >> sys.stderr, 'Leaking %s' % self._botdir
     self._proc = None
     return exit_code
 
   def poll(self):
     """Polls the process to know if it exited."""
-    self._proc.poll()
+    if self._proc:
+      self._proc.poll()
 
   def wait(self, timeout=None):
     """Waits for the process to normally exit."""
-    return self._proc.wait(timeout)
+    if self._proc:
+      return self._proc.wait(timeout)
 
   def kill(self):
     """Kills the child forcibly."""
