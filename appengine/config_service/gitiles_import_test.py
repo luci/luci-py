@@ -65,8 +65,10 @@ class GitilesImportTestCase(test_case.TestCase):
     return attempt
 
   def test_get_gitiles_config_corrupted(self):
-    self.mock(storage, 'get_latest_async', mock.Mock())
-    storage.get_latest_async.return_value = future('garbage')
+    self.mock(storage, 'get_latest_configs_async', mock.Mock())
+    storage.get_latest_configs_async.return_value = future({
+      storage.get_self_config_set(): ('rev', 'content_hash', 'garbage'),
+    })
     gitiles_import.get_gitiles_config()
 
   def mock_get_archive(self):
@@ -305,10 +307,12 @@ class GitilesImportTestCase(test_case.TestCase):
       ),
     ]
     RefType = project_config_pb2.RefsCfg.Ref
-    projects.get_refs.return_value = [
-      RefType(name='refs/heads/master'),
-      RefType(name='refs/heads/release42', config_path='/my-configs'),
-    ]
+    projects.get_refs.return_value = {
+      'chromium': [
+        RefType(name='refs/heads/master'),
+        RefType(name='refs/heads/release42', config_path='/my-configs'),
+      ],
+    }
 
     gitiles_import.import_projects()
 
@@ -350,7 +354,7 @@ class GitilesImportTestCase(test_case.TestCase):
   def test_import_ref(self):
     self.mock(gitiles_import, '_import_config_set', mock.Mock())
     self.mock(projects, 'get_project', mock.Mock())
-    self.mock(projects, 'get_ref', mock.Mock())
+    self.mock(projects, 'get_refs', mock.Mock())
     projects.get_project.return_value = service_config_pb2.Project(
         id='chromium',
         config_location=service_config_pb2.ConfigSetLocation(
@@ -358,10 +362,13 @@ class GitilesImportTestCase(test_case.TestCase):
             storage_type=service_config_pb2.ConfigSetLocation.GITILES,
         ),
     )
-    projects.get_ref.return_value = project_config_pb2.RefsCfg.Ref(
-        name='refs/heads/release42',
-        config_path='/my-configs',
-    )
+    projects.get_refs.return_value = {
+      'chromium': [
+          project_config_pb2.RefsCfg.Ref(
+              name='refs/heads/release42',
+              config_path='/my-configs'),
+      ],
+    }
 
     gitiles_import.import_ref('chromium', 'refs/heads/release42')
 
@@ -383,14 +390,19 @@ class GitilesImportTestCase(test_case.TestCase):
             storage_type=service_config_pb2.ConfigSetLocation.GITILES,
         ),
     )
-    self.mock(projects, 'get_ref', mock.Mock(return_value=None))
+    self.mock(projects, 'get_refs', mock.Mock(return_value={
+      'chromium': [],
+    }))
     with self.assertRaises(gitiles_import.NotFoundError):
       gitiles_import.import_ref('chromium', 'refs/heads/release42')
 
   def test_import_projects_exception(self):
     self.mock(gitiles_import, 'import_project', mock.Mock())
     gitiles_import.import_project.side_effect = Exception
-    self.mock(projects, 'get_refs', mock.Mock(return_value=[]))
+    self.mock(projects, 'get_refs', mock.Mock(return_value={
+      'chromium': [],
+      'will-fail': [],
+    }))
 
     self.mock(projects, 'get_projects', mock.Mock())
     projects.get_projects.return_value = [

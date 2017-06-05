@@ -39,19 +39,6 @@ def get_services_async():
   raise ndb.Return(cfg.services or [])
 
 
-@ndb.tasklet
-def get_service_async(service_id):
-  """Returns a service config by id.
-
-  Returns:
-    service_config_pb2.Service, or None if not found.
-  """
-  services = yield get_services_async()
-  for service in services:
-    if service.id == service_id:
-      raise ndb.Return(service)
-
-
 def _dict_to_dynamic_metadata(data):
   validation.validate_service_dynamic_metadata_blob(
       data,
@@ -86,7 +73,11 @@ def get_metadata_async(service_id):
     msg.ParseFromString(cached)
     raise ndb.Return(msg)
 
-  service = yield get_service_async(service_id)
+  services = yield get_services_async()
+  service = None
+  for s in services:
+    if s.id == service_id:
+      service = s
   if service is None:
     raise ServiceNotFoundError('Service "%s" not found', service_id)
 

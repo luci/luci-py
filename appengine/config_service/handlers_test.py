@@ -41,8 +41,6 @@ class HandlersTest(test_case.TestCase):
     self.app.get('/schemas/non-existent', status=404)
 
   def test_schemas_no_schemas_cfg(self):
-    self.mock(storage, 'get_latest_as_message_async', mock.Mock())
-    storage.get_latest_as_message_async.return_value = future(None)
     self.app.get('/schemas/non-existent', status=404)
 
 

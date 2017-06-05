@@ -323,7 +323,11 @@ def import_ref(project_id, ref_name):
     raise Error('project %s is not a Gitiles project' % project_id)
   loc = gitiles.Location.parse_resolve(project.config_location.url)
 
-  ref = projects.get_ref(project_id, ref_name)
+  ref = None
+  for r in projects.get_refs([project_id]).get(project_id, ()):
+    if r.name == ref_name:
+      ref = r
+
   if ref is None:
     raise NotFoundError(
         ('ref "%s" is not found in project %s. '
@@ -400,7 +404,9 @@ def import_projects():
   Logs errors, does not raise them.
   """
   cfg = get_gitiles_config()
-  for project in projects.get_projects():
+  projs = projects.get_projects()
+  refs = projects.get_refs([p.id for p in projs])
+  for project in projs:
     loc = project.config_location
     if loc.storage_type != GITILES_LOCATION_TYPE:
       continue
@@ -420,7 +426,7 @@ def import_projects():
 
 
     # Import refs of the project
-    for ref in projects.get_refs(project.id):
+    for ref in refs[project.id] or []:
       assert ref.name
       assert ref.name.startswith('refs/'), ref.name
       ref_location = location._replace(

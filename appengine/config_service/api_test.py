@@ -31,35 +31,54 @@ class ApiTest(test_case.EndpointsTestCase):
 
   def setUp(self):
     super(ApiTest, self).setUp()
-    self.mock(acl, 'has_project_access', mock.Mock())
-    acl.has_project_access.side_effect = (
-        lambda pid: pid != 'secret'
+    self.mock(acl, 'has_projects_access', mock.Mock())
+    acl.has_projects_access.side_effect = (
+        lambda pids: {pid: pid != 'secret' for pid in pids}
     )
-    self.mock(acl, 'has_service_access', mock.Mock(return_value=True))
+
+    self.mock(
+        acl, 'has_services_access', lambda sids: {sid: True for sid in sids})
     self.mock(projects, 'get_projects', mock.Mock())
     projects.get_projects.return_value = [
       service_config_pb2.Project(id='chromium'),
       service_config_pb2.Project(id='v8'),
     ]
     self.mock(projects, 'get_metadata', mock.Mock())
-    projects.get_metadata.return_value = project_config_pb2.ProjectCfg()
+    projects.get_metadata.return_value = {
+      'chromium': project_config_pb2.ProjectCfg(),
+      'v8': project_config_pb2.ProjectCfg(),
+    }
     self.mock(projects, 'get_repos', mock.Mock())
-    projects.get_repos.return_value = [
-      (projects.RepositoryType.GITILES, 'https://localhost/project'),
-    ]
+    projects.get_repos.return_value = {
+      'chromium': (
+          projects.RepositoryType.GITILES, 'https://chromium.example.com'),
+      'v8': (
+          projects.RepositoryType.GITILES, 'https://v8.example.com'),
+    }
 
-  def mock_config(self):
-    self.mock(storage, 'get_config_hash_async', mock.Mock())
-    self.mock(storage, 'get_config_by_hash_async', mock.Mock())
-    storage.get_config_hash_async.return_value = future(('deadbeef', 'abc0123'))
-    storage.get_config_by_hash_async.return_value = future('config text')
+  def mock_config(self, mock_content=True):
+    self.mock(storage, 'get_config_hashes_async', mock.Mock())
+    storage.get_config_hashes_async.return_value = future({
+      'services/luci-config': ('deadbeef', 'abc0123'),
+    })
+
+    if mock_content:
+      self.mock(storage, 'get_configs_by_hashes_async', mock.Mock())
+      storage.get_configs_by_hashes_async.return_value = future({
+        'abc0123': 'config text',
+      })
 
   def mock_refs(self):
     self.mock(projects, 'get_refs', mock.Mock())
-    projects.get_refs.return_value = [
-      project_config_pb2.RefsCfg.Ref(name='refs/heads/master'),
-      project_config_pb2.RefsCfg.Ref(name='refs/heads/release42'),
-    ]
+    projects.get_refs.return_value = {
+      'chromium': [
+        project_config_pb2.RefsCfg.Ref(name='refs/heads/master'),
+        project_config_pb2.RefsCfg.Ref(name='refs/heads/release42'),
+      ],
+      'v8': [
+        project_config_pb2.RefsCfg.Ref(name='refs/heads/master'),
+      ],
+    }
 
   ##############################################################################
   # get_mapping
@@ -67,7 +86,7 @@ class ApiTest(test_case.EndpointsTestCase):
   def test_get_mapping_one(self):
     self.mock(storage, 'get_config_sets_async', mock.Mock())
     storage.get_config_sets_async.return_value = future([
-      storage.ConfigSet(id='services/x', location='http://x'),
+      storage.ConfigSet(id='services/x', location='https://x'),
     ])
 
     req = {
@@ -82,13 +101,15 @@ class ApiTest(test_case.EndpointsTestCase):
       'mappings': [
         {
           'config_set': 'services/x',
-          'location': 'http://x',
+          'location': 'https://x',
         },
       ],
     })
 
   def test_get_mapping_one_forbidden(self):
-    self.mock(acl, 'can_read_config_set', mock.Mock(return_value=False))
+    self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
+      'services/x': False,
+    }))
     with self.call_should_fail(httplib.FORBIDDEN):
       req = {
         'config_set': 'services/x',
@@ -98,8 +119,8 @@ class ApiTest(test_case.EndpointsTestCase):
   def test_get_mapping_all(self):
     self.mock(storage, 'get_config_sets_async', mock.Mock())
     storage.get_config_sets_async.return_value = future([
-      storage.ConfigSet(id='services/x', location='http://x'),
-      storage.ConfigSet(id='services/y', location='http://y'),
+      storage.ConfigSet(id='services/x', location='https://x'),
+      storage.ConfigSet(id='services/y', location='https://y'),
     ])
     resp = self.call_api('get_mapping', {}).json_body
 
@@ -107,11 +128,11 @@ class ApiTest(test_case.EndpointsTestCase):
       'mappings': [
         {
           'config_set': 'services/x',
-          'location': 'http://x',
+          'location': 'https://x',
         },
         {
           'config_set': 'services/y',
-          'location': 'http://y',
+          'location': 'https://y',
         },
       ],
     })
@@ -119,10 +140,13 @@ class ApiTest(test_case.EndpointsTestCase):
   def test_get_mapping_all_partially_forbidden(self):
     self.mock(storage, 'get_config_sets_async', mock.Mock())
     storage.get_config_sets_async.return_value = future([
-      storage.ConfigSet(id='services/x', location='http://x'),
-      storage.ConfigSet(id='services/y', location='http://y'),
+      storage.ConfigSet(id='services/x', location='https://x'),
+      storage.ConfigSet(id='services/y', location='https://y'),
     ])
-    self.mock(acl, 'can_read_config_set', mock.Mock(side_effect=[True, False]))
+    self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
+      'services/x': True,
+      'services/y': False,
+    }))
 
     resp = self.call_api('get_mapping', {}).json_body
 
@@ -130,7 +154,7 @@ class ApiTest(test_case.EndpointsTestCase):
       'mappings': [
         {
           'config_set': 'services/x',
-          'location': 'http://x',
+          'location': 'https://x',
         },
       ],
     })
@@ -260,7 +284,9 @@ class ApiTest(test_case.EndpointsTestCase):
     self.assertEqual(resp, expected_resp)
 
   def test_get_config_one_forbidden(self):
-    self.mock(acl, 'can_read_config_set', mock.Mock(return_value=False))
+    self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
+      'services/x': False,
+    }))
     with self.call_should_fail(httplib.FORBIDDEN):
       req = {
         'config_set': 'services/x',
@@ -331,7 +357,10 @@ class ApiTest(test_case.EndpointsTestCase):
           latest_revision='badcoffee',
       ),
     ])
-    self.mock(acl, 'can_read_config_set', mock.Mock(side_effect=[True, False]))
+    self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
+      'services/x': True,
+      'projects/y': False,
+    }))
 
     resp = self.call_api('get_config_sets', {}).json_body
 
@@ -343,42 +372,6 @@ class ApiTest(test_case.EndpointsTestCase):
           'revision': {
             'id': 'deadbeef',
           }
-        },
-      ],
-    })
-
-  def test_get_config_one(self):
-    self.mock(storage, 'get_config_sets_async', mock.Mock())
-    storage.get_config_sets_async.return_value = future([
-      storage.ConfigSet(
-          id='services/x',
-          location='https://x.googlesource.com/x',
-          latest_revision='deadbeef',
-          latest_revision_url='https://x.googlesource.com/x/+/deadbeef',
-          latest_revision_time=datetime.datetime(2016, 1, 1),
-          latest_revision_committer_email='john@doe.com',
-      ),
-    ])
-
-    req = {
-      'config_set': 'services/x',
-    }
-    resp = self.call_api('get_config_sets', req).json_body
-
-    storage.get_config_sets_async.assert_called_once_with(
-        config_set='services/x')
-
-    self.assertEqual(resp, {
-      'config_sets': [
-        {
-          'config_set': 'services/x',
-          'location': 'https://x.googlesource.com/x',
-          'revision': {
-            'id': 'deadbeef',
-            'url': 'https://x.googlesource.com/x/+/deadbeef',
-            'timestamp': '1451606400000000',
-            'committer_email': 'john@doe.com',
-          },
         },
       ],
     })
@@ -401,9 +394,9 @@ class ApiTest(test_case.EndpointsTestCase):
       'content_hash': 'abc0123',
       'revision': 'deadbeef',
     })
-    storage.get_config_hash_async.assert_called_once_with(
-      'services/luci-config', 'my.cfg', revision='deadbeef')
-    storage.get_config_by_hash_async.assert_called_once_with('abc0123')
+    storage.get_config_hashes_async.assert_called_once_with(
+        {'services/luci-config': 'deadbeef'}, 'my.cfg')
+    storage.get_configs_by_hashes_async.assert_called_once_with(['abc0123'])
 
   def test_get_config_hash_only(self):
     self.mock_config()
@@ -420,12 +413,10 @@ class ApiTest(test_case.EndpointsTestCase):
       'content_hash': 'abc0123',
       'revision': 'deadbeef',
     })
-    self.assertFalse(storage.get_config_by_hash_async.called)
+    self.assertFalse(storage.get_configs_by_hashes_async.called)
 
   def test_get_config_blob_not_found(self):
-    self.mock_config()
-    storage.get_config_by_hash_async.return_value = future(None)
-
+    self.mock_config(mock_content=False)
     req = {
       'config_set': 'services/luci-config',
       'path': 'my.cfg',
@@ -434,8 +425,10 @@ class ApiTest(test_case.EndpointsTestCase):
       self.call_api('get_config', req)
 
   def test_get_config_not_found(self):
-    self.mock(
-        storage, 'get_config_hash_async', lambda *_, **__: future((None, None)))
+    def get_config_hashes_async(revs, path):
+      return future({cs: (None, None) for cs in revs})
+
+    self.mock(storage, 'get_config_hashes_async', get_config_hashes_async)
 
     req = {
       'config_set': 'services/x',
@@ -445,7 +438,7 @@ class ApiTest(test_case.EndpointsTestCase):
       self.call_api('get_config', req)
 
   def test_get_wrong_config_set(self):
-    self.mock(acl, 'can_read_config_set', mock.Mock(side_effect=ValueError))
+    self.mock(acl, 'can_read_config_sets', mock.Mock(side_effect=ValueError))
 
     req = {
       'config_set': 'xxx',
@@ -453,11 +446,13 @@ class ApiTest(test_case.EndpointsTestCase):
       'revision': 'deadbeef',
     }
     with self.call_should_fail(httplib.BAD_REQUEST):
-      self.call_api('get_config', req).json_body
+      self.call_api('get_config', req)
 
   def test_get_config_without_permissions(self):
-    self.mock(acl, 'can_read_config_set', mock.Mock(return_value=False))
-    self.mock(storage, 'get_config_hash_async', mock.Mock())
+    self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
+      'services/luci-config': False,
+    }))
+    self.mock(storage, 'get_config_hashes_async', mock.Mock())
 
     req = {
       'config_set': 'services/luci-config',
@@ -465,14 +460,16 @@ class ApiTest(test_case.EndpointsTestCase):
     }
     with self.call_should_fail(404):
       self.call_api('get_config', req)
-    self.assertFalse(storage.get_config_hash_async.called)
+    self.assertFalse(storage.get_config_hashes_async.called)
 
   ##############################################################################
   # get_config_by_hash
 
   def test_get_config_by_hash(self):
-    self.mock(storage, 'get_config_by_hash_async', mock.Mock())
-    storage.get_config_by_hash_async.return_value = future('some content')
+    self.mock(storage, 'get_configs_by_hashes_async', mock.Mock())
+    storage.get_configs_by_hashes_async.return_value = future({
+      'deadbeef': 'some content',
+    })
 
     req = {'content_hash': 'deadbeef'}
     resp = self.call_api('get_config_by_hash', req).json_body
@@ -481,7 +478,9 @@ class ApiTest(test_case.EndpointsTestCase):
       'content': base64.b64encode('some content'),
     })
 
-    storage.get_config_by_hash_async.return_value = future(None)
+    storage.get_configs_by_hashes_async.return_value = future({
+      'deadbeef': None,
+    })
     with self.call_should_fail(httplib.NOT_FOUND):
       self.call_api('get_config_by_hash', req)
 
@@ -495,19 +494,20 @@ class ApiTest(test_case.EndpointsTestCase):
       service_config_pb2.Project(id='inconsistent'),
       service_config_pb2.Project(id='secret'),
     ]
-    projects.get_metadata.side_effect = [
-      project_config_pb2.ProjectCfg(
+    projects.get_metadata.return_value = {
+      'chromium': project_config_pb2.ProjectCfg(
           name='Chromium, the best browser', access='all'),
-      project_config_pb2.ProjectCfg(access='all'),
-      project_config_pb2.ProjectCfg(access='all'),
-      project_config_pb2.ProjectCfg(access='administrators'),
-    ]
-    projects.get_repos.return_value = [
-      (projects.RepositoryType.GITILES, 'http://localhost/chromium'),
-      (projects.RepositoryType.GITILES, 'http://localhost/v8'),
-      (None, None),
-      (projects.RepositoryType.GITILES, 'http://localhost/secret'),
-    ]
+      'v8': project_config_pb2.ProjectCfg(access='all'),
+      'inconsistent': project_config_pb2.ProjectCfg(access='all'),
+      'secret': project_config_pb2.ProjectCfg(access='administrators'),
+    }
+    projects.get_repos.return_value = {
+      'chromium': (
+          projects.RepositoryType.GITILES, 'https://chromium.example.com'),
+      'v8': (projects.RepositoryType.GITILES, 'https://v8.example.com'),
+      'inconsistent': (None, None),
+      'secret': (projects.RepositoryType.GITILES, 'https://localhost/secret'),
+    }
 
     resp = self.call_api('get_projects', {}).json_body
 
@@ -517,18 +517,22 @@ class ApiTest(test_case.EndpointsTestCase):
           'id': 'chromium',
           'name': 'Chromium, the best browser',
           'repo_type': 'GITILES',
-          'repo_url': 'http://localhost/chromium',
+          'repo_url': 'https://chromium.example.com',
         },
         {
           'id': 'v8',
           'repo_type': 'GITILES',
-          'repo_url': 'http://localhost/v8',
+          'repo_url': 'https://v8.example.com',
         },
       ],
     })
 
+  def mock_no_project_access(self):
+    acl.has_projects_access.side_effect = (
+        lambda pids: {pid: False for pid in pids})
+
   def test_get_projects_without_permissions(self):
-    acl.has_project_access.return_value = False
+    self.mock_no_project_access()
     self.call_api('get_projects', {})
 
   ##############################################################################
@@ -549,8 +553,7 @@ class ApiTest(test_case.EndpointsTestCase):
 
   def test_get_refs_without_permissions(self):
     self.mock_refs()
-    acl.has_project_access.side_effect = None
-    acl.has_project_access.return_value = False
+    self.mock_no_project_access()
 
     req = {'project_id': 'chromium'}
     with self.call_should_fail(httplib.NOT_FOUND):
@@ -559,7 +562,7 @@ class ApiTest(test_case.EndpointsTestCase):
 
   def test_get_refs_of_non_existent_project(self):
     self.mock(projects, 'get_refs', mock.Mock())
-    projects.get_refs.return_value = None
+    projects.get_refs.return_value = {'non-existent': None}
     req = {'project_id': 'non-existent'}
     with self.call_should_fail(httplib.NOT_FOUND):
       self.call_api('get_refs', req)
@@ -568,33 +571,25 @@ class ApiTest(test_case.EndpointsTestCase):
   # get_project_configs
 
   def test_get_config_multi(self):
-    self.mock_refs()
     projects.get_projects.return_value.extend([
       service_config_pb2.Project(id='inconsistent'),
       service_config_pb2.Project(id='secret'),
     ])
+    projects.get_metadata.return_value.update({
+      'inconsistent': project_config_pb2.ProjectCfg(access='all'),
+      'secret': project_config_pb2.ProjectCfg(access='administrators'),
+    })
+    projects.get_repos.return_value.update({
+      'inconsistent': (None, None),
+      'secret': (projects.RepositoryType.GITILES, 'https://localhost/secret'),
+    })
 
-    self.mock(storage, 'get_latest_multi_async', mock.Mock())
-    storage.get_latest_multi_async.return_value = future([
-      {
-        'config_set': 'projects/chromium',
-        'revision': 'deadbeef',
-        'content_hash': 'abc0123',
-        'content': 'config text',
-      },
-      {
-        'config_set': 'projects/v8',
-        'revision': 'beefdead',
-        'content_hash': 'ccc123',
-        # No content
-      },
-      {
-        'config_set': 'projects/secret',
-        'revision': 'badcoffee',
-        'content_hash': 'abcabc',
-        'content': 'abcsdjksl',
-      },
-    ])
+    self.mock(storage, 'get_latest_configs_async', mock.Mock())
+    storage.get_latest_configs_async.return_value = future({
+      'projects/chromium': ('deadbeef', 'abc0123', 'config text'),
+      'projects/v8': ('beefdead', 'ccc123', None),  # no content
+      'projects/secret': ('badcoffee', 'abcabc', 'abcsdjksl'),
+    })
 
     req = {'path': 'cq.cfg'}
     resp = self.call_api('get_project_configs', req).json_body
@@ -612,7 +607,8 @@ class ApiTest(test_case.EndpointsTestCase):
   # get_ref_configs
 
   def test_get_ref_configs_without_permission(self):
-    acl.has_project_access.return_value = False
+    self.mock_refs()
+    self.mock_no_project_access()
 
     req = {'path': 'cq.cfg'}
     resp = self.call_api('get_ref_configs', req).json_body

@@ -102,12 +102,6 @@ class GetConfigMultiResponseMessage(messages.Message):
 class ConfigApi(remote.Service):
   """API to access configurations."""
 
-  def can_read_config_set(self, config_set):
-    try:
-      return acl.can_read_config_set(config_set)
-    except ValueError:
-      raise endpoints.BadRequestException('Invalid config set: %s' % config_set)
-
   ##############################################################################
   # endpoint: get_mapping
 
@@ -128,17 +122,18 @@ class ConfigApi(remote.Service):
   @auth.public # ACL check inside
   def get_mapping(self, request):
     """DEPRECATED. Use get_config_sets."""
-    if request.config_set and not self.can_read_config_set(request.config_set):
+    if request.config_set and not can_read_config_set(request.config_set):
       raise endpoints.ForbiddenException()
 
     config_sets = storage.get_config_sets_async(
         config_set=request.config_set).get_result()
+    can_read = can_read_config_sets([cs.key.id() for cs in config_sets])
     return self.GetMappingResponseMessage(
         mappings=[
           self.GetMappingResponseMessage.Mapping(
               config_set=cs.key.id(), location=cs.location)
           for cs in config_sets
-          if self.can_read_config_set(cs.key.id())
+          if can_read[cs.key.id()]
         ]
     )
 
@@ -160,7 +155,7 @@ class ConfigApi(remote.Service):
   @auth.public # ACL check inside
   def get_config_sets(self, request):
     """Returns config sets."""
-    if request.config_set and not self.can_read_config_set(request.config_set):
+    if request.config_set and not can_read_config_set(request.config_set):
       raise endpoints.ForbiddenException()
 
     config_sets = storage.get_config_sets_async(
@@ -174,22 +169,24 @@ class ConfigApi(remote.Service):
       attempts = [None] * len(config_sets)
 
     res = self.GetConfigSetsResponseMessage()
+    can_read = can_read_config_sets([cs.key.id() for cs in config_sets])
     for cs, attempt in zip(config_sets, attempts):
-      if self.can_read_config_set(cs.key.id()):
-        timestamp = None
-        if cs.latest_revision_time:
-          timestamp = utils.datetime_to_timestamp(cs.latest_revision_time)
-        res.config_sets.append(ConfigSet(
-            config_set=cs.key.id(),
-            location=cs.location,
-            revision=Revision(
-                id=cs.latest_revision,
-                url=cs.latest_revision_url,
-                timestamp=timestamp,
-                committer_email=cs.latest_revision_committer_email,
-            ),
-            last_import_attempt=attempt_to_msg(attempt),
-        ))
+      if not can_read[cs.key.id()]:
+        continue
+      timestamp = None
+      if cs.latest_revision_time:
+        timestamp = utils.datetime_to_timestamp(cs.latest_revision_time)
+      res.config_sets.append(ConfigSet(
+          config_set=cs.key.id(),
+          location=cs.location,
+          revision=Revision(
+              id=cs.latest_revision,
+              url=cs.latest_revision_url,
+              timestamp=timestamp,
+              committer_email=cs.latest_revision_committer_email,
+          ),
+          last_import_attempt=attempt_to_msg(attempt),
+      ))
     return res
 
   ##############################################################################
@@ -223,23 +220,22 @@ class ConfigApi(remote.Service):
       raise endpoints.BadRequestException(ex.message)
     res = self.GetConfigResponseMessage()
 
-    if not self.can_read_config_set(request.config_set):
+    if not can_read_config_set(request.config_set):
       logging.warning(
           '%s does not have access to %s',
           auth.get_current_identity().to_bytes(),
           request.config_set)
       raise_config_not_found()
 
-    res.revision, res.content_hash = (
-        storage.get_config_hash_async(
-            request.config_set, request.path, revision=request.revision)
-        .get_result())
+    content_hashes = storage.get_config_hashes_async(
+        {request.config_set: request.revision}, request.path).get_result()
+    res.revision, res.content_hash = content_hashes.get(request.config_set)
     if not res.content_hash:
       raise_config_not_found()
 
     if not request.hash_only:
-      res.content = (
-          storage.get_config_by_hash_async(res.content_hash).get_result())
+      res.content = storage.get_configs_by_hashes_async(
+          [res.content_hash]).get_result().get(res.content_hash)
       if not res.content:
         logging.warning(
             'Config hash is found, but the blob is not.\n'
@@ -266,8 +262,9 @@ class ConfigApi(remote.Service):
   def get_config_by_hash(self, request):
     """Gets a config file by its hash."""
     res = self.GetConfigByHashResponseMessage(
-        content=storage.get_config_by_hash_async(
-            request.content_hash).get_result())
+        content=storage.get_configs_by_hashes_async(
+            [request.content_hash]).get_result().get(request.content_hash)
+    )
     if not res.content:
       raise_config_not_found()
     return res
@@ -289,8 +286,10 @@ class ConfigApi(remote.Service):
 
     The project list is stored in services/luci-config:projects.cfg.
     """
+    projs = get_projects()
+    has_access = acl.has_projects_access([p.id for p in projs])
     return self.GetProjectsResponseMessage(
-        projects=[p for p in get_projects() if acl.has_project_access(p.id)],
+        projects=[p for p in get_projects() if has_access[p.id]],
     )
 
   ##############################################################################
@@ -312,14 +311,16 @@ class ConfigApi(remote.Service):
   @auth.public # ACL check inside
   def get_refs(self, request):
     """Gets list of refs of a project."""
-    if not acl.has_project_access(request.project_id):
+    has_access = acl.has_projects_access(
+        [request.project_id]).get(request.project_id)
+    if not has_access:
       raise endpoints.NotFoundException()
-    ref_names = get_ref_names(request.project_id)
-    if ref_names is None:
+    refs = projects.get_refs([request.project_id]).get(request.project_id)
+    if refs is None:
       # Project not found
       raise endpoints.NotFoundException()
     res = self.GetRefsResponseMessage()
-    res.refs = [res.Ref(name=ref) for ref in ref_names]
+    res.refs = [res.Ref(name=ref.name) for ref in refs]
     return res
 
   ##############################################################################
@@ -393,45 +394,45 @@ def get_projects():
   Does not return projects that have no repo information. It might happen due
   to eventual consistency.
 
-  Caches results in memcache for 10 min.
+  Does not check access.
+
+  Caches results in memcache for 1 min.
   """
   result = []
   projs = projects.get_projects()
-  repos = projects.get_repos(p.id for p in projs)
-  for p, (repo_type, repo_url) in zip(projs, repos):
+  project_ids = [p.id for p in projs]
+  repos = projects.get_repos(project_ids)
+  metadata = projects.get_metadata(project_ids)
+  for p in projs:
+    repo_type, repo_url = repos.get(p.id, (None, None))
     if repo_type is None:
       # Not yet consistent.
       continue
-    metadata = projects.get_metadata(p.id)
+    name = None
+    if metadata.get(p.id) and metadata[p.id].name:
+      name = metadata[p.id].name
     result.append(Project(
         id=p.id,
-        name=metadata.name or None,
+        name=name,
         repo_type=repo_type,
         repo_url=repo_url,
     ))
   return result
 
 
-@utils.memcache('ref_names', ['project_id'], time=60)  # 1 min.
-def get_ref_names(project_id):
-  """Returns list of ref names for a project. Caches results."""
-  assert project_id
-  refs = projects.get_refs(project_id)
-  if refs is None:
-    # Project does not exist
-    return None
-  return [ref.name for ref in refs]
-
-
 def get_config_sets_from_scope(scope):
-  """Returns list of config sets from 'projects' or 'refs'."""
+  """Yields config sets from 'projects' or 'refs'."""
   assert scope in ('projects', 'refs'), scope
-  for project in get_projects():
+  projs = get_projects()
+  refs = None
+  if scope == 'refs':
+    refs = projects.get_refs([p.id for p in projs])
+  for p in projs:
     if scope == 'projects':
-      yield 'projects/%s' % project.id
+      yield 'projects/%s' % p.id
     else:
-      for ref_name in get_ref_names(project.id):
-        yield 'projects/%s/%s' % (project.id, ref_name)
+      for ref in refs.get(p.id, ()):
+        yield 'projects/%s/%s' % (p.id, ref.name)
 
 
 def get_config_multi(scope, path, hashes_only):
@@ -446,24 +447,31 @@ def get_config_multi(scope, path, hashes_only):
     'v2/%s%s:%s' % (scope, ',hashes_only' if hashes_only else '', path))
   configs = memcache.get(cache_key)
   if configs is None:
-    configs = storage.get_latest_multi_async(
-        get_config_sets_from_scope(scope), path, hashes_only).get_result()
-    for config in configs:
-      if not hashes_only and config.get('content') is None:
+    config_sets = list(get_config_sets_from_scope(scope))
+    cfg_map = storage.get_latest_configs_async(
+        config_sets, path, hashes_only=hashes_only).get_result()
+    configs = []
+    for cs in config_sets:
+      rev, content_hash, content = cfg_map.get(cs, (None, None, None))
+      configs.append({
+        'config_set': cs,
+        'revision': rev,
+        'content_hash': content_hash,
+        'content': content,
+      })
+      if not hashes_only and content is None:
         logging.error(
             'Blob %s referenced from %s:%s:%s was not found',
-            config['content_hash'],
-            config['config_set'],
-            config['revision'],
-            path)
+            content_hash, cs, rev, path)
     try:
       memcache.add(cache_key, configs, time=60)
     except ValueError:
       logging.exception('%s:%s configs are too big for memcache', scope, path)
 
   res = GetConfigMultiResponseMessage()
+  can_read = can_read_config_sets([c['config_set'] for c in configs])
   for config in configs:
-    if not acl.can_read_config_set(config['config_set']):
+    if not can_read[config['config_set']]:
       continue
     if not hashes_only and config.get('content') is None:
       continue
@@ -479,3 +487,14 @@ def get_config_multi(scope, path, hashes_only):
 
 def raise_config_not_found():
   raise endpoints.NotFoundException('The requested config is not found')
+
+
+def can_read_config_sets(config_sets):
+  try:
+    return acl.can_read_config_sets(config_sets)
+  except ValueError as ex:
+    raise endpoints.BadRequestException(ex.message)
+
+
+def can_read_config_set(config_set):
+  return can_read_config_sets([config_set]).get(config_set)

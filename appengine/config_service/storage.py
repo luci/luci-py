@@ -5,8 +5,6 @@
 """Storage of config files."""
 
 import hashlib
-import logging
-import urlparse
 
 from google.appengine.api import app_identity
 from google.appengine.ext import ndb
@@ -15,6 +13,7 @@ from google.protobuf import text_format
 
 from components import config
 from components import utils
+
 
 class Blob(ndb.Model):
   """Content-addressed blob. Immutable.
@@ -118,134 +117,132 @@ def get_config_sets_async(config_set=None):
 
 
 @ndb.tasklet
-def get_latest_revision_async(config_set):
-  """Returns latest known revision of the |config_set|. May return None."""
-  config_set_entity = yield ConfigSet.get_by_id_async(config_set)
-  raise ndb.Return(
-      config_set_entity.latest_revision if config_set_entity else None)
+def get_latest_revisions_async(config_sets):
+  """Returns a mapping {config_set: latest_revision}.
+
+  A returned latest_revision may be None.
+  """
+  assert isinstance(config_sets, list)
+  entities = yield ndb.get_multi_async(
+      ndb.Key(ConfigSet, cs) for cs in config_sets
+  )
+  latest_revisions = {e.key.id(): e.latest_revision for e in entities if e}
+  raise ndb.Return({
+      cs: latest_revisions.get(cs)
+      for cs in config_sets
+  })
 
 
 @ndb.tasklet
-def get_config_hash_async(config_set, path, revision=None):
-  """Returns tuple (revision, content_hash).
+def get_config_hashes_async(revs, path):
+  """Returns a mapping {config_set: (revision, content_hash)}.
 
-  |revision| detaults to the latest revision.
+  A returned revision or content_hash may be None.
+
+  Args:
+    revs: a mapping {config_set: revision}.
+      If revision is None, latest will be used.
+    path (str): path to the file.
   """
-  assert isinstance(config_set, basestring)
-  assert config_set
-  assert isinstance(path, basestring)
+  assert isinstance(revs, dict)
+  for cs, rev in revs.iteritems():
+    assert isinstance(cs, basestring)
+    assert cs
+    assert rev is None or isinstance(rev, basestring)
+    assert rev is None or rev
   assert path
   assert not path.startswith('/')
 
-  if not revision:
-    revision = yield get_latest_revision_async(config_set)
-    if revision is None:
-      logging.warning('Config set not found: %s' % config_set)
-      raise ndb.Return(None, None)
+  # Resolve latest revisions.
+  revs = revs.copy()
+  config_sets_without_rev = [cs for cs, rev in revs.iteritems() if not rev]
+  if config_sets_without_rev:
+    latest_revisions = yield get_latest_revisions_async(config_sets_without_rev)
+    revs.update(latest_revisions)
 
-  assert revision
-  file_key = ndb.Key(
-      ConfigSet, config_set,
-      Revision, revision,
-      File, path)
-  file_entity = yield file_key.get_async()
-  content_hash = file_entity.content_hash if file_entity else None
-  if not content_hash:
-    revision = None
-  raise ndb.Return(revision, content_hash)
-
-
-@ndb.tasklet
-def get_config_by_hash_async(content_hash):
-  """Returns config content by its hash."""
-  blob = yield Blob.get_by_id_async(content_hash)
-  raise ndb.Return(blob.content if blob else None)
-
-
-@ndb.tasklet
-def get_latest_async(config_set, path):
-  """Returns latest content of a config file."""
-  _, content_hash = yield get_config_hash_async(config_set, path)
-  if not content_hash:  # pragma: no cover
-    raise ndb.Return(None)
-  content = yield get_config_by_hash_async(content_hash)
-  raise ndb.Return(content)
+  # Load content hashes
+  file_entities = yield ndb.get_multi_async([
+    ndb.Key(
+        ConfigSet, cs,
+        Revision, rev,
+        File, path)
+    for cs, rev in revs.iteritems()
+    if rev
+  ])
+  content_hashes = {
+    # map key is config set
+    f.key.parent().parent().id(): f.content_hash
+    for f in file_entities
+    if f
+  }
+  raise ndb.Return({
+    cs: (rev if content_hashes.get(cs) else None, content_hashes.get(cs))
+    for cs, rev in revs.iteritems()
+  })
 
 
 @ndb.tasklet
-def get_latest_multi_async(config_sets, path, hashes_only=False):
-  """Returns latest contents of all <config_set>:<path> config files.
+def get_configs_by_hashes_async(content_hashes):
+  """Returns a mapping {hash: content}."""
+  assert isinstance(content_hashes, list)
+  if not content_hashes:
+    raise ndb.Return({})
+  assert all(h for h in content_hashes)
+  content_hashes = list(set(content_hashes))
+  blobs = yield ndb.get_multi_async(ndb.Key(Blob, h) for h in content_hashes)
+  raise ndb.Return({
+    h: b.content if b else None
+    for h, b in zip(content_hashes, blobs)
+  })
 
-  Returns:
-    A a list of dicts with keys 'config_set', 'revision', 'content_hash' and
-    'content', 'url'. Content is not available if |hashes_only| is True.
+
+@ndb.tasklet
+def get_latest_configs_async(config_sets, path, hashes_only=False):
+  """Returns a mapping {config_set: (revision, hash, content)}.
+
+  If hash_only is True, returned content items are None.
   """
-  assert path
-  assert not path.startswith('/')
+  assert isinstance(config_sets, list)
+  # Resolve content hashes.
+  revs_and_hashes = yield get_config_hashes_async(
+      {cs: None for cs in config_sets}, path)
 
-  config_set_keys = [ndb.Key(ConfigSet, cs) for cs in config_sets]
-  config_set_entities = yield ndb.get_multi_async(config_set_keys)
-  config_set_entities = filter(None, config_set_entities)
+  if hashes_only:
+    contents = {}
+  else:
+    hashes = [h for _, h in revs_and_hashes.itervalues() if h]
+    contents = yield get_configs_by_hashes_async(hashes)
 
-  file_keys = [
-    ndb.Key(ConfigSet, cs.key.id(), Revision, cs.latest_revision, File, path)
-    for cs in config_set_entities
-  ]
-  file_entities = yield ndb.get_multi_async(file_keys)
-
-  blob_futures = {}
-  if not hashes_only:
-    blob_futures = {
-      f.content_hash: ndb.Key(Blob, f.content_hash).get_async()
-      for f in file_entities
-      if f
-    }
-    yield blob_futures.values()
-
-  results = []
-  for cs, f in zip(config_set_entities, file_entities):
-    if not f:
-      continue
-    url = None
-    if cs.latest_revision_url:
-      base = cs.latest_revision_url
-      if not base.endswith('/'):
-        base += '/'
-      url = urlparse.urljoin(base, path)
-    blob_fut = blob_futures.get(f.content_hash)
-    results.append({
-      'config_set': f.key.parent().parent().id(),
-      'content': blob_fut.get_result().content if blob_fut else None,
-      'content_hash': f.content_hash,
-      'revision': f.key.parent().id(),
-      'url': url,
-    })
-  raise ndb.Return(results)
+  raise ndb.Return({
+    cs: (rev, content_hash, contents.get(content_hash))
+    for cs, (rev, content_hash) in revs_and_hashes.iteritems()
+  })
 
 
 @ndb.tasklet
-def get_latest_as_message_async(config_set, path, message_factory):
-  """Reads latest config file as a text-formatted protobuf message.
+def get_latest_messages_async(config_sets, path, message_factory):
+  """Reads latest config files as a text-formatted protobuf message.
 
   |message_factory| is a function that creates a message. Typically the message
   type itself. Values found in the retrieved config file are merged into the
   return value of the factory.
 
-  Memcaches results.
+  Returns:
+    A mapping {config_set: message}. A message is empty if the file does not
+    exist.
   """
-  msg = message_factory()
-  cache_key = 'get_latest_as_message(%r, %r)' % (config_set, path)
-  ctx = ndb.get_context()
-  cached = yield ctx.memcache_get(cache_key)
-  if cached:
-    msg.ParseFromString(cached)
-    raise ndb.Return(msg)
+  configs = yield get_latest_configs_async(config_sets, path)
 
-  text = yield get_latest_async(config_set, path)
-  if text:
-    text_format.Merge(text, msg)
-  yield ctx.memcache_set(cache_key, msg.SerializeToString(), time=60)
-  raise ndb.Return(msg)
+  def to_msg(text):
+    msg = message_factory()
+    if text:
+      text_format.Merge(text, msg)
+    return msg
+
+  raise ndb.Return({
+    cs: to_msg(text)
+    for cs, (_, _, text) in configs.iteritems()
+  })
 
 
 @utils.cache
@@ -253,10 +250,22 @@ def get_self_config_set():
   return 'services/%s' % app_identity.get_application_id()
 
 
+@ndb.tasklet
 def get_self_config_async(path, message_factory):
   """Parses a config file in the app's config set into a protobuf message."""
-  return get_latest_as_message_async(
-      get_self_config_set(), path, message_factory)
+  cache_key = 'get_self_config_async(%r)' % path
+  ctx = ndb.get_context()
+  cached = yield ctx.memcache_get(cache_key)
+  if cached:
+    msg = message_factory()
+    msg.ParseFromString(cached)
+    raise ndb.Return(msg)
+
+  cs = get_self_config_set()
+  messages = yield get_latest_messages_async([cs], path, message_factory)
+  msg = messages[cs]
+  yield ctx.memcache_set(cache_key, msg.SerializeToString())
+  raise ndb.Return(msg)
 
 
 def compute_hash(content):

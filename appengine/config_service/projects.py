@@ -10,7 +10,6 @@ from google.appengine.ext import ndb
 from google.appengine.ext.ndb import msgprop
 from protorpc import messages
 
-from components import utils
 from components.config.proto import project_config_pb2
 from components.config.proto import service_config_pb2
 
@@ -77,55 +76,73 @@ def get_project(id):
   return None
 
 
-def project_exists(project_id):
-  # TODO(nodir): optimize
-  return any(p.id == project_id for p in get_projects())
-
-
 def get_repos(project_ids):
-  """Returns list of tuples (repo_type, repo_url) for each project."""
-  keys = [ndb.Key(ProjectImportInfo, pid) for pid in project_ids]
-  results = []
-  empty = ProjectImportInfo()
-  for info in ndb.get_multi(keys):
-    info = info or empty
-    results.append((info.repo_type, info.repo_url))
-  return results
+  """Returns a mapping {project_id: (repo_type, repo_url)}.
 
-
-def get_metadata(project_id):
-  """Returns project metadata stored in project.cfg.
-
-  Never returns None.
+  All projects must exist.
   """
-  return _get_project_config(
-      project_id, common.PROJECT_METADATA_FILENAME,
+  assert isinstance(project_ids, list)
+  keys = [ndb.Key(ProjectImportInfo, pid) for pid in project_ids]
+  return {
+    pid: (info.repo_type, info.repo_url) if info else (None, None)
+    for pid, info in zip(project_ids, ndb.get_multi(keys))
+  }
+
+
+def get_metadata(project_ids):
+  """Returns a mapping {project_id: metadata}.
+
+  If a project does not exist, the metadata is None.
+
+  The project metadata stored in project.cfg files in each project.
+  """
+  return _get_project_configs(
+      project_ids, common.PROJECT_METADATA_FILENAME,
       project_config_pb2.ProjectCfg)
 
 
-def get_refs(project_id):
-  """Returns a list of project refs stored in refs.cfg.
+def get_refs(project_ids):
+  """Returns a mapping {project_id: list of refs}
 
-  Never returns None.
+  The ref list is None if a project does not exist.
+
+  The list of refs stored in refs.cfg of a project.
   """
-  cfg = _get_project_config(
-      project_id, common.REFS_FILENAME, project_config_pb2.RefsCfg)
-  # TODO(nodirt): implement globs.
-  if not cfg.refs and not project_exists(project_id):
-    return None
-  return cfg.refs or DEFAULT_REF_CFG.refs
+  cfgs = _get_project_configs(
+      project_ids, common.REFS_FILENAME, project_config_pb2.RefsCfg)
+  return {
+    pid: None if cfg is None else cfg.refs or DEFAULT_REF_CFG.refs
+    for pid, cfg in cfgs.iteritems()
+  }
 
 
-def get_ref(project_id, ref_name):
-  """Returns a ref of a project by name."""
-  for ref in get_refs(project_id):
-    # TODO(nodir): take into account regexes here when they are supported.
-    if ref.name == ref_name:
-      return ref
-  return None
+def _get_project_configs(project_ids, path, message_factory):
+  """Returns a mapping {project_id: message}.
+
+  If a project does not exist, the message is None.
+  """
+  assert isinstance(project_ids, list)
+  if not project_ids:
+    return {}
+  prefix = 'projects/'
+  messages = storage.get_latest_messages_async(
+      [prefix + pid for pid in _filter_existing(project_ids)],
+      path, message_factory).get_result()
+  return {
+    # messages may not have a key because we filter project ids by existence
+    pid: messages.get(prefix + pid)
+    for pid in project_ids
+  }
 
 
-def _get_project_config(project_id, path, message_factory):
-  assert project_id
-  return storage.get_latest_as_message_async(
-      'projects/%s' % project_id, path, message_factory).get_result()
+def _filter_existing(project_ids):
+  # TODO(nodir): optimize
+  assert isinstance(project_ids, list)
+  if not project_ids:
+    return project_ids
+  assert all(pid for pid in project_ids)
+  all_project_ids = set(p.id for p in get_projects())
+  return [
+    pid for pid in project_ids
+    if pid in all_project_ids
+  ]

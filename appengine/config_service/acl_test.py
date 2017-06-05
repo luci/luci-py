@@ -20,6 +20,14 @@ import services
 import storage
 
 
+def can_read_config_set(config_set):
+  return acl.can_read_config_sets([config_set])[config_set]
+
+
+def has_project_access(project_id):
+  return acl.has_projects_access([project_id])[project_id]
+
+
 class AclTestCase(test_case.TestCase):
   def setUp(self):
     super(AclTestCase, self).setUp()
@@ -27,65 +35,69 @@ class AclTestCase(test_case.TestCase):
     auth.get_current_identity.return_value = auth.Anonymous
     self.mock(auth, 'is_admin', lambda *_: False)
     self.mock(auth, 'is_group_member', mock.Mock(return_value=False))
-    self.mock(services, 'get_service_async', mock.Mock())
-    services.get_service_async.side_effect = lambda sid: future(None)
+    self.mock(
+        services, 'get_services_async', mock.Mock(return_value=future([])))
 
     acl_cfg = service_config_pb2.AclCfg(
         project_access_group='project-admins',
     )
+    self.mock(projects, '_filter_existing', lambda pids: pids)
     self.mock(storage, 'get_self_config_async', lambda *_: future(acl_cfg))
 
   def test_admin_can_read_all(self):
     self.mock(auth, 'is_admin', mock.Mock(return_value=True))
-    self.assertTrue(acl.can_read_config_set('services/swarming'))
-    self.assertTrue(acl.can_read_config_set('projects/chromium'))
-    self.assertTrue(acl.has_project_access('chromium'))
+    self.assertTrue(can_read_config_set('services/swarming'))
+    self.assertTrue(can_read_config_set('projects/chromium'))
+    self.assertTrue(has_project_access('chromium'))
 
   def test_has_service_access(self):
-    self.assertFalse(acl.can_read_config_set('services/swarming'))
+    self.assertFalse(can_read_config_set('services/swarming'))
 
-    service_cfg = service_config_pb2.Service(
-        id='swarming', access=['group:swarming-app'])
-    services.get_service_async.side_effect = lambda sid: future(service_cfg)
+    services.get_services_async.return_value = future([
+      service_config_pb2.Service(
+          id='swarming', access=['group:swarming-app']),
+    ])
     auth.is_group_member.side_effect = lambda g, *_: g == 'swarming-app'
 
-    self.assertTrue(acl.can_read_config_set('services/swarming'))
+    self.assertTrue(can_read_config_set('services/swarming'))
 
   def test_has_service_access_no_access(self):
-    self.assertFalse(acl.can_read_config_set('services/swarming'))
+    self.assertFalse(can_read_config_set('services/swarming'))
 
   def test_has_project_access_group(self):
     self.mock(projects, 'get_metadata', mock.Mock())
-    projects.get_metadata.return_value = project_config_pb2.ProjectCfg(
-        access=['group:googlers', 'a@a.com']
-    )
+    projects.get_metadata.return_value = {
+      'secret': project_config_pb2.ProjectCfg(
+          access=['group:googlers', 'a@a.com']),
+    }
 
-    self.assertFalse(acl.can_read_config_set('projects/secret'))
+    self.assertFalse(can_read_config_set('projects/secret'))
 
     auth.is_group_member.side_effect = lambda name, *_: name == 'googlers'
-    self.assertTrue(acl.can_read_config_set('projects/secret'))
+    self.assertTrue(can_read_config_set('projects/secret'))
 
     auth.is_group_member.side_effect = lambda name, *_: name == 'project-admins'
-    self.assertTrue(acl.can_read_config_set('projects/secret'))
+    self.assertTrue(can_read_config_set('projects/secret'))
 
   def test_has_project_access_identity(self):
     self.mock(projects, 'get_metadata', mock.Mock())
-    projects.get_metadata.return_value = project_config_pb2.ProjectCfg(
-        access=['group:googlers', 'a@a.com']
-    )
+    projects.get_metadata.return_value = {
+      'secret': project_config_pb2.ProjectCfg(
+          access=['group:googlers', 'a@a.com']),
+    }
 
-    self.assertFalse(acl.can_read_config_set('projects/secret'))
+    self.assertFalse(can_read_config_set('projects/secret'))
 
     auth.get_current_identity.return_value = auth.Identity('user', 'a@a.com')
-    self.assertTrue(acl.can_read_config_set('projects/secret'))
+    self.assertTrue(can_read_config_set('projects/secret'))
 
   def test_can_read_project_config_no_access(self):
-    self.assertFalse(acl.has_project_access('projects/swarming'))
-    self.assertFalse(acl.can_read_config_set('projects/swarming/refs/heads/x'))
+    self.assertFalse(has_project_access('projects/swarming'))
+    self.assertFalse(can_read_config_set('projects/swarming/refs/heads/x'))
 
   def test_malformed_config_set(self):
     with self.assertRaises(ValueError):
-      acl.can_read_config_set('invalid config set')
+      can_read_config_set('invalid config set')
 
 
 if __name__ == '__main__':
