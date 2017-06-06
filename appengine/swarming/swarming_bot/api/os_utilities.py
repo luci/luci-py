@@ -143,9 +143,13 @@ def _safe_read(filepath):
 ### Public API.
 
 
-@tools.cached
 def get_os_values():
-  """Returns the values to use for 'os' dimension."""
+  """Returns the values to use for 'os' dimension as a list.
+
+  Note that we don't apply @tools.cached decorator since all heavy calls made
+  by this function are already cached. By omitting the decorator we are building
+  a new list object each time, so callers can safely modify it.
+  """
   os_name = get_os_name()
   out = [os_name]
   if sys.platform == 'win32':
