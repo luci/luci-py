@@ -78,7 +78,7 @@ def has_services_access(service_ids):
     return {sid: True for sid in service_ids}
 
   cfgs = {
-    sid: s
+    s.id: s
     for s in services.get_services_async().get_result()
   }
   return {
