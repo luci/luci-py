@@ -63,6 +63,10 @@
         word-break: break-all;
       }
 
+      .bolded {
+        font-weight: bold;
+      }
+
       .expand {
         min-width: 3em;
         vertical-align: middle;
@@ -127,6 +131,10 @@
 
       .italic {
         font-style: italic;
+      }
+
+      span.dim~span.dim:before {
+        content: " | ";
       }
     </style>
 
@@ -342,7 +350,7 @@
                 </tr>
                 <template is="dom-repeat" items="{{_request.properties.dimensions}}" as="dimension">
                   <tr>
-                    <td><b>[[dimension.key]]:</b> [[_alias(dimension)]]</td>
+                    <td><b>[[dimension.key]]:</b> [[_aliasRequest(dimension)]]</td>
                   </tr>
                 </template>
                 <tr>
@@ -483,7 +491,15 @@
                 </tr>
                 <template is="dom-repeat" items="[[_result.bot_dimensions]]" as="dimension">
                   <tr>
-                    <td><b>[[dimension.key]]:</b> [[_alias(dimension)]]</td>
+                    <td bgcolor$="[[_highlight(_request.properties.dimensions, dimension.key)]]">
+                      <b>[[dimension.key]]:</b>
+                      <template 
+                        is="dom-repeat" 
+                        items="[[_aliasResult(_request.properties.dimensions, dimension)]]" 
+                        as="value">
+                        <span class$="[[value.class]] dim">[[value.name]]</span>
+                      </template>
+                    </td>
                   </tr>
                 </template>
 
@@ -736,17 +752,53 @@
       observers: [
         "_similarLoad(_request,_result,_auth_headers)"],
 
-      _alias: function(dim) {
-        var values = dim.value;
+      _aliasRequest: function(request) {
+        var values = request.value;
         if (!Array.isArray(values)) {
           values = [values];
         }
-        if (swarming.alias.has(dim.key)) {
-          values.forEach(function(v, i){
-            values[i] = swarming.alias.apply(v, dim.key);
+        if (swarming.alias.has(request.key)) {
+          values.forEach(function(v, i) {
+            values[i] = swarming.alias.apply(v, request.key);
           });
         }
         return values.join(" | ");
+      },
+
+      _aliasResult: function(requested_dims, bot_dim) {
+        // requested_dims is the entire _request.properties.dimensions array, but we
+        // are only passed in one key at a time from _result.bot_dimensions as the
+        // bot_dim variable. Therefore we need to loop through the key-value pairs
+        // of requested_dims to determine whether the current bot dimension was 
+        // requested.
+        var boldMap = [];
+        var target = null;
+        requested_dims.forEach(function(dim, i) {
+          if (dim.key === bot_dim.key) {
+            target = i;
+          }
+        });
+        var values = bot_dim.value;
+        if (!Array.isArray(values)) {
+          values = [values];
+        }
+        values.forEach(function(v, i) {
+          // Adjust the proper alias, if necessary
+          if (swarming.alias.has(bot_dim.key)) {
+            values[i] = swarming.alias.apply(v, bot_dim.key);
+          }
+          // Set class attribute to bolded if the value was included in the
+          // requested dimensions
+          var bold = "";
+          if (target != null && requested_dims[target].value === v) {
+            bold = "bolded";
+          }
+          boldMap.push({"name": values[i], "class": bold});
+        });
+
+        // Return an array of objects that map each value to its corresponding
+        // class name based on whether it should be bolded.
+        return boldMap;
       },
 
       _bytes: function(sizeInBytes) {
@@ -873,6 +925,16 @@
 
       _hasActualCIPDPackages: function(result) {
         return result && result.cipd_pins && result.cipd_pins.packages;
+      },
+
+      _highlight: function(request, key) {
+        var highlight = false;
+        request.forEach(function (dim) {
+          if (dim.key == key) {
+            highlight = true;
+          }
+        });
+        return highlight ? "Yellow" : "White";
       },
 
       _internalClass: function(failure) {
