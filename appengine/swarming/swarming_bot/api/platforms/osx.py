@@ -230,6 +230,10 @@ def get_gpu():
     dimensions.add(unicode(ven_id))
     dimensions.add(u'%s:%s' % (ven_id, dev_id))
     if version:
+      match = re.search(r'([0-9.]+) \[([0-9.]+)\]', version)
+      if match:
+        dimensions.add(u'%s:%s-%s-%s' % (
+            ven_id, dev_id, match.group(1), match.group(2)))
       state.add(u'%s %s %s' % (ven_name, dev_name, version))
     else:
       state.add(u'%s %s' % (ven_name, dev_name))

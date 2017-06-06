@@ -261,6 +261,7 @@ def get_gpu():
     dimensions.add(unicode(ven_id))
     dimensions.add(u'%s:%s' % (ven_id, dev_id))
     if version:
+      dimensions.add(u'%s:%s-%s' % (ven_id, dev_id, version))
       state.add(u'%s %s %s' % (ven_name, dev_name, version))
     else:
       state.add(u'%s %s' % (ven_name, dev_name))
