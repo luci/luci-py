@@ -603,6 +603,38 @@ class ApiTest(test_case.EndpointsTestCase):
       }],
     })
 
+  def test_get_config_multi_hashes_only(self):
+    projects.get_projects.return_value.extend([
+      service_config_pb2.Project(id='inconsistent'),
+      service_config_pb2.Project(id='secret'),
+    ])
+    projects.get_metadata.return_value.update({
+      'inconsistent': project_config_pb2.ProjectCfg(access='all'),
+      'secret': project_config_pb2.ProjectCfg(access='administrators'),
+    })
+    projects.get_repos.return_value.update({
+      'inconsistent': (None, None),
+      'secret': (projects.RepositoryType.GITILES, 'https://localhost/secret'),
+    })
+
+    self.mock(storage, 'get_latest_configs_async', mock.Mock())
+    storage.get_latest_configs_async.return_value = future({
+      'projects/chromium': ('deadbeef', 'abc0123', None),
+      'projects/v8': ('beefdead', None, None),  # no content hash
+      'projects/secret': ('badcoffee', 'abcabc', None),
+    })
+
+    req = {'path': 'cq.cfg', 'hashes_only': True}
+    resp = self.call_api('get_project_configs', req).json_body
+
+    self.assertEqual(resp, {
+      'configs': [{
+        'config_set': 'projects/chromium',
+        'revision': 'deadbeef',
+        'content_hash': 'abc0123',
+      }],
+    })
+
   ##############################################################################
   # get_ref_configs
 

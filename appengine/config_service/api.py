@@ -453,6 +453,8 @@ def get_config_multi(scope, path, hashes_only):
     configs = []
     for cs in config_sets:
       rev, content_hash, content = cfg_map.get(cs, (None, None, None))
+      if not content_hash:
+        continue
       configs.append({
         'config_set': cs,
         'revision': rev,
