@@ -128,14 +128,8 @@ configured size.
 ## remove-cataloged-instances
 
 Removes each models.Instance from the Machine Provider catalog that wasn't
-created from an instance template currently referenced in the config.
-
-
-## delete-drained-instances
-
-Deletes GCE instances for each models.Instance that was removed from the
-Machine Provider catalog for being created from an instance template not
-currently referenced in the config.
+created from an instance template currently referenced in the config and sets
+pending\_deletion.
 
 
 ## delete-instance-group-managers

@@ -58,14 +58,6 @@ class ConfigProcessHandler(webapp2.RequestHandler):
     )
 
 
-class DrainedInstancesDeletionHandler(webapp2.RequestHandler):
-  """Worker for deleting drained instances."""
-
-  @decorators.require_cronjob
-  def get(self):
-    instances.schedule_drained_deletion()
-
-
 class EntityCleanupHandler(webapp2.RequestHandler):
   """Worker for cleaning up datastore entities."""
 
@@ -167,8 +159,6 @@ def create_cron_app():
        InstanceGroupManagerCreationHandler),
       ('/internal/cron/create-instance-templates',
        InstanceTemplateCreationHandler),
-      ('/internal/cron/delete-drained-instances',
-       DrainedInstancesDeletionHandler),
       ('/internal/cron/delete-instance-group-managers',
        InstanceGroupManagerDeletionHandler),
       ('/internal/cron/delete-instances-pending-deletion',

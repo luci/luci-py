@@ -95,21 +95,6 @@ class DrainedInstanceCleanupHandler(webapp2.RequestHandler):
     cleanup.cleanup_drained_instance(key)
 
 
-class DrainedInstanceDeletionHandler(webapp2.RequestHandler):
-  """Worker for deleting drained instances."""
-
-  @decorators.require_taskqueue('delete-drained-instance')
-  def post(self):
-    """Deletes a drained instance.
-
-    Params:
-      key: URL-safe key for a models.Instance.
-    """
-    key = ndb.Key(urlsafe=self.request.get('key'))
-    assert key.kind() == 'Instance', key
-    instances.delete_drained(key)
-
-
 class InstanceCatalogHandler(webapp2.RequestHandler):
   """Worker for cataloging instances."""
 
@@ -292,8 +277,6 @@ def create_queues_app():
        InstanceGroupManagerCreationHandler),
       ('/internal/queues/create-instance-template',
        InstanceTemplateCreationHandler),
-      ('/internal/queues/delete-drained-instance',
-       DrainedInstanceDeletionHandler),
       ('/internal/queues/delete-instance-group-manager',
        InstanceGroupManagerDeletionHandler),
       ('/internal/queues/delete-instance-pending-deletion',
