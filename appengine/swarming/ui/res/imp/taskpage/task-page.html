@@ -32,6 +32,7 @@
 <link rel="import" href="/res/imp/bower_components/paper-input/paper-input.html">
 <link rel="import" href="/res/imp/bower_components/paper-tabs/paper-tabs.html">
 <link rel="import" href="/res/imp/bower_components/polymer/polymer.html">
+<link rel="import" href="/res/imp/bower_components/svg-piechart/svg-piechart.html">
 
 <link rel="import" href="/res/imp/common/common-behavior.html">
 <link rel="import" href="/res/imp/common/interval-timer.html">
@@ -255,38 +256,6 @@
                     quarantined)
                   </td>
                 </tr>
-                <tr>
-                  <td>Created</td>
-                  <td title$="[[_request.created_ts]]">[[_request.human_created_ts]]</td>
-                </tr>
-                <template is="dom-if" if="[[_wasPickedUp(_result)]]">
-                  <tr>
-                    <td>Started</td>
-                    <td title$="[[_result.started_ts]]">[[_result.human_started_ts]]</td>
-                  </tr>
-                </template>
-                <template is="dom-if" if="[[_wasNotPickedUp(_result)]]">
-                  <tr>
-                    <td>Expires</td>
-                    <td>[[_expires(_request)]]</td>
-                  </tr>
-                </template>
-                <template is="dom-if" if="[[_result.human_completed_ts]]">
-                  <tr>
-                    <td>Completed</td>
-                    <td title$="[[_result.completed_ts]]">[[_result.human_completed_ts]]</td>
-                  </tr>
-                </template>
-                <template is="dom-if" if="[[_result.human_abandoned_ts]]">
-                  <tr>
-                    <td>Abandoned</td>
-                    <td title$="[[_result.abandoned_ts]]">[[_result.human_abandoned_ts]]</td>
-                  </tr>
-                </template>
-                <tr>
-                  <td>Last Updated</td>
-                  <td title$="[[_result.modified_ts]]">[[_result.human_modified_ts]]</td>
-                </tr>
                 <template is="dom-if" if="[[_result.deduped_from]]">
                   <tr>
                     <td><b>Deduped from</b></td>
@@ -297,14 +266,6 @@
                     </td>
                   </tr>
                 </template>
-                <tr>
-                  <td>Pending Time</td>
-                  <td>[[_pending(_result)]]</td>
-                </tr>
-                <tr>
-                  <td>Duration</td>
-                  <td>[[_result.human_duration]]</td>
-                </tr>
                 <tr>
                   <td>Priority</td>
                   <td>[[_request.priority]]</td>
@@ -476,6 +437,70 @@
 
               </tbody>
             </table>
+
+            <div class="title" hidden$="[[_not(_task_exists)]]">Task Timing Information</div>
+            <div class="horizontal layout wrap">
+              <div class="left flex">
+                <table class="task-info" hidden$="[[_not(_task_exists)]]">
+                  <tbody>
+                    <tr>
+                      <td>Created</td>
+                      <td title$="[[_request.created_ts]]">[[_request.human_created_ts]]</td>
+                    </tr>
+                    <template is="dom-if" if="[[_wasPickedUp(_result)]]">
+                      <tr>
+                        <td>Started</td>
+                        <td title$="[[_result.started_ts]]">[[_result.human_started_ts]]</td>
+                      </tr>
+                    </template>
+                    <template is="dom-if" if="[[_wasNotPickedUp(_result)]]">
+                      <tr>
+                        <td>Expires</td>
+                        <td>[[_expires(_request)]]</td>
+                      </tr>
+                    </template>
+                    <template is="dom-if" if="[[_result.human_completed_ts]]">
+                      <tr>
+                        <td>Completed</td>
+                        <td title$="[[_result.completed_ts]]">[[_result.human_completed_ts]]</td>
+                      </tr>
+                    </template>
+                    <template is="dom-if" if="[[_result.human_abandoned_ts]]">
+                      <tr>
+                        <td>Abandoned</td>
+                        <td title$="[[_result.abandoned_ts]]">[[_result.human_abandoned_ts]]</td>
+                      </tr>
+                    </template>
+                    <tr>
+                      <td>Last updated</td>
+                      <td title$="[[_result.modified_ts]]">[[_result.human_modified_ts]]</td>
+                    </tr>
+                    <tr>
+                      <td>Pending Time</td>
+                      <td>
+                        <font color="#cc79a7">[[_pending(_result)]]</font>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Duration</td>
+                      <td>
+                        <font color="#0072b2">[[_result.human_duration]]</font>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="right flex">
+                <template is="dom-if" if="[[_result.human_completed_ts]]">
+                  <div class="left flex" style="padding-left: 50px; padding-right: 50px">
+                    <svg-piechart 
+                      data="[[_computePiechartData(_result)]]"
+                      colors="[&quot;rgb(204,121,167)&quot;, &quot;rgb(0,114,178)&quot;]">
+                    </svg-piechart>
+                  </div>
+                </template>
+              </div>
+            </div>
 
             <div class="title" hidden$="[[_not(_task_exists)]]">Task Execution</div>
             <template is="dom-if" if="[[_wasPickedUp(_result)]]">
@@ -703,6 +728,7 @@
           type: Boolean,
           value: false,
         },
+
         _dialog_prompt: {
           type: String,
           value: "",
@@ -870,6 +896,15 @@
         return args.join(" ");
       },
 
+      _computePiechartData: function(result) {
+        var created = result.created_ts;
+        var started = result.started_ts;
+        var completed = result.completed_ts;
+        return [
+          this._duration(created, started),
+          this._duration(started, completed)];
+      },
+
       _cost: function(result) {
         if (!result || !result.costs_usd || !result.costs_usd.length) {
           return 0;
@@ -882,6 +917,10 @@
           return false;
         }
         return result.try_number > 1;
+      },
+
+      _duration: function(start, end) {
+        return end.getTime() - start.getTime();
       },
 
       _empty: function(array) {
