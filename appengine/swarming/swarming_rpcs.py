@@ -344,24 +344,47 @@ class TaskOutput(messages.Message):
 
 class TaskResult(messages.Message):
   """Representation of the TaskResultSummary or TaskRunResult ndb model."""
+  # Time when the task was abandoned instead of normal completion (e.g.
+  # EXPIRED, BOT_DIED).
   abandoned_ts = message_types.DateTimeField(1)
+  # The same key cannot be repeated.
   bot_dimensions = messages.MessageField(StringListPair, 2, repeated=True)
+  # Unique ID of the bot.
   bot_id = messages.StringField(3)
+  # Hash of the bot code which ran the task.
   bot_version = messages.StringField(4)
+  # List of task IDs that this task triggered, if any.
   children_task_ids = messages.StringField(5, repeated=True)
+  # Time the task completed normally. Only one of abandoned_ts or completed_ts
+  # can be set.
   completed_ts = message_types.DateTimeField(6)
+  # $ saved for task with state DEDUPED.
   cost_saved_usd = messages.FloatField(7)
+  # Time the task was requested.
   created_ts = message_types.DateTimeField(8)
+  # Task ID which results was reused for state DEDUPED.
   deduped_from = messages.StringField(9)
+  # Duration of the task in seconds. This excludes overheads.
   duration = messages.FloatField(10)
+  # Process exit code if relevant. May be forcibly set to -1 in exceptional
+  # cases.
   exit_code = messages.IntegerField(11)
+  # True if exit_code != 0.
   failure = messages.BooleanField(12)
+  # True if state is BOT_DIED.
   internal_failure = messages.BooleanField(13)
+  # Time the results was last updated in the DB.
   modified_ts = message_types.DateTimeField(14)
+  # Isolated outputs, if any.
   outputs_ref = messages.MessageField(FilesRef, 15)
+  # Hash of the task request properties, if idempotent. This is leveraged for
+  # task deduplication.
   properties_hash = messages.StringField(16)
+  # Server versions that touched this task.
   server_versions = messages.StringField(17, repeated=True)
+  # Time the task started being run by a bot.
   started_ts = message_types.DateTimeField(18)
+  # Current state of the task (e.g. PENDING, RUNNING, COMPLETED, EXPIRED, etc).
   state = messages.EnumField(StateField, 19)
   # Summary task ID (ending with '0') when creating a new task.
   task_id = messages.StringField(20)
@@ -371,18 +394,20 @@ class TaskResult(messages.Message):
 
   # Can be multiple values only in TaskResultSummary.
   costs_usd = messages.FloatField(22, repeated=True)
-  # Only in TaskResultSummary.
+  # Name of the task. Only set when requesting task ID summary, ending with '0'.
   name = messages.StringField(23)
-  # Only in TaskResultSummary.
+  # Tags associated with the task when it was requested. Only set when
+  # requesting task ID summary, ending with '0'.
   tags = messages.StringField(24, repeated=True)
-  # Only in TaskResultSummary.
+  # User on behalf this task was requested. Only set when requesting task ID
+  # summary, ending with '0'.
   user = messages.StringField(25)
   # Statistics about overhead for an isolated task. Only sent when requested.
   performance_stats = messages.MessageField(PerformanceStats, 26)
 
-  # A listing of the ACTUAL pinned CipdPackages that the task used. These can
-  # vary from the input packages if the inputs included non-identity versions
-  # (e.g. a ref like "latest").
+  # Listing of the ACTUAL pinned CipdPackages that the task used. These can vary
+  # from the input packages if the inputs included non-identity versions (e.g. a
+  # ref like "latest").
   cipd_pins = messages.MessageField(CipdPins, 27)
   # Actual executed task id that this task represents. For deduped tasks, it is
   # the same value as deduped_from. This value can be empty if there is no
