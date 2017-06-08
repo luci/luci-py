@@ -110,6 +110,12 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request):
   bot_id = bot_dimensions[u'id'][0]
 
   now = utils.utcnow()
+  # Log before the task id in case the function fails in a bad state where the
+  # DB TX ran but the reply never comes to the bot. This is the worst case as
+  # this leads to a task that results in BOT_DIED without ever starting. This
+  # case is specifically handled in cron_handle_bot_died().
+  logging.info(
+      '_reap_task(%s)', task_pack.pack_result_summary_key(result_summary_key))
 
   def run():
     # 3 GET, 1 PUT at the end.
@@ -601,7 +607,7 @@ def bot_update_task(
     run_result_key, bot_id, output, output_chunk_start, exit_code, duration,
     hard_timeout, io_timeout, cost_usd, outputs_ref, cipd_pins,
     performance_stats):
-  """Updates a TaskRunResult and TaskResultSummary, along TaskOutput.
+  """Updates a TaskRunResult and TaskResultSummary, along TaskOutputChunk.
 
   Arguments:
   - run_result_key: ndb.Key to TaskRunResult.

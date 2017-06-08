@@ -302,17 +302,17 @@ def _get_state(botobj, sleep_streak):
   state = _call_hook_safe(False, botobj, 'get_state')
   if not isinstance(state, dict):
     _set_quarantined('get_state(): expected a dict, got %r' % state)
-    state = {'broken': state}
+    state = {u'broken': state}
 
-  if not state.get('quarantined'):
+  if not state.get(u'quarantined'):
     if not _is_base_dir_ok(botobj):
       # Use super hammer in case of dangerous environment.
       _set_quarantined('Can\'t run from blacklisted directory')
     if _QUARANTINED:
-      state['quarantined'] = _QUARANTINED
+      state[u'quarantined'] = _QUARANTINED
 
-  state['sleep_streak'] = sleep_streak
-  if not state.get('quarantined') and botobj:
+  state[u'sleep_streak'] = sleep_streak
+  if not state.get(u'quarantined') and botobj:
     # Quarantines when there's not enough free space on either root partition or
     # the current partition the bot is running in.
     settings = _get_settings(botobj)['free_partition']
@@ -461,9 +461,9 @@ def get_attributes(botobj):
   - botobj: bot.Bot instance or None
   """
   return {
-    'dimensions': _get_dimensions(botobj),
-    'state': _get_state(botobj, 0),
-    'version': generate_version(),
+    u'dimensions': _get_dimensions(botobj),
+    u'state': _get_state(botobj, 0),
+    u'version': generate_version(),
   }
 
 
@@ -819,7 +819,7 @@ def _poll_server(botobj, quit_bit, last_action):
     cmd, value = botobj.remote.poll(botobj._attributes)
   except remote_client_errors.PollError as e:
     # Back off on failure.
-    delay = max(1, min(60, botobj.state.get('sleep_streak', 10) * 2))
+    delay = max(1, min(60, botobj.state.get(u'sleep_streak', 10) * 2))
     logging.warning('Poll failed (%s), sleeping %.1f sec', e, delay)
     quit_bit.wait(delay)
     return False

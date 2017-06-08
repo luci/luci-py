@@ -399,7 +399,11 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
   """
   # TODO(maruel): This function is incomprehensible, split and refactor.
 
-  # Signal the command is about to be started.
+  # Signal the command is about to be started. It is important to post a task
+  # update *BEFORE* starting any user code to signify the server that the bot
+  # correctly started processing the task. In the case of non-idempotent task,
+  # this signal is used to know if it is safe to retry the task or not. See
+  # _reap_task() in task_scheduler.py for more information.
   last_packet = start = now = monotonic_time()
   task_id = task_details.task_id
   bot_id = task_details.bot_id
@@ -448,7 +452,7 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     # We write args to a file since there may be more of them than the OS
     # can handle.
     try:
-      with open(args_path, 'w') as f:
+      with open(args_path, 'wb') as f:
         json.dump(args, f)
     except (IOError, OSError) as e:
       return fail_on_start(

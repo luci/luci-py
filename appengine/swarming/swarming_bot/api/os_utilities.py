@@ -304,14 +304,14 @@ def get_ip():
     # network system to figure out an IP interface to use.
     try:
       s.connect(('8.8.8.8', 80))
-      return s.getsockname()[0]
+      return s.getsockname()[0].decode('utf-8')
     except socket.error:
       # Can raise "error: [Errno 10051] A socket operation was attempted to an
       # unreachable network" if the network is still booting up. We don't want
       # this function to crash.
       if i == max_tries - 1:
         # Can't determine the IP.
-        return '0.0.0.0'
+        return u'0.0.0.0'
       time.sleep(0.05)
     finally:
       s.close()
@@ -553,8 +553,8 @@ def get_locale():
   """Returns the OS's UI active locale."""
   locales = locale.getdefaultlocale()
   if locales[0]:
-    return '.'.join(locales)
-  return 'Unknown'
+    return u'.'.join(locales)
+  return u'Unknown'
 
 
 def get_uptime():
@@ -988,7 +988,7 @@ def get_state():
     u'running_time': int(round(time.time() - _STARTED_TS)),
     u'started_ts': int(round(_STARTED_TS)),
     u'uptime': int(round(get_uptime())),
-    u'user': getpass.getuser(),
+    u'user': getpass.getuser().decode('utf-8'),
   }
   if sys.platform in ('cygwin', 'win32'):
     state[u'cygwin'] = [sys.platform == 'cygwin']

@@ -274,6 +274,7 @@ def _validate_task(bot_dimensions, deadline, stats, now, task_key):
 
   # It's a valid task! Note that in the meantime, another bot may have reaped
   # it.
+  logging.info('_validate_task(%s): ready to reap!', packed)
   return request, task
 
 
