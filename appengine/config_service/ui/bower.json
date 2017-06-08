@@ -1,0 +1,14 @@
+{
+  "name": "Config UI",
+  "description": "This is a UI for the configuration service",
+  "main": "index.html",
+  "dependencies": {
+    "polymer": "Polymer/polymer#^2.0.0",
+    "app-layout": "PolymerElements/app-layout",
+    "paper-search": "Collaborne/paper-search"
+  },
+  "devDependencies": {
+    "web-component-tester": "Polymer/web-component-tester#^6.0.0",
+    "webcomponentsjs": "webcomponents/webcomponentsjs#^1.0.0"
+  }
+}
