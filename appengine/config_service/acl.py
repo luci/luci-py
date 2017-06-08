@@ -2,8 +2,6 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-import re
-
 from components import auth
 from components import config
 from components import utils
@@ -15,7 +13,9 @@ import services
 import storage
 
 
-def read_acl_cfg():
+# Cache acl.cfg for 10min. It never changes.
+@utils.cache_with_expiration(10 * 60)
+def get_acl_cfg():
   return storage.get_self_config_async(
       common.ACL_FILENAME, service_config_pb2.AclCfg).get_result()
 
@@ -63,6 +63,12 @@ def can_read_config_sets(config_sets):
   }
 
 
+def is_admin():
+  acl_cfg = get_acl_cfg()
+  return auth.is_group_member(
+      acl_cfg and acl_cfg.admin_group or auth.ADMIN_GROUP)
+
+
 def has_services_access(service_ids):
   """Returns a mapping {service_id: has_access}.
 
@@ -74,7 +80,7 @@ def has_services_access(service_ids):
     assert isinstance(sid, basestring)
     assert sid
 
-  if auth.is_admin():
+  if is_admin():
     return {sid: True for sid in service_ids}
 
   cfgs = {
@@ -90,8 +96,8 @@ def has_services_access(service_ids):
 def has_projects_access(project_ids):
   if not project_ids:
     return {}
-  super_group = read_acl_cfg().project_access_group
-  if auth.is_admin() or super_group and auth.is_group_member(super_group):
+  super_group = get_acl_cfg().project_access_group
+  if is_admin() or super_group and auth.is_group_member(super_group):
     return {pid: True for pid in project_ids}
   return {
     pid: meta and config.api._has_access(meta.access)

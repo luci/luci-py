@@ -103,6 +103,8 @@ message AclCfg {
   // Name of the group that has access to all projects/* config sets.
   // Only trusted services should be in this group.
   optional string project_access_group = 2;
+  // Name of the group that has admin access to the app.
+  optional string admin_group = 3;
 }
 
 // Schema for import.cfg. It specified how to import configuration files from

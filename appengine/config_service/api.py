@@ -373,7 +373,7 @@ class ConfigApi(remote.Service):
   @auth.public # ACL check inside
   def reimport(self, request):
     """Reimports a config set."""
-    if not auth.is_admin():
+    if not acl.is_admin():
       raise endpoints.ForbiddenException('Only admins are allowed to do this')
     # Assume it is Gitiles.
     try:

@@ -33,7 +33,6 @@ class AclTestCase(test_case.TestCase):
     super(AclTestCase, self).setUp()
     self.mock(auth, 'get_current_identity', mock.Mock())
     auth.get_current_identity.return_value = auth.Anonymous
-    self.mock(auth, 'is_admin', lambda *_: False)
     self.mock(auth, 'is_group_member', mock.Mock(return_value=False))
     self.mock(
         services, 'get_services_async', mock.Mock(return_value=future([])))
@@ -45,7 +44,7 @@ class AclTestCase(test_case.TestCase):
     self.mock(storage, 'get_self_config_async', lambda *_: future(acl_cfg))
 
   def test_admin_can_read_all(self):
-    self.mock(auth, 'is_admin', mock.Mock(return_value=True))
+    self.mock(acl, 'is_admin', mock.Mock(return_value=True))
     self.assertTrue(can_read_config_set('services/swarming'))
     self.assertTrue(can_read_config_set('projects/chromium'))
     self.assertTrue(has_project_access('chromium'))

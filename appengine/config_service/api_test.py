@@ -655,14 +655,14 @@ class ApiTest(test_case.EndpointsTestCase):
       self.call_api('reimport', req)
 
   def test_reimport(self):
-    self.mock(auth, 'is_admin', mock.Mock(return_value=True))
+    self.mock(acl, 'is_admin', mock.Mock(return_value=True))
     self.mock(gitiles_import, 'import_config_set', mock.Mock())
     req = {'config_set': 'services/x'}
     self.call_api('reimport', req)
     gitiles_import.import_config_set.assert_called_once_with('services/x')
 
   def test_reimport_not_found(self):
-    self.mock(auth, 'is_admin', mock.Mock(return_value=True))
+    self.mock(acl, 'is_admin', mock.Mock(return_value=True))
     self.mock(gitiles_import, 'import_config_set', mock.Mock())
     gitiles_import.import_config_set.side_effect = gitiles_import.NotFoundError
     req = {'config_set': 'services/x'}
@@ -670,7 +670,7 @@ class ApiTest(test_case.EndpointsTestCase):
       self.call_api('reimport', req)
 
   def test_reimport_bad_request(self):
-    self.mock(auth, 'is_admin', mock.Mock(return_value=True))
+    self.mock(acl, 'is_admin', mock.Mock(return_value=True))
     self.mock(gitiles_import, 'import_config_set', mock.Mock())
     gitiles_import.import_config_set.side_effect = gitiles_import.Error
     req = {'config_set': 'services/x'}
