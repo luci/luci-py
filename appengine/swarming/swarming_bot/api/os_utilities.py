@@ -118,7 +118,6 @@ MONITORING_SCOPES = ['https://www.googleapis.com/auth/monitoring']
 _STARTED_TS = time.time()
 
 
-
 def _write(filepath, content):
   """Writes out a file and returns True on success."""
   logging.info('Writing in %s:\n%s', filepath, content)
@@ -231,17 +230,66 @@ def get_cpu_bitness():
   return u'64' if sys.maxsize > 2**32 else u'32'
 
 
+def _parse_intel_model(name):
+  """Tries to extract the CPU model name from the display name.
+
+  The actual format varies a bit across products but is consistent across OSes.
+  """
+  # List of regexp to parse Intel model name. It is simpler to have multiple
+  # regexp than try to make one that matches them all.
+  # They shall be in decreasing order of precision.
+  regexps = [
+    ur' ([a-zA-Z]\d-\d{4}[A-Z]{0,2} [vV]\d) ',
+    ur' ([a-zA-Z]\d-\d{4}[A-Z]{0,2}) ',
+    ur' ([A-Z]\d{4}[A-Z]{0,2}) ',
+  ]
+  for r in regexps:
+    m = re.search(r, name)
+    if m:
+      return m.group(1)
+
+
+@tools.cached
+def get_cpu_dimensions():
+  """Returns the values that should be used as 'cpu' dimensions."""
+  cpu_type = get_cpu_type()
+  bitness = get_cpu_bitness()
+  info = get_cpuinfo()
+  out = [
+    cpu_type,
+    u'%s-%s' % (cpu_type, bitness)
+  ]
+  if 'avx2' in info.get(u'flags', []):
+    out.append(u'%s-%s-%s' % (cpu_type, bitness, 'avx2'))
+
+  vendor = info.get(u'vendor') or u''
+  name = info.get(u'name') or u''
+  if u'GenuineIntel' == vendor:
+    model = _parse_intel_model(name)
+    if model:
+      out.append(u'%s-%s-%s' % (cpu_type, bitness, model.replace(' ', '_')))
+  elif cpu_type.startswith(u'arm'):
+    if name:
+      out.append(u'%s-%s-%s' % (cpu_type, bitness, name.replace(' ', '_')))
+    if cpu_type != u'arm':
+      out.append(u'arm')
+      out.append(u'arm-' + bitness)
+  # else AMD like "AMD PRO A6-8500B R5, 6 Compute Cores 2C+4G     "
+
+  out.sort()
+  return out
+
+
 @tools.cached
 def get_cpuinfo():
   """Returns the flags of the processor."""
   if sys.platform == 'darwin':
     return platforms.osx.get_cpuinfo()
-  if sys.platform == 'cygwin':
-    # Eventually fix this.
-    return {}
   if sys.platform == 'win32':
     return platforms.win.get_cpuinfo()
-  return platforms.linux.get_cpuinfo()
+  if sys.platform == 'linux2':
+    return platforms.linux.get_cpuinfo()
+  return {}
 
 
 def get_ip():
@@ -810,17 +858,14 @@ def get_state_all_devices_android(devices):
     return state
 
   # Add a few values that were poped from dimensions.
-  cpu_type = get_cpu_type()
-  cpu_bitness = get_cpu_bitness()
-  state[u'cpu'] = [
-    cpu_type,
-    cpu_type + u'-' + cpu_bitness,
-  ]
-  state[u'cores'] = [unicode(get_num_processors())]
-  state[u'gpu'] = get_gpu()[0]
+  state[u'host_dimensions'] = {
+    u'cpu': get_cpu_dimensions(),
+    u'cores': [unicode(get_num_processors())],
+    u'gpu': get_gpu()[0],
+  }
   machine_type = get_machine_type()
   if machine_type:
-    state[u'machine_type'] = [machine_type]
+    state[u'host_dimensions'][u'machine_type'] = [machine_type]
 
   keys = (
     u'board.platform',
@@ -869,15 +914,9 @@ def get_state_all_devices_android(devices):
 
 def get_dimensions():
   """Returns the default dimensions."""
-  cpu_type = get_cpu_type()
-  cpu_bitness = get_cpu_bitness()
-  cpuinfo = get_cpuinfo()
   dimensions = {
     u'cores': [unicode(get_num_processors())],
-    u'cpu': [
-      cpu_type,
-      cpu_type + u'-' + cpu_bitness,
-    ],
+    u'cpu': get_cpu_dimensions(),
     u'gpu': get_gpu()[0],
     u'id': [get_hostname_short()],
     u'os': get_os_values(),
@@ -887,10 +926,6 @@ def get_dimensions():
   caches = get_named_caches()
   if caches:
     dimensions[u'caches'] = caches
-  if u'avx2' in cpuinfo.get(u'flags', []):
-    dimensions[u'cpu'].append(cpu_type + u'-' + cpu_bitness + u'-avx2')
-  if any(u'avx512' in x for x in cpuinfo.get(u'flags', [])):
-    dimensions[u'cpu'].append(cpu_type + u'-' + cpu_bitness + u'-avx512')
   if u'none' not in dimensions[u'gpu']:
     hidpi = get_monitor_hidpi()
     if hidpi:
@@ -901,11 +936,6 @@ def get_dimensions():
     dimensions[u'machine_type'] = [machine_type]
   if platforms.is_gce():
     dimensions[u'zone'] = [platforms.gce.get_zone()]
-
-  if cpu_type.startswith(u'arm') and cpu_type != u'arm':
-    dimensions[u'cpu'].append(u'arm')
-    dimensions[u'cpu'].append(u'arm-' + cpu_bitness)
-    dimensions[u'cpu'].sort()
 
   if sys.platform == 'darwin':
     udids = platforms.osx.get_ios_device_ids()
@@ -944,7 +974,7 @@ def get_state():
     nb_files_in_temp = 'N/A'
   state = {
     u'audio': get_audio(),
-    u'cpu': get_cpuinfo().get(u'name', u'N/A'),
+    u'cpu_name': get_cpuinfo().get(u'name'),
     u'cost_usd_hour': get_cost_hour(),
     u'cwd': os.getcwd(),
     u'disks': get_disks_info(),

@@ -36,6 +36,29 @@ class TestOsUtilities(auto_stub.TestCase):
     expected = (u'32', u'64')
     self.assertIn(os_utilities.get_cpu_bitness(), expected)
 
+  def test_get_cpu_dimensions(self):
+    values = os_utilities.get_cpu_dimensions()
+    self.assertGreater(len(values), 1)
+
+  def test_parse_intel_model(self):
+    examples = [
+     ('Intel(R) Core(TM) i5-5200U CPU @ 2.20GHz', 'i5-5200U'),
+     ('Intel(R) Core(TM) i7-2635QM CPU @ 2.00GHz', 'i7-2635QM'),
+     ('Intel(R) Core(TM) i7-4578U CPU @ 3.00GHz', 'i7-4578U'),
+     ('Intel(R) Core(TM)2 Duo CPU     P8600  @ 2.40GHz', 'P8600'),
+     ('Intel(R) Core(TM) i7-4870HQ CPU @ 2.50GHz', 'i7-4870HQ'),
+     ('Intel(R) Core(TM) i7-6700T CPU @ 2.80GHz', 'i7-6700T'),
+     ('Intel(R) Pentium(R) CPU  N3710  @ 1.60GHz', 'N3710'),
+     ('Intel(R) Xeon(R) CPU E3-1220 V2 @ 3.10GHz', 'E3-1220 V2'),
+     ('Intel(R) Xeon(R) CPU E3-1230 v3 @ 3.30GHz', 'E3-1230 v3'),
+     ('Intel(R) Xeon(R) CPU E5-2670 0 @ 2.60GHz', 'E5-2670'),
+     ('Intel(R) Xeon(R) CPU E5-2697 v2 @ 2.70GHz', 'E5-2697 v2'),
+     ('Intel(R) Xeon(R) CPU @ 2.30GHz', None),
+    ]
+    for i, expected in examples:
+      actual = os_utilities._parse_intel_model(i)
+      self.assertEqual(expected, actual)
+
   def test_get_ip(self):
     ip = os_utilities.get_ip()
     self.assertNotEqual('127.0.0.1', ip)
@@ -82,7 +105,7 @@ class TestOsUtilities(auto_stub.TestCase):
     actual = os_utilities.get_state()
     actual.pop('temp', None)
     expected = {
-      u'audio', u'cost_usd_hour', u'cpu', u'cwd', u'disks', u'gpu', u'ip',
+      u'audio', u'cost_usd_hour', u'cpu_name', u'cwd', u'disks', u'gpu', u'ip',
       u'hostname', u'locale', u'nb_files_in_temp', u'pid', u'ram',
       u'running_time', u'started_ts', u'uptime', u'user',
     }
