@@ -6,6 +6,7 @@
 
 import logging
 
+from google.appengine.api import memcache
 from google.appengine.ext import ndb
 from google.appengine.ext.ndb import msgprop
 from protorpc import messages
@@ -96,9 +97,38 @@ def get_metadata(project_ids):
 
   The project metadata stored in project.cfg files in each project.
   """
-  return _get_project_configs(
-      project_ids, common.PROJECT_METADATA_FILENAME,
-      project_config_pb2.ProjectCfg)
+  cache_ns = 'projects.get_metadata'
+  cache_map = memcache.get_multi(project_ids, namespace=cache_ns)
+  result = {}
+  missing = []
+  for pid in project_ids:
+    if pid in cache_map:
+      # cache hit
+      binary = cache_map[pid]
+      if binary is None:
+        # project does not exist
+        result[pid] = None
+      else:
+        cfg = project_config_pb2.ProjectCfg()
+        cfg.ParseFromString(binary)
+        result[pid] = cfg
+    else:
+      # cache miss
+      missing.append(pid)
+
+  if missing:
+    fetched = _get_project_configs(
+        missing, common.PROJECT_METADATA_FILENAME,
+        project_config_pb2.ProjectCfg)
+    result.update(fetched)  # at this point result must have all project ids
+    # Cache metadata for 10 min. In practice, it never changes.
+    cache_map = {
+      pid: cfg.SerializeToString() if cfg else None
+      for pid, cfg in fetched.iteritems()
+    }
+    memcache.set_multi(cache_map, namespace=cache_ns, time=60 * 10)
+
+  return result
 
 
 def get_refs(project_ids):
