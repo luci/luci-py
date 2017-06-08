@@ -1,0 +1,4 @@
+per-file endpoints_webapp2*.py=nodir@chromium.org
+per-file gerrit*.py=nodir@chromium.org
+per-file gitiles*.py=nodir@chromium.org
+per-file net*.py=vadimsh@chromium.org
