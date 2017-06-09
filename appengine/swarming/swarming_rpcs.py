@@ -187,31 +187,72 @@ class CacheEntry(messages.Message):
 
 class TaskProperties(messages.Message):
   """Important metadata about a particular task."""
+  # Specifies named caches to map into the working directory. These caches
+  # outlives the task, which can then be reused by tasks later used on this bot
+  # that request the same named cache.
   caches = messages.MessageField(CacheEntry, 11, repeated=True)
+  # CIPD packages to install. These packages are meant to be software that is
+  # needed (a dependency) to the task being run. Unlike isolated files, the CIPD
+  # packages do not expire from the server.
   cipd_input = messages.MessageField(CipdInput, 10)
+  # Command to run. This has priority over a command specified in the isolated
+  # files. Only one of 'command' or 'extra_args' can be specified.
   command = messages.StringField(1, repeated=True)
+  # Dimensions are what is used to determine which bot can run the task. The
+  # bot must have all the matching dimensions, even for repeated keys with
+  # multiple different values. It is a logical AND, all values must match.
   dimensions = messages.MessageField(StringPair, 2, repeated=True)
+  # Environment variables to set when running the task.
   env = messages.MessageField(StringPair, 3, repeated=True)
+  # Maximum number of seconds the task can run before its process is forcibly
+  # terminated and the task results in TIMED_OUT.
   execution_timeout_secs = messages.IntegerField(4)
+  # Extraneous arguments to append to the command specified in the isolated
+  # file. Can only be used when an isolated file specifies a command. Only one
+  # of 'command' or 'extra_args' can be specified.
   extra_args = messages.StringField(5, repeated=True)
+  # Number of second to give the child process after a SIGTERM before sending a
+  # SIGKILL. See doc/Bot.md#timeout-handling
   grace_period_secs = messages.IntegerField(6)
+  # True if the task does not access any service through the network and is
+  # believed to be 100% reproducible with the same outcome. In the case of a
+  # successful task, previous results will be reused if possible.
   idempotent = messages.BooleanField(7)
+  # Isolated inputs to map in the working directory. The isolated file may
+  # optionally specify a command to run. Otherwise, 'command' must be specified.
   inputs_ref = messages.MessageField(FilesRef, 8)
+  # Maximum number of seconds the task may be silent (no output to stdout nor
+  # stderr) before it is considered hung and it forcibly terminated early and
+  # the task results in TIMED_OUT.
   io_timeout_secs = messages.IntegerField(9)
+  # Paths in the working directory to archive back.
   outputs = messages.StringField(12, repeated=True)
-  secret_bytes = messages.BytesField(13)  # only for rpc->ndb
+  # Secret bytes to provide to the task. Cannot be retrieved back.
+  secret_bytes = messages.BytesField(13)
 
 
 class NewTaskRequest(messages.Message):
-  """Description of a new task request as described by the client."""
-  expiration_secs = messages.IntegerField(1)
-  name = messages.StringField(2)
-  parent_task_id = messages.StringField(3)
-  priority = messages.IntegerField(4)
-  properties = messages.MessageField(TaskProperties, 5)
-  tags = messages.StringField(6, repeated=True)
+  """Description of a new task request as described by the client.
 
-  # Arbitrary user name associated with a task for UI and tags. Not validated.
+  This message is used to create a new task.
+  """
+  # Maximum of seconds the task may stay PENDING.
+  expiration_secs = messages.IntegerField(1)
+  # Task name for display purpose.
+  name = messages.StringField(2)
+  # Parent Swarming task ID of the process requesting this task. This is to tell
+  # the server about reentrancy: when a task creates children Swarming tasks, so
+  # that the tree of tasks can be presented in the UI; the parent task will list
+  # all the children tasks that were triggered.
+  parent_task_id = messages.StringField(3)
+  # Task priority, the lower the more important.
+  priority = messages.IntegerField(4)
+  # Task properties, which defines what to run.
+  properties = messages.MessageField(TaskProperties, 5)
+  # Tags are 'key:value' strings that describes what the task is about. This can
+  # later be leveraged to search for kinds of tasks per tag.
+  tags = messages.StringField(6, repeated=True)
+  # User on which behalf this task is run, if relevant. Not validated.
   user = messages.StringField(7)
 
   # Defines what OAuth2 credentials the task uses when calling other services.
@@ -231,7 +272,8 @@ class NewTaskRequest(messages.Message):
   # separately.
   service_account_token = messages.StringField(8)
 
-  # Full topic name to post too, e.g. "projects/<id>/topics/<id>".
+  # Full topic name to post task state updates to, e.g.
+  # "projects/<id>/topics/<id>".
   pubsub_topic = messages.StringField(9)
   # Secret string to put into "auth_token" attribute of PubSub message.
   pubsub_auth_token = messages.StringField(10)
@@ -240,7 +282,12 @@ class NewTaskRequest(messages.Message):
 
 
 class TaskRequest(messages.Message):
-  """Description of a task request as registered by the server."""
+  """Description of a task request as registered by the server.
+
+  This message is used when retrieving information about an existing task.
+
+  See NewtaskRequest for more details.
+  """
   expiration_secs = messages.IntegerField(1)
   name = messages.StringField(2)
   parent_task_id = messages.StringField(3)
@@ -248,8 +295,6 @@ class TaskRequest(messages.Message):
   properties = messages.MessageField(TaskProperties, 5)
   tags = messages.StringField(6, repeated=True)
   created_ts = message_types.DateTimeField(7)
-
-  # Arbitrary user name associated with a task for UI and tags. Not validated.
   user = messages.StringField(8)
   # User name of whoever posted this task, extracted from the credentials.
   authenticated = messages.StringField(9)
