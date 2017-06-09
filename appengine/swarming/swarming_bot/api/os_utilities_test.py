@@ -98,6 +98,7 @@ class TestOsUtilities(auto_stub.TestCase):
     actual.discard(u'hidpi')
     expected = {u'cores', u'cpu', u'gpu', u'id', u'os', u'pool'}
     if sys.platform == 'darwin':
+      expected.add(u'mac_model')
       expected.add(u'xcode_version')
     self.assertEqual(expected, actual)
 
@@ -112,7 +113,6 @@ class TestOsUtilities(auto_stub.TestCase):
     if sys.platform in ('cygwin', 'win32'):
       expected.add(u'cygwin')
     if sys.platform == 'darwin':
-      expected.add(u'model')
       expected.add(u'xcode')
     if sys.platform == 'win32':
       expected.add(u'integrity')

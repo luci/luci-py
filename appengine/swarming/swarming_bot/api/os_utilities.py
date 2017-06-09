@@ -938,6 +938,14 @@ def get_dimensions():
     dimensions[u'zone'] = [platforms.gce.get_zone()]
 
   if sys.platform == 'darwin':
+    model = platforms.osx.get_hardware_model_string()
+    if model:
+      dimensions[u'mac_model'] = [model]
+    xcode_versions = platforms.osx.get_xcode_versions()
+    if xcode_versions:
+      dimensions[u'xcode_version'] = xcode_versions
+
+    # iOS devices
     udids = platforms.osx.get_ios_device_ids()
     device_types = set()
     for udid in udids:
@@ -950,7 +958,6 @@ def get_dimensions():
         device_types.add(device_type)
     if device_types:
       dimensions[u'device'] = sorted(device_types)
-    dimensions[u'xcode_version'] = platforms.osx.get_xcode_versions()
 
   return dimensions
 
@@ -997,9 +1004,6 @@ def get_state():
     if integrity is not None:
       state[u'integrity'] = [integrity]
   if sys.platform == 'darwin':
-    model = platforms.osx.get_hardware_model_string()
-    if model:
-      state[u'model'] = model
     state[u'xcode'] = platforms.osx.get_xcode_state()
   if sys.platform == 'linux2':
     temp = platforms.linux.get_temperatures()
