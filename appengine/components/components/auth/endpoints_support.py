@@ -168,8 +168,13 @@ def endpoints_method(
     def wrapper(service, *args, **kwargs):
       try:
         initialize_request_auth(
-            service.request_state.remote_address, service.request_state.headers)
+            service.request_state.remote_address,
+            service.request_state.headers)
         return func(service, *args, **kwargs)
+      except endpoints.BadRequestException as e:
+        # Useful to debug HTTP 400s.
+        logging.exception('%s', e)
+        raise
       except api.AuthenticationError as ex:
         logging.warning(
             'Authentication error.\n%s\nPeer: %s\nIP: %s',
