@@ -920,7 +920,11 @@
       },
 
       _duration: function(start, end) {
-        return end.getTime() - start.getTime();
+        var duration = end.getTime() - start.getTime();
+        if (duration < 0) {
+          duration = 0;
+        }
+        return duration;
       },
 
       _empty: function(array) {
