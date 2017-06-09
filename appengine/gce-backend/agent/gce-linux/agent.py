@@ -3,10 +3,9 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-"""Machine Provider agent for GCE instances."""
+"""Machine Provider agent for GCE Linux instances."""
 
 import argparse
-import base64
 import datetime
 import httplib2
 import json
@@ -14,15 +13,10 @@ import logging
 import logging.handlers
 import os
 import pwd
-import shutil
-import socket
-import string
 import subprocess
 import sys
-import tempfile
 import time
 import traceback
-import urllib2
 import urlparse
 
 
@@ -40,7 +34,8 @@ METADATA_BASE_URL = 'http://metadata/computeMetadata/v1'
 SWARMING_BOT_DIR = '/b/s'
 SWARMING_BOT_ZIP = os.path.join(SWARMING_BOT_DIR, 'swarming_bot.zip')
 SWARMING_UPSTART_CONFIG_DEST = '/etc/init/swarming-start-bot.conf'
-SWARMING_UPSTART_CONFIG_SRC = os.path.join(THIS_DIR, 'swarming-start-bot.conf')
+SWARMING_UPSTART_CONFIG_TMPL = os.path.join(
+    THIS_DIR, 'swarming-start-bot.conf.tmpl')
 
 
 class Error(Exception):
@@ -222,12 +217,17 @@ def connect_to_swarming(service_account, swarming_server, user):
     swarming_server: URL of the Swarming server to connect to.
     user: Username that Swarming bot process will run as.
   """
+  with open(SWARMING_UPSTART_CONFIG_TMPL) as f:
+    config = f.read().format(user=user)
+
   if os.path.exists(SWARMING_UPSTART_CONFIG_DEST):
+    logging.info('Reinstalling: %s', SWARMING_UPSTART_CONFIG_DEST)
     os.remove(SWARMING_UPSTART_CONFIG_DEST)
-  with open(SWARMING_UPSTART_CONFIG_SRC) as f:
-    swarming_upstart_config = f.read().format(user=user)
-  with open(SWARMING_UPSTART_CONFIG_DEST, "w") as g:
-    g.write(swarming_upstart_config)
+  else:
+    logging.info('Installing: %s', SWARMING_UPSTART_CONFIG_DEST)
+
+  with open(SWARMING_UPSTART_CONFIG_DEST, 'w') as f:
+    f.write(config)
 
   if not os.path.exists(SWARMING_BOT_DIR):
     os.mkdir(SWARMING_BOT_DIR)
@@ -243,8 +243,8 @@ def connect_to_swarming(service_account, swarming_server, user):
     urlparse.urljoin(swarming_server, 'bot_code'),
     method='GET',
   )
-  with open(SWARMING_BOT_ZIP, 'w') as fd:
-    fd.write(bot_code)
+  with open(SWARMING_BOT_ZIP, 'w') as f:
+    f.write(bot_code)
   os.chown(SWARMING_BOT_ZIP, user.pw_uid, user.pw_gid)
 
 
@@ -277,9 +277,7 @@ def poll(user):
 def install():
   """Installs Upstart config for the Machine Provider agent."""
   with open(AGENT_UPSTART_CONFIG_TMPL) as f:
-    template = f.read()
-  config = string.Template(template).substitute(
-      agent=os.path.abspath(__file__))
+    config = f.read().format(agent=os.path.abspath(__file__))
 
   if os.path.exists(AGENT_UPSTART_CONFIG_DEST):
     with open(AGENT_UPSTART_CONFIG_DEST) as f:
@@ -293,7 +291,7 @@ def install():
   else:
     logging.info('Installing: %s', AGENT_UPSTART_CONFIG_DEST)
 
-  with open(AGENT_UPSTART_CONFIG_DEST, 'wb') as f:
+  with open(AGENT_UPSTART_CONFIG_DEST, 'w') as f:
     f.write(config)
   subprocess.check_call(['initctl', 'reload-configuration'])
   subprocess.check_call(['start', AGENT_UPSTART_JOB])
