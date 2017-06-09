@@ -159,7 +159,7 @@ class TaskResultApiTest(TestCase):
       'name': u'Request name',
       'outputs_ref': None,
       'properties_hash': None,
-      'server_versions': [],
+      'server_versions': [u'v1a'],
       'started_ts': None,
       'state': task_result.State.PENDING,
       'tags': [
@@ -246,7 +246,7 @@ class TaskResultApiTest(TestCase):
       'name': u'Request name',
       'outputs_ref': None,
       'properties_hash': None,
-      'server_versions': [],
+      'server_versions': [u'v1a'],
       'started_ts': None,
       'state': task_result.State.PENDING,
       'try_number': None,

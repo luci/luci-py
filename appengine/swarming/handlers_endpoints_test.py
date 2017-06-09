@@ -1253,6 +1253,7 @@ class TaskApiTest(BaseTest):
       u'internal_failure': False,
       u'modified_ts': str_now,
       u'name': u'hi',
+      u'server_versions': [u'v1a'],
       u'state': u'CANCELED',
       u'tags': [
         u'os:Amiga',
@@ -1391,6 +1392,7 @@ class TaskApiTest(BaseTest):
       u'internal_failure': False,
       u'modified_ts': str_now,
       u'name': u'hi',
+      u'server_versions': [u'v1a'],
       u'state': u'PENDING',
       u'tags': [
         u'os:Amiga',

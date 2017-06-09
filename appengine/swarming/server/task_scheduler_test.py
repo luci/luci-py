@@ -568,7 +568,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       'name': u'Request name',
       'outputs_ref': None,
       'properties_hash': None,
-      'server_versions': [],
+      'server_versions': [u'v1a'],
       'started_ts': None,
       'state': State.PENDING,
       'tags': [
@@ -1346,7 +1346,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       'name': u'Request name',
       'outputs_ref': None,
       'properties_hash': None,
-      'server_versions': [],
+      'server_versions': [u'v1a'],
       'started_ts': None,
       'state': task_result.State.EXPIRED,
       'tags': [

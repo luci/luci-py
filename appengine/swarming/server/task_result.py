@@ -1152,6 +1152,7 @@ def new_result_summary(request):
       key=task_pack.request_key_to_result_summary_key(request.key),
       created_ts=request.created_ts,
       name=request.name,
+      server_versions=[utils.get_app_version()],
       user=request.user,
       tags=request.tags)
 
