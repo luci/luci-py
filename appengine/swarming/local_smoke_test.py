@@ -48,6 +48,11 @@ from api import os_utilities
 SIGNAL_TERM = -1073741510 if sys.platform == 'win32' else -signal.SIGTERM
 
 
+# Timeout to wait for the operations, so that the smoke test doesn't hang
+# indefinitely.
+TIMEOUT_SECS = 20
+
+
 # For the isolated tests that outputs a file named result.txt containing 'hey'.
 ISOLATE_HELLO_WORLD = {
   'variables': {
@@ -178,7 +183,7 @@ class SwarmingClient(object):
         # swarming.py collect will return the exit code of the task.
         args = [
           '--task-summary-json', tmp, task_id, '--task-output-dir', tmpdir,
-          '--timeout', '20', '--perf',
+          '--timeout', str(TIMEOUT_SECS), '--perf',
         ]
         self._run('collect', args)
         with open(tmp, 'rb') as f:
@@ -202,7 +207,11 @@ class SwarmingClient(object):
       os.remove(tmp)
 
   def terminate(self, bot_id):
-    return self._run('terminate', ['--wait', bot_id])
+    task_id = self._capture('terminate', [bot_id]).strip()
+    logging.info('swarming.py terminate returned %r', task_id)
+    if not task_id:
+      return 1
+    return self._run('collect', ['--timeout', str(TIMEOUT_SECS), task_id])
 
   def cleanup(self):
     if self._tmpdir:
@@ -308,15 +317,25 @@ class Test(unittest.TestCase):
     #
     # TODO(maruel): 'isolated_upload' is not deterministic because the isolate
     # server not cleared.
-    old = self.client.query_bot()
-    started_ts = json.loads(old['state'])['started_ts'] if old else None
-    logging.info('setUp: started_ts was %s', started_ts)
-    had_cache = any(
-        u'caches' == i['key'] for i in old['dimensions']) if old else False
-    self.bot.wipe_cache(had_cache)
-    # The bot restarts due to wipe_cache() so wait for the bot to come back
-    # online. It may takes a few loop.
+    start = time.time()
     while True:
+      old = self.client.query_bot()
+      if old:
+        break
+      if time.time() - start > TIMEOUT_SECS:
+        self.fail('Bot took too long to start')
+
+    started_ts = json.loads(old['state'])['started_ts']
+    logging.info('setUp: started_ts was %s', started_ts)
+    had_cache = any(u'caches' == i['key'] for i in old['dimensions'])
+    self.bot.wipe_cache(had_cache)
+
+    # The bot restarts due to wipe_cache(True) so wait for the bot to come back
+    # online. It may takes a few loop.
+    start = time.time()
+    while True:
+      if time.time() - start > TIMEOUT_SECS:
+        self.fail('Bot took too long to start after wipe_cache()')
       state = self.client.query_bot()
       if not state:
         time.sleep(0.1)
@@ -910,7 +929,7 @@ def main():
     # completed, the bot process should have terminated. Give it a few
     # seconds due to delay between sending the event that the process is
     # shutting down vs the process is shut down.
-    if client.terminate(bot.bot_id) is not 0:
+    if client.terminate(bot.bot_id) != 0:
       print >> sys.stderr, 'swarming.py terminate failed'
       failed = True
     try:
