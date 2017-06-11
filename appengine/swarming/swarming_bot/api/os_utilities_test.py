@@ -90,7 +90,15 @@ class TestOsUtilities(auto_stub.TestCase):
     self.assertTrue(actual is None or actual)
 
   def test_get_dimensions(self):
-    actual = set(os_utilities.get_dimensions())
+    dimensions = os_utilities.get_dimensions()
+    for key, values in dimensions.iteritems():
+      self.assertIsInstance(key, unicode)
+      self.assertIsInstance(values, list)
+      for value in values:
+        self.assertIsInstance(value, unicode)
+    actual = set(dimensions)
+    # Only set when the process is running in a properly configured GUI context.
+    actual.discard(u'locale')
     # Only set on GCE.
     actual.discard(u'machine_type')
     actual.discard(u'zone')
@@ -107,7 +115,7 @@ class TestOsUtilities(auto_stub.TestCase):
     actual.pop('temp', None)
     expected = {
       u'audio', u'cost_usd_hour', u'cpu_name', u'cwd', u'disks', u'gpu', u'ip',
-      u'hostname', u'locale', u'nb_files_in_temp', u'pid', u'ram',
+      u'hostname', u'nb_files_in_temp', u'pid', u'ram',
       u'running_time', u'started_ts', u'uptime', u'user',
     }
     if sys.platform in ('cygwin', 'win32'):

@@ -554,7 +554,6 @@ def get_locale():
   locales = locale.getdefaultlocale()
   if locales[0]:
     return u'.'.join(locales)
-  return u'Unknown'
 
 
 def get_uptime():
@@ -923,9 +922,13 @@ def get_dimensions():
     # This value is frequently overridden by bots.cfg via luci-config.
     u'pool': [u'default'],
   }
+
+  # Conditional dimensions:
+
   caches = get_named_caches()
   if caches:
     dimensions[u'caches'] = caches
+
   if u'none' not in dimensions[u'gpu']:
     hidpi = get_monitor_hidpi()
     if hidpi:
@@ -934,8 +937,13 @@ def get_dimensions():
   machine_type = get_machine_type()
   if machine_type:
     dimensions[u'machine_type'] = [machine_type]
+
   if platforms.is_gce():
     dimensions[u'zone'] = [platforms.gce.get_zone()]
+
+  loc = get_locale()
+  if loc:
+    dimensions[u'locale'] = [loc]
 
   if sys.platform == 'darwin':
     model = platforms.osx.get_hardware_model_string()
@@ -988,7 +996,6 @@ def get_state():
     u'gpu': get_gpu()[1],
     u'hostname': get_hostname(),
     u'ip': get_ip(),
-    u'locale': get_locale(),
     u'nb_files_in_temp': nb_files_in_temp,
     u'pid': os.getpid(),
     u'ram': get_physical_ram(),
