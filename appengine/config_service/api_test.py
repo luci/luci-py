@@ -43,18 +43,16 @@ class ApiTest(test_case.EndpointsTestCase):
       service_config_pb2.Project(id='chromium'),
       service_config_pb2.Project(id='v8'),
     ]
-    self.mock(projects, 'get_metadata', mock.Mock())
-    projects.get_metadata.return_value = {
+    self.mock(projects, 'get_metadata_async', mock.Mock(return_value=future({
       'chromium': project_config_pb2.ProjectCfg(),
       'v8': project_config_pb2.ProjectCfg(),
-    }
-    self.mock(projects, 'get_repos', mock.Mock())
-    projects.get_repos.return_value = {
+    })))
+    self.mock(projects, 'get_repos_async', mock.Mock(return_value=future({
       'chromium': (
           projects.RepositoryType.GITILES, 'https://chromium.example.com'),
       'v8': (
           projects.RepositoryType.GITILES, 'https://v8.example.com'),
-    }
+    })))
 
   def mock_config(self, mock_content=True):
     self.mock(storage, 'get_config_hashes_async', mock.Mock())
@@ -494,20 +492,20 @@ class ApiTest(test_case.EndpointsTestCase):
       service_config_pb2.Project(id='inconsistent'),
       service_config_pb2.Project(id='secret'),
     ]
-    projects.get_metadata.return_value = {
+    projects.get_metadata_async.return_value = future({
       'chromium': project_config_pb2.ProjectCfg(
           name='Chromium, the best browser', access='all'),
       'v8': project_config_pb2.ProjectCfg(access='all'),
       'inconsistent': project_config_pb2.ProjectCfg(access='all'),
       'secret': project_config_pb2.ProjectCfg(access='administrators'),
-    }
-    projects.get_repos.return_value = {
+    })
+    projects.get_repos_async.return_value = future({
       'chromium': (
           projects.RepositoryType.GITILES, 'https://chromium.example.com'),
       'v8': (projects.RepositoryType.GITILES, 'https://v8.example.com'),
       'inconsistent': (None, None),
       'secret': (projects.RepositoryType.GITILES, 'https://localhost/secret'),
-    }
+    })
 
     resp = self.call_api('get_projects', {}).json_body
 
@@ -575,11 +573,11 @@ class ApiTest(test_case.EndpointsTestCase):
       service_config_pb2.Project(id='inconsistent'),
       service_config_pb2.Project(id='secret'),
     ])
-    projects.get_metadata.return_value.update({
+    projects.get_metadata_async.return_value.get_result().update({
       'inconsistent': project_config_pb2.ProjectCfg(access='all'),
       'secret': project_config_pb2.ProjectCfg(access='administrators'),
     })
-    projects.get_repos.return_value.update({
+    projects.get_repos_async.return_value.get_result().update({
       'inconsistent': (None, None),
       'secret': (projects.RepositoryType.GITILES, 'https://localhost/secret'),
     })
@@ -608,11 +606,11 @@ class ApiTest(test_case.EndpointsTestCase):
       service_config_pb2.Project(id='inconsistent'),
       service_config_pb2.Project(id='secret'),
     ])
-    projects.get_metadata.return_value.update({
+    projects.get_metadata_async.return_value.get_result().update({
       'inconsistent': project_config_pb2.ProjectCfg(access='all'),
       'secret': project_config_pb2.ProjectCfg(access='administrators'),
     })
-    projects.get_repos.return_value.update({
+    projects.get_repos_async.return_value.get_result().update({
       'inconsistent': (None, None),
       'secret': (projects.RepositoryType.GITILES, 'https://localhost/secret'),
     })

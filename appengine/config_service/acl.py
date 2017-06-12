@@ -99,7 +99,8 @@ def has_projects_access(project_ids):
   super_group = get_acl_cfg().project_access_group
   if is_admin() or super_group and auth.is_group_member(super_group):
     return {pid: True for pid in project_ids}
+  metadata = projects.get_metadata_async(project_ids).get_result()
   return {
     pid: meta and config.api._has_access(meta.access)
-    for pid, meta in projects.get_metadata(project_ids).iteritems()
+    for pid, meta in metadata.iteritems()
   }

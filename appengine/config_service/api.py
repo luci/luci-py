@@ -401,8 +401,10 @@ def get_projects():
   result = []
   projs = projects.get_projects()
   project_ids = [p.id for p in projs]
-  repos = projects.get_repos(project_ids)
-  metadata = projects.get_metadata(project_ids)
+  repos_fut = projects.get_repos_async(project_ids)
+  metadata_fut = projects.get_metadata_async(project_ids)
+  ndb.Future.wait_all([repos_fut, metadata_fut])
+  repos, metadata = repos_fut.get_result(), metadata_fut.get_result()
   for p in projs:
     repo_type, repo_url = repos.get(p.id, (None, None))
     if repo_type is None:

@@ -64,11 +64,10 @@ class AclTestCase(test_case.TestCase):
     self.assertFalse(can_read_config_set('services/swarming'))
 
   def test_has_project_access_group(self):
-    self.mock(projects, 'get_metadata', mock.Mock())
-    projects.get_metadata.return_value = {
+    self.mock(projects, 'get_metadata_async', mock.Mock(return_value=future({
       'secret': project_config_pb2.ProjectCfg(
           access=['group:googlers', 'a@a.com']),
-    }
+    })))
 
     self.assertFalse(can_read_config_set('projects/secret'))
 
@@ -79,11 +78,10 @@ class AclTestCase(test_case.TestCase):
     self.assertTrue(can_read_config_set('projects/secret'))
 
   def test_has_project_access_identity(self):
-    self.mock(projects, 'get_metadata', mock.Mock())
-    projects.get_metadata.return_value = {
+    self.mock(projects, 'get_metadata_async', mock.Mock(return_value=future({
       'secret': project_config_pb2.ProjectCfg(
           access=['group:googlers', 'a@a.com']),
-    }
+    })))
 
     self.assertFalse(can_read_config_set('projects/secret'))
 

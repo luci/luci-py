@@ -77,36 +77,45 @@ def get_project(id):
   return None
 
 
-def get_repos(project_ids):
+@ndb.tasklet
+def get_repos_async(project_ids):
   """Returns a mapping {project_id: (repo_type, repo_url)}.
 
   All projects must exist.
   """
   assert isinstance(project_ids, list)
-  keys = [ndb.Key(ProjectImportInfo, pid) for pid in project_ids]
-  return {
+  infos = yield ndb.get_multi_async(
+      ndb.Key(ProjectImportInfo, pid) for pid in project_ids)
+  raise ndb.Return({
     pid: (info.repo_type, info.repo_url) if info else (None, None)
-    for pid, info in zip(project_ids, ndb.get_multi(keys))
-  }
+    for pid, info in zip(project_ids, infos)
+  })
 
 
-def get_metadata(project_ids):
+@ndb.tasklet
+def get_metadata_async(project_ids):
   """Returns a mapping {project_id: metadata}.
 
   If a project does not exist, the metadata is None.
 
   The project metadata stored in project.cfg files in each project.
   """
+  PROJECT_DOES_NOT_EXIST_SENTINEL = (0,)
   cache_ns = 'projects.get_metadata'
-  cache_map = memcache.get_multi(project_ids, namespace=cache_ns)
+  ctx = ndb.get_context()
+  # ctx.memcache_get is auto-batching. Internally it makes get_multi RPC.
+  cache_futs = {
+    pid: ctx.memcache_get(pid, namespace=cache_ns)
+    for pid in project_ids
+  }
+  yield cache_futs.values()
   result = {}
   missing = []
   for pid in project_ids:
-    if pid in cache_map:
+    binary = cache_futs[pid].get_result()
+    if binary is not None:
       # cache hit
-      binary = cache_map[pid]
-      if binary is None:
-        # project does not exist
+      if binary is PROJECT_DOES_NOT_EXIST_SENTINEL:
         result[pid] = None
       else:
         cfg = project_config_pb2.ProjectCfg()
@@ -117,18 +126,22 @@ def get_metadata(project_ids):
       missing.append(pid)
 
   if missing:
-    fetched = _get_project_configs(
+    fetched = yield _get_project_configs_async(
         missing, common.PROJECT_METADATA_FILENAME,
         project_config_pb2.ProjectCfg)
     result.update(fetched)  # at this point result must have all project ids
     # Cache metadata for 10 min. In practice, it never changes.
-    cache_map = {
-      pid: cfg.SerializeToString() if cfg else None
+    # ctx.memcache_set is auto-batching. Internally it makes set_multi RPC.
+    yield [
+      ctx.memcache_set(
+          pid,
+          cfg.SerializeToString() if cfg else PROJECT_DOES_NOT_EXIST_SENTINEL,
+          namespace=cache_ns,
+          time=60 * 10)
       for pid, cfg in fetched.iteritems()
-    }
-    memcache.set_multi(cache_map, namespace=cache_ns, time=60 * 10)
+    ]
 
-  return result
+  raise ndb.Return(result)
 
 
 def get_refs(project_ids):
@@ -138,15 +151,16 @@ def get_refs(project_ids):
 
   The list of refs stored in refs.cfg of a project.
   """
-  cfgs = _get_project_configs(
-      project_ids, common.REFS_FILENAME, project_config_pb2.RefsCfg)
+  cfgs = _get_project_configs_async(
+      project_ids, common.REFS_FILENAME, project_config_pb2.RefsCfg
+  ).get_result()
   return {
     pid: None if cfg is None else cfg.refs or DEFAULT_REF_CFG.refs
     for pid, cfg in cfgs.iteritems()
   }
 
 
-def _get_project_configs(project_ids, path, message_factory):
+def _get_project_configs_async(project_ids, path, message_factory):
   """Returns a mapping {project_id: message}.
 
   If a project does not exist, the message is None.
@@ -154,15 +168,20 @@ def _get_project_configs(project_ids, path, message_factory):
   assert isinstance(project_ids, list)
   if not project_ids:
     return {}
-  prefix = 'projects/'
-  messages = storage.get_latest_messages_async(
-      [prefix + pid for pid in _filter_existing(project_ids)],
-      path, message_factory).get_result()
-  return {
-    # messages may not have a key because we filter project ids by existence
-    pid: messages.get(prefix + pid)
-    for pid in project_ids
-  }
+
+  @ndb.tasklet
+  def get_async():
+    prefix = 'projects/'
+    messages = yield storage.get_latest_messages_async(
+        [prefix + pid for pid in _filter_existing(project_ids)],
+        path, message_factory)
+    raise ndb.Return({
+      # messages may not have a key because we filter project ids by existence
+      pid: messages.get(prefix + pid)
+      for pid in project_ids
+    })
+
+  return get_async()
 
 
 def _filter_existing(project_ids):
