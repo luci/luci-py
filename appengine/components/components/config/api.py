@@ -258,21 +258,16 @@ def get_config_set_location(config_set):  # pragma: no cover
   return get_config_set_location_async(config_set).get_result()
 
 
-def _has_access(access_list, identity=None):
+def _has_access(access, identity=None):
   identity = identity or auth.get_current_identity()
-  identity_str = identity.to_bytes()
-  for ac in access_list:
-    if ac.startswith('group:'):
-      group = ac.split(':', 2)[1]
-      if auth.is_group_member(group, identity):
-        return True
-    else:
-      ac_identity_str = ac
-      if ':' not in ac_identity_str:
-        ac_identity_str = 'user:%s' % ac_identity_str
-      if identity_str == ac_identity_str:
-        return True
-  return False
+  if access.startswith('group:'):
+    group = access.split(':', 2)[1]
+    return auth.is_group_member(group, identity)
+
+  ac_identity_str = access
+  if ':' not in ac_identity_str:
+    ac_identity_str = 'user:%s' % ac_identity_str
+  return identity.to_bytes() == ac_identity_str
 
 
 @ndb.tasklet
@@ -287,7 +282,7 @@ def has_project_access_async(project_id, identity=None):
   cfg = yield get_project_config_async(
       project_id, 'project.cfg', project_config_pb2.ProjectCfg,
       store_last_good=True)
-  raise ndb.Return(cfg and _has_access(cfg.access, identity))
+  raise ndb.Return(cfg and any(_has_access(a, identity) for a in cfg.access))
 
 
 def has_project_access(*args, **kwargs):

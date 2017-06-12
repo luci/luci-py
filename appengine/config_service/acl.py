@@ -74,6 +74,7 @@ def has_services_access(service_ids):
 
   has_access is True if current requester can read service configs.
   """
+  assert isinstance(service_ids, list)
   if not service_ids:
     return {}
   for sid in service_ids:
@@ -83,14 +84,14 @@ def has_services_access(service_ids):
   if is_admin():
     return {sid: True for sid in service_ids}
 
+  service_id_set = set(service_ids)
   cfgs = {
     s.id: s
     for s in services.get_services_async().get_result()
+    if s.id in service_id_set
   }
-  return {
-    sid: cfgs.get(sid) and config.api._has_access(cfgs.get(sid).access)
-    for sid in service_ids
-  }
+  has_access = _has_access([cfgs.get(sid) for sid in service_ids])
+  return dict(zip(service_ids, has_access))
 
 
 def has_projects_access(project_ids):
@@ -100,7 +101,21 @@ def has_projects_access(project_ids):
   if is_admin() or super_group and auth.is_group_member(super_group):
     return {pid: True for pid in project_ids}
   metadata = projects.get_metadata_async(project_ids).get_result()
-  return {
-    pid: meta and config.api._has_access(meta.access)
-    for pid, meta in metadata.iteritems()
+  has_access = _has_access([metadata.get(pid) for pid in project_ids])
+  return dict(zip(project_ids, has_access))
+
+
+def _has_access(resources):
+  access_values = set()
+  for r in resources:
+    if r:
+      access_values.update(r.access)
+
+  has_access = {
+    a: config.api._has_access(a)
+    for a in access_values
   }
+  return [
+    bool(r) and any(has_access[a] for a in r.access)
+    for r in resources
+  ]
