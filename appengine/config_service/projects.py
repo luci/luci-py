@@ -115,7 +115,7 @@ def get_metadata_async(project_ids):
     binary = cache_futs[pid].get_result()
     if binary is not None:
       # cache hit
-      if binary is PROJECT_DOES_NOT_EXIST_SENTINEL:
+      if binary == PROJECT_DOES_NOT_EXIST_SENTINEL:
         result[pid] = None
       else:
         cfg = project_config_pb2.ProjectCfg()
