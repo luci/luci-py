@@ -493,7 +493,7 @@
               <div class="right flex">
                 <template is="dom-if" if="[[_result.human_completed_ts]]">
                   <div class="left flex" style="padding-left: 50px; padding-right: 50px">
-                    <svg-piechart 
+                    <svg-piechart
                       data="[[_computePiechartData(_result)]]"
                       colors="[&quot;rgb(204,121,167)&quot;, &quot;rgb(0,114,178)&quot;]">
                     </svg-piechart>
@@ -518,9 +518,9 @@
                   <tr>
                     <td bgcolor$="[[_highlight(_request.properties.dimensions, dimension.key)]]">
                       <b>[[dimension.key]]:</b>
-                      <template 
-                        is="dom-repeat" 
-                        items="[[_aliasResult(_request.properties.dimensions, dimension)]]" 
+                      <template
+                        is="dom-repeat"
+                        items="[[_aliasResult(_request.properties.dimensions, dimension)]]"
                         as="value">
                         <span class$="[[value.class]] dim">[[value.name]]</span>
                       </template>
@@ -795,7 +795,7 @@
         // requested_dims is the entire _request.properties.dimensions array, but we
         // are only passed in one key at a time from _result.bot_dimensions as the
         // bot_dim variable. Therefore we need to loop through the key-value pairs
-        // of requested_dims to determine whether the current bot dimension was 
+        // of requested_dims to determine whether the current bot dimension was
         // requested.
         var boldMap = [];
         var target = null;
@@ -1059,7 +1059,7 @@
           properties:this._request.properties,
           tags: this._request.tags,
           user: this._profile.email,
-          service_account: this._request.service_account,
+          service_account_token: this._request.service_account,
         }
         newTask.properties.dimensions = this._retry_dimensions.filter(function(d){
           return d && d.key && d.value;
