@@ -5,10 +5,22 @@
   "dependencies": {
     "polymer": "Polymer/polymer#^2.0.0",
     "app-layout": "PolymerElements/app-layout",
-    "paper-search": "Collaborne/paper-search"
+    "paper-search": "Collaborne/paper-search",
+    "google-signin": "GoogleWebComponents/google-signin",
+    "iron-ajax": "PolymerElements/iron-ajax",
+    "paper-item": "^2.0.0",
+    "paper-icon-button": "^2.0.0",
+    "iron-icon": "^2.0.0",
+    "app-route": "PolymerElements/app-route"
   },
   "devDependencies": {
     "web-component-tester": "Polymer/web-component-tester#^6.0.0",
     "webcomponentsjs": "webcomponents/webcomponentsjs#^1.0.0"
+  },
+  "resolutions": {
+    "polymer": "^2.0.0",
+    "iron-flex-layout": "^2.0.0",
+    "webcomponentsjs": "^1.0.0",
+    "iron-icon": "^2.0.0"
   }
 }

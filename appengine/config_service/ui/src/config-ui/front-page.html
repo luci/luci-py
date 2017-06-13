@@ -1,0 +1,137 @@
+<!--
+  Copyright 2017 The LUCI Authors. All rights reserved.
+  Use of this source code is governed under the Apache License, Version 2.0
+  that can be found in the LICENSE file.
+-->
+
+<link rel="import" href="../../bower_components/app-layout/app-layout.html">
+<link rel="import" href="config-card.html">
+<link rel="import" href="../../bower_components/iron-ajax/iron-ajax.html">
+<link rel="import" href="../../bower_components/paper-button/paper-button.html">
+<link rel="import" href="../../bower_components/paper-search/paper-search-bar.html">
+<link rel="import" href="../../bower_components/polymer/polymer.html">
+
+<dom-module id="front-page">
+  <template>
+    <style>
+      app-toolbar {
+        background-color: #efefef;
+        color: #232323;
+      }
+
+      app-header {
+        @apply --layout-fixed-top;
+      }
+
+      .center {
+        width: 50%;
+        margin: auto;
+        text-align: center;
+      }
+
+      .logo {
+        height: 100%;
+      }
+
+      .title {
+        padding-left: 1%;
+        font-size: 150%;
+        font-family: sans-serif;
+      }
+
+      .search-bar {
+        padding-top: 7%;
+        padding-bottom: 2%;
+      }
+
+      paper-search-bar {
+        border-style: solid;
+        border-width: 2px;
+        width: 40%;
+        height: 100%;
+        margin: auto;
+      }
+    </style>
+
+    <app-header reveals>
+      <app-toolbar>
+        <image class="logo" src="/static/images/chromium.png"/>
+        <div class="title" main-title>Configuration Service (not fully implemented)</div>
+      </app-toolbar>
+    </app-header>
+
+    <iron-ajax
+        auto
+        id="requestConfigs"
+        url="/_ah/api/config/v1/config-sets"
+        handle-as="json"
+        on-response="_onGotConfigSets">
+    </iron-ajax>
+
+    <div class="search-bar">
+      <paper-search-bar query="{{query}}"></paper-search-bar>
+    </div>
+    
+    <div class="config-list">
+      <template is="dom-if" if="[[isLoading]]">
+        <div class="center">Fetching config sets...</div>
+      </template>
+      <template is="dom-if" if="[[_not(isLoading)]]">
+        <template is="dom-if" if="[[_isEmpty(searchResults)]]">
+          <div class="center">No config sets found.</div>
+        </template>
+        <template is="dom-if" if="[[_not(_isEmpty(searchResults))]]">
+          <template is="dom-repeat" items="[[searchResults]]" as="config">
+            <config-card name="[[config.config_set]]"></config-card>
+          </template>
+        </template>
+      </template>
+    </div>
+  </template>
+
+  <script>
+    Polymer({
+      is: 'front-page',
+
+      properties: {
+        configSetList: {
+          type: Array,
+          value: () => []
+        },
+
+        isLoading: {
+          type: Boolean,
+          value: true
+        },
+
+        query: {
+          type: String,
+          observer: '_updateSearchResults'
+        },
+
+        searchResults: {
+          type: Array,
+          value: () => []
+        }
+      },
+
+      _isEmpty: function(array) {
+        return array.length === 0;
+      },
+
+      _onGotConfigSets: function(event) {
+        this.configSetList = event.detail.response.config_sets;
+        this._updateSearchResults();
+        this.isLoading = false;
+      },
+
+      _not: function(b) {
+        return !b;
+      },
+
+      _updateSearchResults: function() {
+        this.searchResults = this.configSetList.filter(e => e.config_set.includes(this.query));
+      }
+    });
+  </script>
+</dom-module>

@@ -14,6 +14,9 @@ handlers:
   upload: static/favicon.ico
   secure: always
 
+- url: /static/images
+  static_dir: ui/static/images
+
 - url: /_ah/spi/.*
   script: apps.endpoints
 

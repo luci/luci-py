@@ -1,0 +1,39 @@
+<!--
+  Copyright 2017 The LUCI Authors. All rights reserved.
+  Use of this source code is governed under the Apache License, Version 2.0
+  that can be found in the LICENSE file.
+-->
+
+<link rel="import" href="../../bower_components/paper-item/paper-item.html">
+<link rel="import" href="../../bower_components/polymer/polymer.html">
+
+<dom-module id="config-card">
+  <template>
+    <style>
+      .center {
+        margin: auto;
+        width: 25%;
+        border-style: solid;
+        border-width: 2px;
+      }
+    </style>
+
+    <paper-item class="center">
+      <!-- TODO(cwpayton): Add launch icon next to the name of the config
+        so that upon clicking the icon, the user will be taken to the config
+        set page. -->
+      [[name]]
+    </paper-item>
+  </template>
+  <script>
+    Polymer({
+      is: "config-card",
+
+      properties: {
+        name: {
+          type: String
+        }
+      }
+    });
+  </script>
+</dom-module>
