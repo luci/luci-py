@@ -87,13 +87,17 @@ def _expire_task(to_run_key, request):
 
     return True
 
+  # Add it to the negative cache *before* running the transaction. Either way
+  # the task was already reaped or the task is correctly expired and not
+  # reapable.
+  task_to_run.set_lookup_cache(to_run_key, False)
+
   # It'll be caught by next cron job execution in case of failure.
   try:
     success = datastore_utils.transaction(run)
   except datastore_utils.CommitError:
     success = False
   if success:
-    task_to_run.set_lookup_cache(to_run_key, False)
     logging.info(
         'Expired %s', task_pack.pack_result_summary_key(result_summary_key))
   return success
@@ -154,15 +158,36 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request):
       _maybe_pubsub_notify_via_tq(result_summary, request)
     return run_result, secret_bytes
 
-  # The bot will reap the next available task in case of failure, no big deal.
+  # Add it to the negative cache *before* running the transaction. This will
+  # inhibit concurrently readers to try to reap this task. The downside is if
+  # this request fails in the middle of the transaction, the task may stay
+  # unreapable for up to 15 seconds.
+  task_to_run.set_lookup_cache(to_run_key, False)
+
   try:
     run_result, secret_bytes = datastore_utils.transaction(run, retries=0)
   except datastore_utils.CommitError:
+    # The challenge here is that the transaction may have failed because:
+    # - The DB had an hickup and the TaskToRun, TaskRunResult and
+    #   TaskResultSummary haven't been updated.
+    # - The entities had been updated by a concurrent transaction on another
+    #   handler so it was not reapable anyway. This does cause exceptions as
+    #   both GET returns the TaskToRun.queue_number != None but only one succeed
+    #   at the PUT.
+    #
+    # In the first case, we may want to reset the negative cache, while we don't
+    # want to in the later case. The trade off are one of:
+    # - negative cache is incorrectly set, so the task is not reapable for 15s
+    # - resetting the negative cache would cause even more contention
+    #
+    # We chose the first one here for now, as the when the DB starts misbehaving
+    # and the index becomes stale, it means the DB is *already* not in good
+    # shape, so it is preferable to not put more stress on it, and skipping a
+    # few tasks for 15s may even actively help the DB to stabilize.
     logging.info('CommitError; reaping failed')
+    # The bot will reap the next available task in case of failure, no big deal.
     run_result = None
     secret_bytes = None
-  if run_result:
-    task_to_run.set_lookup_cache(to_run_key, False)
   return run_result, secret_bytes
 
 
@@ -242,15 +267,18 @@ def _handle_dead_bot(run_result_key):
 
     return task_is_retried
 
+  # Remove it from the negative cache *before* running the transaction. Either
+  # way the TaskToRun.queue_number was not set so there was no contention on
+  # this entity. At best the task is reenqueued for a retry.
+  task_to_run.set_lookup_cache(to_run_key, True)
+
   try:
     task_is_retried = datastore_utils.transaction(run)
   except datastore_utils.CommitError:
     task_is_retried = None
-  if task_is_retried is not None:
-    task_to_run.set_lookup_cache(to_run_key, task_is_retried)
-    if task_is_retried:
-      logging.info('Retried %s', packed)
-  else:
+  if task_is_retried:
+    logging.info('Retried %s', packed)
+  elif task_is_retried == False:
     logging.debug('Ignored %s', packed)
   return task_is_retried
 
@@ -847,13 +875,17 @@ def cancel_task(request, result_key):
 
     return True, was_running
 
+  # Add it to the negative cache *before* running the transaction. Either way
+  # the task was already reaped or the task is correctly canceled thus not
+  # reapable.
+  task_to_run.set_lookup_cache(to_run_key, False)
+
   try:
     ok, was_running = datastore_utils.transaction(run)
   except datastore_utils.CommitError as e:
     packed = task_pack.pack_result_summary_key(result_key)
     return 'Failed killing task %s: %s' % (packed, e)
-  # Add it to the negative cache.
-  task_to_run.set_lookup_cache(to_run_key, False)
+
   # TODO(maruel): Add paper trail.
   return ok, was_running
 

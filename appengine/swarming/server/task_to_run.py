@@ -200,24 +200,21 @@ def _validate_task(bot_dimensions, deadline, stats, now, task_key):
 
   # Do this after the basic weeding out but before fetching TaskRequest.
   if _lookup_cache_is_taken(task_key):
-    logging.debug('_validate_task(%s): negative cache pre-fetch', packed)
+    logging.debug('_validate_task(%s): negative cache', packed)
     stats.cache_lookup += 1
     return
 
   # Ok, it's now worth taking a real look at the entity.
-  task = task_key.get()
-
-  # DB operations are slow, double check memcache again.
-  if _lookup_cache_is_taken(task_key):
-    logging.debug('_validate_task(%s): negative cache post-fetch', packed)
-    stats.cache_lookup += 1
-    return
+  task_future = task_key.get_async()
+  request_future = task_to_run_key_to_request_key(task_key).get_async()
+  task = task_future.get_result()
 
   # It is possible for the index to be inconsistent since it is not executed in
   # a transaction, no problem.
   if not task.queue_number:
-    logging.debug('_validate_task(%s): no queue_number', packed)
+    logging.debug('_validate_task(%s): was already reaped', packed)
     stats.no_queue += 1
+    request_future.wait()
     return
 
   # It expired. A cron job will cancel it eventually. Since 'now' is saved
@@ -225,15 +222,18 @@ def _validate_task(bot_dimensions, deadline, stats, now, task_key):
   # expired if the query is very slow. This is on purpose so slow queries do not
   # cause exagerate expirations.
   if task.expiration_ts < now:
+    # It could be possible to handle right away to not have to wait for the cron
+    # job, which would save a 30s average delay.
     logging.debug(
         '_validate_task(%s): expired %s < %s', packed, task.expiration_ts, now)
     stats.expired += 1
+    request_future.wait()
     return
 
   # The hash may have conflicts. Ensure the dimensions actually match by
   # verifying the TaskRequest. There's a probability of 2**-31 of conflicts,
   # which is low enough for our purpose.
-  request = task.request_key.get()
+  request = request_future.get_result()
   if not match_dimensions(request.properties.dimensions, bot_dimensions):
     logging.debug('_validate_task(%s): dimensions mismatch', packed)
     stats.real_mismatch += 1
@@ -453,10 +453,10 @@ def set_lookup_cache(task_key, is_available_to_schedule):
   concurrent HTTP handlers are trying to reap the exact same task
   simultaneously. This blacklist helps reduce the contention.
   """
-  # Set the expiration time for items in the negative cache as 2 minutes. This
+  # Set the expiration time for items in the negative cache as 15 seconds. This
   # copes with significant index inconsistency but do not clog the memcache
   # server with unneeded keys.
-  cache_lifetime = 120
+  cache_lifetime = 15
 
   assert not ndb.in_transaction()
   key = _memcache_to_run_key(task_key)
