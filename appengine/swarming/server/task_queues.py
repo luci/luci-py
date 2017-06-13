@@ -423,15 +423,16 @@ def _hash_data(data):
   return int(struct.unpack('<L', digest[:4])[0]) or 1
 
 
+@ndb.tasklet
 def _remove_old_entity(key, now):
   """Removes a stale TaskDimensions or BotTaskDimensions instance.
 
   Returns:
-    True if the entity was deleted.
+    ndb.Future that evaluates to True if it were deleted.
   """
   obj = key.get()
   if not obj or obj.valid_until_ts >= now:
-    return False
+    raise ndb.Return(False)
 
   def tx():
     obj = key.get()
@@ -440,7 +441,8 @@ def _remove_old_entity(key, now):
       return True
     return False
 
-  return datastore_utils.transaction(tx)
+  res = yield datastore_utils.transaction_async(tx)
+  raise ndb.Return(res)
 
 
 def _yield_BotTaskDimensions_keys(dimensions_hash, dimensions_flat):
@@ -735,33 +737,37 @@ def tidy_stale():
   tens at most.
   """
   now = utils.utcnow()
-  td_found = 0
-  td_deleted = 0
-  btd_found = 0
-  btd_deleted = 0
-  try:
-    # pylint is confused by the lambda.
-    # pylint: disable=undefined-loop-variable
-    q = TaskDimensions.query().filter(TaskDimensions.valid_until_ts < now)
-    logging.debug('TaskDimensions:')
-    for key in q.iter(batch_size=100, keys_only=True):
-      td_found += 1
-      if _remove_old_entity(key, now):
-        td_deleted += 1
-        logging.debug('- %d', key.id())
+  td = []
+  btd = []
 
-    logging.debug('BotTaskDimensions:')
+  @ndb.tasklet
+  def _handle_task(key):
+    removed = yield _remove_old_entity(key, now)
+    if removed:
+      logging.debug('- TD: %d', key.id())
+    raise ndb.Return(int(removed))
+
+  @ndb.tasklet
+  def _handle_bot_task(key):
+    removed = yield _remove_old_entity(key, now)
+    if removed:
+      bot_id = key.parent().id()
+      memcache.delete(bot_id, namespace='task_queues')
+      logging.debug('- BTD: %d for bot %s', key.id(), bot_id)
+    raise ndb.Return(int(removed))
+
+  try:
+    q = TaskDimensions.query().filter(TaskDimensions.valid_until_ts < now)
+    td_future = q.map_async(_handle_task, batch_size=100, keys_only=True)
+
     q = BotTaskDimensions.query().filter(BotTaskDimensions.valid_until_ts < now)
-    for key in q.iter(batch_size=100, keys_only=True):
-      btd_found += 1
-      if _remove_old_entity(key, now):
-        btd_deleted += 1
-        bot_id = key.parent().id()
-        memcache.delete(bot_id, namespace='task_queues')
-        logging.debug('- %d for bot %s', key.id(), bot_id)
+    btd_future = q.map_async(_handle_bot_task, batch_size=100, keys_only=True)
+
+    td = td_future.get_result()
+    btd = btd_future.get_result()
   finally:
     logging.info(
         'tidy_stale() in %.3fs; TaskDimensions: found %d, deleted %d; '
         'BotTaskDimensions: found %d, deleted %d',
         (utils.utcnow() - now).total_seconds(),
-        td_found, td_deleted, btd_found, btd_deleted)
+        len(td), sum(td), len(btd), sum(btd))
