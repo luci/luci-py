@@ -57,7 +57,7 @@ def transaction_async(callback, **ctx_options):
       apiproxy_errors.CancelledError,
       datastore_errors.BadRequestError,
       RuntimeError) as e:
-    logging.info('Transaction failure: %s', e)
+    logging.info('Transaction failure: %s', e.__class__.__name__)
     raise CommitError(e)
 
 

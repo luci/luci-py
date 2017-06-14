@@ -441,7 +441,8 @@ def _remove_old_entity(key, now):
       return True
     return False
 
-  res = yield datastore_utils.transaction_async(tx)
+  res = yield datastore_utils.transaction_async(
+      tx, propagation=ndb.TransactionOptions.INDEPENDENT)
   raise ndb.Return(res)
 
 
