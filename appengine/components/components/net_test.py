@@ -25,7 +25,12 @@ Response = collections.namedtuple('Response', 'status_code content headers')
 class NetTest(test_case.TestCase):
   def setUp(self):
     super(NetTest, self).setUp()
-    self.mock(auth, 'get_access_token', lambda *_args: ('token', 0))
+
+    @ndb.tasklet
+    def get_access_token(*_args):
+      raise ndb.Return(('token', 0))
+    self.mock(auth, 'get_access_token_async', get_access_token)
+
     self.mock(logging, 'warning', lambda *_args: None)
     self.mock(logging, 'error', lambda *_args: None)
 

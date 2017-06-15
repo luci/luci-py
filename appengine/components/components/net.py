@@ -115,10 +115,11 @@ def request_async(
   if params:
     url += '?' + urllib.urlencode(params)
 
+  headers = (headers or {}).copy()
+
   if scopes:
-    access_token = auth.get_access_token(scopes, service_account_key)[0]
-    headers = (headers or {}).copy()
-    headers['Authorization'] = 'Bearer %s' % access_token
+    tok, _ = yield auth.get_access_token_async(scopes, service_account_key)
+    headers['Authorization'] = 'Bearer %s' % tok
 
   if delegation_token:
     if isinstance(delegation_token, auth.DelegationToken):
@@ -143,7 +144,7 @@ def request_async(
           url=url,
           payload=payload,
           method=method,
-          headers=headers or {},
+          headers=headers,
           follow_redirects=False,
           deadline=deadline,
           validate_certificate=True)

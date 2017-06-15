@@ -5,13 +5,15 @@
 
 import collections
 import datetime
-import functools
 import json
 import sys
 import unittest
 
 from test_support import test_env
 test_env.setup_test_env()
+
+from google.appengine.api import urlfetch
+from google.appengine.ext import ndb
 
 from components import utils
 from components.auth import service_account
@@ -22,49 +24,65 @@ EMPTY_SECRET_KEY = service_account.ServiceAccountKey(None, None, None)
 FAKE_SECRET_KEY = service_account.ServiceAccountKey('email', 'pkey', 'pkey_id')
 
 
+MockedResponse = collections.namedtuple('MockedResponse', 'status_code content')
+
+
 class GetAccessTokenTest(test_case.TestCase):
   def setUp(self):
     super(GetAccessTokenTest, self).setUp()
     self.mock(service_account.logging, 'error', lambda *_: None)
+    self.mock(service_account.logging, 'warning', lambda *_: None)
 
   def mock_methods(self):
     calls = []
-    def get_token(method, *args):
-      calls.append((method, args))
+
+    @ndb.tasklet
+    def via_jwt(*args):
+      calls.append(('jwt_based', args))
+      raise ndb.Return(('token', 0))
+    self.mock(service_account, '_get_jwt_based_token_async', via_jwt)
+
+    def via_gae_api(*args):
+      calls.append(('gae_api', args))
       return 'token', 0
-    self.mock(
-        service_account, '_get_jwt_based_token',
-        functools.partial(get_token, 'jwt_based'))
-    self.mock(
-        service_account.app_identity, 'get_access_token',
-        functools.partial(get_token, 'gae_api'))
+    self.mock(service_account.app_identity, 'get_access_token', via_gae_api)
+
     return calls
 
-  ## Verify what token generation method are used when running on real GAE.
+  def test_memcache_key(self):
+    cache_key = service_account._memcache_key(
+        method='pkey',
+        email='blah@example.com',
+        scopes=['1', '2'],
+        key_id='abc')
+    self.assertEqual(
+        '1f7c4e587cd8f6abf972bbcc6437eeba52be7bf69a69974d9a5ef131268a8a4c',
+        cache_key)
 
-  def test_on_gae_no_key_uses_gae_api(self):
-    """Uses GAE api if secret key is not used and running on GAE."""
-    self.mock(service_account.utils, 'is_local_dev_server', lambda: False)
+  ## Verify what token generation method are used based on arguments.
+
+  def test_no_key_uses_gae_api(self):
+    """Uses GAE api if secret key is not used."""
     calls = self.mock_methods()
     self.assertEqual(('token', 0), service_account.get_access_token('scope'))
-    self.assertEqual([('gae_api', ('scope',))], calls)
+    self.assertEqual([('gae_api', (['scope'],))], calls)
 
-  def test_on_gae_empty_key_fails(self):
+  def test_empty_key_fails(self):
     """If empty key is passed on GAE, dies with error."""
-    self.mock(service_account.utils, 'is_local_dev_server', lambda: False)
     calls = self.mock_methods()
     with self.assertRaises(service_account.AccessTokenError):
       service_account.get_access_token('scope', EMPTY_SECRET_KEY)
     self.assertFalse(calls)
 
-  def test_on_gae_good_key_is_used(self):
+  def test_good_key_is_used(self):
     """If good key is passed on GAE, invokes JWT based fetch."""
-    self.mock(service_account.utils, 'is_local_dev_server', lambda: False)
     calls = self.mock_methods()
+    self.mock(service_account, '_memcache_key', lambda **_kwargs: 'cache_key')
     self.assertEqual(
         ('token', 0),
         service_account.get_access_token('scope', FAKE_SECRET_KEY))
-    self.assertEqual([('jwt_based', ('scope', FAKE_SECRET_KEY))], calls)
+    self.assertEqual(
+        [('jwt_based', (['scope'], 'cache_key', FAKE_SECRET_KEY))], calls)
 
   ## Tests for individual token generation methods.
 
@@ -73,46 +91,56 @@ class GetAccessTokenTest(test_case.TestCase):
 
     # Fake memcache, dev server's one doesn't know about mocked time.
     memcache = {}
-    def fake_get(key):
+
+    @ndb.tasklet
+    def fake_get(key, namespace=None):
+      self.assertEqual(service_account._MEMCACHE_NS, namespace)
       if key not in memcache or memcache[key][1] < utils.time_time():
-        return None
-      return memcache[key][0]
-    def fake_set(key, value, exp):
+        raise ndb.Return(None)
+      raise ndb.Return(memcache[key][0])
+    self.mock(service_account, '_memcache_get', fake_get)
+
+    @ndb.tasklet
+    def fake_set(key, value, exp, namespace=None):
+      self.assertEqual(service_account._MEMCACHE_NS, namespace)
       memcache[key] = (value, exp)
-    self.mock(service_account.memcache, 'get', fake_get)
-    self.mock(service_account.memcache, 'set', fake_set)
+    self.mock(service_account, '_memcache_set', fake_set)
 
     # Stub calls to real minting method.
     calls = []
+    @ndb.tasklet
     def fake_mint_token(*args):
       calls.append(args)
-      return {
+      raise ndb.Return({
         'access_token': 'token@%d' % utils.time_time(),
         'exp_ts': utils.time_time() + 3600,
-      }
-    self.mock(service_account, '_mint_jwt_based_token', fake_mint_token)
+      })
+    self.mock(service_account, '_mint_jwt_based_token_async', fake_mint_token)
 
     # Cold cache -> mint a new token, put in cache.
     self.mock_now(now, 0)
     self.assertEqual(
         ('token@1420167600', 1420171200.0),
-        service_account._get_jwt_based_token('http://scope', FAKE_SECRET_KEY))
+        service_account._get_jwt_based_token_async(
+            ['http://scope'], 'cache_key', FAKE_SECRET_KEY).get_result())
     self.assertEqual([(['http://scope'], FAKE_SECRET_KEY)], calls)
-    self.assertEqual(['access_token@http://scope@pkey_id'], memcache.keys())
+    self.assertEqual(['cache_key'], memcache.keys())
     del calls[:]
 
     # Uses cached copy while it is valid.
     self.mock_now(now, 3000)
     self.assertEqual(
         ('token@1420167600', 1420171200.0),
-        service_account._get_jwt_based_token('http://scope', FAKE_SECRET_KEY))
+        service_account._get_jwt_based_token_async(
+            ['http://scope'], 'cache_key', FAKE_SECRET_KEY).get_result())
     self.assertFalse(calls)
 
     # 5 min before expiration it is considered unusable, and new one is minted.
     self.mock_now(now, 3600 - 5 * 60 + 1)
     self.assertEqual(
         ('token@1420170901', 1420174501.0),
-        service_account._get_jwt_based_token('http://scope', FAKE_SECRET_KEY))
+        service_account._get_jwt_based_token_async(
+            ['http://scope'], 'cache_key', FAKE_SECRET_KEY).get_result())
     self.assertEqual([(['http://scope'], FAKE_SECRET_KEY)], calls)
 
   def test_mint_jwt_based_token(self):
@@ -124,62 +152,172 @@ class GetAccessTokenTest(test_case.TestCase):
       return '\x00signature\x00'
     self.mock(service_account, '_rsa_sign', mocked_rsa_sign)
 
-    fetch_calls = []
-    def mocked_fetch(**kwargs):
-      fetch_calls.append(kwargs)
-      response = collections.namedtuple('Response', 'status_code content')
-      return response(
-          200, json.dumps({'access_token': 'token', 'expires_in': 3600}))
-    self.mock(service_account.urlfetch, 'fetch', mocked_fetch)
+    calls = []
+    @ndb.tasklet
+    def mocked_call(**kwargs):
+      calls.append(kwargs)
+      raise ndb.Return({'access_token': 'token', 'expires_in': 3600})
+    self.mock(service_account, '_call_async', mocked_call)
 
-    token = service_account._mint_jwt_based_token(
-        ['scope1', 'scope2'], FAKE_SECRET_KEY)
+    token = service_account._mint_jwt_based_token_async(
+        ['scope1', 'scope2'], FAKE_SECRET_KEY).get_result()
     self.assertEqual({'access_token': 'token', 'exp_ts': 1420171200.0}, token)
 
     self.assertEqual(
-        [('eyJhbGciOiJSUzI1NiIsImtpZCI6InBrZXlfaWQiLCJ0eXAiOiJKV1QifQ.'
-          'eyJhdWQiOiJodHRwczovL3d3dy5nb29nbGVhcGlzLmNvbS9vYXV0aDIvdjM'
-          'vdG9rZW4iLCJleHAiOjE0MjAxNzEyMDAsImlhdCI6MTQyMDE2NzYwMCwiaX'
-          'NzIjoiZW1haWwiLCJzY29wZSI6InNjb3BlMSBzY29wZTIifQ', 'pkey')],
+        [('eyJhbGciOiJSUzI1NiIsImtpZCI6InBrZXlfaWQiLCJ0eXAiOiJKV1QifQ.eyJhdWQiO'
+          'iJodHRwczovL3d3dy5nb29nbGVhcGlzLmNvbS9vYXV0aDIvdjQvdG9rZW4iLCJleHAiO'
+          'jE0MjAxNzExOTUsImlhdCI6MTQyMDE2NzU5NSwiaXNzIjoiZW1haWwiLCJzY29wZSI6I'
+          'nNjb3BlMSBzY29wZTIifQ', 'pkey')],
         rsa_sign_calls)
 
     self.assertEqual([
       {
-        'url': 'https://www.googleapis.com/oauth2/v3/token',
-        'follow_redirects': False,
+        'url': 'https://www.googleapis.com/oauth2/v4/token',
         'method': 'POST',
-        'headers': {'Content-Type': 'application/x-www-form-urlencoded'},
-        'deadline': 10,
-        'validate_certificate': True,
+        'headers': {
+          'Accept': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
         'payload':
             'grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&'
-            'assertion=eyJhbGciOiJSUzI1NiIsImtpZCI6InBrZXlfaWQiLCJ0eXAiOiJKV1Q'
-            'ifQ.eyJhdWQiOiJodHRwczovL3d3dy5nb29nbGVhcGlzLmNvbS9vYXV0aDIvdjMvd'
-            'G9rZW4iLCJleHAiOjE0MjAxNzEyMDAsImlhdCI6MTQyMDE2NzYwMCwiaXNzIjoiZW'
-            '1haWwiLCJzY29wZSI6InNjb3BlMSBzY29wZTIifQ.AHNpZ25hdHVyZQA',
-      }], fetch_calls)
+            'assertion=eyJhbGciOiJSUzI1NiIsImtpZCI6InBrZXlfaWQiLCJ0eXAiOiJKV1Qi'
+            'fQ.eyJhdWQiOiJodHRwczovL3d3dy5nb29nbGVhcGlzLmNvbS9vYXV0aDIvdjQvdG9'
+            'rZW4iLCJleHAiOjE0MjAxNzExOTUsImlhdCI6MTQyMDE2NzU5NSwiaXNzIjoiZW1ha'
+            'WwiLCJzY29wZSI6InNjb3BlMSBzY29wZTIifQ.AHNpZ25hdHVyZQA',
+      }], calls)
 
-  def test_mint_jwt_based_token_failure(self):
-    rsa_sign_calls = []
-    def mocked_rsa_sign(*args):
-      rsa_sign_calls.append(args)
-      return '\x00signature\x00'
-    self.mock(service_account, '_rsa_sign', mocked_rsa_sign)
+  def mock_urlfetch(self, calls):
+    calls = calls[:]
 
-    fetch_calls = []
-    def mocked_fetch(**kwargs):
-      fetch_calls.append(kwargs)
-      response = collections.namedtuple('Response', 'status_code content')
-      return response(500, 'error')
-    self.mock(service_account.urlfetch, 'fetch', mocked_fetch)
+    @ndb.tasklet
+    def urlfetch_mock(
+        url, payload, method, headers,
+        follow_redirects, deadline, validate_certificate):
+      self.assertFalse(follow_redirects)
+      self.assertEqual(deadline, 5)
+      self.assertTrue(validate_certificate)
+      if not calls:
+        self.fail('Unexpected call to %s' % url)
+      call = calls.pop(0).copy()
+      response = call.pop('response')
+      self.assertEqual({
+        'url': url,
+        'payload': payload,
+        'method': method,
+        'headers': headers,
+      }, call)
+      if isinstance(response, Exception):
+        raise response
+      if isinstance(response, MockedResponse):
+        raise ndb.Return(response)
+      raise ndb.Return(MockedResponse(response[0], json.dumps(response[1])))
 
+    self.mock(service_account, '_urlfetch', urlfetch_mock)
+    return calls
+
+  def test_call_async_success(self):
+    calls = self.mock_urlfetch([
+      {
+        'url': 'http://example.com',
+        'payload': 'blah',
+        'method': 'POST',
+        'headers': {'A': 'a'},
+        'response': (200, {'abc': 'def'}),
+      },
+    ])
+    response = service_account._call_async(
+        url='http://example.com',
+        payload='blah',
+        method='POST',
+        headers={'A': 'a'}).get_result()
+    self.assertEqual({'abc': 'def'}, response)
+    self.assertFalse(calls)
+
+  def test_call_async_transient_error(self):
+    calls = self.mock_urlfetch([
+      {
+        'url': 'http://example.com',
+        'payload': 'blah',
+        'method': 'POST',
+        'headers': {'A': 'a'},
+        'response': (500, {'error': 'zzz'}),
+      },
+      {
+        'url': 'http://example.com',
+        'payload': 'blah',
+        'method': 'POST',
+        'headers': {'A': 'a'},
+        'response': urlfetch.Error('blah'),
+      },
+      {
+        'url': 'http://example.com',
+        'payload': 'blah',
+        'method': 'POST',
+        'headers': {'A': 'a'},
+        'response': (200, {'abc': 'def'}),
+      },
+    ])
+    response = service_account._call_async(
+        url='http://example.com',
+        payload='blah',
+        method='POST',
+        headers={'A': 'a'}).get_result()
+    self.assertEqual({'abc': 'def'}, response)
+    self.assertFalse(calls)
+
+  def test_call_async_gives_up(self):
+    calls = self.mock_urlfetch([
+      {
+        'url': 'http://example.com',
+        'payload': 'blah',
+        'method': 'POST',
+        'headers': {'A': 'a'},
+        'response': (500, {'error': 'zzz'}),
+      } for _ in xrange(0, 4)
+    ])
     with self.assertRaises(service_account.AccessTokenError):
-      service_account._mint_jwt_based_token(
-          ['scope1', 'scope2'], FAKE_SECRET_KEY)
+      service_account._call_async(
+        url='http://example.com',
+        payload='blah',
+        method='POST',
+        headers={'A': 'a'}).get_result()
+    self.assertFalse(calls)
 
-    # Sign once, try to send request N times.
-    self.assertEqual(1, len(rsa_sign_calls))
-    self.assertEqual(5, len(fetch_calls))
+  def test_call_async_fatal_error(self):
+    calls = self.mock_urlfetch([
+      {
+        'url': 'http://example.com',
+        'payload': 'blah',
+        'method': 'POST',
+        'headers': {'A': 'a'},
+        'response': (403, {'error': 'zzz'}),
+      },
+    ])
+    with self.assertRaises(service_account.AccessTokenError):
+      service_account._call_async(
+        url='http://example.com',
+        payload='blah',
+        method='POST',
+        headers={'A': 'a'}).get_result()
+    self.assertFalse(calls)
+
+  def test_call_async_not_json(self):
+    calls = self.mock_urlfetch([
+      {
+        'url': 'http://example.com',
+        'payload': 'blah',
+        'method': 'POST',
+        'headers': {'A': 'a'},
+        'response': MockedResponse(200, 'not a json'),
+      },
+    ])
+    with self.assertRaises(service_account.AccessTokenError):
+      service_account._call_async(
+        url='http://example.com',
+        payload='blah',
+        method='POST',
+        headers={'A': 'a'}).get_result()
+    self.assertFalse(calls)
 
 
 if __name__ == '__main__':
