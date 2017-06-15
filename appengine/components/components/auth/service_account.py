@@ -4,10 +4,11 @@
 
 """Generation of OAuth2 token for a service account.
 
-Supports two ways to generate OAuth2 tokens:
+Supports three ways to generate OAuth2 tokens:
   * app_identity.get_access_token(...) to use native GAE service account.
   * OAuth flow with JWT token, for @*.iam.gserviceaccount.com service
     accounts (the one with a private key).
+  * Acting as another service account (via signJwt IAM RPC).
 """
 
 import base64
@@ -56,7 +57,7 @@ ndb.add_flow_exception(AccessTokenError)
 
 
 @ndb.tasklet
-def get_access_token_async(scopes, service_account_key=None):
+def get_access_token_async(scopes, service_account_key=None, act_as=None):
   """Returns an OAuth2 access token for a service account.
 
   If 'service_account_key' is specified, will use it to generate access token
@@ -64,9 +65,19 @@ def get_access_token_async(scopes, service_account_key=None):
   app_identity.get_access_token(...) to use app's @appspot.gserviceaccount.com
   account.
 
+  If 'act_as' is specified, will return an access token for this account with
+  given scopes, generating it through a call to signJwt IAM API, using
+  IAM-scoped access token of a primary service account (an appspot one, or the
+  one specified via 'service_account_key'). In this case the primary service
+  account should have 'serviceAccountActor' role in the service account it acts
+  as.
+
+  See https://cloud.google.com/iam/docs/service-accounts.
+
   Args:
     scopes: the requested API scope string, or a list of strings.
     service_account_key: optional instance of ServiceAccountKey.
+    act_as: email of an account to impersonate.
 
   Returns:
     Tuple (access token, expiration time in seconds since the epoch). The token
@@ -81,6 +92,24 @@ def get_access_token_async(scopes, service_account_key=None):
     scopes = [scopes]
   scopes = sorted(scopes)
 
+  # When acting as account, grab an IAM-scoped token of a primary account first,
+  # and use it to sign JWT when making a token for the target account.
+  if act_as:
+    # Cache key for the target token! Not the IAM-scoped one. The key ID is not
+    # known in advance when using signJwt RPC.
+    cache_key = _memcache_key(
+        method='iam',
+        email=act_as,
+        scopes=scopes,
+        key_id=None)
+    # We need IAM-scoped token only on cache miss, so generate it lazily.
+    # _RemoteSigner will call this function if it really needs a token.
+    iam_token_factory = lambda: get_access_token_async(
+        ['https://www.googleapis.com/auth/iam'], service_account_key)
+    t = yield _get_jwt_based_token_async(
+        scopes, cache_key, _RemoteSigner(act_as, iam_token_factory))
+    raise ndb.Return(t)
+
   if service_account_key:
     # Empty private_key_id probably means that the app is not configured yet.
     if not service_account_key.private_key_id:
@@ -90,7 +119,8 @@ def get_access_token_async(scopes, service_account_key=None):
         email=service_account_key.client_email,
         scopes=scopes,
         key_id=service_account_key.private_key_id)
-    t = yield _get_jwt_based_token_async(scopes, cache_key, service_account_key)
+    t = yield _get_jwt_based_token_async(
+        scopes, cache_key, _LocalSigner(service_account_key))
     raise ndb.Return(t)
 
   # TODO(vadimsh): Use app_identity.make_get_access_token_call to make it async.
@@ -112,7 +142,7 @@ def _memcache_key(method, email, scopes, key_id=None):
   """Returns a string to use as a memcache key for a token.
 
   Args:
-    method: 'pkey' currently.
+    method: 'pkey' or 'iam'.
     email: service account email we are getting a token for.
     scopes: list of strings with scopes.
     key_id: private key ID used (if known).
@@ -127,7 +157,7 @@ def _memcache_key(method, email, scopes, key_id=None):
 
 
 @ndb.tasklet
-def _get_jwt_based_token_async(scopes, cache_key, service_account_key):
+def _get_jwt_based_token_async(scopes, cache_key, signer):
   """Returns token for @*.iam.gserviceaccount.com service account.
 
   Randomizes refresh time to avoid thundering herd effect when token expires.
@@ -137,27 +167,20 @@ def _get_jwt_based_token_async(scopes, cache_key, service_account_key):
       not token_info or
       token_info['exp_ts'] - utils.time_time() < random.randint(300, 600))
   if should_refresh:
-    logging.info('Refreshing the access token with scopes %s', scopes)
-    token_info = yield _mint_jwt_based_token_async(scopes, service_account_key)
+    logging.info(
+        'Refreshing the access token for %s with scopes %s',
+        signer.email, scopes)
+    token_info = yield _mint_jwt_based_token_async(scopes, signer)
     yield _memcache_set(
         cache_key, token_info, token_info['exp_ts'], namespace=_MEMCACHE_NS)
   raise ndb.Return((token_info['access_token'], token_info['exp_ts']))
 
 
 @ndb.tasklet
-def _mint_jwt_based_token_async(scopes, service_account_key):
-  """Creates new access token given service account private key."""
+def _mint_jwt_based_token_async(scopes, signer):
+  """Creates new access token given a JWT signer."""
   # For more info see:
   # * https://developers.google.com/accounts/docs/OAuth2ServiceAccount.
-
-  b64_encode = lambda data: base64.urlsafe_b64encode(data).rstrip('=')
-
-  # JWT header.
-  header_b64 = b64_encode(utils.encode_to_json({
-    'alg': 'RS256',
-    'kid': service_account_key.private_key_id,
-    'typ': 'JWT',
-  }))
 
   # Prepare a claim set to be signed by the service account key. Note that
   # Google backends seem to ignore 'exp' field and always give one-hour long
@@ -168,22 +191,18 @@ def _mint_jwt_based_token_async(scopes, service_account_key):
   # future according to Google server clock, the access token request will be
   # denied. It doesn't complain about slightly late clock though.
   now = int(utils.time_time()) - 5
-  claimset_b64 = b64_encode(utils.encode_to_json({
+  jwt = yield signer.sign_claimset_async({
     'aud': 'https://www.googleapis.com/oauth2/v4/token',
     'exp': now + 3600,
     'iat': now,
-    'iss': service_account_key.client_email,
+    'iss': signer.email,
     'scope': ' '.join(scopes),
-  }))
-
-  # Sign <header>.<claimset> with account's private key.
-  signature_b64 = b64_encode(_rsa_sign(
-      '%s.%s' % (header_b64, claimset_b64), service_account_key.private_key))
+  })
 
   # URL encoded body of a token request.
   request_body = urllib.urlencode({
     'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-    'assertion': '%s.%s.%s' % (header_b64, claimset_b64, signature_b64),
+    'assertion': jwt,
   })
 
   # Exchange signed claimset for an access token.
@@ -269,11 +288,75 @@ def _memcache_set(*args, **kwargs):
   return ndb.get_context().memcache_set(*args, **kwargs)
 
 
-def _rsa_sign(blob, private_key_pem):
-  """Byte blob + PEM key => RSA-SHA256 signature byte blob."""
-  # Lazy import crypto. It is not available in unit tests outside of sandbox.
-  from Crypto.Hash import SHA256
-  from Crypto.PublicKey import RSA
-  from Crypto.Signature import PKCS1_v1_5
-  pkey = RSA.importKey(private_key_pem)
-  return PKCS1_v1_5.new(pkey).sign(SHA256.new(blob))
+## Signers implementation.
+
+
+class _LocalSigner(object):
+  """Knows how to sign JWTs with local private key."""
+
+  def __init__(self, service_account_key):
+    self._key = service_account_key
+
+  @property
+  def email(self):
+    return self._key.client_email
+
+  @ndb.tasklet
+  def sign_claimset_async(self, claimset):
+    # Prepare JWT header and claimset as base 64.
+    header_b64 = self._b64_encode(utils.encode_to_json({
+      'alg': 'RS256',
+      'kid': self._key.private_key_id,
+      'typ': 'JWT',
+    }))
+    claimset_b64 = self._b64_encode(utils.encode_to_json(claimset))
+    # Sign <header>.<claimset> with account's private key.
+    signature_b64 = self._b64_encode(self._rsa_sign(
+        '%s.%s' % (header_b64, claimset_b64), self._key.private_key))
+    # The final JWT is <header>.<claimset>.<signature>.
+    raise ndb.Return('%s.%s.%s' % (header_b64, claimset_b64, signature_b64))
+
+  @staticmethod
+  def _b64_encode(data):
+   return base64.urlsafe_b64encode(data).rstrip('=')
+
+  @staticmethod
+  def _rsa_sign(blob, private_key_pem):
+    """Byte blob + PEM key => RSA-SHA256 signature byte blob."""
+    # Lazy import crypto. It is not available in unit tests outside of sandbox.
+    from Crypto.Hash import SHA256
+    from Crypto.PublicKey import RSA
+    from Crypto.Signature import PKCS1_v1_5
+    pkey = RSA.importKey(private_key_pem)
+    return PKCS1_v1_5.new(pkey).sign(SHA256.new(blob))
+
+
+class _RemoteSigner(object):
+  """Knows how to sign JWTs via signJwt RPC."""
+
+  def __init__(self, email, iam_token_factory):
+    self._email = email
+    self._iam_token_factory = iam_token_factory
+
+  @property
+  def email(self):
+    return self._email
+
+  @ndb.tasklet
+  def sign_claimset_async(self, claimset):
+    # https://cloud.google.com/iam/reference/rest/v1/projects.serviceAccounts/signJwt
+    iam_token, _ = yield self._iam_token_factory()
+    response = yield _call_async(
+        url='https://iam.googleapis.com/v1/projects/-/serviceAccounts/'
+            '%s:signJwt' % self._email,
+        payload=utils.encode_to_json({
+          'payload': utils.encode_to_json(claimset),  # yep, JSON in JSON
+        }),
+        method='POST',
+        headers={
+          'Accept': 'application/json',
+          'Authorization': 'Bearer %s' % iam_token,
+          'Content-Type': 'application/json; charset=utf-8',
+        })
+    # 'signedJwt' is base64-encoded string, convert it from unicode to str.
+    raise ndb.Return(response['signedJwt'].encode('ascii'))

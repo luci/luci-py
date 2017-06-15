@@ -3,6 +3,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import base64
 import collections
 import datetime
 import json
@@ -25,6 +26,20 @@ FAKE_SECRET_KEY = service_account.ServiceAccountKey('email', 'pkey', 'pkey_id')
 
 
 MockedResponse = collections.namedtuple('MockedResponse', 'status_code content')
+
+
+class FakeSigner(object):
+  def __init__(self):
+    self.claimsets = []
+
+  @property
+  def email(self):
+    return 'fake@example.com'
+
+  @ndb.tasklet
+  def sign_claimset_async(self, claimset):
+    self.claimsets.append(claimset)
+    raise ndb.Return('fake_jwt')
 
 
 class GetAccessTokenTest(test_case.TestCase):
@@ -81,8 +96,14 @@ class GetAccessTokenTest(test_case.TestCase):
     self.assertEqual(
         ('token', 0),
         service_account.get_access_token('scope', FAKE_SECRET_KEY))
-    self.assertEqual(
-        [('jwt_based', (['scope'], 'cache_key', FAKE_SECRET_KEY))], calls)
+    self.assertEqual(1, len(calls))
+    method, args = calls[0]
+    scopes, cache_key, signer = args
+    self.assertEqual('jwt_based', method)
+    self.assertEqual(['scope'], scopes)
+    self.assertEqual('cache_key', cache_key)
+    self.assertTrue(isinstance(signer, service_account._LocalSigner))
+    self.assertEqual(FAKE_SECRET_KEY.client_email, signer.email)
 
   ## Tests for individual token generation methods.
 
@@ -117,13 +138,15 @@ class GetAccessTokenTest(test_case.TestCase):
       })
     self.mock(service_account, '_mint_jwt_based_token_async', fake_mint_token)
 
+    fake_signer = FakeSigner()
+
     # Cold cache -> mint a new token, put in cache.
     self.mock_now(now, 0)
     self.assertEqual(
         ('token@1420167600', 1420171200.0),
         service_account._get_jwt_based_token_async(
-            ['http://scope'], 'cache_key', FAKE_SECRET_KEY).get_result())
-    self.assertEqual([(['http://scope'], FAKE_SECRET_KEY)], calls)
+            ['http://scope'], 'cache_key', fake_signer).get_result())
+    self.assertEqual([(['http://scope'], fake_signer)], calls)
     self.assertEqual(['cache_key'], memcache.keys())
     del calls[:]
 
@@ -132,7 +155,7 @@ class GetAccessTokenTest(test_case.TestCase):
     self.assertEqual(
         ('token@1420167600', 1420171200.0),
         service_account._get_jwt_based_token_async(
-            ['http://scope'], 'cache_key', FAKE_SECRET_KEY).get_result())
+            ['http://scope'], 'cache_key', fake_signer).get_result())
     self.assertFalse(calls)
 
     # 5 min before expiration it is considered unusable, and new one is minted.
@@ -140,17 +163,11 @@ class GetAccessTokenTest(test_case.TestCase):
     self.assertEqual(
         ('token@1420170901', 1420174501.0),
         service_account._get_jwt_based_token_async(
-            ['http://scope'], 'cache_key', FAKE_SECRET_KEY).get_result())
-    self.assertEqual([(['http://scope'], FAKE_SECRET_KEY)], calls)
+            ['http://scope'], 'cache_key', fake_signer).get_result())
+    self.assertEqual([(['http://scope'], fake_signer)], calls)
 
   def test_mint_jwt_based_token(self):
     self.mock_now(datetime.datetime(2015, 1, 2, 3))
-
-    rsa_sign_calls = []
-    def mocked_rsa_sign(*args):
-      rsa_sign_calls.append(args)
-      return '\x00signature\x00'
-    self.mock(service_account, '_rsa_sign', mocked_rsa_sign)
 
     calls = []
     @ndb.tasklet
@@ -159,16 +176,18 @@ class GetAccessTokenTest(test_case.TestCase):
       raise ndb.Return({'access_token': 'token', 'expires_in': 3600})
     self.mock(service_account, '_call_async', mocked_call)
 
+    signer = FakeSigner()
     token = service_account._mint_jwt_based_token_async(
-        ['scope1', 'scope2'], FAKE_SECRET_KEY).get_result()
+        ['scope1', 'scope2'], signer).get_result()
     self.assertEqual({'access_token': 'token', 'exp_ts': 1420171200.0}, token)
 
-    self.assertEqual(
-        [('eyJhbGciOiJSUzI1NiIsImtpZCI6InBrZXlfaWQiLCJ0eXAiOiJKV1QifQ.eyJhdWQiO'
-          'iJodHRwczovL3d3dy5nb29nbGVhcGlzLmNvbS9vYXV0aDIvdjQvdG9rZW4iLCJleHAiO'
-          'jE0MjAxNzExOTUsImlhdCI6MTQyMDE2NzU5NSwiaXNzIjoiZW1haWwiLCJzY29wZSI6I'
-          'nNjb3BlMSBzY29wZTIifQ', 'pkey')],
-        rsa_sign_calls)
+    self.assertEqual([{
+      'aud': 'https://www.googleapis.com/oauth2/v4/token',
+      'exp': 1420171195,
+      'iat': 1420167595,
+      'iss': 'fake@example.com',
+      'scope': 'scope1 scope2',
+    }], signer.claimsets)
 
     self.assertEqual([
       {
@@ -180,10 +199,7 @@ class GetAccessTokenTest(test_case.TestCase):
         },
         'payload':
             'grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&'
-            'assertion=eyJhbGciOiJSUzI1NiIsImtpZCI6InBrZXlfaWQiLCJ0eXAiOiJKV1Qi'
-            'fQ.eyJhdWQiOiJodHRwczovL3d3dy5nb29nbGVhcGlzLmNvbS9vYXV0aDIvdjQvdG9'
-            'rZW4iLCJleHAiOjE0MjAxNzExOTUsImlhdCI6MTQyMDE2NzU5NSwiaXNzIjoiZW1ha'
-            'WwiLCJzY29wZSI6InNjb3BlMSBzY29wZTIifQ.AHNpZ25hdHVyZQA',
+            'assertion=fake_jwt',
       }], calls)
 
   def mock_urlfetch(self, calls):
@@ -318,6 +334,77 @@ class GetAccessTokenTest(test_case.TestCase):
         method='POST',
         headers={'A': 'a'}).get_result()
     self.assertFalse(calls)
+
+  def test_local_signer(self):
+    signer = service_account._LocalSigner(FAKE_SECRET_KEY)
+
+    # We have to fake RSA, since PyCrypto is not available in unit tests.
+    rsa_sign_calls = []
+    def mocked_rsa_sign(*args):
+      rsa_sign_calls.append(args)
+      return '\x00signature\x00'
+    self.mock(signer, '_rsa_sign', mocked_rsa_sign)
+
+    claimset = {
+      'aud': 'https://www.googleapis.com/oauth2/v4/token',
+      'exp': 1420171185,
+      'iat': 1420167585,
+      'iss': 'fake@example.com',
+      'scope': 'scope1 scope2',
+    }
+
+    jwt = signer.sign_claimset_async(claimset).get_result()
+
+    def decode(blob):
+      mod = len(blob) % 4
+      if mod:
+        blob += '=' * (4 - mod)
+      return base64.urlsafe_b64decode(blob)
+
+    # Deconstruct JWT.
+    chunks = jwt.split('.')
+    self.assertEqual(3, len(chunks))
+    self.assertEqual({
+      u'alg': u'RS256',
+      u'kid': u'pkey_id',
+      u'typ': u'JWT',
+    }, json.loads(decode(chunks[0])))
+    self.assertEqual(claimset, json.loads(decode(chunks[1])))
+    self.assertEqual('\x00signature\x00', decode(chunks[2]))
+
+  def test_remote_signer(self):
+    @ndb.tasklet
+    def iam_token():
+      raise ndb.Return(('iam_token', 0))
+    signer = service_account._RemoteSigner('fake@example.com', iam_token)
+
+    self.mock_urlfetch([{
+      'url': 'https://iam.googleapis.com/v1/projects/-/serviceAccounts/'
+             'fake@example.com:signJwt',
+      'payload': '{"payload":"{'
+        '\\"aud\\":\\"https://www.googleapis.com/oauth2/v4/token\\",'
+        '\\"exp\\":1420171185,'
+        '\\"iat\\":1420167585,'
+        '\\"iss\\":\\"fake@example.com\\",'
+        '\\"scope\\":\\"scope1 scope2\\"'
+      '}"}',
+      'method': 'POST',
+      'headers': {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer iam_token',
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      'response': (200, {'signedJwt': 'abcdef'})
+    }])
+
+    jwt = signer.sign_claimset_async({
+      'aud': 'https://www.googleapis.com/oauth2/v4/token',
+      'exp': 1420171185,
+      'iat': 1420167585,
+      'iss': 'fake@example.com',
+      'scope': 'scope1 scope2',
+    }).get_result()
+    self.assertEqual('abcdef', jwt)
 
 
 if __name__ == '__main__':
