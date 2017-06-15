@@ -904,6 +904,15 @@ def check_for_connection(machine_lease):
       return
 
   # The bot hasn't connected yet. If it's dead or missing, release the lease.
+  # At this point we have sent the connection instruction so the bot could still
+  # connect after we release the lease but before Machine Provider actually
+  # deletes the bot. Therefore we also schedule a termination task. If the bot
+  # connects, it will just shut itself down immediately.
+  task_scheduler.schedule_request(
+      task_request.create_termination_task(machine_lease.hostname, True),
+      None,
+      check_acls=False,
+  )
   bot_info = bot_management.get_info_key(machine_lease.hostname).get()
   if not bot_info:
     logging.error(
