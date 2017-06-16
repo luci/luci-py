@@ -15,6 +15,7 @@ import logging
 
 from google.appengine.ext import ndb
 from google.appengine.ext.ndb import msgprop
+from protorpc import message_types
 from protorpc import messages
 from protorpc import remote
 
@@ -56,10 +57,23 @@ class AdminApi(remote.Service):
   """Administration API accessible only by the service admins."""
 
   @auth.endpoints_method(
-      GlobalConfigMessage, GlobalConfigMessage, name='globalConfig')
+      message_types.VoidMessage, GlobalConfigMessage, name='readGlobalConfig')
   @auth.require(acl.is_admin)
-  def global_config(self, request):
-    """Reads/writes global configuration."""
+  def read_global_config(self, request):
+    """Reads global configuration."""
+    conf = GlobalConfig.fetch()
+    if not conf:
+      conf = GlobalConfig()
+
+    return GlobalConfigMessage(
+        services_config_location=conf.services_config_location,
+        services_config_storage_type=conf.services_config_storage_type)
+
+  @auth.endpoints_method(
+      GlobalConfigMessage, GlobalConfigMessage, name='writeGlobalConfig')
+  @auth.require(acl.is_admin)
+  def write_global_config(self, request):
+    """Writes global configuration."""
     conf = GlobalConfig.fetch()
     if not conf:
       conf = GlobalConfig()
