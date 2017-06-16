@@ -2,12 +2,13 @@
 #
 # Used for starting a Swarming bot process.
 
-description	"swarming bot startup"
+description "swarming bot startup"
 
 start on net-device-up IFACE!=lo
 stop on shutdown
 
 script
-  /usr/bin/sudo -H -u {user} \
-      /usr/bin/python /b/s/swarming_bot.zip start_bot
+  /usr/bin/sudo -H -u %(user)s \
+      SWARMING_EXTERNAL_BOT_SETUP=1 \
+      /usr/bin/python %(zip)s start_bot
 end script

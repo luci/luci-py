@@ -2,13 +2,13 @@
 #
 # Runs the Machine Provider agent process.
 
-description	"machine provider agent"
+description "machine provider agent"
 
 start on net-device-up IFACE!=lo
 stop on shutdown
 
 script
-  {agent}
+  %(agent)s
 end script
 
 respawn

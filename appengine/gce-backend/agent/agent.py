@@ -3,16 +3,14 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-"""Machine Provider agent for GCE Linux instances."""
+"""Sample Machine Provider agent."""
 
 import argparse
 import datetime
 import httplib2
 import json
 import logging
-import logging.handlers
 import os
-import pwd
 import subprocess
 import sys
 import time
@@ -25,17 +23,7 @@ THIS_DIR = os.path.dirname(__file__)
 LOG_DIR = os.path.join(THIS_DIR, 'logs')
 LOG_FILE = os.path.join(LOG_DIR, '%s.log' % os.path.basename(__file__))
 
-AGENT_UPSTART_CONFIG_DEST = '/etc/init/machine-provider-agent.conf'
-AGENT_UPSTART_CONFIG_TMPL = os.path.join(
-    THIS_DIR, 'machine-provider-agent.conf.tmpl')
-AGENT_UPSTART_JOB = 'machine-provider-agent'
-CHROME_BOT = 'chrome-bot' # TODO(smut): Remove after configs pass --user.
-METADATA_BASE_URL = 'http://metadata/computeMetadata/v1'
-SWARMING_BOT_DIR = '/b/s'
-SWARMING_BOT_ZIP = os.path.join(SWARMING_BOT_DIR, 'swarming_bot.zip')
-SWARMING_UPSTART_CONFIG_DEST = '/etc/init/swarming-start-bot.conf'
-SWARMING_UPSTART_CONFIG_TMPL = os.path.join(
-    THIS_DIR, 'swarming-start-bot.conf.tmpl')
+METADATA_BASE_URL = 'http://metadata.google.internal/computeMetadata/v1'
 
 
 class Error(Exception):
@@ -51,41 +39,6 @@ class RequestError(Error):
 # 404
 class NotFoundError(RequestError):
   pass
-
-
-def configure_logging():
-  """Sets up the log file."""
-  class TimeFormatter(logging.Formatter):
-    def formatTime(self, record, datefmt=None):
-      datefmt = datefmt or '%Y-%m-%d %H:%M:%S'
-      return time.strftime(datefmt, time.localtime(record.created))
-
-  class SeverityFilter(logging.Filter):
-    def filter(self, record):
-      record.severity = record.levelname[0]
-      return True
-
-  if not os.path.exists(LOG_DIR):
-    os.mkdir(LOG_DIR)
-
-  logger = logging.getLogger()
-  logger.setLevel(logging.DEBUG)
-
-  log_file = logging.handlers.RotatingFileHandler(LOG_FILE, backupCount=100)
-  log_file.addFilter(SeverityFilter())
-  log_file.setFormatter(TimeFormatter('%(asctime)s %(severity)s: %(message)s'))
-  logger.addHandler(log_file)
-
-  # Log all uncaught exceptions.
-  def log_exception(exception_type, value, stack_trace):
-    logging.error(
-        ''.join(traceback.format_exception(exception_type, value, stack_trace)),
-    )
-  sys.excepthook = log_exception
-
-  # Rotate log files once on startup to get per-execution log files.
-  if os.path.exists(LOG_FILE):
-    log_file.doRollover()
 
 
 def get_metadata(key=''):
@@ -209,97 +162,266 @@ class MachineProvider(object):
     return json.loads(content)
 
 
-def connect_to_swarming(service_account, swarming_server, user):
-  """Connects to the given Swarming server. Sets up auto-connect on reboot.
+class Agent(object):
+  """Base class for Machine Provider agent."""
 
-  Args:
-    service_account: Service account to authenticate with to Swarming with.
-    swarming_server: URL of the Swarming server to connect to.
-    user: Username that Swarming bot process will run as.
-  """
-  with open(SWARMING_UPSTART_CONFIG_TMPL) as f:
-    config = f.read().format(user=user)
+  def __init__(self, user):
+    """Initializes a new instance of the Agent.
 
-  if os.path.exists(SWARMING_UPSTART_CONFIG_DEST):
-    logging.info('Reinstalling: %s', SWARMING_UPSTART_CONFIG_DEST)
-    os.remove(SWARMING_UPSTART_CONFIG_DEST)
-  else:
-    logging.info('Installing: %s', SWARMING_UPSTART_CONFIG_DEST)
+    Args:
+      user: The username of the user the agent should run for.
+    """
+    self.user = user
 
-  with open(SWARMING_UPSTART_CONFIG_DEST, 'w') as f:
-    f.write(config)
+  def configure_logging(self):
+    """Sets up the log file."""
+    class TimeFormatter(logging.Formatter):
+      def formatTime(self, record, datefmt=None):
+        datefmt = datefmt or '%Y-%m-%d %H:%M:%S'
+        return time.strftime(datefmt, time.localtime(record.created))
 
-  if not os.path.exists(SWARMING_BOT_DIR):
-    os.mkdir(SWARMING_BOT_DIR)
-  user = pwd.getpwnam(user)
-  os.chown(SWARMING_BOT_DIR, user.pw_uid, user.pw_gid)
+    class SeverityFilter(logging.Filter):
+      def filter(self, record):
+        record.severity = record.levelname[0]
+        return True
 
-  if os.path.exists(SWARMING_BOT_ZIP):
-    # Delete just the zip, not the whole directory so logs are kept.
-    os.remove(SWARMING_BOT_ZIP)
+    path = os.path.join(self.LOGS_DIR, 'agent.%s.log' % time.time())
+    if not os.path.exists(self.LOGS_DIR):
+      os.mkdir(self.LOGS_DIR)
 
-  http = AuthorizedHTTPRequest(service_account=service_account)
-  _, bot_code = http.request(
-    urlparse.urljoin(swarming_server, 'bot_code'),
-    method='GET',
-  )
-  with open(SWARMING_BOT_ZIP, 'w') as f:
-    f.write(bot_code)
-  os.chown(SWARMING_BOT_ZIP, user.pw_uid, user.pw_gid)
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)
 
+    log = logging.FileHandler(path)
+    log.addFilter(SeverityFilter())
+    log.setFormatter(TimeFormatter('%(asctime)s %(severity)s: %(message)s'))
+    logger.addHandler(log)
 
-def poll(user):
-  """Polls Machine Provider for instructions."""
-  # Metadata tells us which Machine Provider instance to talk to.
-  hostname = get_metadata('instance/name')
-  server = get_metadata('instance/attributes/machine_provider_server')
-  service_account = get_metadata('instance/attributes/machine_service_account')
-  user = user or CHROME_BOT
-  mp = MachineProvider(server=server, service_account=service_account)
+    # Log all uncaught exceptions.
+    def log_exception(kind, value, trace):
+      logging.error(''.join(traceback.format_exception(kind, value, trace)))
+    sys.excepthook = log_exception
 
-  while True:
-    logging.info('Polling for instructions')
-    try:
-      response = mp.poll(hostname, 'GCE')
-      if response.get('instruction') and response.get('state') != 'EXECUTED':
-        logging.info(
-            'Received new instruction: %s', json.dumps(response, indent=2))
-        if response.get('instruction', {}).get('swarming_server'):
-          connect_to_swarming(
-              service_account, response['instruction']['swarming_server'], user)
-          mp.ack(hostname, 'GCE')
-          subprocess.check_call(['/sbin/shutdown', '-r', 'now'])
-    except NotFoundError:
-      logging.warning('Invalid hostname for GCE backend, or unauthorized')
-    time.sleep(60)
+  def start(self):
+    """Starts the Machine Provider agent."""
+    raise NotImplementedError
 
+  def stop(self):
+    """Stops the Machine Provider agent."""
+    raise NotImplementedError
 
-def install():
-  """Installs Upstart config for the Machine Provider agent."""
-  with open(AGENT_UPSTART_CONFIG_TMPL) as f:
-    config = f.read().format(agent=os.path.abspath(__file__))
+  def chown(self, user, path):
+    """Change ownership of a path.
 
-  if os.path.exists(AGENT_UPSTART_CONFIG_DEST):
-    with open(AGENT_UPSTART_CONFIG_DEST) as f:
-      existing_config = f.read()
-    if config == existing_config:
-      logging.info('Already installed: %s', AGENT_UPSTART_CONFIG_DEST)
-      return
+    Args:
+      user: The user which should own the path.
+      path: The path to change ownership of.
+    """
+    raise NotImplementedError
+
+  def reboot(self):
+    """Reboots the machine."""
+    logging.info('Rebooting...')
+    while True:
+      subprocess.check_call(self.REBOOT_CMD)
+      time.sleep(60)
+      logging.info('Waiting to reboot...')
+
+  def install(self):
+    """Installs the Machine Provider agent and configures autostart.
+
+    Args:
+      user: The username of the user to install the agent for.
+    """
+    with open(self.AGENT_AUTOSTART_TEMPLATE) as f:
+      config = f.read() % {
+          'agent': os.path.abspath(__file__),
+          'user': self.user,
+      }
+
+    path = self.AGENT_AUTOSTART_PATH % {'user': self.user}
+    if os.path.exists(path):
+      with open(path) as f:
+        if config == f.read():
+          logging.info('Already installed: %s', path)
+          return
+      logging.info('Reinstalling: %s', path)
+      self.stop()
     else:
-      logging.info('Reinstalling: %s', AGENT_UPSTART_CONFIG_DEST)
-      os.remove(AGENT_UPSTART_CONFIG_DEST)
-  else:
-    logging.info('Installing: %s', AGENT_UPSTART_CONFIG_DEST)
+      logging.info('Installing: %s', path)
+    with open(path, 'w') as f:
+      f.write(config)
+    self.start()
 
-  with open(AGENT_UPSTART_CONFIG_DEST, 'w') as f:
-    f.write(config)
-  subprocess.check_call(['initctl', 'reload-configuration'])
-  subprocess.check_call(['start', AGENT_UPSTART_JOB])
+  def download_swarming_bot_code(self, service_account, swarming_server, path):
+    """Downloads the Swarming bot code.
+
+    Args:
+      service_account: Service account to authorize requests to Swarming with.
+      swarming_server: URL of the Swarming server to download bot code from.
+      path: Path to download the bot code to.
+    """
+    if os.path.exists(path):
+      logging.info('Already installed: %s', path)
+      return
+
+    logging.info('Installing: %s', path)
+    http = AuthorizedHTTPRequest(service_account=service_account)
+    _, bot_code = http.request(
+      urlparse.urljoin(swarming_server, 'bot_code'), method='GET')
+    # Open for write as a binary file, otherwise Python may convert
+    # end-of-line \n characters to the Windows-specific \r\n.
+    with open(path, 'wb') as f:
+      f.write(bot_code)
+    self.chown(self.user, path)
+
+  def connect_to_swarming(self, service_account, swarming_server):
+    """Connects to the given Swarming server. Configures auto-connect on reboot.
+
+    Args:
+      service_account: Service account to authorize requests to Swarming with.
+      swarming_server: URL of the Swarming server to connect to.
+
+    Returns:
+      True if successful, False otherwise.
+    """
+    if not os.path.exists(self.SWARMING_BOT_DIR):
+      os.mkdir(self.SWARMING_BOT_DIR)
+    self.chown(self.user, self.SWARMING_BOT_DIR)
+
+    path = os.path.join(self.SWARMING_BOT_DIR, 'swarming_bot.zip')
+    self.download_swarming_bot_code(service_account, swarming_server, path)
+
+    with open(self.SWARMING_AUTOSTART_TEMPLATE) as f:
+      config = f.read() % {
+          'user': self.user,
+          'zip': path,
+      }
+
+    path = self.SWARMING_AUTOSTART_PATH % {'user': self.user}
+    if os.path.exists(path):
+      logging.info('Reinstalling: %s', path)
+      os.remove(path)
+    else:
+      logging.info('Installing: %s', path)
+    with open(path, 'w') as f:
+      f.write(config)
+
+  def poll(self):
+    """Polls Machine Provider for instructions."""
+    # Metadata tells us which Machine Provider instance to talk to.
+    hostname = get_metadata('instance/name')
+    server = get_metadata('instance/attributes/machine_provider_server')
+    service_account = get_metadata(
+        'instance/attributes/machine_service_account')
+    mp = MachineProvider(server=server, service_account=service_account)
+
+    while True:
+      logging.info('Polling for instructions')
+      try:
+        response = mp.poll(hostname, 'GCE')
+        if response.get('instruction') and response.get('state') != 'EXECUTED':
+          logging.info(
+              'Received new instruction: %s', json.dumps(response, indent=2))
+          if response.get('instruction', {}).get('swarming_server'):
+            self.connect_to_swarming(
+                service_account, response['instruction']['swarming_server'])
+            mp.ack(hostname, 'GCE')
+            self.reboot()
+      except NotFoundError:
+        logging.warning('Invalid hostname for GCE backend, or unauthorized')
+      time.sleep(60)
+
+
+class UbuntuAgent(Agent):
+  """Machine Provider agent for Ubuntu.
+
+  The agent is installed for root.
+  """
+
+  AGENT_AUTOSTART_TEMPLATE = os.path.join(
+      THIS_DIR, 'machine-provider-agent.conf.tmpl')
+  AGENT_AUTOSTART_PATH = '/etc/init/machine-provider-agent.conf'
+  LOGS_DIR = '/var/log/messages/machine-provider-agent'
+  REBOOT_CMD = ('/sbin/shutdown', '-r', 'now')
+  SWARMING_AUTOSTART_TEMPLATE = os.path.join(
+      THIS_DIR, 'swarming-start-bot.conf.tmpl')
+  SWARMING_AUTOSTART_PATH = '/etc/init/swarming-start-bot.conf'
+  SWARMING_BOT_DIR = '/b/s'
+
+  def start(self):
+    """Starts the Machine Provider agent."""
+    subprocess.check_call(['initctl', 'reload-configuration'])
+    subprocess.check_call(['start', 'machine-provider-agent'])
+
+  def stop(self):
+    """Stops the Machine Provider agent."""
+    subprocess.check_call(['stop', 'machine-provider-agent'])
+
+  def chown(self, user, path):
+    """Change ownership of a path.
+
+    Args:
+      user: The user which should own the path.
+      path: The path to change ownership of.
+    """
+    import pwd
+    user = pwd.getpwnam(user)
+    os.chown(path, user.pw_uid, user.pw_gid)
+
+
+class WindowsAgent(Agent):
+  """Machine Provider agent for Windows.
+
+  The agent is installed for self.user.
+  """
+
+  AGENT_AUTOSTART_TEMPLATE = os.path.join(
+      THIS_DIR, 'machine-provider-agent.bat.tmpl')
+  AGENT_AUTOSTART_PATH = (
+      'C:\\Users\\%(user)s\\Start Menu\\Programs\\Startup\\'
+      'machine-provider-agent.bat'
+  )
+  LOGS_DIR = 'C:\\logs'
+  REBOOT_CMD = ('shutdown', '/f', '/r', '/t', '0')
+  SWARMING_AUTOSTART_TEMPLATE = os.path.join(
+      THIS_DIR, 'swarming-start-bot.bat.tmpl')
+  SWARMING_AUTOSTART_PATH = (
+      'C:\\Users\\%(user)s\\Start Menu\\Programs\\Startup\\'
+      'swarming-start-bot.bat'
+  )
+  SWARMING_BOT_DIR = 'C:\\b\\s'
+
+  def start(self):
+    """Starts the Machine Provider agent."""
+    path = self.AGENT_AUTOSTART_PATH % {'user': self.user}
+    subprocess.Popen(
+        [path],
+        # Prevents handles from being inherited on Windows.
+        close_fds=True,
+        # https://msdn.microsoft.com/en-us/library/windows/desktop/ms684863.aspx
+        # CREATE_NEW_PROCESS_GROUP: 0x200
+        # DETACHED_PROCESS:         0x008
+        creationflags=0x200 | 0x8,
+    )
+
+  def stop(self):
+    """Stops the Machine Provider agent."""
+    # TODO(smut): Stop the agent.
+    pass
+
+  def chown(self, user, path):
+    """Change ownership of a path.
+
+    Args:
+      user: The user which should own the path.
+      path: The path to change ownership of.
+    """
+    # TODO(smut): Determine if this is necessary on our Windows VMs.
+    pass
 
 
 def main():
-  configure_logging()
-
   parser = argparse.ArgumentParser()
   parser.add_argument(
       '-i',
@@ -314,10 +436,19 @@ def main():
   )
   args = parser.parse_args()
 
-  if args.install:
-    return install()
+  if sys.platform == 'linux2':
+    # Ubuntu is the only supported Linux distribution.
+    # TODO(smut): Stop assuming chrome-bot.
+    agent = UbuntuAgent(args.user or 'chrome-bot')
+  elif sys.platform == 'win32':
+    agent = WindowsAgent(args.user)
 
-  return poll(args.user)
+  agent.configure_logging()
+
+  if args.install:
+    return agent.install()
+
+  return agent.poll()
 
 
 if __name__ == '__main__':
