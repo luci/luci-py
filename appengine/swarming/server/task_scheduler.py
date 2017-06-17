@@ -143,6 +143,7 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request):
       # This means two things, first it's a retry, second it's that the first
       # try failed and the retry is being reaped by the same bot. Deny that, as
       # the bot may be deeply broken and could be in a killing spree.
+      # TODO(maruel): Allow retry for bot locked task using 'id' dimension.
       logging.warning(
           '%s can\'t retry its own internal failure task',
           result_summary.task_id)
@@ -151,6 +152,9 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request):
     run_result = task_result.new_run_result(
         request, (result_summary.try_number or 0) + 1, bot_id, bot_version,
         bot_dimensions)
+    # Upon bot reap, both .started_ts and .modified_ts matches. They differ on
+    # the first ping.
+    run_result.started_ts = now
     run_result.modified_ts = now
     result_summary.set_from_run_result(run_result, request)
     ndb.put_multi([to_run, run_result, result_summary])
@@ -224,6 +228,7 @@ def _handle_dead_bot(run_result_key):
       return None, run_result.bot_id
 
     run_result.signal_server_version(server_version)
+    old_modified = run_result.modified_ts
     run_result.modified_ts = now
 
     orig_summary_state = result_summary.state
@@ -236,8 +241,15 @@ def _handle_dead_bot(run_result_key):
       run_result.abandoned_ts = now
       task_is_retried = None
     elif (result_summary.try_number == 1 and now < request.expiration_ts and
-          request.properties.idempotent):
-      # Retry it.
+          (request.properties.idempotent or
+            run_result.started_ts == old_modified)):
+      # Retry it. It fits:
+      # - first try
+      # - not yet expired
+      # - One of:
+      #   - idempotent
+      #   - task hadn't got any ping at all from task_runner.run_command()
+      # TODO(maruel): Allow retry for bot locked task using 'id' dimension.
       to_put = (run_result, result_summary, to_run)
       to_run.queue_number = task_to_run.gen_queue_number(request)
       run_result.state = task_result.State.BOT_DIED
@@ -941,6 +953,11 @@ def cron_handle_bot_died(host):
 
   If the task was at its first try, it'll be retried. Otherwise the task will be
   canceled.
+
+  Returns:
+  - task IDs killed
+  - number of task retried
+  - number of task ignored
   """
   ignored = 0
   killed = []

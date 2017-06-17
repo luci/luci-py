@@ -208,7 +208,7 @@ class TaskResultApiTest(TestCase):
       'modified_ts': None,
       'outputs_ref': None,
       'server_versions': ['v1a'],
-      'started_ts': self.now,
+      'started_ts': None,
       'state': task_result.State.RUNNING,
       'try_number': 1,
     }
@@ -271,7 +271,8 @@ class TaskResultApiTest(TestCase):
     to_run.queue_number = None
     to_run.put()
     run_result = task_result.new_run_result(request, 1, 'localhost', 'abc', {})
-    run_result.modified_ts = utils.utcnow()
+    run_result.started_ts = utils.utcnow()
+    run_result.modified_ts = run_result.started_ts
     result_summary.set_from_run_result(run_result, request)
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
     expected = {
@@ -418,8 +419,9 @@ class TaskResultApiTest(TestCase):
     result_summary.modified_ts = utils.utcnow()
     ndb.transaction(result_summary.put)
     run_result = task_result.new_run_result(request, 1, 'localhost', 'abc', {})
-    run_result.completed_ts = utils.utcnow()
-    run_result.modified_ts = utils.utcnow()
+    run_result.started_ts = utils.utcnow()
+    run_result.completed_ts = run_result.started_ts
+    run_result.modified_ts = run_result.started_ts
     result_summary.set_from_run_result(run_result, request)
     ndb.transaction(lambda: ndb.put_multi((run_result, result_summary)))
 
@@ -436,6 +438,7 @@ class TaskResultApiTest(TestCase):
     request = mkreq(_gen_request())
     result_summary = task_result.new_result_summary(request)
     run_result = task_result.new_run_result(request, 1, 'localhost', 'abc', {})
+    run_result.started_ts = utils.utcnow()
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
     result_summary.modified_ts = utils.utcnow()
     run_result.modified_ts = utils.utcnow()
@@ -451,6 +454,7 @@ class TaskResultApiTest(TestCase):
     request = mkreq(_gen_request())
     result_summary = task_result.new_result_summary(request)
     run_result = task_result.new_run_result(request, 1, 'localhost', 'abc', {})
+    run_result.started_ts = utils.utcnow()
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
     result_summary.modified_ts = utils.utcnow()
     run_result.modified_ts = utils.utcnow()
@@ -474,8 +478,10 @@ class TaskResultApiTest(TestCase):
     result_summary = task_result.new_result_summary(request)
     run_result_1 = task_result.new_run_result(
         request, 1, 'localhost', 'abc', {})
+    run_result_1.started_ts = utils.utcnow()
     run_result_2 = task_result.new_run_result(
         request, 2, 'localhost', 'abc', {})
+    run_result_2.started_ts = utils.utcnow()
     self.assertTrue(result_summary.need_update_from_run_result(run_result_1))
     run_result_2.modified_ts = utils.utcnow()
     result_summary.modified_ts = utils.utcnow()
@@ -523,8 +529,9 @@ class TaskResultApiTest(TestCase):
     run_result.state = task_result.State.TIMED_OUT
     run_result.duration = 0.1
     run_result.exit_code = -1
-    run_result.completed_ts = utils.utcnow()
-    run_result.modified_ts = utils.utcnow()
+    run_result.started_ts = utils.utcnow()
+    run_result.completed_ts = run_result.started_ts
+    run_result.modified_ts = run_result.started_ts
     result_summary.set_from_run_result(run_result, request)
     ndb.transaction(lambda: ndb.put_multi((run_result, result_summary)))
     run_result = run_result.key.get()
@@ -554,6 +561,7 @@ class TestOutput(TestCase):
     ndb.transaction(result_summary.put)
     self.run_result = task_result.new_run_result(
         request, 1, 'localhost', 'abc', {})
+    self.run_result.started_ts = result_summary.modified_ts
     self.run_result.modified_ts = utils.utcnow()
     result_summary.set_from_run_result(self.run_result, request)
     ndb.transaction(lambda: ndb.put_multi((result_summary, self.run_result)))

@@ -83,8 +83,10 @@ from server import task_request
 import cipd
 
 # Amount of time after which a bot is considered dead. In short, if a bot has
-# not ping in the last 5 minutes while running a task, it is considered dead.
-BOT_PING_TOLERANCE = datetime.timedelta(seconds=5*60)
+# not ping in the last 2 minutes while running a task, it is considered dead.
+#
+# task_runner.MAX_PACKET_INTERVAL is 30 seconds.
+BOT_PING_TOLERANCE = datetime.timedelta(seconds=2*60)
 
 
 class State(object):
@@ -741,6 +743,11 @@ class TaskRunResult(_TaskResultCommon):
     out['try_number'] = self.try_number
     return out
 
+  def _pre_put_hook(self):
+    super(TaskRunResult, self)._pre_put_hook()
+    if not self.started_ts:
+      raise datastore_errors.BadValueError('Must update .started_ts')
+
 
 class TaskResultSummary(_TaskResultCommon):
   """Represents the overall result of a task.
@@ -1169,7 +1176,6 @@ def new_run_result(request, try_number, bot_id, bot_version, bot_dimensions):
           summary_key, try_number),
       bot_dimensions=bot_dimensions,
       bot_id=bot_id,
-      started_ts=utils.utcnow(),
       bot_version=bot_version,
       server_versions=[utils.get_app_version()])
 
