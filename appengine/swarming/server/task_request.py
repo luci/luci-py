@@ -911,9 +911,9 @@ def init_new_request(request, allow_high_priority, secret_bytes_ent):
     request_key = task_pack.result_summary_key_to_request_key(
         result_summary_key)
     parent = request_key.get()
-    if not parent:
+    if not parent or parent.properties.is_terminate:
       raise ValueError('parent_task_id is not a valid task')
-    request.priority = max(min(request.priority, parent.priority - 1), 0)
+    request.priority = min(request.priority, max(parent.priority - 1, 1))
     # Drop the previous user.
     request.user = parent.user
 
