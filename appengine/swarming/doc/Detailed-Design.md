@@ -2,7 +2,8 @@
 
 Lightweight distribution server with a legion of dumb bots.
 
-**One line description**: Running all tests concurrently, not be impacted by network or device flakiness.
+**One line description**: Running all tests concurrently, not be impacted by
+network or device flakiness.
 
 
 ## Overview
@@ -30,45 +31,55 @@ after their currently running task completes.
 
 ### APIs
 
-The communication of tasks between clients and the server, or the server and the
-bots, is done through JSON REST API over HTTPS.
+The client API is implemented via Cloud Endpoints over HTTPS.
 
-**All the JSON REST APIs are idempotent**. Retrying them in case of error is
-always safe. This permits transparent retry in case of failure.
+  - API can be browsed online at
+    https://chromium-swarm.appspot.com/_ah/api/explorer in the [swarming
+    API](https://apis-explorer.appspot.com/apis-explorer/?base=https://chromium-swarm.appspot.com/_ah/api#p/swarming/v1/)
+    section.
+  - Implementation is in [handlers_endpoints.py](../handlers_endpoints.py).
+  - Messages are defined in [swarming_rpcs.py](../swarming_rpcs.py).
+  - Authentication is done via OAuth2. The ACL groups are defined via
+    [auth_service](../../auth_service/) integration.
 
-All APIs require authentication when relevant. Multiple access group levels can
-be defined.
+**All the APIs are idempotent**: retrying a call in case of error is always
+safe. This permits transparent retry in case of failure. The exception is
+/tasks/new, which creates a new task, in case of failure, it may leave an orphan
+task.
 
-The bot JSON REST APIs and client JSON REST APIs are clearly separated;
-`/swarming/api/v1/bot/...` and `/swarming/api/v1/client/...`.
+The bot API is an implementation detail and doesn't provide any compatibility
+guarantee.
 
 
 ### Server configuration
 
 The server has a few major configuration points;
-  - Authentication, usually deletaged to the auth_service instance.
-  - [bootstrap.py](../swarming_bot/bootstrap.py) which permits automatic
+  - Authentication, usually deletaged to the [auth_service](../../auth_service/)
+    instance.
+  - [config_service](../../config_service) manages
+  - [bootstrap.py](../swarming_bot/config/bootstrap.py) which permits automatic
     single-command bot bootstrapping.
-  - [bot_config.py](../swarming_bot/bot_config.py)
+  - [bot_config.py](../swarming_bot/config/bot_config.py)
     which permits Swarming server specific global configuration. It can hook
     what the bots do after running a task, their dimensions, etc. See the file
     itself for the APIs. The Bot interface is provided by
-    [bot.py](../swarming/swarming_bot/bot.py).
+    [bot.py](../swarming/swarming_bot/api/bot.py).
 
 
 ### Tasks
 
-Each task is represented by a TaskRequest and a TaskProperties described in
-task_request.py. The TaskRequest represents the meta data about a task, who,
-when, expiration timestamp, etc. The TaskProperties contains the actual details
-to run a task, commands, environment variables, execution timeout, etc. This
-separation makes it possible to dedupe the task requests when the exact same
-`.isolated` file is ran multiple times, so that task-deduplication can be
-eventually implemented.
+Each task is represented by a `TaskRequest` and a `TaskProperties` described in
+[task_request.py](../server/task_request.py). The `TaskRequest` represents the
+meta data about a task, who, when, expiration timestamp, etc. The
+`TaskProperties` contains the actual details to run a task, commands,
+environment variables, execution timeout, etc. This separation makes it possible
+to dedupe the task requests when the exact same `.isolated` file is ran multiple
+times, so that task-deduplication can be eventually implemented.
 
-A task also has a TaskResultSummary to describe its pending state and a tiny
-TaskToRun entity for the actual scheduling. They are respectively defined in
-task_result.py and task_to_run.py.
+A task also has a `TaskResultSummary` to describe its pending state and a tiny
+`TaskToRun` entity for the actual scheduling. They are respectively defined in
+[task_result.py](../server/task_result.py) and
+[task_to_run.py](../server/task_to_run.py).
 
 The task ID is the milliseconds since epoch plus low order random bits and the
 last byte set to 0. The last byte is used to differentiate between each try.
@@ -97,12 +108,12 @@ For example, it could be "os=Windows-Vista-SP2; gpu=15ad:0405".
 
 To make the proces efficient, the dimensions are MD5 hashed and only the first
 32 bits are saved so integer comparison can be used. This greatly reduce the
-size of the hot TaskToRun entities used for task scheduling and the amount of
+size of the hot `TaskToRun` entities used for task scheduling and the amount of
 memory necessary on the frontend server.
 
-Once a bot is assigned to a task, a TaskRunResult is created. If the task is
-actually a retry, multiple TaskRunResult can be created for a single
-TaskRequest.
+Once a bot is assigned to a task, a `TaskRunResult` is created. If the task is
+actually a retry, multiple `TaskRunResult` can be created for a single
+`TaskRequest`.
 
 
 #### Task execution
@@ -114,11 +125,8 @@ connectivity, as a failing HTTPS POST will simply be retried.
 
 #### Task success
 
-Swarming distributes tasks but it doesn't care much about the task exit code.
-The only trick we use is that bots currently automatically reboot when the task
-executed fails on desktop OSes. It fixes classes of issues especially on
-Windows. Obviously this is disabled when multiple bots run on a single host
-(TODO).
+Swarming distributes tasks but it doesn't care much about the task itself. A
+task is marked as `COMPLETED_SUCCESS` when the exit code is 0.
 
 
 #### Orphaned task
@@ -138,17 +146,20 @@ If a task is marked as idempotent, e.g. `--idempotent` is used, the client
 certifies that the task do not have side effects. This means that running the
 task twice shall return the same results (pending flakiness).
 
-The way it works internally is by calculating the SHA256 of !TaskProperties when
-marked as idempotent. When a !TaskResultSummary succeeds that was also
+The way it works internally is by calculating the SHA256 of `TaskProperties`
+when marked as idempotent. When a `TaskResultSummary` succeeds that was also
 idempotent, it sets a property to tell that its values can be reused.
 
-When a new request comes in, it looks for a !TaskResultSummary that has
-properties_hash set. If it finds one, the results are reused as-is and served to
-the client immediately, without ever scheduling a task.
+When a new request comes in, it looks for a `TaskResultSummary` that has
+`properties_hash` set. If it finds one, the results are reused as-is and served
+to the client immediately, without ever scheduling a task.
 
 **Efficient task deduplication requires a deterministic build and no side
-effects in the tasks themselves**. On the other hand, it can results is large
-infrastructure savings.
+effects in the tasks themselves**. On the other hand, successful task
+deduplication can results is large infrastructure savings.
+
+☞ See [the user guide about idempotency](User-Guide.md#idempotency) for more
+information.
 
 
 ### Caveats of running on AppEngine
@@ -205,8 +216,9 @@ Only two basic assumptions are:
 
 The bot's code is served directly from the server as a self-packaged
 `swarming_bot.zip`. The server generates it on the fly and embeds its own URL in
-it. The server can also optionally have a custom bootstrap.py to further
-automate the bot bootstraping process.
+it. The server can also optionally have a custom
+[bootstrap.py](../swarming_bot/config/bootstrap.py) to further automate the bot
+bootstraping process.
 
 
 ### Self updating
@@ -214,15 +226,18 @@ automate the bot bootstraping process.
 The bot keeps itself up to date with what the server provides.
 
    - At each poll, the bot hands to the server the SHA256 of the contents of
-     swarming_bot.zip. If it mismatches what the server expects, it is told to
+     `swarming_bot.zip`. If it mismatches what the server expects, it is told to
      auto-update;
-     - The bot downloads the new bot code to swarming_bot.2.zip or
-       swarming_bot.1.zip, depending on the currently running version and
+     - The bot downloads the new bot code to `swarming_bot.2.zip` or
+       `swarming_bot.1.zip`, depending on the currently running version and
        alternates between both names.
-   - swarming_bot.zip is generated by the server and includes 2 generated files:
-      - bot_config.py is user-configurable and contains hooks to be run on bot
-        startup, shutdown and also before and after task execution.
-      - config.json contains the URL of the server itself.
+   - `swarming_bot.zip` is generated by the server and includes 2 generated
+     files:
+      - [bot_config.py](../swarming_bot/config/bot_config.py) is
+        user-configurable and contains hooks to be run on bot startup, shutdown
+        and also before and after task execution.
+      - [config.json](../swarming_bot/config/config.json) contains the URL of
+        the server itself.
    - When a bot runs a task, it locks itself into the server version it started
      the task with. This permits to do breaking bot API change safely. This
      implies two side-effects:
@@ -237,15 +252,15 @@ roll back to earlier versions if the server is rolled back. All the bot's code
 is inside the zip, this greatly reduces issues like a partial update, update
 failure when there's no free space available, etc.
 
-The bot also keeps a LKGBC copy (Last Known Good Bot Code):
+The bot also keeps a `LKGBC` copy (Last Known Good Bot Code):
 
-   - Upon startup, if the bot was executed via swarming_bot.zip;
+   - Upon startup, if the bot was executed via `swarming_bot.zip`;
      - It copies itself to swarming_bot.1.zip and starts itself back, e.g.
        execv().
-   - After successfully running a task, it looks if swarming_bot.zip is not the
-     same version as the currently running version, if so;
-     - It copies itself (swarming.1.zip or swarming.2.zip) back to
-       swarming_bot.zip. This permits that at the next VM reboot, the most
+   - After successfully running a task, it looks if `swarming_bot.zip` is not
+     the same version as the currently running version, if so;
+     - It copies itself (`swarming.1.zip` or `swarming.2.zip`) back to
+       `swarming_bot.zip`. This permits that at the next VM reboot, the most
        recent LKGBC version will be used right away.
 
 The bot code has been tested on Linux, Mac and Windows, Chrome OS' crouton and
@@ -256,7 +271,7 @@ Raspbian.
 
 The bot publishes a dictionary of *dimensions*, which is a dict(key,
 list(values)), where each value can have multiple values. For example, a Windows
-XP bot would have 'os': ['Windows-XP-SP3']('Windows',). This permits broad or
+XP bot would have `'os': ['Windows', 'Windows-10-15063']`. This permits broad or
 scoped selection of bot type.
 
 For desktop OSes, it's about the OS and hardware properties. For devices, it's
@@ -265,11 +280,28 @@ about the device, not about the host driving it.
 These "dimensions" are used to associate tasks with the bots. See below.
 
 
+### Multiple bots on a single host
+
+Multiple bots can run on a host simultaneously, as long as each bot has its own
+base directory. So for example, one could be located in `/b/s/bot1` and a second
+in `/b/s/bot2`.
+
+In the scenario of multiple bots running on a host, make sure to never call
+[Bot.host_reboot()](../swarming_bot/api/bot.py).
+
+
 ### Device Bot
 
-For bots that represent a device (Android, iOS, !ChromeBook), multiple bots can
-run on a single host (TODO), *one bot per connected device to the host*. Usually
-via USB.
+For bots that represent a device (Android, iOS, ChromeOS, Fuchsia), a bot can
+"own" all the devices connected to the host (generally via USB) or each bot can
+be in a docker container to own a single device.
+
+In the case of devices that are communicated through IP, it's up to
+[bot_config.py](../swarming_bot/config/bot_config.py) to decide what is "owned"
+by this bot. In some cases this can be determined by hardware (like when the
+host has two ethernet cards and devices are connected on the second), vlan
+proximity or hard coded host names in
+[bot_config.py](../swarming_bot/config/bot_config.py).
 
 In the USB case, a prototype recipe to create
 [udev](http://en.wikipedia.org/wiki/Udev) rules to fire up the bot upon
@@ -285,19 +317,23 @@ via the client tools or server monitoring functionality.
 
 ## Client
 
-Clients trigger tasks and requests results via a JSON REST API. It is not
-possible for the client to access bots directly, no interactivity is provided by
-design. The client code gives similar access to the Web UI.
+Clients trigger tasks and requests results via a [Cloud Endpoints JSON REST
+API](#apis).
+
+It is not possible for the client to access bots directly, no interactivity is
+provided _by design_.
+
+See [APIs](#apis) above to write your own client.
 
 
 ### Requesting a task
 
 When a client wishes to run something on swarming, they can use the REST API or
 use the client script `swarming.py trigger`. It's a simple HTTPS POST with the
-TaskRequest and TaskProperties serialized as JSON.
+`TaskRequest` and `TaskProperties` serialized as JSON.
 
-The format is described in `task_request.py` until the [API rewrite is
-done](https://code.google.com/p/swarming/issues/detail?id=179).
+The request message is `NewTaskRequest` as defined in
+[swarming_rpcs.py](../swarming_rpcs.py).
 
 
 ### Task -> Bot assignment
@@ -308,45 +344,27 @@ task with highest priority that has `dimensions` which are also defined on the
 bot.
 
 
-## Stats
-
-Statistics are generated at a minute resolution, with details like the number of
-active bots, tasks, average pending time for the tasks triggered, etc. Details
-per dimensions are also saved. The stats are generated directly from the logs by
-a cron job in an immutable way. This means that once details are saved for a
-minute, they are not updated afterward. This simplifies the DB load. Aggregate
-views of hourly and daily resolutions are automatically generated via a cron
-job.
-
-
-## Security
-
-APIs are XSRF token protected. AppEngine presents a valid SSL certificate that
-is verified by both the bot and the client.
-
-
 ### Authentication
 
-   - Web users are authenticated via AppEngine's native flow.
-   - Client users are authenticated via OAuth2 flow.
+   - The Web UI is implemented in Polymer and uses the same API as the client,
+     both are authenticated via OAuth2.
    - Bots using the REST APIs can optionally be whitelisted by IPs.
-   - The ACLs can be federated through a third party AppEngine instance. Design
-     doc is at AuthDesign.
+   - The ACLs can be federated through a third party AppEngine instance
+     [auth_service](../../auth_service/).
 
 
 ### Access control and Federation
 
-The access control groups are optionally federated (TODO: Add specific page
-about it) via services/auth_service via a master-replica model. This presents a
+The access control groups are optionally federated via
+[auth_service](../../auth_service/) via a master-replica model. This presents a
 coherent view on all the associated services.
 
 
 ## Testing Plan
 
-Swarming is tested by python tests in 4 ways:
-   - Load tests, which was run in the few thousands bots and clients range.
-   - Smoke tests before committing.
-   - Unit tests.
+Swarming is tested by python tests in the following ways:
+   - Pre-commit testing:
+      - Unit tests
+      - Smoke test
    - Canarying on the chromium infrastructure, to ensure the code works before
-     deploying to prod. CI live at
-     http://build.chromium.org/p/chromium.swarm/waterfall
+     deploying to prod.
