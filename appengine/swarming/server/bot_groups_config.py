@@ -8,7 +8,6 @@ import collections
 import hashlib
 import logging
 import os
-import re
 
 from components import auth
 from components import config
@@ -56,6 +55,9 @@ BotGroupConfig = collections.namedtuple('BotGroupConfig', [
   # Content of the supplemental bot_config.py to inject to the bot during
   # handshake.
   'bot_config_script_content',
+
+  # An email, "bot" or "". See 'system_service_account' in bots.proto.
+  'system_service_account',
 ])
 
 
@@ -83,7 +85,8 @@ def _default_bot_groups():
         owners=(),
         dimensions={},
         bot_config_script='',
-        bot_config_script_content=''))
+        bot_config_script_content='',
+        system_service_account=''))
 
 
 def _gen_version(fields):
@@ -171,7 +174,8 @@ def _bot_group_proto_to_tuple(msg, trusted_dimensions):
     owners=tuple(msg.owners),
     dimensions={k: sorted(v) for k, v in dimensions.iteritems()},
     bot_config_script=msg.bot_config_script or '',
-    bot_config_script_content=content or '')
+    bot_config_script_content=content or '',
+    system_service_account=msg.system_service_account or '')
 
 
 def _expand_bot_id_expr(expr):
@@ -312,8 +316,15 @@ def _fetch_bot_groups():
       direct_matches, prefix_matches, machine_types, default_group)
 
 
+def _validate_email(ctx, email, designation):
+  try:
+    auth.Identity(auth.IDENTITY_USER, email)
+  except ValueError:
+    ctx.error('invalid %s email "%s"', designation, email)
+
+
 @validation.self_rule(BOTS_CFG_FILENAME, bots_pb2.BotsCfg)
-def validate_settings(cfg, ctx):
+def validate_bots_cfg(cfg, ctx):
   """Validates bots.cfg file."""
   with ctx.prefix('trusted_dimensions: '):
     for dim_key in cfg.trusted_dimensions:
@@ -456,20 +467,13 @@ def validate_settings(cfg, ctx):
             'if both require_luci_machine_token and require_service_account '
             'are unset, ip_whitelist is required')
       if a.require_service_account:
-        try:
-          auth.Identity(auth.IDENTITY_USER, a.require_service_account)
-        except ValueError:
-          ctx.error(
-              'invalid service account email "%s"', a.require_service_account)
+        _validate_email(ctx, a.require_service_account, 'service account')
       if a.ip_whitelist and not auth.is_valid_ip_whitelist_name(a.ip_whitelist):
         ctx.error('invalid ip_whitelist name "%s"', a.ip_whitelist)
 
       # Validate 'owners'. Just check they are emails.
       for own in entry.owners:
-        try:
-          auth.Identity(auth.IDENTITY_USER, own)
-        except ValueError:
-          ctx.error('invalid owner email "%s"', own)
+        _validate_email(ctx, own, 'owner')
 
       # Validate 'dimensions'.
       for dim in entry.dimensions:
@@ -481,13 +485,29 @@ def validate_settings(cfg, ctx):
         # Another check in bot_code.py confirms that the script itself is valid
         # python.
         if not entry.bot_config_script.endswith('.py'):
-          ctx.error('Invalid bot_config_script name: must end with .py')
+          ctx.error('invalid bot_config_script name: must end with .py')
         if os.path.basename(entry.bot_config_script) != entry.bot_config_script:
           ctx.error(
-              'Invalid bot_config_script name: must not contain path entry')
+              'invalid bot_config_script name: must not contain path entry')
         # We can't validate that the file exists here. It'll fail in
         # _bot_group_proto_to_tuple() which is called by _fetch_bot_groups() and
         # cached for 60 seconds.
+
+      # Validate 'system_service_account'.
+      if entry.system_service_account == 'bot':
+        # If it is 'bot', the bot auth must be configured to use OAuth, since we
+        # need to get a bot token somewhere.
+        if not entry.auth.require_service_account:
+          ctx.error(
+              'system_service_account "bot" requires '
+              'auth.require_service_account to be used')
+      elif entry.system_service_account:
+        # TODO(vadimsh): Strictly speaking we can try to grab a token right
+        # here and thus check that IAM policies are configured. But it's not
+        # clear what happens if they are not. Will config-service reject the
+        # config forever? Will it attempt to revalidate it later?
+        _validate_email(
+            ctx, entry.system_service_account, 'system service account')
 
   # Now verify bot_id_prefix is never a prefix of other prefix. It causes
   # ambiguities.

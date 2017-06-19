@@ -28,14 +28,15 @@ TEST_CONFIG = bots_pb2.BotsCfg(
       owners=['owner@example.com'],
       dimensions=['pool:A', 'pool:B', 'other:D'],
     ),
-    # This group includes an injected bot_config.
+    # This group includes an injected bot_config and system_service_account.
     bots_pb2.BotGroup(
       bot_id=['other_bot'],
       bot_id_prefix=['bot'],
       machine_type=[bots_pb2.MachineType(lease_duration_secs=1, name='mt',
                                          mp_dimensions=['k:v'], target_size=1)],
       auth=bots_pb2.BotAuth(require_service_account='a@example.com'),
-      bot_config_script='foo.py'),
+      bot_config_script='foo.py',
+      system_service_account='bot'),
     bots_pb2.BotGroup(
       auth=bots_pb2.BotAuth(ip_whitelist='bots'),
       dimensions=['pool:default']),
@@ -50,7 +51,8 @@ EXPECTED_GROUP_1 = bot_groups_config._make_bot_group_config(
     owners=(u'owner@example.com',),
     dimensions={u'pool': [u'A', u'B'], u'other': [u'D']},
     bot_config_script='',
-    bot_config_script_content='')
+    bot_config_script_content='',
+    system_service_account='')
 
 EXPECTED_GROUP_2 = bot_groups_config._make_bot_group_config(
     require_luci_machine_token=False,
@@ -59,7 +61,8 @@ EXPECTED_GROUP_2 = bot_groups_config._make_bot_group_config(
     owners=(),
     dimensions={u'pool': []},
     bot_config_script='foo.py',
-    bot_config_script_content='print "Hi"')
+    bot_config_script_content='print "Hi"',
+    system_service_account='bot')
 
 EXPECTED_GROUP_3 = bot_groups_config._make_bot_group_config(
     require_luci_machine_token=False,
@@ -68,7 +71,8 @@ EXPECTED_GROUP_3 = bot_groups_config._make_bot_group_config(
     owners=(),
     dimensions={u'pool': [u'default']},
     bot_config_script='',
-    bot_config_script_content='')
+    bot_config_script_content='',
+    system_service_account='')
 
 
 DEFAULT_AUTH_CFG = bots_pb2.BotAuth(ip_whitelist='bots')
@@ -77,7 +81,7 @@ DEFAULT_AUTH_CFG = bots_pb2.BotAuth(ip_whitelist='bots')
 class BotGroupsConfigTest(test_case.TestCase):
   def validator_test(self, cfg, messages):
     ctx = validation.Context()
-    bot_groups_config.validate_settings(cfg, ctx)
+    bot_groups_config.validate_bots_cfg(cfg, ctx)
     self.assertEquals(ctx.result().messages, [
       validation.Message(severity=logging.ERROR, text=m)
       for m in messages
@@ -96,8 +100,8 @@ class BotGroupsConfigTest(test_case.TestCase):
     utils.clear_cache(bot_groups_config._fetch_bot_groups)
 
   def test_version(self):
-    self.assertEqual('hash:73d6757642a8ae', EXPECTED_GROUP_1.version)
-    self.assertEqual('hash:4fd80203102d64', EXPECTED_GROUP_2.version)
+    self.assertEqual('hash:95126eb205e129', EXPECTED_GROUP_1.version)
+    self.assertEqual('hash:d118358af6ceb7', EXPECTED_GROUP_2.version)
 
   def test_expand_bot_id_expr_success(self):
     def check(expected, expr):
@@ -977,6 +981,41 @@ class BotGroupsConfigTest(test_case.TestCase):
                                ]))
         ]),
     ])
+    self.validator_test(cfg, [])
+
+  def test_system_service_account_bad_email(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(
+          bot_id=['blah'],
+          auth=DEFAULT_AUTH_CFG,
+          system_service_account='bad email'),
+      ])
+    self.validator_test(cfg, [
+      'bot_group #0: invalid system service account email "bad email"'
+    ])
+
+  def test_system_service_account_bot_on_non_oauth_machine(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(
+          bot_id=['blah'],
+          auth=bots_pb2.BotAuth(ip_whitelist='bots'),
+          system_service_account='bot'),
+      ])
+    self.validator_test(cfg, [
+      'bot_group #0: system_service_account "bot" requires '
+      'auth.require_service_account to be used'
+    ])
+
+  def test_system_service_account_bot_on_oauth_machine(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(
+          bot_id=['blah'],
+          auth=bots_pb2.BotAuth(require_service_account='blah@example.com'),
+          system_service_account='bot'),
+      ])
     self.validator_test(cfg, [])
 
 

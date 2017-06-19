@@ -23,7 +23,6 @@ from google.appengine.ext import ndb
 import webapp2
 import webtest
 
-import handlers_backend
 import handlers_bot
 from components import ereporter2
 from components import utils
@@ -450,7 +449,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
         owners=None,
         dimensions={u'pool': [u'server-side']},
         bot_config_script=None,
-        bot_config_script_content=None)
+        bot_config_script_content=None,
+        system_service_account=None)
     self.mock(bot_auth, 'validate_bot_id_and_fetch_config',
               lambda *args, **kwargs: cfg)
 
@@ -472,7 +472,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
         owners=None,
         dimensions={},
         bot_config_script='foo.py',
-        bot_config_script_content='print "Hi";import sys; sys.exit(1)')
+        bot_config_script_content='print "Hi";import sys; sys.exit(1)',
+        system_service_account=None)
     self.mock(bot_auth, 'validate_bot_id_and_fetch_config',
               lambda *args, **kwargs: cfg)
     params = self.do_handshake()

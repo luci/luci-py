@@ -7,14 +7,15 @@ syntax = "proto2";
 
 // Schema for bots.cfg service config file in luci-config.
 //
-// It defines a function bot_id => (required credentials, trusted_dimensions),
-// where
+// It defines a function bot_id => (required credentials, trusted_dimensions,
+// config), where
 //    * "bot_id" is identifier of a bot as sent by the bot itself (usually
 //      machine hostname, short one, not FQDN)
 //    * "required credentials" describes how server should authenticate calls
 //      from the bot.
 //    * "trusted_dimensions" is a set of dimension set by the server itself.
 //      Such dimensions can't be spoofed by the bot.
+//    * "config" is any additional bot configuration.
 //
 // Connections from bots that do not appear in this config are rejected.
 //
@@ -172,6 +173,29 @@ message BotGroup {
 
   // Additional config script to inject into the swarming bot upon handshake.
   optional string bot_config_script = 23;
+
+  // A service account to use on bots when authenticating calls to various
+  // system-level services (like Isolate and CIPD), required for correct
+  // operation of the bot.
+  //
+  // Tasks will be able to access this account too, but it is not recommended
+  // and should be used extremely rare.
+  //
+  // If set to a service account email (*@*.iam.gserviceaccount.com), bots will
+  // use this account, generating access token through Swarming server. For this
+  // to work, the server account (<app-id>@appspot.gserviceaccount.com) must
+  // have "serviceAccountActor" IAM role set on the account.
+  //
+  // If set to a special string "bot", bots will use exact same token they use
+  // when authenticating calls to Swarming server itself. This works only if
+  // bots use OAuth for authentication (see 'require_service_account' in
+  // BotAuth). This mode exists for cases when proliferation of various service
+  // accounts is undesirable. Note that in this mode Swarming processes won't be
+  // able to request a system account token with some new scopes: they get exact
+  // same token as returned by get_authentication_headers bot_config.py hook.
+  //
+  // If not set, bots will not use authentication at all.
+  optional string system_service_account = 24;
 }
 
 
