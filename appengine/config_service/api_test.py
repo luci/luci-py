@@ -196,6 +196,73 @@ class ApiTest(test_case.EndpointsTestCase):
       ],
     })
 
+  @mock.patch('storage.get_file_keys', autospec=True)
+  @mock.patch('storage.get_config_sets_async', autospec=True)
+  def test_get_config_with_include_files(
+      self, mock_get_config_sets_async, mock_get_file_keys):
+    mock_get_config_sets_async.return_value = future([
+      storage.ConfigSet(
+          id='services/x',
+          location='https://x.googlesource.com/x',
+          latest_revision='deadbeef',
+          latest_revision_url='https://x.googlesource.com/x/+/deadbeef',
+          latest_revision_time=datetime.datetime(2016, 1, 1),
+          latest_revision_committer_email='john@doe.com',
+      ),
+    ])
+
+    class Key:
+      def __init__(self, name):
+        self.name = name
+
+      def id(self):
+        return self.name
+
+    mock_get_file_keys.return_value = [
+      Key('README.md'),
+      Key('rick.morty'),
+      Key('pied.piper')
+    ]
+
+    req = {
+      'config_set': 'services/x',
+      'include_files': True,
+    }
+    resp = self.call_api('get_config_sets', req).json_body
+
+    self.assertEqual(resp, {
+      'config_sets': [
+        {
+          'config_set': 'services/x',
+          'files': [
+            {
+              'path': 'README.md'
+            },
+            {
+              'path': 'rick.morty'
+            },
+            {
+              'path': 'pied.piper'
+            }
+          ],
+          'location': 'https://x.googlesource.com/x',
+          'revision': {
+            'committer_email': 'john@doe.com',
+            'id': 'deadbeef',
+            'timestamp': '1451606400000000',
+            'url': 'https://x.googlesource.com/x/+/deadbeef'
+          }
+        }
+      ]
+    })
+
+  def test_get_config_with_inconsistent_request(self):
+    with self.call_should_fail(httplib.BAD_REQUEST):
+      req = {
+        'include_files': True,
+      }
+      self.call_api('get_config_sets', req)
+
   def test_get_config_one_with_last_attempt(self):
     self.mock(storage, 'get_config_sets_async', mock.Mock())
     storage.get_config_sets_async.return_value = future([

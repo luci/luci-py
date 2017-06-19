@@ -106,6 +106,12 @@ def last_import_attempt_key(config_set):
   return ndb.Key(ConfigSet, config_set, ImportAttempt, 'last')
 
 
+def get_file_keys(config_set, revision):
+  return File.query(
+      default_options=ndb.QueryOptions(keys_only=True),
+      ancestor=ndb.Key(ConfigSet, config_set, Revision, revision)).fetch()
+
+
 @ndb.tasklet
 def get_config_sets_async(config_set=None):
   if config_set:

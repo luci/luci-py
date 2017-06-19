@@ -41,6 +41,9 @@ class Revision(messages.Message):
   timestamp = messages.IntegerField(3)
   committer_email = messages.StringField(4)
 
+class File(messages.Message):
+  """Describes a file."""
+  path = messages.StringField(1)
 
 class ConfigSet(messages.Message):
   """Describes a config set."""
@@ -57,7 +60,7 @@ class ConfigSet(messages.Message):
   location = messages.StringField(2)
   revision = messages.MessageField(Revision, 3)
   last_import_attempt = messages.MessageField(ImportAttempt, 4)
-
+  files = messages.MessageField(File, 5, repeated=True)
 
 def attempt_to_msg(entity):
   if entity is None:
@@ -148,6 +151,7 @@ class ConfigApi(remote.Service):
         message_types.VoidMessage,
         config_set=messages.StringField(1),
         include_last_import_attempt=messages.BooleanField(2),
+        include_files=messages.BooleanField(3),
     ),
     GetConfigSetsResponseMessage,
     http_method='GET',
@@ -157,6 +161,18 @@ class ConfigApi(remote.Service):
     """Returns config sets."""
     if request.config_set and not can_read_config_set(request.config_set):
       raise endpoints.ForbiddenException()
+
+    # The files property must always be a list of File objects (not None).
+    files = []
+    if request.include_files:
+      if not request.config_set:
+        raise endpoints.BadRequestException(
+            'Must specify config_set to use include_files')
+      latest_revisions = storage.get_latest_revisions_async(
+          [request.config_set]).get_result()
+      file_keys = storage.get_file_keys(
+          request.config_set, latest_revisions[request.config_set])
+      files = [File(path=key.id()) for key in file_keys]
 
     config_sets = storage.get_config_sets_async(
         config_set=request.config_set).get_result()
@@ -179,6 +195,7 @@ class ConfigApi(remote.Service):
       res.config_sets.append(ConfigSet(
           config_set=cs.key.id(),
           location=cs.location,
+          files=files,
           revision=Revision(
               id=cs.latest_revision,
               url=cs.latest_revision_url,
