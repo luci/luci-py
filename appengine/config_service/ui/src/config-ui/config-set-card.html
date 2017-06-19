@@ -7,7 +7,7 @@
 <link rel="import" href="../../bower_components/paper-item/paper-item.html">
 <link rel="import" href="../../bower_components/polymer/polymer.html">
 
-<dom-module id="config-card">
+<dom-module id="config-set-card">
   <template>
     <style>
       .center {
@@ -18,7 +18,7 @@
       }
     </style>
 
-    <paper-item class="center">
+    <paper-item class="center" id="paper-box">
       <!-- TODO(cwpayton): Add launch icon next to the name of the config
         so that upon clicking the icon, the user will be taken to the config
         set page. -->
@@ -27,13 +27,15 @@
   </template>
   <script>
     Polymer({
-      is: "config-card",
+      is: "config-set-card",
 
       properties: {
         name: {
           type: String
         }
       }
+
     });
   </script>
 </dom-module>
+

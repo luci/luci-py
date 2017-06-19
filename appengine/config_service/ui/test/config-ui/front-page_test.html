@@ -12,8 +12,8 @@
 
     <title>front-page test</title>
 
-    <script src="../../../webcomponentsjs/webcomponents-lite.js"></script>
-    <script src="../../../web-component-tester/browser.js"></script>
+    <script src="../../bower_components/webcomponentsjs/webcomponents-lite.js"></script>
+    <script src="../../bower_components/web-component-tester/browser.js"></script>
 
     <link rel="import" href="../../src/config-ui/front-page.html">
   </head>
@@ -26,8 +26,13 @@
     </test-fixture>
 
     <script>
-      suite('front-page', function() {
+      suite('<front-page>', function() {
         // TODO(cwpayton): write tests for the front page element.
+        var front_page;
+        setup(function() {
+          front_page = fixture('front-pageTestFixture');
+        });
+
       });
     </script>
   </body>
