@@ -18,7 +18,11 @@ import gae_ts_mon
 from server import bot_management
 from server import task_result
 
-IGNORED_DIMENSIONS = ('id', 'android_devices')
+# - android_devices is a side effect of the health of each Android devices
+#   connected to the bot.
+# - caches has an unbounded matrix.
+# - id is unique for each bot.
+IGNORED_DIMENSIONS = ('android_devices', 'caches', 'id')
 # Real timeout is 60s, keep it slightly under to bail out early.
 REQUEST_TIMEOUT_SEC = 50
 # Cap the max number of items per taskqueue task, to keep the total
