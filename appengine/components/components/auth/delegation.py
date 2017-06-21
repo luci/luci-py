@@ -7,7 +7,6 @@
 See delegation.proto for general idea behind it.
 """
 
-import binascii
 import collections
 import datetime
 import hashlib
@@ -110,17 +109,6 @@ def get_trusted_signers():
 
 
 ## Low level API for components.auth and services that know what they are doing.
-
-
-def get_token_fingerprint(blob):
-  """Given a blob with signed token returns first 16 bytes of its SHA256 as hex.
-
-  It can be used to identify this particular token in logs.
-  """
-  assert isinstance(blob, basestring)
-  if isinstance(blob, unicode):
-    blob = blob.encode('ascii', 'ignore')
-  return binascii.hexlify(hashlib.sha256(blob).digest()[:16])
 
 
 def deserialize_token(blob):
@@ -397,7 +385,7 @@ def delegate_async(
   if token and token.expiry - min_validity_duration > now:
     logging.info(
         'Fetched cached delegation token: fingerprint=%s',
-        get_token_fingerprint(token.token))
+        utils.get_token_fingerprint(token.token))
     raise ndb.Return(token)
 
   # Request a new one.
@@ -441,7 +429,7 @@ def delegate_async(
       'Token server "%s" generated token (subtoken_id=%s, fingerprint=%s):\n%s',
       res.get('serviceVersion'),
       token_struct.get('subtokenId'),
-      get_token_fingerprint(token.token),
+      utils.get_token_fingerprint(token.token),
       json.dumps(
           res.get('delegationSubtoken'),
           sort_keys=True, indent=2, separators=(',', ': ')))
@@ -580,7 +568,8 @@ def check_bearer_delegation_token(token, peer_identity):
     TransientError if token can't be verified due to transient errors.
   """
   logging.info(
-      'Checking delegation token: fingerprint=%s', get_token_fingerprint(token))
+      'Checking delegation token: fingerprint=%s',
+      utils.get_token_fingerprint(token))
   subtoken = unseal_token(deserialize_token(token))
   if subtoken.kind != delegation_pb2.Subtoken.BEARER_DELEGATION_TOKEN:
     raise BadTokenError('Not a valid delegation token kind: %s' % subtoken.kind)

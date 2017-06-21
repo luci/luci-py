@@ -318,6 +318,13 @@ class MemcacheTest(test_case.TestCase):
         pass
 
 
+class FingerprintTest(test_case.TestCase):
+  def test_get_token_fingerprint(self):
+    self.assertEqual(
+        '8b7df143d91c716ecfa5fc1730022f6b',
+        utils.get_token_fingerprint(u'blah'))
+
+
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None

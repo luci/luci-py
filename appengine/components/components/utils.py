@@ -10,8 +10,10 @@
 # Disable: 'Method could be a function'. It can't: NDB expects a method.
 # pylint: disable=R0201
 
+import binascii
 import datetime
 import functools
+import hashlib
 import inspect
 import json
 import logging
@@ -628,6 +630,20 @@ def encode_to_json(data):
       sort_keys=True,
       separators=(',', ':'),
       encoding='utf-8')
+
+
+## General
+
+
+def get_token_fingerprint(blob):
+  """Given a blob with a token returns first 16 bytes of its SHA256 as hex.
+
+  It can be used to identify this particular token in logs without revealing it.
+  """
+  assert isinstance(blob, basestring)
+  if isinstance(blob, unicode):
+    blob = blob.encode('ascii', 'ignore')
+  return binascii.hexlify(hashlib.sha256(blob).digest()[:16])
 
 
 ## Hacks
