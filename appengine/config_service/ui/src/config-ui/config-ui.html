@@ -69,16 +69,16 @@
     </div>
 
     <div hidden$="[[!serviceActive]]">
-      <config-set category="services" 
-                  config-set-name="{{serviceData.serviceName}}" 
+      <config-set category="services"
+                  name="{{serviceData.serviceName}}"
                   route="{{serviceTail}}"></config-set>
-    </div>      
+    </div>
 
     <div hidden$="[[!projectActive]]">
-      <config-set category="projects"  
-                  config-set-name="{{projectData.projectName}}" 
+      <config-set category="projects"
+                  name="{{projectData.projectName}}"
                   route="{{projectTail}}"></config-set>
-    </div>        
+    </div>
 
   </template>
 

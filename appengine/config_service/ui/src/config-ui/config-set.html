@@ -1,0 +1,104 @@
+<!--
+  Copyright 2017 The LUCI Authors. All rights reserved.
+  Use of this source code is governed under the Apache License, Version 2.0
+  that can be found in the LICENSE file.
+-->
+
+<link rel="import" href="config-file-card.html">
+<link rel="import" href="../../bower_components/iron-ajax/iron-ajax.html">
+<link rel="import" href="../../bower_components/paper-item/paper-item.html">
+<link rel="import" href="../../bower_components/polymer/polymer.html">
+
+<dom-module id="config-set">
+  <template>
+    <style>
+      .category {
+        font-size: 100%;
+        font-family: sans-serif;
+      }
+
+      .center {
+        width: 27%;
+        margin: auto;
+        text-align: left;
+      }
+
+      .name {
+        font-size: 200%;
+        font-family: sans-serif;
+      }
+
+      .title {
+        padding-bottom: 1%;
+        padding-top: 5%;
+      }
+    </style>
+
+    <iron-ajax
+        auto
+        id="requestConfigs"
+        url="/_ah/api/config/v1/config-sets?config_set=[[category]]%2F[[name]]&include_files=true"
+        handle-as="json"
+        on-response="_onGotConfigFiles">
+    </iron-ajax>
+
+    <div class="center title">
+      <div class="name">[[name]][[route.path]]</div>
+      <div class="category">[[_formatCategory(category)]]</div>
+    </div>
+
+    <template is="dom-if" if="[[isLoading]]">
+      <div class="center">Fetching config files...</div>
+    </template>
+    <template is="dom-if" if="[[_not(isLoading)]]">
+      <template is="dom-repeat" items="[[files]]" as="file">
+        <config-file-card
+            name="[[file.path]]" link="[[location]]/[[file.path]]">
+        </config-file-card>
+      </template>
+    </template>
+  </template>
+  <script>
+    Polymer({
+      is: "config-set",
+
+      properties: {
+        category: {
+          type: String
+        },
+
+        files: {
+          type: Array
+        },
+
+        isLoading: {
+          type: Boolean,
+          value: true
+        },
+
+        location: {
+          type: String
+        },
+
+        name: {
+          type: String
+        }
+      },
+
+      _formatCategory: function(category) {
+        if (category === "projects") return "Project";
+        if (category === "services") return "Service";
+      },
+
+      _not: function(b) {
+        return !b;
+      },
+
+      _onGotConfigFiles: function(event) {
+        this.files = event.detail.response.config_sets[0].files;
+        this.location = event.detail.response.config_sets[0].location;
+        this.isLoading = false;
+      }
+    });
+  </script>
+</dom-module>
