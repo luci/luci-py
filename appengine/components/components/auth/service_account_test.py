@@ -291,12 +291,13 @@ class GetAccessTokenTest(test_case.TestCase):
         'response': (500, {'error': 'zzz'}),
       } for _ in xrange(0, 4)
     ])
-    with self.assertRaises(service_account.AccessTokenError):
+    with self.assertRaises(service_account.AccessTokenError) as err:
       service_account._call_async(
         url='http://example.com',
         payload='blah',
         method='POST',
         headers={'A': 'a'}).get_result()
+    self.assertTrue(err.exception.transient)
     self.assertFalse(calls)
 
   def test_call_async_fatal_error(self):
@@ -309,12 +310,13 @@ class GetAccessTokenTest(test_case.TestCase):
         'response': (403, {'error': 'zzz'}),
       },
     ])
-    with self.assertRaises(service_account.AccessTokenError):
+    with self.assertRaises(service_account.AccessTokenError) as err:
       service_account._call_async(
         url='http://example.com',
         payload='blah',
         method='POST',
         headers={'A': 'a'}).get_result()
+    self.assertFalse(err.exception.transient)
     self.assertFalse(calls)
 
   def test_call_async_not_json(self):
@@ -327,12 +329,13 @@ class GetAccessTokenTest(test_case.TestCase):
         'response': MockedResponse(200, 'not a json'),
       },
     ])
-    with self.assertRaises(service_account.AccessTokenError):
+    with self.assertRaises(service_account.AccessTokenError) as err:
       service_account._call_async(
         url='http://example.com',
         payload='blah',
         method='POST',
         headers={'A': 'a'}).get_result()
+    self.assertFalse(err.exception.transient)
     self.assertFalse(calls)
 
   def test_local_signer(self):

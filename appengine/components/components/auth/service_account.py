@@ -49,7 +49,11 @@ ServiceAccountKey = collections.namedtuple('ServiceAccountKey', [
 
 
 class AccessTokenError(Exception):
-  """Raised by get_access_token() on fatal errors."""
+  """Raised by get_access_token() on fatal or transient errors."""
+
+  def __init__(self, msg, transient=False):
+    super(AccessTokenError, self).__init__(msg)
+    self.transient = transient
 
 
 # Do not log AccessTokenError exception raised from a tasklet.
@@ -270,7 +274,10 @@ def _call_async(url, payload, method, headers):
       raise AccessTokenError('Non-JSON response from %s' % url)
     raise ndb.Return(body)
 
-  raise AccessTokenError('Failed to call %s after multiple attempts' % url)
+  # All our attempts failed with transient errors. Perhaps some later retry
+  # can help, so set transient to True.
+  raise AccessTokenError(
+      'Failed to call %s after multiple attempts' % url, transient=True)
 
 
 def _urlfetch(**kwargs):
