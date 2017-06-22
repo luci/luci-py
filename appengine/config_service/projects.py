@@ -167,7 +167,9 @@ def _get_project_configs_async(project_ids, path, message_factory):
   """
   assert isinstance(project_ids, list)
   if not project_ids:
-    return {}
+    empty = ndb.Future()
+    empty.set_result({})
+    return empty
 
   @ndb.tasklet
   def get_async():
