@@ -29,10 +29,12 @@ scheduler is needed.
         use any pre-created bucket, they won't work.
         *   Click on Browser on the left.
         *   Click the 3 dots on the right of your new bucket and select `Edit
-            bucket permission`.
-        *   Click `Add item`, chose _User_,
-            "_server@\<appid\>.iam.gserviceaccount.com_", _Writer_.
-        *   Click `Save`.
+            bucket permissions`.
+        *   Enter the user
+            "_server@\<appid\>.iam.gserviceaccount.com_"
+            in the `Add members` field and select `Storage Legacy Bucket Writer`
+            and `Storage Legacy Object Reader` from the `Storage Legacy` group.
+        *   Click `Add`.
     *   Pub/Sub, click `Enable API`.
 *   Upload the code with: `./tools/gae upl -x -A <appid>`
 *   If you plan to use an [auth_service](../auth_service),
