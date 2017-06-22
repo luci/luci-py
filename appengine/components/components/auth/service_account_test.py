@@ -98,10 +98,11 @@ class GetAccessTokenTest(test_case.TestCase):
         service_account.get_access_token('scope', FAKE_SECRET_KEY))
     self.assertEqual(1, len(calls))
     method, args = calls[0]
-    scopes, cache_key, signer = args
+    scopes, cache_key, min_lifetime_sec, signer = args
     self.assertEqual('jwt_based', method)
     self.assertEqual(['scope'], scopes)
     self.assertEqual('cache_key', cache_key)
+    self.assertEqual(300, min_lifetime_sec)
     self.assertTrue(isinstance(signer, service_account._LocalSigner))
     self.assertEqual(FAKE_SECRET_KEY.client_email, signer.email)
 
@@ -145,7 +146,7 @@ class GetAccessTokenTest(test_case.TestCase):
     self.assertEqual(
         ('token@1420167600', 1420171200.0),
         service_account._get_jwt_based_token_async(
-            ['http://scope'], 'cache_key', fake_signer).get_result())
+            ['http://scope'], 'cache_key', 300, fake_signer).get_result())
     self.assertEqual([(['http://scope'], fake_signer)], calls)
     self.assertEqual(['cache_key'], memcache.keys())
     del calls[:]
@@ -155,7 +156,7 @@ class GetAccessTokenTest(test_case.TestCase):
     self.assertEqual(
         ('token@1420167600', 1420171200.0),
         service_account._get_jwt_based_token_async(
-            ['http://scope'], 'cache_key', fake_signer).get_result())
+            ['http://scope'], 'cache_key', 300, fake_signer).get_result())
     self.assertFalse(calls)
 
     # 5 min before expiration it is considered unusable, and new one is minted.
@@ -163,7 +164,7 @@ class GetAccessTokenTest(test_case.TestCase):
     self.assertEqual(
         ('token@1420170901', 1420174501.0),
         service_account._get_jwt_based_token_async(
-            ['http://scope'], 'cache_key', fake_signer).get_result())
+            ['http://scope'], 'cache_key', 300, fake_signer).get_result())
     self.assertEqual([(['http://scope'], fake_signer)], calls)
 
   def test_mint_jwt_based_token(self):

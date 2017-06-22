@@ -61,7 +61,8 @@ ndb.add_flow_exception(AccessTokenError)
 
 
 @ndb.tasklet
-def get_access_token_async(scopes, service_account_key=None, act_as=None):
+def get_access_token_async(
+    scopes, service_account_key=None, act_as=None, min_lifetime_sec=5*60):
   """Returns an OAuth2 access token for a service account.
 
   If 'service_account_key' is specified, will use it to generate access token
@@ -78,19 +79,30 @@ def get_access_token_async(scopes, service_account_key=None, act_as=None):
 
   See https://cloud.google.com/iam/docs/service-accounts.
 
+  If using 'act_as' or 'service_account_key', the returned token will be valid
+  for at least approximately 'min_lifetime_sec' (5 min by default), but possibly
+  longer (up to 1h). If both 'act_as' and 'service_account_key' are None,
+  'min_lifetime_sec' is ignored and the returned token should be assumed
+  short-lived (<5 min).
+
   Args:
     scopes: the requested API scope string, or a list of strings.
     service_account_key: optional instance of ServiceAccountKey.
     act_as: email of an account to impersonate.
+    min_lifetime_sec: desired minimal lifetime of the produced token.
 
   Returns:
-    Tuple (access token, expiration time in seconds since the epoch). The token
-    should be valid for at least 5 minutes. It will be cached across multiple
-    calls using memcache (e.g. get_access_token call can be considered cheap).
+    Tuple (access token, expiration time in seconds since the epoch).
 
   Raises:
     AccessTokenError on errors.
   """
+  # Limit min_lifetime_sec, since requesting very long-lived tokens reduces
+  # efficiency of the cache (we need to constantly update it to keep tokens
+  # fresh).
+  if min_lifetime_sec <= 0 or min_lifetime_sec > 30 * 60:
+    raise ValueError('"min_lifetime_sec" should be in range (0; 1800]')
+
   # Accept a single string to mimic app_identity.get_access_token behavior.
   if isinstance(scopes, basestring):
     scopes = [scopes]
@@ -111,7 +123,8 @@ def get_access_token_async(scopes, service_account_key=None, act_as=None):
     iam_token_factory = lambda: get_access_token_async(
         ['https://www.googleapis.com/auth/iam'], service_account_key)
     t = yield _get_jwt_based_token_async(
-        scopes, cache_key, _RemoteSigner(act_as, iam_token_factory))
+        scopes, cache_key, min_lifetime_sec,
+        _RemoteSigner(act_as, iam_token_factory))
     raise ndb.Return(t)
 
   if service_account_key:
@@ -124,7 +137,8 @@ def get_access_token_async(scopes, service_account_key=None, act_as=None):
         scopes=scopes,
         key_id=service_account_key.private_key_id)
     t = yield _get_jwt_based_token_async(
-        scopes, cache_key, _LocalSigner(service_account_key))
+        scopes, cache_key, min_lifetime_sec,
+        _LocalSigner(service_account_key))
     raise ndb.Return(t)
 
   # TODO(vadimsh): Use app_identity.make_get_access_token_call to make it async.
@@ -161,16 +175,18 @@ def _memcache_key(method, email, scopes, key_id=None):
 
 
 @ndb.tasklet
-def _get_jwt_based_token_async(scopes, cache_key, signer):
-  """Returns token for @*.iam.gserviceaccount.com service account.
-
-  Randomizes refresh time to avoid thundering herd effect when token expires.
-  """
+def _get_jwt_based_token_async(scopes, cache_key, min_lifetime_sec, signer):
+  """Returns token for @*.iam.gserviceaccount.com service account."""
+  # Randomize refresh time to avoid thundering herd effect when token expires.
+  # Also add 5 sec extra to make sure callers will get the token that lives for
+  # at least min_lifetime_sec even taking into account possible delays in
+  # propagating the token up the stack. We can't give any strict guarantees
+  # here though (need to be able to stop time to do that).
+  min_allowed_exp = (
+      utils.time_time() +
+      random.randint(min_lifetime_sec + 5, min_lifetime_sec + 305))
   token_info = yield _memcache_get(cache_key, namespace=_MEMCACHE_NS)
-  should_refresh = (
-      not token_info or
-      token_info['exp_ts'] - utils.time_time() < random.randint(300, 600))
-  if should_refresh:
+  if not token_info or token_info['exp_ts'] < min_allowed_exp:
     logging.info(
         'Refreshing the access token for %s with scopes %s',
         signer.email, scopes)
