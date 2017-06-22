@@ -620,7 +620,7 @@ def authenticated_http_request(service_account, *args, **kwargs):
   # the need for the oauth2client.client library.
   if platforms.is_gce():
     try:
-      gce_bearer_token = platforms.gce.oauth2_access_token(
+      gce_bearer_token, _ = platforms.gce.oauth2_access_token_with_expiration(
           account=service_account)
     except (IOError, urllib2.HTTPError) as e:
       raise AuthenticatedHttpRequestFailure(e)

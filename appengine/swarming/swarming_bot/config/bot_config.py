@@ -28,7 +28,6 @@ Here's a pile of poo: 💩
 """
 
 import os
-import time
 
 from api import os_utilities
 from api import platforms
@@ -159,13 +158,13 @@ def get_authentication_headers(bot):
     Tuple (dict with headers or None, unix timestamp of when they expire).
   """
   if platforms.is_gce():
-    # By default, VMs do not have "User info" API enabled, as comment above.
+    # By default, VMs do not have "User info" API enabled, as commented above.
     # When this is the case, the oauth token is unusable. So do not use the
     # oauth token in this case and fall back to IP based whitelisting.
     if ('https://www.googleapis.com/auth/userinfo.email' in
-        platforms.gce.oauth2_available_scopes()):
-      tok = platforms.gce.oauth2_access_token()
-      return {'Authorization': 'Bearer %s' % tok}, time.time() + 5*60
+        platforms.gce.oauth2_available_scopes('default')):
+      tok, exp = platforms.gce.oauth2_access_token_with_expiration('default')
+      return {'Authorization': 'Bearer %s' % tok}, exp
   return (None, None)
 
 

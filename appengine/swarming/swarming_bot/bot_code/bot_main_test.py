@@ -47,6 +47,11 @@ class FakeThreadingEvent(object):
 class TestBotBase(net_utils.TestCase):
   def setUp(self):
     super(TestBotBase, self).setUp()
+    # Throw away all swarming environ if running the test on Swarming. It may
+    # interfere with the test.
+    for k in os.environ.keys():
+      if k.startswith('SWARMING_'):
+        os.environ.pop(k)
     self.root_dir = tempfile.mkdtemp(prefix='bot_main')
     self.old_cwd = os.getcwd()
     os.chdir(self.root_dir)
@@ -106,16 +111,14 @@ class TestBotMain(TestBotBase):
     # Test results shouldn't depend on where they run. And they should not use
     # real GCE tokens.
     self.mock(gce, 'is_gce', lambda: False)
-    self.mock(gce, 'oauth2_access_token', lambda *_args: 'fake-access-token')
+    self.mock(
+        gce, 'oauth2_access_token_with_expiration',
+        lambda *_args, **_kwargs: ('fake-access-token', 0))
     # Ensures the global state is reset after each test case.
     self.mock(bot_main, '_BOT_CONFIG', None)
     self.mock(bot_main, '_EXTRA_BOT_CONFIG', None)
     self.mock(bot_main, '_QUARANTINED', None)
     self.mock(bot_main, 'SINGLETON', None)
-
-  def tearDown(self):
-    os.environ.pop('SWARMING_BOT_ID', None)
-    super(TestBotMain, self).tearDown()
 
   def print_err_and_fail(self, _bot, msg, _task_id):
     print msg

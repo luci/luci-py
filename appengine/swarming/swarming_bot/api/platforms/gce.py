@@ -106,15 +106,19 @@ def get_metadata():
   return None
 
 
-def oauth2_access_token(account='default'):
-  """Returns a value of oauth2 access token."""
+def oauth2_access_token_with_expiration(account):
+  """Returns tuple (oauth2 access token, expiration timestamp).
+
+  Args:
+    account: GCE service account to use (e.g "default").
+  """
   # TODO(maruel): Move GCE VM authentication logic into client/utils/net.py.
   # As seen in google-api-python-client/oauth2client/gce.py
   with _CACHED_OAUTH2_TOKEN_LOCK:
     cached_tok = _CACHED_OAUTH2_TOKEN.get(account)
     # Cached and expires in more than 5 min from now.
     if cached_tok and cached_tok['expiresAt'] >= time.time() + 5*60:
-      return cached_tok['accessToken']
+      return cached_tok['accessToken'], cached_tok['expiresAt']
     # Grab the token.
     url = (
         'http://metadata.google.internal/computeMetadata/v1/instance'
@@ -131,7 +135,17 @@ def oauth2_access_token(account='default'):
       'expiresAt': time.time() + resp['expires_in'],
     }
     _CACHED_OAUTH2_TOKEN[account] = tok
-    return tok['accessToken']
+    return tok['accessToken'], tok['expiresAt']
+
+
+def oauth2_access_token(account='default'):
+  """Returns a value of oauth2 access token.
+
+  Same as oauth2_access_token_with_expiration, but discards expiration and
+  assumed 'default' account. Exists for backward compatibility with various
+  hooks.
+  """
+  return oauth2_access_token_with_expiration(account)[0]
 
 
 def oauth2_available_scopes(account='default'):
