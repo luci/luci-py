@@ -48,21 +48,20 @@ class AuthSystemTest(auto_stub.TestCase):
     self.counter += 1
     path = os.path.join(self.tmp_dir, 'auth_params_%d.json' % self.counter)
     with open(path, 'w') as f:
-      json.dump(auth_params, f)
+      json.dump(auth_params._asdict(), f)
     return path
 
   def test_bot_auth_works(self):
     # If 'task_service_account' is 'bot', local HTTP server returns bot tokens.
-    auth_params_path = self.write_auth_params({
-      'swarming_http_headers': {
-        'Authorization': 'Bearer bot-own-token',
-      },
-      'task_service_account': 'bot',
-    })
+    exp = int(time.time() + 3600)
+    auth_params_path = self.write_auth_params(bot_auth.AuthParams(
+        swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
+        swarming_http_headers_exp=exp,
+        task_service_account='bot'))
     with bot_auth.AuthSystem(auth_params_path) as auth_sys:
       self.assertEqual(
-          {'Authorization': 'Bearer bot-own-token'},
-          auth_sys.bot_headers)
+          ({'Authorization': 'Bearer bot-own-token'}, exp),
+          auth_sys.get_bot_headers())
       self.assertEqual(
           ['rpc_port', 'secret'],
           sorted(auth_sys.local_auth_context))
@@ -70,16 +69,14 @@ class AuthSystemTest(auto_stub.TestCase):
       resp = call_rpc(auth_sys.local_auth_context, ['A', 'B', 'C'])
       self.assertEqual([u'access_token', u'expiry'], sorted(resp))
       self.assertEqual(u'bot-own-token', resp['access_token'])
-      self.assertGreater(resp['expiry'], time.time())
+      self.assertEqual(exp, resp['expiry'])
 
   def test_no_auth_works(self):
     # If 'task_service_account' is empty, doesn't launch local HTTP server.
-    auth_params_path = self.write_auth_params({
-      'swarming_http_headers': {
-        'Authorization': 'Bearer bot-own-token',
-      },
-      'task_service_account': 'none',
-    })
+    auth_params_path = self.write_auth_params(bot_auth.AuthParams(
+        swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
+        swarming_http_headers_exp=0,
+        task_service_account='none'))
     with bot_auth.AuthSystem(auth_params_path) as auth_sys:
       self.assertIsNone(auth_sys.local_auth_context)
 

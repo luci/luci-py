@@ -276,11 +276,7 @@ def load_and_run(
       def headers_cb():
         try:
           if auth_system:
-            # The second parameter is the time until which the remote client
-            # should cache the headers. Since auth_system is doing the
-            # caching, we're just sending "0", which is to say the Epoch
-            # (Jan 1 1970), which effectively means "never cache."
-            return (auth_system.bot_headers, 0)
+            return auth_system.get_bot_headers()
           return (None, None) # A timeout of "None" means "don't use auth"
         except bot_auth.AuthSystemError as e:
           raise InternalError('Failed to grab bot auth headers: %s' % e)

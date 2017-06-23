@@ -122,6 +122,14 @@ class RemoteClientNative(object):
       logging.exception('Failed to refresh auth headers, using cached ones')
       return self._headers or {}
 
+  @property
+  def authentication_headers_expiration(self):
+    """Returns int unix timestamp of when current cached auth headers expire.
+
+    Returns 0 if unknown or not using auth.
+    """
+    return int(self._exp_ts or 0)
+
   def _get_headers_or_throw(self):
     if self._disabled:
       return {}

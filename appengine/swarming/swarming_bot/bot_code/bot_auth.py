@@ -23,6 +23,9 @@ AuthParams = collections.namedtuple('AuthParams', [
   # 'get_authentication_headers' in bot_config.py.
   'swarming_http_headers',
 
+  # Unix timestamp of when swarming_http_headers expire, or 0 if unknown.
+  'swarming_http_headers_exp',
+
   # Indicates the service account the task runs as. One of:
   #   - 'none' if the task shouldn't use any authentication at all.
   #   - 'bot' if the task should use bot's own service account.
@@ -48,6 +51,7 @@ def prepare_auth_params_json(bot, manifest):
   """
   return {
     'swarming_http_headers': bot.remote.get_authentication_headers(),
+    'swarming_http_headers_exp': bot.remote.authentication_headers_expiration,
     'task_service_account': manifest.get('service_account') or 'none',
   }
 
@@ -72,6 +76,11 @@ def process_auth_params_json(val):
     raise ValueError(
         'Expecting "swarming_http_headers" to be dict, got %r' % (headers,))
 
+  exp = val.get('swarming_http_headers_exp') or 0
+  if not isinstance(exp, (int, long)):
+    raise ValueError(
+        'Expecting "swarming_http_headers_exp" to be int, got %r' % (exp,))
+
   # The headers must be ASCII for sure, so don't bother with picking the
   # correct unicode encoding, default would work. If not, it'll raise
   # UnicodeEncodeError, which is subclass of ValueError.
@@ -82,7 +91,7 @@ def process_auth_params_json(val):
     raise ValueError(
         'Expecting "task_service_account" to be a string, got %r' % (acc,))
 
-  return AuthParams(headers, str(acc))
+  return AuthParams(headers, exp, str(acc))
 
 
 class AuthSystem(object):
@@ -128,12 +137,12 @@ class AuthSystem(object):
     """
     assert not self._auth_params_reader, 'already running'
     try:
-      # Read headers more often than bot_main writes them (which is 60 sec), to
-      # reduce maximum possible latency between header updates and reads. Use
-      # interval that isn't a divisor of 60 to avoid reads and writes happening
-      # at the same moment in time.
+      # Read headers more often than bot_main writes them (which is 15 sec), to
+      # reduce maximum possible latency between header updates and reads.
+      #
+      # TODO(vadimsh): Replace this with real IPC, like local sockets.
       reader = file_reader.FileReaderThread(
-          self._auth_params_file, interval_sec=53)
+          self._auth_params_file, interval_sec=10)
       reader.start()
     except file_reader.FatalReadError as e:
       raise AuthSystemError('Cannot start FileReaderThread: %s' % e)
@@ -174,12 +183,14 @@ class AuthSystem(object):
     if reader:
       reader.stop()
 
-  @property
-  def bot_headers(self):
-    """A dict with HTTP headers that contain bots own credentials.
+  def get_bot_headers(self):
+    """HTTP headers that contain bots own credentials and their expiration time.
 
     Such headers can be sent to Swarming server's /bot/* API. Must be used only
     after 'start' and before 'stop'.
+
+    Returns:
+      Tuple (dict with headers, expiration timestamp or 0 if not known).
 
     Raises:
       AuthSystemError if auth_params_file is suddenly no longer valid.
@@ -189,7 +200,7 @@ class AuthSystem(object):
       raw_val = self._auth_params_reader.last_value
     try:
       val = process_auth_params_json(raw_val)
-      return val.swarming_http_headers
+      return val.swarming_http_headers, val.swarming_http_headers_exp
     except ValueError as e:
       raise AuthSystemError('Cannot parse bot_auth_params.json: %s' % e)
 
@@ -249,23 +260,20 @@ class AuthSystem(object):
   def _grab_bot_oauth_token(self, auth_params):
     # Piggyback on the bot own credentials for now. This works only for bots
     # that use OAuth for authentication (e.g. GCE bots). Also it totally ignores
-    # scopes or expiration time. It relies on bot_main to keep the bot OAuth
-    # token sufficiently fresh. See remote_client.AUTH_HEADERS_EXPIRATION_SEC.
+    # scopes. It relies on bot_main to keep the bot OAuth token sufficiently
+    # fresh. See remote_client.AUTH_HEADERS_EXPIRATION_SEC.
     bot_auth_hdr = auth_params.swarming_http_headers.get('Authorization') or ''
     if not bot_auth_hdr.startswith('Bearer '):
       raise auth_server.TokenError(2, 'The bot is not using OAuth', fatal=True)
     tok = bot_auth_hdr[len('Bearer '):]
 
-    # bot_main guarantees swarming_http_headers are usable for at least 6 min.
-    # (see AUTH_HEADERS_EXPIRATION_SEC). task_runner grabs these headers from
-    # bot_main asynchronously with some delay. To account for that delay make
-    # expiration time shorter (4 min instead of 6 min).
-    #
-    # TODO(vadimsh): The real token expiration time can be passed from
-    # bot_main.py via --auth-params-file mechanism (same way as
-    # 'swarming_http_headers' are passed).
-    #
+    # Default to some safe small expiration in case bot_main doesn't report it
+    # to us. This may happen if get_authentication_header bot hook is not
+    # reporting expiration time.
+    exp = auth_params.swarming_http_headers_exp or (time.time() + 4*60)
+    logging.info('Bot token expires in %d sec', exp - time.time())
+
     # TODO(vadimsh): For GCE bots specifically we can pass a list of OAuth
     # scopes granted to the GCE token and verify it contains all the requested
     # scopes.
-    return auth_server.AccessToken(tok, int(time.time()) + 4*60)
+    return auth_server.AccessToken(tok, exp)

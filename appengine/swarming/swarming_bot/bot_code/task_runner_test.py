@@ -5,7 +5,6 @@
 # that can be found in the LICENSE file.
 
 import base64
-import contextlib
 import json
 import logging
 import os
@@ -73,10 +72,9 @@ class FakeAuthSystem(object):
   def stop(self):
     self._running = False
 
-  @property
-  def bot_headers(self):
+  def get_bot_headers(self):
     assert self._running
-    return {'Fake': 'Header'}
+    return {'Fake': 'Header'}, int(time.time() + 300)
 
 
 class TestTaskRunnerBase(net_utils.TestCase):

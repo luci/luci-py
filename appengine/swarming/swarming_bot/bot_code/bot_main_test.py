@@ -753,6 +753,7 @@ class TestBotMain(TestBotBase):
         url='https://localhost:3',
         expected_auth_params_json={
           'swarming_http_headers': {'A': 'a'},
+          'swarming_http_headers_exp': int(time.time() + 3600),
           'task_service_account': 'bot', # as in task manifest
         })
 
