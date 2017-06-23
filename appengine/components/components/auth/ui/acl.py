@@ -21,10 +21,19 @@ def has_access(identity=None):
   By default, passing 'has_access' check grants read-only access to everything
   (via UI or API). Write access is controlled by more fine-grain ACLs.
   """
+  is_super = not identity and api.is_superuser()
   # TODO(vadimsh): Remove 'groups-readonly-access' once everything is migrated
   # to 'auth-service-access'.
   identity = identity or api.get_current_identity()
   return (
+      is_super or
       api.is_admin(identity) or
       api.is_group_member(ACCESS_GROUP_NAME, identity) or
       api.is_group_member('groups-readonly-access', identity))
+
+
+def is_admin():
+  """Returns True if the current caller has admin or superuser access."""
+  return (
+      api.is_superuser() or
+      api.is_admin())

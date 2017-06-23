@@ -178,7 +178,7 @@ class EntityHandlerBase(handler.ApiHandler):
   @classmethod
   def can_create(cls):
     """True if caller is allowed to create a new entity."""
-    return api.is_admin()
+    return acl.is_admin()
 
   @classmethod
   def do_create(cls, entity):
@@ -192,7 +192,7 @@ class EntityHandlerBase(handler.ApiHandler):
   @classmethod
   def can_update(cls, entity):  # pylint: disable=unused-argument
     """True if caller is allowed to update a given entity."""
-    return api.is_admin()
+    return acl.is_admin()
 
   @classmethod
   def do_update(cls, entity, params):
@@ -206,7 +206,7 @@ class EntityHandlerBase(handler.ApiHandler):
   @classmethod
   def can_delete(cls, entity):  # pylint: disable=unused-argument
     """True if caller is allowed to delete a given entity."""
-    return api.is_admin()
+    return acl.is_admin()
 
   @classmethod
   def do_delete(cls, entity):
@@ -693,12 +693,10 @@ class GroupHandler(EntityHandlerBase):
   # Same as in the base class, repeated here just for clarity.
   @classmethod
   def can_create(cls):
-    return api.is_admin()
+    return acl.is_admin()
 
   @classmethod
   def do_create(cls, entity):
-    # Admin group is created during bootstrap, see ui.py BootstrapHandler.
-    assert entity.key.id() != model.ADMIN_GROUP
     # Check that all references group (owning group, nested groups) exist. It is
     # ok for a new group to have itself as an owner.
     entity.owners = entity.owners or model.ADMIN_GROUP
@@ -715,7 +713,7 @@ class GroupHandler(EntityHandlerBase):
 
   @classmethod
   def can_update(cls, entity):
-    return api.is_admin() or api.is_group_member(entity.owners)
+    return acl.is_admin() or api.is_group_member(entity.owners)
 
   @classmethod
   def do_update(cls, entity, params):
@@ -760,7 +758,7 @@ class GroupHandler(EntityHandlerBase):
 
   @classmethod
   def can_delete(cls, entity):
-    return api.is_admin() or api.is_group_member(entity.owners)
+    return acl.is_admin() or api.is_group_member(entity.owners)
 
   @classmethod
   def do_delete(cls, entity):
@@ -1301,7 +1299,7 @@ class OAuthConfigHandler(handler.ApiHandler):
     })
 
   @forbid_api_on_replica
-  @api.require(api.is_admin)
+  @api.require(acl.is_admin)
   def post(self):
     if is_config_locked():
       self.abort_with_error(409, text='The configuration is managed elsewhere')
