@@ -54,6 +54,34 @@ pushing a new version. Use `./tools/gae help` for an up to date list of commands
 available.
 
 
+### Pushing
+
+Pushing new code to an AppEngine instance doesn't change the default version.
+
+To push a new version of one of the services, do:
+
+```
+cd <server> # for example, config_service
+./tools/gae upload -A <instance_name>
+```
+
+As described in the output by the tool, you can access it to
+`<version>-dot-<name>.appspot.com` until you switch the default version.
+
+
+### Changing the version
+
+To make the new code _live_, you need to change the default version:
+
+```
+cd <server> # for example, config_service
+./tools/gae switch -A <instance_name>
+```
+
+`gae` will propose the versions already uploaded and will propose the latest one
+by default.
+
+
 ## External dependencies
 
 luci-py leverages Chromium specific functionalities:
