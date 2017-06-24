@@ -24,6 +24,7 @@ import webapp2
 import webtest
 
 import handlers_bot
+from components import auth
 from components import ereporter2
 from components import utils
 from server import bot_archive
@@ -31,6 +32,7 @@ from server import bot_auth
 from server import bot_code
 from server import bot_groups_config
 from server import bot_management
+from server import service_accounts
 from server import task_queues
 
 
@@ -66,6 +68,12 @@ class BotApiTest(test_env_handlers.AppTestBase):
     if queue_name == 'pubsub':
       return True
     self.fail(url)
+
+  def mock_bot_group_config(self, **kwargs):
+    cfg = bot_groups_config.BotGroupConfig(**kwargs)
+    self.mock(
+        bot_auth, 'validate_bot_id_and_fetch_config',
+        lambda *args, **kwargs: cfg)
 
   def test_handshake(self):
     errors = []
@@ -441,7 +449,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     params = self.do_handshake()
     self.assertEqual(params['dimensions']['pool'], ['default'])
 
-    cfg = bot_groups_config.BotGroupConfig(
+    self.mock_bot_group_config(
         version='default',
         require_luci_machine_token=False,
         require_service_account=None,
@@ -451,8 +459,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
         bot_config_script=None,
         bot_config_script_content=None,
         system_service_account=None)
-    self.mock(bot_auth, 'validate_bot_id_and_fetch_config',
-              lambda *args, **kwargs: cfg)
 
     # Bot sends 'default' pool, but server config defined it as 'server-side'.
     response = self.post_json('/swarming/api/v1/bot/poll', params)
@@ -464,7 +470,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, response)
 
   def test_poll_extra_bot_config(self):
-    cfg = bot_groups_config.BotGroupConfig(
+    self.mock_bot_group_config(
         version='default',
         require_luci_machine_token=False,
         require_service_account=None,
@@ -474,8 +480,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
         bot_config_script='foo.py',
         bot_config_script_content='print "Hi";import sys; sys.exit(1)',
         system_service_account=None)
-    self.mock(bot_auth, 'validate_bot_id_and_fetch_config',
-              lambda *args, **kwargs: cfg)
     params = self.do_handshake()
     self.assertEqual(
         u'print "Hi";import sys; sys.exit(1)', params['bot_config'])
@@ -1135,6 +1139,191 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.set_as_anonymous()
     tok = bot_code.generate_bootstrap_token()
     self.app.get('/bot_code?tok=%s' % tok, status=200)
+
+  def test_oauth_token_bad_scopes(self):
+    self.set_as_bot()
+    response = self.app.post_json(
+        '/swarming/api/v1/bot/oauth_token',
+        params={
+          'account_id': 'system',
+          'id': 'bot1',
+          'scopes': 'not a list of strings',
+        },
+        expect_errors=True)
+    self.assertEqual(400, response.status_code)
+    self.assertEqual(
+        {u'error': u'"scopes" must be a list of strings'},
+        response.json)
+
+  def test_oauth_token_unknown_account_id(self):
+    self.set_as_bot()
+    response = self.app.post_json(
+        '/swarming/api/v1/bot/oauth_token',
+        params={
+          'account_id': 'blah',
+          'id': 'bot1',
+          'scopes': ['scope_a', 'scope_b'],
+        },
+        expect_errors=True)
+    self.assertEqual(400, response.status_code)
+    self.assertEqual(
+        {u'error': u'Unknown "account_id", expecting "task" or "system"'},
+        response.json)
+
+  def test_oauth_token_task_account_without_task_id(self):
+    self.set_as_bot()
+    response = self.app.post_json(
+        '/swarming/api/v1/bot/oauth_token',
+        params={
+          'account_id': 'task',
+          'id': 'bot1',
+          'scopes': ['scope_a', 'scope_b'],
+        },
+        expect_errors=True)
+    self.assertEqual(400, response.status_code)
+    self.assertEqual(
+        {u'error': u'"task_id" is required when using "account_id" == "task"'},
+        response.json)
+
+  def test_oauth_token_task_account(self):
+    calls = []
+    def mocked(task_id, scopes):
+      calls.append((task_id, scopes))
+      return 'blah@example.com', service_accounts.AccessToken('blah', 126240504)
+    self.mock(service_accounts, 'get_task_account_token', mocked)
+
+    # Create a task.
+    _, task_summary_id = self.client_create_task_raw()
+    self.assertEqual('0', task_summary_id[-1])
+    # Convert TaskResultSummary reference to TaskRunResult.
+    task_id = task_summary_id[:-1] + '1'
+
+    # Make the bot grab it.
+    self.set_as_bot()
+    resp = self.bot_poll()
+    self.assertEqual(u'bot1', resp['manifest']['bot_id'])
+    self.assertEqual(task_id, resp['manifest']['task_id'])
+
+    # Pass wrong task_id to oauth_token.
+    response = self.app.post_json(
+        '/swarming/api/v1/bot/oauth_token',
+        params={
+          'account_id': 'task',
+          'id': 'bot1',
+          'scopes': ['scope_a', 'scope_b'],
+          'task_id': task_id[:-1] + '2',
+        },
+        expect_errors=True)
+    self.assertEqual(400, response.status_code)
+    self.assertEqual(
+        {u'error': u'Wrong task_id: the bot is not executing this task'},
+        response.json)
+    self.assertFalse(calls)
+
+    # Pass correct task_id this time.
+    response = self.app.post_json(
+        '/swarming/api/v1/bot/oauth_token',
+        params={
+          'account_id': 'task',
+          'id': 'bot1',
+          'scopes': ['scope_a', 'scope_b'],
+          'task_id': task_id,
+        })
+    self.assertEqual({
+        u'access_token': u'blah',
+        u'expiry': 126240504,
+        u'service_account': u'blah@example.com',
+    }, response.json)
+    self.assertEqual([(task_id, [u'scope_a', u'scope_b'])], calls)
+
+    # Emulate fatal error.
+    def mocked(*_args, **_kwargs):
+      raise auth.AccessTokenError('Fatal error')
+    self.mock(service_accounts, 'get_task_account_token', mocked)
+
+    response = self.app.post_json(
+        '/swarming/api/v1/bot/oauth_token',
+        params={
+          'account_id': 'task',
+          'id': 'bot1',
+          'scopes': ['scope_a', 'scope_b'],
+          'task_id': task_id,
+        },
+        expect_errors=True)
+    self.assertEqual(403, response.status_code)
+    self.assertEqual(
+        {u'error': u'Fatal error when generating the token, see server logs'},
+        response.json)
+
+    # Emulate transient error.
+    def mocked(*_args, **_kwargs):
+      raise auth.AccessTokenError('Transient error', transient=True)
+    self.mock(service_accounts, 'get_task_account_token', mocked)
+
+    response = self.app.post_json(
+        '/swarming/api/v1/bot/oauth_token',
+        params={
+          'account_id': 'task',
+          'id': 'bot1',
+          'scopes': ['scope_a', 'scope_b'],
+          'task_id': task_id,
+        },
+        expect_errors=True)
+    self.assertEqual(500, response.status_code)
+    self.assertEqual(
+        {u'error': u'Transient error when generating the token'},
+        response.json)
+
+  def test_oauth_token_system_account(self):
+    self.set_as_bot()
+    self.mock_bot_group_config(
+        version='default',
+        require_luci_machine_token=False,
+        require_service_account=None,
+        ip_whitelist=None,
+        owners=None,
+        dimensions={},
+        bot_config_script=None,
+        bot_config_script_content=None,
+        system_service_account='system@example.com')
+
+    calls = []
+    def mocked(account, scopes):
+      calls.append((account, scopes))
+      return account, service_accounts.AccessToken('blah', 126240504)
+    self.mock(service_accounts, 'get_system_account_token', mocked)
+
+    response = self.app.post_json(
+        '/swarming/api/v1/bot/oauth_token',
+        params={
+          'account_id': 'system',
+          'id': 'bot1',
+          'scopes': ['scope_a', 'scope_b'],
+        }).json
+    self.assertEqual({
+        u'access_token': u'blah',
+        u'expiry': 126240504,
+        u'service_account': u'system@example.com',
+    }, response)
+    self.assertEqual([('system@example.com', [u'scope_a', u'scope_b'])], calls)
+
+  def test_oauth_token_system_account_none(self):
+    self.set_as_bot()
+
+    def mocked(account, scopes):
+      self.assertFalse(account)
+      self.assertEqual(['scope_a', 'scope_b'], scopes)
+      return 'none', None
+    self.mock(service_accounts, 'get_system_account_token', mocked)
+
+    response = self.app.post_json(
+        '/swarming/api/v1/bot/oauth_token',
+        params={
+          'account_id': 'system',
+          'id': 'bot1',
+          'scopes': ['scope_a', 'scope_b'],
+        }).json
+    self.assertEqual({u'service_account': u'none'}, response)
 
 
 if __name__ == '__main__':

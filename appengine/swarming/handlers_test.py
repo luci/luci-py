@@ -10,7 +10,6 @@ import logging
 import os
 import sys
 import unittest
-import urllib
 
 # Setups environment.
 import test_env_handlers
@@ -58,7 +57,7 @@ class FrontendTest(AppTestBase):
     response = self.app.get('/', status=200)
     self.assertGreater(len(response.body), 600)
 
-  def testAllSwarmingHandlersAreSecured(self):
+  def test_all_swarming_handlers_secured(self):
     # Test that all handlers are accessible only to authenticated user or
     # bots. Assumes all routes are defined with plain paths (i.e.
     # '/some/handler/path' and not regexps).
@@ -96,9 +95,16 @@ class FrontendTest(AppTestBase):
           not route.template.startswith(using_app_login_prefixes))
     ]
 
+    # Produces a body to POST to a /swarming/api/v1/bot/* request.
+    def fake_body_for_bot_request(path):
+      body = {'id': 'bot-id', 'task_id': 'task_id'}
+      if path == '/swarming/api/v1/bot/oauth_token':
+        body.update({'account_id': 'system', 'scopes': ['a', 'b']})
+      return body
+
     # Helper function that executes GET or POST handler for corresponding route
     # and asserts it returns 403 or 405.
-    def CheckProtected(route, method):
+    def check_protected(route, method):
       assert method in ('GET', 'POST')
       # Get back original path from regexp.
       path = route.template
@@ -111,7 +117,7 @@ class FrontendTest(AppTestBase):
       body = ''
       if method == 'POST' and path.startswith('/swarming/api/v1/bot/'):
         headers = {'Content-Type': 'application/json'}
-        body = json.dumps({'id': 'bot-id', 'task_id': 'task_id'})
+        body = json.dumps(fake_body_for_bot_request(path))
 
       response = getattr(self.app, method.lower())(
           path, body, expect_errors=True, headers=headers)
@@ -130,8 +136,8 @@ class FrontendTest(AppTestBase):
         # Sadly, the url cannot be used as-is. Figure out a way to test them
         # easily.
         continue
-      CheckProtected(route, 'GET')
-      CheckProtected(route, 'POST')
+      check_protected(route, 'GET')
+      check_protected(route, 'POST')
 
   def test_task_redirect(self):
     self.set_as_anonymous()
