@@ -316,7 +316,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'secret_bytes': None,
         u'io_timeout': 1200,
         u'outputs': [u'foo', u'path/to/foobar'],
-        u'service_account': u'none',
+        u'service_accounts': {
+          u'system': {u'service_account': u'none'},
+          u'task': {u'service_account': u'none'},
+        },
         u'task_id': task_id,
       },
     }
@@ -385,7 +388,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'secret_bytes': None,
         u'io_timeout': 1200,
         u'outputs': [u'foo', u'path/to/foobar'],
-        u'service_account': u'bot',
+        u'service_accounts': {
+          u'system': {u'service_account': u'none'},
+          u'task': {u'service_account': u'bot'},
+        },
         u'task_id': task_id,
       },
     }
@@ -439,7 +445,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'io_timeout': 1200,
         u'outputs': [u'foo', u'path/to/foobar'],
         u'secret_bytes': None,
-        u'service_account': u'none',
+        u'service_accounts': {
+          u'system': {u'service_account': u'none'},
+          u'task': {u'service_account': u'none'},
+        },
         u'task_id': task_id,
       },
     }
@@ -534,7 +543,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'secret_bytes': None,
         u'io_timeout': 1200,
         u'outputs': [u'foo', u'path/to/foobar'],
-        u'service_account': u'none',
+        u'service_accounts': {
+          u'system': {u'service_account': u'none'},
+          u'task': {u'service_account': u'none'},
+        },
         u'task_id': task_id,
       },
     }
@@ -693,7 +705,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'secret_bytes': None,
         u'io_timeout': 1200,
         u'outputs': [u'foo', u'path/to/foobar'],
-        u'service_account': u'none',
+        u'service_accounts': {
+          u'system': {u'service_account': u'none'},
+          u'task': {u'service_account': u'none'},
+        },
         u'task_id': task_id,
       },
     }

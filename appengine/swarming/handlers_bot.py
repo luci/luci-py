@@ -678,7 +678,9 @@ class BotPollHandler(_BotBaseHandler):
           bot_event(
               'request_task', task_id=run_result.task_id,
               task_name=request.name)
-          self._cmd_run(request, secret_bytes, run_result.key, res.bot_id)
+          self._cmd_run(
+              request, secret_bytes, run_result.key,
+              res.bot_id, res.bot_group_cfg)
       except:
         logging.exception('Dang, exception after reaping')
         raise
@@ -692,7 +694,8 @@ class BotPollHandler(_BotBaseHandler):
       # https://code.google.com/p/swarming/issues/detail?id=130
       self.abort(500, 'Deadline')
 
-  def _cmd_run(self, request, secret_bytes, run_result_key, bot_id):
+  def _cmd_run(
+      self, request, secret_bytes, run_result_key, bot_id, bot_group_cfg):
     logging.info('Run: %s', request.task_id)
     out = {
       'cmd': 'run',
@@ -725,7 +728,18 @@ class BotPollHandler(_BotBaseHandler):
           'server': request.properties.inputs_ref.isolatedserver,
         } if request.properties.inputs_ref else None,
         'outputs': request.properties.outputs,
-        'service_account': request.service_account,
+        'service_accounts': {
+          'system': {
+            # 'none', 'bot' or email. Bot interprets 'none' and 'bot' locally.
+            # When it sees something else, it uses /oauth_token API endpoint to
+            # grab tokens through server.
+            'service_account': bot_group_cfg.system_service_account or 'none',
+          },
+          'task': {
+            # Same here.
+            'service_account': request.service_account,
+          },
+        },
         'task_id': task_pack.pack_run_result_key(run_result_key),
       },
     }

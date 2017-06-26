@@ -754,7 +754,8 @@ class TestBotMain(TestBotBase):
         expected_auth_params_json={
           'swarming_http_headers': {'A': 'a'},
           'swarming_http_headers_exp': int(time.time() + 3600),
-          'task_service_account': 'bot', # as in task manifest
+          'system_service_account': 'robot@example.com',  # as in task manifest
+          'task_service_account': 'bot',
         })
 
     manifest = {
@@ -763,7 +764,10 @@ class TestBotMain(TestBotBase):
       'grace_period': 30,
       'hard_timeout': 60,
       'host': 'https://localhost:3',
-      'service_account': 'bot',
+      'service_accounts': {
+        'system': {'service_account': 'robot@example.com'},
+        'task': {'service_account': 'bot'},
+      },
       'task_id': '24',
     }
     self.assertEqual(self.root_dir, self.bot.base_dir)

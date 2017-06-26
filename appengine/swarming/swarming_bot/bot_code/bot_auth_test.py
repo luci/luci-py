@@ -57,6 +57,7 @@ class AuthSystemTest(auto_stub.TestCase):
     auth_params_path = self.write_auth_params(bot_auth.AuthParams(
         swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
         swarming_http_headers_exp=exp,
+        system_service_account='none',
         task_service_account='bot'))
     with bot_auth.AuthSystem(auth_params_path) as auth_sys:
       self.assertEqual(
@@ -76,6 +77,7 @@ class AuthSystemTest(auto_stub.TestCase):
     auth_params_path = self.write_auth_params(bot_auth.AuthParams(
         swarming_http_headers={'Authorization': 'Bearer bot-own-token'},
         swarming_http_headers_exp=0,
+        system_service_account='none',
         task_service_account='none'))
     with bot_auth.AuthSystem(auth_params_path) as auth_sys:
       self.assertIsNone(auth_sys.local_auth_context)
