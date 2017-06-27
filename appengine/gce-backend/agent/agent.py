@@ -187,7 +187,7 @@ class Agent(object):
 
     path = os.path.join(self.LOGS_DIR, 'agent.%s.log' % time.time())
     if not os.path.exists(self.LOGS_DIR):
-      os.mkdir(self.LOGS_DIR)
+      os.makedirs(self.LOGS_DIR)
 
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
@@ -286,7 +286,7 @@ class Agent(object):
       True if successful, False otherwise.
     """
     if not os.path.exists(self.SWARMING_BOT_DIR):
-      os.mkdir(self.SWARMING_BOT_DIR)
+      os.makedirs(self.SWARMING_BOT_DIR)
     self.chown(self.user, self.SWARMING_BOT_DIR)
 
     path = os.path.join(self.SWARMING_BOT_DIR, 'swarming_bot.zip')
