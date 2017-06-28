@@ -10,12 +10,14 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 import zipfile
 
 import test_env
 test_env.setup_test_env()
 
+from google.appengine.ext import ndb
 from components import auth
 from test_support import test_case
 
@@ -39,6 +41,7 @@ class BotManagementTest(test_case.TestCase):
     self.mock(
         auth, 'get_current_identity',
         lambda: auth.Identity(auth.IDENTITY_USER, 'joe@localhost'))
+
 
   def test_get_bootstrap(self):
     def get_self_config_mock(path, revision=None, store_last_good=False):
@@ -94,7 +97,37 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(expected, additionals)
 
   def test_get_swarming_bot_zip(self):
+    local_mc = {'store': {}, 'reads': 0, 'writes': 0}
+
+    @ndb.tasklet
+    def mock_memcache_get(version, desc, part=None):
+      value = local_mc['store'].get(bot_code.bot_key(version, desc, part))
+      if value is not None:
+        local_mc['reads'] += 1
+      raise ndb.Return(value)
+
+    @ndb.tasklet
+    def mock_memcache_set(value, version, desc, part=None):
+      local_mc['writes'] += 1
+      key = bot_code.bot_key(version, desc, part)
+      local_mc['store'][key] = value
+      return ndb.Return(None)
+
+    self.mock(bot_code, 'bot_memcache_set', mock_memcache_set)
+    self.mock(bot_code, 'bot_memcache_get', mock_memcache_get)
+    self.mock(bot_code, 'MAX_MEMCACHED_SIZE_BYTES', 100000)
+
+    self.assertEqual(0, local_mc['writes'])
     zipped_code = bot_code.get_swarming_bot_zip('http://localhost')
+    self.assertEqual(0, local_mc['reads'])
+    self.assertNotEqual(0, local_mc['writes'])
+
+    # Make sure that we read from memcached if we get it again
+    zipped_code_copy = bot_code.get_swarming_bot_zip('http://localhost')
+    self.assertEqual(local_mc['writes'], local_mc['reads'])
+    # Why not assertEqual? Don't want to dump ~1MB of data if this fails.
+    self.assertTrue(zipped_code == zipped_code_copy)
+
     # Ensure the zip is valid and all the expected files are present.
     with zipfile.ZipFile(StringIO.StringIO(zipped_code), 'r') as zip_file:
       for i in bot_archive.FILES:
@@ -119,6 +152,7 @@ class BotManagementTest(test_case.TestCase):
       self.assertEqual(0, proc.returncode, out)
     finally:
       file_path.rmtree(temp_dir)
+
 
   def test_bootstrap_token(self):
     tok = bot_code.generate_bootstrap_token()

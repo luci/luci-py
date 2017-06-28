@@ -28,6 +28,8 @@ from server import config as local_config
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+MAX_MEMCACHED_SIZE_BYTES = 1000000
+BOT_CODE_NS = 'bot_code'
 
 ### Models.
 
@@ -222,7 +224,7 @@ def get_swarming_bot_zip(host):
     A string representing the zipped file's contents.
   """
   version, additionals = get_bot_version(host)
-  content = memcache.get('code-' + version, namespace='bot_code')
+  content = get_cached_swarming_bot_zip(version)
   if content:
     logging.debug('memcached bot code %s; %d bytes', version, len(content))
     return content
@@ -236,10 +238,78 @@ def get_swarming_bot_zip(host):
   content, version = bot_archive.get_swarming_bot_zip(
       bot_dir, host, utils.get_app_version(), additionals,
       local_config.settings().enable_ts_monitoring)
-  # This is immutable so not no need to set expiration time.
-  memcache.set('code-' + version, content, namespace='bot_code')
   logging.info('generated bot code %s; %d bytes', version, len(content))
+  cache_swarming_bot_zip(version, content)
   return content
+
+
+def get_cached_swarming_bot_zip(version):
+  """Returns the bot contents if its been cached, or None if missing."""
+  # see cache_swarming_bot_zip for how the "meta" entry is set
+  meta = bot_memcache_get(version, 'meta').get_result()
+  if meta is None:
+    logging.info('memcache did not include metadata for version %s', version)
+    return None
+  num_parts, true_sig = meta.split(':')
+
+  # Get everything asynchronously. If something's missing, the hash will be
+  # wrong so no need to check that we got something from each call.
+  futures = [bot_memcache_get(version, 'content', p)
+             for p in range(int(num_parts))]
+  content = ''
+  for f in futures:
+    chunk = f.get_result()
+    if chunk is None:
+      logging.error('bot code %s was missing some of its contents', version)
+      return None
+    content += chunk
+  h = hashlib.sha256()
+  h.update(content)
+  if h.hexdigest() != true_sig:
+    logging.error('bot code %s had signature %s instead of expected %s',
+                  version, h.hexdigest(), true_sig)
+    return None
+  return content
+
+
+def cache_swarming_bot_zip(version, content):
+  """Caches the bot code to memcache."""
+  h = hashlib.sha256()
+  h.update(content)
+  p = 0
+  futures = []
+  while len(content) > 0:
+    chunk_size = min(MAX_MEMCACHED_SIZE_BYTES, len(content))
+    futures.append(bot_memcache_set(content[0:chunk_size],
+                                          version, 'content', p))
+    content = content[chunk_size:]
+    p += 1
+  meta = "%s:%s" % (p, h.hexdigest())
+  for f in futures:
+    f.check_success()
+  bot_memcache_set(meta, version, 'meta').check_success()
+  logging.info('bot %s with sig %s saved in memcached in %d chunks',
+               version, h.hexdigest(), p)
+
+
+def bot_memcache_get(version, desc, part=None):
+  """Mockable async memcache getter."""
+  return ndb.get_context().memcache_get(bot_key(version, desc, part),
+                                        namespace=BOT_CODE_NS)
+
+
+def bot_memcache_set(value, version, desc, part=None):
+  """Mockable async memcache setter."""
+  return ndb.get_context().memcache_set(bot_key(version, desc, part),
+                                        value, namespace=BOT_CODE_NS)
+
+
+def bot_key(version, desc, part=None):
+  """Returns a memcache key for bot entries."""
+  key = 'code-%s-%s' % (version, desc)
+  if part is not None:
+    key = '%s-%d' % (key, part)
+  return key
 
 
 ### Bootstrap token.
