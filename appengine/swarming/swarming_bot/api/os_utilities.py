@@ -868,11 +868,13 @@ def get_state_all_devices_android(devices):
 
   keys = (
     u'board.platform',
+    u'build.product',
     u'build.fingerprint',
     u'build.id',
     u'build.version.sdk',
     u'product.board',
-    u'product.cpu.abi')
+    u'product.cpu.abi',
+    u'product.device')
 
   def fn(device):
     if not device.is_valid or device.failure:
