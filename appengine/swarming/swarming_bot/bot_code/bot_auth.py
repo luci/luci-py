@@ -329,7 +329,7 @@ class AuthSystem(object):
     # See remote_client.AUTH_HEADERS_EXPIRATION_SEC.
     bot_auth_hdr = auth_params.swarming_http_headers.get('Authorization') or ''
     if not bot_auth_hdr.startswith('Bearer '):
-      raise auth_server.TokenError(2, 'The bot is not using OAuth', fatal=True)
+      raise auth_server.TokenError(2, 'The bot is not using OAuth')
     tok = bot_auth_hdr[len('Bearer '):]
 
     # Default to some safe small expiration in case bot_main doesn't report it
