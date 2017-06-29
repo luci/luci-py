@@ -28,8 +28,12 @@ from server import config as local_config
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-MAX_MEMCACHED_SIZE_BYTES = 1000000
-BOT_CODE_NS = 'bot_code'
+# In theory, a memcache entry can be 1MB in size, and this sometimes works, but
+# in practice we found that it's flaky at 500kb or above. 250kb seems to be safe
+# though and doesn't appear to have any runtime impact.
+#    - aludwin@, June 2017
+MAX_MEMCACHED_SIZE_BYTES = 250000
+
 
 ### Models.
 
@@ -257,12 +261,19 @@ def get_cached_swarming_bot_zip(version):
   futures = [bot_memcache_get(version, 'content', p)
              for p in range(int(num_parts))]
   content = ''
-  for f in futures:
+  missing = 0
+  for idx, f in enumerate(futures):
     chunk = f.get_result()
     if chunk is None:
-      logging.error('bot code %s was missing some of its contents', version)
-      return None
-    content += chunk
+      logging.debug('bot code %s was missing chunk %d/%d',
+                    version, idx, len(futures))
+      missing += 1
+    else:
+      content += chunk
+  if missing:
+    logging.error('bot code %s was missing %d/%d chunks',
+                  version, missing, len(futures))
+    return None
   h = hashlib.sha256()
   h.update(content)
   if h.hexdigest() != true_sig:
@@ -280,13 +291,13 @@ def cache_swarming_bot_zip(version, content):
   futures = []
   while len(content) > 0:
     chunk_size = min(MAX_MEMCACHED_SIZE_BYTES, len(content))
-    futures.append(bot_memcache_set(content[0:chunk_size],
-                                          version, 'content', p))
+    futures.append(bot_memcache_set(content[:chunk_size],
+                                    version, 'content', p))
     content = content[chunk_size:]
     p += 1
-  meta = "%s:%s" % (p, h.hexdigest())
   for f in futures:
     f.check_success()
+  meta = "%s:%s" % (p, h.hexdigest())
   bot_memcache_set(meta, version, 'meta').check_success()
   logging.info('bot %s with sig %s saved in memcached in %d chunks',
                version, h.hexdigest(), p)
@@ -295,13 +306,13 @@ def cache_swarming_bot_zip(version, content):
 def bot_memcache_get(version, desc, part=None):
   """Mockable async memcache getter."""
   return ndb.get_context().memcache_get(bot_key(version, desc, part),
-                                        namespace=BOT_CODE_NS)
+                                        namespace='bot_code')
 
 
 def bot_memcache_set(value, version, desc, part=None):
   """Mockable async memcache setter."""
   return ndb.get_context().memcache_set(bot_key(version, desc, part),
-                                        value, namespace=BOT_CODE_NS)
+                                        value, namespace='bot_code')
 
 
 def bot_key(version, desc, part=None):
