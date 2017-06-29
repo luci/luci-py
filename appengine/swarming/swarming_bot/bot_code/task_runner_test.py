@@ -65,9 +65,13 @@ class FakeAuthSystem(object):
     self._running = False
     assert auth_params_file == '/path/to/auth-params-file'
 
+  def set_remote_client(self, _remote_client):
+    pass
+
   def start(self):
     assert not self._running
     self._running = True
+    return self.local_auth_context
 
   def stop(self):
     self._running = False
@@ -202,7 +206,13 @@ class TestTaskRunner(TestTaskRunnerBase):
         start, ['--min-free-space', '1'], '/path/to/file')
 
   def test_load_and_run_raw(self):
-    FakeAuthSystem.local_auth_context = {'rpc_port': 123, 'secret': 'abcdef'}
+    local_auth_ctx = {
+      'accounts': [{'id': 'a'}, {'id': 'b'}],
+      'default_account_id': 'a',
+      'rpc_port': 123,
+      'secret': 'abcdef',
+    }
+    FakeAuthSystem.local_auth_context = local_auth_ctx
     self.mock(bot_auth, 'AuthSystem', FakeAuthSystem)
 
     def run_command(
@@ -217,8 +227,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       self.assertEqual(time.time(), start)
       self.assertEqual(['--min-free-space', '1'], run_isolated_flags)
       self.assertEqual('/path/to/bot-file', bot_file)
-      self.assertDictEqual(luci_context.read('local_auth'),
-                           {'rpc_port': 123, 'secret': 'abcdef'})
+      self.assertDictEqual(local_auth_ctx, luci_context.read('local_auth'))
       return {
         u'exit_code': 1,
         u'hard_timeout': False,

@@ -135,19 +135,45 @@ class AuthSystem(object):
     self._auth_params_file = auth_params_file
     self._auth_params_reader = None
     self._local_server = None
-    self._local_auth_context = None
     self._lock = threading.Lock()
+    self._remote_client = None
 
-  def __enter__(self):
-    self.start()
-    return self
+  def set_remote_client(self, remote_client):
+    """Sets an RPC client to use when calling Swarming.
 
-  def __exit__(self, _exc_type, _exc_val, _exc_tb):
-    self.stop()
-    return False
+    Note that there can be a circular dependency between the RPC client and
+    the auth system (the client may be using AuthSystem's get_bot_headers).
+
+    That's the reason we allow it to be set after 'start'.
+
+    Args:
+      remote_client: instance of remote_client.RemoteClient.
+    """
+    with self._lock:
+      self._remote_client = remote_client
 
   def start(self):
     """Grabs initial bot auth headers and starts all auth related threads.
+
+    If the task is configured to use service accounts (based on data in
+    'auth_params_file'), launches the local auth service and returns a dict that
+    contains its parameters. It can be placed into LUCI_CONTEXT['local_auth']
+    slot.
+
+    By default LUCI subprocesses will be using "task" service account (or none
+    at all, it the task has no associated service account). Internal Swarming
+    processes (like run_isolated.py) can switch to using "system" account.
+
+    If task is not using service accounts, returns None (meaning, there's no
+    need to setup LUCI_CONTEXT['local_auth'] at all).
+
+    Format of the returned dict:
+    {
+      'rpc_port': <int with port number>,
+      'secret': <str with a random string to send with RPCs>,
+      'accounts': [{'id': <str>}, ...],
+      'default_account_id': <str> or None
+    }
 
     Raises:
       AuthSystemError on fatal errors.
@@ -175,34 +201,44 @@ class AuthSystem(object):
     logging.info('  system: %s', params.system_service_account)
     logging.info('  task:   %s', params.task_service_account)
 
+    # Expose all defined accounts (if any) to subprocesses via LUCI_CONTEXT.
+    #
+    # Use 'task' account as default for everything. Internal Swarming processes
+    # will pro-actively switch to 'system'.
+    #
+    # If 'task' is not defined, then do not set default account at all! It means
+    # processes will use non-authenticated calls by default (which is precisely
+    # the meaning of un-set task account).
+    default_account_id = None
+    available_accounts = []
+    if params.system_service_account != 'none':
+      available_accounts.append('system')
+    if params.task_service_account != 'none':
+      default_account_id = 'task'
+      available_accounts.append('task')
+
     # If using service accounts, launch local HTTP server that serves tokens
     # (let OS assign the port).
-    #
-    # TODO(vadimsh): Launch local auth server if using 'system' account (or both
-    # 'system' and 'task') too. This can be done only once all processes that
-    # inherit LUCI_CONTEXT know about 'system' and 'task' accounts distinction.
     server = None
     local_auth_context = None
-    if params.task_service_account != 'none':
-      try:
-        server = auth_server.LocalAuthServer()
-        local_auth_context = server.start(token_provider=self)
-      except Exception as exc:
-        reader.stop() # cleanup
-        raise AuthSystemError('Failed to start local auth server - %s' % exc)
+    if available_accounts:
+      server = auth_server.LocalAuthServer()
+      local_auth_context = server.start(
+          token_provider=self,
+          accounts=available_accounts,
+          default_account_id=default_account_id)
 
     # Good to go.
     with self._lock:
       self._auth_params_reader = reader
       self._local_server = server
-      self._local_auth_context = local_auth_context
+    return local_auth_context
 
   def stop(self):
     """Shuts down all the threads if they are running."""
     with self._lock:
       reader, self._auth_params_reader = self._auth_params_reader, None
       server, self._local_server = self._local_server, None
-      self._local_auth_context = None
     if server:
       server.stop()
     if reader:
@@ -229,26 +265,14 @@ class AuthSystem(object):
     except ValueError as e:
       raise AuthSystemError('Cannot parse bot_auth_params.json: %s' % e)
 
-  @property
-  def local_auth_context(self):
-    """A dict with parameters of local auth server to put into LUCI_CONTEXT.
-
-    None if the task is not using service accounts.
-
-    Format:
-    {
-      'rpc_port': <int with port number>,
-      'secret': <str with a random string to send with RPCs>,
-    }
-    """
-    with self._lock:
-      return self._local_auth_context
-
-  def generate_token(self, scopes):
+  def generate_token(self, account_id, scopes):
     """Generates a new access token with given scopes.
 
     Called by LocalAuthServer from some internal thread whenever new token is
-    needed. See TokenProvider for more details.
+    needed. It happens infrequently, approximately once per hour per combination
+    of scopes (when the previously cached token expires).
+
+    See TokenProvider for more details.
 
     Returns:
       AccessToken.
@@ -261,32 +285,48 @@ class AuthSystem(object):
       if not self._auth_params_reader:
         raise auth_server.RPCError(503, 'Stopped already.')
       val = self._auth_params_reader.last_value
+      rpc_client = self._remote_client
     params = process_auth_params_json(val)
 
+    # Note: 'account_id' here is "task" or "system", it's checked below.
+    logging.info('Getting %r token, scopes %r', account_id, scopes)
+
+    # Grab service account email (or 'none'/'bot' placeholders) of requested
+    # logical account. This is part of the task manifest.
+    service_account = None
+    if account_id == 'task':
+      service_account = params.task_service_account
+    elif account_id == 'system':
+      service_account = params.system_service_account
+    else:
+      raise auth_server.RPCError(404, 'Unknown account %r' % account_id)
+
+    # Note: correctly behaving clients aren't supposed to hit this, since they
+    # should use only accounts specified in 'accounts' section of LUCI_CONTEXT.
+    if service_account == 'none':
+      raise auth_server.TokenError(
+          1, 'The task has no %r account associated with it' % account_id)
+
+    if service_account == 'bot':
+      # This works only for bots that use OAuth for authentication (e.g. GCE
+      # bots). It will raise TokenError if the bot is not using OAuth.
+      tok = self._grab_bot_oauth_token(params)
+    else:
+      # Ask Swarming server to generate a new token for us.
+      if not rpc_client:
+        raise auth_server.RPCError(500, 'No RPC client, can\'t fetch token')
+      tok = self._grab_oauth_token_via_rpc(rpc_client, account_id, scopes)
+
     logging.info(
-        'Getting the token for "%s", scopes %s', params.task_service_account,
-        scopes)
-
-    # This shouldn't happen, since the local HTTP server isn't actually
-    # running in this case. But handle anyway, for completeness.
-    if params.task_service_account == 'none':
-      raise auth_server.TokenError(1, 'The task is not using service accounts')
-
-    # This works only for bots that use OAuth for authentication (e.g. GCE
-    # bots). It will raise TokenError if the bot is not using OAuth.
-    if params.task_service_account == 'bot':
-      return self._grab_bot_oauth_token(params)
-
-    # Using some custom service account.
-    # TODO(vadimsh): Implement. This would involve sending a request to Swarming
-    # backend to generate the token.
-    raise auth_server.TokenError(3, 'Not implemented yet')
+        'Got %r token (belongs to %r), expires in %d sec',
+        account_id, service_account, tok.expiry - time.time())
+    return tok
 
   def _grab_bot_oauth_token(self, auth_params):
-    # Piggyback on the bot own credentials for now. This works only for bots
-    # that use OAuth for authentication (e.g. GCE bots). Also it totally ignores
-    # scopes. It relies on bot_main to keep the bot OAuth token sufficiently
-    # fresh. See remote_client.AUTH_HEADERS_EXPIRATION_SEC.
+    # Piggyback on the bot own credentials. This works only for bots that use
+    # OAuth for authentication (e.g. GCE bots). Also it totally ignores scopes.
+    # It relies on bot_main to keep the bot OAuth token sufficiently fresh.
+    # See remote_client.AUTH_HEADERS_EXPIRATION_SEC.
     bot_auth_hdr = auth_params.swarming_http_headers.get('Authorization') or ''
     if not bot_auth_hdr.startswith('Bearer '):
       raise auth_server.TokenError(2, 'The bot is not using OAuth', fatal=True)
@@ -296,9 +336,13 @@ class AuthSystem(object):
     # to us. This may happen if get_authentication_header bot hook is not
     # reporting expiration time.
     exp = auth_params.swarming_http_headers_exp or (time.time() + 4*60)
-    logging.info('Bot token expires in %d sec', exp - time.time())
 
     # TODO(vadimsh): For GCE bots specifically we can pass a list of OAuth
     # scopes granted to the GCE token and verify it contains all the requested
     # scopes.
     return auth_server.AccessToken(tok, exp)
+
+  def _grab_oauth_token_via_rpc(self, _rpc_client, _account_id, _scopes):
+    # TODO(vadimsh): Send a request to /swarming/api/v1/bot/oauth_token using
+    # given RPC client.
+    raise auth_server.TokenError(3, 'Not implemented yet')

@@ -229,6 +229,7 @@ def load_and_run(
   'failure' from a TaskRunResult standpoint.
   """
   auth_system = None
+  local_auth_context = None
   task_result = None
   work_dir = os.path.dirname(out_file)
 
@@ -256,17 +257,18 @@ def load_and_run(
       if auth_params_file:
         try:
           auth_system = bot_auth.AuthSystem(auth_params_file)
-          auth_system.start()
+          local_auth_context = auth_system.start()
         except bot_auth.AuthSystemError as e:
           raise InternalError('Failed to init auth: %s' % e)
 
-      context_edits = {}
+      # Override LUCI_CONTEXT['local_auth']. If the task is not using auth,
+      # do NOT inherit existing local_auth (if its there). Kick it out by
+      # passing None.
+      context_edits = {
+        'local_auth': local_auth_context
+      }
 
-      # If the task is using service accounts, add local_auth details to
-      # LUCI_CONTEXT.
-      if auth_system and auth_system.local_auth_context:
-        context_edits['local_auth'] = auth_system.local_auth_context
-
+      # Extend existing LUCI_CONTEXT['swarming'], if any.
       if task_details.secret_bytes is not None:
         swarming = luci_context.read('swarming') or {}
         swarming['secret_bytes'] = task_details.secret_bytes
@@ -285,6 +287,13 @@ def load_and_run(
       remote = remote_client.createRemoteClient(
           swarming_server, headers_cb, is_grpc)
       remote.initialize()
+
+      # Let AuthSystem know it can now send RPCs to Swarming (to grab OAuth
+      # tokens). There's a circular dependency here! AuthSystem will be
+      # indirectly relying on its own 'get_bot_headers' method to authenticate
+      # RPCs it sends through the provided client.
+      if auth_system:
+        auth_system.set_remote_client(remote)
 
       # Auth environment is up, start the command. task_result is dumped to
       # disk in 'finally' block.
