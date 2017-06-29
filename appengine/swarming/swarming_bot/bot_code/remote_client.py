@@ -14,6 +14,7 @@ from utils import net
 from remote_client_errors import BotCodeError
 from remote_client_errors import InitializationError
 from remote_client_errors import InternalError
+from remote_client_errors import MintOAuthTokenError
 from remote_client_errors import PollError
 
 
@@ -281,3 +282,41 @@ class RemoteClientNative(object):
     resp = net.url_read(self._server + '/swarming/api/v1/bot/server_ping')
     if resp is None:
       logging.error('No response from server_ping')
+
+  def mint_oauth_token(self, task_id, bot_id, account_id, scopes):
+    """Asks the server to generate an access token for a service account.
+
+    Each task has two service accounts associated with it: 'system' and 'task'.
+    Swarming server is capable of generating oauth tokens for them (if the bot
+    is currently authorized to have access to them).
+
+    Args:
+      task_id: identifier of currently executing task.
+      bot_id: name of the bot.
+      account_id: logical identifier of the account (e.g 'system' or 'task').
+      scopes: list of OAuth scopes the new token should have.
+
+    Returns:
+      {
+        'service_account': <str>,      # account email or 'bot', or 'none'
+        'access_token': <str> or None, # actual token, if using real account
+        'expiry': <int>,               # unix timestamp in seconds
+      }
+
+    Raises:
+      InternalError if can't contact the server after many attempts or the
+      server consistently replies with HTTP 5** errors.
+
+      MintOAuthTokenError on fatal errors.
+    """
+    resp = self._url_read_json('/swarming/api/v1/bot/oauth_token', data={
+        'account_id': account_id,
+        'id': bot_id,
+        'scopes': scopes,
+        'task_id': task_id,
+    })
+    if not resp:
+      raise InternalError('Error when minting the token')
+    if resp.get('error'):
+      raise MintOAuthTokenError(resp['error'])
+    return resp

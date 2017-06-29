@@ -23,4 +23,8 @@ class InternalError(Exception):
 
 
 class PollError(Exception):
-  """Raised on unrecoverable errors when in RemoteClient.poll."""
+  """Raised on unrecoverable errors in RemoteClient.poll."""
+
+
+class MintOAuthTokenError(Exception):
+  """Raised on unrecoverable errors in RemoteClient.mint_oauth_token."""

@@ -77,6 +77,44 @@ class TestRemoteClient(auto_stub.TestCase):
     self.mock(time, 'time', lambda: 103500)
     self.assertEqual({'Now': '103500'}, c.get_authentication_headers())
 
+  def test_mint_oauth_token_ok(self):
+    fake_resp = {
+        'service_account': 'blah@example.com',
+        'access_token': 'abc',
+        'expiry': 12345,
+    }
+
+    c = remote_client.RemoteClientNative('http://localhost:1', None)
+    def mocked_call(url_path, data):
+      self.assertEqual('/swarming/api/v1/bot/oauth_token', url_path)
+      self.assertEqual({
+          'account_id': 'account_id',
+          'id': 'bot_id',
+          'scopes': ['a', 'b'],
+          'task_id': 'task_id',
+      }, data)
+      return fake_resp
+    self.mock(c, '_url_read_json', mocked_call)
+
+    resp = c.mint_oauth_token('task_id', 'bot_id', 'account_id', ['a', 'b'])
+    self.assertEqual(fake_resp, resp)
+
+  def test_mint_oauth_token_transient_err(self):
+    c = remote_client.RemoteClientNative('http://localhost:1', None)
+    def mocked_call(*_args, **_kwargs):
+      return None  # that's how net.url_read_json indicates HTTP 500 :-/
+    self.mock(c, '_url_read_json', mocked_call)
+    with self.assertRaises(remote_client.InternalError):
+      c.mint_oauth_token('task_id', 'bot_id', 'account_id', ['a', 'b'])
+
+  def test_mint_oauth_token_fatal_err(self):
+    c = remote_client.RemoteClientNative('http://localhost:1', None)
+    def mocked_call(*_args, **_kwargs):
+      return {'error': 'blah'}
+    self.mock(c, '_url_read_json', mocked_call)
+    with self.assertRaises(remote_client.MintOAuthTokenError):
+      c.mint_oauth_token('task_id', 'bot_id', 'account_id', ['a', 'b'])
+
 
 if __name__ == '__main__':
   logging.basicConfig(

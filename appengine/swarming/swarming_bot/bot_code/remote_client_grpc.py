@@ -14,6 +14,7 @@ import grpc
 import google.protobuf.json_format
 from proto_bot import swarming_bot_pb2
 from remote_client_errors import InternalError
+from remote_client_errors import MintOAuthTokenError
 from remote_client_errors import PollError
 from utils import net
 
@@ -194,6 +195,11 @@ class RemoteClientGrpc(object):
 
   def ping(self):
     pass
+
+  def mint_oauth_token(self, task_id, bot_id, account_id, scopes):
+    # pylint: disable=unused-argument
+    raise MintOAuthTokenError(
+        'mint_oauth_token is not supported in grpc protocol')
 
 
 def create_state_proto(state_dict, message):
