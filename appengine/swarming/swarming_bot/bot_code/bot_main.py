@@ -575,13 +575,22 @@ def _run_isolated_flags(botobj):
   min_free = (
       _min_free_disk({'size_mb': size}, partition) +
       partition['wiggle'])
-  return [
+  args = [
     '--cache', os.path.join(botobj.base_dir, 'isolated_cache'),
     '--min-free-space', str(min_free),
     '--named-cache-root', os.path.join(botobj.base_dir, 'c'),
     '--max-cache-size', str(settings['caches']['isolated']['size']),
     '--max-items', str(settings['caches']['isolated']['items']),
   ]
+
+  # Get the gRPC proxy from the config, but allow an environment variable to
+  # override.
+  grpc_proxy = get_config().get('isolate_grpc_proxy')
+  grpc_proxy = os.environ.get('ISOLATE_GRPC_PROXY', grpc_proxy)
+  if grpc_proxy is not None:
+    logging.info('Isolate will use gRPC proxy %s', grpc_proxy)
+    args.extend(['--grpc-proxy', grpc_proxy])
+  return args
 
 
 def _clean_cache(botobj):
