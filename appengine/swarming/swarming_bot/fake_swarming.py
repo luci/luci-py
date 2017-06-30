@@ -124,4 +124,4 @@ def gen_zip(url):
   with open(os.path.join(BOT_DIR, 'config', 'bot_config.py'), 'rb') as f:
     bot_config_content = f.read()
   return bot_archive.get_swarming_bot_zip(
-      BOT_DIR, url, '1', {'config/bot_config.py': bot_config_content}, False)
+      BOT_DIR, url, '1', {'config/bot_config.py': bot_config_content}, None)

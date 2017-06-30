@@ -41,10 +41,10 @@ AUTH_HEADERS_EXPIRATION_SEC = 4*60+30
 NET_CONNECTION_TIMEOUT_SEC = 3*60
 
 
-def createRemoteClient(server, auth, useGrpc):
-  if useGrpc:
+def createRemoteClient(server, auth, grpc_proxy):
+  if grpc_proxy:
     import remote_client_grpc
-    return remote_client_grpc.RemoteClientGrpc(server)
+    return remote_client_grpc.RemoteClientGrpc(grpc_proxy)
   return RemoteClientNative(server, auth)
 
 

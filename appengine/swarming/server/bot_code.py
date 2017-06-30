@@ -216,7 +216,7 @@ def get_bot_version(host):
   bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
   version = bot_archive.get_swarming_bot_version(
       bot_dir, host, utils.get_app_version(), additionals,
-      local_config.settings().enable_ts_monitoring)
+      local_config.settings())
   memcache.set('version-' + signature, version, namespace='bot_code', time=60)
   return version, additionals
 
@@ -241,7 +241,7 @@ def get_swarming_bot_zip(host):
   bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
   content, version = bot_archive.get_swarming_bot_zip(
       bot_dir, host, utils.get_app_version(), additionals,
-      local_config.settings().enable_ts_monitoring)
+      local_config.settings())
   logging.info('generated bot code %s; %d bytes', version, len(content))
   cache_swarming_bot_zip(version, content)
   return content

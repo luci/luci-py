@@ -310,7 +310,7 @@ class TestBotMain(TestBotBase):
     self.mock(logging, 'error', lambda *_, **_kw: None)
     self.mock(
         bot_main, 'get_config',
-        lambda: {'server': self.url, 'server_version': '1', 'is_grpc': False})
+        lambda: {'server': self.url, 'server_version': '1'})
     expected_attribs = bot_main.get_attributes(None)
     self.expected_requests(
         [
@@ -405,8 +405,6 @@ class TestBotMain(TestBotBase):
     self.mock(
         bot_main, 'get_config',
         lambda: {
-          'enable_ts_monitoring': False,
-          'is_grpc': False,
           'server': self.url,
           'server_version': '1',
         })

@@ -377,27 +377,26 @@ def resolve_symlink(path):
 
 
 def yield_swarming_bot_files(
-    root_dir, host, host_version, additionals, enable_ts_monitoring):
+    root_dir, host, host_version, additionals, settings):
   """Yields all the files to map as tuple(filename, content).
 
   config.json is injected with json data about the server.
 
   This function guarantees that the output is sorted by filename.
   """
-  grpc_prefix = 'grpc://'
-  is_grpc = host.startswith(grpc_prefix)
-  if is_grpc:
-    host = host[len(grpc_prefix):]
-
   items = {i: None for i in FILES}
   items.update(additionals)
   config = {
-    'enable_ts_monitoring': enable_ts_monitoring,
-    'is_grpc': is_grpc,
     'server': host.rstrip('/'),
     'server_version': host_version,
   }
+
+  if settings:
+    config['enable_ts_monitoring'] = settings.enable_ts_monitoring
+    config['isolate_grpc_proxy'] = settings.bot_isolate_grpc_proxy
+
   items['config/config.json'] = json.dumps(config)
+  logging.debug('Bot config.json: %s', items['config/config.json'])
   for item, content in sorted(items.iteritems()):
     if content is not None:
       yield item, content
@@ -407,7 +406,7 @@ def yield_swarming_bot_files(
 
 
 def get_swarming_bot_zip(
-    root_dir, host, host_version, additionals, enable_ts_monitoring):
+    root_dir, host, host_version, additionals, settings):
   """Returns a zipped file of all the files a bot needs to run.
 
   Arguments:
@@ -425,7 +424,7 @@ def get_swarming_bot_zip(
   h = hashlib.sha256()
   with zipfile.ZipFile(zip_memory_file, 'w', zipfile.ZIP_DEFLATED) as zip_file:
     for name, content in yield_swarming_bot_files(
-        root_dir, host, host_version, additionals, enable_ts_monitoring):
+        root_dir, host, host_version, additionals, settings):
       zip_file.writestr(name, content)
       h.update(str(len(name)))
       h.update(name)
@@ -441,7 +440,7 @@ def get_swarming_bot_zip(
 
 
 def get_swarming_bot_version(
-    root_dir, host, host_version, additionals, enable_ts_monitoring):
+    root_dir, host, host_version, additionals, settings):
   """Returns the SHA256 hash of the bot code, representing the version.
 
   Arguments:
@@ -456,7 +455,7 @@ def get_swarming_bot_version(
   try:
     # TODO(maruel): Deduplicate from zip_package.genereate_version().
     for name, content in yield_swarming_bot_files(
-        root_dir, host, host_version, additionals, enable_ts_monitoring):
+        root_dir, host, host_version, additionals, settings):
       h.update(str(len(name)))
       h.update(name)
       h.update(str(len(content)))

@@ -52,6 +52,9 @@ message SettingsCfg {
 
   // Names of the authorization groups used by components/auth.
   optional AuthSettings auth = 13;
+
+  // Sets the default gRPC proxy for the bot's Isolate server calls.
+  optional string bot_isolate_grpc_proxy = 14;
 }
 
 

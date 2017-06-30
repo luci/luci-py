@@ -516,7 +516,7 @@ def get_bot(config):
   attributes = get_attributes(
     bot.Bot(
       remote_client.createRemoteClient(config['server'],
-                                       None, config['is_grpc']),
+                                       None, config.get('swarming_grpc_proxy')),
       attributes,
       config['server'],
       config['server_version'],
@@ -530,7 +530,7 @@ def get_bot(config):
       remote_client.createRemoteClient(
           config['server'],
           lambda: _get_authentication_headers(botobj),
-          config['is_grpc']),
+          config.get('swarming_grpc_proxy')),
       attributes,
       config['server'],
       config['server_version'],
@@ -704,7 +704,7 @@ def _run_bot_inner(arg_error, quit_bit):
   - bot process shuts down (this includes a signal is received)
   """
   config = get_config()
-  if config['enable_ts_monitoring']:
+  if config.get('enable_ts_monitoring'):
     _init_ts_mon()
   try:
     # First thing is to get an arbitrary url. This also ensures the network is
@@ -713,7 +713,7 @@ def _run_bot_inner(arg_error, quit_bit):
     # up" the network; if there's something seriously wrong, the handshake will
     # fail and we'll handle it there.
     remote = remote_client.createRemoteClient(config['server'], None,
-                                              config['is_grpc'])
+                                              config.get('swarming_grpc_proxy'))
     remote.ping()
   except Exception:
     # url_read() already traps pretty much every exceptions. This except
@@ -1187,8 +1187,6 @@ def get_config():
   except (IOError, OSError, TypeError, ValueError):
     logging.exception('Invalid config.json!')
     config = {
-      'enable_ts_monitoring': False,
-      'is_grpc': False,
       'server': '',
       'server_version': 'version1',
     }
