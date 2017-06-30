@@ -752,6 +752,8 @@ class TestBotMain(TestBotBase):
     result = self._mock_popen(
         url='https://localhost:3',
         expected_auth_params_json={
+          'bot_id': 'localhost',
+          'task_id': '24',
           'swarming_http_headers': {'A': 'a'},
           'swarming_http_headers_exp': int(time.time() + 3600),
           'system_service_account': 'robot@example.com',  # as in task manifest
