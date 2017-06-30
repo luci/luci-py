@@ -37,9 +37,10 @@
     <iron-ajax
         auto
         id="requestConfigs"
-        url="/_ah/api/config/v1/config-sets?config_set=[[category]]%2F[[name]]&include_files=true"
+        url="/_ah/api/config/v1/config-sets?config_set=[[category]]/[[name]][[route.path]]&include_files=true"
         handle-as="json"
-        on-response="_onGotConfigFiles">
+        on-response="_onGotConfigFiles"
+        headers="[[auth_headers]]">
     </iron-ajax>
 
     <div class="center title">
@@ -50,7 +51,7 @@
     <template is="dom-if" if="[[isLoading]]">
       <div class="center">Fetching config files...</div>
     </template>
-    <template is="dom-if" if="[[_not(isLoading)]]">
+    <template is="dom-if" if="[[!isLoading]]">
       <template is="dom-repeat" items="[[files]]" as="file">
         <config-file-card
             name="[[file.path]]" link="[[location]]/[[file.path]]">
@@ -88,10 +89,6 @@
       _formatCategory: function(category) {
         if (category === "projects") return "Project";
         if (category === "services") return "Service";
-      },
-
-      _not: function(b) {
-        return !b;
       },
 
       _onGotConfigFiles: function(event) {

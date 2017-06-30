@@ -40,7 +40,8 @@
         id="requestConfigs"
         url="/_ah/api/config/v1/config-sets"
         handle-as="json"
-        on-response="_onGotConfigSets">
+        on-response="_onGotConfigSets"
+        headers="[[auth_headers]]">
     </iron-ajax>
     
     <div class="search-bar">

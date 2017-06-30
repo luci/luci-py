@@ -31,3 +31,8 @@ $ polymer test
 ```
 
 Your application is already set up to be tested via [web-component-tester](https://github.com/Polymer/web-component-tester). Run `polymer test` to run your application's test suite locally.
+
+## Third Party Files
+
+In order to use proper authentication, the google-signin-aware element was needed. However, this element has not been updated to Polymer 2.0, so edits were made to the current version to ensure compatibility.
+The modified google-signin-aware element can be found in the ui/common/third_party/google-signin folder.

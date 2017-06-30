@@ -20,15 +20,14 @@ handlers:
 - url: /bower_components
   static_dir: ui/bower_components
 
+- url: /common
+  static_dir: ui/common
+
 - url: /src
   static_dir: ui/src
 
 - url: /_ah/spi/.*
   script: apps.endpoints
-
-- url: /newui
-  static_files: ui/static/index.html
-  upload: ui/static/index.html
 
 - url: /.*
   script: apps.html

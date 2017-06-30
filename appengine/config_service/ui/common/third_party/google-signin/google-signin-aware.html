@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-<link rel="import" href="../polymer/polymer.html">
-<link rel="import" href="../google-apis/google-js-api.html">
+<link rel="import" href="../../../bower_components/polymer/polymer.html">
+<link rel="import" href="../../../bower_components/google-apis/google-js-api.html">
 
 <script>
   (function() {
@@ -230,15 +230,19 @@ limitations under the License.
       signinAwares: [],
 
       init: function() {
-        this._apiLoader = document.createElement('google-js-api');
-        this._apiLoader.addEventListener('js-api-load', this.loadAuth2.bind(this));
-        if (Polymer.Element) {
-          document.body.appendChild(this._apiLoader);
-        }
+        var that = this;
+        document.addEventListener('DOMContentLoaded', function() {
+          that._apiLoader = document.createElement('google-js-api');
+          that._apiLoader.addEventListener('js-api-load', that.loadAuth2.bind(that));
+          if (Polymer.Element) {
+            document.body.appendChild(that._apiLoader);
+          }
+        })
       },
 
       loadAuth2: function() {
-        gapi.load('auth2', this.initAuth2.bind(this));
+        var that = this;
+        gapi.load('auth2', that.initAuth2.bind(that));
       },
 
       initAuth2: function() {
