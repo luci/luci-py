@@ -6,6 +6,7 @@
 
 <link rel="import" href="config-file-card.html">
 <link rel="import" href="../../bower_components/iron-ajax/iron-ajax.html">
+<link rel="import" href="../../bower_components/iron-icons/iron-icons.html">
 <link rel="import" href="../../bower_components/paper-item/paper-item.html">
 <link rel="import" href="../../bower_components/polymer/polymer.html">
 
@@ -28,6 +29,10 @@
         font-family: sans-serif;
       }
 
+      #refreshStatus {
+        font-size: 35%;
+      }
+
       .title {
         padding-bottom: 1%;
         padding-top: 5%;
@@ -43,19 +48,39 @@
         headers="[[auth_headers]]">
     </iron-ajax>
 
+    <iron-ajax
+        id="refreshConfigs"
+        url="/_ah/api/config/v1/reimport?config_set=[[category]]/[[name]][[route.path]]"
+        method="POST"
+        handle-as="json"
+        on-error="_onRefreshError"
+        on-response="_onCompleteRefresh"
+        headers="[[auth_headers]]">
+    </iron-ajax>
+
     <div class="center title">
-      <div class="name">[[name]][[route.path]]</div>
+      <div class="name">
+        [[name]][[route.path]]
+        <template is="dom-if" if="[[auth_headers]]">  
+          <iron-icon icon="icons:refresh" on-tap="_forceRefresh"></iron-icon>
+          <span id="refreshStatus">[[refreshMessage]]</span>
+        </template>
+      </div>
       <div class="category">[[_formatCategory(category)]]</div>
     </div>
-
-    <template is="dom-if" if="[[isLoading]]">
-      <div class="center">Fetching config files...</div>
+    <template is="dom-if" if="[[isRefreshing]]">
+      <div class="center">Refreshing config files...</div>
     </template>
-    <template is="dom-if" if="[[!isLoading]]">
-      <template is="dom-repeat" items="[[files]]" as="file">
-        <config-file-card
-            name="[[file.path]]" link="[[location]]/[[file.path]]">
-        </config-file-card>
+    <template is="dom-if" if="[[!isRefreshing]]">
+      <template is="dom-if" if="[[isLoading]]">
+        <div class="center">Fetching config files...</div>
+      </template>
+      <template is="dom-if" if="[[!isLoading]]">
+        <template is="dom-repeat" items="[[files]]" as="file">
+          <config-file-card
+              name="[[file.path]]" link="[[location]]/[[file.path]]">
+          </config-file-card>
+        </template>
       </template>
     </template>
   </template>
@@ -77,13 +102,29 @@
           value: true
         },
 
+        isRefreshing: {
+          type: Boolean,
+          value: false
+        },
+
         location: {
           type: String
         },
 
         name: {
           type: String
+        },
+
+        refreshMessage: {
+          type: String,
+          value: null
         }
+      },
+
+      _forceRefresh: function() {
+        this.refreshMessage = null;
+        this.$.refreshConfigs.generateRequest();
+        this.isRefreshing = true;
       },
 
       _formatCategory: function(category) {
@@ -91,10 +132,20 @@
         if (category === "services") return "Service";
       },
 
+      _onCompleteRefresh: function() {
+        this.isRefreshing = false;
+        this.refreshMessage = "Refresh successful.";
+      },
+
       _onGotConfigFiles: function(event) {
         this.files = event.detail.response.config_sets[0].files;
         this.location = event.detail.response.config_sets[0].location;
         this.isLoading = false;
+      },
+
+      _onRefreshError: function() {
+        this.isRefreshing = false;
+        this.refreshMessage = "Error: Files could not be refreshed.";
       }
     });
   </script>
