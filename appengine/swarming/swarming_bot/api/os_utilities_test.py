@@ -104,6 +104,9 @@ class TestOsUtilities(auto_stub.TestCase):
     actual.discard(u'zone')
     # Only set on Mac.
     actual.discard(u'hidpi')
+    # Only set on machines with SSD
+    if sys.platform in ('darwin', 'linux2'):
+      actual.discard(u'ssd')
     expected = {u'cores', u'cpu', u'gpu', u'id', u'os', u'pool'}
     if sys.platform == 'darwin':
       expected.add(u'mac_model')
@@ -116,7 +119,7 @@ class TestOsUtilities(auto_stub.TestCase):
     expected = {
       u'audio', u'cost_usd_hour', u'cpu_name', u'cwd', u'disks', u'gpu', u'ip',
       u'hostname', u'nb_files_in_temp', u'pid', u'ram',
-      u'running_time', u'started_ts', u'uptime', u'user',
+      u'running_time', u'ssd', u'started_ts', u'uptime', u'user',
     }
     if sys.platform in ('cygwin', 'win32'):
       expected.add(u'cygwin')

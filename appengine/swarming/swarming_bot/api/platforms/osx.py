@@ -6,6 +6,7 @@
 
 import cgi
 import ctypes
+import logging
 import os
 import platform
 import re
@@ -313,6 +314,24 @@ def get_uptime():
   _sysctl(CTL_KERN, KERN_BOOTTIME, result)
   start = float(result.tv_sec) + float(result.tv_usec) / 1000000.
   return time.time() - start
+
+
+@tools.cached
+def get_ssd():
+  """Returns a list of SSD disks."""
+  try:
+    out = subprocess.check_output(['diskutil', 'list', '-plist', 'physical'])
+    pl = plistlib.readPlistFromString(out)
+    ssd = []
+    for disk in pl['WholeDisks']:
+      out = subprocess.check_output(['diskutil', 'info', '-plist', disk])
+      pl = plistlib.readPlistFromString(out)
+      if pl['SolidState']:
+        ssd.append(disk.decode('utf-8'))
+    return tuple(sorted(ssd))
+  except (OSError, subprocess.CalledProcessError) as e:
+    logging.error('Failed to read disk info: %s', e)
+    return ()
 
 
 ## Mutating code.

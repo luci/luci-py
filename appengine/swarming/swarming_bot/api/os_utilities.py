@@ -571,6 +571,15 @@ def get_uptime():
   return platforms.linux.get_uptime()
 
 
+def get_ssd():
+  """Returns a list of SSD disks."""
+  if sys.platform == 'darwin':
+    return platforms.osx.get_ssd()
+  if sys.platform == 'linux2':
+    return platforms.linux.get_ssd()
+  return ()
+
+
 def get_named_caches():
   """Returns the list of named caches."""
   # Strictly speaking, this is a layering violation. This data is managed by
@@ -947,6 +956,10 @@ def get_dimensions():
   if loc:
     dimensions[u'locale'] = [loc]
 
+  ssd = get_ssd()
+  if ssd:
+    dimensions[u'ssd'] = [u'1']
+
   if sys.platform == 'darwin':
     model = platforms.osx.get_hardware_model_string()
     if model:
@@ -1002,6 +1015,7 @@ def get_state():
     u'pid': os.getpid(),
     u'ram': get_physical_ram(),
     u'running_time': int(round(time.time() - _STARTED_TS)),
+    u'ssd': list(get_ssd()),
     u'started_ts': int(round(_STARTED_TS)),
     u'uptime': int(round(get_uptime())),
     u'user': getpass.getuser().decode('utf-8'),

@@ -4,6 +4,7 @@
 
 """GNU/Linux specific utility functions."""
 
+import logging
 import os
 import pipes
 import platform
@@ -195,6 +196,23 @@ def get_uptime():
       return float(f.read().split()[0])
   except (IOError, OSError, ValueError):
     return 0.
+
+
+@tools.cached
+def get_ssd():
+  """Returns a list of SSD disks."""
+  try:
+    out = subprocess.check_output(
+        ['lsblk', '-d', '-o', 'name,rota']).splitlines()
+    ssd = []
+    for line in out:
+      match = re.match(r'(\w+)\s+(0|1)', line)
+      if match and match.group(2) == '0':
+        ssd.append(match.group(1).decode('utf-8'))
+    return tuple(sorted(ssd))
+  except (OSError, subprocess.CalledProcessError) as e:
+    logging.error('Failed to read disk info: %s', e)
+    return ()
 
 
 ## Mutating code.
