@@ -330,6 +330,8 @@ def CMDswitch(parser, args):
 def CMDupload(parser, args):
   """Uploads a new version of specific (or all) modules of an app.
 
+  Note that module yamls are expected to be named module-<module name>.yaml
+
   Version name looks like <number>-<commit sha1>[-tainted-<who>], where:
     number      git commit number, monotonically increases with each commit
     commit sha1 upstream commit hash the branch is based of
