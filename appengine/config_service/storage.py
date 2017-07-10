@@ -270,7 +270,7 @@ def get_self_config_async(path, message_factory):
   cs = get_self_config_set()
   messages = yield get_latest_messages_async([cs], path, message_factory)
   msg = messages[cs]
-  yield ctx.memcache_set(cache_key, msg.SerializeToString())
+  yield ctx.memcache_set(cache_key, msg.SerializeToString(), time=60)
   raise ndb.Return(msg)
 
 
