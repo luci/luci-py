@@ -141,7 +141,7 @@ class ConfigApi(remote.Service):
     )
 
   ##############################################################################
-  # endpoint: get_config_set
+  # endpoint: get_config_sets
 
   class GetConfigSetsResponseMessage(messages.Message):
     config_sets = messages.MessageField(ConfigSet, 1, repeated=True)
@@ -170,9 +170,10 @@ class ConfigApi(remote.Service):
             'Must specify config_set to use include_files')
       latest_revisions = storage.get_latest_revisions_async(
           [request.config_set]).get_result()
-      file_keys = storage.get_file_keys(
-          request.config_set, latest_revisions[request.config_set])
-      files = [File(path=key.id()) for key in file_keys]
+      if latest_revisions[request.config_set]:
+        file_keys = storage.get_file_keys(
+            request.config_set, latest_revisions[request.config_set])
+        files = [File(path=key.id()) for key in file_keys]
 
     config_sets = storage.get_config_sets_async(
         config_set=request.config_set).get_result()
