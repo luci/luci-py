@@ -265,14 +265,14 @@ def get_cached_swarming_bot_zip(version):
   for idx, f in enumerate(futures):
     chunk = f.get_result()
     if chunk is None:
-      logging.debug('bot code %s was missing chunk %d/%d',
-                    version, idx, len(futures))
+      logging.debug(
+          'bot code %s was missing chunk %d/%d', version, idx, len(futures))
       missing += 1
     else:
       content += chunk
   if missing:
-    logging.error('bot code %s was missing %d/%d chunks',
-                  version, missing, len(futures))
+    logging.warning(
+        'bot code %s was missing %d/%d chunks', version, missing, len(futures))
     return None
   h = hashlib.sha256()
   h.update(content)
