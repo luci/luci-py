@@ -6,23 +6,34 @@
 
 <link rel="import" href="../../bower_components/paper-item/paper-item.html">
 <link rel="import" href="../../bower_components/polymer/polymer.html">
+<link rel="import" href="../../bower_components/iron-icons/maps-icons.html">
+<link rel="import" href="../../bower_components/iron-flex-layout/iron-flex-layout.html">
 
 <dom-module id="config-file-card">
   <template>
-    <style>
+    <style include="iron-flex iron-flex-alignment">
       .center {
         margin: auto;
         width: 25%;
         border-style: solid;
         border-width: 2px;
       }
+
+      iron-icon {
+        float: right;
+      }
+
     </style>
 
     <paper-item class="center">
       <!-- TODO(cwpayton): Currently, each card contains a link to the
       corresponding file in gitiles. We would like to pretty print the
       contents of the file in the UI instead of externally linking. -->
-      <a href="[[link]]">[[name]]</a>
+      <div class="horizontal layout wrap" style="width: 100%">
+        [[name]]
+        <iron-icon icon="icons:link" on-tap="_handleClick"></iron-icon>
+      </div>
+
     </paper-item>
   </template>
   <script>
@@ -37,7 +48,12 @@
         link: {
           type: String
         }
-      }
+      },
+
+      _handleClick: function(event) {
+        window.location = this.link;
+      },
+
     });
   </script>
 </dom-module>

@@ -1,0 +1,179 @@
+<!--
+  Copyright 2017 The LUCI Authors. All rights reserved.
+  Use of this source code is governed under the Apache License, Version 2.0
+  that can be found in the LICENSE file.
+-->
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, minimum-scale=1, initial-scale=1, user-scalable=yes">
+
+    <title>config-set test</title>
+
+    <script src="../../bower_components/webcomponentsjs/webcomponents-lite.js"></script>
+    <script src="../../bower_components/web-component-tester/browser.js"></script>
+
+    <link rel="import" href="../../src/config-ui/config-set.html">
+  </head>
+  <body>
+
+    <test-fixture id="valid-project-with-config-files">
+      <template>
+        <config-set category="projects"
+                    name="valid-project-with-config-files"></config-set>
+      </template>
+    </test-fixture>
+
+    <test-fixture id="invalid-project-without-config-files">
+      <template>
+        <config-set category="projects"
+                    name="invalid-project-without-config-files"></config-set>
+      </template>
+    </test-fixture>
+
+    <script>
+      suite('Valid project with config files', function() {
+          
+        var ajax;
+        var request;
+        var server;
+        var responseHeaders = {
+          json: { 'Content-Type': 'application/json' }
+        };
+        var config_set;
+
+        setup(function() {
+          server = sinon.fakeServer.create();
+          var param = {
+            event : {
+              detail: {
+                response: {
+                  config_sets: [{
+                    files: [{path: "OWNERS"}, {path: "README.md"}],
+                    location: "https://test.com/valid-project-with-config-files",
+                    last_import_attempt: {success: true}
+                  }]
+                }
+              }
+            }
+          };
+          server.respondWith(
+            'GET',
+            /\/_ah\/api\/config\/v1\/config-sets\?config_set=([a-z\-]+)%2F([a-z\-]+)&include_files=true&include_last_import_attempt=true/, 
+            [
+              200,
+              responseHeaders.json,
+              JSON.stringify(param)
+            ]
+          );
+          config_set = fixture('valid-project-with-config-files');
+          ajax = Polymer.dom(config_set.root).querySelector('iron-ajax');
+        });
+
+        teardown(function() {
+          server.restore();
+        });
+
+        test('has correct category', function() {
+          assert.equal(config_set.category, 'projects');
+        });
+
+        test('has correct  name', function() {
+          assert.equal(config_set.name, 'valid-project-with-config-files');
+        });
+
+        test('sets isLoading by default', function() {
+          assert.equal(config_set.isLoading, true);
+        });
+
+        test('gets iron-ajax response', function () {
+          request = ajax.generateRequest();
+          server.respond();
+          expect(request.response).to.be.ok;
+          expect(request.response).to.be.an('object');
+          expect(request.response.event).to.be.an('object');
+          // TODO(crbug.com/740768): make the element call on-response handler automatically
+          config_set._onGotConfigFiles(request.response.event);
+          assert.equal(config_set.isLoading, false);
+          assert.equal(config_set.files.length, 2);
+          assert.equal(config_set.lastImportAttempt.success, true);
+          assert.equal(config_set.location, 
+            "https://test.com/valid-project-with-config-files");
+        });
+             
+      });
+
+      suite('Inalid project without config files', function() {
+        var ajax;
+        var request;
+        var server;
+        var responseHeaders = {
+          json: { 'Content-Type': 'application/json' }
+        };
+        var config_set;
+
+        setup(function() {
+          server = sinon.fakeServer.create();
+          var param = {
+            event : {
+              detail: {
+                response: {
+                  config_sets: [{
+                    location: "https://test.com/invalid-project-without-config-files",
+                    last_import_attempt: {success: false}
+                  }]
+                }
+              }
+            }
+          };
+          server.respondWith(
+            'GET',
+            /\/_ah\/api\/config\/v1\/config-sets\?config_set=([a-z\-]+)%2F([a-z\-]+)&include_files=true&include_last_import_attempt=true/, 
+            [
+              200,
+              responseHeaders.json,
+              JSON.stringify(param)
+            ]
+          );
+          config_set = fixture('invalid-project-without-config-files');
+          ajax = Polymer.dom(config_set.root).querySelector('iron-ajax');
+        });
+
+        teardown(function() {
+          server.restore();
+        });
+
+        test('has correct category', function() {
+          assert.equal(config_set.category, 'projects');
+        });
+
+        test('has correct  name', function() {
+          assert.equal(config_set.name, 'invalid-project-without-config-files');
+        });
+
+        test('sets isLoading by default', function() {
+          assert.equal(config_set.isLoading, true);
+        });
+
+        test('gets iron-ajax response', function () {
+          request = ajax.generateRequest();
+          server.respond();
+          expect(request.response).to.be.ok;
+          expect(request.response).to.be.an('object');
+          expect(request.response.event).to.be.an('object');
+          // TODO(crbug.com/740768): make the element call on-response handler automatically
+          config_set._onGotConfigFiles(request.response.event);
+          assert.equal(config_set.isLoading, false);
+          assert.equal(config_set.files.length, 0);
+          assert.equal(config_set.lastImportAttempt.success, false);
+          assert.equal(config_set.location, 
+            "https://test.com/invalid-project-without-config-files");
+        });
+             
+      });
+
+    </script>
+  </body>
+</html>

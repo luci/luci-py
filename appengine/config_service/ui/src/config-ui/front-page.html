@@ -38,7 +38,7 @@
     <iron-ajax
         auto
         id="requestConfigs"
-        url="/_ah/api/config/v1/config-sets"
+        url="/_ah/api/config/v1/config-sets?include_last_import_attempt=true"
         handle-as="json"
         on-response="_onGotConfigSets"
         headers="[[auth_headers]]">
@@ -58,7 +58,11 @@
         </template>
         <template is="dom-if" if="[[_not(_isEmpty(searchResults))]]">
           <template is="dom-repeat" items="[[searchResults]]" as="config">
-            <config-set-card name="[[config.config_set]]" on-tap="_handleClick"></config-set-card>
+            <config-set-card 
+                name="[[config.config_set]]" 
+                last-import-attempt="[[_getLastImportAttempt(config.last_import_attempt)]]" 
+                on-tap="_handleClick">
+            </config-set-card>
           </template>
         </template>
       </template>
@@ -88,6 +92,14 @@
         searchResults: {
           type: Array,
           value: () => []
+        }
+      },
+
+      _getLastImportAttempt: function(lastImportAttempt) {
+        if (lastImportAttempt) {
+          return lastImportAttempt;
+        } else {
+          return null;
         }
       },
 

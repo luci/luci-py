@@ -6,23 +6,43 @@
 
 <link rel="import" href="../../bower_components/paper-item/paper-item.html">
 <link rel="import" href="../../bower_components/polymer/polymer.html">
+<link rel="import" href="../../bower_components/iron-icons/maps-icons.html">
+<link rel="import" href="../../bower_components/iron-flex-layout/iron-flex-layout.html">
 
 <dom-module id="config-set-card">
   <template>
-    <style>
+    <style include="iron-flex iron-flex-alignment">
       .center {
         margin: auto;
         width: 25%;
         border-style: solid;
         border-width: 2px;
       }
+
+      iron-icon {
+        float: right;
+      }
+
     </style>
 
     <paper-item class="center" id="paper-box">
       <!-- TODO(cwpayton): Add launch icon next to the name of the config
         so that upon clicking the icon, the user will be taken to the config
         set page. -->
-      [[name]]
+      <div class="horizontal layout wrap" style="width: 100%">
+        [[name]]
+        <template is="dom-if" if="[[lastImportAttempt]]" restamp="true">
+          <template is="dom-if" if="[[lastImportAttempt.success]]" restamp="true">
+            <iron-icon icon="icons:check-circle"></iron-icon>
+          </template>
+          <template is="dom-if" if="[[_not(lastImportAttempt.success)]]" restamp="true">
+            <iron-icon icon="icons:warning"></iron-icon>
+          </template>
+        </template>
+        <template is="dom-if" if="[[_not(lastImportAttempt)]]" restamp="true">
+          <iron-icon icon="icons:help"></iron-icon>
+        </template>
+      </div>
     </paper-item>
   </template>
   <script>
@@ -30,10 +50,20 @@
       is: "config-set-card",
 
       properties: {
+
         name: {
           type: String
-        }
-      }
+        },
+
+        lastImportAttempt: {
+          type: Object
+        },
+
+      },
+
+      _not: function(b) {
+        return !b;
+      },
 
     });
   </script>

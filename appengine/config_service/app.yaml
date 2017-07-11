@@ -14,6 +14,10 @@ handlers:
   upload: static/favicon.ico
   secure: always
 
+- url: /elements.html
+  static_files: ui/static/elements.html
+  upload: ui/static/elements.html
+
 - url: /static/images
   static_dir: ui/static/images
 

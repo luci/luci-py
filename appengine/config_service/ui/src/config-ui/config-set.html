@@ -9,6 +9,7 @@
 <link rel="import" href="../../bower_components/iron-icons/iron-icons.html">
 <link rel="import" href="../../bower_components/paper-item/paper-item.html">
 <link rel="import" href="../../bower_components/polymer/polymer.html">
+<link rel="import" href="../../bower_components/iron-icons/maps-icons.html">
 
 <dom-module id="config-set">
   <template>
@@ -42,7 +43,7 @@
     <iron-ajax
         auto
         id="requestConfigs"
-        url="/_ah/api/config/v1/config-sets?config_set=[[category]]/[[name]][[route.path]]&include_files=true"
+        url="/_ah/api/config/v1/config-sets?config_set=[[category]]%2F[[name]][[route.path]]&include_files=true&include_last_import_attempt=true"
         handle-as="json"
         on-response="_onGotConfigFiles"
         headers="[[auth_headers]]">
@@ -58,28 +59,60 @@
         headers="[[auth_headers]]">
     </iron-ajax>
 
-    <div class="center title">
+    <div class="center title"> 
       <div class="name">
         [[name]][[route.path]]
-        <template is="dom-if" if="[[auth_headers]]">  
+        <template is="dom-if" if="[[_not(isLoading)]]">
+          <template is="dom-if" if="[[lastImportAttempt]]">
+            <template is="dom-if" if="[[lastImportAttempt.success]]">
+              <iron-icon id="valid" icon="icons:check-circle"></iron-icon>
+            </template>
+            <template is="dom-if" if="[[_not(lastImportAttempt.success)]]">
+              <iron-icon id="invalid" icon="icons:warning"></iron-icon>
+            </template>
+          </template>
+          <template is="dom-if" if="[[_not(lastImportAttempt)]]">
+            <iron-icon icon="icons:help"></iron-icon>
+          </template>
+        </template>
+        <template is="dom-if" if="[[auth_headers]]">
           <iron-icon icon="icons:refresh" on-tap="_forceRefresh"></iron-icon>
           <span id="refreshStatus">[[refreshMessage]]</span>
         </template>
       </div>
-      <div class="category">[[_formatCategory(category)]]</div>
+      <div class="category">
+        [[_formatCategory(category)]] <br>
+        <template is="dom-if" if="[[_not(isLoading)]]">
+          <template is="dom-if" if="[[lastImportAttempt]]">
+            <template is="dom-if" if="[[_not(lastImportAttempt.success)]]">
+              Last import attempt failed: [[lastImportAttempt.message]]
+            </template>
+          </template>
+          <template is="dom-if" if="[[_not(lastImportAttempt)]]">
+            Last import attempt info not available.
+          </template>
+        </template>
+      </div>      
     </div>
     <template is="dom-if" if="[[isRefreshing]]">
       <div class="center">Refreshing config files...</div>
     </template>
-    <template is="dom-if" if="[[!isRefreshing]]">
+    <template is="dom-if" if="[[_not(isRefreshing)]]">
       <template is="dom-if" if="[[isLoading]]">
         <div class="center">Fetching config files...</div>
       </template>
-      <template is="dom-if" if="[[!isLoading]]">
-        <template is="dom-repeat" items="[[files]]" as="file">
-          <config-file-card
-              name="[[file.path]]" link="[[location]]/[[file.path]]">
-          </config-file-card>
+      <template is="dom-if" if="[[_not(isLoading)]]">
+        <template is="dom-if" if="[[_isEmpty(files)]]">
+          <div class="center" style="font-family: sans-serif;">
+            No config files found.
+          </div>
+        </template>
+        <template is="dom-if" if="[[_not(_isEmpty(files))]]">
+          <template is="dom-repeat" items="[[files]]" as="file">
+            <config-file-card
+                name="[[file.path]]" link="[[location]]/[[file.path]]">
+            </config-file-card>
+          </template>
         </template>
       </template>
     </template>
@@ -89,6 +122,12 @@
       is: "config-set",
 
       properties: {
+
+        frontPageIsActive: {
+          type: Boolean,
+          observer: '_frontPageIsActive'
+        },
+
         category: {
           type: String
         },
@@ -105,6 +144,10 @@
         isRefreshing: {
           type: Boolean,
           value: false
+        },
+
+        lastImportAttempt: {
+          type: Object
         },
 
         location: {
@@ -127,6 +170,21 @@
         this.isRefreshing = true;
       },
 
+      _frontPageIsActive: function() {
+        if (this.frontPageIsActive === false) {
+          this.isLoading = true;
+          this.$.requestConfigs.generateRequest();
+        }
+      },
+
+      ready: function() {
+        this.isLoading = true;
+      },
+
+      _isEmpty: function(list) {
+        return list.length === 0;
+      },
+
       _formatCategory: function(category) {
         if (category === "projects") return "Project";
         if (category === "services") return "Service";
@@ -137,9 +195,15 @@
         this.refreshMessage = "Refresh successful.";
       },
 
+      _not: function(b) {
+        return !b;
+      },
+
       _onGotConfigFiles: function(event) {
-        this.files = event.detail.response.config_sets[0].files;
+        this.files = event.detail.response.config_sets[0].files || [];
         this.location = event.detail.response.config_sets[0].location;
+        this.lastImportAttempt = 
+            event.detail.response.config_sets[0].last_import_attempt || null;
         this.isLoading = false;
       },
 

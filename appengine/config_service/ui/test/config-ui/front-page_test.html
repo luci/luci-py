@@ -26,14 +26,120 @@
     </test-fixture>
 
     <script>
-      suite('<front-page>', function() {
-        // TODO(cwpayton): write tests for the front page element.
+
+      suite('Front page with config sets', function() {
+          
+        var ajax;
+        var request;
+        var server;
+        var responseHeaders = {
+          json: { 'Content-Type': 'application/json' }
+        };
         var front_page;
         setup(function() {
+          server = sinon.fakeServer.create();
+          var param = {
+            event : {
+              detail: {
+                response: {
+                  config_sets: [
+                  {
+                    config_set: "valid-project",
+                    location: "https://chromium.googlesource.com/valid-project",
+                    last_import_attempt: {success: true}
+                  },{
+                    config_set: "invalid-project",
+                    location: "https://chromium.googlesource.com/invalid-project",
+                    last_import_attempt: {success: false}
+                  }]
+                }
+              }
+            }
+          };
+          server.respondWith(
+            'GET',
+            /\/_ah\/api\/config\/v1\/config-sets\?include_last_import_attempt=true/, 
+            [
+              200,
+              responseHeaders.json,
+              JSON.stringify(param)
+            ]
+          );
           front_page = fixture('front-pageTestFixture');
+          ajax = Polymer.dom(front_page.root).querySelector('iron-ajax');
         });
 
+        teardown(function() {
+          server.restore();
+        });
+
+        test('checks the config set list is empty before iron ajax call', 
+          function() {
+          assert.equal(front_page.configSetList.length, 0);
+        });
+
+        test('checks the search results list is empty before iron ajax call', 
+          function() {
+          assert.equal(front_page.searchResults.length, 0);
+        });        
+
+        test('checks that isLoading property is true by default', function() {
+          assert.equal(front_page.isLoading, true);
+        });
+
+        test('gets iron-ajax response', function () {
+          request = ajax.generateRequest();
+          server.respond();
+          expect(request.response).to.be.ok;
+          expect(request.response).to.be.an('object');
+          expect(request.response.event).to.be.an('object');
+          // TODO(crbug.com/740768): make the element call on-response handler automatically
+          front_page._onGotConfigSets(request.response.event);
+          assert.equal(front_page.isLoading, false);
+          assert.equal(front_page.configSetList.length, 2);
+          assert.deepEqual(front_page.configSetList, 
+            front_page.searchResults);
+          assert.equal(front_page.configSetList[0].last_import_attempt.success,
+            true);
+          assert.equal(front_page.configSetList[1].last_import_attempt.success,
+            false);
+        });
+
+        test('query does not match any results', function () {
+          request = ajax.generateRequest();
+          server.respond();
+          // TODO(crbug.com/740768): make the element call on-response handler automatically
+          front_page._onGotConfigSets(request.response.event);
+          front_page.query = "service";
+          assert.notEqual(front_page.configSetList, 
+            front_page.searchResults);
+          assert.equal(front_page.searchResults.length, 0);
+        });
+
+        test('query matches all results', function () {
+          request = ajax.generateRequest();
+          server.respond();
+          // TODO(crbug.com/740768): make the element call on-response handler automatically
+          front_page._onGotConfigSets(request.response.event);
+          front_page.query = "project";
+          assert.deepEqual(front_page.configSetList, 
+            front_page.searchResults);
+          assert.equal(front_page.searchResults.length, 2);
+        });
+
+        test('query matches one result', function () {
+          request = ajax.generateRequest();
+          server.respond();
+          // TODO(crbug.com/740768): make the element call on-response handler automatically
+          front_page._onGotConfigSets(request.response.event);
+          front_page.query = "valid-project";
+          assert.notEqual(front_page.configSetList, 
+            front_page.searchResults);
+          assert.equal(front_page.searchResults[0].config_set, "valid-project");
+        });
+             
       });
+
     </script>
   </body>
 </html>
