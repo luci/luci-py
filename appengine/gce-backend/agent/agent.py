@@ -333,8 +333,50 @@ class Agent(object):
       time.sleep(60)
 
 
-class UbuntuAgent(Agent):
-  """Machine Provider agent for Ubuntu.
+class SystemdAgent(Agent):
+  """Machine Provider agent for systemd-based Linux distributions.
+
+  The agent is installed for root.
+  """
+
+  AGENT_AUTOSTART_TEMPLATE = os.path.join(
+      THIS_DIR, 'machine-provider-agent.service.tmpl')
+  AGENT_AUTOSTART_PATH = '/etc/systemd/system/machine-provider-agent.service'
+  LOGS_DIR = '/var/log/messages/machine-provider-agent'
+  REBOOT_CMD = ('/sbin/shutdown', '-r', 'now')
+  SWARMING_AUTOSTART_TEMPLATE = os.path.join(
+      THIS_DIR, 'swarming-start-bot.service.tmpl')
+  SWARMING_AUTOSTART_PATH = '/etc/systemd/system/swarming-start-bot.service'
+  SWARMING_BOT_DIR = '/b/s'
+
+  def start(self):
+    """Starts the Machine Provider agent."""
+    subprocess.check_call(['systemctl', 'daemon-reload'])
+    subprocess.check_call(['systemctl', 'enable', 'machine-provider-agent'])
+    subprocess.check_call(['systemctl', 'start', 'machine-provider-agent'])
+
+  def stop(self):
+    """Stops the Machine Provider agent."""
+    subprocess.check_call(['systemctl', 'stop', 'machine-provider-agent'])
+
+  def chown(self, user, path):
+    """Change ownership of a path.
+
+    Args:
+      user: The user which should own the path.
+      path: The path to change ownership of.
+    """
+    import pwd
+    user = pwd.getpwnam(user)
+    os.chown(path, user.pw_uid, user.pw_gid)
+
+  def connect_to_swarming(self, service_account, swarming_server):
+    super(Agent, self).connect_to_swarming(service_account, swarming_server)
+    subprocess.check_call(['systemctl', 'enable', 'swarming-start-bot'])
+
+
+class UpstartAgent(Agent):
+  """Machine Provider agent for Upstart.
 
   The agent is installed for root.
   """
@@ -437,9 +479,14 @@ def main():
   args = parser.parse_args()
 
   if sys.platform == 'linux2':
-    # Ubuntu is the only supported Linux distribution.
     # TODO(smut): Stop assuming chrome-bot.
-    agent = UbuntuAgent(args.user or 'chrome-bot')
+    if subprocess.call(['which', 'systemctl']) == 0:
+      agent = SystemdAgent(args.user or 'chrome-bot')
+    else if 'upstart' in subprocess.check_output(['init', '--version']:
+      agent = UpstartAgent(args.user or 'chrome-bot')
+    else:
+      # TODO(phosek): Shall we add support for LSB init?
+      logging.error('Unsupported init system')
   elif sys.platform == 'win32':
     agent = WindowsAgent(args.user)
 
