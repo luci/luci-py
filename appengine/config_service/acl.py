@@ -64,6 +64,8 @@ def can_read_config_sets(config_sets):
 
 
 def is_admin():
+  if auth.is_superuser():
+    return True
   acl_cfg = get_acl_cfg()
   return auth.is_group_member(
       acl_cfg and acl_cfg.admin_group or auth.ADMIN_GROUP)

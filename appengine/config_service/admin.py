@@ -58,7 +58,7 @@ class AdminApi(remote.Service):
 
   @auth.endpoints_method(
       message_types.VoidMessage, GlobalConfigMessage, name='readGlobalConfig')
-  @auth.require(lambda: auth.is_superuser() or acl.is_admin())
+  @auth.require(acl.is_admin)
   def read_global_config(self, request):
     """Reads global configuration."""
     conf = GlobalConfig.fetch()
@@ -71,7 +71,7 @@ class AdminApi(remote.Service):
 
   @auth.endpoints_method(
       GlobalConfigMessage, GlobalConfigMessage, name='writeGlobalConfig')
-  @auth.require(lambda: auth.is_superuser() or acl.is_admin())
+  @auth.require(acl.is_admin)
   def write_global_config(self, request):
     """Writes global configuration."""
     conf = GlobalConfig.fetch()
