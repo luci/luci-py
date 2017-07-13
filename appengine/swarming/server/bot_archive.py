@@ -425,7 +425,20 @@ def get_swarming_bot_zip(
   with zipfile.ZipFile(zip_memory_file, 'w', zipfile.ZIP_DEFLATED) as zip_file:
     for name, content in yield_swarming_bot_files(
         root_dir, host, host_version, additionals, settings):
-      zip_file.writestr(name, content)
+
+      # We must pass ZipInfo object, otherwise zipfile will generate ZipInfo
+      # on its own, setting date_time to the current time, thus making the zip
+      # archive non-deterministic. See zipfile.py source for where external_attr
+      # comes from. It is copy-pasta from there.
+      zinfo = zipfile.ZipInfo(filename=name)
+      zinfo.compress_type = zip_file.compression
+      if zinfo.filename.endswith('/'):
+        zinfo.external_attr = 0o40775 << 16   # drwxrwxr-x
+        zinfo.external_attr |= 0x10           # MS-DOS directory flag
+      else:
+        zinfo.external_attr = 0o600 << 16     # ?rw-------
+      zip_file.writestr(zinfo, content)
+
       h.update(str(len(name)))
       h.update(name)
       h.update(str(len(content)))

@@ -96,7 +96,7 @@ class BotManagementTest(test_case.TestCase):
     }
     self.assertEqual(expected, additionals)
 
-  def test_get_swarming_bot_zip(self):
+  def mock_memcache(self):
     local_mc = {'store': {}, 'reads': 0, 'writes': 0}
 
     @ndb.tasklet
@@ -116,6 +116,11 @@ class BotManagementTest(test_case.TestCase):
     self.mock(bot_code, 'bot_memcache_set', mock_memcache_set)
     self.mock(bot_code, 'bot_memcache_get', mock_memcache_get)
     self.mock(bot_code, 'MAX_MEMCACHED_SIZE_BYTES', 100000)
+
+    return local_mc
+
+  def test_get_swarming_bot_zip(self):
+    local_mc = self.mock_memcache()
 
     self.assertEqual(0, local_mc['writes'])
     zipped_code = bot_code.get_swarming_bot_zip('http://localhost')
@@ -153,6 +158,19 @@ class BotManagementTest(test_case.TestCase):
     finally:
       file_path.rmtree(temp_dir)
 
+  def test_get_swarming_bot_zip_is_reproducible(self):
+    self.mock(time, 'time', lambda: 1500000000.0)
+    local_mc = self.mock_memcache()
+
+    zipped_code_1 = bot_code.get_swarming_bot_zip('http://localhost')
+
+    # Time passes, memcache clears.
+    self.mock(time, 'time', lambda: 1500001000.0)
+    local_mc['store'].clear()
+
+    # Some time later, the exact same zip is fetched, byte-to-byte.
+    zipped_code_2 = bot_code.get_swarming_bot_zip('http://localhost')
+    self.assertTrue(zipped_code_1 == zipped_code_2)
 
   def test_bootstrap_token(self):
     tok = bot_code.generate_bootstrap_token()
