@@ -128,7 +128,7 @@ class GitilesImportTestCase(test_case.TestCase):
     self.assertFalse(gitiles.get_archive.called)
     self.assert_attempt(True, 'Up-to-date')
 
-  def test_import_revision_no_acrhive(self):
+  def test_import_revision_no_archive(self):
     self.mock_get_log()
     self.mock(gitiles, 'get_archive', mock.Mock(return_value=None))
 
@@ -212,6 +212,30 @@ class GitilesImportTestCase(test_case.TestCase):
           gitiles.Location.parse('https://localhost/project'))
 
     self.assert_attempt(False, 'Could not load commit log', no_revision=True)
+
+  def test_import_existing_config_set_with_log_failed(self):
+    self.mock(gitiles_import, '_import_revision', mock.Mock())
+    self.mock(gitiles, 'get_log', mock.Mock(return_value = None))
+
+    cs = storage.ConfigSet(
+        id='config_set',
+        latest_revision='deadbeef',
+        latest_revision_url='https://localhost/project/+/deadbeef/x',
+        latest_revision_committer_email=self.john.email,
+        latest_revision_time=self.john.time,
+        location='https://localhost/project/+/master/x',
+    )
+    cs.put()
+
+    with self.assertRaises(gitiles_import.NotFoundError):
+      gitiles_import._import_config_set(
+          'config_set',
+          gitiles.Location.parse('https://localhost/project'))
+
+    self.assert_attempt(False, 'Could not load commit log', no_revision=True)
+
+    cs = cs.key.get()
+    self.assertIsNone(cs.latest_revision)
 
   def test_import_config_set_with_auth_error(self):
     self.mock(gitiles, 'get_log', mock.Mock())

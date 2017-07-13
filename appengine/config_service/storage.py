@@ -37,7 +37,7 @@ class ConfigSet(ndb.Model):
   gitiles_import.py relies on the fact that this class has only one attribute.
   """
   # last imported revision of the config set. See also Revision and File.
-  latest_revision = ndb.StringProperty(required=True)
+  latest_revision = ndb.StringProperty()
   latest_revision_url = ndb.StringProperty(indexed=False)
   latest_revision_time = ndb.DateTimeProperty(indexed=False)
   latest_revision_committer_email = ndb.StringProperty(indexed=False)

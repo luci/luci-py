@@ -161,22 +161,23 @@ class ConfigApi(remote.Service):
     """Returns config sets."""
     if request.config_set and not can_read_config_set(request.config_set):
       raise endpoints.ForbiddenException()
+    if request.include_files and not request.config_set:
+        raise endpoints.BadRequestException(
+            'Must specify config_set to use include_files')
+
+    config_sets = storage.get_config_sets_async(
+        config_set=request.config_set).get_result()
 
     # The files property must always be a list of File objects (not None).
     files = []
     if request.include_files:
-      if not request.config_set:
-        raise endpoints.BadRequestException(
-            'Must specify config_set to use include_files')
-      latest_revisions = storage.get_latest_revisions_async(
-          [request.config_set]).get_result()
-      if latest_revisions[request.config_set]:
+      # There must be a single config set because request.config_set is
+      # specified.
+      cs = config_sets[0]
+      if cs.latest_revision:
         file_keys = storage.get_file_keys(
-            request.config_set, latest_revisions[request.config_set])
+            request.config_set, cs.latest_revision)
         files = [File(path=key.id()) for key in file_keys]
-
-    config_sets = storage.get_config_sets_async(
-        config_set=request.config_set).get_result()
 
     if request.include_last_import_attempt:
       attempts = ndb.get_multi([
@@ -190,21 +191,22 @@ class ConfigApi(remote.Service):
     for cs, attempt in zip(config_sets, attempts):
       if not can_read[cs.key.id()]:
         continue
-      timestamp = None
-      if cs.latest_revision_time:
-        timestamp = utils.datetime_to_timestamp(cs.latest_revision_time)
-      res.config_sets.append(ConfigSet(
+      cs_msg = ConfigSet(
           config_set=cs.key.id(),
           location=cs.location,
           files=files,
-          revision=Revision(
-              id=cs.latest_revision,
-              url=cs.latest_revision_url,
-              timestamp=timestamp,
-              committer_email=cs.latest_revision_committer_email,
-          ),
           last_import_attempt=attempt_to_msg(attempt),
-      ))
+      )
+      if cs.latest_revision:
+        cs_msg.revision = Revision(
+            id=cs.latest_revision,
+            url=cs.latest_revision_url,
+            committer_email=cs.latest_revision_committer_email,
+        )
+        if cs.latest_revision_time:
+          cs_msg.revision.timestamp = utils.datetime_to_timestamp(
+              cs.latest_revision_time)
+      res.config_sets.append(cs_msg)
     return res
 
   ##############################################################################

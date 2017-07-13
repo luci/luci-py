@@ -238,7 +238,25 @@ def _import_config_set(config_set, location):
     log = location.get_log(
         limit=1, deadline=get_gitiles_config().fetch_log_deadline)
     if not log or not log.commits:
-      save_attempt(False, 'Could not load commit log')
+
+      @ndb.transactional
+      def txn():
+        save_attempt(False, 'Could not load commit log')
+
+        # Do not delete entire config set entity, but only clear its latest
+        # revision, so that if someone requests a specific old version, they
+        # still can do that, but the config set would be excluded from
+        # get_ref_configs or get_project_configs listings.
+        cs = storage.ConfigSet.get_by_id(config_set)
+        if cs:
+          cs.latest_revision = None
+          cs.latest_revision_url = None
+          cs.latest_revision_committed_email = None
+          cs.latest_revision_time = None
+          cs.put()
+
+      txn()
+
       raise NotFoundError('Could not load commit log for %s' % (location,))
     commit = log.commits[0]
 

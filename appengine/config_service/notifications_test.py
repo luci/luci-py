@@ -96,6 +96,7 @@ class NotificationsTestCase(test_case.TestCase):
     storage.ConfigSet(
       id='projects/x',
       latest_revision=old_rev,
+      latest_revision_url=str(old_loc),
       location=str(base)
     ).put()
 

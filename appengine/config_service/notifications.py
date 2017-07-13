@@ -101,10 +101,10 @@ def notify_gitiles_rejection(config_set, location, validation_result):
     }
 
     cs = storage.ConfigSet.get_by_id(config_set)
-    if cs:
+    if cs and cs.latest_revision:
       template_params.update(
           cur_rev_hash=cs.latest_revision[:7],
-          cur_rev_link=location._replace(treeish=cs.latest_revision),
+          cur_rev_link=cs.latest_revision_url,
       )
     msg = mail.EmailMessage(
         sender=(
