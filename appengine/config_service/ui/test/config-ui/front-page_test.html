@@ -90,14 +90,18 @@
         test('gets iron-ajax response', function () {
           request = ajax.generateRequest();
           server.respond();
-          expect(request.response).to.be.ok;
+          expect(request.status).to.be.equal(200);
           expect(request.response).to.be.an('object');
           expect(request.response.event).to.be.an('object');
           // TODO(crbug.com/740768): make the element call on-response handler automatically
           front_page._onGotConfigSets(request.response.event);
           assert.equal(front_page.isLoading, false);
           assert.equal(front_page.configSetList.length, 2);
-          assert.deepEqual(front_page.configSetList, 
+          var sortedResults = front_page.configSetList.slice();
+          sortedResults.sort(function(a, b) {
+            return front_page._formatName(a.config_set).localeCompare(front_page._formatName(b.config_set));
+          }.bind(front_page));
+          assert.deepEqual(sortedResults,
             front_page.searchResults);
           assert.equal(front_page.configSetList[0].last_import_attempt.success,
             true);
@@ -122,7 +126,11 @@
           // TODO(crbug.com/740768): make the element call on-response handler automatically
           front_page._onGotConfigSets(request.response.event);
           front_page.query = "project";
-          assert.deepEqual(front_page.configSetList, 
+          var sortedResults = front_page.configSetList.slice();
+          sortedResults.sort(function(a, b) {
+            return front_page._formatName(a.config_set).localeCompare(front_page._formatName(b.config_set));
+          }.bind(front_page));
+          assert.deepEqual(sortedResults,
             front_page.searchResults);
           assert.equal(front_page.searchResults.length, 2);
         });
@@ -132,14 +140,12 @@
           server.respond();
           // TODO(crbug.com/740768): make the element call on-response handler automatically
           front_page._onGotConfigSets(request.response.event);
-          front_page.query = "valid-project";
+          front_page.query = "invalid-project";
           assert.notEqual(front_page.configSetList, 
             front_page.searchResults);
-          assert.equal(front_page.searchResults[0].config_set, "valid-project");
+          assert.equal(front_page.searchResults[0].config_set, "invalid-project");
         });
-             
       });
-
     </script>
   </body>
 </html>

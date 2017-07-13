@@ -230,14 +230,13 @@ limitations under the License.
       signinAwares: [],
 
       init: function() {
-        var that = this;
         document.addEventListener('DOMContentLoaded', function() {
-          that._apiLoader = document.createElement('google-js-api');
-          that._apiLoader.addEventListener('js-api-load', that.loadAuth2.bind(that));
+          this._apiLoader = document.createElement('google-js-api');
+          this._apiLoader.addEventListener('js-api-load', this.loadAuth2.bind(this));
           if (Polymer.Element) {
-            document.body.appendChild(that._apiLoader);
+            document.body.appendChild(this._apiLoader);
           }
-        })
+        }.bind(this));
       },
 
       loadAuth2: function() {

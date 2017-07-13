@@ -4,53 +4,69 @@
   that can be found in the LICENSE file.
 -->
 
-<link rel="import" href="../../bower_components/paper-item/paper-item.html">
+<link rel="import" href="../../bower_components/iron-icons/iron-icons.html">
+<link rel="import" href="../../bower_components/paper-button/paper-button.html">
+<link rel="import" href="../../bower_components/paper-card/paper-card.html">
 <link rel="import" href="../../bower_components/polymer/polymer.html">
 <link rel="import" href="../../bower_components/iron-icons/maps-icons.html">
 <link rel="import" href="../../bower_components/iron-flex-layout/iron-flex-layout.html">
 
 <dom-module id="config-set-card">
   <template>
-    <style include="iron-flex iron-flex-alignment">
-      .center {
-        margin: auto;
-        width: 25%;
-        border-style: solid;
-        border-width: 2px;
+    <style>
+      a { text-decoration: none; }
+      
+      paper-card {
+        max-width: 500px;
+        width: 100%;
       }
 
-      iron-icon {
+      .config-title { @apply --paper-font-headline; }
+
+      .light { color: var(--paper-grey-600); }
+
+      .validation {
         float: right;
+        font-size: 15px;
+        vertical-align: middle;
       }
 
+      .config-open { color: var(--google-blue-500); }
     </style>
 
-    <paper-item class="center" id="paper-box">
-      <!-- TODO(cwpayton): Add launch icon next to the name of the config
-        so that upon clicking the icon, the user will be taken to the config
-        set page. -->
-      <div class="horizontal layout wrap" style="width: 100%">
-        [[name]]
-        <template is="dom-if" if="[[lastImportAttempt]]" restamp="true">
-          <template is="dom-if" if="[[lastImportAttempt.success]]" restamp="true">
-            <iron-icon icon="icons:check-circle"></iron-icon>
-          </template>
-          <template is="dom-if" if="[[_not(lastImportAttempt.success)]]" restamp="true">
-            <iron-icon icon="icons:warning"></iron-icon>
-          </template>
-        </template>
-        <template is="dom-if" if="[[_not(lastImportAttempt)]]" restamp="true">
-          <iron-icon icon="icons:help"></iron-icon>
-        </template>
+    <paper-card elevation="2">
+      <div class="card-content">
+        <div class="config-title">[[_formatName(name)]]
+          <div class="validation light">
+            <template is="dom-if" if="[[lastImportAttempt]]" restamp="true">
+              <template is="dom-if" if="[[lastImportAttempt.success]]" restamp="true">
+                <iron-icon icon="icons:check-circle"></iron-icon>
+              </template>
+              <template is="dom-if" if="[[_not(lastImportAttempt.success)]]" restamp="true">
+                <iron-icon icon="icons:warning"></iron-icon>
+              </template>
+            </template>
+            <template is="dom-if" if="[[_not(lastImportAttempt)]]" restamp="true">
+              <iron-icon icon="icons:help"></iron-icon>
+            </template>
+          </div>
+        </div>
+        <p class="light">Path: [[name]]</p>
       </div>
-    </paper-item>
+      <div class="card-actions">
+        <div class="horizontal justified">
+          <a href="#/[[name]]">
+            <paper-button class="config-open">Open</paper-button>
+          </a>
+        </div>
+      </div>
+    </paper-card>
   </template>
   <script>
     Polymer({
       is: "config-set-card",
 
       properties: {
-
         name: {
           type: String
         },
@@ -58,11 +74,16 @@
         lastImportAttempt: {
           type: Object
         },
-
       },
 
       _not: function(b) {
         return !b;
+      },
+
+      _formatName: function(name) {
+        var tempName = name.substring(name.indexOf("/") + 1);
+        return tempName.includes("/") ?
+            tempName.substring(0, tempName.indexOf("/")) : tempName;
       },
 
     });

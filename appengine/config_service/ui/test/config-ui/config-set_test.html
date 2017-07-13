@@ -61,7 +61,7 @@
           };
           server.respondWith(
             'GET',
-            /\/_ah\/api\/config\/v1\/config-sets\?config_set=([a-z\-]+)%2F([a-z\-]+)&include_files=true&include_last_import_attempt=true/, 
+            /\/_ah\/api\/config\/v1\/config-sets\?config_set=([a-z\-]+)\/([a-z\-]+)&include_files=true&include_last_import_attempt=true/, 
             [
               200,
               responseHeaders.json,
@@ -69,7 +69,7 @@
             ]
           );
           config_set = fixture('valid-project-with-config-files');
-          ajax = Polymer.dom(config_set.root).querySelector('iron-ajax');
+          ajax = Polymer.dom(config_set.root).querySelector('#requestConfigs');
         });
 
         teardown(function() {
@@ -91,7 +91,7 @@
         test('gets iron-ajax response', function () {
           request = ajax.generateRequest();
           server.respond();
-          expect(request.response).to.be.ok;
+          expect(request.status).to.be.equal(200);
           expect(request.response).to.be.an('object');
           expect(request.response.event).to.be.an('object');
           // TODO(crbug.com/740768): make the element call on-response handler automatically
@@ -102,7 +102,6 @@
           assert.equal(config_set.location, 
             "https://test.com/valid-project-with-config-files");
         });
-             
       });
 
       suite('Inalid project without config files', function() {
@@ -130,7 +129,7 @@
           };
           server.respondWith(
             'GET',
-            /\/_ah\/api\/config\/v1\/config-sets\?config_set=([a-z\-]+)%2F([a-z\-]+)&include_files=true&include_last_import_attempt=true/, 
+            /\/_ah\/api\/config\/v1\/config-sets\?config_set=([a-z\-]+)\/([a-z\-]+)&include_files=true&include_last_import_attempt=true/, 
             [
               200,
               responseHeaders.json,
@@ -138,7 +137,7 @@
             ]
           );
           config_set = fixture('invalid-project-without-config-files');
-          ajax = Polymer.dom(config_set.root).querySelector('iron-ajax');
+          ajax = Polymer.dom(config_set.root).querySelector('#requestConfigs');
         });
 
         teardown(function() {
@@ -160,7 +159,7 @@
         test('gets iron-ajax response', function () {
           request = ajax.generateRequest();
           server.respond();
-          expect(request.response).to.be.ok;
+          expect(request.status).to.be.equal(200);
           expect(request.response).to.be.an('object');
           expect(request.response.event).to.be.an('object');
           // TODO(crbug.com/740768): make the element call on-response handler automatically
@@ -171,9 +170,97 @@
           assert.equal(config_set.location, 
             "https://test.com/invalid-project-without-config-files");
         });
-             
       });
 
+      suite('Successful force refresh', function() {
+        var ajax;
+        var request;
+        var server;
+        var responseHeaders = {
+          json: { 'Content-Type': 'application/json' }
+        };
+        var config_set;
+
+        setup(function() {
+          server = sinon.fakeServer.create();
+          server.respondWith(
+            'POST',
+            /\/_ah\/api\/config\/v1\/reimport\?config_set=([a-z\-]+)\/([a-z\-]+)/, 
+            [
+              204,
+              responseHeaders.json,
+              // the reimport API endpoint doesn't return a body, only a status.
+              "{}"
+            ]
+          );
+          config_set = fixture('valid-project-with-config-files');
+          ajax = Polymer.dom(config_set.root).querySelector('#refreshConfigs');
+        });
+
+        teardown(function() {
+          server.restore();
+        });
+
+        test('refreshes config set properly', function () {
+          request = ajax.generateRequest();
+          server.respond();
+          expect(request.status).to.be.equal(204);
+          // TODO(crbug.com/740768): make the element call on-response handler automatically
+          config_set._onCompleteRefresh();
+          assert.equal(config_set.isRefreshing, false);
+          assert.equal(config_set.refreshMessage, "Refresh successful.");
+        });
+      });
+
+      suite('Unsuccessful force refresh', function() {
+        var ajax;
+        var request;
+        var server;
+        var responseHeaders = {
+          json: { 'Content-Type': 'application/json' }
+        };
+        var config_set;
+
+        setup(function() {
+          server = sinon.fakeServer.create();
+          var param = {
+            error: {
+              errors: [{
+                domain: "global",
+                reason: "notFound",
+                message: "project valid-project-with-config-files not found"
+              }],
+              code: 404,
+              message: "project valid-project-with-config-files not found"
+            }
+          }
+          server.respondWith(
+            'POST',
+            /\/_ah\/api\/config\/v1\/reimport\?config_set=([a-z\-]+)\/([a-z\-]+)/, 
+            [
+              404,
+              responseHeaders.json,
+              JSON.stringify(param)
+            ]
+          );
+          config_set = fixture('valid-project-with-config-files');
+          ajax = Polymer.dom(config_set.root).querySelector('#refreshConfigs');
+        });
+
+        teardown(function() {
+          server.restore();
+        });
+
+        test('refreshes config set properly', function () {
+          request = ajax.generateRequest();
+          server.respond();
+          expect(request.status).to.be.equal(404);
+          // TODO(crbug.com/740768): make the element call on-response handler automatically
+          config_set._onRefreshError();
+          assert.equal(config_set.isRefreshing, false);
+          assert.equal(config_set.refreshMessage, "Error: Files could not be refreshed.");
+        });
+      });
     </script>
   </body>
 </html>

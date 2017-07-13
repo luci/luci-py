@@ -8,6 +8,8 @@
 <link rel="import" href="../../bower_components/iron-ajax/iron-ajax.html">
 <link rel="import" href="../../bower_components/paper-button/paper-button.html">
 <link rel="import" href="../../bower_components/paper-search/paper-search-bar.html">
+<link rel="import" href="../../bower_components/paper-spinner/paper-spinner.html">
+<link rel="import" href="../../bower_components/paper-styles/shadow.html">
 <link rel="import" href="../../bower_components/polymer/polymer.html">
 
 <link rel="import" href="config-set-card.html">
@@ -16,10 +18,21 @@
   <template>
     <style>
       .center {
-        width: 50%;
+        width: 25%;
         margin: auto;
-        text-align: center;
       }
+
+      .config-card { 
+        padding-bottom: 1%;
+        animation: fadein 1.5s;
+      }
+
+      @keyframes fadein {
+        from {opacity: 0}
+        to {opacity: 1}
+      }
+
+      .loading { text-align: center; }
 
       .search-bar {
         padding-top: 7%;
@@ -27,8 +40,7 @@
       }
 
       paper-search-bar {
-        border-style: solid;
-        border-width: 2px;
+        @apply --shadow-elevation-4dp;
         width: 40%;
         height: 100%;
         margin: auto;
@@ -45,12 +57,16 @@
     </iron-ajax>
     
     <div class="search-bar">
-      <paper-search-bar query="{{query}}"></paper-search-bar>
+      <paper-search-bar 
+          query="{{query}}"
+          hide-filter-button="true"></paper-search-bar>
     </div>
     
     <div class="config-list">
       <template is="dom-if" if="[[isLoading]]">
-        <div class="center">Fetching config sets...</div>
+        <div class="center loading">
+          <paper-spinner active></paper-spinner>
+        </div>
       </template>
       <template is="dom-if" if="[[_not(isLoading)]]">
         <template is="dom-if" if="[[_isEmpty(searchResults)]]">
@@ -58,17 +74,17 @@
         </template>
         <template is="dom-if" if="[[_not(_isEmpty(searchResults))]]">
           <template is="dom-repeat" items="[[searchResults]]" as="config">
-            <config-set-card 
-                name="[[config.config_set]]" 
-                last-import-attempt="[[_getLastImportAttempt(config.last_import_attempt)]]" 
-                on-tap="_handleClick">
-            </config-set-card>
+            <div class="center config-card">
+              <config-set-card
+                  name="[[config.config_set]]" 
+                  last-import-attempt="[[_getLastImportAttempt(config.last_import_attempt)]]">
+              </config-set-card>
+            </div>
           </template>
         </template>
       </template>
     </div>
   </template>
-
   <script>
     Polymer({
       is: 'front-page',
@@ -95,6 +111,12 @@
         }
       },
 
+      _formatName: function(name) {
+        var tempName = name.substring(name.indexOf("/") + 1);
+        return tempName.includes("/") ?
+            tempName.substring(0, tempName.indexOf("/")) : tempName;
+      },
+
       _getLastImportAttempt: function(lastImportAttempt) {
         if (lastImportAttempt) {
           return lastImportAttempt;
@@ -118,11 +140,14 @@
       },
 
       _updateSearchResults: function() {
-        this.searchResults = this.configSetList.filter(e => e.config_set.includes(this.query));
-      },
-
-      _handleClick: function(event) {
-        window.location = window.location.href + event.model.config.config_set;
+        // This method sorts search results by the name of the config set, that way
+        // the list doesn't consist of all projects followed by all services due to
+        // the path beginning with "projects/" or "services/"
+        var tempResults = this.configSetList.filter(e => e.config_set.includes(this.query));
+        tempResults.sort(function(a, b) {
+          return this._formatName(a.config_set).localeCompare(this._formatName(b.config_set));
+        }.bind(this));
+        this.searchResults = tempResults;
       },
 
     });

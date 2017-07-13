@@ -34,21 +34,11 @@
 <dom-module id="auth-signin">
   <template>
     <style>
-      #avatar {
-        border-radius: 5px;
-      }
+      #avatar { border-radius: 5px; }
 
-      a {
-        color: white;
-      }
+      .center { vertical-align: middle; }
 
-      .center {
-        vertical-align: middle;
-      }
-
-      .sign-in-font {
-        color: black;
-      }
+      .typeface { font-size: 75%; }
     </style>
 
     <google-signin-aware id="aware"
@@ -61,16 +51,16 @@
     <template is="dom-if" if="[[!signed_in]]">
       <div id="signinContainer">
         <!-- TODO(cwpayton): Before official deployment, change href to "/#/" -->
-        <a class="sign-in-font" on-tap="signIn" href="/newui#/">Sign in</a>
+        <a class="typeface" on-tap="signIn" href="/newui#/">Sign in</a>
       </div>
     </template>
 
     <template is="dom-if" if="[[signed_in]]">
       <img class="center" id="avatar" src="[[profile.imageUrl]]" width="30" height="30">
-      <span class="center">[[profile.email]]</span>
-      <span class="center">|</span>
+      <span class="center typeface">[[profile.email]]</span>
+      <span class="center typeface">|</span>
       <!-- TODO(cwpayton): Before official deployment, change href to "/#/" -->
-      <a class="center sign-in-font" on-tap="signOut" href="/newui#/">Sign out</a>
+      <a class="center typeface" on-tap="signOut" href="/newui#/">Sign out</a>
     </template>
   </template>
   <script>

@@ -4,37 +4,42 @@
   that can be found in the LICENSE file.
 -->
 
-<link rel="import" href="../../bower_components/paper-item/paper-item.html">
+<link rel="import" href="../../bower_components/iron-icons/iron-icons.html">
+<link rel="import" href="../../bower_components/paper-button/paper-button.html">
+<link rel="import" href="../../bower_components/paper-card/paper-card.html">
 <link rel="import" href="../../bower_components/polymer/polymer.html">
 <link rel="import" href="../../bower_components/iron-icons/maps-icons.html">
 <link rel="import" href="../../bower_components/iron-flex-layout/iron-flex-layout.html">
 
 <dom-module id="config-file-card">
   <template>
-    <style include="iron-flex iron-flex-alignment">
-      .center {
-        margin: auto;
-        width: 25%;
-        border-style: solid;
-        border-width: 2px;
+    <style>
+      a { text-decoration: none; }
+
+      paper-card {
+        max-width: 500px;
+        width: 100%;
       }
 
-      iron-icon {
-        float: right;
-      }
+      .config-title { @apply --paper-font-headline; }
 
+      .light { color: var(--paper-grey-600); }
+
+      .config-open { color: var(--google-blue-500); }
     </style>
 
-    <paper-item class="center">
-      <!-- TODO(cwpayton): Currently, each card contains a link to the
-      corresponding file in gitiles. We would like to pretty print the
-      contents of the file in the UI instead of externally linking. -->
-      <div class="horizontal layout wrap" style="width: 100%">
-        [[name]]
-        <iron-icon icon="icons:link" on-tap="_handleClick"></iron-icon>
+    <paper-card elevation="2">
+      <div class="card-content">
+        <div class="config-title">[[name]]</div>
       </div>
-
-    </paper-item>
+      <div class="card-actions">
+        <div class="horizontal justified">
+          <a href="[[link]]" target="_blank">
+            <paper-button class="config-open">Open</paper-button>
+          </a>
+        </div>
+      </div>
+    </paper-card>
   </template>
   <script>
     Polymer({
@@ -47,13 +52,8 @@
 
         link: {
           type: String
-        }
-      },
-
-      _handleClick: function(event) {
-        window.location = this.link;
-      },
-
+        },
+      }
     });
   </script>
 </dom-module>

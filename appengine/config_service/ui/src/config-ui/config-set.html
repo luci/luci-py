@@ -8,6 +8,7 @@
 <link rel="import" href="../../bower_components/iron-ajax/iron-ajax.html">
 <link rel="import" href="../../bower_components/iron-icons/iron-icons.html">
 <link rel="import" href="../../bower_components/paper-item/paper-item.html">
+<link rel="import" href="../../bower_components/paper-spinner/paper-spinner.html">
 <link rel="import" href="../../bower_components/polymer/polymer.html">
 <link rel="import" href="../../bower_components/iron-icons/maps-icons.html">
 
@@ -25,14 +26,22 @@
         text-align: left;
       }
 
+      .config-card { 
+        padding-bottom: 1%;
+        animation: fadein 1.5s;
+      }
+
+      @keyframes fadein {
+        from {opacity: 0}
+        to {opacity: 1}
+      }
+
       .name {
         font-size: 200%;
         font-family: sans-serif;
       }
 
-      #refreshStatus {
-        font-size: 35%;
-      }
+      #refreshStatus { font-size: 35%; }
 
       .title {
         padding-bottom: 1%;
@@ -43,7 +52,7 @@
     <iron-ajax
         auto
         id="requestConfigs"
-        url="/_ah/api/config/v1/config-sets?config_set=[[category]]%2F[[name]][[route.path]]&include_files=true&include_last_import_attempt=true"
+        url="/_ah/api/config/v1/config-sets?config_set=[[category]]/[[name]][[route.path]]&include_files=true&include_last_import_attempt=true"
         handle-as="json"
         on-response="_onGotConfigFiles"
         headers="[[auth_headers]]">
@@ -95,11 +104,15 @@
       </div>      
     </div>
     <template is="dom-if" if="[[isRefreshing]]">
-      <div class="center">Refreshing config files...</div>
+      <div class="center">
+        <paper-spinner active></paper-spinner>
+      </div>
     </template>
     <template is="dom-if" if="[[_not(isRefreshing)]]">
       <template is="dom-if" if="[[isLoading]]">
-        <div class="center">Fetching config files...</div>
+        <div class="center">
+          <paper-spinner active></paper-spinner>
+        </div>
       </template>
       <template is="dom-if" if="[[_not(isLoading)]]">
         <template is="dom-if" if="[[_isEmpty(files)]]">
@@ -109,9 +122,11 @@
         </template>
         <template is="dom-if" if="[[_not(_isEmpty(files))]]">
           <template is="dom-repeat" items="[[files]]" as="file">
-            <config-file-card
-                name="[[file.path]]" link="[[location]]/[[file.path]]">
-            </config-file-card>
+            <div class="center config-card">  
+              <config-file-card
+                  name="[[file.path]]" link="[[location]]/[[file.path]]">
+              </config-file-card>
+            </div>
           </template>
         </template>
       </template>
