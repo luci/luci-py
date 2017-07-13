@@ -17,11 +17,13 @@
       a { text-decoration: none; }
 
       paper-card {
-        max-width: 500px;
         width: 100%;
       }
 
-      .config-title { @apply --paper-font-headline; }
+      .config-title { 
+        @apply --paper-font-headline; 
+        word-wrap: break-word;
+      }
 
       .light { color: var(--paper-grey-600); }
 

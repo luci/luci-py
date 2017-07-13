@@ -17,13 +17,18 @@
       a { text-decoration: none; }
       
       paper-card {
-        max-width: 500px;
         width: 100%;
       }
 
-      .config-title { @apply --paper-font-headline; }
+      p {
+        color: var(--paper-grey-600); 
+        word-wrap: break-word;
+      }
 
-      .light { color: var(--paper-grey-600); }
+      .config-title { 
+        @apply --paper-font-headline; 
+        word-wrap: break-word;
+      }
 
       .validation {
         float: right;
@@ -32,26 +37,33 @@
       }
 
       .config-open { color: var(--google-blue-500); }
+
+      .paper-green { color: var(--paper-green-600); }
+
+      .paper-red { color: var(--paper-red-600); }
+
+      .paper-grey { color: var(--paper-grey-600); }
+      
     </style>
 
     <paper-card elevation="2">
       <div class="card-content">
         <div class="config-title">[[_formatName(name)]]
-          <div class="validation light">
+          <div class="validation">
             <template is="dom-if" if="[[lastImportAttempt]]" restamp="true">
               <template is="dom-if" if="[[lastImportAttempt.success]]" restamp="true">
-                <iron-icon icon="icons:check-circle"></iron-icon>
+                <iron-icon icon="icons:check-circle" class="paper-green"></iron-icon>
               </template>
               <template is="dom-if" if="[[_not(lastImportAttempt.success)]]" restamp="true">
-                <iron-icon icon="icons:warning"></iron-icon>
+                <iron-icon icon="icons:warning" class="paper-red"></iron-icon>
               </template>
             </template>
             <template is="dom-if" if="[[_not(lastImportAttempt)]]" restamp="true">
-              <iron-icon icon="icons:help"></iron-icon>
+              <iron-icon icon="icons:help" class="paper-grey"></iron-icon>
             </template>
           </div>
         </div>
-        <p class="light">Path: [[name]]</p>
+        <p>Path: [[name]]</p>
       </div>
       <div class="card-actions">
         <div class="horizontal justified">

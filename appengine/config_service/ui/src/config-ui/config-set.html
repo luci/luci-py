@@ -15,13 +15,17 @@
 <dom-module id="config-set">
   <template>
     <style>
+      .spinner {
+        text-align: center;
+      }
+
       .category {
         font-size: 100%;
         font-family: sans-serif;
       }
 
       .center {
-        width: 27%;
+        width: 20%;
         margin: auto;
         text-align: left;
       }
@@ -39,14 +43,22 @@
       .name {
         font-size: 200%;
         font-family: sans-serif;
+        word-wrap: break-word;
       }
 
-      #refreshStatus { font-size: 35%; }
+      #refreshStatus { font-size: 80%; }
 
       .title {
         padding-bottom: 1%;
         padding-top: 5%;
       }
+
+      .paper-green { color: var(--paper-green-600); }
+
+      .paper-red { color: var(--paper-red-600); }
+
+      .paper-grey { color: var(--paper-grey-600); }
+
     </style>
 
     <iron-ajax
@@ -74,23 +86,22 @@
         <template is="dom-if" if="[[_not(isLoading)]]">
           <template is="dom-if" if="[[lastImportAttempt]]">
             <template is="dom-if" if="[[lastImportAttempt.success]]">
-              <iron-icon id="valid" icon="icons:check-circle"></iron-icon>
+              <iron-icon id="valid" icon="icons:check-circle" class="paper-green"></iron-icon>
             </template>
             <template is="dom-if" if="[[_not(lastImportAttempt.success)]]">
-              <iron-icon id="invalid" icon="icons:warning"></iron-icon>
+              <iron-icon id="invalid" icon="icons:warning" class="paper-red"></iron-icon>
             </template>
           </template>
           <template is="dom-if" if="[[_not(lastImportAttempt)]]">
-            <iron-icon icon="icons:help"></iron-icon>
+            <iron-icon icon="icons:help" class="paper-grey"></iron-icon>
           </template>
         </template>
         <template is="dom-if" if="[[auth_headers]]">
           <iron-icon icon="icons:refresh" on-tap="_forceRefresh"></iron-icon>
-          <span id="refreshStatus">[[refreshMessage]]</span>
         </template>
       </div>
       <div class="category">
-        [[_formatCategory(category)]] <br>
+        <p>[[_formatCategory(category)]]</p>
         <template is="dom-if" if="[[_not(isLoading)]]">
           <template is="dom-if" if="[[lastImportAttempt]]">
             <template is="dom-if" if="[[_not(lastImportAttempt.success)]]">
@@ -101,16 +112,17 @@
             Last import attempt info not available.
           </template>
         </template>
+        <p id="refreshStatus">[[refreshMessage]]</p>
       </div>      
     </div>
     <template is="dom-if" if="[[isRefreshing]]">
-      <div class="center">
+      <div class="spinner">
         <paper-spinner active></paper-spinner>
       </div>
     </template>
     <template is="dom-if" if="[[_not(isRefreshing)]]">
       <template is="dom-if" if="[[isLoading]]">
-        <div class="center">
+        <div class="spinner">
           <paper-spinner active></paper-spinner>
         </div>
       </template>

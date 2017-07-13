@@ -5,10 +5,14 @@
 -->
 
 <link rel="import" href="../../bower_components/polymer/polymer.html">
-<link rel="import" href="../../bower_components/app-layout/app-layout.html">
 <link rel="import" href="../../bower_components/paper-search/paper-search-bar.html">
 <link rel="import" href="../../bower_components/app-route/app-location.html">
 <link rel="import" href="../../bower_components/app-route/app-route.html">
+<link rel="import" href="../../bower_components/app-layout/app-drawer-layout/app-drawer-layout.html">
+<link rel="import" href="../../bower_components/app-layout/app-header/app-header.html">
+<link rel="import" href="../../bower_components/app-layout/app-header-layout/app-header-layout.html">
+<link rel="import" href="../../bower_components/app-layout/app-toolbar/app-toolbar.html">
+<link rel="import" href="../../bower_components/app-layout/app-scroll-effects/effects/resize-title.html">
 
 <link rel="import" href="../../common/auth-signin.html">
 <link rel="import" href="config-set.html">
@@ -20,82 +24,89 @@
       * { font-family: sans-serif; }
 
       app-toolbar {
-        background-color: #efefef;
+        background-color: var(--google-blue-500);
         color: #232323;
+        height: 60px;
       }
 
-      app-header { @apply --layout-fixed-top; }
-
-      .logo { height: 100%; }
+      .logo { 
+        height: 50px;
+      }
 
       .right { margin-left:15px; }
 
       .title {
-        padding-left: 1%;
-        padding-bottom: 0.5%;
-        font-size: 150%;
+        font-size: 125%;
+        color: white;
       }
     </style>
 
-    <app-header reveals>
-      <app-toolbar>
-        <image class="logo" src="/static/images/chromium.png"/>
-        <div class="title" main-title>
-          Configuration Service (not fully implemented)
-        </div>
+    <app-drawer-layout fullbleed force-narrow>
 
-        <template is="dom-if" if="[[client_id]]">
-          <auth-signin
-              class="right"
-              client_id="[[client_id]]"
-              auth_headers="{{auth_headers}}"
-              profile="{{profile}}"
-              signed_in="{{signed_in}}">
-          </auth-signin>
-        </template>
-        <template is="dom-if" if="[[!client_id]]">
-          <div class="right">No OAauth client id found.</div>
-        </template>
-      </app-toolbar>
-    </app-header>
+      <app-header-layout>
 
+        <app-header reveals slot="header" effects="resize-title">
+          <app-toolbar>
+            <!--<image class="logo" src="/static/images/chromium.png"/>-->
+            <div class="title" main-title>
+              Configuration Service
+            </div>
 
-    <app-location route="{{route}}" use-hash-as-path></app-location>
-    <app-route  route="{{route}}"
-                pattern="/services/:serviceName"
-                data="{{serviceData}}"
-                tail="{{serviceTail}}"
-                active="{{serviceActive}}"></app-route>
-
-    <app-route  route="{{route}}"
-                pattern="/projects/:projectName"
-                data="{{projectData}}"
-                tail="{{projectTail}}"
-                active="{{projectActive}}"></app-route>
-
-    <app-route  route="{{route}}"
-                pattern="/"
-                active="{{frontPageActive}}"></app-route>
-
-    <template is="dom-if" if="[[frontPageActive]]">
-      <front-page auth_headers="{{auth_headers}}"></front-page>
-    </template>
-
-    <template is="dom-if" if="[[serviceActive]]" restamp="true">
-      <config-set category="services"
-                  name="{{serviceData.serviceName}}"
-                  route="{{serviceTail}}"
+            <template is="dom-if" if="[[client_id]]">
+              <auth-signin
+                  class="right"
+                  client_id="[[client_id]]"
                   auth_headers="{{auth_headers}}"
-                  front-page-is-active="[[frontPageActive]]"></config-set>
-    </template>
+                  profile="{{profile}}"
+                  signed_in="{{signed_in}}">
+              </auth-signin>
+            </template>
+            <template is="dom-if" if="[[!client_id]]">
+              <div class="right">No OAauth client id found.</div>
+            </template>
+          </app-toolbar>
+        </app-header>
 
-    <template is="dom-if" if="[[projectActive]]" restamp="true">
-      <config-set category="projects"
-                  name="{{projectData.projectName}}"
-                  route="{{projectTail}}"
-                  auth_headers="{{auth_headers}}"
-                  front-page-is-active="[[frontPageActive]]"></config-set>
-    </template>
+        <app-location route="{{route}}" use-hash-as-path></app-location>
+        <app-route  route="{{route}}"
+                    pattern="/services/:serviceName"
+                    data="{{serviceData}}"
+                    tail="{{serviceTail}}"
+                    active="{{serviceActive}}"></app-route>
+
+        <app-route  route="{{route}}"
+                    pattern="/projects/:projectName"
+                    data="{{projectData}}"
+                    tail="{{projectTail}}"
+                    active="{{projectActive}}"></app-route>
+
+        <app-route  route="{{route}}"
+                    pattern="/"
+                    active="{{frontPageActive}}"></app-route>
+
+        <template is="dom-if" if="[[frontPageActive]]">
+          <front-page auth_headers="{{auth_headers}}"></front-page>
+        </template>
+
+        <template is="dom-if" if="[[serviceActive]]" restamp="true">
+          <config-set category="services"
+                      name="{{serviceData.serviceName}}"
+                      route="{{serviceTail}}"
+                      auth_headers="{{auth_headers}}"
+                      front-page-is-active="[[frontPageActive]]"></config-set>
+        </template>
+
+        <template is="dom-if" if="[[projectActive]]" restamp="true">
+          <config-set category="projects"
+                      name="{{projectData.projectName}}"
+                      route="{{projectTail}}"
+                      auth_headers="{{auth_headers}}"
+                      front-page-is-active="[[frontPageActive]]"></config-set>
+        </template>
+
+      </app-header-layout>
+
+    </app-drawer-layout>
 
   </template>
 
