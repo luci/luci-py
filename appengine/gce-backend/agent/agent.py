@@ -482,7 +482,7 @@ def main():
     # TODO(smut): Stop assuming chrome-bot.
     if subprocess.call(['which', 'systemctl']) == 0:
       agent = SystemdAgent(args.user or 'chrome-bot')
-    else if 'upstart' in subprocess.check_output(['init', '--version']:
+    elif 'upstart' in subprocess.check_output(['init', '--version']):
       agent = UpstartAgent(args.user or 'chrome-bot')
     else:
       # TODO(phosek): Shall we add support for LSB init?
