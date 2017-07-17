@@ -14,34 +14,24 @@
 <dom-module id="config-file-card">
   <template>
     <style>
-      a { text-decoration: none; }
+      a { 
+        text-decoration: none;
+        color: inherit;
+      }
 
       paper-card {
         width: 100%;
       }
 
-      .config-title { 
-        @apply --paper-font-headline; 
-        word-wrap: break-word;
-      }
-
-      .light { color: var(--paper-grey-600); }
-
-      .config-open { color: var(--google-blue-500); }
     </style>
 
-    <paper-card elevation="2">
-      <div class="card-content">
-        <div class="config-title">[[name]]</div>
-      </div>
-      <div class="card-actions">
-        <div class="horizontal justified">
-          <a href="[[link]]" target="_blank">
-            <paper-button class="config-open">Open</paper-button>
-          </a>
+    <a href="[[link]]" target="_blank">
+      <paper-card elevation="2" on-tap="_handleClick">
+        <div class="card-content">
+          [[name]]
         </div>
-      </div>
-    </paper-card>
+      </paper-card>
+    </a>
   </template>
   <script>
     Polymer({
@@ -56,6 +46,7 @@
           type: String
         },
       }
+
     });
   </script>
 </dom-module>

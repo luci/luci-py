@@ -39,6 +39,12 @@
         padding-bottom: 2%;
       }
 
+      .name {
+        font-family: sans-serif;
+        word-wrap: break-word;
+        text-align: center;
+      }
+
       paper-search-bar {
         @apply --shadow-elevation-4dp;
         width: 40%;
@@ -70,7 +76,7 @@
       </template>
       <template is="dom-if" if="[[_not(isLoading)]]">
         <template is="dom-if" if="[[_isEmpty(searchResults)]]">
-          <div class="center">No config sets found.</div>
+          <div class="center name">No config sets found.</div>
         </template>
         <template is="dom-if" if="[[_not(_isEmpty(searchResults))]]">
           <template is="dom-repeat" items="[[searchResults]]" as="config">

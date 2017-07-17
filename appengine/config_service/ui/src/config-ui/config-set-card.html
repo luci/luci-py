@@ -10,11 +10,15 @@
 <link rel="import" href="../../bower_components/polymer/polymer.html">
 <link rel="import" href="../../bower_components/iron-icons/maps-icons.html">
 <link rel="import" href="../../bower_components/iron-flex-layout/iron-flex-layout.html">
+<link rel="import" href="../../bower_components/paper-tooltip/paper-tooltip.html">
 
 <dom-module id="config-set-card">
   <template>
     <style>
-      a { text-decoration: none; }
+      a { 
+        text-decoration: none;
+        color: inherit;
+      }
       
       paper-card {
         width: 100%;
@@ -24,7 +28,7 @@
         color: var(--paper-grey-600); 
         word-wrap: break-word;
       }
-
+      
       .config-title { 
         @apply --paper-font-headline; 
         word-wrap: break-word;
@@ -36,8 +40,6 @@
         vertical-align: middle;
       }
 
-      .config-open { color: var(--google-blue-500); }
-
       .paper-green { color: var(--paper-green-600); }
 
       .paper-red { color: var(--paper-red-600); }
@@ -46,33 +48,47 @@
       
     </style>
 
-    <paper-card elevation="2">
-      <div class="card-content">
-        <div class="config-title">[[_formatName(name)]]
-          <div class="validation">
-            <template is="dom-if" if="[[lastImportAttempt]]" restamp="true">
-              <template is="dom-if" if="[[lastImportAttempt.success]]" restamp="true">
-                <iron-icon icon="icons:check-circle" class="paper-green"></iron-icon>
+    <a href="#/[[name]]">
+      <paper-card elevation="2">
+        <div class="card-content">
+          <div class="config-title">[[_formatName(name)]]
+            <div class="validation">
+              <template is="dom-if" if="[[lastImportAttempt]]" restamp="true">
+                <template is="dom-if" if="[[lastImportAttempt.success]]" restamp="true">
+                  <iron-icon id="successful-import" 
+                             icon="icons:check-circle" 
+                             class="paper-green">
+                  </iron-icon>
+                  <paper-tooltip for="successful-import" offset="0">
+                    Last import succeeded.
+                  </paper-tooltip>
+                </template>
+                <template is="dom-if" if="[[_not(lastImportAttempt.success)]]" restamp="true">
+                  <iron-icon id="failed-import" 
+                             icon="icons:warning" 
+                             class="paper-red">
+                  </iron-icon>
+                  <paper-tooltip for="failed-import" offset="0">
+                    Last import failed.
+                  </paper-tooltip>
+                </template>
               </template>
-              <template is="dom-if" if="[[_not(lastImportAttempt.success)]]" restamp="true">
-                <iron-icon icon="icons:warning" class="paper-red"></iron-icon>
+              <template is="dom-if" if="[[_not(lastImportAttempt)]]" restamp="true">
+                <iron-icon id="no-import" 
+                           icon="icons:help" 
+                           class="paper-grey">
+                </iron-icon>
+                <paper-tooltip for="no-import" offset="0">
+                  Last import attempt info not available.
+                </paper-tooltip>
               </template>
-            </template>
-            <template is="dom-if" if="[[_not(lastImportAttempt)]]" restamp="true">
-              <iron-icon icon="icons:help" class="paper-grey"></iron-icon>
-            </template>
+            </div>
           </div>
+          <p>Path: [[name]]</p>
         </div>
-        <p>Path: [[name]]</p>
-      </div>
-      <div class="card-actions">
-        <div class="horizontal justified">
-          <a href="#/[[name]]">
-            <paper-button class="config-open">Open</paper-button>
-          </a>
-        </div>
-      </div>
-    </paper-card>
+      </paper-card>
+    </a>
+
   </template>
   <script>
     Polymer({
@@ -96,7 +112,7 @@
         var tempName = name.substring(name.indexOf("/") + 1);
         return tempName.includes("/") ?
             tempName.substring(0, tempName.indexOf("/")) : tempName;
-      },
+      }
 
     });
   </script>

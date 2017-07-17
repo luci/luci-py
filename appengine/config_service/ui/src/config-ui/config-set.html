@@ -11,6 +11,7 @@
 <link rel="import" href="../../bower_components/paper-spinner/paper-spinner.html">
 <link rel="import" href="../../bower_components/polymer/polymer.html">
 <link rel="import" href="../../bower_components/iron-icons/maps-icons.html">
+<link rel="import" href="../../bower_components/paper-tooltip/paper-tooltip.html">
 
 <dom-module id="config-set">
   <template>
@@ -97,7 +98,13 @@
           </template>
         </template>
         <template is="dom-if" if="[[auth_headers]]">
-          <iron-icon icon="icons:refresh" on-tap="_forceRefresh"></iron-icon>
+          <paper-icon-button id="force-refresh"
+                             icon="icons:refresh"
+                             on-tap="_forceRefresh">
+          </paper-icon-button>
+          <paper-tooltip for="force-refresh" offset="0">
+            Force the config refresh.
+          </paper-tooltip>
         </template>
       </div>
       <div class="category">
@@ -106,6 +113,9 @@
           <template is="dom-if" if="[[lastImportAttempt]]">
             <template is="dom-if" if="[[_not(lastImportAttempt.success)]]">
               Last import attempt failed: [[lastImportAttempt.message]]
+            </template>
+            <template is="dom-if" if="[[lastImportAttempt.success]]">
+              Last import succeeded.
             </template>
           </template>
           <template is="dom-if" if="[[_not(lastImportAttempt)]]">
