@@ -54,7 +54,6 @@
     </style>
 
     <iron-ajax
-        auto
         id="requestConfigs"
         url="/_ah/api/config/v1/config-sets?include_last_import_attempt=true"
         handle-as="json"
@@ -115,6 +114,13 @@
           type: Array,
           value: () => []
         }
+      },
+
+      ready: function() {
+        document.addEventListener('fetch-configs', function() {
+          this.isLoading = true;
+          this.$.requestConfigs.generateRequest();
+        }.bind(this));
       },
 
       _formatName: function(name) {

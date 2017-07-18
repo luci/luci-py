@@ -46,6 +46,7 @@
 
     <google-signin-aware id="aware"
       client-id="[[client_id]]"
+      initialized="{{initialized}}"
       scopes="email"
       on-google-signin-aware-success="_onSignin"
       on-google-signin-aware-signed-out="_onSignout">
@@ -73,7 +74,7 @@
       properties: {
         auth_headers: {
           type: Object,
-          value: () => {},
+          value: () => null,
           notify: true
         },
 
@@ -87,6 +88,12 @@
           type: String
         },
 
+        initialized: {
+          type: Boolean,
+          value: false,
+          observer: '_onInitialized'
+        },
+
         profile: {
           type: Object,
           notify: true
@@ -96,6 +103,11 @@
           type: Boolean,
           value: false,
           notify: true
+        },
+
+        user: {
+          type: Object,
+          value: () => null,
         }
       },
 
@@ -103,44 +115,36 @@
         if (!this.client_id) {
           return;
         }
-        // If a page is opened in a new tab, we are (likely) already logged in
-        // so we wait for the gapi and auth2 to be loaded and re-extract our
-        // access_token.
-        window.setTimeout(function(){
-          // The 'gapi' checks are the same that signin-aware does. We do them
-          // to avoid extraneous errors in the console.
-          if (!this.signed_in && !this._signingIn){
-            if (('gapi' in window) && ('auth2' in window.gapi)) {
-              var user = gapi.auth2.getAuthInstance().currentUser.get();
-              if (user && user.getAuthResponse().access_token) {
-                // User is already logged in, can use the access_token.
-                this._onSignin();
-              } else {
-                window.setTimeout(this.ready.bind(this), 50);
-              }
-            } else {
-              window.setTimeout(this.ready.bind(this), 50);
-            }
+      },
+
+      _onInitialized: function() {
+        if (this.initialized) {
+          this.set('user', null);
+          this.set('user', gapi.auth2.getAuthInstance().currentUser.get());
+          if (!(this.user && this.user.getAuthResponse().access_token)) {
+            this.fire('fetch-configs');
           }
-        }.bind(this), 50);
+        }
       },
 
       _onSignin: function() {
         this._signingIn = true;
-        var user = gapi.auth2.getAuthInstance().currentUser.get();
-        var profile = { email: user.getBasicProfile().getEmail(),
-                        imageUrl: user.getBasicProfile().getImageUrl() };
-        this.set('profile', {});
+        this.set('user', null);
+        this.set('user', gapi.auth2.getAuthInstance().currentUser.get());
+        var profile = { email: this.user.getBasicProfile().getEmail(),
+                        imageUrl: this.user.getBasicProfile().getImageUrl() };
+        this.set('profile', null);
         this.set('profile', profile);
-        this.set('auth_response', user.getAuthResponse());
+        this.set('auth_response', this.user.getAuthResponse());
         this.signed_in = true;
         // The credential will expire after a while (usually an hour)
         // so we need to reload it.
         this.async(function(){
           console.log("reloading credentials");
-          user.reloadAuthResponse();
+          this.user.reloadAuthResponse();
           this._onSignin();
         }, this.auth_response.expires_in * 1000);  // convert seconds to ms
+        this.fire('fetch-configs');
         this._signingIn = false;
       },
 
@@ -151,7 +155,7 @@
 
       _makeHeader: function() {
         if (!this.auth_response) {
-          this.set('auth_headers', {});
+          this.set('auth_headers', null);
         }
         this.set('auth_headers', 
             {

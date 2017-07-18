@@ -41,9 +41,7 @@
     </style>
 
     <app-drawer-layout fullbleed force-narrow>
-
       <app-header-layout>
-
         <app-header reveals slot="header">
           <app-toolbar>
             <!--<image class="logo" src="/static/images/chromium.png"/>-->
@@ -84,29 +82,26 @@
                     active="{{frontPageActive}}"></app-route>
 
         <template is="dom-if" if="[[frontPageActive]]">
-          <front-page auth_headers="{{auth_headers}}"></front-page>
+          <front-page auth_headers="[[auth_headers]]"></front-page>
         </template>
 
         <template is="dom-if" if="[[serviceActive]]" restamp="true">
           <config-set category="services"
-                      name="{{serviceData.serviceName}}"
-                      route="{{serviceTail}}"
-                      auth_headers="{{auth_headers}}"
+                      name="[[serviceData.serviceName]]"
+                      route="[[serviceTail]]"
+                      auth_headers="[[auth_headers]]"
                       front-page-is-active="[[frontPageActive]]"></config-set>
         </template>
 
         <template is="dom-if" if="[[projectActive]]" restamp="true">
           <config-set category="projects"
-                      name="{{projectData.projectName}}"
-                      route="{{projectTail}}"
-                      auth_headers="{{auth_headers}}"
+                      name="[[projectData.projectName]]"
+                      route="[[projectTail]]"
+                      auth_headers="[[auth_headers]]"
                       front-page-is-active="[[frontPageActive]]"></config-set>
         </template>
-
       </app-header-layout>
-
     </app-drawer-layout>
-
   </template>
 
   <script>
