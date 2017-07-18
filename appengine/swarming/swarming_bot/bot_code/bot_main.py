@@ -587,7 +587,7 @@ def _run_isolated_flags(botobj):
   # override.
   grpc_proxy = get_config().get('isolate_grpc_proxy')
   grpc_proxy = os.environ.get('ISOLATE_GRPC_PROXY', grpc_proxy)
-  if grpc_proxy is not None:
+  if grpc_proxy:
     logging.info('Isolate will use gRPC proxy %s', grpc_proxy)
     args.extend(['--grpc-proxy', grpc_proxy])
   return args
