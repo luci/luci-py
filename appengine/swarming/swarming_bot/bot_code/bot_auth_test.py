@@ -136,9 +136,8 @@ class AuthSystemTest(auto_stub.TestCase):
         swarming_http_headers_exp=exp,
         system_service_account='bot',
         task_service_account='none'))
-    self.assertEqual(
-        ['accounts', 'default_account_id', 'rpc_port', 'secret'],
-        sorted(local_auth_ctx))
+    # Note: default_account_id is omitted when it is None.
+    self.assertEqual(['accounts', 'rpc_port', 'secret'], sorted(local_auth_ctx))
 
     # Only 'system' account is defined (no 'task'). And there's NO default
     # account at all.

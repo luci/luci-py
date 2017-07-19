@@ -43,9 +43,10 @@ from api import os_utilities
 from api import platforms
 from infra_libs import ts_mon
 from utils import file_path
+from utils import net
 from utils import on_error
-from utils import tools
 from utils import subprocess42
+from utils import tools
 from utils import zip_package
 
 
@@ -1198,6 +1199,18 @@ def get_config():
 
 def main(argv):
   subprocess42.inhibit_os_error_reporting()
+
+  # Disable magical auto-detection of OAuth config. bot_main.py prepares auth
+  # headers on its own explicitly (via get_authentication_headers hook) when
+  # using 'net' library through RemoteClientNative class and auto-configured
+  # auth in net.py may interfere with this. We also disable auto-detection in
+  # task_runner.py (since it also uses special mechanism for getting auth
+  # headers from bot_main.py). We do _not_ disable auto-detection in
+  # run_isolated.py, since at this layer we have an auth context (setup by
+  # task_runner.py) and it is correctly getting recognized by the auto-detection
+  # in net.py.
+  net.disable_oauth_config()
+
   # Add SWARMING_HEADLESS into environ so subcommands know that they are running
   # in a headless (non-interactive) mode.
   os.environ['SWARMING_HEADLESS'] = '1'

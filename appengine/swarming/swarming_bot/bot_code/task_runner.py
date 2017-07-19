@@ -24,6 +24,7 @@ import time
 import traceback
 
 from utils import file_path
+from utils import net
 from utils import on_error
 from utils import subprocess42
 from utils import zip_package
@@ -652,6 +653,11 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
 
 def main(args):
   subprocess42.inhibit_os_error_reporting()
+
+  # Disable magical auto-detection of OAuth config. See main() in bot_main.py
+  # for detailed explanation why.
+  net.disable_oauth_config()
+
   parser = optparse.OptionParser(description=sys.modules[__name__].__doc__)
   parser.add_option('--in-file', help='Name of the request file')
   parser.add_option(
