@@ -298,10 +298,10 @@ def load_and_run(
 
       # Auth environment is up, start the command. task_result is dumped to
       # disk in 'finally' block.
-      with luci_context.write(_tmpdir=work_dir, **context_edits):
+      with luci_context.stage(_tmpdir=work_dir, **context_edits) as ctx_file:
         task_result = run_command(
             remote, task_details, work_dir, cost_usd_hour,
-            start, run_isolated_flags, bot_file)
+            start, run_isolated_flags, bot_file, ctx_file)
   except (ExitSignal, InternalError, remote_client.InternalError) as e:
     # This normally means run_command() didn't get the chance to run, as it
     # itself traps exceptions and will report accordingly. In this case, we want
@@ -390,7 +390,7 @@ def fail_without_command(remote, bot_id, task_id, params, cost_usd_hour,
 
 
 def run_command(remote, task_details, work_dir, cost_usd_hour,
-                task_start, run_isolated_flags, bot_file):
+                task_start, run_isolated_flags, bot_file, ctx_file):
   """Runs a command and sends packets to the server to stream results back.
 
   Implements both I/O and hard timeouts. Sends the packets numbered, so the
@@ -448,6 +448,8 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         env.pop(key, None)
       else:
         env[key] = value
+    if ctx_file:
+      env['LUCI_CONTEXT'] = ctx_file
     logging.info('cmd=%s', cmd)
     logging.info('cwd=%s', work_dir)
     logging.info('env=%s', env)

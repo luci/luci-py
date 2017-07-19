@@ -201,9 +201,10 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.mock(time, 'time', lambda: start + 10)
     remote = remote_client.createRemoteClient('https://localhost:1', headers_cb,
                                               False)
-    return task_runner.run_command(
-        remote, task_details, self.work_dir, 3600.,
-        start, ['--min-free-space', '1'], '/path/to/file')
+    with luci_context.stage(local_auth=None) as ctx_file:
+      return task_runner.run_command(
+          remote, task_details, self.work_dir, 3600.,
+          start, ['--min-free-space', '1'], '/path/to/file', ctx_file)
 
   def test_load_and_run_raw(self):
     local_auth_ctx = {
@@ -217,7 +218,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     def run_command(
         remote, task_details, work_dir,
-        cost_usd_hour, start, run_isolated_flags, bot_file):
+        cost_usd_hour, start, run_isolated_flags, bot_file, ctx_file):
       self.assertTrue(remote.uses_auth) # mainly to avoid "unused arg" warning
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       # Necessary for OSX.
@@ -227,7 +228,8 @@ class TestTaskRunner(TestTaskRunnerBase):
       self.assertEqual(time.time(), start)
       self.assertEqual(['--min-free-space', '1'], run_isolated_flags)
       self.assertEqual('/path/to/bot-file', bot_file)
-      self.assertDictEqual(local_auth_ctx, luci_context.read('local_auth'))
+      with open(ctx_file, 'r') as f:
+        self.assertDictEqual(local_auth_ctx, json.load(f)['local_auth'])
       return {
         u'exit_code': 1,
         u'hard_timeout': False,
@@ -275,7 +277,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     def run_command(
         remote, task_details, work_dir,
-        cost_usd_hour, start, run_isolated_flags, bot_file):
+        cost_usd_hour, start, run_isolated_flags, bot_file, ctx_file):
       self.assertTrue(remote.uses_auth) # mainly to avoid unused arg warning
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       # Necessary for OSX.
@@ -285,7 +287,8 @@ class TestTaskRunner(TestTaskRunnerBase):
       self.assertEqual(time.time(), start)
       self.assertEqual(['--min-free-space', '1'], run_isolated_flags)
       self.assertEqual('/path/to/bot-file', bot_file)
-      self.assertIsNone(luci_context.read('local_auth'))
+      with open(ctx_file, 'r') as f:
+        self.assertIsNone(json.load(f).get('local_auth'))
       return {
         u'exit_code': 0,
         u'hard_timeout': False,
@@ -466,6 +469,7 @@ class TestTaskRunner(TestTaskRunnerBase):
         self.assertEqual(self.work_dir, cwd)
         expected_env = os.environ.copy()
         expected_env['foo'] = 'bar'
+        expected_env['LUCI_CONTEXT'] = env['LUCI_CONTEXT']  # tmp file
         self.assertEqual(expected_env, env)
         self.assertEqual(subprocess42.PIPE, stdout)
         self.assertEqual(subprocess42.STDOUT, stderr)
@@ -800,9 +804,10 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     # Dot not mock time since this test class is testing timeouts.
     remote = remote_client.createRemoteClient('https://localhost:1', None,
                                               False)
-    return task_runner.run_command(
-        remote, task_details, self.work_dir, 3600., time.time(),
-        ['--min-free-space', '1'], '/path/to/file')
+    with luci_context.stage(local_auth=None) as ctx_file:
+      return task_runner.run_command(
+          remote, task_details, self.work_dir, 3600., time.time(),
+          ['--min-free-space', '1'], '/path/to/file', ctx_file)
 
   def test_hard(self):
     # Actually 0xc000013a
