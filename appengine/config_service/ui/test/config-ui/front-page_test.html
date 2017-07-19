@@ -39,22 +39,16 @@
         setup(function() {
           server = sinon.fakeServer.create();
           var param = {
-            event : {
-              detail: {
-                response: {
-                  config_sets: [
-                  {
-                    config_set: "valid-project",
-                    location: "https://chromium.googlesource.com/valid-project",
-                    last_import_attempt: {success: true}
-                  },{
-                    config_set: "invalid-project",
-                    location: "https://chromium.googlesource.com/invalid-project",
-                    last_import_attempt: {success: false}
-                  }]
-                }
-              }
-            }
+            config_sets: [
+            {
+              config_set: "valid-project",
+              location: "https://chromium.googlesource.com/valid-project",
+              last_import_attempt: {success: true}
+            },{
+              config_set: "invalid-project",
+              location: "https://chromium.googlesource.com/invalid-project",
+              last_import_attempt: {success: false}
+            }]
           };
           server.respondWith(
             'GET',
@@ -87,63 +81,66 @@
           assert.equal(front_page.isLoading, true);
         });
 
-        test('gets iron-ajax response', function () {
+        test('gets iron-ajax response', function (done) {
           request = ajax.generateRequest();
           server.respond();
-          expect(request.status).to.be.equal(200);
-          expect(request.response).to.be.an('object');
-          expect(request.response.event).to.be.an('object');
-          // TODO(crbug.com/740768): make the element call on-response handler automatically
-          front_page._onGotConfigSets(request.response.event);
-          assert.equal(front_page.isLoading, false);
-          assert.equal(front_page.configSetList.length, 2);
-          var sortedResults = front_page.configSetList.slice();
-          sortedResults.sort(function(a, b) {
-            return front_page._formatName(a.config_set).localeCompare(front_page._formatName(b.config_set));
+          assert.equal(request.status, 200);
+          assert.isObject(request.response);
+          front_page.addEventListener('processedConfigSets', function() {
+            assert.equal(front_page.isLoading, false);
+            assert.equal(front_page.configSetList.length, 2);
+            var sortedResults = front_page.configSetList.slice();
+            sortedResults.sort(function(a, b) {
+              return front_page._formatName(a.config_set).localeCompare(front_page._formatName(b.config_set));
+            }.bind(front_page));
+            assert.deepEqual(sortedResults,
+              front_page.searchResults);
+            assert.equal(front_page.configSetList[0].last_import_attempt.success,
+              true);
+            assert.equal(front_page.configSetList[1].last_import_attempt.success,
+              false);
+            done();
           }.bind(front_page));
-          assert.deepEqual(sortedResults,
-            front_page.searchResults);
-          assert.equal(front_page.configSetList[0].last_import_attempt.success,
-            true);
-          assert.equal(front_page.configSetList[1].last_import_attempt.success,
-            false);
         });
 
-        test('query does not match any results', function () {
+        test('query does not match any results', function (done) {
           request = ajax.generateRequest();
           server.respond();
-          // TODO(crbug.com/740768): make the element call on-response handler automatically
-          front_page._onGotConfigSets(request.response.event);
-          front_page.query = "service";
-          assert.notEqual(front_page.configSetList, 
-            front_page.searchResults);
-          assert.equal(front_page.searchResults.length, 0);
-        });
-
-        test('query matches all results', function () {
-          request = ajax.generateRequest();
-          server.respond();
-          // TODO(crbug.com/740768): make the element call on-response handler automatically
-          front_page._onGotConfigSets(request.response.event);
-          front_page.query = "project";
-          var sortedResults = front_page.configSetList.slice();
-          sortedResults.sort(function(a, b) {
-            return front_page._formatName(a.config_set).localeCompare(front_page._formatName(b.config_set));
+          front_page.addEventListener('processedConfigSets', function() {
+            front_page.query = "service";
+            assert.notEqual(front_page.configSetList, 
+              front_page.searchResults);
+            assert.equal(front_page.searchResults.length, 0);
+            done();
           }.bind(front_page));
-          assert.deepEqual(sortedResults,
-            front_page.searchResults);
-          assert.equal(front_page.searchResults.length, 2);
         });
 
-        test('query matches one result', function () {
+        test('query matches all results', function (done) {
           request = ajax.generateRequest();
           server.respond();
-          // TODO(crbug.com/740768): make the element call on-response handler automatically
-          front_page._onGotConfigSets(request.response.event);
-          front_page.query = "invalid-project";
-          assert.notEqual(front_page.configSetList, 
-            front_page.searchResults);
-          assert.equal(front_page.searchResults[0].config_set, "invalid-project");
+          front_page.addEventListener('processedConfigSets', function() {
+            front_page.query = "project";
+            var sortedResults = front_page.configSetList.slice();
+            sortedResults.sort(function(a, b) {
+              return front_page._formatName(a.config_set).localeCompare(front_page._formatName(b.config_set));
+            }.bind(front_page));
+            assert.deepEqual(sortedResults,
+              front_page.searchResults);
+            assert.equal(front_page.searchResults.length, 2);
+            done();
+          }.bind(front_page));
+        });
+
+        test('query matches one result', function (done) {
+          request = ajax.generateRequest();
+          server.respond();
+          front_page.addEventListener('processedConfigSets', function() {
+            front_page.query = "invalid-project";
+            assert.notEqual(front_page.configSetList, 
+              front_page.searchResults);
+            assert.equal(front_page.searchResults[0].config_set, "invalid-project");     
+            done();       
+          }.bind(front_page));
         });
       });
     </script>

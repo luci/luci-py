@@ -47,17 +47,11 @@
         setup(function() {
           server = sinon.fakeServer.create();
           var param = {
-            event : {
-              detail: {
-                response: {
-                  config_sets: [{
-                    files: [{path: "OWNERS"}, {path: "README.md"}],
-                    location: "https://test.com/valid-project-with-config-files",
-                    last_import_attempt: {success: true}
-                  }]
-                }
-              }
-            }
+            config_sets: [{
+              files: [{path: "OWNERS"}, {path: "README.md"}],
+              location: "https://test.com/valid-project-with-config-files",
+              last_import_attempt: {success: true}
+            }]
           };
           server.respondWith(
             'GET',
@@ -88,19 +82,19 @@
           assert.equal(config_set.isLoading, true);
         });
 
-        test('gets iron-ajax response', function () {
+        test('gets iron-ajax response', function (done) {
           request = ajax.generateRequest();
           server.respond();
-          expect(request.status).to.be.equal(200);
-          expect(request.response).to.be.an('object');
-          expect(request.response.event).to.be.an('object');
-          // TODO(crbug.com/740768): make the element call on-response handler automatically
-          config_set._onGotConfigFiles(request.response.event);
-          assert.equal(config_set.isLoading, false);
-          assert.equal(config_set.files.length, 2);
-          assert.equal(config_set.lastImportAttempt.success, true);
-          assert.equal(config_set.location, 
-            "https://test.com/valid-project-with-config-files");
+          assert.equal(request.status, 200);
+          assert.isObject(request.response);
+          config_set.addEventListener('processedConfigFiles', function() {
+            assert.equal(config_set.isLoading, false);
+            assert.equal(config_set.files.length, 2);
+            assert.equal(config_set.lastImportAttempt.success, true);
+            assert.equal(config_set.location, 
+              "https://test.com/valid-project-with-config-files");
+            done();
+          }.bind(config_set));
         });
       });
 
@@ -116,16 +110,10 @@
         setup(function() {
           server = sinon.fakeServer.create();
           var param = {
-            event : {
-              detail: {
-                response: {
-                  config_sets: [{
-                    location: "https://test.com/invalid-project-without-config-files",
-                    last_import_attempt: {success: false}
-                  }]
-                }
-              }
-            }
+            config_sets: [{
+              location: "https://test.com/invalid-project-without-config-files",
+              last_import_attempt: {success: false}
+            }]
           };
           server.respondWith(
             'GET',
@@ -156,19 +144,19 @@
           assert.equal(config_set.isLoading, true);
         });
 
-        test('gets iron-ajax response', function () {
+        test('gets iron-ajax response', function (done) {
           request = ajax.generateRequest();
           server.respond();
-          expect(request.status).to.be.equal(200);
-          expect(request.response).to.be.an('object');
-          expect(request.response.event).to.be.an('object');
-          // TODO(crbug.com/740768): make the element call on-response handler automatically
-          config_set._onGotConfigFiles(request.response.event);
-          assert.equal(config_set.isLoading, false);
-          assert.equal(config_set.files.length, 0);
-          assert.equal(config_set.lastImportAttempt.success, false);
-          assert.equal(config_set.location, 
-            "https://test.com/invalid-project-without-config-files");
+          assert.equal(request.status, 200);
+          assert.isObject(request.response);
+          config_set.addEventListener('processedConfigFiles', function() {
+            assert.equal(config_set.isLoading, false);
+            assert.equal(config_set.files.length, 0);
+            assert.equal(config_set.lastImportAttempt.success, false);
+            assert.equal(config_set.location, 
+              "https://test.com/invalid-project-without-config-files");
+            done();
+          }.bind(config_set));
         });
       });
 
@@ -201,14 +189,15 @@
           server.restore();
         });
 
-        test('refreshes config set properly', function () {
+        test('refreshes config set properly', function (done) {
           request = ajax.generateRequest();
           server.respond();
-          expect(request.status).to.be.equal(204);
-          // TODO(crbug.com/740768): make the element call on-response handler automatically
-          config_set._onCompleteRefresh();
-          assert.equal(config_set.isRefreshing, false);
-          assert.equal(config_set.refreshMessage, "Refresh successful.");
+          assert.equal(request.status, 204);
+          config_set.addEventListener('refreshComplete', function() {
+            assert.equal(config_set.isRefreshing, false);
+            assert.equal(config_set.refreshMessage, "Refresh successful.");
+            done();
+          }.bind(config_set));
         });
       });
 
@@ -251,14 +240,15 @@
           server.restore();
         });
 
-        test('refreshes config set properly', function () {
+        test('refreshes config set properly', function (done) {
           request = ajax.generateRequest();
           server.respond();
-          expect(request.status).to.be.equal(404);
-          // TODO(crbug.com/740768): make the element call on-response handler automatically
-          config_set._onRefreshError();
-          assert.equal(config_set.isRefreshing, false);
-          assert.equal(config_set.refreshMessage, "Error: Files could not be refreshed.");
+          assert.equal(request.status, 404);
+          config_set.addEventListener('refreshError', function() {
+            assert.equal(config_set.isRefreshing, false);
+            assert.equal(config_set.refreshMessage, "Error: Files could not be refreshed.");
+            done();
+          }.bind(config_set));
         });
       });
     </script>

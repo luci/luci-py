@@ -145,6 +145,7 @@
         this.configSetList = event.detail.response.config_sets;
         this._updateSearchResults();
         this.isLoading = false;
+        this.fire('processedConfigSets');
       },
 
       _not: function(b) {

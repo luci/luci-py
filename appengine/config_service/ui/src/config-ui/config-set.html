@@ -230,6 +230,7 @@
       _onCompleteRefresh: function() {
         this.isRefreshing = false;
         this.refreshMessage = "Refresh successful.";
+        this.fire('refreshComplete');
       },
 
       _not: function(b) {
@@ -242,11 +243,13 @@
         this.lastImportAttempt = 
             event.detail.response.config_sets[0].last_import_attempt || null;
         this.isLoading = false;
+        this.fire('processedConfigFiles');
       },
 
       _onRefreshError: function() {
         this.isRefreshing = false;
         this.refreshMessage = "Error: Files could not be refreshed.";
+        this.fire('refreshError');
       }
     });
   </script>
