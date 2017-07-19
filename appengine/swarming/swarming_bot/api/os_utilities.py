@@ -810,6 +810,7 @@ def get_dimensions_all_devices_android(devices):
   del dimensions[u'cores']
   del dimensions[u'gpu']
   dimensions.pop(u'machine_type')
+  dimensions.pop(u'ssd', None)
 
   # Each key in the following dict is a dimension and its value is the list of
   # all possible device properties that can define that dimension.
