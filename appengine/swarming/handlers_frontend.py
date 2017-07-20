@@ -138,32 +138,7 @@ class RestrictedLaunchMapReduceJob(auth.AuthenticatingHandler):
       self.abort(500, 'Failed to launch the job')
 
 
-### Public pages.
-
-
-class OldUIHandler(auth.AuthenticatingHandler):
-  @auth.public
-  def get(self):
-    params = {
-      'host_url': self.request.host_url,
-      'is_admin': acl.is_admin(),
-      'is_privileged_user': acl.is_privileged_user(),
-      'is_user': acl.is_user(),
-      'is_bootstrapper': acl.is_bootstrapper(),
-      'bootstrap_token': '...',
-      'mapreduce_jobs': [],
-      'user_type': acl.get_user_type(),
-      'xsrf_token': '',
-    }
-    if acl.is_admin():
-      params['mapreduce_jobs'] = [
-        {'id': job_id, 'name': job_def['job_name']}
-        for job_id, job_def in mapreduce_jobs.MAPREDUCE_JOBS.iteritems()
-      ]
-      params['xsrf_token'] = self.generate_xsrf_token()
-    if acl.is_bootstrapper():
-      params['bootstrap_token'] = bot_code.generate_bootstrap_token()
-    self.response.write(template.render('swarming/root.html', params))
+### Redirectors.
 
 
 class BotsListHandler(auth.AuthenticatingHandler):
@@ -193,9 +168,6 @@ class BotHandler(auth.AuthenticatingHandler):
     self.redirect('/bot?id=%s' % bot_id)
 
 
-### User accessible pages.
-
-
 class TasksHandler(auth.AuthenticatingHandler):
   """Redirects to a list of all task requests."""
 
@@ -219,6 +191,9 @@ class TaskHandler(auth.AuthenticatingHandler):
   @auth.public
   def get(self, task_id):
     self.redirect('/task?id=%s' % task_id)
+
+
+### Public pages.
 
 
 class UIHandler(auth.AuthenticatingHandler):
@@ -281,18 +256,16 @@ def get_routes():
   routes = [
       # Frontend pages. They return HTML.
       # Public pages.
-      ('/oldui', OldUIHandler),
       ('/<page:(bot|botlist|task|tasklist|)>', UIHandler),
 
-      # Task pages. Redirects to Polymer UI
+      # Redirects to Polymer UI
       ('/user/tasks', TasksHandler),
       ('/user/task/<task_id:[0-9a-fA-F]+>', TaskHandler),
-
-      # Bot pages. Redirects to Polymer UI
       ('/restricted/bots', BotsListHandler),
       ('/restricted/bot/<bot_id:[^/]+>', BotHandler),
 
       # Admin pages.
+      # TODO(maruel): Get rid of them.
       ('/restricted/config', RestrictedConfigHandler),
       ('/restricted/upload/bot_config', UploadBotConfigHandler),
       ('/restricted/upload/bootstrap', UploadBootstrapHandler),
