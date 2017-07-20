@@ -38,6 +38,12 @@
         font-size: 125%;
         color: white;
       }
+
+      .link {
+        font-size: 75%;
+        color: white;
+        margin-right: 10px;
+      }
     </style>
 
     <app-drawer-layout fullbleed force-narrow>
@@ -48,6 +54,11 @@
             <div class="title" main-title>
               Configuration Service
             </div>
+
+            <a href="https://luci-config.appspot.com/_ah/api/explorer" 
+               class="link" 
+               target="_blank"> APIs explorer 
+            </a>
 
             <template is="dom-if" if="[[client_id]]">
               <auth-signin

@@ -9,7 +9,7 @@ This is a UI for the configuration service.
 
 *   Install [Google App Engine SDK](https://cloud.google.com/appengine/downloads).
 
-*	Run `bower install` in the ui directory to make sure you have all the dependecies installed.
+*	Run `bower install` in the ui directory to make sure you have all the dependencies installed.
 
 
 ## Running locally
@@ -26,7 +26,7 @@ This is a UI for the configuration service.
 ## Running Tests
 
 *	Your application is already set up to be tested via [web-component-tester](https://github.com/Polymer/web-component-tester). 
-	Run 'wct, 'wct -p' or 'polymer test' inside ui folder to run your application's test suites locally. 
+	Run `wct`, `wct -p` or `polymer test` inside ui folder to run your application's test suites locally. 
 	These commands will run tests for all browsers installed on your computer.
 
 ## Third Party Files

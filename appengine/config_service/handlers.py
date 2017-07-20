@@ -25,12 +25,6 @@ class CronGitilesImport(webapp2.RequestHandler):
 
 
 class MainPageHandler(webapp2.RequestHandler):
-  """Redirects to API Explorer."""
-
-  def get(self):
-    self.redirect('_ah/api/explorer')
-
-class UIHandler(webapp2.RequestHandler):
   """ Serves the UI with the proper client ID. """
 
   def get(self):
@@ -66,7 +60,6 @@ class SchemasHandler(webapp2.RequestHandler):
 def get_frontend_routes():  # pragma: no cover
   return [
     webapp2.Route(r'/', MainPageHandler),
-    webapp2.Route(r'/newui', UIHandler),
     webapp2.Route(r'/schemas/<name:.+>', SchemasHandler),
     webapp2.Route(r'/_ah/bounce', notifications.BounceHandler),
   ]
