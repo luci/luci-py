@@ -16,8 +16,10 @@
 <dom-module id="config-set">
   <template>
     <style>
-      .spinner {
-        text-align: center;
+      @media only screen and (min-width: 768px) {
+        .center {
+          width: 550px;
+        }
       }
 
       .category {
@@ -25,11 +27,16 @@
         font-family: sans-serif;
       }
 
+      .name {
+        font-size: 200%;
+        font-family: sans-serif;
+        word-wrap: break-word;
+      }
+
       .center {
-        width: 20%;
         margin: auto;
         text-align: left;
-      }
+      }    
 
       .config-card { 
         padding-bottom: 1%;
@@ -41,24 +48,23 @@
         to {opacity: 1}
       }
 
-      .name {
-        font-size: 200%;
-        font-family: sans-serif;
-        word-wrap: break-word;
-      }
-
-      #refreshStatus { font-size: 80%; }
-
       .title {
         padding-bottom: 1%;
         padding-top: 5%;
       }
+
+      #refreshStatus { font-size: 80%; }
 
       .paper-green { color: var(--paper-green-600); }
 
       .paper-red { color: var(--paper-red-600); }
 
       .paper-grey { color: var(--paper-grey-600); }
+
+      .spinner {
+        text-align: center;
+      }
+
     </style>
 
     <iron-ajax

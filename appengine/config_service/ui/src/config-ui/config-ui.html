@@ -20,29 +20,34 @@
 <dom-module id="config-ui">
   <template>
     <style>
+      @media only screen and (min-width: 768px) {
+        app-toolbar {
+          height: 60px;
+        }
+
+        .logo { 
+          height: 50px;
+        }
+
+        .right { margin-left:15px; }
+      }
+
       * { font-family: sans-serif; }
 
       app-toolbar {
         background-color: var(--google-blue-500);
         color: #232323;
-        height: 60px;
-      }
-
-      .logo { 
-        height: 50px;
-      }
-
-      .right { margin-left:15px; }
-
-      .title {
-        font-size: 125%;
-        color: white;
       }
 
       .link {
         font-size: 75%;
         color: white;
         margin-right: 10px;
+      }
+
+      .title {
+        color: white;
+        font-size: 125%;
       }
     </style>
 

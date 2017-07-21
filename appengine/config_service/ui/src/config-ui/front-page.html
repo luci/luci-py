@@ -17,10 +17,17 @@
 <dom-module id="front-page">
   <template>
     <style>
-      .center {
-        width: 23%;
-        margin: auto;
+      @media only screen and (min-width: 768px) {
+        .center {
+          width: 550px;
+        }
+
+        paper-search-bar {
+          width: 900px;
+        }
       }
+
+      .loading { text-align: center; }
 
       .config-card { 
         padding-bottom: 1%;
@@ -31,8 +38,6 @@
         from {opacity: 0}
         to {opacity: 1}
       }
-
-      .loading { text-align: center; }
 
       .search-bar {
         padding-top: 7%;
@@ -45,12 +50,16 @@
         text-align: center;
       }
 
+      .center {
+        margin: auto;
+      }
+
       paper-search-bar {
         @apply --shadow-elevation-4dp;
-        width: 40%;
         height: 100%;
         margin: auto;
       }
+
     </style>
 
     <iron-ajax
