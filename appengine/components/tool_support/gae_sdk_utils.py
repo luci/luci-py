@@ -338,11 +338,12 @@ class Application(object):
     """Runs appcfg.py <args>, deserializes its output and returns it."""
     if USE_GCLOUD:
       raise Error('Attempting to run appcfg.py %s' % ' '.join(args))
-    if not is_gcloud_oauth2_token_cached():
-      raise LoginRequiredError('Login first using \'gcloud auth login\'.')
+    if not is_appcfg_oauth_token_cached():
+      raise LoginRequiredError('Login first using \'gae.py appcfg_login\'.')
     cmd = [
       sys.executable,
       os.path.join(self._gae_sdk, 'appcfg.py'),
+      '--skip_sdk_update_check',
       '--application', self.app_id,
     ]
     if self._verbose:
@@ -353,7 +354,7 @@ class Application(object):
   def run_gcloud(self, args):
     """Runs 'gcloud <args> --project ... --format ...' and parses the output."""
     gcloud = find_gcloud()
-    if not is_gcloud_oauth2_token_cached():
+    if not is_gcloud_auth_set():
       raise LoginRequiredError('Login first using \'gcloud auth login\'')
     raw = self.run_cmd(
         [gcloud] + args + ['--project', self.app_id, '--format', 'json'])
@@ -713,14 +714,47 @@ def confirm(text, app, version, modules=None, default_yes=False):
     return raw_input('Continue? [y/N] ') in ('y', 'Y')
 
 
-def is_gcloud_oauth2_token_cached():
+def is_gcloud_auth_set():
   """Returns false if 'gcloud auth login' needs to be run."""
-  p = os.path.join(os.path.expanduser('~'), '.config', 'gcloud', 'credentials')
   try:
-    with open(p) as f:
-      return len(json.load(f)['data']) != 0
-  except (KeyError, IOError, OSError, ValueError):
+    # This returns an email address of currently active account or empty string
+    # if no account is active.
+    output = subprocess.check_output([
+      find_gcloud(), 'auth', 'list',
+      '--filter=status:ACTIVE', '--format=value(account)',
+    ])
+    return bool(output.strip())
+  except subprocess.CalledProcessError as exc:
+    logging.error('Failed to check active gcloud account: %s', exc)
     return False
+
+
+# TODO(vadimsh): Can be removed if using 'gcloud'.
+def _appcfg_oauth2_tokens():
+  return os.path.join(os.path.expanduser('~'), '.appcfg_oauth2_tokens')
+
+
+# TODO(vadimsh): Can be removed if using 'gcloud'.
+def is_appcfg_oauth_token_cached():
+  """Returns true if ~/.appcfg_oauth2_tokens exists."""
+  return os.path.exists(_appcfg_oauth2_tokens())
+
+
+# TODO(vadimsh): Can be removed if using 'gcloud'.
+def appcfg_login(app):
+  """Starts appcfg.py's login flow."""
+  if not _GAE_SDK_PATH:
+    raise ValueError('Call setup_gae_sdk first')
+  if os.path.exists(_appcfg_oauth2_tokens()):
+    os.remove(_appcfg_oauth2_tokens())
+  # HACK: Call a command with no side effect to launch the flow.
+  subprocess.call([
+    sys.executable,
+    os.path.join(_GAE_SDK_PATH, 'appcfg.py'),
+    '--application', app.app_id,
+    '--noauth_local_webserver',
+    'list_versions',
+  ], cwd=app.app_dir)
 
 
 def setup_gae_env():
