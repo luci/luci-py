@@ -610,9 +610,9 @@ class TaskProperties(ndb.Model):
               'an idempotent task cannot have unpinned packages; '
               'use tags or instance IDs as package versions')
 
-    if len(self.outputs) > 2048:
+    if len(self.outputs) > 4096:
       raise datastore_errors.BadValueError(
-          'Up to 2048 outputs can be listed for a task')
+          'Up to 4096 outputs can be listed for a task')
 
 
 class TaskRequest(ndb.Model):
