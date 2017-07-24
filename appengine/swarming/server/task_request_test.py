@@ -570,9 +570,10 @@ class TaskRequestApiTest(TestCase):
     # Execution timeout.
     with self.assertRaises(datastore_errors.BadValueError):
       mkreq(_gen_request(
-          properties=dict(execution_timeout_secs=task_request._ONE_DAY_SECS+1)))
+          properties=dict(
+              execution_timeout_secs=task_request._THREE_DAY_SECS+1)))
     mkreq(_gen_request(
-        properties=dict(execution_timeout_secs=task_request._ONE_DAY_SECS)))
+        properties=dict(execution_timeout_secs=task_request._THREE_DAY_SECS)))
 
     # Expiration.
     now = utils.utcnow()

@@ -75,8 +75,8 @@ import cipd
 MAXIMUM_PRIORITY = 255
 
 
-# One day in seconds. Add 10s to account for small jitter.
-_ONE_DAY_SECS = 24*60*60 + 10
+# Three days in seconds. Add 10s to account for small jitter.
+_THREE_DAY_SECS = 3*24*60*60 + 10
 
 
 # Seven day in seconds. Add 10s to account for small jitter.
@@ -227,10 +227,10 @@ def _validate_task_run_id(_prop, value):
 
 def _validate_timeout(prop, value):
   """Validates timeouts in seconds in TaskProperties."""
-  if value and not (_MIN_TIMEOUT_SECS <= value <= _ONE_DAY_SECS):
+  if value and not (_MIN_TIMEOUT_SECS <= value <= _THREE_DAY_SECS):
     # pylint: disable=W0212
     raise datastore_errors.BadValueError(
-        '%s (%ds) must be 0 or between %ds and one day' %
+        '%s (%ds) must be 0 or between %ds and three days' %
             (prop._name, value, _MIN_TIMEOUT_SECS))
 
 
