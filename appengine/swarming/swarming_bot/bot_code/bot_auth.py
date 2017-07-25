@@ -209,9 +209,10 @@ class AuthSystem(object):
     contains its parameters. It can be placed into LUCI_CONTEXT['local_auth']
     slot.
 
-    By default LUCI subprocesses will be using "task" service account (or none
-    at all, it the task has no associated service account). Internal Swarming
-    processes (like run_isolated.py) can switch to using "system" account.
+    Sets default service account (to be used by Swarming internal processes,
+    like run_isolated.py) to 'system' (or unsets it if the bot has no associated
+    service account). run_isolated.py eventually switches the default account to
+    'task' before launching the actual user-supplied code.
 
     If task is not using service accounts, returns None (meaning, there's no
     need to setup LUCI_CONTEXT['local_auth'] at all).
@@ -252,18 +253,22 @@ class AuthSystem(object):
 
     # Expose all defined accounts (if any) to subprocesses via LUCI_CONTEXT.
     #
-    # Use 'task' account as default for everything. Internal Swarming processes
-    # will pro-actively switch to 'system'.
+    # Use 'system' logical account as default for internal Swarming processes.
+    # It is specified by 'system_service_account' field in bots.cfg. Swarming
+    # will eventually switch to 'task' logical account before launching
+    # user-supplied code. 'task' account is specified in the task definition.
+    # This happens in run_isolated.py.
     #
-    # If 'task' is not defined, then do not set default account at all! It means
-    # processes will use non-authenticated calls by default (which is precisely
-    # the meaning of un-set task account).
+    # If 'system_service_account' is not defined, then do not set default
+    # account at all! It means internal Swarming processes will use
+    # non-authenticated calls (which is precisely the meaning of un-set
+    # system account).
     default_account_id = None
     available_accounts = []
     if params.system_service_account != 'none':
+      default_account_id = 'system'
       available_accounts.append('system')
     if params.task_service_account != 'none':
-      default_account_id = 'task'
       available_accounts.append('task')
 
     # If using service accounts, launch local HTTP server that serves tokens

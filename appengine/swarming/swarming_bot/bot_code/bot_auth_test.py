@@ -104,13 +104,12 @@ class AuthSystemTest(auto_stub.TestCase):
         swarming_http_headers_exp=exp,
         system_service_account='none',
         task_service_account='bot'))
-    self.assertEqual(
-        ['accounts', 'default_account_id', 'rpc_port', 'secret'],
-        sorted(local_auth_ctx))
+    # Note: default_account_id is omitted when it is None.
+    self.assertEqual(['accounts', 'rpc_port', 'secret'], sorted(local_auth_ctx))
 
-    # Only 'task' account is defined (no 'system'). It is also default.
+    # Only 'task' account is defined (no 'system'). And there's NO default.
     self.assertEqual([{'id': 'task'}], local_auth_ctx['accounts'])
-    self.assertEqual('task', local_auth_ctx['default_account_id'])
+    self.assertFalse(local_auth_ctx.get('default_account_id'))
 
     # Try to use the local RPC service to grab a 'task' token. Should return
     # the token specified by 'swarming_http_headers'.
@@ -136,13 +135,13 @@ class AuthSystemTest(auto_stub.TestCase):
         swarming_http_headers_exp=exp,
         system_service_account='bot',
         task_service_account='none'))
-    # Note: default_account_id is omitted when it is None.
-    self.assertEqual(['accounts', 'rpc_port', 'secret'], sorted(local_auth_ctx))
+    self.assertEqual(
+        ['accounts', 'default_account_id', 'rpc_port', 'secret'],
+        sorted(local_auth_ctx))
 
-    # Only 'system' account is defined (no 'task'). And there's NO default
-    # account at all.
+    # Only 'system' account is defined (no 'task'), and it is default.
     self.assertEqual([{'id': 'system'}], local_auth_ctx['accounts'])
-    self.assertFalse(local_auth_ctx.get('default_account_id'))
+    self.assertEqual('system', local_auth_ctx['default_account_id'])
 
     # Try to use the local RPC service to grab a 'system' token. Should return
     # the token specified by 'swarming_http_headers'.
@@ -172,10 +171,10 @@ class AuthSystemTest(auto_stub.TestCase):
         ['accounts', 'default_account_id', 'rpc_port', 'secret'],
         sorted(local_auth_ctx))
 
-    # Both are defined, 'task' is default.
+    # Both are defined, 'system' is default.
     self.assertEqual(
         [{'id': 'system'}, {'id': 'task'}], local_auth_ctx['accounts'])
-    self.assertEqual('task', local_auth_ctx.get('default_account_id'))
+    self.assertEqual('system', local_auth_ctx.get('default_account_id'))
 
     # Both 'system' and 'task' tokens work.
     for account_id in ('system', 'task'):
