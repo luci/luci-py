@@ -790,10 +790,9 @@ def bot_update_task(
     logging.error('Task %s %s', packed, error)
     return None
   # Caller must retry if PubSub enqueue fails.
-  task_completed = run_result.state != task_result.State.RUNNING
   if not _maybe_pubsub_notify_now(smry, request):
     return None
-  if task_completed:
+  if smry.state not in task_result.State.STATES_RUNNING:
     event_mon_metrics.send_task_event(smry)
     ts_mon_metrics.update_jobs_completed_metrics(smry)
   return run_result.state
