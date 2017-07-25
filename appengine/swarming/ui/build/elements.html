@@ -1242,13 +1242,14 @@ weekdays:"星期日_星期一_星期二_星期三_星期四_星期五_星期六"
         }
         var packages = request.properties.cipd_input.packages || [];
         var actual = (result && result.cipd_pins && result.cipd_pins.packages) || [];
-        packages.forEach(function(p) {
+        packages.forEach(function(p, i) {
           p.requested = p.package_name + ":" + p.version;
-          actual.forEach(function(c) {
-            if (c.path === p.path) {
-              p.actual = c.package_name + ":" + c.version;
-            }
-          });
+          // This makes the key assumption that the actual cipd array is in the same order
+          // as the requested one. Otherwise, there's no easy way to match them up, because
+          // of the wildcards (e.g. requested is foo/${platform} and actual is foo/linux-amd64)
+          if (actual[i]) {
+            p.actual = actual[i].package_name + ":" + actual[i].version;
+          }
         });
         return packages;
       },
