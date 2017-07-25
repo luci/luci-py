@@ -15,6 +15,7 @@ APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, APP_DIR)
 import test_env_handlers
 
+from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
 import webtest
@@ -710,10 +711,11 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_schedule_request_id_without_pool(self):
     self.mock_dim_acls({u'pool:good': u'mocked'})
-    with self.assertRaises(auth.AuthorizationError):
+    with self.assertRaises(datastore_errors.BadValueError):
       self._quick_schedule(properties={'dimensions': {u'id': u'abc'}})
     auth_testing.mock_is_admin(self)
-    self._quick_schedule(properties={'dimensions': {u'id': u'abc'}}, nb_task=0)
+    with self.assertRaises(datastore_errors.BadValueError):
+      self._quick_schedule(properties={'dimensions': {u'id': u'abc'}})
 
   def test_schedule_request_id_and_pool(self):
     self.mock_dim_acls({u'pool:good': u'mocked'})

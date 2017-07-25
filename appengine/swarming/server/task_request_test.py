@@ -552,8 +552,11 @@ class TaskRequestApiTest(TestCase):
     with self.assertRaises(datastore_errors.BadValueError):
       mkreq(_gen_request(
           properties=dict(dimensions={u'id': u'b', u'a:': u'b'})))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkreq(_gen_request(
+          properties=dict(dimensions={u'id': u'b', u'a.': u'b'})))
     mkreq(_gen_request(
-        properties=dict(dimensions={u'id': u'b', u'a.': u'b'})))
+        properties=dict(dimensions={u'id': u'b', u'pool': u'b'})))
 
     # Environment.
     with self.assertRaises(TypeError):

@@ -162,9 +162,6 @@ def _validate_dimensions(prop, value):
     if not config.validate_dimension_value(val):
       raise datastore_errors.BadValueError(
           u'dimension %r:%r isn\'t valid' % (key, val))
-  if u'pool' not in value and u'id' not in value:
-    raise datastore_errors.BadValueError(
-        u'At least one of \'id\' or \'pool\' must be used as %s' % prop._name)
   if len(value) > 64:
     raise datastore_errors.BadValueError(
         '%s can have up to 64 keys' % prop._name)
@@ -489,7 +486,7 @@ class TaskProperties(ndb.Model):
 
   # Filter to use to determine the required properties on the bot to run on. For
   # example, Windows or hostname. Encoded as json. Either 'pool' or 'id'
-  # dimension are required (see _validate_dimensions).
+  # dimension are required (see _validate_dimensions and _pre_put_hook).
   dimensions = datastore_utils.DeterministicJsonProperty(
       validator=_validate_dimensions, json_type=dict, indexed=False)
 
@@ -554,8 +551,13 @@ class TaskProperties(ndb.Model):
     super(TaskProperties, self)._pre_put_hook()
     if self.is_terminate:
       # Most values are not valid with a terminate task. self.is_terminate
-      # already check those.
+      # already check those. Terminate task can only use 'id'.
       return
+
+    if u'pool' not in self.dimensions:
+      # Only terminate task may no use 'pool'. Others must specify one.
+      raise datastore_errors.BadValueError(
+          u'\'pool\' must be used as dimensions')
 
     isolated_input = self.inputs_ref and self.inputs_ref.isolated
     if not self.command and not isolated_input:

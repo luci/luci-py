@@ -396,17 +396,7 @@ def _check_dimension_acls(request):
 
   ident = request.authenticated
   dims = request.properties.dimensions
-  assert 'id' in dims or 'pool' in dims, dims # see _validate_dimensions
   assert ident is not None # see task_request.init_new_request
-
-  # Forbid targeting individual bots for non-admins, but allow using 'id' if
-  # 'pool' is used as well (so whoever can posts tasks to 'pool', can target an
-  # individual bot in that pool).
-  if 'id' in dims and 'pool' not in dims:
-    if not acl.is_admin():
-      raise auth.AuthorizationError(
-          'Only Swarming administrators can post tasks with "id" dimension '
-          'without specifying a "pool" dimension.')
 
   for k, v in sorted(dims.iteritems()):
     if not _can_use_dimension(dim_acls, ident, k, v):
