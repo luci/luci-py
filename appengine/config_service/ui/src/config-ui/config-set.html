@@ -68,10 +68,10 @@
     </style>
 
     <iron-ajax
-        auto
         id="requestConfigs"
         url="/_ah/api/config/v1/config-sets?config_set=[[category]]/[[name]][[route.path]]&include_files=true&include_last_import_attempt=true"
         handle-as="json"
+        on-error="_onRequestError"
         on-response="_onGotConfigFiles"
         headers="[[auth_headers]]">
     </iron-ajax>
@@ -130,33 +130,40 @@
         <p id="refreshStatus">[[refreshMessage]]</p>
       </div>      
     </div>
-    <template is="dom-if" if="[[isRefreshing]]">
-      <div class="spinner">
-        <paper-spinner active></paper-spinner>
-      </div>
-    </template>
-    <template is="dom-if" if="[[_not(isRefreshing)]]">
-      <template is="dom-if" if="[[isLoading]]">
+    <template is="dom-if" if="[[_not(errorMessage)]]">
+      <template is="dom-if" if="[[isRefreshing]]">
         <div class="spinner">
           <paper-spinner active></paper-spinner>
         </div>
       </template>
-      <template is="dom-if" if="[[_not(isLoading)]]">
-        <template is="dom-if" if="[[_isEmpty(files)]]">
-          <div class="center" style="font-family: sans-serif;">
-            No config files found.
+      <template is="dom-if" if="[[_not(isRefreshing)]]">
+        <template is="dom-if" if="[[isLoading]]">
+          <div class="spinner">
+            <paper-spinner active></paper-spinner>
           </div>
         </template>
-        <template is="dom-if" if="[[_not(_isEmpty(files))]]">
-          <template is="dom-repeat" items="[[files]]" as="file">
-            <div class="center config-card">  
-              <config-file-card
-                  name="[[file.path]]" link="[[location]]/[[file.path]]">
-              </config-file-card>
+        <template is="dom-if" if="[[_not(isLoading)]]">
+          <template is="dom-if" if="[[_isEmpty(files)]]">
+            <div class="center" style="font-family: sans-serif;">
+              No config files found.
             </div>
+          </template>
+          <template is="dom-if" if="[[_not(_isEmpty(files))]]">
+            <template is="dom-repeat" items="[[files]]" as="file">
+              <div class="center config-card">  
+                <config-file-card
+                    name="[[file.path]]" link="[[location]]/[[file.path]]">
+                </config-file-card>
+              </div>
+            </template>
           </template>
         </template>
       </template>
+    </template>
+    <template is="dom-if" if="[[errorMessage]]">
+      <div class="center">
+        <p>[[errorMessage]]</p>
+      </div>
     </template>
   </template>
   <script>
@@ -201,6 +208,11 @@
         },
 
         refreshMessage: {
+          type: String,
+          value: null
+        },
+
+        errorMessage: {
           type: String,
           value: null
         }
@@ -248,6 +260,7 @@
         this.lastImportAttempt = 
             event.detail.response.config_sets[0].last_import_attempt || null;
         this.isLoading = false;
+        this.errorMessage = null;
         this.fire('processedConfigFiles');
       },
 
@@ -255,7 +268,22 @@
         this.isRefreshing = false;
         this.refreshMessage = "Error: Files could not be refreshed.";
         this.fire('refreshError');
+      },
+
+      _onRequestError: function(event) {
+        var error = parseInt(event.detail.error.message.match(/\d+/g));
+        this.isLoading = false;
+        if (error === 403) {
+          this.errorMessage = "Authorization required to view this config set. " +
+              "Please sign in.";
+        } else if (500 <= error && error < 600) {
+          this.errorMessage = "Internal server error.";
+        } else {
+          this.errorMessage = "Error occured. Try again later.";
+        }
+        this.fire('fetchError');
       }
+
     });
   </script>
 </dom-module>

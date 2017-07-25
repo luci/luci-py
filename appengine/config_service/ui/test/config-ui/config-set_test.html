@@ -251,6 +251,82 @@
           }.bind(config_set));
         });
       });
+
+      suite('Unsuccessful fetch of config files', function() {
+        var ajax;
+        var request;
+        var server;
+        var param;
+        var responseHeaders = {
+          json: { 'Content-Type': 'application/json' }
+        };
+        var config_set;
+
+        setup(function() {
+          server = sinon.fakeServer.create();
+          config_set = fixture('valid-project-with-config-files');
+          ajax = Polymer.dom(config_set.root).querySelector('#requestConfigs');
+        });
+
+        teardown(function() {
+          server.restore();
+        });
+
+        test('displays error if fetch failed due to error 403', function (done) {
+          param = {
+            error: {
+              code: 403,
+              message: "Error 403"
+            }
+          }
+          server.respondWith(
+            'GET',
+            /\/_ah\/api\/config\/v1\/config-sets\?config_set=([a-z\-]+)\/([a-z\-]+)&include_files=true&include_last_import_attempt=true/,
+            [
+              403,
+              responseHeaders.json,
+              JSON.stringify(param)
+            ]
+          );
+          request = ajax.generateRequest();
+          server.respond();
+          assert.equal(request.status, 403);
+          config_set.addEventListener('fetchError', function() {
+            assert.equal(config_set.isLoading, false);
+            assert.equal(config_set.errorMessage, "Authorization required to view this config set." +
+              " Please sign in.");
+            done();
+          }.bind(config_set));
+        });
+
+        test('displays error if fetch failed due to error 500', function (done) {
+          param = {
+            error: {
+              code: 500,
+              message: "Error 500"
+            }
+          }
+          server.respondWith(
+            'GET',
+            /\/_ah\/api\/config\/v1\/config-sets\?config_set=([a-z\-]+)\/([a-z\-]+)&include_files=true&include_last_import_attempt=true/,
+            [
+              500,
+              responseHeaders.json,
+              JSON.stringify(param)
+            ]
+          );
+          request = ajax.generateRequest();
+          server.respond();
+          assert.equal(request.status, 500);
+          config_set.addEventListener('fetchError', function() {
+            assert.equal(config_set.isLoading, false);
+            assert.equal(config_set.errorMessage, "Internal server error.");
+            done();
+          }.bind(config_set));
+        });
+
+      });
+
     </script>
   </body>
 </html>
