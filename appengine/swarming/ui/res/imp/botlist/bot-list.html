@@ -337,6 +337,12 @@
         }
         return bot.state.temp.average || UNKNOWN;
       },
+      cpu: function(bot) {
+        if (this._verbose) {
+          return this._attribute(bot, "cpu", "none").join(" | ");
+        }
+        return swarming.longest(this._attribute(bot, "cpu", "none"));
+      },
       device_temperature: function(){
         return "";
       },
@@ -406,7 +412,7 @@
         // If a bot is both dead and quarantined, show the deadness over the
         // quarentinedness.
         if (bot.is_dead) {
-          return "Dead.  Last seen " + sk.human.diffDate(bot.last_seen_ts) +
+          return "Dead. Last seen " + sk.human.diffDate(bot.last_seen_ts) +
               " ago";
         }
         if (bot.quarantined) {
@@ -567,6 +573,30 @@
         var botACol = this._state(botA, "running_time") || 0;
         var botBCol = this._state(botB, "running_time") || 0;
         return dir * naturalSort(botACol, botBCol)
+      },
+      status: function(dir, botA, botB) {
+        // Case 1: One of the bots is dead, sort dead bot over alive/quarantined bot.
+        if (botA.is_dead !== botB.is_dead) {
+          if (botA.is_dead) {
+            return dir;
+          } else {
+            return -dir;
+          }
+        }
+        // Case 2: Bots match on deadness, quarantinedness, or aliveness
+        // In this case, sort by last seen time.
+        if (botA.is_dead && botB.is_dead ||
+            botA.quarantined && botB.quarantined ||
+            !botA.is_dead && !botB.is_dead && !botA.quarantined && !botB.quarantined ) {
+          var botACol = botA.last_seen_ts;
+          var botBCol = botB.last_seen_ts;
+          return dir * naturalSort(botACol, botBCol)
+        }
+        // Case 3: One of the bots is quarantined.  Sort quarantined bot over alive bot.
+        if (botA.quarantined) {
+          return dir;
+        }
+        return -dir;
       },
       uptime: function(dir, botA, botB) {
         var botACol = this._state(botA, "uptime") || 0;
