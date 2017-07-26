@@ -18,6 +18,7 @@ Swarming is purely a task scheduler service.
     *   IAM & Admin
         *   Click `Add Member` and add someone else so you can safely be hit by a
             bus.
+    *   API Manager
         *   Create a new "Oauth 2.0 Client Id" of type "web application".  Make sure
             `https://<appid>.appspot.com` is an authorized JavaScript origin
             and `https://<appid>.appspot.com/oauth2callback` is an authorized
