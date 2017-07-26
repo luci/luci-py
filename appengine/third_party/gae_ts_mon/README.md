@@ -59,7 +59,7 @@
     something like `app-id@appspot.gserviceaccount.com`.
     Add it as a "Service Account Actor" of the "App Engine Metric Publishers"
     service account in the
-    (google.com:prodx-mon-chrome-infra project)[https://console.developers.google.com/iam-admin/serviceaccounts/project?project=google.com:prodx-mon-chrome-infra&organizationId=433637338589]
+    [google.com:prodx-mon-chrome-infra project](https://console.developers.google.com/iam-admin/serviceaccounts/project?project=google.com:prodx-mon-chrome-infra&organizationId=433637338589)
     by selecting it from the list and clicking "Permissions".
     If you see an error "You do not have viewing permissions for the selected
     resource.", then please ask the current chrome-trooper to do it for you.
