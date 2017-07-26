@@ -66,6 +66,7 @@
         id="requestConfigs"
         url="/_ah/api/config/v1/config-sets?include_last_import_attempt=true"
         handle-as="json"
+        on-error="_onRequestError"
         on-response="_onGotConfigSets"
         headers="[[auth_headers]]">
     </iron-ajax>
@@ -83,18 +84,23 @@
         </div>
       </template>
       <template is="dom-if" if="[[_not(isLoading)]]">
-        <template is="dom-if" if="[[_isEmpty(searchResults)]]">
-          <div class="center name">No config sets found.</div>
-        </template>
-        <template is="dom-if" if="[[_not(_isEmpty(searchResults))]]">
-          <template is="dom-repeat" items="[[searchResults]]" as="config">
-            <div class="center config-card">
-              <config-set-card
-                name="[[config.config_set]]" 
-                last-import-attempt="[[_getLastImportAttempt(config.last_import_attempt)]]">
-              </config-set-card>
-            </div>
+        <template is="dom-if" if="[[_not(errorMessage)]]">
+          <template is="dom-if" if="[[_isEmpty(searchResults)]]">
+            <div class="center name">No config sets found.</div>
           </template>
+          <template is="dom-if" if="[[_not(_isEmpty(searchResults))]]">
+            <template is="dom-repeat" items="[[searchResults]]" as="config">
+              <div class="center config-card">
+                <config-set-card
+                  name="[[config.config_set]]" 
+                  last-import-attempt="[[_getLastImportAttempt(config.last_import_attempt)]]">
+                </config-set-card>
+              </div>
+            </template>
+          </template>
+        </template>
+        <template is="dom-if" if="[[errorMessage]]">
+          <div class="center name">[[errorMessage]]</div>
         </template>
       </template>
     </div>
@@ -107,6 +113,11 @@
         configSetList: {
           type: Array,
           value: () => []
+        },
+
+        errorMessage: {
+          type: String,
+          value: null
         },
 
         isLoading: {
@@ -150,6 +161,10 @@
         return array.length === 0;
       },
 
+      _not: function(b) {
+        return !b;
+      },
+
       _onGotConfigSets: function(event) {
         this.configSetList = event.detail.response.config_sets;
         this._updateSearchResults();
@@ -157,8 +172,17 @@
         this.fire('processedConfigSets');
       },
 
-      _not: function(b) {
-        return !b;
+      _onRequestError: function(event) {
+        var error = parseInt(event.detail.error.message.match(/\d+/g));
+        if (error === 403) {
+          this.errorMessage = "Access denied.";
+        } else if (500 <= error && error < 600) {
+          this.errorMessage = "Internal server error. Please refresh or try again later.";
+        } else {
+          this.errorMessage = "Error occured. Please try again later.";
+        }
+        this.isLoading = false;
+        this.fire('fetchError');
       },
 
       _updateSearchResults: function() {
