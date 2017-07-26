@@ -457,6 +457,7 @@ class BotOAuthTokenHandler(_BotApiHandler):
   @auth.public  # auth happens in bot_auth.validate_bot_id_and_fetch_config()
   def post(self):
     request = self.parse_body()
+    logging.debug('Request body: %s', request)
     msg = log_unexpected_subset_keys(
         self.ACCEPTED_KEYS, self.REQUIRED_KEYS, request, self.request, 'bot',
         'keys')
