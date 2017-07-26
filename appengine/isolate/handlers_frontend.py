@@ -414,10 +414,12 @@ def get_routes():
       # User web pages.
       webapp2.Route(r'/browse', BrowseHandler),
       webapp2.Route(r'/content', ContentHandler),
-      webapp2.Route(r'/stats', StatsHandler),
-      webapp2.Route(r'/isolate/api/v1/stats/days', StatsGvizDaysHandler),
-      webapp2.Route(r'/isolate/api/v1/stats/hours', StatsGvizHoursHandler),
-      webapp2.Route(r'/isolate/api/v1/stats/minutes', StatsGvizMinutesHandler),
+      # TODO(maruel): These really need to be migrated to Cloud Endpoints, gviz
+      # is just too sorry.
+      #webapp2.Route(r'/stats', StatsHandler),
+      #webapp2.Route(r'/isolate/api/v1/stats/days', StatsGvizDaysHandler),
+      #webapp2.Route(r'/isolate/api/v1/stats/hours', StatsGvizHoursHandler),
+      #webapp2.Route(r'/isolate/api/v1/stats/minutes', StatsGvizMinutesHandler),
       webapp2.Route(r'/', RootHandler),
 
       # AppEngine-specific urls:

@@ -258,13 +258,13 @@ class MainTest(test_case.TestCase):
     self.assertIn('Update conflict', resp)
     self.assertEqual('', config.settings().google_analytics)
 
-  def test_stats(self):
+  def disabled_test_stats(self):
     self._gen_stats()
     response = self.app_frontend.get('/stats')
     # Just ensure something is returned.
     self.assertGreater(response.content_length, 4000)
 
-  def test_api_stats_days(self):
+  def disabled_test_api_stats_days(self):
     self._gen_stats()
     # It's cheezy but at least it asserts that the data makes sense.
     expected = (
@@ -283,7 +283,7 @@ class MainTest(test_case.TestCase):
     response = self.app_frontend.get('/isolate/api/v1/stats/days?duration=1')
     self.assertEqual(expected, response.body)
 
-  def test_api_stats_hours(self):
+  def disabled_test_api_stats_hours(self):
     self._gen_stats()
     # It's cheezy but at least it asserts that the data makes sense.
     expected = (
@@ -303,7 +303,7 @@ class MainTest(test_case.TestCase):
         '/isolate/api/v1/stats/hours?duration=1&now=')
     self.assertEqual(expected, response.body)
 
-  def test_api_stats_minutes(self):
+  def disabled_test_api_stats_minutes(self):
     self._gen_stats()
     # It's cheezy but at least it asserts that the data makes sense.
     expected = (
