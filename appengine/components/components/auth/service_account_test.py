@@ -3,10 +3,11 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-import base64
 import collections
 import datetime
 import json
+import logging
+import os
 import sys
 import unittest
 
@@ -45,8 +46,12 @@ class FakeSigner(object):
 class GetAccessTokenTest(test_case.TestCase):
   def setUp(self):
     super(GetAccessTokenTest, self).setUp()
-    self.mock(service_account.logging, 'error', lambda *_: None)
-    self.mock(service_account.logging, 'warning', lambda *_: None)
+    self.log_lines = []
+    def mocked_log(msg, *args):
+      self.log_lines.append(msg % args)
+    self.mock(logging, 'info', mocked_log)
+    self.mock(logging, 'error', mocked_log)
+    self.mock(logging, 'warning', mocked_log)
 
   def mock_methods(self):
     calls = []
@@ -169,6 +174,7 @@ class GetAccessTokenTest(test_case.TestCase):
 
   def test_mint_jwt_based_token(self):
     self.mock_now(datetime.datetime(2015, 1, 2, 3))
+    self.mock(os, 'urandom', lambda x: '1'*x)
 
     calls = []
     @ndb.tasklet
@@ -187,6 +193,7 @@ class GetAccessTokenTest(test_case.TestCase):
       'exp': 1420171195,
       'iat': 1420167595,
       'iss': 'fake@example.com',
+      'jti': 'MTExMTExMTExMTExMTExMQ',
       'scope': 'scope1 scope2',
     }], signer.claimsets)
 
@@ -359,12 +366,6 @@ class GetAccessTokenTest(test_case.TestCase):
 
     jwt = signer.sign_claimset_async(claimset).get_result()
 
-    def decode(blob):
-      mod = len(blob) % 4
-      if mod:
-        blob += '=' * (4 - mod)
-      return base64.urlsafe_b64decode(blob)
-
     # Deconstruct JWT.
     chunks = jwt.split('.')
     self.assertEqual(3, len(chunks))
@@ -372,11 +373,29 @@ class GetAccessTokenTest(test_case.TestCase):
       u'alg': u'RS256',
       u'kid': u'pkey_id',
       u'typ': u'JWT',
-    }, json.loads(decode(chunks[0])))
-    self.assertEqual(claimset, json.loads(decode(chunks[1])))
-    self.assertEqual('\x00signature\x00', decode(chunks[2]))
+    }, json.loads(service_account._b64_decode(chunks[0])))
+    self.assertEqual(
+        claimset, json.loads(service_account._b64_decode(chunks[1])))
+    self.assertEqual(
+        '\x00signature\x00', service_account._b64_decode(chunks[2]))
+
+    # Logged the token, the signature is truncated.
+    self.assertEqual(
+        'signed_jwt: by=email method=local '
+        'hdr={"alg":"RS256","kid":"pkey_id","typ":"JWT"} '
+        'claims={"aud":"https://www.googleapis.com/oauth2/v4/token",'
+        '"exp":1420171185,"iat":1420167585,"iss":"fake@example.com",'
+        '"scope":"scope1 scope2"} '
+        'sig_prefix=AHNpZ25hdHVy fp=969934c161c64846dbfcbe9776191a73',
+        self.log_lines[0])
+
 
   def test_remote_signer(self):
+    fakeJwt = '%s.%s.%s' % (
+        service_account._b64_encode('{"alg":"RS256","kid":"xyz","typ":"JWT"}'),
+        service_account._b64_encode('{"fake":"payload"}'),
+        '0123456789101112131415')
+
     @ndb.tasklet
     def iam_token():
       raise ndb.Return(('iam_token', 0))
@@ -398,7 +417,7 @@ class GetAccessTokenTest(test_case.TestCase):
         'Authorization': 'Bearer iam_token',
         'Content-Type': 'application/json; charset=utf-8',
       },
-      'response': (200, {'signedJwt': 'abcdef'})
+      'response': (200, {'signedJwt': fakeJwt})
     }])
 
     jwt = signer.sign_claimset_async({
@@ -408,7 +427,15 @@ class GetAccessTokenTest(test_case.TestCase):
       'iss': 'fake@example.com',
       'scope': 'scope1 scope2',
     }).get_result()
-    self.assertEqual('abcdef', jwt)
+    self.assertEqual(fakeJwt, jwt)
+
+    # Logged the token, the signature is truncated.
+    self.assertEqual(
+        'signed_jwt: by=fake@example.com method=remote '
+        'hdr={"alg":"RS256","kid":"xyz","typ":"JWT"} '
+        'claims={"fake":"payload"} sig_prefix=012345678910 '
+        'fp=3a2c2cc0a8427886acd8a012b1a4d09f',
+        self.log_lines[1])
 
 
 if __name__ == '__main__':

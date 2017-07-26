@@ -16,6 +16,7 @@ import collections
 import hashlib
 import json
 import logging
+import os
 import random
 import urllib
 
@@ -216,6 +217,7 @@ def _mint_jwt_based_token_async(scopes, signer):
     'exp': now + 3600,
     'iat': now,
     'iss': signer.email,
+    'jti': _b64_encode(os.urandom(16)),
     'scope': ' '.join(scopes),
   })
 
@@ -311,6 +313,64 @@ def _memcache_set(*args, **kwargs):
   return ndb.get_context().memcache_set(*args, **kwargs)
 
 
+def _is_json_object(blob):
+  """True if blob is valid JSON object, i.e '{...}'."""
+  try:
+    return isinstance(json.loads(blob), dict)
+  except ValueError:
+    return False
+
+
+def _log_jwt(email, method, jwt):
+  """Logs information about the signed JWT.
+
+  Does some minimal validation which fails only if Google backends misbehave,
+  which should not happen. Logs broken JWTs, assuming they are unusable.
+  """
+  parts = jwt.split('.')
+  if len(parts) != 3:
+    logging.error(
+        'Got broken JWT (not <hdr>.<claims>.<sig>): by=%s method=%s jwt=%r',
+        email, method, jwt)
+    raise AccessTokenError('Got broken JWT, see logs')
+
+  try:
+    hdr = _b64_decode(parts[0])     # includes key ID
+    claims = _b64_decode(parts[1])  # includes scopes and timestamp
+    sig = parts[2][:12]             # only 9 bytes of the signature
+  except (TypeError, ValueError):
+    logging.error(
+        'Got broken JWT (can\'t base64-decode): by=%s method=%s jwt=%r',
+        email, method, jwt)
+    raise AccessTokenError('Got broken JWT, see logs')
+
+  if not _is_json_object(hdr):
+    logging.error(
+        'Got broken JWT (the header is not JSON dict): by=%s method=%s jwt=%r',
+        email, method, jwt)
+    raise AccessTokenError('Got broken JWT, see logs')
+  if not _is_json_object(claims):
+    logging.error(
+        'Got broken JWT (claims are not JSON dict): by=%s method=%s jwt=%r',
+        email, method, jwt)
+    raise AccessTokenError('Got broken JWT, see logs')
+
+  logging.info(
+      'signed_jwt: by=%s method=%s hdr=%s claims=%s sig_prefix=%s fp=%s',
+      email, method, hdr, claims, sig, utils.get_token_fingerprint(jwt))
+
+
+def _b64_encode(data):
+  return base64.urlsafe_b64encode(data).rstrip('=')
+
+
+def _b64_decode(data):
+  mod = len(data) % 4
+  if mod:
+    data += '=' * (4 - mod)
+  return base64.urlsafe_b64decode(data)
+
+
 ## Signers implementation.
 
 
@@ -327,21 +387,18 @@ class _LocalSigner(object):
   @ndb.tasklet
   def sign_claimset_async(self, claimset):
     # Prepare JWT header and claimset as base 64.
-    header_b64 = self._b64_encode(utils.encode_to_json({
+    header_b64 = _b64_encode(utils.encode_to_json({
       'alg': 'RS256',
       'kid': self._key.private_key_id,
       'typ': 'JWT',
     }))
-    claimset_b64 = self._b64_encode(utils.encode_to_json(claimset))
+    claimset_b64 = _b64_encode(utils.encode_to_json(claimset))
     # Sign <header>.<claimset> with account's private key.
-    signature_b64 = self._b64_encode(self._rsa_sign(
+    signature_b64 = _b64_encode(self._rsa_sign(
         '%s.%s' % (header_b64, claimset_b64), self._key.private_key))
-    # The final JWT is <header>.<claimset>.<signature>.
-    raise ndb.Return('%s.%s.%s' % (header_b64, claimset_b64, signature_b64))
-
-  @staticmethod
-  def _b64_encode(data):
-   return base64.urlsafe_b64encode(data).rstrip('=')
+    jwt = '%s.%s.%s' % (header_b64, claimset_b64, signature_b64)
+    _log_jwt(self.email, 'local', jwt)
+    raise ndb.Return(jwt)
 
   @staticmethod
   def _rsa_sign(blob, private_key_pem):
@@ -382,4 +439,6 @@ class _RemoteSigner(object):
           'Content-Type': 'application/json; charset=utf-8',
         })
     # 'signedJwt' is base64-encoded string, convert it from unicode to str.
-    raise ndb.Return(response['signedJwt'].encode('ascii'))
+    jwt = response['signedJwt'].encode('ascii')
+    _log_jwt(self.email, 'remote', jwt)
+    raise ndb.Return(jwt)
