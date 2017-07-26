@@ -153,11 +153,45 @@ message DimensionACLs {
 
 message AuthSettings {
   // Members of this group have full administrative access.
+  //
+  // Grants:
+  // - config view and edit
+  // - delete any bot
+  // - all of bot_bootstrap_group membership
+  // - all of privileged_users_group membership
   optional string admins_group = 1;
+
   // Members of this group can fetch swarming bot code and bootstrap bots.
+  //
+  // Grants:
+  // - bot create: create a token to anonymously fetch the bot code.
   optional string bot_bootstrap_group = 2;
+
   // Members of this group can schedule tasks and see everyone else's tasks.
+  //
+  // Grants:
+  // - cancel any task
+  // - edit (terminate) any bot
+  // - all of view_all_bots_group membership
+  // - all of view_all_tasks_group membership
   optional string privileged_users_group = 3;
+
   // Members of this group can schedule tasks and see only their own tasks.
+  //
+  // Grants:
+  // - create a task
+  // - view and edit own task
   optional string users_group = 4;
+
+  // Members of this group can view all bots. This is a read-only group.
+  //
+  // Grants:
+  // - view all bots
+  optional string view_all_bots_group = 5;
+
+  // Members of this group can view all tasks. This is a read-only group.
+  //
+  // Grants:
+  // - view all tasks
+  optional string view_all_tasks_group = 6;
 }

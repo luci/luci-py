@@ -127,7 +127,7 @@ class ServerApiTest(BaseTest):
         u'cancel_tasks': False,
         u'delete_bot': False,
         u'get_bootstrap_token': False,
-        u'get_configs': True,
+        u'get_configs': False,
         u'put_configs': False,
         u'terminate_bot': False,
     }
@@ -142,7 +142,7 @@ class ServerApiTest(BaseTest):
         u'cancel_tasks': False,
         u'delete_bot': False,
         u'get_bootstrap_token': False,
-        u'get_configs': True,
+        u'get_configs': False,
         u'put_configs': False,
         u'terminate_bot': True,
     }
@@ -1352,25 +1352,23 @@ class TaskApiTest(BaseTest):
       out.update((unicode(k), v) for k, v in kwargs.iteritems())
       return out
 
-    def _cycle(params, expected, must_stop):
-      response = self.post_json('/swarming/api/v1/bot/task_update', params)
-      self.assertEqual({u'must_stop': must_stop, u'ok': True}, response)
-      self.assertEqual(expected, self.client_get_results(task_id))
-
+    self.set_as_bot()
     params = _params(output=base64.b64encode('Oh '))
-    expected = _expected()
-    _cycle(params, expected, False)
+    response = self.post_json('/swarming/api/v1/bot/task_update', params)
+    self.assertEqual({u'must_stop': False, u'ok': True}, response)
+    self.set_as_user()
+    self.assertEqual(_expected(), self.client_get_results(task_id))
 
     # Canceling a running task is currently not supported.
-    self.set_as_user()
-    expected = {u'ok': False, u'was_running': True}
     response = self.call_api('cancel', body={'task_id': task_id})
-    self.assertEqual(expected, response.json)
+    self.assertEqual({u'ok': False, u'was_running': True}, response.json)
 
     self.set_as_bot()
     params = _params(output=base64.b64encode('hi'), output_chunk_start=3)
-    expected = _expected()
-    _cycle(params, expected, False)
+    response = self.post_json('/swarming/api/v1/bot/task_update', params)
+    self.assertEqual({u'must_stop': False, u'ok': True}, response)
+    self.set_as_user()
+    self.assertEqual(_expected(), self.client_get_results(task_id))
 
   def test_result_unknown(self):
     """Asserts that result raises 404 for unknown task IDs."""
@@ -1945,7 +1943,7 @@ class BotApiTest(BaseTest):
   def test_delete_ok(self):
     """Assert that delete finds and deletes a bot."""
     self.set_as_admin()
-    self.mock(acl, 'is_admin', lambda *_args, **_kwargs: True)
+    self.mock(acl, '_is_admin', lambda *_args, **_kwargs: True)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
     state = {

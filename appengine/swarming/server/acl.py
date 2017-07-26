@@ -2,32 +2,77 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-"""Defines access groups."""
+"""Defines access groups.
+
+    +------+
+    |admins|
+    +------+
+       ^
+       |
+       +------------------------+
+       |                        |
+    +----------------+    +-------------+
+    |privileged_users|    |bot_bootstrap|
+    +----------------+    +-------------+
+       ^
+       |
+    +-----+
+    |users|
+    +-----+
+
+
+    +-------------+    +--------------+
+    |view_all_bots|    |view_all_tasks|
+    +-------------+    +--------------+
+
+
+    +-------------------------+
+    |is_ip_whitelisted_machine|
+    +-------------------------+
+
+
+Keep this file synchronized with the documentation at ../proto/config.proto.
+"""
 
 from components import auth
 from components import utils
 from server import config
 
 
-def is_admin():
-  admins = config.settings().auth.admins_group
-  return auth.is_group_member(admins) or auth.is_admin()
+def _is_admin():
+  """Full administrative access."""
+  group = config.settings().auth.admins_group
+  return auth.is_group_member(group) or auth.is_admin()
 
 
-def is_privileged_user():
-  priv_users = config.settings().auth.privileged_users_group
-  return auth.is_group_member(priv_users) or is_admin()
+def _is_privileged_user():
+  """Can edit all bots and tasks."""
+  group = config.settings().auth.privileged_users_group
+  return auth.is_group_member(group) or _is_admin()
 
 
-def is_user():
-  users = config.settings().auth.users_group
-  return auth.is_group_member(users) or is_privileged_user()
+def _is_user():
+  group = config.settings().auth.users_group
+  return auth.is_group_member(group) or _is_privileged_user()
 
 
-def is_bootstrapper():
+def _is_view_all_bots():
+  group = config.settings().auth.view_all_bots_group
+  return auth.is_group_member(group) or _is_privileged_user()
+
+
+def _is_view_all_tasks():
+  group = config.settings().auth.view_all_tasks_group
+  return auth.is_group_member(group) or _is_privileged_user()
+
+
+def _is_bootstrapper():
   """Returns True if current user have access to bot code (for bootstrap)."""
   bot_group = config.settings().auth.bot_bootstrap_group
-  return is_admin() or auth.is_group_member(bot_group)
+  return auth.is_group_member(bot_group) or _is_admin()
+
+
+### Capabilities
 
 
 def is_ip_whitelisted_machine():
@@ -39,44 +84,109 @@ def is_ip_whitelisted_machine():
       auth.bots_ip_whitelist(), auth.get_peer_ip(), False)
 
 
-def is_bot():
-  # TODO(vadimsh): Get rid of this. Swarming jobs will use service accounts
-  # associated with the job when calling Swarming, not the machine IP.
-  return is_ip_whitelisted_machine() or is_admin()
+def can_access():
+  """Minimally authenticated user."""
+  return (
+      is_ip_whitelisted_machine() or _is_user() or
+      _is_view_all_bots() or _is_view_all_tasks())
 
 
-def is_bot_or_user():
-  # TODO(vadimsh): Get rid of this. Swarming jobs will use service accounts
-  # associated with the job when calling Swarming, not the machine ID itself.
-  return is_bot() or is_user()
+#### Config
 
 
-def is_bot_or_privileged_user():
-  # TODO(vadimsh): Get rid of this. Swarming jobs will use service accounts
-  # associated with the job when calling Swarming, not the machine ID itself.
-  return is_bot() or is_privileged_user()
+def can_view_config():
+  """Can view the configuration data."""
+  return _is_admin()
 
 
-def is_bot_or_admin():
-  """Returns True if current user can execute user-side and bot-side calls."""
-  # TODO(vadimsh): Get rid of this. Swarming jobs will use service accounts
-  # associated with the job when calling Swarming, not the machine ID itself.
-  return is_bot() or is_admin()
+def can_edit_config():
+  """Can edit the configuration data.
+
+  Only super users can edit the configuration data.
+  """
+  return _is_admin()
+
+
+#### Bot
+
+
+def can_create_bot():
+  """Can create (bootstrap) a bot."""
+  return _is_bootstrapper()
+
+
+def can_edit_bot():
+  """Can terminate a bot.
+
+  Bots can terminate other bots. This may change in the future.
+  """
+  return is_ip_whitelisted_machine() or _is_privileged_user()
+
+
+def can_delete_bot():
+  """Can delete the existence of a bot.
+
+  Bots can delete other bots. This may change in the future.
+  """
+  return is_ip_whitelisted_machine() or _is_admin()
+
+
+def can_view_bot():
+  """Can view bot.
+
+  Bots can view other bots. This may change in the future.
+  """
+  return is_ip_whitelisted_machine() or _is_view_all_bots()
+
+
+#### Task
+
+
+def can_create_task():
+  """Can create a task.
+
+  Swarming is reentrant, a bot can create a new task as part of a task. This may
+  change in the future.
+  """
+  return is_ip_whitelisted_machine() or _is_user()
 
 
 def can_schedule_high_priority_tasks():
   """Returns True if the current user can schedule high priority tasks."""
-  return is_bot() or is_privileged_user()
+  # TODO(maruel): Deny priority < 100 task creation instead of silently
+  # downgrading the priority.
+  return is_ip_whitelisted_machine() or _is_privileged_user()
 
 
-def get_user_type():
-  """Returns a string describing the current access control for the user."""
-  if is_admin():
-    return 'admin'
-  if is_privileged_user():
-    return 'privileged user'
-  if is_user():
-    return 'user'
+def can_edit_task(task):
+  """Can 'edit' tasks, like cancelling.
+
+  Since bots can create tasks, they can also cancel them. This may change in the
+  future.
+  """
+  return (
+      is_ip_whitelisted_machine() or _is_privileged_user() or
+      auth.get_current_identity() == task.authenticated)
+
+
+def can_edit_all_tasks():
+  """Can 'edit' a batch of tasks, like cancelling."""
+  return _is_admin()
+
+
+def can_view_task(task):
+  """Can view a single task."""
+  return (
+      is_ip_whitelisted_machine() or _is_view_all_tasks() or
+      auth.get_current_identity() == task.authenticated)
+
+
+def can_view_all_tasks():
+  """Can view all tasks."""
+  return _is_view_all_tasks()
+
+
+### Other
 
 
 def bootstrap_dev_server_acls():

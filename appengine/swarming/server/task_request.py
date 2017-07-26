@@ -715,20 +715,6 @@ class TaskRequest(ndb.Model):
     """Reconstructs this value from expiration_ts and created_ts. Integer."""
     return int((self.expiration_ts - self.created_ts).total_seconds())
 
-  @property
-  def has_access(self):
-    """Returns True if the current user has read-write access to this request.
-
-    This is used for:
-      * Read access: ability to read the task info and logs.
-      * Write access: ability to cancel the task.
-
-    Warning: This function looks at the current Authentication context.
-    """
-    return (
-        acl.is_privileged_user() or
-        self.authenticated == auth.get_current_identity())
-
   def to_dict(self):
     """Converts properties_hash to hex so it is json serializable."""
     # to_dict() doesn't recurse correctly into ndb.LocalStructuredProperty!

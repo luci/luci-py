@@ -36,7 +36,7 @@ SortOptions = collections.namedtuple('SortOptions', ['key', 'name'])
 
 class RestrictedConfigHandler(auth.AuthenticatingHandler):
   @auth.autologin
-  @auth.require(acl.is_admin)
+  @auth.require(acl.can_view_config)
   def get(self):
     # Template parameters schema matches settings_info() return value.
     self.response.write(template.render(
@@ -47,7 +47,7 @@ class UploadBotConfigHandler(auth.AuthenticatingHandler):
   """Stores a new bot_config.py script."""
 
   @auth.autologin
-  @auth.require(acl.is_admin)
+  @auth.require(acl.can_view_config)
   def get(self):
     bot_config = bot_code.get_bot_config()
     params = {
@@ -61,7 +61,7 @@ class UploadBotConfigHandler(auth.AuthenticatingHandler):
     self.response.write(
         template.render('swarming/restricted_upload_bot_config.html', params))
 
-  @auth.require(acl.is_admin)
+  @auth.require(acl.can_edit_config)
   def post(self):
     script = self.request.get('script', '')
     if not script:
@@ -81,7 +81,7 @@ class UploadBootstrapHandler(auth.AuthenticatingHandler):
   """Stores a new bootstrap.py script."""
 
   @auth.autologin
-  @auth.require(acl.is_admin)
+  @auth.require(acl.can_view_config)
   def get(self):
     bootstrap = bot_code.get_bootstrap(self.request.host_url)
     params = {
@@ -95,7 +95,7 @@ class UploadBootstrapHandler(auth.AuthenticatingHandler):
     self.response.write(
         template.render('swarming/restricted_upload_bootstrap.html', params))
 
-  @auth.require(acl.is_admin)
+  @auth.require(acl.can_edit_config)
   def post(self):
     script = self.request.get('script', '')
     if not script:
@@ -123,7 +123,7 @@ class RestrictedLaunchMapReduceJob(auth.AuthenticatingHandler):
   on backend module.
   """
 
-  @auth.require(acl.is_admin)
+  @auth.require(acl.can_edit_config)
   def post(self):
     job_id = self.request.get('job_id')
     assert job_id in mapreduce_jobs.MAPREDUCE_JOBS
