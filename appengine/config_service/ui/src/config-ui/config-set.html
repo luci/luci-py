@@ -152,7 +152,7 @@
             <template is="dom-repeat" items="[[files]]" as="file">
               <div class="center config-card">  
                 <config-file-card
-                    name="[[file.path]]" link="[[location]]/[[file.path]]">
+                    name="[[file.path]]" link="[[url]]/[[file.path]]">
                 </config-file-card>
               </div>
             </template>
@@ -198,7 +198,7 @@
           type: Object
         },
 
-        location: {
+        url: {
           type: String
         },
 
@@ -256,10 +256,14 @@
       },
 
       _onGotConfigFiles: function(event) {
-        this.files = event.detail.response.config_sets[0].files || [];
-        this.location = event.detail.response.config_sets[0].location;
-        this.lastImportAttempt = 
-            event.detail.response.config_sets[0].last_import_attempt || null;
+        var config_set = event.detail.response.config_sets[0];
+        this.files = config_set.files || [];
+        this.lastImportAttempt = config_set.last_import_attempt || null;
+        if (config_set.revision && config_set.revision.url) {
+          this.url = config_set.revision.url;
+        } else {
+          this.url = config_set.location;
+        }
         this.isLoading = false;
         this.errorMessage = null;
         this.fire('processedConfigFiles');

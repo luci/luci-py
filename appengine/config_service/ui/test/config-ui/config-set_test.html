@@ -46,22 +46,6 @@
 
         setup(function() {
           server = sinon.fakeServer.create();
-          var param = {
-            config_sets: [{
-              files: [{path: "OWNERS"}, {path: "README.md"}],
-              location: "https://test.com/valid-project-with-config-files",
-              last_import_attempt: {success: true}
-            }]
-          };
-          server.respondWith(
-            'GET',
-            /\/_ah\/api\/config\/v1\/config-sets\?config_set=([a-z\-]+)\/([a-z\-]+)&include_files=true&include_last_import_attempt=true/, 
-            [
-              200,
-              responseHeaders.json,
-              JSON.stringify(param)
-            ]
-          );
           config_set = fixture('valid-project-with-config-files');
           ajax = Polymer.dom(config_set.root).querySelector('#requestConfigs');
         });
@@ -69,6 +53,18 @@
         teardown(function() {
           server.restore();
         });
+
+        function setserver(param) {
+          server.respondWith(
+            'GET',
+            /\/_ah\/api\/config\/v1\/config-sets\?config_set=([a-z\-]+)\/([a-z\-]+)&include_files=true&include_last_import_attempt=true/,
+            [
+              200,
+              responseHeaders.json,
+              JSON.stringify(param)
+            ]
+          );
+        }
 
         test('has correct category', function() {
           assert.equal(config_set.category, 'projects');
@@ -83,6 +79,13 @@
         });
 
         test('gets iron-ajax response', function (done) {
+          var param = {
+            config_sets: [{
+              files: [{path: "OWNERS"}, {path: "README.md"}],
+              last_import_attempt: { success: true },
+            }]
+          };
+          setserver(param);
           request = ajax.generateRequest();
           server.respond();
           assert.equal(request.status, 200);
@@ -91,8 +94,49 @@
             assert.equal(config_set.isLoading, false);
             assert.equal(config_set.files.length, 2);
             assert.equal(config_set.lastImportAttempt.success, true);
-            assert.equal(config_set.location, 
-              "https://test.com/valid-project-with-config-files");
+            done();
+          }.bind(config_set));
+        });
+
+        test('has correct url when revision is provided', function(done) {
+          var param = {
+            config_sets: [{
+              files: [{path: "OWNERS"}, {path: "README.md"}],
+              location: "https://test.com/refs/master/valid-project-with-config-files",
+              last_import_attempt: {
+                success: true,
+                revision: {
+                  url: "https://test.com/120c81237zv23hj22/valid-project-with-config-files",
+                  timestamp: "1501162530000000"
+                }
+              },
+              revision: {
+                url: "https://test.com/120c81237zv23hj22/valid-project-with-config-files",
+                id: "4acc18843ff0b8cc858d4cc92ea6fe030cefc2b7"
+              }
+            }]
+          };
+          setserver(param);
+          request = ajax.generateRequest();
+          server.respond();
+          config_set.addEventListener('processedConfigFiles', function() {
+            assert.equal(config_set.url, "https://test.com/120c81237zv23hj22/valid-project-with-config-files");
+            done();
+          }.bind(config_set));
+        });
+
+        test('has correct url when revision is not provided', function(done) {
+          var param = {
+            config_sets: [{
+              files: [{path: "OWNERS"}, {path: "README.md"}],
+              location: "https://test.com/refs/master/valid-project-with-config-files",
+            }]
+          };
+          setserver(param);
+          request = ajax.generateRequest();
+          server.respond();
+          config_set.addEventListener('processedConfigFiles', function() {
+            assert.equal(config_set.url, "https://test.com/refs/master/valid-project-with-config-files");
             done();
           }.bind(config_set));
         });
@@ -153,7 +197,7 @@
             assert.equal(config_set.isLoading, false);
             assert.equal(config_set.files.length, 0);
             assert.equal(config_set.lastImportAttempt.success, false);
-            assert.equal(config_set.location, 
+            assert.equal(config_set.url,
               "https://test.com/invalid-project-without-config-files");
             done();
           }.bind(config_set));
