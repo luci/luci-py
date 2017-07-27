@@ -27,11 +27,13 @@
       p {
         color: var(--paper-grey-600); 
         word-wrap: break-word;
+        font-size: 90%;
       }
       
       .config-title { 
         @apply --paper-font-headline; 
         word-wrap: break-word;
+        font-size: 120%;
       }
 
       .validation {
@@ -51,7 +53,7 @@
     <a href="#/[[name]]">
       <paper-card elevation="2">
         <div class="card-content">
-          <div class="config-title">[[_formatName(name)]]
+          <div class="config-title">[[name]]
             <div class="validation">
               <template is="dom-if" if="[[lastImportAttempt]]" restamp="true">
                 <template is="dom-if" if="[[lastImportAttempt.success]]" restamp="true">
@@ -84,7 +86,6 @@
               </template>
             </div>
           </div>
-          <p>Path: [[name]]</p>
         </div>
       </paper-card>
     </a>
@@ -107,12 +108,6 @@
       _not: function(b) {
         return !b;
       },
-
-      _formatName: function(name) {
-        var tempName = name.substring(name.indexOf("/") + 1);
-        return tempName.includes("/") ?
-            tempName.substring(0, tempName.indexOf("/")) : tempName;
-      }
 
     });
   </script>

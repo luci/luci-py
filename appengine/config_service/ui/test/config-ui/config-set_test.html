@@ -290,19 +290,20 @@
           );
         }
 
-        test('displays error if fetch failed due to error 403 when not signed in', function (done) {
+        test('displays error on 403 when not signed in', function (done) {
           setserver(403);
           request = ajax.generateRequest();
           server.respond();
           assert.equal(request.status, 403);
           config_set.addEventListener('fetchError', function() {
             assert.equal(config_set.isLoading, false);
-            assert.equal(config_set.errorMessage, "Access denied, please sign in.");
+            assert.equal(config_set.errorMessage, 
+                "Access denied, please sign in.");
             done();
           }.bind(config_set));
         });
 
-        test('displays error if fetch failed due to error 403 when signed in', function (done) {
+        test('displays error on 403 when signed in', function (done) {
           setserver(403);
           config_set.auth_headers = {};
           config_set.profile = {
@@ -313,7 +314,8 @@
           assert.equal(request.status, 403);
           config_set.addEventListener('fetchError', function() {
             assert.equal(config_set.isLoading, false);
-            assert.equal(config_set.errorMessage, "Access denied, some_email@google.com" + 
+            assert.equal(config_set.errorMessage, 
+                "Access denied, some_email@google.com" + 
                 " is not authorized to access this config set." + 
                 " Request access or sign in as a different user.");
             done();
