@@ -70,6 +70,7 @@
                   class="right"
                   client_id="[[client_id]]"
                   auth_headers="{{auth_headers}}"
+                  initialized="{{initialized}}"
                   profile="{{profile}}"
                   signed_in="{{signed_in}}">
               </auth-signin>
@@ -98,7 +99,9 @@
                     active="{{frontPageActive}}"></app-route>
 
         <template is="dom-if" if="[[frontPageActive]]">
-          <front-page auth_headers="[[auth_headers]]"></front-page>
+          <front-page auth_headers="[[auth_headers]]"
+                      initialized="[[initialized]]"
+                      signed_in="[[signed_in]]"></front-page>
         </template>
 
         <template is="dom-if" if="[[serviceActive]]" restamp="true">
@@ -106,7 +109,9 @@
                       name="[[serviceData.serviceName]]"
                       route="[[serviceTail]]"
                       auth_headers="[[auth_headers]]"
-                      front-page-is-active="[[frontPageActive]]"></config-set>
+                      initialized="[[initialized]]"
+                      front-page-is-active="[[frontPageActive]]"
+                      profile="[[profile]]"></config-set>
         </template>
 
         <template is="dom-if" if="[[projectActive]]" restamp="true">
@@ -114,7 +119,9 @@
                       name="[[projectData.projectName]]"
                       route="[[projectTail]]"
                       auth_headers="[[auth_headers]]"
-                      front-page-is-active="[[frontPageActive]]"></config-set>
+                      initialized="[[initialized]]"
+                      front-page-is-active="[[frontPageActive]]"
+                      profile="[[profile]]"></config-set>
         </template>
       </app-header-layout>
     </app-drawer-layout>

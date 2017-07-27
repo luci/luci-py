@@ -171,7 +171,6 @@
       is: "config-set",
 
       properties: {
-
         frontPageIsActive: {
           type: Boolean,
           observer: '_frontPageIsActive'
@@ -227,12 +226,14 @@
       _frontPageIsActive: function() {
         if (this.frontPageIsActive === false) {
           this.isLoading = true;
-          this.$.requestConfigs.generateRequest();
+          if (!this.initialized) {
+            document.addEventListener('fetch-configs', function() {
+              this.$.requestConfigs.generateRequest();
+            }.bind(this));
+          } else {
+            this.$.requestConfigs.generateRequest();
+          }
         }
-      },
-
-      ready: function() {
-        this.isLoading = true;
       },
 
       _isEmpty: function(list) {
@@ -274,8 +275,13 @@
         var error = parseInt(event.detail.error.message.match(/\d+/g));
         this.isLoading = false;
         if (error === 403) {
-          this.errorMessage = "Authorization required to view this config set. " +
-              "Please sign in.";
+          if (!this.auth_headers) {
+            this.errorMessage = "Access denied, please sign in.";
+          } else {
+            this.errorMessage = "Access denied, " + this.profile.email + 
+                " is not authorized to access this config set." + 
+                " Request access or sign in as a different user.";
+          }
         } else if (500 <= error && error < 600) {
           this.errorMessage = "Internal server error.";
         } else {

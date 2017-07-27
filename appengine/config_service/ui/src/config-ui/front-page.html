@@ -133,14 +133,29 @@
         searchResults: {
           type: Array,
           value: () => []
+        },
+
+        signed_in: {
+          type: Boolean,
+          observer: '_onSignIn'
         }
       },
 
       ready: function() {
-        document.addEventListener('fetch-configs', function() {
+        if (!this.initialized) {
+          document.addEventListener('fetch-configs', function() {
+            this.$.requestConfigs.generateRequest();
+          }.bind(this));
+        } else {
+          this.$.requestConfigs.generateRequest();
+        }
+      },
+
+      _onSignIn: function() {
+        if (this.signed_in) {
           this.isLoading = true;
           this.$.requestConfigs.generateRequest();
-        }.bind(this));
+        }
       },
 
       _formatName: function(name) {

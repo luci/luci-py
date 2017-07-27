@@ -272,49 +272,56 @@
           server.restore();
         });
 
-        test('displays error if fetch failed due to error 403', function (done) {
+        function setserver(errorNumber) {
           param = {
             error: {
-              code: 403,
-              message: "Error 403"
+              code: errorNumber,
+              message: "Error " + errorNumber.toString()
             }
-          }
+          };
           server.respondWith(
             'GET',
             /\/_ah\/api\/config\/v1\/config-sets\?config_set=([a-z\-]+)\/([a-z\-]+)&include_files=true&include_last_import_attempt=true/,
             [
-              403,
+              errorNumber,
               responseHeaders.json,
               JSON.stringify(param)
             ]
           );
+        }
+
+        test('displays error if fetch failed due to error 403 when not signed in', function (done) {
+          setserver(403);
           request = ajax.generateRequest();
           server.respond();
           assert.equal(request.status, 403);
           config_set.addEventListener('fetchError', function() {
             assert.equal(config_set.isLoading, false);
-            assert.equal(config_set.errorMessage, "Authorization required to view this config set." +
-              " Please sign in.");
+            assert.equal(config_set.errorMessage, "Access denied, please sign in.");
+            done();
+          }.bind(config_set));
+        });
+
+        test('displays error if fetch failed due to error 403 when signed in', function (done) {
+          setserver(403);
+          config_set.auth_headers = {};
+          config_set.profile = {
+            email: "some_email@google.com"
+          };
+          request = ajax.generateRequest();
+          server.respond();
+          assert.equal(request.status, 403);
+          config_set.addEventListener('fetchError', function() {
+            assert.equal(config_set.isLoading, false);
+            assert.equal(config_set.errorMessage, "Access denied, some_email@google.com" + 
+                " is not authorized to access this config set." + 
+                " Request access or sign in as a different user.");
             done();
           }.bind(config_set));
         });
 
         test('displays error if fetch failed due to error 500', function (done) {
-          param = {
-            error: {
-              code: 500,
-              message: "Error 500"
-            }
-          }
-          server.respondWith(
-            'GET',
-            /\/_ah\/api\/config\/v1\/config-sets\?config_set=([a-z\-]+)\/([a-z\-]+)&include_files=true&include_last_import_attempt=true/,
-            [
-              500,
-              responseHeaders.json,
-              JSON.stringify(param)
-            ]
-          );
+          setserver(500);
           request = ajax.generateRequest();
           server.respond();
           assert.equal(request.status, 500);
