@@ -24,6 +24,7 @@ class OSFamily(messages.Enum):
 class LinuxFlavor(messages.Enum):
   """Lists valid flavors of Linux."""
   UBUNTU = 1
+  DEBIAN = 2
 
 
 class Dimensions(messages.Message):
