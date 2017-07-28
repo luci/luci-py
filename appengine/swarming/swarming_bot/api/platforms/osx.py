@@ -9,11 +9,11 @@ import ctypes
 import logging
 import os
 import platform
+import plistlib
 import re
+import struct
 import subprocess
 import time
-
-import plistlib
 
 from utils import tools
 
@@ -22,6 +22,280 @@ import gpu
 
 
 ## Private stuff.
+
+
+iokit = ctypes.CDLL(
+    '/System/Library/Frameworks/IOKit.framework/Versions/A/IOKit')
+# https://developer.apple.com/documentation/iokit/1514274-ioconnectcallstructmethod
+iokit.IOConnectCallStructMethod.argtypes = [
+    ctypes.c_uint, ctypes.c_uint, ctypes.c_void_p, ctypes.c_ulonglong,
+    ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulonglong),
+]
+iokit.IOConnectCallStructMethod.restype = ctypes.c_int
+
+# https://developer.apple.com/documentation/iokit/1514515-ioserviceopen
+iokit.IOServiceOpen.argtypes = [
+    ctypes.c_uint, ctypes.c_uint, ctypes.c_uint, ctypes.POINTER(ctypes.c_uint),
+]
+iokit.IOServiceOpen.restype = ctypes.c_int
+
+# https://developer.apple.com/documentation/iokit/1514687-ioservicematching
+iokit.IOServiceMatching.restype = ctypes.c_void_p
+
+# https://developer.apple.com/documentation/iokit/1514494-ioservicegetmatchingservices
+iokit.IOServiceGetMatchingServices.argtypes = [
+    ctypes.c_uint, ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint),
+]
+iokit.IOServiceGetMatchingServices.restype = ctypes.c_int
+
+# https://developer.apple.com/documentation/iokit/1514741-ioiteratornext
+iokit.IOIteratorNext.argtypes = [ctypes.c_uint]
+iokit.IOIteratorNext.restype = ctypes.c_uint
+
+# https://developer.apple.com/documentation/iokit/1514627-ioobjectrelease
+iokit.IOObjectRelease.argtypes = [ctypes.c_uint]
+iokit.IOObjectRelease.restype = ctypes.c_int
+
+
+libkern = ctypes.CDLL('/usr/lib/system/libsystem_kernel.dylib')
+libkern.mach_task_self.restype = ctypes.c_uint
+
+
+class _SMC_KeyDataVersion(ctypes.Structure):
+  _fields_ = [
+      ('major', ctypes.c_uint8),
+      ('minor', ctypes.c_uint8),
+      ('build', ctypes.c_uint8),
+      ('reserved', ctypes.c_uint8),
+      ('release', ctypes.c_uint16),
+  ]
+
+
+class _SMC_KeyDataLimits(ctypes.Structure):
+  _fields_ = [
+      ('version', ctypes.c_uint16),
+      ('length', ctypes.c_uint16),
+      ('cpu', ctypes.c_uint32),
+      ('gpu', ctypes.c_uint32),
+      ('mem', ctypes.c_uint32),
+  ]
+
+
+class _SMC_KeyDataInfo(ctypes.Structure):
+  _fields_ = [
+      ('size', ctypes.c_uint32),
+      ('type', ctypes.c_uint32),
+      ('attributes', ctypes.c_uint8),
+  ]
+
+
+class _SMC_KeyData(ctypes.Structure):
+  _fields_ = [
+      ('key', ctypes.c_uint32),
+      ('version', _SMC_KeyDataVersion),
+      ('pLimitData', _SMC_KeyDataLimits),
+      ('keyInfo', _SMC_KeyDataInfo),
+      ('result', ctypes.c_uint8),
+      ('status', ctypes.c_uint8),
+      ('data8', ctypes.c_uint8),
+      ('data32', ctypes.c_uint32),
+      ('bytes', ctypes.c_ubyte * 32),
+  ]
+
+
+class _SMC_Value(ctypes.Structure):
+  _fields_ = [
+      ('key', (ctypes.c_ubyte * 5)),
+      ('size', ctypes.c_uint32),
+      ('type', (ctypes.c_ubyte * 5)),
+      ('bytes', ctypes.c_ubyte * 32),
+  ]
+
+
+# http://bxr.su/OpenBSD/sys/dev/isa/asmc.c is a great list of sensors.
+#
+# The following other sensor were found on a MBP 2012 via brute forcing but
+# their signification is unknown:
+#   TC0E, TC0F, TH0A, TH0B, TH0V, TP0P, TS0D, TS0P
+_sensor_names = {
+  'TA0P': u'ambient', # 'hdd bay 1',
+  'TA0S': u'pci slot 1 pos 1',
+  'TA1S': u'pci slot 1 pos 2',
+  'TA3S': u'pci slot 2 pos 2',
+  'TB0T': u'enclosure bottom',
+  'TB2T': u'enclosure bottom 3',
+  'TC0D': u'cpu0 die core',
+  'TC0P': u'cpu0 proximity',
+  'TC1D': u'cpu1',
+  'TCAH': u'cpu0',
+  'TCDH': u'cpu3',
+  'TG0D': u'gpu0 diode',
+  'TG0P': u'gpu0 proximity',
+  'TG1H': u'gpu heatsink 2',
+  'TH0P': u'hdd bay 1',
+  'TH2P': u'hdd bay 3',
+  'TL0P': u'lcd proximity',
+  'TM0P': u'mem bank a1',
+  'TM1P': u'mem bank a2',
+  'TM2P': u'mem bank a3',
+  'TM3P': u'mem bank a4',
+  'TM4P': u'mem bank a5',
+  'TM5P': u'mem bank a6',
+  'TM6P': u'mem bank a7',
+  'TM7P': u'mem bank a8',
+  'TM8P': u'mem bank b1',
+  'TM9P': u'mem bank b2',
+  'TMA1': u'ram a1',
+  'TMA3': u'ram a3',
+  'TMAP': u'mem bank b3',
+  'TMB1': u'ram b1',
+  'TMB3': u'ram b3',
+  'TMBP': u'mem bank b4',
+  'TMCP': u'mem bank b5',
+  'TMDP': u'mem bank b6',
+  'TMEP': u'mem bank b7',
+  'TMFP': u'mem bank b8',
+  'TN0D': u'northbridge die core',
+  'TN0P': u'northbridge proximity',
+  'TO0P': u'optical drive',
+  'TW0P': u'wireless airport card',
+  'Th0H': u'main heatsink a',
+  'Th2H': u'main heatsink c',
+  'Tm0P': u'memory controller',
+  'Tp0C': u'power supply 1',
+  'Tp1C': u'power supply 2',
+  'Tp2P': u'power supply 3',
+  'Tp4P': u'power supply 5',
+  'TA1P': u'ambient 2',
+  'TA2S': u'pci slot 2 pos 1',
+  'TB1T': u'enclosure bottom 2',
+  'TB3T': u'enclosure bottom 4',
+  'TC0H': u'cpu0 heatsink',
+  'TC2D': u'cpu2',
+  'TC3D': u'cpu3',
+  'TCBH': u'cpu1',
+  'TCCH': u'cpu2',
+  'TG0H': u'gpu0 heatsink',
+  'TH1P': u'hdd bay 2',
+  'TH3P': u'hdd bay 4',
+  'TM0S': u'mem module a1',
+  'TM1S': u'mem module a2',
+  'TM2S': u'mem module a3',
+  'TM3S': u'mem module a4',
+  'TM4S': u'mem module a5',
+  'TM5S': u'mem module a6',
+  'TM6S': u'mem module a7',
+  'TM7S': u'mem module a8',
+  'TM8S': u'mem module b1',
+  'TM9S': u'mem module b2',
+  'TMA2': u'ram a2',
+  'TMA4': u'ram a4',
+  'TMAS': u'mem module b3',
+  'TMB2': u'ram b2',
+  'TMB4': u'ram b4',
+  'TMBS': u'mem module b4',
+  'TMCS': u'mem module b5',
+  'TMDS': u'mem module b6',
+  'TMES': u'mem module b7',
+  'TMFS': u'mem module b8',
+  'TN0H': u'northbridge',
+  'TN1P': u'northbridge 2',
+  'TS0C': u'expansion slots',
+  'Th1H': u'main heatsink b',
+  'Tp0P': u'power supply 1',
+  'Tp1P': u'power supply 2',
+  'Tp3P': u'power supply 4',
+  'Tp5P': u'power supply 6',
+}
+
+# _sensor_found_cache is set on the first call to _SMC_get_values.
+_sensor_found_cache = None
+
+
+@tools.cached
+def _SMC_open():
+  """Opens the default SMC driver and returns the first device.
+
+  It leaves the device handle open for the duration of the process.
+  """
+  # There should be only one.
+  itr = ctypes.c_uint()
+  result = iokit.IOServiceGetMatchingServices(
+      0, iokit.IOServiceMatching('AppleSMC'), ctypes.byref(itr))
+  if result:
+    logging.error('failed to get AppleSMC (%d)', result)
+    return None
+  dev = iokit.IOIteratorNext(itr)
+  iokit.IOObjectRelease(itr)
+  if not dev:
+    logging.error('no SMC found')
+    return None
+  conn = ctypes.c_uint()
+  if iokit.IOServiceOpen(dev, libkern.mach_task_self(), 0, ctypes.byref(conn)):
+    logging.error('failed to open AppleSMC (%d)', result)
+    return None
+  return conn
+
+
+def _SMC_call(conn, index, indata, outdata):
+  """Executes a call to the SMC subsystem."""
+  return iokit.IOConnectCallStructMethod(
+      conn,
+      ctypes.c_uint(index),
+      ctypes.cast(ctypes.pointer(indata), ctypes.c_void_p),
+      ctypes.c_ulonglong(ctypes.sizeof(_SMC_KeyData)),
+      ctypes.cast(ctypes.pointer(outdata), ctypes.c_void_p),
+      ctypes.pointer(ctypes.c_ulonglong(ctypes.sizeof(_SMC_KeyData))))
+
+
+def _SMC_read_key(conn, key):
+  """Retrieves an unprocessed key value."""
+  KERNEL_INDEX_SMC = 2
+
+  # Call with SMC_CMD_READ_KEYINFO.
+  # TODO(maruel): Keep cache of result size.
+  indata = _SMC_KeyData(key=struct.unpack('>i', key)[0], data8=9)
+  outdata = _SMC_KeyData()
+  if _SMC_call(conn, KERNEL_INDEX_SMC, indata, outdata):
+    logging.error('SMC call to get key info failed')
+    return None
+
+  # Call with SMC_CMD_READ_BYTES.
+  val = _SMC_Value(size=outdata.keyInfo.size)
+  for i, x in enumerate(struct.pack('>i', outdata.keyInfo.type)):
+    val.type[i] = ord(x)
+  # pylint: disable=attribute-defined-outside-init
+  indata.data8 = 5
+  indata.keyInfo.size = val.size
+  if _SMC_call(conn, KERNEL_INDEX_SMC, indata, outdata):
+    logging.error('SMC call to get data info failed')
+    return None
+  val.bytes = outdata.bytes
+  return val
+
+
+def _SMC_get_value(conn, key):
+  """Returns a processed measurement via AppleSMC for a specified key.
+
+  Returns None on failure.
+  """
+  val = _SMC_read_key(conn, key)
+  if not val or not val.size:
+    return None
+  t = ''.join(map(chr, val.type))
+  if t == 'sp78\0' and val.size == 2:
+    # Format is first byte signed int8, second byte uint8 fractional.
+    return float(ctypes.c_int8(val.bytes[0]).value) + (val.bytes[1] / 256.)
+  if t == 'fpe2\0' and val.size == 2:
+    # Format is unsigned 14 bits big endian, 2 bits fractional.
+    return (
+        float((val.bytes[0] << 6) + (val.bytes[1] >> 2)) +
+        (val.bytes[1] & 3) / 4.)
+  # TODO(maruel): Handler other formats like 64 bits long. This is used for fan
+  # speed.
+  logging.error(
+      '_SMC_get_value(%s) got unknown format: %s of %d bytes', key, t, val.size)
+  return None
 
 
 @tools.cached
@@ -172,7 +446,8 @@ def get_hardware_model_string():
     A string like Macmini5,3 or MacPro6,1.
   """
   try:
-    return subprocess.check_output(['sysctl', '-n', 'hw.model']).rstrip()
+    return unicode(
+        subprocess.check_output(['sysctl', '-n', 'hw.model']).rstrip())
   except (OSError, subprocess.CalledProcessError):
     return None
 
@@ -260,6 +535,33 @@ def get_cpuinfo():
   }
 
 
+def get_temperatures():
+  """Returns the temperatures in Celsius."""
+  global _sensor_found_cache
+  conn = _SMC_open()
+  if not conn:
+    return None
+
+  out = {}
+  if _sensor_found_cache is None:
+    _sensor_found_cache = set()
+    # Populate the cache of the sensors found on this system, so that the next
+    # call can only get the actual sensors.
+    # Note: It is relatively fast to brute force all the possible names.
+    for key, name in _sensor_names.iteritems():
+      value = _SMC_get_value(conn, key)
+      if value is not None:
+        _sensor_found_cache.add(key)
+        out[name] = value
+    return out
+
+  for key in _sensor_found_cache:
+    value = _SMC_get_value(conn, key)
+    if value is not None:
+      out[_sensor_names[key]] = value
+  return out
+
+
 @tools.cached
 def get_monitor_hidpi():
   """Returns True if the monitor is hidpi.
@@ -284,12 +586,13 @@ def get_monitor_hidpi():
     is_hidpi(card['spdisplays_ndrvs'])
     for card in _get_system_profiler('SPDisplaysDataType')
     if 'spdisplays_ndrvs' in card)
-  return str(int(hidpi))
+  return unicode(int(hidpi))
 
 
 def get_xcode_versions():
   """Returns all Xcode versions installed."""
-  return sorted(xcode['version'] for xcode in get_xcode_state().itervalues())
+  return sorted(
+      unicode(xcode['version']) for xcode in get_xcode_state().itervalues())
 
 
 @tools.cached

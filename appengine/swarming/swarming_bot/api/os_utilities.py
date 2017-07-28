@@ -1029,6 +1029,9 @@ def get_state():
       state[u'integrity'] = [integrity]
   if sys.platform == 'darwin':
     state[u'xcode'] = platforms.osx.get_xcode_state()
+    temp = platforms.osx.get_temperatures()
+    if temp is not None:
+      state[u'temp'] = temp
   if sys.platform == 'linux2':
     temp = platforms.linux.get_temperatures()
     if temp:
