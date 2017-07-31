@@ -436,8 +436,9 @@ class Application(object):
     try:
       for m in sorted(modules or self.modules):
         mod = self._modules[m]
-        if mod.data.get('vm'):
-          raise UnsupportedModuleError('MVM is not supported: %s' % m)
+        if mod.data.get('vm') and not USE_GCLOUD:
+          raise UnsupportedModuleError(
+              'MVM is only supported in gcloud mode: %s' % m)
         if mod.data.get('env') == 'flex':
           raise UnsupportedModuleError('Flex is not supported yet: %s' % m)
         if mod.data.get('runtime') == 'go' and not os.environ.get('GOROOT'):
@@ -489,6 +490,7 @@ class Application(object):
       os.path.join(self.default_module_dir, 'index.yaml'),
       os.path.join(self.default_module_dir, 'queue.yaml'),
       os.path.join(self.default_module_dir, 'cron.yaml'),
+      os.path.join(self.default_module_dir, 'dispatch.yaml'),
       self.dispatch_yaml,
     ]
     for extra in possible_extra:
