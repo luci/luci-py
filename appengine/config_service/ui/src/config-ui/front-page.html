@@ -72,7 +72,8 @@
     </iron-ajax>
     
     <div class="search-bar">
-      <paper-search-bar 
+      <paper-search-bar
+          id = "searchBar"
           query="{{query}}"
           hide-filter-button="true"></paper-search-bar>
     </div>
@@ -149,6 +150,9 @@
         } else {
           this.$.requestConfigs.generateRequest();
         }
+        document.addEventListener('WebComponentsReady', function() {
+          this.$['searchBar'].focus();
+        }.bind(this));
       },
 
       _onSignIn: function() {
