@@ -211,6 +211,11 @@
           value: null
         },
 
+        route: {
+          type: Object,
+          observer: '_routeChanged'
+        },
+
         errorMessage: {
           type: String,
           value: null
@@ -293,6 +298,11 @@
           this.errorMessage = "Error occured. Try again later.";
         }
         this.fire('fetchError');
+      },
+
+      _routeChanged: function() {
+        this.isLoading = true;
+        this.$.requestConfigs.generateRequest();
       }
 
     });
