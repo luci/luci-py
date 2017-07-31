@@ -113,7 +113,7 @@
         </template>
       </div>
       <div class="category">
-        <p>[[_formatCategory(category)]]</p>
+        <p>[[_formatCategory(category, route.path)]]</p>
         <template is="dom-if" if="[[_not(isLoading)]]">
           <template is="dom-if" if="[[lastImportAttempt]]">
             <template is="dom-if" if="[[_not(lastImportAttempt.success)]]">
@@ -240,7 +240,8 @@
         return list.length === 0;
       },
 
-      _formatCategory: function(category) {
+      _formatCategory: function(category, name) {
+        if (name.includes("/refs")) return "Ref";
         if (category === "projects") return "Project";
         if (category === "services") return "Service";
       },
