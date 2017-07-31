@@ -46,9 +46,16 @@
       }
 
       .title {
+        text-decoration: none;
         color: white;
-        font-size: 125%;
+        font-size: 115%;
       }
+
+      [main-title] {
+        pointer-events: auto;
+        margin-right: 100px;
+      }
+
     </style>
 
     <app-drawer-layout fullbleed force-narrow>
@@ -56,8 +63,10 @@
         <app-header reveals slot="header">
           <app-toolbar>
             <!--<image class="logo" src="/static/images/chromium.png"/>-->
-            <div class="title" main-title>
-              Configuration Service
+            <div main-title>
+              <a href="/#/" class="title">
+                Configuration Service
+              </a>
             </div>
 
             <a href="https://luci-config.appspot.com/_ah/api/explorer" 
