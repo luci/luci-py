@@ -545,16 +545,19 @@ the fleet."> <template is="dom-repeat" items="[[_filters]]" as="fil"> <div class
             return -dir;
           }
         }
-        // Case 2: Bots match on deadness, quarantinedness, or aliveness
+        // Case 2: Both bots are alive, sort by id
+        if (!botA.is_dead && !botB.is_dead && !botA.quarantined && !botB.quarantined) {
+          return dir * naturalSort(botA.bot_id, botB.bot_id)
+        }
+        // Case 3: Bots match on deadness, quarantinedness, or aliveness
         // In this case, sort by last seen time.
         if (botA.is_dead && botB.is_dead ||
-            botA.quarantined && botB.quarantined ||
-            !botA.is_dead && !botB.is_dead && !botA.quarantined && !botB.quarantined ) {
+            botA.quarantined && botB.quarantined ) {
           var botACol = botA.last_seen_ts;
           var botBCol = botB.last_seen_ts;
           return dir * naturalSort(botACol, botBCol)
         }
-        // Case 3: One of the bots is quarantined.  Sort quarantined bot over alive bot.
+        // Case 4: One of the bots is quarantined.  Sort quarantined bot over alive bot.
         if (botA.quarantined) {
           return dir;
         }
