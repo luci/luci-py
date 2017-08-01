@@ -11,20 +11,16 @@
 <link rel="import" href="../../bower_components/iron-icons/maps-icons.html">
 <link rel="import" href="../../bower_components/iron-flex-layout/iron-flex-layout.html">
 <link rel="import" href="../../bower_components/paper-tooltip/paper-tooltip.html">
+<link rel="import" href="../../common/common-behaviors.html">
 
 <dom-module id="config-set-card">
   <template>
     <style>
-      a { 
-        text-decoration: none;
-        color: inherit;
-      }
-      
       paper-card {
         width: 100%;
       }
 
-      p {
+      span {
         color: var(--paper-grey-600); 
         word-wrap: break-word;
         font-size: 90%;
@@ -50,65 +46,79 @@
       
     </style>
 
-    <a href="#/[[name]]">
-      <paper-card elevation="2">
-        <div class="card-content">
-          <div class="config-title">[[name]]
-            <div class="validation">
-              <template is="dom-if" if="[[lastImportAttempt]]" restamp="true">
-                <template is="dom-if" if="[[lastImportAttempt.success]]" restamp="true">
-                  <iron-icon id="successful-import" 
-                             icon="icons:check-circle" 
-                             class="paper-green">
-                  </iron-icon>
-                  <paper-tooltip for="successful-import" offset="0">
-                    Last import succeeded.
-                  </paper-tooltip>
-                </template>
-                <template is="dom-if" if="[[_not(lastImportAttempt.success)]]" restamp="true">
-                  <iron-icon id="failed-import" 
-                             icon="icons:warning" 
-                             class="paper-red">
-                  </iron-icon>
-                  <paper-tooltip for="failed-import" offset="0">
-                    Last import failed.
-                  </paper-tooltip>
-                </template>
-              </template>
-              <template is="dom-if" if="[[_not(lastImportAttempt)]]" restamp="true">
-                <iron-icon id="no-import" 
-                           icon="icons:help" 
-                           class="paper-grey">
+    <paper-card elevation="2"
+                on-tap="_openConfigPage">
+      <div class="card-content">
+        <div class="config-title">
+          [[name]]
+          <div class="validation">
+            <iron-icon id="launch"
+                       icon="icons:launch"
+                       class="paper-grey"
+                       on-tap="_openConfigGitiles">
+            </iron-icon>
+            <paper-tooltip for="launch" offset="0">
+              [[link]]
+            </paper-tooltip>
+            <template is="dom-if" if="[[lastImportAttempt]]" restamp="true">
+              <template is="dom-if" if="[[lastImportAttempt.success]]" restamp="true">
+                <iron-icon id="successful-import"
+                           icon="icons:check-circle"
+                           class="paper-green">
                 </iron-icon>
-                <paper-tooltip for="no-import" offset="0">
-                  Last import attempt info not available.
+                <paper-tooltip for="successful-import" offset="0">
+                  Last import succeeded.
                 </paper-tooltip>
               </template>
-            </div>
+              <template is="dom-if" if="[[_not(lastImportAttempt.success)]]" restamp="true">
+                <iron-icon id="failed-import"
+                           icon="icons:warning"
+                           class="paper-red">
+                </iron-icon>
+                <paper-tooltip for="failed-import" offset="0">
+                  Last import failed.
+                </paper-tooltip>
+              </template>
+            </template>
+            <template is="dom-if" if="[[_not(lastImportAttempt)]]" restamp="true">
+              <iron-icon id="no-import"
+                         icon="icons:help"
+                         class="paper-grey">
+              </iron-icon>
+              <paper-tooltip for="no-import" offset="0">
+                Last import attempt info not available.
+              </paper-tooltip>
+            </template>
+          </div>
+          <div>
+            <span id="revision">Revision: [[_formatRevision(revision)]]</span>
+            <paper-tooltip for="revision" offset="0">
+              [[revision]]
+            </paper-tooltip>
+            <span id="timestamp">Timestamp: [[_formatDate(timestamp)]]</span>
+            <paper-tooltip for="timestamp" offset="0">
+              [[_getExactTime(timestamp)]]
+            </paper-tooltip>
           </div>
         </div>
-      </paper-card>
-    </a>
+      </div>
+    </paper-card>
 
   </template>
   <script>
     Polymer({
       is: "config-set-card",
 
-      properties: {
-        name: {
-          type: String
-        },
+      behaviors: [ConfigUIBehaviors.CommonBehavior],
 
-        lastImportAttempt: {
-          type: Object
-        },
+      _openConfigGitiles: function(event) {
+        event.stopPropagation();
+        window.open(this.link);
       },
 
-      _not: function(b) {
-        return !b;
+      _openConfigPage: function() {
+        window.location.href = window.location.href + this.name;
       },
-
     });
   </script>
 </dom-module>

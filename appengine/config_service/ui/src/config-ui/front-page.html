@@ -11,6 +11,7 @@
 <link rel="import" href="../../bower_components/paper-spinner/paper-spinner.html">
 <link rel="import" href="../../bower_components/paper-styles/shadow.html">
 <link rel="import" href="../../bower_components/polymer/polymer.html">
+<link rel="import" href="../../common/common-behaviors.html">
 
 <link rel="import" href="config-set-card.html">
 
@@ -94,7 +95,10 @@
               <div class="center config-card">
                 <config-set-card
                   name="[[config.config_set]]" 
-                  last-import-attempt="[[_getLastImportAttempt(config.last_import_attempt)]]">
+                  last-import-attempt="[[_getLastImportAttempt(config.last_import_attempt)]]"
+                  revision="[[_getRevision(config.revision)]]"
+                  link="[[_getURL(config)]]"
+                  timestamp="[[_getTimestamp(config.last_import_attempt, config.revision)]]">
                 </config-set-card>
               </div>
             </template>
@@ -109,6 +113,8 @@
   <script>
     Polymer({
       is: 'front-page',
+
+      behaviors: [ConfigUIBehaviors.CommonBehavior],
 
       properties: {
         configSetList: {
@@ -169,19 +175,17 @@
       },
 
       _getLastImportAttempt: function(lastImportAttempt) {
-        if (lastImportAttempt) {
-          return lastImportAttempt;
+        return lastImportAttempt || null;
+      },
+
+      _getURL: function(config) {
+        if (config.last_import_attempt && config.last_import_attempt.success) {
+          return config.last_import_attempt.revision.url;
+        } else if (config.revision && config.revision.url) {
+          return config.revision.url;
         } else {
-          return null;
+          return config.location;
         }
-      },
-
-      _isEmpty: function(array) {
-        return array.length === 0;
-      },
-
-      _not: function(b) {
-        return !b;
       },
 
       _onGotConfigSets: function(event) {

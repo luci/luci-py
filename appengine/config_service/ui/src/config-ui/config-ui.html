@@ -14,6 +14,7 @@
 <link rel="import" href="../../bower_components/app-layout/app-toolbar/app-toolbar.html">
 
 <link rel="import" href="../../common/auth-signin.html">
+<link rel="import" href="../../common/common-behaviors.html">
 <link rel="import" href="config-set.html">
 <link rel="import" href="front-page.html">
 
@@ -84,7 +85,7 @@
                   signed_in="{{signed_in}}">
               </auth-signin>
             </template>
-            <template is="dom-if" if="[[!client_id]]">
+            <template is="dom-if" if="[[_not(client_id)]]">
               <div class="right">No OAauth client id found.</div>
             </template>
           </app-toolbar>
@@ -139,6 +140,8 @@
   <script>
     Polymer({
       is: 'config-ui',
+
+      behaviors: [ConfigUIBehaviors.CommonBehavior],
 
       properties: {
         client_id: {

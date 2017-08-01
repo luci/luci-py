@@ -70,7 +70,7 @@
           assert.equal(config_set.category, 'projects');
         });
 
-        test('has correct  name', function() {
+        test('has correct name', function() {
           assert.equal(config_set.name, 'valid-project-with-config-files');
         });
 
@@ -82,7 +82,13 @@
           var param = {
             config_sets: [{
               files: [{path: "OWNERS"}, {path: "README.md"}],
-              last_import_attempt: { success: true },
+              last_import_attempt: {
+                success: true,
+                revision: {
+                  url: "https://test.com",
+                  timestamp:  "1234567890"
+                }
+              }
             }]
           };
           setserver(param);
@@ -239,7 +245,7 @@
           assert.equal(request.status, 204);
           config_set.addEventListener('refreshComplete', function() {
             assert.equal(config_set.isRefreshing, false);
-            assert.equal(config_set.refreshMessage, "Refresh successful.");
+            assert.equal(config_set.refreshMessage, "Reimport successful.");
             done();
           }.bind(config_set));
         });
@@ -290,7 +296,7 @@
           assert.equal(request.status, 404);
           config_set.addEventListener('refreshError', function() {
             assert.equal(config_set.isRefreshing, false);
-            assert.equal(config_set.refreshMessage, "Error: Files could not be refreshed.");
+            assert.equal(config_set.refreshMessage, "Error: Files could not be reimported.");
             done();
           }.bind(config_set));
         });

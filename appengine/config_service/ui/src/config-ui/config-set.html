@@ -12,6 +12,7 @@
 <link rel="import" href="../../bower_components/polymer/polymer.html">
 <link rel="import" href="../../bower_components/iron-icons/maps-icons.html">
 <link rel="import" href="../../bower_components/paper-tooltip/paper-tooltip.html">
+<link rel="import" href="../../common/common-behaviors.html">
 
 <dom-module id="config-set">
   <template>
@@ -89,6 +90,14 @@
     <div class="center title"> 
       <div class="name">
         [[name]][[route.path]]
+        <iron-icon id="launch"
+                   icon="icons:launch"
+                   class="paper-grey"
+                   on-tap="_openConfigGitiles">
+        </iron-icon>
+        <paper-tooltip for="launch" offset="0">
+          [[url]]
+        </paper-tooltip>
         <template is="dom-if" if="[[_not(isLoading)]]">
           <template is="dom-if" if="[[lastImportAttempt]]">
             <template is="dom-if" if="[[lastImportAttempt.success]]">
@@ -103,10 +112,10 @@
           </template>
         </template>
         <template is="dom-if" if="[[auth_headers]]">
-          <paper-icon-button id="force-refresh"
-                             icon="icons:file-download"
-                             on-tap="_forceRefresh">
-          </paper-icon-button>
+          <iron-icon id="force-refresh"
+                     icon="icons:refresh"
+                     on-tap="_forceRefresh">
+          </iron-icon>
           <paper-tooltip for="force-refresh" offset="0">
             Re-import the config-set from the repository.
           </paper-tooltip>
@@ -126,6 +135,8 @@
           <template is="dom-if" if="[[_not(lastImportAttempt)]]">
             Last import attempt info not available.
           </template>
+          <p>Revision: [[_getRevision(revision)]]</p>
+          <p>Timestamp: [[_getExactTime(timestamp)]]</p>
         </template>
         <p id="refreshStatus">[[refreshMessage]]</p>
       </div>      
@@ -170,18 +181,25 @@
     Polymer({
       is: "config-set",
 
-      properties: {
-        frontPageIsActive: {
-          type: Boolean,
-          observer: '_frontPageIsActive'
-        },
+      behaviors: [ConfigUIBehaviors.CommonBehavior],
 
+      properties: {
         category: {
           type: String
         },
 
+        errorMessage: {
+          type: String,
+          value: null
+        },
+
         files: {
           type: Array
+        },
+
+        frontPageIsActive: {
+          type: Boolean,
+          observer: '_frontPageIsActive'
         },
 
         isLoading: {
@@ -198,10 +216,6 @@
           type: Object
         },
 
-        url: {
-          type: String
-        },
-
         name: {
           type: String
         },
@@ -216,9 +230,18 @@
           observer: '_routeChanged'
         },
 
-        errorMessage: {
+        revision: {
           type: String,
           value: null
+        },
+
+        timestamp: {
+          type: String,
+          value: null
+        },
+
+        url: {
+          type: String
         }
       },
 
@@ -228,48 +251,33 @@
         this.isRefreshing = true;
       },
 
-      _frontPageIsActive: function() {
-        if (this.frontPageIsActive === false) {
-          this.isLoading = true;
-          if (!this.initialized) {
-            document.addEventListener('fetch-configs', function() {
-              this.$.requestConfigs.generateRequest();
-            }.bind(this));
-          } else {
-            this.$.requestConfigs.generateRequest();
-          }
-        }
-      },
-
-      _isEmpty: function(list) {
-        return list.length === 0;
-      },
-
       _formatCategory: function(category, name) {
-        if (name.includes("/refs")) return "Ref";
+        if (name && name.includes("/refs")) return "Ref";
         if (category === "projects") return "Project";
         if (category === "services") return "Service";
+        return "Cannot determine type of config set.";
       },
 
       _onCompleteRefresh: function() {
         this.isRefreshing = false;
-        this.refreshMessage = "Refresh successful.";
+        this.refreshMessage = "Reimport successful.";
         this.fire('refreshComplete');
-      },
-
-      _not: function(b) {
-        return !b;
       },
 
       _onGotConfigFiles: function(event) {
         var config_set = event.detail.response.config_sets[0];
         this.files = config_set.files || [];
         this.lastImportAttempt = config_set.last_import_attempt || null;
-        if (config_set.revision && config_set.revision.url) {
-          this.url = config_set.revision.url;
+        if (this.lastImportAttempt && this.lastImportAttempt.success) {
+          this.url = config_set.last_import_attempt.revision.url;
+          this.revision = config_set.last_import_attempt.revision;
+        } else if (config_set.revision) {
+          this.url = config_set.revision.url || config_set.location;
+          this.revision = config_set.revision;
         } else {
           this.url = config_set.location;
         }
+        this.timestamp = this._getTimestamp(this.lastImportAttempt, this.revision);
         this.isLoading = false;
         this.errorMessage = null;
         this.fire('processedConfigFiles');
@@ -277,7 +285,7 @@
 
       _onRefreshError: function() {
         this.isRefreshing = false;
-        this.refreshMessage = "Error: Files could not be refreshed.";
+        this.refreshMessage = "Error: Files could not be reimported.";
         this.fire('refreshError');
       },
 
@@ -303,6 +311,10 @@
       _routeChanged: function() {
         this.isLoading = true;
         this.$.requestConfigs.generateRequest();
+      },
+
+      _openConfigGitiles: function() {
+        window.open(this.url);
       }
 
     });
