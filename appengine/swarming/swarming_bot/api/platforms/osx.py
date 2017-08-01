@@ -118,19 +118,19 @@ class _SMC_Value(ctypes.Structure):
 # their signification is unknown:
 #   TC0E, TC0F, TH0A, TH0B, TH0V, TP0P, TS0D, TS0P
 _sensor_names = {
-  'TA0P': u'ambient', # 'hdd bay 1',
+  'TA0P': u'ambient', # u'hdd bay 1',
   #'TA0S': u'pci slot 1 pos 1',
   #'TA1S': u'pci slot 1 pos 2',
   #'TA3S': u'pci slot 2 pos 2',
   'TB0T': u'enclosure bottom',
   #'TB2T': u'enclosure bottom 3',
   #'TC0D': u'cpu0 die core',
-  'TC0P': u'cpu0', # 'cpu0 proximity'
+  'TC0P': u'cpu', # u'cpu0 proximity'
   #'TC1D': u'cpu1',
   #'TCAH': u'cpu0',
   #'TCDH': u'cpu3',
-  'TG0D': u'gpu0 diode',
-  'TG0P': u'gpu0 proximity',
+  'TG0D': u'gpu', # u'gpu0 diode',
+  #'TG0P': u'gpu0 proximity',
   #'TG1H': u'gpu heatsink 2',
   #'TH0P': u'hdd bay 1',
   #'TH2P': u'hdd bay 3',
@@ -162,7 +162,7 @@ _sensor_names = {
   #'Th0H': u'main heatsink a',
   #'Th2H': u'main heatsink c',
   #'Tm0P': u'memory controller',
-  'Tp0C': u'power supply C',
+  'Tp0C': u'power supply',
   #'Tp1C': u'power supply 2',
   #'Tp2P': u'power supply 3',
   #'Tp4P': u'power supply 5',
@@ -202,7 +202,7 @@ _sensor_names = {
   #'TN1P': u'northbridge 2',
   #'TS0C': u'expansion slots',
   #'Th1H': u'main heatsink b',
-  'Tp0P': u'power supply P',
+  #'Tp0P': u'power supply 1',
   #'Tp1P': u'power supply 2',
   #'Tp3P': u'power supply 4',
   #'Tp5P': u'power supply 6',
