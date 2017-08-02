@@ -34,6 +34,15 @@ handlers:
     Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
     X-Frame-Options: deny
 
+- url: /res/(.+)
+  static_files: ui/build/\1
+  upload: ui/build/(.+)
+  secure: always
+  expiration: "1h"
+  http_headers:
+    Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+    X-Frame-Options: deny
+
 - url: /(.+)\.(css|gif|ico|js|txt)
   static_files: static/\1.\2
   upload: static/(.+)\.(css|gif|ico|js|txt)
@@ -91,3 +100,5 @@ skip_files:
 - .+\.py[co]
 - ^[A-Z]+$
 - ^[A-Z]+\.[a-z]+$
+- ui/node_modules/
+- ui/res/imp/bower_components/

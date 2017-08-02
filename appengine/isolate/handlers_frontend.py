@@ -386,6 +386,27 @@ class RootHandler(auth.AuthenticatingHandler):
     self.response.write(template.render('isolate/root.html', params))
 
 
+class UIHandler(auth.AuthenticatingHandler):
+  """Serves the landing page for the new UI of the requested page.
+
+  This landing page is stamped with the OAuth 2.0 client id from the
+  configuration.
+  """
+  @auth.public
+  def get(self):
+    params = {}
+    # Can cache for 1 week, because the only thing that would change in this
+    # template is the oauth client id, which changes very infrequently.
+    self.response.cache_control.no_cache = None
+    self.response.cache_control.public = True
+    self.response.cache_control.max_age = 604800
+    try:
+      self.response.write(template.render(
+        'isolate/public_isolate_index.html', params))
+    except template.TemplateNotFound:
+      self.abort(404, 'Page not found.')
+
+
 class WarmupHandler(webapp2.RequestHandler):
   def get(self):
     config.warmup()
@@ -421,6 +442,7 @@ def get_routes():
       #webapp2.Route(r'/isolate/api/v1/stats/hours', StatsGvizHoursHandler),
       #webapp2.Route(r'/isolate/api/v1/stats/minutes', StatsGvizMinutesHandler),
       webapp2.Route(r'/', RootHandler),
+      webapp2.Route(r'/newui', UIHandler),
 
       # AppEngine-specific urls:
       webapp2.Route(r'/_ah/mail/<to:.+>', EmailHandler),
