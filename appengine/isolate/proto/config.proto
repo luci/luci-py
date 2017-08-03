@@ -40,6 +40,10 @@ message SettingsCfg {
 
   // Names of the authorization groups used by components/auth.
   optional AuthSettings auth = 7;
+
+  // oauth client id for the ui. This is created in the developer's console
+  // under Credentials.
+  optional string ui_client_id = 8;
 }
 
 // Access control groups for the isolate service. Custom group names

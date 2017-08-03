@@ -318,7 +318,8 @@ class IsolateService(remote.Service):
 
   # TODO(kjlubick): Rework these APIs, the http_method part seems to break
   # API explorer.
-  @auth.endpoints_method(message_types.VoidMessage, ServerDetails,
+  @auth.endpoints_method(
+    message_types.VoidMessage, ServerDetails,
     http_method='GET')
   @auth.require(acl.isolate_readable)
   def server_details(self, _request):

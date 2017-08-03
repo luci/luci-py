@@ -394,7 +394,9 @@ class UIHandler(auth.AuthenticatingHandler):
   """
   @auth.public
   def get(self):
-    params = {}
+    params = {
+      'client_id': config.settings().ui_client_id,
+    }
     # Can cache for 1 week, because the only thing that would change in this
     # template is the oauth client id, which changes very infrequently.
     self.response.cache_control.no_cache = None
