@@ -316,7 +316,10 @@ class IsolateService(remote.Service):
         filename=key.id(),
         expiration=DEFAULT_LINK_EXPIRATION))
 
-  @auth.endpoints_method(message_types.VoidMessage, ServerDetails)
+  # TODO(kjlubick): Rework these APIs, the http_method part seems to break
+  # API explorer.
+  @auth.endpoints_method(message_types.VoidMessage, ServerDetails,
+    http_method='GET')
   @auth.require(acl.isolate_readable)
   def server_details(self, _request):
     return ServerDetails(server_version=utils.get_app_version())

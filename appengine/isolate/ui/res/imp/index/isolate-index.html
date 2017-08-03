@@ -28,17 +28,21 @@
     None.
 -->
 
+<link rel="import" href="/res/imp/common/isolate-app.html">
+
 <dom-module id="isolate-index">
   <template>
-    <style>
-      h1 {
-        color:purple;
-      }
+    <style include="isolate-app-style">
     </style>
 
-    <h1>Hello World</h1>
-
-    <div>{{client_id}}</div>
+    <isolate-app
+      client_id="[[client_id]]"
+      auth_headers="{{_auth_headers}}"
+      permissions="{{_permissions}}"
+      server_details="{{_server_details}}"
+      name="Isolate Server">
+      This is an isolate app placeholder.
+    </isolate-app>
 
   </template>
   <script>
