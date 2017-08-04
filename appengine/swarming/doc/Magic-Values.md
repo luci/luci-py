@@ -44,6 +44,18 @@ always set:
 The following environment variables may be set to alter bot behavior:
 
   - `SWARMING_EXTERNAL_BOT_SETUP=1` disables bot_config.setup_bot hook.
+  - `SWARMING_GRPC_PROXY=<url>` and `ISOLATED_GRPC_PROXY=<url>` override the
+    equivalent value in the bot config.
+  - `LUCI_GRPC_PROXY_VERBOSE` dumps out additional gRPC proxy information if set
+    to a truthy value (e.g. `1`).
+  - `LUCI_GRPC_PROXY_TLS_ROOTS=<file>` and points to a .crt file containing
+    certificate authorities. `LUCI_GRPC_PROXY_TLS_OVERRIDE=<name>` specifies the
+    name of the server in the certificate. These are useful for testing a gRPC
+    proxy running on localhost but with TLS enabled. Unlike the `*_GRPC_PROXY`
+    env vars, these are shared between Swarming and Isolated since they're only
+    used in the limited case when you need to override TLS. See
+    [/client/utils/grpc_proxy.py](../../../client/utils/grpc_proxy.py) for more
+    information.
 
 
 ### dimensions

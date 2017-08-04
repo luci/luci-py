@@ -4,6 +4,7 @@
 
 import base64
 import logging
+import os
 import threading
 import time
 import traceback
@@ -42,6 +43,7 @@ NET_CONNECTION_TIMEOUT_SEC = 3*60
 
 
 def createRemoteClient(server, auth, grpc_proxy):
+  grpc_proxy = os.environ.get('SWARMING_GRPC_PROXY', grpc_proxy)
   if grpc_proxy:
     import remote_client_grpc
     return remote_client_grpc.RemoteClientGrpc(grpc_proxy)
