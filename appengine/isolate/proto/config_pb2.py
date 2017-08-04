@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='config.proto',
   package='',
   syntax='proto2',
-  serialized_pb=_b('\n\x0c\x63onfig.proto\"\xc7\x01\n\x0bSettingsCfg\x12\x18\n\x10google_analytics\x18\x01 \x01(\t\x12\x1a\n\x12\x64\x65\x66\x61ult_expiration\x18\x02 \x01(\x05\x12\x18\n\x10sharding_letters\x18\x03 \x01(\x05\x12\x11\n\tgs_bucket\x18\x04 \x01(\t\x12\x1a\n\x12gs_client_id_email\x18\x05 \x01(\t\x12\x1c\n\x14\x65nable_ts_monitoring\x18\x06 \x01(\x08\x12\x1b\n\x04\x61uth\x18\x07 \x01(\x0b\x32\r.AuthSettings\"H\n\x0c\x41uthSettings\x12\x19\n\x11\x66ull_access_group\x18\x01 \x01(\t\x12\x1d\n\x15readonly_access_group\x18\x02 \x01(\t')
+  serialized_pb=_b('\n\x0c\x63onfig.proto\"\xdd\x01\n\x0bSettingsCfg\x12\x18\n\x10google_analytics\x18\x01 \x01(\t\x12\x1a\n\x12\x64\x65\x66\x61ult_expiration\x18\x02 \x01(\x05\x12\x18\n\x10sharding_letters\x18\x03 \x01(\x05\x12\x11\n\tgs_bucket\x18\x04 \x01(\t\x12\x1a\n\x12gs_client_id_email\x18\x05 \x01(\t\x12\x1c\n\x14\x65nable_ts_monitoring\x18\x06 \x01(\x08\x12\x1b\n\x04\x61uth\x18\x07 \x01(\x0b\x32\r.AuthSettings\x12\x14\n\x0cui_client_id\x18\x08 \x01(\t\"H\n\x0c\x41uthSettings\x12\x19\n\x11\x66ull_access_group\x18\x01 \x01(\t\x12\x1d\n\x15readonly_access_group\x18\x02 \x01(\t')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -82,6 +82,13 @@ _SETTINGSCFG = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='ui_client_id', full_name='SettingsCfg.ui_client_id', index=7,
+      number=8, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -95,7 +102,7 @@ _SETTINGSCFG = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=17,
-  serialized_end=216,
+  serialized_end=238,
 )
 
 
@@ -132,8 +139,8 @@ _AUTHSETTINGS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=218,
-  serialized_end=290,
+  serialized_start=240,
+  serialized_end=312,
 )
 
 _SETTINGSCFG.fields_by_name['auth'].message_type = _AUTHSETTINGS
