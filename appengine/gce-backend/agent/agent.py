@@ -342,12 +342,22 @@ class SystemdAgent(Agent):
   AGENT_AUTOSTART_TEMPLATE = os.path.join(
       THIS_DIR, 'machine-provider-agent.service.tmpl')
   AGENT_AUTOSTART_PATH = '/etc/systemd/system/machine-provider-agent.service'
-  LOGS_DIR = '/var/log/messages/machine-provider-agent'
+  LOGS_DIR = '/var/log/machine-provider-agent'
   REBOOT_CMD = ('/sbin/shutdown', '-r', 'now')
   SWARMING_AUTOSTART_TEMPLATE = os.path.join(
       THIS_DIR, 'swarming-start-bot.service.tmpl')
   SWARMING_AUTOSTART_PATH = '/etc/systemd/system/swarming-start-bot.service'
   SWARMING_BOT_DIR = '/b/s'
+
+  def configure_logging(self):
+    """Sets up the logging."""
+    try:
+      from systemd.journal import JournalHandler
+      logger = logging.getLogger()
+      logger.setLevel(logging.DEBUG)
+      logger.addHandler(JournalHandler())
+    except ImportError:
+      super(Agent, self).configure_logging()
 
   def start(self):
     """Starts the Machine Provider agent."""
