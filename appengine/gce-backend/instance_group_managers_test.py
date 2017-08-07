@@ -449,6 +449,32 @@ class GetDrainedInstanceGroupManagersTest(test_case.TestCase):
     )
 
 
+class GetBaseNameTest(test_case.TestCase):
+  """Tests for instance_group_managers.get_base_name."""
+
+  def test_get_base_name(self):
+    """Ensures base instance name is generated correctly."""
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision-extra-long',
+            'zone',
+        ),
+        minimum_size=10,
+        maximum_size=10,
+        url='https://example.com',
+    ).put()
+    models.InstanceTemplateRevision(
+        key=key.parent(),
+    ).put()
+    models.InstanceTemplate(key=key.parent().parent()).put()
+
+    self.assertEqual(
+        instance_group_managers.get_base_name(key.get()),
+        'base-name-revision-zone',
+    )
+
+
 class GetInstanceGroupManagerToDeleteTest(test_case.TestCase):
   """Tests for instance_group_managers.get_instance_group_manager_to_delete."""
 

@@ -65,10 +65,14 @@ def get_base_name(instance_group_manager):
   Returns:
     A string.
   """
-  # <base-name>-<abbreviated-revision>
-  return '%s-%s' % (
+  # <base-name>-<abbreviated-revision>-<zone>
+  # TODO(smut): Ensure this name is < 59 characters because the final
+  # instance name must be < 64 characters and the instance group manager
+  # will add a 5 character random suffix when creating instances.
+  return '%s-%s-%s' % (
       instance_group_manager.key.parent().parent().id(),
       instance_group_manager.key.parent().id()[:8],
+      instance_group_manager.key.id(),
   )
 
 
