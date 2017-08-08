@@ -12,7 +12,7 @@ import sys
 def _run_df():
   """Runs df and returns the output."""
   proc = subprocess.Popen(
-      ['/bin/df', '-k', '-P'], env={'LANG': 'C'},
+      ['/bin/df', '-k', '-P', '-l'], env={'LANG': 'C'},
       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
   for l in proc.communicate()[0].splitlines():
     l = l.decode('utf-8')
