@@ -218,6 +218,9 @@ class ConfigApi(remote.Service):
     # If request.only_hash is not set to True, the contents of the
     # config file.
     content = messages.BytesField(3)
+    # This field is only populated if the latest revision is requested.
+    # TODO(jchinlee): populate in case of specific revision requested.
+    url = messages.StringField(4)
 
   @auth.endpoints_method(
       endpoints.ResourceContainer(
@@ -249,7 +252,8 @@ class ConfigApi(remote.Service):
 
     content_hashes = storage.get_config_hashes_async(
         {request.config_set: request.revision}, request.path).get_result()
-    res.revision, res.content_hash = content_hashes.get(request.config_set)
+    res.revision, res.url, res.content_hash = (
+        content_hashes.get(request.config_set))
     if not res.content_hash:
       raise_config_not_found()
 
@@ -262,6 +266,7 @@ class ConfigApi(remote.Service):
             'File: "%s:%s:%s". Hash: %s', request.config_set,
             request.revision, request.path, res.content_hash)
         raise_config_not_found()
+
     return res
 
   ##############################################################################
@@ -474,7 +479,7 @@ def get_config_multi(scope, path, hashes_only):
         config_sets, path, hashes_only=hashes_only).get_result()
     configs = []
     for cs in config_sets:
-      rev, content_hash, content = cfg_map.get(cs, (None, None, None))
+      rev, rev_url, content_hash, content = cfg_map.get(cs, (None, None, None))
       if not content_hash:
         continue
       configs.append({
@@ -482,6 +487,7 @@ def get_config_multi(scope, path, hashes_only):
         'revision': rev,
         'content_hash': content_hash,
         'content': content,
+        'url': rev_url,
       })
       if not hashes_only and content is None:
         logging.error(

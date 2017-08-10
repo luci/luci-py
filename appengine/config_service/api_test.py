@@ -57,7 +57,7 @@ class ApiTest(test_case.EndpointsTestCase):
   def mock_config(self, mock_content=True):
     self.mock(storage, 'get_config_hashes_async', mock.Mock())
     storage.get_config_hashes_async.return_value = future({
-      'services/luci-config': ('deadbeef', 'abc0123'),
+      'services/luci-config': ('deadbeef', 'https://x.com/+/deadbeef', 'abc0123'),
     })
 
     if mock_content:
@@ -458,6 +458,7 @@ class ApiTest(test_case.EndpointsTestCase):
       'content': base64.b64encode('config text'),
       'content_hash': 'abc0123',
       'revision': 'deadbeef',
+      'url': 'https://x.com/+/deadbeef',
     })
     storage.get_config_hashes_async.assert_called_once_with(
         {'services/luci-config': 'deadbeef'}, 'my.cfg')
@@ -477,6 +478,7 @@ class ApiTest(test_case.EndpointsTestCase):
     self.assertEqual(resp, {
       'content_hash': 'abc0123',
       'revision': 'deadbeef',
+      'url': 'https://x.com/+/deadbeef',
     })
     self.assertFalse(storage.get_configs_by_hashes_async.called)
 
@@ -491,7 +493,7 @@ class ApiTest(test_case.EndpointsTestCase):
 
   def test_get_config_not_found(self):
     def get_config_hashes_async(revs, path):
-      return future({cs: (None, None) for cs in revs})
+      return future({cs: (None, None, None) for cs in revs})
 
     self.mock(storage, 'get_config_hashes_async', get_config_hashes_async)
 
@@ -651,9 +653,24 @@ class ApiTest(test_case.EndpointsTestCase):
 
     self.mock(storage, 'get_latest_configs_async', mock.Mock())
     storage.get_latest_configs_async.return_value = future({
-      'projects/chromium': ('deadbeef', 'abc0123', 'config text'),
-      'projects/v8': ('beefdead', 'ccc123', None),  # no content
-      'projects/secret': ('badcoffee', 'abcabc', 'abcsdjksl'),
+      'projects/chromium': (
+          'deadbeef',
+          'https://x.com/+/deadbeef',
+          'abc0123',
+          'config text'
+      ),
+      'projects/v8': (
+          'beefdead',
+          'https://x.com/+/beefdead',
+          'ccc123',
+          None  # no content
+      ),
+      'projects/secret': (
+          'badcoffee',
+          'https://x.com/+/badcoffee',
+          'abcabc',
+          'abcsdjksl'
+      ),
     })
 
     req = {'path': 'cq.cfg'}
@@ -665,6 +682,7 @@ class ApiTest(test_case.EndpointsTestCase):
         'revision': 'deadbeef',
         'content_hash': 'abc0123',
         'content': base64.b64encode('config text'),
+        'url': 'https://x.com/+/deadbeef',
       }],
     })
 
@@ -684,9 +702,24 @@ class ApiTest(test_case.EndpointsTestCase):
 
     self.mock(storage, 'get_latest_configs_async', mock.Mock())
     storage.get_latest_configs_async.return_value = future({
-      'projects/chromium': ('deadbeef', 'abc0123', None),
-      'projects/v8': ('beefdead', None, None),  # no content hash
-      'projects/secret': ('badcoffee', 'abcabc', None),
+      'projects/chromium': (
+          'deadbeef',
+          'https://x.com/+/deadbeef',
+          'abc0123',
+          None
+      ),
+      'projects/v8': (
+          'beefdead',
+          'https://x.com/+/beefdead',
+          None,
+          None  # no content hash
+      ),
+      'projects/secret': (
+          'badcoffee',
+          'https://x.com/+/badcoffee',
+          'abcabc',
+          None
+      ),
     })
 
     req = {'path': 'cq.cfg', 'hashes_only': True}
@@ -697,6 +730,7 @@ class ApiTest(test_case.EndpointsTestCase):
         'config_set': 'projects/chromium',
         'revision': 'deadbeef',
         'content_hash': 'abc0123',
+        'url': 'https://x.com/+/deadbeef',
       }],
     })
 
