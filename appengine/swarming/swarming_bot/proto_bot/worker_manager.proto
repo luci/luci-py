@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package google.internal.devtools.workerfarm.v1test1;
+
+import "device.proto";
+import "google/protobuf/field_mask.proto";
+import "google/protobuf/struct.proto";
+
+service WorkerManager {
+  rpc CreateWorker(CreateWorkerRequest) returns (Worker);
+  rpc GetWorker(GetWorkerRequest) returns (Worker);
+  rpc ListWorkers(ListWorkersRequest) returns (ListWorkersResponse);
+  rpc UpdateWorker(UpdateWorkerRequest) returns (Worker);
+}
+
+message Worker {
+  string name = 1;
+  string session_id = 2;
+  WorkerHealth health = 3;
+  repeated string pools = 4;
+  google.internal.devtools.workerfarm.v1test1.PrimaryDevice device = 5;
+  map<string, DeviceHealth> attached_device_health = 6;
+  string reservation_manager = 7;
+  repeated string active_leases = 8;
+  google.protobuf.Struct properties = 9;
+}
+
+enum WorkerHealth {
+  WORKER_UNKNOWN = 0;
+  WORKER_HEALTHY = 1;
+  WORKER_BUSY = 2;
+  WORKER_DEGRADED = 3;
+  WORKER_UNHEALTHY = 4;
+  WORKER_QUARANTINED = 5;
+  WORKER_MISSING = 6;
+}
+
+message DeviceHealth {
+  string exception = 1;
+}
+
+message CreateWorkerRequest {
+  string parent = 1;
+  Worker worker = 2;
+}
+
+message GetWorkerRequest {
+  string name = 1;
+}
+
+message UpdateWorkerRequest {
+  Worker worker = 1;
+  google.protobuf.FieldMask update_mask = 2;
+}
+
+message ListWorkersRequest {
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListWorkersResponse {
+  repeated Worker workers = 1;
+  string next_page_token = 2;
+}
