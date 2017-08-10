@@ -590,6 +590,26 @@
                   <td>[[_result.performance_stats.isolated_download.initial_number_items]] items;
                   [[_bytes(_result.performance_stats.isolated_download.initial_size)]]</td>
                 </tr>
+                <tr>
+                  <td>Downloaded Cold Items</td>
+                  <td>[[_result.performance_stats.isolated_download.num_items_cold]] items;
+                  [[_bytes(_result.performance_stats.isolated_download.total_bytes_items_cold)]]</td>
+                </tr>
+                <tr>
+                  <td>Downloaded Hot Items</td>
+                  <td>[[_result.performance_stats.isolated_download.num_items_hot]] items;
+                  [[_bytes(_result.performance_stats.isolated_download.total_bytes_items_hot)]]</td>
+                </tr>
+                <tr>
+                  <td>Uploaded Cold Items</td>
+                  <td>[[_result.performance_stats.isolated_upload.num_items_cold]] items;
+                  [[_bytes(_result.performance_stats.isolated_upload.total_bytes_items_cold)]]</td>
+                </tr>
+                <tr>
+                  <td>Uploaded Hot Items</td>
+                  <td>[[_result.performance_stats.isolated_upload.num_items_hot]] items;
+                  [[_bytes(_result.performance_stats.isolated_upload.total_bytes_items_hot)]]</td>
+                </tr>
               </table>
             </template>
 
@@ -828,6 +848,9 @@
       },
 
       _bytes: function(sizeInBytes) {
+        if (!sizeInBytes) {
+          return "0 B";
+        }
         return sk.human.bytes(sizeInBytes);
       },
 
