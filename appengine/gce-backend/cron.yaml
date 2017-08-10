@@ -38,9 +38,6 @@ cron:
 - url: /internal/cron/update-cataloged-instances
   schedule: every 1 minutes
 
-- url: /internal/cron/schedule-metadata-tasks
-  schedule: every 1 minutes
-
 # External Handlers
 
 # components/config

@@ -57,13 +57,6 @@ instance_deletion_time = gae_ts_mon.CumulativeDistributionMetric(
 #    units=ts_mon.MetricsDataUnits.SECONDS,
 )
 
-instance_set_metadata_time = gae_ts_mon.CumulativeDistributionMetric(
-    'machine_provider/gce_backend/instances/set_metadata/time',
-    'Seconds between initiating set metadata RPC and learning its result.',
-    [gae_ts_mon.BooleanField('success'), gae_ts_mon.StringField('zone')],
-#    units=ts_mon.MetricsDataUnits.SECONDS,
-)
-
 
 def compute_global_metrics(): # pragma: no cover
   for name, counts in config.count_instances().iteritems():

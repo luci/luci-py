@@ -17,7 +17,6 @@ import cleanup
 import instance_group_managers
 import instance_templates
 import instances
-import metadata
 
 
 class CatalogedInstanceRemovalHandler(webapp2.RequestHandler):
@@ -170,51 +169,6 @@ class InstanceGroupResizeHandler(webapp2.RequestHandler):
     instance_group_managers.resize(key)
 
 
-class InstanceMetadataOperationCheckHandler(webapp2.RequestHandler):
-  """Worker for checking an instance metadata operation."""
-
-  @decorators.require_taskqueue('check-instance-metadata-operation')
-  def post(self):
-    """Checks a metadata operation for the given Instance.
-
-    Params:
-      key: URL-safe key for a models.Instance.
-    """
-    key = ndb.Key(urlsafe=self.request.get('key'))
-    assert key.kind() == 'Instance', key
-    metadata.check(key)
-
-
-class InstanceMetadataUpdateHandler(webapp2.RequestHandler):
-  """Worker for updating instance metadata."""
-
-  @decorators.require_taskqueue('update-instance-metadata')
-  def post(self):
-    """Schedules a metadata update for the given Instance.
-
-    Params:
-      key: URL-safe key for a models.Instance.
-    """
-    key = ndb.Key(urlsafe=self.request.get('key'))
-    assert key.kind() == 'Instance', key
-    metadata.update(key)
-
-
-class InstanceMetadataUpdatesCompressionHandler(webapp2.RequestHandler):
-  """Worker for compressing pending instance metadata updates."""
-
-  @decorators.require_taskqueue('compress-instance-metadata-updates')
-  def post(self):
-    """Schedules a pending metadata update compression for the given Instance.
-
-    Params:
-      key: URL-safe key for a models.Instance.
-    """
-    key = ndb.Key(urlsafe=self.request.get('key'))
-    assert key.kind() == 'Instance', key
-    metadata.compress(key)
-
-
 class InstancePendingDeletionDeletionHandler(webapp2.RequestHandler):
   """Worker for deleting instances pending deletion."""
 
@@ -265,14 +219,10 @@ def create_queues_app():
       ('/internal/queues/catalog-instance', InstanceCatalogHandler),
       ('/internal/queues/check-deleted-instance',
        DeletedInstanceCheckHandler),
-      ('/internal/queues/check-instance-metadata-operation',
-       InstanceMetadataOperationCheckHandler),
       ('/internal/queues/cleanup-deleted-instance',
        DeletedInstanceCleanupHandler),
       ('/internal/queues/cleanup-drained-instance',
        DrainedInstanceCleanupHandler),
-      ('/internal/queues/compress-instance-metadata-updates',
-       InstanceMetadataUpdatesCompressionHandler),
       ('/internal/queues/create-instance-group-manager',
        InstanceGroupManagerCreationHandler),
       ('/internal/queues/create-instance-template',
@@ -289,6 +239,4 @@ def create_queues_app():
       ('/internal/queues/resize-instance-group', InstanceGroupResizeHandler),
       ('/internal/queues/update-cataloged-instance',
        CatalogedInstanceUpdateHandler),
-      ('/internal/queues/update-instance-metadata',
-       InstanceMetadataUpdateHandler),
   ])

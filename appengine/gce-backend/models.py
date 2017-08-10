@@ -12,23 +12,6 @@ from components.machine_provider import rpc_messages
 import utilities
 
 
-class MetadataUpdate(ndb.Model):
-  """A pending metadata update.
-
-  Standalone instances should not be present in the datastore.
-  """
-  # Checksum for this metadata.
-  checksum = ndb.ComputedProperty(
-      lambda self: utilities.compute_checksum(self.metadata))
-  # Metadata to modify. Keys present will overwrite existing metadata.
-  # Use null values to delete keys.
-  metadata = ndb.JsonProperty()
-  # Time this operation was started.
-  operation_ts = ndb.DateTimeProperty(indexed=False)
-  # URL for the pending operation to apply this metadata update.
-  url = ndb.StringProperty(indexed=False)
-
-
 class ServiceAccount(ndb.Model):
   """A service account.
 
@@ -48,8 +31,6 @@ class Instance(ndb.Model):
       instance template base name, revision, zone, GCE instance name.
     parent: None (root).
   """
-  # Active metadata operation.
-  active_metadata_update = ndb.LocalStructuredProperty(MetadataUpdate)
   # Whether or not this instance is cataloged in the Machine Provider.
   cataloged = ndb.BooleanProperty(indexed=True)
   # Whether or not this instance has been deleted.
@@ -70,9 +51,6 @@ class Instance(ndb.Model):
   lease_expiration_ts = ndb.DateTimeProperty(indexed=False)
   # Whether or not this instance is pending deletion.
   pending_deletion = ndb.BooleanProperty(indexed=True)
-  # Pending metadata operations.
-  pending_metadata_updates = ndb.LocalStructuredProperty(
-      MetadataUpdate, repeated=True)
   # URL of the instance.
   url = ndb.StringProperty(indexed=False)
 

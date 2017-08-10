@@ -16,7 +16,6 @@ import config
 import instance_group_managers
 import instance_templates
 import instances
-import metadata
 import parse
 
 
@@ -143,14 +142,6 @@ class InstanceTemplateDeletionHandler(webapp2.RequestHandler):
     instance_templates.schedule_deletion()
 
 
-class MetadataTaskScheduleHandler(webapp2.RequestHandler):
-  """Worker for scheduling metadata tasks."""
-
-  @decorators.require_cronjob
-  def get(self):
-    metadata.schedule_metadata_tasks()
-
-
 def create_cron_app():
   return webapp2.WSGIApplication([
       ('/internal/cron/catalog-instances', InstanceCatalogHandler),
@@ -174,5 +165,4 @@ def create_cron_app():
       ('/internal/cron/resize-instance-groups', InstanceGroupResizeHandler),
       ('/internal/cron/update-cataloged-instances',
        CatalogedInstanceUpdateHandler),
-      ('/internal/cron/schedule-metadata-tasks', MetadataTaskScheduleHandler),
   ])

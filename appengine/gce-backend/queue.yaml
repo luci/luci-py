@@ -11,22 +11,12 @@ queue:
    retry_parameters:
      task_retry_limit: 0
 
- - name: check-instance-metadata-operation
-   rate: 100/s
-   retry_parameters:
-     task_retry_limit: 0
-
  - name: cleanup-deleted-instance
    rate: 100/s
    retry_parameters:
      task_retry_limit: 0
 
  - name: cleanup-drained-instance
-   rate: 100/s
-   retry_parameters:
-     task_retry_limit: 0
-
- - name: compress-instance-metadata-updates
    rate: 100/s
    retry_parameters:
      task_retry_limit: 0
@@ -72,11 +62,6 @@ queue:
      task_retry_limit: 0
 
  - name: update-cataloged-instance
-   rate: 100/s
-   retry_parameters:
-     task_retry_limit: 0
-
- - name: update-instance-metadata
    rate: 100/s
    retry_parameters:
      task_retry_limit: 0

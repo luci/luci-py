@@ -103,17 +103,6 @@ Machine Provider has reclaimed the instance after lease expiration, schedules
 an operation to delete the GCE instance.
 
 
-## schedule-metadata-tasks
-
-Looks for an active\_metadata\_update with a url in a models.Instance and checks
-the status of the operation. If succeeded, active\_metadata\_update is cleared,
-otherwise only the url is cleared and the operation is moved to the front of
-the pending\_metadata\_updates. If there is an active\_metadata\_update without
-a url, creates the GCE zone operation to apply the metadata update. If there is
-no active\_metadata\_update, compresses all pending\_metadata\_updates into a
-single metadata update and sets it as the active\_metadata\_update.
-
-
 ## delete-instances-pending-deletion
 
 Deletes GCE instances for each models.Instance with pending\_deletion set.
