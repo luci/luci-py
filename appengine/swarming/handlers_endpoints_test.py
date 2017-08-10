@@ -883,8 +883,6 @@ class TasksApiTest(BaseTest):
     response = self.call_api('cancel', body={u'tags': [u'os:Win']})
     self.assertEqual(expected, response.json)
 
-
-
   def test_list_ok(self):
     """Asserts that list requests all TaskResultSummaries."""
     first, second, str_now_120, start, end = self._gen_two_tasks()
@@ -895,6 +893,7 @@ class TasksApiTest(BaseTest):
         end=end, start=start, include_performance_stats=True)
     expected = {u'now': str_now_120, u'items': [second, first]}
     actual = self.call_api('list', body=message_to_dict(request)).json
+    # Generate the actual expected values by decompressing the data.
     for k in ('isolated_download', 'isolated_upload'):
       for j in ('items_cold', 'items_hot'):
         actual['items'][1]['performance_stats'][k][j] = large.unpack(
@@ -1151,13 +1150,25 @@ class TasksApiTest(BaseTest):
           u'duration': 1.0,
           u'initial_number_items': u'10',
           u'initial_size': u'100000',
+          # Note: these were manually decompressed, they are returned as
+          # base64.b64encode(large.pack()) from the API.
           u'items_cold': [20],
-          u'items_hot': [30],
+          u'items_hot': [30, 40],
+          u'num_items_cold': u'1',
+          u'total_bytes_items_cold': u'20',
+          u'num_items_hot': u'2',
+          u'total_bytes_items_hot': u'70',
         },
         u'isolated_upload': {
           u'duration': 2.0,
-          u'items_cold': [40],
-          u'items_hot': [50],
+          # Note: these were manually decompressed, they are returned as
+          # base64.b64encode(large.pack()) from the API.
+          u'items_cold': [1, 2, 40],
+          u'items_hot': [1, 2, 3, 50],
+          u'num_items_cold': u'3',
+          u'total_bytes_items_cold': u'43',
+          u'num_items_hot': u'4',
+          u'total_bytes_items_hot': u'56',
         },
       },
       u'modified_ts': str_now_120,
@@ -1480,12 +1491,20 @@ class TaskApiTest(BaseTest):
         u'initial_number_items': u'10',
         u'initial_size': u'100000',
         u'items_cold': [20],
-        u'items_hot': [30],
+        u'items_hot': [30, 40],
+        u'num_items_cold': u'1',
+        u'total_bytes_items_cold': u'20',
+        u'num_items_hot': u'2',
+        u'total_bytes_items_hot': u'70',
       },
       u'isolated_upload': {
         u'duration': 2.0,
-        u'items_cold': [40],
-        u'items_hot': [50],
+        u'items_cold': [1, 2, 40],
+        u'items_hot': [1, 2, 3, 50],
+        u'num_items_cold': u'3',
+        u'total_bytes_items_cold': u'43',
+        u'num_items_hot': u'4',
+        u'total_bytes_items_hot': u'56',
       },
     }
     response = self.call_api(
@@ -2022,12 +2041,20 @@ class BotApiTest(BaseTest):
               u'initial_number_items': u'10',
               u'initial_size': u'100000',
               u'items_cold': [20],
-              u'items_hot': [30],
+              u'items_hot': [30, 40],
+              u'num_items_cold': u'1',
+              u'total_bytes_items_cold': u'20',
+              u'num_items_hot': u'2',
+              u'total_bytes_items_hot': u'70',
             },
             u'isolated_upload': {
               u'duration': 2.0,
-              u'items_cold': [40],
-              u'items_hot': [50],
+              u'items_cold': [1, 2, 40],
+              u'items_hot': [1, 2, 3, 50],
+              u'num_items_cold': u'3',
+              u'total_bytes_items_cold': u'43',
+              u'num_items_hot': u'4',
+              u'total_bytes_items_hot': u'56',
             },
           },
           u'run_id': u'5cee870005511',

@@ -262,6 +262,8 @@ class OperationStats(ndb.Model):
   """Statistics for an operation.
 
   This entity is not stored in the DB. It is only embedded in PerformanceStats.
+
+  It is immutable.
   """
   # Duration of the isolation operation in seconds.
   duration = ndb.FloatProperty(indexed=False)
@@ -274,15 +276,57 @@ class OperationStats(ndb.Model):
   items_cold = LargeIntegerArray()
   items_hot = LargeIntegerArray()
 
-  @property
-  def items_cold_array(self):
-    # It seems like it's impossible to add it as a method to LargeIntegerArray
-    # in a way that works in jinja2 templates.
-    return large.unpack(self.items_cold or '')
+  # Cached precalculated values.
+  _num_items_cold = None
+  _total_bytes_items_cold = None
+  _num_items_hot = None
+  _total_bytes_items_hot = None
 
   @property
-  def items_hot_array(self):
-    return large.unpack(self.items_hot or '')
+  def num_items_cold(self):
+    """Numbers of missing items from the bot local isolated cache."""
+    self._ensure_cache()
+    return self._num_items_cold
+
+  @property
+  def total_bytes_items_cold(self):
+    """Total size in bytes of all missing items from the bot local isolated
+    cache.
+    """
+    self._ensure_cache()
+    return self._total_bytes_items_cold
+
+  @property
+  def num_items_hot(self):
+    """Numbers of items already present in the bot local isolated cache."""
+    self._ensure_cache()
+    return self._num_items_hot
+
+  @property
+  def total_bytes_items_hot(self):
+    """Total size in bytes of all items already present in the bot local
+    isolated cache.
+    """
+    self._ensure_cache()
+    return self._total_bytes_items_hot
+
+  def to_dict(self):
+    out = super(OperationStats, self).to_dict()
+    out['num_items_cold'] = self.num_items_cold
+    out['total_bytes_items_cold'] = self.total_bytes_items_cold
+    out['num_items_hot'] = self.num_items_hot
+    out['total_bytes_items_hot'] = self.total_bytes_items_hot
+    return out
+
+  def _ensure_cache(self):
+    if self._num_items_cold is None and self.items_cold:
+      items_cold = large.unpack(self.items_cold)
+      self._num_items_cold = len(items_cold)
+      self._total_bytes_items_cold = sum(items_cold)
+    if self._num_items_hot is None and self.items_hot:
+      items_hot = large.unpack(self.items_hot)
+      self._num_items_hot = len(items_hot)
+      self._total_bytes_items_hot = sum(items_hot)
 
 
 class PerformanceStats(ndb.Model):
@@ -311,6 +355,17 @@ class PerformanceStats(ndb.Model):
   @property
   def is_valid(self):
     return self.bot_overhead is not None
+
+  def to_dict(self):
+    # to_dict() doesn't correctly call overriden to_dict() on
+    # LocalStructuredProperty.
+    out = super(PerformanceStats, self).to_dict(
+        exclude=[
+          'package_installation', 'isolated_download', 'isolated_upload'])
+    out['package_installation'] = self.package_installation.to_dict()
+    out['isolated_download'] = self.isolated_download.to_dict()
+    out['isolated_upload'] = self.isolated_upload.to_dict()
+    return out
 
   def _pre_put_hook(self):
     if self.bot_overhead is None:

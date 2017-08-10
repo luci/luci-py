@@ -22,6 +22,7 @@ from components import auth_testing
 from components import utils
 from test_support import test_case
 
+from server import large
 from server import task_pack
 from server import task_request
 from server import task_result
@@ -325,9 +326,11 @@ class TaskResultApiTest(TestCase):
         bot_overhead=0.1,
         isolated_download=task_result.OperationStats(
             duration=0.05, initial_number_items=10, initial_size=10000,
-            items_cold='foo', items_hot='bar'),
+            items_cold=large.pack([1, 2]),
+            items_hot=large.pack([3, 4, 5])),
         isolated_upload=task_result.OperationStats(
-            duration=0.01, items_cold='foo')).put()
+            duration=0.01,
+            items_cold=large.pack([10]))).put()
     ndb.transaction(lambda: ndb.put_multi(run_result.append_output('foo', 0)))
     result_summary.set_from_run_result(run_result, request)
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
@@ -372,15 +375,23 @@ class TaskResultApiTest(TestCase):
         'duration': 0.05,
         'initial_number_items': 10,
         'initial_size': 10000,
-        'items_cold': 'foo',
-        'items_hot': 'bar',
+        'items_cold': large.pack([1, 2]),
+        'items_hot': large.pack([3, 4, 5]),
+        'num_items_cold': 2,
+        'total_bytes_items_cold': 3,
+        'num_items_hot': 3,
+        'total_bytes_items_hot': 12,
       },
       'isolated_upload': {
         'duration': 0.01,
         'initial_number_items': None,
         'initial_size': None,
-        'items_cold': 'foo',
+        'items_cold': large.pack([10]),
         'items_hot': None,
+        'num_items_cold': 1,
+        'total_bytes_items_cold': 10,
+        'num_items_hot': None,
+        'total_bytes_items_hot': None,
       },
       'package_installation': {
         'duration': None,
@@ -388,6 +399,10 @@ class TaskResultApiTest(TestCase):
         'initial_size': None,
         'items_cold': None,
         'items_hot': None,
+        'num_items_cold': None,
+        'total_bytes_items_cold': None,
+        'num_items_hot': None,
+        'total_bytes_items_hot': None,
       },
     }
     self.assertEqual(expected, result_summary.performance_stats.to_dict())

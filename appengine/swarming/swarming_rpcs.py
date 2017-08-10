@@ -360,6 +360,12 @@ class OperationStats(messages.Message):
   # So can be large! See //client/utils/large.py for the code to handle these.
   items_cold = messages.BytesField(4)
   items_hot = messages.BytesField(5)
+  # Corresponding summaries; for each list above, sum of the number of files
+  # and the sum bytes of the files.
+  num_items_cold = messages.IntegerField(6)
+  total_bytes_items_cold = messages.IntegerField(7)
+  num_items_hot = messages.IntegerField(8)
+  total_bytes_items_hot = messages.IntegerField(9)
 
 
 class PerformanceStats(messages.Message):
