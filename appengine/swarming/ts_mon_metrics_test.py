@@ -69,11 +69,11 @@ class TestMetrics(test_case.TestCase):
 
   def test_pool_from_dimensions(self):
     dimensions = {
-        'os': ['Linux', 'Ubuntu'],
-        'cpu': ['x86-64'],
+        u'os': [u'Linux', u'Ubuntu', u'Ubuntu-14.04'],
+        u'cpu': [u'x86', u'x86-64'],
     }
     dimensions.update({k: 'ignored' for k in ts_mon_metrics.IGNORED_DIMENSIONS})
-    expected = 'cpu:x86-64|os:Linux|os:Ubuntu'
+    expected = u'cpu:x86-64|os:Linux|os:Ubuntu-14.04'
     self.assertEqual(expected, ts_mon_metrics.pool_from_dimensions(dimensions))
 
   def test_shard_params(self):

@@ -6,7 +6,6 @@
 
 from collections import defaultdict
 import datetime
-import itertools
 import json
 import logging
 
@@ -22,7 +21,7 @@ from server import task_result
 #   connected to the bot.
 # - caches has an unbounded matrix.
 # - id is unique for each bot.
-IGNORED_DIMENSIONS = ('android_devices', 'caches', 'id')
+IGNORED_DIMENSIONS = ('android_devices', 'caches', 'id', 'machine_type')
 # Real timeout is 60s, keep it slightly under to bail out early.
 REQUEST_TIMEOUT_SEC = 50
 # Cap the max number of items per taskqueue task, to keep the total
@@ -219,10 +218,15 @@ machine_types_connection_time = gae_ts_mon.CumulativeDistributionMetric(
 
 def pool_from_dimensions(dimensions):
   """Return a canonical string of flattened dimensions."""
-  iterables = (map(lambda x: '%s:%s' % (key, x), values)
-               for key, values in dimensions.iteritems()
-               if key not in IGNORED_DIMENSIONS)
-  return '|'.join(sorted(itertools.chain(*iterables)))
+  pairs = []
+  for key, values in dimensions.iteritems():
+    if key in IGNORED_DIMENSIONS:
+      continue
+    # Strip all the prefixes of other values. values is already sorted.
+    for i, value in enumerate(values):
+      if not any(v.startswith(value) for v in values[i+1:]):
+        pairs.append(u'%s:%s' % (key, value))
+  return u'|'.join(sorted(pairs))
 
 
 def extract_job_fields(tags):
