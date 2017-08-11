@@ -454,7 +454,7 @@ def get_app_revision_url():
   Returns None if a version is tainted or has unexpected name.
   """
   rev = re.match(r'\d+-([a-f0-9]+)$', get_app_version())
-  template = 'https://github.com/luci/luci-py/commit/%s'
+  template = 'https://chromium.googlesource.com/infra/luci/luci-py/+/%s'
   return template % rev.group(1) if rev else None
 
 
