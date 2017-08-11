@@ -24,7 +24,8 @@ class ProjectsTestCase(test_case.TestCase):
   def mock_latest_config(self, config_set, contents):
     self.mock(storage, 'get_latest_configs_async', mock.Mock())
     storage.get_latest_configs_async.return_value = future({
-      config_set: ('rev', storage.compute_hash(contents), contents),
+      config_set: (
+          'rev', 'file://config', storage.compute_hash(contents), contents),
     })
 
   def test_get_projects(self):

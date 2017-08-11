@@ -67,7 +67,8 @@ class GitilesImportTestCase(test_case.TestCase):
   def test_get_gitiles_config_corrupted(self):
     self.mock(storage, 'get_latest_configs_async', mock.Mock())
     storage.get_latest_configs_async.return_value = future({
-      storage.get_self_config_set(): ('rev', 'content_hash', 'garbage'),
+      storage.get_self_config_set(): (
+          'rev', 'file://config', 'content_hash', 'garbage'),
     })
     gitiles_import.get_gitiles_config()
 
