@@ -100,6 +100,7 @@ class TestOsUtilities(auto_stub.TestCase):
     # Only set when the process is running in a properly configured GUI context.
     actual.discard(u'locale')
     # Only set on GCE.
+    actual.discard(u'image')
     actual.discard(u'machine_type')
     actual.discard(u'zone')
     # Only set on Mac.

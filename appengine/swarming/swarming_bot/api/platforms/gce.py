@@ -158,6 +158,14 @@ def oauth2_available_scopes(account='default'):
 
 
 @tools.cached
+def get_image():
+  """Returns the image used by the GCE VM."""
+  # Format is projects/<id>/global/images/<image>
+  metadata = get_metadata()
+  return unicode(metadata['instance']['image'].rsplit('/', 1)[-1])
+
+
+@tools.cached
 def get_zone():
   """Returns the zone containing the GCE VM."""
   # Format is projects/<id>/zones/<zone>
