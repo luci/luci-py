@@ -393,7 +393,7 @@ class TaskRequestApiTest(TestCase):
         as_dict['properties_hash'])
 
   def test_init_new_request_bot_service_account(self):
-    request = mkreq(_gen_request(service_account_token='bot'))
+    request = mkreq(_gen_request(service_account='bot'))
     as_dict = request.to_dict()
     self.assertEqual('bot', as_dict['service_account'])
     self.assertIn(u'service_account:bot', as_dict['tags'])

@@ -261,24 +261,28 @@ class NewTaskRequest(messages.Message):
   #   - 'none': do not use task service accounts at all, this is default.
   #   - 'bot': use bot's own account, works only if bots authenticate with
   #       OAuth2.
-  #   - <token>: a properly signed and scoped delegation token that asserts that
-  #       the caller is allowed to use the specific service account (encoded in
-  #       the token) on Swarming. This is not implemented yet.
+  #   - 'email': use this account (if token server's service_accounts.cfg rules
+  #       allow it). Not implemented yet.
   #
   # Note that the service account name is specified outside of task properties,
   # and thus it is possible to have two tasks with different service accounts,
   # but identical properties hash (so one can be deduped). If this is unsuitable
   # use 'idempotent=False' or include a service account name in properties
   # separately.
-  service_account_token = messages.StringField(8)
+  #
+  # TODO(vadimsh): Link to a doc that describes Swarming Service Accounts, when
+  # it exists.
+  service_account = messages.StringField(8)
+  # DEPRECATED. Use 'service_account' instead.
+  service_account_token = messages.StringField(9)
 
   # Full topic name to post task state updates to, e.g.
   # "projects/<id>/topics/<id>".
-  pubsub_topic = messages.StringField(9)
+  pubsub_topic = messages.StringField(10)
   # Secret string to put into "auth_token" attribute of PubSub message.
-  pubsub_auth_token = messages.StringField(10)
+  pubsub_auth_token = messages.StringField(11)
   # Will be but into "userdata" fields of PubSub message.
-  pubsub_userdata = messages.StringField(11)
+  pubsub_userdata = messages.StringField(12)
 
 
 class TaskRequest(messages.Message):

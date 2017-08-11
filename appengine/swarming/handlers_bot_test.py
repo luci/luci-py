@@ -351,7 +351,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
   def test_poll_task_with_bot_service_account(self):
     params = self.do_handshake()
 
-    _, task_id = self.client_create_task_raw(service_account_token='bot')
+    _, task_id = self.client_create_task_raw(service_account='bot')
     self.assertEqual('0', task_id[-1])
     task_id = task_id[:-1] + '1'
 

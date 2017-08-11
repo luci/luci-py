@@ -299,7 +299,7 @@ class TasksApiTest(BaseTest):
         pubsub_topic='projects/abc/topics/def',
         pubsub_auth_token='secret that must not be shown',
         pubsub_userdata='userdata',
-        service_account_token='bot')
+        service_account='bot')
     expected = {
       u'request': {
         u'authenticated': u'user:user@example.com',

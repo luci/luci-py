@@ -376,12 +376,22 @@ class SwarmingTasksService(remote.Service):
     if sb is not None:
       request.properties.secret_bytes = sb
 
+    # TODO(crbug.com/731847): Remove this once 'service_account_token' is no
+    # longer part of public API. This log lines allow us to easily identify API
+    # users that still use this field.
+    if request.service_account_token:
+      logging.warning('crbug.com/731847: service_account_token is deprecated')
+
     try:
       request, secret_bytes = message_conversion.new_task_request_from_rpc(
           request, utils.utcnow())
       apply_property_defaults(request.properties)
       task_request.init_new_request(
           request, acl.can_schedule_high_priority_tasks(), secret_bytes)
+
+      # TODO(crbug.com/731847): If request.service_account is an email, contact
+      # the token server to generate "OAuth token grant", and put it into
+      # request.service_account_token.
 
       result_summary = task_scheduler.schedule_request(request, secret_bytes)
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
