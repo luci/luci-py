@@ -54,7 +54,6 @@ import hashlib
 import posixpath
 import random
 import re
-import urlparse
 
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
@@ -67,7 +66,6 @@ from components.config import validation
 
 from server import config
 from server import task_pack
-import acl
 import cipd
 
 
@@ -943,64 +941,6 @@ def init_new_request(request, allow_high_priority, secret_bytes_ent):
       utils.encode_to_json(props)).digest()
   else:
     request.properties_hash = None
-
-
-def new_request_clone(original_request, original_secret_bytes,
-                      allow_high_priority):
-  """Creates a new TaskRequest and possibly a SecretBytes as a copy of another
-  one but doesn't store them.
-
-  Used by "Retry task" UI button.
-
-  Modifications:
-  - Enforces idempotent=False.
-  - Removes the parent_task_id if any.
-  - Appends suffix '(Retry #1)' to the task name, incrementing the number of
-    followup retries.
-  - Strips any tag starting with 'user:'.
-  - Overrides request's user with the credentials of the currently logged in
-    user.
-  - Does not inherit pubsub parameter.
-
-  New request uses same 'service_account_token', but 'init_new_request' will
-  recheck it again, ensuring the current user (the one that triggers the retry)
-  is able to use the token.
-
-  Returns:
-    The newly created TaskRequest.
-  """
-  now = utils.utcnow()
-  if original_request.properties.is_terminate:
-    raise ValueError('cannot clone a terminate request')
-  properties = TaskProperties(**original_request.properties.to_dict())
-  properties.idempotent = False
-  expiration_ts = (
-      now + (original_request.expiration_ts - original_request.created_ts))
-  name = original_request.name
-  match = re.match(r'^(.*) \(Retry #(\d+)\)$', name)
-  if match:
-    name = '%s (Retry #%d)' % (match.group(1), int(match.group(2)) + 1)
-  else:
-    name += ' (Retry #1)'
-  user = auth.get_current_identity()
-  username = user.to_bytes()
-  prefix = 'user:'
-  if not username.startswith(prefix):
-    raise ValueError('a request can only be cloned by a user, not a bot')
-  username = username[len(prefix):]
-  tags = set(t for t in original_request.tags if not t.startswith('user:'))
-  request = TaskRequest(
-      created_ts=now,
-      expiration_ts=expiration_ts,
-      name=name,
-      parent_task_id=None,
-      priority=original_request.priority,
-      properties=properties,
-      service_account_token=original_request.service_account_token,
-      tags=tags,
-      user=username)
-  init_new_request(request, allow_high_priority, original_secret_bytes)
-  return request
 
 
 def validate_priority(priority):

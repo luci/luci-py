@@ -217,7 +217,6 @@ class TaskRequestApiTest(TestCase):
       task_request.validate_request_key(ndb.Key('TaskRequest', 1))
 
   def test_init_new_request(self):
-    # Compare with test_new_request_clone().
     parent = mkreq(_gen_request())
     # Hack: Would need to know about TaskResultSummary.
     parent_id = task_pack.pack_request_key(parent.key) + '1'
@@ -624,86 +623,6 @@ class TaskRequestApiTest(TestCase):
             isolated='deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
             isolatedserver='http://localhost:1',
             namespace='default-gzip'))))
-
-  def test_new_request_clone(self):
-    # Compare with test_init_new_request().
-    parent = mkreq(_gen_request())
-    # Hack: Would need to know about TaskResultSummary.
-    parent_id = task_pack.pack_request_key(parent.key) + '1'
-    data = _gen_request(
-        properties=dict(idempotent=True), parent_task_id=parent_id)
-    request = task_request.new_request_clone(mkreq(data), None, True)
-    request.key = task_request.new_request_key()
-    request.put()
-    # Differences from init_new_request() are:
-    # - idempotent was reset to False.
-    # - parent_task_id was reset to None.
-    expected_properties = {
-      'caches': [],
-      'cipd_input': {
-        'client_package': {
-          'package_name': u'infra/tools/cipd/${platform}',
-          'path': None,
-          'version': u'git_revision:deadbeef',
-        },
-        'packages': [{
-          'package_name': u'rm',
-          'path': u'bin',
-          'version': u'git_revision:deadbeef',
-        }],
-        'server': u'https://chrome-infra-packages.appspot.com'
-      },
-      'command': [u'command1', u'arg1'],
-      'dimensions': {
-        u'OS': u'Windows-3.1.1',
-        u'hostname': u'localhost',
-        u'pool': u'default',
-      },
-      'env': {u'foo': u'bar', u'joe': u'2'},
-      'execution_timeout_secs': 30,
-      'extra_args': [],
-      'grace_period_secs': 30,
-      'idempotent': False,
-      'inputs_ref': {
-        'isolated': None,
-        'isolatedserver': u'https://isolateserver.appspot.com',
-        'namespace': u'default-gzip',
-      },
-      'io_timeout_secs': None,
-      'outputs': [],
-      'has_secret_bytes': False,
-    }
-    # Differences from new_request() are:
-    # - parent_task_id was reset to None.
-    # - tag 'user:' was replaced
-    # - user was replaced.
-    expected_request = {
-      'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
-      'name': u'Request name (Retry #1)',
-      'parent_task_id': None,
-      'priority': 49,
-      'properties': expected_properties,
-      'properties_hash': None,
-      'pubsub_topic': None,
-      'pubsub_userdata': None,
-      'service_account': u'none',
-      'tags': [
-        u'OS:Windows-3.1.1',
-        u'hostname:localhost',
-        u'pool:default',
-        u'priority:49',
-        u'service_account:none',
-        u'tag:1',
-        u'user:mocked@example.com',
-      ],
-      'user': u'mocked@example.com',
-    }
-    actual = request.to_dict()
-    # expiration_ts - created_ts == deadline_to_run.
-    actual.pop('created_ts')
-    actual.pop('expiration_ts')
-    self.assertEqual(expected_request, actual)
-    self.assertEqual(30, request.expiration_secs)
 
   def test_validate_priority(self):
     with self.assertRaises(TypeError):
