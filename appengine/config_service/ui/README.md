@@ -15,8 +15,9 @@ This is a UI for the configuration service.
 ## Running locally
 
 *	First, change all the URLs in the iron-ajax elements. Simply add "https://luci-config.appspot.com" before each URL.
-	*	One in the src/config-ui/front-page.html
-	*	Two in the src/config-ui/config-set.html
+	*	One in src/config-ui/front-page.html
+	*	Two in src/config-ui/config-set.html
+	*	One in src/config-ui/config-ui.html
 
 *	In the config-service folder run `dev_appserver.py app.yaml`
 
