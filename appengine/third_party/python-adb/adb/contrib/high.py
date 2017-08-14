@@ -831,76 +831,30 @@ class HighDevice(object):
     out, _ = self.Shell('pm path %s' % pipes.quote(package))
     return out.strip().split(':', 1)[1] if out else out
 
-  def WaitForDevice(self, timeout=180):
-    """Waits for the device to be responsive.
-
-    In practice, waits for the device to have its external storage to be
-    mounted.
+  def IsFullyBooted(self):
+    """Checks whether the device is fully booted.
 
     Returns:
-    - uptime as float in second or None.
+      tuple(booted, status)
+      - booted: True if device is fully booted, false otherwise.
+      - status: If not booted, string describing why.
     """
     if not self.cache.external_storage_path:
-      return False
-    start = time.time()
-    while True:
-      if (time.time() - start) > timeout:
-        break
-      if self.Stat(self.cache.external_storage_path)[0] != None:
-        return True
-      time.sleep(0.1)
-    _LOG.warning('%s.WaitForDevice() failed', self.port_path)
-    return False
+      return False, 'external storage not ready'
+    if self.Stat(self.cache.external_storage_path)[0] is None:
+      return False, 'external storage not ready'
 
-  def WaitUntilFullyBooted(self, timeout=300):
-    """Waits for the device to be fully started up with network connectivity.
+    # Check if the boot animation has stopped.
+    prop = self.GetProp('init.svc.bootanim')
+    if prop is None:
+      return False, 'could not get init.svc.bootanim property'
+    elif prop != 'stopped':
+      return False, 'boot animation still running'
 
-    Arguments:
-    - timeout: minimum amount of time to wait for for the device to come up
-          online. It may extend to up to lock_timeout_ms more.
-    """
-    # Wait for the device to respond at all and optionally have lower uptime.
-    start = time.time()
-    if not self.WaitForDevice(timeout):
-      return False
-
-    # Wait for the internal sys.boot_completed bit to be set. This is the place
-    # where most time is spent.
-    while True:
-      if (time.time() - start) > timeout:
-        _LOG.warning(
-            '%s.WaitUntilFullyBooted() didn\'t get init.svc.bootanim in time: '
-            '%r',
-            self.port_path, self.GetProp('init.svc.bootanim'))
-        return False
-      # sys.boot_completed can't be relyed on. It fires too early or worse can
-      # be completely missing on some kernels (e.g. Manta).
-      prop = self.GetProp('init.svc.bootanim')
-      if prop == 'stopped':
-        break
-      if prop is None:
-        _LOG.warning(
-            '%s.WaitUntilFullyBooted() could not get init.svc.bootanim: '
-            'Device is unreachable.' %
-            self.port_path)
-        return False
-      time.sleep(0.1)
-
-    # Then the slowest part of all.
-    while True:
-      if (time.time() - start) > timeout:
-        _LOG.warning(
-            '%s.WaitUntilFullyBooted() didn\'t get Package Manager running in '
-            'time',
-            self.port_path)
-        return False
-      # pm can be very slow at times. Use a longer timeout to prevent
-      # confusing a long-running command with an interrupted connection.
-      out, exit_code = self.Shell('pm path', timeout_ms=30000)
-      if out == 'Error: no package specified\n':
-        # It's up!
-        break
-
+    # pm can be very slow at times. Use a longer timeout to prevent
+    # confusing a long-running command with an interrupted connection.
+    out, exit_code = self.Shell('pm path', timeout_ms=30000)
+    if out != 'Error: no package specified\n':
       # Accepts an empty string too, which has been observed only on Android 4.4
       # (Kitkat) but not on later versions.
       if out not in (
@@ -909,9 +863,29 @@ class HighDevice(object):
           ''):
         logging.warning(
             'Unexpected reply from pm path (%d): %r', exit_code, out)
-      time.sleep(0.1)
+      return False, 'pm not ready'
 
-    return True
+    # All checks passed.
+    return True, None
+
+  def WaitUntilFullyBooted(self, timeout=300):
+    """Waits for the device to be fully started up with network connectivity.
+
+    Arguments:
+    - timeout: minimum amount of time to wait for for the device to come up
+          online. It may extend to up to lock_timeout_ms more.
+    """
+    start = time.time()
+    while True:
+      is_booted, status = self.IsFullyBooted()
+      if is_booted:
+        return True
+      if (time.time() - start) > timeout:
+        _LOG.warning(
+            '%s.WaitUntilFullyBooted() timed out due to %s',
+            self.port_path, status)
+        return False
+      time.sleep(1)
 
   def PushKeys(self):
     """Pushes all the keys on the file system to the device.

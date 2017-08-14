@@ -904,7 +904,7 @@ def get_state_all_devices_android(devices):
       u'other_packages': platforms.android.get_unknown_apps(device),
       u'port_path': device.port_path,
       u'processes': device.GetProcessCount(),
-      u'state': u'available',
+      u'state': u'available' if device.IsFullyBooted()[0] else u'booting',
       u'temp': device.GetTemperatures(),
       u'uptime': device.GetUptime(),
     }
