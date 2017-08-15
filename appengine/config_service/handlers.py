@@ -28,11 +28,11 @@ class MainPageHandler(webapp2.RequestHandler):
   """ Serves the UI with the proper client ID. """
 
   def get(self):
-    # TODO(cwpayton): put the client_id in a proto file so that it is
-    # configurable and can be read dynamically by this file.
+    # TODO(nodir): put the client_id to a config file so that it's not hardcoded
     template_values = {
       'client_id':
-          '247108661754-svmo17vmk1j5hlt388gb45qblgvg2h98.apps.googleusercontent.com'
+          ('247108661754-svmo17vmk1j5hlt388gb45qblgvg2h98.apps.'
+           'googleusercontent.com'),
     }
     path = os.path.join(os.path.dirname(__file__), 'ui/static/index.html')
     self.response.out.write(template.render(path, template_values))
