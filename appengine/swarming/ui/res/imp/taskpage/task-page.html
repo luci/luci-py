@@ -1083,7 +1083,7 @@
           properties:this._request.properties,
           tags: this._request.tags,
           user: this._profile.email,
-          service_account_token: this._request.service_account,
+          service_account: this._request.service_account,
         }
         newTask.properties.dimensions = this._retry_dimensions.filter(function(d){
           return d && d.key && d.value;
