@@ -986,6 +986,11 @@ def get_dimensions():
     if device_types:
       dimensions[u'device'] = sorted(device_types)
 
+  if sys.platform == 'win32':
+    integrity = platforms.win.get_integrity_level()
+    if integrity is not None:
+      dimensions[u'integrity'] = [integrity]
+
   return dimensions
 
 
@@ -1026,10 +1031,6 @@ def get_state():
   }
   if sys.platform in ('cygwin', 'win32'):
     state[u'cygwin'] = [sys.platform == 'cygwin']
-  if sys.platform == 'win32':
-    integrity = platforms.win.get_integrity_level()
-    if integrity is not None:
-      state[u'integrity'] = [integrity]
   if sys.platform == 'darwin':
     state[u'xcode'] = platforms.osx.get_xcode_state()
     temp = platforms.osx.get_temperatures()

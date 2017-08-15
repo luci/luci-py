@@ -105,6 +105,8 @@ class TestOsUtilities(auto_stub.TestCase):
     actual.discard(u'zone')
     # Only set on Mac.
     actual.discard(u'hidpi')
+    # Only set on Windows.
+    actual.discard(u'integrity')
     # Only set on machines with SSD
     if sys.platform in ('darwin', 'linux2'):
       actual.discard(u'ssd')
