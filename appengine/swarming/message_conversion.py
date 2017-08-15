@@ -198,7 +198,11 @@ def new_task_request_from_rpc(msg, now):
       authenticated=None,
       properties=properties,
       # It is set in task_request.init_new_request().
-      properties_hash=None)
+      properties_hash=None,
+      # Need to convert it to 'str', it is BlobProperty. _rpc_to_ndb raises an
+      # error otherwise. TODO(crbug.com/731847): Remove this.
+      service_account_token=
+          str(msg.service_account_token) if msg.service_account_token else None)
 
   return req, secret_bytes
 
