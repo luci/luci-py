@@ -357,7 +357,7 @@ class SystemdAgent(Agent):
       logger.setLevel(logging.DEBUG)
       logger.addHandler(JournalHandler())
     except ImportError:
-      super(Agent, self).configure_logging()
+      super(SystemdAgent, self).configure_logging()
 
   def start(self):
     """Starts the Machine Provider agent."""
@@ -381,7 +381,7 @@ class SystemdAgent(Agent):
     os.chown(path, user.pw_uid, user.pw_gid)
 
   def connect_to_swarming(self, service_account, swarming_server):
-    super(Agent, self).connect_to_swarming(service_account, swarming_server)
+    super(SystemdAgent, self).connect_to_swarming(service_account, swarming_server)
     subprocess.check_call(['systemctl', 'enable', 'swarming-start-bot'])
 
 
