@@ -28,7 +28,10 @@ if sys.platform == 'win32':
 
 
 if sys.platform == 'linux2':
-  import android
+  try:
+    import android
+  except OSError:
+    android = None
   import gce
   import linux
   import posix
