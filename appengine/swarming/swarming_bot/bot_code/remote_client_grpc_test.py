@@ -20,6 +20,10 @@ class FakeGrpcProxy(object):
   def __init__(self, testobj):
     self._testobj = testobj
 
+  @property
+  def prefix(self):
+    return 'inst'
+
   def call_unary(self, name, request):
     return self._testobj._handle_call(name, request)
 
@@ -31,8 +35,7 @@ class TestRemoteClientGrpc(auto_stub.TestCase):
     def fake_sleep(_time):
       self._num_sleeps += 1
     self.mock(time, 'sleep', fake_sleep)
-    self._client = remote_client_grpc.RemoteClientGrpc('1.2.3.4:90',
-                                                       FakeGrpcProxy(self))
+    self._client = remote_client_grpc.RemoteClientGrpc('', FakeGrpcProxy(self))
     self._expected = []
     self._error_codes = []
 
@@ -49,13 +52,13 @@ class TestRemoteClientGrpc(auto_stub.TestCase):
     self.assertEqual(request, expected[1])
     return expected[2]
 
-  def get_bot_attributes_dict(self):
+  def _get_bot_attributes_dict(self):
     """Gets the attributes of a basic bot; must match next function"""
     return {
         'version': '123',
         'dimensions': {
+            'id': ['robotcop'],
             'mammal': ['ferrett', 'wombat'],
-            'pool': ['dead'],
         },
         'state': {
             'audio': ['Rachmaninov', 'Stravinsky'],
@@ -69,176 +72,60 @@ class TestRemoteClientGrpc(auto_stub.TestCase):
         },
     }
 
-  def get_bot_attributes_proto(self):
-    """Gets the attributes proto of a basic bot; must match prior function"""
-    attributes = remote_client_grpc.swarming_bot_pb2.Attributes()
-    attributes.version = '123'
-    # Note that dimensions are sorted
-    d1 = attributes.dimensions.add()
-    d1.name = 'mammal'
-    d1.values.extend(['ferrett', 'wombat'])
-    d2 = attributes.dimensions.add()
-    d2.name = 'pool'
-    d2.values.append('dead')
-    attributes.state.audio.extend(['Rachmaninov', 'Stravinsky'])
-    attributes.state.cost_usd_hour = 3.141
-    attributes.state.cpu = 'Intel 8080'
-    attributes.state.sleep_streak = 8
-    disk1 = attributes.state.disks.fields['mount']
-    disk1.string_value = 'path/to/mount'
-    disk2 = attributes.state.disks.fields['volume']
-    disk2.string_value = 'turned-to-eleven'
-    return attributes
+  def _get_worker_proto(self):
+    """Gets the worker proto of a basic bot; must match prior function"""
+    worker = remote_client_grpc.worker_manager_pb2.Worker()
+    worker.name = 'inst/workers/robotcop'
+    devprops = worker.device.properties
+    d1 = devprops.add()
+    d1.key.custom = 'id'
+    d1.value = 'robotcop'
+    d2 = devprops.add()
+    d2.key.custom = 'mammal'
+    d2.value = 'ferrett'
+    d3 = devprops.add()
+    d3.key.custom = 'mammal'
+    d3.value = 'wombat'
+    props = worker.properties
+    props.get_or_create_list('audio').extend(
+        ['Rachmaninov', 'Stravinsky'])
+    props['cost_usd_hour'] = 3.141
+    props['cpu'] = 'Intel 8080'
+    disks = props.get_or_create_struct('disks')
+    disks['mount'] = 'path/to/mount'
+    disks['volume'] = 'turned-to-eleven'
+    props['sleep_streak'] = 8
+    props['bot_version'] = '123'
+    return worker
 
   def test_handshake(self):
     """Tests the handshake proto"""
-    msg_req = remote_client_grpc.swarming_bot_pb2.HandshakeRequest()
-    msg_req.attributes.CopyFrom(self.get_bot_attributes_proto())
+    msg_req = remote_client_grpc.worker_manager_pb2.CreateWorkerRequest()
+    msg_req.parent = 'inst'
+    msg_req.worker.CopyFrom(self._get_worker_proto())
 
     # Create proto response
-    msg_rsp = remote_client_grpc.swarming_bot_pb2.HandshakeResponse()
-    msg_rsp.server_version = '101'
-    msg_rsp.bot_version = '102'
-    d1 = msg_rsp.bot_group_cfg.dimensions.add()
-    d1.name = 'mammal'
-    d1.values.extend(['kangaroo', 'emu'])
+    msg_rsp = self._get_worker_proto()
+    # Add a pool
+    poolprop = msg_rsp.device.properties.add()
+    poolprop.key.custom = 'pool'
+    poolprop.value = 'dead'
 
     # Execute call and verify response
-    expected_call = ('Handshake', msg_req, msg_rsp)
+    expected_call = ('CreateWorker', msg_req, msg_rsp)
     self._expected.append(expected_call)
-    response = self._client.do_handshake(self.get_bot_attributes_dict())
+    response = self._client.do_handshake(self._get_bot_attributes_dict())
     self.assertEqual(response, {
-        'server_version': u'101',
-        'bot_version': u'102',
-        'bot_group_cfg_version': u'',
+        'server_version': u'unknown',
+        'bot_version': u'123',
+        'bot_group_cfg_version': u'unknown',
         'bot_group_cfg': {
             'dimensions': {
-                u'mammal': [u'kangaroo', u'emu'],
+                u'pool': [u'dead'],
             },
         },
     })
 
-  def test_poll_manifest(self):
-    """Verifies that we can generate a reasonable manifest from a proto"""
-    msg_req = remote_client_grpc.swarming_bot_pb2.PollRequest()
-    msg_req.attributes.CopyFrom(self.get_bot_attributes_proto())
-
-    # Create dict response
-    dict_rsp = {
-        'bot_id': u'baby_bot',
-        'command': None,
-        'dimensions': {
-            u'mammal': u'emu',
-            u'pool': u'dead',
-        },
-        'env': {
-            u'co2': u'400ppm',
-            u'n2': u'80%',
-            u'o2': u'20%',
-        },
-        'extra_args': None,
-        'grace_period': 1,
-        'hard_timeout': 2,
-        'io_timeout': 3,
-        'isolated': {
-            'namespace': u'default-gzip',
-            'input': u'123abc',
-            'server': '1.2.3.4:90', # from when client was created
-        },
-        'outputs': [u'foo.o', u'foo.log'],
-        'task_id': u'ifyouchoosetoacceptit',
-    }
-    # Create proto response
-    msg_rsp = remote_client_grpc.swarming_bot_pb2.PollResponse()
-    msg_rsp.cmd = remote_client_grpc.swarming_bot_pb2.PollResponse.RUN
-    msg_rsp.manifest.bot_id = 'baby_bot'
-    msg_rsp.manifest.dimensions['mammal'] = 'emu'
-    msg_rsp.manifest.dimensions['pool'] = 'dead'
-    msg_rsp.manifest.env['co2'] = '400ppm'
-    msg_rsp.manifest.env['n2'] = '80%'
-    msg_rsp.manifest.env['o2'] = '20%'
-    msg_rsp.manifest.grace_period = 1
-    msg_rsp.manifest.hard_timeout = 2
-    msg_rsp.manifest.io_timeout = 3
-    msg_rsp.manifest.isolated.namespace = 'default-gzip'
-    msg_rsp.manifest.isolated.input = '123abc'
-    msg_rsp.manifest.outputs.extend(['foo.o', 'foo.log'])
-    msg_rsp.manifest.task_id = 'ifyouchoosetoacceptit'
-
-    # Execute call and verify response
-    expected_call = ('Poll', msg_req, msg_rsp)
-    self._expected.append(expected_call)
-    cmd, value = self._client.poll(self.get_bot_attributes_dict())
-    self.assertEqual(cmd, 'run')
-    self.assertEqual(value, dict_rsp)
-
-  def test_update_no_output_or_code(self):
-    """Includes only a basic param set"""
-    # Create params dict
-    params = {
-        'bot_overhead': 3.141,
-        'cost_usd': 0.001,
-    }
-
-    # Create expected request proto
-    msg_req = remote_client_grpc.swarming_bot_pb2.TaskUpdateRequest()
-    msg_req.id = 'baby_bot'
-    msg_req.task_id = 'abc123'
-    msg_req.bot_overhead = 3.141
-    msg_req.cost_usd = 0.001
-
-    # Create proto response
-    msg_rsp = remote_client_grpc.swarming_bot_pb2.TaskUpdateResponse()
-
-    # Execute call and verify response
-    expected_call = ('TaskUpdate', msg_req, msg_rsp)
-    self._expected.append(expected_call)
-    response = self._client.post_task_update('abc123', 'baby_bot', params)
-    self.assertTrue(response)
-
-  def test_update_final(self):
-    """Includes output chunk, exit code and full param set"""
-    # Create params dict
-    params = {
-        'outputs_ref': {
-            'isolated': 'def987',
-            'isolatedserver': 'foo',
-            'namespace': 'default-gzip',
-        },
-        'isolated_stats': {
-            'upload': {
-                'duration': 0.5,
-                'items_cold': 'YWJj', # b64(u'abc')
-            },
-            'download': {
-                'initial_size': 1234567890,
-            },
-        },
-    }
-
-    # Create expected request proto
-    msg_req = remote_client_grpc.swarming_bot_pb2.TaskUpdateRequest()
-    msg_req.id = 'baby_bot'
-    msg_req.task_id = 'abc123'
-    msg_req.exit_status.code = -5
-    msg_req.output_chunk.data = 'abc'
-    msg_req.output_chunk.offset = 7
-    msg_req.outputs_ref.isolated = 'def987'
-    msg_req.outputs_ref.isolatedserver = 'foo'
-    msg_req.outputs_ref.namespace = 'default-gzip'
-    msg_req.isolated_stats.upload.duration = 0.5
-    msg_req.isolated_stats.upload.items_cold = 'abc'
-    msg_req.isolated_stats.download.initial_size = 1234567890
-
-    # Create proto response
-    msg_rsp = remote_client_grpc.swarming_bot_pb2.TaskUpdateResponse()
-
-    # Execute call and verify response
-    expected_call = ('TaskUpdate', msg_req, msg_rsp)
-    self._expected.append(expected_call)
-    response = self._client.post_task_update('abc123', 'baby_bot', params,
-                                             ['abc', 7], -5)
-    self.assertTrue(response)
 
 if __name__ == '__main__':
   logging.basicConfig(
