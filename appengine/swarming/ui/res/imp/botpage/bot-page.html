@@ -494,11 +494,11 @@
         return "";
       },
 
-      _luciLink: function(revision) {
-        if (!revision) {
+      _luciLink: function(rev) {
+        if (!rev) {
           return undefined;
         }
-        return "https://github.com/luci/luci-py/commit/" + revision;
+        return "https://chromium.googlesource.com/infra/luci/luci-py/+/" + rev;
       },
 
       _mpLink: function(bot, template) {
