@@ -363,6 +363,14 @@
                   <td class="code break-all">[[_command(_request)]]</td>
                 </tr>
                 <tr>
+                  <td rowspan$="[[_rowspan(_request.properties.env)]]">Environment Vars</td>
+                </tr>
+                <template is="dom-repeat" items="{{_request.properties.env}}" as="env">
+                  <tr>
+                    <td class="break-all">[[env.key]]=[[env.value]]</td>
+                  </tr>
+                </template>
+                <tr>
                   <td>Idempotent</td>
                   <td>[[_request.properties.idempotent]]</td>
                 </tr>
@@ -944,6 +952,9 @@
       },
 
       _duration: function(start, end) {
+        if (!(start && start.getTime && end && end.getTime)){
+          return 0;
+        }
         var duration = end.getTime() - start.getTime();
         if (duration < 0) {
           duration = 0;
