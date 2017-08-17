@@ -82,6 +82,37 @@ class UtilsTest(test_case.TestCase):
     with self.assertRaises(ValueError):
       utils.validate_root_service_url('https://blah?asdad')
 
+  def test_parse_rfc3339_datetime(self):
+    # Sanity round-trip test with current time.
+    now = utils.utcnow()
+    parsed = utils.parse_rfc3339_datetime(now.isoformat() + 'Z')
+    self.assertEqual(now, parsed)
+
+    ok_cases = [
+      ('2017-08-17T04:21:32.722952943Z', (2017, 8, 17, 4, 21, 32, 722953)),
+      ('2017-08-17T04:21:32Z',           (2017, 8, 17, 4, 21, 32, 0)),
+      ('1972-01-01T10:00:20.021-05:00',  (1972, 1, 1, 15, 0, 20, 21000)),
+      ('1972-01-01T10:00:20.021+05:00',  (1972, 1, 1, 5, 0, 20, 21000)),
+      ('1985-04-12T23:20:50.52Z',        (1985, 4,  12, 23, 20, 50, 520000)),
+      ('1996-12-19T16:39:57-08:00',      (1996, 12, 20,  0, 39, 57,  0)),
+    ]
+    for val, expected in ok_cases:
+      parsed = utils.parse_rfc3339_datetime(val)
+      self.assertIsNone(parsed.tzinfo)
+      self.assertEqual(datetime.datetime(*expected), parsed)
+
+    bad_cases = [
+      '',
+      '1985-04-12T23:20:50.52',            # no timezone
+      '2017:08:17T04:21:32Z',              # bad base format
+      '2017-08-17T04:21:32.7229529431Z' ,  # more than nano second precision
+      '2017-08-17T04:21:32Zblah',          # trailing data
+      '1972-01-01T10:00:20.021-0500',      # bad timezone format
+    ]
+    for val in bad_cases:
+      with self.assertRaises(ValueError):
+        utils.parse_rfc3339_datetime(val)
+
   def test_datetime_to_rfc2822(self):
     self.assertEqual(
       'Mon, 02 Jan 2012 03:04:05 -0000',
