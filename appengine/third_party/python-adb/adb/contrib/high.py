@@ -831,18 +831,23 @@ class HighDevice(object):
     out, _ = self.Shell('pm path %s' % pipes.quote(package))
     return out.strip().split(':', 1)[1] if out else out
 
-  def IsFullyBooted(self):
+  def IsFullyBooted(self, skip_sd_card=False):
     """Checks whether the device is fully booted.
 
+    Args:
+      - skip_sd_card: Skips checking if the external storage is ready if True.
+                      Some devices lack an internal sd card and permanently
+                      fail this check.
     Returns:
       tuple(booted, status)
       - booted: True if device is fully booted, false otherwise.
       - status: If not booted, string describing why.
     """
-    if not self.cache.external_storage_path:
-      return False, 'external storage not ready'
-    if self.Stat(self.cache.external_storage_path)[0] is None:
-      return False, 'external storage not ready'
+    if not skip_sd_card:
+      if not self.cache.external_storage_path:
+        return False, 'external storage not ready'
+      if self.Stat(self.cache.external_storage_path)[0] is None:
+        return False, 'external storage not ready'
 
     # Check if the boot animation has stopped.
     prop = self.GetProp('init.svc.bootanim')
@@ -868,7 +873,7 @@ class HighDevice(object):
     # All checks passed.
     return True, None
 
-  def WaitUntilFullyBooted(self, timeout=300):
+  def WaitUntilFullyBooted(self, timeout=300, **kwargs):
     """Waits for the device to be fully started up with network connectivity.
 
     Arguments:
@@ -877,7 +882,7 @@ class HighDevice(object):
     """
     start = time.time()
     while True:
-      is_booted, status = self.IsFullyBooted()
+      is_booted, status = self.IsFullyBooted(**kwargs)
       if is_booted:
         return True
       if (time.time() - start) > timeout:

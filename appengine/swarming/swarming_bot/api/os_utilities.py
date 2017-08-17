@@ -892,6 +892,7 @@ def get_state_all_devices_android(devices):
     properties = device.cache.build_props
     if not properties:
       return {u'state': 'unavailable'}
+    no_sd_card = properties.get(u'ro.product.model', '') in ['Chromecast']
     return {
       u'battery': device.GetBattery(),
       u'build': {key: properties.get(u'ro.'+key, '<missing>') for key in keys},
@@ -904,7 +905,8 @@ def get_state_all_devices_android(devices):
       u'other_packages': platforms.android.get_unknown_apps(device),
       u'port_path': device.port_path,
       u'processes': device.GetProcessCount(),
-      u'state': u'available' if device.IsFullyBooted()[0] else u'booting',
+      u'state': u'available' if device.IsFullyBooted(
+          skip_sd_card=no_sd_card)[0] else u'booting',
       u'temp': device.GetTemperatures(),
       u'uptime': device.GetUptime(),
     }
