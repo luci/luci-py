@@ -180,13 +180,13 @@ def endpoints_method(
             'Authentication error.\n%s\nPeer: %s\nIP: %s',
             ex.message, api.get_peer_identity().to_bytes(),
             service.request_state.remote_address)
-        raise endpoints.UnauthorizedException()
+        raise endpoints.UnauthorizedException(ex.message)
       except api.AuthorizationError as ex:
         logging.warning(
             'Authorization error.\n%s\nPeer: %s\nIP: %s',
             ex.message, api.get_peer_identity().to_bytes(),
             service.request_state.remote_address)
-        raise endpoints.ForbiddenException()
+        raise endpoints.ForbiddenException(ex.message)
     return wrapper
   return new_decorator
 
