@@ -21,10 +21,10 @@ from protorpc.remote import protojson
 import webapp2
 import webtest
 
+from components import auth
 from components import ereporter2
 from components import utils
 
-import handlers_backend
 import handlers_bot
 import handlers_endpoints
 import swarming_rpcs
@@ -264,13 +264,9 @@ class TasksApiTest(BaseTest):
     super(TasksApiTest, self).setUp()
     utils.clear_cache(config.settings)
 
-  def test_new_ok_raw(self):
-    """Asserts that new generates appropriate metadata."""
-    self.mock(random, 'getrandbits', lambda _: 0x88)
-    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
-    self.mock_now(now)
-    str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
-    request = swarming_rpcs.NewTaskRequest(
+  @staticmethod
+  def raw_request(service_account='service-account@example.com'):
+    return swarming_rpcs.NewTaskRequest(
         expiration_secs=30,
         name='job1',
         priority=200,
@@ -293,13 +289,25 @@ class TasksApiTest(BaseTest):
             ],
             execution_timeout_secs=30,
             io_timeout_secs=30,
+            grace_period_secs=15,
             outputs=['foo','path/to/dir']),
         tags=['foo:bar'],
         user='joe@localhost',
         pubsub_topic='projects/abc/topics/def',
         pubsub_auth_token='secret that must not be shown',
         pubsub_userdata='userdata',
-        service_account='bot')
+        service_account=service_account)
+
+  def test_new_ok_raw(self):
+    """Asserts that new generates appropriate metadata."""
+    oauth_grant_calls = self.mock_task_service_accounts()
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+    str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
+
+    request = self.raw_request()
     expected = {
       u'request': {
         u'authenticated': u'user:user@example.com',
@@ -328,27 +336,58 @@ class TasksApiTest(BaseTest):
             {u'key': u'PATH', u'value': u'/'},
           ],
           u'execution_timeout_secs': u'30',
-          u'grace_period_secs': u'30',
+          u'grace_period_secs': u'15',
           u'idempotent': False,
           u'io_timeout_secs': u'30',
           u'outputs': [u'foo', u'path/to/dir'],
         },
         u'pubsub_topic': u'projects/abc/topics/def',
         u'pubsub_userdata': u'userdata',
-        u'service_account': u'bot',
+        u'service_account': u'service-account@example.com',
         u'tags': [
           u'foo:bar',
           u'pool:default',
           u'priority:200',
-          u'service_account:bot',
+          u'service_account:service-account@example.com',
           u'user:joe@localhost',
         ],
         u'user': u'joe@localhost',
       },
       u'task_id': u'5cee488008810',
     }
+
     response = self.call_api('new', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
+
+    # Asked for a correct grant.
+    self.assertEqual(
+        [(u'service-account@example.com', datetime.timedelta(0, 30+30+15))],
+        oauth_grant_calls)
+
+  def test_new_bad_service_account(self):
+    oauth_grant_calls = self.mock_task_service_accounts()
+    request = self.raw_request(service_account='bad email')
+    response = self.call_api('new', body=message_to_dict(request), status=400)
+    # Note: Cloud Endpoints proxy transform this response to
+    # {"error": {"message": "..."}}.
+    self.assertEqual({
+        u'error_message': u'\'service_account\' must be an email, "bot" or '
+            '"none" string, got u\'bad email\'',
+        u'state': u'APPLICATION_ERROR',
+    }, response.json)
+    self.assertFalse(oauth_grant_calls)
+
+  def test_new_forbidden_service_account(self):
+    self.mock_task_service_accounts(
+        exc=auth.AuthorizationError('forbidden account'))
+    request = self.raw_request()
+    response = self.call_api('new', body=message_to_dict(request), status=403)
+    # Note: Cloud Endpoints proxy transform this response to
+    # {"error": {"message": "..."}}.
+    self.assertEqual({
+        u'error_message': u'forbidden account',
+        u'state': u'APPLICATION_ERROR',
+    }, response.json)
 
   def test_new_ok_deduped(self):
     """Asserts that new returns task result for deduped."""
@@ -1577,9 +1616,12 @@ class TaskApiTest(BaseTest):
 
   def test_request_ok(self):
     """Asserts that request produces a task request."""
+    self.mock_task_service_accounts()
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
-    _, task_id = self.client_create_task_raw()
+    _, task_id = self.client_create_task_raw(
+        properties={'secret_bytes': 'zekret'},
+        service_account='service-account@example.com')
     response = self.call_api('request', body={'task_id': task_id})
     expected = {
       u'authenticated': u'user:user@example.com',
@@ -1610,13 +1652,14 @@ class TaskApiTest(BaseTest):
         u'idempotent': False,
         u'io_timeout_secs': u'1200',
         u'outputs': [u'foo', u'path/to/foobar'],
+        u'secret_bytes': u'PFJFREFDVEVEPg==',  # <REDACTED> in base64
       },
-      u'service_account': u'none',
+      u'service_account': u'service-account@example.com',
       u'tags': [
         u'os:Amiga',
         u'pool:default',
         u'priority:100',
-        u'service_account:none',
+        u'service_account:service-account@example.com',
         u'user:joe@localhost',
       ],
       u'user': u'joe@localhost',

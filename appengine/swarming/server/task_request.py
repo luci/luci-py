@@ -65,6 +65,7 @@ from components import utils
 from components.config import validation
 
 from server import config
+from server import service_accounts
 from server import task_pack
 import cipd
 
@@ -317,7 +318,7 @@ def _validate_service_account(prop, value):
   _validate_length(prop, value, 1024)
   if not value:
     return None
-  if value in ('bot', 'none') or '@' in value:
+  if value in ('bot', 'none') or service_accounts.is_service_account(value):
     return value
   raise datastore_errors.BadValueError(
       '%r must be an email, "bot" or "none" string, got %r' %
@@ -940,11 +941,6 @@ def init_new_request(request, allow_high_priority, secret_bytes_ent):
   # TaskRequest before storing it.
   request.service_account = request.service_account or 'none'
   request.service_account_token = None
-
-  # TODO(crbug.com/731847): Remove this precaution when service accounts are
-  # implemented.
-  if request.service_account not in ('none', 'bot'):
-    raise ValueError('"service_account" can be only "bot" or "none" for now')
 
   request.tags.append('priority:%s' % request.priority)
   request.tags.append('user:%s' % request.user)

@@ -27,6 +27,7 @@ from test_support import test_case
 from proto import config_pb2
 from server import config
 from server import large
+from server import service_accounts
 
 
 class AppTestBase(test_case.TestCase):
@@ -129,6 +130,19 @@ class AppTestBase(test_case.TestCase):
   def post_json(self, url, params, **kwargs):
     """Does an HTTP POST with a JSON API and return JSON response."""
     return self.app.post_json(url, params=params, **kwargs).json
+
+  def mock_task_service_accounts(self, exc=None):
+    """Mocks support for task-associated service accounts."""
+    self.mock(service_accounts, 'has_token_server', lambda: True)
+    calls = []
+    def mocked(service_account, validity_duration):
+      calls.append((service_account, validity_duration))
+      if exc:
+        raise exc  # pylint: disable=raising-bad-type
+      return 'token-grant-%s-%d' % (
+          str(service_account), validity_duration.total_seconds())
+    self.mock(service_accounts, 'get_oauth_token_grant', mocked)
+    return calls
 
   # Bot
 

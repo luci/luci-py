@@ -47,6 +47,7 @@ __all__ = [
   'get_peer_identity',
   'get_peer_ip',
   'get_process_cache_expiration_sec',
+  'get_request_auth_db',
   'get_secret',
   'get_web_client_id',
   'is_admin',

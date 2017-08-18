@@ -201,6 +201,10 @@ def json_request_async(
     max_attempts=None):
   """Sends a JSON REST API request, returns deserialized response.
 
+  Automatically strips prefixes formed from characters in the set ")]}'\n"
+  before deserializing JSON. Such prefixes sometimes used in REST APIs as
+  a precaution against XSSI attacks.
+
   Retries the request on transient errors for up to |max_attempts| times.
 
   Args:
@@ -209,7 +213,7 @@ def json_request_async(
     payload: object to be serialized to JSON and put in the request body.
     params: dict with query GET parameters (i.e. ?key=value&key=value).
     headers: additional request headers.
-    scopes: OAuth2 scopes for the access token (ok skip auth if None).
+    scopes: OAuth2 scopes for the access token (or skip auth if None).
     service_account_key: auth.ServiceAccountKey with credentials.
     delegation_token: delegation token returned by auth.delegate.
     deadline: deadline for a single attempt.
@@ -239,7 +243,7 @@ def json_request_async(
       deadline=deadline,
       max_attempts=max_attempts)
   try:
-    response = json.loads(response)
+    response = json.loads(response.lstrip(")]}'\n"))
   except ValueError as e:
     raise Error('Bad JSON response: %s' % e, None, response)
   raise ndb.Return(response)

@@ -93,6 +93,10 @@ class TestCase(auto_stub.TestCase):
     self.testbed.init_memcache_stub()
     self.testbed.init_modules_stub()
 
+    # Use mocked time in memcache.
+    memcache = self.testbed.get_stub(testbed.MEMCACHE_SERVICE_NAME)
+    memcache._gettime = lambda: int(utils.time_time())
+
     # Email support.
     self.testbed.init_mail_stub()
     self.mail_stub = self.testbed.get_stub(testbed.MAIL_SERVICE_NAME)

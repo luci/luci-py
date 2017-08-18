@@ -154,7 +154,7 @@ class NetTest(test_case.TestCase):
         'method': 'POST',
         'payload': '{"key":"value"}',
         'url': 'http://localhost/123?a=%3D&b=%26',
-      }, Response(200, '{"a":"b"}', {})),
+      }, Response(200, ')]}\'\n{"a":"b"}', {})),
     ])
     response = net.json_request(
         url='http://localhost/123',

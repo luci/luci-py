@@ -4,6 +4,7 @@
 
 """This module defines Swarming Server endpoints handlers."""
 
+import datetime
 import logging
 import os
 
@@ -30,6 +31,7 @@ from server import acl
 from server import bot_code
 from server import bot_management
 from server import config
+from server import service_accounts
 from server import task_pack
 from server import task_queues
 from server import task_request
@@ -388,11 +390,34 @@ class SwarmingTasksService(remote.Service):
       apply_property_defaults(request.properties)
       task_request.init_new_request(
           request, acl.can_schedule_high_priority_tasks(), secret_bytes)
+    except (datastore_errors.BadValueError, TypeError, ValueError) as e:
+      raise endpoints.BadRequestException(e.message)
 
-      # TODO(crbug.com/731847): If request.service_account is an email, contact
-      # the token server to generate "OAuth token grant", and put it into
-      # request.service_account_token.
+    # If request.service_account is an email, contact the token server to
+    # generate "OAuth token grant" (or grab a cached one). By doing this we
+    # check that the given service account usage is allowed by the token server
+    # rules at the time the task is posted. This check is also performed later
+    # (when running the task), when we get the actual OAuth access token.
+    if service_accounts.is_service_account(request.service_account):
+      if not service_accounts.has_token_server():
+        raise endpoints.BadRequestException(
+            'This Swarming server doesn\'t support task service accounts '
+            'because Token Server URL is not configured')
+      max_lifetime_secs = (
+          request.expiration_secs +
+          request.properties.execution_timeout_secs +
+          request.properties.grace_period_secs)
+      try:
+        # Note: this raises AuthorizationError if the user is not allowed to use
+        # the requested account or service_accounts.InternalError if something
+        # unexpected happens.
+        request.service_account_token = service_accounts.get_oauth_token_grant(
+            service_account=request.service_account,
+            validity_duration=datetime.timedelta(seconds=max_lifetime_secs))
+      except service_accounts.InternalError as exc:
+        raise endpoints.InternalServerErrorException(exc.message)
 
+    try:
       result_summary = task_scheduler.schedule_request(request, secret_bytes)
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
