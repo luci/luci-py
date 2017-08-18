@@ -115,13 +115,14 @@ def compute_template_checksum(template_cfg):
     The checksum string.
   """
   identifying_properties = {
+      'auto-assign-external-ip': template_cfg.auto_assign_external_ip,
       'dimensions': _load_dict(template_cfg.dimensions),
       'disk-size-gb': template_cfg.disk_size_gb,
-      'auto_assign_external_ip': template_cfg.auto_assign_external_ip,
       'image-name': template_cfg.image_name,
       'image-project': template_cfg.image_project,
       'machine-type': template_cfg.machine_type,
       'metadata': _load_dict(template_cfg.metadata),
+      'min-cpu-platform': template_cfg.min_cpu_platform,
       'network_url': template_cfg.network_url,
       'project': template_cfg.project,
       'service-accounts': [],
@@ -371,6 +372,7 @@ def ensure_entities_exist(template_cfg, manager_cfgs, max_concurrent=50):
         image_project=template_cfg.image_project,
         machine_type=template_cfg.machine_type,
         metadata=_load_dict(template_cfg.metadata),
+        min_cpu_platform=template_cfg.min_cpu_platform,
         network_url=template_cfg.network_url,
         project=template_cfg.project,
         service_accounts=_load_service_accounts(template_cfg.service_accounts),

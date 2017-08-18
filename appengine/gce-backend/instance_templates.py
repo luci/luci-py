@@ -136,6 +136,7 @@ def create(key):
         auto_assign_external_ip=
             instance_template_revision.auto_assign_external_ip,
         metadata=metadata,
+        min_cpu_platform=instance_template_revision.min_cpu_platform,
         network_url=instance_template_revision.network_url,
         service_accounts=service_accounts,
         tags=instance_template_revision.tags,

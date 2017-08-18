@@ -226,7 +226,7 @@ class Project(object):
   def create_instance_template(
       self, name, disk_size_gb, image, machine_type,
       auto_assign_external_ip=False, metadata=None, network_url='',
-      service_accounts=None, tags=None):
+      min_cpu_platform=None, service_accounts=None, tags=None):
     """
     Args:
       name: Name of the instance template.
@@ -239,6 +239,7 @@ class Project(object):
       metadata: List of {'key': ..., 'value': ...} dicts to attach as metadata
         to instances created from this template.
       network_url: name or URL of the network resource for this template.
+      min_cpu_platfom: Minimum CPU platform for instances (e.g. Intel Skylake).
       service_accounts: List of {'email': ..., 'scopes': [...]} dicts to make
         available to instances created from this template.
       tags: List of strings to attach as tags to instances created from this
@@ -272,6 +273,7 @@ class Project(object):
                 'metadata': {
                     'items': metadata,
                 },
+                'minCpuPlatform': min_cpu_platform,
                 'networkInterfaces': network_interfaces,
                 'serviceAccounts': service_accounts,
                 'tags': {

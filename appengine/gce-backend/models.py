@@ -90,6 +90,8 @@ class InstanceTemplateRevision(ndb.Model):
   """
   # List of ndb.Keys for the InstanceGroupManagers.
   active = ndb.KeyProperty(kind=InstanceGroupManager, repeated=True)
+  # Enable external network with automatic IP assignment.
+  auto_assign_external_ip = ndb.BooleanProperty(indexed=False)
   # rpc_messages.Dimensions describing instances created from this template.
   dimensions = msgprop.MessageProperty(rpc_messages.Dimensions)
   # Disk size in GiB for instances created from this template.
@@ -104,10 +106,10 @@ class InstanceTemplateRevision(ndb.Model):
   machine_type = ndb.StringProperty(indexed=False)
   # Initial metadata to apply when creating instances from this template.
   metadata = ndb.JsonProperty()
+  # Minimum CPU platform for instances created from this template.
+  min_cpu_platform = ndb.StringProperty(indexed=False)
   # Network URL for this template.
   network_url = ndb.StringProperty(indexed=False)
-  # Enable external network with automatic IP assignment.
-  auto_assign_external_ip = ndb.BooleanProperty(indexed=False)
   # Project to create the instance template in.
   project = ndb.StringProperty(indexed=False)
   # List of service accounts available to instances created from this template.

@@ -48,6 +48,8 @@ message InstanceTemplateConfig {
     optional string network_url = 11;
     // Enables an external network with auto-assigned IP address.
     optional bool auto_assign_external_ip = 12;
+    // Minimum CPU platform.
+    optional string min_cpu_platform = 13;
   }
 
   repeated InstanceTemplate templates = 1;
