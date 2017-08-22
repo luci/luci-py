@@ -31,17 +31,50 @@ This means that all source folders in GOPATH with ".go" files in them are
 copied (hardlink, so fast) into that directory. This is necessary so Docker
 can deploy against the local checkout of those files instead of using "go get"
 to fetch them from HEAD.
+
+We use deployment annotations to track deployment status:
+- luci.managedBy
+  This is set to "luci-gke-py" to assert that a given image is managed by
+  this "gke.py" tool.
+- luci-gke-py/stable-image
+  This is set to be the image name of the last stable image. This can be
+  updated via "commit" to the current deployed image.
+- luci-gke-py/latest-image
+  This is set to be the name of the latest image that was built.
+
+Our general command sequences will be:
+
+UPLOAD:
+  - Build and push the new, unique "gcr.io" image.
+  - Set "latest-image" tag on the deployment to point to the image. This
+    doesn't change deployment, but marks the last built image for a future
+    command.
+  - If the deployment doesn't already exist (first time only), a zero-replica
+    initial deployment will be created.
+
+SWITCH:
+  - Set the deployment's image to the image marked as "latest-image".
+  - Uses "scale" to set the number of replicas.
+
+ROLLBACK:
+  - Issues a straightforward "kubectl rollout undo" command to revert to the
+    previous deployment configuration.
+
+PROMOTE:
+  - Promotes the "latest-image" tag to "stable-image".
 """
 
 __version__ = '1.0'
 
 import argparse
 import collections
+import contextlib
 import logging
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 
 SCRIPT_PATH = os.path.abspath(__file__)
@@ -56,6 +89,11 @@ gae_sdk_utils.setup_gae_env()
 
 import yaml
 
+
+# True if running on Windows.
+IS_WINDOWS = os.name == 'nt'
+
+
 # Enable "yaml" to dump ordered dict.
 def dict_representer(dumper, data):
   return dumper.represent_dict((k, v) for k, v in data.iteritems()
@@ -64,7 +102,7 @@ yaml.Dumper.add_representer(collections.OrderedDict, dict_representer)
 
 
 def run_command(cmd, cwd=None):
-  logging.info('Running command: %s', cmd)
+  logging.debug('Running command: %s', cmd)
   return subprocess.call(
       cmd,
       stdin=sys.stdin,
@@ -74,8 +112,16 @@ def run_command(cmd, cwd=None):
 
 
 def check_output(cmd, cwd=None):
-  logging.info('Running command (cwd=%r): %s', cwd, cmd)
-  return subprocess.check_output(cmd, cwd=cwd)
+  logging.debug('Running command (cwd=%r): %s', cwd, cmd)
+  stdout = subprocess.check_output(cmd, cwd=cwd)
+  logging.debug('Command returned with output:\n%s', stdout)
+  return stdout.strip()
+
+
+def is_same_fs(a, b):
+  dev_a = os.stat(a).st_dev
+  dev_b = os.stat(b).st_dev
+  return dev_a == dev_b
 
 
 def collect_gopath(base, name, gopath):
@@ -111,6 +157,11 @@ def collect_gopath(base, name, gopath):
         continue
       if not any(f.endswith('.go') for f in files):
         continue
+
+      # Determine if we're on the same filesystem. If we are, we can make this
+      # really fast by using hardlinks.
+      link_cmd = (os.link) if is_same_fs(root, dst) else shutil.copy2
+
       rel = os.path.relpath(root, go_src)
       if rel in seen:
         continue
@@ -121,7 +172,18 @@ def collect_gopath(base, name, gopath):
         os.makedirs(rel_dst)
       logging.debug('Copying Go source %r => %r', root, rel_dst)
       for f in files:
-        os.link(os.path.join(root, f), os.path.join(rel_dst, f))
+        link_cmd(os.path.join(root, f), os.path.join(rel_dst, f))
+
+
+@contextlib.contextmanager
+def tempdir():
+  path = None
+  try:
+    path = tempfile.mkdtemp(dir=os.getcwd())
+    yield path
+  finally:
+    if path is not None:
+      shutil.rmtree(path)
 
 
 class Configuration(object):
@@ -240,49 +302,28 @@ class Application(object):
     return 'gcr.io/%s/%s:%s-%d' % (
         self.project, self.name, version, self.timestamp)
 
-  def write_deployment_yaml(self, image_tag, version):
-    v = collections.OrderedDict()
-    v['apiVersion'] = 'apps/v1beta1'
-    v['kind'] = 'Deployment'
-    v['metadata'] = collections.OrderedDict((
-        ('name', self.cluster_key),
-    ))
+  @property
+  def deployment_name(self):
+    return self.cluster_key
 
-    v['spec'] = collections.OrderedDict()
-    v['spec']['replicas'] = self.cluster.replicas or 0
-
-    v['spec']['template'] = collections.OrderedDict()
-    v['spec']['template']['metadata'] = collections.OrderedDict()
-    v['spec']['template']['metadata']['labels'] = collections.OrderedDict((
-        ('luci/project', self.project),
-        ('luci/cluster', self.cluster_key),
-    ))
-    v['spec']['template']['metadata']['annotations'] = collections.OrderedDict((
-        ('luci.managedBy', 'luci-gke-py'),
-        ('luci-gke-py/version', version),
-    ))
-
-    v['spec']['template']['spec'] = collections.OrderedDict()
-    v['spec']['template']['spec']['containers'] = [
-        collections.OrderedDict((
-            ('name', self.cluster_key),
-            ('image', image_tag),
-        )),
-    ]
-
-    deploy_yaml_path = os.path.join(self.config_dir, 'deployment.yaml')
-    with open(deploy_yaml_path, 'w') as fd:
-      yaml.dump(v, fd, default_flow_style=False)
-    return deploy_yaml_path
+  @property
+  def container_name(self):
+    return self.cluster_key
 
 
 class Kubectl(object):
   """Wrapper around the "kubectl" tool.
   """
 
+  _ANNOTATION_MANAGED_BY = 'luci.managedBy'
+  _ANNOTATION_MANAGED_BY_ME = 'luci-gke-py'
+  _ANNOTATION_STABLE = 'luci-gke-py/stable-image'
+  _ANNOTATION_LATEST = 'luci-gke-py/latest-image'
+
   def __init__(self, app, needs_refresh):
     self.app = app
     self._needs_refresh = needs_refresh
+    self._verified_app_context = False
 
   @property
   def executable(self):
@@ -304,7 +345,7 @@ class Kubectl(object):
     args.extend(cmd)
     return check_output(args, **kwargs)
 
-  def check_output(self, *cmd, **kwargs):
+  def check_output(self, cmd, **kwargs):
     context = kwargs.pop('context', self.app.kubectl_context)
     args = [
         self.executable,
@@ -313,18 +354,110 @@ class Kubectl(object):
     args.extend(cmd)
     return check_output(args, **kwargs)
 
+  @staticmethod
+  def _strip_quoted_output(v):
+    if v.startswith("'") and v.endswith("'"):
+      v = v[1:-1]
+    return v
+
+  def is_deployed(self):
+    # Query for deployments w/ the specified name. If an empty string is
+    # returned, we are not deployed.
+    query = '{.items[?(@.metadata.name == "%s")].metadata.name}' % (
+        self.app.deployment_name,)
+    output = self.check_output([
+        'get',
+        'deployments',
+        '--output', "jsonpath='%s'" % (query,),
+    ])
+    output = self._strip_quoted_output(output)
+    return bool(output)
+
+  def get_deployment_annotation(self, name):
+    output = self.check_output([
+        'get',
+        'deployments/%s' % (self.app.deployment_name,),
+        '--output', 'jsonpath=\'{.metadata.annotations.%s}\'' % (name,),
+    ])
+    return self._strip_quoted_output(output)
+
+  def set_deployment_annotation(self, name, value):
+    self.check_output([
+      'annotate',
+      '--overwrite',
+      'deployments',
+      self.app.deployment_name,
+      "%s=%s" % (name, value),
+    ])
+
+  def get_latest_image(self):
+    return self.get_deployment_annotation(self._ANNOTATION_LATEST)
+
+  def set_latest_image(self, image_tag):
+    self.set_deployment_annotation(self._ANNOTATION_LATEST, image_tag)
+
+  def get_stable_image(self):
+    return self.get_deployment_annotation(self._ANNOTATION_STABLE)
+
+  def set_stable_image(self, image_tag):
+    self.set_deployment_annotation(self._ANNOTATION_STABLE, image_tag)
+
+  def describe_deployment(self):
+    print self.check_output([
+        'describe',
+        'deployments/%s' % (self.app.deployment_name,)])
+
+  def maybe_push_new_deployment(self, image_tag):
+    # If we're not deployed, push a brand-new deployment YAML.
+    if self.is_deployed():
+      return False
+
+    logging.info('No current deployment, creating a new one...')
+    with tempdir() as tdir:
+      deployment_yaml_path = os.path.join(tdir, 'deployment.yaml')
+      self.write_deployment_yaml(deployment_yaml_path, image_tag)
+
+      # Deploy to Kubernetes.
+      self.run(['apply', '-f', deployment_yaml_path])
+    return True
+
+  def set_deployment_image(self, image_tag):
+    # Set the deployment's image to the new image version.
+    self.run([
+      'set',
+      'image',
+      'deployments/%s' % (self.app.deployment_name,),
+      '%s=%s' % (self.app.container_name, image_tag),
+    ])
+
+  def undo_rollout(self):
+    """Issues a simple "kubectl rollback" command against the deployment."""
+    self.run(['rollout', 'undo'])
+
+  def scale_replicas(self, count):
+    self.run([
+      'scale',
+      'deployments/%s' % (self.app.deployment_name,),
+      '--replicas=%d' % (count,),
+    ])
+
   def _has_app_context(self):
+    if self._verified_app_context:
+      return True
+
     # If this command returns non-zero and has non-empty output, we know that
     # the context is available.
-    stdout = self.check_output(
-        'config',
-        'view',
-        '--output', 'jsonpath=\'{.users[?(@.name == "%s")].name}\'' % (
-            self.app.kubectl_context,),
+    logging.debug('Checking if "gcloud" credentials are available.')
+    stdout = self.check_output([
+          'config',
+          'view',
+          '--output', 'jsonpath=\'{.users[?(@.name == "%s")].name}\'' % (
+              self.app.kubectl_context,),
+        ],
         context='',
     )
-    stdout = stdout.strip()
-    return stdout and stdout != "''"
+    self._verified_app_context = bool(self._strip_quoted_output(stdout))
+    return self._verified_app_context
 
   def ensure_app_context(self):
     """Sets the current "kubectl" context to point to the current application.
@@ -352,6 +485,46 @@ class Kubectl(object):
         raise Exception('Kubernetes context missing after provisioning.')
     return self.app.kubectl_context
 
+  def write_deployment_yaml(self, path, image_tag):
+    v = collections.OrderedDict()
+    v['apiVersion'] = 'apps/v1beta1'
+    v['kind'] = 'Deployment'
+    v['metadata'] = collections.OrderedDict((
+        ('name', self.app.deployment_name),
+        ('annotations', collections.OrderedDict((
+          (self._ANNOTATION_MANAGED_BY, self._ANNOTATION_MANAGED_BY_ME),
+          (self._ANNOTATION_STABLE, image_tag),
+          (self._ANNOTATION_LATEST, image_tag),
+        ))),
+    ))
+
+    v['spec'] = collections.OrderedDict()
+    v['spec']['replicas'] = 0
+
+    # Set the stategy to "Recreate". This means that, rather than perform a
+    # rolling update, old repica sets are deleted prior to new ones being
+    # instantiated.
+    v['spec']['strategy'] = collections.OrderedDict()
+    v['spec']['strategy']['type'] = 'Recreate'
+
+    v['spec']['template'] = collections.OrderedDict()
+    v['spec']['template']['metadata'] = collections.OrderedDict()
+    v['spec']['template']['metadata']['labels'] = collections.OrderedDict((
+        ('luci/project', self.app.project),
+        ('luci/cluster', self.app.cluster_key),
+    ))
+
+    v['spec']['template']['spec'] = collections.OrderedDict()
+    v['spec']['template']['spec']['containers'] = [
+        collections.OrderedDict((
+            ('name', self.app.container_name),
+            ('image', image_tag),
+        )),
+    ]
+
+    with open(path, 'w') as fd:
+      yaml.dump(v, fd, default_flow_style=False)
+
 
 def subcommand_kubectl(args, kctl):
   """Runs a Kubernetes command in the context of the configured Application.
@@ -362,15 +535,12 @@ def subcommand_kubectl(args, kctl):
   return kctl.run(cmd)
 
 
-def subcommand_deploy(args, kctl):
+def subcommand_upload(args, kctl):
   """Deploys a Kubernetes instance."""
 
   # Determine our version and Docker image tag.
   version = kctl.app.calculate_version(tag=args.tag)
   image_tag = kctl.app.image_tag(version)
-
-  # Generate our deployment YAML, in the same path as our config.
-  deploy_yaml = kctl.app.write_deployment_yaml(image_tag, version)
 
   # If we need to collect GOPATH, do it.
   if kctl.app.cluster.collect_gopath:
@@ -388,11 +558,67 @@ def subcommand_deploy(args, kctl):
   kctl.check_gcloud(
       ['docker', '--', 'push', image_tag])
 
-  # Deploy to Kubernetes.
-  kctl.run(['apply', '-f', deploy_yaml])
+  # If the deployment doesn't exist, deploy it now.
+  if not kctl.maybe_push_new_deployment(image_tag):
+    # Not a new deployment, so just set the "latest" annotation.
+    logging.debug('Setting latest image tag to: %r', image_tag)
+    kctl.set_latest_image(image_tag)
+  return 0
+
+
+def subcommand_switch(_args, kctl):
+  # If the deployment doesn't exist, deploy it now.
+  latest = kctl.get_latest_image()
+  logging.info('Switching image to: %r', latest)
+  kctl.set_deployment_image(latest)
+
+  logging.info('Adjusting replicas to: %d', kctl.app.cluster.replicas)
+  kctl.scale_replicas(kctl.app.cluster.replicas)
+  return 0
+
+
+def subcommand_rollback(args, kctl):
+  if args.stable:
+    # If the deployment doesn't exist, deploy it now.
+    stable = kctl.get_stable_image()
+    logging.info('Rolling back to stable image: %r', stable)
+    kctl.set_deployment_image(stable)
+    return 0
+
+  kctl.undo_rollout()
+  return 0
+
+
+def subcommand_promote(_args, kctl):
+  latest = kctl.get_latest_image()
+  stable = kctl.get_stable_image()
+  logging.info('Promoting stable image: %r => %r', stable, latest)
+  kctl.set_stable_image(latest)
+  return 0
+
+
+def subcommand_status(_args, kctl):
+  kctl.describe_deployment()
+
+  stable = kctl.get_stable_image()
+  print 'Stable image:', stable
+
+  latest = kctl.get_latest_image()
+  print 'Latest image:', latest
+
+  if stable != latest:
+    print 'NOTE: Stable and latest do not match. Run "promote" to commit.'
+  else:
+    print 'Stable and latest images match.'
+
+  return 0
 
 
 def main(args):
+  if IS_WINDOWS:
+    logging.error('This script does not currently work on Windows.')
+    return 1
+
   parser = argparse.ArgumentParser()
   parser.add_argument(
       '-v', '--verbose',
@@ -408,7 +634,7 @@ def main(args):
       help='Path to the cluster configuration JSON file.')
   subparsers = parser.add_subparsers()
 
-  def add_cluster_key_arg(subparser):
+  def add_cluster_key(subparser):
     subparser.add_argument(
         '-K', '--cluster-key', required=True,
         help='Key of the cluster within the config to work with.')
@@ -418,16 +644,45 @@ def main(args):
       help='Direct invocation of "kubectl" command using target context.')
   subparser.add_argument('args', nargs=argparse.REMAINDER,
       help='Arguments to pass to the "kubectl" invocation.')
-  add_cluster_key_arg(subparser)
+  add_cluster_key(subparser)
   subparser.set_defaults(func=subcommand_kubectl)
 
-  # Subcommand: deploy
-  subparser = subparsers.add_parser('deploy',
-      help='Build and deploy a new instance to a Kubernetes cluster.')
+  # Subcommand: upload
+  subparser = subparsers.add_parser('upload',
+      help='Build and upload a new instance to a Kubernetes cluster.')
   subparser.add_argument('-t', '--tag',
       help='Optional tag to add to the version.')
-  add_cluster_key_arg(subparser)
-  subparser.set_defaults(func=subcommand_deploy)
+  add_cluster_key(subparser)
+  subparser.set_defaults(func=subcommand_upload)
+
+  # Subcommand: switch
+  subparser = subparsers.add_parser('switch',
+      help='Switch the current image to the latest uploaded image.')
+  add_cluster_key(subparser)
+  subparser.set_defaults(func=subcommand_switch)
+
+  # Subcommand: rollback
+  subparser = subparsers.add_parser('rollback',
+      help='Issue a rollback command to the deployment.')
+  subparser.add_argument('--stable', action='store_true',
+      help='Rather than issue a rollback command, explicitly set the image '
+           'back to the last "stable" tag. This sidesteps standard Kubernetes '
+           'rollback, but can be useful if multiple deployments have been '
+           'made in between a commit.')
+  add_cluster_key(subparser)
+  subparser.set_defaults(func=subcommand_rollback)
+
+  # Subcommand: promote
+  subparser = subparsers.add_parser('promote',
+      help='Promote the latest deployed build to "stable".')
+  add_cluster_key(subparser)
+  subparser.set_defaults(func=subcommand_promote)
+
+  # Subcommand: status
+  subparser = subparsers.add_parser('status',
+      help='Display information about the current deployment.')
+  add_cluster_key(subparser)
+  subparser.set_defaults(func=subcommand_status)
 
   args = parser.parse_args()
 
