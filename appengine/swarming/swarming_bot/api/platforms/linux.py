@@ -215,6 +215,12 @@ def get_ssd():
     return ()
 
 
+@tools.cached
+def get_kvm():
+  """Check whether KVM is supported."""
+  return os.path.exists('/dev/kvm') and os.access("/dev/kvm", os.R_OK|os.W_OK)
+
+
 ## Mutating code.
 
 

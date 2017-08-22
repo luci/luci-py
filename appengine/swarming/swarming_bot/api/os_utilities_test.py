@@ -111,6 +111,8 @@ class TestOsUtilities(auto_stub.TestCase):
     if sys.platform in ('darwin', 'linux2'):
       actual.discard(u'ssd')
     expected = {u'cores', u'cpu', u'gpu', u'id', u'os', u'pool'}
+    if sys.platform in ('linux2'):
+      actual.discard(u'kvm')
     if sys.platform == 'darwin':
       expected.add(u'mac_model')
       expected.add(u'xcode_version')
