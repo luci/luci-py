@@ -55,6 +55,11 @@ class RemoteClientGrpc(object):
     self._server = server
     self._log_is_asleep = False
 
+  @property
+  def server(self):
+    return self._server
+
+  @property
   def is_grpc(self):
     return True
 

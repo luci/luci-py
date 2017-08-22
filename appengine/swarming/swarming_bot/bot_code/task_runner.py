@@ -83,7 +83,7 @@ def get_run_isolated():
   return [sys.executable, THIS_FILE, 'run_isolated']
 
 
-def get_isolated_args(is_grpc, work_dir, task_details, isolated_result,
+def get_isolated_args(work_dir, task_details, isolated_result,
                       bot_file, run_isolated_flags):
   """Returns the command to call run_isolated. Mocked in tests."""
   bot_dir = os.path.dirname(work_dir)
@@ -104,8 +104,6 @@ def get_isolated_args(is_grpc, work_dir, task_details, isolated_result,
           [
             '--isolated', isolated_input,
           ])
-    if is_grpc:
-      cmd.append('--is-grpc')
 
   # Named caches options.
   # Specify --named-cache-root unconditionally so run_isolated.py never creates
@@ -287,8 +285,12 @@ def load_and_run(
           raise InternalError('Failed to grab bot auth headers: %s' % e)
 
       # Make a client that can send request to Swarming using bot auth headers.
+      grpc_proxy = ''
+      if is_grpc:
+        grpc_proxy = swarming_server
+        swarming_server = ''
       remote = remote_client.createRemoteClient(
-          swarming_server, headers_cb, is_grpc)
+          swarming_server, headers_cb, grpc_proxy)
       remote.initialize()
 
       # Let AuthSystem know it can now send RPCs to Swarming (to grab OAuth
@@ -432,7 +434,7 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
   args_path = os.path.join(work_dir, 'run_isolated_args.json')
   cmd = get_run_isolated()
   cmd.extend(['-a', args_path])
-  args = get_isolated_args(remote.is_grpc(), work_dir, task_details,
+  args = get_isolated_args(work_dir, task_details,
                            isolated_result, bot_file, run_isolated_flags)
   # Hard timeout enforcement is deferred to run_isolated. Grace is doubled to
   # give one 'grace_period' slot to the child process and one slot to upload
@@ -669,7 +671,8 @@ def main(args):
   parser.add_option(
       '--swarming-server', help='Swarming server to send data back')
   parser.add_option(
-      '--is-grpc', action='store_true', help='Communicate to Swarming via gRPC')
+      '--is-grpc', action='store_true',
+      help='If true, --swarming-server is a gRPC proxy')
   parser.add_option(
       '--cost-usd-hour', type='float', help='Cost of this VM in $/h')
   parser.add_option('--start', type='float', help='Time this task was started')

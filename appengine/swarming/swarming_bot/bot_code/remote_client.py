@@ -76,6 +76,11 @@ class RemoteClientNative(object):
     self._exp_ts = None
     self._disabled = not auth_headers_callback
 
+  @property
+  def server(self):
+    return self._server
+
+  @property
   def is_grpc(self):
     return False
 
