@@ -42,7 +42,7 @@ To install in the local user (as `~/nodejs` in this example), use:
     mkdir ~/nodejs
     cd ~/nodejs
     curl https://nodejs.org/dist/v6.10.3/node-v6.10.3-linux-x64.tar.xz | tar xJ --strip-components=1
-    export PATH="$PATH:$HOME:/nodejs/bin"
+    export PATH="$PATH:$HOME/nodejs/bin"
     npm install -g bower
 
 
