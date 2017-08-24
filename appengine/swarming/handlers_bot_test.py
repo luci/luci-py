@@ -1202,8 +1202,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
   def test_oauth_token_task_account(self):
     calls = []
-    def mocked(task_id, scopes):
-      calls.append((task_id, scopes))
+    def mocked(task_id, bot_id, scopes):
+      calls.append((task_id, bot_id, scopes))
       return 'blah@example.com', service_accounts.AccessToken('blah', 126240504)
     self.mock(service_accounts, 'get_task_account_token', mocked)
 
@@ -1249,7 +1249,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'expiry': 126240504,
         u'service_account': u'blah@example.com',
     }, response.json)
-    self.assertEqual([(task_id, [u'scope_a', u'scope_b'])], calls)
+    self.assertEqual([(task_id, 'bot1', [u'scope_a', u'scope_b'])], calls)
 
     # Emulate fatal error.
     def mocked(*_args, **_kwargs):

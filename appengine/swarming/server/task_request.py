@@ -661,8 +661,6 @@ class TaskRequest(ndb.Model):
   # actually running on some bot).
   #
   # This property never shows up in UI or API responses.
-  #
-  # TODO(crbug.com/731847): This is always None currently.
   service_account_token = ndb.BlobProperty()
 
   # The actual properties are embedded in this model.

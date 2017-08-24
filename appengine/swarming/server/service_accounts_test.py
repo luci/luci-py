@@ -19,6 +19,8 @@ from components import net
 from components import utils
 
 from server import service_accounts
+from server import task_pack
+from server import task_request
 
 
 class ServiceAccountRegexpTest(test_case.TestCase):
@@ -36,13 +38,11 @@ class MockedAuthDB(object):
   token_server_url = 'https://tokens.example.com'
 
 
-class OAuthTokenGrantTest(test_case.TestCase):
+class TestBase(test_case.TestCase):
   def setUp(self):
-    super(OAuthTokenGrantTest, self).setUp()
+    super(TestBase, self).setUp()
     self.mock(random, 'randint', lambda _a, _b: 333)
-    self.mock(
-        auth, 'get_current_identity',
-        lambda: auth.Identity.from_bytes('user:end-user@example.com'))
+    self.mock(random, 'getrandbits', lambda _: 0x88)
     self.mock(auth, 'get_request_auth_db', MockedAuthDB)
 
   def mock_json_request(self, expected_url, expected_payload, response):
@@ -60,6 +60,14 @@ class OAuthTokenGrantTest(test_case.TestCase):
       return response
     self.mock(net, 'json_request', mocked)
     return calls
+
+
+class OAuthTokenGrantTest(TestBase):
+  def setUp(self):
+    super(OAuthTokenGrantTest, self).setUp()
+    self.mock(
+        auth, 'get_current_identity',
+        lambda: auth.Identity.from_bytes('user:end-user@example.com'))
 
   def test_happy_path(self):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
@@ -132,14 +140,112 @@ class OAuthTokenGrantTest(test_case.TestCase):
         expected_url='https://tokens.example.com/prpc/'
             'tokenserver.minter.TokenMinter/MintOAuthTokenGrant',
         expected_payload=None,
-      response=net.Error('bad', 403, 'error message'))
+      response=net.Error('bad', 403, 'Token server error message'))
 
     with self.assertRaises(auth.AuthorizationError) as err:
       service_accounts.get_oauth_token_grant(
           'service-account@example.com', datetime.timedelta(seconds=3600))
-    self.assertEqual(
-        'Caller user:end-user@example.com is not allowed to use service '
-        'account service-account@example.com', str(err.exception))
+    self.assertEqual('Token server error message', str(err.exception))
+
+
+class TaskAccountTokenTest(TestBase):
+  def make_task_request(
+      self, service_account, service_account_token, try_number=1):
+    now = utils.utcnow()
+    args = {
+      'created_ts': now,
+      'name': 'Request with %s' % service_account,
+      'priority': 50,
+      'properties': task_request.TaskProperties(**{
+        'command': [u'command1'],
+        'dimensions': {u'pool': u'default'},
+        'env': {},
+        'execution_timeout_secs': 24*60*60,
+        'io_timeout_secs': None,
+      }),
+      'expiration_ts': now + datetime.timedelta(seconds=60),
+      'tags': [u'tag:1'],
+      'user': 'Someone',
+    }
+    req = task_request.TaskRequest(**args)
+    task_request.init_new_request(req, True, None)
+    req.key = task_request.new_request_key()
+    req.service_account = service_account
+    req.service_account_token = service_account_token
+    req.put()
+
+    summary_key = task_pack.request_key_to_result_summary_key(req.key)
+    run_result_key = task_pack.result_summary_key_to_run_result_key(
+        summary_key, try_number)
+    return task_pack.pack_run_result_key(run_result_key)
+
+  def test_happy_path(self):
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+
+    # Initial attempt and a retry.
+    for try_number in (1, 2):
+      task_id = self.make_task_request(
+          service_account='service-account@example.com',
+          service_account_token='mocked-oauth-token-grant',
+          try_number=try_number)
+
+      expiry = now + datetime.timedelta(seconds=3600)
+      self.mock_json_request(
+          expected_url='https://tokens.example.com/prpc/'
+              'tokenserver.minter.TokenMinter/MintOAuthTokenViaGrant',
+          expected_payload={
+            'grantToken': 'mocked-oauth-token-grant',
+            'oauthScope': ['scope1', 'scope2'],
+            'minValidityDuration': 300,
+            'auditTags': [
+              'swarming:gae_request_id:7357B3D7091D',
+              'swarming:service_version:sample-app/v1a',
+              'swarming:bot_id:bot-id',
+              'swarming:task_id:' + task_id,
+              'swarming:task_name:Request with service-account@example.com',
+            ],
+          },
+          response={
+            'accessToken': 'totally_real_token',
+            'serviceVersion': 'token-server-id/ver',
+            'expiry': expiry.isoformat() + 'Z',
+          })
+
+      tok = service_accounts.AccessToken(
+          'totally_real_token', int(utils.time_time() + 3600))
+      self.assertEqual(
+          ('service-account@example.com', tok),
+          service_accounts.get_task_account_token(
+              task_id, 'bot-id', ['scope1', 'scope2']))
+
+  def test_malformed_task_id(self):
+    with self.assertRaises(auth.AccessTokenError):
+      service_accounts.get_task_account_token(
+          'bad-task-id', 'bot-id', ['scope1', 'scope2'])
+
+  def test_missing_task_id(self):
+    with self.assertRaises(auth.AccessTokenError):
+      service_accounts.get_task_account_token(
+          '382b353612985111', 'bot-id', ['scope1', 'scope2'])
+
+  def test_task_account_is_bot(self):
+    task_id = self.make_task_request(
+        service_account='bot',
+        service_account_token=None)
+    account, tok = service_accounts.get_task_account_token(
+        task_id, 'bot-id', ['scope1', 'scope2'])
+    self.assertEqual('bot', account)
+    self.assertIsNone(tok)
+
+  def test_task_account_is_none(self):
+    task_id = self.make_task_request(
+        service_account='none',
+        service_account_token=None)
+    account, tok = service_accounts.get_task_account_token(
+        task_id, 'bot-id', ['scope1', 'scope2'])
+    self.assertEqual('none', account)
+    self.assertIsNone(tok)
 
 
 class SystemAccountTokenTest(test_case.TestCase):

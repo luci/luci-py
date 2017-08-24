@@ -18,6 +18,8 @@ from components import auth
 from components import net
 from components import utils
 
+from server import task_pack
+
 
 # Brackets for possible lifetimes of OAuth tokens produced by this module.
 MIN_TOKEN_LIFETIME_SEC = 5 * 60
@@ -26,7 +28,7 @@ MAX_TOKEN_LIFETIME_SEC = 3600 * 60  # this is just hardcoded by Google APIs
 
 AccessToken = collections.namedtuple('AccessToken', [
   'access_token',  # actual access token
-  'expiry',        # unix timestamp (in seconds) when it expires
+  'expiry',        # unix timestamp (in seconds, int) when it expires
 ])
 
 
@@ -158,7 +160,7 @@ def get_oauth_token_grant(service_account, validity_duration):
   return new_grant
 
 
-def get_task_account_token(task_id, scopes):  # pylint: disable=unused-argument
+def get_task_account_token(task_id, bot_id, scopes):
   """Returns an access token for a service account associated with a task.
 
   Assumes authorization checks have been made already. If the task is not
@@ -170,6 +172,7 @@ def get_task_account_token(task_id, scopes):  # pylint: disable=unused-argument
 
   Args:
     task_id: ID of the task.
+    bot_id: ID of the bot that executes the task, for logs.
     scopes: list of requested OAuth scopes.
 
   Returns:
@@ -178,9 +181,59 @@ def get_task_account_token(task_id, scopes):  # pylint: disable=unused-argument
   Raises:
     auth.AccessTokenError if the token can't be generated.
   """
-  # TODO(vadimsh): Grab TaskRequest entity based on 'task_id' and use data
-  # there to generate new access token for task-associated service account.
-  raise NotImplementedError('"task" service accounts are not implemented yet')
+  # Grab corresponding TaskRequest.
+  try:
+    result_summary_key = task_pack.run_result_key_to_result_summary_key(
+        task_pack.unpack_run_result_key(task_id))
+    task_request_key = task_pack.result_summary_key_to_request_key(
+        result_summary_key)
+  except ValueError as exc:
+    logging.error('Unexpectedly bad task_id: %s', exc)
+    raise auth.AccessTokenError('Bad task_id: %s' % task_id)
+
+  task_request = task_request_key.get()
+  if not task_request:
+    raise auth.AccessTokenError('No such task request: %s' % task_id)
+
+  # 'none' or 'bot' cases are handled by the bot locally, no token for them.
+  if task_request.service_account in ('none', 'bot'):
+    return task_request.service_account, None
+
+  # The only possible case is a service account email. Double check this.
+  if not is_service_account(task_request.service_account):
+    raise auth.AccessTokenError(
+        'Not a service account email: %s', task_request.service_account)
+
+  # Should have a token prepared by 'get_oauth_token_grant' already.
+  if not task_request.service_account_token:
+    raise auth.AccessTokenError(
+        'The task request %s has no associated service account token' % task_id)
+
+  # Additional information for Token Server's logs.
+  audit_tags = [
+    'swarming:bot_id:%s' % bot_id,
+    'swarming:task_id:%s' % task_id,
+    'swarming:task_name:%s' % task_request.name,
+  ]
+
+  # Use this token to grab the real OAuth token. Note that the bot caches the
+  # resulting OAuth token internally, so we don't bother to cache it here.
+  try:
+    access_token, expiry = _mint_oauth_token_via_grant(
+        task_request.service_account_token, scopes, audit_tags)
+  except auth.AuthorizationError as exc:
+    # This token is no longer usable (most likely expired or ACLs has changed),
+    # or requested scopes are not allowed.
+    raise auth.AccessTokenError('Can\'t generate OAuth token - %s' % exc)
+  except InternalError as exc:
+    # Callers expect AccessTokenError.
+    raise auth.AccessTokenError(str(exc), transient=True)
+
+  # Log and return the token.
+  token = AccessToken(
+      access_token, int(utils.datetime_to_timestamp(expiry)/1e6))
+  _check_and_log_token('task associated', task_request.service_account, token)
+  return task_request.service_account, token
 
 
 def get_system_account_token(system_service_account, scopes):
@@ -220,7 +273,7 @@ def get_system_account_token(system_service_account, scopes):
   assert isinstance(blob, basestring)
   assert isinstance(expiry, (int, long, float))
   token = AccessToken(blob, int(expiry))
-  _check_and_log_token(system_service_account, token)
+  _check_and_log_token('bot associated', system_service_account, token)
   return system_service_account, token
 
 
@@ -255,6 +308,67 @@ def _mint_oauth_token_grant(service_account, end_user, validity_duration):
     auth.AuthorizationError if the token server forbids the usage.
     InternalError if the RPC fails unexpectedly.
   """
+  resp = _call_token_server(
+    'MintOAuthTokenGrant', {
+      'serviceAccount': service_account,
+      'validityDuration': int(validity_duration.total_seconds()),
+      'endUser': end_user.to_bytes(),
+      'auditTags': _common_audit_tags(),
+    })
+  try:
+    grant_token = str(resp['grantToken'])
+    service_version = str(resp['serviceVersion'])
+    expiry = utils.parse_rfc3339_datetime(resp['expiry'])
+  except (KeyError, ValueError) as exc:
+    logging.error('Bad response from the token server (%s):\n%r', exc, resp)
+    raise InternalError('Bad response from the token server, see server logs')
+  logging.info('The token server replied, its version: %s', service_version)
+  return grant_token, expiry
+
+
+def _mint_oauth_token_via_grant(grant_token, oauth_scopes, audit_tags):
+  """Does the RPC to the token server to exchange a grant for an access token.
+
+  Args:
+    grant_token: a token generated by get_oauth_token_grant.
+    oauth_scopes: list of strings with requested OAuth scopes.
+    audit_tags: list with information tags to send with the RPC, for logging.
+
+  Returns:
+    (new token, datetime when it expires).
+  """
+  resp = _call_token_server(
+    'MintOAuthTokenViaGrant', {
+      'grantToken': grant_token,
+      'oauthScope': oauth_scopes,
+      'minValidityDuration': MIN_TOKEN_LIFETIME_SEC,
+      'auditTags': _common_audit_tags() + audit_tags,
+    })
+  try:
+    access_token = str(resp['accessToken'])
+    service_version = str(resp['serviceVersion'])
+    expiry = utils.parse_rfc3339_datetime(resp['expiry'])
+  except (KeyError, ValueError) as exc:
+    logging.error('Bad response from the token server (%s):\n%r', exc, resp)
+    raise InternalError('Bad response from the token server, see server logs')
+  logging.info('The token server replied, its version: %s', service_version)
+  return access_token, expiry
+
+
+def _call_token_server(method, request):
+  """Sends an RPC to tokenserver.minter.TokenMinter service.
+
+  Args:
+    method: name of the method to call.
+    request: dict with request fields.
+
+  Returns:
+    Dict with response fields.
+
+  Raises:
+    auth.AuthorizationError on HTTP 403 reply.
+    InternalError if the RPC fails unexpectedly.
+  """
   # Double check token server URL looks sane ('https://....'). This is checked
   # when it's imported from the config. This check should never fail.
   ts_url = auth.get_request_auth_db().token_server_url
@@ -263,41 +377,23 @@ def _mint_oauth_token_grant(service_account, end_user, validity_duration):
   except ValueError as exc:
     raise InternalError('Invalid token server URL %s: %s' % (ts_url, exc))
 
-  # See TokenMinter.MintOAuthTokenGrant in
+  # See TokenMinter in
   # https://chromium.googlesource.com/infra/luci/luci-go/+/master/tokenserver/api/minter/v1/token_minter.proto
   # But beware that proto JSON serialization uses camelCase, not snake_case.
   try:
-    resp = net.json_request(
-        url=ts_url + '/prpc/tokenserver.minter.TokenMinter/MintOAuthTokenGrant',
+    return net.json_request(
+        url='%s/prpc/tokenserver.minter.TokenMinter/%s' % (ts_url, method),
         method='POST',
-        payload={
-          'serviceAccount': service_account,
-          'validityDuration': int(validity_duration.total_seconds()),
-          'endUser': end_user.to_bytes(),
-          'auditTags': _common_audit_tags(),
-        },
+        payload=request,
         headers={'Accept': 'application/json; charset=utf-8'},
         scopes=[net.EMAIL_SCOPE])
   except net.Error as exc:
     logging.error(
-        'Error calling MintOAuthTokenGrant (HTTP %s: %s):\n%s',
-        exc.status_code, exc.message, exc.response)
+        'Error calling %s (HTTP %s: %s):\n%s',
+        method, exc.status_code, exc.message, exc.response)
     if exc.status_code == 403:
-      raise auth.AuthorizationError(
-          'Caller %s is not allowed to use service account %s' %
-          (end_user.to_bytes(), service_account))
+      raise auth.AuthorizationError(exc.response)
     raise InternalError('Failed to call MintOAuthTokenGrant, see server logs')
-
-  try:
-    grant_token = str(resp['grantToken'])
-    service_version = str(resp['serviceVersion'])
-    expiry = utils.parse_rfc3339_datetime(resp['expiry'])
-  except (KeyError, ValueError) as exc:
-    logging.error('Bad response from the token server (%s):\n%r', exc, resp)
-    raise InternalError('Bad response from the token server, see server logs')
-
-  logging.info('The token server replied, its version: %s', service_version)
-  return grant_token, expiry
 
 
 def _common_audit_tags():
@@ -323,12 +419,12 @@ def _log_token_grant(prefix, token, exp_ts, log_call=logging.info):
       prefix, utils.get_token_fingerprint(token), ts, ts - utils.time_time())
 
 
-def _check_and_log_token(account_email, token):
+def _check_and_log_token(flavor, account_email, token):
   """Checks the lifetime and logs details about the generated access token."""
   expires_in = token.expiry - utils.time_time()
   logging.info(
-      'Got access token: email=%s, fingerprint=%s, expiry=%d, expiry_in=%d',
-      account_email,
+      'Got %s access token: email=%s, fingerprint=%s, expiry=%d, expiry_in=%d',
+      flavor, account_email,
       utils.get_token_fingerprint(token.access_token),
       token.expiry,
       expires_in)

@@ -11,8 +11,6 @@ schema details to the user.
 
 from google.appengine.ext import ndb
 
-from server import acl
-
 
 # Mask to TaskRequest key ids so they become decreasing numbers.
 TASK_REQUEST_KEY_ID_MASK = int(2L**63-1)
