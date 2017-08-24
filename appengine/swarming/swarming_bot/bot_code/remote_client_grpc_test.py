@@ -116,9 +116,7 @@ class TestRemoteClientGrpc(auto_stub.TestCase):
     self._expected.append(expected_call)
     response = self._client.do_handshake(self._get_bot_attributes_dict())
     self.assertEqual(response, {
-        'server_version': u'unknown',
         'bot_version': u'123',
-        'bot_group_cfg_version': u'unknown',
         'bot_group_cfg': {
             'dimensions': {
                 u'pool': [u'dead'],
