@@ -96,6 +96,8 @@ class File(ndb.Model):
   # hash of the file content, computed by compute_hash().
   # A Blob entity with this key must exist.
   content_hash = ndb.StringProperty(indexed=False, required=True)
+  # A pinned, fully resolved URL to this file.
+  url = ndb.StringProperty(indexed=False)
 
   def _pre_put_hook(self):
     assert isinstance(self.key.id(), str)
@@ -124,34 +126,28 @@ def get_config_sets_async(config_set=None):
 
 @ndb.tasklet
 def get_latest_revisions_async(config_sets):
-  """Returns a mapping {config_set: (latest_revision, latest_revision_url)}.
+  """Returns a mapping {config_set: latest_revision}.
 
-  A returned latest_revision or latest_revision_url may be None.
+  A returned latest_revision may be None.
   """
   assert isinstance(config_sets, list)
   entities = yield ndb.get_multi_async(
       ndb.Key(ConfigSet, cs) for cs in config_sets
   )
-  latest_revisions = {
-      e.key.id(): (e.latest_revision, e.latest_revision_url)
-      for e in entities if e
-  }
+  latest_revisions = {e.key.id(): e.latest_revision for e in entities if e}
 
-  raise ndb.Return({
-      cs: latest_revisions.get(cs) or (None, None) for cs in config_sets
-  })
+  raise ndb.Return({cs: latest_revisions.get(cs) for cs in config_sets})
 
 
 @ndb.tasklet
 def get_config_hashes_async(revs, path):
-  """Returns a mapping {config_set: (revision, revision_url, content_hash)}.
+  """Returns a mapping {config_set: (revision, file_url, content_hash)}.
 
-  A returned revision, revision_url, or content_hash may be None.
+  A returned revision, file_url, or content_hash may be None.
 
   Args:
     revs: a mapping {config_set: revision}.
-      If revision is None, latest will be used and latest revision_url will be
-      fetched. Otherwise, latest revision_url will be None.
+      If revision is None, latest will be used.
     path (str): path to the file.
   """
   assert isinstance(revs, dict)
@@ -164,8 +160,8 @@ def get_config_hashes_async(revs, path):
   assert not path.startswith('/')
 
   # Resolve latest revisions.
-  revs = {cs: (rev, None) for cs, rev in revs.iteritems()}
-  config_sets_without_rev = [cs for cs, (rev, _) in revs.iteritems() if not rev]
+  revs = revs.copy()
+  config_sets_without_rev = [cs for cs, rev in revs.iteritems() if not rev]
   if config_sets_without_rev:
     latest_revisions = yield get_latest_revisions_async(config_sets_without_rev)
     revs.update(latest_revisions)
@@ -176,21 +172,20 @@ def get_config_hashes_async(revs, path):
         ConfigSet, cs,
         Revision, rev,
         File, path)
-    for cs, (rev, _) in revs.iteritems()
+    for cs, rev in revs.iteritems()
     if rev
   ])
-  content_hashes = {
+  content_url_and_hashes = {
     # map key is config set
-    f.key.parent().parent().id(): f.content_hash
+    f.key.parent().parent().id(): (f.url, f.content_hash)
     for f in file_entities
     if f
   }
   raise ndb.Return({
     cs: (
-        rev if content_hashes.get(cs) else None,
-        rev_url if content_hashes.get(cs) else None,
-        content_hashes.get(cs))
-    for cs, (rev, rev_url) in revs.iteritems()
+        (rev, ) + content_url_and_hashes.get(cs)
+        if content_url_and_hashes.get(cs) else (None, None, None))
+    for cs, rev in revs.iteritems()
   })
 
 
@@ -211,7 +206,7 @@ def get_configs_by_hashes_async(content_hashes):
 
 @ndb.tasklet
 def get_latest_configs_async(config_sets, path, hashes_only=False):
-  """Returns a mapping {config_set: (revision, revision_url, hash, content)}.
+  """Returns a mapping {config_set: (revision, file_url, hash, content)}.
 
   If hash_only is True, returned content items are None.
   """
@@ -227,8 +222,8 @@ def get_latest_configs_async(config_sets, path, hashes_only=False):
     contents = yield get_configs_by_hashes_async(hashes)
 
   raise ndb.Return({
-    cs: (rev, rev_url, content_hash, contents.get(content_hash))
-    for cs, (rev, rev_url, content_hash) in revs_and_hashes.iteritems()
+    cs: (rev, file_url, content_hash, contents.get(content_hash))
+    for cs, (rev, file_url, content_hash) in revs_and_hashes.iteritems()
   })
 
 

@@ -138,7 +138,7 @@ def _import_revision(config_set, base_location, commit):
   else:
     # Extract files and save them to Blobs outside ConfigSet transaction.
     files, validation_result = _read_and_validate_archive(
-        config_set, rev_key, archive)
+        config_set, rev_key, archive, location)
     if validation_result.has_errors:
       logging.warning('Invalid revision %s@%s', config_set, revision)
       notifications.notify_gitiles_rejection(
@@ -169,7 +169,7 @@ def _import_revision(config_set, base_location, commit):
   logging.info('Imported revision %s/%s', config_set, location.treeish)
 
 
-def _read_and_validate_archive(config_set, rev_key, archive):
+def _read_and_validate_archive(config_set, rev_key, archive, location):
   """Reads an archive, validates all files, imports blobs and returns files.
 
   If all files are valid, saves contents to Blob entities and returns
@@ -206,7 +206,8 @@ def _read_and_validate_archive(config_set, rev_key, archive):
       storage.File(
         id=name,
         parent=rev_key,
-        content_hash=content_hash)
+        content_hash=content_hash,
+        url=str(location.join(name)))
     )
   # Wait for Blobs to be imported before proceeding.
   ndb.Future.wait_all(blob_futures)

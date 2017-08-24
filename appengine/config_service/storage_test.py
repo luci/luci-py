@@ -4,6 +4,7 @@
 # that can be found in the LICENSE file.
 
 import datetime
+import os
 
 from test_env import future
 import test_env
@@ -20,27 +21,41 @@ import storage
 class StorageTestCase(test_case.TestCase):
 
   def put_file(self, config_set, revision, path, content):
+    revision_url = 'https://x.com/+/%s' % revision
     confg_set_key = storage.ConfigSet(
         id=config_set,
         location='https://x.com',
 
         latest_revision=revision,
-        latest_revision_url='https://x.com/+/%s' % revision,
+        latest_revision_url=revision_url,
         latest_revision_time=datetime.datetime(2016, 1, 1),
         latest_revision_committer_email='john@example.com',
     ).put()
     rev_key = storage.Revision(id=revision, parent=confg_set_key).put()
 
     content_hash = storage.compute_hash(content)
-    storage.File(id=path, parent=rev_key, content_hash=content_hash).put()
+    storage.File(
+        id=path,
+        parent=rev_key,
+        content_hash=content_hash,
+        url=os.path.join(revision_url, path),
+    ).put()
     storage.Blob(id=content_hash, content=content).put()
 
   def test_get_config(self):
     self.put_file('foo', 'deadbeef', 'config.cfg', 'content')
     self.put_file('bar', 'badcoffee', 'config.cfg', 'content2')
     expected = {
-      'foo': ('deadbeef', None, 'v1:6b584e8ece562ebffc15d38808cd6b98fc3d97ea'),
-      'bar': ('badcoffee', None, 'v1:db00fd65b218578127ea51f3dffac701f12f486a'),
+      'foo': (
+          'deadbeef',
+          'https://x.com/+/deadbeef/config.cfg',
+          'v1:6b584e8ece562ebffc15d38808cd6b98fc3d97ea',
+      ),
+      'bar': (
+          'badcoffee',
+          'https://x.com/+/badcoffee/config.cfg',
+          'v1:db00fd65b218578127ea51f3dffac701f12f486a',
+      ),
     }
     actual = storage.get_config_hashes_async(
       {'foo': 'deadbeef', 'bar': 'badcoffee'}, 'config.cfg').get_result()
@@ -49,7 +64,11 @@ class StorageTestCase(test_case.TestCase):
   def test_get_non_existing_config(self):
     self.put_file('foo', 'deadbeef', 'config.cfg', 'content')
     expected = {
-      'foo': ('deadbeef', None, 'v1:6b584e8ece562ebffc15d38808cd6b98fc3d97ea'),
+      'foo': (
+          'deadbeef',
+          'https://x.com/+/deadbeef/config.cfg',
+          'v1:6b584e8ece562ebffc15d38808cd6b98fc3d97ea',
+       ),
       'bar': (None, None, None),
     }
     actual = storage.get_config_hashes_async(
@@ -62,12 +81,12 @@ class StorageTestCase(test_case.TestCase):
     expected = {
       'foo': (
           'deadbeef',
-          'https://x.com/+/deadbeef',
+          'https://x.com/+/deadbeef/config.cfg',
           'v1:6b584e8ece562ebffc15d38808cd6b98fc3d97ea'
       ),
       'bar': (
           'badcoffee',
-          'https://x.com/+/badcoffee',
+          'https://x.com/+/badcoffee/config.cfg',
           'v1:db00fd65b218578127ea51f3dffac701f12f486a'
       ),
     }
@@ -80,7 +99,7 @@ class StorageTestCase(test_case.TestCase):
     expected = {
       'foo': (
           'deadbeef',
-          'https://x.com/+/deadbeef',
+          'https://x.com/+/deadbeef/config.cfg',
           'v1:6b584e8ece562ebffc15d38808cd6b98fc3d97ea'
       ),
       'bar': (None, None, None),

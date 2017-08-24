@@ -90,6 +90,8 @@ class GitilesImportTestCase(test_case.TestCase):
         ),
         self.test_commit)
 
+    expected_latest_revision_url = (
+        'https://localhost/project/+/a1841f40264376d170269ee9473ce924b7c2c4e9')
     gitiles.get_archive.assert_called_once_with(
         'localhost', 'project', 'a1841f40264376d170269ee9473ce924b7c2c4e9', '/',
         deadline=15)
@@ -99,6 +101,8 @@ class GitilesImportTestCase(test_case.TestCase):
     self.assertEqual(
         saved_config_set.location,
         'https://localhost/project/+/luci/config')
+    self.assertEqual(
+        saved_config_set.latest_revision_url, expected_latest_revision_url)
 
     saved_revision = storage.Revision.get_by_id(
         self.test_commit.sha, parent=saved_config_set.key)
@@ -109,6 +113,9 @@ class GitilesImportTestCase(test_case.TestCase):
     self.assertIsNotNone(saved_file)
     self.assertEqual(
         saved_file.content_hash, 'v1:587be6b4c3f93f93c489c0111bba5596147a26cb')
+    self.assertEqual(
+        saved_file.url,
+        os.path.join(expected_latest_revision_url, 'test_archive/x'))
 
     saved_blob = storage.Blob.get_by_id(saved_file.content_hash)
     self.assertIsNotNone(saved_blob)
