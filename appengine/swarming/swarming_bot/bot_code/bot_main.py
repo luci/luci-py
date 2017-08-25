@@ -1220,6 +1220,10 @@ def main(argv):
   parser.add_argument('unsupported', nargs='*', help=argparse.SUPPRESS)
   args = parser.parse_args(argv)
 
+  if sys.platform == 'win32':
+    if not file_path.enable_privilege('SeShutdownPrivilege'):
+      logging.error('Failed to enable SeShutdownPrivilege')
+
   # Enforces that only one process with a bot in this directory can be run on
   # this host at once.
   if not SINGLETON.acquire():
