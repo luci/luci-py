@@ -776,8 +776,7 @@ def create_termination_task(bot_id, allow_high_priority):
       name=u'Terminate %s' % bot_id,
       priority=0,
       properties=properties,
-      tags=[u'terminate:1'],
-      user=auth.get_current_identity().to_bytes())
+      tags=[u'terminate:1'])
   assert request.properties.is_terminate
   init_new_request(request, allow_high_priority, None)
   return request
