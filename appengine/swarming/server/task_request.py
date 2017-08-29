@@ -755,6 +755,21 @@ class TaskRequest(ndb.Model):
           'pubsub_userdata requires pubsub_topic')
 
 
+### Private stuff.
+
+
+def _get_automatic_tags(request):
+  """Returns tags that should automatically be added to the TaskRequest."""
+  tags = [
+    u'priority:%s' % request.priority,
+    u'service_account:%s' % (request.service_account or u'None'),
+    u'user:%s' % (request.user or u'None'),
+  ]
+  for key, value in request.properties.dimensions.iteritems():
+    tags.append(u'%s:%s' % (key, value))
+  return tags
+
+
 ### Public API.
 
 
@@ -939,19 +954,16 @@ def init_new_request(request, allow_high_priority, secret_bytes_ent):
   request.service_account = request.service_account or 'none'
   request.service_account_token = None
 
-  request.tags.append('priority:%s' % request.priority)
-  request.tags.append('user:%s' % request.user)
-  request.tags.append('service_account:%s' % request.service_account)
-  for key, value in request.properties.dimensions.iteritems():
-    request.tags.append('%s:%s' % (key, value))
-  request.tags = sorted(set(request.tags))
+  # This is useful to categorize the task.
+  tags = set(request.tags).union(_get_automatic_tags(request))
+  request.tags = sorted(tags)
 
   if request.properties.idempotent:
     props = request.properties.to_dict()
     if secret_bytes_ent is not None:
       props['secret_bytes'] = secret_bytes_ent.secret_bytes.encode('hex')
     request.properties_hash = request.HASHING_ALGO(
-      utils.encode_to_json(props)).digest()
+        utils.encode_to_json(props)).digest()
   else:
     request.properties_hash = None
 
