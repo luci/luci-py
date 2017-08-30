@@ -215,9 +215,13 @@ def get_ssd():
     return ()
 
 
+@tools.cached
 def get_kvm():
-  """Check whether KVM is supported."""
-  return os.path.exists('/dev/kvm') and os.access("/dev/kvm", os.R_OK|os.W_OK)
+  """Check whether KVM is available."""
+  # We only check the file existence, not whether we can access it. This avoids
+  # the race condition between swarming_bot and udev which is responsible for
+  # setting the correct ACL of /dev/kvm.
+  return os.path.exists('/dev/kvm')
 
 
 ## Mutating code.
