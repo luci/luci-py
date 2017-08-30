@@ -6,7 +6,7 @@ import "google/protobuf/any.proto";
 
 service TaskManager {
   rpc GetNextTask(GetNextTaskRequest) returns (GetNextTaskResponse);
-  rpc SyncTask(stream SyncTaskRequest) returns (stream SyncTaskResponse);
+  rpc SyncTask(SyncTaskRequest) returns (SyncTaskResponse);
   rpc CompleteTask(CompleteTaskRequest) returns (CompleteTaskResponse);
 }
 
@@ -22,17 +22,19 @@ message GetNextTaskResponse {
 
 message SyncTaskRequest {
   string name = 1;
-  google.protobuf.Any update = 2;
+  string worker_name = 2;
+  google.protobuf.Any update = 3;
 }
 
 message SyncTaskResponse {
-  bool cancelled = 1;
+  bool ok = 1;
 }
 
 message CompleteTaskRequest {
   string name = 1;
-  google.protobuf.Any result = 2;
-  google.protobuf.Any metadata = 3;
+  string worker_name = 2;
+  google.protobuf.Any result = 3;
+  google.protobuf.Any metadata = 4;
 }
 
 message CompleteTaskResponse {}

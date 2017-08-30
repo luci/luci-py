@@ -21,7 +21,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='command.proto',
   package='google.internal.devtools.workerfarm.v1test1',
   syntax='proto3',
-  serialized_pb=_b('\n\rcommand.proto\x12+google.internal.devtools.workerfarm.v1test1\x1a\x1egoogle/protobuf/duration.proto\x1a\x0cstatus.proto\"\xce\x05\n\x0b\x43ommandTask\x12O\n\x06inputs\x18\x01 \x01(\x0b\x32?.google.internal.devtools.workerfarm.v1test1.CommandTask.Inputs\x12Q\n\x07outputs\x18\x04 \x01(\x0b\x32@.google.internal.devtools.workerfarm.v1test1.CommandTask.Outputs\x12S\n\x08timeouts\x18\x05 \x01(\x0b\x32\x41.google.internal.devtools.workerfarm.v1test1.CommandTask.Timeouts\x1a\x87\x02\n\x06Inputs\x12\x11\n\targuments\x18\x01 \x03(\t\x12\x42\n\x05\x66iles\x18\x02 \x03(\x0b\x32\x33.google.internal.devtools.workerfarm.v1test1.Digest\x12r\n\x15\x65nvironment_variables\x18\x03 \x03(\x0b\x32S.google.internal.devtools.workerfarm.v1test1.CommandTask.Inputs.EnvironmentVariable\x1a\x32\n\x13\x45nvironmentVariable\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x1a-\n\x07Outputs\x12\r\n\x05\x66iles\x18\x01 \x03(\t\x12\x13\n\x0b\x64irectories\x18\x02 \x03(\t\x1a\x8c\x01\n\x08Timeouts\x12,\n\texecution\x18\x01 \x01(\x0b\x32\x19.google.protobuf.Duration\x12%\n\x02io\x18\x02 \x01(\x0b\x32\x19.google.protobuf.Duration\x12+\n\x08shutdown\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration\"\xf2\x01\n\x0b\x43ommandSync\x12Z\n\x0cstdout_chunk\x18\x64 \x01(\x0b\x32\x44.google.internal.devtools.workerfarm.v1test1.CommandSync.OutputChunk\x12Z\n\x0cstderr_chunk\x18\x65 \x01(\x0b\x32\x44.google.internal.devtools.workerfarm.v1test1.CommandSync.OutputChunk\x1a+\n\x0bOutputChunk\x12\x0c\n\x04\x64\x61ta\x18\x01 \x01(\x0c\x12\x0e\n\x06offset\x18\x02 \x01(\x03\"\xf3\x01\n\rCommandResult\x12\"\n\x06status\x18\x01 \x01(\x0b\x32\x12.google.rpc.Status\x12\x11\n\texit_code\x18\x02 \x01(\x05\x12O\n\x0coutput_files\x18\x03 \x03(\x0b\x32\x39.google.internal.devtools.workerfarm.v1test1.FileMetadata\x12Z\n\x12output_directories\x18\x04 \x03(\x0b\x32>.google.internal.devtools.workerfarm.v1test1.DirectoryMetadata\"k\n\x0f\x43ommandOverhead\x12+\n\x08\x64uration\x18\x01 \x01(\x0b\x32\x19.google.protobuf.Duration\x12+\n\x08overhead\x18\x02 \x01(\x0b\x32\x19.google.protobuf.Duration\"\x8a\x01\n\x0c\x46ileMetadata\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x43\n\x06\x64igest\x18\x02 \x01(\x0b\x32\x33.google.internal.devtools.workerfarm.v1test1.Digest\x12\x10\n\x08\x63ontents\x18\x03 \x01(\x0c\x12\x15\n\ris_executable\x18\x04 \x01(\x08\"f\n\x11\x44irectoryMetadata\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x43\n\x06\x64igest\x18\x02 \x01(\x0b\x32\x33.google.internal.devtools.workerfarm.v1test1.Digest\"*\n\x06\x44igest\x12\x0c\n\x04hash\x18\x01 \x01(\t\x12\x12\n\nsize_bytes\x18\x02 \x01(\x03\"\xaa\x01\n\tDirectory\x12H\n\x05\x66iles\x18\x01 \x03(\x0b\x32\x39.google.internal.devtools.workerfarm.v1test1.FileMetadata\x12S\n\x0b\x64irectories\x18\x02 \x03(\x0b\x32>.google.internal.devtools.workerfarm.v1test1.DirectoryMetadatab\x06proto3')
+  serialized_pb=_b('\n\rcommand.proto\x12+google.internal.devtools.workerfarm.v1test1\x1a\x1egoogle/protobuf/duration.proto\x1a\x0cstatus.proto\"\xce\x05\n\x0b\x43ommandTask\x12O\n\x06inputs\x18\x01 \x01(\x0b\x32?.google.internal.devtools.workerfarm.v1test1.CommandTask.Inputs\x12Q\n\x07outputs\x18\x04 \x01(\x0b\x32@.google.internal.devtools.workerfarm.v1test1.CommandTask.Outputs\x12S\n\x08timeouts\x18\x05 \x01(\x0b\x32\x41.google.internal.devtools.workerfarm.v1test1.CommandTask.Timeouts\x1a\x87\x02\n\x06Inputs\x12\x11\n\targuments\x18\x01 \x03(\t\x12\x42\n\x05\x66iles\x18\x02 \x03(\x0b\x32\x33.google.internal.devtools.workerfarm.v1test1.Digest\x12r\n\x15\x65nvironment_variables\x18\x03 \x03(\x0b\x32S.google.internal.devtools.workerfarm.v1test1.CommandTask.Inputs.EnvironmentVariable\x1a\x32\n\x13\x45nvironmentVariable\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x1a-\n\x07Outputs\x12\r\n\x05\x66iles\x18\x01 \x03(\t\x12\x13\n\x0b\x64irectories\x18\x02 \x03(\t\x1a\x8c\x01\n\x08Timeouts\x12,\n\texecution\x18\x01 \x01(\x0b\x32\x19.google.protobuf.Duration\x12%\n\x02io\x18\x02 \x01(\x0b\x32\x19.google.protobuf.Duration\x12+\n\x08shutdown\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration\"\xf2\x01\n\x0b\x43ommandSync\x12Z\n\x0cstdout_chunk\x18\x64 \x01(\x0b\x32\x44.google.internal.devtools.workerfarm.v1test1.CommandSync.OutputChunk\x12Z\n\x0cstderr_chunk\x18\x65 \x01(\x0b\x32\x44.google.internal.devtools.workerfarm.v1test1.CommandSync.OutputChunk\x1a+\n\x0bOutputChunk\x12\x0c\n\x04\x64\x61ta\x18\x01 \x01(\x0c\x12\x0e\n\x06offset\x18\x02 \x01(\x03\"\x8c\x01\n\rCommandResult\x12\"\n\x06status\x18\x01 \x01(\x0b\x32\x12.google.rpc.Status\x12\x11\n\texit_code\x18\x02 \x01(\x05\x12\x44\n\x07outputs\x18\x03 \x01(\x0b\x32\x33.google.internal.devtools.workerfarm.v1test1.Digest\"k\n\x0f\x43ommandOverhead\x12+\n\x08\x64uration\x18\x01 \x01(\x0b\x32\x19.google.protobuf.Duration\x12+\n\x08overhead\x18\x02 \x01(\x0b\x32\x19.google.protobuf.Duration\"\x8a\x01\n\x0c\x46ileMetadata\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x43\n\x06\x64igest\x18\x02 \x01(\x0b\x32\x33.google.internal.devtools.workerfarm.v1test1.Digest\x12\x10\n\x08\x63ontents\x18\x03 \x01(\x0c\x12\x15\n\ris_executable\x18\x04 \x01(\x08\"f\n\x11\x44irectoryMetadata\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x43\n\x06\x64igest\x18\x02 \x01(\x0b\x32\x33.google.internal.devtools.workerfarm.v1test1.Digest\"*\n\x06\x44igest\x12\x0c\n\x04hash\x18\x01 \x01(\t\x12\x12\n\nsize_bytes\x18\x02 \x01(\x03\"\xaa\x01\n\tDirectory\x12H\n\x05\x66iles\x18\x01 \x03(\x0b\x32\x39.google.internal.devtools.workerfarm.v1test1.FileMetadata\x12S\n\x0b\x64irectories\x18\x02 \x03(\x0b\x32>.google.internal.devtools.workerfarm.v1test1.DirectoryMetadatab\x06proto3')
   ,
   dependencies=[google_dot_protobuf_dot_duration__pb2.DESCRIPTOR,status__pb2.DESCRIPTOR,])
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
@@ -333,16 +333,9 @@ _COMMANDRESULT = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='output_files', full_name='google.internal.devtools.workerfarm.v1test1.CommandResult.output_files', index=2,
-      number=3, type=11, cpp_type=10, label=3,
-      has_default_value=False, default_value=[],
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='output_directories', full_name='google.internal.devtools.workerfarm.v1test1.CommandResult.output_directories', index=3,
-      number=4, type=11, cpp_type=10, label=3,
-      has_default_value=False, default_value=[],
+      name='outputs', full_name='google.internal.devtools.workerfarm.v1test1.CommandResult.outputs', index=2,
+      number=3, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
@@ -359,7 +352,7 @@ _COMMANDRESULT = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=1075,
-  serialized_end=1318,
+  serialized_end=1215,
 )
 
 
@@ -396,8 +389,8 @@ _COMMANDOVERHEAD = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1320,
-  serialized_end=1427,
+  serialized_start=1217,
+  serialized_end=1324,
 )
 
 
@@ -448,8 +441,8 @@ _FILEMETADATA = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1430,
-  serialized_end=1568,
+  serialized_start=1327,
+  serialized_end=1465,
 )
 
 
@@ -486,8 +479,8 @@ _DIRECTORYMETADATA = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1570,
-  serialized_end=1672,
+  serialized_start=1467,
+  serialized_end=1569,
 )
 
 
@@ -524,8 +517,8 @@ _DIGEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1674,
-  serialized_end=1716,
+  serialized_start=1571,
+  serialized_end=1613,
 )
 
 
@@ -562,8 +555,8 @@ _DIRECTORY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1719,
-  serialized_end=1889,
+  serialized_start=1616,
+  serialized_end=1786,
 )
 
 _COMMANDTASK_INPUTS_ENVIRONMENTVARIABLE.containing_type = _COMMANDTASK_INPUTS
@@ -582,8 +575,7 @@ _COMMANDSYNC_OUTPUTCHUNK.containing_type = _COMMANDSYNC
 _COMMANDSYNC.fields_by_name['stdout_chunk'].message_type = _COMMANDSYNC_OUTPUTCHUNK
 _COMMANDSYNC.fields_by_name['stderr_chunk'].message_type = _COMMANDSYNC_OUTPUTCHUNK
 _COMMANDRESULT.fields_by_name['status'].message_type = status__pb2._STATUS
-_COMMANDRESULT.fields_by_name['output_files'].message_type = _FILEMETADATA
-_COMMANDRESULT.fields_by_name['output_directories'].message_type = _DIRECTORYMETADATA
+_COMMANDRESULT.fields_by_name['outputs'].message_type = _DIGEST
 _COMMANDOVERHEAD.fields_by_name['duration'].message_type = google_dot_protobuf_dot_duration__pb2._DURATION
 _COMMANDOVERHEAD.fields_by_name['overhead'].message_type = google_dot_protobuf_dot_duration__pb2._DURATION
 _FILEMETADATA.fields_by_name['digest'].message_type = _DIGEST

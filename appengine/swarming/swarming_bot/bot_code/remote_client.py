@@ -199,6 +199,8 @@ class RemoteClientNative(object):
       stdout_chunk_start: Total number of stdout previously sent, for coherency
           with the server.
       params: Default JSON parameters for the POST.
+      exit_code: if None, this is an intermediate update. If non-None, this is
+          the final update.
 
     Returns:
       False if the task should stop.

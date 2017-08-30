@@ -19,7 +19,7 @@ class TaskManagerStub(object):
         request_serializer=task__manager__pb2.GetNextTaskRequest.SerializeToString,
         response_deserializer=task__manager__pb2.GetNextTaskResponse.FromString,
         )
-    self.SyncTask = channel.stream_stream(
+    self.SyncTask = channel.unary_unary(
         '/google.internal.devtools.workerfarm.v1test1.TaskManager/SyncTask',
         request_serializer=task__manager__pb2.SyncTaskRequest.SerializeToString,
         response_deserializer=task__manager__pb2.SyncTaskResponse.FromString,
@@ -38,7 +38,7 @@ class TaskManagerServicer(object):
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
 
-  def SyncTask(self, request_iterator, context):
+  def SyncTask(self, request, context):
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
@@ -56,7 +56,7 @@ def add_TaskManagerServicer_to_server(servicer, server):
           request_deserializer=task__manager__pb2.GetNextTaskRequest.FromString,
           response_serializer=task__manager__pb2.GetNextTaskResponse.SerializeToString,
       ),
-      'SyncTask': grpc.stream_stream_rpc_method_handler(
+      'SyncTask': grpc.unary_unary_rpc_method_handler(
           servicer.SyncTask,
           request_deserializer=task__manager__pb2.SyncTaskRequest.FromString,
           response_serializer=task__manager__pb2.SyncTaskResponse.SerializeToString,

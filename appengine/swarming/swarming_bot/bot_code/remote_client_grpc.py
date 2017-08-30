@@ -14,6 +14,7 @@ import logging
 import time
 
 from google.protobuf import json_format
+from proto_bot import code_pb2
 from proto_bot import command_pb2
 from proto_bot import reservation_manager_pb2
 from proto_bot import task_manager_pb2
@@ -50,6 +51,8 @@ class RemoteClientGrpc(object):
       self._proxy_rm = fake_proxy
       self._proxy_tm = fake_proxy
     else:
+      if not worker_manager_pb2_grpc:
+        raise ImportError("can't import stubs - is gRPC installed?")
       self._proxy_wm = grpc_proxy.Proxy(server,
           worker_manager_pb2_grpc.WorkerManagerStub)
       self._proxy_rm = grpc_proxy.Proxy(server,
@@ -91,13 +94,55 @@ class RemoteClientGrpc(object):
 
   def post_task_update(self, task_id, bot_id, params,
                        stdout_and_chunk=None, exit_code=None):
-    # pylint: disable=unused-argument
-    logging.warning('post_task_update(%s, %s, %s): not yet implemented',
-                    task_id, bot_id, params)
+    worker_name = self._proxy_tm.prefix + '/workers/' + bot_id
+    should_continue = True
+    # If there is stdout, send an update.
+    if stdout_and_chunk:
+      cs = command_pb2.CommandSync()
+      cs.stdout_chunk.data = stdout_and_chunk[0]
+      cs.stdout_chunk.offset = stdout_and_chunk[1]
+      ureq = task_manager_pb2.SyncTaskRequest()
+      ureq.name = task_id
+      ureq.worker_name = worker_name
+      ureq.update.Pack(cs)
+      ures = self._proxy_tm.call_unary('SyncTask', ureq)
+      should_continue = ures.ok
+
+    # If this is the last update, send a CompleteTask.
+    # Note that exit_code may be "0" which is falsey, so
+    # specifically check for None.
+    if exit_code is not None:
+      res = command_pb2.CommandResult()
+      ovh = command_pb2.CommandOverhead()
+      res.exit_code = exit_code
+      if params.get('io_timeout'):
+        res.status.code = code_pb2.UNAVAILABLE
+      elif params.get('hard_timeout'):
+        res.status.code = code_pb2.DEADLINE_EXCEEDED
+      _time_to_duration(params.get('duration'), ovh.duration)
+      _time_to_duration(params.get('bot_overhead'), ovh.overhead)
+      if 'outputs_ref' in params:
+        res.outputs.hash = params['outputs_ref']['isolated']
+        res.outputs.size_bytes = -1
+      creq = task_manager_pb2.CompleteTaskRequest()
+      creq.name = task_id
+      creq.worker_name = worker_name
+      creq.result.Pack(res)
+      creq.metadata.Pack(ovh)
+      self._proxy_tm.call_unary('CompleteTask', creq)
+
+    return should_continue
 
   def post_task_error(self, task_id, bot_id, message):
-    # pylint: disable=unused-argument
-    logging.warning('post_task_error(%s): not yet implemented', message)
+    worker_name = self._proxy_tm.prefix + '/workers/' + bot_id
+    res = command_pb2.CommandResult()
+    res.status.code = code_pb2.ABORTED
+    res.status.message = message
+    creq = task_manager_pb2.CompleteTaskRequest()
+    creq.name = task_id
+    creq.worker_name = worker_name
+    creq.result.Pack(res)
+    self._proxy_tm.call_unary('CompleteTask', creq)
 
   def do_handshake(self, attributes):
     logging.info('do_handshake(%s)', attributes)
@@ -278,3 +323,8 @@ def _device_to_new_dimensions(attributes, device):
       dims[k] = dims.get(k, [])
       dims[k].append(prop.value)
   return dims
+
+def _time_to_duration(time_f, duration):
+    duration.seconds = int(time_f)
+    duration.nanos = int(1e9 * (
+        time_f - int(time_f)))

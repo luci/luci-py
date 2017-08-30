@@ -43,8 +43,7 @@ message CommandSync {
 message CommandResult {
   google.rpc.Status status = 1;
   int32 exit_code = 2;
-  repeated FileMetadata output_files = 3;
-  repeated DirectoryMetadata output_directories = 4;
+  Digest outputs = 3;
 }
 
 message CommandOverhead {

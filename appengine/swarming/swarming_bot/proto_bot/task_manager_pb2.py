@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='task_manager.proto',
   package='google.internal.devtools.workerfarm.v1test1',
   syntax='proto3',
-  serialized_pb=_b('\n\x12task_manager.proto\x12+google.internal.devtools.workerfarm.v1test1\x1a\x19google/protobuf/any.proto\"7\n\x12GetNextTaskRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0bworker_name\x18\x02 \x01(\t\"L\n\x13GetNextTaskResponse\x12\x11\n\ttask_name\x18\x01 \x01(\t\x12\"\n\x04task\x18\x02 \x01(\x0b\x32\x14.google.protobuf.Any\"E\n\x0fSyncTaskRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\x12$\n\x06update\x18\x02 \x01(\x0b\x32\x14.google.protobuf.Any\"%\n\x10SyncTaskResponse\x12\x11\n\tcancelled\x18\x01 \x01(\x08\"q\n\x13\x43ompleteTaskRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\x12$\n\x06result\x18\x02 \x01(\x0b\x32\x14.google.protobuf.Any\x12&\n\x08metadata\x18\x03 \x01(\x0b\x32\x14.google.protobuf.Any\"\x16\n\x14\x43ompleteTaskResponse2\xc4\x03\n\x0bTaskManager\x12\x90\x01\n\x0bGetNextTask\x12?.google.internal.devtools.workerfarm.v1test1.GetNextTaskRequest\x1a@.google.internal.devtools.workerfarm.v1test1.GetNextTaskResponse\x12\x8b\x01\n\x08SyncTask\x12<.google.internal.devtools.workerfarm.v1test1.SyncTaskRequest\x1a=.google.internal.devtools.workerfarm.v1test1.SyncTaskResponse(\x01\x30\x01\x12\x93\x01\n\x0c\x43ompleteTask\x12@.google.internal.devtools.workerfarm.v1test1.CompleteTaskRequest\x1a\x41.google.internal.devtools.workerfarm.v1test1.CompleteTaskResponseb\x06proto3')
+  serialized_pb=_b('\n\x12task_manager.proto\x12+google.internal.devtools.workerfarm.v1test1\x1a\x19google/protobuf/any.proto\"7\n\x12GetNextTaskRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0bworker_name\x18\x02 \x01(\t\"L\n\x13GetNextTaskResponse\x12\x11\n\ttask_name\x18\x01 \x01(\t\x12\"\n\x04task\x18\x02 \x01(\x0b\x32\x14.google.protobuf.Any\"Z\n\x0fSyncTaskRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0bworker_name\x18\x02 \x01(\t\x12$\n\x06update\x18\x03 \x01(\x0b\x32\x14.google.protobuf.Any\"\x1e\n\x10SyncTaskResponse\x12\n\n\x02ok\x18\x01 \x01(\x08\"\x86\x01\n\x13\x43ompleteTaskRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0bworker_name\x18\x02 \x01(\t\x12$\n\x06result\x18\x03 \x01(\x0b\x32\x14.google.protobuf.Any\x12&\n\x08metadata\x18\x04 \x01(\x0b\x32\x14.google.protobuf.Any\"\x16\n\x14\x43ompleteTaskResponse2\xc0\x03\n\x0bTaskManager\x12\x90\x01\n\x0bGetNextTask\x12?.google.internal.devtools.workerfarm.v1test1.GetNextTaskRequest\x1a@.google.internal.devtools.workerfarm.v1test1.GetNextTaskResponse\x12\x87\x01\n\x08SyncTask\x12<.google.internal.devtools.workerfarm.v1test1.SyncTaskRequest\x1a=.google.internal.devtools.workerfarm.v1test1.SyncTaskResponse\x12\x93\x01\n\x0c\x43ompleteTask\x12@.google.internal.devtools.workerfarm.v1test1.CompleteTaskRequest\x1a\x41.google.internal.devtools.workerfarm.v1test1.CompleteTaskResponseb\x06proto3')
   ,
   dependencies=[google_dot_protobuf_dot_any__pb2.DESCRIPTOR,])
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
@@ -119,8 +119,15 @@ _SYNCTASKREQUEST = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='update', full_name='google.internal.devtools.workerfarm.v1test1.SyncTaskRequest.update', index=1,
-      number=2, type=11, cpp_type=10, label=1,
+      name='worker_name', full_name='google.internal.devtools.workerfarm.v1test1.SyncTaskRequest.worker_name', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='update', full_name='google.internal.devtools.workerfarm.v1test1.SyncTaskRequest.update', index=2,
+      number=3, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -138,7 +145,7 @@ _SYNCTASKREQUEST = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=229,
-  serialized_end=298,
+  serialized_end=319,
 )
 
 
@@ -150,7 +157,7 @@ _SYNCTASKRESPONSE = _descriptor.Descriptor(
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='cancelled', full_name='google.internal.devtools.workerfarm.v1test1.SyncTaskResponse.cancelled', index=0,
+      name='ok', full_name='google.internal.devtools.workerfarm.v1test1.SyncTaskResponse.ok', index=0,
       number=1, type=8, cpp_type=7, label=1,
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
@@ -168,8 +175,8 @@ _SYNCTASKRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=300,
-  serialized_end=337,
+  serialized_start=321,
+  serialized_end=351,
 )
 
 
@@ -188,15 +195,22 @@ _COMPLETETASKREQUEST = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='result', full_name='google.internal.devtools.workerfarm.v1test1.CompleteTaskRequest.result', index=1,
-      number=2, type=11, cpp_type=10, label=1,
+      name='worker_name', full_name='google.internal.devtools.workerfarm.v1test1.CompleteTaskRequest.worker_name', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='result', full_name='google.internal.devtools.workerfarm.v1test1.CompleteTaskRequest.result', index=2,
+      number=3, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='metadata', full_name='google.internal.devtools.workerfarm.v1test1.CompleteTaskRequest.metadata', index=2,
-      number=3, type=11, cpp_type=10, label=1,
+      name='metadata', full_name='google.internal.devtools.workerfarm.v1test1.CompleteTaskRequest.metadata', index=3,
+      number=4, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -213,8 +227,8 @@ _COMPLETETASKREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=339,
-  serialized_end=452,
+  serialized_start=354,
+  serialized_end=488,
 )
 
 
@@ -237,8 +251,8 @@ _COMPLETETASKRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=454,
-  serialized_end=476,
+  serialized_start=490,
+  serialized_end=512,
 )
 
 _GETNEXTTASKRESPONSE.fields_by_name['task'].message_type = google_dot_protobuf_dot_any__pb2._ANY
@@ -318,7 +332,7 @@ try:
           request_serializer=GetNextTaskRequest.SerializeToString,
           response_deserializer=GetNextTaskResponse.FromString,
           )
-      self.SyncTask = channel.stream_stream(
+      self.SyncTask = channel.unary_unary(
           '/google.internal.devtools.workerfarm.v1test1.TaskManager/SyncTask',
           request_serializer=SyncTaskRequest.SerializeToString,
           response_deserializer=SyncTaskResponse.FromString,
@@ -337,7 +351,7 @@ try:
       context.set_details('Method not implemented!')
       raise NotImplementedError('Method not implemented!')
 
-    def SyncTask(self, request_iterator, context):
+    def SyncTask(self, request, context):
       context.set_code(grpc.StatusCode.UNIMPLEMENTED)
       context.set_details('Method not implemented!')
       raise NotImplementedError('Method not implemented!')
@@ -355,7 +369,7 @@ try:
             request_deserializer=GetNextTaskRequest.FromString,
             response_serializer=GetNextTaskResponse.SerializeToString,
         ),
-        'SyncTask': grpc.stream_stream_rpc_method_handler(
+        'SyncTask': grpc.unary_unary_rpc_method_handler(
             servicer.SyncTask,
             request_deserializer=SyncTaskRequest.FromString,
             response_serializer=SyncTaskResponse.SerializeToString,
@@ -379,7 +393,7 @@ try:
     only to ease transition from grpcio<0.15.0 to grpcio>=0.15.0."""
     def GetNextTask(self, request, context):
       context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
-    def SyncTask(self, request_iterator, context):
+    def SyncTask(self, request, context):
       context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
     def CompleteTask(self, request, context):
       context.code(beta_interfaces.StatusCode.UNIMPLEMENTED)
@@ -394,8 +408,9 @@ try:
     def GetNextTask(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
       raise NotImplementedError()
     GetNextTask.future = None
-    def SyncTask(self, request_iterator, timeout, metadata=None, with_call=False, protocol_options=None):
+    def SyncTask(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
       raise NotImplementedError()
+    SyncTask.future = None
     def CompleteTask(self, request, timeout, metadata=None, with_call=False, protocol_options=None):
       raise NotImplementedError()
     CompleteTask.future = None
@@ -420,7 +435,7 @@ try:
     method_implementations = {
       ('google.internal.devtools.workerfarm.v1test1.TaskManager', 'CompleteTask'): face_utilities.unary_unary_inline(servicer.CompleteTask),
       ('google.internal.devtools.workerfarm.v1test1.TaskManager', 'GetNextTask'): face_utilities.unary_unary_inline(servicer.GetNextTask),
-      ('google.internal.devtools.workerfarm.v1test1.TaskManager', 'SyncTask'): face_utilities.stream_stream_inline(servicer.SyncTask),
+      ('google.internal.devtools.workerfarm.v1test1.TaskManager', 'SyncTask'): face_utilities.unary_unary_inline(servicer.SyncTask),
     }
     server_options = beta_implementations.server_options(request_deserializers=request_deserializers, response_serializers=response_serializers, thread_pool=pool, thread_pool_size=pool_size, default_timeout=default_timeout, maximum_timeout=maximum_timeout)
     return beta_implementations.server(method_implementations, options=server_options)
@@ -445,7 +460,7 @@ try:
     cardinalities = {
       'CompleteTask': cardinality.Cardinality.UNARY_UNARY,
       'GetNextTask': cardinality.Cardinality.UNARY_UNARY,
-      'SyncTask': cardinality.Cardinality.STREAM_STREAM,
+      'SyncTask': cardinality.Cardinality.UNARY_UNARY,
     }
     stub_options = beta_implementations.stub_options(host=host, metadata_transformer=metadata_transformer, request_serializers=request_serializers, response_deserializers=response_deserializers, thread_pool=pool, thread_pool_size=pool_size)
     return beta_implementations.dynamic_stub(channel, 'google.internal.devtools.workerfarm.v1test1.TaskManager', cardinalities, options=stub_options)
