@@ -346,7 +346,7 @@ class AdbCommandsSafe(object):
             break
     return False
 
-  def Reboot(self, wait=True):
+  def Reboot(self, wait=True, force=False):
     """Reboots the device. Waits for it to be rebooted but not fully
     operational.
 
@@ -355,6 +355,14 @@ class AdbCommandsSafe(object):
 
     The caller will likely want to call self.Root() to switch adbd to root
     context if desired.
+
+    Arguments:
+    - wait: If true, attempts to reconnect to the device after sending the
+        reboot. Otherwise, exit early.
+    - force: If true, attempts to force a reboot via the /proc/sysrq-trigger
+        file if the initial command fails. See
+        https://android.googlesource.com/kernel/common/+/android-3.10.y/Documentation/sysrq.txt
+        for more info.
 
     Returns True on success.
     """
@@ -374,6 +382,7 @@ class AdbCommandsSafe(object):
         if not previous_uptime:
           return False
 
+      start = time.time()
       if not self._Reboot():
         return False
 
@@ -381,16 +390,30 @@ class AdbCommandsSafe(object):
       # always take several tens of seconds at best.
       time.sleep(5.)
 
-      i = 0
-      for i in self._Loop(timeout=60000):
-        if not self._Reconnect(True, timeout=60000):
-          continue
-        uptime = self.GetUptime()
-        if uptime and uptime < previous_uptime:
-          return True
-        time.sleep(0.1)
+      def _wait_to_bootup():
+        for _ in self._Loop(timeout=60000):
+          if not self._Reconnect(True, timeout=60000):
+            continue
+          uptime = self.GetUptime()
+          if uptime and uptime < previous_uptime:
+            return True
+          time.sleep(0.1)
+        return False
+
+      if _wait_to_bootup():
+        return True
+
+      if force:
+        if self.IsRoot() or self.Root():
+          # Ignore exit code and stdout/stderr since this will theoretically
+          # cause the device to immediately reboot.
+          self.Shell('echo b > /proc/sysrq-trigger')
+          if _wait_to_bootup():
+            return True
+
       _LOG.error(
-          '%s.Reboot(): Failed to reboot after %d tries', self.port_path, i+1)
+          '%s.Reboot(): Failed to reboot after %.2fs', self.port_path,
+          time.time() - start)
     return False
 
   def Remount(self):

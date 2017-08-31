@@ -444,13 +444,21 @@ class HighDevice(object):
   def PushContent(self, *args, **kwargs):
     return self._device.PushContent(*args, **kwargs)
 
-  def Reboot(self, wait=True):
+  def Reboot(self, wait=True, force=False):
     """Reboots the phone then Waits for the device to come back.
 
     adbd running on the phone will likely not be in Root(), so the caller should
     call Root() right afterward if desired.
+
+    Arguments:
+    - wait: If true, attempts to reconnect to the device after sending the
+        reboot. Otherwise, exit early.
+    - force: If true, attempts to force a reboot via the /proc/sysrq-trigger
+        file if the initial command fails. See
+        https://android.googlesource.com/kernel/common/+/android-3.10.y/Documentation/sysrq.txt
+        for more info.
     """
-    if not self._device.Reboot(wait=wait):
+    if not self._device.Reboot(wait=wait, force=force):
       return False
     return self.WaitUntilFullyBooted() if wait else True
 
