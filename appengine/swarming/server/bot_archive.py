@@ -96,8 +96,6 @@ FILES = (
     'infra_libs/ts_mon/protos/timestamp_pb2.py',
     'infra_libs/utils.py',
     'libs/__init__.py',
-    'libs/arfile/__init__.py',
-    'libs/arfile/arfile.py',
     'libs/luci_context/__init__.py',
     'libs/luci_context/luci_context.py',
     'proto_bot/__init__.py',
