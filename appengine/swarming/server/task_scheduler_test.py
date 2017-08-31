@@ -927,6 +927,29 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_bot_update_io_timeout(self):
     self._bot_update_timeouts(False, True)
 
+  def test_task_priority(self):
+    # Create N tasks of various priority not in order.
+    priorities = [200, 100, 20, 30, 50, 40, 199]
+    # Call the expected ordered list out for clarity.
+    expected = [20, 30, 40, 50, 100, 199, 200]
+    self.assertEqual(expected, sorted(priorities))
+
+    self._register_bot(self.bot_dimensions, nb_task=0)
+    # Triggers many tasks of different priorities.
+    for i, p in enumerate(priorities):
+      self._quick_schedule(priority=p, nb_task=int(not i))
+    self.assertEqual(0, self.execute_tasks())
+
+    # Make sure they are scheduled in priority order. Bot polling should hand
+    # out tasks in the expected order. In practice the order is not 100%
+    # deterministic when running on GAE but it should be deterministic in the
+    # unit test.
+    for i, e in enumerate(expected):
+      request, _, _ = task_scheduler.bot_reap_task(
+          self.bot_dimensions, 'abc', None)
+      self.assertEqual(request.priority, e)
+    self.assertEqual(0, self.execute_tasks())
+
   def test_bot_kill_task(self):
     pub_sub_calls = self.mock_pub_sub()
     request = self._gen_request(pubsub_topic='projects/abc/topics/def')
