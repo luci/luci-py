@@ -943,23 +943,11 @@ def init_new_request(request, allow_high_priority, secret_bytes_ent):
   if request.properties.idempotent is None:
     request.properties.idempotent = False
 
-  # TODO(crbug.com/731847): Remove this once 'service_account_token' is removed
-  # from the Endpoints API. When this happens, service_account_token will be
-  # None here.
-  if request.service_account_token:
-    if request.service_account:
-      raise ValueError(
-          'Please use only "service_account", not "service_account_token" and '
-          '"service_account" both')
-    if request.service_account_token not in ('bot', 'none'):
-      raise ValueError('"service_account_token" can be only "bot" or "none"')
-    request.service_account = request.service_account_token
-    request.service_account_token = None
-
-  # Here request.service_account can be 'none', 'bot' or an <email>. When using
-  # <email>, callers of 'init_new_request' are expected to generate new service
-  # account token (by making an RPC to the token server) and put it into
-  # TaskRequest before storing it.
+  # Convert None to 'none', to make it indexable. Here request.service_account
+  # can be 'none', 'bot' or an <email>. When using <email>, callers of
+  # 'init_new_request' are expected to generate new service account token
+  # (by making an RPC to the token server) and put it into service_account_token
+  # before storing it.
   request.service_account = request.service_account or 'none'
   request.service_account_token = None
 

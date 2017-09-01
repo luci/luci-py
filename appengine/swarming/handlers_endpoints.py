@@ -378,12 +378,6 @@ class SwarmingTasksService(remote.Service):
     if sb is not None:
       request.properties.secret_bytes = sb
 
-    # TODO(crbug.com/731847): Remove this once 'service_account_token' is no
-    # longer part of public API. This log lines allow us to easily identify API
-    # users that still use this field.
-    if request.service_account_token:
-      logging.warning('crbug.com/731847: service_account_token is deprecated')
-
     try:
       request, secret_bytes = message_conversion.new_task_request_from_rpc(
           request, utils.utcnow())

@@ -273,16 +273,14 @@ class NewTaskRequest(messages.Message):
   # TODO(vadimsh): Link to a doc that describes Swarming Service Accounts, when
   # it exists.
   service_account = messages.StringField(8)
-  # DEPRECATED. Use 'service_account' instead.
-  service_account_token = messages.StringField(9)
 
   # Full topic name to post task state updates to, e.g.
   # "projects/<id>/topics/<id>".
-  pubsub_topic = messages.StringField(10)
+  pubsub_topic = messages.StringField(9)
   # Secret string to put into "auth_token" attribute of PubSub message.
-  pubsub_auth_token = messages.StringField(11)
+  pubsub_auth_token = messages.StringField(10)
   # Will be but into "userdata" fields of PubSub message.
-  pubsub_userdata = messages.StringField(12)
+  pubsub_userdata = messages.StringField(11)
 
 
 class TaskRequest(messages.Message):
