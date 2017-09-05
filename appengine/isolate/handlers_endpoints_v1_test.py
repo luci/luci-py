@@ -114,7 +114,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
   """Test the IsolateService's API methods."""
 
   api_service_cls = handlers_endpoints_v1.IsolateService
-  store_prefix = 'https://sample-app.storage.googleapis.com/'
+  store_prefix = 'https://storage.googleapis.com/sample-app/'
 
   APP_DIR = test_env.APP_DIR
 

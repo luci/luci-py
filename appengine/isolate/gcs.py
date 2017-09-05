@@ -263,7 +263,7 @@ class URLSigner(object):
   DEFAULT_EXPIRATION = datetime.timedelta(hours=4)
 
   # Google Storage URL template for a singed link.
-  GS_URL = 'https://%(bucket)s.storage.googleapis.com/%(filename)s?%(query)s'
+  GS_URL = 'https://storage.googleapis.com/%(bucket)s/%(filename)s?%(query)s'
 
   # True if switched to a local dev mode.
   DEV_MODE_ENABLED = False
