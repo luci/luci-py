@@ -123,7 +123,7 @@ class TestOsUtilities(auto_stub.TestCase):
     actual.pop('temp', None)
     expected = {
       u'audio', u'cost_usd_hour', u'cpu_name', u'cwd', u'disks', u'gpu', u'ip',
-      u'hostname', u'nb_files_in_temp', u'pid', u'ram',
+      u'hostname', u'nb_files_in_temp', u'pid', u'python', u'ram',
       u'running_time', u'ssd', u'started_ts', u'uptime', u'user',
     }
     if sys.platform in ('cygwin', 'win32'):
