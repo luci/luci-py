@@ -236,6 +236,7 @@ class Agent(object):
     with open(self.AGENT_AUTOSTART_TEMPLATE) as f:
       config = f.read() % {
           'agent': os.path.abspath(__file__),
+          'python': sys.executable,
           'user': self.user,
       }
 
@@ -294,6 +295,7 @@ class Agent(object):
 
     with open(self.SWARMING_AUTOSTART_TEMPLATE) as f:
       config = f.read() % {
+          'python': sys.executable,
           'user': self.user,
           'zip': path,
       }
