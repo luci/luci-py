@@ -1022,6 +1022,11 @@ def get_state():
     u'cost_usd_hour': get_cost_hour(),
     u'cwd': os.getcwd(),
     u'disks': get_disks_info(),
+    # Only including a subset of the environment variable, as state is not
+    # designed to sustain large load at the moment.
+    u'env': {
+      u'PATH': os.environ[u'PATH'],
+    },
     u'gpu': get_gpu()[1],
     u'hostname': get_hostname(),
     u'ip': get_ip(),
