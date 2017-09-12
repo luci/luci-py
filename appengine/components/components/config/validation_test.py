@@ -7,12 +7,12 @@ import logging
 import re
 import sys
 import unittest
-import yaml
 
 from test_support import test_env
 test_env.setup_test_env()
 
 import mock
+import yaml
 
 from components.config import test_config_pb2
 from components.config import validation

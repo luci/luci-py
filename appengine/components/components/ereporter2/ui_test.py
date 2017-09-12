@@ -116,8 +116,7 @@ class Ereporter2Test(test_case.TestCase):
 
     # Verify the email that was sent.
     messages = self.mail_stub.get_sent_messages()
-    self.assertEqual(1, len(messages))
-    message = messages[0]
+    message = messages[-1]
     self.assertFalse(hasattr(message, 'to'))
     self.assertContent(message)
 

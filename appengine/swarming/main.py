@@ -13,13 +13,14 @@ import os
 import sys
 
 import endpoints
-import gae_ts_mon
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
 
 from components import ereporter2
 from components import utils
+
+import gae_ts_mon
 
 import event_mon_metrics
 import handlers_backend

@@ -7,19 +7,6 @@ import logging
 import os
 import sys
 
-# Since event_mon depends on ts_mon, we reuse module setup (__init__.py) from
-# the gae_ts_mon, which configures infra_libs as if it was imported directly.
-# We expect the users of gae_event_mon to symlink both this and gae_ts_mon
-# modules into their apps.
-import gae_ts_mon
-
-# Additional infra_libs configuration for event_mon.
-import infra_libs.ts_mon.httplib2_utils
-sys.modules['infra_libs'].InstrumentedHttp = (
-    infra_libs.ts_mon.httplib2_utils.InstrumentedHttp)
-sys.modules['infra_libs'].event_mon = sys.modules[__package__]
-sys.modules['infra_libs.event_mon'] = sys.modules[__package__]
-
 from google.appengine.api import modules
 from google.appengine.api.app_identity import app_identity
 
@@ -34,19 +21,20 @@ def initialize(service_name):
     hostname = '%s, %s' % (modules.get_current_module_name(),
                            modules.get_current_version_name())
 
+  from infra_libs.event_mon import config
   # Only send events if we are running on the actual AppEngine.
   if os.environ.get('SERVER_SOFTWARE', '').startswith('Google App Engine'):
     run_type = 'prod'  # pragma: no cover
   else:
     run_type = 'dry'
 
-  config.setup_monitoring(run_type, hostname, service_name, appengine_name)
+  config.setup_monitoring(
+      run_type, hostname, service_name, appengine_name)
   logging.info(
       'Initialized event_mon with run_type=%s, hostname=%s, service_name=%s, '
       'appengine_name=%s', run_type, hostname, service_name, appengine_name)
 
 # The remaining lines are copied from infra_libs/event_mon/__init__.py.
-from infra_libs.event_mon.config import add_argparse_options
 from infra_libs.event_mon.config import close
 from infra_libs.event_mon.config import set_default_event, get_default_event
 from infra_libs.event_mon.config import process_argparse_options

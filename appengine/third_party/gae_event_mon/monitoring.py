@@ -1,1 +1,0 @@
-../../../client/third_party/infra_libs/event_mon/monitoring.py

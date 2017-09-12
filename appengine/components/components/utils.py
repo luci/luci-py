@@ -712,11 +712,21 @@ def get_token_fingerprint(blob):
 
 
 def fix_protobuf_package():
-  """Modifies 'google' package to include path to 'google.protobuf' package."""
+  """Modifies 'google' package to include path to 'google.protobuf' package.
+
+  Prefer our own proto package on the server. Note that this functions is not
+  used on the Swarming bot nor any other client.
+  """
+  # google.__path__[0] will be google_appengine/google.
   import google
-  protobuf_pkg = os.path.join(THIS_DIR, 'third_party', 'protobuf', 'google')
-  if protobuf_pkg not in google.__path__:
-    google.__path__.insert(0, protobuf_pkg)
+  if len(google.__path__) > 1:
+    return
+
+  # We do not mind what 'google' get used, inject protobuf in there.
+  path = os.path.join(THIS_DIR, 'third_party', 'protobuf', 'google')
+  google.__path__.append(path)
+
+  # six is needed for oauth2client and webtest (local testing).
   six_path = os.path.join(THIS_DIR, 'third_party', 'six')
   if six_path not in sys.path:
     sys.path.insert(0, six_path)

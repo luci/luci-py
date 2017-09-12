@@ -29,6 +29,8 @@ includes:
 libraries:
 - name: endpoints
   version: "1.0"
+- name: ssl
+  version: "2.7.11"
 - name: webapp2
   version: "2.5.2"
 - name: webob

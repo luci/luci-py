@@ -2,43 +2,18 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import google  # provided by GAE
 import imp
 import os
 import sys
 
-# Adds third_party to sys.path so the packages inside work.  Do not
-# import third_party directly - it mysteriously flakes on GAE under
-# heavy load.
-third_party_dir = os.path.join(os.path.dirname(__file__), 'third_party')
-if third_party_dir not in sys.path:  # pragma: no cover
-  sys.path.insert(0, third_party_dir)
-
-# Add the gae_ts_mon/protobuf directory into the path for the google package, so
-# "import google.protobuf" works.
-protobuf_dir = os.path.join(os.path.dirname(__file__), 'protobuf')
-google.__path__.append(os.path.join(protobuf_dir, 'google'))
-sys.path.insert(0, protobuf_dir)
-
-# Pretend that we are the infra_libs.ts_mon package, so users can use the same
-# import lines in gae and non-gae code.
-if 'infra_libs' not in sys.modules:  # pragma: no cover
-  sys.modules['infra_libs'] = imp.new_module('infra_libs')
-
-sys.modules['infra_libs'].ts_mon = sys.modules[__package__]
-sys.modules['infra_libs.ts_mon'] = sys.modules[__package__]
-
-# Put the httplib2_utils package into infra_lib directly.
-import infra_libs.ts_mon.httplib2_utils
-sys.modules['infra_libs'].httplib2_utils = infra_libs.ts_mon.httplib2_utils
-sys.modules['infra_libs.httplib2_utils'] = infra_libs.ts_mon.httplib2_utils
+import infra_libs.httplib2_utils
 
 from config import DjangoMiddleware
 from config import initialize
 from config import instrument_endpoint
 from config import instrument_wsgi_application
 from config import reset_for_unittest
-from infra_libs.ts_mon.handlers import app
+from handlers import app
 
 # The remaining lines are copied from infra_libs/ts_mon/__init__.py.
 from infra_libs.ts_mon.common.distribution import Distribution
