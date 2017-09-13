@@ -128,12 +128,22 @@ class TaskRequestPrivateTest(TestCase):
         Prop(), '0123456789012345678901234567890123456789')
     task_request._validate_isolated(
         Prop(), '0123456789012345678901234567890123abcdef')
+    task_request._validate_isolated(
+        Prop(), '0123456789abcdef'*4)
+    task_request._validate_isolated(
+        Prop(), '0123456789abcdef'*8)
     with self.assertRaises(datastore_errors.BadValueError):
       task_request._validate_isolated(
           Prop(), '123456789012345678901234567890123456789')
     with self.assertRaises(datastore_errors.BadValueError):
       task_request._validate_isolated(
           Prop(), 'g123456789012345678901234567890123456789')
+    with self.assertRaises(datastore_errors.BadValueError):
+      task_request._validate_isolated(
+          Prop(), '0123456789abcdef'*3)
+    with self.assertRaises(datastore_errors.BadValueError):
+      task_request._validate_isolated(
+          Prop(), '0123456789abcdef'*9)
 
 
 class TaskRequestApiTest(TestCase):

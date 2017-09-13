@@ -119,10 +119,19 @@ def _get_validate_length(maximum):
 
 
 def _validate_isolated(prop, value):
-  if value:
-    if not _HASH_CHARS.issuperset(value) or len(value) != 40:
-      raise datastore_errors.BadValueError(
-          '%s must be lowercase hex of length 40, not %s' % (prop._name, value))
+  if not value:
+    return
+
+  if not _HASH_CHARS.issuperset(value):
+    raise datastore_errors.BadValueError(
+        '%s must be lowercase hex, not %s' %
+        (prop._name, value))
+
+  length = len(value)
+  if length not in (40, 64, 128):
+    raise datastore_errors.BadValueError(
+        '%s must be lowercase hex of length 40, 64 or 128, but length is %d' %
+        (prop._name, length))
 
 
 def _validate_url(prop, value):

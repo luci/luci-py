@@ -267,6 +267,13 @@ class RemoteClientGrpc(object):
     """
     command = command_pb2.CommandTask()
     lease.task.Unpack(command)
+
+    # TODO(aludwin): Pass the namespace through the proxy. Using
+    # proxy hardcoded values for now.
+    inferred_namespace = 'default-gzip'
+    if len(command.inputs.files[0].hash) == 64:
+      inferred_namespace = 'sha-256-flat'
+
     manifest = {
       'bot_id': self._bot_id_from_worker(worker),
       'dimensions' : {
@@ -280,7 +287,7 @@ class RemoteClientGrpc(object):
       'hard_timeout': int(command.timeouts.execution.seconds),
       'io_timeout': int(command.timeouts.io.seconds),
       'isolated': {
-        'namespace': 'default-gzip',
+        'namespace': inferred_namespace,
         'input' : command.inputs.files[0].hash,
         'server': self._server,
       },

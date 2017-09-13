@@ -457,6 +457,7 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     logging.info('cmd=%s', cmd)
     logging.info('cwd=%s', work_dir)
     logging.info('env=%s', env)
+    logging.info('args=%s', args)
     fail_on_start = lambda exit_code, stdout: fail_without_command(
         remote, bot_id, task_id, params, cost_usd_hour, task_start,
         exit_code, stdout)
