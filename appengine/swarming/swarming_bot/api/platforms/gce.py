@@ -182,6 +182,32 @@ def get_machine_type():
 
 
 @tools.cached
+def get_cpuinfo():
+  """Returns the GCE CPU information as reported by GCE instance metadata."""
+  metadata = get_metadata()
+  if not metadata:
+    return None
+  cpu_platform = unicode(metadata['instance']['cpuPlatform'])
+  if not cpu_platform:
+    return None
+  # Normalize according to the expected name as reported by the CPUID
+  # instruction. Sadly what GCE metadata reports is a 'creative' name that bears
+  # no relation with what CPUID reports.
+  #
+  # Fake it based on the expected names reported at
+  # https://cloud.google.com/compute/docs/instances/specify-min-cpu-platform#availablezones
+  #
+  # TODO: Update once we get other platforms. We don't know in advance what
+  # 'creative' names will be used so better to fail explicitly and fix it right
+  # away.
+  assert cpu_platform.startswith(u'Intel '), cpu_platform
+  return {
+    u'model': u'Intel(R) Xeon(R) CPU %s GCE' % cpu_platform[len(u'Intel '):],
+    u'vendor': u'GenuineIntel',
+  }
+
+
+@tools.cached
 def get_tags():
   """Returns a list of instance tags or empty list if not GCE VM."""
   return get_metadata()['instance']['tags']
