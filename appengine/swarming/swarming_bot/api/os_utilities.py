@@ -612,6 +612,15 @@ def get_named_caches():
     return []
 
 
+@tools.cached
+def get_python_packages():
+  """Returns the list of third party python packages."""
+  try:
+    return unicode(subprocess.check_output(['pip', 'freeze'])).splitlines()
+  except (subprocess.CalledProcessError, OSError):
+    return None
+
+
 class AuthenticatedHttpRequestFailure(Exception):
   pass
 
@@ -942,6 +951,7 @@ def get_dimensions():
     u'os': get_os_values(),
     # This value is frequently overridden by bots.cfg via luci-config.
     u'pool': [u'default'],
+    u'python': [unicode(sys.version).split()[0]],
   }
 
   # Conditional dimensions:
@@ -1039,7 +1049,11 @@ def get_state():
     u'ip': get_ip(),
     u'nb_files_in_temp': nb_files_in_temp,
     u'pid': os.getpid(),
-    u'python': [unicode(sys.executable), unicode(sys.version)],
+    u'python': {
+      u'executable': unicode(sys.executable),
+      u'packages': get_python_packages(),
+      u'version': unicode(sys.version),
+    },
     u'ram': get_physical_ram(),
     u'running_time': int(round(time.time() - _STARTED_TS)),
     u'ssd': list(get_ssd()),

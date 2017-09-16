@@ -112,7 +112,7 @@ class TestOsUtilities(auto_stub.TestCase):
     # Only set on machines with SSD
     if sys.platform in ('darwin', 'linux2'):
       actual.discard(u'ssd')
-    expected = {u'cores', u'cpu', u'gpu', u'id', u'os', u'pool'}
+    expected = {u'cores', u'cpu', u'gpu', u'id', u'os', u'pool', u'python'}
     if sys.platform in ('linux2'):
       actual.discard(u'kvm')
     if sys.platform == 'darwin':
@@ -134,6 +134,8 @@ class TestOsUtilities(auto_stub.TestCase):
       expected.add(u'xcode')
     if sys.platform == 'win32':
       expected.add(u'integrity')
+    if u'quarantined' in actual:
+      self.fail(actual[u'quarantined'])
     self.assertEqual(expected, set(actual))
 
   def test_setup_auto_startup_win(self):
