@@ -503,7 +503,8 @@ class AdbCommandsSafe(object):
     # The adb protocol doesn't return the exit code, so embed it inside the
     # command.
     assert self.IsShellOk(cmd), 'Command is too long: %r' % cmd
-    timeout_ms = max(timeout_ms, self._default_timeout_ms)
+    if timeout_ms is None:
+      timeout_ms = self._default_timeout_ms
     out = self._adb_cmd.Shell(
         cmd + self._SHELL_SUFFIX,
         timeout_ms=timeout_ms).decode('utf-8', 'replace')
