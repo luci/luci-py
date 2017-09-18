@@ -783,8 +783,15 @@ def bot_update_task(
     smry, run_result, error = datastore_utils.transaction(run)
   except datastore_utils.CommitError as e:
     logging.info('Got commit error: %s', e)
-    # It is important that the caller correctly surface this error.
+    # It is important that the caller correctly surface this error as the bot
+    # will retry on HTTP 500.
     return None
+  if smry and smry.state != task_result.State.RUNNING:
+    # Take no chance and explicitly clear the ndb memcache entry. A very rare
+    # race condition is observed where a stale version of the entities it kept
+    # in memcache.
+    ndb.get_context()._clear_memcache(
+        [result_summary_key, run_result_key]).check_success()
   assert bool(error) != bool(run_result), (error, run_result)
   if error:
     logging.error('Task %s %s', packed, error)
