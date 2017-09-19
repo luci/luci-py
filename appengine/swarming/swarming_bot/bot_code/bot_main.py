@@ -103,13 +103,17 @@ DEFAULT_SETTINGS = {
   },
 }
 
+# Keep in sync with ../../ts_mon_metrics.py
+_IGNORED_DIMENSIONS = ('android_devices', 'caches', 'id')
+
+
 ### Monitoring
 
 
 _bucketer = ts_mon.GeometricBucketer(growth_factor=10**0.07,
                                      num_finite_buckets=100)
 
-hooks_durations = ts_mon.CumulativeDistributionMetric(
+_hooks_durations = ts_mon.CumulativeDistributionMetric(
     'swarming/bots/hooks/durations',
     'Duration of bot hook calls in ms', [
         ts_mon.StringField('hookname'),
@@ -119,12 +123,18 @@ hooks_durations = ts_mon.CumulativeDistributionMetric(
     units=ts_mon.MetricsDataUnits.MILLISECONDS)
 
 
-def _flatten_dimensions(dimensions):
+def _pool_from_dimensions(dimensions):
   """Return a canonical string of flattened dimensions."""
-  iterables = (['%s:%s' % (key, x) for x in values]
-               for key, values in dimensions.iteritems()
-               if key not in ('android_devices', 'id'))
-  return '|'.join(sorted(itertools.chain(*iterables)))
+  # Keep in sync with ../../ts_mon_metrics.py
+  pairs = []
+  for key, values in dimensions.iteritems():
+    if key in _IGNORED_DIMENSIONS:
+      continue
+    # Strip all the prefixes of other values. values is already sorted.
+    for i, value in enumerate(values):
+      if not any(v.startswith(value) for v in values[i+1:]):
+        pairs.append(u'%s:%s' % (key, value))
+  return u'|'.join(sorted(pairs))
 
 
 def monitor_call(func):
@@ -136,10 +146,11 @@ def monitor_call(func):
     finally:
       duration = max(0, (time.time() - start) * 1000)
       if botobj and botobj.dimensions:
-        flat_dims = _flatten_dimensions(botobj.dimensions)
+        flat_dims = _pool_from_dimensions(botobj.dimensions)
         if flat_dims:
-          hooks_durations.add(
-              duration, fields={'hookname': name, 'pool': flat_dims})
+          logging.info('ts_mon hook_name=%r pool=%r', name, flat_dims)
+          _hooks_durations.add(
+              duration, fields={u'hookname': name, u'pool': flat_dims})
       logging.info('%s(): %gs', name, round(duration/1000., 3))
   return hook
 

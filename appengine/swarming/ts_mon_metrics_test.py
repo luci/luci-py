@@ -72,9 +72,10 @@ class TestMetrics(test_case.TestCase):
         u'os': [u'Linux', u'Ubuntu', u'Ubuntu-14.04'],
         u'cpu': [u'x86', u'x86-64'],
     }
-    dimensions.update({k: 'ignored' for k in ts_mon_metrics.IGNORED_DIMENSIONS})
+    dimensions.update(
+        {k: 'ignored' for k in ts_mon_metrics._IGNORED_DIMENSIONS})
     expected = u'cpu:x86-64|os:Linux|os:Ubuntu-14.04'
-    self.assertEqual(expected, ts_mon_metrics.pool_from_dimensions(dimensions))
+    self.assertEqual(expected, ts_mon_metrics._pool_from_dimensions(dimensions))
 
   def test_shard_params(self):
     payload = {
@@ -83,14 +84,14 @@ class TestMetrics(test_case.TestCase):
         'task_count': 2,
         'count': 42,
     }
-    params = ts_mon_metrics.ShardParams(json.dumps(payload))
+    params = ts_mon_metrics._ShardParams(json.dumps(payload))
     self.assertEqual(json.loads(params.json()), payload)
 
   def test_shard_params_fail(self):
-    with self.assertRaises(ts_mon_metrics.ShardException):
-      ts_mon_metrics.ShardParams('invalid}')
+    with self.assertRaises(ValueError):
+      ts_mon_metrics._ShardParams('invalid}')
 
-  def test_update_jobs_completed_metrics(self):
+  def test_on_task_completed(self):
     tags = [
         'project:test_project',
         'subproject:test_subproject',
@@ -109,23 +110,23 @@ class TestMetrics(test_case.TestCase):
     summary.duration = 42
 
     fields['result'] = 'success'
-    self.assertIsNone(ts_mon_metrics.jobs_completed.get(fields=fields))
-    ts_mon_metrics.update_jobs_completed_metrics(summary)
-    self.assertEqual(1, ts_mon_metrics.jobs_completed.get(fields=fields))
+    self.assertIsNone(ts_mon_metrics._jobs_completed.get(fields=fields))
+    ts_mon_metrics.on_task_completed(summary)
+    self.assertEqual(1, ts_mon_metrics._jobs_completed.get(fields=fields))
 
     summary.exit_code = 1 # sets failure = True.
     fields['result'] = 'failure'
-    self.assertIsNone(ts_mon_metrics.jobs_completed.get(fields=fields))
-    ts_mon_metrics.update_jobs_completed_metrics(summary)
-    self.assertEqual(1, ts_mon_metrics.jobs_completed.get(fields=fields))
+    self.assertIsNone(ts_mon_metrics._jobs_completed.get(fields=fields))
+    ts_mon_metrics.on_task_completed(summary)
+    self.assertEqual(1, ts_mon_metrics._jobs_completed.get(fields=fields))
 
     summary.internal_failure = True
     fields['result'] = 'infra-failure'
-    self.assertIsNone(ts_mon_metrics.jobs_completed.get(fields=fields))
-    ts_mon_metrics.update_jobs_completed_metrics(summary)
-    self.assertEqual(1, ts_mon_metrics.jobs_completed.get(fields=fields))
+    self.assertIsNone(ts_mon_metrics._jobs_completed.get(fields=fields))
+    ts_mon_metrics.on_task_completed(summary)
+    self.assertEqual(1, ts_mon_metrics._jobs_completed.get(fields=fields))
 
-  def test_update_jobs_requested_metrics(self):
+  def test_on_task_requested(self):
     tags = [
         'project:test_project',
         'subproject:test_subproject',
@@ -142,14 +143,14 @@ class TestMetrics(test_case.TestCase):
     summary = _gen_task_result_summary(self.now, 1, tags=tags)
 
     fields['deduped'] = True
-    self.assertIsNone(ts_mon_metrics.jobs_requested.get(fields=fields))
-    ts_mon_metrics.update_jobs_requested_metrics(summary, deduped=True)
-    self.assertEqual(1, ts_mon_metrics.jobs_requested.get(fields=fields))
+    self.assertIsNone(ts_mon_metrics._jobs_requested.get(fields=fields))
+    ts_mon_metrics.on_task_requested(summary, deduped=True)
+    self.assertEqual(1, ts_mon_metrics._jobs_requested.get(fields=fields))
 
     fields['deduped'] = False
-    self.assertIsNone(ts_mon_metrics.jobs_requested.get(fields=fields))
-    ts_mon_metrics.update_jobs_requested_metrics(summary, deduped=False)
-    self.assertEqual(1, ts_mon_metrics.jobs_requested.get(fields=fields))
+    self.assertIsNone(ts_mon_metrics._jobs_requested.get(fields=fields))
+    ts_mon_metrics.on_task_requested(summary, deduped=False)
+    self.assertEqual(1, ts_mon_metrics._jobs_requested.get(fields=fields))
 
   def test_initialize(self):
     # Smoke test for syntax errors.
@@ -203,34 +204,34 @@ class TestMetrics(test_case.TestCase):
         'subproject_id': 'test_subproject',
         'spec_name': 'test_master:test_builder',
     }
-    jobs_target_fields = dict(ts_mon_metrics.TARGET_FIELDS)
+    jobs_target_fields = dict(ts_mon_metrics._TARGET_FIELDS)
     jobs_target_fields['hostname'] = 'autogen:test_bot1'
 
-    self.assertTrue(ts_mon_metrics.jobs_running.get(
+    self.assertTrue(ts_mon_metrics._jobs_running.get(
         fields=jobs_fields, target_fields=jobs_target_fields))
     jobs_target_fields['hostname'] = 'autogen:test_bot2'
-    self.assertFalse(ts_mon_metrics.jobs_running.get(
+    self.assertFalse(ts_mon_metrics._jobs_running.get(
         fields=jobs_fields, target_fields=jobs_target_fields))
     jobs_fields['status'] = 'running'
-    self.assertEqual(1, ts_mon_metrics.jobs_active.get(
-        fields=jobs_fields, target_fields=ts_mon_metrics.TARGET_FIELDS))
+    self.assertEqual(1, ts_mon_metrics._jobs_active.get(
+        fields=jobs_fields, target_fields=ts_mon_metrics._TARGET_FIELDS))
     jobs_fields['status'] = 'pending'
-    self.assertEqual(2, ts_mon_metrics.jobs_active.get(
-        fields=jobs_fields, target_fields=ts_mon_metrics.TARGET_FIELDS))
+    self.assertEqual(2, ts_mon_metrics._jobs_active.get(
+        fields=jobs_fields, target_fields=ts_mon_metrics._TARGET_FIELDS))
 
-    self.assertEqual(900, ts_mon_metrics.jobs_pending_durations.get(
-        fields=jobs_fields, target_fields=ts_mon_metrics.TARGET_FIELDS).sum)
-    self.assertEqual(600, ts_mon_metrics.jobs_max_pending_duration.get(
-        fields=jobs_fields, target_fields=ts_mon_metrics.TARGET_FIELDS))
+    self.assertEqual(900, ts_mon_metrics._jobs_pending_durations.get(
+        fields=jobs_fields, target_fields=ts_mon_metrics._TARGET_FIELDS).sum)
+    self.assertEqual(600, ts_mon_metrics._jobs_max_pending_duration.get(
+        fields=jobs_fields, target_fields=ts_mon_metrics._TARGET_FIELDS))
 
     for bot_id, status in bots_expected.iteritems():
-      target_fields = dict(ts_mon_metrics.TARGET_FIELDS)
+      target_fields = dict(ts_mon_metrics._TARGET_FIELDS)
       target_fields['hostname'] = 'autogen:' + bot_id
-      self.assertEqual(status, ts_mon_metrics.executors_status.get(
+      self.assertEqual(status, ts_mon_metrics._executors_status.get(
           target_fields=target_fields))
 
       self.assertEqual('bot_id:%s|os:Linux|os:Ubuntu' % bot_id,
-                       ts_mon_metrics.executors_pool.get(
+                       ts_mon_metrics._executors_pool.get(
                            target_fields=target_fields))
 
 

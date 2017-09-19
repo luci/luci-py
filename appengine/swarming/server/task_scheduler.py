@@ -47,7 +47,7 @@ def _expire_task(to_run_key, request):
   """Expires a TaskResultSummary and unschedules the TaskToRun.
 
   Returns:
-    True on success.
+    TaskResultSummary on success.
   """
   # Look if the TaskToRun is reapable once before doing the check inside the
   # transaction. This reduces the likelihood of failing this check inside the
@@ -66,7 +66,7 @@ def _expire_task(to_run_key, request):
     to_run = to_run_future.get_result()
     if not to_run or not to_run.is_reapable:
       result_summary_future.wait()
-      return False
+      return None
 
     to_run.queue_number = None
     result_summary = result_summary_future.get_result()
@@ -85,7 +85,7 @@ def _expire_task(to_run_key, request):
     for f in futures:
       f.check_success()
 
-    return True
+    return result_summary
 
   # Add it to the negative cache *before* running the transaction. Either way
   # the task was already reaped or the task is correctly expired and not
@@ -94,13 +94,13 @@ def _expire_task(to_run_key, request):
 
   # It'll be caught by next cron job execution in case of failure.
   try:
-    success = datastore_utils.transaction(run)
+    res = datastore_utils.transaction(run)
   except datastore_utils.CommitError:
-    success = False
-  if success:
+    res = None
+  if res:
     logging.info(
         'Expired %s', task_pack.pack_result_summary_key(result_summary_key))
-  return success
+  return res
 
 
 def _reap_task(bot_dimensions, bot_version, to_run_key, request):
@@ -591,7 +591,7 @@ def schedule_request(request, secret_bytes, check_acls=True):
     # job, which would remove this code from the critical path.
     datastore_utils.transaction(run_parent)
 
-  ts_mon_metrics.update_jobs_requested_metrics(result_summary, deduped)
+  ts_mon_metrics.on_task_requested(result_summary, deduped)
   return result_summary
 
 
@@ -794,7 +794,7 @@ def bot_update_task(
     return None
   if smry.state not in task_result.State.STATES_RUNNING:
     event_mon_metrics.send_task_event(smry)
-    ts_mon_metrics.update_jobs_completed_metrics(smry)
+    ts_mon_metrics.on_task_completed(smry)
   return run_result.state
 
 
@@ -917,11 +917,11 @@ def cron_abort_expired_task_to_run(host):
   try:
     for to_run in task_to_run.yield_expired_task_to_run():
       request = to_run.request_key.get()
-      if _expire_task(to_run.key, request):
+      summary = _expire_task(to_run.key, request)
+      if summary:
         # TODO(maruel): Know which try it is.
         killed.append(request)
-        ts_mon_metrics.tasks_expired.increment(
-            fields=ts_mon_metrics.extract_job_fields(request.tags))
+        ts_mon_metrics.on_task_completed(summary)
       else:
         # It's not a big deal, the bot will continue running.
         skipped += 1

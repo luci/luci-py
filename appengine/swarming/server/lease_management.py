@@ -895,7 +895,7 @@ def check_for_connection(machine_lease):
           event.ts,
       )
       associate_connection_ts(machine_lease.key, event.ts)
-      ts_mon_metrics.machine_types_connection_time.add(
+      ts_mon_metrics.on_machine_connected_time(
           (event.ts - machine_lease.instruction_ts).total_seconds(),
           fields={
               'machine_type': machine_lease.machine_type.id(),
@@ -1285,30 +1285,15 @@ def set_global_metrics():
   """Set global Machine Provider-related ts_mon metrics."""
   # Consider utilization metrics over 2 minutes old to be outdated.
   outdated = utils.utcnow() - datetime.timedelta(minutes=2)
+  payload = {}
   for machine_type in MachineType.query():
-    ts_mon_metrics.machine_types_target_size.set(
-        machine_type.target_size,
-        fields={
-            'enabled': machine_type.enabled,
-            'machine_type': machine_type.key.id(),
-        },
-        target_fields=ts_mon_metrics.TARGET_FIELDS,
-    )
+    data = {
+      'enabled': machine_type.enabled,
+      'target_size': machine_type.target_size,
+    }
     utilization = ndb.Key(MachineTypeUtilization, machine_type.key.id()).get()
     if utilization and utilization.last_updated_ts > outdated:
-      ts_mon_metrics.machine_types_actual_size.set(
-          utilization.busy,
-          fields={
-              'busy': True,
-              'machine_type': machine_type.key.id(),
-          },
-          target_fields=ts_mon_metrics.TARGET_FIELDS,
-      )
-      ts_mon_metrics.machine_types_actual_size.set(
-          utilization.idle,
-          fields={
-              'busy': False,
-              'machine_type': machine_type.key.id(),
-          },
-          target_fields=ts_mon_metrics.TARGET_FIELDS,
-      )
+      data['busy'] = utilization.busy
+      data['idle'] = utilization.idle
+    payload[machine_type.key.id()] = data
+  ts_mon_metrics.set_global_metrics('mp', payload)
