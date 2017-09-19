@@ -125,9 +125,7 @@ def _InitCache(device):
 
     properties = {}
     out = device.PullContent('/system/build.prop')
-    if not out:
-      properties = None
-    else:
+    if out:
       for line in out.splitlines():
         if line.startswith(u'#') or not line:
           continue
@@ -137,6 +135,17 @@ def _InitCache(device):
           continue
         key, value = line.split(u'=', 1)
         properties[key] = value
+    else:
+      # /system/build.prop isn't world-readable in Oreo, so populate the cache
+      # with getprop directly.
+      out, exit_code = device.Shell('getprop | grep -E "ro.(build|product)"')
+      if exit_code != 0:
+        _LOG.warning('Unable to fetch build properties: %s', out)
+      else:
+        for line in out.splitlines():
+          match = re.match(r'\[(\S+)\]\: \[(\S+)\]', line)
+          if match:
+            properties[match.group(1)] = match.group(2)
 
     mode, _, _ = device.Stat('/system/xbin/su')
     has_su = bool(mode)
