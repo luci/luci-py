@@ -19,6 +19,7 @@ _VENDOR_MAPPING = {
       u'6613': u'Radeon R7 240',   # The table is incorrect
       u'6646': u'Radeon R9 M280X',
       u'6779': u'Radeon HD 6450/7450/8450',
+      u'679e': u'Radeon HD 7800',
       u'6821': u'Radeon R8 M370X', # 'HD 8800M' or 'R7 M380' based on rev_id
       u'683d': u'Radeon HD 7700',
       u'9830': u'Radeon HD 8400',
@@ -29,9 +30,12 @@ _VENDOR_MAPPING = {
     {
       # http://downloadmirror.intel.com/23188/eng/config.xml
       u'0046': u'Ironlake HD Graphics',
+      u'0102': u'Sandy Bridge HD Graphics 2000',
+      u'0116': u'Sandy Bridge HD Graphics 3000',
       u'0166': u'Ivy Bridge HD Graphics 4000',
       u'0412': u'Haswell HD Graphics 4600',
       u'041a': u'Haswell HD Graphics',
+      u'0a16': u'Intel Haswell HD Graphics 4400',
       u'0a26': u'Haswell HD Graphics 5000',
       u'0a2e': u'Haswell Iris Graphics 5100',
       u'0d26': u'Haswell Iris Pro Graphics 5200',
@@ -44,6 +48,8 @@ _VENDOR_MAPPING = {
       u'1926': u'Skylake Iris 540/550',
       u'193b': u'Skylake Iris Pro 580',
       u'22b1': u'Braswell HD Graphics',
+      u'591e': u'Kaby Lake HD Graphics 615',
+      u'5926': u'Kaby Lake Iris Plus Graphics 640',
     }),
   MAXTROX: (
     u'Matrox',
@@ -69,6 +75,7 @@ _VENDOR_MAPPING = {
       u'1244': u'GeForce GTX 550 Ti',
       u'1401': u'GeForce GTX 960',
       u'1ba1': u'GeForce GTX 1070',
+      u'1cb3': u'Quadro P400',
     }),
 }
 

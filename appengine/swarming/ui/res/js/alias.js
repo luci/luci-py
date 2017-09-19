@@ -39,6 +39,7 @@ this.swarming.alias = this.swarming.alias || (function(){
     "1002:6613": "AMD Radeon R7 240",
     "1002:6646": "AMD Radeon R9 M280X",
     "1002:6779": "AMD Radeon HD 6450/7450/8450",
+    "1002:679e": "AMD Radeon HD 7800",
     "1002:6821": "AMD Radeon HD 8870M",
     "1002:683d": "AMD Radeon HD 7770/8760",
     "1002:9830": "AMD Radeon HD 8400",
@@ -58,11 +59,15 @@ this.swarming.alias = this.swarming.alias || (function(){
     "10de:1244": "NVIDIA GeForce GTX 550 Ti",
     "10de:1401": "NVIDIA GeForce GTX 960",
     "10de:1ba1": "NVIDIA GeForce GTX 1070",
+    "10de:1cb3": "NVIDIA Quadro P400",
     "8086":      "Intel",
     "8086:0046": "Intel Ironlake HD Graphics",
+    "8086:0102": "Intel Sandy Bridge HD Graphics 2000",
+    "8086:0116": "Intel Sandy Bridge HD Graphics 3000",
     "8086:0166": "Intel Ivy Bridge HD Graphics 4000",
     "8086:0412": "Intel Haswell HD Graphics 4600",
     "8086:041a": "Intel Haswell HD Graphics",
+    "8086:0a16": "Intel Haswell HD Graphics 4400",
     "8086:0a26": "Intel Haswell HD Graphics 5000",
     "8086:0a2e": "Intel Haswell Iris Graphics 5100",
     "8086:0d26": "Intel Haswell Iris Pro Graphics 5200",
@@ -75,6 +80,8 @@ this.swarming.alias = this.swarming.alias || (function(){
     "8086:1926": "Intel Skylake Iris 540/550",
     "8086:193b": "Intel Skylake Iris Pro 580",
     "8086:22b1": "Intel Braswell HD Graphics",
+    "8086:591e": "Intel Kaby Lake HD Graphics 615",
+    "8086:5926": "Intel Kaby Lake Iris Plus Graphics 640",
   }
 
   // Taken from http://developer.android.com/reference/android/os/BatteryManager.html
@@ -132,6 +139,10 @@ this.swarming.alias = this.swarming.alias || (function(){
   };
 
   alias.gpu = function(gpu) {
+    if (!gpu || !gpu.split) {
+      return UNKNOWN;
+    }
+    gpu = gpu.split("-")[0];
     return GPU_ALIASES[gpu] || UNKNOWN;
   };
 

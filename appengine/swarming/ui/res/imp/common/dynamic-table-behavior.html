@@ -270,21 +270,31 @@
             var verbose = []
             var named = [];
             // non-verbose mode has only the top level full GPU names "e.g. NVidia GTX 660"
-            // which is found by looking for gpu ids w/ a colon.
+            // which is found by looking for gpu ids w/ a dash (e.g. has a gpu driver).
             gpus.forEach(function(g){
               var alias = swarming.alias.gpu(g);
               if (alias === "unknown") {
                 verbose.push(g);
-                if (g.indexOf(":") !== -1) {
+                if (g.indexOf("-") !== -1) {
                   named.push(g);
                 }
                 return;
               }
               verbose.push(swarming.alias.apply(g, alias));
-              if (g.indexOf(":") !== -1) {
+              if (g.indexOf("-") !== -1) {
                 named.push(swarming.alias.apply(g, alias));
               }
             }.bind(this))
+            if (!named.length) {
+              // No gpu has a driver string, fall-back to longest name
+              var g = swarming.longest(this._attribute(bot, "gpu", "none"));
+              var alias = swarming.alias.gpu(g);
+              if (alias === "unknown") {
+                named = [g];
+              } else {
+                named = [swarming.alias.apply(g, alias)];
+              }
+            }
             if (this._verbose || !named.length) {
               return verbose.join(" | ");
             }
