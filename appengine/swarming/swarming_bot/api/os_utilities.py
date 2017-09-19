@@ -825,6 +825,7 @@ def get_dimensions_all_devices_android(devices):
   del dimensions[u'cpu']
   del dimensions[u'cores']
   del dimensions[u'gpu']
+  dimensions.pop(u'kvm', None)
   dimensions.pop(u'machine_type')
   dimensions.pop(u'ssd', None)
 
