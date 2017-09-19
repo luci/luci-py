@@ -583,6 +583,17 @@ a timeout that expired, the code tries to do an ordered shutdown:
     signals are asynchronous on all OSes w.r.t. process termination.
 
 
+### Signal handling
+
+The bot handles the following signals:
+
+*   SIGTERM causes the bot to terminate and cancel a task if one running,
+    following the graceful termination dance.
+*   SIGUSR1 dumps a stack trace of all threads to stderr.
+*   SIGUSR2 starts a python interactive prompt. It is only useful if a bot is
+    started inside an interactive console.
+
+
 ### Anti patterns
 
 The Swarming Bot design used a _negative_ design process. Anti-patterns were
