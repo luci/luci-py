@@ -17,6 +17,8 @@ import shutil
 import sys
 import zipfile
 
+import signal_trace
+
 # That's from ../../../client/
 from third_party.depot_tools import fix_encoding
 from utils import logging_utils
@@ -222,6 +224,9 @@ def main():
   # path and this must be run in every case, as it causes really unexpected
   # issues otherwise, especially in module os.path.
   fix_encoding.fix_encoding()
+
+  # This is extremely useful to debug hangs.
+  signal_trace.register()
 
   if os.path.basename(THIS_FILE) == 'swarming_bot.zip':
     # Self-replicate itself right away as swarming_bot.1.zip and restart the bot

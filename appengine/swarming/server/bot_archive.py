@@ -112,6 +112,7 @@ FILES = (
     'python_libusb1/__init__.py',
     'python_libusb1/libusb1.py',
     'python_libusb1/usb1.py',
+    'signal_trace.py',
     'third_party/__init__.py',
     'third_party/cachetools/abc.py',
     'third_party/cachetools/cache.py',
