@@ -216,7 +216,7 @@ class TestBotMain(TestBotBase):
         (u'Not enough free disk space on %s. 0.1mib < 150.0mib\n'
         u'Not enough free disk space on %s. 0.1mib < 150.0mib') %
         (root, botobj.base_dir),
-      'sleep_streak': 1,
+      u'sleep_streak': 1,
     }
     self.assertEqual(expected, bot_main._get_state(botobj, 1))
 
@@ -249,6 +249,25 @@ class TestBotMain(TestBotBase):
     # If this trigger, you either forgot to update bot_main.py or bot_config.py.
     from config import bot_config
     self.assertEqual(bot_main.DEFAULT_SETTINGS, bot_config.get_settings(None))
+
+  def test_min_free_disk(self):
+    # size_mb, size, min_percent, max_percent, expected
+    data = [
+      (0, 0, 0, 0, 0),
+      # 1GB*10% = 100Mb
+      (1000, 1000, 10., 20., 104857600),
+      # size is between min_percent (104857600) and max_percent (209715200)
+      (1000, 150000000, 10., 20., 150000000),
+      # 1GB*20% = 200Mb
+      (1000, 300000000, 10., 20., 209715200),
+      # No max_percent, so use size
+      (1000, 300000000, 10., 0, 300000000),
+    ]
+    for size_mb, size, minp, maxp, expected in data:
+      infos = {'size_mb': size_mb}
+      settings = {'size': size, 'min_percent': minp, 'max_percent': maxp}
+      actual = bot_main._min_free_disk(infos, settings)
+      self.assertEqual(expected, actual)
 
   def test_dict_deep_merge(self):
     a = {
