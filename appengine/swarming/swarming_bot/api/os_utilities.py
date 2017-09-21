@@ -587,16 +587,60 @@ def get_ssd():
   return ()
 
 
-def get_named_caches():
-  """Returns the list of named caches."""
+def get_cipd_cache_info():
+  """Returns the items in cipd cache."""
+  # Strictly speaking, this is a layering violation. This data is managed by
+  # cipd.py but this is valuable to expose this as a Swarming bot state so
+  # ¯\_(ツ)_/¯
+  #
+  # Assumptions:
+  # - ../__main__.py calls os.chdir(__file__)
+  # - ../client/cipd.py behavior
+  # - cache entries are in cipd_cache/cache/instances
+  try:
+    items = 0
+    total = 0
+    root = os.path.join(u'cipd_cache', u'cache', u'instances')
+    for i in os.listdir(root):
+      if i != u'state.db':
+        items += 1
+        total += os.stat(os.path.join(root, i)).st_size
+    return {u'items': items, u'size': total}
+  except (IOError, OSError):
+    return {}
+  return 0
+
+
+def get_isolated_cache_info():
+  """Returns the items in state.json describing isolated caches."""
   # Strictly speaking, this is a layering violation. This data is managed by
   # run_isolated.py but this is valuable to expose this as a Swarming bot
-  # dimensions so ¯\_(ツ)_/¯
+  # state so ¯\_(ツ)_/¯
+  #
+  # Assumptions:
+  # - ../__main__.py calls os.chdir(__file__)
+  # - ../bot_code/bot_main.py specifies
+  #   --cache os.path.join(botobj.base_dir, 'isolated_cache') to run_isolated.
+  # - state.json is lru.LRUDict format.
+  # - ../client/isolateserver.py behavior
+  try:
+    with open(os.path.join(u'isolated_cache', u'state.json'), 'rb') as f:
+      return dict(json.load(f)['items'])
+  except (IOError, KeyError, OSError, ValueError):
+    return {}
+
+
+def get_named_caches_info():
+  """"Returns the items in state.json describing named caches."""
+  # Strictly speaking, this is a layering violation. This data is managed by
+  # run_isolated.py but this is valuable to expose this as a Swarming bot
+  # dimension and state so ¯\_(ツ)_/¯
   #
   # Assumptions:
   # - ../__main__.py calls os.chdir(__file__)
   # - ../bot_code/bot_main.py specifies
   #   --named-cache-root os.path.join(botobj.base_dir, 'c') to run_isolated.
+  # - state.json is lru.LRUDict format.
   # - ../client/named_cache.py behavior
   #
   # A better implementation would require:
@@ -607,9 +651,22 @@ def get_named_caches():
   # but hey, the following code is 5 lines...
   try:
     with open(os.path.join(u'c', u'state.json'), 'rb') as f:
-      return sorted(i[0] for i in json.load(f)['items'])
-  except (IOError, KeyError, OSError):
-    return []
+      return dict(json.load(f)['items'])
+  except (IOError, KeyError, OSError, ValueError):
+    return {}
+
+
+def get_recursive_size(path):
+  """Returns the total data size for the specified path."""
+  try:
+    total = 0
+    for root, _, files in os.walk(path):
+      for f in files:
+        total += os.stat(os.path.join(root, f)).st_size
+    return total
+  except (IOError, OSError):
+    # Returns a negative number to make it clear that something is wrong.
+    return -1
 
 
 @tools.cached
@@ -957,9 +1014,9 @@ def get_dimensions():
 
   # Conditional dimensions:
 
-  caches = get_named_caches()
+  caches = get_named_caches_info()
   if caches:
-    dimensions[u'caches'] = caches
+    dimensions[u'caches'] = sorted(caches)
 
   if u'none' not in dimensions[u'gpu']:
     hidpi = get_monitor_hidpi()
@@ -1034,8 +1091,20 @@ def get_state():
     nb_files_in_temp = len(os.listdir(tmpdir))
   except OSError:
     nb_files_in_temp = 'N/A'
+  isolated_cached_info = get_isolated_cache_info()
   state = {
     u'audio': get_audio(),
+    u'caches': {
+      u'cipd': get_cipd_cache_info(),
+      u'isolated': {
+        u'items': len(isolated_cached_info),
+        u'size': sum(i[0] for i in isolated_cached_info.itervalues()),
+      },
+      u'named': {
+        k: get_recursive_size(os.path.join(u'c', v[0]))
+        for k, v in get_named_caches_info().iteritems()
+      },
+    },
     u'cpu_name': get_cpuinfo().get(u'name'),
     u'cost_usd_hour': get_cost_hour(),
     u'cwd': os.getcwd(),
