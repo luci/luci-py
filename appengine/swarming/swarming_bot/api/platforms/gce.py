@@ -202,7 +202,7 @@ def get_cpuinfo():
   # away.
   assert cpu_platform.startswith(u'Intel '), cpu_platform
   return {
-    u'model': u'Intel(R) Xeon(R) CPU %s GCE' % cpu_platform[len(u'Intel '):],
+    u'name': u'Intel(R) Xeon(R) CPU %s GCE' % cpu_platform[len(u'Intel '):],
     u'vendor': u'GenuineIntel',
   }
 
