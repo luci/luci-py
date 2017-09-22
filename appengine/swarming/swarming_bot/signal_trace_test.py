@@ -35,8 +35,12 @@ class Test(unittest.TestCase):
     out, err = self._run(cmd, signal.SIGUSR1, None)
     self.assertEqual('', out)
     self.assertEqual(
-        '** SIGUSR1 received **\nMainThread:\n  File "<string>", line 1, in '
-        '<module>\n** SIGUSR1 end **\n', err)
+        'ERROR:root:\n'
+        '** SIGUSR1 received **\n'
+        'MainThread:\n'
+        '  File "<string>", line 1, in <module>\n'
+        '** SIGUSR1 end **\n',
+        err)
 
   def test_SIGUSR1_threads(self):
     # The multithreaded case.
@@ -48,7 +52,8 @@ class Test(unittest.TestCase):
     out, err = self._run(cmd, signal.SIGUSR1, None)
     self.assertEqual('', out)
     self.assertTrue(
-        err.startswith('** SIGUSR1 received **\nAwesome:\n  '), repr(err))
+        err.startswith('ERROR:root:\n** SIGUSR1 received **\nAwesome:\n  '),
+        repr(err))
     self.assertTrue(err.endswith('\n** SIGUSR1 end **\n'), repr(err))
     self.assertIn('MainThread:', err.splitlines())
 

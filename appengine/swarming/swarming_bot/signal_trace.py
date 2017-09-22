@@ -5,6 +5,7 @@
 """Prints stack trace on SIGUSR1 and starts interactive console on SIGUSR2."""
 
 import StringIO
+import logging
 import code
 import traceback
 import signal
@@ -25,10 +26,11 @@ def _dump(_sig, frame):
       # stack.
       f = frame
     traceback.print_stack(f, file=buf)
-  buf.write('** SIGUSR1 end **\n')
-  sys.stderr.flush()
-  sys.stderr.write(buf.getvalue())
-  sys.stderr.flush()
+  buf.write('** SIGUSR1 end **')
+  # Logging as error so that it'll be printed even if logging.basicConfig() is
+  # used. Use logging instead of sys.stderr.write() because stderr could be
+  # sink-holed and logging redirected to a file.
+  logging.error('\n%s', buf.getvalue())
 
 
 def _debug(_sig, frame):
