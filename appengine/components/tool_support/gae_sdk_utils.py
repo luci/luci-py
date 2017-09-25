@@ -439,8 +439,9 @@ class Application(object):
         if mod.data.get('vm') and not USE_GCLOUD:
           raise UnsupportedModuleError(
               'MVM is only supported in gcloud mode: %s' % m)
-        if mod.data.get('env') == 'flex':
-          raise UnsupportedModuleError('Flex is not supported yet: %s' % m)
+        if mod.data.get('env') == 'flex' and not USE_GCLOUD:
+          raise UnsupportedModuleError(
+              'Flex is only supported in gcloud mode: %s' % m)
         if mod.data.get('runtime') == 'go' and not os.environ.get('GOROOT'):
           raise BadEnvironmentError('GOROOT must be set when deploying Go app')
         mods.append(mod)
