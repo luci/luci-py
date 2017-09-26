@@ -773,6 +773,7 @@ class TestBotMain(TestBotBase):
           'task_id': '24',
           'swarming_http_headers': {'A': 'a'},
           'swarming_http_headers_exp': int(time.time() + 3600),
+          'bot_service_account': 'none',
           'system_service_account': 'robot@example.com',  # as in task manifest
           'task_service_account': 'bot',
         })
