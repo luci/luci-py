@@ -263,13 +263,15 @@ class AuthSystem(object):
     # account at all! It means internal Swarming processes will use
     # non-authenticated calls (which is precisely the meaning of un-set
     # system account).
+    #
+    # TODO(vadimsh): Populate emails.
     default_account_id = None
     available_accounts = []
     if params.system_service_account != 'none':
       default_account_id = 'system'
-      available_accounts.append('system')
+      available_accounts.append(auth_server.Account(id='system', email=''))
     if params.task_service_account != 'none':
-      available_accounts.append('task')
+      available_accounts.append(auth_server.Account(id='task', email=''))
 
     # If using service accounts, launch local HTTP server that serves tokens
     # (let OS assign the port).

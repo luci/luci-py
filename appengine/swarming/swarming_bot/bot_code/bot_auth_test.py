@@ -108,7 +108,7 @@ class AuthSystemTest(auto_stub.TestCase):
     self.assertEqual(['accounts', 'rpc_port', 'secret'], sorted(local_auth_ctx))
 
     # Only 'task' account is defined (no 'system'). And there's NO default.
-    self.assertEqual([{'id': 'task'}], local_auth_ctx['accounts'])
+    self.assertEqual([{'id': 'task', 'email': ''}], local_auth_ctx['accounts'])
     self.assertFalse(local_auth_ctx.get('default_account_id'))
 
     # Try to use the local RPC service to grab a 'task' token. Should return
@@ -140,7 +140,8 @@ class AuthSystemTest(auto_stub.TestCase):
         sorted(local_auth_ctx))
 
     # Only 'system' account is defined (no 'task'), and it is default.
-    self.assertEqual([{'id': 'system'}], local_auth_ctx['accounts'])
+    self.assertEqual(
+        [{'id': 'system', 'email': ''}], local_auth_ctx['accounts'])
     self.assertEqual('system', local_auth_ctx['default_account_id'])
 
     # Try to use the local RPC service to grab a 'system' token. Should return
@@ -173,7 +174,11 @@ class AuthSystemTest(auto_stub.TestCase):
 
     # Both are defined, 'system' is default.
     self.assertEqual(
-        [{'id': 'system'}, {'id': 'task'}], local_auth_ctx['accounts'])
+        [
+            {'id': 'system', 'email': ''},
+            {'id': 'task', 'email': ''},
+        ],
+        local_auth_ctx['accounts'])
     self.assertEqual('system', local_auth_ctx.get('default_account_id'))
 
     # Both 'system' and 'task' tokens work.
