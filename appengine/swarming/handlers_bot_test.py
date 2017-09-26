@@ -288,6 +288,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'cmd': u'run',
       u'manifest': {
         u'bot_id': u'bot1',
+        u'bot_authenticated_as': u'bot:whitelisted-ip',
         u'caches': [],
         u'cipd_input': {
           u'client_package': {
@@ -360,6 +361,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'cmd': u'run',
       u'manifest': {
         u'bot_id': u'bot1',
+        u'bot_authenticated_as': u'bot:whitelisted-ip',
         u'caches': [],
         u'cipd_input': {
           u'client_package': {
@@ -414,6 +416,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'cmd': u'run',
       u'manifest': {
         u'bot_id': u'bot1',
+        u'bot_authenticated_as': u'bot:whitelisted-ip',
         u'caches': [{
           u'name': u'git_infra',
           u'path': u'git_cache',
@@ -511,6 +514,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'cmd': u'run',
       u'manifest': {
         u'bot_id': u'bot1',
+        u'bot_authenticated_as': u'bot:whitelisted-ip',
         u'caches': [],
         u'cipd_input': {
           u'client_package': {
@@ -673,6 +677,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'cmd': u'run',
       u'manifest': {
         u'bot_id': u'bot1',
+        u'bot_authenticated_as': u'bot:whitelisted-ip',
         u'caches': [],
         u'cipd_input': {
           u'client_package': {

@@ -678,6 +678,7 @@ class BotPollHandler(_BotBaseHandler):
       'cmd': 'run',
       'manifest': {
         'bot_id': bot_id,
+        'bot_authenticated_as': auth.get_peer_identity().to_bytes(),
         'caches': [
           c.to_dict() for c in request.properties.caches
         ],
