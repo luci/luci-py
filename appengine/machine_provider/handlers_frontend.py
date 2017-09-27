@@ -97,6 +97,8 @@ def create_frontend_app():
   template.bootstrap({
       'templates': os.path.join(THIS_DIR, 'templates'),
   })
-  routes = get_routes()
+  routes = []
+  if not utils.should_disable_ui_routes():
+    routes.extend(get_routes())
   routes.extend(handlers_endpoints.get_routes())
   return webapp2.WSGIApplication(routes)

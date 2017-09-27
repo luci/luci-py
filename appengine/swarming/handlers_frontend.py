@@ -254,6 +254,12 @@ class EmailHandler(webapp2.RequestHandler):
 
 def get_routes():
   routes = [
+      ('/_ah/mail/<to:.+>', EmailHandler),
+      ('/_ah/warmup', WarmupHandler),
+  ]
+
+  if not utils.should_disable_ui_routes():
+    routes.extend([
       # Frontend pages. They return HTML.
       # Public pages.
       ('/<page:(bot|botlist|task|tasklist|)>', UIHandler),
@@ -272,10 +278,8 @@ def get_routes():
 
       # Mapreduce related urls.
       (r'/restricted/launch_mapreduce', RestrictedLaunchMapReduceJob),
+    ])
 
-      ('/_ah/mail/<to:.+>', EmailHandler),
-      ('/_ah/warmup', WarmupHandler),
-  ]
   return [webapp2.Route(*i) for i in routes]
 
 

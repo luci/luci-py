@@ -58,17 +58,18 @@ def configure_ui(app_name, ui_tabs=None, ui_data_callback=None):
 
 def get_ui_routes():
   """Returns a list of routes with auth UI handlers."""
-  # Routes for registered navbar tabs.
   routes = []
-  for cls in _ui_navbar_tabs:
-    routes.extend(cls.get_webapp2_routes())
-  # Routes for everything else.
-  routes.extend([
-    webapp2.Route(r'/auth', MainHandler),
-    webapp2.Route(r'/auth/bootstrap', BootstrapHandler, name='bootstrap'),
-    webapp2.Route(r'/auth/bootstrap/oauth', BootstrapOAuthHandler),
-    webapp2.Route(r'/auth/link', LinkToPrimaryHandler),
-  ])
+  if not utils.should_disable_ui_routes():
+    # Routes for registered navbar tabs.
+    for cls in _ui_navbar_tabs:
+      routes.extend(cls.get_webapp2_routes())
+    # Routes for everything else.
+    routes.extend([
+      webapp2.Route(r'/auth', MainHandler),
+      webapp2.Route(r'/auth/bootstrap', BootstrapHandler, name='bootstrap'),
+      webapp2.Route(r'/auth/bootstrap/oauth', BootstrapOAuthHandler),
+      webapp2.Route(r'/auth/link', LinkToPrimaryHandler),
+    ])
   return routes
 
 

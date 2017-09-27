@@ -50,6 +50,10 @@ EPOCH = datetime.datetime.utcfromtimestamp(0)
 _task_queue_module = 'backend'
 
 
+def should_disable_ui_routes():
+    return os.environ.get('LUCI_DISABLE_UI_ROUTES', '0') == '1'
+
+
 def is_local_dev_server():
   """Returns True if running on local development server or in unit tests.
 

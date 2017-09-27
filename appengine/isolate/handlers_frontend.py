@@ -425,6 +425,12 @@ class EmailHandler(webapp2.RequestHandler):
 
 def get_routes():
   routes = [
+      # AppEngine-specific urls:
+      webapp2.Route(r'/_ah/mail/<to:.+>', EmailHandler),
+      webapp2.Route(r'/_ah/warmup', WarmupHandler),
+  ]
+  if not utils.should_disable_ui_routes():
+    routes.extend([
       # Administrative urls.
       webapp2.Route(r'/restricted/config', RestrictedConfigHandler),
       webapp2.Route(r'/restricted/purge', RestrictedPurgeHandler),
@@ -445,11 +451,7 @@ def get_routes():
       #webapp2.Route(r'/isolate/api/v1/stats/minutes', StatsGvizMinutesHandler),
       webapp2.Route(r'/', RootHandler),
       webapp2.Route(r'/newui', UIHandler),
-
-      # AppEngine-specific urls:
-      webapp2.Route(r'/_ah/mail/<to:.+>', EmailHandler),
-      webapp2.Route(r'/_ah/warmup', WarmupHandler),
-  ]
+    ])
   routes.extend(handlers_endpoints_v1.get_routes())
   return routes
 
