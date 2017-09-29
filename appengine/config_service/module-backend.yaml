@@ -24,6 +24,8 @@ libraries:
   version: "1.0"
 - name: pycrypto
   version: "2.6"
+- name: six
+  version: "1.9.0"
 - name: webapp2
   version: "2.5.2"
 - name: webob
