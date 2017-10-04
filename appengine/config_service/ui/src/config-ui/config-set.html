@@ -263,6 +263,7 @@
       _onCompleteRefresh: function() {
         this.isRefreshing = false;
         this.refreshMessage = "Reimport successful.";
+        this.$.requestConfigs.generateRequest();
         this.fire('refreshComplete');
       },
 
