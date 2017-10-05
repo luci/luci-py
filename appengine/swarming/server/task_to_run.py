@@ -317,7 +317,7 @@ def _yield_potential_tasks(bot_id):
   latency. The number of queries is unbounded.
 
   Yields:
-    TaskToRun entities, trying to yield the highest priority one first.  To have
+    TaskToRun keys, trying to yield the highest priority one first.  To have
     finite execution time, starts yielding results once one of these conditions
     are met:
     - 1 second elapsed; in this case, continue iterating in the background
