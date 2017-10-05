@@ -37,9 +37,9 @@
       .center {
         margin: auto;
         text-align: left;
-      }    
+      }
 
-      .config-card { 
+      .config-card {
         padding-bottom: 1%;
         animation: fadein 1.5s;
       }
@@ -87,7 +87,7 @@
         headers="[[auth_headers]]">
     </iron-ajax>
 
-    <div class="center title"> 
+    <div class="center title">
       <div class="name">
         [[name]][[route.path]]
         <iron-icon id="launch"
@@ -141,7 +141,7 @@
           <p>Timestamp: [[_getExactTime(timestamp)]]</p>
         </template>
         <p id="refreshStatus">[[refreshMessage]]</p>
-      </div>      
+      </div>
     </div>
     <template is="dom-if" if="[[_not(errorMessage)]]">
       <template is="dom-if" if="[[isRefreshing]]">
@@ -163,7 +163,7 @@
           </template>
           <template is="dom-if" if="[[_not(_isEmpty(files))]]">
             <template is="dom-repeat" items="[[files]]" as="file">
-              <div class="center config-card">  
+              <div class="center config-card">
                 <config-file-card
                     name="[[file.path]]" link="[[url]]/[[file.path]]">
                 </config-file-card>
@@ -299,8 +299,8 @@
           if (!this.auth_headers) {
             this.errorMessage = "Access denied, please sign in.";
           } else {
-            this.errorMessage = "Access denied, " + this.profile.email + 
-                " is not authorized to access this config set." + 
+            this.errorMessage = "Access denied, " + this.profile.email +
+                " is not authorized to access this config set." +
                 " Request access or sign in as a different user.";
           }
         } else if (500 <= error && error < 600) {
