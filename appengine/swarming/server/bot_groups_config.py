@@ -335,6 +335,8 @@ def validate_bots_cfg(cfg, ctx):
   bot_ids = {}
   # bot_id_prefix => index of a group where it was defined.
   bot_id_prefixes = {}
+  # Index of a group to use as default fallback (there can be only one).
+  default_group_idx = None
   # machine_type names.
   machine_type_names = set()
 
@@ -365,6 +367,17 @@ def validate_bots_cfg(cfg, ctx):
               bot_id_prefix, bot_id_prefixes[bot_id_prefix])
           continue
         bot_id_prefixes[bot_id_prefix] = i
+
+      # A group without bot_id, bot_id_prefix and machine_type is applied to
+      # bots that don't fit any other groups. There should be at most one such
+      # group.
+      if (not entry.bot_id and
+          not entry.bot_id_prefix and
+          not entry.machine_type):
+        if default_group_idx is not None:
+          ctx.error('group #%d is already set as default', default_group_idx)
+        else:
+          default_group_idx = i
 
       # Validate machine_type.
       for i, machine_type in enumerate(entry.machine_type):

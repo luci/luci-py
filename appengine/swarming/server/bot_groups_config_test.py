@@ -299,6 +299,16 @@ class BotGroupsConfigTest(test_case.TestCase):
       '"abc-def-" ambigious'
     ])
 
+  def test_two_default_groups(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG),
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG),
+      ])
+    self.validator_test(cfg, [
+      u'bot_group #1: group #0 is already set as default'
+    ])
+
   def test_machine_types(self):
     cfg = bots_pb2.BotsCfg(
       bot_group=[

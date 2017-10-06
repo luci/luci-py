@@ -139,6 +139,8 @@ message MachineType {
 // If bot_id, bot_id_prefix, and machine_type are all missing, the group defines
 // all bots that didn't fit into other groups. There can be only one such
 // "default" group.
+//
+// TODO(vadimsh): Introduce explicit field "use_as_default" instead.
 message BotGroup {
   // Explicit enumeration of bot IDs belonging to this group.
   //
