@@ -337,19 +337,18 @@ class Kubectl(object):
     args.extend(cmd)
     return run_command(args, **kwargs)
 
-  def check_gcloud(self, cmd, **kwargs):
+  def check_output(self, cmd, **kwargs):
     args = [
-        'gcloud',
-        '--project', self.app.project,
+        self.executable,
+        '--context', self.ensure_app_context(),
     ]
     args.extend(cmd)
     return check_output(args, **kwargs)
 
-  def check_output(self, cmd, **kwargs):
-    context = kwargs.pop('context', self.app.kubectl_context)
+  def check_gcloud(self, cmd, **kwargs):
     args = [
-        self.executable,
-        '--context', context,
+        'gcloud',
+        '--project', self.app.project,
     ]
     args.extend(cmd)
     return check_output(args, **kwargs)
@@ -382,7 +381,7 @@ class Kubectl(object):
     return self._strip_quoted_output(output)
 
   def set_deployment_annotation(self, name, value):
-    self.check_output([
+    self.run([
       'annotate',
       '--overwrite',
       'deployments',
@@ -448,13 +447,13 @@ class Kubectl(object):
     # If this command returns non-zero and has non-empty output, we know that
     # the context is available.
     logging.debug('Checking if "gcloud" credentials are available.')
-    stdout = self.check_output([
+    stdout = check_output([
+          self.executable,
           'config',
           'view',
           '--output', 'jsonpath=\'{.users[?(@.name == "%s")].name}\'' % (
               self.app.kubectl_context,),
         ],
-        context='',
     )
     self._verified_app_context = bool(self._strip_quoted_output(stdout))
     return self._verified_app_context
