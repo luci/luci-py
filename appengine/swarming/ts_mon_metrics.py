@@ -21,7 +21,7 @@ from server import task_result
 #   connected to the bot.
 # - caches has an unbounded matrix.
 # - id is unique for each bot.
-_IGNORED_DIMENSIONS = ('android_devices', 'caches', 'id')
+_IGNORED_DIMENSIONS = ('android_devices', 'caches', 'id', 'temp_band')
 # Real timeout is 60s, keep it slightly under to bail out early.
 _REQUEST_TIMEOUT_SEC = 50
 # Cap the max number of items per taskqueue task, to keep the total
