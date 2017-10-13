@@ -107,6 +107,8 @@ message AclCfg {
   optional string admin_group = 3;
   // Name of the group that can access configs by hash.
   optional string config_get_by_hash_group = 4;
+  // Name of the group that may call validation API.
+  optional string validation_group = 5;
 }
 
 // Schema for import.cfg. It specified how to import configuration files from

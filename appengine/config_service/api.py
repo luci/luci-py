@@ -14,6 +14,7 @@ import endpoints
 from components import auth
 from components import utils
 from components.config import endpoint as cfg_endpoint
+from components.config import common
 
 import acl
 import gitiles_import
@@ -139,6 +140,59 @@ class ConfigApi(remote.Service):
           if can_read[cs.key.id()]
         ]
     )
+
+  ##############################################################################
+  # endpoint: validate_config
+
+  class ValidateConfigResponseMessage(messages.Message):
+    messages = messages.MessageField(
+        cfg_endpoint.ValidationMessage, 1, repeated=True)
+
+  class ValidateConfigRequestMessage(messages.Message):
+    class File(messages.Message):
+      path = messages.StringField(1)
+      content = messages.StringField(2)
+
+    config_set = messages.StringField(1)
+    files = messages.MessageField(File, 2, repeated=True)
+
+  @auth.endpoints_method(
+      ValidateConfigRequestMessage,
+      ValidateConfigResponseMessage,
+      http_method='POST',
+      path='validate-config',
+  )
+  @auth.public # ACL check inside
+  def validate_config(self, request):
+    if not request.config_set:
+      raise endpoints.BadRequestException('Must specify a config_set')
+    if not request.files:
+      raise endpoints.BadRequestException('Must specify files to validate')
+    for f in request.files:
+      if not f.path:
+        raise endpoints.BadRequestException('Must specify the path of a file')
+    if (not can_read_config_set(request.config_set)
+        or not acl.has_validation_access()):
+      raise endpoints.ForbiddenException()
+
+    futs = []
+    for f in request.files:
+      futs.append(validation.validate_config_async(
+          request.config_set, f.path, f.content))
+
+    ndb.Future.wait_all(futs)
+    messages = []
+    for fut in futs:
+      messages.extend(fut.get_result().messages)
+
+    # return the severities and the texts
+    return self.ValidateConfigResponseMessage(messages=[
+      cfg_endpoint.ValidationMessage(
+          severity=common.Severity.lookup_by_number(msg.severity),
+          text=msg.text,
+      )
+      for msg in messages
+    ])
 
   ##############################################################################
   # endpoint: get_config_sets

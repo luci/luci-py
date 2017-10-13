@@ -6,6 +6,7 @@
 import base64
 import datetime
 import httplib
+import logging
 
 import test_env
 from test_env import future
@@ -14,6 +15,7 @@ test_env.setup_test_env()
 
 from components import auth
 from components import config
+from components.config import validation_context
 from components.config.proto import project_config_pb2
 from components.config.proto import service_config_pb2
 from test_support import test_case
@@ -24,6 +26,7 @@ import api
 import gitiles_import
 import projects
 import storage
+import validation
 
 
 class ApiTest(test_case.EndpointsTestCase):
@@ -775,6 +778,54 @@ class ApiTest(test_case.EndpointsTestCase):
     req = {'config_set': 'services/x'}
     with self.call_should_fail(500):
       self.call_api('reimport', req)
+
+  ##############################################################################
+  # validate_config
+
+  def test_validate_config(self):
+    self.mock(validation, 'validate_config_async', mock.Mock())
+    mock_message = validation_context.Message('problem', logging.WARNING)
+    mock_result = validation_context.Result([mock_message])
+    validation.validate_config_async.return_value = future(mock_result)
+    self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
+      'services/luci-config': True,
+    }))
+    self.mock(acl, 'has_validation_access', mock.Mock(return_value=True))
+
+    req = {
+      'config_set': 'services/luci-config',
+      'files': [{'path': 'myproj.cfg', 'content': 'mock_content'}]
+    }
+    resp = self.call_api('validate_config', req).json_body
+    self.assertEqual(resp, {
+      'messages': [
+        {'severity': 'WARNING', 'text': 'problem'},
+      ]
+    })
+
+  def test_validate_config_no_files(self):
+    req = {
+      'config_set': 'services/luci-config',
+      'files': []
+    }
+    self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
+      'services/luci-config': True,
+    }))
+    self.mock(acl, 'has_validation_access', mock.Mock(return_value=True))
+    with self.call_should_fail(400):
+      self.call_api('validate_config', req)
+
+  def test_validate_config_no_path(self):
+    req = {
+      'config_set': 'services/luci-config',
+      'files': [{'path': '', 'content': 'mock_content'}]
+    }
+    self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
+      'services/luci-config': True,
+    }))
+    self.mock(acl, 'has_validation_access', mock.Mock(return_value=True))
+    with self.call_should_fail(400):
+      self.call_api('validate_config', req)
 
 
 if __name__ == '__main__':

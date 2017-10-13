@@ -107,6 +107,12 @@ def has_projects_access(project_ids):
   return dict(zip(project_ids, has_access))
 
 
+def has_validation_access():
+  validation_group = get_acl_cfg().validation_group
+  return is_admin() or (validation_group and
+                        auth.is_group_member(validation_group))
+
+
 def _has_access(resources):
   access_values = set()
   for r in resources:
