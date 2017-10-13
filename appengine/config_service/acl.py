@@ -121,3 +121,12 @@ def _has_access(resources):
     bool(r) and any(has_access[a] for a in r.access)
     for r in resources
   ]
+
+
+def can_get_by_hash():
+  acl_cfg = get_acl_cfg()
+  # TODO(kamrik): Remove this once acl.cfg is updated b/64201867
+  if not acl_cfg.config_get_by_hash_group:
+    return True
+
+  return auth.is_group_member(acl_cfg.config_get_by_hash_group)
