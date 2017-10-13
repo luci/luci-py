@@ -576,6 +576,124 @@ class EnsureEntitiesExistTest(test_case.TestCase):
     self.failUnless(lease_management.MachineLease.get_by_id('machine-type-b-1'))
     self.failUnless(lease_management.MachineLease.get_by_id('machine-type-c-0'))
 
+  def test_enable_machine_type(self):
+    def fetch_machine_types():
+      return {
+          'machine-type': bots_pb2.MachineType(
+              early_release_secs=0,
+              lease_duration_secs=1,
+              mp_dimensions=['disk_gb:100'],
+              name='machine-type',
+              target_size=1,
+          ),
+      }
+    self.mock(
+        lease_management.bot_groups_config,
+        'fetch_machine_types',
+        fetch_machine_types,
+    )
+    key = lease_management.MachineType(
+        id='machine-type',
+        early_release_secs=0,
+        enabled=False,
+        lease_duration_secs=1,
+        mp_dimensions=machine_provider.Dimensions(
+            disk_gb=100,
+        ),
+        target_size=1,
+    ).put()
+
+    lease_management.ensure_entities_exist()
+
+    self.failUnless(key.get().enabled)
+
+  def test_update_machine_type(self):
+    def fetch_machine_types():
+      return {
+          'machine-type': bots_pb2.MachineType(
+              early_release_secs=0,
+              lease_duration_secs=2,
+              mp_dimensions=['disk_gb:100'],
+              name='machine-type',
+              target_size=1,
+          ),
+      }
+    self.mock(
+        lease_management.bot_groups_config,
+        'fetch_machine_types',
+        fetch_machine_types,
+    )
+    key = lease_management.MachineType(
+        id='machine-type',
+        early_release_secs=0,
+        enabled=True,
+        lease_duration_secs=1,
+        mp_dimensions=machine_provider.Dimensions(
+            disk_gb=100,
+        ),
+        target_size=1,
+    ).put()
+
+    lease_management.ensure_entities_exist()
+
+    self.assertEqual(key.get().lease_duration_secs, 2)
+
+  def test_enable_and_update_machine_type(self):
+    def fetch_machine_types():
+      return {
+          'machine-type': bots_pb2.MachineType(
+              early_release_secs=0,
+              lease_duration_secs=2,
+              mp_dimensions=['disk_gb:100'],
+              name='machine-type',
+              target_size=1,
+          ),
+      }
+    self.mock(
+        lease_management.bot_groups_config,
+        'fetch_machine_types',
+        fetch_machine_types,
+    )
+    key = lease_management.MachineType(
+        id='machine-type',
+        early_release_secs=0,
+        enabled=False,
+        lease_duration_secs=1,
+        mp_dimensions=machine_provider.Dimensions(
+            disk_gb=100,
+        ),
+        target_size=1,
+    ).put()
+
+    lease_management.ensure_entities_exist()
+
+    self.failUnless(key.get().enabled)
+    self.assertEqual(key.get().lease_duration_secs, 2)
+
+  def test_disable_machine_type(self):
+    def fetch_machine_types():
+      return {
+      }
+    self.mock(
+        lease_management.bot_groups_config,
+        'fetch_machine_types',
+        fetch_machine_types,
+    )
+    key = lease_management.MachineType(
+        id='machine-type',
+        early_release_secs=0,
+        enabled=True,
+        lease_duration_secs=1,
+        mp_dimensions=machine_provider.Dimensions(
+            disk_gb=100,
+        ),
+        target_size=1,
+    ).put()
+
+    lease_management.ensure_entities_exist()
+
+    self.failIf(key.get().enabled)
+
   def test_machine_lease_exists_mismatched_not_updated(self):
     key = lease_management.MachineType(
         early_release_secs=0,

@@ -357,6 +357,12 @@ def ensure_entities_exist(max_concurrent=50):
 
     put = False
 
+    # Re-enable disabled MachineTypes.
+    if not machine_type.enabled:
+      logging.info('Enabling MachineType: %s', machine_type)
+      machine_type.enabled = True
+      put = True
+
     # Handle scheduled config changes.
     if config.schedule:
       target_size = get_target_size(
@@ -380,7 +386,6 @@ def ensure_entities_exist(max_concurrent=50):
     # of certain fields so we can compare the MachineType to the config to check
     # for differences in all other fields.
     config = machine_type_pb2_to_entity(config)
-    config.enabled = machine_type.enabled
     config.target_size = machine_type.target_size
     if machine_type != config:
       logging.info('Updating MachineType: %s', config)
