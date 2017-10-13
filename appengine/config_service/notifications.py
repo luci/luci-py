@@ -108,8 +108,7 @@ def notify_gitiles_rejection(config_set, location, validation_result):
       )
     msg = mail.EmailMessage(
         sender=(
-            '%s.appspot.com <%s@appspot.gserviceaccount.com>' %
-            (app_id, app_id)),
+            '%s.appspot.com <noreply@%s.appspotmail.com>' % (app_id, app_id)),
         subject='Config revision %s is rejected' % rev,
         to=get_recipients(commit),
         html=template.render(

@@ -64,7 +64,7 @@ class NotificationsTestCase(test_case.TestCase):
     email = notifications._send.call_args[0][0]
     self.assertEqual(
         email.sender,
-        'sample-app.appspot.com <sample-app@appspot.gserviceaccount.com>')
+        'sample-app.appspot.com <noreply@sample-app.appspotmail.com>')
     self.assertEqual(email.subject, 'Config revision aaaaaaa is rejected')
     self.assertEqual(email.to, ['John <john@x.com>'])
     self.assertEqual(email.cc, {'bill@x.com'})
