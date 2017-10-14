@@ -213,7 +213,7 @@ class TestBotMain(TestBotBase):
         },
       },
       u'quarantined':
-        (u'Not enough free disk space on %s. 0.1mib < 150.0mib\n'
+        (u'Not enough free disk space on %s. 0.1mib < 100.0mib\n'
         u'Not enough free disk space on %s. 0.1mib < 150.0mib') %
         (root, botobj.base_dir),
       u'sleep_streak': 1,
@@ -244,6 +244,39 @@ class TestBotMain(TestBotBase):
       'yo': 'dawh',
     }
     self.assertEqual(expected, bot_main._get_state(obj, 0.1))
+
+  def test_get_disks_quarantine_empty(self):
+    root = 'c:\\' if sys.platform == 'win32' else '/'
+    disks = {
+      self.bot.base_dir: {
+        'free_mb': 0,
+        'size_mb': 0,
+      },
+      root: {
+        'free_mb': 0,
+        'size_mb': 0,
+      },
+    }
+    expected = (
+      u'Not enough free disk space on %s. 0.0mib < 1024.0mib\n'
+      u'Not enough free disk space on %s. 0.0mib < 4096.0mib') % (
+          root, self.bot.base_dir)
+    self.assertEqual(expected, bot_main._get_disks_quarantine(self.bot, disks))
+
+  def test_get_disks_quarantine(self):
+    root = 'c:\\' if sys.platform == 'win32' else '/'
+    disks = {
+      self.bot.base_dir: {
+        'free_mb': 4096,
+        'size_mb': 4096,
+      },
+      root: {
+        'free_mb': 4096,
+        'size_mb': 4096,
+      },
+    }
+    expected = None
+    self.assertEqual(expected, bot_main._get_disks_quarantine(self.bot, disks))
 
   def test_default_settings(self):
     # If this trigger, you either forgot to update bot_main.py or bot_config.py.

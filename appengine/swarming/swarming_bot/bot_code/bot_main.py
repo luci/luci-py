@@ -90,10 +90,17 @@ PASSLIST = (
 # Keep in sync with ../config/bot_config.py. This is enforced by a unit test.
 DEFAULT_SETTINGS = {
   'free_partition': {
-    'size': 4 * 1024*1024*1024,
-    'max_percent': 15.,
-    'min_percent': 7.,
-    'wiggle': 250 * 1024*1024,
+    'root': {
+      'size': 1 * 1024*1024*1024,
+      'max_percent': 10.,
+      'min_percent': 6.,
+    },
+    'bot': {
+      'size': 4 * 1024*1024*1024,
+      'max_percent': 15.,
+      'min_percent': 7.,
+      'wiggle': 250 * 1024*1024,
+    },
   },
   'caches': {
     'isolated': {
@@ -325,41 +332,53 @@ def _get_state(botobj, sleep_streak):
 
   state[u'sleep_streak'] = sleep_streak
   if not state.get(u'quarantined') and botobj:
-    # Quarantines when there's not enough free space on either root partition or
-    # the current partition the bot is running in.
-    settings = _get_settings(botobj)['free_partition']
-    # On Windows, drive letters are always lower case.
-    root = 'c:\\' if sys.platform == 'win32' else '/'
     # Reuse the data from 'state/disks'
     disks = state.get(u'disks', {})
-
-    s = []
-    def check_for_quarantine(r, i):
-      min_free = _min_free_disk(i, settings)
-      if int(i[u'free_mb']*1024*1024) < min_free:
-        s.append(
-            'Not enough free disk space on %s. %.1fmib < %.1fmib' %
-            (r, i[u'free_mb'], round(min_free / 1024. / 1024., 1)))
-
-    # root may be missing in the case of netbooted devices.
-    if root in disks:
-      check_for_quarantine(root, disks[root])
-    # Try again with the bot's base directory. It is frequent to run the bot
-    # from a secondary partition, to reduce the risk of OS failure due to full
-    # root partition.
-    # This code is similar to os_utilities.get_disk_size().
-    path = botobj.base_dir
-    case_insensitive = sys.platform in ('darwin', 'win32')
-    if case_insensitive:
-      path = path.lower()
-    for mount, infos in sorted(disks.iteritems(), key=lambda x: -len(x[0])):
-      if path.startswith(mount.lower() if case_insensitive else mount):
-        if mount != root:
-          check_for_quarantine(mount, infos)
-        break
-    if s:
-      state[u'quarantined'] = '\n'.join(s)
+    err = _get_disks_quarantine(botobj, disks)
+    if err:
+      state[u'quarantined'] = err
   return state
+
+
+def _get_disks_quarantine(botobj, disks):
+  """Returns a quarantine error message when there's not enough free space.
+
+  It looks at both root partition and the current partition the bot is running
+  in.
+  """
+  settings = _get_settings(botobj)['free_partition']
+  # On Windows, drive letters are always lower case.
+  root = 'c:\\' if sys.platform == 'win32' else '/'
+
+  errors = []
+  def _check_for_quarantine(r, i, key):
+    min_free = _min_free_disk(i, settings[key])
+    if int(i[u'free_mb']*1024*1024) < min_free:
+      errors.append(
+          u'Not enough free disk space on %s. %.1fmib < %.1fmib' %
+          (r, i[u'free_mb'], round(min_free / 1024. / 1024., 1)))
+
+  # root may be missing in the case of netbooted devices.
+  if root in disks:
+    _check_for_quarantine(root, disks[root], 'root')
+
+  # Try again with the bot's base directory. It is frequent to run the bot
+  # from a secondary partition, to reduce the risk of OS failure due to full
+  # root partition.
+  # This code is similar to os_utilities.get_disk_size().
+  path = botobj.base_dir
+  case_insensitive = sys.platform in ('darwin', 'win32')
+  if case_insensitive:
+    path = path.lower()
+  for mount, infos in sorted(disks.iteritems(), key=lambda x: -len(x[0])):
+    if path.startswith(mount.lower() if case_insensitive else mount):
+      # Apply 'bot' check if bot is on its own partition, or it's on
+      # root partition and there are no errors reported yet.
+      if mount != root or not errors:
+        _check_for_quarantine(mount, infos, 'bot')
+      break
+  if errors:
+    return '\n'.join(errors)
 
 
 def setup_bot(skip_reboot):
@@ -582,7 +601,7 @@ def _run_isolated_flags(botobj):
   These are not meant to be processed by task_runner.py.
   """
   settings = _get_settings(botobj)
-  partition = settings['free_partition']
+  partition = settings['free_partition']['bot']
   size = os_utilities.get_disk_size(THIS_FILE)
   min_free = (
       _min_free_disk({'size_mb': size}, partition) +

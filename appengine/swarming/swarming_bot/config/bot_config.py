@@ -79,21 +79,31 @@ def get_settings(bot):
     #
     # When trimming the cache, 'wiggle' is added to the value selected above.
     #
-    # The partitions checked for self-quarantine are the root partition (/ on
-    # POSIX, C:\ on Windows) and the partition containing swarming_bot.zip.
     'free_partition': {
-      # Minimum free space in bytes to use, if lower than 'max_percent'.
-      'size': 4 * 1024*1024*1024,
-      # Maximum free space in percent to ensure to keep free, if lower than
-      # 'size'.
-      'max_percent': 15.,
-      # Minimum of of free space percentage, even if higher than 'size'.
-      'min_percent': 7.,
-      # Number of bytes to add to the minimum value selected above when
-      # calculating the isolated cache trimming. This is to ensure that system
-      # level processes writing logs and such do not cause to criss the
-      # self-quarantine line while the bot is idle.
-      'wiggle': 250 * 1024*1024,
+      # Settings specifically for the OS root partition: / on Linux
+      # distributions and OSX, generally (but not necessarily) C:\ on Windows).
+      # If the bot runs on the root partition, these values are ignored.
+      'root': {
+        # Minimum free space in bytes to use, if lower than 'max_percent'.
+        'size': 1 * 1024*1024*1024,
+        # Maximum free space in percent to ensure to keep free, if lower than
+        # 'size'.
+        'max_percent': 10.,
+        # Minimum of of free space percentage, even if higher than 'size'.
+        'min_percent': 6.,
+      },
+      # Settings specifically for the partition in which the bot runs on. These
+      # values are expected to be higher than 'root' values.
+      'bot': {
+        'size': 4 * 1024*1024*1024,
+        'max_percent': 15.,
+        'min_percent': 7.,
+        # Number of bytes to add to the minimum value selected above when
+        # calculating the isolated cache trimming. This is to ensure that system
+        # level processes writing logs and such do not cause to criss the
+        # self-quarantine line while the bot is idle.
+        'wiggle': 250 * 1024*1024,
+      },
     },
     # Local caches settings.
     'caches': {
