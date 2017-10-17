@@ -64,6 +64,7 @@ class Location(LocationTuple):
     """Parses a Gitiles-formatted url.
 
     If /a authentication prefix is present in |url|, it is omitted.
+    If .git suffix is present in |url|, it is omitted.
 
     Args:
       url (str): url to parse.
@@ -85,6 +86,8 @@ class Location(LocationTuple):
     if project.startswith('a/'):
       project = project[len('a/'):]
     project = project.strip('/')
+    if project.endswith('.git'):
+      project = project[:-len('.git')]
 
     treeish_and_path = (path_match.group(3) or '').strip('/')
     first_slash = treeish_and_path.find('/')

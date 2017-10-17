@@ -301,6 +301,11 @@ class GitilesTestCase(test_case.TestCase):
     self.assertEqual(loc.treeish, 'treeish')
     self.assertEqual(loc.path, '/path')
 
+  def test_parse_location_with_git_ending(self):
+    url = 'http://localhost/project.git/+/treeish/path'
+    loc = gitiles.Location.parse(url)
+    self.assertEqual(loc.project, 'project')
+
   def test_parse_resolve(self):
     self.mock(gitiles, 'get_refs', mock.Mock())
     gitiles.get_refs.return_value = {

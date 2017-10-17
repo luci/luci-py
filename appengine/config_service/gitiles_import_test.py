@@ -457,6 +457,27 @@ class GitilesImportTestCase(test_case.TestCase):
     gitiles_import.import_projects()
     self.assertEqual(gitiles_import.import_project.call_count, 2)
 
+  def test_import_projects_canonical(self):
+    self.mock(gitiles_import, 'import_project', mock.Mock())
+    self.mock(projects, 'get_refs', mock.Mock(return_value={
+      'chromium': [],
+    }))
+    self.mock(projects, 'get_projects', mock.Mock())
+    projects.get_projects.return_value = [
+      service_config_pb2.Project(
+        id='chromium',
+        config_location=service_config_pb2.ConfigSetLocation(
+          url='https://localhost/a/chromium/src.git/',
+          storage_type=service_config_pb2.ConfigSetLocation.GITILES,
+        ),
+      ),
+    ]
+
+    gitiles_import.import_projects()
+    gitiles_import.import_project.assert_called_once_with(
+        'chromium',
+        gitiles.Location.parse_resolve('https://localhost/chromium/src'))
+
 
 if __name__ == '__main__':
   test_env.main()

@@ -123,6 +123,7 @@ def _import_revision(config_set, base_location, commit):
         latest_revision_committer_email=commit.committer.email,
         latest_revision_time=commit.committer.time,
         location=str(base_location),
+        version=storage.ConfigSet.CUR_VERSION
     ),
     storage.Revision(key=rev_key),
   ]
@@ -263,7 +264,8 @@ def _import_config_set(config_set, location):
 
     config_set_key = ndb.Key(storage.ConfigSet, config_set)
     config_set_entity = config_set_key.get()
-    if config_set_entity and config_set_entity.latest_revision == commit.sha:
+    if (config_set_entity and config_set_entity.latest_revision == commit.sha
+        and (config_set_entity.version >= storage.ConfigSet.CUR_VERSION)):
       save_attempt(True, 'Up-to-date')
       logging.debug('Config set %s is up-to-date', config_set)
       return
