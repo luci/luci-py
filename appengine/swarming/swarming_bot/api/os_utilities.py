@@ -626,7 +626,7 @@ def get_isolated_cache_info():
   try:
     with open(os.path.join(u'isolated_cache', u'state.json'), 'rb') as f:
       return dict(json.load(f)['items'])
-  except (IOError, KeyError, OSError, ValueError):
+  except (IOError, KeyError, OSError, TypeError, ValueError):
     return {}
 
 
@@ -652,7 +652,7 @@ def get_named_caches_info():
   try:
     with open(os.path.join(u'c', u'state.json'), 'rb') as f:
       return dict(json.load(f)['items'])
-  except (IOError, KeyError, OSError, ValueError):
+  except (IOError, KeyError, OSError, TypeError, ValueError):
     return {}
 
 
