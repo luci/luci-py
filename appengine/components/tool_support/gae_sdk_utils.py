@@ -72,7 +72,7 @@ def find_gcloud():
   for path in os.environ['PATH'].split(os.pathsep):
     exe_file = os.path.join(path, 'gcloud')  # <sdk_root>/bin/gcloud
     if os.path.isfile(exe_file) and os.access(exe_file, os.X_OK):
-      return exe_file
+      return os.path.realpath(exe_file)
   raise BadEnvironmentError(
       'Can\'t find "gcloud" in PATH. Install the Google Cloud SDK from '
       'https://cloud.google.com/sdk/')
