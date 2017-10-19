@@ -88,7 +88,8 @@ class GitilesImportTestCase(test_case.TestCase):
             treeish='luci/config',
             path='/',
         ),
-        self.test_commit)
+        self.test_commit,
+        False)
 
     expected_latest_revision_url = (
         'https://localhost/project/+/a1841f40264376d170269ee9473ce924b7c2c4e9')
@@ -132,7 +133,8 @@ class GitilesImportTestCase(test_case.TestCase):
             project='project',
             treeish='master',
             path='/'),
-        self.test_commit)
+        self.test_commit,
+        False)
     self.assertFalse(gitiles.get_archive.called)
     self.assert_attempt(True, 'Up-to-date')
 
@@ -147,7 +149,8 @@ class GitilesImportTestCase(test_case.TestCase):
           project='project',
           treeish='master',
           path='/'),
-        self.test_commit)
+        self.test_commit,
+        False)
     self.assert_attempt(True, 'Config directory not found. Imported as empty')
 
   def test_import_invalid_revision(self):
@@ -166,7 +169,8 @@ class GitilesImportTestCase(test_case.TestCase):
           project='project',
           treeish='master',
           path='/'),
-        self.test_commit)
+        self.test_commit,
+        False)
     # Assert not saved.
     self.assertIsNone(storage.ConfigSet.get_by_id('config_set'))
 
@@ -187,6 +191,12 @@ class GitilesImportTestCase(test_case.TestCase):
     self.mock_get_log()
     self.mock_get_archive()
 
+    storage.ConfigSet(
+      location='https://localhost/project',
+      latest_revision='deadbeef',
+      version=0,
+      id='config_set',
+    ).put()
     gitiles_import._import_config_set(
         'config_set', gitiles.Location.parse('https://localhost/project'))
 
@@ -260,7 +270,12 @@ class GitilesImportTestCase(test_case.TestCase):
     self.mock_get_log()
     self.mock(gitiles, 'get_archive', mock.Mock())
     gitiles.get_archive.side_effect = urlfetch_errors.DeadlineExceededError
-
+    storage.ConfigSet(
+        location='https://localhost/project',
+        latest_revision='deadbeef',
+        version=0,
+        id='config_set',
+    ).put()
     with self.assertRaises(gitiles_import.Error):
       gitiles_import._import_config_set(
           'config_set',

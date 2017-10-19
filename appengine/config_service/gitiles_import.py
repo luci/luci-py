@@ -86,7 +86,7 @@ def get_gitiles_config():
 ## Low level import functions
 
 
-def _import_revision(config_set, base_location, commit):
+def _import_revision(config_set, base_location, commit, force_update):
   """Imports a referenced Gitiles revision into a config set.
 
   |base_location| will be used to set storage.ConfigSet.location.
@@ -109,7 +109,7 @@ def _import_revision(config_set, base_location, commit):
   attempt = storage.ImportAttempt(
       key=storage.last_import_attempt_key(config_set),
       revision=_commit_to_revision_info(commit, location))
-  if rev_key.get():
+  if not force_update and rev_key.get():
     attempt.success = True
     attempt.message = 'Up-to-date'
     attempt.put()
@@ -162,7 +162,7 @@ def _import_revision(config_set, base_location, commit):
 
   @ndb.transactional
   def txn():
-    if not rev_key.get():
+    if force_update or not rev_key.get():
       ndb.put_multi(rev_entities)
     attempt.put()
 
@@ -264,13 +264,14 @@ def _import_config_set(config_set, location):
 
     config_set_key = ndb.Key(storage.ConfigSet, config_set)
     config_set_entity = config_set_key.get()
+    force_update = config_set_entity.version < storage.ConfigSet.CUR_VERSION
     if (config_set_entity and config_set_entity.latest_revision == commit.sha
-        and (config_set_entity.version >= storage.ConfigSet.CUR_VERSION)):
+        and not force_update):
       save_attempt(True, 'Up-to-date')
       logging.debug('Config set %s is up-to-date', config_set)
       return
 
-    _import_revision(config_set, location, commit)
+    _import_revision(config_set, location, commit, force_update)
   except urlfetch_errors.DeadlineExceededError:
     save_attempt(False, 'Could not import: deadline exceeded')
     raise Error(
