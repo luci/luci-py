@@ -385,16 +385,7 @@ def yield_swarming_bot_files(
   """
   items = {i: None for i in FILES}
   items.update(additionals)
-  config = {
-    'server': host.rstrip('/'),
-    'server_version': host_version,
-  }
-
-  if settings:
-    config['enable_ts_monitoring'] = settings.enable_ts_monitoring
-    config['isolate_grpc_proxy'] = settings.bot_isolate_grpc_proxy
-
-  items['config/config.json'] = json.dumps(config)
+  items['config/config.json'] = _make_config_json(host, host_version, settings)
   logging.debug('Bot config.json: %s', items['config/config.json'])
   for item, content in sorted(items.iteritems()):
     if content is not None:
@@ -478,3 +469,22 @@ def get_swarming_bot_version(
   logging.info(
       'get_swarming_bot_version(%s) = %s', sorted(additionals), bot_version)
   return bot_version
+
+
+## Private stuff.
+
+
+def _make_config_json(host, host_version, settings):
+  """Generates a config.json to embed in swarming_bot.zip"""
+  # The keys must match ../swarming_bot/config/config.json.
+  config = {
+    'enable_ts_monitoring': False,
+    'isolate_grpc_proxy': False,
+    'server': host.rstrip('/'),
+    'server_version': host_version,
+    'swarming_grpc_proxy': False,
+  }
+  if settings:
+    config['enable_ts_monitoring'] = settings.enable_ts_monitoring
+    config['isolate_grpc_proxy'] = settings.bot_isolate_grpc_proxy
+  return json.dumps(config)

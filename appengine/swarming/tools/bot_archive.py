@@ -20,14 +20,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def read_config():
   config_path = os.path.join(ROOT_DIR, 'swarming_bot', 'config', 'config.json')
   with open(config_path, 'rb') as f:
-    config = json.load(f) or {}
-  expected = ['enable_ts_monitoring', 'is_grpc', 'server', 'server_version']
-  actual = sorted(config)
-  if expected != actual:
-    raise ValueError(
-        'Only expected keys \'%s\', got \'%s\'' % (
-        ','.join(expected), ','.join(actual)))
-  return config
+    return json.load(f) or {}
 
 
 def get_swarming_bot_zip():
