@@ -130,9 +130,10 @@ def _gen_queue_number(dimensions_hash, timestamp, priority):
 
 
 def _queue_number_priority(q):
-  """Returns the number to be used as a comparision for priority.
+  """Returns the number to be used as a comparison for priority.
 
-  The higher the more important.
+  Lower values are more important. The queue priority is the lowest 30 bits,
+  of which the top 8 bits are the task priority, and the rest is the timestamp.
   """
   return q & 0x7FFFFFFF
 
@@ -350,7 +351,7 @@ def _yield_potential_tasks(bot_id):
     if f and f.done():
       items.extend(f.get_result())
       futures[i] = next(yielders[i], None)
-  items.sort(key=lambda k: _queue_number_priority(k.id()), reverse=True)
+  items.sort(key=lambda k: _queue_number_priority(k.id()))
 
   # It is possible that there is no items yet, in case all futures are taking
   # more than 1 second.
@@ -372,7 +373,7 @@ def _yield_potential_tasks(bot_id):
         futures[i] = next(yielders[i], None)
         changed = True
     if changed:
-      items.sort(key=lambda k: _queue_number_priority(k.id()), reverse=True)
+      items.sort(key=lambda k: _queue_number_priority(k.id()))
 
 
 ### Public API.

@@ -455,28 +455,64 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(sorted(expected), sorted(actual))
 
   def test_yield_next_available_task_to_dispatch_priority(self):
-    # Task added later but with higher priority are returned first.
-    request_dimensions_1 = {u'os': u'Windows-3.1.1', u'pool': u'default'}
-    self._gen_new_task_to_run(properties=dict(dimensions=request_dimensions_1))
+    # Tasks added later but with higher priority are returned first.
+    request_dimensions = {u'os': u'Windows-3.1.1', u'pool': u'default'}
+    self._gen_new_task_to_run(
+        properties=dict(dimensions=request_dimensions), priority=50)
 
     # This one is later but has higher priority.
     self.mock_now(self.now, 60)
-    request_dimensions_2 = {u'os': u'Windows-3.1.1', u'pool': u'default'}
+    request = self.mkreq(
+        _gen_request(
+            properties=dict(dimensions=request_dimensions), priority=10),
+        nb_task=0)
+    task_to_run.new_task_to_run(request).put()
+
+    # It should return them all, in the expected order: lowest priority first.
+    expected = [
+      {
+        'dimensions_hash': _hash_dimensions(request_dimensions),
+        'expiration_ts': datetime.datetime(2014, 1, 2, 3, 6, 5, 6),
+        'queue_number': '0x1a3aa663028ee0ca',
+      },
+      {
+        'dimensions_hash': _hash_dimensions(request_dimensions),
+        'expiration_ts': datetime.datetime(2014, 1, 2, 3, 5, 5, 6),
+        'queue_number': '0x1a3aa6630c8ede72',
+      },
+    ]
+    bot_dimensions = {
+      u'id': [u'localhost'],
+      u'os': [u'Windows-3.1.1'],
+      u'pool': [u'default'],
+    }
+    actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
+    self.assertEqual(expected, actual)
+
+  def test_yield_next_available_task_to_dispatch_multi_priority(self):
+    # High priority tasks added later with other dimensions are returned first.
+    request_dimensions_1 = {u'os': u'Windows-3.1.1', u'pool': u'default'}
+    self._gen_new_task_to_run(
+        properties=dict(dimensions=request_dimensions_1), priority=50)
+
+    # This one is later but has higher priority.
+    self.mock_now(self.now, 60)
+    request_dimensions_2 = {u'id': u'localhost', u'pool': u'default'}
     request = self.mkreq(
         _gen_request(
             properties=dict(dimensions=request_dimensions_2), priority=10),
         nb_task=0)
     task_to_run.new_task_to_run(request).put()
 
-    # It should return them all, in the expected order.
+    # It should return them all, in the expected order: lowest priority first.
     expected = [
       {
-        'dimensions_hash': _hash_dimensions(request_dimensions_1),
+        'dimensions_hash': _hash_dimensions(request_dimensions_2),
         'expiration_ts': datetime.datetime(2014, 1, 2, 3, 6, 5, 6),
-        'queue_number': '0x1a3aa663028ee0ca',
+        'queue_number': '0x5385bf74828ee0ca',
       },
       {
-        'dimensions_hash': _hash_dimensions(request_dimensions_2),
+        'dimensions_hash': _hash_dimensions(request_dimensions_1),
         'expiration_ts': datetime.datetime(2014, 1, 2, 3, 5, 5, 6),
         'queue_number': '0x1a3aa6630c8ede72',
       },
