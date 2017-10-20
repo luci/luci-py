@@ -975,6 +975,7 @@ def _run_manifest(botobj, manifest, start):
   internal_failure = False
   msg = None
   auth_params_dumper = None
+  must_reboot = False
   # Use 'w' instead of 'work' because path length is precious on Windows.
   work_dir = os.path.join(botobj.base_dir, 'w')
   try:
@@ -1080,6 +1081,9 @@ def _run_manifest(botobj, manifest, start):
         task_result = json.load(fd)
 
     if proc.returncode:
+      # STATUS_DLL_INIT_FAILED generally means that something bad happened, and
+      # a reboot magically clears things out. :(
+      must_reboot = sys.platform == 'win32' and proc.returncode == -1073741502
       msg = 'Execution failed: internal error (%d).' % proc.returncode
       internal_failure = True
     elif not task_result:
@@ -1114,6 +1118,8 @@ def _run_manifest(botobj, manifest, start):
       except Exception as e:
         botobj.post_error(
             'Failed to delete work directory %s: %s' % (work_dir, e))
+    if must_reboot:
+      botobj.host_reboot('Working around STATUS_DLL_INIT_FAILED by task_runner')
 
 
 def _update_bot(botobj, version):
@@ -1160,6 +1166,11 @@ def _bot_restart(botobj, message, filepath=None):
     botobj.post_error(
         'New bot code is bad: proc exit = %s. stdout:\n%s' %
         (proc.returncode, output))
+    if sys.platform == 'win32' and proc.returncode == -1073741502:
+      # STATUS_DLL_INIT_FAILED generally means that something bad happened, and
+      # a reboot magically clears things out. :(
+      botobj.host_reboot(
+          'Working around STATUS_DLL_INIT_FAILED when restarting the bot')
     return
 
   botobj.post_event('bot_shutdown', 'About to restart: %s' % message)
