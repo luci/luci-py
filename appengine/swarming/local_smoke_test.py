@@ -933,6 +933,9 @@ def main():
   os.environ.pop('SWARMING_SERVER', None)
   os.environ.pop('ISOLATE_SERVER', None)
 
+  # Ensure ambient identity doesn't leak through during local smoke test.
+  os.environ.pop('LUCI_CONTEXT', None)
+
   bot = None
   client = None
   servers = None
