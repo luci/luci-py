@@ -35,6 +35,7 @@ from components import utils
 from . import config
 from . import ipaddr
 from . import model
+from .proto import delegation_pb2
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
@@ -44,6 +45,7 @@ __all__ = [
   'disable_process_cache',
   'Error',
   'get_current_identity',
+  'get_delegation_token',
   'get_peer_identity',
   'get_peer_ip',
   'get_process_cache_expiration_sec',
@@ -713,6 +715,7 @@ class RequestCache(object):
   def __init__(self):
     self._auth_db = None
     self._current_identity = None
+    self._delegation_token = None
     self._peer_identity = None
     self._peer_ip = None
     self._is_superuser = None
@@ -738,6 +741,17 @@ class RequestCache(object):
     assert isinstance(current_identity, model.Identity), current_identity
     assert not self._current_identity
     self._current_identity = current_identity
+
+  @property
+  def delegation_token(self):
+    return self._delegation_token
+
+  @delegation_token.setter
+  def delegation_token(self, token):
+    """Records unwrapped verified delegation token used by this request."""
+    assert isinstance(token, delegation_pb2.Subtoken), token
+    assert not self._delegation_token
+    self._delegation_token = token
 
   @property
   def peer_identity(self):
@@ -777,6 +791,7 @@ class RequestCache(object):
     """Helps GC to collect garbage faster."""
     self._auth_db = None
     self._current_identity = None
+    self._delegation_token = None
     self._peer_identity = None
     self._peer_ip = None
 
@@ -1037,6 +1052,17 @@ def _get_current_identity():
   simpler to move implementation to a private mockable function.
   """
   return get_request_cache().current_identity
+
+
+def get_delegation_token():
+  """Returns unwrapped validated delegation token used by this request.
+
+  Services that accept the token may use them for additional authorization
+  decisions. Please use extremely carefully, only when you control both sides
+  of the delegation link and can guarantee that services involved understand
+  the additional authorization limitations.
+  """
+  return get_request_cache().delegation_token
 
 
 def get_peer_identity():

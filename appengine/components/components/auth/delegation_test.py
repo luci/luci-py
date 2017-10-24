@@ -110,9 +110,10 @@ class SignatureTest(test_case.TestCase):
     blob = serialize_token(seal_token(tok))
     # Deserialize, check sig, validate.
     make_id = model.Identity.from_bytes
-    ident = delegation.check_bearer_delegation_token(
+    ident, unwrapped_tok = delegation.check_bearer_delegation_token(
         blob, make_id('user:final@a.com'))
     self.assertEqual(make_id('user:initial@a.com'), ident)
+    self.assertEqual(tok, unwrapped_tok)
 
   def test_bad_signer_id(self):
     msg = seal_token(fake_subtoken_proto())

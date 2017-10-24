@@ -183,8 +183,10 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     delegation_tok = self.request.headers.get(delegation.HTTP_HEADER)
     if delegation_tok:
       try:
-        ctx.current_identity = delegation.check_bearer_delegation_token(
+        ident, unwrapped_tok = delegation.check_bearer_delegation_token(
             delegation_tok, ctx.peer_identity)
+        ctx.current_identity = ident
+        ctx.delegation_token = unwrapped_tok
         ctx.is_superuser = False
       except delegation.BadTokenError as exc:
         self.authorization_error(

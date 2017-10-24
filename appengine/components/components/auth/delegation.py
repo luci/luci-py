@@ -573,7 +573,7 @@ def check_bearer_delegation_token(token, peer_identity):
     peer_identity: Identity of whoever tries to wield the token.
 
   Returns:
-    Delegated Identity.
+    (Delegated Identity, validated delegation_pb2.Subtoken proto).
 
   Raises:
     BadTokenError if token is invalid.
@@ -589,4 +589,4 @@ def check_bearer_delegation_token(token, peer_identity):
   logging.info(
       'Using delegation token: subtoken_id=%s, delegated_identity=%s',
       subtoken.subtoken_id, ident.to_bytes())
-  return ident
+  return ident, subtoken
