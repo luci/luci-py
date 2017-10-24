@@ -158,10 +158,12 @@ def get_isolated_args(work_dir, task_details, isolated_result,
   cmd.extend(run_isolated_flags)
 
   # TODO(nodir): Pass the command line arguments via a response file.
-  cmd.append('--')
   if task_details.command:
+    cmd.append('--raw-cmd')
+    cmd.append('--')
     cmd.extend(task_details.command)
   elif task_details.extra_args:
+    cmd.append('--')
     cmd.extend(task_details.extra_args)
   return cmd
 
