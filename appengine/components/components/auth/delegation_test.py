@@ -256,6 +256,7 @@ class CreateTokenTest(test_case.TestCase):
       ],
       u'services': [u'https://example.com', u'service:1', u'service:2'],
       u'delegatedIdentity': u'user:i@example.com',
+      u'tags': [u'a:b', u'c:d'],
       u'validityDuration': 3000,
     }
     urlfetch.called = False
@@ -286,6 +287,7 @@ class CreateTokenTest(test_case.TestCase):
       ],
       'max_validity_duration_sec': 3000,
       'impersonate': model.Identity('user', 'i@example.com'),
+      'tags': ['c:d', 'a:b'],
     }
     result = delegation.delegate(**args)
     self.assertTrue(urlfetch.called)

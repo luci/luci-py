@@ -270,6 +270,7 @@ def delegate_async(
     min_validity_duration_sec=5*60,
     max_validity_duration_sec=60*60*3,
     impersonate=None,
+    tags=None,
     token_server_url=None):
   """Creates a delegation token by contacting the token server.
 
@@ -296,6 +297,9 @@ def delegate_async(
       set of callers can do that. If impersonation is allowed, token's
       delegated_identity field will contain whatever is in 'impersonate' field.
       Example: 'user:abc@example.com'
+    tags (list of str): optional list of key:value pairs to embed into the
+      token. Services that accept the token may use them for additional
+      authorization decisions.
     token_server_url (str): the URL for the token service that will mint the
       token. Defaults to the URL provided by the primary auth service.
 
@@ -357,6 +361,13 @@ def delegate_async(
     assert isinstance(impersonate, (basestring, model.Identity)), impersonate
     impersonate = id_to_str(impersonate)
 
+  # Validate tags.
+  tags = sorted(tags or [])
+  for tag in tags:
+    parts = tag.split(':', 1)
+    if len(parts) != 2 or parts[0] == '' or parts[1] == '':
+      raise ValueError('Bad delegation token tag: %r' % tag)
+
   # Grab the token service URL.
   if not token_server_url:
     token_server_url = api.get_request_auth_db().token_server_url
@@ -372,6 +383,7 @@ def delegate_async(
     'validityDuration': max_validity_duration_sec,
     'audience': audience,
     'services': services,
+    'tags': tags,
   }
 
   # Get from cache.

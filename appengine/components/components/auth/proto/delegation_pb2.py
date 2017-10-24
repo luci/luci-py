@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='delegation.proto',
   package='components.auth.proto.delegation',
   syntax='proto3',
-  serialized_pb=_b('\n\x10\x64\x65legation.proto\x12 components.auth.proto.delegation\"y\n\x0f\x44\x65legationToken\x12\x11\n\tsigner_id\x18\x02 \x01(\t\x12\x16\n\x0esigning_key_id\x18\x03 \x01(\t\x12\x18\n\x10pkcs1_sha256_sig\x18\x04 \x01(\x0c\x12\x1b\n\x13serialized_subtoken\x18\x05 \x01(\x0cJ\x04\x08\x01\x10\x02\"\xa3\x02\n\x08Subtoken\x12=\n\x04kind\x18\x08 \x01(\x0e\x32/.components.auth.proto.delegation.Subtoken.Kind\x12\x13\n\x0bsubtoken_id\x18\x04 \x01(\x03\x12\x1a\n\x12\x64\x65legated_identity\x18\x01 \x01(\t\x12\x1a\n\x12requestor_identity\x18\x07 \x01(\t\x12\x15\n\rcreation_time\x18\x02 \x01(\x03\x12\x19\n\x11validity_duration\x18\x03 \x01(\x05\x12\x10\n\x08\x61udience\x18\x05 \x03(\t\x12\x10\n\x08services\x18\x06 \x03(\t\"5\n\x04Kind\x12\x10\n\x0cUNKNOWN_KIND\x10\x00\x12\x1b\n\x17\x42\x45\x41RER_DELEGATION_TOKEN\x10\x01\x62\x06proto3')
+  serialized_pb=_b('\n\x10\x64\x65legation.proto\x12 components.auth.proto.delegation\"y\n\x0f\x44\x65legationToken\x12\x11\n\tsigner_id\x18\x02 \x01(\t\x12\x16\n\x0esigning_key_id\x18\x03 \x01(\t\x12\x18\n\x10pkcs1_sha256_sig\x18\x04 \x01(\x0c\x12\x1b\n\x13serialized_subtoken\x18\x05 \x01(\x0cJ\x04\x08\x01\x10\x02\"\xb1\x02\n\x08Subtoken\x12=\n\x04kind\x18\x08 \x01(\x0e\x32/.components.auth.proto.delegation.Subtoken.Kind\x12\x13\n\x0bsubtoken_id\x18\x04 \x01(\x03\x12\x1a\n\x12\x64\x65legated_identity\x18\x01 \x01(\t\x12\x1a\n\x12requestor_identity\x18\x07 \x01(\t\x12\x15\n\rcreation_time\x18\x02 \x01(\x03\x12\x19\n\x11validity_duration\x18\x03 \x01(\x05\x12\x10\n\x08\x61udience\x18\x05 \x03(\t\x12\x10\n\x08services\x18\x06 \x03(\t\x12\x0c\n\x04tags\x18\t \x03(\t\"5\n\x04Kind\x12\x10\n\x0cUNKNOWN_KIND\x10\x00\x12\x1b\n\x17\x42\x45\x41RER_DELEGATION_TOKEN\x10\x01\x62\x06proto3')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -42,8 +42,8 @@ _SUBTOKEN_KIND = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=416,
-  serialized_end=469,
+  serialized_start=430,
+  serialized_end=483,
 )
 _sym_db.RegisterEnumDescriptor(_SUBTOKEN_KIND)
 
@@ -163,6 +163,13 @@ _SUBTOKEN = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='tags', full_name='components.auth.proto.delegation.Subtoken.tags', index=8,
+      number=9, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -177,7 +184,7 @@ _SUBTOKEN = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=178,
-  serialized_end=469,
+  serialized_end=483,
 )
 
 _SUBTOKEN.fields_by_name['kind'].enum_type = _SUBTOKEN_KIND
