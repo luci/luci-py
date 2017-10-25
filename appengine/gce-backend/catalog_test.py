@@ -259,10 +259,12 @@ class ExtractDimensionsTest(test_case.TestCase):
         ),
     )
     instance_template_revision = models.InstanceTemplateRevision(
+        project='project',
     )
     expected_dimensions = {
         'backend': 'GCE',
         'hostname': 'instance-name',
+        'project': 'project',
     }
 
     self.assertEqual(
@@ -286,6 +288,7 @@ class ExtractDimensionsTest(test_case.TestCase):
         ),
         disk_size_gb=300,
         machine_type='n1-standard-8',
+        project='project',
     )
     expected_dimensions = {
         'backend': 'GCE',
@@ -294,6 +297,7 @@ class ExtractDimensionsTest(test_case.TestCase):
         'memory_gb': 30,
         'num_cpus': 8,
         'os_family': 'LINUX',
+        'project': 'project',
     }
 
     self.assertEqual(

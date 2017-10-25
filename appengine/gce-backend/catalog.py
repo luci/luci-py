@@ -69,6 +69,8 @@ def extract_dimensions(instance, instance_template_revision):
 
   dimensions['hostname'] = instance.hostname
 
+  dimensions['project'] = instance_template_revision.project
+
   return dimensions
 
 

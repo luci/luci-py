@@ -47,3 +47,5 @@ class Dimensions(messages.Message):
   linux_flavor = messages.EnumField(LinuxFlavor, 7)
   # The operating system version of this machine.
   os_version = messages.StringField(8)
+  # The project this machine was created in.
+  project = messages.StringField(9)
