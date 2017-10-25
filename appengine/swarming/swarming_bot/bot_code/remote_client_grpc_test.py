@@ -49,72 +49,49 @@ class TestRemoteClientGrpc(auto_stub.TestCase):
     #    * The proto request
     #    * The proto response
     self.assertEqual(method, expected[0])
-    self.assertEqual(request, expected[1])
+    self.assertEqual(str(request), str(expected[1]))
     return expected[2]
-
-  def _get_bot_attributes_dict(self):
-    """Gets the attributes of a basic bot; must match next function"""
-    return {
-        'version': '123',
-        'dimensions': {
-            'id': ['robotcop'],
-            'mammal': ['ferrett', 'wombat'],
-        },
-        'state': {
-            'audio': ['Rachmaninov', 'Stravinsky'],
-            'cost_usd_hour': 3.141,
-            'cpu': 'Intel 8080',
-            'disks': {
-                'mount': 'path/to/mount',
-                'volume': 'turned-to-eleven',
-            },
-            'sleep_streak': 8,
-        },
-    }
-
-  def _get_worker_proto(self):
-    """Gets the worker proto of a basic bot; must match prior function"""
-    worker = remote_client_grpc.worker_manager_pb2.Worker()
-    worker.name = 'inst/workers/robotcop'
-    devprops = worker.device.properties
-    d1 = devprops.add()
-    d1.key.custom = 'id'
-    d1.value = 'robotcop'
-    d2 = devprops.add()
-    d2.key.custom = 'mammal'
-    d2.value = 'ferrett'
-    d3 = devprops.add()
-    d3.key.custom = 'mammal'
-    d3.value = 'wombat'
-    props = worker.properties
-    props.get_or_create_list('audio').extend(
-        ['Rachmaninov', 'Stravinsky'])
-    props['cost_usd_hour'] = 3.141
-    props['cpu'] = 'Intel 8080'
-    disks = props.get_or_create_struct('disks')
-    disks['mount'] = 'path/to/mount'
-    disks['volume'] = 'turned-to-eleven'
-    props['sleep_streak'] = 8
-    props['bot_version'] = '123'
-    return worker
 
   def test_handshake(self):
     """Tests the handshake proto"""
-    msg_req = remote_client_grpc.worker_manager_pb2.CreateWorkerRequest()
-    msg_req.parent = 'inst'
-    msg_req.worker.CopyFrom(self._get_worker_proto())
+    attrs = {
+        'version': '123',
+        'dimensions': {
+            'id': ['robocop'],
+            'pool': ['swimming'],
+            'mammal': ['ferrett', 'wombat'],
+        },
+        'state': {},
+    }
 
-    # Create proto response
-    msg_rsp = self._get_worker_proto()
-    # Add a pool
-    poolprop = msg_rsp.device.properties.add()
-    poolprop.key.custom = 'pool'
-    poolprop.value = 'dead'
+    msg_req = remote_client_grpc.bots_pb2.CreateBotSessionRequest()
+    msg_req.parent = 'inst'
+    session = msg_req.bot_session
+    session.bot_id = 'robocop'
+    session.health = remote_client_grpc.bots_pb2.HEALTHY
+    session.version = '123'
+    worker = session.worker
+    wp = worker.properties.add()
+    wp.key = 'pool'
+    wp.value = 'swimming'
+    dev = worker.devices.add()
+    dev.handle = 'robocop'
+    dp1 = dev.properties.add()
+    dp1.key = 'mammal'
+    dp1.value = 'ferrett'
+    dp2 = dev.properties.add()
+    dp2.key = 'mammal'
+    dp2.value = 'wombat'
+
+    # Create proto response, overriding the pool
+    msg_rsp = remote_client_grpc.bots_pb2.BotSession()
+    msg_rsp.CopyFrom(msg_req.bot_session)
+    msg_rsp.worker.properties[0].value = 'dead'
 
     # Execute call and verify response
-    expected_call = ('CreateWorker', msg_req, msg_rsp)
+    expected_call = ('CreateBotSession', msg_req, msg_rsp)
     self._expected.append(expected_call)
-    response = self._client.do_handshake(self._get_bot_attributes_dict())
+    response = self._client.do_handshake(attrs)
     self.assertEqual(response, {
         'bot_version': u'123',
         'bot_group_cfg': {
@@ -122,6 +99,7 @@ class TestRemoteClientGrpc(auto_stub.TestCase):
                 u'pool': [u'dead'],
             },
         },
+        'bot_group_cfg_version': 1,
     })
 
 

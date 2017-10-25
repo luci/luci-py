@@ -12,11 +12,10 @@ compile:
 	python -m grpc.tools.protoc \
 	  --python_out=. \
 	  --grpc_python_out=. \
+	  bots.proto \
+	  bytestream.proto \
 	  code.proto \
 	  command.proto \
-	  device.proto \
-	  reservation_manager.proto \
 	  status.proto \
-	  task_manager.proto \
-	  worker_manager.proto \
+	  tasks.proto \
 	  -I.

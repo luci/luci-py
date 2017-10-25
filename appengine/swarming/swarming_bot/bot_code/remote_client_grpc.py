@@ -14,11 +14,11 @@ import logging
 import time
 
 from google.protobuf import json_format
+from proto_bot import bots_pb2
+from proto_bot import bytestream_pb2
 from proto_bot import code_pb2
 from proto_bot import command_pb2
-from proto_bot import reservation_manager_pb2
-from proto_bot import task_manager_pb2
-from proto_bot import worker_manager_pb2
+from proto_bot import tasks_pb2
 from remote_client_errors import InternalError
 from remote_client_errors import MintOAuthTokenError
 from remote_client_errors import PollError
@@ -26,14 +26,14 @@ from utils import net
 from utils import grpc_proxy
 
 try:
-  from proto_bot import worker_manager_pb2_grpc
-  from proto_bot import reservation_manager_pb2_grpc
-  from proto_bot import task_manager_pb2_grpc
+  from proto_bot import bots_pb2_grpc
+  from proto_bot import tasks_pb2_grpc
+  from proto_bot import bytestream_pb2_grpc
 except ImportError:
   # This happens legitimately during unit tests
-  worker_manager_pb2_grpc = None
-  reservation_manager_pb2_grpc = None
-  task_manager_pb2_grpc = None
+  bots_pb2_grpc = None
+  tasks_pb2_grpc = None
+  bytestream_pb2_grpc = None
 
 
 class RemoteClientGrpc(object):
@@ -47,20 +47,21 @@ class RemoteClientGrpc(object):
   def __init__(self, server, fake_proxy=None):
     logging.info('Communicating with host %s via gRPC', server)
     if fake_proxy:
-      self._proxy_wm = fake_proxy
-      self._proxy_rm = fake_proxy
-      self._proxy_tm = fake_proxy
+      self._proxy_bots = fake_proxy
+      self._proxy_tasks = fake_proxy
+      self._proxy_bytestream = fake_proxy
     else:
-      if not worker_manager_pb2_grpc:
-        raise ImportError("can't import stubs - is gRPC installed?")
-      self._proxy_wm = grpc_proxy.Proxy(server,
-          worker_manager_pb2_grpc.WorkerManagerStub)
-      self._proxy_rm = grpc_proxy.Proxy(server,
-          reservation_manager_pb2_grpc.ReservationManagerStub)
-      self._proxy_tm = grpc_proxy.Proxy(server,
-          task_manager_pb2_grpc.TaskManagerStub)
+      if not bots_pb2_grpc:
+        raise ImportError('can\'t import stubs - is gRPC installed?')
+      self._proxy_bots = grpc_proxy.Proxy(server, bots_pb2_grpc.BotsStub)
+      self._proxy_tasks = grpc_proxy.Proxy(server, tasks_pb2_grpc.TasksStub)
+      self._proxy_bs = grpc_proxy.Proxy(server,
+                                        bytestream_pb2_grpc.ByteStreamStub)
     self._server = server
     self._log_is_asleep = False
+    self._session = None
+    self._stdout_offset = 0
+    self._stdout_resource = None
 
   @property
   def server(self):
@@ -83,84 +84,25 @@ class RemoteClientGrpc(object):
   def ping(self):
     pass
 
-  def mint_oauth_token(self, task_id, bot_id, account_id, scopes):
-    # pylint: disable=unused-argument
-    raise MintOAuthTokenError(
-        'mint_oauth_token is not supported in grpc protocol')
-
-  def post_bot_event(self, _event_type, message, _attributes):
-    # pylint: disable=unused-argument
-    logging.warning('post_bot_event(%s): not yet implemented', message)
-
-  def post_task_update(self, task_id, bot_id, params,
-                       stdout_and_chunk=None, exit_code=None):
-    worker_name = self._proxy_tm.prefix + '/workers/' + bot_id
-    should_continue = True
-    # If there is stdout, send an update.
-    if stdout_and_chunk:
-      cs = command_pb2.CommandSync()
-      cs.stdout_chunk.data = stdout_and_chunk[0]
-      cs.stdout_chunk.offset = stdout_and_chunk[1]
-      ureq = task_manager_pb2.SyncTaskRequest()
-      ureq.name = task_id
-      ureq.worker_name = worker_name
-      ureq.update.Pack(cs)
-      ures = self._proxy_tm.call_unary('SyncTask', ureq)
-      should_continue = ures.ok
-
-    # If this is the last update, send a CompleteTask.
-    # Note that exit_code may be "0" which is falsey, so
-    # specifically check for None.
-    if exit_code is not None:
-      res = command_pb2.CommandResult()
-      ovh = command_pb2.CommandOverhead()
-      res.exit_code = exit_code
-      if params.get('io_timeout'):
-        res.status.code = code_pb2.UNAVAILABLE
-      elif params.get('hard_timeout'):
-        res.status.code = code_pb2.DEADLINE_EXCEEDED
-      _time_to_duration(params.get('duration'), ovh.duration)
-      _time_to_duration(params.get('bot_overhead'), ovh.overhead)
-      if 'outputs_ref' in params:
-        res.outputs.hash = params['outputs_ref']['isolated']
-        res.outputs.size_bytes = -1
-      creq = task_manager_pb2.CompleteTaskRequest()
-      creq.name = task_id
-      creq.worker_name = worker_name
-      creq.result.Pack(res)
-      creq.metadata.Pack(ovh)
-      self._proxy_tm.call_unary('CompleteTask', creq)
-
-    return should_continue
-
-  def post_task_error(self, task_id, bot_id, message):
-    worker_name = self._proxy_tm.prefix + '/workers/' + bot_id
-    res = command_pb2.CommandResult()
-    res.status.code = code_pb2.ABORTED
-    res.status.message = message
-    creq = task_manager_pb2.CompleteTaskRequest()
-    creq.name = task_id
-    creq.worker_name = worker_name
-    creq.result.Pack(res)
-    self._proxy_tm.call_unary('CompleteTask', creq)
-
   def do_handshake(self, attributes):
     logging.info('do_handshake(%s)', attributes)
-    request = worker_manager_pb2.CreateWorkerRequest()
-    request.parent = self._proxy_wm.prefix
-    self._attributes_to_worker(attributes, request.worker)
-    worker = self._proxy_wm.call_unary('CreateWorker', request)
-    props = json_format.MessageToDict(worker.properties, False, True)
+    # Initialize the session
+    self._session = bots_pb2.BotSession()
+    self._attributes_to_session(attributes)
+
+    # Call the server and overwrite our copy of the session
+    request = bots_pb2.CreateBotSessionRequest()
+    request.parent = self._proxy_bots.prefix
+    request.bot_session.CopyFrom(self._session)
+    self._session = self._proxy_bots.call_unary('CreateBotSession', request)
     resp = {
-        'bot_version': props['bot_version'],
+        'bot_version': self._session.version,
         'bot_group_cfg': {
-            'dimensions': _device_to_new_dimensions(attributes, worker.device),
+            'dimensions': _worker_to_bot_group_cfg(self._session.worker),
         },
-        # Don't fill in server_version or bot_group_cfg_version, even with dummy
-        # values, as the server will expect them to be correct and will tell the
-        # bot to restart itself.
-        # TODO(aludwin): fill these values in once we can retrieve them in a
-        # reasonable way.
+        # server_version: unknown, doesn't seem to matter
+        # bot_group_cfg_version: only really matters that it's non-None
+        'bot_group_cfg_version': 1,
     }
 
     logging.info('Completed handshake: %s', resp)
@@ -168,20 +110,58 @@ class RemoteClientGrpc(object):
 
   def poll(self, attributes):
     logging.info('poll(%s)', attributes)
-    # In the experimental worker API, this is two operations: updating the
-    # worker and getting a lease. First, get a description of the current
-    # worker.
-    worker = worker_manager_pb2.Worker()
-    self._attributes_to_worker(attributes, worker)
+    if self._session:
+      if len(self._session.leases) == 1:
+        # Wouldn't have gotten here unless the prior task finished
+        self._session.leases[0].state = bots_pb2.COMPLETED
+      elif self._session.leases:
+        # Not a good assumption but works for now. When this fails, need to do
+        # more realistic state management.
+        logging.error('multiple leases are not supported yet')
+    else:
+      # This shouldn't happen since the session was created in do_handshake, but
+      # if it does, we want the poll to continue so we can download a new
+      # version of the bot code.
+      logging.error('session is unset; creating a blank one')
+      self._session = bots_pb2.BotSession()
 
-    # Next, send the update.
-    worker = self._update_worker(worker)
-    # TODO(aludwin): if there are any admin actions that need doing, do them
-    # now.
+    # Update and send the session
+    self._attributes_to_session(attributes)
+    req = bots_pb2.UpdateBotSessionRequest()
+    req.bot_session.CopyFrom(self._session)
+    req.name = req.bot_session.name
+    try:
+      # TODO(aludwin): pass in quit_bit? Pressing ctrl-c doesn't actually
+      # interrupt either the long poll or the retry process, so we need to wait
+      # a while to exit cleanly.
+      self._session = self._proxy_bots.call_unary('UpdateBotSession', req)
+    except grpc_proxy.grpc.RpcError as e:
+      # It's fine for the deadline to expire; this simply means that no tasks
+      # were received while long-polling. Any other exception cannot be
+      # recovered here.
+      if e.code() is not grpc_proxy.grpc.StatusCode.DEADLINE_EXCEEDED:
+        raise PollError(str(e))
+    except Exception as e:
+      raise PollError(str(e))
 
-    # Actually get a lease
-    lease = self._poll_for_lease(worker)
-    if not lease:
+    # Check for new leases
+    new_lease = None
+    for lease in self._session.leases:
+      if lease.state == bots_pb2.PENDING:
+        if new_lease:
+          raise PollError('Multiple new leases are not supported')
+        new_lease = lease
+        # This will be picked up the next time we call UpdateBotSession (in
+        # post_bot_event).
+        new_lease.state = bots_pb2.ACTIVE
+      elif lease.state == bots_pb2.ACTIVE:
+        raise PollError('Server thinks lease is already running')
+      elif lease.state == bots_pb2.COMPLETED:
+        pass
+      elif lease.state == bots_pb2.CANCELLED:
+        pass
+
+    if not new_lease:
       # Nothing to do at the moment. Sleep briefly and then call again because
       # the server supports long-polls. If the server is overwhelmed, it should
       # reply with UNAVAILABLE.
@@ -192,81 +172,83 @@ class RemoteClientGrpc(object):
       return 'sleep', 1
 
     self._log_is_asleep = False
-    if lease.client:
-      raise ValueError('managers on different endpoints are not supported')
-    if not lease.exclusive:
-      raise ValueError('received nonexclusive lease')
-    if not lease.task:
-      raise ValueError('task must be included in lease')
-    return ('run', self._lease_to_manifest(worker, lease))
+    if not new_lease.inline_assignment:
+      raise PollError('task must be included in lease')
+
+    return ('run', self._process_lease(new_lease))
+
+  def post_bot_event(self, _event_type, message, _attributes):
+    # pylint: disable=unused-argument
+    logging.warning('post_bot_event(%s): not yet implemented', message)
+
+  def post_task_update(self, task_id, bot_id, params,
+                       stdout_and_chunk=None, exit_code=None):
+    # In gRPC mode, task_id is a full resource name, as returned in
+    # lease.assignment_name.
+    #
+    # Note that exit_code may be "0" which is falsey, so specifically check for
+    # None.
+    finished = (exit_code is not None)
+
+    # If there is stdout, send an update.
+    if stdout_and_chunk or finished:
+      self._send_stdout_chunk(bot_id, task_id, stdout_and_chunk, finished)
+
+    # If this is the last update, call UpdateTaskResult.
+    if finished:
+      self._complete_task(task_id, bot_id, params, exit_code)
+
+    # TODO(aludwin): send normal BotSessionUpdate and verify that this lease is
+    # not CANCELLED.
+    should_continue = True
+    return should_continue
+
+  def post_task_error(self, task_id, bot_id, message):
+    req = tasks_pb2.UpdateTaskResultRequest()
+    req.name = task_id + '/result'
+    req.source = self._session.bot_id
+    req.result.name = req.name
+    req.result.complete = True
+    req.result.status.code = code_pb2.ABORTED
+    req.result.status.message = message
+    self._proxy_tasks.call_unary('UpdateTaskResult', req)
+    self._send_stdout_chunk(bot_id, task_id, None, True)
 
   def get_bot_code(self, new_zip_fn, bot_version, _bot_id):
     # pylint: disable=unused-argument
     logging.warning('Not yet implemented: get_bot_code')
 
-  def _attributes_to_worker(self, attributes, worker):
+  def mint_oauth_token(self, task_id, bot_id, account_id, scopes):
+    # pylint: disable=unused-argument
+    raise MintOAuthTokenError(
+        'mint_oauth_token is not supported in grpc protocol')
+
+  def _attributes_to_session(self, attributes):
     """Creates a proto Worker message from  bot attributes."""
-    worker.name = (self._proxy_wm.prefix + '/workers/' +
-                   attributes['dimensions']['id'][0])
-    _dimensions_to_device(attributes['dimensions'], worker.device)
-    attributes['state']['bot_version'] = attributes['version']
-    json_format.ParseDict(attributes['state'], worker.properties)
+    self._session.bot_id = attributes['dimensions']['id'][0]
+    _dimensions_to_workers(attributes['dimensions'], self._session.worker)
+    self._session.health = bots_pb2.HEALTHY
+    self._session.version = attributes['version']
 
-  def _bot_id_from_worker(self, worker):
-    prefix = self._proxy_wm.prefix + '/workers/'
-    if not worker.name.startswith(prefix):
-      raise ValueError('worker %s does not start with expected prefix %s' %
-                       (worker.name, prefix))
-    return worker.name[len(prefix):]
-
-  def _update_worker(self, worker):
-    req = worker_manager_pb2.UpdateWorkerRequest()
-    req.worker.CopyFrom(worker)
-    # TODO(aludwin): use the worker returned by UpdateWorker, but right now
-    # UpdateWorker isn't returning a valid worker, so just go with what we
-    # passed in for now.
-    self._proxy_wm.call_unary('UpdateWorker', req)
-    return worker
-
-  def _poll_for_lease(self, worker):
-    """Gets a lease from the server.
-
-    In this implementation, the device in the poll request is identical to that
-    of the worker as a whole because we do not support partial leases of a
-    worker.
-    """
-    req = reservation_manager_pb2.PollRequest()
-    req.parent = self._proxy_rm.prefix
-    req.worker_name = worker.name
-    req.device.CopyFrom(worker.device)
-    req.accept_exclusive_leases = True
-    res = None
-    try:
-      # TODO(aludwin): pass in quit_bit? Pressing ctrl-c doesn't actually
-      # interrupt either the long poll or the retry process, so we need to wait
-      # a while to exit cleanly.
-      res = self._proxy_rm.call_unary('Poll', req)
-    except grpc_proxy.grpc.RpcError as g:
-      # It's fine for the deadline to expire; this simply means that no tasks
-      # were received while long-polling. Any other exception cannot be
-      # recovered here.
-      if g.code() is not grpc_proxy.grpc.StatusCode.DEADLINE_EXCEEDED:
-        raise
-    logging.info('received poll response: %s', res)
-    # res may be None if we got DEADLINE_EXCEEDED; res.lease appears to always
-    # be present but if it has its zero value, the name will be the empty
-    # string.
-    if not res or not res.lease.name:
-      return None
-    return res.lease
-
-  def _lease_to_manifest(self, worker, lease):
-    """Convert the lease into a manifest.
+  def _process_lease(self, lease):
+    """Process the lease and return its equivalent manifest.
 
     The only supported leases are the ones that include a task.
     """
+    task = tasks_pb2.Task()
+    lease.inline_assignment.Unpack(task)
     command = command_pb2.CommandTask()
-    lease.task.Unpack(command)
+    task.description.Unpack(command)
+
+    # Save the log handle
+    self._stdout_offset = 0
+    self._stdout_resource = task.logs['stdout']
+    expected_stdout = self._stdout_resource_name_from_ids(
+        self._session.bot_id, lease.assignment)
+    # We don't currently pass _stdout_resource to task_runner.py so verify now
+    # that it's what we can reconstruct given the information that we *do* have.
+    # TODO(aludwin): pass this information to task_runner.py.
+    assert self._stdout_resource == expected_stdout
 
     # TODO(aludwin): Pass the namespace through the proxy. Using
     # proxy hardcoded values for now.
@@ -275,9 +257,10 @@ class RemoteClientGrpc(object):
       inferred_namespace = 'sha-256-flat'
 
     manifest = {
-      'bot_id': self._bot_id_from_worker(worker),
+      'bot_id': self._session.bot_id,
       'dimensions' : {
-        prop.key.custom: prop.value for prop in lease.requirements.properties
+        # TODO(aludwin): handle standard keys
+        prop.key: prop.value for prop in lease.requirements.properties
       },
       'env': {
         env.name: env.value for env in command.inputs.environment_variables
@@ -285,14 +268,14 @@ class RemoteClientGrpc(object):
       # proto duration uses long integers; clients expect ints
       'grace_period': int(command.timeouts.shutdown.seconds),
       'hard_timeout': int(command.timeouts.execution.seconds),
-      'io_timeout': int(command.timeouts.io.seconds),
+      'io_timeout': int(command.timeouts.idle.seconds),
       'isolated': {
         'namespace': inferred_namespace,
         'input' : command.inputs.files[0].hash,
         'server': self._server,
       },
-      'outputs': [o for o in command.outputs.files],
-      'task_id': lease.name,
+      'outputs': [o for o in command.expected_outputs.files],
+      'task_id': lease.assignment,
       # These keys are only needed by raw commands. While this method
       # only supports isolated commands, the keys need to exist to avoid
       # missing key errors.
@@ -302,33 +285,111 @@ class RemoteClientGrpc(object):
     logging.info('returning manifest: %s', manifest)
     return manifest
 
+  def _send_stdout_chunk(self, bot_id, task_id, stdout_and_chunk, finished):
+    """Sends a stdout chunk to Bytestream.
 
-def _dimensions_to_device(dims, device):
-  """Converts botattribute dims to a Worker device."""
-  properties = device.properties
+    If stdout_and_chunk is not None, it must be a two element array, with the
+    first element being the data to send and the second being the offset (which
+    must match the size of all previously sent chunks). If it is None, then
+    `finished` must be true and we will tell the server the log is complete.
+    """
+    if not stdout_and_chunk and not finished:
+      raise InternalError('missing stdout, but finished is False')
+
+    req = bytestream_pb2.WriteRequest()
+    req.resource_name = self._stdout_resource_name_from_ids(bot_id, task_id)
+    req.write_offset = self._stdout_offset
+    req.finish_write = finished
+    if stdout_and_chunk:
+      req.data = stdout_and_chunk[0]
+      req.write_offset = stdout_and_chunk[1]
+      self._stdout_offset += len(req.data)
+
+    res = None
+    try:
+      def stream():
+        logging.info('Writing to ByteStream:\n%s', req)
+        yield req
+      res = self._proxy_bs.call_no_retries('Write', stream())
+    except grpc_proxy.grpc.RpcError as r:
+      logging.error('gRPC error during stdout update: %s' % r)
+      raise r
+
+    if res is not None and res.committed_size != self._stdout_offset:
+      raise InternalError('%s: incorrect size written (got %d, want %d)' % (
+          req.resource_name, res.committed_size, self._stdout_offset))
+
+    if finished:
+      self._stdout_offset = 0
+      self._stdout_resource = None
+
+  def _stdout_resource_name_from_ids(self, bot_id, task_id):
+    # TODO(aludwin): use self._stdout_resource, but it's not set in
+    # task_runner.py yet. Until then, take the task_id (currently in the form
+    # projects/project/tasks/taskid) and extract the taskid from it.
+    project_id = self._proxy_bs.prefix
+    real_task_id = task_id[task_id.rfind('/')+1:]
+    return '%s/logs/%s/%s/stdout' % (project_id, bot_id, real_task_id)
+
+  def _complete_task(self, task_id, bot_id, params, exit_code):
+    # Create command result
+    res = command_pb2.CommandOutputs()
+    res.exit_code = exit_code
+    if 'outputs_ref' in params:
+      res.outputs.hash = params['outputs_ref']['isolated']
+      res.outputs.size_bytes = -1
+
+    # Create command overhead
+    ovh = command_pb2.CommandOverhead()
+    _time_to_duration(params.get('duration'), ovh.duration)
+    _time_to_duration(params.get('bot_overhead'), ovh.overhead)
+
+    # Create task result and pack in command result/overhead
+    req = tasks_pb2.UpdateTaskResultRequest()
+    req.name = task_id + '/result'
+    req.source = bot_id
+    req.result.name = req.name
+    req.result.complete = True
+    if params.get('io_timeout'):
+      req.result.status.code = code_pb2.UNAVAILABLE
+    elif params.get('hard_timeout'):
+      req.result.status.code = code_pb2.DEADLINE_EXCEEDED
+    req.result.output.Pack(res)
+    req.result.meta.Pack(ovh)
+
+    # Send update
+    self._proxy_tasks.call_unary('UpdateTaskResult', req)
+
+
+def _dimensions_to_workers(dims, worker):
+  """Converts botattribute dims to a Worker."""
+  if not worker.devices:
+    worker.devices.add()
+  del worker.properties[:]
+  del worker.devices[0].properties[:]
   for k, values in sorted(dims.iteritems()):
+    if k == 'id':
+      # Proxy treats ID as worker-level, not device-level. But use this for the
+      # device name.
+      worker.devices[0].handle = values[0]
+      continue
     for v in sorted(values):
-      prop = properties.add()
-      prop.key.custom = k
+      prop = None
+      if k == 'pool':
+        prop = worker.properties.add()
+      else:
+        prop = worker.devices[0].properties.add()
+      prop.key = k
       prop.value = v
 
 
-def _device_to_new_dimensions(attributes, device):
-  """Detects what new dimensions have been returned."""
-  # Make a record of what old values existed
-  old_dims = {}
-  for k, values in attributes['dimensions'].iteritems():
-    old_dims[k] = {}
-    for v in values:
-      old_dims[k][v] = True
-  # Record all missing kvps
+def _worker_to_bot_group_cfg(worker):
+  """Returns global properties since those are only settable by a config."""
   dims = {}
-  for prop in device.properties:
-    k = prop.key.custom
-    v = prop.value
-    if not old_dims.get(k) or not old_dims[k].get(v):
-      dims[k] = dims.get(k, [])
-      dims[k].append(prop.value)
+  for prop in worker.properties:
+    k = prop.key
+    dims[k] = dims.get(k, [])
+    dims[k].append(prop.value)
   return dims
 
 def _time_to_duration(time_f, duration):
