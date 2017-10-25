@@ -56,6 +56,10 @@ The following environment variables may be set to alter bot behavior:
     used in the limited case when you need to override TLS. See
     [/client/utils/grpc_proxy.py](../../../client/utils/grpc_proxy.py) for more
     information.
+  - `SWARMING_BOT_ID` can be used to override hostname-based bot id with a
+    custom value. Must be specified before swarming script is started. Note that
+    this environment variable will be set even if it was not specified manually
+    and will always contain the bot id used.
 
 
 ### dimensions

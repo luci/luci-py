@@ -327,9 +327,10 @@ def get_ip():
 @tools.cached
 def get_hostname():
   """Returns the machine's hostname."""
-  if platforms.is_gce():
+  if platforms.is_gce() and not os.path.isfile('/.docker_env'):
     # When running on GCE, always use the hostname as defined by GCE. It's
-    # possible the VM hadn't learned about it yet.
+    # possible the VM hadn't learned about it yet. We ignore GCE hostname when
+    # running inside a Docker container and instead use its own hostname.
     meta = platforms.gce.get_metadata() or {}
     hostname = meta.get('instance', {}).get('hostname')
     if hostname:
@@ -1013,6 +1014,9 @@ def get_dimensions():
   }
 
   # Conditional dimensions:
+  id_override = os.environ.get('SWARMING_BOT_ID')
+  if id_override:
+    dimensions[u'id'] = [unicode(id_override)]
 
   caches = get_named_caches_info()
   if caches:

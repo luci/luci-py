@@ -7,6 +7,7 @@ import logging
 import math
 import os
 import re
+import socket
 import subprocess
 import sys
 import time
@@ -15,8 +16,13 @@ import unittest
 import test_env_api
 test_env_api.setup_test_env()
 
+from api import platforms
 from depot_tools import auto_stub
 from utils import file_path
+
+# Disable caching before importing os_utilities.
+from utils import tools
+tools.cached = lambda func: func
 
 import os_utilities
 
@@ -120,6 +126,16 @@ class TestOsUtilities(auto_stub.TestCase):
       expected.add(u'xcode_version')
     self.assertEqual(expected, actual)
 
+  def test_override_id_via_env(self):
+    mock_env = os.environ.copy()
+    mock_env['SWARMING_BOT_ID'] = 'customid'
+    self.mock(os, 'environ', mock_env)
+    dimensions = os_utilities.get_dimensions()
+    self.assertIsInstance(dimensions[u'id'], list)
+    self.assertEqual(len(dimensions[u'id']), 1)
+    self.assertIsInstance(dimensions[u'id'][0], unicode)
+    self.assertEqual(dimensions[u'id'][0], u'customid')
+
   def test_get_state(self):
     actual = os_utilities.get_state()
     actual.pop('temp', None)
@@ -138,6 +154,32 @@ class TestOsUtilities(auto_stub.TestCase):
     if u'quarantined' in actual:
       self.fail(actual[u'quarantined'])
     self.assertEqual(expected, set(actual))
+
+  def test_get_hostname_gce_docker(self):
+    self.mock(platforms, 'is_gce', lambda: True)
+    self.mock(os.path, 'isfile', lambda _: True)
+    self.mock(socket, 'getfqdn', lambda: 'dockerhost')
+    self.assertEqual(os_utilities.get_hostname(), 'dockerhost')
+
+  def test_get_hostname_gce_nodocker(self):
+    self.mock(platforms, 'is_gce', lambda: True)
+    self.mock(os.path, 'isfile', lambda _: False)
+    self.mock(platforms.gce, 'get_metadata',
+              lambda: {'instance': {'hostname': 'gcehost'}})
+    self.assertEqual(os_utilities.get_hostname(), 'gcehost')
+
+  def test_get_hostname_nogce(self):
+    self.mock(platforms, 'is_gce', lambda: False)
+    self.mock(os.path, 'isfile', lambda _: False)
+    self.mock(socket, 'getfqdn', lambda: 'somehost')
+    self.assertEqual(os_utilities.get_hostname(), 'somehost')
+
+  def test_get_hostname_macos(self):
+    self.mock(platforms, 'is_gce', lambda: False)
+    self.mock(os.path, 'isfile', lambda _: False)
+    self.mock(socket, 'getfqdn', lambda: 'somehost.in-addr.arpa')
+    self.mock(socket, 'gethostname', lambda: 'somehost')
+    self.assertEqual(os_utilities.get_hostname(), 'somehost')
 
   def test_setup_auto_startup_win(self):
     # TODO(maruel): Figure out a way to test properly.

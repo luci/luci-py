@@ -28,7 +28,8 @@
     *   `python` is in `PATH`.
     *   HTTPS access to *.appspot.com and Cloud Storage (GCS).
     *   Unique bot id across the fleet. The bot id uses the base hostname (not
-        FQDN) by default so by default, hostnames should be unique.
+        FQDN) by default so by default, hostnames should be unique. You may
+        specify custom bot id using `SWARMING_BOT_ID` environment variable.
 *   Android
     *   On an Debian desktop host, the current user must be a member
         of `plugdev` so it can open USB ports.
