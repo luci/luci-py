@@ -67,16 +67,8 @@ def CommonChecks(input_api, output_api):
     join('components', 'config'),
     join('components', 'datastore_utils'),
     join('components', 'ereporter2'),
+    join('tests'),
   ]
-  blacklist = []
-  if not input_api.is_committing:
-    # Skip smoke tests on upload.
-    blacklist.append(r'.+_smoke_test\.py$')
-  else:
-    # 'tests' contains only smoke tests. Add it only when committing (otherwise
-    # depot_tools emits warning "Out of 4 files, found none that matched ...").
-    test_directories.append(join('tests'))
-
   tests = []
   for directory in test_directories:
     tests.extend(
@@ -84,13 +76,14 @@ def CommonChecks(input_api, output_api):
             input_api, output_api,
             directory,
             whitelist=[r'.+_test\.py$'],
-            blacklist=blacklist))
+            blacklist=[]))
   output.extend(input_api.RunTests(tests, parallel=True))
   return output
 
 
+# pylint: disable=unused-argument
 def CheckChangeOnUpload(input_api, output_api):
-  return CommonChecks(input_api, output_api)
+  return []
 
 
 def CheckChangeOnCommit(input_api, output_api):

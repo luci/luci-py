@@ -18,8 +18,9 @@ def CommonChecks(input_api, output_api):
   return input_api.RunTests(tests, parallel=True)
 
 
+# pylint: disable=unused-argument
 def CheckChangeOnUpload(input_api, output_api):
-  return CommonChecks(input_api, output_api)
+  return []
 
 
 def CheckChangeOnCommit(input_api, output_api):
