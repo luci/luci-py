@@ -13,7 +13,14 @@
     <task-retry-prompt></task-retry-prompt>
 
   Properties:
-    None.
+    is_debug_task: Boolean, Show the options used for debug tasks.
+    lease_duration: String, How long the task should be leased out for debugging.
+        (e.g. "2h", "30m", "5s")
+    task_id: String, Specifies the task_id of the task to be retried.
+    task_dimensions: Array, List of dimensions to restrict the new task to.
+        (e.g. [{key: "...", value: "..."}, ...])
+    task_use_same_bot: Boolean, If set to true, task_dimensions is ignored
+        and the task should be restricted to the exact bot it previously ran on.
 
   Methods:
     setDimensions(Array): Set the dimensions to show the user for editing.
@@ -22,6 +29,7 @@
 -->
 
 <link rel="import" href="/res/imp/bower_components/paper-input/paper-input.html">
+<link rel="import" href="/res/imp/bower_components/paper-toggle-button/paper-toggle-button.html">
 
 <dom-module id="task-retry-prompt">
   <template>
@@ -41,8 +49,19 @@
 
   <h2>Are you sure you want to retry task [[task_id]]?</h2>
 
-  <div>If you want to modify any dimensions (e.g. specify a bot's id), do so now.</div>
+  <template is="dom-if" if="[[is_debug_task]]">
+    <paper-input auto-validate pattern="[1-9][0-9]*[smh]" error-message="enter a duration (e.g. 30s, 2m, 6h)" label="Lease duration" value="{{lease_duration}}"></paper-input>
+    <paper-toggle-button checked="{{task_use_same_bot}}">
+      <template is="dom-if" if="[[task_use_same_bot]]">
+      Run task on the same bot
+      </template>
+      <template is="dom-if" if="[[!task_use_same_bot]]">
+      Run task on any bot matching the dimensions
+      </template>
+    </paper-toggle-button>
+  </template>
 
+  <div>If you want to modify any dimensions (e.g. specify a bot's id), do so now.</div>
   <table>
     <thead>
       <tr>
@@ -55,6 +74,7 @@
       <tr>
         <td>
           <paper-input
+            disabled="[[task_use_same_bot]]"
             no-label-float=true
             value="[[dim.key]]"
             on-change="_updateKey">
@@ -62,6 +82,7 @@
         </td>
         <td>
           <paper-input
+            disabled="[[task_use_same_bot]]"
             no-label-float=true
             value="[[dim.value]]"
             on-change="_updateValue">
@@ -78,13 +99,26 @@
     Polymer({
       is: "task-retry-prompt",
       properties: {
+        is_debug_task: {
+          type: Boolean,
+        },
+        lease_duration: {
+          // TODO: make this an Integer, so this element is entirely responsible
+          // for the duration validation.
+          type: String,
+          notify: true,
+        },
         task_id: {
           type: String,
         },
         task_dimensions: {
           type: Array,
           notify: true,
-        }
+        },
+        task_use_same_bot: {
+          type: Boolean,
+          notify: true,
+        },
       },
 
       setDimensions: function(dims) {

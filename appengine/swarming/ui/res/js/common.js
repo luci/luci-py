@@ -95,5 +95,33 @@ this.swarming = this.swarming || function() {
     }
   }
 
+  // parseDuration parses a duration string into an integer number of seconds.
+  // e.g:
+  // swarming.parseDuration("40s") == 40
+  // swarming.parseDuration("2m") == 120
+  // swarming.parseDuration("1h") == 3600
+  // swarming.parseDuration("foo") == null
+  swarming.parseDuration = function(duration) {
+    var number = duration.slice(0, -1);
+    if (!/[1-9][0-9]*/.test(number)) {
+      return null;
+    }
+    number = Number(number);
+
+    var unit = duration.slice(-1);
+    switch (unit) {
+      // the fallthroughs here are intentional
+      case 'h':
+        number *= 60;
+      case 'm':
+        number *= 60;
+      case 's':
+        break;
+      default:
+        return null;
+    }
+    return number;
+  }
+
   return swarming;
 }();

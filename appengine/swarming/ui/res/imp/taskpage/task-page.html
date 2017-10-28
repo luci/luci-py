@@ -194,6 +194,7 @@
                 <iron-icon class="refresh" icon="icons:refresh"></iron-icon>
               </button>
               <button on-click="_promptRetry">Retry</button>
+              <button on-click="_promptDebug">Debug</button>
               <template is="dom-if" if="[[_canCancelTask(_result,_permissions)]]">
                 <button on-click="_promptCancel">Cancel</button>
               </template>
@@ -701,6 +702,20 @@
       </div>
     </paper-dialog>
 
+    <paper-dialog id="debug_task" modal on-iron-overlay-closed="_debugClosed">
+      <task-retry-prompt id="debug_task_prompt"
+        is_debug_task
+        lease_duration="{{_lease_duration}}"
+        task_id="[[task_id]]"
+        task_dimensions="{{_retry_dimensions}}"
+        task_use_same_bot="{{_use_same_bot}}">
+      </task-retry-prompt>
+      <div class="buttons">
+        <paper-button dialog-dismiss>Cancel</paper-button>
+        <paper-button dialog-confirm>OK</paper-button>
+      </div>
+    </paper-dialog>
+
     <interval-timer period="[[_refresh_interval]]" on-trigger="_softRefresh">
     </interval-timer>
 
@@ -761,6 +776,10 @@
           type: String,
           value: "",
         },
+        _lease_duration: {
+          type: String,
+          value: "4h",
+        },
         _host_url: {
           type: String,
           value: function(){
@@ -800,7 +819,10 @@
         },
         _stdout: {
           type: String,
-        }
+        },
+        _use_same_bot: {
+          type: Boolean,
+        },
       },
 
       observers: [
@@ -1073,12 +1095,21 @@
         this.$.prompt.open();
       },
 
+      _promptDebug: function() {
+        this.$.debug_task_prompt.setDimensions(this._request.properties.dimensions);
+        this.$.debug_task.open();
+      },
+
+      _debugClosed: function(e) {
+        return this._retryClosed(e, true);
+      },
+
       _promptRetry: function() {
         this.$.retry_task_prompt.setDimensions(this._request.properties.dimensions);
         this.$.retry_task.open();
       },
 
-      _retryClosed: function(e) {
+      _retryClosed: function(e, isDebug) {
         if (!this._request) {
           sk.errorMessage("Task not yet loaded", 3000);
           return;
@@ -1088,22 +1119,51 @@
         }
         var newTask = {
           expiration_secs: this._request.expiration_secs,
-          name: this._request.name +" (retry)",
           parent_task_id: this._request.parent_task_id,
           priority: this._request.priority,
-          properties:this._request.properties,
+          properties: this._request.properties,
           tags: this._request.tags,
           user: this._profile.email,
           service_account: this._request.service_account,
         }
-        newTask.properties.dimensions = this._retry_dimensions.filter(function(d){
-          return d && d.key && d.value;
-        });
+        if (isDebug) {
+          newTask.name = `leased to ${this._profile.email} for debugging`;
+          newTask.tags = ["debug_task:1"];
+
+          var leaseDuration = swarming.parseDuration(this._lease_duration);
+
+          newTask.properties.command = ["python", "-c", `import os, sys, time
+print 'Mapping task: ${location.origin}/task?id=${this._result.task_id}'
+print 'Files are mapped into: ' + os.getcwd()
+print ''
+print 'Bot id: ' + os.environ['SWARMING_BOT_ID']
+print 'Bot leased for: ${leaseDuration} seconds'
+print 'How to access this bot: http://go/swarming-ssh'
+print 'When done, reboot the host'
+sys.stdout.flush()
+time.sleep(${leaseDuration})`];
+          delete newTask.properties.extra_args;
+
+          newTask.properties.execution_timeout_secs = leaseDuration;
+          newTask.properties.io_timeout_secs = leaseDuration;
+        } else {
+          newTask.name = this._result.name + " (retry)";
+        }
+        if (this._use_same_bot) {
+          newTask.properties.dimensions = [
+            {key: "id", value: this._getFirstResultDimension("id")},
+            {key: "pool", value: this._getFirstRequestDimension("pool")},
+          ];
+        } else {
+          newTask.properties.dimensions = this._retry_dimensions.filter(function(d){
+            return d && d.key && d.value;
+          });
+        }
         if (!newTask.properties.dimensions || !newTask.properties.dimensions.length) {
           sk.errorMessage("Your retried task must specify dimensions", 5000);
           return;
         }
-        console.log("Retrying with dimensions", newTask.properties.dimensions);
+        console.log("New task has dimensions", newTask.properties.dimensions);
         newTask.properties.idempotent = false;
         swarming.postWithToast("/api/swarming/v1/tasks/new", "Retrying task " + this.task_id,
           this._auth_headers, newTask)
@@ -1118,6 +1178,30 @@
             console.log("Task could not be retried", e);
           }
         );
+      },
+
+      _getFirstRequestDimension: function(key) {
+        var dimensions = this._request.properties.dimensions.filter(function (d) {
+          return d.key === key;
+        });
+        if (!dimensions.length) {
+          return null;
+        }
+        return dimensions[0].value;
+      },
+
+      _getFirstResultDimension: function(key) {
+        var dimensions = this._result.bot_dimensions.filter(function(d) {
+          return d.key === key;
+        });
+        if (!dimensions.length) {
+          return null;
+        }
+        var values = dimensions[0].value;
+        if (!values.length) {
+          return null;
+        }
+        return values[0];
       },
 
       _rawOutput: function(stdout, result) {
