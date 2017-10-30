@@ -4,6 +4,8 @@
 
 """Provides info about registered luci services."""
 
+import logging
+
 from google.appengine.ext import ndb
 
 from components import config
@@ -59,20 +61,17 @@ def _dict_to_dynamic_metadata(data):
 def get_metadata_async(service_id):
   """Returns service dynamic metadata.
 
-  Memcaches results for 1 min. Never returns None.
-
   Raises:
     ServiceNotFoundError if service |service_id| is not found.
     DynamicMetadataError if metadata endpoint response is bad.
   """
-  cache_key = 'get_metadata(%r)' % service_id
-  ctx = ndb.get_context()
-  cached = yield ctx.memcache_get(cache_key)
-  if cached:
+  model = yield storage.ServiceDynamicMetadata.get_by_id_async(service_id)
+  if model:
     msg = service_config_pb2.ServiceDynamicMetadata()
-    msg.ParseFromString(cached)
+    msg.ParseFromString(model.metadata)
     raise ndb.Return(msg)
 
+  #TODO(myjang): delete the rest of the function once entities in production
   services = yield get_services_async()
   service = None
   for s in services:
@@ -83,12 +82,38 @@ def get_metadata_async(service_id):
 
   if not service.metadata_url:
     raise ndb.Return(service_config_pb2.ServiceDynamicMetadata())
-
   try:
     res = yield net.json_request_async(
         service.metadata_url, scopes=net.EMAIL_SCOPE)
   except net.Error as ex:
     raise DynamicMetadataError('Net error: %s' % ex.message)
   msg = _dict_to_dynamic_metadata(res)
-  yield ctx.memcache_set(cache_key, msg.SerializeToString(), time=60)
   raise ndb.Return(msg)
+
+
+@ndb.tasklet
+def _update_service_metadata_async(service):
+  entity = storage.ServiceDynamicMetadata(id=service.id)
+  if service.metadata_url:
+    try:
+      res = yield net.json_request_async(
+          service.metadata_url, scopes=net.EMAIL_SCOPE)
+    except net.Error as ex:
+      raise DynamicMetadataError('Net error: %s' % ex.message)
+    entity.metadata = _dict_to_dynamic_metadata(res).SerializeToString()
+
+  prev_entity = yield storage.ServiceDynamicMetadata.get_by_id_async(service.id)
+  if not prev_entity or prev_entity.metadata != entity.metadata:
+    yield entity.put_async()
+    logging.info('Updated service metadata for %s', service.id)
+
+
+def cron_request_metadata():
+  services = get_services_async().get_result()
+  futs = [_update_service_metadata_async(s) for s in services]
+  ndb.Future.wait_all(futs)
+  for s, fut in zip(services, futs):
+    try:
+      fut.check_success()
+    except DynamicMetadataError:
+      logging.exception('Could not load dynamic metadata for %s', s.id)

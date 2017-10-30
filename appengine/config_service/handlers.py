@@ -15,6 +15,7 @@ import gitiles_import
 import notifications
 import os
 import storage
+import services
 
 
 class CronGitilesImport(webapp2.RequestHandler):
@@ -22,6 +23,13 @@ class CronGitilesImport(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
     gitiles_import.cron_run_import()
+
+
+class CronServicesMetadataRequest(webapp2.RequestHandler):
+  """Updates stored service metadata."""
+  @decorators.require_cronjob
+  def get(self):
+    services.cron_request_metadata()
 
 
 class MainPageHandler(webapp2.RequestHandler):
@@ -70,4 +78,8 @@ def get_backend_routes():  # pragma: no cover
       webapp2.Route(
           r'/internal/cron/luci-config/gitiles_import',
           CronGitilesImport),
+      webapp2.Route(
+          r'/internal/cron/luci-config/update_services_metadata',
+          CronServicesMetadataRequest
+      )
   ]

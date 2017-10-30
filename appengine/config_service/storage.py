@@ -15,6 +15,17 @@ from components import config
 from components import utils
 
 
+class ServiceDynamicMetadata(ndb.Model):
+  """Contains service dynamic metadata.
+
+  Entity key:
+    Id is the service id.
+  """
+  # contains ServiceDynamicMetadata message in binary format.
+  # see components/config/proto/service_config.proto file.
+  metadata = ndb.BlobProperty(required=True)
+
+
 class Blob(ndb.Model):
   """Content-addressed blob. Immutable.
 

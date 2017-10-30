@@ -9,6 +9,11 @@ cron:
   url: /internal/cron/luci-config/gitiles_import
   schedule: every 10 minutes
 
+- description: request metadata from services
+  target: backend
+  url: /internal/cron/luci-config/update_services_metadata
+  schedule: every 10 minutes
+
 ### ereporter2
 
 - description: ereporter2 cleanup

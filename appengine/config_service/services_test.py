@@ -8,6 +8,7 @@ import test_env
 test_env.setup_test_env()
 
 import mock
+import logging
 
 from components import net
 from components.config.proto import service_config_pb2
@@ -30,6 +31,23 @@ class ProjectsTestCase(test_case.TestCase):
               service_config_pb2.Service(id='metadataless'),
             ]
         ))
+
+  def mock_metadata_entity(self):
+    dict = {
+      'version': '1.0',
+      'validation': {
+        'url': 'https://a.com/validate',
+        'patterns': [
+          {'config_set': 'projects/foo', 'path': 'bar.cfg'},
+          {'config_set': 'regex:services/.+', 'path': 'regex:.+'},
+        ]
+      }
+    }
+    mck_meta = (services._dict_to_dynamic_metadata(dict).SerializeToString())
+    storage.ServiceDynamicMetadata(
+        id='deadbeef',
+        metadata=mck_meta,
+    ).put()
 
   def test_dict_to_dynamic_metadata(self):
     with self.assertRaises(services.DynamicMetadataError):
@@ -111,6 +129,50 @@ class ProjectsTestCase(test_case.TestCase):
     metadata = services.get_metadata_async('metadataless').get_result()
     self.assertIsNotNone(metadata)
     self.assertFalse(metadata.validation.patterns)
+
+  def test_update_service_metadata_async_same(self):
+    self.mock_metadata_entity()
+    self.mock(net, 'json_request_async', mock.Mock())
+    dict = {
+      'version': '1.0',
+      'validation': {
+        'url': 'https://a.com/validate',
+        'patterns': [
+          {'config_set': 'projects/foo', 'path': 'bar.cfg'},
+          {'config_set': 'regex:services/.+', 'path': 'regex:.+'},
+        ]
+      }
+    }
+
+    net.json_request_async.return_value = future(dict)
+    self.mock(logging, 'info', mock.Mock())
+    mock_service = mock.Mock()
+    mock_service.id = 'deadbeef'
+    mock_service.metadata_url = 'https://a.com/validate'
+    services._update_service_metadata_async(mock_service).get_result()
+    self.assertFalse(logging.info.called)
+
+  def test_update_service_metadata_async_different(self):
+    self.mock_metadata_entity()
+    self.mock(net, 'json_request_async', mock.Mock())
+    dict = {
+      'version': '1.0',
+      'validation': {
+        'url': 'https://a.com/different_validate',
+        'patterns': [
+          {'config_set': 'projects/bar', 'path': 'foo.cfg'},
+          {'config_set': 'regex:services/.+', 'path': 'regex:.+'},
+        ]
+      }
+    }
+
+    net.json_request_async.return_value = future(dict)
+    self.mock(logging, 'info', mock.Mock())
+    mock_service = mock.Mock()
+    mock_service.id = 'deadbeef'
+    mock_service.metadata_url = 'https://a.com/validate'
+    services._update_service_metadata_async(mock_service).get_result()
+    self.assertTrue(logging.info.called)
 
 
 if __name__ == '__main__':
