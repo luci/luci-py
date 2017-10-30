@@ -266,6 +266,48 @@ class GitilesImportTestCase(test_case.TestCase):
     self.assert_attempt(
         False, 'Could not import: permission denied', no_revision=True)
 
+  def test_import_config_set_with_force_update(self):
+    self.mock_get_log()
+    storage.ConfigSet(
+        id='config_set',
+        latest_revision='a1841f40264376d170269ee9473ce924b7c2c4e9',
+        latest_revision_url='https://localhost/project/+/deadbeef/x',
+        latest_revision_committer_email=self.john.email,
+        latest_revision_time=self.john.time,
+        location='https://localhost/project/+/master/x',
+        version=0,
+    ).put()
+    self.mock(gitiles_import, '_import_revision', mock.Mock())
+    gitiles_import._import_config_set(
+        'config_set',
+        gitiles.Location.parse('https://localhost/project/+/master/x'))
+    gitiles_import._import_revision.assert_called_once()
+
+  def test_import_config_set_without_force_update(self):
+    self.mock_get_log()
+    storage.ConfigSet(
+        id='config_set',
+        latest_revision='a1841f40264376d170269ee9473ce924b7c2c4e9',
+        latest_revision_url='https://localhost/project/+/deadbeef/x',
+        latest_revision_committer_email=self.john.email,
+        latest_revision_time=self.john.time,
+        location='https://localhost/project/+/master/x',
+        version=1,
+    ).put()
+    self.mock(gitiles_import, '_import_revision', mock.Mock())
+    gitiles_import._import_config_set(
+        'config_set',
+        gitiles.Location.parse('https://localhost/project/+/master/x'))
+    self.assertFalse(gitiles_import._import_revision.called)
+
+  def test_import_config_set_without_cs(self):
+    self.mock_get_log()
+    self.mock(gitiles_import, '_import_revision', mock.Mock())
+    gitiles_import._import_config_set(
+        'config_set',
+        gitiles.Location.parse('https://localhost/project/+/master/x'))
+    self.assertTrue(gitiles_import._import_revision.called)
+
   def test_deadline_exceeded(self):
     self.mock_get_log()
     self.mock(gitiles, 'get_archive', mock.Mock())

@@ -264,7 +264,8 @@ def _import_config_set(config_set, location):
 
     config_set_key = ndb.Key(storage.ConfigSet, config_set)
     config_set_entity = config_set_key.get()
-    force_update = config_set_entity.version < storage.ConfigSet.CUR_VERSION
+    force_update = (config_set_entity and
+                    config_set_entity.version < storage.ConfigSet.CUR_VERSION)
     if (config_set_entity and config_set_entity.latest_revision == commit.sha
         and not force_update):
       save_attempt(True, 'Up-to-date')
