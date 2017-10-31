@@ -387,6 +387,10 @@ class SwarmingTasksService(remote.Service):
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
 
+    # Make sure the caller is actually allowed to schedule the task before
+    # asking the token server for a service account token.
+    task_scheduler.check_schedule_request_acl(request)
+
     # If request.service_account is an email, contact the token server to
     # generate "OAuth token grant" (or grab a cached one). By doing this we
     # check that the given service account usage is allowed by the token server
@@ -752,6 +756,7 @@ class SwarmingBotService(remote.Service):
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
 
+    task_scheduler.check_schedule_request_acl(request)
     result_summary = task_scheduler.schedule_request(request, None)
     return swarming_rpcs.TerminateResponse(
         task_id=task_pack.pack_result_summary_key(result_summary.key))

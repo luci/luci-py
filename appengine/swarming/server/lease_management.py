@@ -923,7 +923,6 @@ def check_for_connection(machine_lease):
     task_scheduler.schedule_request(
         task_request.create_termination_task(machine_lease.hostname, True),
         None,
-        check_acls=False,
     )
     if release(machine_lease):
       clear_lease_request(machine_lease.key, machine_lease.client_request_id)
@@ -937,7 +936,6 @@ def check_for_connection(machine_lease):
     task_scheduler.schedule_request(
         task_request.create_termination_task(machine_lease.hostname, True),
         None,
-        check_acls=False,
     )
     if release(machine_lease):
       cleanup_bot(machine_lease)
@@ -1057,7 +1055,6 @@ def handle_early_release(machine_lease):
     task_result_summary = task_scheduler.schedule_request(
         task_request.create_termination_task(machine_lease.hostname, True),
         None,
-        check_acls=False,
     )
     associate_termination_task(
         machine_lease.key, machine_lease.hostname, task_result_summary.task_id)
