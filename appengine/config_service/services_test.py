@@ -174,6 +174,15 @@ class ProjectsTestCase(test_case.TestCase):
     services._update_service_metadata_async(mock_service).get_result()
     self.assertTrue(logging.info.called)
 
+  def test_update_service_metadata_no_service_url(self):
+    self.mock_metadata_entity()
+    mock_service = mock.Mock()
+    mock_service.id = 'deadbeef'
+    mock_service.metadata_url = ''
+    self.mock(logging, 'info', mock.Mock())
+    services._update_service_metadata_async(mock_service).get_result()
+    self.assertTrue(logging.info.called)
+
 
 if __name__ == '__main__':
   test_env.main()

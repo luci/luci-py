@@ -65,10 +65,11 @@ def get_metadata_async(service_id):
     ServiceNotFoundError if service |service_id| is not found.
     DynamicMetadataError if metadata endpoint response is bad.
   """
-  model = yield storage.ServiceDynamicMetadata.get_by_id_async(service_id)
-  if model:
+  entity = yield storage.ServiceDynamicMetadata.get_by_id_async(service_id)
+  if entity:
     msg = service_config_pb2.ServiceDynamicMetadata()
-    msg.ParseFromString(model.metadata)
+    if entity.metadata:
+      msg.ParseFromString(entity.metadata)
     raise ndb.Return(msg)
 
   #TODO(myjang): delete the rest of the function once entities in production

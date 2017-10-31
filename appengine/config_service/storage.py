@@ -23,7 +23,7 @@ class ServiceDynamicMetadata(ndb.Model):
   """
   # contains ServiceDynamicMetadata message in binary format.
   # see components/config/proto/service_config.proto file.
-  metadata = ndb.BlobProperty(required=True)
+  metadata = ndb.BlobProperty()
 
 
 class Blob(ndb.Model):
