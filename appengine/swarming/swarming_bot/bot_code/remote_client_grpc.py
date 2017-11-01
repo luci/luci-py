@@ -22,6 +22,7 @@ from proto_bot import tasks_pb2
 from remote_client_errors import InternalError
 from remote_client_errors import MintOAuthTokenError
 from remote_client_errors import PollError
+from remote_client_errors import BotCodeError
 from utils import net
 from utils import grpc_proxy
 
@@ -175,7 +176,7 @@ class RemoteClientGrpc(object):
     if not new_lease.inline_assignment:
       raise PollError('task must be included in lease')
 
-    return ('run', self._process_lease(new_lease))
+    return self._process_lease(new_lease)
 
   def post_bot_event(self, _event_type, message, _attributes):
     # pylint: disable=unused-argument
@@ -215,8 +216,15 @@ class RemoteClientGrpc(object):
     self._send_stdout_chunk(bot_id, task_id, None, True)
 
   def get_bot_code(self, new_zip_fn, bot_version, _bot_id):
-    # pylint: disable=unused-argument
-    logging.warning('Not yet implemented: get_bot_code')
+    with open(new_zip_fn, 'w') as zf:
+      req = bytestream_pb2.ReadRequest()
+      req.resource_name = bot_version
+      try:
+        for resp in self._proxy_bs.call_no_retries('Read', req):
+          zf.write(resp.data)
+      except grpc_proxy.grpc.RpcError as e:
+        logging.error('gRPC error fetching %s: %s', req.resource_name, e)
+        raise BotCodeError(new_zip_fn, req.resource_name, bot_version)
 
   def mint_oauth_token(self, task_id, bot_id, account_id, scopes):
     # pylint: disable=unused-argument
@@ -231,10 +239,17 @@ class RemoteClientGrpc(object):
     self._session.version = attributes['version']
 
   def _process_lease(self, lease):
-    """Process the lease and return its equivalent manifest.
+    """Process the lease and return its command and payload."""
+    pf = 'type.googleapis.com/google.devtools.remoteworkers.v1test2.'
+    t = lease.inline_assignment.type_url
+    if t == pf + 'AdminTemp':
+      return self._process_admin_lease(lease)
+    if t == pf + 'Task':
+      return self._process_task_lease(lease)
+    raise PollError('unknown assignment type %s' % t)
 
-    The only supported leases are the ones that include a task.
-    """
+  def _process_task_lease(self, lease):
+    """Processes the task lease."""
     task = tasks_pb2.Task()
     lease.inline_assignment.Unpack(task)
     command = command_pb2.CommandTask()
@@ -248,7 +263,9 @@ class RemoteClientGrpc(object):
     # We don't currently pass _stdout_resource to task_runner.py so verify now
     # that it's what we can reconstruct given the information that we *do* have.
     # TODO(aludwin): pass this information to task_runner.py.
-    assert self._stdout_resource == expected_stdout
+    if self._stdout_resource != expected_stdout:
+      raise PollError('expected stdout resouce %s but got %s' % (
+          expected_stdout, self._stdout_resource))
 
     # TODO(aludwin): Pass the namespace through the proxy. Using
     # proxy hardcoded values for now.
@@ -283,7 +300,27 @@ class RemoteClientGrpc(object):
       'extra_args': None,
     }
     logging.info('returning manifest: %s', manifest)
-    return manifest
+    return ('run', manifest)
+
+  def _process_admin_lease(self, lease):
+    """Process the admin lease."""
+    action = bots_pb2.AdminTemp()
+    lease.inline_assignment.Unpack(action)
+    cmd = None
+    if action.command == bots_pb2.AdminTemp.BOT_UPDATE:
+      cmd = 'update'
+    elif action.command == bots_pb2.AdminTemp.BOT_RESTART:
+      cmd = 'bot_restart'
+    elif action.command == bots_pb2.AdminTemp.BOT_TERMINATE:
+      cmd = 'terminate'
+    elif action.command == bots_pb2.AdminTemp.HOST_RESTART:
+      cmd = 'host_reboot'
+
+    if not cmd:
+      raise PollError('Unknown command: %s(%s)' % (action.command, action.arg))
+
+    logging.info('Performing admin action: %s(%s)', cmd, action.arg)
+    return (cmd, action.arg)
 
   def _send_stdout_chunk(self, bot_id, task_id, stdout_and_chunk, finished):
     """Sends a stdout chunk to Bytestream.

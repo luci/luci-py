@@ -87,6 +87,23 @@ message Device {
   repeated Property properties = 2;
 }
 
+message AdminTemp {
+  enum Command {
+    UNSPECIFIED = 0;
+
+    BOT_UPDATE = 1;
+
+    BOT_RESTART = 2;
+
+    BOT_TERMINATE = 3;
+
+    HOST_RESTART = 4;
+  }
+  Command command = 1;
+  string arg = 2;
+}
+
+
 message CreateBotSessionRequest {
   string parent = 1;
 
