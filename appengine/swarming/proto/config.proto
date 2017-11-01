@@ -55,6 +55,9 @@ message SettingsCfg {
 
   // Sets the default gRPC proxy for the bot's Isolate server calls.
   optional string bot_isolate_grpc_proxy = 14;
+
+  // Sets the default gRPC proxy for the bot's Swarming server calls.
+  optional string bot_swarming_grpc_proxy = 15;
 }
 
 
