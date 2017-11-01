@@ -510,6 +510,8 @@ class Test(unittest.TestCase):
         'print(\'hi\')',
         'with open(os.path.join(sys.argv[1], \'result.txt\'), \'wb\') as f:',
         '  f.write(\'hey2\')'))
+    # Hard code the size of the isolated file.
+    isolated_size = 138
     expected_summary = self.gen_expected(
         name=u'separate_cmd',
         isolated_out=RESULT_HEY2_ISOLATED_OUT,
@@ -517,10 +519,11 @@ class Test(unittest.TestCase):
           u'isolated_download': {
             u'initial_number_items': u'0',
             u'initial_size': u'0',
-            u'items_cold': sorted([len(hello_world), 157]),
+            u'items_cold': sorted([len(hello_world), isolated_size]),
             u'items_hot': [],
             u'num_items_cold': u'2',
-            u'total_bytes_items_cold': unicode(len(hello_world) + 157),
+            u'total_bytes_items_cold': unicode(
+                len(hello_world) + isolated_size),
           },
           u'isolated_upload': {
             u'items_cold': [4, 118],
