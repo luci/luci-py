@@ -253,34 +253,40 @@ class Project(object):
     network_interfaces = get_network_interfaces(self.project_id, network_url,
                                                 auto_assign_external_ip)
     service_accounts = service_accounts or []
+
+    payload = {
+        'name': name,
+        'properties': {
+            'disks': [
+              {
+                  'autoDelete': True,
+                  'boot': True,
+                  'initializeParams': {
+                      'diskSizeGb': disk_size_gb,
+                      'sourceImage': image,
+                  },
+              },
+            ],
+            'machineType': machine_type,
+            'metadata': {
+                'items': metadata,
+            },
+            'networkInterfaces': network_interfaces,
+            'serviceAccounts': service_accounts,
+            'tags': {
+                'items': tags,
+            },
+        },
+    }
+
+    # Empty 'minCpuPlatform' field is rejected, need to omit it entirely.
+    if min_cpu_platform:
+      payload['properties']['minCpuPlatform'] = min_cpu_platform
+
     return self.call_api(
         '/global/instanceTemplates',
         method='POST',
-        payload={
-            'name': name,
-            'properties': {
-                'disks': [
-                  {
-                      'autoDelete': True,
-                      'boot': True,
-                      'initializeParams': {
-                          'diskSizeGb': disk_size_gb,
-                          'sourceImage': image,
-                      },
-                  },
-                ],
-                'machineType': machine_type,
-                'metadata': {
-                    'items': metadata,
-                },
-                'minCpuPlatform': min_cpu_platform,
-                'networkInterfaces': network_interfaces,
-                'serviceAccounts': service_accounts,
-                'tags': {
-                    'items': tags,
-                },
-            },
-        },
+        payload=payload,
     )
 
   def create_instance_group_manager(
