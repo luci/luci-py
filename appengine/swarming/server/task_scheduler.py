@@ -24,6 +24,8 @@ import event_mon_metrics
 import ts_mon_metrics
 
 from server import config
+from server import pools_config
+from server import service_accounts
 from server import task_pack
 from server import task_queues
 from server import task_request
@@ -436,6 +438,107 @@ def _find_dupe_task(now, h):
   return None
 
 
+def _check_schedule_request_acl_v2(request):
+  # Only terminate tasks don't have a pool. ACLs for them are handled through
+  # 'acl.can_edit_bot', see 'terminate' RPC handler. Such tasks do not end up
+  # hitting this function, and so we can assume there's a pool set (this is
+  # checked in TaskProperties's pre put hook).
+  assert u'pool' in request.properties.dimensions, request.properties
+  pool = request.properties.dimensions[u'pool']
+  pool_cfg = pools_config.get_pool_config(pool)
+
+  # request.service_account can be 'bot' or 'none'. We don't care about these,
+  # they are always allowed. We care when the service account is a real email.
+  has_service_account = service_accounts.is_service_account(
+      request.service_account)
+
+  if not pool_cfg:
+    # Pools without pools.cfg entry are relatively wide open (anyone with
+    # 'can_create_task' permission can use them). This is to be backward
+    # compatible with Swarming deployments that do not care about pools
+    # isolation. As a downside, they are not allowed to use service accounts,
+    # since Swarming doesn't know what accounts are allowed in such unknown
+    # pools.
+    logging.info('Pool "%s" is not in pools.cfg, using default acl', pool)
+    if has_service_account:
+      raise auth.AuthorizationError(
+          'Can\'t use account "%s" in the pool "%s" not defined in pools.cfg' %
+          (request.service_account, pool))
+    return
+
+  logging.info(
+      'Looking at the pool "%s" in pools.cfg, rev "%s"', pool, pool_cfg.rev)
+
+  # Verify the caller can use the pool at all.
+  if not _is_allowed_to_schedule(pool_cfg):
+    raise auth.AuthorizationError(
+        'User "%s" is not allowed to schedule tasks in the pool "%s", '
+        'see pools.cfg' % (auth.get_current_identity().to_bytes(), pool))
+
+  # Verify the requested task service account is allowed in this pool.
+  if (has_service_account and
+      request.service_account not in pool_cfg.service_accounts):
+    raise auth.AuthorizationError(
+        'Service account "%s" is not allowed in the pool "%s", see pools.cfg' %
+        (request.service_account, pool))
+
+
+def _is_allowed_to_schedule(pool_cfg):
+  """True if the current caller is allowed to schedule tasks in the pool."""
+  caller_id = auth.get_current_identity()
+
+  # Listed directly?
+  if caller_id in pool_cfg.scheduling_users:
+    logging.info(
+        'Caller "%s" is allowed to schedule tasks in the pool "%s" by being '
+        'specified directly in the pool config', caller_id.to_bytes(),
+        pool_cfg.name)
+    return True
+
+  # Listed through a group?
+  for group in pool_cfg.scheduling_groups:
+    if auth.is_group_member(group, caller_id):
+      logging.info(
+          'Caller "%s" is allowed to schedule tasks in the pool "%s" by being '
+          'referenced via the group "%s" in the pool config',
+          caller_id.to_bytes(), pool_cfg.name, group)
+      return True
+
+  # Using delegation?
+  delegation_token = auth.get_delegation_token()
+  if not delegation_token:
+    return False
+
+  # Log relevant info about the delegation to simplify debugging.
+  peer_id = auth.get_peer_identity()
+  token_tags = set(delegation_token.tags or [])
+  logging.info(
+      'Using delegation, delegatee is "%s", delegation tags are %s',
+      peer_id.to_bytes(), sorted(map(str, token_tags)))
+
+  # Is the delegatee listed in the config?
+  trusted_delegatee = pool_cfg.trusted_delegatees.get(peer_id)
+  if not trusted_delegatee:
+    logging.warning('The delegatee "%s" is unknown', peer_id.to_bytes())
+    return False
+
+  # Are any of the required delegation tags present in the token?
+  cross = token_tags & trusted_delegatee.required_delegation_tags
+  if cross:
+    logging.info(
+        'Caller "%s" is allowed to schedule tasks in the pool "%s" by acting '
+        'through a trusted delegatee "%s" that set the delegation tags %s',
+        caller_id.to_bytes(), pool_cfg.name, peer_id.to_bytes(),
+        sorted(map(str, cross)))
+    return True
+
+  logging.warning(
+      'Expecting any of %s tags, got %s, forbidding the call',
+      sorted(map(str, trusted_delegatee.required_delegation_tags)),
+      sorted(map(str, token_tags)))
+  return False
+
+
 ### Public API.
 
 
@@ -460,7 +563,15 @@ def check_schedule_request_acl(request):
   Raises:
     auth.AuthorizationError if the caller is not allowed to schedule this task.
   """
-  # TODO(vadimsh): Check service accounts and delegation token.
+  # TODO(vadimsh): Perform v2 check, but ignore its result for now. Once all
+  # Swarming instances are updated with correct pools.cfg this will become the
+  # main check and the code below (based in dimension_acls) will be deleted.
+  try:
+    _check_schedule_request_acl_v2(request)
+  except auth.AuthorizationError as err:
+    logging.error('crbug.com/777022: ACL check failed (but ignored): %s', err)
+
+  # TODO(vadimsh): Delete this once pools.cfg are defined everywhere.
   dim_acls = config.settings().dimension_acls
   if not dim_acls or not dim_acls.entry:
     return # not configured, this is fine

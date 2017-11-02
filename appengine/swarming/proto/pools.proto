@@ -1,0 +1,98 @@
+// Copyright 2017 The LUCI Authors. All rights reserved.
+// Use of this source code is governed under the Apache License, Version 2.0
+// that can be found in the LICENSE file.
+
+syntax = "proto2";
+
+
+// Schema for pools.cfg service config file in luci-config.
+//
+// It defined a set of Pool objects, each one corresponding to a single Swarming
+// pool dimension. Each Swarming task resided in some pool, and each Swarming
+// bot belongs to at least one pool.
+//
+// Pools are used to isolate groups of tasks/bots from each other for security
+// and capacity reasons. Two different pools should not interfere with each
+// other at all (unless explicitly configured to share bots or accounts).
+message PoolsCfg {
+  repeated Pool pool = 1;
+}
+
+
+// Properties of a single pool, in particular authorization related information.
+message Pool {
+  // Name of the pool. Tasks target the pool by specifying its name as 'pool'
+  // dimension, thus this name should be valid dimension value.
+  optional string name = 1;
+
+  // Contact information for people that own this pool.
+  //
+  // Not used in any ACLs, just informational field.
+  repeated string owners = 2;
+
+  // Defines who can schedule tasks in this pool.
+  //
+  // Moved into a separate proto message for improved readability of text proto.
+  optional Schedulers schedulers = 3;
+
+  // List of service account emails allowed to be used for tasks that target
+  // this pool. Tasks specify the service account via 'service_account' field
+  // in the tasks.New RPC.
+  //
+  // By associating accounts with pools in the config we make it more explicit
+  // that a bot belonging to a pool eventually can get access to service
+  // accounts of all tasks running in this pool (just by sitting there, grabbing
+  // tasks and sniffing service account tokens).
+  repeated string allowed_service_account = 4;
+}
+
+
+// Defines who can schedule tasks in a pool.
+message Schedulers {
+  // Emails of individual end-users.
+  //
+  // Useful to avoid creating one-person groups.
+  repeated string user = 1;
+
+  // List of groups with end-users.
+  repeated string group = 2;
+
+  // See TrustedDelegation comment.
+  repeated TrustedDelegation trusted_delegation = 3;
+}
+
+
+// Defines a delegatee trusted to make authorization decisions for who can use
+// a pool.
+//
+// This is based on LUCI delegation protocol. Imagine an end user U calling
+// Swarming through an intermediary service X. In this case U is a delegator and
+// X is a delegatee. When X calls Swarming, it makes an RPC to the token server
+// to make a delegation token that says "<X can call Swarming on behalf of U>".
+//
+// This token is then sent to the Swarming with the RPC. Swarming sees that
+// the direct peer it's talking to is X, but the call should be performed under
+// the authority of U.
+//
+// We extend this to also allow X make authorization decisions about whether U
+// can use particular Swarming resource or not. The result of this decision is
+// encoded in the delegation token as a set of "key:value" tags. Swarming then
+// can treat presence of such tags as a signal that the particular call is
+// allowed.
+//
+// In this scenario we totally trust X to make the correct decision.
+message TrustedDelegation {
+  message TagList {
+    repeated string tag = 1;
+  }
+
+  // Email of a trusted delegatee (the one who's minting the delegation token).
+  optional string peer_id = 1;
+
+  // A list of tags to expected in the delegation token to allow the usage of
+  // a pool.
+  //
+  // Presence of any of the specified tags are enough. The format of these tags
+  // generally depends on what service is doing the delegation.
+  optional TagList require_any_of = 2;
+}

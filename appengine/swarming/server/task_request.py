@@ -493,8 +493,8 @@ class TaskProperties(ndb.Model):
   cipd_input = ndb.LocalStructuredProperty(CipdInput)
 
   # Filter to use to determine the required properties on the bot to run on. For
-  # example, Windows or hostname. Encoded as json. Either 'pool' or 'id'
-  # dimension are required (see _validate_dimensions and _pre_put_hook).
+  # example, Windows or hostname. Encoded as json. 'pool' dimension is required
+  # for all tasks except terminate (see _pre_put_hook).
   dimensions = datastore_utils.DeterministicJsonProperty(
       validator=_validate_dimensions, json_type=dict, indexed=False)
 
@@ -563,7 +563,7 @@ class TaskProperties(ndb.Model):
       return
 
     if u'pool' not in self.dimensions:
-      # Only terminate task may no use 'pool'. Others must specify one.
+      # Only terminate task may not use 'pool'. Others must specify one.
       raise datastore_errors.BadValueError(
           u'\'pool\' must be used as dimensions')
 

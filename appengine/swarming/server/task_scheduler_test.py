@@ -28,9 +28,11 @@ from components import auth_testing
 from components import datastore_utils
 from components import pubsub
 from components import utils
+from components.auth.proto import delegation_pb2
 
 from server import bot_management
 from server import config
+from server import pools_config
 from server import task_pack
 from server import task_queues
 from server import task_request
@@ -1407,6 +1409,118 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     with self.assertRaises(auth.AuthorizationError):
       self.check_schedule_request_acl(
           properties={'dimensions': {u'pool': u'default', u'abc': u'blah'}})
+
+  def mock_pool_config(
+      self,
+      name,
+      scheduling_users=None,
+      scheduling_groups=None,
+      trusted_delegatees=None,
+      service_accounts=None):
+    def mocked_get_pool_config(pool):
+      if pool == name:
+        return pools_config.PoolConfig(
+            name=name,
+            rev='rev',
+            scheduling_users=frozenset(scheduling_users or []),
+            scheduling_groups=frozenset(scheduling_groups or []),
+            trusted_delegatees={
+              peer: pools_config.TrustedDelegatee(peer, frozenset(tags))
+              for peer, tags in (trusted_delegatees or {}).iteritems()
+            },
+            service_accounts=frozenset(service_accounts or []))
+      return None
+    self.mock(pools_config, 'get_pool_config', mocked_get_pool_config)
+
+  def mock_delegation(self, peer_id, tags):
+    self.mock(auth, 'get_peer_identity', lambda: peer_id)
+    self.mock(
+        auth, 'get_delegation_token',
+        lambda: delegation_pb2.Subtoken(tags=tags))
+
+  def check_schedule_request_acl_v2(self, **kwargs):
+    task_scheduler._check_schedule_request_acl_v2(gen_request(**kwargs))
+
+  def test_check_schedule_request_acl_v2(self):
+    self.mock_pool_config('some-other-pool')
+
+    # Uses default ACL is there's no pool config.
+    self.check_schedule_request_acl_v2(
+        properties={'dimensions': {u'pool': u'some-pool'}})
+
+    # Service accounts are not allowed in this case.
+    with self.assertRaises(auth.AuthorizationError) as ctx:
+      self.check_schedule_request_acl_v2(
+          properties={'dimensions': {u'pool': u'some-pool'}},
+          service_account='robot@example.com')
+    self.assertTrue('Can\'t use account' in str(ctx.exception))
+
+  def test_check_schedule_request_acl_v2_forbidden(self):
+    self.mock_pool_config('some-pool')
+    with self.assertRaises(auth.AuthorizationError) as ctx:
+      self.check_schedule_request_acl_v2(
+          properties={'dimensions': {u'pool': u'some-pool'}})
+    self.assertTrue('not allowed to schedule tasks' in str(ctx.exception))
+
+  def test_check_schedule_request_acl_v2_allowed_explicitly(self):
+    self.mock_pool_config(
+        'some-pool', scheduling_users=[auth_testing.DEFAULT_MOCKED_IDENTITY])
+    self.check_schedule_request_acl_v2(
+        properties={'dimensions': {u'pool': u'some-pool'}})
+
+  def test_check_schedule_request_acl_v2_allowed_through_the_group(self):
+    self.mock_pool_config(
+        'some-pool', scheduling_groups=['mocked'])
+    def mocked_is_group_member(group, ident):
+      return group == 'mocked' and ident == auth_testing.DEFAULT_MOCKED_IDENTITY
+    self.mock(auth, 'is_group_member', mocked_is_group_member)
+    self.check_schedule_request_acl_v2(
+        properties={'dimensions': {u'pool': u'some-pool'}})
+
+  def test_check_schedule_request_acl_v2_unknown_delegation(self):
+    delegatee1 = auth.Identity.from_bytes('user:d1@example.com')
+    delegatee2 = auth.Identity.from_bytes('user:d2@example.com')
+    self.mock_pool_config('some-pool', trusted_delegatees={delegatee1: ['t1']})
+    self.mock_delegation(delegatee2, ['t1'])
+    with self.assertRaises(auth.AuthorizationError):
+      self.check_schedule_request_acl_v2(
+          properties={'dimensions': {u'pool': u'some-pool'}})
+
+  def test_check_schedule_request_acl_v2_delegation_ok(self):
+    delegatee = auth.Identity.from_bytes('user:d1@example.com')
+    self.mock_pool_config(
+        'some-pool', trusted_delegatees={delegatee: ['t1', 'other']})
+    self.mock_delegation(delegatee, ['t1', 'extra'])
+    self.check_schedule_request_acl_v2(
+        properties={'dimensions': {u'pool': u'some-pool'}})
+
+  def test_check_schedule_request_acl_v2_delegation_missing_tag(self):
+    delegatee = auth.Identity.from_bytes('user:d1@example.com')
+    self.mock_pool_config('some-pool', trusted_delegatees={delegatee: ['t1']})
+    self.mock_delegation(delegatee, ['another'])
+    with self.assertRaises(auth.AuthorizationError):
+      self.check_schedule_request_acl_v2(
+          properties={'dimensions': {u'pool': u'some-pool'}})
+
+  def test_check_schedule_request_acl_v2_good_service_acc(self):
+    self.mock_pool_config(
+        'some-pool',
+        scheduling_users=[auth_testing.DEFAULT_MOCKED_IDENTITY],
+        service_accounts=['good@example.com'])
+    self.check_schedule_request_acl_v2(
+        properties={'dimensions': {u'pool': u'some-pool'}},
+        service_account='good@example.com')
+
+  def test_check_schedule_request_acl_v2_bad_service_acc(self):
+    self.mock_pool_config(
+        'some-pool',
+        scheduling_users=[auth_testing.DEFAULT_MOCKED_IDENTITY],
+        service_accounts=['good@example.com'])
+    with self.assertRaises(auth.AuthorizationError) as ctx:
+      self.check_schedule_request_acl_v2(
+          properties={'dimensions': {u'pool': u'some-pool'}},
+          service_account='bad@example.com')
+    self.assertTrue('is not allowed in the pool' in str(ctx.exception))
 
 
 if __name__ == '__main__':

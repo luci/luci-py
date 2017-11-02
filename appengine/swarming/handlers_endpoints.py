@@ -756,7 +756,6 @@ class SwarmingBotService(remote.Service):
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
 
-    task_scheduler.check_schedule_request_acl(request)
     result_summary = task_scheduler.schedule_request(request, None)
     return swarming_rpcs.TerminateResponse(
         task_id=task_pack.pack_result_summary_key(result_summary.key))
