@@ -38,6 +38,7 @@ Tree = collections.namedtuple('Tree', ['id', 'entries'])
 Log = collections.namedtuple('Log', ['commits', 'next_cursor'])
 
 RGX_URL_PATH = re.compile(r'^/([^\+]+)(\+/(.*))?$')
+RGX_HASH = re.compile(r'^[0-9a-f]{40}$')
 
 
 LocationTuple = collections.namedtuple(
@@ -111,6 +112,9 @@ class Location(LocationTuple):
       path = treeish_and_path[len(treeish):]
 
     treeish = treeish or 'HEAD'
+    # if not HEAD or a hash, should be prefixed with refs/heads/
+    if treeish != 'HEAD' and not RGX_HASH.match(treeish):
+      treeish = 'refs/heads/' + treeish
 
     path = path or ''
     if not path.startswith('/'):

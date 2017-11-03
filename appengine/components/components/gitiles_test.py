@@ -286,7 +286,7 @@ class GitilesTestCase(test_case.TestCase):
     loc = gitiles.Location.parse(url)
     self.assertEqual(loc.hostname, 'localhost')
     self.assertEqual(loc.project, 'project')
-    self.assertEqual(loc.treeish, 'treeish')
+    self.assertEqual(loc.treeish, 'refs/heads/treeish')
     self.assertEqual(loc.path, '/path/to/something')
 
   def test_parse_authenticated_url(self):
@@ -298,13 +298,31 @@ class GitilesTestCase(test_case.TestCase):
   def test_parse_location_with_dot(self):
     url = 'http://localhost/project/+/treeish/path'
     loc = gitiles.Location.parse(url)
-    self.assertEqual(loc.treeish, 'treeish')
+    self.assertEqual(loc.treeish, 'refs/heads/treeish')
     self.assertEqual(loc.path, '/path')
 
   def test_parse_location_with_git_ending(self):
     url = 'http://localhost/project.git/+/treeish/path'
     loc = gitiles.Location.parse(url)
     self.assertEqual(loc.project, 'project')
+
+  def test_parse_location_hash_treeish(self):
+    url = ('http://localhost/project.git/+/'
+           'f9af6214956f071d0e541d05e65285b3600079a0/path')
+    loc = gitiles.Location.parse(url)
+    self.assertEqual(loc.treeish, 'f9af6214956f071d0e541d05e65285b3600079a0')
+
+  def test_parse_location_fake_hash_treeish(self):
+    url = ('http://localhost/project.git/+/'
+           'f9af6214956f071d0e541d05e65285b3600079a0d/path')
+    loc = gitiles.Location.parse(url)
+    self.assertEqual(
+        loc.treeish, 'refs/heads/f9af6214956f071d0e541d05e65285b3600079a0d')
+
+  def test_parse_location_HEAD_treeish(self):
+    url = 'http://localhost/project/+/HEAD/path'
+    loc = gitiles.Location.parse(url)
+    self.assertEqual(loc.treeish, 'HEAD')
 
   def test_parse_resolve(self):
     self.mock(gitiles, 'get_refs', mock.Mock())
@@ -314,15 +332,15 @@ class GitilesTestCase(test_case.TestCase):
       'refs/tags/c/d': {},
     }
     loc = gitiles.Location.parse_resolve('http://h/p/+/a/b/c')
-    self.assertEqual(loc.treeish, 'a/b')
+    self.assertEqual(loc.treeish, 'refs/heads/a/b')
     self.assertEqual(loc.path, '/c')
 
     loc = gitiles.Location.parse_resolve('http://h/p/+/c/d/e')
-    self.assertEqual(loc.treeish, 'c/d')
+    self.assertEqual(loc.treeish, 'refs/heads/c/d')
     self.assertEqual(loc.path, '/e')
 
     loc = gitiles.Location.parse_resolve('http://h/p/+/a/c/b')
-    self.assertEqual(loc.treeish, 'a')
+    self.assertEqual(loc.treeish, 'refs/heads/a')
     self.assertEqual(loc.path, '/c/b')
 
   def test_location_neq(self):

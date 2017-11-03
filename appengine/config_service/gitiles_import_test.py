@@ -292,7 +292,7 @@ class GitilesImportTestCase(test_case.TestCase):
         latest_revision_committer_email=self.john.email,
         latest_revision_time=self.john.time,
         location='https://localhost/project/+/master/x',
-        version=1,
+        version=2,
     ).put()
     self.mock(gitiles_import, '_import_revision', mock.Mock())
     gitiles_import._import_config_set(
