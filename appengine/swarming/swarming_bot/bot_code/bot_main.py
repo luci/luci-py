@@ -1004,7 +1004,6 @@ def _run_manifest(botobj, manifest, start):
     handle, bot_file = tempfile.mkstemp(
         prefix='bot_file', suffix='.json', dir=work_dir)
     os.close(handle)
-    _call_hook_safe(True, botobj, 'on_before_task', bot_file)
     task_result_file = os.path.join(work_dir, 'task_runner_out.json')
     if os.path.exists(task_result_file):
       os.remove(task_result_file)
@@ -1040,6 +1039,7 @@ def _run_manifest(botobj, manifest, start):
     # without interpretation.
     command.append('--')
     command.extend(_run_isolated_flags(botobj))
+    _call_hook_safe(True, botobj, 'on_before_task', bot_file, command, env)
     logging.debug('Running command: %s', command)
 
     # Put the output file into the current working directory, which should be

@@ -220,7 +220,7 @@ def on_handshake(bot):
   pass
 
 
-def on_before_task(bot, bot_file):
+def on_before_task(bot, bot_file, runner_cmd, runner_env):
   """Hook function called before running a task.
 
   It shouldn't do much, since it can't cancel the task so it shouldn't do
@@ -232,6 +232,10 @@ def on_before_task(bot, bot_file):
               This file can be used to pass certain info about the bot
               to tasks, such as which connected android devices to run on. See
               https://github.com/luci/luci-py/tree/master/appengine/swarming/doc/Magic-Values.md#run_isolated
+  - runner_cmd: Command to be executed to launch task runner. This variable can
+                be mutated to override the task runner, modify its arguments
+                and/or add a wrapper script around it. USE WITH CAUTION.
+  - runner_env: Environment in which test runner is launched. Can be mutated.
   """
   pass
 
