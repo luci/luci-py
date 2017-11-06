@@ -171,8 +171,16 @@ class ConfigApi(remote.Service):
     for f in request.files:
       if not f.path:
         raise endpoints.BadRequestException('Must specify the path of a file')
-    if (not can_read_config_set(request.config_set)
-        or not acl.has_validation_access()):
+    if not acl.has_validation_access():
+      logging.warning(
+          '%s does not have validation access',
+          auth.get_current_identity().to_bytes())
+      raise endpoints.ForbiddenException()
+    if not can_read_config_set(request.config_set):
+      logging.warning(
+          '%s does not have access to %s',
+          auth.get_current_identity().to_bytes(),
+          request.config_set)
       raise endpoints.ForbiddenException()
 
     futs = []
