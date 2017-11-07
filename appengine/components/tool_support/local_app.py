@@ -138,6 +138,7 @@ class LocalApplication(object):
       '--admin_port', str(free_ports[-1]),
       '--storage_path', os.path.join(self._temp_root, 'storage'),
       '--automatic_restart', 'no',
+      '--log_level', 'debug',
       # Note: The random policy will provide the same consistency every
       # time the test is run because the random generator is always given
       # the same seed.
