@@ -47,6 +47,11 @@ def _get_nvidia_version():
     return None
 
 
+def _read_cpuinfo():
+  with open('/proc/cpuinfo', 'rb') as f:
+    return f.read()
+
+
 ## Public API.
 
 
@@ -97,8 +102,7 @@ def get_audio():
 
 @tools.cached
 def get_cpuinfo():
-  with open('/proc/cpuinfo', 'rb') as f:
-    values = common._safe_parse(f.read())
+  values = common._safe_parse(_read_cpuinfo())
   cpu_info = {}
   if u'vendor_id' in values:
     # Intel.
@@ -122,16 +126,19 @@ def get_cpuinfo():
     # http://www.wired.com/1999/01/intel-on-privacy-whoops/
     # http://www.theregister.co.uk/2000/05/04/intel_processor_serial_number_q/
     # It is very ironic that ARM based manufacturers are getting away with.
-    cpu_info[u'serial'] = values[u'Serial'].lstrip(u'0')
-    cpu_info[u'revision'] = values[u'Revision']
+    if u'Serial' in values:
+      cpu_info[u'serial'] = values[u'Serial'].lstrip(u'0')
+    if u'Revision' in values:
+      cpu_info[u'revision'] = values[u'Revision']
 
     # 'Hardware' field has better content so use it instead of 'model name' /
     # 'Processor' field.
-    cpu_info[u'name'] = values[u'Hardware']
-    # Samsung felt this was useful information. Strip that.
-    suffix = ' (Flattened Device Tree)'
-    if cpu_info[u'name'].endswith(suffix):
-      cpu_info[u'name'] = cpu_info[u'name'][:-len(suffix)]
+    if u'Hardware' in values:
+      cpu_info[u'name'] = values[u'Hardware']
+      # Samsung felt this was useful information. Strip that.
+      suffix = ' (Flattened Device Tree)'
+      if cpu_info[u'name'].endswith(suffix):
+        cpu_info[u'name'] = cpu_info[u'name'][:-len(suffix)]
     # SAMSUNG EXYNOS5 uses 'Processor' instead of 'model name' as the key for
     # its name <insert exasperation meme here>.
     cpu_info[u'vendor'] = (

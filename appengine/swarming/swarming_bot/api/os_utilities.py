@@ -207,10 +207,12 @@ def get_os_name():
 
 @tools.cached
 def get_cpu_type():
-  """Returns the type of processor: arm or x86."""
+  """Returns the type of processor: armv6l, armv7l, arm64 or x86."""
   machine = platform.machine().lower()
   if machine in ('amd64', 'x86_64', 'i386'):
     return u'x86'
+  if machine == 'aarch64':
+    return u'arm64'
   return unicode(machine)
 
 
@@ -298,6 +300,7 @@ def get_cpuinfo():
     # keeping the CPU flags as reported by the OS.
     info.update(platforms.gce.get_cpuinfo() or {})
   return info
+
 
 def get_ip():
   """Returns the IP that is the most likely to be used for TCP connections."""
