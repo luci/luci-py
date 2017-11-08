@@ -1101,15 +1101,6 @@
       },
 
       _debugClosed: function(e) {
-        return this._retryClosed(e, true);
-      },
-
-      _promptRetry: function() {
-        this.$.retry_task_prompt.setDimensions(this._request.properties.dimensions);
-        this.$.retry_task.open();
-      },
-
-      _retryClosed: function(e, isDebug) {
         if (!this._request) {
           sk.errorMessage("Task not yet loaded", 3000);
           return;
@@ -1119,20 +1110,17 @@
         }
         var newTask = {
           expiration_secs: this._request.expiration_secs,
+          name: `leased to ${this._profile.email} for debugging`,
           parent_task_id: this._request.parent_task_id,
           priority: this._request.priority,
           properties: this._request.properties,
-          tags: this._request.tags,
-          user: this._profile.email,
           service_account: this._request.service_account,
+          tags: ["debug_task:1"],
+          user: this._profile.email,
         }
-        if (isDebug) {
-          newTask.name = `leased to ${this._profile.email} for debugging`;
-          newTask.tags = ["debug_task:1"];
+        var leaseDuration = swarming.parseDuration(this._lease_duration);
 
-          var leaseDuration = swarming.parseDuration(this._lease_duration);
-
-          newTask.properties.command = ["python", "-c", `import os, sys, time
+        newTask.properties.command = ["python", "-c", `import os, sys, time
 print 'Mapping task: ${location.origin}/task?id=${this._result.task_id}'
 print 'Files are mapped into: ' + os.getcwd()
 print ''
@@ -1142,13 +1130,10 @@ print 'How to access this bot: http://go/swarming-ssh'
 print 'When done, reboot the host'
 sys.stdout.flush()
 time.sleep(${leaseDuration})`];
-          delete newTask.properties.extra_args;
+        delete newTask.properties.extra_args;
 
-          newTask.properties.execution_timeout_secs = leaseDuration;
-          newTask.properties.io_timeout_secs = leaseDuration;
-        } else {
-          newTask.name = this._result.name + " (retry)";
-        }
+        newTask.properties.execution_timeout_secs = leaseDuration;
+        newTask.properties.io_timeout_secs = leaseDuration;
         if (this._use_same_bot) {
           newTask.properties.dimensions = [
             {key: "id", value: this._getFirstResultDimension("id")},
@@ -1159,13 +1144,49 @@ time.sleep(${leaseDuration})`];
             return d && d.key && d.value;
           });
         }
+        this._newTask(newTask);
+      },
+
+      _promptRetry: function() {
+        this.$.retry_task_prompt.setDimensions(this._request.properties.dimensions);
+        this.$.retry_task.open();
+      },
+
+      _retryClosed: function(e) {
+        if (!this._request) {
+          sk.errorMessage("Task not yet loaded", 3000);
+          return;
+        }
+        if (!e.detail.confirmed) {
+          return;
+        }
+        var newTask = {
+          expiration_secs: this._request.expiration_secs,
+          name: this._request.name +" (retry)",
+          parent_task_id: this._request.parent_task_id,
+          priority: this._request.priority,
+          properties: this._request.properties,
+          service_account: this._request.service_account,
+          tags: this._request.tags,
+          user: this._profile.email,
+        }
+        newTask.tags.push("retry:1");
+        newTask.properties.dimensions = this._retry_dimensions.filter(function(d){
+          return d && d.key && d.value;
+        });
+        this._newTask(newTask);
+      },
+
+      // _newTask makes a request to the server to start a new task, given a request.
+      _newTask: function(newTask){
         if (!newTask.properties.dimensions || !newTask.properties.dimensions.length) {
           sk.errorMessage("Your retried task must specify dimensions", 5000);
           return;
         }
-        console.log("New task has dimensions", newTask.properties.dimensions);
         newTask.properties.idempotent = false;
-        swarming.postWithToast("/api/swarming/v1/tasks/new", "Retrying task " + this.task_id,
+
+        console.log("New task has dimensions", newTask.properties.dimensions);
+        swarming.postWithToast("/api/swarming/v1/tasks/new", "Requesting new task",
           this._auth_headers, newTask)
         .then(function(response) {
             response = JSON.parse(response);
