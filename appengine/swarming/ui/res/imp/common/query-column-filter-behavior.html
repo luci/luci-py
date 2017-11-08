@@ -461,7 +461,10 @@
         if (!primarySelected) {
           return [];
         }
-        var arr = primary_map[primarySelected] || [];
+        var arr = Object.assign([], primary_map[primarySelected]) || [];
+        if (!query) {
+          return arr;
+        }
         if (matchFilter(primarySelected, query, true)) {
           return arr.sort(function(a, b){
             var aMatch = matchFilter(a, query, false);
@@ -474,16 +477,21 @@
           });
         }
         if (matchPartCaseInsensitive(primarySelected, query).idx !== -1) {
-          // Sort the secondaries alphabetically, but prioritize query matches.
-          return arr.sort(function(a, b){
-            var aMatch = matchPartCaseInsensitive(a, query).idx !== -1;
-            var bMatch = matchPartCaseInsensitive(b, query).idx !== -1;
-            if (aMatch === bMatch) {
-              return naturalSort(a,b);
-            }
-            // true == 1 and false == 0.  So, put the one that matches first.
-            return bMatch - aMatch;
-          });
+          // For performance, don't worry about sorting this part until the query is
+          // of a useful length.
+          if (query.length > 3) {
+            // Sort the secondaries alphabetically, but prioritize query matches.
+            arr.sort(function(a, b){
+              var aMatch = matchPartCaseInsensitive(a, query).idx !== -1;
+              var bMatch = matchPartCaseInsensitive(b, query).idx !== -1;
+              if (aMatch === bMatch) {
+                return naturalSort(a,b);
+              }
+              // true == 1 and false == 0.  So, put the one that matches first.
+              return bMatch - aMatch;
+            });
+          }
+          return arr;
         }
         // Otherwise, filter out those that do not match.
         return arr.filter(function(s) {
