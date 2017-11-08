@@ -147,6 +147,14 @@ class LocalApplication(object):
     if self._listen_all:
       cmd.extend(('--host', '0.0.0.0'))
       cmd.extend(('--admin_host', '0.0.0.0'))
+      cmd.extend(('--api_host', '0.0.0.0'))
+    else:
+      # The default is 'localhost' EXCEPT if environment variable
+      # 'DEVSHELL_CLIENT_PORT' is set, then the default is '0.0.0.0'. Take no
+      # chance and always bind to localhost.
+      cmd.extend(('--host', 'localhost'))
+      cmd.extend(('--admin_host', 'localhost'))
+      cmd.extend(('--api_host', 'localhost'))
 
     kwargs = {}
     if sys.platform != 'win32':
