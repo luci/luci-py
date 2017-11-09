@@ -26,7 +26,7 @@ A complete CI toolkit:
 
 1.  Install [Google AppEngine
     SDK](https://cloud.google.com/appengine/downloads).
-2.  git clone https://github.com/luci/luci-py
+2.  git clone https://chromium.googlesource.com/infra/luci/luci-py
 
 
 ## Code layout
