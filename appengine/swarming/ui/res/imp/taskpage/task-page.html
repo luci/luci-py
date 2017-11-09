@@ -193,10 +193,20 @@
               <button on-click="_refresh">
                 <iron-icon class="refresh" icon="icons:refresh"></iron-icon>
               </button>
-              <button on-click="_promptRetry">Retry</button>
-              <button on-click="_promptDebug">Debug</button>
-              <template is="dom-if" if="[[_canCancelTask(_result,_permissions)]]">
-                <button on-click="_promptCancel">Cancel</button>
+              <button on-click="_promptRetry"
+                  title="Retry this task. Dimensions can be altered before task is sent.">
+                Retry
+              </button>
+              <button on-click="_promptDebug"
+                  title="Send a request to reserve a machine like the one that ran this task.">
+                Debug
+              </button>
+              <template is="dom-if" if="[[_canCancelTask(_result)]]">
+                <button on-click="_promptCancel"
+                    disabled$="[[!_permissions.cancel_task]]"
+                    title="[[_cancelTaskText(_permissions,_profile)]]">
+                  Cancel
+                </button>
               </template>
             </div>
             <h2 hidden$="[[_task_exists]]">Task not found.</h2>
@@ -884,8 +894,15 @@
         return sk.human.bytes(sizeInBytes);
       },
 
-      _canCancelTask: function(result, permissions) {
-        return result && result.state === "PENDING" && permissions.cancel_task;
+      _canCancelTask: function(result) {
+        return result && result.state === "PENDING";
+      },
+
+      _cancelTaskText: function(permissions, profile){
+        if (permissions.cancel_task) {
+          return "Cancel a pending task. Running tasks can not (yet) be canceled."
+        }
+        return profile.email +" does not have cancel_task permissions. Log in as a different profile that does.";
       },
 
       _cancelTask: function() {

@@ -9,6 +9,15 @@
     <task-filters></task-filters>
 
   Properties:
+    // inputs
+    dimensions: Array<String>, of all valid dimensions.
+    primary_map: Object, a mapping of primary keys to secondary items.
+        The primary keys are things that can be columns or sorted by.  The
+        primary values (aka the secondary items) are things that can be filtered
+        on. Primary consists of dimensions and state.  Secondary contains the
+        values primary things can be.
+    primary_arr: Array<String>, the display order of the primary keys.
+    profile: Object, information about the logged-in user; see swarming-app.
     // outputs
     columns: Array<String>, the columns that should be displayed.
     query_params: Object, The query params that will filter the query
@@ -52,7 +61,6 @@
 <link rel="import" href="/res/imp/bower_components/iron-flex-layout/iron-flex-layout-classes.html">
 <link rel="import" href="/res/imp/bower_components/iron-icons/iron-icons.html">
 <link rel="import" href="/res/imp/bower_components/iron-selector/iron-selector.html">
-<link rel="import" href="/res/imp/bower_components/paper-button/paper-button.html">
 <link rel="import" href="/res/imp/bower_components/paper-checkbox/paper-checkbox.html">
 <link rel="import" href="/res/imp/bower_components/paper-icon-button/paper-icon-button.html">
 <link rel="import" href="/res/imp/bower_components/paper-input/paper-input.html">
@@ -76,7 +84,7 @@
       }
       .cancel-button {
         display: block;
-        margin-top: 5px;
+        padding: 1.0em 1.5em;
       }
       .settings {
         margin-left: 5px;
@@ -220,10 +228,13 @@
             value="{{_limit}}">
           </paper-input>
           <a href$="[[_matchingBotsLink(query_params,dimensions.*)]]">View Matching Bots</a>
-          <template is="dom-if" if="[[permissions.cancel_tasks]]">
-            <paper-button class="cancel-button" raised on-tap="_promptCancel">
+          <template is="dom-if" if="">
+            <button class="cancel-button"
+                disabled$="[[!permissions.cancel_tasks]]"
+                title="[[_cancelTasksText(permissions, profile)]]"
+                on-tap="_promptCancel">
               Cancel All Tasks
-            </paper-button>
+            </button>
           </template>
         </div>
 
@@ -290,6 +301,9 @@
       ],
 
       properties: {
+        profile: {
+          type: Object
+        },
       // output
         columns: {
           type: Array,
@@ -351,6 +365,13 @@
         // Don't allow the name column to be removed, as the task list is
         // basically meaningless without it.
         return !col || col === "name" ;
+      },
+
+      _cancelTasksText: function(permissions, profile){
+        if (permissions.cancel_tasks) {
+          return "Cancel all pending tasks. Generally used for emergencies."
+        }
+        return profile.email +" does not have cancel_tasks permissions. Log in as a different profile that does.";
       },
 
       _dateString: function(ts) {

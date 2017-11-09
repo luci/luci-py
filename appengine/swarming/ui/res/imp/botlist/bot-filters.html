@@ -24,6 +24,7 @@
         on. Primary consists of dimensions and state.  Secondary contains the
         values primary things can be.
     primary_arr: Array<String>, the display order of the primary keys.
+    profile: Object, information about the logged-in user; see swarming-app.
 
     // outputs
     columns: Array<String>, the columns that should be displayed.
@@ -61,7 +62,6 @@
 <link rel="import" href="/res/imp/bower_components/iron-flex-layout/iron-flex-layout-classes.html">
 <link rel="import" href="/res/imp/bower_components/iron-icons/iron-icons.html">
 <link rel="import" href="/res/imp/bower_components/iron-selector/iron-selector.html">
-<link rel="import" href="/res/imp/bower_components/paper-button/paper-button.html">
 <link rel="import" href="/res/imp/bower_components/paper-checkbox/paper-checkbox.html">
 <link rel="import" href="/res/imp/bower_components/paper-icon-button/paper-icon-button.html">
 <link rel="import" href="/res/imp/bower_components/paper-input/paper-input.html">
@@ -77,7 +77,7 @@
     <style is="custom-style" include="iron-flex iron-flex-alignment iron-positioning query-column-filter-style swarming-app-style">
     .delete-button {
       display: block;
-      margin-top: 5px;
+      padding: 1.0em 1.5em;
     }
     </style>
 
@@ -194,10 +194,13 @@ the fleet.">
             value="{{_limit}}">
           </paper-input>
           <a href$="[[_matchingTasksLink(query_params)]]">View Matching Tasks</a>
-          <template is="dom-if" if="[[permissions.delete_bot]]">
-            <paper-button class="delete-button" raised on-tap="_promptDelete">
+          <template is="dom-if" if=>
+            <button class="delete-button"
+                disabled$="[[!permissions.delete_bot]]"
+                title="[[_deleteBotsText(permissions, profile)]]"
+                on-tap="_promptDelete">
               Delete All Dead bots
-            </paper-button>
+            </button>
           </template>
         </div>
       </div>
@@ -251,6 +254,9 @@ the fleet.">
       ],
 
       properties: {
+        profile: {
+          type: Object
+        },
         // url-param doesn't like columns to be defined in query_column-filter,
         // so we define it here.
         columns: {
@@ -294,6 +300,13 @@ the fleet.">
         // Don't allow the id column to be removed, as the bot list is basically
         // meaningless without it.
         return !col || col === "id" ;
+      },
+
+      _deleteBotsText: function(permissions, profile) {
+        if (permissions.delete_bot) {
+          return "Delete all dead bots matching a set of dimensions."
+        }
+        return profile.email +" does not have delete_bot permissions. Log in as a different profile that does.";
       },
 
       _extractQueryParams: function() {

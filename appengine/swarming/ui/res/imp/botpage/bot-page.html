@@ -111,6 +111,7 @@
       client_id="[[client_id]]"
       auth_headers="{{_auth_headers}}"
       permissions="{{_permissions}}"
+      profile="{{_profile}}"
       server_details="{{_server_details}}"
       signed_in="{{_signed_in}}"
 
@@ -162,13 +163,17 @@
                 <!-- dom-ifs are slightly less performant than hidden$=, but
                 prevent things from first drawing and then hiding. We prefer to
                 not flash buttons or quarantined messages -->
-                  <template is="dom-if" if="[[_canShutdown(_bot,_permissions)]]">
-                    <button class="raised" on-click="_promptShutdown">
+                  <template is="dom-if" if="[[_canShutdown(_bot)]]">
+                    <button class="raised" on-click="_promptShutdown"
+                        disabled$="[[!_permissions.terminate_bot]]"
+                        title="[[_shutdownText(_permissions,_profile)]]">
                       Shut Down Gracefully
                     </button>
                   </template>
-                  <template is="dom-if" if="[[_canDelete(_bot,_permissions)]]">
-                    <button class="raised" on-click="_promptDelete">
+                  <template is="dom-if" if="[[_canDelete(_bot)]]">
+                    <button class="raised" on-click="_promptDelete"
+                        disabled$="[[!_permissions.delete_bot]]"
+                        title="[[_deleteText(_permissions,_profile)]]">
                       Delete
                     </button>
                   </template>
@@ -286,14 +291,14 @@
             <paper-tab>Events</paper-tab>
           </paper-tabs>
 
-          <template is="dom-if" if="[[_showEvents]]">
+          <template is="dom-if" if="[[_show_events]]">
             <paper-checkbox checked="{{_show_all}}">
                 Show all events
             </paper-checkbox>
           </template>
         </div>
 
-        <template is="dom-if" if="[[_not(_showEvents)]]">
+        <template is="dom-if" if="[[_not(_show_events)]]">
           <table class="tasks_table">
             <thead>
               <tr>
@@ -321,7 +326,7 @@
           </table>
         </template>
 
-        <template is="dom-if" if="[[_showEvents]]">
+        <template is="dom-if" if="[[_show_events]]">
           <table class="events_table">
             <thead>
               <tr>
@@ -353,30 +358,30 @@
           </table>
         </template>
         <!-- https://github.com/Polymer/polymer/issues/3669 hidden$ doesn't
-            respect truthiness, only booleanness, so we have _showEvents
+            respect truthiness, only booleanness, so we have _show_events
             instead of using _selected directly.-->
         <pageable-data
           id="page_tasks"
-          hidden$="[[_showEvents]]"
+          hidden$="[[_show_events]]"
           busy="{{_busy2}}"
           label="Show more tasks"
           output="{{_tasks}}"
-          parse="[[_parseTasks]]">
+          parse="[[_parse_tasks]]">
         </pageable-data>
         <pageable-data
           id="page_events"
-          hidden$="[[_not(_showEvents)]]"
+          hidden$="[[_not(_show_events)]]"
           busy="{{_busy3}}"
           label="Show more events"
           output="{{_events}}"
-          parse="[[_parseEvents]]">
+          parse="[[_parse_events]]">
         </pageable-data>
       </div> <!-- hidden when not signed in-->
     </swarming-app>
 
     <paper-dialog id="prompt" modal on-iron-overlay-closed="_promptClosed">
       <h2>Are you sure?</h2>
-      <div>Are you sure you want to [[_dialogPrompt]]?</div>
+      <div>Are you sure you want to [[_dialog_prompt]]?</div>
       <div class="buttons">
         <paper-button dialog-dismiss autofocus>No</paper-button>
         <paper-button dialog-confirm>Yes</paper-button>
@@ -409,9 +414,12 @@
         _bot: {
           type: Object,
         },
-        _dialogPrompt: {
+        _dialog_prompt: {
           type: String,
           value: "",
+        },
+        _profile: {
+          type: Object,
         },
         _selected: {
           type: Number,
@@ -419,7 +427,7 @@
         _show_all: {
           type: Boolean,
         },
-        _showEvents: {
+        _show_events: {
           type: Boolean,
           computed: "_truthy(_selected)"
         },
@@ -427,13 +435,13 @@
           type: Boolean,
         },
 
-        _parseEvents: {
+        _parse_events: {
           type: Function,
           value: function() {
             return this.$.data.parseEvents.bind(this);
           }
         },
-        _parseTasks: {
+        _parse_tasks: {
           type: Function,
           value: function() {
             return this.$.data.parseTasks.bind(this);
@@ -445,12 +453,26 @@
         return bot && bot.task_id && permissions.cancel_task && !bot.deleted;
       },
 
-      _canDelete: function(bot, permissions) {
-        return bot && bot.is_dead && permissions.delete_bot && !bot.deleted;
+      _canDelete: function(bot) {
+        return bot && bot.is_dead && !bot.deleted;
       },
 
-      _canShutdown: function(bot, permissions){
-        return bot && !bot.is_dead && permissions.terminate_bot && !bot.deleted;
+      _deleteText: function(permissions, profile){
+        if (permissions.delete_bot) {
+          return "Delete the bot from the list of active bots. Historical data will be preserved."
+        }
+        return profile.email +" does not have delete_bot permissions. Log in as a different profile that does.";
+      },
+
+      _canShutdown: function(bot){
+        return bot && !bot.is_dead && !bot.deleted;
+      },
+
+      _shutdownText: function(permissions, profile){
+        if (permissions.terminate_bot) {
+          return "Send a task to the bot to stop the swarming process on it, but keep the machine up."
+        }
+        return profile.email +" does not have terminate_bot permissions. Log in as a different profile that does.";
       },
 
       _classVersion: function(serverVersion, otherVersion) {
@@ -522,7 +544,7 @@
 
       _promptClosed: function(e) {
         if (e.detail.confirmed) {
-          if (this._dialogPrompt.startsWith("shut down")) {
+          if (this._dialog_prompt.startsWith("shut down")) {
             this._shutdownBot();
           } else {
             this._deleteBot();
@@ -531,12 +553,12 @@
       },
 
       _promptDelete: function() {
-        this.set("_dialogPrompt", "delete "+this.bot_id);
+        this.set("_dialog_prompt", "delete "+this.bot_id);
         this.$.prompt.open();
       },
 
       _promptShutdown: function() {
-        this.set("_dialogPrompt", "shut down "+this.bot_id);
+        this.set("_dialog_prompt", "shut down "+this.bot_id);
         this.$.prompt.open();
       },
 

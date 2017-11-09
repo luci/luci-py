@@ -15,7 +15,7 @@
 
     swarming-app-style
 
-  <style include="shared-style"> contains styles to be shared among all
+  <style include="swarming-app-style"> contains styles to be shared among all
       apps, such as colors.
 
   Properties:
@@ -27,6 +27,8 @@
     auth_headers: Object, Use this as an argument to sk.request to set oauth2 headers.
     permissions: Object, {String:Boolean} of permissions to perform various
         behaviors, such as terminate_bot.
+    profile: Object, information about the logged-in user.
+        {email:String, imageURL:String}
     server_details: Object, containing multiple Strings including:
         server_version: what git revision the server is using.
         bot_version: A hash of the bot code being distributed. Isn't associated
@@ -327,7 +329,7 @@
       }
 
       button:disabled:hover {
-        background: initial;
+        background: #fff;
         cursor: initial;
       }
 

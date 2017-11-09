@@ -65,6 +65,7 @@
       client_id="[[client_id]]"
       auth_headers="{{_auth_headers}}"
       permissions="{{_permissions}}"
+      profile="{{_profile}}"
       signed_in="{{_signed_in}}"
       busy="[[_or(_busy1,_busy2,_busy3)]]"
       name="Swarming Task List">
@@ -90,6 +91,7 @@
             permissions="[[_permissions]]"
             primary_map="[[_primary_map]]"
             primary_arr="[[_primary_arr]]"
+            profile="[[_profile]]"
             special_columns="[[_specialColumns]]"
 
             columns="{{_columns}}"
@@ -198,12 +200,13 @@
                 </td>
                 <td hidden$="[[_hide('state', _columns.*)]]">
                   [[_column('state', task)]]
-                  <paper-button
-                      raised
-                      hidden$="[[_cannotCancel(task,_permissions)]]"
+                  <button
+                      hidden$="[[!_canCancelTask(task)]]"
+                      disabled$="[[!_permissions.cancel_task]]"
+                      title="[[_cancelTaskText(_permissions,_profile)]]"
                       on-tap="_promptCancel">
                     Cancel
-                  </paper-button>
+                  </button>
                 </td>
                 <td hidden$="[[_hide('bot', _columns.*)]]">
                   <a
@@ -451,9 +454,15 @@
         return retVal;
       },
 
-      _cannotCancel: function(task, permissions) {
-        return !(permissions && permissions.cancel_task &&
-              this._column("state", task) === "PENDING");
+      _canCancelTask: function(task) {
+        return this._column("state", task) === "PENDING";
+      },
+
+      _cancelTaskText: function(permissions, profile){
+        if (permissions.cancel_task) {
+          return "Cancel a pending task. Running tasks can not (yet) be canceled."
+        }
+        return profile.email +" does not have cancel_task permissions. Log in as a different profile that does.";
       },
 
       _cancelTask: function() {
