@@ -94,10 +94,10 @@ class TaskToRun(ndb.Model):
 
 
 def _gen_queue_number(dimensions_hash, timestamp, priority):
-  """Generates a 64 bit packed value used for TaskToRun.queue_number.
+  """Generates a 63 bit packed value used for TaskToRun.queue_number.
 
   Arguments:
-  - dimensions_hash: 31 bit integer to classify in a queue.
+  - dimensions_hash: 32 bit integer to classify in a queue.
   - timestamp: datetime.datetime when the TaskRequest was filed in. This value
         is used for FIFO ordering with a 100ms granularity; the year is ignored.
   - priority: priority of the TaskRequest. It's a 8 bit integer. Lower is higher
@@ -424,7 +424,7 @@ def validate_to_run_key(task_key):
   if not key_id or key_id >= 2**32:
     raise ValueError(
         'TaskToRun key id should be between 1 and 2**32, found %s' %
-        task_key.id())
+        task_key.integer_id())
   task_request.validate_request_key(request_key)
 
 

@@ -450,8 +450,10 @@ class Test(unittest.TestCase):
   def test_update_continue(self):
     # Run a task, force the bot to update, run another task, ensure both tasks
     # used different bot version.
-    args = ['-T', 'simple_success', '--', 'python', '-u', '-c', 'print(\'hi\')']
-    summary = self.gen_expected(name=u'simple_success')
+    args = [
+        '-T', 'update_continue', '--', 'python', '-u', '-c', 'print(\'hi\')',
+    ]
+    summary = self.gen_expected(name=u'update_continue')
     bot_version1 = self.assertOneTask(args, summary, {})
 
     # Replace bot_config.py.
@@ -824,7 +826,7 @@ class Test(unittest.TestCase):
   def assertResults(self, expected, result, deduped=False):
     self.assertEqual([u'shards'], result.keys())
     self.assertEqual(1, len(result[u'shards']))
-    self.assertTrue(result[u'shards'][0])
+    self.assertTrue(result[u'shards'][0], result)
     result = result[u'shards'][0].copy()
     self.assertFalse(result.get(u'abandoned_ts'))
     # These are not deterministic (or I'm too lazy to calculate the value).
