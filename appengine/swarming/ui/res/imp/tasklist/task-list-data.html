@@ -220,6 +220,7 @@
         pMap["costs_usd"] = [];
         pMap["deduped_from"] = [];
         pMap["duration"] = [];
+        pMap["pending_time"] = [];
         pMap["server_versions"] = [];
 
         // TODO(kjlubick): Allow a person to sort on the task list by bot
@@ -265,6 +266,21 @@
           }
           // Make the duration human readable
           t.human_duration = this._humanDuration(t.duration);
+
+          if (t.created_ts) {
+            let et = t.started_ts || t.abandoned_ts || new Date();
+            // Deduplicated tasks usually have tasks that ended before
+            // they were created, so we need to account for that.
+            if (et >= t.created_ts) {
+              t.pending_time = (et - t.created_ts) / 1000;
+              t.human_pending_time = this._humanDuration(t.pending_time);
+            }
+          }
+          if (!t.pending_time) {
+            t.pending_time = 0;
+            t.human_pending_time = "ⁿ/ₐ";
+          }
+
         }.bind(this));
         return json.items;
       }

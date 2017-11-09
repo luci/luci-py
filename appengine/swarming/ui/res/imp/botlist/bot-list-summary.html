@@ -124,31 +124,31 @@
       </tr>
       <tr>
         <td class="right">
-          <a href$="[[_makeURL('alive','true',columns.*,sort,verbose)]]">Alive</a>:
+          <a href$="[[_makeURL('alive','true',columns.*,sort,verbose,count_params.*)]]">Alive</a>:
         </td>
         <td class="left">[[_computeAlive(_count_query.*)]]</td>
       </tr>
       <tr>
         <td class="right">
-          <a href$="[[_makeURL('busy','true',columns.*,sort,verbose)]]">Busy</a>:
+          <a href$="[[_makeURL('busy','true',columns.*,sort,verbose,count_params.*)]]">Busy</a>:
         </td>
         <td class="left">[[_count_query.busy]]</td>
       </tr>
       <tr>
         <td class="right">
-          <a href$="[[_makeURL('idle','true',columns.*,sort,verbose)]]">Idle</a>:
+          <a href$="[[_makeURL('idle','true',columns.*,sort,verbose,count_params.*)]]">Idle</a>:
         </td>
         <td class="left">[[_computeIdle(_count_query.*)]]</td>
       </tr>
       <tr>
         <td class="right">
-          <a href$="[[_makeURL('dead','true',columns.*,sort,verbose)]]">Dead</a>:
+          <a href$="[[_makeURL('dead','true',columns.*,sort,verbose,count_params.*)]]">Dead</a>:
         </td>
         <td class="left">[[_count_query.dead]]</td>
       </tr>
       <tr>
         <td class="right">
-          <a href$="[[_makeURL('quarantined','true',columns.*,sort,verbose)]]">Quarantined</a>:
+          <a href$="[[_makeURL('quarantined','true',columns.*,sort,verbose,count_params.*)]]">Quarantined</a>:
         </td>
         <td class="left">[[_count_query.quarantined]]</td>
       </tr>

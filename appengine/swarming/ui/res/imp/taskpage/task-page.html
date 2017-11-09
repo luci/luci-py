@@ -1254,6 +1254,11 @@ time.sleep(${leaseDuration})`];
 
       _refresh: function() {
         this.$.data.reload();
+        var miloFrame = this.$$("iframe")
+        if (miloFrame) {
+          var templ = this._server_details.display_server_url_template;
+          miloFrame.src = this._getDisplayServerLink(templ, this.task_id);
+        }
       },
 
       _requestUpdated: function(request) {
@@ -1267,12 +1272,7 @@ time.sleep(${leaseDuration})`];
             this._result.state !==  "PENDING") {
           return;
         }
-        this.$.data.reload();
-        var miloFrame = this.$$("iframe")
-        if (miloFrame) {
-          var templ = this._server_details.display_server_url_template;
-          miloFrame.src = this._getDisplayServerLink(templ, this.task_id);
-        }
+        this._refresh();
       },
 
       _rowspan: function(dims) {
