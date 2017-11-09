@@ -212,14 +212,14 @@ message BotAuth {
   // Incompatible with require_service_account.
   optional bool require_luci_machine_token = 1;
 
-  // If set, the bot should use OAuth access token belonging to this service
-  // account.
+  // If set, the bot should use OAuth access token belonging to any of these
+  // service accounts.
   //
   // The token should have "https://www.googleapis.com/auth/userinfo.email"
   // scope.
   //
   // Incompatible with require_luci_machine_token.
-  optional string require_service_account = 2;
+  repeated string require_service_account = 2;
 
   // If set, defines an IP whitelist name (in auth_service database) with a set
   // of IPs allowed to be used by the bots in this group.

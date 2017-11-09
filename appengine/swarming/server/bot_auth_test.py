@@ -32,7 +32,10 @@ TEST_CONFIG = bots_pb2.BotsCfg(
       dimensions=['pool:with_token']),
     bots_pb2.BotGroup(
       bot_id=['bot_with_service_account'],
-      auth=bots_pb2.BotAuth(require_service_account='a@example.com'),
+      auth=bots_pb2.BotAuth(require_service_account=[
+        'a@example.com',
+        'x@example.com',
+      ]),
       dimensions=['pool:with_service_account']),
     bots_pb2.BotGroup(
       bot_id=['bot_with_ip_whitelist'],
@@ -41,7 +44,9 @@ TEST_CONFIG = bots_pb2.BotsCfg(
     bots_pb2.BotGroup(
       bot_id=['bot_with_service_account_and_ip_whitelist'],
       auth=bots_pb2.BotAuth(
-          require_service_account='a@example.com', ip_whitelist='ip_whitelist'),
+          require_service_account=['a@example.com'],
+          ip_whitelist='ip_whitelist',
+      ),
       dimensions=['pool:with_service_account_and_ip_whitelist']),
     bots_pb2.BotGroup(
       bot_id=['bot_with_token_and_ip_whitelist'],
@@ -134,7 +139,6 @@ class BotAuthTest(test_case.TestCase):
       bot_auth.validate_bot_id_and_fetch_config('bot_with_token', None)
     self.assert_error_log('bot ID doesn\'t match the machine token used')
     self.assert_error_log('bot_id: "bot_with_token"')
-    self.assert_error_log('original bot_id: "bot_with_token"')
 
   def test_machine_token_ip_whitelist_ok(self):
     # Caller is using valid machine token and belongs to the IP whitelist.
@@ -159,6 +163,14 @@ class BotAuthTest(test_case.TestCase):
     # Caller is using valid service account.
     self.mock_config(TEST_CONFIG)
     self.mock_caller('user:a@example.com', '1.2.3.5')
+    cfg = bot_auth.validate_bot_id_and_fetch_config(
+        'bot_with_service_account', None)
+    self.assertEquals({u'pool': [u'with_service_account']}, cfg.dimensions)
+
+  def test_alternative_service_account_ok(self):
+    # Caller is using the second service account.
+    self.mock_config(TEST_CONFIG)
+    self.mock_caller('user:x@example.com', '1.2.3.5')
     cfg = bot_auth.validate_bot_id_and_fetch_config(
         'bot_with_service_account', None)
     self.assertEquals({u'pool': [u'with_service_account']}, cfg.dimensions)
@@ -215,7 +227,6 @@ class BotAuthTest(test_case.TestCase):
       bot_auth.validate_bot_id_and_fetch_config('bot_with_token--vm123', None)
     self.assert_error_log('bot ID doesn\'t match the machine token used')
     self.assert_error_log('bot_id: "bot_with_token"')
-    self.assert_error_log('original bot_id: "bot_with_token--vm123"')
 
 
 if __name__ == '__main__':

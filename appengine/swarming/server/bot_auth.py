@@ -43,13 +43,11 @@ def validate_bot_id_and_fetch_config(bot_id, machine_type):
   On success returns the configuration for this bot (BotGroupConfig tuple), as
   defined in bots.cfg
   """
-  original_bot_id = bot_id
   bot_id = _extract_primary_hostname(bot_id)
   cfg = bot_groups_config.get_bot_group_config(bot_id, machine_type)
   if not cfg:
     logging.error(
-        'bot_auth: unknown bot_id, not in the config\nbot_id: "%s", '
-        'original bot_id: "%s"', bot_id, original_bot_id)
+        'bot_auth: unknown bot_id, not in the config\nbot_id: "%s"', bot_id)
     raise auth.AuthorizationError('Unknown bot ID, not in config')
 
   peer_ident = auth.get_peer_identity()
@@ -57,26 +55,29 @@ def validate_bot_id_and_fetch_config(bot_id, machine_type):
     if not _is_valid_ident_for_bot(peer_ident, bot_id):
       logging.error(
           'bot_auth: bot ID doesn\'t match the machine token used\n'
-          'bot_id: "%s", peer_ident: "%s", original bot_id: "%s"',
-          bot_id, peer_ident.to_bytes(), original_bot_id)
+          'bot_id: "%s", peer_ident: "%s"',
+          bot_id, peer_ident.to_bytes())
       raise auth.AuthorizationError('Bot ID doesn\'t match the token used')
   elif cfg.require_service_account:
-    expected_id = auth.Identity(auth.IDENTITY_USER, cfg.require_service_account)
-    if peer_ident != expected_id:
+    expected_ids = [
+      auth.Identity(auth.IDENTITY_USER, email)
+      for email in cfg.require_service_account
+    ]
+    if peer_ident not in expected_ids:
       logging.error(
           'bot_auth: bot is not using expected service account\n'
-          'bot_id: "%s", expected_id: "%s", peer_ident: "%s", '
-          'original bot_id: "%s"', bot_id, expected_id.to_bytes(),
-          peer_ident.to_bytes(), original_bot_id)
-      if peer_ident.to_bytes() == 'anonymous:anonymous':
-        logging.error('bot is identifying as anonymous. Is the "userinfo" '
-                      'scope enabled for this instance?')
-      raise auth.AuthorizationError('bot is not using expected service account')
+          'bot_id: "%s", expected_id: %s, peer_ident: "%s"',
+          bot_id, [i.to_bytes() for i in expected_ids], peer_ident.to_bytes())
+      if peer_ident.is_anonymous:
+        logging.error(
+            'Bot is identifying as anonymous. Is the "userinfo" scope enabled '
+            'for this instance?')
+      raise auth.AuthorizationError('Bot is not using expected service account')
   elif not cfg.ip_whitelist:
     # This branch should not be hit for validated configs.
     logging.error(
         'bot_auth: invalid bot group config, no auth method defined\n'
-        'bot_id: "%s", original bot_id: "%s"', bot_id, original_bot_id)
+        'bot_id: "%s"', bot_id)
     raise auth.AuthorizationError('Invalid bot group config')
 
   # Check that IP whitelist applies (in addition to credentials).

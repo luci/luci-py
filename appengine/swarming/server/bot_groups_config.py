@@ -31,8 +31,8 @@ BotGroupConfig = collections.namedtuple('BotGroupConfig', [
   # If True, the bot is expected to authenticate as "bot:<bot-id>.*".
   'require_luci_machine_token',
 
-  # If set to non empty string, the bot is expected to authenticate as
-  # "user:<service_account>".
+  # A list of service account emails the bot is expected to authenticate as.
+  # If empty, OAuth authentication is disabled.
   'require_service_account',
 
   # If set to non empty string, name of IP whitelist that's expected to contain
@@ -169,7 +169,7 @@ def _bot_group_proto_to_tuple(msg, trusted_dimensions):
           msg.bot_config_script, msg)
   return _make_bot_group_config(
     require_luci_machine_token=auth_cfg.require_luci_machine_token,
-    require_service_account=auth_cfg.require_service_account,
+    require_service_account=list(auth_cfg.require_service_account),
     ip_whitelist=auth_cfg.ip_whitelist,
     owners=tuple(msg.owners),
     dimensions={k: sorted(v) for k, v in dimensions.iteritems()},
@@ -480,7 +480,8 @@ def validate_bots_cfg(cfg, ctx):
             'if both require_luci_machine_token and require_service_account '
             'are unset, ip_whitelist is required')
       if a.require_service_account:
-        _validate_email(ctx, a.require_service_account, 'service account')
+        for email in a.require_service_account:
+          _validate_email(ctx, email, 'service account')
       if a.ip_whitelist and not auth.is_valid_ip_whitelist_name(a.ip_whitelist):
         ctx.error('invalid ip_whitelist name "%s"', a.ip_whitelist)
 

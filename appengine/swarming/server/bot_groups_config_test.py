@@ -34,7 +34,7 @@ TEST_CONFIG = bots_pb2.BotsCfg(
       bot_id_prefix=['bot'],
       machine_type=[bots_pb2.MachineType(lease_duration_secs=1, name='mt',
                                          mp_dimensions=['k:v'], target_size=1)],
-      auth=bots_pb2.BotAuth(require_service_account='a@example.com'),
+      auth=bots_pb2.BotAuth(require_service_account=['a@example.com']),
       bot_config_script='foo.py',
       system_service_account='bot'),
     bots_pb2.BotGroup(
@@ -46,7 +46,7 @@ TEST_CONFIG = bots_pb2.BotsCfg(
 
 EXPECTED_GROUP_1 = bot_groups_config._make_bot_group_config(
     require_luci_machine_token=True,
-    require_service_account=u'',
+    require_service_account=[],
     ip_whitelist=u'',
     owners=(u'owner@example.com',),
     dimensions={u'pool': [u'A', u'B'], u'other': [u'D']},
@@ -56,7 +56,7 @@ EXPECTED_GROUP_1 = bot_groups_config._make_bot_group_config(
 
 EXPECTED_GROUP_2 = bot_groups_config._make_bot_group_config(
     require_luci_machine_token=False,
-    require_service_account=u'a@example.com',
+    require_service_account=[u'a@example.com'],
     ip_whitelist=u'',
     owners=(),
     dimensions={u'pool': []},
@@ -66,7 +66,7 @@ EXPECTED_GROUP_2 = bot_groups_config._make_bot_group_config(
 
 EXPECTED_GROUP_3 = bot_groups_config._make_bot_group_config(
     require_luci_machine_token=False,
-    require_service_account=u'',
+    require_service_account=[],
     ip_whitelist=u'bots',
     owners=(),
     dimensions={u'pool': [u'default']},
@@ -100,8 +100,8 @@ class BotGroupsConfigTest(test_case.TestCase):
     utils.clear_cache(bot_groups_config._fetch_bot_groups)
 
   def test_version(self):
-    self.assertEqual('hash:95126eb205e129', EXPECTED_GROUP_1.version)
-    self.assertEqual('hash:d118358af6ceb7', EXPECTED_GROUP_2.version)
+    self.assertEqual('hash:06a8c8330221ff', EXPECTED_GROUP_1.version)
+    self.assertEqual('hash:4b0d816826c1ad', EXPECTED_GROUP_2.version)
 
   def test_expand_bot_id_expr_success(self):
     def check(expected, expr):
@@ -211,7 +211,7 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=bots_pb2.BotAuth(
           require_luci_machine_token=True,
-          require_service_account='abc@example.com',
+          require_service_account=['abc@example.com'],
         ))
       ])
     self.validator_test(cfg, [
@@ -233,7 +233,7 @@ class BotGroupsConfigTest(test_case.TestCase):
     cfg = bots_pb2.BotsCfg(
       bot_group=[
         bots_pb2.BotGroup(auth=bots_pb2.BotAuth(
-          require_service_account='not-an-email'
+          require_service_account=['not-an-email'],
         ))
       ])
     self.validator_test(cfg, [
@@ -1023,7 +1023,7 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(
           bot_id=['blah'],
-          auth=bots_pb2.BotAuth(require_service_account='blah@example.com'),
+          auth=bots_pb2.BotAuth(require_service_account=['blah@example.com']),
           system_service_account='bot'),
       ])
     self.validator_test(cfg, [])
