@@ -107,6 +107,35 @@ def _get_os_numbers():
   return match.group(1), match.group(2)
 
 
+def _is_topmost_window(hwnd):
+  """Returns True if |hwnd| is a topmost window."""
+  ctypes.windll.user32.GetWindowLongW.restype = ctypes.c_long  # LONG
+  ctypes.windll.user32.GetWindowLongW.argtypes = [
+      ctypes.c_void_p,  # HWND
+      ctypes.c_int
+  ]
+  # -20 is GWL_EXSTYLE
+  ex_styles = ctypes.windll.user32.GetWindowLongW(hwnd, -20)
+  # 8 is WS_EX_TOPMOST
+  return bool(ex_styles & 8)
+
+
+def _get_window_class(hwnd):
+  """Returns the class name of |hwnd|."""
+  ctypes.windll.user32.GetClassNameW.restype = ctypes.c_int
+  ctypes.windll.user32.GetClassNameW.argtypes = [
+      ctypes.c_void_p,  # HWND
+      ctypes.c_wchar_p,
+      ctypes.c_int
+  ]
+  name = ctypes.create_unicode_buffer(257)
+  name_len = ctypes.windll.user32.GetClassNameW(hwnd, name, len(name))
+  if name_len <= 0 or name_len >= len(name):
+    raise ctypes.WinError(descr='GetClassNameW failed; %s' %
+                          ctypes.FormatError())
+  return name.value
+
+
 ## Public API.
 
 
@@ -419,3 +448,49 @@ def get_uptime():
   if ctypes.windll.kernel32.QueryUnbiasedInterruptTime(ctypes.byref(val)) != 0:
     return val.value / 10000000.
   return 0.
+
+
+def list_top_windows():
+  """Returns a list of the class names of topmost windows.
+
+  Windows owned by the shell are ignored.
+  """
+  # The function prototype of EnumWindowsProc.
+  window_enum_proc_prototype = ctypes.WINFUNCTYPE(
+      ctypes.c_long,  # BOOL
+      ctypes.c_void_p,  # HWND
+      ctypes.c_void_p)  # LPARAM
+
+  # Set up various user32 functions that are needed.
+  ctypes.windll.user32.EnumWindows.restype = ctypes.c_long  # BOOL
+  ctypes.windll.user32.EnumWindows.argtypes = [
+      window_enum_proc_prototype,
+      ctypes.py_object
+  ]
+  ctypes.windll.user32.IsWindowVisible.restype = ctypes.c_long  # BOOL
+  ctypes.windll.user32.IsWindowVisible.argtypes = [ctypes.c_void_p]  # HWND
+  ctypes.windll.user32.IsIconic.restype = ctypes.c_long  # BOOL
+  ctypes.windll.user32.IsIconic.argtypes = [ctypes.c_void_p]  # HWND
+
+  out = []
+
+  def on_window(hwnd, lparam):  # pylint: disable=unused-argument
+    """Evaluates |hwnd| to determine whether or not it is a topmost window.
+
+    In case |hwnd| is a topmost window, its class name is added to the
+    collection of topmost window class names to return.
+    """
+    # Dig deeper into visible, non-iconified, topmost windows.
+    if (ctypes.windll.user32.IsWindowVisible(hwnd) and
+        not ctypes.windll.user32.IsIconic(hwnd) and
+        _is_topmost_window(hwnd)):
+      # Fetch the class name and make sure it's not owned by the Windows shell.
+      class_name = _get_window_class(hwnd)
+      if (class_name and
+          class_name not in ['Button', 'Shell_TrayWnd',
+                             'Shell_SecondaryTrayWnd']):
+        out.append(class_name)
+    return 1
+
+  ctypes.windll.user32.EnumWindows(window_enum_proc_prototype(on_window), None)
+  return out

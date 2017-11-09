@@ -42,6 +42,10 @@ class TestWin(unittest.TestCase):
       self.assertEqual(2, len(names))
       self.assertTrue(isinstance(name, unicode) for name in names)
 
+  def test_list_top_windows(self):
+    if sys.platform == 'win32':
+      win.list_top_windows()
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
