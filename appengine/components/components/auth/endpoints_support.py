@@ -177,15 +177,17 @@ def endpoints_method(
         raise
       except api.AuthenticationError as ex:
         logging.warning(
-            'Authentication error.\n%s\nPeer: %s\nIP: %s',
+            'Authentication error.\n%s\nPeer: %s\nIP: %s\nOrigin: %s',
             ex.message, api.get_peer_identity().to_bytes(),
-            service.request_state.remote_address)
+            service.request_state.remote_address,
+            service.request_state.headers.get('Origin'))
         raise endpoints.UnauthorizedException(ex.message)
       except api.AuthorizationError as ex:
         logging.warning(
-            'Authorization error.\n%s\nPeer: %s\nIP: %s',
+            'Authorization error.\n%s\nPeer: %s\nIP: %s\nOrigin: %s',
             ex.message, api.get_peer_identity().to_bytes(),
-            service.request_state.remote_address)
+            service.request_state.remote_address,
+            service.request_state.headers.get('Origin'))
         raise endpoints.ForbiddenException(ex.message)
     return wrapper
   return new_decorator

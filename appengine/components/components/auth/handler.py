@@ -431,8 +431,9 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       error: instance of AuthorizationError subclass.
     """
     logging.warning(
-        'Authorization error.\n%s\nPeer: %s\nIP: %s',
-        error, api.get_peer_identity().to_bytes(), self.request.remote_addr)
+        'Authorization error.\n%s\nPeer: %s\nIP: %s\nOrigin: %s',
+        error, api.get_peer_identity().to_bytes(), self.request.remote_addr,
+        self.request.headers.get('Origin'))
     self.abort(403, detail=str(error))
 
   ### Wrappers around Users API or its equivalent.
@@ -487,8 +488,9 @@ class ApiHandler(AuthenticatingHandler):
 
   def authorization_error(self, error):
     logging.warning(
-        'Authorization error.\n%s\nPeer: %s\nIP: %s',
-        error, api.get_peer_identity().to_bytes(), self.request.remote_addr)
+        'Authorization error.\n%s\nPeer: %s\nIP: %s\nOrigin: %s',
+        error, api.get_peer_identity().to_bytes(), self.request.remote_addr,
+        self.request.headers.get('Origin'))
     self.abort_with_error(403, text=str(error))
 
   def send_response(self, response, http_code=200, headers=None):
