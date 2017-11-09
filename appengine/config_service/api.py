@@ -151,7 +151,7 @@ class ConfigApi(remote.Service):
   class ValidateConfigRequestMessage(messages.Message):
     class File(messages.Message):
       path = messages.StringField(1)
-      content = messages.StringField(2)
+      content = messages.BytesField(2)
 
     config_set = messages.StringField(1)
     files = messages.MessageField(File, 2, repeated=True)
