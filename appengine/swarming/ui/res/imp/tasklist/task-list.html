@@ -382,7 +382,7 @@
       pending_time: sortableTime("pending_time"),
       started_ts: sortableTime("started_ts"),
     };
-    var priorityColumns = ["created_ts", "started_ts", "abandoned_ts", "completed_ts", "modified_ts", "duration"];
+    var priorityColumns = ["created_ts", "pending_time", "started_ts", "duration", "completed_ts", "abandoned_ts", "modified_ts"];
 
     Polymer({
       is: "task-list",
