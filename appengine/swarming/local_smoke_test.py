@@ -206,6 +206,10 @@ class SwarmingClient(object):
     finally:
       os.remove(tmp)
 
+  def task_query(self, task_id):
+    """Query a task result without waiting for it to complete."""
+    return json.loads(self._capture('query', ['task/%s/result' % task_id]))
+
   def terminate(self, bot_id):
     task_id = self._capture('terminate', [bot_id]).strip()
     logging.info('swarming.py terminate returned %r', task_id)
@@ -799,6 +803,93 @@ class Test(unittest.TestCase):
     dimensions = {
         i['key']: i['value'] for i in self.client.query_bot()['dimensions']}
     self.assertEqual(expected, set(dimensions))
+
+  def test_priority(self):
+    # Make a test that keeps the bot busy, while all the other tasks are being
+    # created with priorities that are out of order. Then it unblocks the bot
+    # and asserts the tasks are run in the expected order, based on priority and
+    # created_ts.
+    h, tmp = tempfile.mkstemp(prefix='swarming_smoke_test')
+    os.close(h)
+
+    # List of tuple(task_name, priority, task_id).
+    tasks = []
+    tags = [u'pool:default', u'service_account:none', u'user:joe@localhost']
+    try:
+      args = [
+        '-T', 'wait', '--priority', '20', '--',
+        'python', '-u', '-c',
+        # Cheezy wait.
+        ('import os,time;'
+         '[time.sleep(0.1) for _ in xrange(100000) if os.path.exists(\'%s\')];'
+        'print(\'hi\')') % tmp,
+      ]
+      wait_task_id = self.client.task_trigger_raw(args)
+      # Assert that the 'wait' task has started but not completed, otherwise
+      # this defeats the purpose.
+      state = stats = None
+      start = time.time()
+      # 15 seconds is a long time.
+      while time.time() - start < 15.:
+        stats = self.client.task_query(wait_task_id)
+        state = stats[u'state']
+        if state == u'RUNNING':
+          break
+        self.assertEqual(u'PENDING', state, stats)
+        time.sleep(0.01)
+      self.assertEqual(u'RUNNING', state, stats)
+
+      # This is the order of the priorities used for each task triggered. In
+      # particular, below it asserts that the priority 8 tasks are run in order
+      # of created_ts.
+      for i, priority in enumerate((9, 8, 6, 7, 8)):
+        task_name = '%d-p%d' % (i, priority)
+        args = [
+          '-T', task_name, '--priority', str(priority), '--',
+          'python', '-u', '-c', 'print(\'%d\')' % priority,
+        ]
+        tasks.append((task_name, priority, self.client.task_trigger_raw(args)))
+
+      # And the wait task is still running, so that all tasks above are pending,
+      # thus are given a chance to run in priority order.
+      stats = self.client.task_query(wait_task_id)
+      self.assertEqual(u'RUNNING', stats[u'state'], stats)
+
+      # Ensure the tasks under test are pending.
+      for task_name, priority, task_id in tasks:
+        stats = self.client.task_query(task_id)
+      self.assertEqual(u'PENDING', stats[u'state'], stats)
+    finally:
+      # Unblock the wait_task_id on the bot.
+      os.remove(tmp)
+
+    # Ensure the initial wait task is completed. This will cause all the pending
+    # tasks to be run. Now, will they be run in the expected order? That is the
+    # question!
+    actual_summary, actual_files = self.client.task_collect(wait_task_id)
+    t = tags[:] + [u'priority:20']
+    self.assertResults(
+        self.gen_expected(name=u'wait', tags=sorted(t)), actual_summary)
+    self.assertEqual(['summary.json'], actual_files.keys())
+
+    # List of tuple(task_name, priority, task_id, results).
+    results = []
+    # Collect every tasks.
+    for task_name, priority, task_id in tasks:
+      actual_summary, actual_files = self.client.task_collect(task_id)
+      t = tags[:] + [u'priority:%d' % priority]
+      expected_summary = self.gen_expected(
+          name=task_name, tags=sorted(t), outputs=[u'%d\n' % priority])
+      self.assertResults(expected_summary, actual_summary)
+      self.assertEqual(['summary.json'], actual_files.keys())
+      results.append(
+          (task_name, priority, task_id, actual_summary[u'shards'][0]))
+
+    # Now assert that they ran in the expected order. started_ts encoding means
+    # string sort is equivalent to timestamp sort.
+    results.sort(key=lambda x: x[3][u'started_ts'])
+    expected = ['2-p6', '3-p7', '1-p8', '4-p8', '0-p9']
+    self.assertEqual(expected, [r[0] for r in results])
 
   def _run_isolated(self, hello_world, name, args, expected_summary,
       expected_files, deduped=False, isolated_content=None):

@@ -87,7 +87,7 @@ class BotDimensions(ndb.Model):
   """Notes the current valid bot dimensions.
 
   Parent is BotRoot.
-  key id is 1.
+  Key id is 1.
 
   This is redundant from BotEvents but it is leveraged to quickly assert if
   _rebuild_bot_cache() must be called or not.
@@ -108,7 +108,7 @@ class BotTaskDimensions(ndb.Model):
   """Stores the precalculated hashes for this bot.
 
   Parent is BotRoot.
-  key id is <dimensions_hash>.
+  Key id is <dimensions_hash>. It is guaranteed to fit 32 bits.
 
   This hash could be conflicting different properties set, but this doesn't
   matter at this level because disambiguation is done in TaskDimensions
@@ -191,7 +191,7 @@ class TaskDimensions(ndb.Model):
   """List dimensions for each kind of task.
 
   Parent is TaskDimensionsRoot
-  key id is <dimensions_hash>
+  Key id is <dimensions_hash>. It is guaranteed to fit 32 bits.
 
   A single dimensions_hash may represent multiple independent queues in a single
   root. This is because the hash is very compressed (32 bits). This is handled
@@ -512,8 +512,8 @@ def hash_dimensions(dimensions):
   Arguments:
     dimensions: dict(str, str)
 
-  The return value is guaranteed to be non-zero so it can be used as a key id in
-  a ndb.Key.
+  The return value is guaranteed to be a non-zero int so it can be used as a key
+  id in a ndb.Key.
   """
   # This horrible code is the product of micro benchmarks.
   data = ''
@@ -649,7 +649,7 @@ def get_queues(bot_id):
   now = utils.utcnow()
   bot_root_key = bot_management.get_root_key(bot_id)
   data = sorted(
-      obj.key.id() for obj in
+      obj.key.integer_id() for obj in
       BotTaskDimensions.query(ancestor=bot_root_key)
       if obj.valid_until_ts >= now)
   memcache.set(bot_id, data, namespace='task_queues')

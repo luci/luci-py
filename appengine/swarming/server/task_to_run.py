@@ -86,6 +86,7 @@ class TaskToRun(ndb.Model):
 
   def to_dict(self):
     out = super(TaskToRun, self).to_dict()
+    # dimensions_hash is guaranteed to be 32 bits.
     out['dimensions_hash'] = self.key.integer_id()
     return out
 
@@ -107,6 +108,8 @@ def _gen_queue_number(dimensions_hash, timestamp, priority):
     queue_number is a 63 bit integer with dimension_hash, timestamp at 100ms
     resolution plus priority.
   """
+  # dimensions_hash should be 32 bits but on AppEngine, which is using 32 bits
+  # python, it is silently upgraded to long.
   assert isinstance(dimensions_hash, (int, long)), repr(dimensions_hash)
   assert dimensions_hash > 0 and dimensions_hash <= 0xFFFFFFFF, hex(
       dimensions_hash)
@@ -115,27 +118,42 @@ def _gen_queue_number(dimensions_hash, timestamp, priority):
 
   # Ignore the year.
   year_start = datetime.datetime(timestamp.year, 1, 1)
-  t = int(round((timestamp - year_start).total_seconds() * 10.))
+  # It is guaranteed to fit 32 bits but upgrade to long right away to ensure
+  # assert works.
+  t = long(round((timestamp - year_start).total_seconds() * 10.))
   assert t >= 0 and t <= 0x7FFFFFFF, (
       hex(t), dimensions_hash, timestamp, priority)
   # 31-22 == 9, leaving room for overflow with the addition.
   # 0x3fc00000 is the priority mask.
   # It is important that priority mixed with time is an addition, not a bitwise
   # or.
-  low_part = (priority << 22) + t
+  low_part = (long(priority) << 22) + t
   assert low_part >= 0 and low_part <= 0xFFFFFFFF, '0x%X is out of band' % (
       low_part)
-  high_part = dimensions_hash << 31
+  # int may be 32 bits, upgrade to long for consistency, albeit this is
+  # significantly slower.
+  high_part = long(dimensions_hash) << 31
   return high_part | low_part
 
 
-def _queue_number_priority(q):
+def _queue_number_fifo_priority(v):
   """Returns the number to be used as a comparison for priority.
 
-  Lower values are more important. The queue priority is the lowest 30 bits,
-  of which the top 8 bits are the task priority, and the rest is the timestamp.
+  Lower values are more important. The queue priority is the lowest 31 bits,
+  of which the top 9 bits are the task priority, and the rest is the timestamp
+  which may overflow in the task priority.
   """
-  return q & 0x7FFFFFFF
+  return v.queue_number & 0x7FFFFFFF
+
+
+def _queue_number_priority(v):
+  """Returns the task's priority.
+
+  There's an overflow of 1 bit, as part of the timestamp overflows on the laster
+  part of the year, so the result is between 0 and 330. See _gen_queue_number()
+  for the details.
+  """
+  return int(_queue_number_fifo_priority(v) >> 22)
 
 
 def _memcache_to_run_key(task_key):
@@ -181,42 +199,26 @@ class _QueryStats(object):
         self.deadline)
 
 
-def _validate_task(bot_dimensions, deadline, stats, now, task_key):
+def _validate_task(bot_dimensions, deadline, stats, now, task):
   """Validates the TaskToRun and update stats.
 
   Returns:
-    None if the task_key cannot be reaped by this bot.
-    tuple(TaskRequest, TaskToRun) if this is a good candidate to reap.
+    None if the task cannot be reaped by this bot.
+    TaskRequest if this is a good candidate to reap.
   """
   # TODO(maruel): Create one TaskToRun per TaskRunResult.
-  packed = task_pack.pack_request_key(task_key.parent()) + '0'
+  packed = task_pack.pack_request_key(
+      task_to_run_key_to_request_key(task.key)) + '0'
   stats.total += 1
-  # Verify TaskToRun is what is expected. Play defensive here.
-  try:
-    validate_to_run_key(task_key)
-  except ValueError as e:
-    logging.error('_validate_task(%s): validation error: %s', packed, e)
-    stats.broken += 1
-    return
 
   # Do this after the basic weeding out but before fetching TaskRequest.
-  if _lookup_cache_is_taken(task_key):
+  if _lookup_cache_is_taken(task.key):
     logging.debug('_validate_task(%s): negative cache', packed)
     stats.cache_lookup += 1
-    return
+    return None
 
   # Ok, it's now worth taking a real look at the entity.
-  task_future = task_key.get_async()
-  request_future = task_to_run_key_to_request_key(task_key).get_async()
-  task = task_future.get_result()
-
-  # It is possible for the index to be inconsistent since it is not executed in
-  # a transaction, no problem.
-  if not task.queue_number:
-    logging.debug('_validate_task(%s): was already reaped', packed)
-    stats.no_queue += 1
-    request_future.wait()
-    return
+  request_future = task_to_run_key_to_request_key(task.key).get_async()
 
   # It expired. A cron job will cancel it eventually. Since 'now' is saved
   # before the query, an expired task may still be reaped even if technically
@@ -229,7 +231,7 @@ def _validate_task(bot_dimensions, deadline, stats, now, task_key):
         '_validate_task(%s): expired %s < %s', packed, task.expiration_ts, now)
     stats.expired += 1
     request_future.wait()
-    return
+    return None
 
   # The hash may have conflicts. Ensure the dimensions actually match by
   # verifying the TaskRequest. There's a probability of 2**-31 of conflicts,
@@ -238,7 +240,7 @@ def _validate_task(bot_dimensions, deadline, stats, now, task_key):
   if not match_dimensions(request.properties.dimensions, bot_dimensions):
     logging.debug('_validate_task(%s): dimensions mismatch', packed)
     stats.real_mismatch += 1
-    return
+    return None
 
   # If the bot has a deadline, don't allow it to reap the task unless it can be
   # completed before the deadline. We have to assume the task takes the
@@ -259,7 +261,7 @@ def _validate_task(bot_dimensions, deadline, stats, now, task_key):
           '_validate_task(%s): deadline %s but no execution timeout',
           packed, deadline)
       stats.too_long += 1
-      return
+      return None
     hard = request.properties.execution_timeout_secs
     grace = 3 * (request.properties.grace_period_secs or 30)
     # Allowance buffer for overheads (scheduling and isolation)
@@ -271,12 +273,12 @@ def _validate_task(bot_dimensions, deadline, stats, now, task_key):
           '%d)',
           packed, deadline, max_schedule, now, hard, grace, overhead)
       stats.too_long += 1
-      return
+      return None
 
   # It's a valid task! Note that in the meantime, another bot may have reaped
   # it.
   logging.info('_validate_task(%s): ready to reap!', packed)
-  return request, task
+  return request
 
 
 def _yield_pages_async(q, size):
@@ -301,8 +303,12 @@ def _yield_pages_async(q, size):
 
 def _get_task_to_run_query(dimensions_hash):
   """Returns a ndb.Query of TaskToRun within this dimensions_hash queue."""
-  opts = ndb.QueryOptions(keys_only=True, deadline=15)
-  # See _gen_queue_number() as of why << 31.
+  # dimensions_hash should be 32 bits but on AppEngine, which is using 32 bits
+  # python, it is silently upgraded to long.
+  assert isinstance(dimensions_hash, (int, long)), repr(dimensions_hash)
+  opts = ndb.QueryOptions(deadline=15)
+  # See _gen_queue_number() as of why << 31. This query cannot use the key
+  # because it is not a root entity.
   return TaskToRun.query(default_options=opts).order(
           TaskToRun.queue_number).filter(
               TaskToRun.queue_number >= (dimensions_hash << 31),
@@ -318,7 +324,7 @@ def _yield_potential_tasks(bot_id):
   latency. The number of queries is unbounded.
 
   Yields:
-    TaskToRun keys, trying to yield the highest priority one first.  To have
+    TaskToRun entities, trying to yield the highest priority one first. To have
     finite execution time, starts yielding results once one of these conditions
     are met:
     - 1 second elapsed; in this case, continue iterating in the background
@@ -344,14 +350,23 @@ def _yield_potential_tasks(bot_id):
       break
     time.sleep(r)
   logging.debug(
-      'Waited %.3fs for %d futures, %d completed',
-      time.time() - start, sum(1 for f in futures if f.done()), len(futures))
+      '_yield_potential_tasks(%s): waited %.3fs for %d items from %d Futures',
+      bot_id, time.time() - start,
+      sum(len(f.get_result()) for f in futures if f.done()),
+      len(futures))
+  # items is a list of TaskToRun. The entities are needed because property
+  # queue_number is used to sort according to each task's priority.
   items = []
   for i, f in enumerate(futures):
     if f and f.done():
-      items.extend(f.get_result())
-      futures[i] = next(yielders[i], None)
-  items.sort(key=lambda k: _queue_number_priority(k.id()))
+      r = f.get_result()
+      if r:
+        items.extend(r)
+        # Prime the next page, in case.
+        futures[i] = next(yielders[i], None)
+
+  # That's going to be our search space for now.
+  items.sort(key=_queue_number_fifo_priority)
 
   # It is possible that there is no items yet, in case all futures are taking
   # more than 1 second.
@@ -373,7 +388,7 @@ def _yield_potential_tasks(bot_id):
         futures[i] = next(yielders[i], None)
         changed = True
     if changed:
-      items.sort(key=lambda k: _queue_number_priority(k.id()))
+      items.sort(key=_queue_number_fifo_priority)
 
 
 ### Public API.
@@ -490,7 +505,7 @@ def yield_next_available_task_to_dispatch(bot_dimensions, deadline):
   stats.deadline = deadline
   bot_id = bot_dimensions[u'id'][0]
   try:
-    for task_key in _yield_potential_tasks(bot_id):
+    for task in _yield_potential_tasks(bot_id):
       duration = (utils.utcnow() - now).total_seconds()
       if duration > 40.:
         # Stop searching after too long, since the odds of the request blowing
@@ -500,10 +515,9 @@ def yield_next_available_task_to_dispatch(bot_dimensions, deadline):
         # search to 40s, it gives 20s to complete the reaping and complete the
         # HTTP request.
         return
-      # _validate_task() returns (request, task) if it's worth reaping.
-      item = _validate_task(bot_dimensions, deadline, stats, now, task_key)
-      if item:
-        yield item[0], item[1]
+      request = _validate_task(bot_dimensions, deadline, stats, now, task)
+      if request:
+        yield request, task
         # If the code is still executed, it means that the task reaping wasn't
         # successful.
         stats.ignored += 1
