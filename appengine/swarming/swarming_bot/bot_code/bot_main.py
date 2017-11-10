@@ -259,7 +259,11 @@ def _call_hook(chained, botobj, name, *args, **kwargs):
       hook = getattr(_get_bot_config(), name, None)
       if hook:
         return hook(botobj, *args, **kwargs)
-    # Call both in order.
+      # The hook is not defined.
+      return None
+
+    # In the case of chained=True, call both hooks. Call the generic one first,
+    # then the specialized.
     ret = None
     hook = getattr(_get_bot_config(), name, None)
     if hook:
