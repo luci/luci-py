@@ -359,9 +359,12 @@ def _yield_potential_tasks(bot_id):
   items = []
   for i, f in enumerate(futures):
     if f and f.done():
+      # The ndb.Future returns a list of up to 10 TaskToRun entities.
       r = f.get_result()
       if r:
-        items.extend(r)
+        # The ndb.Query ask for a valid queue_number but under load, it happens
+        # the value is not valid anymore.
+        items.extend(i for i in r if i.queue_number)
         # Prime the next page, in case.
         futures[i] = next(yielders[i], None)
 
@@ -379,12 +382,11 @@ def _yield_potential_tasks(bot_id):
     else:
       # Let activity happen.
       ndb.eventloop.run1()
-
-    # Continue iteration.
     changed = False
     for i, f in enumerate(futures):
       if f and f.done():
-        items.extend(f.get_result())
+        # See loop above for explanation.
+        items.extend(i for i in f.get_result() if i.queue_number)
         futures[i] = next(yielders[i], None)
         changed = True
     if changed:
