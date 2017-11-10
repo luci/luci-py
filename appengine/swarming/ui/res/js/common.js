@@ -80,6 +80,7 @@ this.swarming = this.swarming || function() {
   // Date object and foo["human_some_ts"] is the human formated version from
   // sk.human.localeTime.
   swarming.sanitizeAndHumanizeTime = function(obj, key) {
+    obj["human_"+key] = "‑‑";
     if (obj[key]) {
       if (obj[key].endsWith && !obj[key].endsWith('Z')) {
         // Timestamps from the server are missing the 'Z' that specifies Zulu
@@ -91,7 +92,20 @@ this.swarming = this.swarming || function() {
         obj[key] += 'Z';
       }
       obj[key] = new Date(obj[key]);
-      obj["human_"+key] = sk.human.localeTime(obj[key]);
+
+      // Extract the timezone.
+      var str = obj[key].toString();
+      var timezone = str.substring(str.indexOf("("));
+
+      // If timestamp is today, skip the date.
+      var now = new Date();
+      if (obj[key].getDate() == now.getDate() &&
+          obj[key].getMonth() == now.getMonth() &&
+          obj[key].getYear() == now.getYear()) {
+        obj["human_"+key] = obj[key].toLocaleTimeString() + " " + timezone;
+      } else {
+        obj["human_"+key] = obj[key].toLocaleString() + " " + timezone;
+      }
     }
   }
 

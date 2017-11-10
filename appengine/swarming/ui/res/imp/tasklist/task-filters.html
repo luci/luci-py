@@ -169,7 +169,6 @@
                 <span class="flex"></span>
                 <paper-checkbox
                   noink
-                  disabled$="[[_cantToggleColumn(item)]]"
                   checked="[[_columnState(item,columns.*)]]"
                   on-change="_toggleColumn">
                 </paper-checkbox>
@@ -359,12 +358,6 @@
         if (!this._start_ts) {
           this._setStartTS(now.getTime() - 24*60*60*1000);
         }
-      },
-
-      _cantToggleColumn: function(col) {
-        // Don't allow the name column to be removed, as the task list is
-        // basically meaningless without it.
-        return !col || col === "name" ;
       },
 
       _cancelTasksText: function(permissions, profile){

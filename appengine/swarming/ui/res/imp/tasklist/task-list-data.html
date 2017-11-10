@@ -249,38 +249,45 @@
             tagMap[key] = rest;
           });
           t.tagMap = tagMap;
-          if (!t.costs_usd || !Array.isArray(t.costs_usd)) {
-            t.costs_usd = "none";
-          } else {
-            t.costs_usd.forEach(function(c, idx) {
-              t.costs_usd[idx] = c.toFixed(4);
-            });
-          }
 
           TIMES.forEach(function(time) {
             swarming.sanitizeAndHumanizeTime(t, time);
           });
+
+          if (!t.costs_usd || !Array.isArray(t.costs_usd)) {
+            t.costs_usd = "‑‑";
+          } else {
+            t.costs_usd.forEach(function(c, idx) {
+              t.costs_usd[idx] = c.toFixed(4) + "$";
+              if (t.state === this.RUNNING && t.started_ts) {
+                t.costs_usd[idx] = t.costs_usd[idx] + "*";
+              }
+            }.bind(this));
+          }
+
           // Running tasks have no duration set, so we can figure it out.
-          if (!t.duration && t.state === this.RUNNING && t.started_ts){
+          if (!t.duration && t.state === this.RUNNING && t.started_ts) {
             t.duration = (now - t.started_ts) / 1000;
           }
           // Make the duration human readable
           t.human_duration = this._humanDuration(t.duration);
-
-          if (t.created_ts) {
-            let et = t.started_ts || t.abandoned_ts || new Date();
-            // Deduplicated tasks usually have tasks that ended before
-            // they were created, so we need to account for that.
-            if (et >= t.created_ts) {
-              t.pending_time = (et - t.created_ts) / 1000;
-              t.human_pending_time = this._humanDuration(t.pending_time);
-            }
-          }
-          if (!t.pending_time) {
-            t.pending_time = 0;
-            t.human_pending_time = "ⁿ/ₐ";
+          if (t.state === this.RUNNING && t.started_ts) {
+            t.human_duration = t.human_duration + "*";
           }
 
+          // Deduplicated tasks usually have tasks that ended before they were
+          // created, so we need to account for that.
+          var et = t.started_ts || t.abandoned_ts || new Date();
+          var deduped = (t.created_ts && et < t.created_ts);
+
+          t.pending_time = null;
+          if (!deduped && t.created_ts) {
+            t.pending_time = (et - t.created_ts) / 1000;
+          }
+          t.human_pending_time = this._humanDuration(t.pending_time);
+          if (!deduped && t.created_ts && !t.started_ts && !t.abandoned_ts) {
+            t.human_pending_time = t.human_pending_time + "*";
+          }
         }.bind(this));
         return json.items;
       }

@@ -124,7 +124,7 @@
           and task are inserted in a fixed order.
           -->
             <tr>
-              <th>
+              <th hidden$="[[_hide('name', _columns.*)]]">
                 <span>Task Name</span>
                 <sort-toggle
                     name="name"
@@ -190,7 +190,7 @@
                 initial-count=50>
 
               <tr class$="[[_taskClass(task)]]">
-                <td>
+                <td hidden$="[[_hide('name', _columns.*)]]">
                   <a
                       class="center"
                       href$="[[_taskLink(task.task_id)]]"
