@@ -759,10 +759,10 @@ def tidy_stale():
 
   try:
     q = TaskDimensions.query().filter(TaskDimensions.valid_until_ts < now)
-    td_future = q.map_async(_handle_task, batch_size=100, keys_only=True)
+    td_future = q.map_async(_handle_task, batch_size=16, keys_only=True)
 
     q = BotTaskDimensions.query().filter(BotTaskDimensions.valid_until_ts < now)
-    btd_future = q.map_async(_handle_bot_task, batch_size=100, keys_only=True)
+    btd_future = q.map_async(_handle_bot_task, batch_size=16, keys_only=True)
 
     td = td_future.get_result()
     btd = btd_future.get_result()
