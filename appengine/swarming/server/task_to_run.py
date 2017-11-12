@@ -60,6 +60,11 @@ class TaskToRun(ndb.Model):
   The key id is the value of 'dimensions_hash' that is generated with
   task_queues.hash_dimensions(), parent is TaskRequest.
   """
+  # This entity is used in transactions. It is not worth using either cache.
+  # https://cloud.google.com/appengine/docs/standard/python/ndb/cache
+  _use_cache = False
+  _use_memcache = False
+
   # Moment by which the task has to be requested by a bot. Copy of TaskRequest's
   # TaskRequest.expiration_ts to enable queries when cleaning up stale jobs.
   expiration_ts = ndb.DateTimeProperty(required=True)
