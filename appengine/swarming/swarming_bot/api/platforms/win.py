@@ -38,6 +38,7 @@ _WIN32_SERVER_NAMES = {
     u'6.1': u'2008ServerR2',
     u'6.2': u'2012Server',
     u'6.3': u'2012ServerR2',
+    u'10.0': u'2016Server',
 }
 
 
@@ -102,8 +103,10 @@ def _get_os_numbers():
   # - XP: Microsoft Windows XP [Version 5.1.2600]
   # - Win10: Microsoft Windows [Version 10.0.10240]
   # - Win7 or Win2K8R2: Microsoft Windows [Version 6.1.7601]
+  # - Win1709: Microsoft Windows [Version 10.0.16299.19]
   out = subprocess.check_output(['cmd.exe', '/c', 'ver']).strip()
-  match = re.search(r'\[Version (\d+\.\d+)\.(\d+)\]', out, re.IGNORECASE)
+  match = re.search(r'\[Version (\d+\.\d+)\.(\d+(:?\.\d+))\]', out,
+                    re.IGNORECASE)
   return match.group(1), match.group(2)
 
 
