@@ -164,6 +164,11 @@ class ConfigApi(remote.Service):
   )
   @auth.public # ACL check inside
   def validate_config(self, request):
+    logging.debug(
+        "requester: %s, config_set: %s, paths: %s",
+        auth.get_current_identity().to_bytes(),
+        request.config_set,
+        [f.path for f in request.files])
     if not request.config_set:
       raise endpoints.BadRequestException('Must specify a config_set')
     if not request.files:
