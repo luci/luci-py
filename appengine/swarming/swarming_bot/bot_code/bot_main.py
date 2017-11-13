@@ -9,6 +9,14 @@ is always up to date and executes a child process to run tasks and upload
 results back.
 
 It manages self-update and rebooting the host in case of problems.
+
+Sections are:
+  - Globals
+  - Monitoring
+  - bot_config handler
+  - Public functions used by __main__.py
+  - Sub process management
+  - Bot lifetime management
 """
 
 import argparse
@@ -48,6 +56,9 @@ from utils import on_error
 from utils import subprocess42
 from utils import tools
 from utils import zip_package
+
+
+### Globals
 
 
 # Used to opportunistically set the error handler to notify the server when the
@@ -144,7 +155,7 @@ def _pool_from_dimensions(dimensions):
   return u'|'.join(sorted(pairs))
 
 
-def monitor_call(func):
+def _monitor_call(func):
   """Decorates a functions and reports the runtime to ts_mon."""
   def hook(chained, botobj, name, *args, **kwargs):
     start = time.time()
@@ -162,7 +173,22 @@ def monitor_call(func):
   return hook
 
 
-### bot_config handler part.
+def _init_ts_mon():
+  """Initializes ts_mon."""
+  parser = argparse.ArgumentParser(description=sys.modules[__name__].__doc__)
+  ts_mon.add_argparse_options(parser)
+  parser.set_defaults(
+      ts_mon_target_type='task',
+      ts_mon_task_service_name='swarming-bot',
+      ts_mon_task_job_name='default',
+      ts_mon_flush='auto',
+      ts_mon_ca_certs=tools.get_cacerts_bundle(),
+  )
+  args = parser.parse_args([])
+  ts_mon.process_argparse_options(args)
+
+
+### bot_config handler
 
 
 # Reference to the config/bot_config.py module inside the swarming_bot.zip file.
@@ -214,7 +240,7 @@ def _register_extra_bot_config(content):
     _set_quarantined('handshake returned invalid bot_config: %s' % e)
 
 
-@monitor_call
+@_monitor_call
 def _call_hook(chained, botobj, name, *args, **kwargs):
   """Calls a hook function named `name` in bot_config.py.
 
@@ -381,41 +407,6 @@ def _get_disks_quarantine(botobj, disks):
     return '\n'.join(errors)
 
 
-def setup_bot(skip_reboot):
-  """Calls bot_config.setup_bot() to have the bot self-configure itself.
-
-  Reboots the host if bot_config.setup_bot() returns False, unless skip_reboot
-  is also true.
-
-  Does nothing if SWARMING_EXTERNAL_BOT_SETUP env var is set to 1. It is set in
-  case bot's autostart configuration is managed elsewhere, and we don't want
-  the bot itself to interfere.
-  """
-  if os.environ.get('SWARMING_EXTERNAL_BOT_SETUP') == '1':
-    logging.info('Skipping setup_bot, SWARMING_EXTERNAL_BOT_SETUP is set')
-    return
-
-  botobj = get_bot(get_config())
-  try:
-    from config import bot_config
-  except Exception as e:
-    msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
-    botobj.post_error('bot_config.py is bad: %s' % msg)
-    return
-
-  # TODO(maruel): Convert the should_continue return value to the hook calling
-  # botobj.host_reboot() by itself.
-  try:
-    should_continue = bot_config.setup_bot(botobj)
-  except Exception as e:
-    msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
-    botobj.post_error('bot_config.setup_bot() threw: %s' % msg)
-    return
-
-  if not should_continue and not skip_reboot:
-    botobj.host_reboot('Starting new swarming bot: %s' % THIS_FILE)
-
-
 def _get_authentication_headers(botobj):
   """Calls bot_config.get_authentication_headers() if it is defined.
 
@@ -427,7 +418,13 @@ def _get_authentication_headers(botobj):
   return _call_hook(False, botobj, 'get_authentication_headers') or (None, None)
 
 
-### end of bot_config handler part.
+def _on_shutdown_hook(b):
+  """Called when the bot is restarting."""
+  _call_hook_safe(True, b, 'on_bot_shutdown')
+  # Aggressively set itself up so we ensure the auto-reboot configuration is
+  # fine before restarting the host. This is important as some tasks delete the
+  # autorestart script (!)
+  setup_bot(True)
 
 
 def _min_free_disk(infos, settings):
@@ -473,6 +470,44 @@ def _is_base_dir_ok(botobj):
   return botobj.base_dir != os.path.expanduser('~')
 
 
+### Public functions used by __main__.py
+
+
+def setup_bot(skip_reboot):
+  """Calls bot_config.setup_bot() to have the bot self-configure itself.
+
+  Reboots the host if bot_config.setup_bot() returns False, unless skip_reboot
+  is also true.
+
+  Does nothing if SWARMING_EXTERNAL_BOT_SETUP env var is set to 1. It is set in
+  case bot's autostart configuration is managed elsewhere, and we don't want
+  the bot itself to interfere.
+  """
+  if os.environ.get('SWARMING_EXTERNAL_BOT_SETUP') == '1':
+    logging.info('Skipping setup_bot, SWARMING_EXTERNAL_BOT_SETUP is set')
+    return
+
+  botobj = get_bot(get_config())
+  try:
+    from config import bot_config
+  except Exception as e:
+    msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
+    botobj.post_error('bot_config.py is bad: %s' % msg)
+    return
+
+  # TODO(maruel): Convert the should_continue return value to the hook calling
+  # botobj.host_reboot() by itself.
+  try:
+    should_continue = bot_config.setup_bot(botobj)
+  except Exception as e:
+    msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
+    botobj.post_error('bot_config.setup_bot() threw: %s' % msg)
+    return
+
+  if not should_continue and not skip_reboot:
+    botobj.host_reboot('Starting new swarming bot: %s' % THIS_FILE)
+
+
 def generate_version():
   """Returns the bot's code version."""
   try:
@@ -496,35 +531,6 @@ def get_attributes(botobj):
     u'state': _get_state(botobj, 0),
     u'version': generate_version(),
   }
-
-
-def _post_error_task(botobj, error, task_id):
-  """Posts given error as failure cause for the task.
-
-  This is used in case of internal code error, and this causes the task to
-  become BOT_DIED.
-
-  Arguments:
-    botobj: A bot.Bot instance.
-    error: String representing the problem.
-    task_id: Task that had an internal error. When the Swarming server sends
-        commands to a bot, even though they could be completely wrong, the
-        server assumes the job as running. Thus this function acts as the
-        exception handler for incoming commands from the Swarming server. If for
-        any reason the local test runner script can not be run successfully,
-        this function is invoked.
-  """
-  logging.error('Error: %s', error)
-  return botobj.remote.post_task_error(task_id, botobj.id, error)
-
-
-def _on_shutdown_hook(b):
-  """Called when the bot is restarting."""
-  _call_hook_safe(True, b, 'on_bot_shutdown')
-  # Aggressively set itself up so we ensure the auto-reboot configuration is
-  # fine before restarting the host. This is important as some tasks delete the
-  # autorestart script (!)
-  setup_bot(True)
 
 
 def get_bot(config):
@@ -568,6 +574,29 @@ def get_bot(config):
       base_dir,
       _on_shutdown_hook)
   return botobj
+
+
+def get_config():
+  """Returns the data from config.json."""
+  global _ERROR_HANDLER_WAS_REGISTERED
+  try:
+    with contextlib.closing(zipfile.ZipFile(THIS_FILE, 'r')) as f:
+      config = json.load(f.open('config/config.json', 'r'))
+    if config['server'].endswith('/'):
+      raise ValueError('Invalid server entry %r' % config['server'])
+  except (IOError, OSError, TypeError, ValueError):
+    logging.exception('Invalid config.json!')
+    config = {
+      'server': '',
+      'server_version': 'version1',
+    }
+  if not _ERROR_HANDLER_WAS_REGISTERED and config['server']:
+    on_error.report_on_exception_exit(config['server'])
+    _ERROR_HANDLER_WAS_REGISTERED = True
+  return config
+
+
+### Sub process management
 
 
 def _cleanup_bot_directory(botobj):
@@ -661,256 +690,24 @@ def _clean_cache(botobj):
         'swarming_bot.zip internal failure during run_isolated --clean')
 
 
-def _do_handshake(botobj, quit_bit):
-  """Connects to /handshake and reads the bot_config if specified."""
-  # This is the first authenticated request to the server. If the bot is
-  # misconfigured, the request may fail with HTTP 401 or HTTP 403. Instead of
-  # dying right away, spin in a loop, hoping the bot will "fix itself"
-  # eventually. Authentication errors in /handshake are logged on the server and
-  # generate error reports, so bots stuck in this state are discoverable.
-  sleep_time = 5
-  while not quit_bit.is_set():
-    resp = botobj.remote.do_handshake(botobj._attributes)
-    if resp:
-      logging.info('Connected to %s', resp.get('server_version'))
-      if resp.get('bot_version') != botobj._attributes['version']:
-        logging.warning(
-            'Found out we\'ll need to update: server said %s; we\'re %s',
-            resp.get('bot_version'), botobj._attributes['version'])
-      # Remember the server-provided per-bot configuration. '/handshake' is
-      # the only place where the server returns it. The bot will be sending
-      # the 'bot_group_cfg_version' back in each /poll (as part of 'state'),
-      # so that the server can instruct the bot to restart itself when
-      # config changes.
-      cfg_version = resp.get('bot_group_cfg_version')
-      if cfg_version:
-        botobj._update_bot_group_cfg(cfg_version, resp.get('bot_group_cfg'))
-      content = resp.get('bot_config')
-      if content:
-        _register_extra_bot_config(content)
-      break
-    logging.error(
-        'Failed to contact for handshake, retrying in %d sec...', sleep_time)
-    quit_bit.wait(sleep_time)
-    sleep_time = min(300, sleep_time * 2)
+def _post_error_task(botobj, error, task_id):
+  """Posts given error as failure cause for the task.
 
+  This is used in case of internal code error, and this causes the task to
+  become BOT_DIED.
 
-def _run_bot(arg_error):
-  """Runs _run_bot_inner() with a signal handler."""
-  # The quit_bit is to signal that the bot process must shutdown. It is
-  # different from a request to restart the bot process or reboot the host.
-  quit_bit = threading.Event()
-  def handler(sig, _):
-    # A signal terminates the bot process, it doesn't cause it to restart.
-    logging.info('Got signal %s', sig)
-    quit_bit.set()
-
-  # TODO(maruel): Set quit_bit when stdin is closed on Windows.
-
-  with subprocess42.set_signal_handler(subprocess42.STOP_SIGNALS, handler):
-    return _run_bot_inner(arg_error, quit_bit)
-
-
-def _init_ts_mon():
-  """Initializes ts_mon."""
-  parser = argparse.ArgumentParser(description=sys.modules[__name__].__doc__)
-  ts_mon.add_argparse_options(parser)
-  parser.set_defaults(
-      ts_mon_target_type='task',
-      ts_mon_task_service_name='swarming-bot',
-      ts_mon_task_job_name='default',
-      ts_mon_flush='auto',
-      ts_mon_ca_certs=tools.get_cacerts_bundle(),
-  )
-  args = parser.parse_args([])
-  ts_mon.process_argparse_options(args)
-
-
-def _run_bot_inner(arg_error, quit_bit):
-  """Runs the bot until an event occurs.
-
-  One of the three following even can occur:
-  - host reboots
-  - bot process restarts (this includes self-update)
-  - bot process shuts down (this includes a signal is received)
+  Arguments:
+    botobj: A bot.Bot instance.
+    error: String representing the problem.
+    task_id: Task that had an internal error. When the Swarming server sends
+        commands to a bot, even though they could be completely wrong, the
+        server assumes the job as running. Thus this function acts as the
+        exception handler for incoming commands from the Swarming server. If for
+        any reason the local test runner script can not be run successfully,
+        this function is invoked.
   """
-  config = get_config()
-  if config.get('enable_ts_monitoring'):
-    _init_ts_mon()
-  try:
-    # First thing is to get an arbitrary url. This also ensures the network is
-    # up and running, which is necessary before trying to get the FQDN below.
-    # There's no need to do error handling here - the "ping" is just to "wake
-    # up" the network; if there's something seriously wrong, the handshake will
-    # fail and we'll handle it there.
-    remote = remote_client.createRemoteClient(config['server'], None,
-                                              config.get('swarming_grpc_proxy'))
-    remote.ping()
-  except Exception:
-    # url_read() already traps pretty much every exceptions. This except
-    # clause is kept there "just in case".
-    logging.exception('server_ping threw')
-
-  # If we are on GCE, we want to make sure GCE metadata server responds, since
-  # we use the metadata to derive bot ID, dimensions and state.
-  if platforms.is_gce():
-    logging.info('Running on GCE, waiting for the metadata server')
-    platforms.gce.wait_for_metadata(quit_bit)
-    if quit_bit.is_set():
-      logging.info('Early quit 1')
-      return 0
-
-  # Next we make sure the bot can make authenticated calls by grabbing the auth
-  # headers, retrying on errors a bunch of times. We don't give up if it fails
-  # though (maybe the bot will "fix itself" later).
-  botobj = get_bot(config)
-  try:
-    botobj.remote.initialize(quit_bit)
-  except remote_client.InitializationError as exc:
-    botobj.post_error('failed to grab auth headers: %s' % exc.last_error)
-    logging.error('Can\'t grab auth headers, continuing anyway...')
-
-  if arg_error:
-    botobj.post_error('Bootstrapping error: %s' % arg_error)
-
-  if quit_bit.is_set():
-    logging.info('Early quit 2')
-    return 0
-
-  _call_hook_safe(True, botobj, 'on_bot_startup')
-
-  # Initial attributes passed to bot.Bot in get_bot above were constructed for
-  # 'fake' bot ID ('none'). Refresh them to match the real bot ID, now that we
-  # have fully initialize bot.Bot object. Note that 'get_dimensions' and
-  # 'get_state' may depend on actions done by 'on_bot_startup' hook, that's why
-  # we do it here and not in 'get_bot'.
-  dims = _get_dimensions(botobj)
-  states = _get_state(botobj, 0)
-  with botobj._lock:
-    botobj._update_dimensions(dims)
-    botobj._update_state(states)
-
-  if quit_bit.is_set():
-    logging.info('Early quit 3')
-    return 0
-
-  _do_handshake(botobj, quit_bit)
-
-  if quit_bit.is_set():
-    logging.info('Early quit 4')
-    return 0
-
-  # Let the bot to finish the initialization, now that it knows its server
-  # defined dimensions.
-  _call_hook_safe(True, botobj, 'on_handshake')
-
-  _cleanup_bot_directory(botobj)
-  _clean_cache(botobj)
-
-  if quit_bit.is_set():
-    logging.info('Early quit 5')
-    return 0
-
-  # This environment variable is accessible to the tasks executed by this bot.
-  os.environ['SWARMING_BOT_ID'] = botobj.id.encode('utf-8')
-
-  consecutive_sleeps = 0
-  last_action = time.time()
-  while not quit_bit.is_set():
-    try:
-      dims = _get_dimensions(botobj)
-      states = _get_state(botobj, consecutive_sleeps)
-      with botobj._lock:
-        botobj._update_dimensions(dims)
-        botobj._update_state(states)
-      did_something = _poll_server(botobj, quit_bit, last_action)
-      if did_something:
-        last_action = time.time()
-        consecutive_sleeps = 0
-      else:
-        consecutive_sleeps += 1
-    except Exception as e:
-      logging.exception('_poll_server failed in a completely unexpected way')
-      msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
-      botobj.post_error(msg)
-      consecutive_sleeps = 0
-      # Sleep a bit as a precaution to avoid hammering the server.
-      quit_bit.wait(10)
-  # Tell the server we are going away.
-  botobj.post_event('bot_shutdown', 'Signal was received')
-  return 0
-
-
-def _should_have_exited_but_didnt(reason):
-  """Something super sad happened, set the sticky quarantine bit before polling
-  again and sleep a bit to prevent busy-loop/DDoS.
-  """
-  time.sleep(2)
-  _set_quarantined(reason)
-
-
-def _poll_server(botobj, quit_bit, last_action):
-  """Polls the server to run one loop.
-
-  Returns True if executed some action, False if server asked the bot to sleep.
-  """
-  start = time.time()
-  try:
-    cmd, value = botobj.remote.poll(botobj._attributes)
-  except remote_client_errors.PollError as e:
-    # Back off on failure.
-    delay = max(1, min(60, botobj.state.get(u'sleep_streak', 10) * 2))
-    logging.warning('Poll failed (%s), sleeping %.1f sec', e, delay)
-    quit_bit.wait(delay)
-    return False
-  logging.debug('Server response:\n%s: %s', cmd, value)
-
-  if cmd == 'sleep':
-    # Value is duration
-    _call_hook_safe(
-        True, botobj, 'on_bot_idle', max(0, time.time() - last_action))
-    quit_bit.wait(value)
-    return False
-
-  if cmd == 'terminate':
-    # The value is the task ID to serve as the special termination command.
-    quit_bit.set()
-    try:
-      # Duration must be set or server IEs. For that matter, we've never cared
-      # if there's an error here before, so let's preserve that behaviour
-      # (though anything that's not a remote_client.InternalError will make
-      # it through, again preserving prior behaviour).
-      botobj.remote.post_task_update(value, botobj.id, {'duration':0}, None, 0)
-    except remote_client_errors.InternalError:
-      pass
-    return False
-
-  if cmd == 'run':
-    # Value is the manifest
-    if _run_manifest(botobj, value, start):
-      # Completed a task successfully so update swarming_bot.zip if necessary.
-      _update_lkgbc(botobj)
-    # Clean up cache after a task
-    _clean_cache(botobj)
-    # TODO(maruel): Handle the case where quit_bit.is_set() happens here. This
-    # is concerning as this means a signal (often SIGTERM) was received while
-    # running the task. Make sure the host is properly restarting.
-  elif cmd == 'update':
-    # Value is the version
-    _update_bot(botobj, value)
-    _should_have_exited_but_didnt('Failed to self-update the bot')
-  elif cmd in ('host_reboot', 'restart'):
-    # Value is the message to display while rebooting the host
-    botobj.host_reboot(value)
-    _should_have_exited_but_didnt('Failed to reboot the host')
-  elif cmd == 'bot_restart':
-    # Value is the message to display while restarting
-    _bot_restart(botobj, value)
-    _should_have_exited_but_didnt('Failed to restart the bot process')
-  else:
-    raise ValueError('Unexpected command: %s\n%s' % (cmd, value))
-
-  return True
+  logging.error('Error: %s', error)
+  return botobj.remote.post_task_error(task_id, botobj.id, error)
 
 
 def _run_manifest(botobj, manifest, start):
@@ -1122,6 +919,246 @@ def _run_manifest(botobj, manifest, start):
       botobj.host_reboot('Working around STATUS_DLL_INIT_FAILED by task_runner')
 
 
+### Bot lifetime management
+
+
+def _run_bot(arg_error):
+  """Runs _run_bot_inner() with a signal handler."""
+  # The quit_bit is to signal that the bot process must shutdown. It is
+  # different from a request to restart the bot process or reboot the host.
+  quit_bit = threading.Event()
+  def handler(sig, _):
+    # A signal terminates the bot process, it doesn't cause it to restart.
+    logging.info('Got signal %s', sig)
+    quit_bit.set()
+
+  # TODO(maruel): Set quit_bit when stdin is closed on Windows.
+
+  with subprocess42.set_signal_handler(subprocess42.STOP_SIGNALS, handler):
+    return _run_bot_inner(arg_error, quit_bit)
+
+
+def _run_bot_inner(arg_error, quit_bit):
+  """Runs the bot until an event occurs.
+
+  One of the three following even can occur:
+  - host reboots
+  - bot process restarts (this includes self-update)
+  - bot process shuts down (this includes a signal is received)
+  """
+  config = get_config()
+  if config.get('enable_ts_monitoring'):
+    _init_ts_mon()
+  try:
+    # First thing is to get an arbitrary url. This also ensures the network is
+    # up and running, which is necessary before trying to get the FQDN below.
+    # There's no need to do error handling here - the "ping" is just to "wake
+    # up" the network; if there's something seriously wrong, the handshake will
+    # fail and we'll handle it there.
+    remote = remote_client.createRemoteClient(config['server'], None,
+                                              config.get('swarming_grpc_proxy'))
+    remote.ping()
+  except Exception:
+    # url_read() already traps pretty much every exceptions. This except
+    # clause is kept there "just in case".
+    logging.exception('server_ping threw')
+
+  # If we are on GCE, we want to make sure GCE metadata server responds, since
+  # we use the metadata to derive bot ID, dimensions and state.
+  if platforms.is_gce():
+    logging.info('Running on GCE, waiting for the metadata server')
+    platforms.gce.wait_for_metadata(quit_bit)
+    if quit_bit.is_set():
+      logging.info('Early quit 1')
+      return 0
+
+  # Next we make sure the bot can make authenticated calls by grabbing the auth
+  # headers, retrying on errors a bunch of times. We don't give up if it fails
+  # though (maybe the bot will "fix itself" later).
+  botobj = get_bot(config)
+  try:
+    botobj.remote.initialize(quit_bit)
+  except remote_client.InitializationError as exc:
+    botobj.post_error('failed to grab auth headers: %s' % exc.last_error)
+    logging.error('Can\'t grab auth headers, continuing anyway...')
+
+  if arg_error:
+    botobj.post_error('Bootstrapping error: %s' % arg_error)
+
+  if quit_bit.is_set():
+    logging.info('Early quit 2')
+    return 0
+
+  _call_hook_safe(True, botobj, 'on_bot_startup')
+
+  # Initial attributes passed to bot.Bot in get_bot above were constructed for
+  # 'fake' bot ID ('none'). Refresh them to match the real bot ID, now that we
+  # have fully initialize bot.Bot object. Note that 'get_dimensions' and
+  # 'get_state' may depend on actions done by 'on_bot_startup' hook, that's why
+  # we do it here and not in 'get_bot'.
+  dims = _get_dimensions(botobj)
+  states = _get_state(botobj, 0)
+  with botobj._lock:
+    botobj._update_dimensions(dims)
+    botobj._update_state(states)
+
+  if quit_bit.is_set():
+    logging.info('Early quit 3')
+    return 0
+
+  _do_handshake(botobj, quit_bit)
+
+  if quit_bit.is_set():
+    logging.info('Early quit 4')
+    return 0
+
+  # Let the bot to finish the initialization, now that it knows its server
+  # defined dimensions.
+  _call_hook_safe(True, botobj, 'on_handshake')
+
+  _cleanup_bot_directory(botobj)
+  _clean_cache(botobj)
+
+  if quit_bit.is_set():
+    logging.info('Early quit 5')
+    return 0
+
+  # This environment variable is accessible to the tasks executed by this bot.
+  os.environ['SWARMING_BOT_ID'] = botobj.id.encode('utf-8')
+
+  consecutive_sleeps = 0
+  last_action = time.time()
+  while not quit_bit.is_set():
+    try:
+      dims = _get_dimensions(botobj)
+      states = _get_state(botobj, consecutive_sleeps)
+      with botobj._lock:
+        botobj._update_dimensions(dims)
+        botobj._update_state(states)
+      did_something = _poll_server(botobj, quit_bit, last_action)
+      if did_something:
+        last_action = time.time()
+        consecutive_sleeps = 0
+      else:
+        consecutive_sleeps += 1
+    except Exception as e:
+      logging.exception('_poll_server failed in a completely unexpected way')
+      msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
+      botobj.post_error(msg)
+      consecutive_sleeps = 0
+      # Sleep a bit as a precaution to avoid hammering the server.
+      quit_bit.wait(10)
+  # Tell the server we are going away.
+  botobj.post_event('bot_shutdown', 'Signal was received')
+  return 0
+
+
+def _should_have_exited_but_didnt(reason):
+  """Something super sad happened, set the sticky quarantine bit before polling
+  again and sleep a bit to prevent busy-loop/DDoS.
+  """
+  time.sleep(2)
+  _set_quarantined(reason)
+
+
+def _do_handshake(botobj, quit_bit):
+  """Connects to /handshake and reads the bot_config if specified."""
+  # This is the first authenticated request to the server. If the bot is
+  # misconfigured, the request may fail with HTTP 401 or HTTP 403. Instead of
+  # dying right away, spin in a loop, hoping the bot will "fix itself"
+  # eventually. Authentication errors in /handshake are logged on the server and
+  # generate error reports, so bots stuck in this state are discoverable.
+  sleep_time = 5
+  while not quit_bit.is_set():
+    resp = botobj.remote.do_handshake(botobj._attributes)
+    if resp:
+      logging.info('Connected to %s', resp.get('server_version'))
+      if resp.get('bot_version') != botobj._attributes['version']:
+        logging.warning(
+            'Found out we\'ll need to update: server said %s; we\'re %s',
+            resp.get('bot_version'), botobj._attributes['version'])
+      # Remember the server-provided per-bot configuration. '/handshake' is
+      # the only place where the server returns it. The bot will be sending
+      # the 'bot_group_cfg_version' back in each /poll (as part of 'state'),
+      # so that the server can instruct the bot to restart itself when
+      # config changes.
+      cfg_version = resp.get('bot_group_cfg_version')
+      if cfg_version:
+        botobj._update_bot_group_cfg(cfg_version, resp.get('bot_group_cfg'))
+      content = resp.get('bot_config')
+      if content:
+        _register_extra_bot_config(content)
+      break
+    logging.error(
+        'Failed to contact for handshake, retrying in %d sec...', sleep_time)
+    quit_bit.wait(sleep_time)
+    sleep_time = min(300, sleep_time * 2)
+
+
+def _poll_server(botobj, quit_bit, last_action):
+  """Polls the server to run one loop.
+
+  Returns True if executed some action, False if server asked the bot to sleep.
+  """
+  start = time.time()
+  try:
+    cmd, value = botobj.remote.poll(botobj._attributes)
+  except remote_client_errors.PollError as e:
+    # Back off on failure.
+    delay = max(1, min(60, botobj.state.get(u'sleep_streak', 10) * 2))
+    logging.warning('Poll failed (%s), sleeping %.1f sec', e, delay)
+    quit_bit.wait(delay)
+    return False
+  logging.debug('Server response:\n%s: %s', cmd, value)
+
+  if cmd == 'sleep':
+    # Value is duration
+    _call_hook_safe(
+        True, botobj, 'on_bot_idle', max(0, time.time() - last_action))
+    quit_bit.wait(value)
+    return False
+
+  if cmd == 'terminate':
+    # The value is the task ID to serve as the special termination command.
+    quit_bit.set()
+    try:
+      # Duration must be set or server IEs. For that matter, we've never cared
+      # if there's an error here before, so let's preserve that behaviour
+      # (though anything that's not a remote_client.InternalError will make
+      # it through, again preserving prior behaviour).
+      botobj.remote.post_task_update(value, botobj.id, {'duration':0}, None, 0)
+    except remote_client_errors.InternalError:
+      pass
+    return False
+
+  if cmd == 'run':
+    # Value is the manifest
+    if _run_manifest(botobj, value, start):
+      # Completed a task successfully so update swarming_bot.zip if necessary.
+      _update_lkgbc(botobj)
+    # Clean up cache after a task
+    _clean_cache(botobj)
+    # TODO(maruel): Handle the case where quit_bit.is_set() happens here. This
+    # is concerning as this means a signal (often SIGTERM) was received while
+    # running the task. Make sure the host is properly restarting.
+  elif cmd == 'update':
+    # Value is the version
+    _update_bot(botobj, value)
+    _should_have_exited_but_didnt('Failed to self-update the bot')
+  elif cmd in ('host_reboot', 'restart'):
+    # Value is the message to display while rebooting the host
+    botobj.host_reboot(value)
+    _should_have_exited_but_didnt('Failed to reboot the host')
+  elif cmd == 'bot_restart':
+    # Value is the message to display while restarting
+    _bot_restart(botobj, value)
+    _should_have_exited_but_didnt('Failed to restart the bot process')
+  else:
+    raise ValueError('Unexpected command: %s\n%s' % (cmd, value))
+
+  return True
+
+
 def _update_bot(botobj, version):
   """Downloads the new version of the bot code and then runs it.
 
@@ -1215,26 +1252,6 @@ def _update_lkgbc(botobj):
     shutil.copy(THIS_FILE, golden)
   except Exception as e:
     botobj.post_error('Failed to update LKGBC: %s' % e)
-
-
-def get_config():
-  """Returns the data from config.json."""
-  global _ERROR_HANDLER_WAS_REGISTERED
-  try:
-    with contextlib.closing(zipfile.ZipFile(THIS_FILE, 'r')) as f:
-      config = json.load(f.open('config/config.json', 'r'))
-    if config['server'].endswith('/'):
-      raise ValueError('Invalid server entry %r' % config['server'])
-  except (IOError, OSError, TypeError, ValueError):
-    logging.exception('Invalid config.json!')
-    config = {
-      'server': '',
-      'server_version': 'version1',
-    }
-  if not _ERROR_HANDLER_WAS_REGISTERED and config['server']:
-    on_error.report_on_exception_exit(config['server'])
-    _ERROR_HANDLER_WAS_REGISTERED = True
-  return config
 
 
 def main(argv):
