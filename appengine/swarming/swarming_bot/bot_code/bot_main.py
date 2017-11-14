@@ -839,9 +839,12 @@ def _run_manifest(botobj, manifest, start):
     _call_hook_safe(True, botobj, 'on_before_task', bot_file, command, env)
     logging.debug('Running command: %s', command)
 
-    # Put the output file into the current working directory, which should be
-    # the one containing swarming_bot.zip.
-    log_path = os.path.join(botobj.base_dir, 'logs', 'task_runner_stdout.log')
+    base_log = os.path.join(botobj.base_dir, 'logs')
+    if not os.path.isdir(base_log):
+      # It was observed that this directory may be unexpectedly deleted.
+      # Recreate as needed, otherwise it may throw at the open() call below.
+      os.mkdir(base_log)
+    log_path = os.path.join(base_log, 'task_runner_stdout.log')
     os_utilities.roll_log(log_path)
     os_utilities.trim_rolled_log(log_path)
     with open(log_path, 'a+b') as f:
