@@ -31,6 +31,7 @@ import ts_mon_metrics
 class CronBotDiedHandler(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
+    ndb.get_context().set_cache_policy(lambda _: False)
     try:
       task_scheduler.cron_handle_bot_died(self.request.host_url)
     except datastore_errors.NeedIndexError as e:
@@ -47,6 +48,7 @@ class CronBotDiedHandler(webapp2.RequestHandler):
 class CronAbortExpiredShardToRunHandler(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
+    ndb.get_context().set_cache_policy(lambda _: False)
     task_scheduler.cron_abort_expired_task_to_run(self.request.host_url)
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
@@ -55,6 +57,7 @@ class CronAbortExpiredShardToRunHandler(webapp2.RequestHandler):
 class CronTaskQueues(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
+    ndb.get_context().set_cache_policy(lambda _: False)
     task_queues.tidy_stale()
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
@@ -65,6 +68,7 @@ class CronMachineProviderBotsUtilizationHandler(webapp2.RequestHandler):
 
   @decorators.require_cronjob
   def get(self):
+    ndb.get_context().set_cache_policy(lambda _: False)
     if not config.settings().mp.enabled:
       logging.info('MP support is disabled')
       return
@@ -77,6 +81,7 @@ class CronMachineProviderConfigHandler(webapp2.RequestHandler):
 
   @decorators.require_cronjob
   def get(self):
+    ndb.get_context().set_cache_policy(lambda _: False)
     if not config.settings().mp.enabled:
       logging.info('MP support is disabled')
       return
@@ -97,6 +102,7 @@ class CronMachineProviderManagementHandler(webapp2.RequestHandler):
 
   @decorators.require_cronjob
   def get(self):
+    ndb.get_context().set_cache_policy(lambda _: False)
     if not config.settings().mp.enabled:
       logging.info('MP support is disabled')
       return
@@ -109,6 +115,7 @@ class CronBotsDimensionAggregationHandler(webapp2.RequestHandler):
 
   @decorators.require_cronjob
   def get(self):
+    ndb.get_context().set_cache_policy(lambda _: False)
     seen = {}
     now = utils.utcnow()
     for b in bot_management.BotInfo.query():
@@ -133,6 +140,7 @@ class CronTasksTagsAggregationHandler(webapp2.RequestHandler):
 
   @decorators.require_cronjob
   def get(self):
+    ndb.get_context().set_cache_policy(lambda _: False)
     seen = {}
     now = utils.utcnow()
     count = 0
@@ -194,6 +202,7 @@ class CancelTasksHandler(webapp2.RequestHandler):
 class TaskDimensionsHandler(webapp2.RequestHandler):
   @decorators.require_taskqueue('rebuild-task-cache')
   def post(self):
+    ndb.get_context().set_cache_policy(lambda _: False)
     task_queues.rebuild_task_cache(self.request.body)
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
@@ -216,6 +225,7 @@ class TaskMachineProviderManagementHandler(webapp2.RequestHandler):
 
   @decorators.require_taskqueue('machine-provider-manage')
   def post(self):
+    ndb.get_context().set_cache_policy(lambda _: False)
     key = ndb.Key(urlsafe=self.request.get('key'))
     assert key.kind() == 'MachineLease', key
     lease_management.manage_lease(key)
@@ -242,6 +252,7 @@ class InternalLaunchMapReduceJobWorkerHandler(webapp2.RequestHandler):
   """Called via task queue or cron to start a map reduce job."""
   @decorators.require_taskqueue(mapreduce_jobs.MAPREDUCE_TASK_QUEUE)
   def post(self, job_id):  # pylint: disable=R0201
+    ndb.get_context().set_cache_policy(lambda _: False)
     mapreduce_jobs.launch_job(job_id)
 
 
