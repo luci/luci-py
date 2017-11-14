@@ -1319,6 +1319,7 @@ def host_reboot(message=None, timeout=None):
   """
   # The shutdown process sends SIGTERM and waits for processes to exit. It's
   # important to not handle SIGTERM and die when needed.
+  # TODO(maruel): We may want to die properly here.
   signal.signal(signal.SIGTERM, signal.SIG_DFL)
 
   deadline = time.time() + timeout if timeout else None
@@ -1326,10 +1327,20 @@ def host_reboot(message=None, timeout=None):
     host_reboot_and_return(message)
     # Sleep for 300 seconds to ensure we don't try to do anymore work while the
     # OS is preparing to shutdown.
-    duration = min(300, deadline - time.time()) if timeout else 300
-    if duration > 0:
+    loop = True
+    while loop:
+      duration = min(300, deadline - time.time()) if timeout else 300
+      if duration <= 0:
+        break
       logging.info('Sleeping for %s', duration)
-      time.sleep(duration)
+      try:
+        time.sleep(duration)
+        loop = False
+      except IOError as e:
+        # Ignore "[Errno 4] Interrupted function call"; we do not want the
+        # process to die, so let's sleep again until the OS forcibly kill the
+        # process.
+        logging.info('Interrupted sleep: %s', e)
     if timeout and time.time() >= deadline:
       logging.warning(
           'Waited for host to reboot for too long (%s); aborting', timeout)
