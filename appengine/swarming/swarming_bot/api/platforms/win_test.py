@@ -4,6 +4,7 @@
 # that can be found in the LICENSE file.
 
 import logging
+import re
 import sys
 import unittest
 
@@ -45,6 +46,14 @@ class TestWin(unittest.TestCase):
   def test_list_top_windows(self):
     if sys.platform == 'win32':
       win.list_top_windows()
+
+  def test_version(self):
+    m = re.search(
+        win._CMD_RE, 'Microsoft Windows [version 10.0.15063]', re.IGNORECASE)
+    self.assertEqual(('10.0', '15063'), m.groups())
+    m = re.search(
+        win._CMD_RE, 'Microsoft Windows [version 10.0.16299.19]', re.IGNORECASE)
+    self.assertEqual(('10.0', '16299.19'), m.groups())
 
 
 if __name__ == '__main__':

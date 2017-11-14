@@ -85,6 +85,10 @@ def _get_wmi_wbem():
   return wmi_service.ConnectServer('.', 'root\\cimv2')
 
 
+# Regexp for _get_os_numbers()
+_CMD_RE = r'\[version (\d+\.\d+)\.(\d+(?:\.\d+|))\]'
+
+
 @tools.cached
 def _get_os_numbers():
   """Returns the normalized OS version and build numbers as strings.
@@ -104,9 +108,10 @@ def _get_os_numbers():
   # - Win10: Microsoft Windows [Version 10.0.10240]
   # - Win7 or Win2K8R2: Microsoft Windows [Version 6.1.7601]
   # - Win1709: Microsoft Windows [Version 10.0.16299.19]
+  #
+  # Some locale (like fr_CA) use a lower case 'version'.
   out = subprocess.check_output(['cmd.exe', '/c', 'ver']).strip()
-  match = re.search(r'\[Version (\d+\.\d+)\.(\d+(:?\.\d+))\]', out,
-                    re.IGNORECASE)
+  match = re.search(_CMD_RE, out, re.IGNORECASE)
   return match.group(1), match.group(2)
 
 
