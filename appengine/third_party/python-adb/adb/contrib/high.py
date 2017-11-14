@@ -997,8 +997,12 @@ class HighDevice(object):
     It acts as a directory service but each service return their data without
     any real format, and will happily return failure.
     """
+    _failure_msgs = [
+        'Error dumping service info',
+        'Can\'t find service: ',
+    ]
     out, exit_code = self.Shell('dumpsys ' + arg)
-    if exit_code != 0 or out.startswith('Can\'t find service: '):
+    if exit_code != 0 or any(out.startswith(msg) for msg in _failure_msgs):
       return None
     return out
 
