@@ -202,10 +202,12 @@ class CancelTasksHandler(webapp2.RequestHandler):
 class TaskDimensionsHandler(webapp2.RequestHandler):
   @decorators.require_taskqueue('rebuild-task-cache')
   def post(self):
-    ndb.get_context().set_cache_policy(lambda _: False)
-    task_queues.rebuild_task_cache(self.request.body)
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
+    if not task_queues.rebuild_task_cache(self.request.body):
+      # The task needs to be retried.
+      self.response.set_status(500)
+    else:
+      self.response.out.write('Success.')
 
 
 

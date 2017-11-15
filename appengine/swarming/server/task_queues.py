@@ -685,6 +685,9 @@ def rebuild_task_cache(payload):
     - 'dimensions_hash': precalculated hash for dimensions
     - 'valid_until_ts': expiration_ts + _ADVANCE for how long this cache is
       valid
+
+  Returns:
+    True if everything was processed, False if it needs to be retried.
   """
   data = json.loads(payload)
   logging.debug('rebuild_task_cache(%s)', data)
@@ -718,13 +721,23 @@ def rebuild_task_cache(payload):
         obj.put()
       return obj
 
-    datastore_utils.transaction(run)
+    try:
+      datastore_utils.transaction(run)
+    except datastore_utils.CommitError as e:
+      # Still log an error but no need for a stack trace in the logs. It is
+      # important to surface that the call failed so the task queue is retried
+      # later.
+      logging.error('Failed updating TaskDimensions: %s', e)
+      return False
   finally:
+    # Any of the _refresh_BotTaskDimensions() calls above could throw. Still log
+    # how far we went.
     logging.debug(
         'rebuild_task_cache(%d) in %.3fs. viable bots: %d; bots updated: %d\n'
         '%s',
         dimensions_hash, (utils.utcnow()-now).total_seconds(), viable, updated,
         '\n'.join('  ' + d for d in dimensions_flat))
+  return True
 
 
 def tidy_stale():
