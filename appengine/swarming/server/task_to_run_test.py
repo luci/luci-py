@@ -643,13 +643,14 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         properties={
           'dimensions': {u'os': u'Windows-3.1.1', u'pool': u'default'},
         })
-    self.assertEqual(False, task_to_run._lookup_cache_is_taken(to_run.key))
+    lookup = lambda k: task_to_run._lookup_cache_is_taken_async(k).get_result()
+    self.assertEqual(False, lookup(to_run.key))
     task_to_run.set_lookup_cache(to_run.key, True)
-    self.assertEqual(False, task_to_run._lookup_cache_is_taken(to_run.key))
+    self.assertEqual(False, lookup(to_run.key))
     task_to_run.set_lookup_cache(to_run.key, False)
-    self.assertEqual(True, task_to_run._lookup_cache_is_taken(to_run.key))
+    self.assertEqual(True, lookup(to_run.key))
     task_to_run.set_lookup_cache(to_run.key, True)
-    self.assertEqual(False, task_to_run._lookup_cache_is_taken(to_run.key))
+    self.assertEqual(False, lookup(to_run.key))
 
 
 if __name__ == '__main__':

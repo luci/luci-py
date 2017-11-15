@@ -167,7 +167,9 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request):
   # inhibit concurrently readers to try to reap this task. The downside is if
   # this request fails in the middle of the transaction, the task may stay
   # unreapable for up to 15 seconds.
-  task_to_run.set_lookup_cache(to_run_key, False)
+  if not task_to_run.set_lookup_cache(to_run_key, False):
+    logging.debug('hit negative cache')
+    return None, None
 
   try:
     run_result, secret_bytes = datastore_utils.transaction(run, retries=0)
