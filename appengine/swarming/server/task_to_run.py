@@ -552,7 +552,11 @@ def yield_expired_task_to_run():
   # is that TaskToRun entities are very hot and it is important to not require
   # composite indexes on it. It is expected that the number of pending task is
   # 'relatively low', in the orders of 100,000 entities.
+  #
+  # Use a large batch size since the entities are very small and to reduce RPC
+  # overhead.
+  opts = ndb.QueryOptions(batch_size=256)
   now = utils.utcnow()
-  for task in TaskToRun.query(TaskToRun.queue_number > 0):
+  for task in TaskToRun.query(TaskToRun.queue_number > 0, default_options=opts):
     if task.expiration_ts < now:
       yield task
