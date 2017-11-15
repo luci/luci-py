@@ -32,6 +32,7 @@ import datetime
 import logging
 import time
 
+from google.appengine.runtime import apiproxy_errors
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
@@ -346,56 +347,66 @@ def _yield_potential_tasks(bot_id):
   # results of every query insensibly.
   futures = []
 
-  for y in yielders:
-    futures.append(next(y, None))
+  try:
+    for y in yielders:
+      futures.append(next(y, None))
 
-  while (time.time() - start) < 1 and not all(f.done() for f in futures if f):
-    r = ndb.eventloop.run0()
-    if r is None:
-      break
-    time.sleep(r)
-  logging.debug(
-      '_yield_potential_tasks(%s): waited %.3fs for %d items from %d Futures',
-      bot_id, time.time() - start,
-      sum(len(f.get_result()) for f in futures if f.done()),
-      len(futures))
-  # items is a list of TaskToRun. The entities are needed because property
-  # queue_number is used to sort according to each task's priority.
-  items = []
-  for i, f in enumerate(futures):
-    if f and f.done():
-      # The ndb.Future returns a list of up to 10 TaskToRun entities.
-      r = f.get_result()
-      if r:
-        # The ndb.Query ask for a valid queue_number but under load, it happens
-        # the value is not valid anymore.
-        items.extend(i for i in r if i.queue_number)
-        # Prime the next page, in case.
-        futures[i] = next(yielders[i], None)
-
-  # That's going to be our search space for now.
-  items.sort(key=_queue_number_fifo_priority)
-
-  # It is possible that there is no items yet, in case all futures are taking
-  # more than 1 second.
-  # It is possible that all futures are done if every queue has less than 10
-  # task pending.
-  while any(futures) or items:
-    if items:
-      yield items[0]
-      items = items[1:]
-    else:
-      # Let activity happen.
-      ndb.eventloop.run1()
-    changed = False
+    while (time.time() - start) < 1 and not all(f.done() for f in futures if f):
+      r = ndb.eventloop.run0()
+      if r is None:
+        break
+      time.sleep(r)
+    logging.debug(
+        '_yield_potential_tasks(%s): waited %.3fs for %d items from %d Futures',
+        bot_id, time.time() - start,
+        sum(len(f.get_result()) for f in futures if f.done()),
+        len(futures))
+    # items is a list of TaskToRun. The entities are needed because property
+    # queue_number is used to sort according to each task's priority.
+    items = []
     for i, f in enumerate(futures):
       if f and f.done():
-        # See loop above for explanation.
-        items.extend(i for i in f.get_result() if i.queue_number)
-        futures[i] = next(yielders[i], None)
-        changed = True
-    if changed:
-      items.sort(key=_queue_number_fifo_priority)
+        # The ndb.Future returns a list of up to 10 TaskToRun entities.
+        r = f.get_result()
+        if r:
+          # The ndb.Query ask for a valid queue_number but under load, it
+          # happens the value is not valid anymore.
+          items.extend(i for i in r if i.queue_number)
+          # Prime the next page, in case.
+          futures[i] = next(yielders[i], None)
+
+    # That's going to be our search space for now.
+    items.sort(key=_queue_number_fifo_priority)
+
+    # It is possible that there is no items yet, in case all futures are taking
+    # more than 1 second.
+    # It is possible that all futures are done if every queue has less than 10
+    # task pending.
+    while any(futures) or items:
+      if items:
+        yield items[0]
+        items = items[1:]
+      else:
+        # Let activity happen.
+        ndb.eventloop.run1()
+      changed = False
+      for i, f in enumerate(futures):
+        if f and f.done():
+          # See loop above for explanation.
+          items.extend(i for i in f.get_result() if i.queue_number)
+          futures[i] = next(yielders[i], None)
+          changed = True
+      if changed:
+        items.sort(key=_queue_number_fifo_priority)
+  except apiproxy_errors.DeadlineExceededError as e:
+    # This is normally due to: "The API call datastore_v3.RunQuery() took too
+    # long to respond and was cancelled."
+    # At that point, the Cloud DB index is not able to sustain the load. So the
+    # best thing to do is to back off a bit and not return any task to the bot
+    # for this poll.
+    logging.error(
+        'Failed to yield a task due to an RPC timeout. Returning no '
+        'task to the bot: %s', e)
 
 
 ### Public API.
