@@ -1246,41 +1246,45 @@ def manage_lease(key):
   delete_machine_lease(key)
 
 
-def compute_utilization(batch_size=50):
-  """Computes bot utilization per machine type.
-
-  Args:
-    batch_size: Number of bots to query for at a time.
-  """
+def compute_utilization():
+  """Computes bot utilization per machine type."""
   # A query that requires multiple batches may produce duplicate results. To
   # ensure each bot is only counted once, map machine types to [busy, idle]
   # sets of bots.
   machine_types = collections.defaultdict(lambda: [set(), set()])
+
+  def process(bot):
+    bot_id = bot.key.parent().id()
+    if bot.task_id:
+      machine_types[bot.machine_type][0].add(bot_id)
+      machine_types[bot.machine_type][1].discard(bot_id)
+    else:
+      machine_types[bot.machine_type][0].discard(bot_id)
+      machine_types[bot.machine_type][1].add(bot_id)
+
+  # Expectation is ~2000 entities, so batching is valuable but local caching is
+  # not. Can't use a projection query because 'cannot use projection on a
+  # property with an equality filter'.
   now = utils.utcnow()
   q = bot_management.BotInfo.query()
-  q = bot_management.filter_availability(q, False, False, now, None, True)
-  cursor = ''
-  while cursor is not None:
-    bots, cursor = datastore_utils.fetch_page(q, batch_size, cursor)
-    for bot in bots:
-      bot_id = bot.key.parent().id()
-      if bot.task_id:
-        machine_types[bot.machine_type][0].add(bot_id)
-        machine_types[bot.machine_type][1].discard(bot_id)
-      else:
-        machine_types[bot.machine_type][0].discard(bot_id)
-        machine_types[bot.machine_type][1].add(bot_id)
+  q = bot_management.filter_availability(
+      q, quarantined=None, is_dead=False, now=now, is_busy=None, is_mp=True)
+  q.map(process, batch_size=128, use_cache=False)
 
+  # The number of machine types isn't very large, in the few tens, so no need to
+  # rate limit parallelism yet.
+  futures = []
   for machine_type, (busy, idle) in machine_types.iteritems():
     busy = len(busy)
     idle = len(idle)
     logging.info('Utilization for %s: %s/%s', machine_type, busy, busy + idle)
-    MachineTypeUtilization(
-        id=machine_type,
-        busy=busy,
-        idle=idle,
-        last_updated_ts=now,
-    ).put()
+    # TODO(maruel): This should be a single entity.
+    # TODO(maruel): Historical data would be useful.
+    obj = MachineTypeUtilization(
+        id=machine_type, busy=busy, idle=idle, last_updated_ts=now)
+    futures.append(obj.put_async())
+  for f in futures:
+    f.get_result()
 
 
 def set_global_metrics():

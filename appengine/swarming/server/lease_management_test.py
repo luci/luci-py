@@ -7,6 +7,8 @@
 
 import datetime
 import json
+import logging
+import sys
 import unittest
 
 import test_env
@@ -197,6 +199,7 @@ class CheckForConnectionTest(test_case.TestCase):
 
 class ComputeUtilizationTest(test_case.TestCase):
   """Tests for lease_management.compute_utilization."""
+  APP_DIR = test_env.APP_DIR
 
   def test_no_machine_provider_bots(self):
     bots = [
@@ -216,66 +219,71 @@ class ComputeUtilizationTest(test_case.TestCase):
     self.failIf(key.get())
 
   def test_machine_provider_bots(self):
+    ndb.get_context().set_cache_policy(lambda _: None)
+    now = utils.utcnow()
     bots = [
         bot_management.BotInfo(
             key=bot_management.get_info_key('bot1'),
             machine_type='machine-type-1',
+            last_seen_ts=now,
         ),
         bot_management.BotInfo(
             key=bot_management.get_info_key('bot2'),
             machine_type='machine-type-1',
+            last_seen_ts=now,
         ),
         bot_management.BotInfo(
             key=bot_management.get_info_key('bot3'),
             machine_type='machine-type-2',
+            last_seen_ts=now,
             task_id='task',
         ),
         bot_management.BotInfo(
             key=bot_management.get_info_key('bot4'),
             machine_type='machine-type-3',
+            last_seen_ts=now,
             task_id='task',
         ),
         bot_management.BotInfo(
             key=bot_management.get_info_key('bot5'),
             machine_type='machine-type-3',
+            last_seen_ts=now,
         ),
         bot_management.BotInfo(
             key=bot_management.get_info_key('bot6'),
             machine_type='machine-type-3',
+            last_seen_ts=now,
             task_id='task',
         ),
     ]
-    def fetch_page(*_args, **_kwargs):
-      return bots, None
-    self.mock(lease_management.datastore_utils, 'fetch_page', fetch_page)
+    ndb.put_multi(bots)
 
-    lease_management.MachineType(
-        id='machine-type-1',
-        target_size=2,
-    ).put()
-    key1 = ndb.Key(lease_management.MachineTypeUtilization, 'machine-type-1')
-    lease_management.MachineType(
-        id='machine-type-2',
-        target_size=1,
-    ).put()
-    key2 = ndb.Key(lease_management.MachineTypeUtilization, 'machine-type-2')
-    lease_management.MachineType(
-        id='machine-type-3',
-        target_size=1,
-    ).put()
-    key3 = ndb.Key(lease_management.MachineTypeUtilization, 'machine-type-3')
+    obj1 = lease_management.MachineType(id='machine-type-1', target_size=2)
+    obj1.put()
+    obj2 = lease_management.MachineType(id='machine-type-2', target_size=1)
+    obj2.put()
+    obj3 = lease_management.MachineType(id='machine-type-3', target_size=1)
+    obj3.put()
 
     lease_management.compute_utilization()
 
-    self.assertEqual(key1.get().busy, 0)
-    self.assertEqual(key1.get().idle, 2)
-    self.failUnless(key1.get().last_updated_ts)
-    self.assertEqual(key2.get().busy, 1)
-    self.assertEqual(key2.get().idle, 0)
-    self.failUnless(key2.get().last_updated_ts)
-    self.assertEqual(key3.get().busy, 2)
-    self.assertEqual(key3.get().idle, 1)
-    self.failUnless(key3.get().last_updated_ts)
+    u1 = ndb.Key(lease_management.MachineTypeUtilization,
+        obj1.key.string_id()).get()
+    self.assertEqual(u1.busy, 0)
+    self.assertEqual(u1.idle, 2)
+    self.failUnless(u1.last_updated_ts)
+
+    u2 = ndb.Key(lease_management.MachineTypeUtilization,
+        obj2.key.string_id()).get()
+    self.assertEqual(u2.busy, 1)
+    self.assertEqual(u2.idle, 0)
+    self.failUnless(u2.last_updated_ts)
+
+    u3 = ndb.Key(lease_management.MachineTypeUtilization,
+        obj3.key.string_id()).get()
+    self.assertEqual(u3.busy, 2)
+    self.assertEqual(u3.idle, 1)
+    self.failUnless(u3.last_updated_ts)
 
 
 class DrainExcessTest(test_case.TestCase):
@@ -1037,4 +1045,6 @@ class GetTargetSize(test_case.TestCase):
 
 
 if __name__ == '__main__':
+  logging.basicConfig(
+      level=logging.DEBUG if '-v' in sys.argv else logging.ERROR)
   unittest.main()
