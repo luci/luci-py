@@ -50,7 +50,7 @@ class BotManagementTest(test_case.TestCase):
       self.assertEqual(True, store_last_good)
       return None, 'foo bar'
     self.mock(config, 'get_self_config', get_self_config_mock)
-    f = bot_code.get_bootstrap('localhost', 'token', None)
+    f = bot_code.get_bootstrap('localhost', 'token')
     expected = (
       '#!/usr/bin/env python\n'
       'host_url = \'localhost\'\n'
@@ -65,28 +65,8 @@ class BotManagementTest(test_case.TestCase):
       self.assertEqual(True, store_last_good)
       return None, 'foo bar'
     self.mock(config, 'get_self_config', get_self_config_mock)
-    f = bot_code.get_bot_config(None)
+    f = bot_code.get_bot_config()
     self.assertEqual('foo bar', f.content)
-
-  def test_store_bot_config(self):
-    # When a new start bot script is uploaded, we should recalculate the
-    # version hash since it will have changed.
-    expected = {
-      'config/bot_config.py': bot_code.get_bot_config().content,
-    }
-    v1, additionals = bot_code.get_bot_version('http://localhost')
-    self.assertEqual(expected, additionals)
-    bot_code.store_bot_config('http://localhost', 'dummy_script')
-    # memcache timeout is 60 seconds, fake it by just clearing.
-    bot_code.memcache.flush_all()
-    v2, additionals = bot_code.get_bot_version('http://localhost')
-    expected = {'config/bot_config.py': 'dummy_script'}
-    self.assertEqual(expected, additionals)
-    v3, additionals = bot_code.get_bot_version('http://localhost:8080')
-    self.assertEqual(expected, additionals)
-    self.assertNotEqual(v1, v2)
-    self.assertNotEqual(v1, v3)
-    self.assertNotEqual(v2, v3)
 
   def test_get_bot_version(self):
     actual, additionals = bot_code.get_bot_version('http://localhost')

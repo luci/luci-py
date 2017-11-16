@@ -41,56 +41,15 @@ MAX_MEMCACHED_SIZE_BYTES = 250000
 File = collections.namedtuple('File', ('content', 'who', 'when', 'version'))
 
 
-class VersionedFile(ndb.Model):
-  """Versionned entity.
-
-  Root is ROOT_MODEL. id is datastore_utils.HIGH_KEY_ID - version number.
-  """
-  created_ts = ndb.DateTimeProperty(indexed=False, auto_now_add=True)
-  who = auth.IdentityProperty(indexed=False)
-  content = ndb.BlobProperty(compressed=True)
-
-  ROOT_MODEL = datastore_utils.get_versioned_root_model('VersionedFileRoot')
-
-  @property
-  def version(self):
-    return datastore_utils.HIGH_KEY_ID - self.key.integer_id()
-
-  @classmethod
-  def fetch(cls, name):
-    """Returns the current version of the instance."""
-    return datastore_utils.get_versioned_most_recent(
-        cls, cls._gen_root_key(name))
-
-  def store(self, name):
-    """Stores a new version of the instance."""
-    # Create an incomplete key.
-    self.key = ndb.Key(self.__class__, None, parent=self._gen_root_key(name))
-    self.who = auth.get_current_identity()
-    return datastore_utils.store_new_version(self, self.ROOT_MODEL)
-
-  @classmethod
-  def _gen_root_key(cls, name):
-    return ndb.Key(cls.ROOT_MODEL, name)
-
-
 ### Public APIs.
 
 
-def get_bootstrap(host_url, bootstrap_token=None, version=None):
+def get_bootstrap(host_url, bootstrap_token=None):
   """Returns the mangled version of the utility script bootstrap.py.
 
   Try to find the content in the following order:
   - get the file from luci-config
-  - get the file from VersionedFile in the DB
   - return the default version
-
-  When using luci-config, version is ignored. This is because components/config
-  doesn't cache previous values locally, so requesting a file at a specific
-  version means a RPC to the luci-config instance, which can take several
-  seconds(!) to execute.
-
-  Eventually support for 'version' will be removed.
 
   Returns:
     File instance.
@@ -110,50 +69,18 @@ def get_bootstrap(host_url, bootstrap_token=None, version=None):
   if cfg:
     return File(header + cfg, config.config_service_hostname(), None, rev)
 
-  # Look in the DB.
-  if version is not None:
-    obj = ndb.Key(
-        VersionedFile, datastore_utils.HIGH_KEY_ID - version,
-        parent=VersionedFile._gen_root_key('bootstrap.py')).get()
-    if not obj:
-      return None
-  else:
-    obj = VersionedFile.fetch('bootstrap.py')
-  if obj and obj.content:
-    return File(
-        header + obj.content, obj.who.to_bytes(), obj.created_ts,
-        str(obj.version))
-
   # Fallback to the one embedded in the tree.
   path = os.path.join(ROOT_DIR, 'swarming_bot', 'config', 'bootstrap.py')
   with open(path, 'rb') as f:
     return File(header + f.read(), None, None, None)
 
 
-def store_bootstrap(content):
-  """Stores a new version of bootstrap.py.
-
-  Returns the ndb.Key of the new stored entity.
-  """
-  if not _validate_python(content):
-    raise ValueError('Invalid python')
-  return VersionedFile(content=content).store('bootstrap.py')
-
-
-def get_bot_config(version=None):
-  """Returns the requested (or current) version of bot_config.py.
+def get_bot_config():
+  """Returns the current version of bot_config.py.
 
   Try to find the content in the following order:
   - get the file from luci-config
-  - get the file from VersionedFile in the DB
   - return the default version
-
-  When using luci-config, version is ignored. This is because components/config
-  doesn't cache previous values locally, so requesting a file at a specific
-  version means a RPC to the luci-config instance, which can take several
-  seconds(!) to execute.
-
-  Eventually support for 'version' will be removed.
 
   Returns:
     File instance.
@@ -164,38 +91,11 @@ def get_bot_config(version=None):
   if cfg:
     return File(cfg, config.config_service_hostname(), None, rev)
 
-  # Look in the DB.
-  if version is not None:
-    obj = ndb.Key(
-        VersionedFile, datastore_utils.HIGH_KEY_ID - version,
-        parent=VersionedFile._gen_root_key('bot_config.py')).get()
-    if not obj:
-      return None
-  else:
-    obj = VersionedFile.fetch('bot_config.py')
-  if obj:
-    return File(
-        obj.content, obj.who.to_bytes(), obj.created_ts, str(obj.version))
-
   # Fallback to the one embedded in the tree.
   path = os.path.join(ROOT_DIR, 'swarming_bot', 'config', 'bot_config.py')
   with open(path, 'rb') as f:
     return File(f.read(), None, None, None)
 
-
-def store_bot_config(host, content):
-  """Stores a new version of bot_config.py.
-
-  Returns the ndb.Key of the new stored entity.
-  """
-  if not _validate_python(content):
-    raise ValueError('Invalid python')
-  # The memcache entry will be cleared out automatically after 60s. Try a best
-  # effort.
-  signature = _get_signature(host)
-  v = VersionedFile(content=content).store('bot_config.py')
-  memcache.delete('version-' + signature, namespace='bot_code')
-  return v
 
 def get_bot_version(host):
   """Retrieves the current bot version (SHA256) loaded on this server.

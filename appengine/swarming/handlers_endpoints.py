@@ -131,11 +131,6 @@ swarming_api = auth.endpoints_api(
         'view and cancel tasks, query tasks and bots')
 
 
-VersionRequest = endpoints.ResourceContainer(
-    message_types.VoidMessage,
-    version=messages.IntegerField(1))
-
-
 @swarming_api.api_class(resource_name='server', path='server')
 class SwarmingServerService(remote.Service):
   @gae_ts_mon.instrument_endpoint()
@@ -195,18 +190,12 @@ class SwarmingServerService(remote.Service):
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
-      VersionRequest, swarming_rpcs.FileContent,
+      message_types.VoidMessage, swarming_rpcs.FileContent,
       http_method='GET')
   @auth.require(acl.can_view_config)
-  def get_bootstrap(self, request):
-    """Retrieves the current or a previous version of bootstrap.py.
-
-    When the file is sourced via luci-config, the version parameter is ignored.
-    Eventually the support for 'version' will be removed completely.
-    """
-    obj = bot_code.get_bootstrap('', '', request.version)
-    if not obj:
-      return swarming_rpcs.FileContent()
+  def get_bootstrap(self, _request):
+    """Retrieves the current version of bootstrap.py."""
+    obj = bot_code.get_bootstrap('', '')
     return swarming_rpcs.FileContent(
         content=obj.content.decode('utf-8'),
         who=obj.who,
@@ -215,60 +204,17 @@ class SwarmingServerService(remote.Service):
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
-      VersionRequest, swarming_rpcs.FileContent,
+      message_types.VoidMessage, swarming_rpcs.FileContent,
       http_method='GET')
   @auth.require(acl.can_view_config)
-  def get_bot_config(self, request):
-    """Retrieves the current or a previous version of bot_config.py.
-
-    When the file is sourced via luci-config, the version parameter is ignored.
-    Eventually the support for 'version' will be removed completely.
-    """
-    obj = bot_code.get_bot_config(request.version)
-    if not obj:
-      return swarming_rpcs.FileContent()
+  def get_bot_config(self, _request):
+    """Retrieves the current version of bot_config.py."""
+    obj = bot_code.get_bot_config()
     return swarming_rpcs.FileContent(
         content=obj.content.decode('utf-8'),
         who=obj.who,
         when=obj.when,
         version=obj.version)
-
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      swarming_rpcs.FileContentRequest, swarming_rpcs.FileContent)
-  @auth.require(acl.can_edit_config)
-  def put_bootstrap(self, request):
-    """Stores a new version of bootstrap.py.
-
-    Warning: if a file exists in luci-config, the file stored by this function
-    is ignored. Uploads are not blocked in case the file is later deleted from
-    luci-config.
-    """
-    key = bot_code.store_bootstrap(request.content.encode('utf-8'))
-    obj = key.get()
-    return swarming_rpcs.FileContent(
-        who=obj.who.to_bytes() if obj.who else None,
-        when=obj.created_ts,
-        version=str(obj.version))
-
-  @gae_ts_mon.instrument_endpoint()
-  @auth.endpoints_method(
-      swarming_rpcs.FileContentRequest, swarming_rpcs.FileContent)
-  @auth.require(acl.can_edit_config)
-  def put_bot_config(self, request):
-    """Stores a new version of bot_config.py.
-
-    Warning: if a file exists in luci-config, the file stored by this function
-    is ignored. Uploads are not blocked in case the file is later deleted from
-    luci-config.
-    """
-    host = 'https://' + os.environ['HTTP_HOST']
-    key = bot_code.store_bot_config(host, request.content.encode('utf-8'))
-    obj = key.get()
-    return swarming_rpcs.FileContent(
-        who=obj.who.to_bytes() if obj.who else None,
-        when=obj.created_ts,
-        version=str(obj.version))
 
 
 TaskId = endpoints.ResourceContainer(

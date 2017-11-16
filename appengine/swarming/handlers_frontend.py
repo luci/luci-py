@@ -43,74 +43,6 @@ class RestrictedConfigHandler(auth.AuthenticatingHandler):
         'swarming/restricted_config.html', config.settings_info()))
 
 
-class UploadBotConfigHandler(auth.AuthenticatingHandler):
-  """Stores a new bot_config.py script."""
-
-  @auth.autologin
-  @auth.require(acl.can_view_config)
-  def get(self):
-    bot_config = bot_code.get_bot_config()
-    params = {
-      'content': bot_config.content.decode('utf-8'),
-      'path': self.request.path,
-      'version': bot_config.version,
-      'when': bot_config.when,
-      'who': bot_config.who or 'N/A',
-      'xsrf_token': self.generate_xsrf_token(),
-    }
-    self.response.write(
-        template.render('swarming/restricted_upload_bot_config.html', params))
-
-  @auth.require(acl.can_edit_config)
-  def post(self):
-    script = self.request.get('script', '')
-    if not script:
-      self.abort(400, 'No script uploaded')
-
-    # Make sure the script is valid utf-8. For some odd reason, the script
-    # instead may or may not be an unicode instance. This depends if it is on
-    # AppEngine production or not.
-    if isinstance(script, str):
-      script = script.decode('utf-8', 'replace')
-    script = script.encode('utf-8')
-    bot_code.store_bot_config(self.request.host_url, script)
-    self.get()
-
-
-class UploadBootstrapHandler(auth.AuthenticatingHandler):
-  """Stores a new bootstrap.py script."""
-
-  @auth.autologin
-  @auth.require(acl.can_view_config)
-  def get(self):
-    bootstrap = bot_code.get_bootstrap(self.request.host_url)
-    params = {
-      'content': bootstrap.content.decode('utf-8'),
-      'path': self.request.path,
-      'version': bootstrap.version,
-      'when': bootstrap.when,
-      'who': bootstrap.who or 'N/A',
-      'xsrf_token': self.generate_xsrf_token(),
-    }
-    self.response.write(
-        template.render('swarming/restricted_upload_bootstrap.html', params))
-
-  @auth.require(acl.can_edit_config)
-  def post(self):
-    script = self.request.get('script', '')
-    if not script:
-      self.abort(400, 'No script uploaded')
-
-    # Make sure the script is valid utf-8. For some odd reason, the script
-    # instead may or may not be an unicode instance. This depends if it is on
-    # AppEngine production or not.
-    if isinstance(script, str):
-      script = script.decode('utf-8', 'replace')
-    script = script.encode('utf-8')
-    bot_code.store_bootstrap(script)
-    self.get()
-
-
 ### Mapreduce related handlers
 
 
@@ -273,8 +205,6 @@ def get_routes():
       # Admin pages.
       # TODO(maruel): Get rid of them.
       ('/restricted/config', RestrictedConfigHandler),
-      ('/restricted/upload/bot_config', UploadBotConfigHandler),
-      ('/restricted/upload/bootstrap', UploadBootstrapHandler),
 
       # Mapreduce related urls.
       (r'/restricted/launch_mapreduce', RestrictedLaunchMapReduceJob),

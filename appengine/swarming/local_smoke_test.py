@@ -451,29 +451,6 @@ class Test(unittest.TestCase):
       actual_files.pop('summary.json')
       self.assertEqual(files, actual_files)
 
-  def test_update_continue(self):
-    # Run a task, force the bot to update, run another task, ensure both tasks
-    # used different bot version.
-    args = [
-        '-T', 'update_continue', '--', 'python', '-u', '-c', 'print(\'hi\')',
-    ]
-    summary = self.gen_expected(name=u'update_continue')
-    bot_version1 = self.assertOneTask(args, summary, {})
-
-    # Replace bot_config.py.
-    with open(os.path.join(BOT_DIR, 'config', 'bot_config.py'), 'rb') as f:
-      bot_config_content = f.read() + '\n'
-
-    # This will restart the bot. This ensures the update mechanism works.
-    # TODO(maruel): Convert to a real API. Can only be accessed by admin-level
-    # account.
-    res = self.servers.http_client.request(
-        '/restricted/upload/bot_config',
-        body=urllib.urlencode({'script': bot_config_content}))
-    self.assertEqual(200, res.http_code, res.body)
-    bot_version2 = self.assertOneTask(args, summary, {})
-    self.assertNotEqual(bot_version1, bot_version2)
-
   def test_isolated(self):
     # Make an isolated file, archive it.
     hello_world = '\n'.join((

@@ -169,55 +169,6 @@ class FrontendAdminTest(AppTestBase):
         'bootstrap_token = \'bootstrap-token\'\n')
     self.assertEqual(header + expected, actual)
 
-  def test_bootstrap_custom(self):
-    self.set_as_admin()
-    self.mock(bot_code, 'generate_bootstrap_token', lambda: 'bootstrap-token')
-    xsrf_token = self.get_xsrf_token()
-    self.app.get('/restricted/upload/bootstrap')
-    response = self.app.post(
-        '/restricted/upload/bootstrap?xsrf_token=%s' % xsrf_token,
-        status=400)
-    self.assertEqual(
-        '400 Bad Request\n\nThe server could not comply with the request since '
-        'it is either malformed or otherwise incorrect.\n\n No script uploaded'
-        '  ', response.body)
-
-    script = u'print(\'script_bodé\')'
-    response = self.app.post(
-        '/restricted/upload/bootstrap?xsrf_token=%s' % xsrf_token,
-        upload_files=[
-          ('script', 'script', script.encode('utf-8')),
-        ])
-    self.assertIn(u'script_bodé'.encode('utf-8'), response.body)
-
-    actual = self.app.get('/bootstrap').body
-    header = (
-        u'#!/usr/bin/env python\n'
-        u'host_url = \'http://localhost\'\n'
-        u'bootstrap_token = \'bootstrap-token\'\n')
-    expected =  (header + script).encode('utf-8')
-    self.assertEqual(expected, actual)
-
-  def test_upload_bot_config(self):
-    self.set_as_admin()
-    xsrf_token = self.get_xsrf_token()
-    self.app.get('/restricted/upload/bot_config')
-    response = self.app.post(
-        '/restricted/upload/bot_config?xsrf_token=%s' % xsrf_token,
-        status=400)
-    self.assertEqual(
-        '400 Bad Request\n\nThe server could not comply with the request since '
-        'it is either malformed or otherwise incorrect.\n\n No script uploaded'
-        '  ', response.body)
-
-    response = self.app.post(
-        '/restricted/upload/bot_config?xsrf_token=%s' % xsrf_token,
-        upload_files=[
-          ('script', 'script', u'print(\'script_bodé\')'.encode('utf-8')),
-        ])
-    self.assertIn(u'script_bodé'.encode('utf-8'), response.body)
-    # TODO(maruel): Assert swarming_bot.zip now contains the new code.
-
   def test_config(self):
     self.set_as_admin()
     self.app.get('/restricted/config')
