@@ -98,7 +98,7 @@ class BotDimensions(ndb.Model):
 
   def _pre_put_hook(self):
     super(BotDimensions, self)._pre_put_hook()
-    if self.key.id() != 1:
+    if self.key.integer_id() != 1:
       raise datastore_errors.BadValueError(
           '%s.key.id must be 1' % self.__class__.__name__)
     _validate_dimensions_flat(self)
@@ -382,7 +382,7 @@ def _rebuild_bot_cache(bot_dimensions, bot_root_key):
         if s.valid_until_ts < now:
           # Stale TaskDimensionsSet.
           continue
-        dimensions_hash = task_dimensions.key.id()
+        dimensions_hash = task_dimensions.key.integer_id()
         # Reuse TaskDimensionsSet.valid_until_ts.
         obj = BotTaskDimensions(
             id=dimensions_hash, parent=bot_root_key,
@@ -424,22 +424,22 @@ def _hash_data(data):
 
 
 @ndb.tasklet
-def _remove_old_entity(key, now):
+def _remove_old_entity_async(key, now):
   """Removes a stale TaskDimensions or BotTaskDimensions instance.
 
   Returns:
-    ndb.Future that evaluates to True if it were deleted.
+    key if it was deleted.
   """
   obj = key.get()
   if not obj or obj.valid_until_ts >= now:
-    raise ndb.Return(False)
+    raise ndb.Return(None)
 
+  @ndb.tasklet
   def tx():
-    obj = key.get()
+    obj = yield key.get_async()
     if obj and obj.valid_until_ts < now:
-      key.delete()
-      return True
-    return False
+      yield key.delete_async()
+      raise ndb.Return(key)
 
   res = yield datastore_utils.transaction_async(
       tx, propagation=ndb.TransactionOptions.INDEPENDENT)
@@ -498,7 +498,7 @@ def _refresh_BotTaskDimensions(
         key=bot_task_key, valid_until_ts=valid_until_ts,
         dimensions_flat=dimensions_flat).put_async()
   if need_memcache_clear:
-    bot_id = bot_task_key.parent().id()
+    bot_id = bot_task_key.parent().string_id()
     yield ndb.get_context().memcache_delete(bot_id, namespace='task_queues')
   raise ndb.Return(need_db_store)
 
@@ -754,21 +754,15 @@ def tidy_stale():
   td = []
   btd = []
 
-  @ndb.tasklet
-  def _handle_task(key):
-    removed = yield _remove_old_entity(key, now)
-    if removed:
-      logging.debug('- TD: %d', key.id())
-    raise ndb.Return(int(removed))
+  _handle_task = lambda key: _remove_old_entity_async(key, now)
 
   @ndb.tasklet
   def _handle_bot_task(key):
-    removed = yield _remove_old_entity(key, now)
-    if removed:
-      bot_id = key.parent().id()
-      memcache.delete(bot_id, namespace='task_queues')
-      logging.debug('- BTD: %d for bot %s', key.id(), bot_id)
-    raise ndb.Return(int(removed))
+    res = yield _remove_old_entity_async(key, now)
+    if res:
+      bot_id = key.parent().string_id()
+      yield ndb.get_context().memcache_delete(bot_id, namespace='task_queues')
+    raise ndb.Return(res)
 
   try:
     q = TaskDimensions.query().filter(TaskDimensions.valid_until_ts < now)
@@ -778,10 +772,15 @@ def tidy_stale():
     btd_future = q.map_async(_handle_bot_task, batch_size=16, keys_only=True)
 
     td = td_future.get_result()
+    for k in td:
+      logging.info('- TD: %d', k.integer_id())
     btd = btd_future.get_result()
+    for k in btd:
+      bot_id = k.parent().string_id()
+      logging.debug('- BTD: %d for bot %s', k.integer_id(), bot_id)
   finally:
     logging.info(
         'tidy_stale() in %.3fs; TaskDimensions: found %d, deleted %d; '
         'BotTaskDimensions: found %d, deleted %d',
         (utils.utcnow() - now).total_seconds(),
-        len(td), sum(td), len(btd), sum(btd))
+        len(td), sum(1 for i in td if i), len(btd), sum(1 for i in btd if i))

@@ -38,6 +38,10 @@ def transaction_async(callback, **ctx_options):
     callback: function to run in the transaction. See
         https://cloud.google.com/appengine/docs/python/ndb/functions for more
         details.
+        It is interesting to note that deep down in
+        google/appengine/ext/ndb/context.py, Context.transaction() looks at the
+        return value of callback(), and if it is an ndb.Future, will
+        automatically handle it and return the yielded value.
 
   Sets retries default value to 1 instead 3 (!)
   """
