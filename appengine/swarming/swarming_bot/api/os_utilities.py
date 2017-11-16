@@ -890,50 +890,7 @@ def get_dimensions_all_devices_android(devices):
   dimensions.pop(u'machine_type')
   dimensions.pop(u'ssd', None)
 
-  # Each key in the following dict is a dimension and its value is the list of
-  # all possible device properties that can define that dimension.
-  # TODO(bpastene) Make sure all the devices use the same board and OS.
-  dimension_properties = {
-    u'device_os': ['build.id'],
-    u'device_type': ['build.product', 'product.board', 'product.device'],
-  }
-  for dim in dimension_properties:
-    dimensions[dim] = set()
-  dimensions[u'android'] = []
-  for device in devices:
-    properties = device.cache.build_props
-    if properties:
-      for dim, props in dimension_properties.iteritems():
-        for prop in props:
-          real_prop = u'ro.' + prop
-          if real_prop in properties and properties[real_prop].strip():
-            dimensions[dim].add(properties[real_prop].strip())
-            break
-      # Only advertize devices that can be used.
-      dimensions[u'android'].append(device.serial)
-
-  # Add the first character of each device_os to the dimension.
-  android_vers = {
-    os[0] for os in dimensions.get(u'device_os', []) if os and os[0].isupper()
-  }
-  dimensions[u'device_os'] = dimensions[u'device_os'].union(android_vers)
-
-  dimensions[u'android'].sort()
-  for dim in dimension_properties:
-    if not dimensions[dim]:
-      del dimensions[dim]
-    else:
-      dimensions[dim] = sorted(dimensions[dim])
-  nb_android = len(dimensions[u'android'])
-  dimensions[u'android_devices'] = map(
-      str, range(nb_android, max(0, nb_android-4), -1))
-
-  # TODO(maruel): Add back once dimensions limit is figured out and there's a
-  # need.
-  del dimensions[u'android']
-  # Trim 'os' to reduce the number of dimensions and not run tests by accident
-  # on it.
-  dimensions[u'os'] = ['Android']
+  dimensions.update(platforms.android.get_dimensions(devices))
   return dimensions
 
 
@@ -954,49 +911,7 @@ def get_state_all_devices_android(devices):
   if machine_type:
     state[u'host_dimensions'][u'machine_type'] = [machine_type]
 
-  keys = (
-    u'board.platform',
-    u'build.product',
-    u'build.fingerprint',
-    u'build.id',
-    u'build.version.sdk',
-    u'product.board',
-    u'product.cpu.abi',
-    u'product.device')
-
-  def fn(device):
-    if not device.is_valid or device.failure:
-      return {u'state': device.failure or 'unavailable'}
-    properties = device.cache.build_props
-    if not properties:
-      return {u'state': 'unavailable'}
-    no_sd_card = properties.get(u'ro.product.model', '') in ['Chromecast']
-    return {
-      u'battery': device.GetBattery(),
-      u'build': {key: properties.get(u'ro.'+key, '<missing>') for key in keys},
-      u'cpu': device.GetCPUScale(),
-      u'disk': device.GetDisk(),
-      u'imei': device.GetIMEI(),
-      u'ip': device.GetIPs(),
-      u'max_uid': device.GetLastUID(),
-      u'mem': device.GetMemInfo(),
-      u'other_packages': platforms.android.get_unknown_apps(device),
-      u'port_path': device.port_path,
-      u'processes': device.GetProcessCount(),
-      u'state': (u'available' if
-          no_sd_card or device.IsFullyBooted()[0] else u'booting'),
-      u'temp': device.GetTemperatures(),
-      u'uptime': device.GetUptime(),
-    }
-
-  start = time.time()
-  state[u'devices'] = {
-    device.serial: out
-    for device, out in zip(devices, parallel.pmap(fn, devices))
-  }
-  logging.info(
-      'get_state_all_devices_android() (device part) took %gs' %
-      round(time.time() - start, 1))
+  state.update(platforms.android.get_state(devices))
   return state
 
 
