@@ -225,7 +225,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     bot_management.bot_event(
         'bot_connected', bot_dimensions[u'id'][0], '1.2.3.4', 'joe@localhost',
         bot_dimensions, {'state': 'real'}, '1234', False, None, None)
-    task_queues.assert_bot(bot_dimensions)
+    task_queues.assert_bot_async(bot_dimensions).get_result()
     self.assertEqual(nb_task, self.execute_tasks())
 
   def _quick_reap(self, nb_task=1, **kwargs):

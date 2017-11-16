@@ -71,7 +71,7 @@ def _yield_next_available_task_to_dispatch(bot_dimensions, deadline):
   bot_management.bot_event(
       'bot_connected', bot_dimensions[u'id'][0], '1.2.3.4', 'joe@localhost',
       bot_dimensions, {'state': 'real'}, '1234', False, None, None)
-  task_queues.assert_bot(bot_dimensions)
+  task_queues.assert_bot_async(bot_dimensions).get_result()
   return [
     _task_to_run_to_dict(to_run)
     for _request, to_run in

@@ -360,7 +360,8 @@ class _BotBaseHandler(_BotApiHandler):
       result.quarantined_msg = 'Quarantined by admin'
       return result
 
-    task_queues.assert_bot(dimensions)
+    # TODO(maruel): Parallelise.
+    task_queues.assert_bot_async(dimensions).get_result()
     return result
 
 

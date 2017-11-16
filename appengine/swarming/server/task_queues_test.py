@@ -39,7 +39,7 @@ def _assert_bot(dimensions=None):
   bot_management.bot_event(
       'bot_connected', u'bot1', '1.2.3.4', 'bot1', bot_dimensions, {},
       '1234', False, None, None)
-  task_queues.assert_bot(bot_dimensions)
+  task_queues.assert_bot_async(bot_dimensions).get_result()
 
 
 def _gen_request(properties=None):
@@ -159,7 +159,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
       self.fail([i.to_dict() for i in entity.query()])
     self.assertEqual(count, actual)
 
-  def test_assert_bot(self):
+  def test_assert_bot_async(self):
     self.assert_count(0, task_queues.BotDimensions)
     self.assert_count(0, task_queues.BotTaskDimensions)
     self.assert_count(0, task_queues.TaskDimensions)
