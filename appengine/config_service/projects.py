@@ -155,7 +155,7 @@ def get_refs(project_ids):
       project_ids, common.REFS_FILENAME, project_config_pb2.RefsCfg
   ).get_result()
   return {
-    pid: None if cfg is None else cfg.refs or DEFAULT_REF_CFG.refs
+    pid: [] if cfg is None else cfg.refs or DEFAULT_REF_CFG.refs
     for pid, cfg in cfgs.iteritems()
   }
 
