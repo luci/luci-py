@@ -379,7 +379,9 @@ class RemoteClientGrpc(object):
     # Create command overhead
     ovh = command_pb2.CommandOverhead()
     _time_to_duration(params.get('duration'), ovh.duration)
-    _time_to_duration(params.get('bot_overhead'), ovh.overhead)
+    # bot_overhead is not set for terminate task.
+    if params.get('bot_overhead'):
+      _time_to_duration(params.get('bot_overhead'), ovh.overhead)
 
     # Create task result and pack in command result/overhead
     req = tasks_pb2.UpdateTaskResultRequest()
