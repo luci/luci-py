@@ -4,6 +4,7 @@ from grpc.framework.common import cardinality
 from grpc.framework.interfaces.face import utilities as face_utilities
 
 import bots_pb2 as bots__pb2
+import google.protobuf.empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 
 class BotsStub(object):
@@ -24,6 +25,11 @@ class BotsStub(object):
         request_serializer=bots__pb2.UpdateBotSessionRequest.SerializeToString,
         response_deserializer=bots__pb2.BotSession.FromString,
         )
+    self.PostBotEventTemp = channel.unary_unary(
+        '/google.devtools.remoteworkers.v1test2.Bots/PostBotEventTemp',
+        request_serializer=bots__pb2.PostBotEventTempRequest.SerializeToString,
+        response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+        )
 
 
 class BotsServicer(object):
@@ -34,6 +40,11 @@ class BotsServicer(object):
     raise NotImplementedError('Method not implemented!')
 
   def UpdateBotSession(self, request, context):
+    context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+    context.set_details('Method not implemented!')
+    raise NotImplementedError('Method not implemented!')
+
+  def PostBotEventTemp(self, request, context):
     context.set_code(grpc.StatusCode.UNIMPLEMENTED)
     context.set_details('Method not implemented!')
     raise NotImplementedError('Method not implemented!')
@@ -50,6 +61,11 @@ def add_BotsServicer_to_server(servicer, server):
           servicer.UpdateBotSession,
           request_deserializer=bots__pb2.UpdateBotSessionRequest.FromString,
           response_serializer=bots__pb2.BotSession.SerializeToString,
+      ),
+      'PostBotEventTemp': grpc.unary_unary_rpc_method_handler(
+          servicer.PostBotEventTemp,
+          request_deserializer=bots__pb2.PostBotEventTempRequest.FromString,
+          response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
       ),
   }
   generic_handler = grpc.method_handlers_generic_handler(

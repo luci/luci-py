@@ -165,6 +165,7 @@ FILES = (
     'third_party/google/protobuf/descriptor_pb2.py',
     'third_party/google/protobuf/descriptor_pool.py',
     'third_party/google/protobuf/duration_pb2.py',
+    'third_party/google/protobuf/empty_pb2.py',
     'third_party/google/protobuf/field_mask_pb2.py',
     'third_party/google/protobuf/internal/__init__.py',
     'third_party/google/protobuf/internal/api_implementation.py',

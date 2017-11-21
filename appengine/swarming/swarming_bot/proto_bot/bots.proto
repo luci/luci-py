@@ -3,14 +3,17 @@ syntax = "proto3";
 package google.devtools.remoteworkers.v1test2;
 
 import "google/protobuf/any.proto";
+import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "status.proto";
 
 service Bots {
-  rpc CreateBotSession(CreateBotSessionRequest) returns (BotSession) ;
+  rpc CreateBotSession(CreateBotSessionRequest) returns (BotSession);
 
-  rpc UpdateBotSession(UpdateBotSessionRequest) returns (BotSession) ;
+  rpc UpdateBotSession(UpdateBotSessionRequest) returns (BotSession);
+
+  rpc PostBotEventTemp(PostBotEventTempRequest) returns (google.protobuf.Empty);
 }
 
 message BotSession {
@@ -18,7 +21,7 @@ message BotSession {
 
   string bot_id = 2;
 
-  BotHealth health = 3;
+  BotStatus status = 3;
 
   Worker worker = 4;
 
@@ -43,16 +46,16 @@ message Lease {
   google.protobuf.Any inline_assignment = 6;
 }
 
-enum BotHealth {
-  BOT_HEALTH_UNSPECIFIED = 0;
+enum BotStatus {
+  BOT_STATUS_UNSPECIFIED = 0;
 
-  HEALTHY = 1;
+  OK = 1;
 
-  DEGRADED = 2;
+  UNHEALTHY = 2;
 
-  BUSY = 3;
+  HOST_REBOOTING = 3;
 
-  UNHEALTHY = 4;
+  BOT_TERMINATING = 4;
 }
 
 enum LeaseState {
@@ -116,4 +119,19 @@ message UpdateBotSessionRequest {
   BotSession bot_session = 2;
 
   google.protobuf.FieldMask update_mask = 3;
+}
+
+message PostBotEventTempRequest {
+  string name = 1;
+
+  enum Type {
+    UNSPECIFIED = 0;
+    INFO = 1;
+    ERROR = 2;
+  }
+  Type type = 2;
+
+  string msg = 3;
+
+  BotSession bot_session_temp = 4;
 }

@@ -89,6 +89,7 @@ class RemoteClientGrpc(object):
     logging.info('do_handshake(%s)', attributes)
     # Initialize the session
     self._session = bots_pb2.BotSession()
+    self._session.status = bots_pb2.OK
     self._attributes_to_session(attributes)
 
     # Call the server and overwrite our copy of the session
@@ -178,9 +179,40 @@ class RemoteClientGrpc(object):
 
     return self._process_lease(new_lease)
 
-  def post_bot_event(self, _event_type, message, _attributes):
-    # pylint: disable=unused-argument
-    logging.warning('post_bot_event(%s): not yet implemented', message)
+  def post_bot_event(self, event_type, message, _attributes):
+    """Logs bot-specific info to the server"""
+    logging.info('post_bot_event(%s, %s)', event_type, message)
+
+    req_type, status = {
+        'bot_error': (bots_pb2.ERROR, None),
+        'bot_rebooting': (bots_pb2.INFO, bots_pb2.HOST_REBOOTING),
+        'bot_shutdown': (bots_pb2.INFO, bots_pb2.BOT_TERMINATING),
+    }.get(event_type, (None, None))
+
+    if req_type is None:
+      logging.error('Unsupported event type %s: %s', event_type, message)
+      return
+
+    if self._session is None:
+      logging.error('post_bot_event called before do_handshake: %s %s',
+                    event_type, message)
+      return
+
+    # The proxy already knows when a bot is shutting down or rebooting, so the
+    # proxy API doesn't allow the bot to send state transition messages - it
+    # generates the state transition messages itself."
+    if status is not None:
+      self._session.status = status
+
+    req = bots_pb2.PostBotEventTempRequest()
+    req.name = self._session.name
+    req.bot_session_temp.CopyFrom(self._session)
+    req.type = event_type
+    req.msg = message
+    try:
+      self._proxy_bots.call_unary('PostBotEventTemp', req)
+    except grpc_proxy.grpc.RpcError as e:
+      logging.error('gRPC error posting bot event: %s', e)
 
   def post_task_update(self, task_id, bot_id, params,
                        stdout_and_chunk=None, exit_code=None):
@@ -232,10 +264,9 @@ class RemoteClientGrpc(object):
         'mint_oauth_token is not supported in grpc protocol')
 
   def _attributes_to_session(self, attributes):
-    """Creates a proto Worker message from  bot attributes."""
+    """Creates a proto Worker message from bot attributes."""
     self._session.bot_id = attributes['dimensions']['id'][0]
     _dimensions_to_workers(attributes['dimensions'], self._session.worker)
-    self._session.health = bots_pb2.HEALTHY
     self._session.version = attributes['version']
 
   def _process_lease(self, lease):

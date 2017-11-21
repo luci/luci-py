@@ -68,7 +68,7 @@ class TestRemoteClientGrpc(auto_stub.TestCase):
     msg_req.parent = 'inst'
     session = msg_req.bot_session
     session.bot_id = 'robocop'
-    session.health = remote_client_grpc.bots_pb2.HEALTHY
+    session.status = remote_client_grpc.bots_pb2.OK
     session.version = '123'
     worker = session.worker
     wp = worker.properties.add()
