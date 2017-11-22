@@ -81,21 +81,12 @@ RESULT_HEY_OUTPUTS_REF = {
 }
 
 RESULT_HEY2_ISOLATED_OUT = {
-  u'isolated': u'0616f86b24065a0595e58088925567ae54a8157c',
+  u'isolated': u'7f89142465cba8d465b1f0a3f6e6f95ad28cc56b',
   u'isolatedserver': u'http://localhost:10050',
   u'namespace': u'default-gzip',
   u'view_url':
     u'http://localhost:10050/browse?namespace=default-gzip'
-    '&hash=0616f86b24065a0595e58088925567ae54a8157c',
-}
-
-RESULT_HEY2_OUTPUTS_REF = {
-  u'isolated': u'0616f86b24065a0595e58088925567ae54a8157c',
-  u'isolatedserver': u'http://localhost:10050',
-  u'namespace': u'default-gzip',
-  u'view_url':
-    u'http://localhost:10050/browse?namespace=default-gzip'
-    '&hash=0616f86b24065a0595e58088925567ae54a8157c',
+    '&hash=7f89142465cba8d465b1f0a3f6e6f95ad28cc56b',
 }
 
 RESULT_SECRET_OUTPUT = {
@@ -491,8 +482,16 @@ class Test(unittest.TestCase):
         'import os',
         'import sys',
         'print(\'hi\')',
+        'cwd = os.path.realpath(os.getcwd()).rstrip(os.sep)',
+        'path = os.environ["PATH"].split(os.pathsep)',
+        'print(os.path.realpath(path[0]).replace(cwd, "$CWD"))',
+        'with open(os.path.join(sys.argv[1], \'FOO.txt\'), \'wb\') as f:',
+        '  f.write(os.environ["FOO"])',
         'with open(os.path.join(sys.argv[1], \'result.txt\'), \'wb\') as f:',
-        '  f.write(\'hey2\')'))
+        '  f.write(\'hey2\')',
+    ))
+    computed_PATH = os.sep.join(['$CWD', 'local', 'path'])
+
     # Hard code the size of the isolated file.
     isolated_size = 138
     expected_summary = self.gen_expected(
@@ -509,18 +508,24 @@ class Test(unittest.TestCase):
                 len(hello_world) + isolated_size),
           },
           u'isolated_upload': {
-            u'items_cold': [4, 118],
+            u'items_cold': [3, 4, 191],
             u'items_hot': [],
-            u'num_items_cold': u'2',
-            u'total_bytes_items_cold': u'122',
+            u'num_items_cold': u'3',
+            u'total_bytes_items_cold': u'198',
           },
         },
-        outputs=[u'hi\n'],
-        outputs_ref=RESULT_HEY2_OUTPUTS_REF)
-    expected_files = {os.path.join('0', 'result.txt'): 'hey2'}
+        outputs=[u'hi\n%s\n' % computed_PATH],
+        outputs_ref=RESULT_HEY2_ISOLATED_OUT)
+    expected_files = {
+      os.path.join('0', 'result.txt'): 'hey2',
+      os.path.join('0', 'FOO.txt'): 'bar',
+    }
     self._run_isolated(
         hello_world, 'separate_cmd',
-        ['--raw-cmd', '--', 'python', 'hello_world.py', '${ISOLATED_OUTDIR}'],
+        ['--raw-cmd',
+         '--env', 'FOO', 'bar',
+         '--env-prefix', 'PATH', 'local/path',
+         '--', 'python', 'hello_world.py', '${ISOLATED_OUTDIR}'],
         expected_summary, expected_files,
         isolated_content={'variables': {'files': ['hello_world.py']}})
 
@@ -635,7 +640,7 @@ class Test(unittest.TestCase):
         },
       },
       properties_hash =
-          u'082928de84d0a65839d227dcea2f5a947898929c77c1602b68c46d7d4588c1f5',
+          u'3d6dcab82b1c098b27c7a7cbb6ddcb3d41689c42ca7fe5fafd53f9105af6efea',
     )
     task_id = self._run_isolated(
         hello_world, 'idempotent_reuse', ['--idempotent'], expected_summary, {})

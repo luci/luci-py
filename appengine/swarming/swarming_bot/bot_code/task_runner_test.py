@@ -47,6 +47,7 @@ def get_manifest(script=None, isolated=None, **kwargs):
     'command':
         [sys.executable, '-u', '-c', script] if not isolated_input else None,
     'env': {},
+    'env_prefixes': {},
     'extra_args': [],
     'grace_period': 30.,
     'hard_timeout': 10.,
@@ -245,6 +246,7 @@ class TestTaskRunner(TestTaskRunnerBase):
         'bot_id': 'localhost',
         'command': ['a'],
         'env': {'d': 'e'},
+        'env_prefixes': {},
         'extra_args': [],
         'grace_period': 30.,
         'hard_timeout': 10,
@@ -304,6 +306,7 @@ class TestTaskRunner(TestTaskRunnerBase):
         'bot_id': 'localhost',
         'command': None,
         'env': {'d': 'e'},
+        'env_prefixes': {},
         'extra_args': ['foo', 'bar'],
         'grace_period': 30.,
         'hard_timeout': 10,
@@ -336,6 +339,56 @@ class TestTaskRunner(TestTaskRunnerBase):
     # This runs the command for real.
     self.requests(cost_usd=1, exit_code=0)
     task_details = self.get_task_details('print(\'hi\')')
+    expected = {
+      u'exit_code': 0,
+      u'hard_timeout': False,
+      u'io_timeout': False,
+      u'must_signal_internal_failure': None,
+      u'version': task_runner.OUT_VERSION,
+    }
+    self.assertEqual(expected, self._run_command(task_details))
+
+  def test_run_command_env_prefix(self):
+    # This runs the command for real.
+    self.requests(cost_usd=1, exit_code=0,
+                  output_re='.*%slocal%ssmurf\n$' % (os.sep, os.sep))
+    task_details = self.get_task_details(
+      'import os\nprint os.getenv("PATH").split(os.pathsep)[0]',
+      env_prefixes={
+        'PATH': ['./local/smurf', './other/thing'],
+      }
+    )
+    expected = {
+      u'exit_code': 0,
+      u'hard_timeout': False,
+      u'io_timeout': False,
+      u'must_signal_internal_failure': None,
+      u'version': task_runner.OUT_VERSION,
+    }
+    self.assertEqual(expected, self._run_command(task_details))
+
+  def test_run_command_env_prefix(self):
+    # This runs the command for real.
+    self.requests(
+        cost_usd=1, exit_code=0,
+        output_re=(
+          r'^'
+          r'(?P<cwd>[^\n]*)\n'
+          r'(?P=cwd)%slocal%ssmurf\n'
+          r'(?P=cwd)%sother%sthing\n'
+          r'$'
+        ) % (os.sep, os.sep, os.sep, os.sep))
+    task_details = self.get_task_details(
+        '\n'.join([
+          'import os',
+          'print os.path.realpath(os.getcwd())',
+          'path = os.getenv("PATH").split(os.pathsep)',
+          'print os.path.realpath(path[0])',
+          'print os.path.realpath(path[1])',
+        ]),
+        env_prefixes={
+          'PATH': ['./local/smurf', './other/thing'],
+        })
     expected = {
       u'exit_code': 0,
       u'hard_timeout': False,
@@ -445,6 +498,7 @@ class TestTaskRunner(TestTaskRunnerBase):
             'thus_raising_OSError',
           ],
           'env': {},
+          'env_prefixes': {},
           'extra_args': [],
           'grace_period': 30.,
           'hard_timeout': 6,
@@ -563,6 +617,7 @@ class TestTaskRunner(TestTaskRunnerBase):
           'bot_id': 'localhost',
           'command': ['large', 'executable'],
           'env': {'foo': 'bar'},
+          'env_prefixes': {},
           'extra_args': [],
           'grace_period': 30.,
           'hard_timeout': 60,

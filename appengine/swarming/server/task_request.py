@@ -175,22 +175,44 @@ def _validate_dimensions(prop, value):
         '%s can have up to 64 keys' % prop._name)
 
 
+def _validate_env_key(prop, key):
+  maxlen = 1024
+  if not isinstance(key, unicode):
+    raise TypeError(
+        '%s must have string key, not %r' % (prop._name, key))
+  if not key:
+    raise datastore_errors.BadValueError(
+        'valid key are required in %s' % prop._name)
+  if len(key) > maxlen:
+    raise datastore_errors.BadValueError(
+        'key in %s is too long: %d > %d' % (prop._name, len(key), maxlen))
+  if not _ENV_KEY_RE.match(key):
+    raise datastore_errors.BadValueError(
+        'key in %s is invalid: %r' % (prop._name, key))
+
+
 def _validate_env(prop, value):
   _validate_dict_of_strings(prop, value)
   maxlen = 1024
   for k, v in value.iteritems():
-    if not k:
-      raise datastore_errors.BadValueError(
-          'valid key are required in %s' % prop._name)
-    if len(k) > maxlen:
-      raise datastore_errors.BadValueError(
-          'key in %s is too long: %d > %d' % (prop._name, len(k), maxlen))
-    if not _ENV_KEY_RE.match(k):
-      raise datastore_errors.BadValueError(
-          'key in %s is invalid: %r' % (prop._name, k))
+    _validate_env_key(prop, k)
     if len(v) > maxlen:
       raise datastore_errors.BadValueError(
           'key in %s is too long: %d > %d' % (prop._name, len(v), maxlen))
+  if len(value) > 64:
+    raise datastore_errors.BadValueError(
+        '%s can have up to 64 keys' % prop._name)
+
+
+def _validate_env_prefixes(prop, value):
+  for k, v in value.iteritems():
+    if not isinstance(v, list):
+      raise TypeError(
+          '%s must have list value, not %r' % (prop._name, v))
+    _validate_env_key(prop, k)
+    for path in v:
+      _validate_rel_path('Env Prefix', path)
+
   if len(value) > 64:
     raise datastore_errors.BadValueError(
         '%s can have up to 64 keys' % prop._name)
@@ -502,6 +524,12 @@ class TaskProperties(ndb.Model):
   env = datastore_utils.DeterministicJsonProperty(
       validator=_validate_env, json_type=dict, indexed=False)
 
+  # Environment path prefix variables. Encoded as json. Optional.
+  #
+  # Env key -> [list, of, rel, paths, to, prepend]
+  env_prefixes = datastore_utils.DeterministicJsonProperty(
+      validator=_validate_env_prefixes, json_type=dict, indexed=False)
+
   # Maximum duration the bot can take to run this task. It's named hard_timeout
   # in the bot.
   execution_timeout_secs = ndb.IntegerProperty(
@@ -547,6 +575,7 @@ class TaskProperties(ndb.Model):
         not (self.inputs_ref and self.inputs_ref.isolated) and
         not self.cipd_input and
         not self.env and
+        not self.env_prefixes and
         not self.execution_timeout_secs and
         not self.extra_args and
         not self.grace_period_secs and

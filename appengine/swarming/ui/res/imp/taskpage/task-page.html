@@ -382,6 +382,15 @@
                   </tr>
                 </template>
                 <tr>
+                  <td
+                    rowspan$="[[_rowspan(_request.properties.env_prefixes)]]">Environment Prefixes</td>
+                </tr>
+                <template is="dom-repeat" items="{{_request.properties.env_prefixes}}" as="env">
+                  <tr>
+                    <td class="break-all">[[env.key]]=[[[env.value]]]</td>
+                  </tr>
+                </template>
+                <tr>
                   <td>Idempotent</td>
                   <td>[[_request.properties.idempotent]]</td>
                 </tr>

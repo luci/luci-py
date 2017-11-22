@@ -204,6 +204,32 @@ class TaskProperties(messages.Message):
   dimensions = messages.MessageField(StringPair, 2, repeated=True)
   # Environment variables to set when running the task.
   env = messages.MessageField(StringPair, 3, repeated=True)
+  # Swarming-root relative paths to prepend to a given environment variable.
+  #
+  # These allow you to put certain subdirectories of the task into PATH,
+  # PYTHONPATH, or other PATH-like environment variables. The order of
+  # operations is:
+  #   * Turn slashes into native-platform slashes.
+  #   * Make the path absolute
+  #   * Prepend it to the current value of the envvar using the os-native list
+  #     separator (i.e. `;` on windows, `:` on POSIX).
+  #
+  # Each envvar can have multiple paths to prepend. They will be prepended in
+  # the order seen here.
+  #
+  # For example, if env_prefixes was:
+  #   [("PATH", ["foo", "bar"]),
+  #    ("CUSTOMPATH", ["custom"])]
+  #
+  # The task would see:
+  #   PATH=/path/to/swarming/rundir/foo:/path/to/swarming/rundir/bar:$PATH
+  #   CUSTOMPATH=/path/to/swarming/rundir/custom
+  #
+  # The path should always be specified here with forward-slashes, and it must
+  # not attempt to escape the swarming root (i.e. must not contain `..`).
+  #
+  # These are applied AFTER evaluating `env` entries.
+  env_prefixes = messages.MessageField(StringListPair, 14, repeated=True)
   # Maximum number of seconds the task can run before its process is forcibly
   # terminated and the task results in TIMED_OUT.
   execution_timeout_secs = messages.IntegerField(4)

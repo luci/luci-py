@@ -127,6 +127,8 @@ def task_request_to_rpc(entity):
       secret_bytes='<REDACTED>' if props.has_secret_bytes else None,
       dimensions=_string_pairs_from_dict(props.dimensions),
       env=_string_pairs_from_dict(props.env),
+      env_prefixes=_string_list_pairs_from_dict(
+          entity.properties.env_prefixes or {}),
       inputs_ref=inputs_ref)
 
   return _ndb_to_rpc(
@@ -175,6 +177,8 @@ def new_task_request_from_rpc(msg, now):
     raise ValueError('same dimension key cannot be specified twice')
   if len(set(i.key for i in props.env)) != len(props.env):
     raise ValueError('same environment variable key cannot be specified twice')
+  if len(set(i.key for i in props.env_prefixes)) != len(props.env_prefixes):
+    raise ValueError('same environment prefix key cannot be specified twice')
 
   properties = _rpc_to_ndb(
       task_request.TaskProperties,
@@ -187,6 +191,7 @@ def new_task_request_from_rpc(msg, now):
       secret_bytes=None, # ignore this, it's handled out of band
       dimensions={i.key: i.value for i in props.dimensions},
       env={i.key: i.value for i in props.env},
+      env_prefixes={i.key: i.value for i in props.env_prefixes},
       inputs_ref=inputs_ref)
 
   req = _rpc_to_ndb(

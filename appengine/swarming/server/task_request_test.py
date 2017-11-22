@@ -81,6 +81,7 @@ def _gen_request(properties=None, **kwargs):
       u'pool': u'default',
     },
     'env': {u'foo': u'bar', u'joe': u'2'},
+    'env_prefixes': {u'PATH': [u'local/path']},
     'execution_timeout_secs': 30,
     'grace_period_secs': 30,
     'idempotent': False,
@@ -256,6 +257,7 @@ class TaskRequestApiTest(TestCase):
         u'pool': u'default',
       },
       'env': {u'foo': u'bar', u'joe': u'2'},
+      'env_prefixes': {u'PATH': [u'local/path']},
       'extra_args': [],
       'execution_timeout_secs': 30,
       'grace_period_secs': 30,
@@ -278,7 +280,7 @@ class TaskRequestApiTest(TestCase):
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
       'properties_hash':
-          '258e0894f2589a7bc2b46bd563d01f64300ae08938fb14b3d750baff94ba714e',
+          '0063761c9b2e47eabeb4bc1cc07f9f8613edf04731947a1e0d5d7afe49ef3ac7',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'service_account': u'none',
@@ -335,6 +337,7 @@ class TaskRequestApiTest(TestCase):
         u'pool': u'default',
       },
       'env': {u'foo': u'bar', u'joe': u'2'},
+      'env_prefixes': {u'PATH': [u'local/path']},
       'extra_args': [],
       'execution_timeout_secs': 30,
       'grace_period_secs': 30,
@@ -357,7 +360,7 @@ class TaskRequestApiTest(TestCase):
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
       'properties_hash':
-          '693715e9539552e2ece434e25a665d437cfe4685504a3c7bad6356f9feffee2a',
+          'bf688f31ecb8f0c8f029b6afa4d6da037af63bdae180f466109c43af5809874b',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'service_account': u'none',
@@ -399,7 +402,7 @@ class TaskRequestApiTest(TestCase):
     # Other unit tests should use the calculated value.
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        'c7445927612637c589b72dd47c4657b166a53ac6ecdfd08c167539331a7890d3',
+        '75825e335ed719b464e5dd9e116380fcec1d7f04406dafbc9dc3b1889b9338ed',
         as_dict['properties_hash'])
 
   def test_init_new_request_bot_service_account(self):

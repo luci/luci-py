@@ -694,6 +694,7 @@ class BotPollHandler(_BotBaseHandler):
         'command': request.properties.command,
         'dimensions': request.properties.dimensions,
         'env': request.properties.env,
+        'env_prefixes': request.properties.env_prefixes,
         'extra_args': request.properties.extra_args,
         'grace_period': request.properties.grace_period_secs,
         'hard_timeout': request.properties.execution_timeout_secs,
