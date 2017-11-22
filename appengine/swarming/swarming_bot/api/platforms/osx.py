@@ -484,7 +484,7 @@ def get_gpu():
   for card in _get_system_profiler('SPDisplaysDataType'):
     # Warning: the value provided depends on the driver manufacturer.
     # Other interesting values: spdisplays_vram, spdisplays_revision-id
-    ven_id = u'UNKNOWN'
+    ven_id = None
     if 'spdisplays_vendor-id' in card:
       # NVidia
       ven_id = card['spdisplays_vendor-id'][2:]
@@ -500,11 +500,20 @@ def get_gpu():
 
     # VMWare doesn't set it.
     dev_name = unicode(card.get('sppci_model', u''))
+    ven_name = ''
     if dev_name:
-      # The first word is pretty much always the company name on OSX so strip
-      # it.
-      dev_name = dev_name.split(' ', 1)[-1]
-    ven_name, dev_name = gpu.ids_to_names(ven_id, u'', dev_id, dev_name)
+      # The first word is pretty much always the company name on OSX.
+      split_name = dev_name.split(' ', 1)
+      ven_name = split_name[0]
+      dev_name = split_name[1]
+
+    # macOS 10.13 stopped including the vendor ID in the spdisplays_vendor
+    # string. Infer it from the vendor name instead.
+    if not ven_id:
+      ven_id = gpu.vendor_name_to_id(ven_name)
+    if not ven_id:
+      ven_id = u'UNKNOWN'
+    ven_name, dev_name = gpu.ids_to_names(ven_id, ven_name, dev_id, dev_name)
 
     dimensions.add(unicode(ven_id))
     dimensions.add(u'%s:%s' % (ven_id, dev_id))
