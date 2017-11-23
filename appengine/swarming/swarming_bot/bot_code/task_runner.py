@@ -197,7 +197,7 @@ class TaskDetails(object):
     }
     self.env_prefixes = {
       k.encode('utf-8'): [path.encode('utf-8') for path in v]
-      for k, v in data['env_prefixes'].iteritems()
+      for k, v in (data.get('env_prefixes') or {}).iteritems()
     }
     self.grace_period = data['grace_period']
     self.hard_timeout = data['hard_timeout']
