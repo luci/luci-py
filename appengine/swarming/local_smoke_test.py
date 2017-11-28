@@ -444,10 +444,12 @@ class Test(unittest.TestCase):
 
   def test_isolated(self):
     # Make an isolated file, archive it.
+    # Assert that the environment variable SWARMING_TASK_ID is set.
     hello_world = '\n'.join((
         'import os',
         'import sys',
         'print(\'hi\')',
+        'assert os.environ.get("SWARMING_TASK_ID")',
         'with open(os.path.join(sys.argv[1], \'result.txt\'), \'wb\') as f:',
         '  f.write(\'hey\')'))
     expected_summary = self.gen_expected(
@@ -478,10 +480,12 @@ class Test(unittest.TestCase):
 
   def test_isolated_command(self):
     # Command is specified in Swarming task, still with isolated file.
+    # Confirms that --env and --env-prefix work.
     hello_world = '\n'.join((
         'import os',
         'import sys',
         'print(\'hi\')',
+        'assert "SWARMING_TASK_ID" not in os.environ',
         'cwd = os.path.realpath(os.getcwd()).rstrip(os.sep)',
         'path = os.environ["PATH"].split(os.pathsep)',
         'print(os.path.realpath(path[0]).replace(cwd, "$CWD"))',
@@ -524,6 +528,7 @@ class Test(unittest.TestCase):
         hello_world, 'separate_cmd',
         ['--raw-cmd',
          '--env', 'FOO', 'bar',
+         '--env', 'SWARMING_TASK_ID', '',
          '--env-prefix', 'PATH', 'local/path',
          '--', 'python', 'hello_world.py', '${ISOLATED_OUTDIR}'],
         expected_summary, expected_files,

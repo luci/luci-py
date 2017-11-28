@@ -155,6 +155,9 @@ def get_isolated_args(work_dir, task_details, isolated_result,
   if task_details.grace_period:
     cmd.extend(('--grace-period', str(task_details.grace_period)))
 
+  for key, value in (task_details.env or {}).iteritems():
+    cmd.extend(('--env', '%s=%s' % (key, value)))
+
   cmd.extend(run_isolated_flags)
 
   for key, values in task_details.env_prefixes.iteritems():
@@ -457,16 +460,10 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     # TODO(maruel): Support both channels independently and display stderr in
     # red.
     env = os.environ.copy()
-    for key, value in (task_details.env or {}).iteritems():
-      if not value:
-        env.pop(key, None)
-      else:
-        env[key] = value
     if ctx_file:
       env['LUCI_CONTEXT'] = ctx_file
     logging.info('cmd=%s', cmd)
     logging.info('cwd=%s', work_dir)
-    logging.info('env=%s', env)
     logging.info('args=%s', args)
     fail_on_start = lambda exit_code, stdout: fail_without_command(
         remote, bot_id, task_id, params, cost_usd_hour, task_start,

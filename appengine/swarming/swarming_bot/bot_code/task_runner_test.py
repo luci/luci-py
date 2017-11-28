@@ -522,7 +522,8 @@ class TestTaskRunner(TestTaskRunnerBase):
       def __init__(self2, _cmd, cwd, env, stdout, stderr, stdin, detached):
         self.assertEqual(self.work_dir, cwd)
         expected_env = os.environ.copy()
-        expected_env['foo'] = 'bar'
+        # In particular, foo=bar is not set here, it will be passed to
+        # run_isolated as an argument.
         expected_env['LUCI_CONTEXT'] = env['LUCI_CONTEXT']  # tmp file
         self.assertEqual(expected_env, env)
         self.assertEqual(subprocess42.PIPE, stdout)
