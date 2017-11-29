@@ -45,6 +45,7 @@ class UpdateConfigTest(test_case.TestCase):
       template_config=None,
       manager_config=None,
       settings_config=None,
+      metadata_file=None,
   ):
     """Installs a mock for config.config.get_self_config.
 
@@ -55,15 +56,20 @@ class UpdateConfigTest(test_case.TestCase):
         to an empty config_pb2.InstanceGroupManagerConfig instance.
       settings_config: What to return when settings.cfg is requested. Defaults
         to an empty config_pb2.SettingsCfg instance.
+      metadata_file: What to return when metadata_file is requested. Defaults
+        to an empty string.
     """
     def get_self_config(path, _,  **kwargs):
-      self.assertIn(path, ('templates.cfg', 'managers.cfg', 'settings.cfg'))
+      self.assertIn(path, ('templates.cfg', 'managers.cfg', 'settings.cfg',
+          'metadata_file'))
       if path == 'templates.cfg':
         proto = template_config or config_pb2.InstanceTemplateConfig()
       elif path == 'managers.cfg':
         proto = manager_config or config_pb2.InstanceGroupManagerConfig()
       elif path == 'settings.cfg':
         proto = settings_config or config_pb2.SettingsCfg()
+      elif path == 'metadata_file':
+        proto = metadata_file or ''
       return revision or 'mock-revision', proto
     self.mock(config.config, 'get_self_config', get_self_config)
 
@@ -314,6 +320,27 @@ class UpdateConfigTest(test_case.TestCase):
         config_pb2.SettingsCfg(mp_server='url'),
         ['mp_server must start with "https://" or "http://localhost"'])
 
+  def test_metadata_from_file(self):
+    key = "startup-script"
+    content = "./cmd.sh"
+    template_config = config_pb2.InstanceTemplateConfig(
+      templates=[
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                base_name='base-name-1',
+                metadata_from_file=[
+                    '%s:metadata_file' % key,
+                ],
+            ),
+      ],
+    )
+    self.install_mock(template_config=template_config, metadata_file=content)
+    config.update_template_configs()
+    self.failUnless(config.Configuration.cached().template_config)
+    self.assertEqual(len(template_config.templates[0].metadata), 0)
+    cfg, _ = config.Configuration.load()
+    self.assertEqual(len(cfg.templates), 1)
+    self.assertEqual(len(cfg.templates[0].metadata), 1)
+    self.assertEqual(cfg.templates[0].metadata[0], '%s:%s' % (key, content))
 
 if __name__ == '__main__':
   unittest.main()

@@ -41,6 +41,10 @@ message InstanceTemplateConfig {
     // Metadata to attach when creating instances.
     // Each string should be formatted as "key:value".
     repeated string metadata = 8;
+    // Path to file with metadata.
+    // Value should be on the form 'key:path' and will be translated to a
+    // metadata field with a value on the form 'key:content(path)'.
+    repeated string metadata_from_file = 14;
     // GCE machine type.
     optional string machine_type = 9;
     // Network resource attached to instance.

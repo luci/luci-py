@@ -53,11 +53,26 @@ class Configuration(datastore_utils.config.GlobalConfig):
         raise ValueError(ex)
       return proto_cfg
 
+    def _desugar_template(proto_cfg):
+      for template in proto_cfg.templates:
+        for value in template.metadata_from_file:
+          # Assumes value is on the form key:path
+          part = value.split(':', 1)
+          if len(part) < 2:
+            logging.error('Invalid metadata_from_file value: %s', value)
+            return proto_cfg
+          _, content = config.get_self_config(part[1], None,
+                  store_last_good=True)
+          template.metadata.append('%s:%s' % (part[0], content))
+        del template.metadata_from_file[:]
+      return proto_cfg
+
     configuration = cls.cached()
     template_cfg = _adds_cfg_to_message(
         'template.cfg', configuration.template_config,
         config_pb2.InstanceTemplateConfig()
     )
+    template_cfg = _desugar_template(template_cfg)
     manager_cfg = _adds_cfg_to_message(
         'manager.cfg', configuration.manager_config,
         config_pb2.InstanceGroupManagerConfig()
