@@ -310,7 +310,7 @@ def compile_pattern(pattern):
     kind = 'text'
     value = pattern
 
-  if kind == 'text':
+  if kind in ('text', 'exact'):
     return lambda s: s == value
 
   if kind == 'regex':
