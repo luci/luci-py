@@ -184,9 +184,11 @@ class RemoteClientGrpc(object):
     logging.info('post_bot_event(%s, %s)', event_type, message)
 
     req_type, status = {
-        'bot_error': (bots_pb2.ERROR, None),
-        'bot_rebooting': (bots_pb2.INFO, bots_pb2.HOST_REBOOTING),
-        'bot_shutdown': (bots_pb2.INFO, bots_pb2.BOT_TERMINATING),
+        'bot_error': (bots_pb2.PostBotEventTempRequest.ERROR, None),
+        'bot_rebooting': (bots_pb2.PostBotEventTempRequest.INFO,
+                          bots_pb2.HOST_REBOOTING),
+        'bot_shutdown': (bots_pb2.PostBotEventTempRequest.INFO,
+                         bots_pb2.BOT_TERMINATING),
     }.get(event_type, (None, None))
 
     if req_type is None:
@@ -207,7 +209,7 @@ class RemoteClientGrpc(object):
     req = bots_pb2.PostBotEventTempRequest()
     req.name = self._session.name
     req.bot_session_temp.CopyFrom(self._session)
-    req.type = event_type
+    req.type = req_type
     req.msg = message
     try:
       self._proxy_bots.call_unary('PostBotEventTemp', req)
