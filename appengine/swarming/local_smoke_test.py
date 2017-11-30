@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# coding=utf-8
 # Copyright 2014 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
@@ -14,7 +15,6 @@ import json
 import logging
 import os
 import re
-import shutil
 import signal
 import socket
 import sys
@@ -33,6 +33,7 @@ from tools import start_servers
 
 sys.path.insert(0, CLIENT_DIR)
 from third_party.depot_tools import fix_encoding
+from utils import fs
 from utils import file_path
 from utils import large
 from utils import subprocess42
@@ -45,6 +46,12 @@ test_env_bot.setup_test_env()
 from api import os_utilities
 
 
+# Use a variable because it is corrupting my text editor from the 80s.
+# One important thing to note is that this character U+1F310 is not in the BMP
+# so it tests more accurately emojis like 💣 (U+1F4A3) and 💩(U+1F4A9).
+HELLO_WORLD = u'hello_🌐'
+
+
 # Signal as seen by the process.
 SIGNAL_TERM = -1073741510 if sys.platform == 'win32' else -signal.SIGTERM
 
@@ -54,50 +61,24 @@ SIGNAL_TERM = -1073741510 if sys.platform == 'win32' else -signal.SIGTERM
 TIMEOUT_SECS = 20
 
 
-# For the isolated tests that outputs a file named result.txt containing 'hey'.
-ISOLATE_HELLO_WORLD = {
-  'variables': {
-    'command': ['python', '-u', 'hello_world.py'],
-    'files': ['hello_world.py'],
+# The default isolated command is to map and run HELLO_WORLD.
+DEFAULT_ISOLATE_HELLO = """{
+  "variables": {
+    "command": ["python", "-u", "%(name)s.py"],
+    "files": ["%(name)s.py"],
   },
-}
+}""" % {'name': HELLO_WORLD.encode('utf-8')}
 
-# Update these hashes everytime isolated_format.py is updated:
-RESULT_HEY_ISOLATED_OUT = {
-  u'isolated': u'5c64883277eb00bceafe3659f182e194cffc5d96',
-  u'isolatedserver': u'http://localhost:10050',
-  u'namespace': u'default-gzip',
-  u'view_url':
-    u'http://localhost:10050/browse?namespace=default-gzip'
-    '&hash=5c64883277eb00bceafe3659f182e194cffc5d96',
-}
 
-RESULT_HEY_OUTPUTS_REF = {
-  u'isolated': u'5c64883277eb00bceafe3659f182e194cffc5d96',
-  u'isolatedserver': u'http://localhost:10050',
-  u'namespace': u'default-gzip',
-  u'view_url':
-    u'http://localhost:10050/browse?namespace=default-gzip'
-    '&hash=5c64883277eb00bceafe3659f182e194cffc5d96',
-}
-
-RESULT_HEY2_ISOLATED_OUT = {
-  u'isolated': u'7f89142465cba8d465b1f0a3f6e6f95ad28cc56b',
-  u'isolatedserver': u'http://localhost:10050',
-  u'namespace': u'default-gzip',
-  u'view_url':
-    u'http://localhost:10050/browse?namespace=default-gzip'
-    '&hash=7f89142465cba8d465b1f0a3f6e6f95ad28cc56b',
-}
-
-RESULT_SECRET_OUTPUT = {
-  u'isolated': u'd2eca4d860e4f1728272f6a736fd1c9ac6e98c4f',
-  u'isolatedserver': u'http://localhost:10050',
-  u'namespace': u'default-gzip',
-  u'view_url':
-    u'http://localhost:10050/browse?namespace=default-gzip'
-    '&hash=d2eca4d860e4f1728272f6a736fd1c9ac6e98c4f',
-}
+def _out(isolated_hash):
+  return {
+    u'isolated': isolated_hash,
+    u'isolatedserver': u'http://localhost:10050',
+    u'namespace': u'default-gzip',
+    u'view_url':
+      u'http://localhost:10050/browse?namespace=default-gzip&hash=' +
+      isolated_hash,
+  }
 
 
 class SwarmingClient(object):
@@ -132,7 +113,7 @@ class SwarmingClient(object):
     ]
     cmd.extend(args)
     assert not self._run('trigger', cmd), args
-    with open(tmp, 'rb') as f:
+    with fs.open(tmp, 'rb') as f:
       data = json.load(f)
       task_id = data['tasks'].popitem()[1]['task_id']
       logging.debug('task_id = %s', task_id)
@@ -155,7 +136,7 @@ class SwarmingClient(object):
     if extra:
       cmd.extend(extra)
     assert not self._run('trigger', cmd)
-    with open(tmp, 'rb') as f:
+    with fs.open(tmp, 'rb') as f:
       data = json.load(f)
       task_id = data['tasks'].popitem()[1]['task_id']
       logging.debug('task_id = %s', task_id)
@@ -164,7 +145,7 @@ class SwarmingClient(object):
   def task_collect(self, task_id):
     """Collects the results for a task."""
     tmp = os.path.join(self._tmpdir, task_id + '.json')
-    tmpdir = os.path.join(self._tmpdir, task_id)
+    tmpdir = unicode(os.path.join(self._tmpdir, task_id))
     os.mkdir(tmpdir)
     # swarming.py collect will return the exit code of the task.
     args = [
@@ -172,7 +153,7 @@ class SwarmingClient(object):
       '--timeout', str(TIMEOUT_SECS), '--perf',
     ]
     self._run('collect', args)
-    with open(tmp, 'rb') as f:
+    with fs.open(tmp, 'rb') as f:
       content = f.read()
     try:
       summary = json.loads(content)
@@ -180,11 +161,11 @@ class SwarmingClient(object):
       print >> sys.stderr, 'Bad json:\n%s' % content
       raise
     outputs = {}
-    for root, _, files in os.walk(tmpdir):
+    for root, _, files in fs.walk(tmpdir):
       for i in files:
         p = os.path.join(root, i)
         name = p[len(tmpdir)+1:]
-        with open(p, 'rb') as f:
+        with fs.open(p, 'rb') as f:
           outputs[name] = f.read()
     return summary, outputs
 
@@ -212,7 +193,7 @@ class SwarmingClient(object):
     print >> sys.stderr, 'Client calls'
     print >> sys.stderr, '-' * 60
     for i in xrange(self._index):
-      with open(os.path.join(self._tmpdir, 'client_%d.log' % i), 'rb') as f:
+      with fs.open(os.path.join(self._tmpdir, 'client_%d.log' % i), 'rb') as f:
         log = f.read().strip('\n')
       for l in log.splitlines():
         sys.stderr.write('  %s\n' % l)
@@ -226,13 +207,13 @@ class SwarmingClient(object):
     Returns:
       The process exit code.
     """
-    name = os.path.join(self._tmpdir, 'client_%d.log' % self._index)
+    name = os.path.join(self._tmpdir, u'client_%d.log' % self._index)
     self._index += 1
     cmd = [
       sys.executable, 'swarming.py', command, '-S', self._swarming_server,
       '--verbose',
     ] + args
-    with open(name, 'wb') as f:
+    with fs.open(name, 'wb') as f:
       f.write('\nRunning: %s\n' % ' '.join(cmd))
       f.flush()
       p = subprocess42.Popen(
@@ -432,100 +413,110 @@ class Test(unittest.TestCase):
   def test_isolated(self):
     # Make an isolated file, archive it.
     # Assert that the environment variable SWARMING_TASK_ID is set.
-    hello_world = '\n'.join((
+    content  = '\n'.join((
+        '# coding=utf-8',
         'import os',
         'import sys',
         'print(\'hi\')',
         'assert os.environ.get("SWARMING_TASK_ID")',
-        'with open(os.path.join(sys.argv[1], \'result.txt\'), \'wb\') as f:',
-        '  f.write(\'hey\')'))
+        'with open(os.path.join(sys.argv[1], u\'💣.txt\'), \'wb\') as f:',
+        '  f.write(\'test_isolated\')'))
+    isolated_out = _out(u'f067c9cf13dcc90f2fe269499d44082150876126')
+    items_in = [len(content), 214]
+    items_out = [len('test_isolated'), 125]
     expected_summary = self.gen_expected(
         name=u'isolated_task',
-        isolated_out=RESULT_HEY_ISOLATED_OUT,
+        isolated_out=isolated_out,
         performance_stats={
           u'isolated_download': {
             u'initial_number_items': u'0',
             u'initial_size': u'0',
-            u'items_cold': sorted([len(hello_world), 200]),
+            u'items_cold': sorted(items_in),
             u'items_hot': [],
-            u'num_items_cold': u'2',
-            u'total_bytes_items_cold': unicode(len(hello_world) + 200),
+            u'num_items_cold': unicode(len(items_in)),
+            u'total_bytes_items_cold': unicode(sum(items_in)),
           },
           u'isolated_upload': {
-            u'items_cold': [3, 118],
+            u'items_cold': sorted(items_out),
             u'items_hot': [],
-            u'num_items_cold': u'2',
-            u'total_bytes_items_cold': u'121',
+            u'num_items_cold': unicode(len(items_out)),
+            u'total_bytes_items_cold': unicode(sum(items_out)),
           },
         },
         outputs=[u'hi\n'],
-        outputs_ref=RESULT_HEY_OUTPUTS_REF)
-    expected_files = {os.path.join('0', 'result.txt'): 'hey'}
+        outputs_ref=isolated_out)
+    expected_files = {
+      os.path.join(u'0', u'💣.txt'.encode('utf-8')): 'test_isolated',
+    }
     self._run_isolated(
-        hello_world, 'isolated_task', ['--', '${ISOLATED_OUTDIR}'],
+        content, 'isolated_task', ['--', '${ISOLATED_OUTDIR}'],
         expected_summary, expected_files)
 
   def test_isolated_command(self):
     # Command is specified in Swarming task, still with isolated file.
     # Confirms that --env and --env-prefix work.
-    hello_world = '\n'.join((
-        'import os',
-        'import sys',
-        'print(\'hi\')',
-        'assert "SWARMING_TASK_ID" not in os.environ',
-        'cwd = os.path.realpath(os.getcwd()).rstrip(os.sep)',
-        'path = os.environ["PATH"].split(os.pathsep)',
-        'print(os.path.realpath(path[0]).replace(cwd, "$CWD"))',
-        'with open(os.path.join(sys.argv[1], \'FOO.txt\'), \'wb\') as f:',
-        '  f.write(os.environ["FOO"])',
-        'with open(os.path.join(sys.argv[1], \'result.txt\'), \'wb\') as f:',
-        '  f.write(\'hey2\')',
-    ))
-    computed_PATH = os.sep.join(['$CWD', 'local', 'path'])
-
-    # Hard code the size of the isolated file.
-    isolated_size = 138
+    content = u'\n'.join((
+        u'# coding=utf-8',
+        u'import os',
+        u'import sys',
+        u'print(sys.argv[1])',
+        u'assert "SWARMING_TASK_ID" not in os.environ',
+        u'cwd = os.path.realpath(os.getcwd()).rstrip(os.sep)',
+        u'path = os.environ["PATH"].split(os.pathsep)',
+        u'print(os.path.realpath(path[0]).replace(cwd, "$CWD"))',
+        u'with open(os.path.join(sys.argv[2], \'FOO.txt\'), \'wb\') as f:',
+        u'  f.write(os.environ["FOO"])',
+        u'with open(os.path.join(sys.argv[2], \'result.txt\'), \'wb\') as f:',
+        u'  f.write(\'hey2\')',
+    )).encode('utf-8')
+    isolated_out = _out(u'fc04fe5eee668c35c81db590a76c0da9cbcdae90')
+    items_in = [len(content), 145]
+    items_out = [len('hey2'), len(u'bar💩'.encode('utf-8')), 191]
     expected_summary = self.gen_expected(
         name=u'separate_cmd',
-        isolated_out=RESULT_HEY2_ISOLATED_OUT,
+        isolated_out=isolated_out,
         performance_stats={
           u'isolated_download': {
             u'initial_number_items': u'0',
             u'initial_size': u'0',
-            u'items_cold': sorted([len(hello_world), isolated_size]),
+            u'items_cold': sorted(items_in),
             u'items_hot': [],
-            u'num_items_cold': u'2',
-            u'total_bytes_items_cold': unicode(
-                len(hello_world) + isolated_size),
+            u'num_items_cold': unicode(len(items_in)),
+            u'total_bytes_items_cold': unicode(sum(items_in)),
           },
           u'isolated_upload': {
-            u'items_cold': [3, 4, 191],
+            u'items_cold': sorted(items_out),
             u'items_hot': [],
-            u'num_items_cold': u'3',
-            u'total_bytes_items_cold': u'198',
+            u'num_items_cold': unicode(len(items_out)),
+            u'total_bytes_items_cold': unicode(sum(items_out)),
           },
         },
-        outputs=[u'hi\n%s\n' % computed_PATH],
-        outputs_ref=RESULT_HEY2_ISOLATED_OUT)
+        outputs=[u'hi💩\n%s\n' % os.sep.join(['$CWD', 'local', 'path'])],
+        outputs_ref=isolated_out)
     expected_files = {
       os.path.join('0', 'result.txt'): 'hey2',
-      os.path.join('0', 'FOO.txt'): 'bar',
+      os.path.join('0', 'FOO.txt'): u'bar💩'.encode('utf-8'),
     }
+    # Use a --raw-cmd instead of a command in the isolated file. This is the
+    # future!
+    isolated_content='{"variables": {"files": ["%s.py"]}}' % HELLO_WORLD.encode(
+        'utf-8')
     self._run_isolated(
-        hello_world, 'separate_cmd',
+        content, 'separate_cmd',
         ['--raw-cmd',
-         '--env', 'FOO', 'bar',
+         '--env', 'FOO', u'bar💩',
          '--env', 'SWARMING_TASK_ID', '',
          '--env-prefix', 'PATH', 'local/path',
-         '--', 'python', 'hello_world.py', '${ISOLATED_OUTDIR}'],
+         '--', 'python', HELLO_WORLD + '.py', u'hi💩',
+         '${ISOLATED_OUTDIR}'],
         expected_summary, expected_files,
-        isolated_content={'variables': {'files': ['hello_world.py']}})
+        isolated_content=isolated_content)
 
   def test_isolated_hard_timeout(self):
     # Make an isolated file, archive it, have it time out. Similar to
     # test_hard_timeout. The script doesn't handle signal so it failed the grace
     # period.
-    hello_world = '\n'.join((
+    content = '\n'.join((
         'import os',
         'import sys',
         'import time',
@@ -533,7 +524,8 @@ class Test(unittest.TestCase):
         'sys.stdout.flush()',
         'time.sleep(120)',
         'with open(os.path.join(sys.argv[1], \'result.txt\'), \'wb\') as f:',
-        '  f.write(\'hey\')'))
+        '  f.write(\'test_isolated_hard_timeout\')'))
+    items_in = [len(content), 214]
     expected_summary = self.gen_expected(
         name=u'isolated_hard_timeout',
         exit_codes=[SIGNAL_TERM],
@@ -542,10 +534,10 @@ class Test(unittest.TestCase):
           u'isolated_download': {
             u'initial_number_items': u'0',
             u'initial_size': u'0',
-            u'items_cold': sorted([len(hello_world), 200]),
+            u'items_cold': sorted(items_in),
             u'items_hot': [],
-            u'num_items_cold': u'2',
-            u'total_bytes_items_cold': unicode(len(hello_world) + 200),
+            u'num_items_cold': unicode(len(items_in)),
+            u'total_bytes_items_cold': unicode(sum(items_in)),
           },
           u'isolated_upload': {
             u'items_cold': [],
@@ -555,14 +547,14 @@ class Test(unittest.TestCase):
         state=0x40)  # task_result.State.TIMED_OUT
     # Hard timeout is enforced by run_isolated, I/O timeout by task_runner.
     self._run_isolated(
-        hello_world, 'isolated_hard_timeout',
+        content, 'isolated_hard_timeout',
         ['--hard-timeout', '1', '--', '${ISOLATED_OUTDIR}'],
         expected_summary, {})
 
   def test_isolated_hard_timeout_grace(self):
     # Make an isolated file, archive it, have it time out. Similar to
     # test_hard_timeout. The script handles signal so it send results back.
-    hello_world = '\n'.join((
+    content = '\n'.join((
         'import os',
         'import signal',
         'import sys',
@@ -582,49 +574,55 @@ class Test(unittest.TestCase):
         '  except IOError:',
         '    print(\'ioerror\')',
         'with open(os.path.join(sys.argv[1], \'result.txt\'), \'wb\') as f:',
-        '  f.write(\'hey\')'))
+        '  f.write(\'test_isolated_hard_timeout_grace\')'))
+    isolated_out = _out(u'53b4ab0562f05135e20ec91b473e5ca2282edc2b')
+    items_in = [len(content), 214]
+    items_out = [len('test_isolated_hard_timeout_grace'), 119]
     expected_summary = self.gen_expected(
         name=u'isolated_hard_timeout_grace',
-        isolated_out=RESULT_HEY_ISOLATED_OUT,
+        isolated_out=isolated_out,
         performance_stats={
           u'isolated_download': {
             u'initial_number_items': u'0',
             u'initial_size': u'0',
-            u'items_cold': sorted([200, len(hello_world)]),
+            u'items_cold': sorted(items_in),
             u'items_hot': [],
-            u'num_items_cold': u'2',
-            u'total_bytes_items_cold': unicode(len(hello_world) + 200),
+            u'num_items_cold': unicode(len(items_in)),
+            u'total_bytes_items_cold': unicode(sum(items_in)),
           },
           u'isolated_upload': {
-            u'items_cold': [],
-            u'items_hot': [3, 118],
-            u'num_items_hot': u'2',
-            u'total_bytes_items_hot': u'121',
+            u'items_cold': sorted(items_out),
+            u'items_hot': [],
+            u'num_items_cold': unicode(len(items_out)),
+            u'total_bytes_items_cold': unicode(sum(items_out)),
           },
         },
         outputs=[u'hi\ngot signal 15\n'],
-        outputs_ref=RESULT_HEY_OUTPUTS_REF,
+        outputs_ref=isolated_out,
         failure=True,
         state=0x40)  # task_result.State.TIMED_OUT
-    expected_files = {os.path.join('0', 'result.txt'): 'hey'}
+    expected_files = {
+      os.path.join('0', 'result.txt'): 'test_isolated_hard_timeout_grace',
+    }
     # Hard timeout is enforced by run_isolated, I/O timeout by task_runner.
     self._run_isolated(
-        hello_world, 'isolated_hard_timeout_grace',
+        content, 'isolated_hard_timeout_grace',
         ['--hard-timeout', '1', '--', '${ISOLATED_OUTDIR}'],
         expected_summary, expected_files)
 
   def test_idempotent_reuse(self):
-    hello_world = 'print "hi"\n'
+    content = 'print "hi"\n'
+    items_in = [len(content), 213]
     expected_summary = self.gen_expected(
       name=u'idempotent_reuse',
       performance_stats={
         u'isolated_download': {
           u'initial_number_items': u'0',
           u'initial_size': u'0',
-          u'items_cold': sorted([len(hello_world), 199]),
+          u'items_cold': sorted(items_in),
           u'items_hot': [],
-            u'num_items_cold': u'2',
-            u'total_bytes_items_cold': unicode(len(hello_world) + 199),
+          u'num_items_cold': unicode(len(items_in)),
+          u'total_bytes_items_cold': unicode(sum(items_in)),
         },
         u'isolated_upload': {
           u'items_cold': [],
@@ -632,10 +630,10 @@ class Test(unittest.TestCase):
         },
       },
       properties_hash =
-          u'3d6dcab82b1c098b27c7a7cbb6ddcb3d41689c42ca7fe5fafd53f9105af6efea',
+          u'7801158c5536725f6cf6e8d9f01a2af666943f3d2997995034fd4eb4ba747e37',
     )
     task_id = self._run_isolated(
-        hello_world, 'idempotent_reuse', ['--idempotent'], expected_summary, {})
+        content, 'idempotent_reuse', ['--idempotent'], expected_summary, {})
 
     # The task name changes, there's a bit less data but the rest is the same.
     expected_summary[u'name'] = u'idempotent_reuse2'
@@ -646,11 +644,11 @@ class Test(unittest.TestCase):
     expected_summary[u'try_number'] = 0
     expected_summary[u'properties_hash'] = None
     self._run_isolated(
-        hello_world, 'idempotent_reuse2', ['--idempotent'], expected_summary,
-        {}, deduped=True)
+        content, 'idempotent_reuse2', ['--idempotent'], expected_summary, {},
+        deduped=True)
 
   def test_secret_bytes(self):
-    hello_world = textwrap.dedent("""
+    content = textwrap.dedent("""
       import sys
       import os
       import json
@@ -663,32 +661,35 @@ class Test(unittest.TestCase):
       with open(os.path.join(sys.argv[1], 'sekret'), 'w') as f:
         print >> f, data['swarming']['secret_bytes'].decode('base64')
     """)
+    isolated_out = _out(u'd2eca4d860e4f1728272f6a736fd1c9ac6e98c4f')
+    items_in = [len(content), 214]
+    items_out = [len('foobar\n'), 114]
     expected_summary = self.gen_expected(
       name=u'secret_bytes',
-      isolated_out=RESULT_SECRET_OUTPUT,
+      isolated_out=isolated_out,
       performance_stats={
         u'isolated_download': {
           u'initial_number_items': u'0',
           u'initial_size': u'0',
-          u'items_cold': sorted([200, len(hello_world)]),
+          u'items_cold': sorted(items_in),
           u'items_hot': [],
-          u'num_items_cold': u'2',
-            u'total_bytes_items_cold': unicode(len(hello_world) + 200),
+          u'num_items_cold': unicode(len(items_in)),
+          u'total_bytes_items_cold': unicode(sum(items_in)),
         },
         u'isolated_upload': {
-          u'items_cold': [7, 114],
+          u'items_cold': sorted(items_out),
           u'items_hot': [],
-          u'num_items_cold': u'2',
-          u'total_bytes_items_cold': u'121',
+          u'num_items_cold': unicode(len(items_out)),
+          u'total_bytes_items_cold': unicode(sum(items_out)),
         },
       },
-      outputs_ref=RESULT_SECRET_OUTPUT,
+      outputs_ref=isolated_out,
     )
     tmp = os.path.join(self.tmpdir, 'test_secret_bytes')
-    with open(tmp, 'wb') as f:
+    with fs.open(tmp, 'wb') as f:
       f.write('foobar')
     self._run_isolated(
-        hello_world, 'secret_bytes',
+        content, 'secret_bytes',
         ['--secret-bytes-path', tmp, '--', '${ISOLATED_OUTDIR}'],
         expected_summary, {os.path.join('0', 'sekret'): 'foobar\n'})
 
@@ -708,17 +709,17 @@ class Test(unittest.TestCase):
       'else:',
       '  shutil.copy(p, sys.argv[1])',
       'print "hi"'))
-    sizes = sorted([len(script), 200])
+    items_in = [len(script), 214]
     expected_summary = self.gen_expected(
       name=u'cache_first',
       performance_stats={
         u'isolated_download': {
           u'initial_number_items': u'0',
           u'initial_size': u'0',
-          u'items_cold': sizes,
+          u'items_cold': sorted(items_in),
           u'items_hot': [],
-          u'num_items_cold': u'2',
-          u'total_bytes_items_cold': unicode(sum(sizes)),
+          u'num_items_cold': unicode(len(items_in)),
+          u'total_bytes_items_cold': unicode(sum(items_in)),
         },
         u'isolated_upload': {
           u'items_cold': [],
@@ -732,32 +733,27 @@ class Test(unittest.TestCase):
         expected_summary, {})
 
     # Second run with a cache available.
-    out = {
-      u'isolated': u'63fc667fd217ebabdf60ca143fe25998b5ea5c77',
-      u'isolatedserver': u'http://localhost:10050',
-      u'namespace': u'default-gzip',
-      u'view_url':
-        u'http://localhost:10050/browse?namespace=default-gzip'
-          u'&hash=63fc667fd217ebabdf60ca143fe25998b5ea5c77',
-    }
+    isolated_out = _out(u'63fc667fd217ebabdf60ca143fe25998b5ea5c77')
+    items_out = [3, 110]
     expected_summary = self.gen_expected(
       name=u'cache_second',
-      isolated_out=out,
-      outputs_ref=out,
+      isolated_out=isolated_out,
+      outputs_ref=isolated_out,
       performance_stats={
         u'isolated_download': {
-          u'initial_number_items': unicode(len(sizes)),
-          u'initial_size': unicode(sum(sizes)),
+          u'initial_number_items': unicode(len(items_in)),
+          u'initial_size': unicode(sum(items_in)),
           u'items_cold': [],
-          u'items_hot': sizes,
-          u'num_items_hot': u'2',
-          u'total_bytes_items_hot': unicode(sum(sizes)),
+          # Items are hot.
+          u'items_hot': items_in,
+          u'num_items_hot': unicode(len(items_in)),
+          u'total_bytes_items_hot': unicode(sum(items_in)),
         },
         u'isolated_upload': {
-          u'items_cold': [3, 110],
+          u'items_cold': sorted(items_out),
           u'items_hot': [],
-          u'num_items_cold': u'2',
-          u'total_bytes_items_cold': u'113',
+          u'num_items_cold': unicode(len(items_out)),
+          u'total_bytes_items_cold': unicode(sum(items_out)),
         },
       },
     )
@@ -784,7 +780,7 @@ class Test(unittest.TestCase):
     # and asserts the tasks are run in the expected order, based on priority and
     # created_ts.
     signal_file = os.path.join(self.tmpdir, 'test_priority')
-    open(signal_file, 'wb').close()
+    fs.open(signal_file, 'wb').close()
 
     # List of tuple(task_name, priority, task_id).
     tasks = []
@@ -876,9 +872,9 @@ class Test(unittest.TestCase):
     os.mkdir(root)
     isolate_path = os.path.join(root, 'i.isolate')
     isolated_path = os.path.join(root, 'i.isolated')
-    with open(isolate_path, 'wb') as f:
-      json.dump(isolated_content or ISOLATE_HELLO_WORLD, f)
-    with open(os.path.join(root, 'hello_world.py'), 'wb') as f:
+    with fs.open(isolate_path, 'wb') as f:
+      f.write(isolated_content or DEFAULT_ISOLATE_HELLO)
+    with fs.open(os.path.join(root, HELLO_WORLD + u'.py'), 'wb') as f:
       f.write(content)
     isolated_hash = self.client.isolate(isolate_path, isolated_path)
     task_id = self.client.task_trigger_isolated(
@@ -973,14 +969,14 @@ def cleanup(bot, client, servers, print_all):
     if client:
       client.dump_log()
   if not Test.leak:
-    shutil.rmtree(Test.tmpdir)
+    file_path.rmtree(Test.tmpdir)
 
 
 def main():
   fix_encoding.fix_encoding()
   verbose = '-v' in sys.argv
   Test.leak = bool('--leak' in sys.argv)
-  Test.tmpdir = tempfile.mkdtemp(prefix='local_smoke_test')
+  Test.tmpdir = unicode(tempfile.mkdtemp(prefix='local_smoke_test'))
   if Test.leak:
     # Note that --leak will not guarantee that 'c' and 'isolated_cache' are
     # kept. Only the last test case will leak these two directories.
