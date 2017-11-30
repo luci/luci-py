@@ -8,6 +8,7 @@
 import glob
 import logging
 import os
+import shutil
 import signal
 import socket
 import sys
@@ -38,9 +39,8 @@ class LocalBot(object):
   It creates its own temporary directory to download the zip and run tasks
   locally.
   """
-  def __init__(self, swarming_server_url, redirect=True):
-    # It is deleted in self.stop(False).
-    self._botdir = tempfile.mkdtemp(prefix='swarming_bot')
+  def __init__(self, swarming_server_url, redirect, botdir):
+    self._botdir = botdir
     self._swarming_server_url = swarming_server_url
     self._proc = None
     self._logs = {}
@@ -54,7 +54,7 @@ class LocalBot(object):
     """
     if restart:
       logging.info('wipe_cache(): Restarting the bot')
-      self.stop(True)
+      self.stop()
       # Deletion needs to happen while the bot is not running to ensure no side
       # effect.
       # These values are from ./swarming_bot/bot_code/bot_main.py.
@@ -92,7 +92,7 @@ class LocalBot(object):
     else:
       self._proc = subprocess42.Popen(cmd, cwd=self._botdir, detached=True)
 
-  def stop(self, leak):
+  def stop(self):
     """Stops the local Swarming bot. Returns the process exit code."""
     if not self._proc:
       return None
@@ -104,14 +104,8 @@ class LocalBot(object):
       except OSError:
         pass
     exit_code = self._proc.returncode
-    if self._botdir:
-      for i in sorted(glob.glob(os.path.join(self._botdir, 'logs', '*.log'))):
-        self._read_log(i)
-      if not leak:
-        try:
-          file_path.rmtree(self._botdir)
-        except OSError:
-          print >> sys.stderr, 'Leaking %s' % self._botdir
+    for i in sorted(glob.glob(os.path.join(self._botdir, 'logs', '*.log'))):
+      self._read_log(i)
     self._proc = None
     return exit_code
 
@@ -157,15 +151,19 @@ def main():
   if len(sys.argv) != 2:
     print >> sys.stderr, 'Specify url to Swarming server'
     return 1
-  bot = LocalBot(sys.argv[1], False)
+  botdir = tempfile.mkdtemp(prefix='start_bot')
   try:
-    bot.start()
-    bot.wait()
-    bot.dump_log()
-  except KeyboardInterrupt:
-    print >> sys.stderr, '<Ctrl-C> received; stopping bot'
+    bot = LocalBot(sys.argv[1], False, botdir)
+    try:
+      bot.start()
+      bot.wait()
+      bot.dump_log()
+    except KeyboardInterrupt:
+      print >> sys.stderr, '<Ctrl-C> received; stopping bot'
+    finally:
+      exit_code = bot.stop()
   finally:
-    exit_code = bot.stop(False)
+    shutil.rmtree(botdir)
   return exit_code
 
 

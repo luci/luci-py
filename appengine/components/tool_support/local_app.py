@@ -18,7 +18,6 @@ import shutil
 import socket
 import subprocess
 import sys
-import tempfile
 import time
 import urllib2
 
@@ -72,7 +71,7 @@ def find_free_ports(host, base_port, count):
 class LocalApplication(object):
   """GAE application running locally via dev_appserver.py."""
 
-  def __init__(self, app_dir, base_port, listen_all=False):
+  def __init__(self, app_dir, base_port, listen_all, root):
     self._app = gae_sdk_utils.Application(app_dir)
     self._base_port = base_port
     self._client = None
@@ -80,7 +79,7 @@ class LocalApplication(object):
     self._port = None
     self._proc = None
     self._serving = False
-    self._temp_root = None
+    self._root = os.path.join(root, self.app_id)
     self._listen_all = listen_all
 
   @property
@@ -125,18 +124,16 @@ class LocalApplication(object):
         'localhost', self._base_port, len(self._app.modules) + 1)
     self._port = free_ports[0]
 
-    # Create temp directories where dev_server keeps its state.
-    self._temp_root = tempfile.mkdtemp(prefix=self.app_id)
-    os.makedirs(os.path.join(self._temp_root, 'storage'))
+    os.makedirs(os.path.join(self._root, 'storage'))
 
     # Launch the process.
-    log_file = os.path.join(self._temp_root, 'dev_appserver.log')
+    log_file = os.path.join(self._root, 'dev_appserver.log')
     logging.info(
         'Launching %s at %s, log is %s', self.app_id, self.url, log_file)
     cmd = [
       '--port', str(self._port),
       '--admin_port', str(free_ports[-1]),
-      '--storage_path', os.path.join(self._temp_root, 'storage'),
+      '--storage_path', os.path.join(self._root, 'storage'),
       '--automatic_restart', 'no',
       '--log_level', 'debug',
       # Note: The random policy will provide the same consistency every
@@ -196,7 +193,7 @@ class LocalApplication(object):
     logging.info('Service %s is ready.', self.app_id)
     self._serving = True
 
-  def stop(self, leak=False):
+  def stop(self):
     """Stops dev_appserver, collects its log.
 
     Returns the process error code if applicable.
@@ -219,19 +216,12 @@ class LocalApplication(object):
         if exit_code is None:
           logging.error('Leaking PID %d', self._proc.pid)
     finally:
-      with open(os.path.join(self._temp_root, 'dev_appserver.log'), 'r') as f:
+      with open(os.path.join(self._root, 'dev_appserver.log'), 'r') as f:
         self._log = f.read()
-      if not leak:
-        try:
-          rmtree(self._temp_root)
-        except OSError as e:
-          # Log but ignore it to not mask other errors.
-          print >> sys.stderr, str(e)
       self._client = None
       self._port = None
       self._proc = None
       self._serving = False
-      self._temp_root = None
     return exit_code
 
   def wait(self):

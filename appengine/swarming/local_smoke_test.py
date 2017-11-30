@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import signal
 import socket
 import sys
@@ -100,10 +101,10 @@ RESULT_SECRET_OUTPUT = {
 
 
 class SwarmingClient(object):
-  def __init__(self, swarming_server, isolate_server):
+  def __init__(self, swarming_server, isolate_server, tmpdir):
     self._swarming_server = swarming_server
     self._isolate_server = isolate_server
-    self._tmpdir = tempfile.mkdtemp(prefix='swarming_client')
+    self._tmpdir = tmpdir
     self._index = 0
 
   def isolate(self, isolate_path, isolated_path):
@@ -120,82 +121,72 @@ class SwarmingClient(object):
 
   def task_trigger_raw(self, args):
     """Triggers a task and return the task id."""
-    h, tmp = tempfile.mkstemp(prefix='swarming_smoke_test', suffix='.json')
+    h, tmp = tempfile.mkstemp(
+        dir=self._tmpdir, prefix='trigger_raw', suffix='.json')
     os.close(h)
-    try:
-      cmd = [
-        '--user', 'joe@localhost',
-        '-d', 'pool', 'default',
-        '--dump-json', tmp,
-        '--raw-cmd',
-      ]
-      cmd.extend(args)
-      assert not self._run('trigger', cmd), args
-      with open(tmp, 'rb') as f:
-        data = json.load(f)
-        task_id = data['tasks'].popitem()[1]['task_id']
-        logging.debug('task_id = %s', task_id)
-        return task_id
-    finally:
-      os.remove(tmp)
+    cmd = [
+      '--user', 'joe@localhost',
+      '-d', 'pool', 'default',
+      '--dump-json', tmp,
+      '--raw-cmd',
+    ]
+    cmd.extend(args)
+    assert not self._run('trigger', cmd), args
+    with open(tmp, 'rb') as f:
+      data = json.load(f)
+      task_id = data['tasks'].popitem()[1]['task_id']
+      logging.debug('task_id = %s', task_id)
+      return task_id
 
   def task_trigger_isolated(self, name, isolated_hash, extra=None):
     """Triggers a task and return the task id."""
-    h, tmp = tempfile.mkstemp(prefix='swarming_smoke_test', suffix='.json')
+    h, tmp = tempfile.mkstemp(
+        dir=self._tmpdir, prefix='trigger_isolated', suffix='.json')
     os.close(h)
-    try:
-      cmd = [
-        '--user', 'joe@localhost',
-        '-d', 'pool', 'default',
-        '--dump-json', tmp,
-        '--task-name', name,
-        '-I',  self._isolate_server,
-        '--namespace', 'default-gzip',
-        '-s', isolated_hash,
-      ]
-      if extra:
-        cmd.extend(extra)
-      assert not self._run('trigger', cmd)
-      with open(tmp, 'rb') as f:
-        data = json.load(f)
-        task_id = data['tasks'].popitem()[1]['task_id']
-        logging.debug('task_id = %s', task_id)
-        return task_id
-    finally:
-      os.remove(tmp)
+    cmd = [
+      '--user', 'joe@localhost',
+      '-d', 'pool', 'default',
+      '--dump-json', tmp,
+      '--task-name', name,
+      '-I',  self._isolate_server,
+      '--namespace', 'default-gzip',
+      '-s', isolated_hash,
+    ]
+    if extra:
+      cmd.extend(extra)
+    assert not self._run('trigger', cmd)
+    with open(tmp, 'rb') as f:
+      data = json.load(f)
+      task_id = data['tasks'].popitem()[1]['task_id']
+      logging.debug('task_id = %s', task_id)
+      return task_id
 
   def task_collect(self, task_id):
     """Collects the results for a task."""
-    h, tmp = tempfile.mkstemp(prefix='swarming_smoke_test', suffix='.json')
-    os.close(h)
+    tmp = os.path.join(self._tmpdir, task_id + '.json')
+    tmpdir = os.path.join(self._tmpdir, task_id)
+    os.mkdir(tmpdir)
+    # swarming.py collect will return the exit code of the task.
+    args = [
+      '--task-summary-json', tmp, task_id, '--task-output-dir', tmpdir,
+      '--timeout', str(TIMEOUT_SECS), '--perf',
+    ]
+    self._run('collect', args)
+    with open(tmp, 'rb') as f:
+      content = f.read()
     try:
-      tmpdir = tempfile.mkdtemp(prefix='swarming_smoke_test')
-      try:
-        # swarming.py collect will return the exit code of the task.
-        args = [
-          '--task-summary-json', tmp, task_id, '--task-output-dir', tmpdir,
-          '--timeout', str(TIMEOUT_SECS), '--perf',
-        ]
-        self._run('collect', args)
-        with open(tmp, 'rb') as f:
-          content = f.read()
-        try:
-          summary = json.loads(content)
-        except ValueError:
-          print >> sys.stderr, 'Bad json:\n%s' % content
-          raise
-        outputs = {}
-        for root, _, files in os.walk(tmpdir):
-          for i in files:
-            p = os.path.join(root, i)
-            name = p[len(tmpdir)+1:]
-            with open(p, 'rb') as f:
-              outputs[name] = f.read()
-        return summary, outputs
-      finally:
-        file_path.rmtree(tmpdir)
-    finally:
-      os.remove(tmp)
+      summary = json.loads(content)
+    except ValueError:
+      print >> sys.stderr, 'Bad json:\n%s' % content
+      raise
+    outputs = {}
+    for root, _, files in os.walk(tmpdir):
+      for i in files:
+        p = os.path.join(root, i)
+        name = p[len(tmpdir)+1:]
+        with open(p, 'rb') as f:
+          outputs[name] = f.read()
+    return summary, outputs
 
   def task_query(self, task_id):
     """Query a task result without waiting for it to complete."""
@@ -207,11 +198,6 @@ class SwarmingClient(object):
     if not task_id:
       return 1
     return self._run('collect', ['--timeout', str(TIMEOUT_SECS), task_id])
-
-  def cleanup(self):
-    if self._tmpdir:
-      file_path.rmtree(self._tmpdir)
-      self._tmpdir = None
 
   def query_bot(self):
     """Returns the bot's properties."""
@@ -302,6 +288,7 @@ class Test(unittest.TestCase):
   client = None
   servers = None
   bot = None
+  leak = False
 
   def setUp(self):
     super(Test, self).setUp()
@@ -406,7 +393,7 @@ class Test(unittest.TestCase):
     self.assertOneTask(args, summary, {})
 
   def test_success_fails(self):
-    def get_hello_world(exit_code=0):
+    def get_cmd(exit_code=0):
       return [
         'python', '-u', '-c',
         'import sys; print(\'hi\'); sys.exit(%d)' % exit_code,
@@ -414,11 +401,11 @@ class Test(unittest.TestCase):
     # tuple(task_request, expectation)
     tasks = [
       (
-        ['-T', 'simple_success', '--'] + get_hello_world(),
+        ['-T', 'simple_success', '--'] + get_cmd(),
         (self.gen_expected(name=u'simple_success'), {}),
       ),
       (
-        ['-T', 'simple_failure', '--'] + get_hello_world(1),
+        ['-T', 'simple_failure', '--'] + get_cmd(1),
         (
           self.gen_expected(
               name=u'simple_failure', exit_codes=[1], failure=True),
@@ -426,7 +413,7 @@ class Test(unittest.TestCase):
         ),
       ),
       (
-        ['-T', 'ending_simple_success', '--'] + get_hello_world(),
+        ['-T', 'ending_simple_success', '--'] + get_cmd(),
         (self.gen_expected(name=u'ending_simple_success'), {}),
       ),
     ]
@@ -649,6 +636,9 @@ class Test(unittest.TestCase):
     )
     task_id = self._run_isolated(
         hello_world, 'idempotent_reuse', ['--idempotent'], expected_summary, {})
+
+    # The task name changes, there's a bit less data but the rest is the same.
+    expected_summary[u'name'] = u'idempotent_reuse2'
     expected_summary[u'costs_usd'] = None
     expected_summary.pop('performance_stats')
     expected_summary[u'cost_saved_usd'] = 0.02
@@ -656,8 +646,8 @@ class Test(unittest.TestCase):
     expected_summary[u'try_number'] = 0
     expected_summary[u'properties_hash'] = None
     self._run_isolated(
-        hello_world, 'idempotent_reuse', ['--idempotent'], expected_summary, {},
-        deduped=True)
+        hello_world, 'idempotent_reuse2', ['--idempotent'], expected_summary,
+        {}, deduped=True)
 
   def test_secret_bytes(self):
     hello_world = textwrap.dedent("""
@@ -694,16 +684,13 @@ class Test(unittest.TestCase):
       },
       outputs_ref=RESULT_SECRET_OUTPUT,
     )
-    h, tmp = tempfile.mkstemp(prefix='swarming_smoke_test_secret')
-    os.write(h, 'foobar')
-    os.close(h)
-    try:
-      self._run_isolated(
-          hello_world, 'secret_bytes',
-          ['--secret-bytes-path', tmp, '--', '${ISOLATED_OUTDIR}'],
-          expected_summary, {os.path.join('0', 'sekret'): 'foobar\n'})
-    finally:
-      os.remove(tmp)
+    tmp = os.path.join(self.tmpdir, 'test_secret_bytes')
+    with open(tmp, 'wb') as f:
+      f.write('foobar')
+    self._run_isolated(
+        hello_world, 'secret_bytes',
+        ['--secret-bytes-path', tmp, '--', '${ISOLATED_OUTDIR}'],
+        expected_summary, {os.path.join('0', 'sekret'): 'foobar\n'})
 
   def test_local_cache(self):
     # First task creates the cache, second copy the content to the output
@@ -796,8 +783,8 @@ class Test(unittest.TestCase):
     # created with priorities that are out of order. Then it unblocks the bot
     # and asserts the tasks are run in the expected order, based on priority and
     # created_ts.
-    h, tmp = tempfile.mkstemp(prefix='swarming_smoke_test')
-    os.close(h)
+    signal_file = os.path.join(self.tmpdir, 'test_priority')
+    open(signal_file, 'wb').close()
 
     # List of tuple(task_name, priority, task_id).
     tasks = []
@@ -809,7 +796,7 @@ class Test(unittest.TestCase):
         # Cheezy wait.
         ('import os,time;'
          '[time.sleep(0.1) for _ in xrange(100000) if os.path.exists(\'%s\')];'
-        'print(\'hi\')') % tmp,
+        'print(\'hi\')') % signal_file,
       ]
       wait_task_id = self.client.task_trigger_raw(args)
       # Assert that the 'wait' task has started but not completed, otherwise
@@ -848,7 +835,7 @@ class Test(unittest.TestCase):
       self.assertEqual(u'PENDING', stats[u'state'], stats)
     finally:
       # Unblock the wait_task_id on the bot.
-      os.remove(tmp)
+      os.remove(signal_file)
 
     # Ensure the initial wait task is completed. This will cause all the pending
     # tasks to be run. Now, will they be run in the expected order? That is the
@@ -878,28 +865,29 @@ class Test(unittest.TestCase):
     expected = ['2-p6', '3-p7', '1-p8', '4-p8', '0-p9']
     self.assertEqual(expected, [r[0] for r in results])
 
-  def _run_isolated(self, hello_world, name, args, expected_summary,
+  def _run_isolated(self, content, name, args, expected_summary,
       expected_files, deduped=False, isolated_content=None):
-    """Runs hello_world.py as an isolated file."""
+    """Runs a python script as an isolated file."""
     # Shared code for all test_isolated_* test cases.
-    tmpdir = tempfile.mkdtemp(prefix='swarming_smoke')
-    try:
-      isolate_path = os.path.join(tmpdir, 'i.isolate')
-      isolated_path = os.path.join(tmpdir, 'i.isolated')
-      with open(isolate_path, 'wb') as f:
-        json.dump(isolated_content or ISOLATE_HELLO_WORLD, f)
-      with open(os.path.join(tmpdir, 'hello_world.py'), 'wb') as f:
-        f.write(hello_world)
-      isolated_hash = self.client.isolate(isolate_path, isolated_path)
-      task_id = self.client.task_trigger_isolated(
-          name, isolated_hash, extra=args)
-      actual_summary, actual_files = self.client.task_collect(task_id)
-      self.assertResults(expected_summary, actual_summary, deduped=deduped)
-      actual_files.pop('summary.json')
-      self.assertEqual(expected_files, actual_files)
-      return task_id
-    finally:
-      file_path.rmtree(tmpdir)
+    root = os.path.join(self.tmpdir, name)
+    # Refuse reusing the same task name twice, it makes the whole test suite
+    # more manageable.
+    self.assertFalse(os.path.isdir(root), root)
+    os.mkdir(root)
+    isolate_path = os.path.join(root, 'i.isolate')
+    isolated_path = os.path.join(root, 'i.isolated')
+    with open(isolate_path, 'wb') as f:
+      json.dump(isolated_content or ISOLATE_HELLO_WORLD, f)
+    with open(os.path.join(root, 'hello_world.py'), 'wb') as f:
+      f.write(content)
+    isolated_hash = self.client.isolate(isolate_path, isolated_path)
+    task_id = self.client.task_trigger_isolated(
+        name, isolated_hash, extra=args)
+    actual_summary, actual_files = self.client.task_collect(task_id)
+    self.assertResults(expected_summary, actual_summary, deduped=deduped)
+    actual_files.pop('summary.json')
+    self.assertEqual(expected_files, actual_files)
+    return task_id
 
   def assertResults(self, expected, result, deduped=False):
     self.assertEqual([u'shards'], result.keys())
@@ -969,34 +957,31 @@ class Test(unittest.TestCase):
     return bot_version
 
 
-def cleanup(bot, client, servers, print_all, leak):
+def cleanup(bot, client, servers, print_all):
   """Kills bot, kills server, print logs if failed, delete tmpdir."""
   try:
-    try:
-      try:
-        if bot:
-          bot.stop(leak)
-      finally:
-        if servers:
-          servers.stop(leak)
-    finally:
-      if print_all:
-        if bot:
-          bot.dump_log()
-        if servers:
-          servers.dump_log()
-        if client:
-          client.dump_log()
+    if bot:
+      bot.stop()
   finally:
-    if client and not leak:
-      client.cleanup()
+    if servers:
+      servers.stop()
+  if print_all:
+    if bot:
+      bot.dump_log()
+    if servers:
+      servers.dump_log()
+    if client:
+      client.dump_log()
+  if not Test.leak:
+    shutil.rmtree(Test.tmpdir)
 
 
 def main():
   fix_encoding.fix_encoding()
   verbose = '-v' in sys.argv
-  leak = bool('--leak' in sys.argv)
-  if leak:
+  Test.leak = bool('--leak' in sys.argv)
+  Test.tmpdir = tempfile.mkdtemp(prefix='local_smoke_test')
+  if Test.leak:
     # Note that --leak will not guarantee that 'c' and 'isolated_cache' are
     # kept. Only the last test case will leak these two directories.
     sys.argv.remove('--leak')
@@ -1024,13 +1009,15 @@ def main():
   servers = None
   failed = True
   try:
-    servers = start_servers.LocalServers(False)
+    servers = start_servers.LocalServers(False, Test.tmpdir)
     servers.start()
-    bot = start_bot.LocalBot(servers.swarming_server.url)
+    botdir = os.path.join(Test.tmpdir, 'bot')
+    os.mkdir(botdir)
+    bot = start_bot.LocalBot(servers.swarming_server.url, True, botdir)
     Test.bot = bot
     bot.start()
     client = SwarmingClient(
-        servers.swarming_server.url, servers.isolate_server.url)
+        servers.swarming_server.url, servers.isolate_server.url, Test.tmpdir)
     # Test cases only interract with the client; except for test_update_continue
     # which mutates the bot.
     Test.client = client
@@ -1056,7 +1043,7 @@ def main():
       bot.kill()
       bot.wait()
   finally:
-    cleanup(bot, client, servers, failed or verbose, leak)
+    cleanup(bot, client, servers, failed or verbose)
   return int(failed)
 
 

@@ -9,9 +9,11 @@ It launches app via dev_appserver and queries a bunch of cloud endpoints
 methods.
 """
 
-import unittest
 import os
+import shutil
 import sys
+import tempfile
+import unittest
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_APP_DIR = os.path.join(THIS_DIR, 'test_endpoints_app')
@@ -27,13 +29,15 @@ from tool_support import local_app
 class CloudEndpointsSmokeTest(unittest.TestCase):
   def setUp(self):
     super(CloudEndpointsSmokeTest, self).setUp()
-    self.app = local_app.LocalApplication(TEST_APP_DIR, 9700)
+    self.root = tempfile.mkdtemp(prefix='endpoints_smoke_test')
+    self.app = local_app.LocalApplication(TEST_APP_DIR, 9700, False, self.root)
     self.app.start()
     self.app.ensure_serving()
 
   def tearDown(self):
     try:
       self.app.stop()
+      shutil.rmtree(self.root)
       if self.has_failed():
         self.app.dump_log()
     finally:

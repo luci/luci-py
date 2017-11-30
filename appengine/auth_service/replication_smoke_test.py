@@ -13,7 +13,9 @@ import base64
 import hashlib
 import logging
 import os
+import shutil
 import sys
+import tempfile
 import time
 import unittest
 import zlib
@@ -30,8 +32,11 @@ REPLICA_APP_DIR = os.path.join(APP_DIR, 'test_replica_app')
 class ReplicationTest(unittest.TestCase):
   def setUp(self):
     super(ReplicationTest, self).setUp()
-    self.auth_service = local_app.LocalApplication(APP_DIR, 9500)
-    self.replica = local_app.LocalApplication(REPLICA_APP_DIR, 9600)
+    self.root = tempfile.mkdtemp(prefix='replication_smoke_test')
+    self.auth_service = local_app.LocalApplication(
+        APP_DIR, 9500, False, self.root)
+    self.replica = local_app.LocalApplication(
+        REPLICA_APP_DIR, 9600, False, self.root)
     # Launch both first, only then wait for them to come online.
     apps = [self.auth_service, self.replica]
     for app in apps:
@@ -44,6 +49,7 @@ class ReplicationTest(unittest.TestCase):
     try:
       self.auth_service.stop()
       self.replica.stop()
+      shutil.rmtree(self.root)
       if self.has_failed() or self.maxDiff is None:
         self.auth_service.dump_log()
         self.replica.dump_log()

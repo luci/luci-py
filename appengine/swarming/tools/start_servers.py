@@ -28,10 +28,11 @@ from tool_support import local_app
 
 class LocalServers(object):
   """Local Swarming and Isolate servers."""
-  def __init__(self, listen_all):
+  def __init__(self, listen_all, root):
     self._isolate_server = None
     self._swarming_server = None
     self._listen_all = listen_all
+    self._root = root
 
   @property
   def isolate_server(self):
@@ -49,13 +50,14 @@ class LocalServers(object):
   def start(self):
     """Starts both the Swarming and Isolate servers."""
     self._swarming_server = local_app.LocalApplication(
-        APP_DIR, 9050, self._listen_all)
+        APP_DIR, 9050, self._listen_all, self._root)
     self._swarming_server.start()
 
     # We wait for the Swarming server to be started up so the isolate server
     # ports do not clash.
     self._isolate_server = local_app.LocalApplication(
-        os.path.join(APP_DIR, '..', 'isolate'), 10050, self._listen_all)
+        os.path.join(APP_DIR, '..', 'isolate'), 10050, self._listen_all,
+        self._root)
     self._isolate_server.start()
     self._swarming_server.ensure_serving()
     self._isolate_server.ensure_serving()
@@ -64,7 +66,7 @@ class LocalServers(object):
     self.http_client.url_opener.addheaders.append(
         ('X-XSRF-Token', self._swarming_server.client.xsrf_token))
 
-  def stop(self, leak):
+  def stop(self):
     """Stops the local Swarming and Isolate servers.
 
     Returns the exit code with priority to non-zero.
@@ -72,10 +74,10 @@ class LocalServers(object):
     exit_code = None
     try:
       if self._isolate_server:
-        exit_code = exit_code or self._isolate_server.stop(leak)
+        exit_code = exit_code or self._isolate_server.stop()
     finally:
       if self._swarming_server:
-        exit_code = exit_code or self._swarming_server.stop(leak)
+        exit_code = exit_code or self._swarming_server.stop()
     return exit_code
 
   def wait(self):
@@ -97,20 +99,24 @@ def main():
   parser = argparse.ArgumentParser(description=sys.modules[__name__].__doc__)
   parser.add_argument('-a', '--all', action='store_true')
   args = parser.parse_args()
-  servers = LocalServers(args.all)
-  dump_log = True
+  root = tempfile.mkdtemp(prefix='start_servers')
   try:
-    servers.start()
-    print('Swarming: %s' % servers.swarming_server.url)
-    print('Isolate : %s' % servers.isolate_server.url)
-    servers.wait()
-  except KeyboardInterrupt:
-    print >> sys.stderr, '<Ctrl-C> received; stopping servers'
-    dump_log = False
+    servers = LocalServers(args.all, root)
+    dump_log = True
+    try:
+      servers.start()
+      print('Swarming: %s' % servers.swarming_server.url)
+      print('Isolate : %s' % servers.isolate_server.url)
+      servers.wait()
+    except KeyboardInterrupt:
+      print >> sys.stderr, '<Ctrl-C> received; stopping servers'
+      dump_log = False
+    finally:
+      exit_code = servers.stop()
+      if dump_log:
+        servers.dump_log()
   finally:
-    exit_code = servers.stop(False)
-    if dump_log:
-      servers.dump_log()
+    shutil.rmtree(root)
   return exit_code
 
 
