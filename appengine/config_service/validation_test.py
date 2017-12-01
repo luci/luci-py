@@ -425,7 +425,7 @@ class ValidationTestCase(test_case.TestCase):
     net.json_request_async.return_value.set_result({
       'messages': [{
         'text': 'error',
-        'severity': 'ERROR'
+        'severity': 'ERROR',
       }]
     })
 
@@ -433,7 +433,25 @@ class ValidationTestCase(test_case.TestCase):
     self.assertEqual(
         result.messages,
         [
-          validation_context.Message(text='error', severity=logging.ERROR)
+          validation_context.Message(text='error', severity=logging.ERROR),
+        ])
+
+    ############################################################################
+    # Validation messages from Go applications with integer severities
+
+    net.json_request_async.return_value = ndb.Future()
+    net.json_request_async.return_value.set_result({
+      'messages': [{
+        'text': 'warn',
+        'severity': logging.WARNING,
+      }]
+    })
+
+    result = validation.validate_config('projects/baz/refs/x', 'qux.cfg', cfg)
+    self.assertEqual(
+        result.messages,
+        [
+          validation_context.Message(text='warn', severity=logging.WARNING),
         ])
 
     ############################################################################
@@ -443,7 +461,7 @@ class ValidationTestCase(test_case.TestCase):
       'messages': [
         {'severity': 'invalid severity'},
         {},
-        []
+        [],
       ]
     }
     net.json_request_async.return_value = ndb.Future()

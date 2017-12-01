@@ -131,7 +131,7 @@ def validate_identity(identity, ctx):
 def validate_email(email, ctx):
   try:
     auth.Identity('user', email)
-  except ValueError as ex:
+  except ValueError:
     ctx.error('invalid email: "%s"', email)
 
 
@@ -345,10 +345,15 @@ def _validate_by_service_async(service, config_set, path, content, ctx):
         report_error('invalid response: message is not a dict: %r' % msg)
         continue
       severity = msg.get('severity') or 'INFO'
+      # validation library for Go services sends severity as an integer
+      # corresponding to Python's logging severity level.
+      if severity in (logging.DEBUG, logging.INFO, logging.WARNING,
+                      logging.ERROR, logging.CRITICAL):
+        severity = logging.getLevelName(severity)
       if (severity not in
           service_config_pb2.ValidationResponseMessage.Severity.keys()):
         report_error(
-            'invalid response: unexpected message severity: %s' % severity)
+            'invalid response: unexpected message severity: %r' % severity)
         continue
       # It is safe because we've validated |severity|.
       func = getattr(ctx, severity.lower())
