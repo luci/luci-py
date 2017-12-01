@@ -635,6 +635,19 @@ class BotPollHandler(_BotBaseHandler):
       self._cmd_host_reboot(restart_message)
       return
 
+    # If a bot advertise itself with a key state 'maintenance', do not give
+    # a task to it until this key is removed.
+    #
+    # It's an 'hack' because this is not listed in the DB as a separate state,
+    # which hinders system monitoring. See bot_management.BotInfo. In practice,
+    # ts_mon_metrics.py can look a BotInfo.get('maintenance') to determine if a
+    # bot is in maintenance or idle.
+    if res.state.get('maintenance'):
+      bot_event('request_sleep')
+      # Tell the bot it's considered quarantined.
+      self._cmd_sleep(sleep_streak, True)
+      return
+
     # The bot is in good shape. Try to grab a task.
     try:
       # This is a fairly complex function call, exceptions are expected.
