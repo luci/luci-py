@@ -594,10 +594,12 @@ class Application(object):
     # Sort by version number (best effort, nonconforming version names will
     # appear first in the list).
     def extract_version_num(version):
+      parts = version.split('-', 1)
       try:
-        return int(version.split('-', 1)[0])
+        parts[0] = int(parts[0])
       except ValueError:
-        return -1
+        pass
+      return tuple(parts)
     return sorted(actual_versions, key=extract_version_num)
 
   def get_actives(self, modules=None):
