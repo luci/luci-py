@@ -107,23 +107,24 @@ class TestOsUtilities(auto_stub.TestCase):
     actual = set(dimensions)
     # Only set when the process is running in a properly configured GUI context.
     actual.discard(u'locale')
-    # Only set on GCE.
-    actual.discard(u'image')
+    # Only set on machines with SSD.
+    actual.discard(u'ssd')
+    # There are cases where this dimension is not set.
     actual.discard(u'machine_type')
-    actual.discard(u'zone')
-    # Only set on Mac.
-    actual.discard(u'hidpi')
-    # Only set on Windows.
-    actual.discard(u'integrity')
-    # Only set on machines with SSD
-    if sys.platform in ('darwin', 'linux2'):
-      actual.discard(u'ssd')
+
     expected = {u'cores', u'cpu', u'gpu', u'id', u'os', u'pool', u'python'}
-    if sys.platform in ('linux2'):
-      actual.discard(u'kvm')
+    if platforms.is_gce():
+      expected.add(u'image')
+      expected.add(u'zone')
     if sys.platform == 'darwin':
+      expected.add(u'hidpi')
       expected.add(u'mac_model')
       expected.add(u'xcode_version')
+    if sys.platform == 'linux2':
+      expected.add(u'inside_docker')
+      expected.add(u'kvm')
+    if sys.platform == 'win32':
+      expected.add(u'integrity')
     self.assertEqual(expected, actual)
 
   def test_override_id_via_env(self):

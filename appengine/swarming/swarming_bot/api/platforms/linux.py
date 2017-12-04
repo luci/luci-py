@@ -231,6 +231,21 @@ def get_kvm():
   return os.path.exists('/dev/kvm')
 
 
+@tools.cached
+def get_inside_docker():
+  """Returns a strings representing if running inside docker, and which type.
+
+  Returns:
+    - None if not run in docker.
+    - u'stock' if running in standard docker.
+    - u'nvidia' if running in nvidia-docker.
+  """
+  if not os.path.isfile('/.docker_env'):
+    return None
+  # TODO(maruel): Detect nvidia-docker.
+  return u'stock'
+
+
 ## Mutating code.
 
 

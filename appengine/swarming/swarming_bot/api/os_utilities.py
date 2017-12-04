@@ -964,6 +964,12 @@ def get_dimensions():
     dimensions[u'ssd'] = [u'1']
 
   if sys.platform == 'linux2':
+    inside_docker = platforms.linux.get_inside_docker()
+    if not inside_docker:
+      dimensions[u'inside_docker'] = [u'0']
+    else:
+      dimensions[u'inside_docker'] = [u'1', inside_docker]
+
     dimensions[u'kvm'] = [unicode(int(platforms.linux.get_kvm()))]
 
   if sys.platform == 'darwin':
