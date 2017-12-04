@@ -1037,6 +1037,7 @@ def _run_bot_inner(arg_error, quit_bit):
   last_action = time.time()
   while not quit_bit.is_set():
     try:
+      _call_hook_safe(False, botobj, 'on_before_poll')
       dims = _get_dimensions(botobj)
       states = _get_state(botobj, consecutive_sleeps)
       with botobj._lock:
@@ -1108,6 +1109,7 @@ def _poll_server(botobj, quit_bit, last_action):
   Returns True if executed some action, False if server asked the bot to sleep.
   """
   start = time.time()
+  cmd = None
   try:
     cmd, value = botobj.remote.poll(botobj._attributes)
   except remote_client_errors.PollError as e:
@@ -1116,6 +1118,9 @@ def _poll_server(botobj, quit_bit, last_action):
     logging.warning('Poll failed (%s), sleeping %.1f sec', e, delay)
     quit_bit.wait(delay)
     return False
+  finally:
+    _call_hook_safe(False, botobj, 'on_after_poll', cmd)
+
   logging.debug('Server response:\n%s: %s', cmd, value)
 
   if cmd == 'sleep':

@@ -220,6 +220,29 @@ def on_handshake(bot):
   pass
 
 
+def on_before_poll(bot):
+  """Hook function called before polling the server for an action.
+
+  This function is guaranteed to be called before fetching the dimensions and
+  state of the bot.
+
+  Arguments:
+  - bot: bot.Bot instance. See ../api/bot.py.
+  """
+  pass
+
+
+def on_after_poll(bot, cmd):
+  """Hook function called immediately after polling the server for an action.
+
+  Arguments:
+  - bot: bot.Bot instance. See ../api/bot.py.
+  - cmd: The action that the server asked the bot to perform (e.g. "sleep",
+         "terminate", "run").
+  """
+  pass
+
+
 def on_before_task(bot, bot_file, runner_cmd, runner_env):
   """Hook function called before running a task.
 
