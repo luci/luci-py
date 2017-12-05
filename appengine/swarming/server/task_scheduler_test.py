@@ -1416,7 +1416,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       scheduling_users=None,
       scheduling_groups=None,
       trusted_delegatees=None,
-      service_accounts=None):
+      service_accounts=None,
+      service_accounts_groups=None):
     def mocked_get_pool_config(pool):
       if pool == name:
         return pools_config.PoolConfig(
@@ -1428,7 +1429,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
               peer: pools_config.TrustedDelegatee(peer, frozenset(tags))
               for peer, tags in (trusted_delegatees or {}).iteritems()
             },
-            service_accounts=frozenset(service_accounts or []))
+            service_accounts=frozenset(service_accounts or []),
+            service_accounts_groups=tuple(service_accounts_groups or []))
       return None
     self.mock(pools_config, 'get_pool_config', mocked_get_pool_config)
 
@@ -1511,11 +1513,25 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         properties={'dimensions': {u'pool': u'some-pool'}},
         service_account='good@example.com')
 
+  def test_check_schedule_request_acl_v2_good_service_acc_through_group(self):
+    def mocked_is_group_member(group, ident):
+      return group == 'accounts' and ident.to_bytes() == 'user:good@example.com'
+    self.mock(auth, 'is_group_member', mocked_is_group_member)
+
+    self.mock_pool_config(
+        'some-pool',
+        scheduling_users=[auth_testing.DEFAULT_MOCKED_IDENTITY],
+        service_accounts_groups=['accounts'])
+    self.check_schedule_request_acl_v2(
+        properties={'dimensions': {u'pool': u'some-pool'}},
+        service_account='good@example.com')
+
   def test_check_schedule_request_acl_v2_bad_service_acc(self):
     self.mock_pool_config(
         'some-pool',
         scheduling_users=[auth_testing.DEFAULT_MOCKED_IDENTITY],
-        service_accounts=['good@example.com'])
+        service_accounts=['good@example.com'],
+        service_accounts_groups=['accounts'])
     with self.assertRaises(auth.AuthorizationError) as ctx:
       self.check_schedule_request_acl_v2(
           properties={'dimensions': {u'pool': u'some-pool'}},

@@ -44,6 +44,10 @@ message Pool {
   // accounts of all tasks running in this pool (just by sitting there, grabbing
   // tasks and sniffing service account tokens).
   repeated string allowed_service_account = 4;
+
+  // Same as 'allowed_service_account', but the set of service accounts is
+  // specified through an auth group.
+  repeated string allowed_service_account_group = 5;
 }
 
 

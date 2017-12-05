@@ -39,6 +39,10 @@ TEST_CONFIG = pools_pb2.PoolsCfg(pool=[
       'a1@example.com',
       'a2@example.com',
     ],
+    allowed_service_account_group=[
+      'accounts_group1',
+      'accounts_group2',
+    ],
   ),
 ])
 
@@ -81,6 +85,7 @@ class PoolsConfigTest(test_case.TestCase):
               ),
           },
           service_accounts=frozenset([u'a2@example.com', u'a1@example.com']),
+          service_accounts_groups=(u'accounts_group1', u'accounts_group2'),
       ),
       pools_config.get_pool_config('pool_name'))
 
@@ -193,6 +198,15 @@ class PoolsConfigTest(test_case.TestCase):
     )])
     self.validator_test(cfg, [
       'pool #0 (abc): bad allowed_service_account #0 "not an email"',
+    ])
+
+  def test_bad_service_account_group(self):
+    cfg = pools_pb2.PoolsCfg(pool=[pools_pb2.Pool(
+      name='abc',
+      allowed_service_account_group=['!!!'],
+    )])
+    self.validator_test(cfg, [
+      'pool #0 (abc): bad allowed_service_account_group #0 "!!!"',
     ])
 
 

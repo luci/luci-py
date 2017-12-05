@@ -35,8 +35,10 @@ PoolConfig = collections.namedtuple('PoolConfig', [
   'scheduling_groups',
   # Map {auth.Identity of a delegatee => TrustedDelegatee tuple}.
   'trusted_delegatees',
-  # Set of service account emails allowed in this pool.
+  # Set of service account emails allowed in this pool, specified explicitly.
   'service_accounts',
+  # Additional list of groups with allowed service accounts.
+  'service_accounts_groups',
 ])
 
 
@@ -97,7 +99,8 @@ def _fetch_pools_config():
               required_delegation_tags=frozenset(d.require_any_of.tag))
           for d in msg.schedulers.trusted_delegation
         },
-        service_accounts=frozenset(msg.allowed_service_account))
+        service_accounts=frozenset(msg.allowed_service_account),
+        service_accounts_groups=tuple(msg.allowed_service_account_group))
   return pools
 
 
@@ -146,3 +149,8 @@ def _validate_pools_cfg(cfg, ctx):
       for i, account in enumerate(msg.allowed_service_account):
         if not service_accounts.is_service_account(account):
           ctx.error('bad allowed_service_account #%d "%s"', i, account)
+
+      # Validate service account groups.
+      for i, group in enumerate(msg.allowed_service_account_group):
+        if not auth.is_valid_group_name(group):
+          ctx.error('bad allowed_service_account_group #%d "%s"', i, group)

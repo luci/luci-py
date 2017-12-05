@@ -479,7 +479,7 @@ def _check_schedule_request_acl_v2(request):
 
   # Verify the requested task service account is allowed in this pool.
   if (has_service_account and
-      request.service_account not in pool_cfg.service_accounts):
+      not _is_allowed_service_account(request.service_account, pool_cfg)):
     raise auth.AuthorizationError(
         'Service account "%s" is not allowed in the pool "%s", see pools.cfg' %
         (request.service_account, pool))
@@ -538,6 +538,25 @@ def _is_allowed_to_schedule(pool_cfg):
       'Expecting any of %s tags, got %s, forbidding the call',
       sorted(map(str, trusted_delegatee.required_delegation_tags)),
       sorted(map(str, token_tags)))
+  return False
+
+
+def _is_allowed_service_account(service_account, pool_cfg):
+  """True if given service account email is permitted to be used in the pool."""
+  if service_account in pool_cfg.service_accounts:
+    logging.info(
+        'Service account "%s" is allowed in the pool "%s" by being listed '
+        'explicitly in pools.cfg', service_account, pool_cfg.name)
+    return True
+
+  ident = auth.Identity(auth.IDENTITY_USER, service_account)
+  for group in pool_cfg.service_accounts_groups:
+    if auth.is_group_member(group, ident):
+      logging.info(
+          'Service account "%s" is allowed in the pool "%s" by being listed '
+          'through group "%s"', service_account, pool_cfg.name, group)
+      return True
+
   return False
 
 
