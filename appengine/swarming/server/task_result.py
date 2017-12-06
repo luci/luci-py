@@ -649,24 +649,6 @@ class _TaskResultCommon(ndb.Model):
     out = yield TaskOutput.get_output_async(output_key, self.stdout_chunks)
     raise ndb.Return(out)
 
-  def validate(self, request):
-    """Validation that requires the task_request.
-
-    Full validation includes calling this method, and the checks in
-    _pre_put_hook.
-
-    Raises ValueError if this is invalid, otherwise returns None.
-    """
-    props = request.properties
-
-    if props.cipd_input and self.cipd_pins:
-      with cipd.pin_check_fn(None, None) as check:
-        check(props.cipd_input.client_package, self.cipd_pins.client_package)
-        if len(props.cipd_input.packages) != len(self.cipd_pins.packages):
-          raise ValueError('Mismatched package lengths')
-        for a, b in zip(props.cipd_input.packages, self.cipd_pins.packages):
-          check(a, b)
-
   def _pre_put_hook(self):
     """Use extra validation that cannot be validated throught 'validator'."""
     super(_TaskResultCommon, self)._pre_put_hook()

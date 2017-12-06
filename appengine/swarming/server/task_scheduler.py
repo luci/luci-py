@@ -876,7 +876,6 @@ def bot_update_task(
         run_result.completed_ts = now
 
     run_result.signal_server_version(server_version)
-    run_result.validate(request)
     to_put = [run_result]
     if output:
       # This does 1 multi GETs. This also modifies run_result in place.
@@ -900,7 +899,6 @@ def bot_update_task(
     else:
       result_summary.set_from_run_result(run_result, request)
 
-    result_summary.validate(request)
     to_put.append(result_summary)
     ndb.put_multi(to_put)
 
