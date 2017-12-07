@@ -22,7 +22,7 @@ from server import pools_config
 
 TEST_CONFIG = pools_pb2.PoolsCfg(pool=[
   pools_pb2.Pool(
-    name='pool_name',
+    name=['pool_name', 'another_name'],
     schedulers=pools_pb2.Schedulers(
       user=['user:a@example.com', 'b@example.com'],
       group=['group1', 'group2'],
@@ -68,26 +68,28 @@ class PoolsConfigTest(test_case.TestCase):
   def test_get_pool_config(self):
     self.mock_config(TEST_CONFIG)
     self.assertEqual(None, pools_config.get_pool_config('unknown'))
-    self.assertEqual(
-      pools_config.PoolConfig(
-          name=u'pool_name',
-          rev='rev',
-          scheduling_users=frozenset([
-            auth.Identity('user', 'b@example.com'),
-            auth.Identity('user', 'a@example.com'),
-          ]),
-          scheduling_groups=frozenset([u'group2', u'group1']),
-          trusted_delegatees={
-            auth.Identity('user', 'delegatee@example.com'):
-              pools_config.TrustedDelegatee(
-                peer_id=auth.Identity('user', 'delegatee@example.com'),
-                required_delegation_tags=frozenset([u'k:tag1', u'k:tag2']),
-              ),
-          },
-          service_accounts=frozenset([u'a2@example.com', u'a1@example.com']),
-          service_accounts_groups=(u'accounts_group1', u'accounts_group2'),
-      ),
-      pools_config.get_pool_config('pool_name'))
+
+    expected1 = pools_config.PoolConfig(
+        name=u'pool_name',
+        rev='rev',
+        scheduling_users=frozenset([
+          auth.Identity('user', 'b@example.com'),
+          auth.Identity('user', 'a@example.com'),
+        ]),
+        scheduling_groups=frozenset([u'group2', u'group1']),
+        trusted_delegatees={
+          auth.Identity('user', 'delegatee@example.com'):
+            pools_config.TrustedDelegatee(
+              peer_id=auth.Identity('user', 'delegatee@example.com'),
+              required_delegation_tags=frozenset([u'k:tag1', u'k:tag2']),
+            ),
+        },
+        service_accounts=frozenset([u'a2@example.com', u'a1@example.com']),
+        service_accounts_groups=(u'accounts_group1', u'accounts_group2'))
+    expected2 = expected1._replace(name='another_name')
+
+    self.assertEqual(expected1, pools_config.get_pool_config('pool_name'))
+    self.assertEqual(expected2, pools_config.get_pool_config('another_name'))
 
   def test_empty_config_is_valid(self):
     self.validator_test(pools_pb2.PoolsCfg(), [])
@@ -98,20 +100,20 @@ class PoolsConfigTest(test_case.TestCase):
   def test_missing_pool_name(self):
     cfg = pools_pb2.PoolsCfg(pool=[pools_pb2.Pool()])
     self.validator_test(cfg, [
-      'pool #0 (unnamed): missing name',
+      'pool #0 (unnamed): at least one pool name must be given',
     ])
 
   def test_bad_pool_name(self):
     n = 'x'*300
-    cfg = pools_pb2.PoolsCfg(pool=[pools_pb2.Pool(name=n)])
+    cfg = pools_pb2.PoolsCfg(pool=[pools_pb2.Pool(name=[n])])
     self.validator_test(cfg, [
-      'pool #0 (%s): bad name "%s", not a valid dimension value' % (n, n),
+      'pool #0 (%s): bad pool name "%s", not a valid dimension value' % (n, n),
     ])
 
   def test_duplicate_pool_name(self):
     cfg = pools_pb2.PoolsCfg(pool=[
-      pools_pb2.Pool(name='abc'),
-      pools_pb2.Pool(name='abc'),
+      pools_pb2.Pool(name=['abc']),
+      pools_pb2.Pool(name=['abc']),
     ])
     self.validator_test(cfg, [
       'pool #1 (abc): pool "abc" was already declared',
@@ -119,7 +121,7 @@ class PoolsConfigTest(test_case.TestCase):
 
   def test_bad_scheduling_user(self):
     cfg = pools_pb2.PoolsCfg(pool=[
-      pools_pb2.Pool(name='abc', schedulers=pools_pb2.Schedulers(
+      pools_pb2.Pool(name=['abc'], schedulers=pools_pb2.Schedulers(
         user=['not valid email'],
       )),
     ])
@@ -130,7 +132,7 @@ class PoolsConfigTest(test_case.TestCase):
 
   def test_bad_scheduling_group(self):
     cfg = pools_pb2.PoolsCfg(pool=[
-      pools_pb2.Pool(name='abc', schedulers=pools_pb2.Schedulers(
+      pools_pb2.Pool(name=['abc'], schedulers=pools_pb2.Schedulers(
         group=['!!!'],
       )),
     ])
@@ -140,7 +142,7 @@ class PoolsConfigTest(test_case.TestCase):
 
   def test_no_delegatee_peer_id(self):
     cfg = pools_pb2.PoolsCfg(pool=[
-      pools_pb2.Pool(name='abc', schedulers=pools_pb2.Schedulers(
+      pools_pb2.Pool(name=['abc'], schedulers=pools_pb2.Schedulers(
         trusted_delegation=[pools_pb2.TrustedDelegation()],
       )),
     ])
@@ -150,7 +152,7 @@ class PoolsConfigTest(test_case.TestCase):
 
   def test_bad_delegatee_peer_id(self):
     cfg = pools_pb2.PoolsCfg(pool=[
-      pools_pb2.Pool(name='abc', schedulers=pools_pb2.Schedulers(
+      pools_pb2.Pool(name=['abc'], schedulers=pools_pb2.Schedulers(
         trusted_delegation=[pools_pb2.TrustedDelegation(
           peer_id='not valid email',
         )],
@@ -163,7 +165,7 @@ class PoolsConfigTest(test_case.TestCase):
 
   def test_duplicate_delegatee_peer_id(self):
     cfg = pools_pb2.PoolsCfg(pool=[
-      pools_pb2.Pool(name='abc', schedulers=pools_pb2.Schedulers(
+      pools_pb2.Pool(name=['abc'], schedulers=pools_pb2.Schedulers(
         trusted_delegation=[
           pools_pb2.TrustedDelegation(peer_id='a@example.com'),
           pools_pb2.TrustedDelegation(peer_id='a@example.com'),
@@ -177,7 +179,7 @@ class PoolsConfigTest(test_case.TestCase):
 
   def test_bad_delegation_tag(self):
     cfg = pools_pb2.PoolsCfg(pool=[
-      pools_pb2.Pool(name='abc', schedulers=pools_pb2.Schedulers(
+      pools_pb2.Pool(name=['abc'], schedulers=pools_pb2.Schedulers(
         trusted_delegation=[pools_pb2.TrustedDelegation(
           peer_id='a@example.com',
           require_any_of=pools_pb2.TrustedDelegation.TagList(
@@ -193,7 +195,7 @@ class PoolsConfigTest(test_case.TestCase):
 
   def test_bad_service_account(self):
     cfg = pools_pb2.PoolsCfg(pool=[pools_pb2.Pool(
-      name='abc',
+      name=['abc'],
       allowed_service_account=['not an email'],
     )])
     self.validator_test(cfg, [
@@ -202,7 +204,7 @@ class PoolsConfigTest(test_case.TestCase):
 
   def test_bad_service_account_group(self):
     cfg = pools_pb2.PoolsCfg(pool=[pools_pb2.Pool(
-      name='abc',
+      name=['abc'],
       allowed_service_account_group=['!!!'],
     )])
     self.validator_test(cfg, [

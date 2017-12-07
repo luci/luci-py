@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='pools.proto',
   package='',
   syntax='proto2',
-  serialized_pb=_b('\n\x0bpools.proto\"\x1f\n\x08PoolsCfg\x12\x13\n\x04pool\x18\x01 \x03(\x0b\x32\x05.Pool\"\x8d\x01\n\x04Pool\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06owners\x18\x02 \x03(\t\x12\x1f\n\nschedulers\x18\x03 \x01(\x0b\x32\x0b.Schedulers\x12\x1f\n\x17\x61llowed_service_account\x18\x04 \x03(\t\x12%\n\x1d\x61llowed_service_account_group\x18\x05 \x03(\t\"Y\n\nSchedulers\x12\x0c\n\x04user\x18\x01 \x03(\t\x12\r\n\x05group\x18\x02 \x03(\t\x12.\n\x12trusted_delegation\x18\x03 \x03(\x0b\x32\x12.TrustedDelegation\"p\n\x11TrustedDelegation\x12\x0f\n\x07peer_id\x18\x01 \x01(\t\x12\x32\n\x0erequire_any_of\x18\x02 \x01(\x0b\x32\x1a.TrustedDelegation.TagList\x1a\x16\n\x07TagList\x12\x0b\n\x03tag\x18\x01 \x03(\t')
+  serialized_pb=_b('\n\x0bpools.proto\"\x1f\n\x08PoolsCfg\x12\x13\n\x04pool\x18\x01 \x03(\x0b\x32\x05.Pool\"\x8d\x01\n\x04Pool\x12\x0c\n\x04name\x18\x01 \x03(\t\x12\x0e\n\x06owners\x18\x02 \x03(\t\x12\x1f\n\nschedulers\x18\x03 \x01(\x0b\x32\x0b.Schedulers\x12\x1f\n\x17\x61llowed_service_account\x18\x04 \x03(\t\x12%\n\x1d\x61llowed_service_account_group\x18\x05 \x03(\t\"Y\n\nSchedulers\x12\x0c\n\x04user\x18\x01 \x03(\t\x12\r\n\x05group\x18\x02 \x03(\t\x12.\n\x12trusted_delegation\x18\x03 \x03(\x0b\x32\x12.TrustedDelegation\"p\n\x11TrustedDelegation\x12\x0f\n\x07peer_id\x18\x01 \x01(\t\x12\x32\n\x0erequire_any_of\x18\x02 \x01(\x0b\x32\x1a.TrustedDelegation.TagList\x1a\x16\n\x07TagList\x12\x0b\n\x03tag\x18\x01 \x03(\t')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -66,8 +66,8 @@ _POOL = _descriptor.Descriptor(
   fields=[
     _descriptor.FieldDescriptor(
       name='name', full_name='Pool.name', index=0,
-      number=1, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=_b("").decode('utf-8'),
+      number=1, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),

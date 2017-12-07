@@ -19,11 +19,15 @@ message PoolsCfg {
 }
 
 
-// Properties of a single pool, in particular authorization related information.
+// Properties of a single pool or a bunch of identically configured pools.
+//
+// In particular contains authorization confirmation.
 message Pool {
-  // Name of the pool. Tasks target the pool by specifying its name as 'pool'
-  // dimension, thus this name should be valid dimension value.
-  optional string name = 1;
+  // Names of the pools this config applies to.
+  //
+  // Tasks target the pool by specifying its name as 'pool' dimension, thus
+  // names here should be valid dimension value.
+  repeated string name = 1;
 
   // Contact information for people that own this pool.
   //

@@ -88,19 +88,20 @@ def _fetch_pools_config():
 
   pools = {}
   for msg in cfg.pool:
-    pools[msg.name] = PoolConfig(
-        name=msg.name,
-        rev=rev,
-        scheduling_users=frozenset(_to_ident(u) for u in msg.schedulers.user),
-        scheduling_groups=frozenset(msg.schedulers.group),
-        trusted_delegatees={
-          _to_ident(d.peer_id): TrustedDelegatee(
-              peer_id=_to_ident(d.peer_id),
-              required_delegation_tags=frozenset(d.require_any_of.tag))
-          for d in msg.schedulers.trusted_delegation
-        },
-        service_accounts=frozenset(msg.allowed_service_account),
-        service_accounts_groups=tuple(msg.allowed_service_account_group))
+    for name in msg.name:
+      pools[name] = PoolConfig(
+          name=name,
+          rev=rev,
+          scheduling_users=frozenset(_to_ident(u) for u in msg.schedulers.user),
+          scheduling_groups=frozenset(msg.schedulers.group),
+          trusted_delegatees={
+            _to_ident(d.peer_id): TrustedDelegatee(
+                peer_id=_to_ident(d.peer_id),
+                required_delegation_tags=frozenset(d.require_any_of.tag))
+            for d in msg.schedulers.trusted_delegation
+          },
+          service_accounts=frozenset(msg.allowed_service_account),
+          service_accounts_groups=tuple(msg.allowed_service_account_group))
   return pools
 
 
@@ -109,16 +110,17 @@ def _validate_pools_cfg(cfg, ctx):
   """Validates pools.cfg file."""
   pools = set()
   for i, msg in enumerate(cfg.pool):
-    with ctx.prefix('pool #%d (%s): ', i, msg.name or 'unnamed'):
-      # Validate name.
+    with ctx.prefix('pool #%d (%s): ', i, '|'.join(msg.name) or 'unnamed'):
+      # Validate names.
       if not msg.name:
-        ctx.error('missing name')
-      elif not local_config.validate_dimension_value(msg.name):
-        ctx.error('bad name "%s", not a valid dimension value', msg.name)
-      elif msg.name in pools:
-        ctx.error('pool "%s" was already declared', msg.name)
-      else:
-        pools.add(msg.name)
+        ctx.error('at least one pool name must be given')
+      for name in msg.name:
+        if not local_config.validate_dimension_value(name):
+          ctx.error('bad pool name "%s", not a valid dimension value', name)
+        elif name in pools:
+          ctx.error('pool "%s" was already declared', name)
+        else:
+          pools.add(name)
 
       # Validate schedulers.user.
       for u in msg.schedulers.user:
