@@ -51,6 +51,7 @@ def _gen_bot_info(key_id, last_seen_ts, **kwargs):
         'os': ['Linux', 'Ubuntu'],
         'bot_id': [key_id],
     },
+    'state': {},
   }
   args.update(**kwargs)
   args['dimensions_flat'] = bot_management.dimensions_to_flat(
@@ -189,11 +190,14 @@ class TestMetrics(test_case.TestCase):
     _gen_bot_info('bot_running', self.now, task_id='deadbeef').put()
     _gen_bot_info('bot_quarantined', self.now, quarantined=True).put()
     _gen_bot_info('bot_dead', self.now - datetime.timedelta(days=365)).put()
+    _gen_bot_info(
+        'bot_maintenance', self.now, state={'maintenance': True}).put()
     bots_expected = {
         'bot_ready': 'ready',
         'bot_running': 'running',
         'bot_quarantined': 'quarantined',
         'bot_dead': 'dead',
+        'bot_maintenance': 'maintenance'
     }
 
     ts_mon_metrics.set_global_metrics('jobs')
