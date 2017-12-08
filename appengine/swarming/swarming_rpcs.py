@@ -198,6 +198,9 @@ class TaskProperties(messages.Message):
   # Command to run. This has priority over a command specified in the isolated
   # files. Only one of 'command' or 'extra_args' can be specified.
   command = messages.StringField(1, repeated=True)
+  # Relative working directory to start the 'command' in, defaults to the root
+  # mapped directory or what is provided in the isolated file, if any.
+  relative_cwd = messages.StringField(15)
   # Dimensions are what is used to determine which bot can run the task. The
   # bot must have all the matching dimensions, even for repeated keys with
   # multiple different values. It is a logical AND, all values must match.

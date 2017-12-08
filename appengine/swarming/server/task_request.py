@@ -502,6 +502,10 @@ class TaskProperties(ndb.Model):
   # Command to run. This overrides the command in the isolated file if any.
   command = ndb.StringProperty(repeated=True, indexed=False)
 
+  # Relative working directory to run 'command' in, defaults to one specified
+  # in an isolated file, if any, else the root mapped directory.
+  relative_cwd = ndb.StringProperty(indexed=False)
+
   # Isolate server, namespace and input isolate hash.
   #
   # Despite its name, contains isolate server URL and namespace for isolated

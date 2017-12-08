@@ -721,6 +721,7 @@ class BotPollHandler(_BotBaseHandler):
           'server': request.properties.inputs_ref.isolatedserver,
         } if request.properties.inputs_ref else None,
         'outputs': request.properties.outputs,
+        'relative_cwd': request.properties.relative_cwd,
         'service_accounts': {
           'system': {
             # 'none', 'bot' or email. Bot interprets 'none' and 'bot' locally.

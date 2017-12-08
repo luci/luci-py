@@ -290,7 +290,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     # A bot polls, gets a task, updates it, completes it.
     params = self.do_handshake()
     # Enqueue a task.
-    _, task_id = self.client_create_task_raw()
+    _, task_id = self.client_create_task_raw(
+        properties={u'relative_cwd': u'de/ep'})
     self.assertEqual('0', task_id[-1])
     # Convert TaskResultSummary reference to TaskRunResult.
     task_id = task_id[:-1] + '1'
@@ -315,6 +316,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
           u'server': u'https://chrome-infra-packages.appspot.com',
         },
         u'command': [u'python', u'run_test.py'],
+        u'relative_cwd': u'de/ep',
         u'dimensions': {
           u'os': u'Amiga',
           u'pool': u'default',
@@ -389,6 +391,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
           u'server': u'https://chrome-infra-packages.appspot.com',
         },
         u'command': [u'python', u'run_test.py'],
+        u'relative_cwd': None,
         u'dimensions': {
           u'os': u'Amiga',
           u'pool': u'default',
@@ -448,6 +451,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
           u'server': u'https://chrome-infra-packages.appspot.com',
         },
         u'command': [u'python', u'run_test.py'],
+        u'relative_cwd': None,
         u'dimensions': {
           u'os': u'Amiga',
           u'pool': u'default',
@@ -544,6 +548,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
           u'server': u'https://chrome-infra-packages.appspot.com',
         },
         u'command': [],
+        u'relative_cwd': None,
         u'dimensions': {
           u'os': u'Amiga',
           u'pool': u'default',
@@ -708,6 +713,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
           u'server': u'https://chrome-infra-packages.appspot.com',
         },
         u'command': [],
+        u'relative_cwd': None,
         u'dimensions': {
           u'os': u'Amiga',
           u'pool': u'default',

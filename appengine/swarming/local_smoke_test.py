@@ -651,7 +651,7 @@ class Test(unittest.TestCase):
       # Intentionally hard code the value to ensure it propagated correctly and
       # is deterministic.
       properties_hash =
-          u'7801158c5536725f6cf6e8d9f01a2af666943f3d2997995034fd4eb4ba747e37',
+          u'52d1a1cdbd39634f4001782f3c4e846488d00e9b6cd662454206bc615559b4e1',
     )
     task_id = self._run_isolated(
         content, 'idempotent_reuse', ['--idempotent'], expected_summary, {},

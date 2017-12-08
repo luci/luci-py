@@ -150,6 +150,9 @@ def get_isolated_args(work_dir, task_details, isolated_result,
   if bot_file:
     cmd.extend(('--bot-file', bot_file))
 
+  if task_details.relative_cwd:
+    cmd.extend(('--relative-cwd', task_details.relative_cwd))
+
   if task_details.hard_timeout:
     cmd.extend(('--hard-timeout', str(task_details.hard_timeout)))
   if task_details.grace_period:
@@ -186,6 +189,7 @@ class TaskDetails(object):
 
     # Raw command. Only self.command or self.isolated.input can be set.
     self.command = data['command'] or []
+    self.relative_cwd = data.get('relative_cwd')
 
     # Isolated command. Is a serialized version of task_request.FilesRef.
     self.isolated = data['isolated']
