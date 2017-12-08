@@ -23,6 +23,13 @@ class CommonCase(test_case.TestCase):
   def test_convert_empty(self):
     self.assertIsNotNone(common._convert_config('', test_config_pb2.Config))
 
+  def test_convert_unicode(self):
+    text = u'param: "\U0001f604"'.encode('utf-8')
+    self.assertEqual(
+        common._convert_config(text, test_config_pb2.Config),
+        test_config_pb2.Config(param=u'\U0001f604'),
+    )
+
   def test_trim_app_id(self):
     trimmed_app_id = 'gce-backend'
     app_id_external = trimmed_app_id

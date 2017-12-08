@@ -97,8 +97,10 @@ def _convert_config(content, dest_type):
     return None
   msg = dest_type()
   try:
-    protobuf.text_format.Merge(multiline_proto.parse(content), msg)
-  except (multiline_proto.ParseError, protobuf.text_format.ParseError) as ex:
+    protobuf.text_format.Merge(
+        multiline_proto.parse(content.decode('utf-8')), msg)
+  except (multiline_proto.ParseError, protobuf.text_format.ParseError,
+          UnicodeDecodeError) as ex:
     raise ConfigFormatError(ex.message)
   return msg
 

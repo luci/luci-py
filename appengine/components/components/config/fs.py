@@ -48,7 +48,7 @@ class Provider(object):
     assert filename.startswith(os.path.abspath(self.root)), filename
     content = None
     if os.path.exists(filename):
-      with open(filename, 'r') as f:
+      with open(filename, 'rb') as f:
         content = f.read()
     config = common._convert_config(content, dest_type)
     raise ndb.Return(None, config)

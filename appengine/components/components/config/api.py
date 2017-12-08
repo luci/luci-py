@@ -157,6 +157,7 @@ def get_project_configs_async(path, dest_type=None):
     dest_type (type): if specified, config contents will be converted to
       |dest_type|. Only protobuf messages are supported. If a config could not
       be converted, the exception will be logged, but not raised.
+      If |dest_type| is not specified, returned config is bytes.
 
   Returns:
     {project_id -> (revision, config, exception)} map.
