@@ -534,6 +534,26 @@ class TestAuthDBCache(test_case.TestCase):
     self.set_fetched_auth_db(auth_db_v1)
     self.assertEqual(auth_db_v1, api.get_process_auth_db())
 
+  def test_get_latest_auth_db(self):
+    """Ensure get_latest_auth_db "rushes" cached AuthDB update."""
+    auth_db_v0 = api.AuthDB(entity_group_version=0)
+    auth_db_v1 = api.AuthDB(entity_group_version=1)
+
+    # Fetch initial copy of AuthDB.
+    self.set_time(0)
+    self.set_fetched_auth_db(auth_db_v0)
+    self.assertEqual(auth_db_v0, api.get_process_auth_db())
+
+    # Rig up fetch_auth_db to return a newer version.
+    self.set_fetched_auth_db(auth_db_v1)
+
+    # 'get_process_auth_db' still returns the cached one.
+    self.assertEqual(auth_db_v0, api.get_process_auth_db())
+
+    # But 'get_latest_auth_db' returns a new one and updates the cached copy.
+    self.assertEqual(auth_db_v1, api.get_latest_auth_db())
+    self.assertEqual(auth_db_v1, api.get_process_auth_db())
+
   def test_get_request_auth_db(self):
     """Ensure get_request_auth_db() caches AuthDB in request cache."""
     api.reinitialize_request_cache()
