@@ -127,10 +127,9 @@ def notify_gitiles_rejection(config_set, location, validation_result):
 @utils.cache_with_expiration(10 * 60)
 def get_cc_recipients():
   """Returns a set of emails in CC group."""
-  identities = auth.list_group(CC_GROUP)
   recipients = set()
-  for ident in identities:
-    if ident.kind == auth.IDENTITY_USER:
+  for ident in auth.list_group(CC_GROUP).members:
+    if ident.is_user:
       try:
         mail.CheckEmailValid(ident.name, 'to')
         recipients.add(ident.name)

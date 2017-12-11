@@ -111,13 +111,19 @@ class AuthDBTest(test_case.TestCase):
         is_member([with_nesting, with_listing], model.Anonymous, 'WithNesting'))
 
   def test_list_group(self):
-    list_group = (lambda groups, group, recursive:
-        api.AuthDB(groups=groups).list_group(group, recursive))
+    def list_group(groups, group, recursive):
+      l = api.AuthDB(groups=groups).list_group(group, recursive)
+      return api.GroupListing(
+          sorted(l.members), sorted(l.globs), sorted(l.nested))
 
     grp_1 = model.AuthGroup(id='1')
     grp_1.members.extend([
       model.Identity(model.IDENTITY_USER, 'a@example.com'),
       model.Identity(model.IDENTITY_USER, 'b@example.com'),
+    ])
+    grp_1.globs.extend([
+      model.IdentityGlob(model.IDENTITY_USER, '*@a.example.com'),
+      model.IdentityGlob(model.IDENTITY_USER, '*@b.example.com'),
     ])
 
     grp_2 = model.AuthGroup(id='2')
@@ -127,24 +133,43 @@ class AuthDBTest(test_case.TestCase):
       model.Identity(model.IDENTITY_USER, 'b@example.com'),
       model.Identity(model.IDENTITY_USER, 'c@example.com'),
     ])
+    grp_2.globs.extend([
+      # Specify '*@b.example.com' again, even though it's in a nested group.
+      model.IdentityGlob(model.IDENTITY_USER, '*@b.example.com'),
+      model.IdentityGlob(model.IDENTITY_USER, '*@c.example.com'),
+    ])
 
     # Unknown group.
-    self.assertEqual(set(), list_group([grp_1, grp_2], 'blah', False))
-    self.assertEqual(set(), list_group([grp_1, grp_2], 'blah', True))
+    empty = api.GroupListing([], [], [])
+    self.assertEqual(empty, list_group([grp_1, grp_2], 'blah', False))
+    self.assertEqual(empty, list_group([grp_1, grp_2], 'blah', True))
 
     # Non recursive.
-    expected = set([
-      model.Identity(model.IDENTITY_USER, 'b@example.com'),
-      model.Identity(model.IDENTITY_USER, 'c@example.com'),
-    ])
+    expected = api.GroupListing(
+        members=[
+          model.Identity(model.IDENTITY_USER, 'b@example.com'),
+          model.Identity(model.IDENTITY_USER, 'c@example.com'),
+        ],
+        globs=[
+          model.IdentityGlob(model.IDENTITY_USER, '*@b.example.com'),
+          model.IdentityGlob(model.IDENTITY_USER, '*@c.example.com'),
+        ],
+        nested=['1'])
     self.assertEqual(expected, list_group([grp_1, grp_2], '2', False))
 
     # Recursive.
-    expected = set([
-      model.Identity(model.IDENTITY_USER, 'a@example.com'),
-      model.Identity(model.IDENTITY_USER, 'b@example.com'),
-      model.Identity(model.IDENTITY_USER, 'c@example.com'),
-    ])
+    expected = api.GroupListing(
+        members=[
+          model.Identity(model.IDENTITY_USER, 'a@example.com'),
+          model.Identity(model.IDENTITY_USER, 'b@example.com'),
+          model.Identity(model.IDENTITY_USER, 'c@example.com'),
+        ],
+        globs=[
+          model.IdentityGlob(model.IDENTITY_USER, '*@a.example.com'),
+          model.IdentityGlob(model.IDENTITY_USER, '*@b.example.com'),
+          model.IdentityGlob(model.IDENTITY_USER, '*@c.example.com'),
+        ],
+        nested=['1'])
     self.assertEqual(expected, list_group([grp_1, grp_2], '2', True))
 
   def test_nested_groups_cycle(self):

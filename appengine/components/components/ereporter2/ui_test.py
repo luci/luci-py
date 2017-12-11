@@ -178,12 +178,12 @@ class Ereporter2Test(test_case.TestCase):
 
 class Ereporter2RecipientsTest(test_case.TestCase):
   def test_recipients_from_auth_group(self):
-    fake_group = [
+    fake_listing = auth.GroupListing([
       auth.Identity(auth.IDENTITY_USER, 'a@example.com'),
       auth.Identity(auth.IDENTITY_USER, 'b@example.com'),
       auth.Identity(auth.IDENTITY_SERVICE, 'blah-service'),
-    ]
-    self.mock(auth, 'list_group', lambda _: fake_group)
+    ], [], [])
+    self.mock(auth, 'list_group', lambda _: fake_listing)
     self.assertEqual(
         ['a@example.com', 'b@example.com'], acl.get_ereporter2_recipients())
 

@@ -52,6 +52,7 @@ __all__ = [
   'get_request_auth_db',
   'get_secret',
   'get_web_client_id',
+  'GroupListing',
   'is_admin',
   'is_group_member',
   'is_in_ip_whitelist',
@@ -142,6 +143,14 @@ CachedGroup = collections.namedtuple('CachedGroup', [
   'created_by',
   'modified_ts',
   'modified_by',
+])
+
+
+# GroupListing is returned by list_group.
+GroupListing = collections.namedtuple('GroupListing', [
+  'members',  # list of Identity in no particular order
+  'globs',    # list of IdentityGlob in no particular order
+  'nested',   # list of strings with nested group names in no particular order
 ])
 
 
@@ -319,44 +328,53 @@ class AuthDB(object):
         modified_by=g.modified_by)
 
   def list_group(self, group_name, recursive=True):
-    """Returns a set of all identities in a group.
+    """Returns all members, all globs and all nested groups in a group.
+
+    The returned lists are unordered.
 
     Args:
       group_name: name of a group to list.
       recursive: True to include nested group.
 
     Returns:
-      Set of Identity objects. Unknown groups are considered empty.
+      GroupListing object.
     """
+    members = set()  # set of strings (not Identity!), see CachedGroup
+    globs = set()    # set of IdentityGlob
+    nested = set()   # set of strings
+
+    def accumulate(group_obj):
+      members.update(group_obj.members)
+      globs.update(group_obj.globs)
+      nested.update(group_obj.nested)
+
+    def finalize_listing():
+      return GroupListing(
+          members=[model.Identity.from_bytes(m) for m in members],
+          globs=list(globs),
+          nested=list(nested))
+
     if not recursive:
       group_obj = self.groups.get(group_name)
-      if not group_obj:
-        return set()
-      return set(model.Identity.from_bytes(m) for m in group_obj.members)
+      if group_obj:
+        accumulate(group_obj)
+      return finalize_listing()
 
-    # Set of groups already added to 'listing'.
+    # Set of groups already added to the listing.
     visited = set()
 
-    # Updated by visit_group. We keep it in the closure to avoid passing more
-    # stuff through the thread stack.
-    listing = set()
-
-    def visit_group(group_name):
+    def visit_group(name):
       # An unknown group is empty.
-      group_obj = self.groups.get(group_name)
-      if not group_obj:
+      group_obj = self.groups.get(name)
+      if not group_obj or name in visited:
         return
-
-      if group_name in visited:
-        return
-      visited.add(group_name)
-
-      listing.update(group_obj.members)
+      visited.add(name)
+      accumulate(group_obj)
       for nested in group_obj.nested:
         visit_group(nested)
 
     visit_group(group_name)
-    return set(model.Identity.from_bytes(m) for m in listing)
+    return finalize_listing()
 
   def fetch_groups_with_member(self, ident):
     """Returns a set of group names that have given Identity as a member.
@@ -1214,7 +1232,13 @@ def is_superuser():
 
 
 def list_group(group_name, recursive=True):
-  """Returns a set of all Identity in a group."""
+  """Returns all members, all globs and all nested groups in a group.
+
+  The returned lists are unordered.
+
+  Returns:
+    GroupListing object.
+  """
   return get_request_cache().auth_db.list_group(group_name, recursive)
 
 

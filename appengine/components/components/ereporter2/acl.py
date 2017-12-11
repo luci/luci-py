@@ -14,7 +14,9 @@ VIEWERS_AUTH_GROUP = config.config.VIEWERS_AUTH_GROUP
 
 def get_ereporter2_recipients():
   """Returns list of emails to send reports to."""
-  return [x.name for x in auth.list_group(RECIPIENTS_AUTH_GROUP) if x.is_user]
+  return [
+    x.name for x in auth.list_group(RECIPIENTS_AUTH_GROUP).members if x.is_user
+  ]
 
 
 def is_ereporter2_viewer():

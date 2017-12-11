@@ -51,10 +51,10 @@ class NotificationsTestCase(test_case.TestCase):
     self.mock(template, 'render', mock.Mock())
 
     self.mock(auth, 'list_group', mock.Mock())
-    auth.list_group.return_value = [
+    auth.list_group.return_value = auth.GroupListing([
       auth.Identity('user', 'bill@x.com'),
       auth.Identity('service', 'foo'),
-    ]
+    ], [], [])
 
     # Notify.
 
