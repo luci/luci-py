@@ -301,5 +301,13 @@ exports.queryChangeLog = function(target, revision, limit, cursor) {
 };
 
 
+// Fetches recursive listing of a group.
+exports.fetchGroupListing = function(group) {
+  return call(
+      'GET', '/auth/api/v1/listing/groups/' + group, null,
+      {'Cache-Control': 'no-cache'});
+};
+
+
 return exports;
 }());

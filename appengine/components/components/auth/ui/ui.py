@@ -69,6 +69,7 @@ def get_ui_routes():
       webapp2.Route(r'/auth/bootstrap', BootstrapHandler, name='bootstrap'),
       webapp2.Route(r'/auth/bootstrap/oauth', BootstrapOAuthHandler),
       webapp2.Route(r'/auth/link', LinkToPrimaryHandler),
+      webapp2.Route(r'/auth/listing', GroupListingHandler),
     ])
   return routes
 
@@ -472,6 +473,16 @@ class GroupsHandler(UINavbarTabHandler):
   template_file = 'auth/groups.html'
 
 
+class GroupListingHandler(UINavbarTabHandler):
+  """Page with full listing of some single group."""
+  routes = ['/auth/listing']
+  navbar_tab_url = '/auth/groups'
+  navbar_tab_id = 'groups'  # keep 'Groups' tab highlighted
+  navbar_tab_title = 'Groups'
+  js_file_url = '/auth/static/js/listing.js'
+  template_file = 'auth/listing.html'
+
+
 class ChangeLogHandler(UINavbarTabHandler):
   """Page with a log of changes to some groups."""
   navbar_tab_url = '/auth/change_log'
@@ -549,7 +560,7 @@ class ApiDocHandler(UINavbarTabHandler):
       },
     },
     {
-      'name': 'Group listing',
+      'name': 'Groups',
       'doc':
         'All groups, along with their metadata. Does not include members '
         'listings.',
@@ -576,6 +587,27 @@ class ApiDocHandler(UINavbarTabHandler):
             'owners': 'Owning group',
           },
         ],
+      },
+    },
+    {
+      'name': 'Group listing',
+      'doc':
+        'Recursive listing of all members, globs and nested groups inside '
+        'a group. In no particular order.',
+      'example': {
+        'listing': {
+          'members': [
+            {'principal': 'user:someone@example.com'},
+            {'principal': 'user:another@example.com'},
+          ],
+          'globs': [
+            {'principal': 'user:*@example.com'},
+          ],
+          'nested': [
+            {'principal': 'Nested group'},
+            {'principal': 'Another nested group'},
+          ],
+        },
       },
     },
   ]

@@ -39,6 +39,12 @@ exports.getChangeLogRevisionURL = function(rev) {
 };
 
 
+// Returns URL to a page with full listing of the group.
+exports.getGroupListingURL = function(group) {
+  return '/auth/listing?group=' + encodeURIComponent(group);
+};
+
+
 // Appends '<prefix>:' to a string if it doesn't have a prefix.
 exports.addPrefix = function(prefix, str) {
   if (str.indexOf(':') == -1) {

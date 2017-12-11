@@ -59,13 +59,21 @@ javascript library and not jinja2. #}
         {{#if isExternal}}
         <span style="color: gray">(external)</span>
         {{/if}}
+        <a href="{{fullListingUrl}}"
+           id="full-listing-button"
+           style="float: right; padding-left: 4px"
+           title="Full listing"
+           data-toggle="tooltip"
+           data-placement="top">
+          <span class="glyphicon glyphicon-list"></span>
+        </a>
         <a href="{{changeLogUrl}}"
            id="change-log-button"
-           style="float: right"
-           title="View change log"
+           style="float: right; padding-right: 4px"
+           title="Change log"
            data-toggle="tooltip"
-           data-placement="left">
-          <span class="glyphicon glyphicon-list-alt"></span>
+           data-placement="top">
+          <span class="glyphicon glyphicon-calendar"></span>
         </a>
       </h3>
     </div>

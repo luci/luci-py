@@ -541,6 +541,7 @@ EditGroupForm.prototype.buildForm = function(group, lastModified) {
   // Prepare environment for template.
   group = _.clone(group);
   group.changeLogUrl = common.getChangeLogURL('AuthGroup', group.name);
+  group.fullListingUrl = common.getGroupListingURL(group.name);
 
   // Join members and globs list into single UI list.
   var members = common.stripPrefixFromItems('user', group.members || []);
@@ -583,7 +584,8 @@ EditGroupForm.prototype.buildForm = function(group, lastModified) {
     });
   }
 
-  // Activate tooltip on "View change log" button.
+  // Activate tooltips on utility buttons.
+  $('#full-listing-button', this.$element).tooltip();
   $('#change-log-button', this.$element).tooltip();
 };
 

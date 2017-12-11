@@ -52,6 +52,9 @@ def get_rest_api_routes():
     webapp2.Route(
         '/auth/api/v1/ip_whitelists/<name:%s>' % ip_whitelist_re,
         IPWhitelistHandler),
+    webapp2.Route(
+        '/auth/api/v1/listing/groups/<name:%s>' % group_re,
+        GroupListingHandler),
     webapp2.Route('/auth/api/v1/memberships/list', MembershipsListHandler),
     webapp2.Route('/auth/api/v1/memberships/check', MembershipsCheckHandler),
     webapp2.Route('/auth/api/v1/suggest/groups', GroupsSuggestHandler),
@@ -577,7 +580,7 @@ class GroupsHandler(handler.ApiHandler):
     {
       'verb': 'GET',
       'doc': 'Lists names and descriptions of all known groups.',
-      'response_type': 'Group listing',
+      'response_type': 'Groups',
     },
   ]
 
@@ -1010,6 +1013,41 @@ class PerIdentityBatchHandler(handler.ApiHandler):
         for ident, res in self.execute_batch(queries).iteritems()
       },
     }
+
+
+class GroupListingHandler(handler.ApiHandler):
+  """Lists all members of a group, recursively."""
+
+  # This is visible in the UI.
+  api_doc = [
+    {
+      'verb': 'GET',
+      'doc': 'Lists all members of a group, expanding subgroups.',
+      'response_type': 'Group listing',
+    },
+  ]
+
+  @api.require(acl.has_access)
+  def get(self, name):
+    if not model.is_valid_group_name(name):
+      self.abort_with_error(400, text='Invalid group name')
+
+    # By default use cached auth DB. Switch to latest one only if No-Cache
+    # header is given.
+    auth_db = None
+    if _is_no_cache(self.request):
+      auth_db = api.get_latest_auth_db()
+    else:
+      auth_db = api.get_request_auth_db()
+    listing = auth_db.list_group(name)
+
+    self.send_response({
+      'listing': {
+        'members': [{'principal': m.to_bytes()} for m in listing.members],
+        'globs': [{'principal': g.to_bytes()} for g in listing.globs],
+        'nested': [{'principal': n} for n in listing.nested],
+      },
+    })
 
 
 class MembershipsListHandler(PerIdentityBatchHandler):
