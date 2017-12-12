@@ -45,7 +45,7 @@ from tools import calculate_version
 from tools import log_since
 
 
-def print_version_log(app, to_version):
+def _print_version_log(app, to_version):
   """Queries the server active version and prints the log between the active
   version and the new version.
   """
@@ -330,7 +330,7 @@ def CMDswitch(parser, args):
       print('No such version.')
       return 1
 
-  print_version_log(app, version)
+  _print_version_log(app, version)
   # Switching a default version is disruptive operation. Require confirmation.
   if (not options.force and
       not gae_sdk_utils.confirm('Switch default version?', app, version)):
@@ -397,7 +397,7 @@ def CMDupload(parser, args):
     print('')
     print >> sys.stderr, 'Can\'t use --switch with a tainted version!'
     return 1
-  print_version_log(app, version)
+  _print_version_log(app, version)
   print('Switching as default version')
   app.set_default_version(version)
   return 0
@@ -429,7 +429,7 @@ class OptionParser(optparse.OptionParser):
         version=__version__,
         description=sys.modules['__main__'].__doc__,
         **kwargs)
-    self.app_dir = app_dir
+    self.default_app_dir = app_dir
     self.allow_positional_args = False
 
   def add_tag_option(self):
@@ -447,15 +447,15 @@ class OptionParser(optparse.OptionParser):
         help='Do not ask for confirmation')
 
   def parse_args(self, *args, **kwargs):
-    gae_sdk_utils.add_sdk_options(self, self.app_dir)
+    gae_sdk_utils.add_sdk_options(self, self.default_app_dir)
     options, args = optparse.OptionParser.parse_args(self, *args, **kwargs)
     if not self.allow_positional_args and args:
       self.error('Unknown arguments: %s' % args)
-    app = gae_sdk_utils.process_sdk_options(self, options, self.app_dir)
+    app = gae_sdk_utils.process_sdk_options(self, options)
     return app, options, args
 
 
-def find_app_dir(search_dir):
+def _find_app_dir(search_dir):
   """Locates GAE app root directory (or returns None if not found).
 
   Starts by examining search_dir, then its parent, and so on, until it discovers
@@ -503,19 +503,19 @@ def main(args):
   # typing --app-dir all the time). If linked into subdirectory, discover root
   # by locating app.yaml. It is used for Python GAE apps and one-module Go apps
   # that have all YAMLs in app root dir.
-  app_dir = None
+  default_app_dir = None
   if IS_SYMLINKED:
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    app_dir = find_app_dir(script_dir)
+    default_app_dir = _find_app_dir(script_dir)
 
   # If not symlinked into an app directory, try to discover app root starting
   # from cwd.
-  app_dir = app_dir or find_app_dir(os.getcwd())
+  default_app_dir = default_app_dir or _find_app_dir(os.getcwd())
 
   colorama.init()
   dispatcher = subcommand.CommandDispatcher(__name__)
   try:
-    return dispatcher.execute(OptionParser(app_dir), args)
+    return dispatcher.execute(OptionParser(default_app_dir), args)
   except gae_sdk_utils.Error as e:
     print >> sys.stderr, str(e)
     return 1

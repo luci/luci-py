@@ -641,26 +641,25 @@ def setup_env(app_dir, app_id, version, module_id, remote_api=False):
     os.environ['CURRENT_MODULE_ID'] = module_id
 
 
-def add_sdk_options(parser, app_dir=None):
+def add_sdk_options(parser, default_app_dir):
   """Adds common command line options used by tools that wrap GAE SDK.
 
   Args:
     parser: OptionParser to add options to.
-    app_dir: default value for --app-dir option.
+    default_app_dir: default value for --app-dir option.
   """
   parser.add_option(
       '-s', '--sdk-path',
       help='Path to AppEngine SDK. Will try to find by itself.')
-  if not app_dir:
-    parser.add_option(
-        '-p', '--app-dir',
-        default=app_dir,
-        help='Path to application directory with app.yaml.')
+  parser.add_option(
+      '-p', '--app-dir',
+      default=default_app_dir,
+      help='Path to application directory with app.yaml.')
   parser.add_option('-A', '--app-id', help='Defaults to name in app.yaml.')
   parser.add_option('-v', '--verbose', action='store_true')
 
 
-def process_sdk_options(parser, options, app_dir):
+def process_sdk_options(parser, options):
   """Handles values of options added by 'add_sdk_options'.
 
   Modifies global process state by configuring logging and path to GAE SDK.
@@ -668,16 +667,15 @@ def process_sdk_options(parser, options, app_dir):
   Args:
     parser: OptionParser instance to use to report errors.
     options: parsed options, as returned by parser.parse_args.
-    app_dir: path to application directory to use by default.
 
   Returns:
     New instance of Application configured based on passed options.
   """
   logging.basicConfig(level=logging.DEBUG if options.verbose else logging.ERROR)
 
-  if not app_dir and not options.app_dir:
+  if not options.app_dir:
     parser.error('--app-dir option is required')
-  app_dir = os.path.abspath(app_dir or options.app_dir)
+  app_dir = os.path.abspath(options.app_dir)
 
   try:
     runtime = get_app_runtime(find_app_yamls(app_dir))
