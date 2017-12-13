@@ -6,6 +6,10 @@ api_version: 1
 threadsafe: true
 
 handlers:
+- url: /internal/cron/ts_mon/.*
+  script: main_backend.ts_mon_app
+  secure: always
+  login: admin
 - url: /internal.*
   script: main_backend.app
   secure: always
@@ -16,7 +20,6 @@ builtins:
 
 includes:
 - components/ereporter2
-- gae_ts_mon
 
 # https://developers.google.com/appengine/docs/python/tools/libraries27
 # As the doc says, serious applications should specify the third party versions.
