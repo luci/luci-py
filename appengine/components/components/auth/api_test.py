@@ -19,6 +19,7 @@ test_env.setup_test_env()
 from google.appengine.ext import ndb
 
 from components.auth import api
+from components.auth import config
 from components.auth import ipaddr
 from components.auth import model
 from components import utils
@@ -237,7 +238,9 @@ class AuthDBTest(test_case.TestCase):
     self.assertTrue(model.root_key().get())
 
   def test_fetch_auth_db(self):
-    # Client IDs callback.
+    # Client IDs callback. Disable config.ensure_configured() since it overrides
+    # _additional_client_ids_cb after we mock it.
+    self.mock(config, 'ensure_configured', lambda: None)
     self.mock(api, '_additional_client_ids_cb', lambda: ['', 'cb_client_id'])
     self.mock(api, 'get_web_client_id', lambda: 'web_client_id')
 

@@ -69,7 +69,7 @@ __all__ = [
 # a list of additional OAuth client IDs we trust in this GAE application.
 _additional_client_ids_cb = None
 
-# How soon process-global AuthDB cache expires, sec.
+# How soon process-global AuthDB cache expires (may be 0), sec.
 _process_cache_expiration_sec = 30
 # True if fetch_auth_db was called at least once and created all root entities.
 _lazy_bootstrap_ran = False
@@ -821,7 +821,7 @@ class RequestCache(object):
 def disable_process_cache():
   """Disables in-process cache of AuthDB.
 
-  Useful in tests.
+  Useful in tests. Once disabled, it can't be enabled again.
   """
   global _process_cache_expiration_sec
   _process_cache_expiration_sec = 0
@@ -883,6 +883,7 @@ def fetch_auth_db(known_auth_db=None):
     # initial loading.
     global _lazy_bootstrap_ran
     if not _lazy_bootstrap_ran:
+      config.ensure_configured()
       model.AuthGlobalConfig.get_or_insert(root_key.string_id())
       _lazy_bootstrap_ran = True
     # Call the user-supplied callbacks in non-transactional context.
@@ -959,6 +960,10 @@ def get_process_auth_db():
   known_auth_db = None
 
   with _auth_db_lock:
+    # Not using cache at all (usually in tests) => always fetch.
+    if not _process_cache_expiration_sec:
+      return fetch_auth_db()
+
     # Cached copy is still fresh?
     if _auth_db and time.time() < _auth_db_expiration:
       return _auth_db
@@ -1031,6 +1036,10 @@ def get_latest_auth_db():
   # it gets unlocked, waiting threads quickly discover that '_auth_db' is
   # already fresh.
   with _auth_db_fetch_lock:
+    # Not using cache at all (usually in tests) => always fetch.
+    if not _process_cache_expiration_sec:
+      return fetch_auth_db()
+
     cached = None
     with _auth_db_lock:
       if _auth_db is None:
@@ -1062,7 +1071,6 @@ def _initialize_auth_db_cache():
 
   assert _auth_db is None
   logging.info('Initial fetch of AuthDB')
-  config.ensure_configured()
   _auth_db = fetch_auth_db()
   _auth_db_expiration = time.time() + _process_cache_expiration_sec
   logging.info('Fetched AuthDB at rev %d', _auth_db.auth_db_rev)
