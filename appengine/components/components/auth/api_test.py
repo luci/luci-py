@@ -382,6 +382,13 @@ class AuthDBTest(test_case.TestCase):
           ipaddr.ip_from_string('127.0.0.1'))
 
 
+def mock_replication_state(auth_db_rev):
+  return model.AuthReplicationState(
+      key=model.replication_state_key(),
+      primary_id='primary-id',
+      auth_db_rev=auth_db_rev)
+
+
 class TestAuthDBCache(test_case.TestCase):
   """Tests for process-global and request-local AuthDB cache."""
 
@@ -395,10 +402,10 @@ class TestAuthDBCache(test_case.TestCase):
 
   def set_fetched_auth_db(self, auth_db):
     """Mocks fetch_auth_db to return |auth_db|."""
-    def mock_fetch_auth_db(known_version=None):
-      if (known_version is not None and
-          auth_db.entity_group_version == known_version):
-        return None
+    def mock_fetch_auth_db(known_auth_db=None):
+      if (known_auth_db is not None and
+          auth_db.auth_db_rev == known_auth_db.auth_db_rev):
+        return known_auth_db
       return auth_db
     self.mock(api, 'fetch_auth_db', mock_fetch_auth_db)
 
@@ -443,8 +450,8 @@ class TestAuthDBCache(test_case.TestCase):
   def test_get_process_auth_db_expiration(self):
     """Ensure get_process_auth_db() respects expiration."""
     # Prepare several instances of AuthDB to be used in mocks.
-    auth_db_v0 = api.AuthDB(entity_group_version=0)
-    auth_db_v1 = api.AuthDB(entity_group_version=1)
+    auth_db_v0 = api.AuthDB(replication_state=mock_replication_state(0))
+    auth_db_v1 = api.AuthDB(replication_state=mock_replication_state(1))
 
     # Fetch initial copy of AuthDB.
     self.set_time(0)
@@ -464,8 +471,8 @@ class TestAuthDBCache(test_case.TestCase):
   def test_get_process_auth_db_known_version(self):
     """Ensure get_process_auth_db() respects entity group version."""
     # Prepare several instances of AuthDB to be used in mocks.
-    auth_db_v0 = api.AuthDB(entity_group_version=0)
-    auth_db_v0_again = api.AuthDB(entity_group_version=0)
+    auth_db_v0 = api.AuthDB(replication_state=mock_replication_state(0))
+    auth_db_v0_again = api.AuthDB(replication_state=mock_replication_state(0))
 
     # Fetch initial copy of AuthDB.
     self.set_time(0)
@@ -490,8 +497,8 @@ class TestAuthDBCache(test_case.TestCase):
       return result
 
     # Prepare several instances of AuthDB to be used in mocks.
-    auth_db_v0 = api.AuthDB(entity_group_version=0)
-    auth_db_v1 = api.AuthDB(entity_group_version=1)
+    auth_db_v0 = api.AuthDB(replication_state=mock_replication_state(0))
+    auth_db_v1 = api.AuthDB(replication_state=mock_replication_state(1))
 
     # Run initial fetch, should cache |auth_db_v0| in process cache.
     self.set_time(0)
@@ -531,8 +538,8 @@ class TestAuthDBCache(test_case.TestCase):
   def test_get_process_auth_db_exceptions(self):
     """Ensure get_process_auth_db() handles DB exceptions well."""
     # Prepare several instances of AuthDB to be used in mocks.
-    auth_db_v0 = api.AuthDB(entity_group_version=0)
-    auth_db_v1 = api.AuthDB(entity_group_version=1)
+    auth_db_v0 = api.AuthDB(replication_state=mock_replication_state(0))
+    auth_db_v1 = api.AuthDB(replication_state=mock_replication_state(1))
 
     # Fetch initial copy of AuthDB.
     self.set_time(0)
@@ -561,8 +568,8 @@ class TestAuthDBCache(test_case.TestCase):
 
   def test_get_latest_auth_db(self):
     """Ensure get_latest_auth_db "rushes" cached AuthDB update."""
-    auth_db_v0 = api.AuthDB(entity_group_version=0)
-    auth_db_v1 = api.AuthDB(entity_group_version=1)
+    auth_db_v0 = api.AuthDB(replication_state=mock_replication_state(0))
+    auth_db_v1 = api.AuthDB(replication_state=mock_replication_state(1))
 
     # Fetch initial copy of AuthDB.
     self.set_time(0)
@@ -723,7 +730,6 @@ class ApiTest(test_case.TestCase):
       def static_method(*args, **kwargs):
         return (args, kwargs)
 
-    obj = Class()
     self.assertEqual((('value',), {'a': 2}), Class.static_method('value', a=2))
     self.assertEqual(1, len(calls))
 
@@ -739,7 +745,6 @@ class ApiTest(test_case.TestCase):
       def class_method(cls, *args, **kwargs):
         return (cls, args, kwargs)
 
-    obj = Class()
     self.assertEqual(
         (Class, ('value',), {'a': 2}), Class.class_method('value', a=2))
     self.assertEqual(1, len(calls))

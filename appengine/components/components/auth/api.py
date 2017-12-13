@@ -26,7 +26,6 @@ import urllib
 from google.appengine.api import oauth
 from google.appengine.api import urlfetch
 from google.appengine.ext import ndb
-from google.appengine.ext.ndb import metadata
 from google.appengine.runtime import apiproxy_errors
 
 from components.datastore_utils import config as ds_config
@@ -171,8 +170,7 @@ class AuthDB(object):
       secrets=None,
       ip_whitelist_assignments=None,
       ip_whitelists=None,
-      additional_client_ids=None,
-      entity_group_version=None):
+      additional_client_ids=None):
     """
     Args:
       replication_state: instance of AuthReplicationState entity.
@@ -182,8 +180,6 @@ class AuthDB(object):
       ip_whitelist_assignments: AuthIPWhitelistAssignments entity.
       ip_whitelists: list of AuthIPWhitelist entities.
       additional_client_ids: an additional list of OAuth2 client IDs to trust.
-      entity_group_version: version of AuthGlobalConfig entity group at the
-          moment when entities were fetched from it.
     """
     self.replication_state = replication_state or model.AuthReplicationState()
     self.global_config = global_config or model.AuthGlobalConfig()
@@ -191,7 +187,6 @@ class AuthDB(object):
     self.ip_whitelists = {e.key.string_id(): e for e in (ip_whitelists or [])}
     self.ip_whitelist_assignments = (
         ip_whitelist_assignments or model.AuthIPWhitelistAssignments())
-    self.entity_group_version = entity_group_version
 
     for secret in (secrets or []):
       assert secret.key.string_id() not in self.secrets, secret.key
@@ -859,16 +854,15 @@ def get_request_cache():
   return cache or reinitialize_request_cache()
 
 
-def fetch_auth_db(known_version=None):
+def fetch_auth_db(known_auth_db=None):
   """Returns instance of AuthDB.
 
-  If |known_version| is None, this function always returns a new instance.
+  If |known_auth_db| is None, this function always returns a new instance.
 
-  If |known_version| is not None, this function will compare |known_version| to
-  current version of root_key() entity group, fetched by calling
-  get_entity_group_version(). It they match, function will return None
-  (meaning that there's no need to refetch AuthDB), otherwise it will fetch
-  a fresh copy of AuthDB and return it.
+  If |known_auth_db| is not None, this function will compare it to the latest
+  version in the datastore. It they match, function will return known_auth_db
+  unaltered (meaning that there's no need to refetch AuthDB), otherwise it will
+  fetch a fresh copy of AuthDB and return it.
 
   Runs in transaction to guarantee consistency of fetched data. Effectively it
   fetches momentary snapshot of subset of root_key() entity group.
@@ -897,30 +891,22 @@ def fetch_auth_db(known_version=None):
     web_id = get_web_client_id()
     if web_id:
       additional_client_ids.append(web_id)
-    # Fetch current known version before opening the transaction. If it matches
-    # |known_version| we don't need to do the transaction at all. On dev server
-    # metadata.get_entity_group_version() always returns None, so on dev server
-    # this optimization is effectively disabled.
-    if known_version is not None:
-      return metadata.get_entity_group_version(root_key) != known_version
+    # Fetch the latest known revision before opening the transaction. If it
+    # matches |known_auth_db| we don't need to do the transaction at all.
+    if known_auth_db is not None:
+      state = model.get_replication_state()
+      return (
+          not state or
+          state.primary_id != known_auth_db.primary_id or
+          state.auth_db_rev != known_auth_db.auth_db_rev)
     return True
 
   @ndb.transactional(propagation=ndb.TransactionOptions.INDEPENDENT)
   def fetch():
-    # Grab the most recent version number. It may have changed since the check
-    # in 'prepare'.
-    current_version = metadata.get_entity_group_version(root_key)
-    if known_version is not None and current_version == known_version:
-      return None
-
-    # TODO(vadimsh): Use auth_db_rev instead of entity group version. It is less
-    # likely to change without any apparent reason (like entity group version
-    # does).
-
-    # TODO(vadimsh): Add memcache keyed at |current_version| so only one
-    # frontend instance have to pay the cost of fetching AuthDB from Datastore
-    # via multiple RPCs. All other instances will fetch it via single
-    # memcache 'get'.
+    # TODO(vadimsh): Add memcache keyed at |auth_db_rev| so only one frontend
+    # instance has to pay the cost of fetching AuthDB from Datastore via
+    # multiple RPCs. All other instances will fetch it via single memcache
+    # 'get'.
 
     # Fetch all stuff in parallel. Fetch ALL groups and ALL secrets.
     replication_state_future = model.replication_state_key().get_async()
@@ -931,22 +917,22 @@ def fetch_auth_db(known_version=None):
     # It's fine to block here as long as it's the last fetch.
     ip_whitelist_assignments, ip_whitelists = model.fetch_ip_whitelists()
 
-    # Note that get_entity_group_version() uses same entity group (root_key)
-    # internally and respects transactions. So all data fetched here does indeed
-    # correspond to |current_version|.
-    return AuthDB(
-        replication_state=replication_state_future.get_result(),
-        global_config=global_config_future.get_result(),
-        groups=groups_future.get_result(),
-        secrets=secrets_future.get_result(),
-        ip_whitelist_assignments=ip_whitelist_assignments,
-        ip_whitelists=ip_whitelists,
-        additional_client_ids=additional_client_ids,
-        entity_group_version=current_version)
+    # Do not invoke AuthDB constructor while we still hold the transaction,
+    # since it does some heavy computations. Instead just return all kwargs for
+    # it, so AuthDB can be built outside.
+    return {
+      'replication_state': replication_state_future.get_result(),
+      'global_config': global_config_future.get_result(),
+      'groups': groups_future.get_result(),
+      'secrets': secrets_future.get_result(),
+      'ip_whitelist_assignments': ip_whitelist_assignments,
+      'ip_whitelists': ip_whitelists,
+      'additional_client_ids': additional_client_ids,
+    }
 
   if prepare():  # non-transactional work
-    return fetch()
-  return None
+    return AuthDB(**fetch())
+  return known_auth_db
 
 
 def reset_local_state():
@@ -971,7 +957,6 @@ def get_process_auth_db():
   global _auth_db_fetching_thread
 
   known_auth_db = None
-  known_auth_db_version = None
 
   with _auth_db_lock:
     # Cached copy is still fresh?
@@ -999,7 +984,6 @@ def get_process_auth_db():
     # on the lock.
     _auth_db_fetching_thread = threading.current_thread()
     known_auth_db = _auth_db
-    known_auth_db_version = _auth_db.entity_group_version
     logging.debug('Refetching AuthDB')
 
   # Do the actual fetch outside the lock. Be careful to handle any unexpected
@@ -1010,12 +994,9 @@ def get_process_auth_db():
     # only one thread that is doing the fetch. This lock is useful only in
     # conjunction with concurrent 'get_latest_auth_db' calls.
     with _auth_db_fetch_lock:
-      fresh_copy = fetch_auth_db(known_version=known_auth_db_version)
-    if fresh_copy is None:
-      # No changes, entity group versions match, reuse same object.
-      fresh_copy = known_auth_db
+      fetched = fetch_auth_db(known_auth_db=known_auth_db)
   except Exception:
-    # Failed. Be sure to allow other threads to try the fetch. Meanwhile log the
+    # Be sure to allow other threads to try the fetch. Meanwhile log the
     # exception and return a stale copy of AuthDB. Better than nothing.
     logging.exception('Failed to refetch AuthDB, returning stale cached copy')
     with _auth_db_lock:
@@ -1027,7 +1008,7 @@ def get_process_auth_db():
   with _auth_db_lock:
     assert _auth_db_fetching_thread == threading.current_thread()
     _auth_db_fetching_thread = None
-    return _roll_auth_db_cache(fresh_copy)
+    return _roll_auth_db_cache(fetched)
 
 
 def get_latest_auth_db():
@@ -1050,17 +1031,16 @@ def get_latest_auth_db():
   # it gets unlocked, waiting threads quickly discover that '_auth_db' is
   # already fresh.
   with _auth_db_fetch_lock:
-    known = None
+    cached = None
     with _auth_db_lock:
       if _auth_db is None:
         return _initialize_auth_db_cache()
-      known = _auth_db
+      cached = _auth_db
 
-    # Note: fetch_auth_db returns None if known version is already latest.
-    fresh = fetch_auth_db(known_version=known.entity_group_version) or known
+    fetched = fetch_auth_db(known_auth_db=cached)
 
     with _auth_db_lock:
-      return _roll_auth_db_cache(fresh)
+      return _roll_auth_db_cache(fetched)
 
 
 def warmup():
@@ -1100,14 +1080,26 @@ def _roll_auth_db_cache(candidate):
 
   # This may happen after 'reset_local_state' call.
   if _auth_db is None:
+    logging.info('Fetched AuthDB at rev %d', candidate.auth_db_rev)
     _auth_db = candidate
     _auth_db_expiration = time.time() + _process_cache_expiration_sec
-    logging.info('Updated AuthDB to rev %d', _auth_db.auth_db_rev)
+    return _auth_db
+
+  # This may happen when we switch the primary server the replica is linked to.
+  # AuthDB revisions are not directly comparable in this case, so assume
+  # 'candidate' is newer.
+  if _auth_db.primary_id != candidate.primary_id:
+    logging.info(
+        'AuthDB primary changed %s (rev %d) -> %s (rev %d)',
+        _auth_db.primary_id, _auth_db.auth_db_rev,
+        candidate.primary_id, candidate.auth_db_rev)
+    _auth_db = candidate
+    _auth_db_expiration = time.time() + _process_cache_expiration_sec
     return _auth_db
 
   # Completely skip the update if the fetched version is older than what we
   # already have.
-  if candidate.entity_group_version < _auth_db.entity_group_version:
+  if candidate.auth_db_rev < _auth_db.auth_db_rev:
     logging.info(
         'Someone else updated the cached AuthDB already '
         '(cached rev %d > fetched rev %d)',
@@ -1115,8 +1107,9 @@ def _roll_auth_db_cache(candidate):
     return _auth_db
 
   # Prefer to reuse the known copy if it matches the fetched one, it may have
-  # some internal caches we want to keep.
-  if candidate.entity_group_version > _auth_db.entity_group_version:
+  # some internal caches we want to keep. So update _auth_db only if candidate
+  # is strictly fresher.
+  if candidate.auth_db_rev > _auth_db.auth_db_rev:
     _auth_db = candidate
     logging.info(
         'Updated cached AuthDB: rev %d->%d',
