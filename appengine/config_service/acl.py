@@ -20,6 +20,14 @@ def get_acl_cfg():
       common.ACL_FILENAME, service_config_pb2.AclCfg).get_result()
 
 
+def can_reimport(config_set):
+  if not can_read_config_sets([config_set])[config_set]:
+    return False
+  acl_cfg = get_acl_cfg()
+  return acl_cfg and acl_cfg.reimport_group and auth.is_group_member(
+    acl_cfg.reimport_group) or is_admin()
+
+
 def can_read_config_sets(config_sets):
   """Returns a mapping {config_set: has_access}.
 

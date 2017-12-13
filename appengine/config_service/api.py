@@ -465,8 +465,10 @@ class ConfigApi(remote.Service):
   @auth.public # ACL check inside
   def reimport(self, request):
     """Reimports a config set."""
-    if not acl.is_admin():
-      raise endpoints.ForbiddenException('Only admins are allowed to do this')
+    if not acl.can_reimport(request.config_set):
+      raise endpoints.ForbiddenException(
+          '%s is now allowed to reimport %r' % (
+              auth.get_current_identity().to_bytes()), request.config_set)
     # Assume it is Gitiles.
     try:
       gitiles_import.import_config_set(request.config_set)

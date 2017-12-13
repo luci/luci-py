@@ -109,6 +109,8 @@ message AclCfg {
   optional string config_get_by_hash_group = 4;
   // Name of the group that may call validation API.
   optional string validation_group = 5;
+  // Name of the group that may call reimport API.
+  optional string reimport_group = 6;
 }
 
 // Schema for import.cfg. It specified how to import configuration files from
