@@ -309,5 +309,15 @@ exports.fetchGroupListing = function(group) {
 };
 
 
+// Fetches the subgraph with information related to the given principal.
+//
+// Refer to the backend source code to figure out what it is exactly.
+exports.fetchRelevantSubgraph = function(principal) {
+  return call(
+      'GET', '/auth/api/v1/subgraph/' + principal, null,
+      {'Cache-Control': 'no-cache'});
+};
+
+
 return exports;
 }());

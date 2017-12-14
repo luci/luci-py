@@ -45,6 +45,15 @@ exports.getGroupListingURL = function(group) {
 };
 
 
+// Returns URL to a page with a principal lookup results.
+exports.getLookupURL = function(principal) {
+  if (principal) {
+    return '/auth/lookup?p=' + encodeURIComponent(principal);
+  }
+  return '/auth/lookup';
+};
+
+
 // Appends '<prefix>:' to a string if it doesn't have a prefix.
 exports.addPrefix = function(prefix, str) {
   if (str.indexOf(':') == -1) {

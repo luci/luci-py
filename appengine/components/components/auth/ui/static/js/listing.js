@@ -18,10 +18,11 @@ var sortByPrincipal = function(list) {
 };
 
 
-// Walks over list of objects and remove 'user:' prefix from 'principal' field.
-var beautifyPrincipalList = function(list) {
+// Removes 'user:' prefix from 'principal' field, adds lookupUrl field.
+var preparePrincipalList = function(list) {
   _.each(list, function(obj) {
     obj.principal = common.stripPrefix('user', obj.principal);
+    obj.lookupUrl = common.getLookupURL(obj.principal);
   });
 };
 
@@ -42,9 +43,10 @@ var renderListing = function(group, listing, $element) {
   sortByPrincipal(listing.globs);
   sortByPrincipal(listing.nested);
 
-  // Beautify strings by stripping default 'user:' prefix.
-  beautifyPrincipalList(listing.members);
-  beautifyPrincipalList(listing.globs);
+  // Beautify strings by stripping default 'user:' prefix, calculate URLs to
+  // Lookup pages.
+  preparePrincipalList(listing.members);
+  preparePrincipalList(listing.globs);
 
   // Compute nested groups href's.
   _.each(listing.nested, function(obj) {

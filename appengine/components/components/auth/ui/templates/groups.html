@@ -67,10 +67,18 @@ javascript library and not jinja2. #}
            data-placement="top">
           <span class="glyphicon glyphicon-list"></span>
         </a>
+        <a href="{{lookupUrl}}"
+           id="lookup-button"
+           style="float: right; padding-right: 4px"
+           title="View in Lookup"
+           data-toggle="tooltip"
+           data-placement="top">
+          <span class="glyphicon glyphicon-search"></span>
+        </a>
         <a href="{{changeLogUrl}}"
            id="change-log-button"
            style="float: right; padding-right: 4px"
-           title="Change log"
+           title="Changes"
            data-toggle="tooltip"
            data-placement="top">
           <span class="glyphicon glyphicon-calendar"></span>
@@ -192,7 +200,7 @@ javascript library and not jinja2. #}
       <!-- Group search button. -->
       <div class="input-group" id="search-box-group">
           <input id="search-box" type="text"
-                 class="form-control" placeholder="Search" />
+                 class="form-control" placeholder="Search" autofocus />
           <span class="input-group-addon">
             <i class="glyphicon glyphicon-search"></i>
           </span>

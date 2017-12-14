@@ -28,10 +28,14 @@ javascript library and not jinja2. #}
       <h4>Members</h4>
       <table class="table table-condensed" style="font-family:monospace;">
         {{#each globs}}
-        <tr class="warning"><td>{{this.principal}}</td></tr>
+        <tr class="warning">
+          <td><a href={{this.lookupUrl}}>{{this.principal}}</a></td>
+        </tr>
         {{/each}}
         {{#each members}}
-        <tr><td>{{this.principal}}</td></tr>
+        <tr>
+          <td><a href={{this.lookupUrl}}>{{this.principal}}</a></td>
+        </tr>
         {{/each}}
       </table>
       {{#if emptyListing}}

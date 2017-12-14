@@ -433,6 +433,7 @@ def create_application(debug):
       ui_tabs=[
         ui.GroupsHandler,
         ui.ChangeLogHandler,
+        ui.LookupHandler,
         ServicesHandler,
         ui.OAuthConfigHandler,
         ui.IPWhitelistsHandler,

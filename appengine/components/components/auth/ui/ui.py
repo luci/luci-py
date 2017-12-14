@@ -456,7 +456,7 @@ class UINavbarTabHandler(UIHandler):
 
 
 ################################################################################
-## Default tabs.
+## Default tabs (in order of their appearance in the navbar).
 
 
 class GroupsHandler(UINavbarTabHandler):
@@ -487,7 +487,7 @@ class ChangeLogHandler(UINavbarTabHandler):
   """Page with a log of changes to some groups."""
   navbar_tab_url = '/auth/change_log'
   navbar_tab_id = 'change_log'
-  navbar_tab_title = 'Change Log'
+  navbar_tab_title = 'Changes'
   js_file_url = '/auth/static/js/change_log.js'
   template_file = 'auth/change_log.html'
 
@@ -499,6 +499,15 @@ class ChangeLogHandler(UINavbarTabHandler):
     # stumble on Change log page (e.g. by using direct URL), it handles
     # NeedIndexError gracefully (explaining how to configure indexes).
     return change_log.is_changle_log_indexed()
+
+
+class LookupHandler(UINavbarTabHandler):
+  """Page with UI to lookup groups a principal belongs to."""
+  navbar_tab_url = '/auth/lookup'
+  navbar_tab_id = 'lookup'
+  navbar_tab_title = 'Lookup'
+  js_file_url = '/auth/static/js/lookup.js'
+  template_file = 'auth/lookup.html'
 
 
 class OAuthConfigHandler(UINavbarTabHandler):
@@ -723,6 +732,7 @@ class ApiDocHandler(UINavbarTabHandler):
 _ui_navbar_tabs = (
   GroupsHandler,
   ChangeLogHandler,
+  LookupHandler,
   OAuthConfigHandler,
   IPWhitelistsHandler,
   ApiDocHandler,

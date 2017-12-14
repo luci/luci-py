@@ -541,6 +541,7 @@ EditGroupForm.prototype.buildForm = function(group, lastModified) {
   // Prepare environment for template.
   group = _.clone(group);
   group.changeLogUrl = common.getChangeLogURL('AuthGroup', group.name);
+  group.lookupUrl = common.getLookupURL(group.name);
   group.fullListingUrl = common.getGroupListingURL(group.name);
 
   // Join members and globs list into single UI list.
@@ -586,6 +587,7 @@ EditGroupForm.prototype.buildForm = function(group, lastModified) {
 
   // Activate tooltips on utility buttons.
   $('#full-listing-button', this.$element).tooltip();
+  $('#lookup-button', this.$element).tooltip();
   $('#change-log-button', this.$element).tooltip();
 };
 
