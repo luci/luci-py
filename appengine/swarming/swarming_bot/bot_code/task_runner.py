@@ -410,6 +410,58 @@ def fail_without_command(remote, bot_id, task_id, params, cost_usd_hour,
   }
 
 
+class _FailureOnStart(Exception):
+  """Process run_isolated couldn't be started."""
+  def __init__(self, exit_code, stdout):
+    super(_FailureOnStart, self).__init__(stdout)
+    self.exit_code = exit_code
+    self.stdout = stdout
+
+
+def _start_task_runner(args, work_dir, ctx_file):
+  """Starts task_runner process and returns its handle.
+
+  Raises:
+    _FailureOnStart if a problem occurred.
+  """
+  cmd = get_run_isolated()
+  args_path = os.path.join(work_dir, 'run_isolated_args.json')
+  cmd.extend(['-a', args_path])
+  env = os.environ.copy()
+  if ctx_file:
+    env['LUCI_CONTEXT'] = ctx_file
+  logging.info('cmd=%s', cmd)
+  logging.info('cwd=%s', work_dir)
+  logging.info('args=%s', args)
+
+  # We write args to a file since there may be more of them than the OS
+  # can handle. Since it is inside work_dir, it'll be automatically be deleted
+  # upon task termination.
+  try:
+    with open(args_path, 'wb') as f:
+      json.dump(args, f)
+  except (IOError, OSError) as e:
+    raise _FailureOnStart(
+        e.errno or -1,
+        'Could not write args to %s: %s' % (args_path, e))
+
+  try:
+    # TODO(maruel): Support separate streams for stdout and stderr.
+    proc = subprocess42.Popen(
+        cmd,
+        env=env,
+        cwd=work_dir,
+        detached=True,
+        stdout=subprocess42.PIPE,
+        stderr=subprocess42.STDOUT,
+        stdin=subprocess42.PIPE)
+  except OSError as e:
+    raise _FailureOnStart(
+        e.errno or -1,
+        'Command "%s" failed to start.\nError: %s' % (' '.join(cmd), e))
+  return proc
+
+
 def run_command(remote, task_details, work_dir, cost_usd_hour,
                 task_start, run_isolated_flags, bot_file, ctx_file):
   """Runs a command and sends packets to the server to stream results back.
@@ -424,20 +476,17 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     ExitSignal if caught some signal when starting or stopping.
     InternalError on unexpected internal errors.
   """
-  # TODO(maruel): This function is incomprehensible, split and refactor.
-
   # Signal the command is about to be started. It is important to post a task
   # update *BEFORE* starting any user code to signify the server that the bot
   # correctly started processing the task. In the case of non-idempotent task,
   # this signal is used to know if it is safe to retry the task or not. See
   # _reap_task() in task_scheduler.py for more information.
   last_packet = start = now = monotonic_time()
-  task_id = task_details.task_id
-  bot_id = task_details.bot_id
   params = {
     'cost_usd': cost_usd_hour * (now - task_start) / 60. / 60.,
   }
-  if not remote.post_task_update(task_id, bot_id, params):
+  if not remote.post_task_update(
+      task_details.task_id, task_details.bot_id, params):
     # Don't even bother, the task was already canceled.
     return {
       u'exit_code': -1,
@@ -448,9 +497,6 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     }
 
   isolated_result = os.path.join(work_dir, 'isolated_result.json')
-  args_path = os.path.join(work_dir, 'run_isolated_args.json')
-  cmd = get_run_isolated()
-  cmd.extend(['-a', args_path])
   args = get_isolated_args(work_dir, task_details,
                            isolated_result, bot_file, run_isolated_flags)
   # Hard timeout enforcement is deferred to run_isolated. Grace is doubled to
@@ -461,44 +507,13 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     task_details.grace_period *= 2
 
   try:
-    # TODO(maruel): Support both channels independently and display stderr in
-    # red.
-    env = os.environ.copy()
-    if ctx_file:
-      env['LUCI_CONTEXT'] = ctx_file
-    logging.info('cmd=%s', cmd)
-    logging.info('cwd=%s', work_dir)
-    logging.info('args=%s', args)
-    fail_on_start = lambda exit_code, stdout: fail_without_command(
-        remote, bot_id, task_id, params, cost_usd_hour, task_start,
-        exit_code, stdout)
+    proc = _start_task_runner(args, work_dir, ctx_file)
+  except _FailureOnStart as e:
+    return fail_without_command(
+      remote, task_details.bot_id, task_details.task_id, params, cost_usd_hour,
+      task_start, e.exit_code, e.stdout)
 
-    # We write args to a file since there may be more of them than the OS
-    # can handle.
-    try:
-      with open(args_path, 'wb') as f:
-        json.dump(args, f)
-    except (IOError, OSError) as e:
-      return fail_on_start(
-          -1,
-          'Could not write args to %s: %s' % (args_path, e))
-
-    # Start the command
-    try:
-      assert cmd and all(isinstance(a, basestring) for a in cmd)
-      proc = subprocess42.Popen(
-          cmd,
-          env=env,
-          cwd=work_dir,
-          detached=True,
-          stdout=subprocess42.PIPE,
-          stderr=subprocess42.STDOUT,
-          stdin=subprocess42.PIPE)
-    except OSError as e:
-      return fail_on_start(
-          1,
-          'Command "%s" failed to start.\nError: %s' % (' '.join(cmd), e))
-
+  try:
     # Monitor the task
     output_chunk_start = 0
     stdout = ''
@@ -524,7 +539,7 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
           params['cost_usd'] = (
               cost_usd_hour * (last_packet - task_start) / 60. / 60.)
           if not remote.post_task_update(
-              task_id, bot_id,
+              task_details.task_id, task_details.bot_id,
               params, (stdout, output_chunk_start)):
             # Server is telling us to stop. Normally task cancellation.
             if not kill_sent:
@@ -652,7 +667,8 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     # already handling some.
     try:
       remote.post_task_update(
-          task_id, bot_id, params, (stdout, output_chunk_start), exit_code)
+          task_details.task_id, task_details.bot_id, params,
+          (stdout, output_chunk_start), exit_code)
     except remote_client.InternalError as e:
       logging.error('Internal error while finishing the task: %s', e)
       if not must_signal_internal_failure:

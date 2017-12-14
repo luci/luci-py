@@ -699,6 +699,15 @@ class TestTaskRunner(TestTaskRunnerBase):
         self.assertEqual('updated_cache', f.read())
       cache_manager.uninstall(install_dir, 'foo')
 
+  def test_start_task_runner_fail_on_startup(self):
+    def _get_run_isolated():
+      return ['invalid_commad_that_shouldnt_exist']
+    self.mock(task_runner, 'get_run_isolated', _get_run_isolated)
+    with self.assertRaises(task_runner._FailureOnStart) as e:
+      task_runner._start_task_runner([], self.work_dir, None)
+    # TODO(maruel): Fix on Windows.
+    self.assertEqual(2, e.exception.exit_code)
+
   def test_main(self):
     def load_and_run(
         manifest, swarming_server, is_grpc, cost_usd_hour, start,
