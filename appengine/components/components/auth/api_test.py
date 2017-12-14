@@ -840,6 +840,153 @@ class AuthWebUIConfigTest(test_case.TestCase):
     self.assertEqual('zzz', api.get_web_client_id())
 
 
+class AuthDBBuilder(object):
+  def __init__(self):
+    self.groups = []
+
+  def group(self, name, members=None, globs=None, nested=None, owners=None):
+    self.groups.append(model.AuthGroup(
+        key=model.group_key(name),
+        members=[model.Identity.from_bytes(m) for m in (members or [])],
+        globs=[model.IdentityGlob.from_bytes(g) for g in (globs or [])],
+        nested=nested or [],
+        owners=owners or 'default-owners-group',
+    ))
+    return self
+
+  def build(self):
+    return api.AuthDB(groups=self.groups)
+
+
+class RelevantSubgraphTest(test_case.TestCase):
+  def call(self, db, principal):
+    if '*' in principal:
+      principal = model.IdentityGlob.from_bytes(principal)
+    elif '@' in principal:
+      principal = model.Identity.from_bytes(principal)
+    graph = db.get_relevant_subgraph(principal)
+    # Use a dict with integer keys instead of a list to improve the readability
+    # of assertions below.
+    nodes = {}
+    for i, (node, edges) in enumerate(graph.describe()):
+      if isinstance(node, (model.Identity, model.IdentityGlob)):
+        node = node.to_bytes()
+      nodes[i]= (node, {l: sorted(s) for l, s in edges.iteritems() if s})
+    return nodes
+
+  def test_empty(self):
+    db = AuthDBBuilder().build()
+    self.assertEqual(
+        {0: ('user:a@example.com', {})}, self.call(db, 'user:a@example.com'))
+    self.assertEqual(
+        {0: ('user:*@example.com', {})}, self.call(db, 'user:*@example.com'))
+    self.assertEqual(
+        {0: ('group', {})}, self.call(db, 'group'))
+
+  def test_identity_discoverable_directly_and_through_glob(self):
+    b = AuthDBBuilder()
+    b.group('g1', ['user:a@example.com'])
+    b.group('g2', ['user:b@example.com'])
+    b.group('g3', [], ['user:*@example.com'])
+    b.group('g4', ['user:a@example.com'], ['user:*'])
+    self.assertEqual({
+      0: ('user:a@example.com', {'IN': [1, 3, 4, 5]}),
+      1: ('user:*@example.com', {'IN': [2]}),
+      2: ('g3', {}),
+      3: ('user:*', {'IN': [4]}),
+      4: ('g4', {}),
+      5: ('g1', {}),
+    }, self.call(b.build(), 'user:a@example.com'))
+
+  def test_glob_is_matched_directly(self):
+    b = AuthDBBuilder()
+    b.group('g1', [], ['user:*@example.com'])
+    b.group('g2', [], ['user:*'])
+    self.assertEqual({
+      0: ('user:*@example.com', {'IN': [1]}),
+      1: ('g1', {}),
+    }, self.call(b.build(), 'user:*@example.com'))
+
+  def test_simple_group_lookup(self):
+    b = AuthDBBuilder()
+    b.group('g1', nested=['g2', 'g3'])
+    b.group('g2', nested=['g3'])
+    b.group('g3')
+    self.assertEqual({
+      0: ('g3', {'IN': [1, 2]}),
+      1: ('g1', {}),
+      2: ('g2', {'IN': [1]}),
+    }, self.call(b.build(), 'g3'))
+
+  def test_ownership_relations(self):
+    b = AuthDBBuilder()
+    b.group('a-root', nested=['b-inner'])
+    b.group('b-inner')
+    b.group('c-owned-by-root', owners='a-root')
+    b.group('d-includes-owned-by-root', nested=['c-owned-by-root'])
+    b.group('e-owned-by-3', owners='d-includes-owned-by-root')
+    self.assertEqual({
+      0: ('b-inner', {'IN': [1]}),
+      1: ('a-root', {'OWNS': [2]}),
+      2: ('c-owned-by-root', {'IN': [3]}),
+      3: ('d-includes-owned-by-root', {'OWNS': [4]}),
+      4: ('e-owned-by-3', {}),
+    }, self.call(b.build(), 'b-inner'))
+
+  def test_diamond(self):
+    b = AuthDBBuilder()
+    b.group('top', nested=['middle1', 'middle2'])
+    b.group('middle1', nested=['bottom'])
+    b.group('middle2', nested=['bottom'])
+    b.group('bottom')
+    self.assertEqual({
+      0: ('bottom', {'IN': [1, 3]}),
+      1: ('middle1', {'IN': [2]}),
+      2: ('top', {}),
+      3: ('middle2', {'IN': [2]}),
+    }, self.call(b.build(), 'bottom'))
+
+  def test_cycle(self):
+    # Note: cycles in groups are forbidden on API layer, but make sure we still
+    # handle them without hanging in case something unexpected happens and they
+    # appear.
+    b = AuthDBBuilder()
+    b.group('g1', nested=['g2'])
+    b.group('g2', nested=['g1', 'g2'])
+    self.assertEqual({
+      0: ('g2', {'IN': [0, 1]}),
+      1: ('g1', {'IN': [0]}),
+    }, self.call(b.build(), 'g2'))
+
+  def test_selfowners(self):
+    b = AuthDBBuilder()
+    b.group('g1', nested=['g2'], owners='g1')
+    b.group('g2')
+    self.assertEqual({0: ('g1', {'OWNS': [0]})}, self.call(b.build(), 'g1'))
+    self.assertEqual({
+      0: ('g2', {'IN': [1]}),
+      1: ('g1', {'OWNS': [1]}),
+    }, self.call(b.build(), 'g2'))
+
+
+  def test_messy_graph(self):
+    b = AuthDBBuilder()
+    b.group('directly', ['user:a@example.com'])
+    b.group('via-glob', [], ['user:*@example.com'])
+    b.group('g1', nested=['via-glob'], owners='g2')
+    b.group('g2', nested=['directly'])
+    b.group('g3', nested=['g1'])
+    self.assertEqual({
+      0: ('user:a@example.com', {'IN': [1, 5]}),
+      1: ('user:*@example.com', {'IN': [2]}),
+      2: ('via-glob', {'IN': [3]}),
+      3: ('g1', {'IN': [4]}),
+      4: ('g3', {}),
+      5: ('directly', {'IN': [6]}),
+      6: ('g2', {'OWNS': [3]}),
+    }, self.call(b.build(), 'user:a@example.com'))
+
+
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None

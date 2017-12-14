@@ -610,6 +610,54 @@ class ApiDocHandler(UINavbarTabHandler):
         },
       },
     },
+    {
+      'name': 'Group subgraph',
+      'doc':
+        'Subgraph with all groups that include a principal (perhaps indirectly)'
+        ' or owned by it (also perhaps indirectly). Each node has an ID that '
+        'matches its index in "nodes" array. These IDs are referenced in '
+        '"edges" relations. ID of the node that matches the principal of '
+        'interest is 0, i.e it is always first in "nodes" array.',
+      'example': {
+        'subgraph': {
+          'nodes': [
+            {
+              'kind': 'IDENTITY',
+              'edges': {
+                'IN': [1, 2],
+              },
+              'value': 'user:someone@example.com',
+            },
+            {
+              'kind': 'GLOB',
+              'edges': {
+                'IN': [2],
+              },
+              'value': 'user:*',
+            },
+            {
+              'kind': 'GROUP',
+              'edges': {
+                'IN': [3],
+                'OWNS': [2, 4],
+              },
+              'value': 'owners-group',
+            },
+            {
+              'kind': 'GROUP',
+              'edges': {
+                'OWNS': [3],
+              },
+              'value': 'another-owners-group',
+            },
+            {
+              'kind': 'GROUP',
+              'value': 'owned-group',
+            },
+          ],
+        },
+      },
+    },
   ]
 
   @redirect_ui_on_replica

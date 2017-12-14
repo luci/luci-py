@@ -218,6 +218,70 @@ class AuthDB(object):
       client_ids.extend(additional_client_ids)
     self.allowed_client_ids = set(c for c in client_ids if c)
 
+    # Lazy-initialized indexes structures. See _indexes().
+    self._lock = threading.Lock()
+    self._members_idx = None
+    self._globs_idx = None
+    self._nested_idx = None
+    self._owned_idx = None
+
+  def _indexes(self):
+    """Lazily builds and returns various indexes used by get_relevant_subgraph.
+
+    Members index is a map from serialized Identity to a list of groups that
+    directly include it (NOT via glob or a nested subgroup).
+
+    Globs index is a map from IdentityGlob to a list of groups that directly
+    include it. We store it as OrderedDict to make 'get_relevant_subgraph'
+    output deterministic (it linearly traverses through globs index keys at some
+    point).
+
+    Nested groups index is a map from a group name to a list of groups that
+    directly include it.
+
+    Ownership index is a map from a group name to a list of groups directly
+    owned by it.
+
+    Returns:
+      (
+        Members index as dict(Identity.to_bytes() str => [str with group name]),
+        Globs index as OrderedDict(IndentityGlob => [str with group name],
+        Nested groups index as dict(group name => [str with group name]),
+        Ownership index as dict(group name => [str with group name]),
+      )
+    """
+    with self._lock:
+      if self._members_idx is not None:
+        assert self._globs_idx is not None
+        assert self._nested_idx is not None
+        assert self._owned_idx is not None
+        return (
+            self._members_idx, self._globs_idx,
+            self._nested_idx, self._owned_idx)
+
+      logging.info('Building in-memory indexes...')
+
+      members_idx = collections.defaultdict(list)
+      globs_idx = collections.defaultdict(list)
+      nested_idx = collections.defaultdict(list)
+      owned_idx = collections.defaultdict(list)
+      for name, group in sorted(self.groups.iteritems()):
+        for member in group.members:
+          members_idx[member].append(name)
+        for glob in group.globs:
+          globs_idx[glob].append(name)
+        for nested in group.nested:
+          nested_idx[nested].append(name)
+        owned_idx[group.owners].append(name)
+
+      logging.info('Finished building in-memory indexes')
+
+      self._members_idx = members_idx
+      self._globs_idx = collections.OrderedDict(sorted(globs_idx.items()))
+      self._nested_idx = nested_idx
+      self._owned_idx = owned_idx
+      return members_idx, globs_idx, nested_idx, owned_idx
+
   @property
   def auth_db_rev(self):
     """Returns the revision number of groups database."""
@@ -382,6 +446,75 @@ class AuthDB(object):
   def get_group_names_with_prefix(self, prefix):
     """Returns a sorted list of group names that start with the given prefix."""
     return sorted(g for g in self.groups if g.startswith(prefix))
+
+  def get_relevant_subgraph(self, principal):
+    """Returns groups that include the principal and owned by principal.
+
+    Returns it in a graph form where edges represent relations "subset of" and
+    "owned by".
+
+    Args:
+      principal: Identity, IdentityGlob or a group name string.
+
+    Returns:
+      Graph instance.
+    """
+    # members_idx: {identity str => list of group names that have it}
+    # globs_idx: {IdentityGlob tuple => list of group names that have it}
+    # nested_idx: {group name => list of group names that include it}
+    # owned_idx: {group name => list of group names owned by it}
+    members_idx, globs_idx, nested_idx, owned_idx = self._indexes()
+
+    # Note: when we say 'add_edge(A, IN, B)' we mean 'A' is a direct subset of
+    # 'B' in the full group graph, i.e 'B' includes 'A' directly.
+    graph = Graph()
+    add_node = graph.add_node
+    add_edge = graph.add_edge
+
+    # Adds the given group and all groups that include it and owned by it (
+    # perhaps indirectly) to 'graph'. Traverses group graph from leafs (most
+    # nested groups) to roots (least nested groups that include other groups).
+    def traverse(group):
+      group_id, added = add_node(group)
+      if added:
+        for supergroup in nested_idx.get(group, ()):
+          add_edge(group_id, Graph.IN, traverse(supergroup))
+        for owned in owned_idx.get(group, ()):
+          add_edge(group_id, Graph.OWNS, traverse(owned))
+      return group_id
+
+    # Find the leafs of the graph. It's the only part that depends on the exact
+    # kind of the principal. Once we get to leaf groups, everything is uniform
+    # after that: we just travel through the graph via 'traverse'.
+    if isinstance(principal, model.Identity):
+      graph.root_id, _ = add_node(principal)
+
+      # Find all globs that match the identity. The identity will belong to
+      # all groups the globs belong to. Note that 'globs_idx' is OrderedDict.
+      for glob, groups_that_have_glob in globs_idx.iteritems():
+        if glob.match(principal):
+          glob_id, _ = add_node(glob)
+          add_edge(graph.root_id, Graph.IN, glob_id)
+          for group in groups_that_have_glob:
+            add_edge(glob_id, Graph.IN, traverse(group))
+
+      # Find all groups that directly mention the identity.
+      for group in members_idx.get(principal.to_bytes(), ()):
+        add_edge(graph.root_id, Graph.IN, traverse(group))
+
+    elif isinstance(principal, model.IdentityGlob):
+      graph.root_id, _ = add_node(principal)
+
+      # Find all groups that directly mention the glob.
+      for group in globs_idx.get(principal, ()):
+        add_edge(graph.root_id, Graph.IN, traverse(group))
+
+    elif isinstance(principal, basestring):
+      graph.root_id = traverse(principal)
+    else:
+      raise TypeError('Wrong "principal" type %s' % type(principal))
+
+    return graph
 
   def get_secret(self, key):
     """Returns list of strings with last known values of a secret.
@@ -1128,6 +1261,71 @@ def _roll_auth_db_cache(candidate):
   # it cached for longer.
   _auth_db_expiration = time.time() + _process_cache_expiration_sec
   return _auth_db
+
+
+################################################################################
+## Group graph used by 'get_relevant_subgraph'.
+
+
+class Graph(object):
+  """Graph is directed multigraph with labeled edges and a designated root node.
+
+  Nodes are assigned integer IDs and edges are stored as a map
+  {node_from_id => label => node_to_id}. It simplifies serializing such graphs.
+
+  Nodes must be comparable and hashable, since we use them as a dictionary keys.
+  """
+
+  # Note: exact values of labels end up in JSON API output, so change carefully.
+  IN   = 'IN'    # edge A->B labeled 'IN' means 'A is subset of B'
+  OWNS = 'OWNS'  # edge A->B labeled 'OWNS' means 'A owns B'
+
+  def __init__(self):
+    self._nodes = []        # list of all added nodes
+    self._nodes_to_id = {}  # node object -> index of the node in _nodes
+    self._root_id = None
+    self._edges = collections.defaultdict(lambda: {
+      self.IN: set(),
+      self.OWNS: set(),
+    })
+
+  @property
+  def root_id(self):
+    return self._root_id
+
+  @root_id.setter
+  def root_id(self, node_id):
+    assert node_id >= 0 and node_id < len(self._nodes)
+    self._root_id = node_id
+
+  def add_node(self, value):
+    """Adds the given node (if not there).
+
+    Returns:
+      (Integer ID of the node, True if was added or False if existed before).
+    """
+    node_id = self._nodes_to_id.get(value)
+    if node_id is not None:
+      return node_id, False
+    self._nodes_to_id[value] = node_id = len(self._nodes)
+    self._nodes.append(value)
+    return node_id, True
+
+  def add_edge(self, from_node_id, relation, to_node_id):
+    """Adds an edge (labeled by 'relation') between nodes given by their IDs."""
+    assert from_node_id >= 0 and from_node_id < len(self._nodes)
+    assert to_node_id >= 0 and to_node_id < len(self._nodes)
+    assert relation in (self.IN, self.OWNS), relation
+    self._edges[from_node_id][relation].add(to_node_id)
+
+  def describe(self):
+    """Yields pairs (node, edges from it) in order of node IDs.
+
+    Nodes IDs are sequential, starting from 0. Edges are represented by a map
+    {label -> set([to_node_id])}.
+    """
+    for i, node in enumerate(self._nodes):
+      yield node, self._edges.get(i, {})
 
 
 ################################################################################

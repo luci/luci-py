@@ -1907,6 +1907,75 @@ class MembershipsCheckHandlerTest(RestAPITestCase):
     self.assertEqual(400, status)
 
 
+class SubgraphHandlerTest(RestAPITestCase):
+  def setUp(self):
+    super(SubgraphHandlerTest, self).setUp()
+    self.mock_is_admin(True)
+
+  def test_no_arg(self):
+    status, body, _ = self.get(
+        path='/auth/api/v1/subgraph/', expect_errors=True)
+    self.assertEqual(400, status)
+    self.assertEqual({u'text': u'Bad principal - Not a valid group name'}, body)
+
+  def test_invalid_arg(self):
+    status, body, _ = self.get(
+        path='/auth/api/v1/subgraph/???', expect_errors=True)
+    self.assertEqual(400, status)
+    self.assertEqual({u'text': u'Bad principal - Not a valid group name'}, body)
+
+  def test_empty_reply_identity(self):
+    status, body, _ = self.get(path='/auth/api/v1/subgraph/user:a@example.com')
+    self.assertEqual(200, status)
+    self.assertEqual({
+      u'subgraph': {
+        u'nodes': [
+          {u'kind': u'IDENTITY', u'value': u'user:a@example.com'},
+        ],
+      },
+    }, body)
+
+  def test_empty_reply_glob(self):
+    status, body, _ = self.get(path='/auth/api/v1/subgraph/user:*@example.com')
+    self.assertEqual(200, status)
+    self.assertEqual({
+      u'subgraph': {
+        u'nodes': [
+          {u'kind': u'GLOB', u'value': u'user:*@example.com'},
+        ],
+      },
+    }, body)
+
+  def test_empty_reply_group(self):
+    status, body, _ = self.get(path='/auth/api/v1/subgraph/group')
+    self.assertEqual(200, status)
+    self.assertEqual({
+      u'subgraph': {
+        u'nodes': [
+          {u'kind': u'GROUP', u'value': u'group'},
+        ],
+      },
+    }, body)
+
+  def test_non_empty_reply(self):
+    make_group('a-root', nested=['b-inner'])
+    make_group('b-inner')
+    make_group('c-owned-by-root', owners='a-root')
+    make_group('d-inc-owned', nested=['c-owned-by-root'])
+    make_group('e-owned-by-3', owners='d-inc-owned')
+    api.reset_local_state()  # invalidate request cache to reread new groups
+
+    status, body, _ = self.get(path='/auth/api/v1/subgraph/b-inner')
+    self.assertEqual(200, status)
+    self.assertEqual({u'subgraph': {u'nodes': [
+      {u'edges': {u'IN': [1]}, u'kind': u'GROUP', u'value': u'b-inner'},
+      {u'edges': {u'OWNS': [2]}, u'kind': u'GROUP', u'value': u'a-root'},
+      {u'edges': {u'IN': [3]}, u'kind': u'GROUP', u'value': u'c-owned-by-root'},
+      {u'edges': {u'OWNS': [4]}, u'kind': u'GROUP', u'value': u'd-inc-owned'},
+      {u'kind': u'GROUP', u'value': u'e-owned-by-3'},
+    ]}}, body)
+
+
 class GroupsSuggestHandlerTest(RestAPITestCase):
   def setUp(self):
     super(GroupsSuggestHandlerTest, self).setUp()

@@ -57,6 +57,7 @@ def get_rest_api_routes():
         GroupListingHandler),
     webapp2.Route('/auth/api/v1/memberships/list', MembershipsListHandler),
     webapp2.Route('/auth/api/v1/memberships/check', MembershipsCheckHandler),
+    webapp2.Route('/auth/api/v1/subgraph/<principal:.*$>', SubgraphHandler),
     webapp2.Route('/auth/api/v1/suggest/groups', GroupsSuggestHandler),
     webapp2.Route('/auth/api/v1/server/certificates', CertificatesHandler),
     webapp2.Route('/auth/api/v1/server/info', ServerInfoHandler),
@@ -113,6 +114,13 @@ def _is_no_cache(request):
   """Returns True if the request should skip the cache."""
   cache_control = request.headers.get('Cache-Control') or ''
   return 'no-cache' in cache_control or 'max-age=0' in cache_control
+
+
+def _get_maybe_cached_auth_db(request):
+  """Returns cached auth DB unless the request has no cache header."""
+  if _is_no_cache(request):
+    return api.get_latest_auth_db()
+  return api.get_request_auth_db()
 
 
 class EntityOperationError(Exception):
@@ -1034,12 +1042,7 @@ class GroupListingHandler(handler.ApiHandler):
 
     # By default use cached auth DB. Switch to latest one only if No-Cache
     # header is given.
-    auth_db = None
-    if _is_no_cache(self.request):
-      auth_db = api.get_latest_auth_db()
-    else:
-      auth_db = api.get_request_auth_db()
-    listing = auth_db.list_group(name)
+    listing = _get_maybe_cached_auth_db(self.request).list_group(name)
 
     self.send_response({
       'listing': {
@@ -1235,6 +1238,69 @@ class MembershipsCheckHandler(PerIdentityBatchHandler):
         'is_member': any(auth_db.is_group_member(g, iden) for g in p['groups']),
       }
     return resp
+
+
+class SubgraphHandler(handler.ApiHandler):
+  """Returns groups that include this principal and are owned by it."""
+
+  # This is visible in the UI.
+  api_doc = [
+    {
+      'verb': 'GET',
+      'doc': 'Returns groups that include this principal and are owned by it.',
+      'response_type': 'Group subgraph',
+    },
+  ]
+
+  @api.require(acl.has_access)
+  def get(self, principal):
+    # Guess the principal type. All globs necessarily have '*' and ':', and all
+    # identities necessarily have ':' (but don't have '*'). Group names are
+    # forbidden to have '*' or ':'.
+    try:
+      if '*' in principal:
+        principal = model.IdentityGlob.from_bytes(principal)
+      elif ':' in principal:
+        principal = model.Identity.from_bytes(principal)
+      elif not model.is_valid_group_name(principal):
+        raise ValueError('Not a valid group name')
+    except ValueError as exc:
+      self.abort_with_error(400, text='Bad principal - %s' % exc)
+
+    # By default use cached auth DB. Switch to latest one only if No-Cache
+    # header is given.
+    auth_db = _get_maybe_cached_auth_db(self.request)
+    subgraph = auth_db.get_relevant_subgraph(principal)
+
+    def as_dict(node, edges):
+      if isinstance(node, model.Identity):
+        kind = 'IDENTITY'
+        value = node.to_bytes()
+      elif isinstance(node, model.IdentityGlob):
+        kind = 'GLOB'
+        value = node.to_bytes()
+      else:
+        assert isinstance(node, basestring), node
+        kind = 'GROUP'
+        value = node
+
+      sorted_edges = {}
+      for label, node_id_set in edges.iteritems():
+        if node_id_set:
+          sorted_edges[label] = sorted(node_id_set)
+
+      out = {'kind': kind, 'value': value}
+      if sorted_edges:
+        out['edges'] = sorted_edges
+      return out
+
+    # Per API contract the requested principal should have ID 0, verify this.
+    assert subgraph.root_id == 0, subgraph.root_id
+    self.send_response({
+      'subgraph': {
+        'nodes': [as_dict(node, edges) for node, edges in subgraph.describe()],
+      },
+    })
 
 
 class GroupsSuggestHandler(handler.ApiHandler):
