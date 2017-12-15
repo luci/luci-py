@@ -27,6 +27,12 @@ exports.utcTimestampToString = function(utc) {
 };
 
 
+// Returns URL to a main group page (where the group can be edited).
+exports.getGroupPageURL = function(group) {
+  return '/auth/groups/' + group;
+};
+
+
 // Returns URL to a change log page for a given target.
 exports.getChangeLogURL = function(kind, name) {
   return '/auth/change_log?target=' + encodeURIComponent(kind + '$' + name);
@@ -86,6 +92,27 @@ exports.stripPrefix = function(prefix, str) {
 // Applies 'stripPrefix' to each item of a list.
 exports.stripPrefixFromItems = function(prefix, items) {
   return _.map(items, _.partial(exports.stripPrefix, prefix));
+};
+
+
+// Returns sorted list of groups.
+//
+// Groups without '-' or '/' come first, then groups with '-'. Groups that can
+// be modified by a caller (based on 'caller_can_modify' field if available)
+// always come before read-only groups.
+exports.sortGroupsByName = function(groups) {
+  return _.sortBy(groups, function(group) {
+    // Note: caller_can_modify is optional, it is fine if its 'undefined'.
+    var prefix = group.caller_can_modify ? 'A' : 'B';
+    var name = group.name;
+    if (name.indexOf('/') != -1) {
+      return prefix + 'C' + name;
+    }
+    if (name.indexOf('-') != -1) {
+      return prefix + 'B' + name;
+    }
+    return prefix + 'A' + name;
+  });
 };
 
 

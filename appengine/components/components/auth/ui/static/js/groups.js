@@ -118,22 +118,7 @@ GroupChooser.prototype.refetchGroups = function() {
 GroupChooser.prototype.setGroupList = function(groups) {
   var self = this;
 
-  // Groups without '-' or '/' come first, then groups with '-'. Groups that can
-  // be modified by a caller always come before read-only groups.
-  var sortKeyFunc = function(group) {
-    var prefix = group.caller_can_modify ? 'A' : 'B';
-    var name = group.name;
-    if (name.indexOf('/') != -1) {
-      return prefix + 'C' + name;
-    }
-    if (name.indexOf('-') != -1) {
-      return prefix + 'B' + name;
-    }
-    return prefix + 'A' + name;
-  };
-
-  // Remember new sorted list.
-  self.groupList = _.sortBy(groups, sortKeyFunc);
+  self.groupList = common.sortGroupsByName(groups);
   self.groupMap = {};
   self.groupToItemMap = {};
   self.groupNames = [];

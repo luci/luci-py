@@ -1,6 +1,12 @@
 {% extends 'auth/base.html' %}
 {% block content %}
 
+<style>
+.popover{
+  max-width: 100%;
+}
+</style>
+
 {# BEWARE: The following templates in 'raw' section are handled by handlebars
 javascript library and not jinja2. #}
 
@@ -10,12 +16,68 @@ javascript library and not jinja2. #}
   <div class="row">
     <div class="col-md-12">
       <hr>
-      <h3 class="text-center">THIS FEATURE IS UNDER CONSTRUCTION</h3>
-      <h3 class="text-center"><small>as you can obviously see</small></h3>
-      <!-- TODO(vadimsh): Implement. -->
-      <pre>{{text}}</pre>
     </div>
   </div>
+
+  <div class="row">
+    <div class="col-md-12 text-center">
+      <h3 style="margin-top: 0px; text-align: center;">
+        {{#if principalIsGroup}}
+          <a href="{{groupHref}}">{{principalName}}</a>
+        {{else}}
+          {{principalName}}
+        {{/if}}
+      </h3>
+      <hr style="margin-top: 20px; margin-bottom: 10px;">
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-6">
+      <h4>Directly included by</h4>
+      {{#each directIncluders}}
+      <div>
+        <a href="{{this.href}}"
+           class="group-link"
+           data-group-name="{{this.name}}">{{this.name}}</a>
+        {{#if this.includesViaGlobs}}
+        <small>via {{#each this.includesViaGlobs}}{{this}} {{/each}}</small>
+        {{/if}}
+      </div>
+      {{else}}
+      <p style="color: #bbb"><i>None</i></p>
+      {{/each}}
+    </div>
+
+    <div class="col-md-6">
+      <h4>Indirectly included by</h4>
+      {{#each indirectIncluders}}
+      <div>
+        <a href="{{this.href}}"
+           class="group-link"
+           data-group-name="{{this.name}}"
+           data-toggle="popover"
+           data-trigger="hover"
+           data-placement="left">{{this.name}}</a>
+      </div>
+      {{else}}
+      <p style="color: #bbb"><i>None</i></p>
+      {{/each}}
+    </div>
+  </div>
+</script>
+
+<script id="indirect-group-popover" type="text/x-handlebars-template">
+<div style="font-size: small">
+  {{#each includesIndirectly}}
+  <p>
+    {{#each this}}
+      {{#if @index}}&rarr;{{/if}}
+      {{#if this}}{{this}}{{else}}&hellip;{{/if}}
+    {{/each}}
+  </p>
+  {{/each}}
+</div>
 </script>
 
 {% endraw %}
