@@ -657,8 +657,8 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         must_signal_internal_failure = '%s\n%s' % (
             e, traceback.format_exc()[-2048:])
 
-    # TODO(maruel): Send the internal failure here instead of sending it through
-    # bot_main, this causes a race condition.
+    # If no exit code has been set, something went wrong with run_isolated.py.
+    # Set exit code to -1 to indicate a generic error occurred.
     if exit_code is None:
       exit_code = -1
     params['hard_timeout'] = had_hard_timeout
@@ -666,9 +666,27 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     # Ignore server reply to stop. Also ignore internal errors here if we are
     # already handling some.
     try:
+      if must_signal_internal_failure:
+        # We need to update the task and then send task error. However, we
+        # should *not* send the exit_code since doing so would cause the task
+        # to be marked as COMPLETED until the subsequent post_task_error call
+        # finished, which would cause any query made between these two calls to
+        # get the wrong task status. We also clear out the duration as the
+        # server prints errors if the duration is set in this case.
+        # TODO(sethkoehler): Come up with some way to still send the exit_code
+        # without marking the task COMPLETED.
+        exit_code = None
+        params.pop('duration', None)
       remote.post_task_update(
           task_details.task_id, task_details.bot_id, params,
           (stdout, output_chunk_start), exit_code)
+      if must_signal_internal_failure:
+        remote.post_task_error(task_details.task_id, task_details.bot_id,
+            must_signal_internal_failure)
+        # Clear out this error as we've posted it now (we already cleared out
+        # exit_code above). Note: another error could arise after this point,
+        # which is fine, since bot_main.py will post it).
+        must_signal_internal_failure = ''
     except remote_client.InternalError as e:
       logging.error('Internal error while finishing the task: %s', e)
       if not must_signal_internal_failure:
