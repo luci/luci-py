@@ -29,7 +29,7 @@ import os_utilities
 
 class TestOsUtilities(auto_stub.TestCase):
   def test_get_os_name(self):
-    expected = (u'Linux', u'Mac', u'Raspbian', u'Ubuntu', u'Windows')
+    expected = (u'Debian', u'Linux', u'Mac', u'Raspbian', u'Ubuntu', u'Windows')
     self.assertIn(os_utilities.get_os_name(), expected)
 
   def test_get_cpu_type(self):
