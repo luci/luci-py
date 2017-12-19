@@ -240,7 +240,7 @@ def get_inside_docker():
     - u'stock' if running in standard docker.
     - u'nvidia' if running in nvidia-docker.
   """
-  if not os.path.isfile('/.docker_env'):
+  if not os.path.isfile('/.docker_env') and not os.path.isfile('/.dockerenv'):
     return None
   # TODO(maruel): Detect nvidia-docker.
   return u'stock'
