@@ -819,8 +819,10 @@ def _get_automatic_tags(request):
 ### Public API.
 
 
-def create_termination_task(bot_id, allow_high_priority):
+def create_termination_task(bot_id):
   """Returns a task to terminate the given bot.
+
+  ACL check must have been done before.
 
   Returns:
     TaskRequest for priority 0 (highest) termination task.
@@ -839,7 +841,7 @@ def create_termination_task(bot_id, allow_high_priority):
       properties=properties,
       tags=[u'terminate:1'])
   assert request.properties.is_terminate
-  init_new_request(request, allow_high_priority, None)
+  init_new_request(request, True, None)
   return request
 
 
@@ -945,6 +947,8 @@ def validate_request_key(request_key):
 def init_new_request(request, allow_high_priority, secret_bytes_ent):
   """Initializes a new TaskRequest but doesn't store it.
 
+  ACL check must have been done before, except for high priority task.
+
   Fills up some values and does minimal checks.
 
   If parent_task_id is set, properties for the parent are used:
@@ -966,12 +970,12 @@ def init_new_request(request, allow_high_priority, secret_bytes_ent):
     # Drop the previous user.
     request.user = parent.user
 
-  # If the priority is below 100, make sure the user has right to do so.
-  if request.priority < 100 and not allow_high_priority:
+  # If the priority is below 20, make sure the user has right to do so.
+  if request.priority < 20 and not allow_high_priority:
     # Special case for terminate request.
     if not request.properties.is_terminate:
       # Silently drop the priority of normal users.
-      request.priority = 100
+      request.priority = 20
 
   request.authenticated = auth.get_current_identity()
   if (not request.properties.is_terminate and

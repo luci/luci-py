@@ -581,7 +581,7 @@ class TasksApiTest(BaseTest):
           u'created_ts': str_now,
           u'expiration_secs': u'86400',
           u'name': u'task',
-          u'priority': u'100',
+          u'priority': u'20',
           u'properties': {
             u'cipd_input': {
               u'client_package': {
@@ -612,7 +612,7 @@ class TasksApiTest(BaseTest):
             u'os:Amiga',
             u'os:Win',
             u'pool:default',
-            u'priority:100',
+            u'priority:20',
             u'project:yay',
             u'service_account:none',
             u'user:joe@localhost',
@@ -1112,7 +1112,7 @@ class TasksApiTest(BaseTest):
         u'os:Amiga',
         u'os:Win',
         u'pool:default',
-        u'priority:100',
+        u'priority:20',
         u'project:yay',
         u'service_account:none',
         u'user:jack@localhost',
@@ -1175,7 +1175,7 @@ class TasksApiTest(BaseTest):
         u'os:Amiga',
         u'os:Win',
         u'pool:default',
-        u'priority:100',
+        u'priority:20',
         u'project:yay',
         u'service_account:none',
         u'user:joe@localhost',
@@ -1261,7 +1261,7 @@ class TaskApiTest(BaseTest):
       u'tags': [
         u'os:Amiga',
         u'pool:default',
-        u'priority:100',
+        u'priority:20',
         u'service_account:none',
         u'user:joe@localhost',
       ],
@@ -1344,7 +1344,7 @@ class TaskApiTest(BaseTest):
         u'tags': [
           u'os:Amiga',
           u'pool:default',
-          u'priority:100',
+          u'priority:20',
           u'service_account:none',
           u'user:joe@localhost',
         ],
@@ -1398,7 +1398,7 @@ class TaskApiTest(BaseTest):
       u'tags': [
         u'os:Amiga',
         u'pool:default',
-        u'priority:100',
+        u'priority:20',
         u'service_account:none',
         u'user:joe@localhost',
       ],
@@ -1581,7 +1581,7 @@ class TaskApiTest(BaseTest):
       u'created_ts': unicode(now.strftime(self.DATETIME_FORMAT)),
       u'expiration_secs': unicode(24 * 60 * 60),
       u'name': u'hi',
-      u'priority': u'100',
+      u'priority': u'20',
       u'properties': {
         u'cipd_input': {
           u'client_package': {
@@ -1611,7 +1611,7 @@ class TaskApiTest(BaseTest):
       u'tags': [
         u'os:Amiga',
         u'pool:default',
-        u'priority:100',
+        u'priority:20',
         u'service_account:service-account@example.com',
         u'user:joe@localhost',
       ],

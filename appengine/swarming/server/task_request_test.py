@@ -159,7 +159,7 @@ class TaskRequestApiTest(TestCase):
     self.assertFalse(missing)
 
   def test_create_termination_task(self):
-    request = task_request.create_termination_task(u'some-bot', True)
+    request = task_request.create_termination_task(u'some-bot')
     self.assertTrue(request.properties.is_terminate)
 
   def test_new_request_key(self):

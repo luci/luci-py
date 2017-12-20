@@ -152,10 +152,8 @@ def can_create_task():
 
 
 def can_schedule_high_priority_tasks():
-  """Returns True if the current user can schedule high priority tasks."""
-  # TODO(maruel): Deny priority < 100 task creation instead of silently
-  # downgrading the priority.
-  return is_ip_whitelisted_machine() or _is_privileged_user()
+  """Returns True if the current user can schedule high priority (<20) tasks."""
+  return _is_admin()
 
 
 def can_edit_task(task):

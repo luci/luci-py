@@ -257,6 +257,7 @@ class AppTestBase(test_case.TestCase):
     params = {
       'expiration_secs': 24*60*60,
       'name': 'hi',
+      # Low priority user will be downgraded to 20.
       'priority': 10,
       'properties': props,
       'tags': [],
