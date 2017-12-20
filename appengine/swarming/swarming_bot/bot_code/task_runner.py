@@ -39,18 +39,6 @@ import remote_client
 THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
 
 
-# Sends a maximum of 100kb of stdout per task_update packet.
-MAX_CHUNK_SIZE = 102400
-
-
-# Maximum wait between task_update packet when there's no output.
-MAX_PACKET_INTERVAL = 30
-
-
-# Minimum wait between task_update packet when there's output.
-MIN_PACKET_INTERNAL = 10
-
-
 # Current task_runner_out version.
 OUT_VERSION = 3
 
@@ -347,38 +335,6 @@ def load_and_run(
       json.dump(task_result, f)
 
 
-def should_post_update(stdout, now, last_packet):
-  """Returns True if it's time to send a task_update packet via post_update().
-
-  Sends a packet when one of this condition is met:
-  - more than MAX_CHUNK_SIZE of stdout is buffered.
-  - last packet was sent more than MIN_PACKET_INTERNAL seconds ago and there was
-    stdout.
-  - last packet was sent more than MAX_PACKET_INTERVAL seconds ago.
-  """
-  packet_interval = MIN_PACKET_INTERNAL if stdout else MAX_PACKET_INTERVAL
-  return len(stdout) >= MAX_CHUNK_SIZE or (now - last_packet) > packet_interval
-
-
-def calc_yield_wait(task_details, start, last_io, timed_out, stdout):
-  """Calculates the maximum number of seconds to wait in yield_any()."""
-  now = monotonic_time()
-  if timed_out:
-    # Give a |grace_period| seconds delay.
-    if task_details.grace_period:
-      return max(now - timed_out - task_details.grace_period, 0.)
-    return 0.
-
-  out = MIN_PACKET_INTERNAL if stdout else MAX_PACKET_INTERVAL
-  if task_details.hard_timeout:
-    out = min(out, start + task_details.hard_timeout - now)
-  if task_details.io_timeout:
-    out = min(out, last_io + task_details.io_timeout - now)
-  out = max(out, 0)
-  logging.debug('calc_yield_wait() = %d', out)
-  return out
-
-
 def kill_and_wait(proc, grace_period, reason):
   logging.warning('SIGTERM finally due to %s', reason)
   proc.terminate()
@@ -462,6 +418,109 @@ def _start_task_runner(args, work_dir, ctx_file):
   return proc
 
 
+class _OutputBuffer(object):
+  """_OutputBuffer implements stdout (and eventually stderr) buffering.
+
+  This data is buffered and must be sent to the Swarming server when
+  self.should_post_update() is True.
+  """
+  def __init__(self, task_details, start):
+    self._task_details = task_details
+    self._start = start
+    # Sends a maximum of 100kb of stdout per task_update packet.
+    self._max_chunk_size = 102400
+    # Minimum wait between task_update packet when there's output.
+    self._min_packet_internal = 10
+    # Maximum wait between task_update packet when there's no output.
+    self._max_packet_interval = 30
+
+    # Mutable:
+    # Buffered data to send to the server.
+    self._stdout = ''
+    # Offset at which the buffered data shall be sent to the server.
+    self._output_chunk_start = 0
+    # Last time proc.yield_any() yielded.
+    self._last_loop = monotonic_time()
+    # Last time proc.yield_any() yielded data.
+    self._last_io = self._last_loop
+    # Last time data was poped and (we assume) sent to the server.
+    self._last_pop = self._last_loop
+
+  @property
+  def last_loop(self):
+    return self._last_loop
+
+  @property
+  def since_last_io(self):
+    """Returns the number of seconds since the last stdout/stderr data was
+    received from the child process.
+
+    This is used to implement I/O timeout.
+    """
+    return self._last_loop - self._last_io
+
+  def add(self, _channel, data):
+    """Buffers more data, that will eventually be sent to the server."""
+    self._last_loop = monotonic_time()
+    if data:
+      self._last_io = self._last_loop
+      self._stdout += data
+
+  def pop(self):
+    """Pops the buffered data to send it to the server."""
+    o = self._output_chunk_start
+    s = self._stdout
+    self._output_chunk_start += len(self._stdout)
+    self._stdout = ''
+    self._last_pop = monotonic_time()
+    return (s, o)
+
+  def maxsize(self):
+    """Returns the maximum number of bytes proc.yield_any() can return."""
+    return self._max_chunk_size - len(self._stdout)
+
+  def should_post_update(self):
+    """Returns True if it's time to send a task_update packet via post_update().
+
+    Sends a packet when one of this condition is met:
+    - more than self._max_chunk_size of stdout is buffered.
+    - self._last_pop was more than "self._min_packet_internal seconds ago"
+      and there was stdout.
+    - self._last_pop was more than "self._max_packet_interval seconds ago".
+    """
+    packet_interval = (
+        self._min_packet_internal if self._stdout
+        else self._max_packet_interval)
+    return (
+        len(self._stdout) >= self._max_chunk_size or
+        (self._last_loop - self._last_pop) > packet_interval)
+
+  def calc_yield_wait(self, timed_out):
+    """Calculates the maximum number of seconds to wait in yield_any().
+
+    This is necessary as task_runner must send keep-alive to the server to tell
+    it that it is not hung, even if the subprocess doesn't output any data.
+    """
+    if timed_out:
+      # Give a |grace_period| seconds delay.
+      if self._task_details.grace_period:
+        return max(
+            self._last_loop - timed_out - self._task_details.grace_period, 0.)
+      return 0.
+
+    out = (
+        self._min_packet_internal if self._stdout
+        else self._max_packet_interval)
+    now = monotonic_time()
+    if self._task_details.hard_timeout:
+      out = min(out, self._start + self._task_details.hard_timeout - now)
+    if self._task_details.io_timeout:
+      out = min(out, self._last_loop + self._task_details.io_timeout - now)
+    out = max(out, 0)
+    logging.debug('calc_yield_wait() = %d', out)
+    return out
+
+
 def run_command(remote, task_details, work_dir, cost_usd_hour,
                 task_start, run_isolated_flags, bot_file, ctx_file):
   """Runs a command and sends packets to the server to stream results back.
@@ -481,9 +540,9 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
   # correctly started processing the task. In the case of non-idempotent task,
   # this signal is used to know if it is safe to retry the task or not. See
   # _reap_task() in task_scheduler.py for more information.
-  last_packet = start = now = monotonic_time()
+  start = monotonic_time()
   params = {
-    'cost_usd': cost_usd_hour * (now - task_start) / 60. / 60.,
+    'cost_usd': cost_usd_hour * (start - task_start) / 60. / 60.,
   }
   if not remote.post_task_update(
       task_details.task_id, task_details.bot_id, params):
@@ -510,61 +569,50 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
     proc = _start_task_runner(args, work_dir, ctx_file)
   except _FailureOnStart as e:
     return fail_without_command(
-      remote, task_details.bot_id, task_details.task_id, params, cost_usd_hour,
-      task_start, e.exit_code, e.stdout)
+        remote, task_details.bot_id, task_details.task_id, params,
+        cost_usd_hour, task_start, e.exit_code, e.stdout)
 
+  buf = _OutputBuffer(task_details, start)
   try:
     # Monitor the task
-    output_chunk_start = 0
-    stdout = ''
     exit_code = None
     had_io_timeout = False
     must_signal_internal_failure = None
     kill_sent = False
     timed_out = None
     try:
-      calc = lambda: calc_yield_wait(
-          task_details, start, last_io, timed_out, stdout)
-      maxsize = lambda: MAX_CHUNK_SIZE - len(stdout)
-      last_io = monotonic_time()
-      for _, new_data in proc.yield_any(maxsize=maxsize, timeout=calc):
-        now = monotonic_time()
-        if new_data:
-          stdout += new_data
-          last_io = now
+      for channel, new_data in proc.yield_any(
+          maxsize=buf.maxsize, timeout=lambda: buf.calc_yield_wait(timed_out)):
+        buf.add(channel, new_data)
 
         # Post update if necessary.
-        if should_post_update(stdout, now, last_packet):
-          last_packet = monotonic_time()
+        if buf.should_post_update():
           params['cost_usd'] = (
-              cost_usd_hour * (last_packet - task_start) / 60. / 60.)
+              cost_usd_hour * (monotonic_time() - task_start) / 60. / 60.)
           if not remote.post_task_update(
-              task_details.task_id, task_details.bot_id,
-              params, (stdout, output_chunk_start)):
+              task_details.task_id, task_details.bot_id, params, buf.pop()):
             # Server is telling us to stop. Normally task cancellation.
             if not kill_sent:
               logging.warning('Server induced stop; sending SIGKILL')
               proc.kill()
               kill_sent = True
 
-          output_chunk_start += len(stdout)
-          stdout = ''
-
         # Send signal on timeout if necessary. Both are failures, not
         # internal_failures.
         # Eventually kill but return 0 so bot_main.py doesn't cancel the task.
         if not timed_out:
           if (task_details.io_timeout and
-              now - last_io > task_details.io_timeout):
+              buf.since_last_io > task_details.io_timeout):
             had_io_timeout = True
             logging.warning(
                 'I/O timeout is %.3fs; no update for %.3fs sending SIGTERM',
-                task_details.io_timeout, now - last_io)
+                task_details.io_timeout, buf.since_last_io)
             proc.terminate()
             timed_out = monotonic_time()
         else:
           # During grace period.
-          if not kill_sent and now - timed_out >= task_details.grace_period:
+          if (not kill_sent and
+              buf.last_loop - timed_out >= task_details.grace_period):
             # Now kill for real. The user can distinguish between the following
             # states:
             # - signal but process exited within grace period,
@@ -573,7 +621,7 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
             # - processed exited late, exit code will be -9 on posix.
             logging.warning(
                 'Grace of %.3fs exhausted at %.3fs; sending SIGKILL',
-                task_details.grace_period, now - timed_out)
+                task_details.grace_period, buf.last_loop - timed_out)
             proc.kill()
             kill_sent = True
       logging.info('Waiting for process exit')
@@ -678,8 +726,8 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         exit_code = None
         params.pop('duration', None)
       remote.post_task_update(
-          task_details.task_id, task_details.bot_id, params,
-          (stdout, output_chunk_start), exit_code)
+          task_details.task_id, task_details.bot_id, params, buf.pop(),
+          exit_code)
       if must_signal_internal_failure:
         remote.post_task_error(task_details.task_id, task_details.bot_id,
             must_signal_internal_failure)
