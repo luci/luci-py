@@ -471,7 +471,11 @@ class Test(unittest.TestCase):
         import sys
         print(sys.argv[1])
         assert "SWARMING_TASK_ID" not in os.environ
-        cwd = os.path.realpath(os.getcwd()).rstrip(os.sep)
+        # cwd is in base/
+        cwd = os.path.realpath(os.getcwd())
+        base = os.path.basename(cwd)
+        assert base == 'base', base
+        cwd = os.path.dirname(cwd)
         path = os.environ["PATH"].split(os.pathsep)
         print(os.path.realpath(path[0]).replace(cwd, "$CWD"))
         with open(os.path.join(sys.argv[2], 'FOO.txt'), 'wb') as f:
