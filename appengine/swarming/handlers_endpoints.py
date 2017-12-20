@@ -42,7 +42,7 @@ from server import task_scheduler
 ### Helper Methods
 
 
-# Used by get_request_and_result(), clearer than using True/False and important
+# Used by _get_request_and_result(), clearer than using True/False and important
 # as this is part of the security boundary.
 _EDIT = object()
 _VIEW = object()
@@ -58,21 +58,25 @@ def _decode_field(self, field, value):
 protojson.ProtoJson.decode_field = _decode_field
 
 
-def get_request_and_result(task_id, viewing):
-  """Provides the key and TaskRequest corresponding to a task ID.
+def _to_keys(task_id):
+  """Returns request and result keys, handling failure."""
+  try:
+    return task_pack.get_request_and_result_keys(task_id)
+  except ValueError:
+    raise endpoints.BadRequestException('%s is an invalid key.' % task_id)
+
+
+@ndb.tasklet
+def _get_task_request_async(task_id, request_key, viewing):
+  """Returns the TaskRequest corresponding to a task ID.
 
   Enforces the ACL for users. Allows bots all access for the moment.
 
   Returns:
-    tuple(TaskRequest, result): result can be either for a TaskRunResult or a
-                                TaskResultSummay.
+    TaskRequest instance.
   """
-  try:
-    request_key, result_key = task_pack.get_request_and_result_keys(task_id)
-    request, result = ndb.get_multi((request_key, result_key))
-  except ValueError:
-    raise endpoints.BadRequestException('%s is an invalid key.' % task_id)
-  if not request or not result:
+  request = yield request_key.get_async()
+  if not request:
     raise endpoints.NotFoundException('%s not found.' % task_id)
   if viewing == _VIEW:
     if not acl.can_view_task(request):
@@ -81,7 +85,51 @@ def get_request_and_result(task_id, viewing):
     if not acl.can_edit_task(request):
       raise endpoints.ForbiddenException('%s is not accessible.' % task_id)
   else:
-    raise endpoints.InternalServerErrorException('get_request_and_result()')
+    raise endpoints.InternalServerErrorException('_get_task_request_async()')
+  raise ndb.Return(request)
+
+
+def _get_request_and_result(task_id, viewing, trust_memcache):
+  """Returns the TaskRequest and task result corresponding to a task ID.
+
+  For the task result, first do an explict lookup of the caches, and then decide
+  if it is necessary to fetch from the DB.
+
+  Arguments:
+    task_id: task ID as provided by the user.
+    viewing: one of _EDIT or _VIEW
+    trust_memcache: bool to state if memcache should be trusted for running
+        task. If False, when a task is still pending/running, do a DB fetch.
+
+  Returns:
+    tuple(TaskRequest, result): result can be either for a TaskRunResult or a
+                                TaskResultSummay.
+  """
+  request_key, result_key = _to_keys(task_id)
+  # The task result has a very high odd of taking much more time to fetch than
+  # the TaskRequest, albeit it is the TaskRequest that enforces ACL. Do the task
+  # result fetch first, the worst that will happen is unnecessarily fetching the
+  # task result.
+  result_future = result_key.get_async(
+      use_cache=True, use_memcache=True, use_datastore=False)
+
+  # The TaskRequest has P(99.9%) chance of being fetched from memcache since it
+  # is immutable.
+  request_future = _get_task_request_async(task_id, request_key, viewing)
+
+  result = result_future.get_result()
+  if (not result or
+      (result.state in task_result.State.STATES_RUNNING and not
+        trust_memcache)):
+    # Either the entity is not in cache, or we don't trust memcache for a
+    # running task result. Do the DB fetch, which is slow.
+    result = result_key.get(
+        use_cache=False, use_memcache=False, use_datastore=True)
+
+  request = request_future.get_result()
+
+  if not result:
+    raise endpoints.NotFoundException('%s not found.' % task_id)
   return request, result
 
 
@@ -248,7 +296,12 @@ class SwarmingTaskService(remote.Service):
     A summary ID ends with '0', a run ID ends with '1' or '2'.
     """
     logging.debug('%s', request)
-    _, result = get_request_and_result(request.task_id, _VIEW)
+    # Workaround a bug in ndb where if a memcache set fails, a stale copy can be
+    # kept in memcache indefinitely. In the case of task result, if this happens
+    # on the very last store where the task is saved to NDB to be marked as
+    # completed, and that the DB store succeeds *but* the memcache update fails,
+    # this API will *always* return the stale version.
+    _, result = _get_request_and_result(request.task_id, _VIEW, False)
     return message_conversion.task_result_to_rpc(
         result, request.include_performance_stats)
 
@@ -262,7 +315,9 @@ class SwarmingTaskService(remote.Service):
   def request(self, request):
     """Returns the task request corresponding to a task ID."""
     logging.debug('%s', request)
-    request_obj, _ = get_request_and_result(request.task_id, _VIEW)
+    request_key, _ = _to_keys(request.task_id)
+    request_obj = _get_task_request_async(
+        request.task_id, request_key, _VIEW).get_result()
     return message_conversion.task_request_to_rpc(request_obj)
 
   @gae_ts_mon.instrument_endpoint()
@@ -277,8 +332,10 @@ class SwarmingTaskService(remote.Service):
     If a bot was running the task, the bot will forcibly cancel the task.
     """
     logging.debug('%s', request)
-    request_obj, result = get_request_and_result(request.task_id, _EDIT)
-    ok, was_running = task_scheduler.cancel_task(request_obj, result.key)
+    request_key, result_key = _to_keys(request.task_id)
+    request_obj = _get_task_request_async(
+        request.task_id, request_key, _EDIT).get_result()
+    ok, was_running = task_scheduler.cancel_task(request_obj, result_key)
     return swarming_rpcs.CancelResponse(ok=ok, was_running=was_running)
 
   @gae_ts_mon.instrument_endpoint()
@@ -295,7 +352,8 @@ class SwarmingTaskService(remote.Service):
     # TODO(maruel): Send as raw content instead of encoded. This is not
     # supported by cloud endpoints.
     logging.debug('%s', request)
-    _, result = get_request_and_result(request.task_id, _VIEW)
+    # The result must be fetched to know the right run_result_key to use.
+    _, result = _get_request_and_result(request.task_id, _VIEW, True)
     output = result.get_output()
     if output:
       output = output.decode('utf-8', 'replace')
