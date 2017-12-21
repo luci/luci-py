@@ -323,6 +323,95 @@ def _validate_email(ctx, email, designation):
     ctx.error('invalid %s email "%s"', designation, email)
 
 
+def _validate_machine_type(ctx, machine_type, known_machine_type_names):
+  """Validates machine_type section and updates known_machine_type_names set."""
+  if not machine_type.name:
+    ctx.error('name is required')
+    return
+  if machine_type.name in known_machine_type_names:
+    ctx.error('reusing name "%s"', machine_type.name)
+    return
+  known_machine_type_names.add(machine_type.name)
+  if not machine_type.lease_duration_secs:
+    ctx.error('lease_duration_secs is required')
+    return
+  if machine_type.lease_duration_secs < 0:
+    ctx.error('lease_duration_secs must be positive')
+    return
+  if not machine_type.mp_dimensions:
+    ctx.error('at least one dimension is required')
+    return
+  for j, dim in enumerate(machine_type.mp_dimensions):
+    with ctx.prefix('mp_dimensions #%d: ', j):
+      if ':' not in dim:
+        ctx.error('bad dimension "%s", not a key:value pair', dim)
+        continue
+  if machine_type.target_size < 0:
+    ctx.error('target_size must be positive')
+    return
+  if machine_type.schedule:
+    # Maps day of the week to a list of 2-tuples (start time in minutes,
+    # end time in minutes). Used to ensure intervals do not intersect.
+    daily_schedules = {day: [] for day in xrange(7)}
+
+    for daily_schedule in machine_type.schedule.daily:
+      if daily_schedule.target_size < 0:
+        ctx.error('target size must be non-negative')
+      if not daily_schedule.start or not daily_schedule.end:
+        ctx.error('daily schedule must have a start and end time')
+        continue
+      try:
+        h1, m1 = map(int, daily_schedule.start.split(':'))
+        h2, m2 = map(int, daily_schedule.end.split(':'))
+      except ValueError:
+        ctx.error('start and end times must be formatted as %%H:%%M')
+        continue
+      if m1 < 0 or m1 > 59 or m2 < 0 or m2 > 59:
+        ctx.error('start and end times must be formatted as %%H:%%M')
+        continue
+      if h1 < 0 or h1 > 23 or h2 < 0 or h2 > 23:
+        ctx.error('start and end times must be formatted as %%H:%%M')
+        continue
+      start = h1 * 60 + m1
+      end = h2 * 60 + m2
+      if daily_schedule.days_of_the_week:
+        for day in daily_schedule.days_of_the_week:
+          if day < 0 or day > 6:
+            ctx.error(
+                'days of the week must be between 0 (Mon) and 6 (Sun)')
+          else:
+            daily_schedules[day].append((start, end))
+      else:
+        # Unspecified means all days.
+        for day in xrange(7):
+          daily_schedules[day].append((start, end))
+      if start >= end:
+        ctx.error(
+            'end time "%s" must be later than start time "%s"',
+            daily_schedule.end,
+            daily_schedule.start,
+        )
+        continue
+
+    # Detect intersections. For each day of the week, sort by start time
+    # and ensure that the end of each interval is earlier than the start
+    # of the next interval.
+    for intervals in daily_schedules.itervalues():
+      intervals.sort(key=lambda i: i[0])
+      for i in xrange(len(intervals) - 1):
+        current_end = intervals[i][1]
+        next_start = intervals[i + 1][0]
+        if current_end >= next_start:
+          ctx.error('intervals must be disjoint')
+          continue
+
+    for load_based in machine_type.schedule.load_based:
+      if load_based.maximum_size < load_based.minimum_size:
+        ctx.error('maximum size cannot be less than minimum size')
+      if load_based.minimum_size < 1:
+        ctx.error('minimum size must be positive')
+
+
 @validation.self_rule(BOTS_CFG_FILENAME, bots_pb2.BotsCfg)
 def validate_bots_cfg(cfg, ctx):
   """Validates bots.cfg file."""
@@ -382,91 +471,7 @@ def validate_bots_cfg(cfg, ctx):
       # Validate machine_type.
       for i, machine_type in enumerate(entry.machine_type):
         with ctx.prefix('machine_type #%d: ', i):
-          if not machine_type.name:
-            ctx.error('name is required')
-            continue
-          if machine_type.name in machine_type_names:
-            ctx.error('reusing name "%s"', machine_type.name)
-            continue
-          machine_type_names.add(machine_type.name)
-          if not machine_type.lease_duration_secs:
-            ctx.error('lease_duration_secs is required')
-            continue
-          if machine_type.lease_duration_secs < 0:
-            ctx.error('lease_duration_secs must be positive')
-            continue
-          if not machine_type.mp_dimensions:
-            ctx.error('at least one dimension is required')
-            continue
-          for j, dim in enumerate(machine_type.mp_dimensions):
-            with ctx.prefix('mp_dimensions #%d: ', j):
-              if ':' not in dim:
-                ctx.error('bad dimension "%s", not a key:value pair', dim)
-                continue
-          if machine_type.target_size < 0:
-            ctx.error('target_size must be positive')
-            continue
-          if machine_type.schedule:
-            # Maps day of the week to a list of 2-tuples (start time in minutes,
-            # end time in minutes). Used to ensure intervals do not intersect.
-            daily_schedules = {day: [] for day in xrange(7)}
-
-            for daily_schedule in machine_type.schedule.daily:
-              if daily_schedule.target_size < 0:
-                ctx.error('target size must be non-negative')
-              if not daily_schedule.start or not daily_schedule.end:
-                ctx.error('daily schedule must have a start and end time')
-                continue
-              try:
-                h1, m1 = map(int, daily_schedule.start.split(':'))
-                h2, m2 = map(int, daily_schedule.end.split(':'))
-              except ValueError:
-                ctx.error('start and end times must be formatted as %%H:%%M')
-                continue
-              if m1 < 0 or m1 > 59 or m2 < 0 or m2 > 59:
-                ctx.error('start and end times must be formatted as %%H:%%M')
-                continue
-              if h1 < 0 or h1 > 23 or h2 < 0 or h2 > 23:
-                ctx.error('start and end times must be formatted as %%H:%%M')
-                continue
-              start = h1 * 60 + m1
-              end = h2 * 60 + m2
-              if daily_schedule.days_of_the_week:
-                for day in daily_schedule.days_of_the_week:
-                  if day < 0 or day > 6:
-                    ctx.error(
-                        'days of the week must be between 0 (Mon) and 6 (Sun)')
-                  else:
-                    daily_schedules[day].append((start, end))
-              else:
-                # Unspecified means all days.
-                for day in xrange(7):
-                  daily_schedules[day].append((start, end))
-              if start >= end:
-                ctx.error(
-                    'end time "%s" must be later than start time "%s"',
-                    daily_schedule.end,
-                    daily_schedule.start,
-                )
-                continue
-
-            # Detect intersections. For each day of the week, sort by start time
-            # and ensure that the end of each interval is earlier than the start
-            # of the next interval.
-            for intervals in daily_schedules.itervalues():
-              intervals.sort(key=lambda i: i[0])
-              for i in xrange(len(intervals) - 1):
-                current_end = intervals[i][1]
-                next_start = intervals[i + 1][0]
-                if current_end >= next_start:
-                  ctx.error('intervals must be disjoint')
-                  continue
-
-            for load_based in machine_type.schedule.load_based:
-              if load_based.maximum_size < load_based.minimum_size:
-                ctx.error('maximum size cannot be less than minimum size')
-              if load_based.minimum_size < 1:
-                ctx.error('minimum size must be positive')
+          _validate_machine_type(ctx, machine_type, machine_type_names)
 
       # Validate 'auth' field.
       a = entry.auth
