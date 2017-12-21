@@ -433,6 +433,39 @@ def _validate_group_bot_ids(ctx, group_bot_ids, group_idx, known_bot_ids):
       ctx.error('bad bot_id expression "%s" - %s', bot_id_expr, exc)
 
 
+def _validate_group_auth_and_system_service_account(ctx, bot_group):
+  a = bot_group.auth
+  if a.require_luci_machine_token and a.require_service_account:
+    ctx.error(
+        'require_luci_machine_token and require_service_account can\'t '
+        'both be used at the same time')
+  if not a.require_luci_machine_token and not a.require_service_account:
+    if not a.ip_whitelist:
+      ctx.error(
+        'if both require_luci_machine_token and require_service_account '
+        'are unset, ip_whitelist is required')
+  if a.require_service_account:
+    for email in a.require_service_account:
+      _validate_email(ctx, email, 'service account')
+  if a.ip_whitelist and not auth.is_valid_ip_whitelist_name(a.ip_whitelist):
+    ctx.error('invalid ip_whitelist name "%s"', a.ip_whitelist)
+
+  if bot_group.system_service_account == 'bot':
+    # If it is 'bot', the bot auth must be configured to use OAuth, since we
+    # need to get a bot token somewhere.
+    if not a.require_service_account:
+      ctx.error(
+          'system_service_account "bot" requires '
+          'auth.require_service_account to be used')
+  elif bot_group.system_service_account:
+    # TODO(vadimsh): Strictly speaking we can try to grab a token right
+    # here and thus check that IAM policies are configured. But it's not
+    # clear what happens if they are not. Will config-service reject the
+    # config forever? Will it attempt to revalidate it later?
+    _validate_email(
+        ctx, bot_group.system_service_account, 'system service account')
+
+
 @validation.self_rule(BOTS_CFG_FILENAME, bots_pb2.BotsCfg)
 def validate_bots_cfg(cfg, ctx):
   """Validates bots.cfg file."""
@@ -484,22 +517,8 @@ def validate_bots_cfg(cfg, ctx):
         with ctx.prefix('machine_type #%d: ', i):
           _validate_machine_type(ctx, machine_type, machine_type_names)
 
-      # Validate 'auth' field.
-      a = entry.auth
-      if a.require_luci_machine_token and a.require_service_account:
-        ctx.error(
-            'require_luci_machine_token and require_service_account can\'t '
-            'both be used at the same time')
-      if not a.require_luci_machine_token and not a.require_service_account:
-        if not a.ip_whitelist:
-          ctx.error(
-            'if both require_luci_machine_token and require_service_account '
-            'are unset, ip_whitelist is required')
-      if a.require_service_account:
-        for email in a.require_service_account:
-          _validate_email(ctx, email, 'service account')
-      if a.ip_whitelist and not auth.is_valid_ip_whitelist_name(a.ip_whitelist):
-        ctx.error('invalid ip_whitelist name "%s"', a.ip_whitelist)
+      # Validate 'auth' and 'system_service_account' fields.
+      _validate_group_auth_and_system_service_account(ctx, entry)
 
       # Validate 'owners'. Just check they are emails.
       for own in entry.owners:
@@ -522,22 +541,6 @@ def validate_bots_cfg(cfg, ctx):
         # We can't validate that the file exists here. It'll fail in
         # _bot_group_proto_to_tuple() which is called by _fetch_bot_groups() and
         # cached for 60 seconds.
-
-      # Validate 'system_service_account'.
-      if entry.system_service_account == 'bot':
-        # If it is 'bot', the bot auth must be configured to use OAuth, since we
-        # need to get a bot token somewhere.
-        if not entry.auth.require_service_account:
-          ctx.error(
-              'system_service_account "bot" requires '
-              'auth.require_service_account to be used')
-      elif entry.system_service_account:
-        # TODO(vadimsh): Strictly speaking we can try to grab a token right
-        # here and thus check that IAM policies are configured. But it's not
-        # clear what happens if they are not. Will config-service reject the
-        # config forever? Will it attempt to revalidate it later?
-        _validate_email(
-            ctx, entry.system_service_account, 'system service account')
 
   # Now verify bot_id_prefix is never a prefix of other prefix. It causes
   # ambiguities.
