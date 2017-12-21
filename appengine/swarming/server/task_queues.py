@@ -785,11 +785,13 @@ def tidy_stale():
 
     td = td_future.get_result()
     for k in td:
-      logging.info('- TD: %d', k.integer_id())
+      if k:
+        logging.info('- TD: %s', k.integer_id())
     btd = btd_future.get_result()
     for k in btd:
-      bot_id = k.parent().string_id()
-      logging.debug('- BTD: %d for bot %s', k.integer_id(), bot_id)
+      if k:
+        bot_id = k.parent().string_id()
+        logging.debug('- BTD: %d for bot %s', k.integer_id(), bot_id)
   finally:
     logging.info(
         'tidy_stale() in %.3fs; TaskDimensions: found %d, deleted %d; '
