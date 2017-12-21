@@ -488,8 +488,8 @@ def validate_bots_cfg(cfg, ctx):
       # Validate bot_id field and make sure bot_id groups do not intersect.
       _validate_group_bot_ids(ctx, entry.bot_id, i, bot_ids)
 
-      # Validate bot_id_prefix. Later (when we know all the prefixes) we will
-      # check that they do not intersect.
+      # Validate bot_id_prefix and make sure bot_id_prefix groups do not
+      # intersect.
       for bot_id_prefix in entry.bot_id_prefix:
         if not bot_id_prefix:
           ctx.error('empty bot_id_prefix is not allowed')
@@ -499,6 +499,18 @@ def validate_bots_cfg(cfg, ctx):
               'bot_id_prefix "%s" is already specified in group #%d',
               bot_id_prefix, bot_id_prefixes[bot_id_prefix])
           continue
+        for p, idx in bot_id_prefixes.iteritems():
+          # Inefficient, but robust code wrt variable char length.
+          if p.startswith(bot_id_prefix):
+            msg = 'bot_id_prefix "%s" is subprefix of "%s"'
+          elif bot_id_prefix.startswith(p):
+            msg = 'bot_id_prefix "%s" contains prefix "%s"'
+          else:
+            continue
+          ctx.error(
+              msg + ', defined in group #%d, making group assigned for bots '
+              'with prefix "%s" ambigious',
+              bot_id_prefix, p, idx, min(p, bot_id_prefix))
         bot_id_prefixes[bot_id_prefix] = i
 
       # A group without bot_id, bot_id_prefix and machine_type is applied to
@@ -541,15 +553,3 @@ def validate_bots_cfg(cfg, ctx):
         # We can't validate that the file exists here. It'll fail in
         # _bot_group_proto_to_tuple() which is called by _fetch_bot_groups() and
         # cached for 60 seconds.
-
-  # Now verify bot_id_prefix is never a prefix of other prefix. It causes
-  # ambiguities.
-  for smaller, s_idx in bot_id_prefixes.iteritems():
-    for larger, l_idx in bot_id_prefixes.iteritems():
-      if smaller == larger:
-        continue # we've already checked prefixes have no duplicated
-      if larger.startswith(smaller):
-        ctx.error(
-            'bot_id_prefix "%s", defined in group #%d, is subprefix of "%s", '
-            'defined in group #%d; it makes group assigned for bots with '
-            'prefix "%s" ambigious', smaller, s_idx, larger, l_idx, larger)
