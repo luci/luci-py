@@ -349,67 +349,73 @@ def _validate_machine_type(ctx, machine_type, known_machine_type_names):
   if machine_type.target_size < 0:
     ctx.error('target_size must be positive')
     return
-  if machine_type.schedule:
-    # Maps day of the week to a list of 2-tuples (start time in minutes,
-    # end time in minutes). Used to ensure intervals do not intersect.
-    daily_schedules = {day: [] for day in xrange(7)}
+  _validate_machine_type_schedule(ctx, machine_type.schedule)
 
-    for daily_schedule in machine_type.schedule.daily:
-      if daily_schedule.target_size < 0:
-        ctx.error('target size must be non-negative')
-      if not daily_schedule.start or not daily_schedule.end:
-        ctx.error('daily schedule must have a start and end time')
-        continue
-      try:
-        h1, m1 = map(int, daily_schedule.start.split(':'))
-        h2, m2 = map(int, daily_schedule.end.split(':'))
-      except ValueError:
-        ctx.error('start and end times must be formatted as %%H:%%M')
-        continue
-      if m1 < 0 or m1 > 59 or m2 < 0 or m2 > 59:
-        ctx.error('start and end times must be formatted as %%H:%%M')
-        continue
-      if h1 < 0 or h1 > 23 or h2 < 0 or h2 > 23:
-        ctx.error('start and end times must be formatted as %%H:%%M')
-        continue
-      start = h1 * 60 + m1
-      end = h2 * 60 + m2
-      if daily_schedule.days_of_the_week:
-        for day in daily_schedule.days_of_the_week:
-          if day < 0 or day > 6:
-            ctx.error(
-                'days of the week must be between 0 (Mon) and 6 (Sun)')
-          else:
-            daily_schedules[day].append((start, end))
-      else:
-        # Unspecified means all days.
-        for day in xrange(7):
+
+def _validate_machine_type_schedule(ctx, schedule):
+  if not schedule:
+    # No schedule is allowed.
+    return
+  # Maps day of the week to a list of 2-tuples (start time in minutes,
+  # end time in minutes). Used to ensure intervals do not intersect.
+  daily_schedules = {day: [] for day in xrange(7)}
+
+  for daily_schedule in schedule.daily:
+    if daily_schedule.target_size < 0:
+      ctx.error('target size must be non-negative')
+    if not daily_schedule.start or not daily_schedule.end:
+      ctx.error('daily schedule must have a start and end time')
+      continue
+    try:
+      h1, m1 = map(int, daily_schedule.start.split(':'))
+      h2, m2 = map(int, daily_schedule.end.split(':'))
+    except ValueError:
+      ctx.error('start and end times must be formatted as %%H:%%M')
+      continue
+    if m1 < 0 or m1 > 59 or m2 < 0 or m2 > 59:
+      ctx.error('start and end times must be formatted as %%H:%%M')
+      continue
+    if h1 < 0 or h1 > 23 or h2 < 0 or h2 > 23:
+      ctx.error('start and end times must be formatted as %%H:%%M')
+      continue
+    start = h1 * 60 + m1
+    end = h2 * 60 + m2
+    if daily_schedule.days_of_the_week:
+      for day in daily_schedule.days_of_the_week:
+        if day < 0 or day > 6:
+          ctx.error(
+              'days of the week must be between 0 (Mon) and 6 (Sun)')
+        else:
           daily_schedules[day].append((start, end))
-      if start >= end:
-        ctx.error(
-            'end time "%s" must be later than start time "%s"',
-            daily_schedule.end,
-            daily_schedule.start,
-        )
+    else:
+      # Unspecified means all days.
+      for day in xrange(7):
+        daily_schedules[day].append((start, end))
+    if start >= end:
+      ctx.error(
+          'end time "%s" must be later than start time "%s"',
+          daily_schedule.end,
+          daily_schedule.start,
+      )
+      continue
+
+  # Detect intersections. For each day of the week, sort by start time
+  # and ensure that the end of each interval is earlier than the start
+  # of the next interval.
+  for intervals in daily_schedules.itervalues():
+    intervals.sort(key=lambda i: i[0])
+    for i in xrange(len(intervals) - 1):
+      current_end = intervals[i][1]
+      next_start = intervals[i + 1][0]
+      if current_end >= next_start:
+        ctx.error('intervals must be disjoint')
         continue
 
-    # Detect intersections. For each day of the week, sort by start time
-    # and ensure that the end of each interval is earlier than the start
-    # of the next interval.
-    for intervals in daily_schedules.itervalues():
-      intervals.sort(key=lambda i: i[0])
-      for i in xrange(len(intervals) - 1):
-        current_end = intervals[i][1]
-        next_start = intervals[i + 1][0]
-        if current_end >= next_start:
-          ctx.error('intervals must be disjoint')
-          continue
-
-    for load_based in machine_type.schedule.load_based:
-      if load_based.maximum_size < load_based.minimum_size:
-        ctx.error('maximum size cannot be less than minimum size')
-      if load_based.minimum_size < 1:
-        ctx.error('minimum size must be positive')
+  for load_based in schedule.load_based:
+    if load_based.maximum_size < load_based.minimum_size:
+      ctx.error('maximum size cannot be less than minimum size')
+    if load_based.minimum_size < 1:
+      ctx.error('minimum size must be positive')
 
 
 @validation.self_rule(BOTS_CFG_FILENAME, bots_pb2.BotsCfg)
