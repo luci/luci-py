@@ -418,6 +418,21 @@ def _validate_machine_type_schedule(ctx, schedule):
       ctx.error('minimum size must be positive')
 
 
+def _validate_group_bot_ids(ctx, group_bot_ids, group_idx, known_bot_ids):
+  """Validates bot_id sections of a group and updates known_bot_ids."""
+  for bot_id_expr in group_bot_ids:
+    try:
+      for bot_id in _expand_bot_id_expr(bot_id_expr):
+        if bot_id in known_bot_ids:
+          ctx.error(
+              'bot_id "%s" was already mentioned in group #%d',
+              bot_id, known_bot_ids[bot_id])
+          continue
+        known_bot_ids[bot_id] = group_idx
+    except ValueError as exc:
+      ctx.error('bad bot_id expression "%s" - %s', bot_id_expr, exc)
+
+
 @validation.self_rule(BOTS_CFG_FILENAME, bots_pb2.BotsCfg)
 def validate_bots_cfg(cfg, ctx):
   """Validates bots.cfg file."""
@@ -438,17 +453,7 @@ def validate_bots_cfg(cfg, ctx):
   for i, entry in enumerate(cfg.bot_group):
     with ctx.prefix('bot_group #%d: ', i):
       # Validate bot_id field and make sure bot_id groups do not intersect.
-      for bot_id_expr in entry.bot_id:
-        try:
-          for bot_id in _expand_bot_id_expr(bot_id_expr):
-            if bot_id in bot_ids:
-              ctx.error(
-                  'bot_id "%s" was already mentioned in group #%d',
-                  bot_id, bot_ids[bot_id])
-              continue
-            bot_ids[bot_id] = i
-        except ValueError as exc:
-          ctx.error('bad bot_id expression "%s" - %s', bot_id_expr, exc)
+      _validate_group_bot_ids(ctx, entry.bot_id, i, bot_ids)
 
       # Validate bot_id_prefix. Later (when we know all the prefixes) we will
       # check that they do not intersect.
