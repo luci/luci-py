@@ -515,10 +515,11 @@ class Test(unittest.TestCase):
     self._run_isolated(
         content, 'separate_cmd',
         ['--raw-cmd',
+         '--relative-cwd', 'base',
          '--env', 'FOO', u'bar💩',
          '--env', 'SWARMING_TASK_ID', '',
          '--env-prefix', 'PATH', 'local/path',
-         '--', 'python', os.path.join(u'base', HELLO_WORLD + u'.py'), u'hi💩',
+         '--', 'python', HELLO_WORLD + u'.py', u'hi💩',
          '${ISOLATED_OUTDIR}'],
         expected_summary, expected_files, deduped=False,
         isolate_content=isolate_content)
