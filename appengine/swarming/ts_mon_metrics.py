@@ -49,6 +49,7 @@ _bucketer = gae_ts_mon.GeometricBucketer(growth_factor=10**0.05,
 # Both have the following metric fields:
 # - project_id: e.g. 'chromium'
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
+# - pool: e.g. 'Chrome'
 # - spec_name: name of a job specification, e.g. '<master>:<builder>'
 #     for buildbot jobs.
 # - result: one of 'success', 'failure', or 'infra-failure'.
@@ -58,6 +59,7 @@ _jobs_completed = gae_ts_mon.CounterMetric(
         gae_ts_mon.StringField('spec_name'),
         gae_ts_mon.StringField('project_id'),
         gae_ts_mon.StringField('subproject_id'),
+        gae_ts_mon.StringField('pool'),
         gae_ts_mon.StringField('result'),
     ])
 
@@ -68,6 +70,7 @@ _jobs_durations = gae_ts_mon.CumulativeDistributionMetric(
         gae_ts_mon.StringField('spec_name'),
         gae_ts_mon.StringField('project_id'),
         gae_ts_mon.StringField('subproject_id'),
+        gae_ts_mon.StringField('pool'),
         gae_ts_mon.StringField('result'),
     ],
     bucketer=_bucketer)
@@ -76,6 +79,7 @@ _jobs_durations = gae_ts_mon.CumulativeDistributionMetric(
 # Similar to jobs/completed and jobs/duration, but with a dedup field.
 # - project_id: e.g. 'chromium'
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
+# - pool: e.g. 'Chrome'
 # - spec_name: name of a job specification, e.g. '<master>:<builder>'
 #     for buildbot jobs.
 # - deduped: boolean describing whether the job was deduped or not.
@@ -85,6 +89,7 @@ _jobs_requested = gae_ts_mon.CounterMetric(
         gae_ts_mon.StringField('spec_name'),
         gae_ts_mon.StringField('project_id'),
         gae_ts_mon.StringField('subproject_id'),
+        gae_ts_mon.StringField('pool'),
         gae_ts_mon.BooleanField('deduped'),
     ])
 
@@ -92,6 +97,7 @@ _jobs_requested = gae_ts_mon.CounterMetric(
 # Swarming-specific metric. Metric fields:
 # - project_id: e.g. 'chromium'
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
+# - pool: e.g. 'Chrome'
 # - spec_name: name of a job specification, e.g. '<master>:<builder>'
 #     for buildbot jobs.
 _tasks_expired = gae_ts_mon.CounterMetric(
@@ -100,12 +106,14 @@ _tasks_expired = gae_ts_mon.CounterMetric(
         gae_ts_mon.StringField('spec_name'),
         gae_ts_mon.StringField('project_id'),
         gae_ts_mon.StringField('subproject_id'),
+        gae_ts_mon.StringField('pool'),
     ])
 
 
 # Global metric. Metric fields:
 # - project_id: e.g. 'chromium'
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
+# - pool: e.g. 'Chrome'
 # - spec_name: name of a job specification, e.g. '<master>:<builder>'
 #     for buildbot jobs.
 # Override target field:
@@ -119,11 +127,13 @@ _jobs_running = gae_ts_mon.BooleanMetric(
         gae_ts_mon.StringField('spec_name'),
         gae_ts_mon.StringField('project_id'),
         gae_ts_mon.StringField('subproject_id'),
+        gae_ts_mon.StringField('pool'),
     ])
 
 # Global metric. Metric fields:
 # - project_id: e.g. 'chromium'
 # - subproject_id: e.g. 'blink'. Set to empty string if not used.
+# - pool: e.g. 'Chrome'
 # - spec_name: name of a job specification, e.g. '<master>:<builder>'
 #     for buildbot jobs.
 # - status: 'pending' or 'running'.
@@ -133,6 +143,7 @@ _jobs_active = gae_ts_mon.GaugeMetric(
         gae_ts_mon.StringField('spec_name'),
         gae_ts_mon.StringField('project_id'),
         gae_ts_mon.StringField('subproject_id'),
+        gae_ts_mon.StringField('pool'),
         gae_ts_mon.StringField('status'),
     ])
 
@@ -168,6 +179,7 @@ _jobs_pending_durations = gae_ts_mon.NonCumulativeDistributionMetric(
         gae_ts_mon.StringField('spec_name'),
         gae_ts_mon.StringField('project_id'),
         gae_ts_mon.StringField('subproject_id'),
+        gae_ts_mon.StringField('pool'),
         gae_ts_mon.StringField('status'),
     ],
     bucketer=_bucketer)
@@ -186,6 +198,7 @@ _jobs_max_pending_duration = gae_ts_mon.FloatMetric(
         gae_ts_mon.StringField('spec_name'),
         gae_ts_mon.StringField('project_id'),
         gae_ts_mon.StringField('subproject_id'),
+        gae_ts_mon.StringField('pool'),
         gae_ts_mon.StringField('status'),
     ])
 
@@ -434,6 +447,7 @@ def _extract_job_fields(tags):
   fields = {
       'project_id': tags_dict.get('project', ''),
       'subproject_id': tags_dict.get('subproject', ''),
+      'pool': tags_dict.get('pool', ''),
       'spec_name': spec_name,
   }
   return fields

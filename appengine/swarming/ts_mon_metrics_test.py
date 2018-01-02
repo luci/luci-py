@@ -96,6 +96,7 @@ class TestMetrics(test_case.TestCase):
     tags = [
         'project:test_project',
         'subproject:test_subproject',
+        'pool:test_pool',
         'master:test_master',
         'buildername:test_builder',
         'name:some_tests',
@@ -103,6 +104,7 @@ class TestMetrics(test_case.TestCase):
     fields = {
         'project_id': 'test_project',
         'subproject_id': 'test_subproject',
+        'pool': 'test_pool',
         'spec_name': 'test_master:test_builder',
     }
     summary = _gen_task_result_summary(self.now, 1, tags=tags)
@@ -131,6 +133,7 @@ class TestMetrics(test_case.TestCase):
     tags = [
         'project:test_project',
         'subproject:test_subproject',
+        'pool:test_pool',
         'master:test_master',
         'buildername:test_builder',
         'name:some_tests',
@@ -139,6 +142,7 @@ class TestMetrics(test_case.TestCase):
     fields = {
         'project_id': 'test_project',
         'subproject_id': 'test_subproject',
+        'pool': 'test_pool',
         'spec_name': 'my:custom:test:spec:name',
     }
     summary = _gen_task_result_summary(self.now, 1, tags=tags)
@@ -161,6 +165,7 @@ class TestMetrics(test_case.TestCase):
     tags = [
         'project:test_project',
         'subproject:test_subproject',
+        'pool:test_pool',
         'master:test_master',
         'buildername:test_builder',
         'name:some_tests',
@@ -206,6 +211,7 @@ class TestMetrics(test_case.TestCase):
     jobs_fields = {
         'project_id': 'test_project',
         'subproject_id': 'test_subproject',
+        'pool': 'test_pool',
         'spec_name': 'test_master:test_builder',
     }
     jobs_target_fields = dict(ts_mon_metrics._TARGET_FIELDS)
