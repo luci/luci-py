@@ -719,12 +719,16 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
         # should *not* send the exit_code since doing so would cause the task
         # to be marked as COMPLETED until the subsequent post_task_error call
         # finished, which would cause any query made between these two calls to
-        # get the wrong task status. We also clear out the duration as the
-        # server prints errors if the duration is set in this case.
+        # get the wrong task status. We also clear out the duration and various
+        # stats as the server prints errors if either are set in this case.
         # TODO(sethkoehler): Come up with some way to still send the exit_code
-        # without marking the task COMPLETED.
+        # (and thus also duration/stats) without marking the task COMPLETED.
         exit_code = None
         params.pop('duration', None)
+        params.pop('bot_overhead', None)
+        params.pop('isolated_stats', None)
+        params.pop('cipd_stats', None)
+        params.pop('cipd_pins', None)
       remote.post_task_update(
           task_details.task_id, task_details.bot_id, params, buf.pop(),
           exit_code)
