@@ -61,7 +61,7 @@ To install in the local user (as `~/nodejs` in this example), use:
     sudo npm install -g n
     sudo n stable
 
-    # should return 6.x or 7.x
+    # should return 6.x or higher
     node -v
 
     sudo npm install -g bower
