@@ -206,6 +206,45 @@ class BotGroupsConfigTest(test_case.TestCase):
       'bot_group #1: bot_id_prefix "abc-" is already specified in group #0'
     ])
 
+  def test_duplicate_bot_and_prefix_ids(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(
+          bot_id=['abc', 'ok'], bot_id_prefix=['xyz'], auth=DEFAULT_AUTH_CFG,
+          dimensions=['g:first']),
+        bots_pb2.BotGroup(
+          bot_id=['xyz'], bot_id_prefix=['abc', 'ok-'], auth=DEFAULT_AUTH_CFG,
+          dimensions=['g:second']),
+        bots_pb2.BotGroup(
+          bot_id=['foo'], bot_id_prefix=['foo'], auth=DEFAULT_AUTH_CFG,
+          dimensions=['g:third']),
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, dimensions=['g:default']),
+      ])
+    self.validator_test(cfg, [
+      (u'bot_group #1: bot_id "xyz" was already mentioned as bot_id_prefix '
+        'in group #0'),
+      (u'bot_group #1: bot_id_prefix "abc" is already specified as bot_id '
+        'in group #0'),
+      (u'bot_group #2: bot_id_prefix "foo" is already specified as bot_id '
+        'in group #2'),
+    ])
+    self.mock_config(cfg)
+
+    def get_group_dimension(bot_id):
+      g = bot_groups_config.get_bot_group_config(bot_id, None)
+      self.assertIsNotNone(g)
+      return g.dimensions[u'g'][0]
+    self.assertEqual(get_group_dimension('abc'), u'first')
+    # second, because direct match takes precedence over prefix match.
+    # TODO(tandrii): update to match first group, because 2nd group is not
+    # valid.
+    self.assertEqual(get_group_dimension('xyz'), u'second')
+
+    self.assertEqual(get_group_dimension('foo'), u'third')
+    self.assertEqual(get_group_dimension('ok'), u'first')
+    self.assertEqual(get_group_dimension('ok-1'), u'second')
+    self.assertEqual(get_group_dimension('any'), u'default')
+
   def test_bad_auth_cfg_two_methods(self):
     cfg = bots_pb2.BotsCfg(
       bot_group=[

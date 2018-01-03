@@ -280,6 +280,8 @@ def _fetch_bot_groups():
   machine_types = {}
   default_group = None
 
+  known_prefixes = set()
+
   for entry in cfg.bot_group:
     group_cfg = _bot_group_proto_to_tuple(entry, cfg.trusted_dimensions or [])
 
@@ -292,6 +294,12 @@ def _fetch_bot_groups():
             logging.error(
                 'Bot "%s" is specified in two different bot groups', bot_id)
             continue
+          if bot_id in known_prefixes:
+            # TODO(tandrii): change to error and skip this prefix
+            # https://crbug.com/781087.
+            logging.warn(
+                'bot_id "%s" is equal to existing bot_id_prefix of other group',
+                bot_id)
           direct_matches[bot_id] = group_cfg
       except ValueError as exc:
         logging.error('Invalid bot_id expression "%s": %s', bot_id_expr, exc)
@@ -300,7 +308,15 @@ def _fetch_bot_groups():
       if not bot_id_prefix:
         logging.error('Skipping empty bot_id_prefix')
         continue
+      if bot_id_prefix in direct_matches:
+        # TODO(tandrii): change to error and skip this prefix
+        # https://crbug.com/781087.
+        logging.warn(
+            'bot_id_prefix "%s" is equal to existing bot of %s', bot_id_prefix,
+            'the same group ' if group_cfg == direct_matches[bot_id_prefix] else
+            'another group')
       prefix_matches.append((bot_id_prefix, group_cfg))
+      known_prefixes.add(bot_id_prefix)
 
     for machine_type in entry.machine_type:
       machine_types[machine_type.name] = group_cfg
@@ -418,7 +434,8 @@ def _validate_machine_type_schedule(ctx, schedule):
       ctx.error('minimum size must be positive')
 
 
-def _validate_group_bot_ids(ctx, group_bot_ids, group_idx, known_bot_ids):
+def _validate_group_bot_ids(
+    ctx, group_bot_ids, group_idx, known_bot_ids, known_bot_id_prefixes):
   """Validates bot_id sections of a group and updates known_bot_ids."""
   for bot_id_expr in group_bot_ids:
     try:
@@ -428,13 +445,19 @@ def _validate_group_bot_ids(ctx, group_bot_ids, group_idx, known_bot_ids):
               'bot_id "%s" was already mentioned in group #%d',
               bot_id, known_bot_ids[bot_id])
           continue
+        if bot_id in known_bot_id_prefixes:
+          ctx.error(
+              'bot_id "%s" was already mentioned as bot_id_prefix in group #%d',
+              bot_id, known_bot_id_prefixes[bot_id])
+          continue
         known_bot_ids[bot_id] = group_idx
     except ValueError as exc:
       ctx.error('bad bot_id expression "%s" - %s', bot_id_expr, exc)
 
 
 def _validate_group_bot_id_prefixes(
-    ctx, group_bot_id_prefixes, group_idx, known_bot_id_prefixes):
+    ctx, group_bot_id_prefixes, group_idx, known_bot_id_prefixes,
+    known_bot_ids):
   """Validates bot_id_prefixes and updates known_bot_id_prefixes."""
   for bot_id_prefix in group_bot_id_prefixes:
     if not bot_id_prefix:
@@ -445,6 +468,12 @@ def _validate_group_bot_id_prefixes(
           'bot_id_prefix "%s" is already specified in group #%d',
           bot_id_prefix, known_bot_id_prefixes[bot_id_prefix])
       continue
+    if bot_id_prefix in known_bot_ids:
+      ctx.error(
+          'bot_id_prefix "%s" is already specified as bot_id in group #%d',
+          bot_id_prefix, known_bot_ids[bot_id_prefix])
+      continue
+
     for p, idx in known_bot_id_prefixes.iteritems():
       # Inefficient, but robust code wrt variable char length.
       if p.startswith(bot_id_prefix):
@@ -513,12 +542,12 @@ def validate_bots_cfg(cfg, ctx):
   for i, entry in enumerate(cfg.bot_group):
     with ctx.prefix('bot_group #%d: ', i):
       # Validate bot_id field and make sure bot_id groups do not intersect.
-      _validate_group_bot_ids(ctx, entry.bot_id, i, bot_ids)
+      _validate_group_bot_ids(ctx, entry.bot_id, i, bot_ids, bot_id_prefixes)
 
       # Validate bot_id_prefix and make sure bot_id_prefix groups do not
       # intersect.
       _validate_group_bot_id_prefixes(
-          ctx, entry.bot_id_prefix, i, bot_id_prefixes)
+          ctx, entry.bot_id_prefix, i, bot_id_prefixes, bot_ids)
 
       # A group without bot_id, bot_id_prefix and machine_type is applied to
       # bots that don't fit any other groups. There should be at most one such
