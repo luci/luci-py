@@ -61,6 +61,50 @@ BotGroupConfig = collections.namedtuple('BotGroupConfig', [
 ])
 
 
+def get_bot_group_config(bot_id, machine_type):
+  """Returns BotGroupConfig for a bot with given ID or machine type.
+
+  Returns:
+    BotGroupConfig or None if not found.
+  """
+  cfg = _fetch_bot_groups()
+
+  if machine_type and cfg.machine_types.get(machine_type):
+    return cfg.machine_types[machine_type]
+
+  gr = cfg.direct_matches.get(bot_id)
+  if gr is not None:
+    return gr
+
+  for prefix, gr in cfg.prefix_matches:
+    if bot_id.startswith(prefix):
+      return gr
+
+  return cfg.default_group
+
+
+@utils.cache_with_expiration(60)
+def fetch_machine_types():
+  """Returns a dict of MachineTypes contained in bots.cfg.
+
+  Returns:
+    A dict mapping the name of a MachineType to a bots_pb2.MachineType.
+  """
+  cfg = _fetch_bots_config()
+  if not cfg:
+    return {}
+
+  machine_types = {}
+  for bot_group in cfg.bot_group:
+    for mt in bot_group.machine_type:
+      machine_types[mt.name] = mt
+
+  return machine_types
+
+
+### Private stuff.
+
+
 # Post-processed and validated read-only form of bots.cfg config. Its structure
 # is optimized for fast lookup of BotGroupConfig by bot_id.
 _BotGroups = collections.namedtuple('_BotGroups', [
@@ -113,28 +157,6 @@ def _gen_version(fields):
 def _make_bot_group_config(**fields):
   """Instantiates BotGroupConfig properly deriving 'version' field."""
   return BotGroupConfig(version=_gen_version(fields), **fields)
-
-
-def get_bot_group_config(bot_id, machine_type):
-  """Returns BotGroupConfig for a bot with given ID or machine type.
-
-  Returns:
-    BotGroupConfig or None if not found.
-  """
-  cfg = _fetch_bot_groups()
-
-  if machine_type and cfg.machine_types.get(machine_type):
-    return cfg.machine_types[machine_type]
-
-  gr = cfg.direct_matches.get(bot_id)
-  if gr is not None:
-    return gr
-
-  for prefix, gr in cfg.prefix_matches:
-    if bot_id.startswith(prefix):
-      return gr
-
-  return cfg.default_group
 
 
 def _bot_group_proto_to_tuple(msg, trusted_dimensions):
@@ -230,25 +252,6 @@ def _expand_bot_id_expr(expr):
     yield prefix + str(i) + suffix
 
 
-@utils.cache_with_expiration(60)
-def fetch_machine_types():
-  """Returns a dict of MachineTypes contained in bots.cfg.
-
-  Returns:
-    A dict mapping the name of a MachineType to a bots_pb2.MachineType.
-  """
-  cfg = _fetch_bots_config()
-  if not cfg:
-    return {}
-
-  machine_types = {}
-  for bot_group in cfg.bot_group:
-    for mt in bot_group.machine_type:
-      machine_types[mt.name] = mt
-
-  return machine_types
-
-
 def _fetch_bots_config():
   """Fetches bots.cfg."""
   # store_last_good=True tells config components to update the config file
@@ -330,6 +333,9 @@ def _fetch_bot_groups():
 
   return _BotGroups(
       direct_matches, prefix_matches, machine_types, default_group)
+
+
+### Config validation.
 
 
 def _validate_email(ctx, email, designation):
@@ -523,7 +529,7 @@ def _validate_group_auth_and_system_service_account(ctx, bot_group):
 
 
 @validation.self_rule(BOTS_CFG_FILENAME, bots_pb2.BotsCfg)
-def validate_bots_cfg(cfg, ctx):
+def _validate_bots_cfg(cfg, ctx):
   """Validates bots.cfg file."""
   with ctx.prefix('trusted_dimensions: '):
     for dim_key in cfg.trusted_dimensions:

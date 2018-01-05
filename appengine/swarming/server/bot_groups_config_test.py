@@ -81,7 +81,7 @@ DEFAULT_AUTH_CFG = bots_pb2.BotAuth(ip_whitelist='bots')
 class BotGroupsConfigTest(test_case.TestCase):
   def validator_test(self, cfg, messages):
     ctx = validation.Context()
-    bot_groups_config.validate_bots_cfg(cfg, ctx)
+    bot_groups_config._validate_bots_cfg(cfg, ctx)
     self.assertEquals(ctx.result().messages, [
       validation.Message(severity=logging.ERROR, text=m)
       for m in messages
