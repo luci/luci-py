@@ -19,6 +19,21 @@ from proto import bots_pb2
 from server import bot_groups_config
 
 
+MACHINE_TYPE_1 = bots_pb2.MachineType(
+  name='mt1',
+  lease_duration_secs=1,
+  mp_dimensions=['k:v'],
+  target_size=1,
+)
+
+MACHINE_TYPE_2 = bots_pb2.MachineType(
+  name='mt2',
+  lease_duration_secs=1,
+  mp_dimensions=['k:v'],
+  target_size=1,
+)
+
+
 TEST_CONFIG = bots_pb2.BotsCfg(
   trusted_dimensions=['pool'],
   bot_group=[
@@ -32,8 +47,7 @@ TEST_CONFIG = bots_pb2.BotsCfg(
     bots_pb2.BotGroup(
       bot_id=['other_bot'],
       bot_id_prefix=['bot'],
-      machine_type=[bots_pb2.MachineType(lease_duration_secs=1, name='mt',
-                                         mp_dimensions=['k:v'], target_size=1)],
+      machine_type=[MACHINE_TYPE_1, MACHINE_TYPE_2],
       auth=bots_pb2.BotAuth(require_service_account=['a@example.com']),
       bot_config_script='foo.py',
       system_service_account='bot'),
@@ -140,16 +154,25 @@ class BotGroupsConfigTest(test_case.TestCase):
     self.assertEquals([('bot', EXPECTED_GROUP_2)], cfg.prefix_matches)
     self.assertEquals(EXPECTED_GROUP_3, cfg.default_group)
 
+    self.assertEquals({
+      u'mt1': EXPECTED_GROUP_2,
+      u'mt2': EXPECTED_GROUP_2,
+    }, cfg.machine_types)
+    self.assertEquals({
+      u'mt1': MACHINE_TYPE_1,
+      u'mt2': MACHINE_TYPE_2,
+    }, cfg.machine_types_raw)
+
   def test_get_bot_group_config(self):
     self.mock_config(TEST_CONFIG)
     self.assertEquals(
         EXPECTED_GROUP_1, bot_groups_config.get_bot_group_config('bot1', None))
     self.assertEquals(
-        EXPECTED_GROUP_2, bot_groups_config.get_bot_group_config('botzz', 'mt'))
+        EXPECTED_GROUP_2, bot_groups_config.get_bot_group_config('botz', 'mt1'))
     self.assertEquals(
         EXPECTED_GROUP_3, bot_groups_config.get_bot_group_config('?', None))
     self.assertEquals(
-        EXPECTED_GROUP_2, bot_groups_config.get_bot_group_config('?', 'mt'))
+        EXPECTED_GROUP_2, bot_groups_config.get_bot_group_config('?', 'mt1'))
 
   def test_empty_config_is_valid(self):
     self.validator_test(bots_pb2.BotsCfg(), [])

@@ -83,23 +83,13 @@ def get_bot_group_config(bot_id, machine_type):
   return cfg.default_group
 
 
-@utils.cache_with_expiration(60)
 def fetch_machine_types():
   """Returns a dict of MachineTypes contained in bots.cfg.
 
   Returns:
     A dict mapping the name of a MachineType to a bots_pb2.MachineType.
   """
-  cfg = _fetch_bots_config()
-  if not cfg:
-    return {}
-
-  machine_types = {}
-  for bot_group in cfg.bot_group:
-    for mt in bot_group.machine_type:
-      machine_types[mt.name] = mt
-
-  return machine_types
+  return _fetch_bot_groups().machine_types_raw
 
 
 ### Private stuff.
@@ -108,10 +98,11 @@ def fetch_machine_types():
 # Post-processed and validated read-only form of bots.cfg config. Its structure
 # is optimized for fast lookup of BotGroupConfig by bot_id.
 _BotGroups = collections.namedtuple('_BotGroups', [
-  'direct_matches', # dict bot_id => BotGroupConfig
-  'prefix_matches', # list of pairs (bot_id_prefix, BotGroupConfig)
-  'machine_types',  # dict machine_type.name => BotGroupConfig
-  'default_group',  # fallback BotGroupConfig or None if not defined
+  'direct_matches',     # dict bot_id => BotGroupConfig
+  'prefix_matches',     # list of pairs (bot_id_prefix, BotGroupConfig)
+  'machine_types',      # dict machine_type.name => BotGroupConfig
+  'machine_types_raw',  # dict machine_type.name => bots_pb2.MachineType
+  'default_group',      # fallback BotGroupConfig or None if not defined
 ])
 
 
@@ -121,6 +112,7 @@ def _default_bot_groups():
     direct_matches={},
     prefix_matches=[],
     machine_types={},
+    machine_types_raw={},
     default_group=BotGroupConfig(
         version='default',
         require_luci_machine_token=False,
@@ -281,6 +273,7 @@ def _fetch_bot_groups():
   direct_matches = {}
   prefix_matches = []
   machine_types = {}
+  machine_types_raw = {}
   default_group = None
 
   known_prefixes = set()
@@ -323,6 +316,7 @@ def _fetch_bot_groups():
 
     for machine_type in entry.machine_type:
       machine_types[machine_type.name] = group_cfg
+      machine_types_raw[machine_type.name] = machine_type
 
     # Default group?
     if not entry.bot_id and not entry.bot_id_prefix and not entry.machine_type:
@@ -332,7 +326,9 @@ def _fetch_bot_groups():
         default_group = group_cfg
 
   return _BotGroups(
-      direct_matches, prefix_matches, machine_types, default_group)
+      direct_matches, prefix_matches,
+      machine_types, machine_types_raw,
+      default_group)
 
 
 ### Config validation.
