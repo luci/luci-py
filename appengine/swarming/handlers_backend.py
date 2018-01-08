@@ -18,6 +18,7 @@ import mapreduce_jobs
 from components import decorators
 from components import datastore_utils
 from components import machine_provider
+from server import bot_groups_config
 from server import bot_management
 from server import config
 from server import lease_management
@@ -175,6 +176,21 @@ class CronTasksTagsAggregationHandler(webapp2.RequestHandler):
         ts=now).put()
 
 
+class CronBotGroupsConfigHandler(webapp2.RequestHandler):
+  """Fetches bots.cfg with all includes, assembles the final config."""
+
+  @decorators.require_cronjob
+  def get(self):
+    ndb.get_context().set_cache_policy(lambda _: False)
+    ok = True
+    try:
+      bot_groups_config.refetch_from_config_service()
+    except bot_groups_config.BadConfigError:
+      ok = False
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    self.response.out.write('Success.' if ok else 'Fail.')
+
+
 class CancelTasksHandler(webapp2.RequestHandler):
   """Cancels tasks given a list of their ids."""
   @decorators.require_taskqueue('cancel-tasks')
@@ -275,6 +291,8 @@ def get_routes():
         CronBotsDimensionAggregationHandler),
     ('/internal/cron/aggregate_tasks_tags',
         CronTasksTagsAggregationHandler),
+
+    ('/internal/cron/bot_groups_config', CronBotGroupsConfigHandler),
 
     # Machine Provider.
     ('/internal/cron/machine_provider_bot_usage',

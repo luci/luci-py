@@ -73,10 +73,15 @@ cron:
   target: backend
 
 
-### luci-config
+### Configs
 
 - description: read luci-config configs
   # Handled by inclusion of components/config in app.yaml.
   url: /internal/cron/config/update
+  schedule: every 1 minutes
+  target: backend
+
+- description: assemble bot groups configs
+  url: /internal/cron/bot_groups_config
   schedule: every 1 minutes
   target: backend

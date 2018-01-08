@@ -3,6 +3,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import datetime
 import logging
 import sys
 import unittest
@@ -1094,6 +1095,169 @@ class BotGroupsConfigTest(test_case.TestCase):
           system_service_account='bot'),
       ])
     self.validator_test(cfg, [])
+
+
+class CacheTest(test_case.TestCase):
+  def setUp(self):
+    super(CacheTest, self).setUp()
+    self.epoch = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(self.epoch)
+
+  def mock_config(self, cfg):
+    def get_self_config_mock(path, cls=None, **kwargs):
+      self.assertEqual({'store_last_good': True}, kwargs)
+      if path not in cfg:
+        return None, None
+      rev, value = cfg[path]
+      if cls:
+        self.assertIsInstance(value, cls)
+      return rev, value
+    self.mock(config, 'get_self_config', get_self_config_mock)
+
+  def cached_config_entity(self):
+    head = bot_groups_config._bots_cfg_head_key().get()
+    body = bot_groups_config._bots_cfg_body_key().get()
+    if not head:
+      self.assertIsNone(body)
+      return None
+    self.assertIsNotNone(body)
+    # Body's fields must match corresponding head's fields.
+    for k in head._properties:
+      self.assertEqual(getattr(head, k), getattr(body, k))
+    return head
+
+  def test_refetch_from_config_service_empty(self):
+    self.mock_config({})
+    ctx = validation.Context.raise_on_error()
+
+    # Importing empty config.
+    cfg = bot_groups_config.refetch_from_config_service(ctx)
+    self.assertIsNone(cfg)
+
+    cached = self.cached_config_entity()
+    self.assertTrue(cached.empty)
+    self.assertEqual(self.epoch, cached.last_update_ts)
+
+    # Reimporting empty config.
+    self.mock_now(self.epoch + datetime.timedelta(hours=12))
+    cfg = bot_groups_config.refetch_from_config_service(ctx)
+    self.assertIsNone(cfg)
+
+    # No changes in the datastore (same last_update_ts).
+    cached = self.cached_config_entity()
+    self.assertTrue(cached.empty)
+    self.assertEqual(self.epoch, cached.last_update_ts)
+
+  def test_refetch_from_config_service_non_empty(self):
+    self.mock_config({'bots.cfg': ('rev1', TEST_CONFIG)})
+    ctx = validation.Context.raise_on_error()
+
+    # Importing non-empty config.
+    cfg = bot_groups_config.refetch_from_config_service(ctx)
+    self.assertEqual(TEST_CONFIG, cfg.bots)
+    self.assertEqual('rev1', cfg.rev)
+    self.assertTrue(cfg.digest)
+
+    cached = self.cached_config_entity()
+    self.assertFalse(cached.empty)
+    self.assertEqual('rev1', cached.bots_cfg_rev)
+    self.assertEqual(cfg.digest, cached.digest)
+    self.assertEqual(self.epoch, cached.last_update_ts)
+
+    # Some time later reimporting exact same config => no changes.
+    self.mock_now(self.epoch + datetime.timedelta(hours=12))
+    cfg = bot_groups_config.refetch_from_config_service(ctx)
+    self.assertEqual('rev1', cfg.rev)
+
+    # Same last_update_ts, indicating datastore wasn't touched.
+    cached = self.cached_config_entity()
+    self.assertEqual('rev1', cached.bots_cfg_rev)
+    self.assertEqual(self.epoch, cached.last_update_ts)
+
+    # Now the config changes, it gets reimported.
+    self.mock_config({'bots.cfg': ('rev2', TEST_CONFIG)})
+
+    prev_digest = cfg.digest
+    cfg = bot_groups_config.refetch_from_config_service(ctx)
+    self.assertEqual('rev2', cfg.rev)
+    self.assertTrue(cfg.digest != prev_digest)
+
+    # New config is stored.
+    cached = self.cached_config_entity()
+    self.assertEqual('rev2', cached.bots_cfg_rev)
+    self.assertEqual(
+        self.epoch + datetime.timedelta(hours=12), cached.last_update_ts)
+
+  def test_get_expanded_bots_cfg_empty(self):
+    self.mock_config({})
+    cfg = bot_groups_config.refetch_from_config_service()
+    self.assertIsNone(cfg)
+
+    # Read from the cache.
+    fetched, cfg = bot_groups_config._get_expanded_bots_cfg()
+    self.assertTrue(fetched)
+    self.assertIsNone(cfg)
+
+  def test_get_expanded_bots_cfg_non_empty(self):
+    self.mock_config({'bots.cfg': ('rev1', TEST_CONFIG)})
+    cfg = bot_groups_config.refetch_from_config_service()
+    self.assertIsNotNone(cfg)
+
+    # Read from the cache.
+    fetched, cfg = bot_groups_config._get_expanded_bots_cfg()
+    self.assertTrue(fetched)
+    self.assertEqual(TEST_CONFIG, cfg.bots)
+
+    # Rereading, but providing known_digest.
+    fetched, cfg = bot_groups_config._get_expanded_bots_cfg(cfg.digest)
+    self.assertFalse(fetched)
+
+  def test_get_expanded_bots_cfg_changing(self):
+    self.mock_config({'bots.cfg': ('rev1', TEST_CONFIG)})
+    bot_groups_config.refetch_from_config_service()
+
+    # Read from the cache.
+    fetched, cfg = bot_groups_config._get_expanded_bots_cfg()
+    self.assertTrue(fetched)
+    self.assertEqual('rev1', cfg.rev)
+
+    # Now the cache is changing.
+    self.mock_config({'bots.cfg': ('rev2', TEST_CONFIG)})
+    bot_groups_config.refetch_from_config_service()
+
+    # Reading new value.
+    fetched, cfg = bot_groups_config._get_expanded_bots_cfg(cfg.digest)
+    self.assertTrue(fetched)
+    self.assertEqual('rev2', cfg.rev)
+
+  def test_get_expanded_bots_cfg_bootstrap_empty(self):
+    self.mock_config({})
+
+    # No cache.
+    self.assertIsNone(self.cached_config_entity())
+
+    # Bootstraps empty cache value.
+    fetched, cfg = bot_groups_config._get_expanded_bots_cfg()
+    self.assertTrue(fetched)
+    self.assertIsNone(cfg)
+
+    cached = self.cached_config_entity()
+    self.assertTrue(cached.empty)
+
+  def test_get_expanded_bots_cfg_bootstrap_non_empty(self):
+    self.mock_config({'bots.cfg': ('rev1', TEST_CONFIG)})
+
+    # No cache.
+    self.assertIsNone(self.cached_config_entity())
+
+    # Bootstraps cache value.
+    fetched, cfg = bot_groups_config._get_expanded_bots_cfg()
+    self.assertTrue(fetched)
+    self.assertEqual(TEST_CONFIG, cfg.bots)
+
+    cached = self.cached_config_entity()
+    self.assertFalse(cached.empty)
+    self.assertEqual('rev1', cached.bots_cfg_rev)
 
 
 if __name__ == '__main__':

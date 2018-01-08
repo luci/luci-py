@@ -9,6 +9,8 @@ import hashlib
 import logging
 import os
 
+from google.appengine.ext import ndb
+
 from components import auth
 from components import config
 from components import utils
@@ -61,11 +63,35 @@ BotGroupConfig = collections.namedtuple('BotGroupConfig', [
 ])
 
 
+# Represents bots_pb2.BotsCfg after all includes are expanded, along with its
+# revision and a digest string.
+#
+# If two ExpandedBotsCfg have identical digests, then they are semantically same
+# (and vice versa). There's no promise for how exactly the digest is built, this
+# is an internal implementation detail.
+#
+# The revision alone must not be used to detect changes to the expanded config,
+# since it doesn't capture changes to the included files.
+ExpandedBotsCfg = collections.namedtuple('ExpandedBotsCfg', [
+  'bots',    # instance of bots_pb2.BotsCfg with expanded config
+  'rev',     # revision of bots.cfg file this config was built from, FYI
+  'digest',  # str with digest string, derived from 'bots' contents
+])
+
+
+class BadConfigError(Exception):
+  """Raised if the current bots.cfg config is broken."""
+
+
 def get_bot_group_config(bot_id, machine_type):
   """Returns BotGroupConfig for a bot with given ID or machine type.
 
   Returns:
     BotGroupConfig or None if not found.
+
+  Raises:
+    BadConfigError if there's no cached config and the current config at HEAD is
+    not passing validation.
   """
   cfg = _fetch_bot_groups()
 
@@ -88,11 +114,246 @@ def fetch_machine_types():
 
   Returns:
     A dict mapping the name of a MachineType to a bots_pb2.MachineType.
+
+  Raises:
+    BadConfigError if there's no cached config and the current config at HEAD is
+    not passing validation.
   """
   return _fetch_bot_groups().machine_types_raw
 
 
+def refetch_from_config_service(ctx=None):
+  """Updates the cached expanded copy of bots.cfg in the datastore.
+
+  Fetches the bots config from the config service and expands all includes,
+  validates the expanded config, and on success rewrites singleton entity with
+  the last expanded config, which is later used from serving RPCs.
+
+  Logs errors internally.
+
+  Args:
+    ctx: validation.Context to use for config validation or None default.
+
+  Returns:
+    ExpandedBotsCfg if the config was successfully fetched.
+    None if the config is missing.
+
+  Raises:
+    BadConfigError if the config is present, but not valid.
+  """
+  ctx = ctx or validation.Context.logging()
+  cfg = _fetch_and_expand_bots_cfg(ctx)
+  if ctx.result().has_errors:
+    logging.error('Refusing the invalid config')
+    raise BadConfigError('Invalid bots.cfg config, see logs')
+
+  # Fast path to skip the transaction if everything is up-to-date. Mostly
+  # important when 'refetch_from_config_service' is called directly from
+  # '_get_expanded_bots_cfg', since there may be large stampede of such calls.
+  cur = _bots_cfg_head_key().get()
+  if cur:
+    # Either 'is empty?' flag or the current digest are already set.
+    if (cur.empty and not cfg) or cur.digest == cfg.digest:
+      logging.info(
+          'Config is up-to-date at rev "%s" (digest "%s"), updated %s ago',
+          cfg.rev if cfg else 'none',
+          cfg.digest if cfg else 'none',
+          utils.utcnow()-cur.last_update_ts)
+      return cfg
+
+  bots_cfg_pb = cfg.bots.SerializeToString() if cfg else ''
+
+  @ndb.transactional
+  def update():
+    now = utils.utcnow()
+    cur = _bots_cfg_head_key().get()
+
+    # If the config file is missing, we need to let consumers know, otherwise
+    # they can't distinguish between "missing the config" and "the fetch cron
+    # hasn't run yet".
+    if not cfg:
+      if not cur or not cur.empty:
+        ndb.put_multi([
+          BotsCfgHead(
+              key=_bots_cfg_head_key(),
+              empty=True,
+              last_update_ts=now),
+          BotsCfgBody(
+              key=_bots_cfg_body_key(),
+              empty=True,
+              last_update_ts=now),
+        ])
+      return
+
+    # This digest check exists mostly to avoid clobbering memcache if nothing
+    # has actually changed.
+    if cur and cur.digest == cfg.digest:
+      logging.info(
+          'Config is up-to-date at rev "%s" (digest "%s"), updated %s ago',
+          cfg.rev, cfg.digest, now-cur.last_update_ts)
+      return
+
+    logging.info(
+        'Storing expanded bots.cfg, its size before compression is %d bytes',
+        len(bots_cfg_pb))
+    ndb.put_multi([
+      BotsCfgHead(
+          key=_bots_cfg_head_key(),
+          bots_cfg_rev=cfg.rev,
+          digest=cfg.digest,
+          last_update_ts=now),
+      BotsCfgBody(
+          key=_bots_cfg_body_key(),
+          bots_cfg=bots_cfg_pb,
+          bots_cfg_rev=cfg.rev,
+          digest=cfg.digest,
+          last_update_ts=now),
+    ])
+
+  update()
+  return cfg
+
+
 ### Private stuff.
+
+
+# Bump this to force trigger bots.cfg cache refresh, even if the config itself
+# didn't change.
+#
+# Changing this value is equivalent to removing the entities that hold
+# the cache. Note that we intentionally keep older version of the config to
+# allow GAE instances that still run the old code to use them.
+_BOT_CFG_CACHE_VER = 1
+
+
+class BotsCfgHead(ndb.Model):
+  """Contains digest of the latest expanded bots.cfg, but not the config itself.
+
+  Root singleton entity with ID == _BOT_CFG_CACHE_VER.
+
+  The config body is stored in a separate BotsCfgBody entity. We do it this way
+  to avoid fetching a huge entity just to discover we already have the latest
+  version cached in the local memory.
+  """
+  # True if there's no bots.cfg in the config repository.
+  empty = ndb.BooleanProperty(indexed=False)
+  # The revision of root bots.cfg file used to construct this config, FYI.
+  bots_cfg_rev = ndb.StringProperty(indexed=False)
+  # Identifies the content of the expanded config and how we got it.
+  digest = ndb.StringProperty(indexed=False)
+  # When this entity was updated the last time.
+  last_update_ts = ndb.DateTimeProperty(indexed=False)
+
+
+class BotsCfgBody(BotsCfgHead):
+  """Contains prefetched and expanded bots.cfg file (with all includes).
+
+  It is updated from a cron via 'refetch_from_config_service' and used for
+  serving configs to RPCs via 'get_bot_group_config' and 'fetch_machine_types'.
+
+  There's only one entity of this kind. Its ID is 1 and the parent key is
+  corresponding BotsCfgHead.
+  """
+  # Disable useless in-process per-request cache to save some RAM.
+  _use_cache = False
+
+  # Serialized bots_pb2.BotsCfg proto that has all includes expanded.
+  bots_cfg = ndb.BlobProperty(compressed=True)
+
+
+def _bots_cfg_head_key():
+  """ndb.Key of BotsCfgHead singleton entity."""
+  return ndb.Key(BotsCfgHead, _BOT_CFG_CACHE_VER)
+
+
+def _bots_cfg_body_key():
+  """ndb.Key of BotsCfgBody singleton entity."""
+  return ndb.Key(BotsCfgBody, 1, parent=_bots_cfg_head_key())
+
+
+def _fetch_and_expand_bots_cfg(ctx):
+  """Fetches bots.cfg with all includes from config service, validating it.
+
+  All validation errors are reported through the given validation context.
+  Doesn't stop on a first error, parses as much of the config as possible.
+
+  Args:
+    ctx: validation.Context to use for accepting validation errors.
+
+  Returns:
+    ExpandedBotsCfg if bots.cfg exists.
+    None if there's no bots.cfg file, this is not an error.
+  """
+  # Note: store_last_good=True has a side effect of returning configs that
+  # passed @validation.self_rule validators. This is the primary reason we are
+  # using it.
+  rev, cfg = config.get_self_config(
+      BOTS_CFG_FILENAME, bots_pb2.BotsCfg, store_last_good=True)
+  if not cfg:
+    logging.info('No bots.cfg found')
+    return None
+
+  logging.info('Expanding and validating bots.cfg at rev %s', rev)
+
+  # TODO(vadimsh): Actually expand.
+  _ = ctx
+
+  return ExpandedBotsCfg(cfg, rev, 'v%d:%s' % (_BOT_CFG_CACHE_VER, rev))
+
+
+def _get_expanded_bots_cfg(known_digest=None):
+  """Fetches expanded bots.cfg from the datastore cache.
+
+  If the cache is not there (may happen right after deploying the service or
+  after changing _BOT_CFG_CACHE_VER), falls back to fetching the config directly
+  right here. This situation is rare.
+
+  Args:
+    known_digest: digest of ExpandedBotsCfg already known to the caller, to skip
+        fetching it from the cache if nothing has changed.
+
+  Returns:
+    (True, ExpandedBotsCfg) if fetches some new version from the cache.
+    (True, None) if there's no bots.cfg config at all.
+    (False, None) if the cached version has digest matching 'known_digest'.
+
+  Raises:
+    BadConfigError if there's no cached config and the current config at HEAD is
+    not passing validation.
+  """
+  head = _bots_cfg_head_key().get()
+  if not head:
+    # This branch is hit when we deploy the service the first time, before
+    # the fetch cron runs, or after changing _BOT_CFG_CACHE_VER. We manually
+    # refresh the cache in this case, not waiting for the cron.
+    logging.warning(
+        'No bots.cfg cached for code v%d, forcing the refresh',
+        _BOT_CFG_CACHE_VER)
+    expanded = refetch_from_config_service()  # raises BadConfigError on errors
+    if expanded and known_digest and expanded.digest == known_digest:
+      return False, None
+    return True, expanded
+
+  if known_digest and head.digest == known_digest:
+    return False, None
+  if head.empty:
+    return True, None
+
+  # At this point we know there's something newer stored in the cache. Grab it.
+  # Since this happens outside of a transaction, we may fetch a version that is
+  # ever newer than pointed to by 'head'. This is fine.
+  body = _bots_cfg_body_key().get()
+  if not body:
+    raise AssertionError('BotsCfgBody is missing, this should not be possible')
+
+  if known_digest and body.digest == known_digest:
+    return False, None  # the body was sneakily reverted back just now
+  if body.empty:
+    return True, None
+
+  bots = bots_pb2.BotsCfg()
+  bots.ParseFromString(body.bots_cfg)
+  return True, ExpandedBotsCfg(bots, body.bots_cfg_rev, body.digest)
 
 
 # Post-processed and validated read-only form of bots.cfg config. Its structure
@@ -244,31 +505,26 @@ def _expand_bot_id_expr(expr):
     yield prefix + str(i) + suffix
 
 
-def _fetch_bots_config():
-  """Fetches bots.cfg."""
-  # store_last_good=True tells config components to update the config file
-  # in a cron job. Here we juts read from the datastore. In case it's the first
-  # call ever, or config doesn't exist, it returns (None, None).
-  rev, cfg = config.get_self_config(
-      BOTS_CFG_FILENAME, bots_pb2.BotsCfg, store_last_good=True)
-  if cfg:
-    logging.debug('Using bots.cfg at rev %s', rev)
-    # Callers can assume the config is already validated (as promised by
-    # components.config). There should be no error at this point.
-  return cfg
-
-
 @utils.cache_with_expiration(60)
 def _fetch_bot_groups():
   """Loads bots.cfg and parses it into _BotGroups struct.
 
   If bots.cfg doesn't exist, returns default config that allows any caller from
   'bots' IP whitelist to act as a bot.
+
+  Raises:
+    BadConfigError if there's no cached config and the current config at HEAD is
+    not passing validation.
   """
-  cfg = _fetch_bots_config()
-  if not cfg:
+  # TODO(vadimsh): Make the local cache smarter and start using 'known_digest'
+  # to skip rebuilding _BotGroups if nothing has changed.
+  _, expanded_cfg = _get_expanded_bots_cfg()
+  if not expanded_cfg:
     logging.info('Didn\'t find bots.cfg, using default')
     return _default_bot_groups()
+
+  logging.info('Using bots.cfg at rev %s', expanded_cfg.rev)
+  cfg = expanded_cfg.bots
 
   direct_matches = {}
   prefix_matches = []
