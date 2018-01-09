@@ -20,7 +20,6 @@ from google.appengine.ext import ndb
 
 from components import auth
 from components import config
-from components import datastore_utils
 from components import utils
 from server import bot_archive
 from server import config as local_config

@@ -21,6 +21,7 @@ from components import auth
 from components import utils
 from server import acl
 from server import bot_code
+from server import bot_groups_config
 from server import config
 
 
@@ -173,6 +174,7 @@ class WarmupHandler(webapp2.RequestHandler):
   def get(self):
     auth.warmup()
     bot_code.get_swarming_bot_zip(self.request.host_url)
+    bot_groups_config.warmup()
     utils.get_module_version_list(None, None)
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.write('ok')

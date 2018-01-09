@@ -13,7 +13,6 @@ test_env.setup_test_env()
 from components import auth
 from components import auth_testing
 from components import config
-from components import utils
 from components.auth import ipaddr
 from test_support import test_case
 
@@ -53,9 +52,6 @@ TEST_CONFIG = bots_pb2.BotsCfg(
       auth=bots_pb2.BotAuth(
           require_luci_machine_token=True, ip_whitelist='ip_whitelist'),
       dimensions=['pool:with_token_and_ip_whitelist']),
-    bots_pb2.BotGroup(
-      bot_id=['broken_config'],
-      dimensions=['pool:broken_config']),
   ],
 )
 
@@ -80,9 +76,9 @@ class BotAuthTest(test_case.TestCase):
     def get_self_config_mock(path, cls, **_kwargs):
       self.assertEquals('bots.cfg', path)
       self.assertEquals(cls, bots_pb2.BotsCfg)
-      return None, cfg
+      return 'rev', cfg
     self.mock(config, 'get_self_config', get_self_config_mock)
-    utils.clear_cache(bot_groups_config._fetch_bot_groups)
+    bot_groups_config.clear_cache()
 
   def mock_caller(self, ident, ip):
     self.mock(
@@ -202,14 +198,6 @@ class BotAuthTest(test_case.TestCase):
       bot_auth.validate_bot_id_and_fetch_config(
           'bot_with_service_account_and_ip_whitelist', None)
     self.assert_error_log('bot IP is not whitelisted')
-
-  def test_broken_config_section(self):
-    # This should not happen in practice, but test in case it somewhat happens.
-    self.mock_config(TEST_CONFIG)
-    self.mock_caller('anonymous:anonymous', '1.2.3.4')
-    with self.assertRaises(auth.AuthorizationError):
-      bot_auth.validate_bot_id_and_fetch_config('broken_config', None)
-    self.assert_error_log('invalid bot group config, no auth method defined')
 
   def test_composite_machine_token_ok(self):
     # Caller is using valid machine token.

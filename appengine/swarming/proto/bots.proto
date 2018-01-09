@@ -173,8 +173,18 @@ message BotGroup {
   // Each dimension is a "<key>:<value>" pair.
   repeated string dimensions = 22;
 
-  // Additional config script to inject into the swarming bot upon handshake.
+  // Path to an additional config script to inject into the swarming bot upon
+  // handshake.
+  //
+  // The path is relative to 'scripts/' directory in the service config repo.
   optional string bot_config_script = 23;
+
+  // The actual body of the config script to inject into the swarming bot upon
+  // handshake (in whatever encoding it happened to be in the config repo).
+  //
+  // For internal use (unless you fancy writing python scripts as single line
+  // escaped text proto string). If present, overrides 'bot_config_script'.
+  optional bytes bot_config_script_content = 25;
 
   // A service account to use on bots when authenticating calls to various
   // system-level services (like Isolate and CIPD), required for correct
