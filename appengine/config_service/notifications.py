@@ -92,7 +92,7 @@ def notify_gitiles_rejection(config_set, location, validation_result):
           'text': msg.text
         }
         for msg in validation_result.messages
-        ],
+      ],
       'rev_link': location,
       'rev_hash': rev,
       'rev_repo': location.project,

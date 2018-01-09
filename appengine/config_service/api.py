@@ -14,6 +14,7 @@ import endpoints
 from components import auth
 from components import utils
 from components.config import endpoint as cfg_endpoint
+from components.config import validation as cfg_validation
 from components.config import common
 
 import acl
@@ -190,8 +191,10 @@ class ConfigApi(remote.Service):
 
     futs = []
     for f in request.files:
-      futs.append(validation.validate_config_async(
-          request.config_set, f.path, f.content))
+      ctx = cfg_validation.Context()
+      with ctx.prefix(f.path + ': '):
+        futs.append(validation.validate_config_async(
+            request.config_set, f.path, f.content, ctx=ctx))
 
     ndb.Future.wait_all(futs)
     messages = []

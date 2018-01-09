@@ -6,7 +6,6 @@ import base64
 import json
 import logging
 import posixpath
-import re
 import urlparse
 
 from google.appengine.ext import ndb
@@ -21,7 +20,6 @@ from components.config.proto import service_config_pb2
 
 import common
 import services
-import storage
 
 
 def validate_config_set(config_set, ctx=None):

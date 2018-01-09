@@ -6,16 +6,13 @@
 import base64
 import datetime
 import httplib
-import logging
 
 import test_env
 from test_env import future
 
 test_env.setup_test_env()
 
-from components import auth
 from components import config
-from components.config import validation_context
 from components.config.proto import project_config_pb2
 from components.config.proto import service_config_pb2
 from test_support import test_case
@@ -783,10 +780,14 @@ class ApiTest(test_case.EndpointsTestCase):
   # validate_config
 
   def test_validate_config(self):
+
+    def validate_mock(_config_set, _path, _content, ctx=None):
+      ctx.warning('problem')
+      return future(ctx.result())
+
     self.mock(validation, 'validate_config_async', mock.Mock())
-    mock_message = validation_context.Message('problem', logging.WARNING)
-    mock_result = validation_context.Result([mock_message])
-    validation.validate_config_async.return_value = future(mock_result)
+    validation.validate_config_async.side_effect = validate_mock
+
     self.mock(acl, 'can_read_config_sets', mock.Mock(return_value={
       'services/luci-config': True,
     }))
@@ -799,7 +800,7 @@ class ApiTest(test_case.EndpointsTestCase):
     resp = self.call_api('validate_config', req).json_body
     self.assertEqual(resp, {
       'messages': [
-        {'severity': 'WARNING', 'text': 'problem'},
+        {'severity': 'WARNING', 'text': 'myproj.cfg: problem'},
       ]
     })
 
