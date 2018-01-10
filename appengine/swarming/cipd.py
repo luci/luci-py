@@ -4,16 +4,14 @@
 
 """CIPD-specific code is concentrated here."""
 
-import contextlib
-import logging
 import re
 
 # Regular expressions below are copied from
-# https://chromium.googlesource.com/infra/infra/+/468bb43/appengine/chrome_infra_packages/cipd/impl.py
-# https://chromium.googlesource.com/infra/infra/+/468bb43/appengine/chrome_infra_packages/cas/impl.py
+# https://chromium.googlesource.com/infra/infra/+/40574c5/appengine/chrome_infra_packages/cipd/impl.py
+# https://chromium.googlesource.com/infra/infra/+/40574c5/appengine/chrome_infra_packages/cas/impl.py
 
-PACKAGE_NAME_RE = re.compile(r'^([a-z0-9_\-]+/)*[a-z0-9_\-]+$')
-PACKAGE_NAME_TEMPLATE_RE = re.compile(r'^[a-z0-9_\-,\${}/=]+$')
+PACKAGE_NAME_RE = re.compile(r'^([a-z0-9_\-\.]+/)*[a-z0-9_\-\.]+$')
+PACKAGE_NAME_TEMPLATE_RE = re.compile(r'^[a-z0-9_\-\.,\${}/=]+$')
 INSTANCE_ID_RE = re.compile(r'^[0-9a-f]{40}$')
 TAG_KEY_RE = re.compile(r'^[a-z0-9_\-]+$')
 REF_RE = re.compile(r'^[a-z0-9_\-]{1,100}$')
@@ -22,7 +20,10 @@ TAG_MAX_LEN = 400
 
 def is_valid_package_name(package_name):
   """Returns True if |package_name| is a valid CIPD package name."""
-  return bool(PACKAGE_NAME_RE.match(package_name))
+  return (
+      package_name and
+      bool(PACKAGE_NAME_RE.match(package_name)) and
+      all(c.replace('.', '') != '' for c in package_name.split('/')))
 
 
 def is_valid_package_name_template(template):

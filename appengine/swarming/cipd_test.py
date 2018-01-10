@@ -5,7 +5,6 @@
 # that can be found in the LICENSE file.
 
 import logging
-import re
 import sys
 import unittest
 
@@ -18,7 +17,9 @@ import cipd
 class Test(unittest.TestCase):
   def test_is_valid_package_name(self):
     self.assertTrue(cipd.is_valid_package_name('foo'))
+    self.assertTrue(cipd.is_valid_package_name('foo/.bar'))
     self.assertFalse(cipd.is_valid_package_name('foo{'))
+    self.assertFalse(cipd.is_valid_package_name('foo/../bar'))
 
   def test_is_valid_package_name_template(self):
     for i in ('foo', 'foo${bar}', 'infra/tools/cipd/${platform}',
