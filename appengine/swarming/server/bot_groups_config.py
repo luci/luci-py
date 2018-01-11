@@ -9,6 +9,7 @@ import collections
 import hashlib
 import logging
 import os
+import threading
 
 from google.appengine.ext import ndb
 
@@ -172,7 +173,8 @@ def refetch_from_config_service(ctx=None):
 
   bots_cfg_pb = cfg.bots.SerializeToString() if cfg else ''
 
-  @ndb.transactional
+  # pylint: disable=no-value-for-parameter
+  @ndb.transactional(propagation=ndb.TransactionOptions.INDEPENDENT)
   def update():
     now = utils.utcnow()
     cur = _bots_cfg_head_key().get()
@@ -223,6 +225,8 @@ def refetch_from_config_service(ctx=None):
   return cfg
 
 
+# pylint: disable=no-value-for-parameter
+@ndb.transactional(propagation=ndb.TransactionOptions.INDEPENDENT)
 def clear_cache():
   """Removes cached bot config from the datastore and the local memory.
 
@@ -230,7 +234,7 @@ def clear_cache():
   """
   _bots_cfg_head_key().delete()
   _bots_cfg_body_key().delete()
-  utils.clear_cache(_fetch_bot_groups)
+  _cache.reset()
 
 
 ### Private stuff.
@@ -243,6 +247,11 @@ def clear_cache():
 # the cache. Note that we intentionally keep older version of the config to
 # allow GAE instances that still run the old code to use them.
 _BOT_CFG_CACHE_VER = 2
+
+
+# How often to synchronize in-process bots.cfg cache with what's in the
+# datastore.
+_IN_PROCESS_CACHE_EXP_SEC = 30
 
 
 class BotsCfgHead(ndb.Model):
@@ -398,7 +407,7 @@ def _get_expanded_bots_cfg(known_digest=None):
         fetching it from the cache if nothing has changed.
 
   Returns:
-    (True, ExpandedBotsCfg) if fetches some new version from the cache.
+    (True, ExpandedBotsCfg) if fetched some new version from the cache.
     (True, None) if there's no bots.cfg config at all.
     (False, None) if the cached version has digest matching 'known_digest'.
 
@@ -441,9 +450,12 @@ def _get_expanded_bots_cfg(known_digest=None):
   return True, ExpandedBotsCfg(bots, body.bots_cfg_rev, body.digest)
 
 
-# Post-processed and validated read-only form of bots.cfg config. Its structure
-# is optimized for fast lookup of BotGroupConfig by bot_id.
+# Post-processed and validated read-only immutable form of expanded bots.cfg
+# config. Its structure is optimized for fast lookup of BotGroupConfig by
+# bot_id.
 _BotGroups = collections.namedtuple('_BotGroups', [
+  'digest',             # a digest of corresponding ExpandedBotsCfg
+  'rev',                # a revision of root bots.cfg config file
   'direct_matches',     # dict bot_id => BotGroupConfig
   'prefix_matches',     # list of pairs (bot_id_prefix, BotGroupConfig)
   'machine_types',      # dict machine_type.name => BotGroupConfig
@@ -452,9 +464,45 @@ _BotGroups = collections.namedtuple('_BotGroups', [
 ])
 
 
+class _BotGroupsCache(object):
+  """State of _BotGroups in-process cache, see _fetch_bot_groups()."""
+
+  def __init__(self):
+    self.lock = threading.Lock()
+    self.cfg_and_exp = None  # pair (last _BotGroups, its unix expiration time)
+    self.fetcher_thread = None  # a thread that fetches the config now
+
+  def get_cfg_if_fresh(self):
+    """Returns cached _BotGroups if it is still fresh or None if not."""
+    # We allow this to be executed outside the lock. We assume here that when a
+    # change to self.cfg_and_exp field is visible to other threads, all changes
+    # to the tuple itself are also already visible. This is safe in Python,
+    # there's no memory write reordering there.
+    tp = self.cfg_and_exp
+    if tp and tp[1] > utils.time_time():
+      return tp[0]
+    return None
+
+  def set_cfg(self, cfg):
+    """Updates cfg and bumps the expiration time."""
+    self.cfg_and_exp = (cfg, utils.time_time() + _IN_PROCESS_CACHE_EXP_SEC)
+
+  def reset(self):
+    """Resets the state of the cache."""
+    with self.lock:
+      self.cfg_and_exp = None
+      self.fetcher_thread = None
+
+
+# The actual in-process _BotGroups cache.
+_cache = _BotGroupsCache()
+
+
 # Default config to use on unconfigured server.
 def _default_bot_groups():
   return _BotGroups(
+    digest='none',
+    rev='none',
     direct_matches={},
     prefix_matches=[],
     machine_types={},
@@ -577,25 +625,91 @@ def _expand_bot_id_expr(expr):
     yield prefix + str(i) + suffix
 
 
-@utils.cache_with_expiration(60)
 def _fetch_bot_groups():
   """Loads bots.cfg and parses it into _BotGroups struct.
 
   If bots.cfg doesn't exist, returns default config that allows any caller from
   'bots' IP whitelist to act as a bot.
 
+  Caches the loaded bot config internally.
+
+  Returns:
+    _BotGroups with pre-processed bots.cfg ready for serving.
+
   Raises:
     BadConfigError if there's no cached config and the current config at HEAD is
     not passing validation.
   """
-  # TODO(vadimsh): Make the local cache smarter and start using 'known_digest'
-  # to skip rebuilding _BotGroups if nothing has changed.
-  _, expanded_cfg = _get_expanded_bots_cfg()
+  cfg = _cache.get_cfg_if_fresh()
+  if cfg:
+    logging.info('Using cached bots.cfg at rev %s', cfg.rev)
+    return cfg
+
+  with _cache.lock:
+    # Maybe someone refreshed it already?
+    cfg = _cache.get_cfg_if_fresh()
+    if cfg:
+      logging.info('Using cached bots.cfg at rev %s', cfg.rev)
+      return cfg
+
+    # Nothing is known yet? Block everyone (by holding the lock) until we get
+    # a result, there's no other choice.
+    known_cfg, exp = _cache.cfg_and_exp or (None, None)
+    if not known_cfg:
+      cfg = _do_fetch_bot_groups(None)
+      _cache.set_cfg(cfg)
+      return cfg
+
+    # Someone is already refreshing the cache? Let them finish.
+    if _cache.fetcher_thread is not None:
+      logging.warning(
+          'Using stale cached bots.cfg at rev %s while another thread is '
+          'refreshing it. Cache expired %.1f sec ago.',
+          known_cfg.rev, utils.time_time() - exp)
+      return known_cfg
+
+    # Ok, we'll do it, outside the lock.
+    tid = threading.current_thread()
+    _cache.fetcher_thread = tid
+
+  cfg = None
+  try:
+    cfg = _do_fetch_bot_groups(known_cfg)
+    return cfg
+  finally:
+    with _cache.lock:
+      # 'fetcher_thread' may be different if _cache.reset() was used while we
+      # were fetching. Ignore the result in this case.
+      if _cache.fetcher_thread is tid:
+        _cache.fetcher_thread = None
+        if cfg:  # may be None on exceptions
+          _cache.set_cfg(cfg)
+
+
+def _do_fetch_bot_groups(known_cfg=None):
+  """Does the actual job of loading and parsing the expanded bots.cfg config.
+
+  Args:
+    known_cfg: a currently cached _BotGroups instance to skip refetching it if
+        nothing has changed.
+
+  Returns:
+    _BotGroups instances (perhaps same as 'known_cfg' if nothing has changed).
+
+  Raises:
+    BadConfigError if there's no cached config and the current config at HEAD is
+    not passing validation.
+  """
+  refreshed, expanded_cfg = _get_expanded_bots_cfg(
+      known_digest=known_cfg.digest if known_cfg else None)
+  if not refreshed:
+    logging.info('Cached bots.cfg at rev %s is still fresh', known_cfg.rev)
+    return known_cfg
   if not expanded_cfg:
     logging.info('Didn\'t find bots.cfg, using default')
     return _default_bot_groups()
 
-  logging.info('Using bots.cfg at rev %s', expanded_cfg.rev)
+  logging.info('Fetched cached bots.cfg at rev %s', expanded_cfg.rev)
   cfg = expanded_cfg.bots
 
   direct_matches = {}
@@ -654,8 +768,12 @@ def _fetch_bot_groups():
         default_group = group_cfg
 
   return _BotGroups(
-      direct_matches, prefix_matches,
-      machine_types, machine_types_raw,
+      expanded_cfg.digest,
+      expanded_cfg.rev,
+      direct_matches,
+      prefix_matches,
+      machine_types,
+      machine_types_raw,
       default_group)
 
 

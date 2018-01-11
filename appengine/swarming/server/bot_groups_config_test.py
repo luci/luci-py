@@ -1088,6 +1088,7 @@ class BotGroupsConfigTest(test_case.TestCase):
 class CacheTest(test_case.TestCase):
   def setUp(self):
     super(CacheTest, self).setUp()
+    bot_groups_config.clear_cache()
     self.epoch = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(self.epoch)
 
@@ -1116,6 +1117,24 @@ class CacheTest(test_case.TestCase):
     for k in head._properties:
       self.assertEqual(getattr(head, k), getattr(body, k))
     return head
+
+  def test_fetch_bot_groups_cache(self):
+    # Empty config initially. Gets cached in memory.
+    cfg = bot_groups_config._fetch_bot_groups()
+    self.assertEqual('none',  cfg.rev)
+
+    # New config becomes available.
+    self.mock_config({'bots.cfg': ('rev1', TEST_CONFIG)})
+    bot_groups_config.refetch_from_config_service(None)
+
+    # Still using the empty config from the cache.
+    cfg = bot_groups_config._fetch_bot_groups()
+    self.assertEqual('none',  cfg.rev)
+
+    # Until the cache expires.
+    self.mock_now(self.epoch + datetime.timedelta(hours=1))
+    cfg = bot_groups_config._fetch_bot_groups()
+    self.assertEqual('rev1',  cfg.rev)
 
   def test_refetch_from_config_service_empty(self):
     self.mock_config({})
