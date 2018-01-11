@@ -96,6 +96,8 @@ class InstanceTemplateRevision(ndb.Model):
   dimensions = msgprop.MessageProperty(rpc_messages.Dimensions)
   # Disk size in GiB for instances created from this template.
   disk_size_gb = ndb.IntegerProperty(indexed=False)
+  # Disk type for instances created from this template.
+  disk_type = ndb.StringProperty(indexed=False)
   # List of ndb.Keys for drained InstanceGroupManagers.
   drained = ndb.KeyProperty(kind=InstanceGroupManager, repeated=True)
   # Name of the image for instances created from this template.

@@ -135,6 +135,7 @@ def create(key):
         instance_template_revision.machine_type,
         auto_assign_external_ip=
             instance_template_revision.auto_assign_external_ip,
+        disk_type=instance_template_revision.disk_type,
         metadata=metadata,
         min_cpu_platform=instance_template_revision.min_cpu_platform,
         network_url=instance_template_revision.network_url,

@@ -60,6 +60,8 @@ def extract_dimensions(instance, instance_template_revision):
 
   if instance_template_revision.disk_size_gb:
     dimensions['disk_gb'] = instance_template_revision.disk_size_gb
+  if instance_template_revision.disk_type:
+    dimensions['disk_type'] = instance_template_revision.disk_type
 
   if instance_template_revision.machine_type:
     dimensions['memory_gb'] = gce.machine_type_to_memory(

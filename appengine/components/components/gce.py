@@ -225,8 +225,8 @@ class Project(object):
 
   def create_instance_template(
       self, name, disk_size_gb, image, machine_type,
-      auto_assign_external_ip=False, metadata=None, network_url='',
-      min_cpu_platform=None, service_accounts=None, tags=None):
+      auto_assign_external_ip=False, disk_type=None, metadata=None,
+      network_url='', min_cpu_platform=None, service_accounts=None, tags=None):
     """
     Args:
       name: Name of the instance template.
@@ -236,6 +236,7 @@ class Project(object):
         e.g. n1-standard-8.
       auto_assign_external_ip: flag to enable external network with
         auto-assigned IP address.
+      disk_type: Disk type for instances created from this template.
       metadata: List of {'key': ..., 'value': ...} dicts to attach as metadata
         to instances created from this template.
       network_url: name or URL of the network resource for this template.
@@ -279,6 +280,11 @@ class Project(object):
         },
     }
 
+    # Empty 'diskType' field is rejected, need to omit it entirely.
+    if disk_type:
+      payload['properties']['disks'][0]['initializeParams']['diskType'] = (
+          disk_type
+      )
     # Empty 'minCpuPlatform' field is rejected, need to omit it entirely.
     if min_cpu_platform:
       payload['properties']['minCpuPlatform'] = min_cpu_platform

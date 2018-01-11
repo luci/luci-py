@@ -30,6 +30,8 @@ message InstanceTemplateConfig {
     optional string image_name = 4;
     // Project which contains the specified image, if different than "project".
     optional string image_project = 10;
+    // Disk type.
+    optional string disk_type = 15;
     // Disk size (GiB).
     optional int32 disk_size_gb = 5;
     // Service accounts. Must be at least one.

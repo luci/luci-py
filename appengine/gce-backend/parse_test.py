@@ -37,6 +37,7 @@ class ComputeTemplateChecksumTest(test_case.TestCase):
             'key2:value2',
         ],
         disk_size_gb=300,
+        disk_type='pd-ssd',
         machine_type='n1-standard-8',
         metadata=[
             'key1:value1',
@@ -53,6 +54,7 @@ class ComputeTemplateChecksumTest(test_case.TestCase):
             'key1:value1',
         ],
         disk_size_gb=300,
+        disk_type='pd-ssd',
         machine_type='n1-standard-8',
         metadata=[
             'key2:value2',
@@ -633,6 +635,7 @@ class EnsureEntityExists(test_case.TestCase):
             'os_family:LINUX',
         ],
         disk_size_gb=100,
+        disk_type="pd-ssd",
         machine_type='n1-standard-8',
         metadata=[
             'key:value',
@@ -707,6 +710,8 @@ class EnsureEntityExists(test_case.TestCase):
     self.assertEqual(instance_template_revision.dimensions, expected_dimensions)
     self.assertEqual(
         instance_template_revision.disk_size_gb, template_cfg.disk_size_gb)
+    self.assertEqual(
+        instance_template_revision.disk_type, template_cfg.disk_type)
     self.assertEqual(
         instance_template_revision.machine_type, template_cfg.machine_type)
     self.assertEqual(instance_template_revision.metadata, expected_metadata)
