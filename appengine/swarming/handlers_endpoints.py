@@ -383,44 +383,47 @@ class SwarmingTasksService(remote.Service):
       request.properties.secret_bytes = sb
 
     try:
-      request, secret_bytes = message_conversion.new_task_request_from_rpc(
+      request_obj, secret_bytes = message_conversion.new_task_request_from_rpc(
           request, utils.utcnow())
-      apply_property_defaults(request.properties)
+      apply_property_defaults(request_obj.properties)
       task_request.init_new_request(
-          request, acl.can_schedule_high_priority_tasks(), secret_bytes)
+          request_obj, acl.can_schedule_high_priority_tasks(), secret_bytes)
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
 
     # Make sure the caller is actually allowed to schedule the task before
     # asking the token server for a service account token.
-    task_scheduler.check_schedule_request_acl(request)
+    task_scheduler.check_schedule_request_acl(request_obj)
 
-    # If request.service_account is an email, contact the token server to
+    # If request_obj.service_account is an email, contact the token server to
     # generate "OAuth token grant" (or grab a cached one). By doing this we
     # check that the given service account usage is allowed by the token server
     # rules at the time the task is posted. This check is also performed later
     # (when running the task), when we get the actual OAuth access token.
-    if service_accounts.is_service_account(request.service_account):
+    if service_accounts.is_service_account(request_obj.service_account):
       if not service_accounts.has_token_server():
         raise endpoints.BadRequestException(
             'This Swarming server doesn\'t support task service accounts '
             'because Token Server URL is not configured')
       max_lifetime_secs = (
-          request.expiration_secs +
-          request.properties.execution_timeout_secs +
-          request.properties.grace_period_secs)
+          request_obj.expiration_secs +
+          request_obj.properties.execution_timeout_secs +
+          request_obj.properties.grace_period_secs)
       try:
         # Note: this raises AuthorizationError if the user is not allowed to use
         # the requested account or service_accounts.InternalError if something
         # unexpected happens.
-        request.service_account_token = service_accounts.get_oauth_token_grant(
-            service_account=request.service_account,
-            validity_duration=datetime.timedelta(seconds=max_lifetime_secs))
+        duration = datetime.timedelta(seconds=max_lifetime_secs)
+        request_obj.service_account_token = (
+            service_accounts.get_oauth_token_grant(
+                service_account=request_obj.service_account,
+                validity_duration=duration))
       except service_accounts.InternalError as exc:
         raise endpoints.InternalServerErrorException(exc.message)
 
     try:
-      result_summary = task_scheduler.schedule_request(request, secret_bytes)
+      result_summary = task_scheduler.schedule_request(
+          request_obj, secret_bytes)
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
 
@@ -430,7 +433,7 @@ class SwarmingTasksService(remote.Service):
           result_summary, False)
 
     return swarming_rpcs.TaskRequestMetadata(
-        request=message_conversion.task_request_to_rpc(request),
+        request=message_conversion.task_request_to_rpc(request_obj),
         task_id=task_pack.pack_result_summary_key(result_summary.key),
         task_result=previous_result)
 

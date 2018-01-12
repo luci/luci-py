@@ -688,40 +688,36 @@ class BotPollHandler(_BotBaseHandler):
   def _cmd_run(
       self, request, secret_bytes, run_result_key, bot_id, bot_group_cfg):
     logging.info('Run: %s', request.task_id)
+    props = request.properties
     out = {
       'cmd': 'run',
       'manifest': {
         'bot_id': bot_id,
         'bot_authenticated_as': auth.get_peer_identity().to_bytes(),
-        'caches': [
-          c.to_dict() for c in request.properties.caches
-        ],
+        'caches': [c.to_dict() for c in props.caches],
         'cipd_input': {
-          'client_package': (
-              request.properties.cipd_input.client_package.to_dict()),
-          'packages': [
-            p.to_dict() for p in request.properties.cipd_input.packages
-          ],
-          'server': request.properties.cipd_input.server,
-        } if request.properties.cipd_input else None,
-        'command': request.properties.command,
-        'dimensions': request.properties.dimensions,
-        'env': request.properties.env,
-        'env_prefixes': request.properties.env_prefixes,
-        'extra_args': request.properties.extra_args,
-        'grace_period': request.properties.grace_period_secs,
-        'hard_timeout': request.properties.execution_timeout_secs,
+          'client_package': props.cipd_input.client_package.to_dict(),
+          'packages': [p.to_dict() for p in props.cipd_input.packages],
+          'server': props.cipd_input.server,
+        } if props.cipd_input else None,
+        'command': props.command,
+        'dimensions': props.dimensions,
+        'env': props.env,
+        'env_prefixes': props.env_prefixes,
+        'extra_args': props.extra_args,
+        'grace_period': props.grace_period_secs,
+        'hard_timeout': props.execution_timeout_secs,
         'host': utils.get_versioned_hosturl(),
-        'io_timeout': request.properties.io_timeout_secs,
+        'io_timeout': props.io_timeout_secs,
         'secret_bytes': (secret_bytes.secret_bytes.encode('base64')
                          if secret_bytes else None),
         'isolated': {
-          'input': request.properties.inputs_ref.isolated,
-          'namespace': request.properties.inputs_ref.namespace,
-          'server': request.properties.inputs_ref.isolatedserver,
-        } if request.properties.inputs_ref else None,
-        'outputs': request.properties.outputs,
-        'relative_cwd': request.properties.relative_cwd,
+          'input': props.inputs_ref.isolated,
+          'namespace': props.inputs_ref.namespace,
+          'server': props.inputs_ref.isolatedserver,
+        } if props.inputs_ref else None,
+        'outputs': props.outputs,
+        'relative_cwd': props.relative_cwd,
         'service_accounts': {
           'system': {
             # 'none', 'bot' or email. Bot interprets 'none' and 'bot' locally.

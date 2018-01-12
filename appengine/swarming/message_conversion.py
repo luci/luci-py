@@ -97,28 +97,27 @@ def bot_event_to_rpc(entity):
 def task_request_to_rpc(entity):
   """"Returns a swarming_rpcs.TaskRequest from a task_request.TaskRequest."""
   assert entity.__class__ is task_request.TaskRequest
+  props = entity.properties
   cipd_input = None
-  if entity.properties.cipd_input:
+  if props.cipd_input:
     client_package = None
-    if entity.properties.cipd_input.client_package:
+    if props.cipd_input.client_package:
       client_package = _ndb_to_rpc(
           swarming_rpcs.CipdPackage,
-          entity.properties.cipd_input.client_package)
+          props.cipd_input.client_package)
     cipd_input = _ndb_to_rpc(
         swarming_rpcs.CipdInput,
-        entity.properties.cipd_input,
+        props.cipd_input,
         client_package=client_package,
         packages=[
           _ndb_to_rpc(swarming_rpcs.CipdPackage, p)
-          for p in entity.properties.cipd_input.packages
+          for p in props.cipd_input.packages
         ])
 
   inputs_ref = None
-  if entity.properties.inputs_ref:
-    inputs_ref = _ndb_to_rpc(
-        swarming_rpcs.FilesRef, entity.properties.inputs_ref)
+  if props.inputs_ref:
+    inputs_ref = _ndb_to_rpc(swarming_rpcs.FilesRef, props.inputs_ref)
 
-  props = entity.properties
   properties = _ndb_to_rpc(
       swarming_rpcs.TaskProperties,
       props,
@@ -127,8 +126,7 @@ def task_request_to_rpc(entity):
       secret_bytes='<REDACTED>' if props.has_secret_bytes else None,
       dimensions=_string_pairs_from_dict(props.dimensions),
       env=_string_pairs_from_dict(props.env),
-      env_prefixes=_string_list_pairs_from_dict(
-          entity.properties.env_prefixes or {}),
+      env_prefixes=_string_list_pairs_from_dict(props.env_prefixes or {}),
       inputs_ref=inputs_ref)
 
   return _ndb_to_rpc(
