@@ -22,7 +22,6 @@ Sections are:
 import argparse
 import contextlib
 import fnmatch
-import itertools
 import json
 import logging
 import os
@@ -1223,6 +1222,13 @@ def _bot_restart(botobj, message, filepath=None):
     return
 
   botobj.post_event('bot_shutdown', 'About to restart: %s' % message)
+
+  # Sleep a bit to make sure new bot process connects to a GAE instance with
+  # the fresh bot group config cache (it gets refreshed each second). This makes
+  # sure the bot doesn't accidentally pick up the old config after restarting
+  # and connecting to an instance with a stale cache.
+  if not botobj.remote.is_grpc:
+    time.sleep(2)
 
   # Don't forget to release the singleton before restarting itself.
   SINGLETON.release()

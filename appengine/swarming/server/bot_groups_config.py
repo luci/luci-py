@@ -251,7 +251,7 @@ _BOT_CFG_CACHE_VER = 2
 
 # How often to synchronize in-process bots.cfg cache with what's in the
 # datastore.
-_IN_PROCESS_CACHE_EXP_SEC = 30
+_IN_PROCESS_CACHE_EXP_SEC = 1
 
 
 class BotsCfgHead(ndb.Model):
