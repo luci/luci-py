@@ -369,7 +369,7 @@ class BotHandshakeHandler(_BotBaseHandler):
   """First request to be called to get initial data like bot code version.
 
   The bot is server-controlled so the server doesn't have to support multiple
-  API version. When running a task, the bot sync the the version specific URL.
+  API version. When running a task, the bot sync the version specific URL.
   Once a bot finishes its currently running task, it'll be immediately upgraded
   on its next poll.
 

@@ -313,7 +313,7 @@ discard the data if there is a mismatch.
   - The whole project is written in python.
   - The isolate server code is subsumed by the Swarming project to make task
     distribution efficient.
-  - The code is all contained in the the repository
+  - The code is all contained in the repository
     https://github.com/luci/luci-py.
   - Code reviews are done with Rietveld.
   - The primary consumer project is the Chromium project. As such some

@@ -193,7 +193,7 @@ as found in the Chromium project as a real world example.
 
   - The whole project is written in python.
   - The isolate code is subsumed by the Swarming project.
-  - The code is all contained in the the directory
+  - The code is all contained in the directory
     [client](https://github.com/luci/luci-py/tree/master/client).
   - Code reviews are done with Rietveld.
   - The primary consumer project is the Chromium project. As such some

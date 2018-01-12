@@ -584,7 +584,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             outputs_ref=outputs_ref,
             performance_stats=performance_stats))
     # Simulate an unexpected retry, e.g. the response of the previous RPC never
-    # got the the client even if it succeedded.
+    # got the client even if it succeedded.
     self.assertEqual(
         task_result.State.COMPLETED,
         task_scheduler.bot_update_task(

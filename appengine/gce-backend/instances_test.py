@@ -782,7 +782,7 @@ class SetDeletionTime(test_case.TestCase):
     self.failIf(key.get())
 
   def test_already_set(self):
-    """Ensures nothing happens when the the deletion_ts is already set."""
+    """Ensures nothing happens when the deletion_ts is already set."""
     now = utils.utcnow()
     key = models.Instance(
         key=instances.get_instance_key(
