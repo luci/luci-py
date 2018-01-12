@@ -156,6 +156,39 @@ class UtilsTest(test_case.TestCase):
     if t.is_alive():
       self.fail('deadlock')
 
+  def test_cache_with_expiration(self):
+    ran = []
+    self.mock(utils, 'time_time', lambda: 1000)
+
+    @utils.cache_with_expiration(30)
+    def do_work():
+      ran.append(1)
+      return len(ran)
+
+    self.assertEqual(30, do_work.__parent_cache__.expiration_sec)
+    self.assertEqual(None, do_work.__parent_cache__.expires)
+
+    self.assertEqual(1, do_work())
+    self.assertEqual(1, do_work())
+    self.assertEqual(1, len(ran))
+    self.assertEqual(1030, do_work.__parent_cache__.expires)
+
+    utils.clear_cache(do_work)
+    self.assertEqual(2, do_work())
+    self.assertEqual(2, len(ran))
+    self.assertEqual(1030, do_work.__parent_cache__.expires)
+
+    self.mock(utils, 'time_time', lambda: 1029)
+    self.assertEqual(2, do_work())
+    self.assertEqual(2, do_work())
+    self.assertEqual(2, len(ran))
+
+    self.mock(utils, 'time_time', lambda: 1030)
+    self.assertEqual(3, do_work())
+    self.assertEqual(3, do_work())
+    self.assertEqual(3, len(ran))
+    self.assertEqual(1060, do_work.__parent_cache__.expires)
+
   def test_clear_cache(self):
     calls = []
 
