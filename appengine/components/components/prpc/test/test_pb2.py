@@ -23,6 +23,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   serialized_pb=_b('\n\ntest.proto\x12\x04test\x1a\x1bgoogle/protobuf/empty.proto\"\x18\n\x0bGiveRequest\x12\t\n\x01m\x18\x01 \x01(\x03\"\x19\n\x0cTakeResponse\x12\t\n\x01k\x18\x01 \x01(\x03\"+\n\x0b\x45\x63hoRequest\x12\x1c\n\x01r\x18\x01 \x01(\x0b\x32\x11.test.GiveRequest\" \n\x0c\x45\x63hoResponse\x12\x10\n\x08response\x18\x01 \x03(\t2\xa2\x01\n\x04Test\x12\x33\n\x04Give\x12\x11.test.GiveRequest\x1a\x16.google.protobuf.Empty\"\x00\x12\x34\n\x04Take\x12\x16.google.protobuf.Empty\x1a\x12.test.TakeResponse\"\x00\x12/\n\x04\x45\x63ho\x12\x11.test.EchoRequest\x1a\x12.test.EchoResponse\"\x00\x62\x06proto3')
   ,
   dependencies=[google_dot_protobuf_dot_empty__pb2.DESCRIPTOR,])
+_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 
 
@@ -155,7 +156,6 @@ DESCRIPTOR.message_types_by_name['GiveRequest'] = _GIVEREQUEST
 DESCRIPTOR.message_types_by_name['TakeResponse'] = _TAKERESPONSE
 DESCRIPTOR.message_types_by_name['EchoRequest'] = _ECHOREQUEST
 DESCRIPTOR.message_types_by_name['EchoResponse'] = _ECHORESPONSE
-_sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 GiveRequest = _reflection.GeneratedProtocolMessageType('GiveRequest', (_message.Message,), dict(
   DESCRIPTOR = _GIVEREQUEST,

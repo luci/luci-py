@@ -108,7 +108,7 @@ class PRPCServerTestCase(test_case.TestCase):
     if enc == encoding.Encoding.JSON:
       encoded_req = encoded_req[4:]
     http_resp = self.app.post(
-        '/prpc/Test/Echo',
+        '/prpc/test.Test/Echo',
         encoded_req,
         headers,
     )
@@ -135,7 +135,7 @@ class PRPCServerTestCase(test_case.TestCase):
     headers = self.make_headers(encoding.Encoding.BINARY)
     req = test_pb2.GiveRequest(m=3333)
     raw_resp = self.app.post(
-        '/prpc/Test/Give',
+        '/prpc/test.Test/Give',
         req.SerializeToString(),
         headers,
     ).body
@@ -143,7 +143,7 @@ class PRPCServerTestCase(test_case.TestCase):
 
     req = empty_pb2.Empty()
     raw_resp = self.app.post(
-        '/prpc/Test/Take',
+        '/prpc/test.Test/Take',
         req.SerializeToString(),
         headers,
     ).body
@@ -163,7 +163,7 @@ class PRPCServerTestCase(test_case.TestCase):
 
     req = test_pb2.GiveRequest(m=825800)
     resp = self.app.post(
-        '/prpc/Test/Give',
+        '/prpc/test.Test/Give',
         req.SerializeToString(),
         {},
         expect_errors=True,
@@ -189,7 +189,7 @@ class PRPCServerTestCase(test_case.TestCase):
 
     req = test_pb2.GiveRequest(m=825800)
     resp = self.app.post(
-        '/prpc/Test/IDontExist',
+        '/prpc/test.Test/IDontExist',
         req.SerializeToString(),
         self.make_headers(encoding.Encoding.BINARY),
         expect_errors=True,
@@ -202,7 +202,7 @@ class PRPCServerTestCase(test_case.TestCase):
 
     req = test_pb2.GiveRequest(m=825800)
     resp = self.bad_app.post(
-        '/prpc/Test/Give',
+        '/prpc/test.Test/Give',
         req.SerializeToString(),
         self.make_headers(encoding.Encoding.BINARY),
         expect_errors=True,
@@ -212,7 +212,7 @@ class PRPCServerTestCase(test_case.TestCase):
 
     req = empty_pb2.Empty()
     resp = self.bad_app.post(
-        '/prpc/Test/Take',
+        '/prpc/test.Test/Take',
         req.SerializeToString(),
         self.make_headers(encoding.Encoding.BINARY),
         expect_errors=True,
@@ -224,7 +224,7 @@ class PRPCServerTestCase(test_case.TestCase):
     """Make sure the server handles a malformed request."""
 
     resp = self.app.post(
-        '/prpc/Test/Give',
+        '/prpc/test.Test/Give',
         'asdfjasdhlkiqwuebweo',
         self.make_headers(encoding.Encoding.BINARY),
         expect_errors=True,

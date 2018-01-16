@@ -91,7 +91,8 @@ class Server(object):
       ValueError: when trying to add another handler for the same service name.
     """
     sym_db = symbol_database.Default()
-    desc = servicer.DESCRIPTION
+    pkg = servicer.DESCRIPTION['package']
+    desc = servicer.DESCRIPTION['descriptor']
 
     # Construct handler.
     methods = {
@@ -105,11 +106,15 @@ class Server(object):
       for method in desc.method if hasattr(servicer, method.name)
     }
 
+    full_name = desc.name
+    if pkg:
+      full_name = '%s.%s' % (pkg, desc.name)
+
     # Register handler with internal server state.
     if desc.name in self._services:
       raise ValueError(
           'Tried to double-register handlers for service %s' % desc.name)
-    self._services[desc.name] = _Service(desc, methods)
+    self._services[full_name] = _Service(desc, methods)
 
   def get_routes(self):
     """Returns a list of webapp2.Route for all the routes the API handles."""

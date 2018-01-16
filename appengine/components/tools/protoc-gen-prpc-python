@@ -17,8 +17,11 @@ from google.protobuf import descriptor_pb2
 
 
 SERVICE_FORMAT = '''
-%sServiceDescription = descriptor_pb2.ServiceDescriptorProto()
-%sServiceDescription.ParseFromString(\'%s\'.decode(\'hex\'))
+%sServiceDescription = {
+  'descriptor': descriptor_pb2.ServiceDescriptorProto(),
+  'package': %r,
+}
+%sServiceDescription['descriptor'].ParseFromString(%r.decode(\'hex\'))
 '''
 
 
@@ -27,6 +30,7 @@ def generate_code(input):
   for service in input.service:
     fragments.append(SERVICE_FORMAT % (
         service.name,
+        str(input.package),
         service.name,
         service.SerializeToString().encode('hex'),
     ))
@@ -42,7 +46,7 @@ def main():
   for input in req.proto_file:
     if input.name not in files_to_generate:
       continue
-    output = res.file.add(
+    res.file.add(
         name=input.name.replace('.proto', '_prpc_pb2.py'),
         content=generate_code(input),
     )
