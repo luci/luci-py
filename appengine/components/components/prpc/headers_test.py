@@ -52,6 +52,11 @@ class PRPCHeadersTestCase(test_case.TestCase):
         {'Accept': 'application/json'},
         expect_accept=encoding.Encoding.JSON,
     )
+    self.process_headers(
+        {'Accept': '*/*'},
+        expect_accept=encoding.Encoding.BINARY,
+    )
+
 
   def test_process_headers_timeout(self):
     check_timeout = lambda t, n: self.assertEqual(

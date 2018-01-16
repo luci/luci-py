@@ -22,6 +22,18 @@ def _parse_media_type(media_type):
   raise ValueError('Invalid media type "%s"' % media_type)
 
 
+def _parse_accept_header(value):
+  # TODO(nodir,mknyszek): Correctly parse Accept header according to
+  # https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
+  # (e.g. list multiple acceptable types, or have quality factors).
+  if not value or value == '*/*':
+    return encoding.Encoding.BINARY
+  try:
+    return _parse_media_type(value)
+  except ValueError:
+    raise ValueError('unsupported Accept header %r' % value)
+
+
 def _parse_timeout(timeout):
   if timeout is None:
     return None
@@ -77,11 +89,7 @@ def process_headers(context, headers):
     else:
       raise
 
-  accept_header = headers.get('Accept')
-  # TODO(nodir,mknyszek): Correctly parse accept headers that are more complex
-  # (e.g. list multiple acceptable types, or have quality factors).
-  accept = _parse_media_type(accept_header)
-
+  accept = _parse_accept_header(headers.get('Accept'))
   timeout_header = headers.get('X-Prpc-Timeout')
   context.timeout = _parse_timeout(timeout_header)
 
