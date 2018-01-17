@@ -4,7 +4,6 @@
 
 """Wrapper around GCE REST API."""
 
-import json
 import re
 
 from components import net
@@ -35,6 +34,11 @@ MACHINE_TYPES = {
     'n1-highmem-16':  {'cpus': 16, 'memory': 104},
     'n1-highmem-32':  {'cpus': 32, 'memory': 208},
 }
+
+
+# TODO(vadimsh): Add a method to fetch list of available zones and use the
+# result together with yield_instances_in_zones to emulate yield_instances. Once
+# this is done, we can remove hacky HTTP 400 error handling there.
 
 
 class Project(object):
@@ -150,6 +154,78 @@ class Project(object):
       page_token = resp.get('nextPageToken')
       if not page_token:
         break
+
+  def yield_instances_in_zone(self, zone, instance_filter=None):
+    """Yields dicts with all project instances in the specific zone.
+
+    If the zone doesn't exist, silently yields nothing. We assume non-existing
+    zones are empty.
+
+    The format of the instance dict is defined here:
+      https://cloud.google.com/compute/docs/reference/v1/instances#resource
+
+    Returns instances in all possible states (instance['status'] attribute):
+      PROVISIONING
+      STAGING
+      RUNNING
+      STOPPING
+      STOPPED
+      TERMINATED
+
+    Very slow call (can run for minutes). Should be used only from task queues.
+
+    Args:
+      zone: a zone to list instances in, e.g "us-central1-a".
+      instance_filter: optional filter to apply to instance names when scanning.
+    """
+    if instance_filter and set("\"\\'").intersection(instance_filter):
+      raise ValueError('Invalid instance filter: %s' % instance_filter)
+    page_token = None
+    while True:
+      params = {'maxResults': 250}
+      if instance_filter:
+        params['filter'] = 'name eq "%s"' % instance_filter
+      if page_token:
+        params['pageToken'] = page_token
+      try:
+        resp = self.call_api(
+            '/zones/%s/instances' % zone, params=params, deadline=120)
+      except net.Error as exc:
+        if not page_token and exc.status_code == 400:
+          return  # no such zone, this is fine...
+        raise
+      for instance in resp.get('items', []):
+        yield instance
+      page_token = resp.get('nextPageToken')
+      if not page_token:
+        break
+
+  def yield_instances_in_zones(self, zones, instance_filter=None):
+    """Yields dicts with all project instances in the specific zones.
+
+    Fetches listing sequentially zone-by-zone. We assume non-existing zones are
+    empty.
+
+    The format of the instance dict is defined here:
+      https://cloud.google.com/compute/docs/reference/v1/instances#resource
+
+    Returns instances in all possible states (instance['status'] attribute):
+      PROVISIONING
+      STAGING
+      RUNNING
+      STOPPING
+      STOPPED
+      TERMINATED
+
+    Very slow call (can run for minutes). Should be used only from task queues.
+
+    Args:
+      zones: a list of zones to list instances in, e.g ["us-central1-a"].
+      instance_filter: optional filter to apply to instance names when scanning.
+    """
+    for zone in zones:
+      for instance in self.yield_instances_in_zone(zone, instance_filter):
+        yield instance
 
   def set_metadata(self, zone, instance, fingerprint, items):
     """Initiates metadata update operation.

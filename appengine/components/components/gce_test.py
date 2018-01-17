@@ -3,6 +3,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import json
 import sys
 import unittest
 
@@ -34,6 +35,8 @@ class GceTest(test_case.TestCase):
       }
       defaults.update(expected)
       self.assertEqual(defaults, kwargs)
+      if isinstance(response, net.Error):
+        raise response
       return response
     self.mock(net, 'json_request', mocked_request)
     return requests
@@ -142,6 +145,82 @@ class GceTest(test_case.TestCase):
   def test_yield_instances_bad_filter(self):
     with self.assertRaises(ValueError):
       list(gce.Project('123').yield_instances('"'))
+
+  def test_yield_instances_in_zones(self):
+    self.mock_requests([
+      (
+        {
+          'deadline': 120,
+          'params': {
+            'maxResults': 250,
+          },
+          'url':
+              'https://www.googleapis.com/compute/v1/projects/123'
+              '/zones/z1/instances',
+        },
+        {
+          'items': [instance('a')],
+          'nextPageToken': 'page-token',
+        },
+      ),
+      (
+        {
+          'deadline': 120,
+          'params': {
+            'maxResults': 250,
+            'pageToken': 'page-token',
+          },
+          'url':
+              'https://www.googleapis.com/compute/v1/projects/123'
+              '/zones/z1/instances',
+        },
+        {
+          'items': [instance('b')],
+        },
+      ),
+      (
+        {
+          'deadline': 120,
+          'params': {
+            'maxResults': 250,
+          },
+          'url':
+              'https://www.googleapis.com/compute/v1/projects/123'
+              '/zones/z2/instances',
+        },
+        {
+          'items': [instance('c')],
+        },
+      ),
+      (
+        {
+          'deadline': 120,
+          'params': {
+            'maxResults': 250,
+          },
+          'url':
+              'https://www.googleapis.com/compute/v1/projects/123'
+              '/zones/z3/instances',
+        },
+        # Missing zone is ignored.
+        net.Error('Bad request', 400, json.dumps({
+          'error': {
+            'errors': [{
+              'domain': 'global',
+              'reason': 'invalid',
+              'message':
+                'Invalid value for field \'zone\': \'z3\'. Unknown zone.',
+            }],
+            'code': 400,
+            'message':
+              'Invalid value for field \'zone\': \'z3\'. Unknown zone.',
+          },
+        })),
+      ),
+    ])
+    result = gce.Project('123').yield_instances_in_zones(['z1', 'z2', 'z3'])
+    self.assertEqual(
+        [instance('a'), instance('b'), instance('c')], list(result))
 
   def test_set_metadata(self):
     self.mock_requests([
