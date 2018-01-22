@@ -165,6 +165,7 @@ class FrontendAdminTest(AppTestBase):
       expected = f.read()
     header = (
         u'#!/usr/bin/env python\n'
+        '# coding: utf-8\n'
         'host_url = \'http://localhost\'\n'
         'bootstrap_token = \'bootstrap-token\'\n')
     self.assertEqual(header + expected, actual)

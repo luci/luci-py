@@ -204,7 +204,10 @@ class ServerApiTest(BaseTest):
   def test_bootstrap(self):
     self._test_file(
         'bootstrap',
-        '#!/usr/bin/env python\nhost_url = \'\'\nbootstrap_token = \'\'\n')
+        '#!/usr/bin/env python\n'
+        '# coding: utf-8\n'
+        'host_url = \'\'\n'
+        'bootstrap_token = \'\'\n')
 
   def test_bot_config(self):
     self._test_file('bot_config', '')

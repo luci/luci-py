@@ -53,6 +53,7 @@ class BotManagementTest(test_case.TestCase):
     f = bot_code.get_bootstrap('localhost', 'token')
     expected = (
       '#!/usr/bin/env python\n'
+      '# coding: utf-8\n'
       'host_url = \'localhost\'\n'
       'bootstrap_token = \'token\'\n'
       'foo bar')

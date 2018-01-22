@@ -59,6 +59,7 @@ def get_bootstrap(host_url, bootstrap_token=None):
     assert bootstrap_token == quoted, bootstrap_token
   header = (
       '#!/usr/bin/env python\n'
+      '# coding: utf-8\n'
       'host_url = %r\n'
       'bootstrap_token = %r\n') % (host_url or '', bootstrap_token or '')
 
