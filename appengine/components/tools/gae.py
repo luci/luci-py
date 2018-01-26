@@ -368,7 +368,9 @@ def CMDupload(parser, args):
     if module not in app.modules:
       parser.error('No such module: %s' % module)
 
-  version = calculate_version.calculate_version(app.app_dir, options.tag)
+  # Additional chars is for the app_id as well as 5 chars for '-dot-'.
+  version = calculate_version.calculate_version(
+    app.app_dir, options.tag, len(app.app_id)+5)
 
   # Updating indexes, queues, etc is a disruptive operation. Confirm.
   if not options.force:
@@ -416,7 +418,9 @@ def CMDversion(parser, args):
   """
   parser.add_tag_option()
   app, options, _ = parser.parse_args(args)
-  print(calculate_version.calculate_version(app.app_dir, options.tag))
+  # Additional chars is for the app_id as well as 5 chars for '-dot-'.
+  print(calculate_version.calculate_version(
+    app.app_dir, options.tag, len(app.app_id)+5))
   return 0
 
 

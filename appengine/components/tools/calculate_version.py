@@ -20,6 +20,11 @@ from depot_tools import git_number
 from depot_tools import git_common
 
 
+# Defines an error when generating the version for app engine.
+class VersionError(Exception):
+  pass
+
+
 def git(cmd, cwd):
   return subprocess.check_output(['git'] + cmd, cwd=cwd)
 
@@ -98,20 +103,94 @@ def is_pristine(root, mergebase):
       git(['diff', '--ignore-submodules', '--cached', mergebase], cwd=root))
 
 
-def calculate_version(root, tag):
+def calculate_version(root, tag, additional_chars=0):
   """Returns a tag for a git checkout.
 
   Uses the pseudo revision number from the upstream commit this branch is based
   on, the abbreviated commit hash. Adds -tainted-<username> if the code is not
-  pristine and optionally adds a tag to further describe it.
+  pristine and optionally adds a tag to further describe it. If version is over
+  63 characters, some truncation is attempted, potentially raising an error if
+  we can't get the version under 63 characters. 'additional_chars' indicates
+  that additional characters will be added, and thus that the limit for version
+  should actually be 63 - additional_chars.
+
+  Raises:
+    VersionError: version cannot be generated using at most 63 characters.
   """
   pseudo_revision, mergebase = get_head_pseudo_revision(root, 'origin/master')
   pristine = is_pristine(root, mergebase)
-  # Trim it to 7 characters like 'git describe' does. 40 characters is
-  # overwhelming!
+  user = getpass.getuser()
+
+  # Per https://tools.ietf.org/html/rfc1035#section-2.3.1 and
+  # https://tools.ietf.org/html/rfc2181#section-11, labels in domains can't be
+  # more than 63 chars - additional_chars.
+  return get_limited_version(pseudo_revision, mergebase, pristine, user, tag,
+                             63 - additional_chars)
+
+
+def get_limited_version(pseudo_revision, mergebase, pristine, user, tag, limit):
+  """Return version, limited to the given 'limit' number of chars.
+
+  Raises:
+    VersionError: version cannot be generated using at most 'limit' chars.
+  """
+  tainted_text = '-tainted-%s' % user if not pristine else ''
+  version = get_version(pseudo_revision, mergebase, tainted_text, tag)
+
+  # If already under the limit, return what we have.
+  orig_version_len = len(version)
+  if orig_version_len <= limit:
+    return version
+
+  # All our attempts to shorten the version currently involve shortening
+  # tainted_text, so if there is no tainted_text, we're powerless, bail now.
+  if not tainted_text:
+    raise VersionError('Failed to truncate "%s" ' % version +
+      '(length=%d, limit=%d): version is pristine.' % (len(version), limit))
+
+  # Shorten tainted_text by excluding '-tainted' (saves 8 chars) and truncating
+  # user as needed to fit in the char limit, though (somewhat arbitrarily) we
+  # refuse to truncate the username to less than 6 chars in order to maintain
+  # some chance of identifying the user who deployed (though it's ok if the
+  # username is less than 6 chars to begin with).
+  min_user_chars = 6
+
+  # Try with full username (just removing '-tainted').
+  version = get_version(pseudo_revision, mergebase, '-%s' % user, tag)
+  if len(version) <= limit:
+    return version
+
+  # That's still not enough. Truncate username (in addition to removing the
+  # 8 chars of tainted), bailing if we try to go lower than min_user_chars.
+  current_chars_without_user = orig_version_len - len(user) - 8
+  chars_for_user = limit - current_chars_without_user
+  if chars_for_user < min_user_chars:
+    tainted_text = '-%s' % user[:min_user_chars]
+    version = get_version(pseudo_revision, mergebase, tainted_text, tag)
+    raise VersionError('Failed to truncate "%s" ' % version +
+      '(length=%d, limit=%d): ' % (len(version), limit) +
+      'refusing to truncate username to %d (< %d) chars.' %
+        (chars_for_user, min_user_chars))
+
+  # Regenerate smaller version.
+  tainted_text = '-%s' % user[:chars_for_user]
+  version = get_version(pseudo_revision, mergebase, tainted_text, tag)
+
+  # Sanity check that version is now at most 'limit' chars.
+  if len(version) > limit:
+    raise VersionError('Internal error: failed to truncate "%s" ' % version +
+      '(length=%d, limit=%d)' % (len(version), limit))
+
+  return version
+
+
+def get_version(pseudo_revision, mergebase, tainted_text, tag):
+  """Returns version based on given args."""
+
+  # Build version, trimming mergebase to 7 characters like 'git describe' does
+  # (since 40 chars is overwhelming)!
   version = '%s-%s' % (pseudo_revision, mergebase[:7])
-  if not pristine:
-    version += '-tainted-%s' % getpass.getuser()
+  version += tainted_text
   if tag:
     version += '-' + tag
   return version
@@ -135,7 +214,12 @@ def main():
 
   root = checkout_root(os.getcwd())
   logging.info('Checkout root is %s', root)
-  print calculate_version(root, options.tag)
+  try:
+    print calculate_version(root, options.tag)
+  except VersionError as e:
+    sys.stderr.write(str(e))
+    return 1
+
   return 0
 
 
