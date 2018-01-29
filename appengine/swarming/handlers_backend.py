@@ -4,6 +4,7 @@
 
 """Main entry point for Swarming backend handlers."""
 
+import collections
 import datetime
 import json
 import logging
@@ -109,6 +110,58 @@ class CronMachineProviderManagementHandler(webapp2.RequestHandler):
       return
 
     lease_management.schedule_lease_management()
+
+
+class CronCountTaskBotDistributionHandler(webapp2.RequestHandler):
+  """Counts how many runnable bots per task for monitoring."""
+
+  @decorators.require_cronjob
+  def get(self):
+    ndb.get_context().set_cache_policy(lambda _: False)
+
+    # step one: build a dictionary mapping dimensions to a count of how many
+    # tasks have those dimensions (exclude id from dimensions)
+    n_tasks_by_dimensions = collections.Counter()
+    q = task_result.TaskResultSummary.query(
+        task_result.TaskResultSummary.state.IN(
+            task_result.State.STATES_RUNNING))
+    for result in q:
+      request = result.request
+
+      # make dimensions immutable
+      dimensions = tuple(sorted(request.properties.dimensions.items()))
+      n_tasks_by_dimensions[dimensions] += 1
+
+    # Count how many bots have those dimensions for each set
+    n_bots_by_dimensions = {}
+    for dimensions, n_tasks in n_tasks_by_dimensions.iteritems():
+      filter_dimensions = ['%s:%s' % d for d in dimensions]
+
+      q = bot_management.BotInfo.query()
+      try:
+        q = bot_management.filter_dimensions(q, filter_dimensions)
+      except ValueError as e:
+        # If there's a problem getting dimensions here, we just don't add the
+        # async result to n_bots_by_dimensions, then below treat it as zero
+        # (no bots could run this task).
+        # This results in overly-pessimistic monitoring, which means someone
+        # might look into it to and find the actual error here.
+        logging.error('%s', e)
+        continue
+      n_bots_by_dimensions[dimensions] = q.count_async()
+
+    # Multiply out, aggregating by fixed dimensions
+    for dimensions, n_tasks in n_tasks_by_dimensions.iteritems():
+      n_bots = 0
+      if dimensions in n_bots_by_dimensions:
+        n_bots = n_bots_by_dimensions[dimensions].get_result()
+
+      dimensions = dict(dimensions)
+      fields = {
+          'pool': dimensions.get('pool', ''),
+      }
+      for _ in range(n_tasks):
+        ts_mon_metrics._task_bots_runnable.add(n_bots, fields)
 
 
 class CronBotsDimensionAggregationHandler(webapp2.RequestHandler):
@@ -286,6 +339,9 @@ def get_routes():
     ('/internal/cron/abort_expired_task_to_run',
         CronAbortExpiredShardToRunHandler),
     ('/internal/cron/task_queues_tidy', CronTaskQueues),
+
+    ('/internal/cron/count_task_bot_distribution',
+        CronCountTaskBotDistributionHandler),
 
     ('/internal/cron/aggregate_bots_dimensions',
         CronBotsDimensionAggregationHandler),

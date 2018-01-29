@@ -20,6 +20,11 @@ cron:
   schedule: every 10 minutes
   target: backend
 
+- description: Count how many runnable bots per task for monitoring.
+  url: /internal/cron/count_task_bot_distribution
+  schedule: every 1 minutes synchronized
+  target: backend
+
 
 ### MP
 
