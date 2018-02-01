@@ -4,7 +4,10 @@
 
 """GNU/Linux specific utility functions."""
 
+import ctypes
+import ctypes.util
 import logging
+import multiprocessing
 import os
 import pipes
 import platform
@@ -19,6 +22,51 @@ import gpu
 
 
 ## Private stuff.
+
+
+libc = ctypes.cdll.LoadLibrary(ctypes.util.find_library('c'))
+
+cpu_mask_t = ctypes.c_ulong
+
+CPU_SETSIZE = 1024
+NCPUBITS = 8 * ctypes.sizeof(cpu_mask_t)
+
+pid_t = ctypes.c_uint64
+
+class cpu_set_t(ctypes.Structure):
+  _fields_ = [('__bits', cpu_mask_t * (CPU_SETSIZE / NCPUBITS))]
+
+  def get_cpus(self):
+    """Convert bits in list len == CPU_SETSIZE
+    Use 1 / 0 per cpu
+    """
+    cpus = []
+    for bitmask in getattr(self, '__bits'):
+      for i in range(NCPUBITS):
+        if bitmask & 1:
+          cpus.append(i)
+        bitmask >>= 1
+        if not bitmask:
+          break
+    return cpus
+
+
+@tools.cached
+def get_num_processors():
+  # Multiprocessing cpu_count() returns number of processors on the system,
+  # not the number of processors process can actually use. These numbers
+  # may differ for example in Docker containers. Use sched_getaffinity to
+  # find out the number of usable processors instead.
+  cpu_set = cpu_set_t()
+  err = libc.sched_getaffinity(
+      pid_t(os.getpid()),
+      ctypes.sizeof(cpu_set_t),
+      ctypes.pointer(cpu_set))
+  if err != 0:
+    logging.error('sched_getaffinity() failed to get CPU affinity mask')
+    # Fallback onto multiprocessing.
+    return multiprocessing.cpu_count()
+  return len(cpu_set.get_cpus())
 
 
 @tools.cached

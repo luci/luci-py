@@ -86,6 +86,9 @@ class TestCPUInfo(unittest.TestCase):
       u'vendor': u'N/A',
     }, self.get_cpuinfo(CAVIUM_CPU_INFO))
 
+  def test_get_num_processors(self):
+    self.assertTrue(linux.get_num_processors() != 0)
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

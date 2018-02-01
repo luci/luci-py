@@ -362,6 +362,8 @@ def get_num_processors():
   Python on OSX 10.6 raises a NotImplementedError exception.
   """
   try:
+    if sys.platform == 'linux2':
+      return platforms.linux.get_num_processors()
     # Multiprocessing
     return multiprocessing.cpu_count()
   except:  # pylint: disable=W0702
