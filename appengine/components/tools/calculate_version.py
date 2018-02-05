@@ -100,7 +100,8 @@ def is_pristine(root, mergebase):
   # Look for local uncommitted diff.
   return not (
       git(['diff', '--ignore-submodules=none', mergebase], cwd=root) or
-      git(['diff', '--ignore-submodules', '--cached', mergebase], cwd=root))
+      git(['diff', '--ignore-submodules', '--cached', mergebase], cwd=root) or
+      git(['status', '-s', '--porcelain=v2'], cwd=root))
 
 
 def calculate_version(root, tag, additional_chars=0):
