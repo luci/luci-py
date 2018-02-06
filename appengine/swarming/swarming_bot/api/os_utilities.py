@@ -36,6 +36,7 @@ import urllib2
 from api import parallel
 from api import platforms
 from utils import file_path
+from utils import fs
 from utils import tools
 from third_party import httplib2
 from third_party.oauth2client import client
@@ -666,11 +667,12 @@ def get_recursive_size(path):
   """Returns the total data size for the specified path."""
   try:
     total = 0
-    for root, _, files in os.walk(path):
+    for root, _, files in fs.walk(path):
       for f in files:
-        total += os.stat(os.path.join(root, f)).st_size
+        total += fs.lstat(os.path.join(root, f)).st_size
     return total
-  except (IOError, OSError):
+  except (IOError, OSError, UnicodeEncodeError) as exc:
+    logging.warning('Exception while getting the size of %s:\n%s', path, exc)
     # Returns a negative number to make it clear that something is wrong.
     return -1
 
@@ -1013,15 +1015,13 @@ def get_state():
   'dimensions' for that), but it can use it for maintenance and bookkeeping
   tasks.
   """
-  # TODO(vadimsh): Send number of open file descriptors, processes or any other
-  # leaky resources. So that the server can decided to reboot the bot to clean
-  # up.
   tmpdir = tempfile.gettempdir()
   try:
     nb_files_in_temp = len(os.listdir(tmpdir))
   except OSError:
     nb_files_in_temp = 'N/A'
   isolated_cached_info = get_isolated_cache_info()
+  named_caches_dir = os.path.abspath(u'c')
   state = {
     u'audio': get_audio(),
     u'caches': {
@@ -1031,7 +1031,7 @@ def get_state():
         u'size': sum(i[0] for i in isolated_cached_info.itervalues()),
       },
       u'named': {
-        k: get_recursive_size(os.path.join(u'c', v[0]))
+        k: get_recursive_size(os.path.join(named_caches_dir, v[0]))
         for k, v in get_named_caches_info().iteritems()
       },
     },
