@@ -134,6 +134,19 @@
         font-style: italic;
       }
 
+      #milolink {
+        /* paper-tab tries to make anchors inside tabs take up the
+        full height, which does not line up well with everything else. */
+        height: initial;
+        /* undo standard anchor color, so it matches the tab */
+        color: #000;
+      }
+
+      paper-tab[aria-selected] #milolink {
+        color: #FFF;
+      }
+
+      /* Adds | between the dimensions, if there are more than 1*/
       span.dim~span.dim:before {
         content: " | ";
       }
@@ -663,7 +676,11 @@
             <div class="horizontal layout">
               <div class="tabs">
                 <paper-tabs selected="{{_show_raw}}" no-bar>
-                  <paper-tab disabled$="[[_noMilo(_request)]]">Milo Output</paper-tab>
+                  <paper-tab disabled$="[[_noMilo(_request)]]">
+                    <a id="milolink" href$="[[_getDisplayServerLink(_server_details.display_server_url_template,task_id)]]" target="_blank" rel="noopener">
+                      Milo Output
+                    </a>
+                  </paper-tab>
                   <paper-tab>Raw Output</paper-tab>
                 </paper-tabs>
               </div>
