@@ -11,6 +11,7 @@ import threading
 import time
 import urllib2
 
+from api import oauth
 from utils import tools
 
 
@@ -124,18 +125,13 @@ def oauth2_access_token_with_expiration(account):
         'http://metadata.google.internal/computeMetadata/v1/instance'
         '/service-accounts/%s/token' % account)
     headers = {'Metadata-Flavor': 'Google'}
-    try:
-      resp = json.load(
-          urllib2.urlopen(urllib2.Request(url, headers=headers), timeout=20))
-    except IOError as e:
-      logging.error('Failed to grab GCE access token: %s', e)
-      raise
+    access_token, expires_at = oauth.oauth2_access_token_from_url(url, headers)
     tok = {
-      'accessToken': resp['access_token'],
-      'expiresAt': time.time() + resp['expires_in'],
+      'accessToken': access_token,
+      'expiresAt': expires_at,
     }
     _CACHED_OAUTH2_TOKEN[account] = tok
-    return tok['accessToken'], tok['expiresAt']
+    return access_token, expires_at
 
 
 def oauth2_access_token(account='default'):

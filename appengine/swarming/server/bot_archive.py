@@ -38,6 +38,7 @@ FILES = (
     'adb/usb_exceptions.py',
     'api/__init__.py',
     'api/bot.py',
+    'api/oauth.py',
     'api/os_utilities.py',
     'api/parallel.py',
     'api/platforms/__init__.py',
