@@ -147,35 +147,56 @@ def _validate_namespace(prop, value):
     raise datastore_errors.BadValueError('malformed %s' % prop._name)
 
 
-def _validate_dict_of_strings(prop, value):
-  """Validates TaskProperties.env."""
-  # pylint: disable=W0212
-  if not all(
-         isinstance(k, unicode) and isinstance(v, unicode)
-         for k, v in value.iteritems()):
-    # pylint: disable=W0212
-    raise TypeError(
-        '%s must be a dict of strings, not %r' % (prop._name, value))
-
-
-def _validate_dimensions(prop, value):
+def _validate_dimensions(_prop, value):
   """Validates TaskProperties.dimensions."""
-  # pylint: disable=W0212
   if not value:
-    raise datastore_errors.BadValueError(u'%s must be specified' % prop._name)
-  _validate_dict_of_strings(prop, value)
-  for key, val in value.iteritems():
-    if not config.validate_dimension_key(key):
-      raise datastore_errors.BadValueError(u'dimension %r isn\'t valid' % key)
-    if not config.validate_dimension_value(val):
-      raise datastore_errors.BadValueError(
-          u'dimension %r:%r isn\'t valid' % (key, val))
+    raise datastore_errors.BadValueError(u'dimensions must be specified')
   if len(value) > 64:
-    raise datastore_errors.BadValueError(
-        '%s can have up to 64 keys' % prop._name)
+    raise datastore_errors.BadValueError('dimensions can have up to 64 entries')
+
+  is_list = isinstance(value.items()[0][1], (list, tuple))
+  normalized = {}
+  for k, values in value.iteritems():
+    if not k or not isinstance(k, unicode):
+      raise datastore_errors.BadValueError(
+          'dimensions must be a dict of strings or list of string, not %r' %
+          value)
+    if u':' in k:
+      raise datastore_errors.BadValueError('dimensions key cannot contain ":"')
+    if k.strip() != k:
+      raise datastore_errors.BadValueError('dimensions key has whitespace')
+    if not values:
+      raise datastore_errors.BadValueError(
+          'dimensions must be a dict of strings or list of string, not %r' %
+          value)
+    if is_list:
+      if (not isinstance(values, (list, tuple)) or
+          not all(isinstance(v, unicode) for v in values)):
+        raise datastore_errors.BadValueError(
+            'dimensions must be a dict of strings or list of string, not %r' %
+            value)
+      if k == u'id' and len(values) != 1:
+        raise datastore_errors.BadValueError(
+            u'\'id\' cannot be specified more than once in dimensions')
+      # Do not allow a task to be triggered in multiple pools, as this could
+      # cross a security boundary.
+      if k == u'pool' and len(values) != 1:
+        raise datastore_errors.BadValueError(
+            u'\'pool\' cannot be specified more than once in dimensions')
+      # Always store the values sorted, that simplies the code.
+      normalized[k] = sorted(values)
+    else:
+      if not isinstance(values, unicode):
+        raise datastore_errors.BadValueError(
+            'dimensions must be a dict of strings or list of string, not %r' %
+            value)
+      normalized[k] = values
+
+  return normalized
 
 
 def _validate_env_key(prop, key):
+  """Validates TaskProperties.env."""
   maxlen = 1024
   if not isinstance(key, unicode):
     raise TypeError(
@@ -192,7 +213,10 @@ def _validate_env_key(prop, key):
 
 
 def _validate_env(prop, value):
-  _validate_dict_of_strings(prop, value)
+  # pylint: disable=W0212
+  if not all(isinstance(v, unicode) for v in value.itervalues()):
+    raise TypeError(
+        '%s must be a dict of strings, not %r' % (prop._name, value))
   maxlen = 1024
   for k, v in value.iteritems():
     _validate_env_key(prop, k)
@@ -525,8 +549,9 @@ class TaskProperties(ndb.Model):
   # Filter to use to determine the required properties on the bot to run on. For
   # example, Windows or hostname. Encoded as json. 'pool' dimension is required
   # for all tasks except terminate (see _pre_put_hook).
-  dimensions = datastore_utils.DeterministicJsonProperty(
-      validator=_validate_dimensions, json_type=dict, indexed=False)
+  dimensions_data = datastore_utils.DeterministicJsonProperty(
+      validator=_validate_dimensions, json_type=dict, indexed=False,
+      name='dimensions')
 
   # Environment variables. Encoded as json. Optional.
   env = datastore_utils.DeterministicJsonProperty(
@@ -574,12 +599,25 @@ class TaskProperties(ndb.Model):
   has_secret_bytes = ndb.BooleanProperty(default=False, indexed=False)
 
   @property
+  def dimensions(self):
+    """Returns dimensions as a dict(unicode, list(unicode)), even for older
+    entities.
+    """
+    # Just look at the first one. The property is guaranteed to be internally
+    # consistent.
+    for v in self.dimensions_data.itervalues():
+      if isinstance(v, (list, tuple)):
+        return self.dimensions_data
+      break
+    return {k: [v] for k, v in self.dimensions_data.iteritems()}
+
+  @property
   def is_terminate(self):
     """If True, it is a terminate request."""
+    # Check dimensions last because it's a bit slower.
     return (
         not self.caches and
         not self.command and
-        self.dimensions.keys() == [u'id'] and
         not (self.inputs_ref and self.inputs_ref.isolated) and
         not self.cipd_input and
         not self.env and
@@ -590,7 +628,15 @@ class TaskProperties(ndb.Model):
         not self.io_timeout_secs and
         not self.idempotent and
         not self.outputs and
-        not self.has_secret_bytes)
+        not self.has_secret_bytes and
+        self.dimensions_data.keys() == [u'id'])
+
+  def to_dict(self):
+    out = super(TaskProperties, self).to_dict(
+        exclude=['dimensions_data'])
+    # Use the data stored as-is, so properties_hash doesn't change.
+    out['dimensions'] = self.dimensions_data
+    return out
 
   def _pre_put_hook(self):
     super(TaskProperties, self)._pre_put_hook()
@@ -599,11 +645,12 @@ class TaskProperties(ndb.Model):
       # already check those. Terminate task can only use 'id'.
       return
 
-    if u'pool' not in self.dimensions:
+    if u'pool' not in self.dimensions_data:
       # Only terminate task may not use 'pool'. Others must specify one.
       raise datastore_errors.BadValueError(
           u'\'pool\' must be used as dimensions')
 
+    # Isolated input and commands.
     isolated_input = self.inputs_ref and self.inputs_ref.isolated
     if not self.command and not isolated_input:
       raise datastore_errors.BadValueError(
@@ -811,8 +858,9 @@ def _get_automatic_tags(request):
     u'service_account:%s' % (request.service_account or u'None'),
     u'user:%s' % (request.user or u'None'),
   ]
-  for key, value in request.properties.dimensions.iteritems():
-    tags.append(u'%s:%s' % (key, value))
+  for key, values in request.properties.dimensions.iteritems():
+    for value in values:
+      tags.append(u'%s:%s' % (key, value))
   return tags
 
 
@@ -828,7 +876,7 @@ def create_termination_task(bot_id):
     TaskRequest for priority 0 (highest) termination task.
   """
   properties = TaskProperties(
-      dimensions={u'id': unicode(bot_id)},
+      dimensions_data={u'id': unicode(bot_id)},
       execution_timeout_secs=0,
       grace_period_secs=0,
       io_timeout_secs=0)

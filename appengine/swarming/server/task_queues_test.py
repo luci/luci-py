@@ -57,6 +57,7 @@ def _gen_request(properties=None):
   }
   props.update(properties or {})
   now = utils.utcnow()
+  props[u'dimensions_data'] = props.pop(u'dimensions')
   args = {
     'created_ts': now,
     'name': 'Request name',

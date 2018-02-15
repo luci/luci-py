@@ -158,7 +158,7 @@ class TaskAccountTokenTest(TestBase):
       'priority': 50,
       'properties': task_request.TaskProperties(**{
         'command': [u'command1'],
-        'dimensions': {u'pool': u'default'},
+        'dimensions_data': {u'pool': u'default'},
         'env': {},
         'execution_timeout_secs': 24*60*60,
         'io_timeout_secs': None,

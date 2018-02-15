@@ -238,8 +238,11 @@ class TaskDimensions(ndb.Model):
 
   def match_request(self, dimensions):
     """Confirms that this instance actually stores this set."""
-    return self._match_request_flat(
-        u'%s:%s' % (k, v) for k, v in dimensions.iteritems())
+    flat = []
+    for k, values in dimensions.iteritems():
+      for v in values:
+        flat.append(u'%s:%s' % (k, v))
+    return self._match_request_flat(flat)
 
   def match_bot(self, bot_dimensions):
     """Returns the TaskDimensionsSet that matches this bot_dimensions, if any.
@@ -414,12 +417,13 @@ def _rebuild_bot_cache_async(bot_dimensions, bot_root_key):
 
 
 def _get_task_dims_key(dimensions_hash, dimensions):
+  # Both 'id' and 'pool' are guaranteed to have at most 1 item.
   if u'id' in dimensions:
     return ndb.Key(
-        TaskDimensionsRoot, u'id:%s' % dimensions['id'],
+        TaskDimensionsRoot, u'id:%s' % dimensions[u'id'][0],
         TaskDimensions, dimensions_hash)
   return ndb.Key(
-      TaskDimensionsRoot, u'pool:%s' % dimensions['pool'],
+      TaskDimensionsRoot, u'pool:%s' % dimensions[u'pool'][0],
       TaskDimensions, dimensions_hash)
 
 
@@ -525,12 +529,16 @@ def hash_dimensions(dimensions):
   id in a ndb.Key.
   """
   # This horrible code is the product of micro benchmarks.
+  # TODO(maruel): This is incorrect, as it can confuse keys and values. But
+  # changing the algo is non-trivial.
   data = ''
-  for k, v in sorted(dimensions.items()):
+  for k, values in sorted(dimensions.iteritems()):
     data += k.encode('utf8')
     data += '\000'
-    data += v.encode('utf8')
-    data += '\000'
+    assert isinstance(values, (list, tuple)), values
+    for v in values:
+      data += v.encode('utf8')
+      data += '\000'
   return _hash_data(data)
 
 
@@ -706,7 +714,11 @@ def rebuild_task_cache(payload):
   dimensions = data[u'dimensions']
   dimensions_hash = int(data[u'dimensions_hash'])
   valid_until_ts = utils.parse_datetime(data[u'valid_until_ts'])
-  dimensions_flat = sorted(u'%s:%s' % (k, v) for k, v in dimensions.iteritems())
+  dimensions_flat = []
+  for k, values in dimensions.iteritems():
+    for v in values:
+      dimensions_flat.append(u'%s:%s' % (k, v))
+  dimensions_flat.sort()
 
   now = utils.utcnow()
   updated = 0

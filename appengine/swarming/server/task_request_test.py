@@ -89,6 +89,7 @@ def _gen_request(properties=None, **kwargs):
     'io_timeout_secs': None,
     'has_secret_bytes': 'secret_bytes' in kwargs,
   })
+  properties['dimensions_data'] = properties.pop('dimensions')
   now = utils.utcnow()
   args = {
     'created_ts': now,
@@ -569,8 +570,23 @@ class TaskRequestApiTest(TestCase):
     with self.assertRaises(datastore_errors.BadValueError):
       mkreq(_gen_request(
           properties=dict(dimensions={u'id': u'b', u'a.': u'b'})))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkreq(_gen_request(
+          properties=dict(dimensions={u'id': u'b', u'a': [u'b']})))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkreq(_gen_request(
+          properties=dict(dimensions={u'id': [u'a', u'b']})))
     mkreq(_gen_request(
         properties=dict(dimensions={u'id': u'b', u'pool': u'b'})))
+    mkreq(_gen_request(
+        properties=dict(
+            dimensions={u'id': u'b', u'pool': u'b', u'a.': u'c'})))
+    mkreq(_gen_request(
+        properties=dict(
+            dimensions={u'id': [u'b'], u'pool': [u'b'], u'a.': [u'c']})))
+    mkreq(_gen_request(
+        properties=dict(
+            dimensions={u'pool': [u'b'], u'a.': [u'b', u'c']})))
 
     # Environment.
     with self.assertRaises(TypeError):

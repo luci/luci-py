@@ -204,6 +204,8 @@ class TaskProperties(messages.Message):
   # Dimensions are what is used to determine which bot can run the task. The
   # bot must have all the matching dimensions, even for repeated keys with
   # multiple different values. It is a logical AND, all values must match.
+  #
+  # It should have been a StringListPair but this would be a breaking change.
   dimensions = messages.MessageField(StringPair, 2, repeated=True)
   # Environment variables to set when running the task.
   env = messages.MessageField(StringPair, 3, repeated=True)

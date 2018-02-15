@@ -90,10 +90,11 @@ def _task_summary_to_proto(summary, event):
       package_proto = cipd_proto.packages.add()
       _cipd_package_to_proto(package, package_proto)
 
+  dimensions = task_properties.dimensions
   for d, t in DIMENSIONS:
-    if d in task_properties.dimensions:
-      getattr(properties_proto.dimensions, d).append(
-          t(task_properties.dimensions[d]))
+    if d in dimensions:
+      for v in dimensions[d]:
+        getattr(properties_proto.dimensions, d).append(t(v))
 
   if task_properties.execution_timeout_secs:
     properties_proto.execution_timeout_s = \

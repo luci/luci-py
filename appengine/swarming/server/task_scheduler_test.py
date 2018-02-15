@@ -57,6 +57,7 @@ def gen_request(properties=None, **kwargs):
     'io_timeout_secs': None,
   }
   props.update(properties or {})
+  props['dimensions_data'] = props.pop('dimensions')
   now = utils.utcnow()
   args = {
     'created_ts': now,

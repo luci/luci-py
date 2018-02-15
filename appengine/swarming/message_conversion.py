@@ -26,13 +26,25 @@ from server import task_result
 
 
 def _string_pairs_from_dict(dictionary):
+  # For key: value items like env.
   return [
     swarming_rpcs.StringPair(key=k, value=v)
     for k, v in sorted((dictionary or {}).iteritems())
   ]
 
 
+def _duplicate_string_pairs_from_dict(dictionary):
+  # For compatibility due to legacy swarming_rpcs.TaskProperties.dimensions.
+  out = []
+  for k, values in (dictionary or {}).iteritems():
+    assert isinstance(values, (list, tuple)), dictionary
+    for v in values:
+      out.append(swarming_rpcs.StringPair(key=k, value=v))
+  return out
+
+
 def _string_list_pairs_from_dict(dictionary):
+  # For key: values items like bot dimensions.
   return [
     swarming_rpcs.StringListPair(key=k, value=v)
     for k, v in sorted((dictionary or {}).iteritems())
@@ -124,7 +136,7 @@ def task_request_to_rpc(entity):
       caches=[_ndb_to_rpc(swarming_rpcs.CacheEntry, c) for c in props.caches],
       cipd_input=cipd_input,
       secret_bytes='<REDACTED>' if props.has_secret_bytes else None,
-      dimensions=_string_pairs_from_dict(props.dimensions),
+      dimensions=_duplicate_string_pairs_from_dict(props.dimensions),
       env=_string_pairs_from_dict(props.env),
       env_prefixes=_string_list_pairs_from_dict(props.env_prefixes or {}),
       inputs_ref=inputs_ref)
@@ -187,7 +199,9 @@ def new_task_request_from_rpc(msg, now):
       command=props.command or [],
       has_secret_bytes=secret_bytes is not None,
       secret_bytes=None, # ignore this, it's handled out of band
-      dimensions={i.key: i.value for i in props.dimensions},
+      dimensions=None, # it's named dimensions_data
+      # TODO(maruel): https://crbug.com/728124 Switch to dict(key: values).
+      dimensions_data={i.key: i.value for i in props.dimensions},
       env={i.key: i.value for i in props.env},
       env_prefixes={i.key: i.value for i in props.env_prefixes},
       inputs_ref=inputs_ref)

@@ -445,8 +445,9 @@ def _check_schedule_request_acl_v2(request):
   # 'acl.can_edit_bot', see 'terminate' RPC handler. Such tasks do not end up
   # hitting this function, and so we can assume there's a pool set (this is
   # checked in TaskProperties's pre put hook).
-  assert u'pool' in request.properties.dimensions, request.properties
-  pool = request.properties.dimensions[u'pool']
+  #
+  # It is guaranteed that at most one item can be specified in 'pool'.
+  pool = request.properties.dimensions[u'pool'][0]
   pool_cfg = pools_config.get_pool_config(pool)
 
   # request.service_account can be 'bot' or 'none'. We don't care about these,
@@ -598,14 +599,14 @@ def check_schedule_request_acl(request):
     return # not configured, this is fine
 
   ident = request.authenticated
-  dims = request.properties.dimensions
   assert ident is not None # see task_request.init_new_request
 
-  for k, v in sorted(dims.iteritems()):
-    if not _can_use_dimension(dim_acls, ident, k, v):
-      raise auth.AuthorizationError(
-          'User %s is not allowed to schedule tasks with dimension "%s:%s"' %
-          (ident.to_bytes(), k, v))
+  for k, values in sorted(request.properties.dimensions.iteritems()):
+    for v in values:
+      if not _can_use_dimension(dim_acls, ident, k, v):
+        raise auth.AuthorizationError(
+            'User %s is not allowed to schedule tasks with dimension "%s:%s"' %
+            (ident.to_bytes(), k, v))
 
 
 def schedule_request(request, secret_bytes):

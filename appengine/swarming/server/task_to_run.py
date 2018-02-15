@@ -473,12 +473,8 @@ def match_dimensions(request_dimensions, bot_dimensions):
   assert isinstance(bot_dimensions, dict), bot_dimensions
   if frozenset(request_dimensions).difference(bot_dimensions):
     return False
-  for key, required in request_dimensions.iteritems():
-    bot_value = bot_dimensions[key]
-    if isinstance(bot_value, (list, tuple)):
-      if required not in bot_value:
-        return False
-    elif required != bot_value:
+  for key, values in request_dimensions.iteritems():
+    if not all(v in bot_dimensions.get(key, []) for v in values):
       return False
   return True
 
