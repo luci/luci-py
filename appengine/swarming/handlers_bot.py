@@ -704,10 +704,7 @@ class BotPollHandler(_BotBaseHandler):
           'server': props.cipd_input.server,
         } if props.cipd_input else None,
         'command': props.command,
-        # TODO(maruel): https://crbug.com/728124 We just want to make sure all
-        # scripts are updated before changing this.
-        'dimensions': {
-            k: values[0] for k, values in props.dimensions.iteritems()},
+        'dimensions': props.dimensions,
         'env': props.env,
         'env_prefixes': props.env_prefixes,
         'extra_args': props.extra_args,

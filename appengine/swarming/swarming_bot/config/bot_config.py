@@ -263,7 +263,7 @@ def on_before_task(bot, bot_file, runner_cmd, runner_env):
   pass
 
 
-def on_after_task(bot, failure, internal_failure, dimensions, summary):
+def on_after_task(bot, failure, internal_failure, task_dimensions, summary):
   """Hook function called after running a task.
 
   It is an excellent place to do post-task cleanup of temporary files.
@@ -272,7 +272,7 @@ def on_after_task(bot, failure, internal_failure, dimensions, summary):
   - bot: bot.Bot instance. See ../api/bot.py.
   - failure: bool, True if the task failed.
   - internal_failure: bool, True if an internal failure happened.
-  - dimensions: dict, Dimensions requested as part of the task.
+  - task_dimensions: dict, Dimensions requested as part of the task.
   - summary: dict, Summary of the task execution.
   """
   # Example code:
