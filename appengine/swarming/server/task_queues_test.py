@@ -47,9 +47,9 @@ def _gen_request(properties=None):
   props = {
     'command': [u'command1'],
     'dimensions': {
-      u'cpu': u'x86-64',
-      u'os': u'Ubuntu-16.04',
-      u'pool': u'default',
+      u'cpu': [u'x86-64'],
+      u'os': [u'Ubuntu-16.04'],
+      u'pool': [u'default'],
     },
     'env': {},
     'execution_timeout_secs': 24*60*60,
@@ -238,7 +238,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     # Assert a task that includes an 'id' dimension. No task queue is triggered
     # in this case, rebuild_task_cache() is called inlined.
     _assert_bot()
-    request = _gen_request(properties={u'dimensions': {u'id': u'bot1'}})
+    request = _gen_request(properties={u'dimensions': {u'id': [u'bot1']}})
     task_request.init_new_request(request, True, None)
     task_queues.assert_task(request)
     self.assertEqual(0, self.execute_tasks())

@@ -322,19 +322,34 @@ class Test(unittest.TestCase):
   def gen_expected(self, **kwargs):
     return gen_expected(bot_dimensions=self.dimensions, **kwargs)
 
-  def test_raw_bytes(self):
+  def test_raw_bytes_and_dupe_dimensions(self):
     # A string of a letter 'A', UTF-8 BOM then UTF-16 BOM then UTF-EDBCDIC then
     # invalid UTF-8 and the letter 'B'. It is double escaped so it can be passed
     # down the shell.
+    #
+    # Leverage the occasion to also specify the same dimension key twice with
+    # different values, and ensure it works.
     invalid_bytes = 'A\\xEF\\xBB\\xBF\\xFE\\xFF\\xDD\\x73\\x66\\x73\\xc3\\x28B'
     args = [
-      '-T', 'non_utf8', '--',
+      '-T', 'non_utf8',
+      # It's pretty much guaranteed 'os' has at least two values.
+      '-d', 'os', self.dimensions['os'][0],
+      '-d', 'os', self.dimensions['os'][1],
+      '--',
       'python', '-u', '-c', 'print(\'' + invalid_bytes + '\')',
     ]
     summary = self.gen_expected(
         name=u'non_utf8',
         # The string is mostly converted to 'Replacement Character'.
-        outputs=[u'A\ufeff\ufffd\ufffd\ufffdsfs\ufffd(B\n'])
+        outputs=[u'A\ufeff\ufffd\ufffd\ufffdsfs\ufffd(B\n'],
+        tags=sorted([
+          u'os:' + self.dimensions['os'][0],
+          u'os:' + self.dimensions['os'][1],
+          u'pool:default',
+          u'priority:100',
+          u'service_account:none',
+          u'user:joe@localhost',
+        ]))
     self.assertOneTask(args, summary, {})
 
   def test_invalid_command(self):
@@ -379,19 +394,20 @@ class Test(unittest.TestCase):
     self.assertOneTask(args, summary, {})
 
   def test_success_fails(self):
-    def get_cmd(exit_code=0):
+    def get_cmd(name, exit_code):
       return [
+        '-T', name, '--',
         'python', '-u', '-c',
         'import sys; print(\'hi\'); sys.exit(%d)' % exit_code,
       ]
     # tuple(task_request, expectation)
     tasks = [
       (
-        ['-T', 'simple_success', '--'] + get_cmd(),
+        get_cmd('simple_success', 0),
         (self.gen_expected(name=u'simple_success'), {}),
       ),
       (
-        ['-T', 'simple_failure', '--'] + get_cmd(1),
+        get_cmd('simple_failure', 1),
         (
           self.gen_expected(
               name=u'simple_failure', exit_codes=[1], failure=True),
@@ -399,7 +415,7 @@ class Test(unittest.TestCase):
         ),
       ),
       (
-        ['-T', 'ending_simple_success', '--'] + get_cmd(),
+        get_cmd('ending_simple_success', 0),
         (self.gen_expected(name=u'ending_simple_success'), {}),
       ),
     ]
@@ -656,7 +672,7 @@ class Test(unittest.TestCase):
       # Intentionally hard code the value to ensure it propagated correctly and
       # is deterministic.
       properties_hash =
-          u'52d1a1cdbd39634f4001782f3c4e846488d00e9b6cd662454206bc615559b4e1',
+          u'ac55c98ae1b3351fc57848514380caab846b3ff68643799af389c50e9f23262d',
     )
     task_id = self._run_isolated(
         content, 'idempotent_reuse', ['--idempotent'], expected_summary, {},

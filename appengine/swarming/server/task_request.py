@@ -154,7 +154,6 @@ def _validate_dimensions(_prop, value):
   if len(value) > 64:
     raise datastore_errors.BadValueError('dimensions can have up to 64 entries')
 
-  is_list = isinstance(value.items()[0][1], (list, tuple))
   normalized = {}
   for k, values in value.iteritems():
     if not k or not isinstance(k, unicode):
@@ -169,28 +168,24 @@ def _validate_dimensions(_prop, value):
       raise datastore_errors.BadValueError(
           'dimensions must be a dict of strings or list of string, not %r' %
           value)
-    if is_list:
-      if (not isinstance(values, (list, tuple)) or
-          not all(isinstance(v, unicode) for v in values)):
-        raise datastore_errors.BadValueError(
-            'dimensions must be a dict of strings or list of string, not %r' %
-            value)
-      if k == u'id' and len(values) != 1:
-        raise datastore_errors.BadValueError(
-            u'\'id\' cannot be specified more than once in dimensions')
-      # Do not allow a task to be triggered in multiple pools, as this could
-      # cross a security boundary.
-      if k == u'pool' and len(values) != 1:
-        raise datastore_errors.BadValueError(
-            u'\'pool\' cannot be specified more than once in dimensions')
-      # Always store the values sorted, that simplies the code.
-      normalized[k] = sorted(values)
-    else:
-      if not isinstance(values, unicode):
-        raise datastore_errors.BadValueError(
-            'dimensions must be a dict of strings or list of string, not %r' %
-            value)
-      normalized[k] = values
+    if (not isinstance(values, (list, tuple)) or
+        not all(isinstance(v, unicode) for v in values)):
+      raise datastore_errors.BadValueError(
+          'dimensions must be a dict of strings or list of string, not %r' %
+          value)
+    if k == u'id' and len(values) != 1:
+      raise datastore_errors.BadValueError(
+          u'\'id\' cannot be specified more than once in dimensions')
+    # Do not allow a task to be triggered in multiple pools, as this could
+    # cross a security boundary.
+    if k == u'pool' and len(values) != 1:
+      raise datastore_errors.BadValueError(
+          u'\'pool\' cannot be specified more than once in dimensions')
+    if len(values) != len(set(values)):
+      raise datastore_errors.BadValueError(
+          u'dimensions values cannot be repeated')
+    # Always store the values sorted, that simplies the code.
+    normalized[k] = sorted(values)
 
   return normalized
 
@@ -609,6 +604,7 @@ class TaskProperties(ndb.Model):
       if isinstance(v, (list, tuple)):
         return self.dimensions_data
       break
+    # Compatibility code for old entities.
     return {k: [v] for k, v in self.dimensions_data.iteritems()}
 
   @property
@@ -876,7 +872,7 @@ def create_termination_task(bot_id):
     TaskRequest for priority 0 (highest) termination task.
   """
   properties = TaskProperties(
-      dimensions_data={u'id': unicode(bot_id)},
+      dimensions_data={u'id': [unicode(bot_id)]},
       execution_timeout_secs=0,
       grace_period_secs=0,
       io_timeout_secs=0)

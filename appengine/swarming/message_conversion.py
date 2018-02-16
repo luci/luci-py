@@ -183,13 +183,14 @@ def new_task_request_from_rpc(msg, now):
   if props.secret_bytes:
     secret_bytes = task_request.SecretBytes(secret_bytes=props.secret_bytes)
 
-  if len(set(i.key for i in props.dimensions)) != len(props.dimensions):
-    raise ValueError('same dimension key cannot be specified twice')
   if len(set(i.key for i in props.env)) != len(props.env):
     raise ValueError('same environment variable key cannot be specified twice')
   if len(set(i.key for i in props.env_prefixes)) != len(props.env_prefixes):
     raise ValueError('same environment prefix key cannot be specified twice')
 
+  dims = {}
+  for i in props.dimensions:
+    dims.setdefault(i.key, []).append(i.value)
   properties = _rpc_to_ndb(
       task_request.TaskProperties,
       props,
@@ -200,8 +201,7 @@ def new_task_request_from_rpc(msg, now):
       has_secret_bytes=secret_bytes is not None,
       secret_bytes=None, # ignore this, it's handled out of band
       dimensions=None, # it's named dimensions_data
-      # TODO(maruel): https://crbug.com/728124 Switch to dict(key: values).
-      dimensions_data={i.key: i.value for i in props.dimensions},
+      dimensions_data=dims,
       env={i.key: i.value for i in props.env},
       env_prefixes={i.key: i.value for i in props.env_prefixes},
       inputs_ref=inputs_ref)

@@ -36,7 +36,7 @@ def _gen_request(properties=None, **kwargs):
   """Creates a TaskRequest."""
   props = {
     'command': [u'command1'],
-    'dimensions': {u'pool': u'default'},
+    'dimensions': {u'pool': [u'default']},
     'env': {},
     'execution_timeout_secs': 24*60*60,
     'io_timeout_secs': None,

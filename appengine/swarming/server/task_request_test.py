@@ -76,9 +76,9 @@ def _gen_request(properties=None, **kwargs):
     'cipd_input': cipd_input,
     'command': [u'command1', u'arg1'],
     'dimensions': {
-      u'OS': u'Windows-3.1.1',
-      u'hostname': u'localhost',
-      u'pool': u'default',
+      u'OS': [u'Windows-3.1.1'],
+      u'hostname': [u'localhost'],
+      u'pool': [u'default'],
     },
     'env': {u'foo': u'bar', u'joe': u'2'},
     'env_prefixes': {u'PATH': [u'local/path']},
@@ -254,9 +254,9 @@ class TaskRequestApiTest(TestCase):
       'command': [u'command1', u'arg1'],
       'relative_cwd': u'deeep',
       'dimensions': {
-        u'OS': u'Windows-3.1.1',
-        u'hostname': u'localhost',
-        u'pool': u'default',
+        u'OS': [u'Windows-3.1.1'],
+        u'hostname': [u'localhost'],
+        u'pool': [u'default'],
       },
       'env': {u'foo': u'bar', u'joe': u'2'},
       'env_prefixes': {u'PATH': [u'local/path']},
@@ -282,7 +282,7 @@ class TaskRequestApiTest(TestCase):
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
       'properties_hash':
-          'b78c5febf9ad76c9880328c01cdb0b5dcb1b4953473fabfadb00d9e9e4170e94',
+          'aa33c679b3ee30e37b9724d79a9d20bc767475c00e7f659b6191508f6b16f1ab',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'service_account': u'none',
@@ -335,9 +335,9 @@ class TaskRequestApiTest(TestCase):
       'command': [u'command1', u'arg1'],
       'relative_cwd': None,
       'dimensions': {
-        u'OS': u'Windows-3.1.1',
-        u'hostname': u'localhost',
-        u'pool': u'default',
+        u'OS': [u'Windows-3.1.1'],
+        u'hostname': [u'localhost'],
+        u'pool': [u'default'],
       },
       'env': {u'foo': u'bar', u'joe': u'2'},
       'env_prefixes': {u'PATH': [u'local/path']},
@@ -363,7 +363,7 @@ class TaskRequestApiTest(TestCase):
       # Intentionally hard code the hash value since it has to be deterministic.
       # Other unit tests should use the calculated value.
       'properties_hash':
-          '16c068f00dde4f5708b67e21d767c0c3f6f9d3bd1c5be23594830867c2a69d75',
+          '121c6bd6216a4cc9c4302a52da6292e5a240807ef13ace6f7f36a0c83aec6f55',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'service_account': u'none',
@@ -405,7 +405,7 @@ class TaskRequestApiTest(TestCase):
     # Other unit tests should use the calculated value.
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        '979e70c585ac206579cf4ebacdcc66c98468b75011e02e050dab910b098d92a8',
+        '58b6b8966199b901406b82ed15b23b7070cbf6ea8cba237838911939b387b4c6',
         as_dict['properties_hash'])
 
   def test_init_new_request_bot_service_account(self):
@@ -576,11 +576,14 @@ class TaskRequestApiTest(TestCase):
     with self.assertRaises(datastore_errors.BadValueError):
       mkreq(_gen_request(
           properties=dict(dimensions={u'id': [u'a', u'b']})))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkreq(_gen_request(
+          properties=dict(dimensions={u'id': u'b', u'pool': u'b'})))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkreq(_gen_request(
+          properties=dict(dimensions={u'pool': [u'b', u'b']})))
     mkreq(_gen_request(
-        properties=dict(dimensions={u'id': u'b', u'pool': u'b'})))
-    mkreq(_gen_request(
-        properties=dict(
-            dimensions={u'id': u'b', u'pool': u'b', u'a.': u'c'})))
+        properties=dict(dimensions={u'id': [u'b'], u'pool': [u'b']})))
     mkreq(_gen_request(
         properties=dict(
             dimensions={u'id': [u'b'], u'pool': [u'b'], u'a.': [u'c']})))
