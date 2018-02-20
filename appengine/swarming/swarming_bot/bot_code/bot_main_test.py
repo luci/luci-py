@@ -130,12 +130,13 @@ class TestBotMain(TestBotBase):
     def get_dimensions(botobj):
       self.assertEqual(obj, botobj)
       obj.bot_restart('Yo')
-      return {'id': ['foo'], 'pool': ['bar']}
+      return {u'id': [u'foo'], u'pool': [u'bar']}
     self.mock(bot_config, 'get_dimensions', get_dimensions)
     restarts = []
     self.mock(bot_main, '_bot_restart', lambda *args: restarts.append(args))
-    self.assertEqual(
-        {'id': ['foo'], 'pool': ['bar']}, bot_main._get_dimensions(obj))
+    expected = {
+      u'id': [u'foo'], u'pool': [u'bar'], u'server_version': [u'version1']}
+    self.assertEqual(expected, bot_main._get_dimensions(obj))
     self.assertEqual('Yo', obj.bot_restart_msg())
     self.assertEqual([(obj, 'Yo')], restarts)
 
@@ -144,25 +145,27 @@ class TestBotMain(TestBotBase):
     obj = self.make_bot()
     def get_dimensions(botobj):
       self.assertEqual(obj, botobj)
-      return {'yo': 'dawh'}
+      return {u'yo': [u'dawh']}
     self.mock(bot_config, 'get_dimensions', get_dimensions)
-    self.assertEqual({'yo': 'dawh'}, bot_main._get_dimensions(obj))
+    expected = {u'server_version': [u'version1'], u'yo': [u'dawh']}
+    self.assertEqual(expected, bot_main._get_dimensions(obj))
 
   def test_get_dimensions_extra(self):
     from config import bot_config
     obj = self.make_bot()
     def get_dimensions(botobj):
       self.assertEqual(obj, botobj)
-      return {'yo': 'dawh'}
+      return {u'yo': [u'dawh']}
     self.mock(bot_config, 'get_dimensions', get_dimensions)
 
     # The extra version takes priority.
     class extra(object):
       def get_dimensions(self2, botobj): # pylint: disable=no-self-argument
         self.assertEqual(obj, botobj)
-        return {'alternative': 'truth'}
+        return {u'alternative': [u'truth']}
     self.mock(bot_main, '_EXTRA_BOT_CONFIG', extra())
-    self.assertEqual({'alternative': 'truth'}, bot_main._get_dimensions(obj))
+    expected = {u'alternative': [u'truth'], u'server_version': [u'version1']}
+    self.assertEqual(expected, bot_main._get_dimensions(obj))
 
   def test_generate_version(self):
     self.assertEqual('123', bot_main.generate_version())
@@ -229,14 +232,18 @@ class TestBotMain(TestBotBase):
       return 'invalid'
     self.mock(bot_config, 'get_dimensions', get_dimensions)
     def get_dimensions_os():
-      return {'os': 'safe'}
+      return {u'os': [u'safe']}
     self.mock(os_utilities, 'get_dimensions', get_dimensions_os)
     def get_state(botobj):
       self.assertEqual(obj, botobj)
       return {'yo': 'dawh'}
     self.mock(bot_config, 'get_state', get_state)
 
-    expected = {'os': 'safe', 'quarantined': ['1']}
+    expected = {
+      u'os': [u'safe'],
+      u'quarantined': [u'1'],
+      u'server_version': [u'version1'],
+    }
     self.assertEqual(expected, bot_main._get_dimensions(obj))
     expected = {
       'quarantined': "get_dimensions(): expected a dict, got 'invalid'",

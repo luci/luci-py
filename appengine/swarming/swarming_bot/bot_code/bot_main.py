@@ -303,24 +303,36 @@ def _get_dimensions(botobj):
   # startup. That is why it is imported late.
   out = _call_hook_safe(False, botobj, 'get_dimensions')
   if isinstance(out, dict):
+    out = out.copy()
+    out[u'server_version'] = [_get_server_version_safe()]
     return out
   try:
     _set_quarantined('get_dimensions(): expected a dict, got %r' % out)
-    out2 = os_utilities.get_dimensions()
-    out2['quarantined'] = ['1']
-    return out2
+    out = os_utilities.get_dimensions()
+    out[u'quarantined'] = [u'1']
+    out[u'server_version'] = [_get_server_version_safe()]
+    return out
   except Exception as e:
     logging.exception('os.utilities.get_dimensions() failed')
-    try:
-      botid = os_utilities.get_hostname_short()
-    except Exception as e2:
-      logging.exception('os.utilities.get_hostname_short() failed')
-      botid = 'error_%s' % str(e2)
     return {
-        'id': [botid],
-        'error': ['%s\n%s' % (e, traceback.format_exc()[-2048:])],
-        'quarantined': ['1'],
-      }
+      u'error': [u'%s\n%s' % (e, traceback.format_exc()[-2048:])],
+      u'id': [_get_botid_safe()],
+      u'quarantined': [u'1'],
+      u'server_version': [_get_server_version_safe()],
+    }
+
+
+def _get_server_version_safe():
+  return get_config().get(u'server_version', u'N/A')
+
+
+def _get_botid_safe():
+  """Paranoid version of get_hostname_short()."""
+  try:
+    return os_utilities.get_hostname_short()
+  except Exception as e:
+    logging.exception('os.utilities.get_hostname_short() failed')
+    return 'error_%s' % str(e)
 
 
 def _get_settings(botobj):
@@ -511,6 +523,7 @@ def setup_bot(skip_reboot):
     botobj.host_reboot('Starting new swarming bot: %s' % THIS_FILE)
 
 
+@tools.cached
 def generate_version():
   """Returns the bot's code version."""
   try:
@@ -579,6 +592,7 @@ def get_bot(config):
   return botobj
 
 
+@tools.cached
 def get_config():
   """Returns the data from config.json."""
   global _ERROR_HANDLER_WAS_REGISTERED
@@ -587,11 +601,11 @@ def get_config():
       config = json.load(f.open('config/config.json', 'r'))
     if config['server'].endswith('/'):
       raise ValueError('Invalid server entry %r' % config['server'])
-  except (IOError, OSError, TypeError, ValueError):
+  except (zipfile.BadZipfile, IOError, OSError, TypeError, ValueError):
     logging.exception('Invalid config.json!')
     config = {
-      'server': '',
-      'server_version': 'version1',
+      u'server': u'',
+      u'server_version': u'N/A',
     }
   if not _ERROR_HANDLER_WAS_REGISTERED and config['server']:
     on_error.report_on_exception_exit(config['server'])
