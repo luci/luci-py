@@ -271,6 +271,19 @@ class BackendTest(AppTestBase):
         ts=now)
     self.assertEqual(expected, actual)
 
+  def testCronCountTaskBotDistributionHandler(self):
+    self.set_as_admin()
+    now = datetime.datetime(2011, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+
+    self.client_create_task_raw(tags=['alpha:beta', 'gamma:delta'])
+    self.assertEqual(1, self.execute_tasks())
+    self.client_create_task_raw(tags=['alpha:epsilon', 'zeta:theta'])
+    self.assertEqual(0, self.execute_tasks())
+
+    self.app.get('/internal/cron/count_task_bot_distribution',
+        headers={'X-AppEngine-Cron': 'true'}, status=200)
+
   def testTaskQueueUrls(self):
     # Tests all the task queue tasks are securely handled.
     # TODO(maruel): Test mapreduce.

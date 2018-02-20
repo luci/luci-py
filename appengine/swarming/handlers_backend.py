@@ -119,24 +119,26 @@ class CronCountTaskBotDistributionHandler(webapp2.RequestHandler):
   def get(self):
     ndb.get_context().set_cache_policy(lambda _: False)
 
-    # step one: build a dictionary mapping dimensions to a count of how many
-    # tasks have those dimensions (exclude id from dimensions)
+    # Step one: build a dictionary mapping dimensions to a count of how many
+    # tasks have those dimensions (exclude id from dimensions).
     n_tasks_by_dimensions = collections.Counter()
     q = task_result.TaskResultSummary.query(
         task_result.TaskResultSummary.state.IN(
             task_result.State.STATES_RUNNING))
     for result in q:
-      request = result.request
-
-      # make dimensions immutable
-      dimensions = tuple(sorted(request.properties.dimensions.items()))
+      # Make dimensions immutable so they can be used to index a key.
+      dimensions = tuple(sorted(
+            (k, tuple(sorted(v)))
+            for k, v in result.request.properties.dimensions.iteritems()))
       n_tasks_by_dimensions[dimensions] += 1
 
-    # Count how many bots have those dimensions for each set
+    # Count how many bots have those dimensions for each set.
     n_bots_by_dimensions = {}
     for dimensions, n_tasks in n_tasks_by_dimensions.iteritems():
-      filter_dimensions = ['%s:%s' % d for d in dimensions]
-
+      filter_dimensions = []
+      for k, values in dimensions:
+        for v in values:
+          filter_dimensions.append(u'%s:%s' % (k, v))
       q = bot_management.BotInfo.query()
       try:
         q = bot_management.filter_dimensions(q, filter_dimensions)
@@ -157,9 +159,7 @@ class CronCountTaskBotDistributionHandler(webapp2.RequestHandler):
         n_bots = n_bots_by_dimensions[dimensions].get_result()
 
       dimensions = dict(dimensions)
-      fields = {
-          'pool': dimensions.get('pool', ''),
-      }
+      fields = {'pool': dimensions.get('pool', [''])[0]}
       for _ in range(n_tasks):
         ts_mon_metrics._task_bots_runnable.add(n_bots, fields)
 
