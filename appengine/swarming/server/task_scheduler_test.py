@@ -1368,49 +1368,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         (['1d69b9f088008911'], 0, 0),
         task_scheduler.cron_handle_bot_died('f.local'))
 
-  def mock_dim_acls(self, mapping):
-    self.mock(config, 'settings', lambda: config_pb2.SettingsCfg(
-      dimension_acls=config_pb2.DimensionACLs(entry=[
-        config_pb2.DimensionACLs.Entry(dimension=[d], usable_by=g)
-        for d, g in sorted(mapping.iteritems())
-      ]),
-    ))
-
-  def check_schedule_request_acl(self, **kwargs):
-    task_scheduler.check_schedule_request_acl(gen_request(**kwargs))
-
-  def test_check_schedule_request_acl(self):
-    self.mock_dim_acls({u'pool:good': u'mocked'})
-    self.mock_dim_acls({u'pool:bad': u'unknown'})
-
-    def mocked_is_group_member(group, ident):
-      return group == 'mocked' and ident == auth_testing.DEFAULT_MOCKED_IDENTITY
-    self.mock(auth, 'is_group_member', mocked_is_group_member)
-
-    self.check_schedule_request_acl(
-        properties={'dimensions': {u'id': [u'abc'], u'pool': [u'unknown']}})
-    self.check_schedule_request_acl(
-        properties={'dimensions': {u'id': [u'abc'], u'pool': [u'good']}})
-    with self.assertRaises(auth.AuthorizationError):
-      self.check_schedule_request_acl(
-          properties={'dimensions': {u'id': [u'abc'], u'pool': [u'bad']}})
-
-  def test_check_schedule_request_acl_forbidden_dim(self):
-    self.mock_dim_acls({u'pool:bad': u'noone'})
-    self.check_schedule_request_acl(
-        properties={'dimensions': {u'pool': [u'good']}})
-    with self.assertRaises(auth.AuthorizationError):
-      self.check_schedule_request_acl(
-          properties={'dimensions': {u'pool': [u'bad']}})
-
-  def test_check_schedule_request_acl_forbidden_dim_via_star(self):
-    self.mock_dim_acls({u'abc:*': u'noone'})
-    self.check_schedule_request_acl(
-        properties={'dimensions': {u'pool': [u'default']}})
-    with self.assertRaises(auth.AuthorizationError):
-      self.check_schedule_request_acl(
-          properties={'dimensions': {u'pool': [u'default'], u'abc': [u'blah']}})
-
   def mock_pool_config(
       self,
       name,
@@ -1441,88 +1398,88 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         auth, 'get_delegation_token',
         lambda: delegation_pb2.Subtoken(tags=tags))
 
-  def check_schedule_request_acl_v2(self, **kwargs):
-    task_scheduler._check_schedule_request_acl_v2(gen_request(**kwargs))
+  def check_schedule_request_acl(self, **kwargs):
+    task_scheduler.check_schedule_request_acl(gen_request(**kwargs))
 
-  def test_check_schedule_request_acl_v2_unknown(self):
+  def test_check_schedule_request_acl(self):
     self.mock_pool_config('some-other-pool')
 
     # Uses default ACL is there's no pool config.
-    self.check_schedule_request_acl_v2(
+    self.check_schedule_request_acl(
         properties={'dimensions': {u'pool': [u'some-pool']}})
 
     # Service accounts are not allowed in this case.
     with self.assertRaises(auth.AuthorizationError) as ctx:
-      self.check_schedule_request_acl_v2(
+      self.check_schedule_request_acl(
           properties={'dimensions': {u'pool': [u'some-pool']}},
           service_account='robot@example.com')
     self.assertTrue('Can\'t use account' in str(ctx.exception))
 
-  def test_check_schedule_request_acl_v2_unknown_forbidden(self):
+  def test_check_schedule_request_acl_unknown_forbidden(self):
     self.mock_pool_config('some-other-pool')
     self.mock(pools_config, 'forbid_unknown_pools', lambda: True)
     with self.assertRaises(auth.AuthorizationError) as ctx:
-      self.check_schedule_request_acl_v2(
+      self.check_schedule_request_acl(
           properties={'dimensions': {u'pool': [u'some-pool']}})
     self.assertTrue('not defined in pools.cfg' in str(ctx.exception))
 
-  def test_check_schedule_request_acl_v2_forbidden(self):
+  def test_check_schedule_request_acl_forbidden(self):
     self.mock_pool_config('some-pool')
     with self.assertRaises(auth.AuthorizationError) as ctx:
-      self.check_schedule_request_acl_v2(
+      self.check_schedule_request_acl(
           properties={'dimensions': {u'pool': [u'some-pool']}})
     self.assertTrue('not allowed to schedule tasks' in str(ctx.exception))
 
-  def test_check_schedule_request_acl_v2_allowed_explicitly(self):
+  def test_check_schedule_request_acl_allowed_explicitly(self):
     self.mock_pool_config(
         'some-pool', scheduling_users=[auth_testing.DEFAULT_MOCKED_IDENTITY])
-    self.check_schedule_request_acl_v2(
+    self.check_schedule_request_acl(
         properties={'dimensions': {u'pool': [u'some-pool']}})
 
-  def test_check_schedule_request_acl_v2_allowed_through_the_group(self):
+  def test_check_schedule_request_acl_allowed_through_the_group(self):
     self.mock_pool_config(
         'some-pool', scheduling_groups=['mocked'])
     def mocked_is_group_member(group, ident):
       return group == 'mocked' and ident == auth_testing.DEFAULT_MOCKED_IDENTITY
     self.mock(auth, 'is_group_member', mocked_is_group_member)
-    self.check_schedule_request_acl_v2(
+    self.check_schedule_request_acl(
         properties={'dimensions': {u'pool': [u'some-pool']}})
 
-  def test_check_schedule_request_acl_v2_unknown_delegation(self):
+  def test_check_schedule_request_acl_unknown_delegation(self):
     delegatee1 = auth.Identity.from_bytes('user:d1@example.com')
     delegatee2 = auth.Identity.from_bytes('user:d2@example.com')
     self.mock_pool_config('some-pool', trusted_delegatees={delegatee1: ['t1']})
     self.mock_delegation(delegatee2, ['t1'])
     with self.assertRaises(auth.AuthorizationError):
-      self.check_schedule_request_acl_v2(
+      self.check_schedule_request_acl(
           properties={'dimensions': {u'pool': [u'some-pool']}})
 
-  def test_check_schedule_request_acl_v2_delegation_ok(self):
+  def test_check_schedule_request_acl_delegation_ok(self):
     delegatee = auth.Identity.from_bytes('user:d1@example.com')
     self.mock_pool_config(
         'some-pool', trusted_delegatees={delegatee: ['t1', 'other']})
     self.mock_delegation(delegatee, ['t1', 'extra'])
-    self.check_schedule_request_acl_v2(
+    self.check_schedule_request_acl(
         properties={'dimensions': {u'pool': [u'some-pool']}})
 
-  def test_check_schedule_request_acl_v2_delegation_missing_tag(self):
+  def test_check_schedule_request_acl_delegation_missing_tag(self):
     delegatee = auth.Identity.from_bytes('user:d1@example.com')
     self.mock_pool_config('some-pool', trusted_delegatees={delegatee: ['t1']})
     self.mock_delegation(delegatee, ['another'])
     with self.assertRaises(auth.AuthorizationError):
-      self.check_schedule_request_acl_v2(
+      self.check_schedule_request_acl(
           properties={'dimensions': {u'pool': [u'some-pool']}})
 
-  def test_check_schedule_request_acl_v2_good_service_acc(self):
+  def test_check_schedule_request_acl_good_service_acc(self):
     self.mock_pool_config(
         'some-pool',
         scheduling_users=[auth_testing.DEFAULT_MOCKED_IDENTITY],
         service_accounts=['good@example.com'])
-    self.check_schedule_request_acl_v2(
+    self.check_schedule_request_acl(
         properties={'dimensions': {u'pool': [u'some-pool']}},
         service_account='good@example.com')
 
-  def test_check_schedule_request_acl_v2_good_service_acc_through_group(self):
+  def test_check_schedule_request_acl_good_service_acc_through_group(self):
     def mocked_is_group_member(group, ident):
       return group == 'accounts' and ident.to_bytes() == 'user:good@example.com'
     self.mock(auth, 'is_group_member', mocked_is_group_member)
@@ -1531,18 +1488,18 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         'some-pool',
         scheduling_users=[auth_testing.DEFAULT_MOCKED_IDENTITY],
         service_accounts_groups=['accounts'])
-    self.check_schedule_request_acl_v2(
+    self.check_schedule_request_acl(
         properties={'dimensions': {u'pool': [u'some-pool']}},
         service_account='good@example.com')
 
-  def test_check_schedule_request_acl_v2_bad_service_acc(self):
+  def test_check_schedule_request_acl_bad_service_acc(self):
     self.mock_pool_config(
         'some-pool',
         scheduling_users=[auth_testing.DEFAULT_MOCKED_IDENTITY],
         service_accounts=['good@example.com'],
         service_accounts_groups=['accounts'])
     with self.assertRaises(auth.AuthorizationError) as ctx:
-      self.check_schedule_request_acl_v2(
+      self.check_schedule_request_acl(
           properties={'dimensions': {u'pool': [u'some-pool']}},
           service_account='bad@example.com')
     self.assertTrue('is not allowed in the pool' in str(ctx.exception))

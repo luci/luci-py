@@ -135,17 +135,6 @@
         </div>
       </div>
 
-      <h2>Dimension ACLs</h2>
-      <!-- {{cfg.dimension_acls}} -->
-      {% for entry in cfg.dimension_acls.entry %}
-        <div class="form-group">
-          <label class="col-sm-3 control-label">{{', '.join(entry.dimension)}}:</label>
-          <div class="col-sm-9">
-            <input class="form-control" value="{{entry.usable_by}}" disabled/>
-          </div>
-        </div>
-      {% endfor %}
-
       <h2>Authorization Settings</h2>
 
       <div class="form-group">

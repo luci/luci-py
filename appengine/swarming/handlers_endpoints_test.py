@@ -219,6 +219,7 @@ class TasksApiTest(BaseTest):
   def setUp(self):
     super(TasksApiTest, self).setUp()
     utils.clear_cache(config.settings)
+    self.mock_default_pool_acl(['service-account@example.com'])
 
   @staticmethod
   def raw_request(service_account='service-account@example.com'):
@@ -1573,6 +1574,7 @@ class TaskApiTest(BaseTest):
   def test_request_ok(self):
     """Asserts that request produces a task request."""
     self.mock_task_service_accounts()
+    self.mock_default_pool_acl(['service-account@example.com'])
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
     _, task_id = self.client_create_task_raw(

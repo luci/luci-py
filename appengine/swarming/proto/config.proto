@@ -7,6 +7,8 @@ syntax = "proto2";
 
 // Schema for settings.cfg service config file in luci-config.
 message SettingsCfg {
+  reserved 10;  // used to be dimension_acls
+
   // id to inject into pages if applicable.
   optional string google_analytics = 1;
 
@@ -37,9 +39,6 @@ message SettingsCfg {
   // oauth client id for the ui. This is created in the developer's console
   // under Credentials.
   optional string ui_client_id = 9;
-
-  // A mapping "dimension" => "who can posts tasks for it".
-  optional DimensionACLs dimension_acls = 10;
 
   // A url to a task display server (e.g. milo).  This should have a %s where
   // a task id can go.
@@ -108,45 +107,9 @@ message MachineProviderSettings {
 }
 
 
-// Access control lists for dimensions.
-//
-// A dimension (concrete 'key:value' pair) can have an ACL attached to it that
-// lists all who can post tasks with this dimension. This is especially useful
-// for 'pool' dimension: the ACL controls who can use machines in the
-// corresponding pool.
-//
-// This work in conjunction with global 'swarming-users' group check: in order
-// to post a task that uses dimension "X:Y", the user must be both in
-// 'swarming-users' group and in "X:Y"'s ACL.
-//
-// The default ACL (the one used if dimension is not specified in this config)
-// is "all", e.g. any user in 'swarming-users' can use the dimension.
-//
-// TODO(vadimsh): This is a simple temporary scheme. It will likely
-// significantly change in the future when we introduce a notion of Project.
-message DimensionACLs {
-  message Entry {
-    // A "<key>:<value>" pairs specifying dimensions protected by this ACL.
-    //
-    // Also accepts "<key>:*" value, that means "any value for <key> dimension".
-    repeated string dimension = 1;
-
-    // A name of a group with users that are allowed to post tasks with the
-    // given dimension value.
-    //
-    // This check always work in conjunction with 'swarming-users' group check:
-    // in order to post a task that uses dimension "X:Y", the user must be both
-    // in 'swarming-users' group and in "X:Y"'s 'usable_by' group.
-    optional string usable_by = 2;
-  }
-
-  // Entries with ACLs for individual dimensions. Order is irrelevant.
-  repeated Entry entry = 1;
-}
-
 // Access control groups for the swarming service. Custom group names
 // allow several swarming instances to co-exist under the same "auth"
-// server. 
+// server.
 //
 // All groups default to 'administrators'.
 //

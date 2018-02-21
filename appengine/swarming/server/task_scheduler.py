@@ -388,22 +388,6 @@ def _pubsub_notify(task_id, topic, auth_token, userdata):
     logging.exception('Fatal error when sending PubSub notification')
 
 
-def _can_use_dimension(dim_acls, ident, k, v):
-  """Returns True if 'dimension_acls' allow the given dimension to be used.
-
-  Args:
-    dim_acls: config_pb2.DimensionACLs message.
-    ident: auth.Identity to check.
-    k: dimension name.
-    v: dimension value.
-  """
-  for e in dim_acls.entry:
-    if '%s:%s' % (k, v) in e.dimension or '%s:*' % k in e.dimension:
-      return auth.is_group_member(e.usable_by, ident)
-  # A dimension not mentioned in 'dimension_acls' is allowed by default.
-  return True
-
-
 def _find_dupe_task(now, h):
   """Finds a previously run task that is also idempotent and completed.
 
@@ -438,57 +422,6 @@ def _find_dupe_task(now, h):
       return None
     return dupe_summary
   return None
-
-
-def _check_schedule_request_acl_v2(request):
-  # Only terminate tasks don't have a pool. ACLs for them are handled through
-  # 'acl.can_edit_bot', see 'terminate' RPC handler. Such tasks do not end up
-  # hitting this function, and so we can assume there's a pool set (this is
-  # checked in TaskProperties's pre put hook).
-  #
-  # It is guaranteed that at most one item can be specified in 'pool'.
-  pool = request.properties.dimensions[u'pool'][0]
-  pool_cfg = pools_config.get_pool_config(pool)
-
-  # request.service_account can be 'bot' or 'none'. We don't care about these,
-  # they are always allowed. We care when the service account is a real email.
-  has_service_account = service_accounts.is_service_account(
-      request.service_account)
-
-  if not pool_cfg:
-    logging.info('Pool "%s" is not in pools.cfg', pool)
-    # Deployments that use pools.cfg may forbid unknown pools completely.
-    # This is a safeguard against anyone executing tasks in a new not fully
-    # configured pool.
-    if pools_config.forbid_unknown_pools():
-      raise auth.AuthorizationError(
-          'Can\'t submit tasks to pool "%s" not defined in pools.cfg' % pool)
-    # To be backward compatible with Swarming deployments that do not care about
-    # pools isolation pools without pools.cfg entry are relatively wide open
-    # (anyone with 'can_create_task' permission can use them). As a downside,
-    # they are not allowed to use service accounts, since Swarming doesn't know
-    # what accounts are allowed in such unknown pools.
-    if has_service_account:
-      raise auth.AuthorizationError(
-          'Can\'t use account "%s" in the pool "%s" not defined in pools.cfg' %
-          (request.service_account, pool))
-    return
-
-  logging.info(
-      'Looking at the pool "%s" in pools.cfg, rev "%s"', pool, pool_cfg.rev)
-
-  # Verify the caller can use the pool at all.
-  if not _is_allowed_to_schedule(pool_cfg):
-    raise auth.AuthorizationError(
-        'User "%s" is not allowed to schedule tasks in the pool "%s", '
-        'see pools.cfg' % (auth.get_current_identity().to_bytes(), pool))
-
-  # Verify the requested task service account is allowed in this pool.
-  if (has_service_account and
-      not _is_allowed_service_account(request.service_account, pool_cfg)):
-    raise auth.AuthorizationError(
-        'Service account "%s" is not allowed in the pool "%s", see pools.cfg' %
-        (request.service_account, pool))
 
 
 def _is_allowed_to_schedule(pool_cfg):
@@ -590,28 +523,54 @@ def check_schedule_request_acl(request):
   Raises:
     auth.AuthorizationError if the caller is not allowed to schedule this task.
   """
-  # TODO(vadimsh): Perform v2 check, but ignore its result for now. Once all
-  # Swarming instances are updated with correct pools.cfg this will become the
-  # main check and the code below (based in dimension_acls) will be deleted.
-  try:
-    _check_schedule_request_acl_v2(request)
-  except auth.AuthorizationError as err:
-    logging.error('crbug.com/777022: ACL check failed (but ignored): %s', err)
+  # Only terminate tasks don't have a pool. ACLs for them are handled through
+  # 'acl.can_edit_bot', see 'terminate' RPC handler. Such tasks do not end up
+  # hitting this function, and so we can assume there's a pool set (this is
+  # checked in TaskProperties's pre put hook).
+  #
+  # It is guaranteed that at most one item can be specified in 'pool'.
+  pool = request.properties.dimensions[u'pool'][0]
+  pool_cfg = pools_config.get_pool_config(pool)
 
-  # TODO(vadimsh): Delete this once pools.cfg are defined everywhere.
-  dim_acls = config.settings().dimension_acls
-  if not dim_acls or not dim_acls.entry:
-    return # not configured, this is fine
+  # request.service_account can be 'bot' or 'none'. We don't care about these,
+  # they are always allowed. We care when the service account is a real email.
+  has_service_account = service_accounts.is_service_account(
+      request.service_account)
 
-  ident = request.authenticated
-  assert ident is not None # see task_request.init_new_request
+  if not pool_cfg:
+    logging.info('Pool "%s" is not in pools.cfg', pool)
+    # Deployments that use pools.cfg may forbid unknown pools completely.
+    # This is a safeguard against anyone executing tasks in a new not fully
+    # configured pool.
+    if pools_config.forbid_unknown_pools():
+      raise auth.AuthorizationError(
+          'Can\'t submit tasks to pool "%s" not defined in pools.cfg' % pool)
+    # To be backward compatible with Swarming deployments that do not care about
+    # pools isolation pools without pools.cfg entry are relatively wide open
+    # (anyone with 'can_create_task' permission can use them). As a downside,
+    # they are not allowed to use service accounts, since Swarming doesn't know
+    # what accounts are allowed in such unknown pools.
+    if has_service_account:
+      raise auth.AuthorizationError(
+          'Can\'t use account "%s" in the pool "%s" not defined in pools.cfg' %
+          (request.service_account, pool))
+    return
 
-  for k, values in sorted(request.properties.dimensions.iteritems()):
-    for v in values:
-      if not _can_use_dimension(dim_acls, ident, k, v):
-        raise auth.AuthorizationError(
-            'User %s is not allowed to schedule tasks with dimension "%s:%s"' %
-            (ident.to_bytes(), k, v))
+  logging.info(
+      'Looking at the pool "%s" in pools.cfg, rev "%s"', pool, pool_cfg.rev)
+
+  # Verify the caller can use the pool at all.
+  if not _is_allowed_to_schedule(pool_cfg):
+    raise auth.AuthorizationError(
+        'User "%s" is not allowed to schedule tasks in the pool "%s", '
+        'see pools.cfg' % (auth.get_current_identity().to_bytes(), pool))
+
+  # Verify the requested task service account is allowed in this pool.
+  if (has_service_account and
+      not _is_allowed_service_account(request.service_account, pool_cfg)):
+    raise auth.AuthorizationError(
+        'Service account "%s" is not allowed in the pool "%s", see pools.cfg' %
+        (request.service_account, pool))
 
 
 def schedule_request(request, secret_bytes):

@@ -27,6 +27,7 @@ from test_support import test_case
 from proto import config_pb2
 from server import config
 from server import large
+from server import pools_config
 from server import service_accounts
 
 
@@ -143,6 +144,29 @@ class AppTestBase(test_case.TestCase):
           str(service_account), validity_duration.total_seconds())
     self.mock(service_accounts, 'get_oauth_token_grant', mocked)
     return calls
+
+  # pylint: disable=redefined-outer-name
+  def mock_default_pool_acl(self, service_accounts):
+    """Mocks ACLs of 'default' pool to allow usage of given service accounts."""
+    assert isinstance(service_accounts, (list, tuple)), service_accounts
+    def mocked_get_pool_config(pool):
+      if pool != 'default':
+        return None
+      return pools_config.PoolConfig(
+          name='default',
+          rev='pools_cfg_rev',
+          scheduling_users=frozenset([
+            # See setUp above. We just duplicate the first ACL layer here
+            auth.Identity(auth.IDENTITY_USER, 'super-admin@example.com'),
+            auth.Identity(auth.IDENTITY_USER, 'admin@example.com'),
+            auth.Identity(auth.IDENTITY_USER, 'priv@example.com'),
+            auth.Identity(auth.IDENTITY_USER, 'user@example.com'),
+          ]),
+          scheduling_groups=frozenset(),
+          trusted_delegatees={},
+          service_accounts=frozenset(service_accounts),
+          service_accounts_groups=())
+    self.mock(pools_config, 'get_pool_config', mocked_get_pool_config)
 
   # Bot
 

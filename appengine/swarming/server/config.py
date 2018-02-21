@@ -132,49 +132,6 @@ def _validate_cipd_settings(cfg, ctx=None):
     _validate_cipd_package(cfg.default_client_package, ctx)
 
 
-def _validate_dimension_acls(cfg, ctx):
-  """Validates DimensionACLs message stored in settings.cfg."""
-  ctx = ctx or validation.Context.raise_on_error()
-
-  # Pick '<key>:*' entries upfront to check that regular '<key>:<val>' entries
-  # aren't colliding with wildcard entries.
-  stars = set()
-  star_dups = set()
-  for e in cfg.entry:
-    for dim in e.dimension:
-      if not dim.endswith(':*'):
-        continue
-      if dim in stars:
-        star_dups.add(dim)
-      else:
-        stars.add(dim)
-
-  seen = set()
-  for i, e in enumerate(cfg.entry):
-    with ctx.prefix('entry #%d: ', i+1):
-      if not e.dimension:
-        ctx.error('at least one dimension is required')
-      for dim in e.dimension:
-        with ctx.prefix('dimension "%s": ', dim):
-          if not validate_flat_dimension(dim):
-            ctx.error('not a valid dimension')
-          key, _, val = dim.partition(':')
-          if val == '*':
-            if dim in star_dups:
-              ctx.error('was specified multiple times')
-              star_dups.remove(dim) # to avoid rereporting same error
-          else:
-            if dim in seen:
-              ctx.error('was already specified')
-            if '%s:*' % key in stars:
-              ctx.error('was already specified via "%s:*"' % key)
-            seen.add(dim)
-      if not e.usable_by:
-        ctx.error('"usable_by" is required')
-      elif not auth.is_valid_group_name(e.usable_by):
-        ctx.error('"usable_by" specifies invalid group name "%s"' % e.usable_by)
-
-
 @validation.self_rule(_SETTINGS_CFG_FILENAME, config_pb2.SettingsCfg)
 def _validate_settings(cfg, ctx):
   """Validates settings.cfg file against proto message schema."""
@@ -200,10 +157,6 @@ def _validate_settings(cfg, ctx):
   if cfg.HasField('mp') and cfg.mp.HasField('server'):
     with ctx.prefix('mp.server '):
       _validate_url(cfg.mp.server, ctx)
-
-  if cfg.HasField('dimension_acls'):
-    with ctx.prefix('dimension_acls: '):
-      _validate_dimension_acls(cfg.dimension_acls, ctx)
 
 
 @utils.memcache('config:get_configs_url', time=60)
