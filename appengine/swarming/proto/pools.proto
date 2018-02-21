@@ -15,13 +15,27 @@ syntax = "proto2";
 // and capacity reasons. Two different pools should not interfere with each
 // other at all (unless explicitly configured to share bots or accounts).
 message PoolsCfg {
+  // List of all defined pools.
   repeated Pool pool = 1;
+
+  // If 'true' and callers try to add a task that use a pool not defined in
+  // 'pools' above, Swarming will reject the call with "Permission Denied"
+  // error.
+  //
+  // If 'false', Swarming will allow the task if caller has 'can_create_task'
+  // permission. This is used for backward compatibility with simple Swarming
+  // deployments that don't do pool isolation.
+  //
+  // Note that tasks in undefined pools aren't allowed to use service accounts,
+  // since Swarming doesn't know what accounts are allowed in such unconfigured
+  // pools.
+  optional bool forbid_unknown_pools = 2;
 }
 
 
 // Properties of a single pool or a bunch of identically configured pools.
 //
-// In particular contains authorization confirmation.
+// In particular contains authorization configuration.
 message Pool {
   // Names of the pools this config applies to.
   //
@@ -36,7 +50,9 @@ message Pool {
 
   // Defines who can schedule tasks in this pool.
   //
-  // Moved into a separate proto message for improved readability of text proto.
+  // The checks here act as a second authorization layer, consulted after the
+  // first server-global one (defined based on groups set in settings.cfg, see
+  // AuthSettings in config.proto).
   optional Schedulers schedulers = 3;
 
   // List of service account emails allowed to be used for tasks that target

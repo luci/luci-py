@@ -1444,7 +1444,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def check_schedule_request_acl_v2(self, **kwargs):
     task_scheduler._check_schedule_request_acl_v2(gen_request(**kwargs))
 
-  def test_check_schedule_request_acl_v2(self):
+  def test_check_schedule_request_acl_v2_unknown(self):
     self.mock_pool_config('some-other-pool')
 
     # Uses default ACL is there's no pool config.
@@ -1457,6 +1457,14 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
           properties={'dimensions': {u'pool': [u'some-pool']}},
           service_account='robot@example.com')
     self.assertTrue('Can\'t use account' in str(ctx.exception))
+
+  def test_check_schedule_request_acl_v2_unknown_forbidden(self):
+    self.mock_pool_config('some-other-pool')
+    self.mock(pools_config, 'forbid_unknown_pools', lambda: True)
+    with self.assertRaises(auth.AuthorizationError) as ctx:
+      self.check_schedule_request_acl_v2(
+          properties={'dimensions': {u'pool': [u'some-pool']}})
+    self.assertTrue('not defined in pools.cfg' in str(ctx.exception))
 
   def test_check_schedule_request_acl_v2_forbidden(self):
     self.mock_pool_config('some-pool')

@@ -44,7 +44,7 @@ TEST_CONFIG = pools_pb2.PoolsCfg(pool=[
       'accounts_group2',
     ],
   ),
-])
+], forbid_unknown_pools=True)
 
 
 class PoolsConfigTest(test_case.TestCase):
@@ -67,6 +67,7 @@ class PoolsConfigTest(test_case.TestCase):
 
   def test_get_pool_config(self):
     self.mock_config(TEST_CONFIG)
+    self.assertTrue(pools_config.forbid_unknown_pools())
     self.assertEqual(None, pools_config.get_pool_config('unknown'))
 
     expected1 = pools_config.PoolConfig(

@@ -53,10 +53,29 @@ TrustedDelegatee = collections.namedtuple('TrustedDelegatee', [
 
 def get_pool_config(pool_name):
   """Returns PoolConfig for the given pool or None if not defined."""
-  return _fetch_pools_config().get(pool_name)
+  return _fetch_pools_config().pools.get(pool_name)
+
+
+def forbid_unknown_pools():
+  """Returns True if the configuration forbids task in unknown pools.
+
+  Unknown pools are pools that are not defined in pools.cfg.
+
+  On a server without pools.cfg file, forbid_unknown_pools() returns False, to
+  be backward compatible with simple Swarming deployments that don't do pool
+  isolation.
+  """
+  return _fetch_pools_config().forbid_unknown_pools
 
 
 ### Private stuff.
+
+
+# Parsed representation of pools.cfg ready for queries.
+_PoolsCfg = collections.namedtuple('_PoolsCfg', [
+  'pools',                 # dict {pool name => PoolConfig tuple}
+  'forbid_unknown_pools',  # boolean, taken directly from the proto message
+])
 
 
 def _to_ident(s):
@@ -75,14 +94,14 @@ def _validate_ident(ctx, title, s):
 
 @utils.cache_with_expiration(60)
 def _fetch_pools_config():
-  """Loads pools.cfg and parses it into a map of PoolConfig tuples."""
+  """Loads pools.cfg and parses it into a _PoolsCfg instance."""
   # store_last_good=True tells config components to update the config file
   # in a cron job. Here we just read from the datastore. In case it's the first
   # call ever, or config doesn't exist, it returns (None, None).
   rev, cfg = config.get_self_config(
       POOLS_CFG_FILENAME, pools_pb2.PoolsCfg, store_last_good=True)
   if not cfg:
-    return {}
+    return _PoolsCfg({}, False)
 
   # The config is already validated at this point.
 
@@ -102,7 +121,7 @@ def _fetch_pools_config():
           },
           service_accounts=frozenset(msg.allowed_service_account),
           service_accounts_groups=tuple(msg.allowed_service_account_group))
-  return pools
+  return _PoolsCfg(pools, cfg.forbid_unknown_pools)
 
 
 @validation.self_rule(POOLS_CFG_FILENAME, pools_pb2.PoolsCfg)
