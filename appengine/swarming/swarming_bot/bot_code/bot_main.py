@@ -69,10 +69,11 @@ _ERROR_HANDLER_WAS_REGISTERED = False
 # to swarming_bot.zip when run as part of swarming_bot.zip. This value is
 # overriden in unit tests.
 THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
+THIS_DIR = os.path.dirname(THIS_FILE)
 
 
 # The singleton, initially unset.
-SINGLETON = singleton.Singleton(os.path.dirname(THIS_FILE))
+SINGLETON = singleton.Singleton(THIS_DIR)
 
 
 # Whitelist of files that can be present in the bot's directory. Anything else
@@ -481,7 +482,7 @@ def _is_base_dir_ok(botobj):
   """Returns False if the bot must be quarantined at all cost."""
   if not botobj:
     # This can happen very early in the process lifetime.
-    return os.path.dirname(THIS_FILE) != os.path.expanduser('~')
+    return THIS_DIR != os.path.expanduser('~')
   return botobj.base_dir != os.path.expanduser('~')
 
 
@@ -563,7 +564,7 @@ def get_bot(config):
     'state': {},
     'version': generate_version(),
   }
-  base_dir = os.path.dirname(THIS_FILE)
+  base_dir = THIS_DIR
   # Use temporary Bot object to call get_attributes. Attributes are needed to
   # construct the "real" bot.Bot.
   attributes = get_attributes(
@@ -1327,7 +1328,7 @@ def main(argv):
       print >> sys.stderr, 'Found a previous bot, %d exiting.' % os.getpid()
     return 1
 
-  base_dir = os.path.dirname(THIS_FILE)
+  base_dir = THIS_DIR
   for t in ('out', 'err'):
     log_path = os.path.join(base_dir, 'logs', 'bot_std%s.log' % t)
     os_utilities.roll_log(log_path)
