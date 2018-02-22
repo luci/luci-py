@@ -241,7 +241,7 @@ class RemoteClientGrpc(object):
   def post_task_error(self, task_id, bot_id, message):
     req = tasks_pb2.UpdateTaskResultRequest()
     req.name = task_id + '/result'
-    req.source = self._session.bot_id
+    req.source = bot_id
     req.result.name = req.name
     req.result.complete = True
     req.result.status.code = code_pb2.ABORTED
