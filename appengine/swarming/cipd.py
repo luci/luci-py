@@ -7,14 +7,13 @@
 import re
 
 # Regular expressions below are copied from
-# https://chromium.googlesource.com/infra/infra/+/40574c5/appengine/chrome_infra_packages/cipd/impl.py
-# https://chromium.googlesource.com/infra/infra/+/40574c5/appengine/chrome_infra_packages/cas/impl.py
+# https://chromium.googlesource.com/infra/luci/luci-go/+/eb562da3/cipd/client/cipd/common/common.go
 
 PACKAGE_NAME_RE = re.compile(r'^([a-z0-9_\-\.]+/)*[a-z0-9_\-\.]+$')
 PACKAGE_NAME_TEMPLATE_RE = re.compile(r'^[a-z0-9_\-\.,\${}/=]+$')
 INSTANCE_ID_RE = re.compile(r'^[0-9a-f]{40}$')
 TAG_KEY_RE = re.compile(r'^[a-z0-9_\-]+$')
-REF_RE = re.compile(r'^[a-z0-9_\-]{1,100}$')
+REF_RE = re.compile(r'^[a-z0-9_./\-]{1,256}$')
 TAG_MAX_LEN = 400
 
 
