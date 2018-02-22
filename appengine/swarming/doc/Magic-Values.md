@@ -60,6 +60,9 @@ The following environment variables may be set to alter bot behavior:
     custom value. Must be specified before swarming script is started. Note that
     this environment variable will be set even if it was not specified manually
     and will always contain the bot id used.
+  - `DOCKER_HOST_HOSTNAME` dumps the value of this env var to the bot's state
+    under the `docker_host_hostname` field. Used to advertise the hostname of
+    the host machine when the bot is running within a container.
 
 
 ### dimensions

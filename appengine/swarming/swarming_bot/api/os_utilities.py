@@ -905,7 +905,7 @@ def get_state_all_devices_android(devices):
   if not devices:
     return state
 
-  # Add a few values that were poped from dimensions.
+  # Add a few values that were popped from dimensions.
   state[u'host_dimensions'] = {
     u'cpu': get_cpu_dimensions(),
     u'cores': [unicode(get_num_processors())],
@@ -1072,6 +1072,10 @@ def get_state():
     temp = platforms.linux.get_temperatures()
     if temp:
       state[u'temp'] = temp
+
+    docker_host_hostname = os.environ.get('DOCKER_HOST_HOSTNAME')
+    if docker_host_hostname:
+      state[u'docker_host_hostname'] = unicode(docker_host_hostname)
 
   # Put an arbitrary limit on the amount of junk that can stay in TEMP.
   if nb_files_in_temp == 'N/A':
