@@ -5,6 +5,7 @@
 # that can be found in the LICENSE file.
 
 import base64
+import datetime
 import json
 import logging
 import os
@@ -96,7 +97,6 @@ class TestTaskRunnerBase(net_utils.TestCase):
     def _get_run_isolated():
       return [sys.executable, os.path.join(CLIENT_DIR, 'run_isolated.py')]
     self.mock(task_runner, 'get_run_isolated', _get_run_isolated)
-
     # In case this test itself is running on Swarming, clear the bot
     # environment.
     os.environ.pop('LUCI_CONTEXT', None)
@@ -105,6 +105,8 @@ class TestTaskRunnerBase(net_utils.TestCase):
     os.environ.pop('SWARMING_TASK_ID', None)
     os.environ.pop('SWARMING_SERVER', None)
     os.environ.pop('ISOLATE_SERVER', None)
+    # Make HTTP headers consistent
+    self.mock(remote_client, 'make_appengine_id', lambda *a: 42)
 
   def tearDown(self):
     os.chdir(test_env_bot_code.BOT_DIR)
@@ -124,15 +126,18 @@ class TestTaskRunnerBase(net_utils.TestCase):
     return task_runner.TaskDetails(get_manifest(*args, **kwargs))
 
   def gen_requests(self, cost_usd=0., auth_headers=None, **kwargs):
+    headers = {'Cookie': 'GOOGAPPUID=42'}
+    if auth_headers is not None:
+      headers.update(auth_headers)
     return [
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
-        self.get_check_first(cost_usd, auth_headers=auth_headers),
+        self.get_check_first(cost_usd, headers=headers),
         {'must_stop': False, 'ok': True},
       ),
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
-        self.get_check_final(auth_headers=auth_headers, **kwargs),
+        self.get_check_final(headers=headers, **kwargs),
         {'must_stop': False, 'ok': True},
       ),
     ]
@@ -141,7 +146,7 @@ class TestTaskRunnerBase(net_utils.TestCase):
     """Generates the expected HTTP requests for a task run."""
     self.expected_requests(self.gen_requests(**kwargs))
 
-  def get_check_first(self, cost_usd, auth_headers=None):
+  def get_check_first(self, cost_usd, headers):
     def check_first(kwargs):
       self.assertLessEqual(cost_usd, kwargs['data'].pop('cost_usd'))
       self.assertEqual(
@@ -152,7 +157,7 @@ class TestTaskRunnerBase(net_utils.TestCase):
           },
           'follow_redirects': False,
           'timeout': 180,
-          'headers': auth_headers or {},
+          'headers': headers,
         },
         kwargs)
     return check_first
@@ -165,7 +170,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
   def get_check_final(
       self, exit_code=0, output_re=r'^hi\n$', outputs_ref=None,
-      auth_headers=None):
+      headers=None):
     def check_final(kwargs):
       # Ignore these values.
       kwargs['data'].pop('bot_overhead', None)
@@ -190,7 +195,7 @@ class TestTaskRunner(TestTaskRunnerBase):
         },
         'follow_redirects': False,
         'timeout': 180,
-        'headers': auth_headers or {},
+        'headers': headers,
       }
       if outputs_ref:
         expected['data']['outputs_ref'] = outputs_ref
@@ -201,6 +206,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     start = time.time()
     self.mock(time, 'time', lambda: start + 10)
     remote = remote_client.createRemoteClient('https://localhost:1', headers_cb,
+                                              'localhost', self.work_dir,
                                               False)
     with luci_context.stage(local_auth=None) as ctx_file:
       return task_runner.run_command(
@@ -571,7 +577,7 @@ class TestTaskRunner(TestTaskRunnerBase):
             },
             'follow_redirects': False,
             'timeout': 180,
-            'headers': {},
+            'headers': {'Cookie': 'GOOGAPPUID=42'},
           },
           kwargs)
 
@@ -586,7 +592,7 @@ class TestTaskRunner(TestTaskRunnerBase):
           },
           'follow_redirects': False,
           'timeout': 180,
-          'headers': {},
+          'headers': {'Cookie': 'GOOGAPPUID=42'},
         },
         {'must_stop': False, 'ok': True},
       ),
@@ -602,7 +608,7 @@ class TestTaskRunner(TestTaskRunnerBase):
           },
           'follow_redirects': False,
           'timeout': 180,
-          'headers': {},
+          'headers': {'Cookie': 'GOOGAPPUID=42'},
         },
         {'must_stop': False, 'ok': True},
       ),
@@ -640,7 +646,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     requests = [
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
-        self.get_check_first(1),
+        self.get_check_first(1, {'Cookie': 'GOOGAPPUID=42'}),
         {u'must_stop': True, u'ok': True},
       ),
     ]
@@ -818,7 +824,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
 
   def get_check_final(
       self, hard_timeout=False, io_timeout=False, exit_code=None,
-      output_re='^hi\n$', auth_headers=None):
+      output_re='^hi\n$', headers=None):
     def check_final(kwargs):
       kwargs['data'].pop('bot_overhead', None)
       if hard_timeout or io_timeout:
@@ -847,7 +853,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
             },
             'follow_redirects': False,
             'timeout': 180,
-            'headers': auth_headers or {},
+            'headers': headers,
           },
           kwargs)
     return check_final
@@ -868,6 +874,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
   def _run_command(self, task_details):
     # Dot not mock time since this test class is testing timeouts.
     remote = remote_client.createRemoteClient('https://localhost:1', None,
+                                              'localhost', self.work_dir,
                                               False)
     with luci_context.stage(local_auth=None) as ctx_file:
       return task_runner.run_command(
@@ -1064,13 +1071,13 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
             },
             'follow_redirects': False,
             'timeout': 180,
-            'headers': {},
+            'headers': {'Cookie': 'GOOGAPPUID=42'},
           },
           kwargs)
     requests = [
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
-        self.get_check_first(0.),
+        self.get_check_first(0., {'Cookie': 'GOOGAPPUID=42'}),
         {'must_stop': False, 'ok': True},
       ),
       (
@@ -1186,13 +1193,13 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
             },
             'follow_redirects': False,
             'timeout': 180,
-            'headers': {},
+            'headers': {'Cookie': 'GOOGAPPUID=42'},
           },
           kwargs)
     requests = [
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
-        self.get_check_first(0.),
+        self.get_check_first(0., {'Cookie': 'GOOGAPPUID=42'}),
         {'must_stop': False, 'ok': True},
       ),
       (

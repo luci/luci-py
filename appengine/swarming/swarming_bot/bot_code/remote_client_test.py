@@ -3,6 +3,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import datetime
 import logging
 import sys
 import threading
@@ -29,7 +30,7 @@ class TestRemoteClient(auto_stub.TestCase):
     headers = {'A': 'a'}
     exp_ts = time.time() + 3600
     c = remote_client.RemoteClientNative(
-        'http://localhost:1', lambda: (headers, exp_ts))
+        'http://localhost:1', lambda: (headers, exp_ts), 'localhost', '/')
     c.initialize(threading.Event())
     self.assertEqual(0, self.slept)
     self.assertTrue(c.uses_auth)
@@ -44,7 +45,8 @@ class TestRemoteClient(auto_stub.TestCase):
       if attempt[0] == 10:
         return headers, exp_ts
       raise Exception('fail')
-    c = remote_client.RemoteClientNative('http://localhost:1', callback)
+    c = remote_client.RemoteClientNative('http://localhost:1', callback,
+                                         'localhost', '/')
     c.initialize(threading.Event())
     self.assertEqual(9*2, self.slept)
     self.assertTrue(c.uses_auth)
@@ -53,18 +55,39 @@ class TestRemoteClient(auto_stub.TestCase):
   def test_initialize_gives_up(self):
     def callback():
       raise Exception('fail')
-    c = remote_client.RemoteClientNative('http://localhost:1', callback)
+    c = remote_client.RemoteClientNative('http://localhost:1', callback,
+                                         'localhost', '/')
     with self.assertRaises(remote_client.InitializationError):
       c.initialize(threading.Event())
     self.assertEqual(29*2, self.slept)
     self.assertFalse(c.uses_auth)
     self.assertEqual({}, c.get_authentication_headers())
 
+  def test_get_headers(self):
+    today = datetime.datetime(2018, 2, 16, 1, 19, 45, 130574)
+    self.mock(remote_client, 'utcnow', lambda: today)
+
+    auth_headers = {'A': 'a'}
+    auth_exp_ts = time.time() + 3600
+
+    c = remote_client.RemoteClientNative(
+        'http://localhost:1',
+        lambda: (auth_headers, auth_exp_ts),
+        'localhost',
+        '/')
+    self.assertTrue(c.uses_auth)
+
+    self.assertEqual({'Cookie': 'GOOGAPPUID=899'}, c.get_headers())
+    self.assertEqual({'A': 'a', 'Cookie': 'GOOGAPPUID=899'},
+                     c.get_headers(include_auth=True))
+
   def test_get_authentication_headers(self):
     self.mock(time, 'time', lambda: 100000)
     c = remote_client.RemoteClientNative(
         'http://localhost:1',
-        lambda: ({'Now': str(time.time())}, time.time() + 3600))
+        lambda: ({'Now': str(time.time())}, time.time() + 3600),
+        'localhost',
+        '/')
 
     # Grab initial headers.
     self.assertEqual({'Now': '100000'}, c.get_authentication_headers())
@@ -84,7 +107,8 @@ class TestRemoteClient(auto_stub.TestCase):
         'expiry': 12345,
     }
 
-    c = remote_client.RemoteClientNative('http://localhost:1', None)
+    c = remote_client.RemoteClientNative('http://localhost:1', None,
+                                         'localhost', '/')
     def mocked_call(url_path, data):
       self.assertEqual('/swarming/api/v1/bot/oauth_token', url_path)
       self.assertEqual({
@@ -100,7 +124,8 @@ class TestRemoteClient(auto_stub.TestCase):
     self.assertEqual(fake_resp, resp)
 
   def test_mint_oauth_token_transient_err(self):
-    c = remote_client.RemoteClientNative('http://localhost:1', None)
+    c = remote_client.RemoteClientNative('http://localhost:1', None,
+                                         'localhost', '/')
     def mocked_call(*_args, **_kwargs):
       return None  # that's how net.url_read_json indicates HTTP 500 :-/
     self.mock(c, '_url_read_json', mocked_call)
@@ -108,7 +133,8 @@ class TestRemoteClient(auto_stub.TestCase):
       c.mint_oauth_token('task_id', 'bot_id', 'account_id', ['a', 'b'])
 
   def test_mint_oauth_token_fatal_err(self):
-    c = remote_client.RemoteClientNative('http://localhost:1', None)
+    c = remote_client.RemoteClientNative('http://localhost:1', None,
+                                         'localhost', '/')
     def mocked_call(*_args, **_kwargs):
       return {'error': 'blah'}
     self.mock(c, '_url_read_json', mocked_call)

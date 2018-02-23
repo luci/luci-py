@@ -1,8 +1,11 @@
+# coding: utf-8
 # Copyright 2016 The LUCI Authors. All rights reserved.
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
 import base64
+import datetime
+import hashlib
 import logging
 import os
 import threading
@@ -42,12 +45,45 @@ AUTH_HEADERS_EXPIRATION_SEC = 4*60+30
 NET_CONNECTION_TIMEOUT_SEC = 3*60
 
 
-def createRemoteClient(server, auth, grpc_proxy):
+def createRemoteClient(server, auth, hostname, work_dir, grpc_proxy):
   grpc_proxy = os.environ.get('SWARMING_GRPC_PROXY', grpc_proxy)
   if grpc_proxy:
     import remote_client_grpc
     return remote_client_grpc.RemoteClientGrpc(grpc_proxy)
-  return RemoteClientNative(server, auth)
+  return RemoteClientNative(server, auth, hostname, work_dir)
+
+
+def utcnow():
+  return datetime.datetime.utcnow()
+
+
+def make_appengine_id(hostname, work_dir):
+  """Generate a value to use in the GOOGAPPUID cookie for AppEngine.
+
+  AppEngine looks for this cookie: if it contains a value in the range 0-999,
+  it is used to split traffic. For more details, see:
+  https://cloud.google.com/appengine/docs/flexible/python/splitting-traffic
+
+  The bot code will send requests with a value generated locally:
+    GOOGAPPUID = sha1('YYYY-MM-DD-hostname:work_dir') % 1000
+  (from go/swarming-release-canaries)
+
+  This scheme should result in the values being roughly uniformly distributed.
+  The date is included in the hash to ensure that across different rollouts,
+  it's not the same set of bots being used as the canary (otherwise we might
+  be unlucky and get a unrepresentative sample).
+
+  Args:
+    hostname: The short hostname of the bot.
+    work_dir: The working directory used by the bot.
+
+  Returns:
+    An integer in the range [0, 999].
+  """
+  s = '%s-%s:%s' % (utcnow().strftime('%Y-%m-%d'), hostname, work_dir)
+  googappuid = int(hashlib.sha1(s).hexdigest(), 16) % 1000
+  logging.debug('GOOGAPPUID = sha1(%s) %% 1000 = %d', s, googappuid)
+  return googappuid
 
 
 class RemoteClientNative(object):
@@ -68,13 +104,15 @@ class RemoteClientNative(object):
   the callback will be called for each request.
   """
 
-  def __init__(self, server, auth_headers_callback):
+  def __init__(self, server, auth_headers_callback, hostname, work_dir):
     self._server = server
     self._auth_headers_callback = auth_headers_callback
     self._lock = threading.Lock()
     self._headers = None
     self._exp_ts = None
     self._disabled = not auth_headers_callback
+    self._bot_hostname = hostname
+    self._bot_work_dir = work_dir
 
   @property
   def server(self):
@@ -117,6 +155,21 @@ class RemoteClientNative(object):
     False.
     """
     return bool(self.get_authentication_headers())
+
+  def get_headers(self, include_auth=False):
+    """Returns the headers to use to send a request.
+
+    Args:
+      include_auth: Whether or not to include authentication headers.
+
+    Returns:
+      A dict of HTTP headers.
+    """
+    googappuid = make_appengine_id(self._bot_hostname, self._bot_work_dir)
+    headers = {'Cookie': 'GOOGAPPUID=%d' % googappuid}
+    if include_auth:
+      headers.update(self.get_authentication_headers())
+    return headers
 
   def get_authentication_headers(self):
     """Returns a dict with the headers, refreshing them if necessary.
@@ -171,7 +224,7 @@ class RemoteClientNative(object):
     return net.url_read_json(
         self._server + url_path,
         data=data,
-        headers=self.get_authentication_headers(),
+        headers=self.get_headers(include_auth=True),
         timeout=NET_CONNECTION_TIMEOUT_SEC,
         follow_redirects=False)
 
@@ -180,7 +233,7 @@ class RemoteClientNative(object):
     return net.url_retrieve(
         filepath,
         self._server + url_path,
-        headers=self.get_authentication_headers(),
+        headers=self.get_headers(include_auth=True),
         timeout=NET_CONNECTION_TIMEOUT_SEC)
 
   def post_bot_event(self, event_type, message, attributes):
