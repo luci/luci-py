@@ -289,6 +289,14 @@ class GitilesTestCase(test_case.TestCase):
     self.assertEqual(loc.treeish, 'refs/heads/treeish')
     self.assertEqual(loc.path, '/path/to/something')
 
+  def test_parse_location_no_treeish(self):
+    url = 'http://localhost/project'
+    loc = gitiles.Location.parse(url)
+    self.assertEqual(loc.hostname, 'localhost')
+    self.assertEqual(loc.project, 'project')
+    self.assertEqual(loc.treeish, 'HEAD')
+    self.assertEqual(loc.path, '/')
+
   def test_parse_refs_heads_master(self):
     url = 'http://localhost/project/+/refs/heads/master/path/to/something'
     loc = gitiles.Location.parse(url)

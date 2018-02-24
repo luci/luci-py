@@ -91,6 +91,7 @@ class Location(LocationTuple):
       project = project[:-len('.git')]
 
     treeish_and_path = (path_match.group(3) or '').strip('/').split('/')
+    treeish_and_path = [] if treeish_and_path == [''] else treeish_and_path
     treeish = treeish_and_path[:]
     if len(treeish) == 1:
       pass
