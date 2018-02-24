@@ -126,10 +126,12 @@ class Location(LocationTuple):
   def parse_resolve(cls, url):
     """Like parse, but supports refs with slashes.
 
+    Does not support refs that start with "refs/heads/master/".
+
     May send a get_refs() request.
     """
     loc = cls.parse(url)
-    if loc.path and loc.path != '/':
+    if loc.path and loc.path != '/' and loc.treeish != 'refs/heads/master':
       # If true ref name contains slash, a prefix of path might be suffix of
       # ref. Try to resolve it.
       refs = get_refs(loc.hostname, loc.project)
