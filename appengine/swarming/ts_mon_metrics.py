@@ -20,8 +20,12 @@ from server import task_result
 # - android_devices is a side effect of the health of each Android devices
 #   connected to the bot.
 # - caches has an unbounded matrix.
+# - server_version is the current server version. It'd be good to have but the
+#   current monitoring pipeline is not adapted for this.
 # - id is unique for each bot.
-_IGNORED_DIMENSIONS = ('android_devices', 'caches', 'id', 'temp_band')
+# - temp_band is android specific.
+_IGNORED_DIMENSIONS = (
+    'android_devices', 'caches', 'id', 'server_version', 'temp_band')
 # Real timeout is 60s, keep it slightly under to bail out early.
 _REQUEST_TIMEOUT_SEC = 50
 # Cap the max number of items per taskqueue task, to keep the total
