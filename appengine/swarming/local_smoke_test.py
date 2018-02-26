@@ -249,7 +249,6 @@ def gen_expected(**kwargs):
     u'name': u'',
     u'outputs': [u'hi\n'],
     u'outputs_ref': None,
-    u'properties_hash': None,
     u'server_versions': [u'1'],
     u'state': 0x70,  # task_result.State.COMPLETED.
     u'tags': [
@@ -671,10 +670,6 @@ class Test(unittest.TestCase):
           u'items_hot': [],
         },
       },
-      # Intentionally hard code the value to ensure it propagated correctly and
-      # is deterministic.
-      properties_hash =
-          u'ac55c98ae1b3351fc57848514380caab846b3ff68643799af389c50e9f23262d',
     )
     task_id = self._run_isolated(
         content, 'idempotent_reuse', ['--idempotent'], expected_summary, {},
@@ -687,7 +682,6 @@ class Test(unittest.TestCase):
     expected_summary[u'cost_saved_usd'] = 0.02
     expected_summary[u'deduped_from'] = task_id[:-1] + '1'
     expected_summary[u'try_number'] = 0
-    expected_summary[u'properties_hash'] = None
     self._run_isolated(
         content, 'idempotent_reuse2', ['--idempotent'], expected_summary, {},
         deduped=True, isolate_content=DEFAULT_ISOLATE_HELLO)

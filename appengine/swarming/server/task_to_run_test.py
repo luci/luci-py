@@ -114,7 +114,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     is new (unseen before) and a GAE task queue was enqueued to process it, 0
     otherwise.
     """
-    task_request.init_new_request(req, True, None)
+    task_request.init_new_request(req, True)
     task_queues.assert_task(req)
     self.assertEqual(nb_task, self.execute_tasks())
     req.key = task_request.new_request_key()

@@ -1087,7 +1087,6 @@ class TasksApiTest(BaseTest):
     entity = task_pack.unpack_result_summary_key(first_id).get()
     entity.modified_ts = now_120
     entity.put()
-    properties_hash = entity.properties_hash.encode('hex')
 
     second = {
       u'bot_dimensions': [
@@ -1169,7 +1168,6 @@ class TasksApiTest(BaseTest):
       },
       u'modified_ts': str_now_120,
       u'name': u'first',
-      u'properties_hash': unicode(properties_hash),
       u'run_id': u'5cee488006611',
       u'server_versions': [u'v1a'],
       u'started_ts': str_now,

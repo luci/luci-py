@@ -461,9 +461,6 @@ class TaskResult(messages.Message):
   modified_ts = message_types.DateTimeField(14)
   # Isolated outputs, if any.
   outputs_ref = messages.MessageField(FilesRef, 15)
-  # Hash of the task request properties, if idempotent. This is leveraged for
-  # task deduplication.
-  properties_hash = messages.StringField(16)
   # Server versions that touched this task.
   server_versions = messages.StringField(17, repeated=True)
   # Time the task started being run by a bot.

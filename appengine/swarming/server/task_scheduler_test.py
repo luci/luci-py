@@ -70,7 +70,7 @@ def gen_request(properties=None, **kwargs):
   }
   args.update(kwargs)
   ret = task_request.TaskRequest(**args)
-  task_request.init_new_request(ret, True, None)
+  task_request.init_new_request(ret, True)
   return ret
 
 
@@ -158,7 +158,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       'modified_ts': self.now,
       'name': u'yay',
       'outputs_ref': None,
-      'properties_hash': None,
       'server_versions': [u'v1a'],
       'started_ts': None,
       'state': State.PENDING,
@@ -249,7 +248,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_bot_reap_task(self):
     request = gen_request()
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     _result_summary = task_scheduler.schedule_request(request, None)
     self._register_bot(self.bot_dimensions)
     actual_request, _, run_result  = task_scheduler.bot_reap_task(
@@ -260,7 +259,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_bot_reap_task_not_enough_time(self):
     request = gen_request()
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     _result_summary = task_scheduler.schedule_request(request, None)
     self._register_bot(self.bot_dimensions)
     actual_request, _, run_result  = task_scheduler.bot_reap_task(
@@ -271,7 +270,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_bot_reap_task_enough_time(self):
     request = gen_request()
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     _result_summary = task_scheduler.schedule_request(request, None)
     self._register_bot(self.bot_dimensions)
     actual_request, _, run_result  = task_scheduler.bot_reap_task(
@@ -330,7 +329,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def _task_ran_successfully(self, nb_task=1):
     """Runs an idempotent task successfully and returns the task_id."""
     request = gen_request(properties={'idempotent': True})
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     result_summary = task_scheduler.schedule_request(request, None)
     self._register_bot(self.bot_dimensions, nb_task=nb_task)
     actual_request, _, run_result = task_scheduler.bot_reap_task(
@@ -361,7 +360,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def _task_deduped(self, new_ts, deduped_from, task_id, nb_task=1, now=None):
     """Runs a task that was deduped."""
     request = gen_request(properties={'idempotent': True})
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     result_summary_1 = task_scheduler.schedule_request(request, None)
     self.assertEqual(None, task_to_run.TaskToRun.query().get().queue_number)
     self._register_bot(self.bot_dimensions, nb_task=nb_task)
@@ -402,7 +401,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # Second task is scheduled, first task is too old to be reused.
     new_ts = self.mock_now(self.now, config.settings().reusable_task_age_secs)
     request = gen_request(properties={'idempotent': True})
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     _result_summary = task_scheduler.schedule_request(request, None)
     self.assertEqual(1, self.execute_tasks())
     # The task was enqueued for execution.
@@ -420,7 +419,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # old.
     new_ts = self.mock_now(self.now, config.settings().reusable_task_age_secs)
     request = gen_request(properties={'idempotent': True})
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     _result_summary = task_scheduler.schedule_request(request, None)
     # The task was enqueued for execution.
     self.assertNotEqual(None, task_to_run.TaskToRun.query().get().queue_number)
@@ -453,7 +452,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # Parent task creates a child task.
     parent_id = self._task_ran_successfully()
     request = gen_request(parent_task_id=parent_id)
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     result_summary = task_scheduler.schedule_request(request, None)
     self.assertEqual([], result_summary.children_task_ids)
     self.assertEqual(parent_id, request.parent_task_id)
@@ -475,7 +474,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             'namespace': 'default-gzip',
           },
         })
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     _result_summary = task_scheduler.schedule_request(request, None)
     self._register_bot(self.bot_dimensions)
     actual_request, _, run_result = task_scheduler.bot_reap_task(
@@ -502,7 +501,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     parent_id = run_result.task_id
     request = gen_request(parent_task_id=parent_id)
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     result_summary = task_scheduler.schedule_request(request, None)
     self.assertEqual([], result_summary.children_task_ids)
     self.assertEqual(parent_id, request.parent_task_id)
@@ -519,7 +518,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     created_ts = self.now
     self.mock_now(created_ts)
     request = gen_request()
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     _result_summary = task_scheduler.schedule_request(request, None)
 
     # The TaskRequest was enqueued, the TaskResultSummary was created but no
@@ -639,7 +638,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_exit_code_failure(self):
     request = gen_request()
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     _result_summary = task_scheduler.schedule_request(request, None)
     self._register_bot(self.bot_dimensions)
     reaped_request, _, run_result = task_scheduler.bot_reap_task(
@@ -789,7 +788,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_bot_update_pubsub_error(self):
     pub_sub_calls = self.mock_pub_sub()
     request = gen_request(pubsub_topic='projects/abc/topics/def')
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     task_scheduler.schedule_request(request, None)
     self._register_bot(self.bot_dimensions)
     _, _, run_result = task_scheduler.bot_reap_task(
@@ -837,7 +836,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def _bot_update_timeouts(self, hard, io):
     request = gen_request()
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     result_summary = task_scheduler.schedule_request(request, None)
     self._register_bot(self.bot_dimensions)
     reaped_request, _, run_result = task_scheduler.bot_reap_task(
@@ -913,7 +912,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_bot_kill_task(self):
     pub_sub_calls = self.mock_pub_sub()
     request = gen_request(pubsub_topic='projects/abc/topics/def')
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     result_summary = task_scheduler.schedule_request(request, None)
     self._register_bot(self.bot_dimensions)
     reaped_request, _, run_result = task_scheduler.bot_reap_task(
@@ -942,7 +941,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_bot_kill_task_wrong_bot(self):
     request = gen_request()
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     result_summary = task_scheduler.schedule_request(request, None)
     self._register_bot(self.bot_dimensions)
     reaped_request, _, run_result = task_scheduler.bot_reap_task(
@@ -956,7 +955,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_cancel_task(self):
     request = gen_request(pubsub_topic='projects/abc/topics/def')
     pub_sub_calls = self.mock_pub_sub()
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     result_summary = task_scheduler.schedule_request(request, None)
     ok, was_running = task_scheduler.cancel_task(request, result_summary.key)
     self.assertEqual(True, ok)
@@ -969,7 +968,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_cancel_task_running(self):
     request = gen_request(pubsub_topic='projects/abc/topics/def')
     pub_sub_calls = self.mock_pub_sub()
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     result_summary = task_scheduler.schedule_request(request, None)
     self._register_bot(self.bot_dimensions)
     reaped_request, _, run_result = task_scheduler.bot_reap_task(
@@ -984,7 +983,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_cron_abort_expired_task_to_run(self):
     request = gen_request(pubsub_topic='projects/abc/topics/def')
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     pub_sub_calls = self.mock_pub_sub()
     result_summary = task_scheduler.schedule_request(request, None)
     abandoned_ts = self.mock_now(self.now, request.expiration_secs+1)
@@ -1009,7 +1008,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         created_ts=now,
         expiration_ts=now+datetime.timedelta(seconds=600),
         pubsub_topic='projects/abc/topics/def')
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     result_summary = task_scheduler.schedule_request(request, None)
 
     # Fake first try bot died.
@@ -1055,7 +1054,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         created_ts=now,
         expiration_ts=now+datetime.timedelta(seconds=600),
         pubsub_topic='projects/abc/topics/def')
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     _result_summary = task_scheduler.schedule_request(request, None)
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(0, len(pub_sub_calls))
@@ -1124,7 +1123,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         exit_code=0,
         id='1d69b9f088008910',
         modified_ts=now_2,
-        properties_hash=request.properties_hash.encode('hex'),
         started_ts=now_2,
         state=task_result.State.COMPLETED,
         try_number=2)
@@ -1145,7 +1143,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         created_ts=now,
         expiration_ts=now+datetime.timedelta(seconds=600),
         pubsub_topic='projects/abc/topics/def')
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     _result_summary = task_scheduler.schedule_request(request, None)
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(0, len(pub_sub_calls))
@@ -1272,7 +1270,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         properties={'idempotent': True},
         created_ts=now,
         expiration_ts=now+datetime.timedelta(seconds=600))
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     _result_summary = task_scheduler.schedule_request(request, None)
     self._register_bot(self.bot_dimensions)
     _request, _, run_result = task_scheduler.bot_reap_task(
@@ -1317,7 +1315,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         properties={'idempotent': True},
         created_ts=now,
         expiration_ts=now+datetime.timedelta(seconds=600))
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     _result_summary = task_scheduler.schedule_request(request, None)
     self._register_bot(self.bot_dimensions)
     _request, _, run_result = task_scheduler.bot_reap_task(
@@ -1356,7 +1354,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     now = utils.utcnow()
     request = gen_request(
         created_ts=now, expiration_ts=now+datetime.timedelta(seconds=600))
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     _result_summary = task_scheduler.schedule_request(request, None)
     self._register_bot(self.bot_dimensions)
     _request, _, run_result = task_scheduler.bot_reap_task(

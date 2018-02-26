@@ -785,10 +785,6 @@ class TaskRequest(ndb.Model):
   pubsub_userdata = ndb.StringProperty(
       indexed=False, validator=_get_validate_length(1024))
 
-  # This stores the computed properties_hash for this Task's properties object.
-  # It is set in init_new_request. It is None for non-idempotent tasks.
-  properties_hash = ndb.BlobProperty(indexed=False)
-
   @property
   def secret_bytes_key(self):
     if self.properties.has_secret_bytes:
@@ -805,15 +801,31 @@ class TaskRequest(ndb.Model):
     """Reconstructs this value from expiration_ts and created_ts. Integer."""
     return int((self.expiration_ts - self.created_ts).total_seconds())
 
+  def properties_hash(self):
+    """Calculates the properties_hash for this request, if applicable.
+
+    Note: if the property has secret bytes, this function call causes a DB GET.
+    """
+    if not self.properties.idempotent:
+      return None
+    props = self.properties.to_dict()
+    k = self.secret_bytes_key
+    if k:
+      # When called from task_scheduler.schedule_task(), this function is called
+      # in the same context that stored the SecretBytes entity, so the entity is
+      # still in the in process cache.
+      #
+      # When called in the context of an idempotent TaskRunResult that is
+      # COMPLETED with success, this is much more costly since this happens
+      # inside a transaction.
+      props['secret_bytes'] = k.get().secret_bytes.encode('hex')
+    return self.HASHING_ALGO(utils.encode_to_json(props)).digest()
+
   def to_dict(self):
-    """Converts properties_hash to hex so it is json serializable."""
     # to_dict() doesn't recurse correctly into ndb.LocalStructuredProperty!
     out = super(TaskRequest, self).to_dict(
         exclude=['pubsub_auth_token', 'properties', 'service_account_token'])
     out['properties'] = self.properties.to_dict()
-    properties_hash = out['properties_hash']
-    out['properties_hash'] = (
-        properties_hash.encode('hex') if properties_hash else None)
     return out
 
   def _pre_put_hook(self):
@@ -885,7 +897,7 @@ def create_termination_task(bot_id):
       properties=properties,
       tags=[u'terminate:1'])
   assert request.properties.is_terminate
-  init_new_request(request, True, None)
+  init_new_request(request, True)
   return request
 
 
@@ -988,7 +1000,7 @@ def validate_request_key(request_key):
             root_entity_shard_id))
 
 
-def init_new_request(request, allow_high_priority, secret_bytes_ent):
+def init_new_request(request, allow_high_priority):
   """Initializes a new TaskRequest but doesn't store it.
 
   ACL check must have been done before, except for high priority task.
@@ -1039,15 +1051,6 @@ def init_new_request(request, allow_high_priority, secret_bytes_ent):
   # This is useful to categorize the task.
   tags = set(request.tags).union(_get_automatic_tags(request))
   request.tags = sorted(tags)
-
-  if request.properties.idempotent:
-    props = request.properties.to_dict()
-    if secret_bytes_ent is not None:
-      props['secret_bytes'] = secret_bytes_ent.secret_bytes.encode('hex')
-    request.properties_hash = request.HASHING_ALGO(
-        utils.encode_to_json(props)).digest()
-  else:
-    request.properties_hash = None
 
 
 def validate_priority(priority):

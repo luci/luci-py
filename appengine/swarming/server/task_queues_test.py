@@ -87,7 +87,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
 
   def _assert_task(self, tasks=1):
     request = _gen_request()
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     task_queues.assert_task(request)
     self.assertEqual(tasks, self.execute_tasks())
     return request
@@ -239,7 +239,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     # in this case, rebuild_task_cache() is called inlined.
     _assert_bot()
     request = _gen_request(properties={u'dimensions': {u'id': [u'bot1']}})
-    task_request.init_new_request(request, True, None)
+    task_request.init_new_request(request, True)
     task_queues.assert_task(request)
     self.assertEqual(0, self.execute_tasks())
     self.assert_count(1, bot_management.BotInfo)

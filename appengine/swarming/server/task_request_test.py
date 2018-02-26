@@ -29,14 +29,13 @@ from server import task_request
 def mkreq(req, secret_bytes=None):
   # This function fits the old style where TaskRequest was stored first, before
   # TaskToRun and TaskResultSummary.
-  sb = None
   if secret_bytes is not None:
     req.properties.has_secret_bytes = True
-    sb = task_request.SecretBytes(secret_bytes=secret_bytes)
-  task_request.init_new_request(req, True, sb)
+  task_request.init_new_request(req, True)
   req.key = task_request.new_request_key()
   req.put()
-  if sb:
+  if secret_bytes is not None:
+    sb = task_request.SecretBytes(secret_bytes=secret_bytes)
     sb.key = req.secret_bytes_key
     sb.put()
   return req
@@ -279,10 +278,6 @@ class TaskRequestApiTest(TestCase):
       'parent_task_id': unicode(parent_id),
       'priority': 49,
       'properties': expected_properties,
-      # Intentionally hard code the hash value since it has to be deterministic.
-      # Other unit tests should use the calculated value.
-      'properties_hash':
-          'aa33c679b3ee30e37b9724d79a9d20bc767475c00e7f659b6191508f6b16f1ab',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'service_account': u'none',
@@ -302,6 +297,11 @@ class TaskRequestApiTest(TestCase):
     actual.pop('expiration_ts')
     self.assertEqual(expected_request, actual)
     self.assertEqual(30, request.expiration_secs)
+    # Intentionally hard code the hash value since it has to be deterministic.
+    # Other unit tests should use the calculated value.
+    self.assertEqual(
+        'aa33c679b3ee30e37b9724d79a9d20bc767475c00e7f659b6191508f6b16f1ab',
+        request.properties_hash().encode('hex'))
 
   def test_init_new_request_isolated(self):
     parent = mkreq(_gen_request(properties={
@@ -360,10 +360,6 @@ class TaskRequestApiTest(TestCase):
       'parent_task_id': unicode(parent_id),
       'priority': 49,
       'properties': expected_properties,
-      # Intentionally hard code the hash value since it has to be deterministic.
-      # Other unit tests should use the calculated value.
-      'properties_hash':
-          '121c6bd6216a4cc9c4302a52da6292e5a240807ef13ace6f7f36a0c83aec6f55',
       'pubsub_topic': None,
       'pubsub_userdata': None,
       'service_account': u'none',
@@ -384,6 +380,11 @@ class TaskRequestApiTest(TestCase):
     actual.pop('expiration_ts')
     self.assertEqual(expected_request, actual)
     self.assertEqual(30, request.expiration_secs)
+    # Intentionally hard code the hash value since it has to be deterministic.
+    # Other unit tests should use the calculated value.
+    self.assertEqual(
+        '121c6bd6216a4cc9c4302a52da6292e5a240807ef13ace6f7f36a0c83aec6f55',
+        request.properties_hash().encode('hex'))
 
   def test_init_new_request_parent(self):
     parent = mkreq(_gen_request())
@@ -406,7 +407,7 @@ class TaskRequestApiTest(TestCase):
     # Ensure the algorithm is deterministic.
     self.assertEqual(
         '58b6b8966199b901406b82ed15b23b7070cbf6ea8cba237838911939b387b4c6',
-        as_dict['properties_hash'])
+        request.properties_hash().encode('hex'))
 
   def test_init_new_request_bot_service_account(self):
     request = mkreq(_gen_request(service_account='bot'))
@@ -427,9 +428,9 @@ class TaskRequestApiTest(TestCase):
         tags=['tag:2'],
         properties=dict(idempotent=True)))
     self.assertEqual(
-        request_1.properties_hash,
-        request_2.properties_hash)
-    self.assertTrue(request_1.properties_hash)
+        request_1.properties_hash(),
+        request_2.properties_hash())
+    self.assertTrue(request_1.properties_hash())
 
   def test_different(self):
     # Two TestRequest with different properties.
@@ -438,8 +439,8 @@ class TaskRequestApiTest(TestCase):
     request_2 = mkreq(_gen_request(
         properties=dict(execution_timeout_secs=129, idempotent=True)))
     self.assertNotEqual(
-        request_1.properties_hash,
-        request_2.properties_hash)
+        request_1.properties_hash(),
+        request_2.properties_hash())
 
   def test_bad_values(self):
     with self.assertRaises(AssertionError):

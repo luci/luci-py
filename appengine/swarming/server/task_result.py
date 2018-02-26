@@ -618,8 +618,8 @@ class _TaskResultCommon(ndb.Model):
   def to_string(self):
     return state_to_string(self)
 
-  def to_dict(self):
-    out = super(_TaskResultCommon, self).to_dict()
+  def to_dict(self, **kwargs):
+    out = super(_TaskResultCommon, self).to_dict(**kwargs)
     # stdout_chunks is an implementation detail.
     out.pop('stdout_chunks')
     out['id'] = self.task_id
@@ -888,6 +888,7 @@ class TaskResultSummary(_TaskResultCommon):
     If the task completed, succeeded and is idempotent, self.properties_hash is
     set.
     """
+    assert ndb.in_transaction()
     assert isinstance(run_result, TaskRunResult), run_result
     for property_name in _TaskResultCommon._properties_fixed():
       setattr(self, property_name, getattr(run_result, property_name))
@@ -907,17 +908,9 @@ class TaskResultSummary(_TaskResultCommon):
         not self.internal_failure and
         request.properties.idempotent and
         not self.deduped_from):
-      # Signal the results are valid and can be reused.
-      phash = request.properties_hash
-      if phash is None:
-        # TODO(iannucci): Remove this 24 hours after addition.
-        # this was triggered on the older schema where properties_hash was
-        # dynamically calculated on every use, and so its value in the db is
-        # None. Recalculate it here to smooth the transition.
-        phash = request.HASHING_ALGO(
-          utils.encode_to_json(request.properties)).digest()
-      self.properties_hash = phash
-      assert self.properties_hash
+      # Signal the results are valid and can be reused. If the request has a
+      # SecretBytes, it is GET, which is a performance concern.
+      self.properties_hash = request.properties_hash()
 
   def need_update_from_run_result(self, run_result):
     """Returns True if set_from_run_result() would modify this instance.
@@ -943,10 +936,7 @@ class TaskResultSummary(_TaskResultCommon):
         self.try_number != run_result.try_number)
 
   def to_dict(self):
-    out = super(TaskResultSummary, self).to_dict()
-    if out['properties_hash']:
-      out['properties_hash'] = out['properties_hash'].encode('hex')
-    return out
+    return super(TaskResultSummary, self).to_dict(exclude=['properties_hash'])
 
 
 class TagValues(ndb.Model):

@@ -387,7 +387,7 @@ class SwarmingTasksService(remote.Service):
           request, utils.utcnow())
       apply_property_defaults(request_obj.properties)
       task_request.init_new_request(
-          request_obj, acl.can_schedule_high_priority_tasks(), secret_bytes)
+          request_obj, acl.can_schedule_high_priority_tasks())
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
 

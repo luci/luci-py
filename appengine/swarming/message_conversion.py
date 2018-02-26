@@ -214,8 +214,6 @@ def new_task_request_from_rpc(msg, now):
       # It is set in task_request.init_new_request().
       authenticated=None,
       properties=properties,
-      # It is set in task_request.init_new_request().
-      properties_hash=None,
       # This is internal field not settable via RPC.
       service_account_token=None)
 
@@ -264,15 +262,11 @@ def task_result_to_rpc(entity, send_stats):
     kwargs['costs_usd'] = []
     if entity.cost_usd is not None:
       kwargs['costs_usd'].append(entity.cost_usd)
-    kwargs['properties_hash'] = None
     kwargs['tags'] = []
     kwargs['user'] = None
     kwargs['run_id'] = entity.task_id
   else:
     assert entity.__class__ is task_result.TaskResultSummary, entity
-    kwargs['properties_hash'] = (
-        entity.properties_hash.encode('hex')
-        if entity.properties_hash else None)
     # This returns the right value for deduped tasks too.
     k = entity.run_result_key
     kwargs['run_id'] = task_pack.pack_run_result_key(k) if k else None
