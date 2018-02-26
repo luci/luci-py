@@ -94,14 +94,15 @@ def process_headers(context, headers):
   context.timeout = _parse_timeout(timeout_header)
 
   for header, value in headers.iteritems():
-    if header.endswith('-Bin'):
+    header = header.lower()
+    if header.startswith('x-prpc-'):
+      continue
+    if header.endswith('-bin'):
       try:
         value = base64.b64decode(value)
       except TypeError:
         raise ValueError('Received invalid base64 string in header %s' % header)
-      header = header[:-len('-Bin')]
-    if header in context.invocation_metadata:
-      raise ValueError('Received multiple values for header %s' % header)
-    context.invocation_metadata[header] = value
+      header = header[:-len('-bin')]
+    context.invocation_metadata.append((header, value))
 
   return content_type, accept

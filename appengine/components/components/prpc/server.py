@@ -22,31 +22,15 @@ from google.protobuf import symbol_database
 # Helpers are in separate modules so this one exposes only the public interface.
 from components.prpc import encoding, headers
 from components.prpc.context import ServicerContext
+from components.prpc.codes import StatusCode
 
-__all__ = ['Server', 'StatusCode']
+__all__ = [
+  'HandlerCallDetails',
+  'Server',
+  'StatusCode',
+]
 
 # pylint: disable=pointless-string-statement
-
-class StatusCode(object):
-  """Mirrors grpc_status_code in the gRPC Core."""
-  OK                  = (0, 'ok')
-  CANCELLED           = (1, 'cancelled')
-  UNKNOWN             = (2, 'unknown')
-  INVALID_ARGUMENT    = (3, 'invalid argument')
-  DEADLINE_EXCEEDED   = (4, 'deadline exceeded')
-  NOT_FOUND           = (5, 'not found')
-  ALREADY_EXISTS      = (6, 'already exists')
-  PERMISSION_DENIED   = (7, 'permission denied')
-  RESOURCE_EXHAUSTED  = (8, 'resource exhausted')
-  FAILED_PRECONDITION = (9, 'failed precondition')
-  ABORTED             = (10, 'aborted')
-  OUT_OF_RANGE        = (11, 'out of range')
-  UNIMPLEMENTED       = (12, 'unimplemented')
-  INTERNAL            = (13, 'internal error')
-  UNAVAILABLE         = (14, 'unavailable')
-  DATA_LOSS           = (15, 'data loss')
-  UNAUTHENTICATED     = (16, 'unauthenticated')
-
 
 _PRPC_TO_HTTP_STATUS = {
   StatusCode.OK: httplib.OK,
@@ -69,15 +53,44 @@ _PRPC_TO_HTTP_STATUS = {
 _Service = collections.namedtuple('_Service', ['description', 'methods'])
 
 
+# Details about the RPC call passed to the interceptors.
+HandlerCallDetails = collections.namedtuple('HandlerCallDetails', [
+  'method',               # full method name <service>.<method>
+  'invocation_metadata',  # (k, v) pairs list with metadata sent by the client
+])
+
+
 class Server(object):
   """Server represents a pRPC server that handles a set of services.
 
-  Server is intended to mimic gRPC's Server as an abstraction, but provides
-  a simpler interface via add_service and get_routes.
+  Server is intended to vaguely mimic gRPC's Server as an abstraction, but
+  provides a simpler interface via add_service and get_routes.
   """
 
   def __init__(self):
     self._services = {}
+    self._interceptors = ()
+
+  def add_interceptor(self, interceptor):
+    """Adds an interceptor to the interceptor chain.
+
+    Interceptors can be used to examine or modify requests before they reach
+    the real handlers. The API is vaguely similar to grpc.ServerInterceptor.
+
+    An interceptor is a callback that accepts following arguments:
+      request: deserialized request message.
+      context: an instance of ServicerContext.
+      call_details: an instance of HandlerCallDetails.
+      continuation: a callback that resumes the processing, accepts
+        (request, context, call_details).
+
+    An interceptor may decide NOT to call the continuation if it handles the
+    request itself.
+
+    Args:
+      interceptor: an interceptor callback to add to the chain.
+    """
+    self._interceptors = self._interceptors + (interceptor,)
 
   def add_service(self, servicer):
     """Registers a servicer for a service with the server.
@@ -212,10 +225,15 @@ class Server(object):
           context.set_details('Error parsing request')
           return None, None
 
+        call_details = HandlerCallDetails(
+            method='%s.%s' % (service, method),
+            invocation_metadata=context.invocation_metadata)
+
         try:
           # TODO(nodir,mknyszek): Poll for context to hit timeout or be
           # canceled.
-          response = handler(request, context)
+          response = server._run_interceptors(
+              request, context, call_details, handler, 0)
         except Exception:
           logging.exception('Service implementation threw an exception')
           context.set_code(StatusCode.INTERNAL)
@@ -223,6 +241,10 @@ class Server(object):
           return None, None
 
         if response is None:
+          if context.code == StatusCode.OK:
+            context.set_code(StatusCode.INTERNAL)
+            context.set_details(
+                'Service implementation didn\'t return a response')
           return None, None
 
         if not isinstance(response, response_message):
@@ -256,3 +278,25 @@ class Server(object):
           self.response.headers['Access-Control-Max-Age'] = '600'
 
     return Handler
+
+  def _run_interceptors(self, request, context, call_details, handler, idx):
+    """Runs the request via interceptors chain starting from given index.
+
+    Args:
+      request: deserialized request proto.
+      context: a context.ServicerContext.
+      handler: a final handler, given as callback (request, context): response.
+      idx: an index in the interceptor chain to start from.
+
+    Returns:
+      Response message.
+    """
+    if idx == len(self._interceptors):
+      return handler(request, context)
+
+    def continuation(request, context, call_details):
+      return self._run_interceptors(
+          request, context, call_details, handler, idx+1)
+
+    interceptor = self._interceptors[idx]
+    return interceptor(request, context, call_details, continuation)

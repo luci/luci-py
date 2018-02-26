@@ -4,6 +4,7 @@
 # that can be found in the LICENSE file.
 
 import base64
+import collections
 import sys
 import unittest
 
@@ -24,7 +25,8 @@ class PRPCHeadersTestCase(test_case.TestCase):
   def process_headers(self, h, expect_content_type=None,
                       expect_accept=None):
     ctx = context.ServicerContext()
-    content_type, accept = headers.process_headers(ctx, h)
+    content_type, accept = headers.process_headers(
+        ctx, collections.OrderedDict(h))
     if expect_content_type is not None:
       self.assertEqual(content_type, expect_content_type)
     if expect_accept is not None:
@@ -32,28 +34,28 @@ class PRPCHeadersTestCase(test_case.TestCase):
     return ctx
 
   def test_no_header(self):
-    self.process_headers({})
+    self.process_headers([])
 
   def test_header_bad_content_type(self):
     with self.assertRaises(ValueError):
-      self.process_headers({
-        'Content-Type': 'www/urlencoded'
-      })
+      self.process_headers([
+        ('Content-Type', 'www/urlencoded'),
+      ])
 
   def test_process_headers_encodings(self):
     check_known_encodings = lambda e: self.process_headers(
-        {'Accept': e[1]},
+        [('Accept', e[1])],
         expect_accept=e,
     )
     check_known_encodings(encoding.Encoding.JSON)
     check_known_encodings(encoding.Encoding.TEXT)
     check_known_encodings(encoding.Encoding.BINARY)
     self.process_headers(
-        {'Accept': 'application/json'},
+        [('Accept', 'application/json')],
         expect_accept=encoding.Encoding.JSON,
     )
     self.process_headers(
-        {'Accept': '*/*'},
+        [('Accept', '*/*')],
         expect_accept=encoding.Encoding.BINARY,
     )
 
@@ -61,10 +63,10 @@ class PRPCHeadersTestCase(test_case.TestCase):
   def test_process_headers_timeout(self):
     check_timeout = lambda t, n: self.assertEqual(
         self.process_headers(
-            {
-              'Accept': encoding.Encoding.JSON[1],
-              'X-Prpc-Timeout': t,
-            },
+            [
+              ('Accept', encoding.Encoding.JSON[1]),
+              ('X-Prpc-Timeout', t),
+            ],
             expect_accept=encoding.Encoding.JSON,
         ).timeout,
         n,
@@ -76,55 +78,59 @@ class PRPCHeadersTestCase(test_case.TestCase):
     check_timeout('92u', 92*1e-6)
     check_timeout('56n', 56*1e-9)
     with self.assertRaises(ValueError):
-      self.process_headers({
-        'Accept': encoding.Encoding.JSON[1],
-        'X-Prpc-Timeout': '222222',
-      })
+      self.process_headers([
+        ('Accept', encoding.Encoding.JSON[1]),
+        ('X-Prpc-Timeout', '222222'),
+      ])
 
   def test_process_headers_content_type(self):
     self.process_headers(
-        {
-          'Accept': encoding.Encoding.TEXT[1],
-          'Content-Type': 'application/json',
-        },
+        [
+          ('Accept', encoding.Encoding.TEXT[1]),
+          ('Content-Type', 'application/json'),
+        ],
         expect_accept=encoding.Encoding.TEXT,
         expect_content_type=encoding.Encoding.JSON,
     )
     self.process_headers(
-        {
-          'Accept': encoding.Encoding.JSON[1],
-          'Content_Type': encoding.Encoding.BINARY[1],
-        },
+        [
+          ('Accept', encoding.Encoding.JSON[1]),
+          ('Content_Type', encoding.Encoding.BINARY[1]),
+        ],
         expect_accept=encoding.Encoding.JSON,
         expect_content_type=encoding.Encoding.BINARY,
     )
 
   def test_process_headers_metadata(self):
     ctx = self.process_headers(
-        {
-          'Accept': encoding.Encoding.JSON[1],
-          'What-Bin': base64.b64encode('haha'),
-          'Uhhhhh-Bin': base64.b64encode('lol'),
-        },
+        [
+          ('Accept', encoding.Encoding.JSON[1]),
+          ('X-Prpc-Timeout', '1m'),    # skipped from metadata
+          ('X-Prpc-Future-Option', 'zzz'),  # same
+          ('What-Bin', base64.b64encode('haha')),
+          ('What', 'dup is ok'),
+          ('Uhhhhh-Bin', base64.b64encode('lol')),
+        ],
         expect_accept=encoding.Encoding.JSON,
     )
-    self.assertEqual(ctx.invocation_metadata, {
-        'Accept': encoding.Encoding.JSON[1],
-        'What': 'haha',
-        'Uhhhhh': 'lol',
-    })
+    self.assertEqual(ctx.invocation_metadata, [
+        ('accept', encoding.Encoding.JSON[1]),
+        ('what', 'haha'),
+        ('what', 'dup is ok'),
+        ('uhhhhh', 'lol'),
+    ])
     with self.assertRaises(ValueError):
-      self.process_headers({
-        'Accept': encoding.Encoding.JSON[1],
-        'What': 'haha',
-        'What-Bin': 'lol',
-      })
+      self.process_headers([
+        ('Accept', encoding.Encoding.JSON[1]),
+        ('What', 'haha'),
+        ('What-Bin', 'lol'),
+      ])
 
     with self.assertRaises(ValueError):
-      self.process_headers({
-        'Accept': encoding.Encoding.JSON[1],
-        'What-Bin': 'asdfs=',
-      })
+      self.process_headers([
+        ('Accept', encoding.Encoding.JSON[1]),
+        ('What-Bin', 'asdfs='),
+      ])
 
 
 if __name__ == '__main__':

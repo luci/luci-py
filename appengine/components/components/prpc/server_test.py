@@ -3,7 +3,10 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+# pylint: disable=unused-argument
+
 import httplib
+import json
 import sys
 import unittest
 
@@ -30,7 +33,7 @@ class TestServicer(object):
 
   def __init__(self):
     self.given = None
-
+    self.echoed = None
 
   def Give(self, request, _context):
     self.given = request.m
@@ -42,6 +45,7 @@ class TestServicer(object):
 
 
   def Echo(self, request, _context):
+    self.echoed = request
     return test_pb2.EchoResponse(response=['hello!', str(request.r.m)])
 
 
@@ -60,7 +64,7 @@ class BadTestServicer(object):
 
 
   def Echo(self, request, _context):
-    return request
+    return None  # no respose and no status code
 
 
 class PRPCServerTestCase(test_case.TestCase):
@@ -220,6 +224,16 @@ class PRPCServerTestCase(test_case.TestCase):
     self.assertEqual(resp.status_int, httplib.INTERNAL_SERVER_ERROR)
     self.check_headers(resp.headers, server.StatusCode.INTERNAL)
 
+    req = test_pb2.EchoRequest()
+    resp = self.bad_app.post(
+        '/prpc/test.Test/Echo',
+        req.SerializeToString(),
+        self.make_headers(encoding.Encoding.BINARY),
+        expect_errors=True,
+    )
+    self.assertEqual(resp.status_int, httplib.INTERNAL_SERVER_ERROR)
+    self.check_headers(resp.headers, server.StatusCode.INTERNAL)
+
   def test_bad_request(self):
     """Make sure the server handles a malformed request."""
 
@@ -231,6 +245,107 @@ class PRPCServerTestCase(test_case.TestCase):
     )
     self.assertEqual(resp.status_int, httplib.BAD_REQUEST)
     self.check_headers(resp.headers, server.StatusCode.INVALID_ARGUMENT)
+
+
+class InterceptorsTestCase(test_case.TestCase):
+  def make_test_server_app(self, servicer, interceptors):
+    s = server.Server()
+    s.add_service(servicer)
+    for interceptor in interceptors:
+      s.add_interceptor(interceptor)
+    app = webapp2.WSGIApplication(s.get_routes(), debug=True)
+    return webtest.TestApp(app, extra_environ={'REMOTE_ADDR': 'fake-ip'})
+
+  def call_echo(self, app, m, headers=None, return_raw_resp=False):
+    headers = dict(headers or {})
+    headers.update({
+      'Content-Type': encoding.Encoding.JSON[1],
+      'Accept': encoding.Encoding.JSON[1],
+    })
+    raw_resp = app.post(
+        '/prpc/test.Test/Echo',
+        json.dumps({'r': {'m': m}}),
+        headers,
+        expect_errors=True)
+    if return_raw_resp:
+      return raw_resp
+    return json.loads(raw_resp.body[4:])
+
+  def test_no_interceptors(self):
+    s = TestServicer()
+    app = self.make_test_server_app(s, [])
+    resp = self.call_echo(app, 123)
+    self.assertEqual(resp, {u'response': [u'hello!', u'123']}, )
+    self.assertEqual(s.echoed.r.m, 123)
+
+  def test_single_noop_interceptor(self):
+    calls = []
+
+    def interceptor(request, context, details, cont):
+      calls.append((request, details))
+      return cont(request, context, details)
+
+    s = TestServicer()
+    app = self.make_test_server_app(s, [interceptor])
+    resp = self.call_echo(app, 123, headers={'Authorization': 'x'})
+    self.assertEqual(resp, {u'response': [u'hello!', u'123']}, )
+    self.assertEqual(s.echoed.r.m, 123)
+
+    # Interceptor called and saw relevant metadata.
+    self.assertEqual(len(calls), 1)
+    req, details = calls[0]
+
+    self.assertEqual(req, test_pb2.EchoRequest(r=test_pb2.GiveRequest(m=123)))
+    self.assertEqual(details.method, 'test.Test.Echo')
+    self.assertEqual(dict(details.invocation_metadata)['authorization'], 'x')
+
+  def test_interceptor_replies(self):
+    def interceptor(request, context, details, cont):
+      return test_pb2.EchoResponse(response=['intercepted!', str(request.r.m)])
+
+    s = TestServicer()
+    app = self.make_test_server_app(s, [interceptor])
+    resp = self.call_echo(app, 123)
+    self.assertEqual(resp, {u'response': [u'intercepted!', u'123']}, )
+    self.assertIsNone(s.echoed)
+
+  def test_interceptor_chain(self):
+    calls = []
+
+    def make(name):
+      def interceptor(request, context, details, cont):
+        calls.append(name)
+        return cont(request, context, details)
+      return interceptor
+
+    s = TestServicer()
+    app = self.make_test_server_app(s, [make(1), make(2), make(3)])
+    resp = self.call_echo(app, 123)
+    self.assertEqual(resp, {u'response': [u'hello!', u'123']}, )
+    self.assertEqual(s.echoed.r.m, 123)
+
+    # Interceptors are called in correct order.
+    self.assertEqual(calls, [1, 2, 3])
+
+  def test_interceptor_exceptions(self):
+    class Error(Exception):
+      pass
+
+    def outter(request, context, details, cont):
+      try:
+        return cont(request, context, details)
+      except Error as exc:
+        context.set_code(server.StatusCode.PERMISSION_DENIED)
+        context.set_details(exc.message)
+
+    def inner(request, context, details, cont):
+      raise Error('FAIL')
+
+    s = TestServicer()
+    app = self.make_test_server_app(s, [outter, inner])
+    resp = self.call_echo(app, 123, return_raw_resp=True)
+    self.assertEqual(resp.status_int, 403)
+    self.assertTrue('FAIL' in resp.body)
 
 
 if __name__ == '__main__':
