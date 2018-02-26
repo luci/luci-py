@@ -37,6 +37,7 @@ def ip_from_string(ipstr):
 
   Raises ValueError if |ipstr| is not recognized as IPv4 or IPv6 address.
   """
+  assert isinstance(ipstr, basestring), '%r is not a string' % (ipstr,)
   values = None
   try:
     if '.' in ipstr:

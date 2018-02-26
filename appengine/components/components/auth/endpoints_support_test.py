@@ -142,13 +142,6 @@ class EndpointsAuthTest(test_case.TestCase):
     with self.assertRaises(api.AuthorizationError):
       call(tok + 'blah')
 
-    # Transient error.
-    def mocked_check(*_args):
-      raise delegation.TransientError('Blah')
-    self.mock(delegation, 'check_bearer_delegation_token', mocked_check)
-    with self.assertRaises(endpoints.InternalServerErrorException):
-      call(tok)
-
 
 @endpoints.api(name='testing', version='v1')
 class TestingServiceApi(remote.Service):

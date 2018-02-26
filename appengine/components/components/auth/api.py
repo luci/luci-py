@@ -556,12 +556,13 @@ class AuthDB(object):
     This check is used to restrict some callers to particular IP subnets as
     additional security measure.
 
-    Raises AuthorizationError if identity has an IP whitelist assigned and given
-    IP address doesn't belong to it.
-
     Args:
       identity: caller's identity.
       ip: instance of ipaddr.IP.
+
+    Raises:
+      AuthorizationError if identity has an IP whitelist assigned and given IP
+      address doesn't belong to it.
     """
     assert isinstance(identity, model.Identity), identity
 
@@ -1473,12 +1474,13 @@ def verify_ip_whitelisted(identity, ip):
   This check is used to restrict some callers to particular IP subnets as
   additional security measure.
 
-  Raises AuthorizationError if identity has an IP whitelist assigned and given
-  IP address doesn't belong to it.
-
   Args:
     identity: caller's identity.
     ip: instance of ipaddr.IP.
+
+  Raises:
+    AuthorizationError if identity has an IP whitelist assigned and given IP
+    address doesn't belong to it.
   """
   get_request_cache().auth_db.verify_ip_whitelisted(identity, ip)
 

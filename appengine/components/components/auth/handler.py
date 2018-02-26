@@ -16,6 +16,7 @@ import webapp2
 from google.appengine.api import users
 
 from . import api
+from . import check
 from . import config
 from . import delegation
 from . import ipaddr
@@ -124,12 +125,12 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     if self.frame_options:
       self.response.headers['X-Frame-Options'] = self.frame_options
 
-    identity = None
+    peer_identity = None
     is_superuser = False
     for method_func in self.get_auth_methods(conf):
       try:
-        identity, is_superuser = method_func(self.request)
-        if identity:
+        peer_identity, is_superuser = method_func(self.request)
+        if peer_identity:
           break
       except api.AuthenticationError as err:
         self.authentication_error(err)
@@ -142,64 +143,29 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     self.auth_method = method_func
 
     # If no authentication method is applicable, default to anonymous identity.
-    if not identity:
-      identity = model.Anonymous
+    if not peer_identity:
+      peer_identity = model.Anonymous
       is_superuser = False
 
-    # XSRF token is required only if using Cookie based or IP whitelist auth.
-    # A browser doesn't send Authorization: 'Bearer ...' or any other headers
-    # by itself. So XSRF check is not required if header based authentication
-    # is used.
-    using_headers_auth = method_func in (
-        oauth_authentication, service_to_service_authentication)
-
-    assert self.request.remote_addr
-    ip = ipaddr.ip_from_string(self.request.remote_addr)
-    ctx.peer_ip = ip
-
-    # Hack to allow pure IP-whitelist based authentication for bots, until they
-    # are switched to use something better.
-    #
-    # TODO(vadimsh): Get rid of this. Blocked on Swarming and Isolate switching
-    # to service accounts.
-    if self.use_bots_ip_whitelist:
-      if (identity.is_anonymous and
-          api.is_in_ip_whitelist(model.bots_ip_whitelist(), ip, False)):
-        identity = model.IP_WHITELISTED_BOT_ID
-
-    ctx.peer_identity = identity
-
-    # Verify the caller is allowed to make calls from the given IP. It raises
-    # AuthorizationError if IP is not allowed.
     try:
-      api.verify_ip_whitelisted(identity, ip)
-    except api.AuthorizationError as err:
-      self.authorization_error(err)
-      return
+      # Verify the caller is allowed to make calls from the given IP and use the
+      # delegation token (if any). It raises AuthorizationError if something is
+      # not allowed. Populates auth context fields.
+      check.check_request(
+          ctx=ctx,
+          peer_identity=peer_identity,
+          peer_ip=ipaddr.ip_from_string(self.request.remote_addr),
+          is_superuser=is_superuser,
+          delegation_token=self.request.headers.get(delegation.HTTP_HEADER),
+          use_bots_ip_whitelist=self.use_bots_ip_whitelist)
 
-    # Parse delegation token, if given, to deduce end-user identity. We clear
-    # 'is_superuser' bit if delegation is used, since it no longer applies to
-    # delegated identity.
-    delegation_tok = self.request.headers.get(delegation.HTTP_HEADER)
-    if delegation_tok:
-      try:
-        ident, unwrapped_tok = delegation.check_bearer_delegation_token(
-            delegation_tok, ctx.peer_identity)
-        ctx.current_identity = ident
-        ctx.delegation_token = unwrapped_tok
-        ctx.is_superuser = False
-      except delegation.BadTokenError as exc:
-        self.authorization_error(
-            api.AuthorizationError('Bad delegation token: %s' % exc))
-      except delegation.TransientError as exc:
-        msg = 'Transient error while validating delegation token.\n%s' % exc
-        logging.error(msg)
-        self.abort(500, detail=msg)
-    else:
-      ctx.current_identity = ctx.peer_identity
-      ctx.is_superuser = is_superuser
+      # XSRF token is required only if using Cookie based or IP whitelist auth.
+      # A browser doesn't send Authorization: 'Bearer ...' or any other headers
+      # by itself. So XSRF check is not required if header based authentication
+      # is used.
+      using_headers_auth = method_func in (
+          oauth_authentication, service_to_service_authentication)
 
-    try:
       # Fail if XSRF token is required, but not provided.
       need_xsrf_token = (
           not using_headers_auth and

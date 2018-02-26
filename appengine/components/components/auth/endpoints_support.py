@@ -16,6 +16,7 @@ from protorpc import message_types
 from protorpc import util
 
 from . import api
+from . import check
 from . import config
 from . import delegation
 from . import ipaddr
@@ -228,54 +229,26 @@ def initialize_request_auth(remote_address, headers):
   or AuthenticationError exceptions.
   """
   config.ensure_configured()
-  auth_context = api.reinitialize_request_cache()
+  ctx = api.reinitialize_request_cache()
 
   # Verify the validity of the token (including client_id check), if given.
   is_superuser = False
   if headers.get('Authorization'):
-    identity, is_superuser = api.check_oauth_access_token(headers)
+    peer_identity, is_superuser = api.check_oauth_access_token(headers)
   else:
     # Cloud Endpoints support more authentication methods than we do. Make sure
     # to fail the request if one of such methods is used.
     if endpoints.get_current_user() is not None:
       raise api.AuthenticationError('Unsupported authentication method')
-    identity = model.Anonymous
+    peer_identity = model.Anonymous
 
-  assert remote_address
-  ip = ipaddr.ip_from_string(remote_address)
-
-  # Hack to allow pure IP-whitelist based authentication for bots, until they
-  # are switched to use something better.
-  #
-  # TODO(vadimsh): Get rid of this. Blocked on Swarming and Isolate switching
-  # to service accounts.
-  assert identity is not None
-  if (identity.is_anonymous and
-      api.is_in_ip_whitelist(model.bots_ip_whitelist(), ip, False)):
-    identity = model.IP_WHITELISTED_BOT_ID
-
-  auth_context.peer_ip = ip
-  auth_context.peer_identity = identity
-
-  # Verify the caller is allowed to make calls from the given IP. It raises
-  # AuthorizationError if IP is not allowed.
-  api.verify_ip_whitelisted(identity, ip)
-
-  # Parse delegation token, if given, to deduce end-user identity.
-  delegation_tok = headers.get(delegation.HTTP_HEADER)
-  if delegation_tok:
-    try:
-      ident, unwrapped_tok = delegation.check_bearer_delegation_token(
-          delegation_tok, auth_context.peer_identity)
-      auth_context.current_identity = ident
-      auth_context.delegation_token = unwrapped_tok
-      auth_context.is_superuser = False
-    except delegation.BadTokenError as exc:
-      raise api.AuthorizationError('Bad delegation token: %s' % exc)
-    except delegation.TransientError as exc:
-      msg = 'Transient error while validating delegation token.\n%s' % exc
-      logging.error(msg)
-      raise endpoints.InternalServerErrorException(msg)
-  else:
-    auth_context.current_identity = auth_context.peer_identity
-    auth_context.is_superuser = is_superuser
+  # Verify the caller is allowed to make calls from the given IP and use the
+  # delegation token (if any). It raises AuthorizationError if something is
+  # not allowed. Populates auth context fields.
+  check.check_request(
+      ctx=ctx,
+      peer_identity=peer_identity,
+      peer_ip=ipaddr.ip_from_string(remote_address),
+      is_superuser=is_superuser,
+      delegation_token=headers.get(delegation.HTTP_HEADER),
+      use_bots_ip_whitelist=True)
