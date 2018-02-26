@@ -462,12 +462,13 @@ def delegate(**kwargs):
 ## Token validation.
 
 
-def check_subtoken(subtoken, peer_identity):
+def check_subtoken(subtoken, peer_identity, auth_db):
   """Validates the delegation subtoken, extracts delegated_identity.
 
   Args:
     subtoken: instance of delegation_pb2.Subtoken.
     peer_identity: identity of whoever tries to use this token.
+    auth_db: instance of AuthDB with groups.
 
   Returns:
     Delegated Identity extracted from the token (if it is valid).
@@ -483,7 +484,7 @@ def check_subtoken(subtoken, peer_identity):
   check_subtoken_services(subtoken, service_id.to_bytes())
 
   # Verify caller can use the token, figure out a delegated identity.
-  check_subtoken_audience(subtoken, peer_identity)
+  check_subtoken_audience(subtoken, peer_identity, auth_db)
   try:
     return model.Identity.from_bytes(subtoken.delegated_identity)
   except ValueError as exc:
@@ -530,12 +531,13 @@ def check_subtoken_services(subtoken, service_id):
     raise BadTokenError('The token is not intended for %s' % service_id)
 
 
-def check_subtoken_audience(subtoken, current_identity):
+def check_subtoken_audience(subtoken, current_identity, auth_db):
   """Checks 'audience' field of the subtoken.
 
   Args:
     subtoken: instance of delegation_pb2.Subtoken.
     current_identity: Identity to look for in 'audience' field.
+    auth_db: instance of AuthDB with groups.
 
   Raises:
     BadTokenError if token is not allowed to be used by current_identity.
@@ -555,7 +557,7 @@ def check_subtoken_audience(subtoken, current_identity):
     if not aud.startswith('group:'):
       continue
     group = aud[len('group:'):]
-    if api.is_group_member(group, current_identity):
+    if auth_db.is_group_member(group, current_identity):
       return
   raise BadTokenError('%s is not allowed to use the token' % ident_as_bytes)
 
@@ -563,7 +565,7 @@ def check_subtoken_audience(subtoken, current_identity):
 ## High level API to parse, validate and traverse delegation token.
 
 
-def check_bearer_delegation_token(token, peer_identity):
+def check_bearer_delegation_token(token, peer_identity, auth_db=None):
   """Decodes the token, checks its validity, extracts delegated Identity.
 
   Logs details about the token.
@@ -571,6 +573,7 @@ def check_bearer_delegation_token(token, peer_identity):
   Args:
     token: blob with base64 encoded delegation token.
     peer_identity: Identity of whoever tries to wield the token.
+    auth_db: AuthDB instance with groups, defaults to get_request_auth_db().
 
   Returns:
     (Delegated Identity, validated delegation_pb2.Subtoken proto).
@@ -585,7 +588,8 @@ def check_bearer_delegation_token(token, peer_identity):
   subtoken = unseal_token(deserialize_token(token))
   if subtoken.kind != delegation_pb2.Subtoken.BEARER_DELEGATION_TOKEN:
     raise BadTokenError('Not a valid delegation token kind: %s' % subtoken.kind)
-  ident = check_subtoken(subtoken, peer_identity)
+  ident = check_subtoken(
+      subtoken, peer_identity, auth_db or api.get_request_auth_db())
   logging.info(
       'Using delegation token: subtoken_id=%s, delegated_identity=%s',
       subtoken.subtoken_id, ident.to_bytes())
