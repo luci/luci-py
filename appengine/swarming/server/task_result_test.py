@@ -636,7 +636,7 @@ class TestOutput(TestCase):
             task_result.TaskOutput.CHUNK_SIZE)
 
     calls = []
-    self.mock(logging, 'error', lambda *args: calls.append(args))
+    self.mock(logging, 'warning', lambda *args: calls.append(args))
     max_chunk = 'x' * task_result.TaskOutput.PUT_MAX_CONTENT
     entities = self.run_result.append_output(max_chunk, 0)
     self.assertEqual(task_result.TaskOutput.PUT_MAX_CHUNKS, len(entities))

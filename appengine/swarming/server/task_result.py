@@ -1010,7 +1010,7 @@ def _output_append(output_key, number_chunks, output, output_chunk_start):
     chunk_number = output_chunk_start / TaskOutput.CHUNK_SIZE
     if chunk_number >= TaskOutput.PUT_MAX_CHUNKS:
       # TODO(maruel): Log into TaskOutput that data was dropped.
-      logging.error('Dropping output\n%d bytes were lost', len(output))
+      logging.warning('Dropping output\n%d bytes were lost', len(output))
       break
     key = _output_key_to_output_chunk_key(output_key, chunk_number)
     start = output_chunk_start % TaskOutput.CHUNK_SIZE
