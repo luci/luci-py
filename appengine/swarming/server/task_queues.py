@@ -443,7 +443,7 @@ def _remove_old_entity_async(key, now):
   Returns:
     key if it was deleted.
   """
-  obj = key.get()
+  obj = yield key.get_async()
   if not obj or obj.valid_until_ts >= now:
     raise ndb.Return(None)
 
