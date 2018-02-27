@@ -223,6 +223,12 @@ class Server(object):
         context._timeout = parsed_headers.timeout
         context._invocation_metadata = parsed_headers.invocation_metadata
 
+        # Only ipv6 addresses have ':' in them. Assume everything else is ipv4.
+        if ':' in self.request.remote_addr:
+          context._peer = 'ipv6:[%s]' % self.request.remote_addr
+        else:
+          context._peer = 'ipv4:%s' % self.request.remote_addr
+
         call_details = HandlerCallDetails(
             method='%s.%s' % (service, method),
             invocation_metadata=context.invocation_metadata())

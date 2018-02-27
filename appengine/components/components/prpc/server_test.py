@@ -34,15 +34,16 @@ class TestServicer(object):
   def __init__(self):
     self.given = None
     self.echoed = None
+    self.give_callback = None
 
-  def Give(self, request, _context):
+  def Give(self, request, context):
+    if self.give_callback:
+      self.give_callback(request, context)
     self.given = request.m
     return empty_pb2.Empty()
 
-
   def Take(self, _request, _context):
     return test_pb2.TakeResponse(k=self.given)
-
 
   def Echo(self, request, _context):
     self.echoed = request
@@ -54,14 +55,11 @@ class BadTestServicer(object):
 
   DESCRIPTION = test_prpc_pb2.TestServiceDescription
 
-
   def Give(self, _request, _context):
     return 5
 
-
   def Take(self, _request, _context):
     raise Exception("Look at me, I'm bad.")
-
 
   def Echo(self, request, _context):
     return None  # no respose and no status code
@@ -71,18 +69,19 @@ class PRPCServerTestCase(test_case.TestCase):
   def setUp(self):
     super(PRPCServerTestCase, self).setUp()
     s = server.Server()
-    s.add_service(TestServicer())
+    self.service = TestServicer()
+    s.add_service(self.service)
     real_app = webapp2.WSGIApplication(s.get_routes(), debug=True)
     self.app = webtest.TestApp(
         real_app,
-        extra_environ={'REMOTE_ADDR': 'fake-ip'},
+        extra_environ={'REMOTE_ADDR': '::ffff:127.0.0.1'},
     )
     bad_s = server.Server()
     bad_s.add_service(BadTestServicer())
     real_bad_app = webapp2.WSGIApplication(bad_s.get_routes(), debug=True)
     self.bad_app = webtest.TestApp(
         real_bad_app,
-        extra_environ={'REMOTE_ADDR': 'fake-ip-2'},
+        extra_environ={'REMOTE_ADDR': '192.192.192.192'},
     )
 
   def make_headers(self, enc):
@@ -132,6 +131,33 @@ class PRPCServerTestCase(test_case.TestCase):
     self.assertEqual(len(resp.response), 2)
     self.assertEqual(resp.response[0], 'hello!')
     self.assertEqual(resp.response[1], '94049')
+
+  def test_context(self):
+    calls = []
+    def rpc_callback(_request, context):
+      calls.append({
+        'peer': context.peer(),
+        'is_active': context.is_active(),
+        'time_remaining': context.time_remaining(),
+      })
+    self.service.give_callback = rpc_callback
+
+    headers = self.make_headers(encoding.Encoding.BINARY)
+    req = test_pb2.GiveRequest(m=3333)
+    raw_resp = self.app.post(
+        '/prpc/test.Test/Give',
+        req.SerializeToString(),
+        headers,
+    ).body
+    self.assertEqual(len(raw_resp), 0)
+
+    self.assertEqual(calls, [
+      {
+        'is_active': True,
+        'peer': 'ipv6:[::ffff:127.0.0.1]',
+        'time_remaining': None,
+      },
+    ])
 
   def test_servicer_persistence(self):
     """Basic test which ensures the servicer state persists."""

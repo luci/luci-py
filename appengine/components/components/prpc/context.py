@@ -20,6 +20,7 @@ class ServicerContext(object):
     self._code = codes.StatusCode.OK
     self._details = None
     self._invocation_metadata = []
+    self._peer = None
 
   def invocation_metadata(self):
     """Accesses the metadata from the sent by the client.
@@ -28,6 +29,14 @@ class ServicerContext(object):
       The invocation metadata as a list of (k, v) pairs, the key is lowercase.
     """
     return self._invocation_metadata
+
+  def peer(self):
+    """Identifies the peer that invoked the RPC being serviced.
+
+    Returns:
+      A string - either "ipv4:xxx.xxx.xxx.xxx" or "ipv6:[....]".
+    """
+    return self._peer
 
   def is_active(self):
     """Describes whether the RPC is active or has terminated.
