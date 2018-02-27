@@ -98,6 +98,7 @@ def _get_os_numbers():
   Returns:
     - 5.1, 6.1, etc. There is no way to distinguish between Windows 7
       and Windows Server 2008R2 since they both report 6.1.
+    - build number, like '10240'. Mostly relevant on Windows 10.
   """
   # Windows is lying to us until python adds to its manifest:
   #   <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
@@ -112,6 +113,11 @@ def _get_os_numbers():
   # Some locale (like fr_CA) use a lower case 'version'.
   out = subprocess.check_output(['cmd.exe', '/c', 'ver']).strip()
   match = re.search(_CMD_RE, out, re.IGNORECASE)
+  if not match:
+    # Failed to start cmd.exe, that's really bad. Return a dummy value to not
+    # crash.
+    logging.error('Failed to run cmd.exe /c ver:\n%s', out)
+    return '0.0', '0'
   return match.group(1), match.group(2)
 
 
