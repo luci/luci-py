@@ -736,7 +736,7 @@ def extract_oauth_caller_identity():
   return ident, oauth.is_current_user_admin(oauth_scope)
 
 
-def check_oauth_access_token(headers):
+def check_oauth_access_token(header):
   """Verifies the access token of the current request.
 
   This function uses slightly different strategies for prod, dev and local
@@ -755,7 +755,7 @@ def check_oauth_access_token(headers):
   token info endpoint (e.g. on '-dev' instances).
 
   Args:
-    headers: a dict with request headers.
+    header: a value of Authorization header (as is in the request).
 
   Returns:
     Tuple (ident, is_superuser), where ident is an identity of the caller in
@@ -766,7 +766,6 @@ def check_oauth_access_token(headers):
     AuthenticationError in case the access token is invalid.
     AuthorizationError in case the access token is not allowed.
   """
-  header = headers.get('Authorization')
   if not header:
     raise AuthenticationError('No "Authorization" header')
 

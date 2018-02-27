@@ -233,8 +233,9 @@ def initialize_request_auth(remote_address, headers):
 
   # Verify the validity of the token (including client_id check), if given.
   is_superuser = False
-  if headers.get('Authorization'):
-    peer_identity, is_superuser = api.check_oauth_access_token(headers)
+  auth_header = headers.get('Authorization')
+  if auth_header:
+    peer_identity, is_superuser = api.check_oauth_access_token(auth_header)
   else:
     # Cloud Endpoints support more authentication methods than we do. Make sure
     # to fail the request if one of such methods is used.

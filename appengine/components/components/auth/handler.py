@@ -525,9 +525,10 @@ def gae_cookie_authentication(_request):
 
 def oauth_authentication(request):
   """OAuth2 based authentication via access tokens."""
-  if not request.headers.get('Authorization'):
+  auth_header = request.headers.get('Authorization')
+  if not auth_header:
     return None, False
-  return api.check_oauth_access_token(request.headers)
+  return api.check_oauth_access_token(auth_header)
 
 
 def service_to_service_authentication(request):
