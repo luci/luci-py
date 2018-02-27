@@ -10,13 +10,32 @@ from components.prpc import codes
 class ServicerContext(object):
   """A context object passed to method implementations."""
 
+  # Note: guts of this object are used by Server, but RPC handlers MUST use only
+  # public API.
+
   def __init__(self):
     self._start_time = time.time()
-    self.timeout = None
-    self.active = True
-    self.code = None
-    self.details = None
-    self.invocation_metadata = []  # list of (k, v) pairs, the key is lowercase
+    self._timeout = None
+    self._active = True
+    self._code = codes.StatusCode.OK
+    self._details = None
+    self._invocation_metadata = []
+
+  def invocation_metadata(self):
+    """Accesses the metadata from the sent by the client.
+
+    Returns:
+      The invocation metadata as a list of (k, v) pairs, the key is lowercase.
+    """
+    return self._invocation_metadata
+
+  def is_active(self):
+    """Describes whether the RPC is active or has terminated.
+
+    Returns:
+      True if RPC is active, False otherwise.
+    """
+    return self._active
 
   def time_remaining(self):
     """Describes the length of allowed time remaining for the RPC.
@@ -36,7 +55,7 @@ class ServicerContext(object):
 
     Idempotent and has no effect if the RPC has already terminated.
     """
-    self.active = False
+    self._active = False
 
   def set_code(self, code):
     """Accepts the status code of the RPC.
@@ -49,7 +68,7 @@ class ServicerContext(object):
         be transmitted to the invocation side of the RPC.
     """
     assert code in codes.ALL_CODES, '%r is not StatusCode.*' % (code,)
-    self.code = code
+    self._code = code
 
   def set_details(self, details):
     """Accepts the service-side details of the RPC.
@@ -62,4 +81,4 @@ class ServicerContext(object):
         the invocation side of the RPC.
     """
     assert isinstance(details, basestring), '%r is not string' % (details,)
-    self.details = details
+    self._details = details

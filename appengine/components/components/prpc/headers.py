@@ -3,9 +3,18 @@
 # that can be found in the LICENSE file.
 
 import base64
+import collections
 import re
 
 from components.prpc import encoding
+
+
+ParsedHeaders = collections.namedtuple('ParsedHeaders', [
+  'content_type',       # an encoding.Encoding value for the incoming request
+  'accept',             # an encoding.Encoding value for the outgoing response
+  'timeout',            # RPC timeout as a number of seconds or None
+  'invocation_metadata' # metadata as a list of (k, v) pairs with lowercase keys
+])
 
 
 def _parse_media_type(media_type):
@@ -60,23 +69,19 @@ def _parse_timeout(timeout):
   return seconds
 
 
-def process_headers(context, headers):
-  """Parses headers and sets up the context object.
+def parse_headers(headers):
+  """Parses headers extracting metadata from it.
 
   Args:
-    context: a context.ServicerContext, which represents a handler's execution
-        context.
     headers: the self.request.headers dictionary-like object from a
         webapp2.RequestHandler.
 
   Returns:
-    content_type: an encoding.Encoding enum value for the incoming request.
-    accept: an encoding.Encoding enum value for the outgoing response.
+    ParsedHeaders named tuple, see its definition for more info.
 
   Raises:
     ValueError: when the headers indicate invalid content types or don't parse.
   """
-
   content_type_header = headers.get('Content-Type')
   try:
     content_type = _parse_media_type(content_type_header)
@@ -89,10 +94,7 @@ def process_headers(context, headers):
     else:
       raise
 
-  accept = _parse_accept_header(headers.get('Accept'))
-  timeout_header = headers.get('X-Prpc-Timeout')
-  context.timeout = _parse_timeout(timeout_header)
-
+  invocation_metadata = []
   for header, value in headers.iteritems():
     header = header.lower()
     if header.startswith('x-prpc-'):
@@ -103,6 +105,10 @@ def process_headers(context, headers):
       except TypeError:
         raise ValueError('Received invalid base64 string in header %s' % header)
       header = header[:-len('-bin')]
-    context.invocation_metadata.append((header, value))
+    invocation_metadata.append((header, value))
 
-  return content_type, accept
+  return ParsedHeaders(
+      content_type,
+      _parse_accept_header(headers.get('Accept')),
+      _parse_timeout(headers.get('X-Prpc-Timeout')),
+      invocation_metadata)

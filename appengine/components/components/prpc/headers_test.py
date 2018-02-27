@@ -13,7 +13,6 @@ test_env.setup_test_env()
 
 from test_support import test_case
 
-from components.prpc import context
 from components.prpc import encoding
 from components.prpc import headers
 
@@ -22,47 +21,44 @@ class PRPCHeadersTestCase(test_case.TestCase):
   def setUp(self):
     super(PRPCHeadersTestCase, self).setUp()
 
-  def process_headers(self, h, expect_content_type=None,
-                      expect_accept=None):
-    ctx = context.ServicerContext()
-    content_type, accept = headers.process_headers(
-        ctx, collections.OrderedDict(h))
+  def parse_headers(self, h, expect_content_type=None, expect_accept=None):
+    res = headers.parse_headers(collections.OrderedDict(h))
     if expect_content_type is not None:
-      self.assertEqual(content_type, expect_content_type)
+      self.assertEqual(res.content_type, expect_content_type)
     if expect_accept is not None:
-      self.assertEqual(accept, expect_accept)
-    return ctx
+      self.assertEqual(res.accept, expect_accept)
+    return res
 
   def test_no_header(self):
-    self.process_headers([])
+    self.parse_headers([])
 
   def test_header_bad_content_type(self):
     with self.assertRaises(ValueError):
-      self.process_headers([
+      self.parse_headers([
         ('Content-Type', 'www/urlencoded'),
       ])
 
-  def test_process_headers_encodings(self):
-    check_known_encodings = lambda e: self.process_headers(
+  def test_parse_headers_encodings(self):
+    check_known_encodings = lambda e: self.parse_headers(
         [('Accept', e[1])],
         expect_accept=e,
     )
     check_known_encodings(encoding.Encoding.JSON)
     check_known_encodings(encoding.Encoding.TEXT)
     check_known_encodings(encoding.Encoding.BINARY)
-    self.process_headers(
+    self.parse_headers(
         [('Accept', 'application/json')],
         expect_accept=encoding.Encoding.JSON,
     )
-    self.process_headers(
+    self.parse_headers(
         [('Accept', '*/*')],
         expect_accept=encoding.Encoding.BINARY,
     )
 
 
-  def test_process_headers_timeout(self):
+  def test_parse_headers_timeout(self):
     check_timeout = lambda t, n: self.assertEqual(
-        self.process_headers(
+        self.parse_headers(
             [
               ('Accept', encoding.Encoding.JSON[1]),
               ('X-Prpc-Timeout', t),
@@ -78,13 +74,13 @@ class PRPCHeadersTestCase(test_case.TestCase):
     check_timeout('92u', 92*1e-6)
     check_timeout('56n', 56*1e-9)
     with self.assertRaises(ValueError):
-      self.process_headers([
+      self.parse_headers([
         ('Accept', encoding.Encoding.JSON[1]),
         ('X-Prpc-Timeout', '222222'),
       ])
 
-  def test_process_headers_content_type(self):
-    self.process_headers(
+  def test_parse_headers_content_type(self):
+    self.parse_headers(
         [
           ('Accept', encoding.Encoding.TEXT[1]),
           ('Content-Type', 'application/json'),
@@ -92,7 +88,7 @@ class PRPCHeadersTestCase(test_case.TestCase):
         expect_accept=encoding.Encoding.TEXT,
         expect_content_type=encoding.Encoding.JSON,
     )
-    self.process_headers(
+    self.parse_headers(
         [
           ('Accept', encoding.Encoding.JSON[1]),
           ('Content_Type', encoding.Encoding.BINARY[1]),
@@ -101,8 +97,8 @@ class PRPCHeadersTestCase(test_case.TestCase):
         expect_content_type=encoding.Encoding.BINARY,
     )
 
-  def test_process_headers_metadata(self):
-    ctx = self.process_headers(
+  def test_parse_headers_metadata(self):
+    ctx = self.parse_headers(
         [
           ('Accept', encoding.Encoding.JSON[1]),
           ('X-Prpc-Timeout', '1m'),    # skipped from metadata
@@ -120,14 +116,14 @@ class PRPCHeadersTestCase(test_case.TestCase):
         ('uhhhhh', 'lol'),
     ])
     with self.assertRaises(ValueError):
-      self.process_headers([
+      self.parse_headers([
         ('Accept', encoding.Encoding.JSON[1]),
         ('What', 'haha'),
         ('What-Bin', 'lol'),
       ])
 
     with self.assertRaises(ValueError):
-      self.process_headers([
+      self.parse_headers([
         ('Accept', encoding.Encoding.JSON[1]),
         ('What-Bin', 'asdfs='),
       ])

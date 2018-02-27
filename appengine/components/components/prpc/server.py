@@ -153,31 +153,28 @@ class Server(object):
         Returns:
           response: a webapp2.Response.
         """
-
         context = ServicerContext()
-        context.set_code(StatusCode.OK)
-
         content, accept = self._handle(context, service, method)
         origin = self.request.headers.get('Origin')
         if origin:
           self.response.headers['Access-Control-Allow-Origin'] = origin
           self.response.headers['Vary'] = 'Origin'
           self.response.headers['Access-Control-Allow-Credentials'] = 'true'
-        self.response.status = _PRPC_TO_HTTP_STATUS[context.code]
-        self.response.headers['X-Prpc-Grpc-Code'] = str(context.code[0])
+        self.response.status = _PRPC_TO_HTTP_STATUS[context._code]
+        self.response.headers['X-Prpc-Grpc-Code'] = str(context._code[0])
         self.response.headers['Access-Control-Expose-Headers'] = (
             'X-Prpc-Grpc-Code')
         if content is not None:
           self.response.headers['Content-Type'] = encoding.Encoding.header(
               accept)
           self.response.out.write(content)
-        elif context.details is not None:
+        elif context._details is not None:
           # webapp2 will automatically encode strings as utf-8.
           # http://webapp2.readthedocs.io/en/latest/guide/response.html
           #
           # TODO(nodir,mknyszek): Come up with an actual test for this.
           self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-          self.response.out.write(context.details)
+          self.response.out.write(context._details)
         return self.response
 
       def _handle(self, context, service, method):
@@ -194,10 +191,8 @@ class Server(object):
           accept: an encoding.Encoding enum value for the encoding of the
             response.
         """
-
         try:
-          content_type, accept = headers.process_headers(
-              context, self.request.headers)
+          parsed_headers = headers.parse_headers(self.request.headers)
         except ValueError as e:
           logging.exception('Error processing headers')
           context.set_code(StatusCode.INVALID_ARGUMENT)
@@ -217,7 +212,7 @@ class Server(object):
 
         request = request_message()
         try:
-          decoder = encoding.get_decoder(content_type)
+          decoder = encoding.get_decoder(parsed_headers.content_type)
           decoder(self.request.body, request)
         except Exception as e:
           logging.warning('Failed to decode request: %s' % e)
@@ -225,9 +220,12 @@ class Server(object):
           context.set_details('Error parsing request')
           return None, None
 
+        context._timeout = parsed_headers.timeout
+        context._invocation_metadata = parsed_headers.invocation_metadata
+
         call_details = HandlerCallDetails(
             method='%s.%s' % (service, method),
-            invocation_metadata=context.invocation_metadata)
+            invocation_metadata=context.invocation_metadata())
 
         try:
           # TODO(nodir,mknyszek): Poll for context to hit timeout or be
@@ -241,7 +239,7 @@ class Server(object):
           return None, None
 
         if response is None:
-          if context.code == StatusCode.OK:
+          if context._code == StatusCode.OK:
             context.set_code(StatusCode.INTERNAL)
             context.set_details(
                 'Service implementation didn\'t return a response')
@@ -254,7 +252,7 @@ class Server(object):
           return None, None
 
         try:
-          encoder = encoding.get_encoder(accept)
+          encoder = encoding.get_encoder(parsed_headers.accept)
           content = encoder(response)
         except Exception:
           logging.exception('Failed to encode response')
@@ -262,7 +260,7 @@ class Server(object):
           context.set_details('Error serializing response')
           return None, None
 
-        return content, accept
+        return content, parsed_headers.accept
 
       def options(self, _service, _method):
         """Sends an empty response with headers for CORS for all requests."""
