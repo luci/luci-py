@@ -73,10 +73,10 @@ class GerritFetchTestCase(test_case.TestCase):
 class GerritTestCase(test_case.TestCase):
   def setUp(self):
     super(GerritTestCase, self).setUp()
-    self.mock(gerrit, 'fetch_json', mock.Mock())
+    self.mock(gerrit, 'fetch_json_async', mock.Mock())
 
   def test_get_change(self):
-    req_path = 'changes/%s?o=ALL_REVISIONS' % CHANGE_ID
+    req_path = 'changes/%s' % CHANGE_ID
     change_reponse = {
       'id': CHANGE_ID,
       'project': 'project',
@@ -109,11 +109,13 @@ class GerritTestCase(test_case.TestCase):
       },
     }
 
-    gerrit.fetch_json.return_value = change_reponse
+    gerrit.fetch_json_async.return_value = ndb.Future()
+    gerrit.fetch_json_async.return_value.set_result(change_reponse)
 
     change = gerrit.get_change(HOSTNAME, CHANGE_ID)
 
-    gerrit.fetch_json.assert_called_with(HOSTNAME, req_path)
+    gerrit.fetch_json_async.assert_called_with(
+        HOSTNAME, req_path, params={'o': 'ALL_REVISIONS'})
     self.assertIsNotNone(change)
     self.assertEqual(change.change_id, SHORT_CHANGE_ID)
     self.assertEqual(change.branch, 'master')
@@ -129,7 +131,8 @@ class GerritTestCase(test_case.TestCase):
   def test_set_review(self):
     req_path = 'changes/%s/revisions/%s/review' % (CHANGE_ID, REVISION)
     labels = {'Verified': 1 }
-    gerrit.fetch_json.return_value = {'labels': labels}
+    gerrit.fetch_json_async.return_value = ndb.Future()
+    gerrit.fetch_json_async.return_value.set_result({'labels': labels})
 
     gerrit.set_review(
         HOSTNAME, CHANGE_ID, REVISION, message='Hi!', labels=labels)
@@ -138,14 +141,14 @@ class GerritTestCase(test_case.TestCase):
         'message': 'Hi!',
         'labels': labels,
     }
-    gerrit.fetch_json.assert_called_with(
+    gerrit.fetch_json_async.assert_called_with(
         HOSTNAME, req_path, method='POST', payload=expected_body)
 
     # Test with "notify" parameter.
     gerrit.set_review(
         HOSTNAME, CHANGE_ID, REVISION, message='Hi!', labels=labels,
         notify='all')
-    gerrit.fetch_json.assert_called_with(
+    gerrit.fetch_json_async.assert_called_with(
         HOSTNAME,
         req_path,
         method='POST',

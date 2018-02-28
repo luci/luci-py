@@ -56,7 +56,13 @@ Change = collections.namedtuple(
     ])
 
 
-def get_change(
+def get_change(*args, **kwargs):
+  """Sync version of get_change_async."""
+  return get_change_async(*args, **kwargs).get_result()
+
+
+@ndb.tasklet
+def get_change_async(
     hostname, change_id, include_all_revisions=True,
     include_owner_details=False):
   """Gets a single Gerrit change by id.
@@ -66,11 +72,12 @@ def get_change(
   path = 'changes/%s' % change_id
   if include_owner_details:
     path += '/detail'
+  params = {}
   if include_all_revisions:
-    path += '?o=ALL_REVISIONS'
-  data = fetch_json(hostname, path)
+    params['o'] = 'ALL_REVISIONS'
+  data = yield fetch_json_async(hostname, path, params=params)
   if data is None:
-    return None
+    raise ndb.Return(None)
 
   owner = None
   ownerData = data.get('owner')
@@ -88,7 +95,7 @@ def get_change(
     ) for key, value in data.get('revisions', {}).iteritems()]
   revisions.sort(key=lambda r: r.number)
 
-  return Change(
+  raise ndb.Return(Change(
       id=data['id'],
       project=data.get('project'),
       branch=data.get('branch'),
@@ -96,10 +103,16 @@ def get_change(
       change_id=data.get('change_id'),
       current_revision=data.get('current_revision'),
       revisions=revisions,
-      owner=owner)
+      owner=owner))
 
 
-def set_review(
+def set_review(*args, **kwargs):
+  """Sync version of set_review_async."""
+  return set_review_async(*args, **kwargs).get_result()
+
+
+@ndb.tasklet
+def set_review_async(
     hostname, change_id, revision, message=None, labels=None, notify=None):
   """Sets review on a revision.
 
@@ -127,7 +140,7 @@ def set_review(
   body = {k:v for k, v in body.iteritems() if v is not None}
 
   path = 'changes/%s/revisions/%s/review' % (change_id, revision)
-  fetch_json(hostname, path, method='POST', payload=body)
+  yield fetch_json_async(hostname, path, method='POST', payload=body)
 
 
 @ndb.tasklet
