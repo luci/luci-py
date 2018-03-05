@@ -229,6 +229,7 @@ def json_request_async(
   """
   if payload is not None:
     headers = (headers or {}).copy()
+    headers['Accept'] = 'application/json; charset=utf-8'
     headers['Content-Type'] = 'application/json; charset=utf-8'
     payload = utils.encode_to_json(payload)
   response = yield request_async(

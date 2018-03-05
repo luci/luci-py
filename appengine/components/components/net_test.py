@@ -148,6 +148,7 @@ class NetTest(test_case.TestCase):
         'deadline': 123,
         'headers': {
           'Authorization': 'Bearer token',
+          'Accept': 'application/json; charset=utf-8',
           'Content-Type': 'application/json; charset=utf-8',
           'Header': 'value',
         },
