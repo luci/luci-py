@@ -375,6 +375,7 @@ def format_url(url_format, *args):
   return url_format % tuple(urllib.quote(a, '') for a in args)
 
 
+@ndb.non_transactional
 @ndb.tasklet
 def get_provider_async():
   """Returns True if config service hostname is set."""
