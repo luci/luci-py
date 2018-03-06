@@ -380,7 +380,7 @@ class RemoteClientGrpc(object):
       def stream():
         logging.info('Writing to ByteStream:\n%s', req)
         yield req
-      res = self._proxy_bs.call_no_retries('Write', stream())
+      res = self._proxy_bs.call_unary('Write', stream())
     except grpc_proxy.grpc.RpcError as r:
       logging.error('gRPC error during stdout update: %s' % r)
       raise r
