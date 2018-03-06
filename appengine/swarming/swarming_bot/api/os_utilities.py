@@ -906,15 +906,9 @@ def get_state_all_devices_android(devices):
     return state
 
   # Add a few values that were popped from dimensions.
-  state[u'host_dimensions'] = {
-    u'cpu': get_cpu_dimensions(),
-    u'cores': [unicode(get_num_processors())],
-    u'gpu': get_gpu()[0],
-  }
-  machine_type = get_machine_type()
-  if machine_type:
-    state[u'host_dimensions'][u'machine_type'] = [machine_type]
-
+  state[u'host_dimensions'] = get_dimensions()
+  # The default value is irrelevant.
+  state[u'host_dimensions'].pop(u'pool', None)
   state.update(platforms.android.get_state(devices))
   return state
 
