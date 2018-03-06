@@ -303,6 +303,7 @@ def _content_to_binary(proto_message_name, content):
   return common._convert_config(content, dest_type).SerializeToString()
 
 
+@ndb.non_transactional
 @ndb.tasklet
 def _get_last_good_async(config_set, path, dest_type):
   """Returns last good (rev, config) and updates last_access_ts if needed."""
@@ -330,7 +331,7 @@ def _get_last_good_async(config_set, path, dest_type):
       last_good.proto_message_name != proto_message_name):
     # pylint does not like this usage of transactional_tasklet
     # pylint: disable=no-value-for-parameter
-    @ndb.transactional_tasklet(propagation=ndb.TransactionOptions.INDEPENDENT)
+    @ndb.transactional_tasklet
     def update():
       last_good = yield LastGoodConfig.get_by_id_async(last_good_id)
       last_good = last_good or LastGoodConfig(id=last_good_id)
