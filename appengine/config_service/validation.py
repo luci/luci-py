@@ -54,7 +54,7 @@ def validate_pattern(pattern, literal_validator, ctx):
   try:
     config.validation.compile_pattern(pattern)
   except ValueError as ex:
-    ctx.error(ex.message)
+    ctx.error('%s', ex.message)
     return
 
   if ':' not in pattern:
@@ -103,7 +103,7 @@ def validate_config_set_location(loc, ctx, allow_relative_url=False):
     try:
       gitiles.Location.parse(loc.url)
     except ValueError as ex:
-      ctx.error(ex.message)
+      ctx.error('%s', ex.message)
 
 
 @validation.self_rule(
@@ -123,7 +123,7 @@ def validate_identity(identity, ctx):
   try:
     auth.Identity.from_bytes(identity)
   except ValueError as ex:
-    ctx.error(ex.message)
+    ctx.error('%s', ex.message)
 
 
 def validate_email(email, ctx):
@@ -323,7 +323,7 @@ def _validate_by_service_async(service, config_set, path, content, ctx):
         'path: %s\n'
         'response: %r') % (text, url, config_set, path, res)
     logging.error(text)
-    ctx.critical(text)
+    ctx.critical('%s', text)
 
   try:
     req = {
