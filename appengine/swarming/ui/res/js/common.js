@@ -63,12 +63,17 @@ this.swarming = this.swarming || function() {
     }
 
     return sk.request("POST", url, body, auth_headers).then(function(response) {
+      // Assumes response is a stringified json object
       sk.errorMessage("Request sent.  Response: "+response, 3000);
       return response;
-    }).catch(function(reason) {
-      console.log("Request failed", reason);
-      sk.errorMessage("Request failed.  Reason: "+reason, 5000);
-      return Promise.reject(reason);
+    }).catch(function(r) {
+      // Assumes r is something like
+      // {response: "{\"error\":{\"message\":\"User ... \"}}", status: 403}
+      var err = JSON.parse(r.response);
+      console.log("Request failed", err);
+      var humanReadable = (err.error && err.error.message) || JSON.stringify(err);
+      sk.errorMessage("Request failed.  Reason: "+ humanReadable, 5000);
+      return Promise.reject(err);
     });
   }
 

@@ -103,8 +103,9 @@
     });
 
     var newTask = function(request) {
-      console.log("retry requested");
-      request.respond(200, {"Content-Type":"application/json"}, JSON.stringify(newResponse));
+      console.log("new task requested");
+      newResponse={"error": {"message": "User \"user:example@chromium.org\" is not allowed to schedule tasks in the pool \"Skia\", see pools.cfg"}}
+      request.respond(403, {"Content-Type":"application/json"}, JSON.stringify(newResponse));
     }
 
     server.respondWith("POST", /^\/_ah\/api\/swarming\/v1\/tasks\/new/, newTask);

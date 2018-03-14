@@ -1588,8 +1588,11 @@ time.sleep(${leaseDuration})`];
               history.pushState(state, "Task Page");
               this.set("task_id", response.task_id);
             }
-          }.bind(this), function(e) {
-            console.log("Task could not be retried", e);
+          }.bind(this), function(err) {
+            console.log("Task could not be created", err);
+            var humanReadable = (err.error && err.error.message) || JSON.stringify(err);
+            humanReadable += " Perhaps you need to login to a different account?";
+            sk.errorMessage("Could not create new task. Error: "+ humanReadable, 15000);
           }
         );
       },
