@@ -223,7 +223,7 @@ def _get_bot_config():
 
 
 def _register_extra_bot_config(content):
-  """Registers the server injected extra bot_config.py.
+  """Registers the server injected extra injected.py bot_config.
 
   This file is called implicitly by _call_hook() and _call_hook_safe().
   """
@@ -233,11 +233,12 @@ def _register_extra_bot_config(content):
     # in unicode. <3 python.
     content = content.encode('utf-8')
   try:
-    compiled = compile(content, 'bot_config.py', 'exec')
-    _EXTRA_BOT_CONFIG  = types.ModuleType('bot_config')
+    compiled = compile(content, 'injected.py', 'exec')
+    _EXTRA_BOT_CONFIG = types.ModuleType('injected')
     exec(compiled, _EXTRA_BOT_CONFIG.__dict__)
   except (SyntaxError, TypeError) as e:
-    _set_quarantined('handshake returned invalid bot_config: %s' % e)
+    _set_quarantined(
+        'handshake returned invalid injected bot_config.py: %s' % e)
 
 
 @_monitor_call

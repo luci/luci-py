@@ -10,6 +10,7 @@ import logging
 import os
 import sys
 import tempfile
+import textwrap
 import threading
 import time
 import unittest
@@ -396,23 +397,42 @@ class TestBotMain(TestBotBase):
     self.assertEqual(True, bot_main._post_error_task(botobj, 'error', 23))
 
   def test_do_handshake(self):
-    # Ensures the injected code was called.
+    # Ensures the injected code was called. Ensures the injected name is
+    # 'injected', that it can imports the base one.
     quit_bit = threading.Event()
     obj = self.make_bot()
-    def do_handshake(attributes):
-      return {
-        'bot_version': attributes['version'],
-        'bot_group_cfg_version': None,
-        'bot_group_cfg': None,
-        'bot_config':
-            'def get_dimensions(_): return {\'alternative\': \'truth\'}',
+
+    # Hack into bot_config.
+    bot_config = bot_main._get_bot_config()
+    bot_config.base_func = lambda: 'yo'
+    try:
+      def do_handshake(attributes):
+        return {
+          'bot_version': attributes['version'],
+          'bot_group_cfg_version': None,
+          'bot_group_cfg': None,
+          'bot_config': textwrap.dedent("""
+              from config import bot_config
+              def get_dimensions(_):
+                return {
+                  'alternative': __name__,
+                  'bot_config': bot_config.__file__,
+                  'called': bot_config.base_func(),
+                }
+              """),
+        }
+      self.mock(obj.remote, 'do_handshake', do_handshake)
+      bot_main._do_handshake(obj, quit_bit)
+      self.assertFalse(quit_bit.is_set())
+      self.assertEqual(None, obj.bot_restart_msg())
+      expected = {
+        'alternative': 'injected',
+        'bot_config': bot_config.__file__,
+        'called': 'yo',
       }
-    self.mock(obj.remote, 'do_handshake', do_handshake)
-    bot_main._do_handshake(obj, quit_bit)
-    self.assertFalse(quit_bit.is_set())
-    self.assertEqual(None, obj.bot_restart_msg())
-    expected = {'alternative': 'truth'}
-    self.assertEqual(expected, bot_main._EXTRA_BOT_CONFIG.get_dimensions(obj))
+      self.assertEqual(expected, bot_main._EXTRA_BOT_CONFIG.get_dimensions(obj))
+    finally:
+      del bot_config.base_func
 
   def test_call_hook_both(self):
     # Both hooks must be called.
