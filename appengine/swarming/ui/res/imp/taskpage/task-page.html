@@ -253,41 +253,46 @@
                   <td class$="[[_stateClass(_result)]]">[[state(_result)]]</td>
                 </tr>
 
-                  <tr>
-                    <td>
-                      <template is="dom-if" if="[[_eq(_result.state,'PENDING')]]">
-                        <b>Why Pending?</b>
-                      </template>
-                      <template is="dom-if" if="[[_neq(_result.state,'PENDING')]]">
-                        Similar Load
-                      </template>
-                      </td>
-                    <td>
-                      <span class$="[[_it(_other_pending.count)]]">[[_other_pending.count]]</span>
-                      <a
-                        title="The list of pending tasks that matches the list of dimensions"
-                        href$='[[_taskListLink(_request.properties.dimensions,"","state:PENDING")]]'>similar pending tasks</a>,
-                      <span class$="[[_it(_other_running.count)]]">[[_other_running.count]]</span>
-                      <a
-                        title="The list of running tasks that matches the list of dimensions"
-                        href$='[[_taskListLink(_request.properties.dimensions,"","state:RUNNING")]]'>similar running tasks</a>
-                    </td>
-                  </tr>
-
                 <tr>
-                  <td>Fleet Capacity</td>
+                  <td>
+                    <template is="dom-if" if="[[_eq(_result.state,'PENDING')]]">
+                      <b>Why Pending?</b>
+                    </template>
+                    <template is="dom-if" if="[[_neq(_result.state,'PENDING')]]">
+                      Fleet Capacity
+                    </template>
+                  </td>
                   <td>
                     <span class$="[[_it(_bots_count.count)]]">[[_bots_count.count]]</span>
                     <a
                         title="The list of bots that matches the list of dimensions"
                         href$="[[_botListLink(_request.properties.dimensions)]]">bots</a>
-                    can run this task
-                    (<span class$="[[_it(_bots_count.dead)]]">[[_bots_count.dead]]</span>
+                    could possibly run this task
+                    (<span class$="[[_it(_bots_count.busy)]]">[[_bots_count.busy]]</span>
+                    busy,
+                    <span class$="[[_it(_bots_count.dead)]]">[[_bots_count.dead]]</span>
                     dead,
                     <span class$="[[_it(_bots_count.dead)]]">[[_bots_count.quarantined]]</span>
                     quarantined)
                   </td>
                 </tr>
+
+                <tr>
+                  <td>
+                    Similar Load
+                  </td>
+                  <td>
+                    <span class$="[[_it(_other_pending.count)]]">[[_other_pending.count]]</span>
+                    <a
+                      title="The list of pending tasks that matches the list of dimensions"
+                      href$='[[_taskListLink(_request.properties.dimensions,"","state:PENDING")]]'>similar pending tasks</a>,
+                    <span class$="[[_it(_other_running.count)]]">[[_other_running.count]]</span>
+                    <a
+                      title="The list of running tasks that matches the list of dimensions"
+                      href$='[[_taskListLink(_request.properties.dimensions,"","state:RUNNING")]]'>similar running tasks</a>
+                  </td>
+                </tr>
+
                 <template is="dom-if" if="[[_result.deduped_from]]">
                   <tr class="highlighted">
                     <td><b>Deduped from</b></td>
@@ -1130,7 +1135,7 @@
 
       // makes text italic unless it's numbers (i.e. when loading)
       _it: function(s) {
-        if (!s || (s[0] === "<")) {
+        if (!s || (s[0] !== "<")) {
           return "italic";
         }
         return "";
