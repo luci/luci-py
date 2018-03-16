@@ -351,13 +351,10 @@ class GitilesImportTestCase(test_case.TestCase):
         ],
     )
 
-    gitiles_import.import_services(
-        gitiles.Location.parse('https://localhost/config'))
-
-    gitiles.get_tree.assert_called_once_with(
-        'localhost', 'config', 'HEAD', '/')
-    gitiles_import._import_config_set.assert_called_once_with(
-        'services/luci-config', 'https://localhost/config/+/HEAD/luci-config')
+    loc = gitiles.Location.parse('https://localhost/config')
+    self.assertEqual(gitiles_import._service_config_sets(loc), [
+        'services/luci-config',
+    ])
 
   def test_import_service(self):
     self.mock(gitiles_import, '_import_config_set', mock.Mock())
@@ -372,7 +369,7 @@ class GitilesImportTestCase(test_case.TestCase):
         'services/luci-config',
         'https://localhost/config/+/HEAD/luci-config')
 
-  def test_import_projects_and_refs(self):
+  def test__project_and_ref_config_sets(self):
     self.mock(gitiles_import, '_import_config_set', mock.Mock())
     self.mock(projects, 'get_projects', mock.Mock())
     self.mock(projects, 'get_refs', mock.Mock())
@@ -384,16 +381,6 @@ class GitilesImportTestCase(test_case.TestCase):
             storage_type=service_config_pb2.ConfigSetLocation.GITILES,
           )
       ),
-      service_config_pb2.Project(
-          id='bad_location',
-          config_location=service_config_pb2.ConfigSetLocation(
-            url='https://localhost/',
-            storage_type=service_config_pb2.ConfigSetLocation.GITILES,
-          ),
-      ),
-      service_config_pb2.Project(
-          id='non-gitiles',
-      ),
     ]
     RefType = project_config_pb2.RefsCfg.Ref
     projects.get_refs.return_value = {
@@ -403,17 +390,11 @@ class GitilesImportTestCase(test_case.TestCase):
       ],
     }
 
-    gitiles_import.import_projects()
-
-    self.assertEqual(gitiles_import._import_config_set.call_count, 3)
-    gitiles_import._import_config_set.assert_any_call(
-        'projects/chromium', 'https://localhost/chromium/src/+/refs/heads/luci')
-    gitiles_import._import_config_set.assert_any_call(
-        'projects/chromium/refs/heads/master',
-        'https://localhost/chromium/src/+/refs/heads/master/luci')
-    gitiles_import._import_config_set.assert_any_call(
-        'projects/chromium/refs/heads/release42',
-        'https://localhost/chromium/src/+/refs/heads/release42/my-configs')
+    self.assertEqual(gitiles_import._project_and_ref_config_sets(), [
+      'projects/chromium',
+      'projects/chromium/refs/heads/master',
+      'projects/chromium/refs/heads/release42',
+    ])
 
   def test_import_project(self):
     self.mock(gitiles_import, '_import_config_set', mock.Mock())
@@ -484,56 +465,6 @@ class GitilesImportTestCase(test_case.TestCase):
     }))
     with self.assertRaises(gitiles_import.NotFoundError):
       gitiles_import.import_ref('chromium', 'refs/heads/release42')
-
-  def test_import_projects_exception(self):
-    self.mock(gitiles_import, 'import_project', mock.Mock())
-    gitiles_import.import_project.side_effect = Exception
-    self.mock(projects, 'get_refs', mock.Mock(return_value={
-      'chromium': [],
-      'will-fail': [],
-    }))
-
-    self.mock(projects, 'get_projects', mock.Mock())
-    projects.get_projects.return_value = [
-      service_config_pb2.Project(
-          id='chromium',
-          config_location=service_config_pb2.ConfigSetLocation(
-            url='https://localhost/chromium/src/',
-            storage_type=service_config_pb2.ConfigSetLocation.GITILES,
-          ),
-      ),
-      service_config_pb2.Project(
-          id='will-fail',
-          config_location=service_config_pb2.ConfigSetLocation(
-            url='https://localhost/chromium/src/',
-            storage_type=service_config_pb2.ConfigSetLocation.GITILES,
-          ),
-      )
-    ]
-
-    gitiles_import.import_projects()
-    self.assertEqual(gitiles_import.import_project.call_count, 2)
-
-  def test_import_projects_canonical(self):
-    self.mock(gitiles_import, 'import_project', mock.Mock())
-    self.mock(projects, 'get_refs', mock.Mock(return_value={
-      'chromium': [],
-    }))
-    self.mock(projects, 'get_projects', mock.Mock())
-    projects.get_projects.return_value = [
-      service_config_pb2.Project(
-        id='chromium',
-        config_location=service_config_pb2.ConfigSetLocation(
-          url='https://localhost/a/chromium/src.git/',
-          storage_type=service_config_pb2.ConfigSetLocation.GITILES,
-        ),
-      ),
-    ]
-
-    gitiles_import.import_projects()
-    gitiles_import.import_project.assert_called_once_with(
-        'chromium',
-        gitiles.Location.parse_resolve('https://localhost/chromium/src'))
 
 
 if __name__ == '__main__':

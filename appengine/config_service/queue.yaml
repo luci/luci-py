@@ -1,0 +1,4 @@
+queue:
+- name: gitiles-import
+  target: backend
+  rate: 100/s

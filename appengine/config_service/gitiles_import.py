@@ -13,6 +13,7 @@ from project.config_location.
 """
 
 import contextlib
+import json
 import logging
 import os
 import re
@@ -20,6 +21,7 @@ import StringIO
 import tarfile
 
 from google.appengine.api import urlfetch_errors
+from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
 from google.protobuf import text_format
 
@@ -305,17 +307,16 @@ def import_service(service_id, conf=None):
   _import_config_set('services/%s' % service_id, service_location)
 
 
-def import_project(project_id, loc=None):
+def import_project(project_id):
   if not config.validation.is_valid_project_id(project_id):
     raise ValueError('Invalid project id: %s' % project_id)
 
-  if loc is None:
-    project = projects.get_project(project_id)
-    if project is None:
-      raise NotFoundError('project %s not found' % project_id)
-    if project.config_location.storage_type != GITILES_LOCATION_TYPE:
-      raise Error('project %s is not a Gitiles project' % project_id)
-    loc = gitiles.Location.parse_resolve(project.config_location.url)
+  project = projects.get_project(project_id)
+  if project is None:
+    raise NotFoundError('project %s not found' % project_id)
+  if project.config_location.storage_type != GITILES_LOCATION_TYPE:
+    raise Error('project %s is not a Gitiles project' % project_id)
+  loc = gitiles.Location.parse_resolve(project.config_location.url)
 
   # Adjust location
   cfg = get_gitiles_config()
@@ -385,28 +386,16 @@ def import_config_set(config_set):
   raise ValueError('Invalid config set "%s' % config_set)
 
 
-## Bulk import in a cron job
+## A cron job that schedules an import push task for each config set
 
 
-@contextlib.contextmanager
-def _log_import_error(cs):
-  try:
-    yield
-  except NotFoundError as ex:
-    logging.warning(ex)
-  except Exception:
-    logging.exception('Could not import %s', cs)
-
-
-def import_services(location_root):
-  """Imports all services, assuming they are in Gitiles.
-
-  Logs errors, does not raise them.
-  """
+def _service_config_sets(location_root):
+  """Returns a list of all service config sets stored in Gitiles."""
   # TODO(nodir): import services from location specified in services.cfg
   assert location_root
   tree = location_root.get_tree()
 
+  ret = []
   for service_entry in tree.entries:
     service_id = service_entry.name
     if service_entry.type != 'tree':
@@ -414,57 +403,51 @@ def import_services(location_root):
     if not config.validation.is_valid_service_id(service_id):
       logging.error('Invalid service id: %s', service_id)
       continue
-    service_location = location_root._replace(
-        path=os.path.join(location_root.path, service_entry.name))
-    cs = 'services/%s' % service_id
-    with _log_import_error(cs):
-      _import_config_set(cs, service_location)
+    ret.append('services/%s' % service_id)
+  return ret
 
 
-def import_projects():
-  """Imports all project and ref config sets that are stored in Gitiles.
-
-  Logs errors, does not raise them.
-  """
-  cfg = get_gitiles_config()
+def _project_and_ref_config_sets():
+  """Returns a list of project and ref config sets stored in Gitiles."""
   projs = projects.get_projects()
   refs = projects.get_refs([p.id for p in projs])
+  ret = []
+
   for project in projs:
-    loc = project.config_location
-    if loc.storage_type != GITILES_LOCATION_TYPE:
-      continue
-    try:
-      location = gitiles.Location.parse_resolve(loc.url)
-    except ValueError:
-      logging.exception('Invalid project location: %s', project.config_location)
-      continue
-    except net.AuthError as ex:
-      logging.error(
-          'Could not resolve %s due to permissions: %s',
-          project.config_location, ex.message)
-      continue
-
-    with _log_import_error('projects/%s' % project.id):
-      import_project(project.id, location)
-
+    ret.append('projects/%s' % project.id)
 
     # Import refs of the project
     for ref in refs[project.id] or []:
       assert ref.name
       assert ref.name.startswith('refs/'), ref.name
-      ref_location = location._replace(
-          treeish=ref.name,
-          path=ref.config_path or cfg.ref_config_default_path,
-      )
-      ref_cs = 'projects/%s/%s' % (project.id, ref.name)
-      with _log_import_error(ref_cs):
-        _import_config_set(ref_cs, ref_location)
+      ret.append('projects/%s/%s' % (project.id, ref.name))
+  return ret
 
 
 def cron_run_import():  # pragma: no cover
+  """Schedules a push task for each config set imported from Gitiles."""
   conf = admin.GlobalConfig.fetch()
+
+  # Collect the list of config sets to import.
+  config_sets = []
   if (conf and conf.services_config_storage_type == GITILES_STORAGE_TYPE and
       conf.services_config_location):
     loc = gitiles.Location.parse_resolve(conf.services_config_location)
-    import_services(loc)
-  import_projects()
+    config_sets += _service_config_sets(loc)
+  config_sets += _project_and_ref_config_sets()
+
+  # For each config set, schedule a push task.
+  # This assumes that tasks are processed faster than we add them.
+  tasks = [
+    taskqueue.Task(url='/internal/task/luci-config/gitiles_import/%s' % cs)
+    for cs in config_sets
+  ]
+
+  q = taskqueue.Queue('gitiles-import')
+  pending = tasks
+  while pending:
+    batch = pending[:100]
+    pending = pending[len(batch):]
+    q.add(batch)
+
+  logging.info('scheduled %d tasks', len(tasks))
