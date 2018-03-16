@@ -3,6 +3,7 @@
 # that can be found in the LICENSE file.
 
 import httplib
+import logging
 
 import webapp2
 
