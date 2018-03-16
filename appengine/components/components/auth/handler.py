@@ -331,12 +331,14 @@ class AuthenticatingHandler(webapp2.RequestHandler):
         'https://www.google-analytics.com',
         'https://www.google.com/jsapi',
         'https://apis.google.com',
+        'https://www.gstatic.com', # Google charts loader
       ],
 
       'style-src': [
         "'self'",
         "'unsafe-inline'",  # fallback if the browser doesn't support nonces
         "https://fonts.googleapis.com",
+        "https://www.gstatic.com", # Google charts styling
       ],
 
       'child-src': [

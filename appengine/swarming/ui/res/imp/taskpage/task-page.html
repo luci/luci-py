@@ -32,7 +32,6 @@
 <link rel="import" href="/res/imp/bower_components/paper-input/paper-input.html">
 <link rel="import" href="/res/imp/bower_components/paper-tabs/paper-tabs.html">
 <link rel="import" href="/res/imp/bower_components/polymer/polymer.html">
-<link rel="import" href="/res/imp/bower_components/svg-piechart/svg-piechart.html">
 
 <link rel="import" href="/res/imp/common/common-behavior.html">
 <link rel="import" href="/res/imp/common/single-page-style.html">
@@ -41,9 +40,10 @@
 <link rel="import" href="/res/imp/shared/interval-timer.html">
 <link rel="import" href="/res/imp/shared/url-param.html">
 
+<link rel="import" href="stacked-time-chart.html">
+<link rel="import" href="task-disambiguation.html">
 <link rel="import" href="task-page-data.html">
 <link rel="import" href="task-retry-prompt.html">
-<link rel="import" href="task-disambiguation.html">
 
 <dom-module id="task-page">
   <template>
@@ -149,6 +149,10 @@
       /* Adds | between the dimensions, if there are more than 1*/
       span.dim~span.dim:before {
         content: " | ";
+      }
+
+      .chart {
+        margin-left: 5px;
       }
     </style>
 
@@ -519,27 +523,30 @@
                     <tr>
                       <td>Pending Time</td>
                       <td>
-                        <font color="#cc79a7">[[_pending(_result)]]</font>
+                        <font color="#E69F00">[[_result.human_pending]]</font>
                       </td>
                     </tr>
                     <tr>
-                      <td>Duration</td>
+                      <td>Total Overhead</td>
                       <td>
-                        <font color="#0072b2">[[_result.human_duration]]</font>
+                        <font color="#D55E00">[[_humanDuration(_result.performance_stats.bot_overhead)]]</font>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Running Time</td>
+                      <td>
+                        <font color="#0072B2">[[_result.human_duration]]</font>
                       </td>
                     </tr>
                   </tbody>
                 </table>
               </div>
-              <div class="right flex">
-                <template is="dom-if" if="[[_result.human_completed_ts]]">
-                  <div class="left flex" style="padding-left: 50px; padding-right: 50px">
-                    <svg-piechart
-                      data="[[_computePiechartData(_result)]]"
-                      colors="[&quot;rgb(204,121,167)&quot;, &quot;rgb(0,114,178)&quot;]">
-                    </svg-piechart>
-                  </div>
-                </template>
+              <div class="right flex chart">
+                <stacked-time-chart
+                  labels='["Pending", "Overhead", "Running", "Overhead"]'
+                  colors='["#E69F00", "#D55E00", "#0072B2", "#D55E00"]'
+                  values='[[_durationChart(_result, _result.*)]]'>
+                </stacked-time-chart>
               </div>
             </div>
 
@@ -993,15 +1000,6 @@
         return args.join(" ");
       },
 
-      _computePiechartData: function(result) {
-        var created = result.created_ts;
-        var started = result.started_ts;
-        var completed = result.completed_ts;
-        return [
-          this._duration(created, started),
-          this._duration(started, completed)];
-      },
-
       _cost: function(result) {
         if (!result || !result.costs_usd || !result.costs_usd.length) {
           return 0;
@@ -1016,15 +1014,26 @@
         return result.try_number > 1;
       },
 
-      _duration: function(start, end) {
-        if (!(start && start.getTime && end && end.getTime)){
-          return 0;
+      _durationChart: function(result) {
+        var oneDecimalPlace = function(a) {
+          if (!a) {
+            return 0.0;
+          }
+          return Math.round(a * 10)/10;
         }
-        var duration = end.getTime() - start.getTime();
-        if (duration < 0) {
-          duration = 0;
+        var preOverhead = 0;
+        var postOverhead = 0;
+        // These are only put in upon task completion.
+        if (result.performance_stats) {
+          postOverhead = (result.performance_stats.isolated_upload &&
+                          result.performance_stats.isolated_upload.duration) || 0;
+          // We only know the certain timings of isolating. To get
+          // close enough (tm) overhead timings, we assume CIPD is the only
+          // other source of overhead and all of CIPD's overhead is done pre-task.
+          preOverhead = result.performance_stats.bot_overhead - postOverhead;
         }
-        return duration;
+        return [result.pending, preOverhead,
+               result.duration, postOverhead].map(oneDecimalPlace);
       },
 
       _empty: function(array) {
@@ -1113,18 +1122,6 @@
 
       _noMilo: function(result) {
         return !(this._tag(result, "allow_milo") || this._tag(result, "luci_project"));
-      },
-
-      _pending: function(result) {
-        if (!result.created_ts) {
-          return "";
-        }
-        var end = result.started_ts || result.abandoned_ts || new Date();
-        // In the case of deduplicated tasks, started_ts comes before the task.
-        if (end <= result.created_ts) {
-          return "0s";
-        }
-        return this._timeDiffExact(result.created_ts, end);
       },
 
       _promptClosed: function(e) {

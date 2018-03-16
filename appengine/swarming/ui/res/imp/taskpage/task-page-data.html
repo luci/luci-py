@@ -188,6 +188,21 @@
         }
         // Make the duration human readable
         result.human_duration = this._humanDuration(result.duration);
+
+        var end = result.started_ts || result.abandoned_ts || new Date();
+        if (!result.created_ts) {
+          // This should never happen
+          result.pending = 0;
+          result.human_pending = "";
+        } else if (end <= result.created_ts) {
+          // In the case of deduplicated tasks, started_ts comes before the task.
+          result.pending = 0;
+          result.human_pending = "0s";
+        } else {
+          result.pending = (end - result.created_ts) / 1000; // convert to seconds.
+          result.human_pending = this._timeDiffExact(result.created_ts, end);
+        }
+
         return result;
       },
 

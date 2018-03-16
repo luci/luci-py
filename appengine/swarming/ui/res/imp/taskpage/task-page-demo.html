@@ -26,8 +26,8 @@
   <script type="text/javascript" src="new-task-demo.json"></script>
 
   <script type="text/javascript" charset="utf-8">
-    sinon.format = function(object) {return JSON.stringify(object);}
-    sinon.log = function(message) {console.log(message);};
+   // sinon.format = function(object) {return JSON.stringify(object);}
+   // sinon.log = function(message) {console.log(message);};
     var server = sinon.fakeServer.create();
     server.autoRespond = true;
     server.autoRespondAfter = 500;
