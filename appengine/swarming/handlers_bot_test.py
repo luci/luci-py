@@ -879,6 +879,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'lease_id': None,
         'lease_expiration_ts': None,
         'machine_type': None,
+        'machine_lease': None,
         'message': u'for the best',
         'quarantined': False,
         'state': {
@@ -906,6 +907,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'lease_id': None,
         'lease_expiration_ts': None,
         'machine_type': None,
+        'machine_lease': None,
         'message': None,
         'quarantined': False,
         'state': {

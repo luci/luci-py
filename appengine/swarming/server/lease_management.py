@@ -767,6 +767,7 @@ def ensure_bot_info_exists(machine_lease):
         lease_id=machine_lease.lease_id,
         lease_expiration_ts=machine_lease.lease_expiration_ts,
         machine_type=machine_lease.machine_type.id(),
+        machine_lease=machine_lease.key.id(),
     )
     # Occasionally bot_management.bot_event fails to store the BotInfo so
     # verify presence of Machine Provider fields. See https://crbug.com/681224.
@@ -776,6 +777,7 @@ def ensure_bot_info_exists(machine_lease):
         and bot_info.lease_id
         and bot_info.lease_expiration_ts
         and bot_info.machine_type
+        and bot_info.machine_lease
     ):
       # If associate_bot_id isn't called, cron will try again later.
       logging.error(

@@ -393,6 +393,7 @@ class EnsureBotInfoExistsTest(test_case.TestCase):
 
   def test_creates(self):
     key = lease_management.MachineLease(
+        id='machine-type-1',
         hostname='hostname',
         lease_id='lease-id',
         lease_expiration_ts=utils.utcnow(),
@@ -408,6 +409,7 @@ class EnsureBotInfoExistsTest(test_case.TestCase):
     self.assertEqual(
         bot_info.lease_expiration_ts, machine_lease.lease_expiration_ts)
     self.assertEqual(bot_info.machine_type, machine_lease.machine_type.id())
+    self.assertEqual(bot_info.machine_lease, machine_lease.key.id())
 
 
 class EnsureEntitiesExistTest(test_case.TestCase):

@@ -118,6 +118,9 @@ class _BotCommon(ndb.Model):
   # ID of the MachineType, for bots acquired from Machine Provider.
   machine_type = ndb.StringProperty(indexed=False)
 
+  # ID of the MachineLease, for bots acquired from Machine Provider.
+  machine_lease = ndb.StringProperty(indexed=False)
+
   @property
   def dimensions(self):
     """Returns a dict representation of self.dimensions_flat."""
@@ -386,6 +389,8 @@ def bot_event(
         Provider lease expires.
   - machine_type (in kwargs): ID of the lease_management.MachineType this
         Machine Provider bot was leased for.
+  - machine_lease (in kwargs): ID of the lease_management.MachineType
+        corresponding to this bot.
   """
   if not bot_id:
     return
@@ -416,6 +421,8 @@ def bot_event(
     bot_info.lease_expiration_ts = kwargs['lease_expiration_ts']
   if kwargs.get('machine_type') is not None:
     bot_info.machine_type = kwargs['machine_type']
+  if kwargs.get('machine_lease') is not None:
+    bot_info.machine_lease = kwargs['machine_lease']
 
   if event_type in ('request_sleep', 'task_update'):
     # Handle this specifically. It's not much of an even worth saving a BotEvent

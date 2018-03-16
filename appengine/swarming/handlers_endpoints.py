@@ -31,6 +31,7 @@ from server import acl
 from server import bot_code
 from server import bot_management
 from server import config
+from server import lease_management
 from server import service_accounts
 from server import task_pack
 from server import task_queues
@@ -667,7 +668,8 @@ class SwarmingBotService(remote.Service):
           last_seen_ts=events[0].ts,
           lease_id=events[0].lease_id,
           lease_expiration_ts=events[0].lease_expiration_ts,
-          machine_type=events[0].machine_type)
+          machine_type=events[0].machine_type,
+          machine_lease=events[0].machine_lease)
       deleted = True
 
     return message_conversion.bot_info_to_rpc(bot, utils.utcnow(),
@@ -692,8 +694,11 @@ class SwarmingBotService(remote.Service):
     """
     logging.debug('%s', request)
     bot_key = bot_management.get_info_key(request.bot_id)
-    get_or_raise(bot_key)  # raises 404 if there is no such bot
-    # TODO(maruel): If the bot was a MP, call lease_management.cleanup_bot()?
+    bot_info = get_or_raise(bot_key)  # raises 404 if there is no such bot
+    if bot_info.machine_lease:
+      ml = lease_management.MachineLease.get_by_id(bot_info.machine_lease)
+      if lease_management.release(ml):
+        lease_management.cleanup_bot(ml)
     task_queues.cleanup_after_bot(request.bot_id)
     bot_key.delete()
     return swarming_rpcs.DeletedResponse(deleted=True)
