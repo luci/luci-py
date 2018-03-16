@@ -450,7 +450,19 @@
         if (def === undefined) {
           def = "none";
         }
-        var retVal = this._tag(task, col) || task[col] || [def];
+        var retVal = task[col];
+        if (col.startsWith("tag:")) {
+          // Trim off the first 4 letters "tag:"
+          retVal = this._tag(task, col.substr(4));
+        }
+        if (!retVal) {
+          // Handle legacy links that don't have tag:
+          // TODO(kjlubick): remove this after old links have been updated (Mar 2019)
+          retVal = this._tag(task, col);
+        }
+        if (!retVal) {
+          retVal = [def];
+        }
         if (!Array.isArray(retVal)) {
           return [retVal];
         }
