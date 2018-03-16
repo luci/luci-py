@@ -70,7 +70,10 @@ class TaskGitilesImportConfigSet(webapp2.RequestHandler):
   """Imports a config set from gitiles."""
 
   def post(self, config_set):
-    gitiles_import.import_config_set(config_set)
+    try:
+      gitiles_import.import_config_set(config_set)
+    except gitiles_import.NotFoundError:
+      logging.warning(ex.message)
 
 
 def get_frontend_routes():  # pragma: no cover

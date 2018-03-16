@@ -271,7 +271,7 @@ def _import_config_set(config_set, location):
     if (config_set_entity and config_set_entity.latest_revision == commit.sha
         and not force_update):
       save_attempt(True, 'Up-to-date')
-      logging.debug('Up-to-date', config_set)
+      logging.debug('Up-to-date')
       return
 
     logging.info(
