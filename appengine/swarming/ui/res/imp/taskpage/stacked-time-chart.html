@@ -123,7 +123,8 @@
         } else {
           gridCount = 0;
         }
-      } else {
+        // Prevent tasks with super long times (> 10 days) from locking up the drawing.
+      } else if (total < 1000000) {
         for (var t = 600; t < total; t+=600) {
           ticks.push({v: t, f: t/60+'m'});
         }

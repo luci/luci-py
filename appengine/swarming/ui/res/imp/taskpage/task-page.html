@@ -154,6 +154,10 @@
       .chart {
         margin-left: 5px;
       }
+
+      .highlighted {
+        background-color: #fffc6c;
+      }
     </style>
 
     <url-param name="id"
@@ -285,7 +289,7 @@
                   </td>
                 </tr>
                 <template is="dom-if" if="[[_result.deduped_from]]">
-                  <tr>
+                  <tr class="highlighted">
                     <td><b>Deduped from</b></td>
                     <td>
                       <a href$="[[_taskLink(_result.deduped_from)]]">
@@ -483,10 +487,10 @@
               </tbody>
             </table>
 
-            <div class="title" hidden$="[[_not(_task_exists)]]">Task Timing Information</div>
-            <div class="horizontal layout wrap">
+            <div class="title" hidden$="[[!_deduped(_task_exists,_result)]]">Task Timing Information</div>
+            <div class="horizontal layout wrap" hidden$="[[!_deduped(_task_exists,_result)]]">
               <div class="left flex">
-                <table class="task-info" hidden$="[[_not(_task_exists)]]">
+                <table class="task-info">
                   <tbody>
                     <tr>
                       <td>Created</td>
@@ -550,9 +554,9 @@
               </div>
             </div>
 
-            <div class="title" hidden$="[[_not(_task_exists)]]">Task Execution</div>
+            <div class="title" hidden$="[[!_deduped(_task_exists,_result)]]">Task Execution</div>
             <template is="dom-if" if="[[_wasPickedUp(_result)]]">
-              <table hidden$="[[_not(_task_exists)]]">
+              <table hidden$="[[!_deduped(_task_exists,_result)]]">
                 <tr>
                   <td>Bot assigned to task</td>
                   <td><a href$="[[_botLink(_result.bot_id)]]">[[_result.bot_id]]</td>
@@ -659,6 +663,18 @@
                   [[_bytes(_result.performance_stats.isolated_upload.total_bytes_items_hot)]]</td>
                 </tr>
               </table>
+            </template>
+
+            <template is="dom-if" if="[[_result.deduped_from]]">
+              <div class="title">Task was Deduplicated</div>
+
+              <p>This task was deduplicated from task
+                <a href$="[[_taskLink(_result.deduped_from)]]">[[_result.deduped_from]]</a>.
+                For more information on deduplication, see <a href="https://chromium.googlesource.com/infra/luci/luci-py/+/master/appengine/swarming/doc/Detailed-Design.md#task-deduplication">
+                the docs</a>.
+              </p>
+
+              <br>
             </template>
 
             <div hidden$="[[_not(_task_exists)]]">
@@ -1005,6 +1021,10 @@
           return 0;
         }
         return result.costs_usd[0].toFixed(4);
+      },
+
+      _deduped: function(exists, result) {
+        return exists && !result.deduped_from;
       },
 
       _disambiguate: function(taskId, result) {

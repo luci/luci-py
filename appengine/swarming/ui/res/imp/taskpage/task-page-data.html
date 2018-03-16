@@ -182,12 +182,20 @@
         TIMES.forEach(function(time) {
           swarming.sanitizeAndHumanizeTime(result, time);
         });
-        // Running tasks have no duration set, so we can figure it out.
-        if (!result.duration && result.state === this.RUNNING && result.started_ts){
+        // Running and bot_died tasks have no duration set, so we can figure it out.
+        if (!result.duration && result.state === this.RUNNING && result.started_ts) {
           result.duration = (now - result.started_ts) / 1000;
+        } else if (!result.duration && result.state === this.BOT_DIED &&
+                    result.started_ts && result.abandoned_ts) {
+          result.duration = (result.abandoned_ts - result.started_ts) / 1000;
         }
         // Make the duration human readable
         result.human_duration = this._humanDuration(result.duration);
+        if (result.state === this.RUNNING) {
+          result.human_duration += "*";
+        } else if (result.state === this.BOT_DIED) {
+          result.human_duration += " -- died";
+        }
 
         var end = result.started_ts || result.abandoned_ts || new Date();
         if (!result.created_ts) {
