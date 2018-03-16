@@ -119,7 +119,7 @@
     </url-param>
     <url-param name="c"
       value="{{columns}}"
-      default_values='["name","state","created_ts","duration","pending_time","tag:pool","bot"]'
+      default_values='["name","state","created_ts","duration","pending_time","pool","bot"]'
       multi>
     </url-param>
     <url-param name="q"
@@ -375,6 +375,10 @@
         var params = {};
         var tags = [];
         this._filters.forEach(function(f) {
+          if (f.startsWith("tag-")) {
+            // Trim off the 4 letters "tag-"
+            f = f.substring(4);
+          }
           var split = f.split(this.FILTER_SEP, 1)
           var col = split[0];
           var rest = f.substring(col.length + this.FILTER_SEP.length);

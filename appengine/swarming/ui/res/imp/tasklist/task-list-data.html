@@ -159,7 +159,7 @@
         // This way a user can filter by what the data actually has and can
         // discover new tags to filter by.
         tags.forEach(function(t) {
-          var k = "tag:" + t.key;
+          var k = "tag-" + t.key;
           if (!map[k]) {
             map[k] = {};
           }
@@ -182,7 +182,7 @@
         tasks.forEach(function(t) {
           Object.keys(t.tagMap).forEach(function(k) {
             var v = t.tagMap[k];
-            k = "tag:" + k;
+            k = "tag-" + k;
             if (!map[k]) {
               map[k] = {};
             }
