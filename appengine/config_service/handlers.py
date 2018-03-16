@@ -73,7 +73,7 @@ class TaskGitilesImportConfigSet(webapp2.RequestHandler):
   def post(self, config_set):
     try:
       gitiles_import.import_config_set(config_set)
-    except gitiles_import.NotFoundError:
+    except gitiles_import.NotFoundError as ex:
       logging.warning(ex.message)
 
 
