@@ -102,7 +102,6 @@ def _import_revision(config_set, base_location, commit, force_update):
   assert re.match('[0-9a-f]{40}', revision), (
       '"%s" is not a valid sha' % revision
   )
-  logging.debug('Importing revision %s @ %s', config_set, revision)
   rev_key = ndb.Key(
       storage.ConfigSet, config_set,
       storage.Revision, revision)
@@ -191,6 +190,7 @@ def _read_and_validate_archive(config_set, rev_key, archive, location):
     for item in tar:
       if not item.isreg():  # pragma: no cover
         continue
+      logging.info('Found file "%s"', item.name)
       with contextlib.closing(tar.extractfile(item)) as extracted:
         content = extracted.read()
         files[item.name] = content
@@ -271,9 +271,12 @@ def _import_config_set(config_set, location):
     if (config_set_entity and config_set_entity.latest_revision == commit.sha
         and not force_update):
       save_attempt(True, 'Up-to-date')
-      logging.debug('Config set %s is up-to-date', config_set)
+      logging.debug('Up-to-date', config_set)
       return
 
+    logging.info(
+        'Rolling %s => %s',
+        config_set_entity and config_set_entity.latest_revision, commit.sha)
     _import_revision(config_set, location, commit, force_update)
   except urlfetch_errors.DeadlineExceededError:
     save_attempt(False, 'Could not import: deadline exceeded')
