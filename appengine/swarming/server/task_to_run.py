@@ -220,19 +220,6 @@ def _validate_task_async(bot_dimensions, deadline, stats, now, task):
       task_to_run_key_to_request_key(task.key)) + '0'
   stats.total += 1
 
-  # It expired. A cron job will cancel it eventually. Since 'now' is saved
-  # before the query, an expired task may still be reaped even if technically
-  # expired if the query is very slow. This is on purpose so slow queries do not
-  # cause exagerate expirations.
-  if task.expiration_ts < now:
-    # It could be possible to handle right away to not have to wait for the cron
-    # job, which would save a 30s average delay.
-    logging.debug(
-        '_validate_task_async(%s): expired %s < %s',
-        packed, task.expiration_ts, now)
-    stats.expired += 1
-    raise ndb.Return((None, None))
-
   # Do this after the basic weeding out but before fetching TaskRequest.
   neg = yield _lookup_cache_is_taken_async(task.key)
   if neg:
@@ -286,10 +273,17 @@ def _validate_task_async(bot_dimensions, deadline, stats, now, task):
       stats.too_long += 1
       raise ndb.Return((None, None))
 
-  # It's a valid task! Note that in the meantime, another bot may have reaped
-  # it. This is verified one last time in task_scheduler._reap_task() by calling
-  # set_lookup_cache().
-  logging.info('_validate_task_async(%s): ready to reap!', packed)
+  # Expire as the bot polls by returning it, and task_scheduler will handle it.
+  if task.expiration_ts < now:
+    logging.debug(
+        '_validate_task_async(%s): expired %s < %s',
+        packed, task.expiration_ts, now)
+    stats.expired += 1
+  else:
+    # It's a valid task! Note that in the meantime, another bot may have reaped
+    # it. This is verified one last time in task_scheduler._reap_task() by
+    # calling set_lookup_cache().
+    logging.info('_validate_task_async(%s): ready to reap!', packed)
   raise ndb.Return((request, task))
 
 
@@ -551,7 +545,8 @@ def yield_next_available_task_to_dispatch(bot_dimensions, deadline):
           if request:
             yield request, task
             # If the code is still executed, it means that the task reaping
-            # wasn't successful.
+            # wasn't successful. Note that this includes expired ones, which is
+            # kinda weird but it's not a big deal.
             stats.ignored += 1
           futures.popleft()
         # Don't batch too much.
@@ -565,7 +560,7 @@ def yield_next_available_task_to_dispatch(bot_dimensions, deadline):
       if request:
         yield request, task
         # If the code is still executed, it means that the task reaping
-        # wasn't successful.
+        # wasn't successful. Same as above about expired.
         stats.ignored += 1
       futures.popleft()
   finally:

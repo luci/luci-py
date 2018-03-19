@@ -606,11 +606,12 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         0, len(list(task_to_run.yield_expired_task_to_run())))
 
     # All tasks are now expired. Note that even if they still have .queue_number
-    # set because the cron job wasn't run, they are still not yielded by
-    # yield_next_available_task_to_dispatch()
+    # set because the cron job wasn't run. They are still yielded by
+    # yield_next_available_task_to_dispatch() because then task_scheduler can
+    # expire them "inline" instead of waiting for a cron job.
     self.mock_now(self.now, 61)
     self.assertEqual(
-        0, len(_yield_next_available_task_to_dispatch(bot_dimensions, None)))
+        1, len(_yield_next_available_task_to_dispatch(bot_dimensions, None)))
     self.assertEqual(
         1, len(list(task_to_run.yield_expired_task_to_run())))
 

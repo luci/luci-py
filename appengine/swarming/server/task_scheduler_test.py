@@ -251,7 +251,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     task_request.init_new_request(request, True)
     _result_summary = task_scheduler.schedule_request(request, None)
     self._register_bot(self.bot_dimensions)
-    actual_request, _, run_result  = task_scheduler.bot_reap_task(
+    actual_request, _, run_result = task_scheduler.bot_reap_task(
         self.bot_dimensions, 'abc', None)
     self.assertEqual(request, actual_request)
     self.assertEqual('localhost', run_result.bot_id)
@@ -262,7 +262,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     task_request.init_new_request(request, True)
     _result_summary = task_scheduler.schedule_request(request, None)
     self._register_bot(self.bot_dimensions)
-    actual_request, _, run_result  = task_scheduler.bot_reap_task(
+    actual_request, _, run_result = task_scheduler.bot_reap_task(
         self.bot_dimensions, 'abc', datetime.datetime(1969, 1, 1))
     self.failIf(actual_request)
     self.failIf(run_result)
@@ -273,11 +273,27 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     task_request.init_new_request(request, True)
     _result_summary = task_scheduler.schedule_request(request, None)
     self._register_bot(self.bot_dimensions)
-    actual_request, _, run_result  = task_scheduler.bot_reap_task(
+    actual_request, _, run_result = task_scheduler.bot_reap_task(
         self.bot_dimensions, 'abc', datetime.datetime(3000, 1, 1))
     self.assertEqual(request, actual_request)
     self.assertEqual('localhost', run_result.bot_id)
     self.failIf(task_to_run.TaskToRun.query().get().queue_number)
+
+  def test_bot_reap_task_expired(self):
+    request = gen_request()
+    task_request.init_new_request(request, True)
+    result_summary = task_scheduler.schedule_request(request, None)
+    self._register_bot(self.bot_dimensions)
+    # Forwards clock to get past expiration.
+    self.mock_now(request.expiration_ts, 1)
+
+    actual_request, _, _ = task_scheduler.bot_reap_task(
+        self.bot_dimensions, 'abc', None)
+    # The task is not returned because it's expired.
+    self.assertEqual(None, actual_request)
+    # It's effectively expired.
+    self.assertEqual(None, task_to_run.TaskToRun.query().get().queue_number)
+    self.assertEqual(task_result.State.EXPIRED, result_summary.key.get().state)
 
   def test_exponential_backoff(self):
     self.mock(
