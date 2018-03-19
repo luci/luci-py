@@ -2,7 +2,7 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-syntax = "proto2";
+syntax = "proto3";
 
 
 // Schema for pools.cfg service config file in luci-config.
@@ -29,7 +29,7 @@ message PoolsCfg {
   // Note that tasks in undefined pools aren't allowed to use service accounts,
   // since Swarming doesn't know what accounts are allowed in such unconfigured
   // pools.
-  optional bool forbid_unknown_pools = 2;
+  bool forbid_unknown_pools = 2;
 }
 
 
@@ -53,7 +53,7 @@ message Pool {
   // The checks here act as a second authorization layer, consulted after the
   // first server-global one (defined based on groups set in settings.cfg, see
   // AuthSettings in config.proto).
-  optional Schedulers schedulers = 3;
+  Schedulers schedulers = 3;
 
   // List of service account emails allowed to be used for tasks that target
   // this pool. Tasks specify the service account via 'service_account' field
@@ -111,12 +111,12 @@ message TrustedDelegation {
   }
 
   // Email of a trusted delegatee (the one who's minting the delegation token).
-  optional string peer_id = 1;
+  string peer_id = 1;
 
   // A list of tags to expected in the delegation token to allow the usage of
   // a pool.
   //
   // Presence of any of the specified tags are enough. The format of these tags
   // generally depends on what service is doing the delegation.
-  optional TagList require_any_of = 2;
+  TagList require_any_of = 2;
 }

@@ -2,7 +2,7 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-syntax = "proto2";
+syntax = "proto3";
 
 
 // Schema for settings.cfg service config file in luci-config.
@@ -10,53 +10,53 @@ message SettingsCfg {
   reserved 10;  // used to be dimension_acls
 
   // id to inject into pages if applicable.
-  optional string google_analytics = 1;
+  string google_analytics = 1;
 
   // The number of seconds an old task can be deduped from.
   // Default is one week: 7*24*60*60 = 604800
-  optional int32 reusable_task_age_secs = 2;
+  int32 reusable_task_age_secs = 2;
 
   // The amount of time that has to pass before a machine is considered dead.
   // Default is 600 (10 minutes).
-  optional int32 bot_death_timeout_secs = 3;
+  int32 bot_death_timeout_secs = 3;
 
   // Enable ts_mon based monitoring.
-  optional bool enable_ts_monitoring = 4;
+  bool enable_ts_monitoring = 4;
 
   // Configuration for swarming-isolate integration.
-  optional IsolateSettings isolate = 5;
+  IsolateSettings isolate = 5;
 
   // Configuration for swarming-cipd integration.
-  optional CipdSettings cipd = 6;
+  CipdSettings cipd = 6;
 
   // Configuration for swarming-mp integration.
-  optional MachineProviderSettings mp = 7;
+  MachineProviderSettings mp = 7;
 
   // Emergency setting to disable bot task reaping. When set, all bots are
   // always put to sleep and are never granted task.
-  optional bool force_bots_to_sleep_and_not_run_task = 8;
+  bool force_bots_to_sleep_and_not_run_task = 8;
 
   // oauth client id for the ui. This is created in the developer's console
   // under Credentials.
-  optional string ui_client_id = 9;
+  string ui_client_id = 9;
 
   // A url to a task display server (e.g. milo).  This should have a %s where
   // a task id can go.
-  optional string display_server_url_template = 11;
+  string display_server_url_template = 11;
 
   // Sets a maximum sleep time in seconds for bots that limits the exponental
   // backoff. If missing, the task scheduler will provide the default maximum
   // (usually 60s, but see bot_code/task_scheduler.py for details).
-  optional int32 max_bot_sleep_time = 12;
+  int32 max_bot_sleep_time = 12;
 
   // Names of the authorization groups used by components/auth.
-  optional AuthSettings auth = 13;
+  AuthSettings auth = 13;
 
   // Sets the default gRPC proxy for the bot's Isolate server calls.
-  optional string bot_isolate_grpc_proxy = 14;
+  string bot_isolate_grpc_proxy = 14;
 
   // Sets the default gRPC proxy for the bot's Swarming server calls.
-  optional string bot_swarming_grpc_proxy = 15;
+  string bot_swarming_grpc_proxy = 15;
 }
 
 
@@ -65,11 +65,11 @@ message IsolateSettings {
   // URL of the default isolate server to use if it is not specified in a
   // task. Must start with "https://" or "http://",
   // e.g. "https://isolateserver.appspot.com"
-  optional string default_server = 1;
+  string default_server = 1;
 
   // Default namespace to use if it is not specified in a task,
   // e.g. "default-gzip"
-  optional string default_namespace = 2;
+  string default_namespace = 2;
 }
 
 
@@ -78,10 +78,10 @@ message CipdPackage {
   // A template of a full CIPD package name, e.g.
   // "infra/tools/cipd/${platform}"
   // See also cipd.ALL_PARAMS.
-  optional string package_name = 1;
+  string package_name = 1;
 
   // Valid package version for all packages matched by package name.
-  optional string version = 2;
+  string version = 2;
 }
 
 
@@ -90,20 +90,20 @@ message CipdSettings {
   // URL of the default CIPD server to use if it is not specified in a task.
   // Must start with "https://" or "http://",
   // e.g. "https://chrome-infra-packages.appspot.com".
-  optional string default_server = 1;
+  string default_server = 1;
 
   // Package of the default CIPD client to use if it is not specified in a
   // task.
-  optional CipdPackage default_client_package = 2;
+  CipdPackage default_client_package = 2;
 }
 
 
 // Settings for Swarming-MP integration.
 message MachineProviderSettings {
   // Whether or not Swarming-MP integration is enabled.
-  optional bool enabled = 1;
+  bool enabled = 1;
   // URL of the Machine Provider server to use.
-  optional string server = 2;
+  string server = 2;
 }
 
 
@@ -125,13 +125,13 @@ message AuthSettings {
   // - delete any bot
   // - all of bot_bootstrap_group membership
   // - all of privileged_users_group membership
-  optional string admins_group = 1;
+  string admins_group = 1;
 
   // Members of this group can fetch swarming bot code and bootstrap bots.
   //
   // Grants:
   // - bot create: create a token to anonymously fetch the bot code.
-  optional string bot_bootstrap_group = 2;
+  string bot_bootstrap_group = 2;
 
   // Members of this group can schedule tasks and see everyone else's tasks.
   //
@@ -140,24 +140,24 @@ message AuthSettings {
   // - edit (terminate) any bot
   // - all of view_all_bots_group membership
   // - all of view_all_tasks_group membership
-  optional string privileged_users_group = 3;
+  string privileged_users_group = 3;
 
   // Members of this group can schedule tasks and see only their own tasks.
   //
   // Grants:
   // - create a task
   // - view and edit own task
-  optional string users_group = 4;
+  string users_group = 4;
 
   // Members of this group can view all bots. This is a read-only group.
   //
   // Grants:
   // - view all bots
-  optional string view_all_bots_group = 5;
+  string view_all_bots_group = 5;
 
   // Members of this group can view all tasks. This is a read-only group.
   //
   // Grants:
   // - view all tasks
-  optional string view_all_tasks_group = 6;
+  string view_all_tasks_group = 6;
 }

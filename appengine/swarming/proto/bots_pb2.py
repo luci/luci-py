@@ -18,8 +18,8 @@ _sym_db = _symbol_database.Default()
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='bots.proto',
   package='',
-  syntax='proto2',
-  serialized_pb=_b('\n\nbots.proto\"C\n\x07\x42otsCfg\x12\x1a\n\x12trusted_dimensions\x18\x01 \x03(\t\x12\x1c\n\tbot_group\x18\x02 \x03(\x0b\x32\t.BotGroup\"Z\n\rDailySchedule\x12\r\n\x05start\x18\x01 \x01(\t\x12\x0b\n\x03\x65nd\x18\x02 \x01(\t\x12\x18\n\x10\x64\x61ys_of_the_week\x18\x03 \x03(\x05\x12\x13\n\x0btarget_size\x18\x04 \x01(\x05\"7\n\tLoadBased\x12\x14\n\x0cminimum_size\x18\x01 \x01(\x05\x12\x14\n\x0cmaximum_size\x18\x02 \x01(\x05\"I\n\x08Schedule\x12\x1d\n\x05\x64\x61ily\x18\x01 \x03(\x0b\x32\x0e.DailySchedule\x12\x1e\n\nload_based\x18\x02 \x03(\x0b\x32\n.LoadBased\"\xb2\x01\n\x0bMachineType\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x1a\n\x12\x65\x61rly_release_secs\x18\x03 \x01(\x05\x12\x1b\n\x13lease_duration_secs\x18\x04 \x01(\x05\x12\x15\n\rmp_dimensions\x18\x05 \x03(\t\x12\x13\n\x0btarget_size\x18\x06 \x01(\x05\x12\x1b\n\x08schedule\x18\x07 \x01(\x0b\x32\t.Schedule\"\xef\x01\n\x08\x42otGroup\x12\x0e\n\x06\x62ot_id\x18\x01 \x03(\t\x12\x15\n\rbot_id_prefix\x18\x02 \x03(\t\x12\"\n\x0cmachine_type\x18\x03 \x03(\x0b\x32\x0c.MachineType\x12\x16\n\x04\x61uth\x18\x14 \x01(\x0b\x32\x08.BotAuth\x12\x0e\n\x06owners\x18\x15 \x03(\t\x12\x12\n\ndimensions\x18\x16 \x03(\t\x12\x19\n\x11\x62ot_config_script\x18\x17 \x01(\t\x12!\n\x19\x62ot_config_script_content\x18\x19 \x01(\x0c\x12\x1e\n\x16system_service_account\x18\x18 \x01(\t\"d\n\x07\x42otAuth\x12\"\n\x1arequire_luci_machine_token\x18\x01 \x01(\x08\x12\x1f\n\x17require_service_account\x18\x02 \x03(\t\x12\x14\n\x0cip_whitelist\x18\x03 \x01(\t')
+  syntax='proto3',
+  serialized_pb=_b('\n\nbots.proto\"C\n\x07\x42otsCfg\x12\x1a\n\x12trusted_dimensions\x18\x01 \x03(\t\x12\x1c\n\tbot_group\x18\x02 \x03(\x0b\x32\t.BotGroup\"Z\n\rDailySchedule\x12\r\n\x05start\x18\x01 \x01(\t\x12\x0b\n\x03\x65nd\x18\x02 \x01(\t\x12\x18\n\x10\x64\x61ys_of_the_week\x18\x03 \x03(\x05\x12\x13\n\x0btarget_size\x18\x04 \x01(\x05\"7\n\tLoadBased\x12\x14\n\x0cminimum_size\x18\x01 \x01(\x05\x12\x14\n\x0cmaximum_size\x18\x02 \x01(\x05\"I\n\x08Schedule\x12\x1d\n\x05\x64\x61ily\x18\x01 \x03(\x0b\x32\x0e.DailySchedule\x12\x1e\n\nload_based\x18\x02 \x03(\x0b\x32\n.LoadBased\"\xb2\x01\n\x0bMachineType\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x02 \x01(\t\x12\x1a\n\x12\x65\x61rly_release_secs\x18\x03 \x01(\x05\x12\x1b\n\x13lease_duration_secs\x18\x04 \x01(\x05\x12\x15\n\rmp_dimensions\x18\x05 \x03(\t\x12\x13\n\x0btarget_size\x18\x06 \x01(\x05\x12\x1b\n\x08schedule\x18\x07 \x01(\x0b\x32\t.Schedule\"\xef\x01\n\x08\x42otGroup\x12\x0e\n\x06\x62ot_id\x18\x01 \x03(\t\x12\x15\n\rbot_id_prefix\x18\x02 \x03(\t\x12\"\n\x0cmachine_type\x18\x03 \x03(\x0b\x32\x0c.MachineType\x12\x16\n\x04\x61uth\x18\x14 \x01(\x0b\x32\x08.BotAuth\x12\x0e\n\x06owners\x18\x15 \x03(\t\x12\x12\n\ndimensions\x18\x16 \x03(\t\x12\x19\n\x11\x62ot_config_script\x18\x17 \x01(\t\x12!\n\x19\x62ot_config_script_content\x18\x19 \x01(\x0c\x12\x1e\n\x16system_service_account\x18\x18 \x01(\t\"d\n\x07\x42otAuth\x12\"\n\x1arequire_luci_machine_token\x18\x01 \x01(\x08\x12\x1f\n\x17require_service_account\x18\x02 \x03(\t\x12\x14\n\x0cip_whitelist\x18\x03 \x01(\tb\x06proto3')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -55,7 +55,7 @@ _BOTSCFG = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
+  syntax='proto3',
   extension_ranges=[],
   oneofs=[
   ],
@@ -107,7 +107,7 @@ _DAILYSCHEDULE = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
+  syntax='proto3',
   extension_ranges=[],
   oneofs=[
   ],
@@ -145,7 +145,7 @@ _LOADBASED = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
+  syntax='proto3',
   extension_ranges=[],
   oneofs=[
   ],
@@ -183,7 +183,7 @@ _SCHEDULE = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
+  syntax='proto3',
   extension_ranges=[],
   oneofs=[
   ],
@@ -256,7 +256,7 @@ _MACHINETYPE = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
+  syntax='proto3',
   extension_ranges=[],
   oneofs=[
   ],
@@ -343,7 +343,7 @@ _BOTGROUP = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
+  syntax='proto3',
   extension_ranges=[],
   oneofs=[
   ],
@@ -388,7 +388,7 @@ _BOTAUTH = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
+  syntax='proto3',
   extension_ranges=[],
   oneofs=[
   ],
