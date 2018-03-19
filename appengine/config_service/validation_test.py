@@ -141,7 +141,6 @@ class ValidationTestCase(test_case.TestCase):
         ]
     )
 
-
   def test_validate_service_dynamic_metadata_blob(self):
     def expect_errors(blob, expected_messages):
       ctx = config.validation.Context()
@@ -462,38 +461,37 @@ class ValidationTestCase(test_case.TestCase):
         {'severity': 'invalid severity'},
         {},
         [],
+        {'text': '%s', 'severity': logging.INFO},  # format string
       ]
     }
     net.json_request_async.return_value = ndb.Future()
     net.json_request_async.return_value.set_result(res)
 
     result = validation.validate_config('projects/baz/refs/x', 'qux.cfg', cfg)
-    self.assertEqual(
-        result.messages,
-        [
-          validation_context.Message(
-              severity=logging.CRITICAL,
-              text=(
-                  'Error during external validation: invalid response: '
-                  'unexpected message severity: \'invalid severity\'\n'
-                  'url: https://ultimate.verifier\n'
-                  'config_set: projects/baz/refs/x\n'
-                  'path: qux.cfg\n'
-                  'response: %r' % res),
-              ),
-          validation_context.Message(severity=logging.INFO, text=''),
-          validation_context.Message(
-              severity=logging.CRITICAL,
-              text=(
-                  'Error during external validation: invalid response: '
-                  'message is not a dict: []\n'
-                  'url: https://ultimate.verifier\n'
-                  'config_set: projects/baz/refs/x\n'
-                  'path: qux.cfg\n'
-                  'response: %r' % res),
-              ),
-        ],
-    )
+    self.assertEqual(result.messages, [
+      validation_context.Message(
+          severity=logging.CRITICAL,
+          text=(
+              'Error during external validation: invalid response: '
+              'unexpected message severity: \'invalid severity\'\n'
+              'url: https://ultimate.verifier\n'
+              'config_set: projects/baz/refs/x\n'
+              'path: qux.cfg\n'
+              'response: %r' % res)),
+      validation_context.Message(severity=logging.INFO, text=''),
+      validation_context.Message(
+          severity=logging.CRITICAL,
+          text=(
+              'Error during external validation: invalid response: '
+              'message is not a dict: []\n'
+              'url: https://ultimate.verifier\n'
+              'config_set: projects/baz/refs/x\n'
+              'path: qux.cfg\n'
+              'response: %r' % res)),
+      validation_context.Message(
+          severity=logging.INFO,
+          text='%s'),
+    ])
 
   def test_validate_json_files(self):
     with self.assertRaises(ValueError):
