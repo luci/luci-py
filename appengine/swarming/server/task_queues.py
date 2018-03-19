@@ -300,18 +300,17 @@ def _flatten_bot_dimensions(bot_dimensions):
 
 
 def _get_task_queries_for_bot(bot_dimensions):
-  """Returns all the ndb.Query for TaskDimensions relevant for this bot."""
-  opts = ndb.QueryOptions(batch_size=100, deadline=15)
+  """Returns all the ndb.Query for TaskDimensions relevant for this bot.
+
+  In practice it returns one query for the bot id and one per pool.
+  """
   ancestors = [ndb.Key(TaskDimensionsRoot, u'id:' + bot_dimensions[u'id'][0])]
   for pool in bot_dimensions['pool']:
     ancestors.append(ndb.Key(TaskDimensionsRoot, u'pool:' + pool))
   # These are consistent queries because they use an ancestor. The old entries
   # are removed by cron job /internal/cron/task_queues_tidy triggered every N
   # minutes (see cron.yaml).
-  return [
-      TaskDimensions.query(default_options=opts, ancestor=a)
-      for a in ancestors
-  ]
+  return [TaskDimensions.query(ancestor=a) for a in ancestors]
 
 
 def _cap_futures(futures):
@@ -339,6 +338,61 @@ def _flush_futures(futures):
 
 
 @ndb.tasklet
+def _delete_stale_BotTaskDimensions(bot_dimensions, bot_root_key, cleaned):
+  """Deletes any BotTaskDimensions that do not match the current dimensions."""
+  qit = BotTaskDimensions.query(ancestor=bot_root_key).iter(batch_size=64)
+  while (yield qit.has_next_async()):
+    ent = qit.next()
+    if not ent.is_valid(bot_dimensions):
+      # This BotTaskDimensions doesn't match bot_dimensions anymore, remove.
+      yield ent.key.delete_async()
+      # This hack so that even if the task queue throws a deadline exceeded
+      # exception, we still get the number of cleaned items.
+      cleaned[0] += 1
+
+
+@ndb.tasklet
+def _update_BotTaskDimensions_slice(
+    bot_dimensions, bot_root_key, now, matches, q):
+  """Updates BotTaskDimensions for task queues with the TaskDimensions query for
+  this bot.
+
+  The TaskDimension ndb.Query is either rooted on the bot id or one of its pool.
+
+  The expected total number of TaskDimensions is in the tens or few hundreds, as
+  it depends on all the kinds of different task dimensions that this bot could
+  run that are ACTIVE queues, e.g. TaskDimensions.valid_until_ts is in the
+  future.
+  """
+  qit = q.iter(batch_size=100, deadline=15)
+  while (yield qit.has_next_async()):
+    task_dimensions = qit.next()
+    # match_bot() returns a TaskDimensionsSet if there's a match.
+    s = task_dimensions.match_bot(bot_dimensions)
+    if s and s.valid_until_ts >= now:
+      # Valid TaskDimensionsSet.
+      dimensions_hash = task_dimensions.key.integer_id()
+      # Reuse TaskDimensionsSet.valid_until_ts.
+      obj = BotTaskDimensions(
+          id=dimensions_hash, parent=bot_root_key,
+          valid_until_ts=s.valid_until_ts,
+          dimensions_flat=s.dimensions_flat)
+      yield obj.put_async()
+      matches.append(dimensions_hash)
+
+
+@ndb.tasklet
+def _update_BotTaskDimensions(bot_dimensions, bot_root_key, now, matches):
+  """Updates all task queues known for this bot."""
+  # There's one per pool plus one for the bot id.
+  yield [
+    _update_BotTaskDimensions_slice(
+        bot_dimensions, bot_root_key, now, matches, q)
+    for q in _get_task_queries_for_bot(bot_dimensions)
+  ]
+
+
+@ndb.tasklet
 def _rebuild_bot_cache_async(bot_dimensions, bot_root_key):
   """Rebuilds the BotTaskDimensions cache for a single bot.
 
@@ -362,49 +416,15 @@ def _rebuild_bot_cache_async(bot_dimensions, bot_root_key):
   matches = []
   cleaned = [0]
   try:
-    # First delete any BotTaskDimensions that do not match the current
-    # dimensions.
-    @ndb.tasklet
-    def _handle_bot(i):
-      if not i.is_valid(bot_dimensions):
-        # This BotTaskDimensions doesn't match bot_dimensions anymore, remove.
-        yield i.key.delete_async()
-        cleaned[0] += 1
-
-    q = BotTaskDimensions.query(ancestor=bot_root_key)
-    futures = [q.map_async(_handle_bot, batch_size=64)]
-
-    # The expected total number of TaskDimensions is in the tens or few
-    # hundreds, as it depends on all the kinds of different task dimensions that
-    # this bot could run that are ACTIVE queues, e.g.
-    # TaskDimensions.valid_until_ts is in the future.
-    # TODO(maruel): Run the queries in parallel if it becomes an issue, e.g.
-    # datastore_utils.incremental_map().
-    @ndb.tasklet
-    def _handle_task_dimensions(task_dimensions):
-      s = task_dimensions.match_bot(bot_dimensions)
-      if s and s.valid_until_ts >= now:
-        # Stale TaskDimensionsSet.
-        dimensions_hash = task_dimensions.key.integer_id()
-        # Reuse TaskDimensionsSet.valid_until_ts.
-        obj = BotTaskDimensions(
-            id=dimensions_hash, parent=bot_root_key,
-            valid_until_ts=s.valid_until_ts,
-            dimensions_flat=s.dimensions_flat)
-        yield obj.put_async()
-        matches.append(dimensions_hash)
-
-    for q in _get_task_queries_for_bot(bot_dimensions):
-      futures.append(q.map_async(_handle_task_dimensions, batch_size=64))
-
-    # Wait for all of them before the next step.
-    for f in futures:
-      yield f
+    future_bots = _delete_stale_BotTaskDimensions(
+        bot_dimensions, bot_root_key, cleaned)
+    future_tasks = _update_BotTaskDimensions(
+        bot_dimensions, bot_root_key, now, matches)
+    yield [future_bots, future_tasks]
 
     # Seal the fact that it has been updated.
-    obj = BotDimensions(
-        id=1, parent=bot_root_key,
-        dimensions_flat=_flatten_bot_dimensions(bot_dimensions))
+    df = _flatten_bot_dimensions(bot_dimensions)
+    obj = BotDimensions(id=1, parent=bot_root_key, dimensions_flat=df)
     # Do these steps in order.
     yield obj.put_async()
     yield ndb.get_context().memcache_set(
@@ -463,8 +483,7 @@ def _yield_BotTaskDimensions_keys(dimensions_hash, dimensions_flat):
   """Yields all the BotTaskDimensions ndb.Key for the bots that correspond to
   these task request dimensions.
   """
-  opts = ndb.QueryOptions(batch_size=100, keys_only=True, deadline=15)
-  q = BotDimensions.query(default_options=opts)
+  q = BotDimensions.query()
   for d in dimensions_flat:
     q = q.filter(BotDimensions.dimensions_flat == d)
 
@@ -475,7 +494,7 @@ def _yield_BotTaskDimensions_keys(dimensions_hash, dimensions_flat):
       '_yield_BotTaskDimensions_keys(%d, %s) = %d BotDimensions',
       dimensions_hash, dimensions_flat, q.count())
 
-  for bot_info_key in q:
+  for bot_info_key in q.iter(batch_size=100, keys_only=True, deadline=15):
     yield ndb.Key(
         BotTaskDimensions, dimensions_hash, parent=bot_info_key.parent())
 
@@ -514,6 +533,46 @@ def _refresh_BotTaskDimensions(
     bot_id = bot_task_key.parent().string_id()
     yield ndb.get_context().memcache_delete(bot_id, namespace='task_queues')
   raise ndb.Return(need_db_store)
+
+
+@ndb.tasklet
+def _tidy_stale_TaskDimensions(now):
+  """Removes all stale TaskDimensions entities."""
+  qit = TaskDimensions.query(TaskDimensions.valid_until_ts < now).iter(
+      batch_size=64, keys_only=True)
+  td = []
+  while (yield qit.has_next_async()):
+    key = qit.next()
+    # This function takes care of confirming that the entity is indeed
+    # expired.
+    res = yield _remove_old_entity_async(key, now)
+    td.append(res)
+    if res:
+      logging.info('- TD: %s', res.integer_id())
+  raise ndb.Return(td)
+
+
+@ndb.tasklet
+def _tidy_stale_BotTaskDimensions(now):
+  """Removes all stale BotTaskDimensions entities.
+
+  This also cleans up entities for bots that were deleted or that died, as the
+  corresponding will become stale after _ADVANCE.
+  """
+  qit = BotTaskDimensions.query(BotTaskDimensions.valid_until_ts < now).iter(
+      batch_size=64, keys_only=True)
+  btd = []
+  while (yield qit.has_next_async()):
+    key = qit.next()
+    # This function takes care of confirming that the entity is indeed
+    # expired.
+    res = yield _remove_old_entity_async(key, now)
+    btd.append(res)
+    if res:
+      bot_id = res.parent().string_id()
+      yield ndb.get_context().memcache_delete(bot_id, namespace='task_queues')
+      logging.debug('- BTD: %d for bot %s', res.integer_id(), bot_id)
+  raise ndb.Return(btd)
 
 
 ### Public APIs.
@@ -777,33 +836,11 @@ def tidy_stale():
   now = utils.utcnow()
   td = []
   btd = []
-
-  _handle_task = lambda key: _remove_old_entity_async(key, now)
-
-  @ndb.tasklet
-  def _handle_bot_task(key):
-    res = yield _remove_old_entity_async(key, now)
-    if res:
-      bot_id = key.parent().string_id()
-      yield ndb.get_context().memcache_delete(bot_id, namespace='task_queues')
-    raise ndb.Return(res)
-
   try:
-    q = TaskDimensions.query().filter(TaskDimensions.valid_until_ts < now)
-    td_future = q.map_async(_handle_task, batch_size=16, keys_only=True)
-
-    q = BotTaskDimensions.query().filter(BotTaskDimensions.valid_until_ts < now)
-    btd_future = q.map_async(_handle_bot_task, batch_size=16, keys_only=True)
-
-    td = td_future.get_result()
-    for k in td:
-      if k:
-        logging.info('- TD: %s', k.integer_id())
-    btd = btd_future.get_result()
-    for k in btd:
-      if k:
-        bot_id = k.parent().string_id()
-        logging.debug('- BTD: %d for bot %s', k.integer_id(), bot_id)
+    future_tasks = _tidy_stale_TaskDimensions(now)
+    future_bots = _tidy_stale_BotTaskDimensions(now)
+    td = future_tasks.get_result()
+    btd = future_bots.get_result()
   finally:
     logging.info(
         'tidy_stale() in %.3fs; TaskDimensions: found %d, deleted %d; '
