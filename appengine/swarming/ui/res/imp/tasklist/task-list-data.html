@@ -153,21 +153,6 @@
         dims = (dims && dims.bots_dimensions) || [];
         tasks = this.tasks || [];
         var map = {};
-        // We combine all the tags reported by the tags endpoint, all known
-        // dimensions from the dimensions endpoint, and the tags seen in the
-        // returned tasks, just in case they didn't show up in the first two.
-        // This way a user can filter by what the data actually has and can
-        // discover new tags to filter by.
-        tags.forEach(function(t) {
-          var k = "tag-" + t.key;
-          if (!map[k]) {
-            map[k] = {};
-          }
-          var values = t.value || [];
-          values.forEach(function(v) {
-            map[k][v] = true;
-          })
-        });
 
         dims.forEach(function(d) {
           var vals = d.value;
@@ -179,10 +164,34 @@
           })
         });
 
+        // We combine all the tags reported by the tags endpoint, all known
+        // dimensions from the dimensions endpoint, and the tags seen in the
+        // returned tasks, just in case they didn't show up in the first two.
+        // This way a user can filter by what the data actually has and can
+        // discover new tags to filter by.
+        tags.forEach(function(t) {
+          if (map[t.key]) {
+              // don't add a -tag version if it's already been seen.
+              return;
+            }
+          var k = t.key + "-tag";
+          if (!map[k]) {
+            map[k] = {};
+          }
+          var values = t.value || [];
+          values.forEach(function(v) {
+            map[k][v] = true;
+          })
+        });
+
         tasks.forEach(function(t) {
           Object.keys(t.tagMap).forEach(function(k) {
+            if (map[k]) {
+              // don't add a -tag version if it's already been seen.
+              return;
+            }
             var v = t.tagMap[k];
-            k = "tag-" + k;
+            k = t.key + "-tag";
             if (!map[k]) {
               map[k] = {};
             }

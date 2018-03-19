@@ -358,6 +358,12 @@
       "started_ts": "Started Working On",
       "user": "Requesting User",
       "pending_time": "Time Spent Pending",
+      "_displayHeader": function(s) {
+        if (s.endsWith("-tag")) {
+          return s.substring(0, s.length-4) + " (tag)"
+        }
+        return s;
+      },
     };
 
     // Given a time attribute like "abandoned_ts", sortableTime returns a function
@@ -429,6 +435,19 @@
         _headerMap: {
           type: Object,
           value: headerMap,
+        },
+        _prettyItem: {
+          type: Object,
+          value: function() {
+            return {
+              apply: function(s) {
+                if (s.endsWith("-tag")) {
+                  return s.substring(0, s.length-4) + " (tag)"
+                }
+                return s;
+              }
+            };
+          }
         },
         _priorityColumns: {
           type: Array,

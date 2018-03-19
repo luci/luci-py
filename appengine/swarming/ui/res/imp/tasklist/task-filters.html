@@ -197,7 +197,7 @@
             <div class="pointable item" title="There may be more valid options than just the ones shown.">...</div>
           </template>
           <template is="dom-if" if="[[_showTagMessage(_primarySelected,_secondaryItems.length)]]">
-            <div class="item">Only tags can be used for filtering. <i>"[[_primarySelected]]"</i> is informational only.</div>
+            <div class="item">Only tags and dimensions can be used for filtering. <i>"[[_primarySelected]]"</i> is informational only.</div>
           </template>
         </div>
 
@@ -342,7 +342,20 @@
             }
             return base;
           },
-        }
+        },
+        _prettyItem: {
+          type: Object,
+          value: function() {
+            return {
+              apply: function(s) {
+                if (s.endsWith("-tag")) {
+                  return s.substring(0, s.length-4) + " (tag)"
+                }
+                return s;
+              }
+            };
+          }
+        },
       },
 
       ready: function() {
