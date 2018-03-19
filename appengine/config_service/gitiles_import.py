@@ -351,7 +351,7 @@ def import_ref(project_id, ref_name):
   loc = gitiles.Location.parse_resolve(project.config_location.url)
 
   ref = None
-  for r in projects.get_refs([project_id]).get(project_id, ()):
+  for r in projects.get_refs([project_id])[project_id] or ():
     if r.name == ref_name:
       ref = r
 

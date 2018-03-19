@@ -475,7 +475,7 @@ class ValidationTestCase(test_case.TestCase):
               severity=logging.CRITICAL,
               text=(
                   'Error during external validation: invalid response: '
-                  'unexpected message severity: invalid severity\n'
+                  'unexpected message severity: \'invalid severity\'\n'
                   'url: https://ultimate.verifier\n'
                   'config_set: projects/baz/refs/x\n'
                   'path: qux.cfg\n'

@@ -530,7 +530,7 @@ def get_config_sets_from_scope(scope):
     if scope == 'projects':
       yield 'projects/%s' % p.id
     else:
-      for ref in refs.get(p.id, ()):
+      for ref in refs[p.id] or ():
         yield 'projects/%s/%s' % (p.id, ref.name)
 
 
