@@ -245,15 +245,15 @@ class GitilesImportTestCase(test_case.TestCase):
     )
     cs.put()
 
-    with self.assertRaises(gitiles_import.NotFoundError):
+    with self.assertRaises(gitiles_import.HistoryDisappeared):
       gitiles_import._import_config_set(
           'config_set',
           gitiles.Location.parse('https://localhost/project'))
 
-    self.assert_attempt(False, 'Could not load commit log', no_revision=True)
+    self.assertIsNone(storage.last_import_attempt_key('config_set').get())
 
-    cs = cs.key.get()
-    self.assertIsNone(cs.latest_revision)
+    cs_fresh = cs.key.get()
+    self.assertEqual(cs.latest_revision, cs_fresh.latest_revision)
 
   def test_import_config_set_with_auth_error(self):
     self.mock(gitiles, 'get_log', mock.Mock())

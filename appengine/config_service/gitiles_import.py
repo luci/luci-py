@@ -57,6 +57,10 @@ class NotFoundError(Error):
   """A service, project or ref is not found."""
 
 
+class HistoryDisappeared(Error):
+  """Gitiles history unexpectedly disappeared."""
+
+
 def _commit_to_revision_info(commit, location):
   if commit is None:
     return None
@@ -245,23 +249,18 @@ def _import_config_set(config_set, location):
 
       @ndb.transactional
       def txn():
-        save_attempt(False, 'Could not load commit log')
-
-        # Do not delete entire config set entity, but only clear its latest
-        # revision, so that if someone requests a specific old version, they
-        # still can do that, but the config set would be excluded from
-        # get_ref_configs or get_project_configs listings.
         cs = storage.ConfigSet.get_by_id(config_set)
         if cs:
-          cs.latest_revision = None
-          cs.latest_revision_url = None
-          cs.latest_revision_committed_email = None
-          cs.latest_revision_time = None
-          cs.put()
+          # The config set existed once, but its git history disappeared.
+          # Most probably, it is Gitiles bug https://crbug.com/819453#c21
+          raise HistoryDisappeared()
+
+        save_attempt(False, 'Could not load commit log')
 
       txn()
 
       raise NotFoundError('Could not load commit log for %s' % (location,))
+
     commit = log.commits[0]
 
     config_set_key = ndb.Key(storage.ConfigSet, config_set)
