@@ -301,7 +301,6 @@ def _SMC_get_value(conn, key):
   return None
 
 
-@tools.cached
 def _get_system_profiler(data_type):
   """Returns an XML about the system display properties."""
   sp = subprocess.check_output(
@@ -476,9 +475,11 @@ def get_audio():
   ]
 
 
-@tools.cached
 def get_gpu():
-  """Returns video device as listed by 'system_profiler'. See get_gpu()."""
+  """Returns video device as listed by 'system_profiler'.
+
+  Not cached as the GPU driver may change underneat.
+  """
   dimensions = set()
   state = set()
   for card in _get_system_profiler('SPDisplaysDataType'):

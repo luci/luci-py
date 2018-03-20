@@ -69,7 +69,6 @@ def get_num_processors():
   return len(cpu_set.get_cpus())
 
 
-@tools.cached
 def _lspci():
   """Returns list of PCI devices found.
 
@@ -197,9 +196,10 @@ def get_cpuinfo():
   return cpu_info
 
 
-@tools.cached
 def get_gpu():
   """Returns video device as listed by 'lspci'. See get_gpu().
+
+  Not cached as the GPU driver may change underneat.
   """
   pci_devices = _lspci()
   if not pci_devices:

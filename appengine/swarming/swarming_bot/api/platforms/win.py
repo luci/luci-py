@@ -274,9 +274,11 @@ def get_cpuinfo():
     k.Close()
 
 
-@tools.cached
 def get_gpu():
-  """Returns video device as listed by WMI."""
+  """Returns video device as listed by WMI.
+
+  Not cached as the GPU driver may change underneat.
+  """
   wbem = _get_wmi_wbem()
   if not wbem:
     return None, None

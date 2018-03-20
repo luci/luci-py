@@ -444,9 +444,10 @@ def get_audio():
   return None
 
 
-@tools.cached
 def get_gpu():
   """Returns the installed video card(s) name.
+
+  Not cached as the GPU driver may change underneat.
 
   Returns:
     All the video cards detected.
