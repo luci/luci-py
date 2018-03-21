@@ -138,6 +138,36 @@ class GitilesImportTestCase(test_case.TestCase):
     self.assertFalse(gitiles.get_archive.called)
     self.assert_attempt(True, 'Up-to-date')
 
+  def test_revision_revision_exists(self):
+    self.mock(gitiles, 'get_archive', mock.Mock())
+    with open(TEST_ARCHIVE_PATH, 'r') as test_archive_file:
+      gitiles.get_archive.return_value = test_archive_file.read()
+
+    loc = gitiles.Location(
+        hostname='localhost',
+        project='project',
+        treeish='master',
+        path='/')
+    cs = storage.ConfigSet(
+        id='config_set',
+        latest_revision=None,
+        location=str(loc),
+    )
+    rev = storage.Revision(
+        parent=cs.key,
+        id='deadbeef',
+    )
+    ndb.put_multi([cs, rev])
+
+    gitiles_import._import_revision(
+        'config_set',
+        loc,
+        self.test_commit,
+        False)
+
+    cs_fresh = cs.key.get()
+    self.assertEqual(cs_fresh.latest_revision, self.test_commit.sha)
+
   def test_import_revision_no_archive(self):
     self.mock_get_log()
     self.mock(gitiles, 'get_archive', mock.Mock(return_value=None))

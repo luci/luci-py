@@ -99,8 +99,7 @@ def _import_revision(config_set, base_location, commit, force_update):
 
   Updates last ImportAttempt for the config set.
 
-  If Revision entity does not exist, then creates ConfigSet initialized from
-  arguments.
+  Puts ConfigSet initialized from arguments.
   """
   revision = commit.sha
   assert re.match('[0-9a-f]{40}', revision), (
@@ -114,24 +113,24 @@ def _import_revision(config_set, base_location, commit, force_update):
   attempt = storage.ImportAttempt(
       key=storage.last_import_attempt_key(config_set),
       revision=_commit_to_revision_info(commit, location))
+
+  cs_entity = storage.ConfigSet(
+      id=config_set,
+      latest_revision=revision,
+      latest_revision_url=str(location),
+      latest_revision_committer_email=commit.committer.email,
+      latest_revision_time=commit.committer.time,
+      location=str(base_location),
+      version=storage.ConfigSet.CUR_VERSION,
+  )
+
   if not force_update and rev_key.get():
     attempt.success = True
     attempt.message = 'Up-to-date'
-    attempt.put()
+    ndb.put_multi([cs_entity, attempt])
     return
 
-  rev_entities = [
-    storage.ConfigSet(
-        id=config_set,
-        latest_revision=revision,
-        latest_revision_url=str(location),
-        latest_revision_committer_email=commit.committer.email,
-        latest_revision_time=commit.committer.time,
-        location=str(base_location),
-        version=storage.ConfigSet.CUR_VERSION
-    ),
-    storage.Revision(key=rev_key),
-  ]
+  rev_entities = [cs_entity, storage.Revision(key=rev_key)]
 
   # Fetch archive outside ConfigSet transaction.
   archive = location.get_archive(
