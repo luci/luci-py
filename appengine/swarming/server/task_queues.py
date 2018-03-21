@@ -575,6 +575,68 @@ def _tidy_stale_BotTaskDimensions(now):
   raise ndb.Return(btd)
 
 
+def _assert_task_props(properties, expiration_ts):
+  """Asserts a TaskDimensions for a specific TaskProperties.
+
+  Implementation of assert_task().
+  """
+  # TODO(maruel): Make it a tasklet.
+  dimensions_hash = hash_dimensions(properties.dimensions)
+  task_dims_key = _get_task_dims_key(dimensions_hash, properties.dimensions)
+  obj = task_dims_key.get()
+  if obj:
+    # Reduce the check to be 5~10 minutes earlier to help reduce an attack of
+    # task queues when there's a strong on-going load of tasks happening. This
+    # jitter is essentially removed from _ADVANCE window.
+    jitter = datetime.timedelta(seconds=random.randint(5*60, 10*60))
+    valid_until_ts = expiration_ts - jitter
+    s = obj.match_request(properties.dimensions)
+    if s:
+      if s.valid_until_ts >= valid_until_ts:
+        # Cache hit. It is important to reconfirm the dimensions because a hash
+        # can be conflicting.
+        logging.debug('assert_task(%d): hit', dimensions_hash)
+        return
+      else:
+        logging.info(
+            'assert_task(%d): set.valid_until_ts(%s) < expected(%s); '
+            'triggering rebuild-task-cache',
+            dimensions_hash, s.valid_until_ts, valid_until_ts)
+    else:
+      logging.info(
+          'assert_task(%d): failed to match the dimensions; triggering '
+          'rebuild-task-cache',
+          dimensions_hash)
+  else:
+    logging.info(
+        'assert_task(%d): new request kind; triggering rebuild-task-cache',
+        dimensions_hash)
+
+  data = {
+    u'dimensions': properties.dimensions,
+    u'dimensions_hash': str(dimensions_hash),
+    u'valid_until_ts': expiration_ts + _ADVANCE,
+  }
+  payload = utils.encode_to_json(data)
+
+  # If this task specifies an 'id' value, updates the cache inline since we know
+  # there's only one bot that can run it, so it won't take long. This permits
+  # tasks like 'terminate' tasks to execute faster.
+  if properties.dimensions.get(u'id'):
+    rebuild_task_cache(payload)
+    return
+
+  # We can't use the request ID since the request was not stored yet, so embed
+  # all the necessary information.
+  url = '/internal/taskqueue/rebuild-task-cache'
+  if not utils.enqueue_task(
+      url, queue_name='rebuild-task-cache', payload=payload):
+    logging.error('Failed to enqueue TaskDimensions update %x', dimensions_hash)
+    # Technically we'd want to raise a endpoints.InternalServerErrorException.
+    # Raising anything that is not TypeError or ValueError is fine.
+    raise Error('Failed to trigger task queue; please try again')
+
+
 ### Public APIs.
 
 
@@ -653,61 +715,7 @@ def assert_task(request):
   practice.
   """
   assert not request.key, request.key
-  dimensions_hash = hash_dimensions(request.properties.dimensions)
-  task_dims_key = _get_task_dims_key(
-      dimensions_hash, request.properties.dimensions)
-  obj = task_dims_key.get()
-  if obj:
-    # Reduce the check to be 5~10 minutes earlier to help reduce an attack of
-    # task queues when there's a strong on-going load of tasks happening. This
-    # jitter is essentially removed from _ADVANCE window.
-    jitter = datetime.timedelta(seconds=random.randint(5*60, 10*60))
-    valid_until_ts = request.expiration_ts - jitter
-    s = obj.match_request(request.properties.dimensions)
-    if s:
-      if s.valid_until_ts >= valid_until_ts:
-        # Cache hit. It is important to reconfirm the dimensions because a hash
-        # can be conflicting.
-        logging.debug('assert_task(%d): hit', dimensions_hash)
-        return
-      else:
-        logging.info(
-            'assert_task(%d): set.valid_until_ts(%s) < expected(%s); '
-            'triggering rebuild-task-cache',
-            dimensions_hash, s.valid_until_ts, valid_until_ts)
-    else:
-      logging.info(
-          'assert_task(%d): failed to match the dimensions; triggering '
-          'rebuild-task-cache',
-          dimensions_hash)
-  else:
-    logging.info(
-        'assert_task(%d): new request kind; triggering rebuild-task-cache',
-        dimensions_hash)
-
-  data = {
-    u'dimensions': request.properties.dimensions,
-    u'dimensions_hash': str(dimensions_hash),
-    u'valid_until_ts': request.expiration_ts + _ADVANCE,
-  }
-  payload = utils.encode_to_json(data)
-
-  # If this task specifies an 'id' value, updates the cache inline since we know
-  # there's only one bot that can run it, so it won't take long. This permits
-  # tasks like 'terminate' tasks to execute faster.
-  if request.properties.dimensions.get(u'id'):
-    rebuild_task_cache(payload)
-    return
-
-  # We can't use the request ID since the request was not stored yet, so embed
-  # all the necessary information.
-  url = '/internal/taskqueue/rebuild-task-cache'
-  if not utils.enqueue_task(
-      url, queue_name='rebuild-task-cache', payload=payload):
-    logging.error('Failed to enqueue TaskDimensions update %x', dimensions_hash)
-    # Technically we'd want to raise a endpoints.InternalServerErrorException.
-    # Raising anything that is not TypeError or ValueError is fine.
-    raise Error('Failed to trigger task queue; please try again')
+  _assert_task_props(request.properties, request.expiration_ts)
 
 
 def get_queues(bot_id):
