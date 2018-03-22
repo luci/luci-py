@@ -500,6 +500,100 @@ def _is_allowed_service_account(service_account, pool_cfg):
   return False
 
 
+def _bot_update_tx(
+    run_result_key, bot_id, output, output_chunk_start, exit_code, duration,
+    hard_timeout, io_timeout, cost_usd, outputs_ref, cipd_pins,
+    performance_stats, now, result_summary_key, server_version, request):
+  """Runs the transaction for bot_update_task().
+
+  Returns tuple(TaskRunResult, bool(completed), str(error)).
+
+  Any error is returned as a string to be passed to logging.error() instead of
+  logging inside the transaction for performance.
+  """
+  # 2 or 3 consecutive GETs, one PUT.
+  run_result_future = run_result_key.get_async()
+  result_summary_future = result_summary_key.get_async()
+  run_result = run_result_future.get_result()
+  if not run_result:
+    result_summary_future.wait()
+    return None, None, 'is missing'
+
+  if run_result.bot_id != bot_id:
+    result_summary_future.wait()
+    return None, None, (
+        'expected bot (%s) but had update from bot %s' % (
+        run_result.bot_id, bot_id))
+
+  if not run_result.started_ts:
+    return None, None, 'TaskRunResult is broken; %s' % (
+        run_result.to_dict())
+
+  # Assumptions:
+  # - duration and exit_code are both set or not set.
+  # - same for run_result.
+  if exit_code is not None:
+    if run_result.exit_code is not None:
+      # This happens as an HTTP request is retried when the DB write succeeded
+      # but it still returned HTTP 500.
+      if run_result.exit_code != exit_code:
+        result_summary_future.wait()
+        return None, None, 'got 2 different exit_code; %s then %s' % (
+            run_result.exit_code, exit_code)
+      if run_result.duration != duration:
+        result_summary_future.wait()
+        return None, None, 'got 2 different durations; %s then %s' % (
+            run_result.duration, duration)
+    else:
+      run_result.duration = duration
+      run_result.exit_code = exit_code
+
+  if outputs_ref:
+    run_result.outputs_ref = outputs_ref
+
+  if cipd_pins:
+    run_result.cipd_pins = cipd_pins
+
+  if run_result.state in task_result.State.STATES_RUNNING:
+    if hard_timeout or io_timeout:
+      run_result.state = task_result.State.TIMED_OUT
+      run_result.completed_ts = now
+    elif run_result.exit_code is not None:
+      run_result.state = task_result.State.COMPLETED
+      run_result.completed_ts = now
+
+  run_result.signal_server_version(server_version)
+  to_put = [run_result]
+  if output:
+    # This does 1 multi GETs. This also modifies run_result in place.
+    to_put.extend(run_result.append_output(output, output_chunk_start or 0))
+  if performance_stats:
+    performance_stats.key = task_pack.run_result_key_to_performance_stats_key(
+        run_result.key)
+    to_put.append(performance_stats)
+
+  run_result.cost_usd = max(cost_usd, run_result.cost_usd or 0.)
+  run_result.modified_ts = now
+
+  result_summary = result_summary_future.get_result()
+  if (result_summary.try_number and
+      result_summary.try_number > run_result.try_number):
+    # The situation where a shard is retried but the bot running the previous
+    # try somehow reappears and reports success, the result must still show
+    # the last try's result. We still need to update cost_usd manually.
+    result_summary.costs_usd[run_result.try_number-1] = run_result.cost_usd
+    result_summary.modified_ts = now
+  else:
+    # Performance warning: this function calls properties_hash() which will
+    # GET SecretBytes entity if there's one.
+    result_summary.set_from_run_result(run_result, request)
+
+  to_put.append(result_summary)
+  ndb.put_multi(to_put)
+
+  return result_summary, run_result, None
+
+
 ### Public API.
 
 
@@ -793,94 +887,10 @@ def bot_update_task(
   request = request_future.get_result()
   now = utils.utcnow()
 
-  def run():
-    """Returns tuple(TaskRunResult, bool(completed), str(error)).
-
-    Any error is returned as a string to be passed to logging.error() instead of
-    logging inside the transaction for performance.
-    """
-    # 2 or 3 consecutive GETs, one PUT.
-    run_result_future = run_result_key.get_async()
-    result_summary_future = result_summary_key.get_async()
-    run_result = run_result_future.get_result()
-    if not run_result:
-      result_summary_future.wait()
-      return None, None, 'is missing'
-
-    if run_result.bot_id != bot_id:
-      result_summary_future.wait()
-      return None, None, (
-          'expected bot (%s) but had update from bot %s' % (
-          run_result.bot_id, bot_id))
-
-    if not run_result.started_ts:
-      return None, None, 'TaskRunResult is broken; %s' % (
-          run_result.to_dict())
-
-    # Assumptions:
-    # - duration and exit_code are both set or not set.
-    # - same for run_result.
-    if exit_code is not None:
-      if run_result.exit_code is not None:
-        # This happens as an HTTP request is retried when the DB write succeeded
-        # but it still returned HTTP 500.
-        if run_result.exit_code != exit_code:
-          result_summary_future.wait()
-          return None, None, 'got 2 different exit_code; %s then %s' % (
-              run_result.exit_code, exit_code)
-        if run_result.duration != duration:
-          result_summary_future.wait()
-          return None, None, 'got 2 different durations; %s then %s' % (
-              run_result.duration, duration)
-      else:
-        run_result.duration = duration
-        run_result.exit_code = exit_code
-
-    if outputs_ref:
-      run_result.outputs_ref = outputs_ref
-
-    if cipd_pins:
-      run_result.cipd_pins = cipd_pins
-
-    if run_result.state in task_result.State.STATES_RUNNING:
-      if hard_timeout or io_timeout:
-        run_result.state = task_result.State.TIMED_OUT
-        run_result.completed_ts = now
-      elif run_result.exit_code is not None:
-        run_result.state = task_result.State.COMPLETED
-        run_result.completed_ts = now
-
-    run_result.signal_server_version(server_version)
-    to_put = [run_result]
-    if output:
-      # This does 1 multi GETs. This also modifies run_result in place.
-      to_put.extend(run_result.append_output(output, output_chunk_start or 0))
-    if performance_stats:
-      performance_stats.key = task_pack.run_result_key_to_performance_stats_key(
-          run_result.key)
-      to_put.append(performance_stats)
-
-    run_result.cost_usd = max(cost_usd, run_result.cost_usd or 0.)
-    run_result.modified_ts = now
-
-    result_summary = result_summary_future.get_result()
-    if (result_summary.try_number and
-        result_summary.try_number > run_result.try_number):
-      # The situation where a shard is retried but the bot running the previous
-      # try somehow reappears and reports success, the result must still show
-      # the last try's result. We still need to update cost_usd manually.
-      result_summary.costs_usd[run_result.try_number-1] = run_result.cost_usd
-      result_summary.modified_ts = now
-    else:
-      # Performance warning: this function calls properties_hash() which will
-      # GET SecretBytes entity if there's one.
-      result_summary.set_from_run_result(run_result, request)
-
-    to_put.append(result_summary)
-    ndb.put_multi(to_put)
-
-    return result_summary, run_result, None
-
+  run = lambda: _bot_update_tx(
+      run_result_key, bot_id, output, output_chunk_start, exit_code, duration,
+      hard_timeout, io_timeout, cost_usd, outputs_ref, cipd_pins,
+      performance_stats, now, result_summary_key, server_version, request)
   try:
     smry, run_result, error = datastore_utils.transaction(run)
   except datastore_utils.CommitError as e:
