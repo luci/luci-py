@@ -22,10 +22,14 @@ EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email'
 
 
 class Error(Exception):
-  """Raised on non-transient errors."""
-  def __init__(self, msg, status_code, response):
+  """Raised on non-transient errors.
+
+  Attribute response is response body.
+  """
+  def __init__(self, msg, status_code, response, headers=None):
     super(Error, self).__init__(msg)
     self.status_code = status_code
+    self.headers = headers
     self.response = response
 
 
@@ -158,18 +162,18 @@ def request_async(
     # Transient error on the other side.
     if is_transient_error(response, url):
       logging.warning(
-          '%s %s failed with HTTP %d: %r',
-          method, url, response.status_code, response.content)
+          '%s %s failed with HTTP %d\nHeaders: %r\nBody: %r',
+          method, url, response.status_code, response.headers, response.content)
       continue
 
     # Non-transient error.
     if 300 <= response.status_code < 500:
       logging.warning(
-          '%s %s failed with HTTP %d: %r',
-          method, url, response.status_code, response.content)
+          '%s %s failed with HTTP %d\nHeaders: %r\nBody: %r',
+          method, url, response.status_code, response.headers, response.content)
       raise _error_class_for_status(response.status_code)(
           'Failed to call %s: HTTP %d' % (url, response.status_code),
-          response.status_code, response.content)
+          response.status_code, response.content, headers=response.headers)
 
     # Success. Beware of large responses.
     if len(response.content) > 1024 * 1024:
@@ -179,7 +183,8 @@ def request_async(
   raise _error_class_for_status(last_status_code)(
       'Failed to call %s after %d attempts' % (url, max_attempts),
       response.status_code if response else None,
-      response.content if response else None)
+      response.content if response else None,
+      headers=response.headers if response else None)
 
 
 def request(*args, **kwargs):
