@@ -147,15 +147,21 @@ class SwarmingClient(object):
       logging.debug('task_id = %s', task_id)
       return task_id
 
-  def task_collect(self, task_id):
+  def task_collect(self, task_id, timeout=TIMEOUT_SECS):
     """Collects the results for a task."""
     tmp = os.path.join(self._tmpdir, task_id + '.json')
     tmpdir = unicode(os.path.join(self._tmpdir, task_id))
+    if os.path.isdir(tmpdir):
+      for i in xrange(100000):
+        t = '%s_%d' % (tmpdir, i)
+        if not os.path.isdir(t):
+          tmpdir = t
+          break
     os.mkdir(tmpdir)
     # swarming.py collect will return the exit code of the task.
     args = [
       '--task-summary-json', tmp, task_id, '--task-output-dir', tmpdir,
-      '--timeout', str(TIMEOUT_SECS), '--perf',
+      '--timeout', str(timeout), '--perf',
     ]
     self._run('collect', args)
     with fs.open(tmp, 'rb') as f:
@@ -174,8 +180,12 @@ class SwarmingClient(object):
           outputs[name] = f.read()
     return summary, outputs
 
+  def task_cancel(self, task_id):
+    """Cancels a task."""
+    return self._capture('cancel', [str(task_id)]) == ''
+
   def task_query(self, task_id):
-    """Query a task result without waiting for it to complete."""
+    """Queries a task result without waiting for it to complete."""
     return json.loads(self._capture('query', ['task/%s/result' % task_id]))
 
   def terminate(self, bot_id):
@@ -227,9 +237,14 @@ class SwarmingClient(object):
       return p.returncode
 
   def _capture(self, command, args):
+    name = os.path.join(self._tmpdir, u'client_%d.log' % self._index)
+    self._index += 1
     cmd = [
       sys.executable, 'swarming.py', command, '-S', self._swarming_server,
+      '--log-file', name
     ] + args
+    with fs.open(name, 'wb') as f:
+      f.write('\nRunning: %s\n' % ' '.join(cmd))
     p = subprocess42.Popen(cmd, stdout=subprocess42.PIPE, cwd=CLIENT_DIR)
     return p.communicate()[0]
 
@@ -596,20 +611,17 @@ class Test(unittest.TestCase):
         import os
         import signal
         import sys
-        import time
-        l = []
+        import threading
+        bit = threading.Event()
         def handler(signum, _):
-          l.append(signum)
+          bit.set()
           sys.stdout.write('got signal %%d\\n' %% signum)
           sys.stdout.flush()
         signal.signal(signal.%s, handler)
         sys.stdout.write('hi\\n')
         sys.stdout.flush()
-        while not l:
-          try:
-            time.sleep(0.01)
-          except IOError:
-            print('ioerror')
+        while not bit.wait(0.01):
+          pass
         with open(os.path.join(sys.argv[1], 'result.txt'), 'wb') as f:
           f.write('test_isolated_hard_timeout_grace')
         """ % ('SIGBREAK' if sys.platform == 'win32' else 'SIGTERM')
@@ -906,6 +918,23 @@ class Test(unittest.TestCase):
     results.sort(key=lambda x: x[3][u'started_ts'])
     expected = ['2-p6', '3-p7', '1-p8', '4-p8', '0-p9']
     self.assertEqual(expected, [r[0] for r in results])
+
+  def test_cancel_pending(self):
+    # Cancel a pending task.
+    args = [
+      '-T', 'cancel_pending', '--dimension', 'unknown_key', 'unknown_value',
+      '--', 'python', '-u', '-c', 'print(\'hi\')'
+    ]
+    task_id = self.client.task_trigger_raw(args)
+    actual, _ = self.client.task_collect(task_id, timeout=-1)
+    self.assertEqual(
+        0x20,  # task_result.PENDING
+        actual[u'shards'][0][u'state'])
+    self.assertTrue(self.client.task_cancel(task_id))
+    actual, _ = self.client.task_collect(task_id, timeout=-1)
+    self.assertEqual(
+        0x60,  # task_result.State.CANCELED
+        actual[u'shards'][0][u'state'], actual[u'shards'][0])
 
   def _run_isolated(
       self, contents, name, args, expected_summary, expected_files,
