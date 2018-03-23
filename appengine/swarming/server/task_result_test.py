@@ -94,6 +94,74 @@ class TaskResultApiTest(TestCase):
   def assertEntities(self, expected, entity_model):
     self.assertEqual(expected, get_entities(entity_model))
 
+  def _gen_summary(self, **kwargs):
+    """Returns TaskResultSummary.to_dict()."""
+    out = {
+      'abandoned_ts': None,
+      'bot_dimensions': None,
+      'bot_id': None,
+      'bot_version': None,
+      'cipd_pins': None,
+      'children_task_ids': [],
+      'completed_ts': None,
+      'costs_usd': [],
+      'cost_saved_usd': None,
+      'created_ts': self.now,
+      'deduped_from': None,
+      'duration': None,
+      'exit_code': None,
+      'failure': False,
+      # Constant due to the mock of both utils.utcnow() and
+      # random.getrandbits().
+      'id': '1d69b9f088008810',
+      'internal_failure': False,
+      'modified_ts': None,
+      'name': u'Request name',
+      'outputs_ref': None,
+      'server_versions': [u'v1a'],
+      'started_ts': None,
+      'state': task_result.State.PENDING,
+      'tags': [
+        u'pool:default',
+        u'priority:50',
+        u'service_account:none',
+        u'tag:1',
+        u'user:Jesus',
+      ],
+      'try_number': None,
+      'user': u'Jesus',
+    }
+    out.update(kwargs)
+    return out
+
+  def _gen_result(self, **kwargs):
+    """Returns TaskRunResult.to_dict()."""
+    out = {
+      'abandoned_ts': None,
+      'bot_dimensions': {u'id': [u'localhost'], u'foo': [u'bar', u'biz']},
+      'bot_id': u'localhost',
+      'bot_version': u'abc',
+      'children_task_ids': [],
+      'cipd_pins': None,
+      'completed_ts': None,
+      'cost_usd': 0.,
+      'duration': None,
+      'exit_code': None,
+      'failure': False,
+      # Constant due to the mock of both utils.utcnow() and
+      # random.getrandbits().
+      'id': '1d69b9f088008811',
+      'internal_failure': False,
+      'modified_ts': None,
+      'outputs_ref': None,
+      'server_versions': [u'v1a'],
+      'started_ts': None,
+      'state': task_result.State.RUNNING,
+      'try_number': 1,
+    }
+    out.update(kwargs)
+    return out
+
   def test_all_apis_are_tested(self):
     # Ensures there's a test for each public API.
     module = task_result
@@ -140,39 +208,10 @@ class TaskResultApiTest(TestCase):
   def test_new_result_summary(self):
     request = mkreq(_gen_request())
     actual = task_result.new_result_summary(request)
-    expected = {
-      'abandoned_ts': None,
-      'bot_dimensions': None,
-      'bot_id': None,
-      'bot_version': None,
-      'cipd_pins': None,
-      'children_task_ids': [],
-      'completed_ts': None,
-      'costs_usd': [],
-      'cost_saved_usd': None,
-      'created_ts': self.now,
-      'deduped_from': None,
-      'duration': None,
-      'exit_code': None,
-      'failure': False,
-      'id': '1d69b9f088008810',
-      'internal_failure': False,
-      'modified_ts': None,
-      'name': u'Request name',
-      'outputs_ref': None,
-      'server_versions': [u'v1a'],
-      'started_ts': None,
-      'state': task_result.State.PENDING,
-      'tags': [
-        u'pool:default',
-        u'priority:50',
-        u'service_account:none',
-        u'tag:1',
-        u'user:Jesus',
-      ],
-      'try_number': None,
-      'user': u'Jesus',
-    }
+    actual.modified_ts = self.now
+    # Trigger _pre_put_hook().
+    actual.put()
+    expected = self._gen_summary(modified_ts=self.now)
     self.assertEqual(expected, actual.to_dict())
     self.assertEqual(50, actual.request.priority)
     self.assertEqual(True, actual.can_be_canceled)
@@ -190,32 +229,35 @@ class TaskResultApiTest(TestCase):
   def test_new_run_result(self):
     request = mkreq(_gen_request())
     actual = task_result.new_run_result(
-        request, 1, 'localhost', 'abc',
-        {'id': ['localhost'], 'foo': ['bar', 'biz']})
-    expected = {
-      'abandoned_ts': None,
-      'bot_dimensions': {'id': ['localhost'], 'foo': ['bar', 'biz']},
-      'bot_id': 'localhost',
-      'bot_version': 'abc',
-      'children_task_ids': [],
-      'cipd_pins': None,
-      'completed_ts': None,
-      'cost_usd': 0.,
-      'duration': None,
-      'exit_code': None,
-      'failure': False,
-      'id': '1d69b9f088008811',
-      'internal_failure': False,
-      'modified_ts': None,
-      'outputs_ref': None,
-      'server_versions': ['v1a'],
-      'started_ts': None,
-      'state': task_result.State.RUNNING,
-      'try_number': 1,
-    }
+        request, 1, u'localhost', u'abc',
+        {u'id': [u'localhost'], u'foo': [u'bar', u'biz']})
+    actual.modified_ts = self.now
+    actual.started_ts = self.now
+    # Trigger _pre_put_hook().
+    actual.put()
+    expected = self._gen_result(modified_ts=self.now, started_ts=self.now)
     self.assertEqual(expected, actual.to_dict())
     self.assertEqual(50, actual.request.priority)
     self.assertEqual(False, actual.can_be_canceled)
+
+  def test_new_run_result_duration_no_exit_code(self):
+    request = mkreq(_gen_request())
+    actual = task_result.new_run_result(
+        request, 1, u'localhost', u'abc',
+        {u'id': [u'localhost'], u'foo': [u'bar', u'biz']})
+    actual.modified_ts = self.now
+    actual.started_ts = self.now
+    actual.duration = 1.
+    actual.state = task_result.State.COMPLETED
+    # Trigger _pre_put_hook().
+    with self.assertRaises(datastore_errors.BadValueError):
+      actual.put()
+    actual.state = task_result.State.TIMED_OUT
+    actual.put()
+    expected = self._gen_result(
+        duration=1., modified_ts=self.now, failure=True,
+        started_ts=self.now, state=task_result.State.TIMED_OUT)
+    self.assertEqual(expected, actual.to_dict())
 
   def test_integration(self):
     # Creates a TaskRequest, along its TaskResultSummary and TaskToRun. Have a
@@ -226,39 +268,7 @@ class TaskResultApiTest(TestCase):
     to_run = task_to_run.new_task_to_run(request)
     result_summary.modified_ts = utils.utcnow()
     ndb.transaction(lambda: ndb.put_multi([result_summary, to_run]))
-    expected = {
-      'abandoned_ts': None,
-      'bot_dimensions': None,
-      'bot_id': None,
-      'bot_version': None,
-      'cipd_pins': None,
-      'children_task_ids': [],
-      'completed_ts': None,
-      'costs_usd': [],
-      'cost_saved_usd': None,
-      'created_ts': self.now,
-      'deduped_from': None,
-      'duration': None,
-      'exit_code': None,
-      'failure': False,
-      'id': '1d69b9f088008810',
-      'internal_failure': False,
-      'modified_ts': self.now,
-      'name': u'Request name',
-      'outputs_ref': None,
-      'server_versions': [u'v1a'],
-      'started_ts': None,
-      'state': task_result.State.PENDING,
-      'try_number': None,
-      'tags': [
-        u'pool:default',
-        u'priority:50',
-        u'service_account:none',
-        u'tag:1',
-        u'user:Jesus',
-      ],
-      'user': u'Jesus',
-    }
+    expected = self._gen_summary(modified_ts=self.now)
     self.assertEqual(expected, result_summary.to_dict())
 
     # Nothing changed 2 secs later except latency.
@@ -270,45 +280,22 @@ class TaskResultApiTest(TestCase):
     self.mock_now(reap_ts)
     to_run.queue_number = None
     to_run.put()
-    run_result = task_result.new_run_result(request, 1, 'localhost', 'abc', {})
+    run_result = task_result.new_run_result(
+        request, 1, u'localhost', u'abc', {})
     run_result.started_ts = utils.utcnow()
     run_result.modified_ts = run_result.started_ts
     ndb.transaction(
         lambda: result_summary.set_from_run_result(run_result, request))
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
-    expected = {
-      'abandoned_ts': None,
-      'bot_dimensions': {},
-      'bot_id': u'localhost',
-      'bot_version': u'abc',
-      'cipd_pins': None,
-      'children_task_ids': [],
-      'completed_ts': None,
-      'costs_usd': [0.],
-      'cost_saved_usd': None,
-      'created_ts': self.now,
-      'deduped_from': None,
-      'duration': None,
-      'exit_code': None,
-      'failure': False,
-      'id': '1d69b9f088008810',
-      'internal_failure': False,
-      'modified_ts': reap_ts,
-      'name': u'Request name',
-      'outputs_ref': None,
-      'server_versions': [u'v1a'],
-      'started_ts': reap_ts,
-      'state': task_result.State.RUNNING,
-      'tags': [
-        u'pool:default',
-        u'priority:50',
-        u'service_account:none',
-        u'tag:1',
-        u'user:Jesus',
-      ],
-      'try_number': 1,
-      'user': u'Jesus',
-    }
+    expected = self._gen_summary(
+        bot_dimensions={},
+        bot_version=u'abc',
+        bot_id=u'localhost',
+        costs_usd=[0.],
+        modified_ts=reap_ts,
+        state=task_result.State.RUNNING,
+        started_ts=reap_ts,
+        try_number=1)
     self.assertEqual(expected, result_summary.key.get().to_dict())
 
     # Task completed after 2 seconds (6 secs total), the task has been running
@@ -334,39 +321,18 @@ class TaskResultApiTest(TestCase):
     ndb.transaction(
         lambda: result_summary.set_from_run_result(run_result, request))
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
-    expected = {
-      'abandoned_ts': None,
-      'bot_dimensions': {},
-      'bot_id': u'localhost',
-      'bot_version': u'abc',
-      'cipd_pins': None,
-      'children_task_ids': [],
-      'completed_ts': complete_ts,
-      'costs_usd': [0.],
-      'cost_saved_usd': None,
-      'created_ts': self.now,
-      'deduped_from': None,
-      'duration': 0.1,
-      'exit_code': 0,
-      'failure': False,
-      'id': '1d69b9f088008810',
-      'internal_failure': False,
-      'modified_ts': complete_ts,
-      'name': u'Request name',
-      'outputs_ref': None,
-      'server_versions': [u'v1a'],
-      'started_ts': reap_ts,
-      'state': task_result.State.COMPLETED,
-      'tags': [
-        u'pool:default',
-        u'priority:50',
-        u'service_account:none',
-        u'tag:1',
-        u'user:Jesus',
-      ],
-      'try_number': 1,
-      'user': u'Jesus',
-    }
+    expected = self._gen_summary(
+        bot_dimensions={},
+        bot_version=u'abc',
+        bot_id=u'localhost',
+        completed_ts=complete_ts,
+        costs_usd=[0.],
+        duration=0.1,
+        exit_code=0,
+        modified_ts=complete_ts,
+        state=task_result.State.COMPLETED,
+        started_ts=reap_ts,
+        try_number=1)
     self.assertEqual(expected, result_summary.key.get().to_dict())
     expected = {
       'bot_overhead': 0.1,

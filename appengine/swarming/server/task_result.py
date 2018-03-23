@@ -427,13 +427,12 @@ class _TaskResultCommon(ndb.Model):
   # Number of TaskOutputChunk entities for the output.
   stdout_chunks = ndb.IntegerProperty(indexed=False)
 
-  # Process exit code.
+  # Process exit code. May be missing when task_runner dies and bot_main tries
+  # to recover the task and in some cases with state TIMED_OUT.
   exit_code = ndb.IntegerProperty(indexed=False, name='exit_codes')
 
   # Task duration in seconds as seen by the process who started the child task,
-  # excluding all overheads. If the task was not isolated, this is the value
-  # returned by task_runner. If the task was isolated, this is the value
-  # returned by run_isolated.
+  # excluding all overheads.
   duration = ndb.FloatProperty(indexed=False, name='durations')
 
   # Time when a bot reaped this task.
@@ -663,19 +662,27 @@ class _TaskResultCommon(ndb.Model):
     if not self.modified_ts:
       raise datastore_errors.BadValueError('Must update .modified_ts')
 
-    if (self.duration is None) != (self.exit_code is None):
-        raise datastore_errors.BadValueError(
-            'duration and exit_code must both be None or not None')
     if self.state in State.STATES_DONE:
       if self.duration is None:
         raise datastore_errors.BadValueError(
-            'duration and exit_code must be set with state %s' %
+            'duration must be set with state %s' %
             State.to_string(self.state))
+      # Allow exit_code to be missing for TIMED_OUT.
+      if self.state != State.TIMED_OUT:
+        if self.exit_code is None:
+          raise datastore_errors.BadValueError(
+              'exit_code must be set with state %s' %
+              State.to_string(self.state))
     elif self.state != State.BOT_DIED:
-      # With BOT_DIED, it can be either ways.
+      # Allow duration and exit_code to be either missing or set for BOT_DIED,
+      # but they should be not present for any running/pending states.
       if self.duration is not None:
         raise datastore_errors.BadValueError(
-            'duration and exit_code must not be set with state %s' %
+            'duration must not be set with state %s' %
+            State.to_string(self.state))
+      if self.exit_code is not None:
+        raise datastore_errors.BadValueError(
+            'exit_code must not be set with state %s' %
             State.to_string(self.state))
 
     if self.deduped_from:
