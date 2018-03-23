@@ -26,7 +26,7 @@
   A client must define the following properties:
     columns, Array<String>, The columns that should be displayed.
     _filterMap, Object, a mapping of column name to a function that returns true if the item should be shown in the dynamic table. Used to create the filter property.  Will be bound to this element.
-    _prettyItem: Object, an object with a function apply(s) that takes a string and returns a string. This is used if the display of a column should be different than the column string. E.g. making foo-tag show up as foo (tag).
+
 
   A client must define the following methods:
     none.
@@ -503,7 +503,6 @@
       // instance of the filter query, making it easier to see why elements
       // show up.
       _beforeBold: function(item, query) {
-        item = this._prettyItem.apply(item);
         var match = matchPartCaseInsensitive(item, query.replace(":", " "));
         if (match.idx === -1) {
           return item;
@@ -512,7 +511,6 @@
       },
 
       _bold: function(item, query) {
-        item = this._prettyItem.apply(item);
         var match = matchPartCaseInsensitive(item, query.replace(":", " "));
         if (match.idx === -1) {
           return "";
@@ -521,7 +519,6 @@
       },
 
       _afterBold: function(item, query) {
-        item = this._prettyItem.apply(item);
         var match = matchPartCaseInsensitive(item, query.replace(":", " "));
         if (match.idx === -1) {
           return "";

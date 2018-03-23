@@ -32,9 +32,7 @@
     _columnMap: Object, a mapping of column name to a function that will return the content for a
         given bot. These functions are bound to this element. If a column is not listed here, a sane
         default will be used (see _column()).
-    _headerMap: Object, a mapping of column name to the displayed text for a column. There can be
-        a magic value "_displayHeader" that is a function(c) which returns a display version of
-        the column (e.g. foo-tag -> "foo (tag)")
+    _headerMap: Object, a mapping of column name to the displayed text for a column.
     _specialColumns, Array<String> A list of "special" column names, that is, columns which will
         have html in them, provided by the client. non-special (i.e. plain columns) just contain
         text and will have their content provided by _attribute (see below).
@@ -188,14 +186,7 @@
       },
 
       _header: function(col){
-        if (this._headerMap[col]) {
-          return this._headerMap[col];
-        }
-        var dh = this._headerMap["_displayHeader"];
-        if (dh) {
-          return dh(col);
-        }
-        return col;
+        return this._headerMap[col] || col;
       },
 
       _hide: function(col) {
