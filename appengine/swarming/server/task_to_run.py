@@ -21,11 +21,12 @@ Graph of the schema:
     |id=<based on epoch>|
     +-------------------+
         |
+        |
         v
-    +--------------------+
-    |TaskToRun           |
-    |id=<dimensions_hash>|
-    +--------------------+
+    +--------------+     +--------------+
+    |TaskToRun     | ... |TaskToRun     |
+    |id=<composite>| ... |id=<composite>|
+    +--------------+     +--------------+
 """
 
 import collections
@@ -59,13 +60,20 @@ class TaskToRun(ndb.Model):
     bot gets assigned this task item to work on.
   - all the ones currently active are fetched at once in a cron job.
 
-  The key id is the value of 'dimensions_hash' that is generated with
-  task_queues.hash_dimensions(), parent is TaskRequest.
+  The key id is:
+  - lower 4 bits is the try number. The only supported values are 1 and 2.
+  - rest is 0.
   """
   # This entity is used in transactions. It is not worth using either cache.
   # https://cloud.google.com/appengine/docs/standard/python/ndb/cache
   _use_cache = False
   _use_memcache = False
+
+  # Used to know when retries are enqueued. The very first TaskToRun
+  # (try_number=1) has the same value as TaskRequest.created_ts, but following
+  # ones have created_ts set at the time the new entity is created: when the
+  # task is reenqueued.
+  created_ts = ndb.DateTimeProperty(indexed=False)
 
   # Moment by which the task has to be requested by a bot. Copy of TaskRequest's
   # TaskRequest.expiration_ts to enable queries when cleaning up stale jobs.
@@ -82,6 +90,11 @@ class TaskToRun(ndb.Model):
   queue_number = ndb.IntegerProperty()
 
   @property
+  def try_number(self):
+    """Returns the try number, 1 or 2."""
+    return self.key.integer_id() & 15
+
+  @property
   def is_reapable(self):
     """Returns True if the task is ready to be scheduled."""
     return bool(self.queue_number)
@@ -92,10 +105,20 @@ class TaskToRun(ndb.Model):
     return task_to_run_key_to_request_key(self.key)
 
   def to_dict(self):
+    """Purely used for unit testing."""
     out = super(TaskToRun, self).to_dict()
-    # dimensions_hash is guaranteed to be 32 bits.
-    out['dimensions_hash'] = self.key.integer_id()
+    # Consistent formatting makes it easier to reason about.
+    if out['queue_number']:
+      out['queue_number'] = '0x%016x' % out['queue_number']
+    out['try_number'] = self.try_number
     return out
+
+  def _pre_put_hook(self):
+    super(TaskToRun, self)._pre_put_hook()
+    # TODO(maruel): Enable the assert once all pending items using the old key
+    # format have been committed, which is normally ~1h.
+    # https://crbug.com/817831
+    #assert 1 <= self.try_number <= 2, self.try_number
 
 
 ### Private functions.
@@ -208,7 +231,7 @@ class _QueryStats(object):
 
 
 @ndb.tasklet
-def _validate_task_async(bot_dimensions, deadline, stats, now, task):
+def _validate_task_async(bot_dimensions, deadline, stats, now, to_run):
   """Validates the TaskToRun and updates stats.
 
   Returns:
@@ -217,25 +240,26 @@ def _validate_task_async(bot_dimensions, deadline, stats, now, task):
   """
   # TODO(maruel): Create one TaskToRun per TaskRunResult.
   packed = task_pack.pack_request_key(
-      task_to_run_key_to_request_key(task.key)) + '0'
+      task_to_run_key_to_request_key(to_run.key)) + '0'
   stats.total += 1
 
   # Do this after the basic weeding out but before fetching TaskRequest.
-  neg = yield _lookup_cache_is_taken_async(task.key)
+  neg = yield _lookup_cache_is_taken_async(to_run.key)
   if neg:
     logging.debug('_validate_task_async(%s): negative cache', packed)
     stats.cache_lookup += 1
     raise ndb.Return((None, None))
 
   # Ok, it's now worth taking a real look at the entity.
-  request = yield task_to_run_key_to_request_key(task.key).get_async()
+  request = yield task_to_run_key_to_request_key(to_run.key).get_async()
+  props = request.properties
 
   # The hash may have conflicts. Ensure the dimensions actually match by
   # verifying the TaskRequest.
   #
   # There's a probability of 2**-31 of conflicts, which is low enough for our
   # purpose.
-  if not match_dimensions(request.properties.dimensions, bot_dimensions):
+  if not match_dimensions(props.dimensions, bot_dimensions):
     logging.debug('_validate_task_async(%s): dimensions mismatch', packed)
     stats.real_mismatch += 1
     raise ndb.Return((None, None))
@@ -252,16 +276,16 @@ def _validate_task_async(bot_dimensions, deadline, stats, now, task):
   #
   # Give an exemption to the special terminate task because it doesn't actually
   # run anything.
-  if deadline is not None and not request.properties.is_terminate:
-    if not request.properties.execution_timeout_secs:
+  if deadline is not None and not props.is_terminate:
+    if not props.execution_timeout_secs:
       # Task never times out, so it cannot be accepted.
       logging.debug(
           '_validate_task_async(%s): deadline %s but no execution timeout',
           packed, deadline)
       stats.too_long += 1
       raise ndb.Return((None, None))
-    hard = request.properties.execution_timeout_secs
-    grace = 3 * (request.properties.grace_period_secs or 30)
+    hard = props.execution_timeout_secs
+    grace = 3 * (props.grace_period_secs or 30)
     # Allowance buffer for overheads (scheduling and isolation)
     overhead = 300
     max_schedule = now + datetime.timedelta(seconds=hard + grace + overhead)
@@ -274,17 +298,17 @@ def _validate_task_async(bot_dimensions, deadline, stats, now, task):
       raise ndb.Return((None, None))
 
   # Expire as the bot polls by returning it, and task_scheduler will handle it.
-  if task.expiration_ts < now:
+  if to_run.expiration_ts < now:
     logging.debug(
         '_validate_task_async(%s): expired %s < %s',
-        packed, task.expiration_ts, now)
+        packed, to_run.expiration_ts, now)
     stats.expired += 1
   else:
     # It's a valid task! Note that in the meantime, another bot may have reaped
     # it. This is verified one last time in task_scheduler._reap_task() by
     # calling set_lookup_cache().
     logging.info('_validate_task_async(%s): ready to reap!', packed)
-  raise ndb.Return((request, task))
+  raise ndb.Return((request, to_run))
 
 
 def _yield_pages_async(q, size):
@@ -412,17 +436,15 @@ def _yield_potential_tasks(bot_id):
 ### Public API.
 
 
-def request_to_task_to_run_key(request):
+def request_to_task_to_run_key(request, try_number):
   """Returns the ndb.Key for a TaskToRun from a TaskRequest."""
-  return ndb.Key(
-      TaskToRun, task_queues.hash_dimensions(request.properties.dimensions),
-      parent=request.key)
+  assert 1 <= try_number <= 2, try_number
+  return ndb.Key(TaskToRun, try_number, parent=request.key)
 
 
 def task_to_run_key_to_request_key(task_key):
   """Returns the ndb.Key for a TaskToRun from a TaskRequest key."""
-  if task_key.kind() != 'TaskToRun':
-    raise ValueError('Expected key to TaskToRun, got %s' % task_key.kind())
+  assert task_key.kind() == 'TaskToRun', task_key
   return task_key.parent()
 
 
@@ -437,28 +459,25 @@ def gen_queue_number(request):
       request.priority)
 
 
-def new_task_to_run(request):
+def new_task_to_run(request, try_number):
   """Returns a fresh new TaskToRun for the task ready to be scheduled.
 
   Returns:
     Unsaved TaskToRun entity.
   """
+  assert 1 <= try_number <= 2, try_number
+  created = request.created_ts
+  if try_number != 1:
+    # When retrying, use the current time.
+    created = utils.utcnow()
+  # TODO(maruel): expiration_ts is based on request.created_ts but it could be
+  # enqueued sooner or later. crbug.com/781021
+  exp = request.created_ts + datetime.timedelta(seconds=request.expiration_secs)
   return TaskToRun(
-      key=request_to_task_to_run_key(request),
+      key=request_to_task_to_run_key(request, try_number),
+      created_ts=created,
       queue_number=gen_queue_number(request),
-      expiration_ts=request.expiration_ts)
-
-
-def validate_to_run_key(task_key):
-  """Validates a ndb.Key to a TaskToRun entity. Raises ValueError if invalid."""
-  # This also validates the key kind.
-  request_key = task_to_run_key_to_request_key(task_key)
-  key_id = task_key.integer_id()
-  if not key_id or key_id >= 2**32:
-    raise ValueError(
-        'TaskToRun key id should be between 1 and 2**32, found %s' %
-        task_key.integer_id())
-  task_request.validate_request_key(request_key)
+      expiration_ts=exp)
 
 
 def match_dimensions(request_dimensions, bot_dimensions):

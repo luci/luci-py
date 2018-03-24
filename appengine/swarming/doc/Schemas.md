@@ -71,10 +71,10 @@ case.
         +------+
         |      |
         |      v
-        |  +--------------------+
-        |  |TaskToRun           |                                 task_to_run.py
-        |  |id=<dimensions_hash>|
-        |  +--------------------+
+        |  +--------------+     +--------------+
+        |  |TaskToRun     | ... |TaskToRun     |                  task_to_run.py
+        |  |id=<composite>| ... |id=<composite>|
+        |  +--------------+     +--------------+
         |
         v
     +-----------------+

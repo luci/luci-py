@@ -375,16 +375,21 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def _task_deduped(self, new_ts, deduped_from, task_id, nb_task=1, now=None):
     """Runs a task that was deduped."""
+    # TODO(maruel): Test with SecretBytes.
     request = gen_request(properties={'idempotent': True})
     task_request.init_new_request(request, True)
     result_summary_1 = task_scheduler.schedule_request(request, None)
-    self.assertEqual(None, task_to_run.TaskToRun.query().get().queue_number)
+    to_run_key = task_to_run.request_to_task_to_run_key(request, 1)
+    # TaskToRun was not stored.
+    self.assertEqual(None, to_run_key.get())
     self._register_bot(self.bot_dimensions, nb_task=nb_task)
-    actual_request_2, _, run_result_2 = task_scheduler.bot_reap_task(
+    # Bot can't reap.
+    reaped_request, _, _ = task_scheduler.bot_reap_task(
         self.bot_dimensions, 'abc', None)
-    self.assertEqual(None, actual_request_2)
+    self.assertEqual(None, reaped_request)
+
     result_summary_duped, run_results_duped = get_results(request.key)
-    # A deduped task cannot be deduped against so properties_hash is None.
+    # A deduped task cannot be deduped again so properties_hash is None.
     expected = self._gen_result_summary_reaped(
         completed_ts=now or self.now,
         cost_saved_usd=0.1,
@@ -980,6 +985,11 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(task_result.State.CANCELED, result_summary.state)
     self.assertEqual(2, self.execute_tasks())
     self.assertEqual(1, len(pub_sub_calls)) # sent completion notification
+    # Make sure they are added to the negative cache.
+    for i in (1, 2):
+      to_run_key = task_to_run.request_to_task_to_run_key(request, i)
+      actual = task_to_run._lookup_cache_is_taken_async(to_run_key).get_result()
+      self.assertEqual(True, actual)
 
   def test_cancel_task_running(self):
     request = gen_request(pubsub_topic='projects/abc/topics/def')
@@ -1245,9 +1255,9 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     run_result = self._quick_reap(
         expiration_ts=self.now+(3*task_result.BOT_PING_TOLERANCE),
        nb_task=0)
-    to_run_key = task_to_run.request_to_task_to_run_key(
-        run_result.request_key.get())
-    self.assertEqual(None, to_run_key.get().queue_number)
+    to_run_key_1 = task_to_run.request_to_task_to_run_key(
+        run_result.request_key.get(), 1)
+    self.assertEqual(None, to_run_key_1.get().queue_number)
 
     # See _handle_dead_bot() with special case about non-idempotent task that
     # were never updated.
@@ -1277,7 +1287,11 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(State.BOT_DIED, run_result.state)
     result_summary = run_result.result_summary_key.get()
     self.assertEqual(State.PENDING, result_summary.state)
-    self.assertTrue(to_run_key.get().queue_number)
+    # The old TaskToRun is not reused.
+    self.assertEqual(None, to_run_key_1.get().queue_number)
+    to_run_key_2 = task_to_run.request_to_task_to_run_key(
+        run_result.request_key.get(), 2)
+    self.assertTrue(to_run_key_2.get().queue_number)
 
   def test_cron_handle_bot_died_same_bot_denied(self):
     # Test first retry, then success.

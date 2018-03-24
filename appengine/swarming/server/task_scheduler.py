@@ -217,7 +217,9 @@ def _handle_dead_bot(run_result_key):
   server_version = utils.get_app_version()
   packed = task_pack.pack_run_result_key(run_result_key)
   request = request_future.get_result()
-  to_run_key = task_to_run.request_to_task_to_run_key(request)
+  # The TaskRunResult key id is the try number.
+  try_number = run_result_key.integer_id()
+  to_run_key = task_to_run.request_to_task_to_run_key(request, try_number)
 
   def run():
     """Returns tuple(task_is_retried or None, bot_id)."""
@@ -254,8 +256,9 @@ def _handle_dead_bot(run_result_key):
       #   - idempotent
       #   - task hadn't got any ping at all from task_runner.run_command()
       # TODO(maruel): Allow retry for bot locked task using 'id' dimension.
+      # Create a second TaskToRun.
+      to_run = task_to_run.new_task_to_run(request, 2)
       to_put = (run_result, result_summary, to_run)
-      to_run.queue_number = task_to_run.gen_queue_number(request)
       run_result.state = task_result.State.BOT_DIED
       run_result.internal_failure = True
       run_result.abandoned_ts = now
@@ -696,7 +699,8 @@ def schedule_request(request, secret_bytes):
 
   now = utils.utcnow()
   request.key = task_request.new_request_key()
-  task = task_to_run.new_task_to_run(request)
+  # This is the first try.
+  to_run = task_to_run.new_task_to_run(request, 1)
   result_summary = task_result.new_result_summary(request)
   result_summary.modified_ts = now
   if secret_bytes:
@@ -705,7 +709,7 @@ def schedule_request(request, secret_bytes):
   def get_new_keys():
     # Warning: this assumes knowledge about the hierarchy of each entity.
     key = task_request.new_request_key()
-    task.key = ndb.Key(task.key.kind(), task.key.id(), parent=key)
+    to_run.key = ndb.Key(to_run.key.kind(), to_run.key.id(), parent=key)
     if secret_bytes:
       secret_bytes.key = ndb.Key(
           secret_bytes.key.kind(), secret_bytes.key.id(), parent=key)
@@ -719,13 +723,14 @@ def schedule_request(request, secret_bytes):
   if request.properties.idempotent:
     dupe_summary = _find_dupe_task(now, request.properties_hash())
     if dupe_summary:
-      # Setting task.queue_number to None removes it from the scheduling.
-      task.queue_number = None
       _copy_summary(
           dupe_summary, result_summary,
           ('created_ts', 'modified_ts', 'name', 'user', 'tags'))
-      # Zap irrelevant properties. PerformanceStats is also not copied over,
-      # since it's not relevant.
+      # Zap irrelevant properties.
+      # It is not possible to deduped against a deduped task, so zap
+      # properties_hash.
+      # PerformanceStats is not copied over, since it's not relevant, nothing
+      # ran.
       result_summary.properties_hash = None
       result_summary.try_number = 0
       result_summary.cost_saved_usd = result_summary.cost_usd
@@ -734,14 +739,17 @@ def schedule_request(request, secret_bytes):
       result_summary.deduped_from = task_pack.pack_run_result_key(
           dupe_summary.run_result_key)
       # In this code path, there's not much to do as the task will not be run,
-      # previous results are returned. We still need to store all the entities
-      # correctly. However, since the has_secret_bytes property is already set
-      # for UI purposes, and the task itself will never be run, we skip storing
-      # the SecretBytes, as they would never be read and will just consume space
-      # in the datastore (and the task we deduplicated with will have them
-      # stored anyway, if we really want to get them again).
-      datastore_utils.insert(
-          request, get_new_keys, extra=[task, result_summary])
+      # previous results are returned. We still need to store the TaskRequest
+      # and TaskResultSummary.
+      #
+      # Since the task is never scheduled, TaskToRun is not stored.
+      #
+      # Since the has_secret_bytes property is already set for UI purposes, and
+      # the task itself will never be run, we skip storing the SecretBytes, as
+      # they would never be read and will just consume space in the datastore
+      # (and the task we deduplicated with will have them stored anyway, if we
+      # really want to get them again).
+      datastore_utils.insert(request, get_new_keys, extra=[result_summary])
       logging.debug(
           'New request %s reusing %s', result_summary.task_id,
           dupe_summary.task_id)
@@ -752,7 +760,7 @@ def schedule_request(request, secret_bytes):
     # that the HTTP handler returns as fast as possible, otherwise the task will
     # be run but the client will not know about it.
     datastore_utils.insert(request, get_new_keys,
-        extra=filter(bool, [task, result_summary, secret_bytes]))
+        extra=filter(bool, [to_run, result_summary, secret_bytes]))
     logging.debug('New request %s', result_summary.task_id)
 
   # Get parent task details if applicable.
@@ -973,22 +981,40 @@ def cancel_task(request, result_key):
 
   Warning: ACL check must have been done before.
   """
-  to_run_key = task_to_run.request_to_task_to_run_key(request)
   if result_key.kind() == 'TaskRunResult':
+    # Ignore the try number. A user may ask to cancel run result 1, but if it
+    # BOT_DIED, it is accepted to cancel try number #2 since the task is still
+    # "pending".
     result_key = task_pack.run_result_key_to_result_summary_key(result_key)
   now = utils.utcnow()
 
   def run():
-    to_run, result_summary = ndb.get_multi((to_run_key, result_key))
+    """3x DB GETs, 2x DB PUTs, 1x task queue."""
+    # Need to get the current try number to know which TaskToRun to fetch.
+    result_summary_future = result_key.get_async()
+    to_runs_future = ndb.get_multi_async(
+        task_to_run.request_to_task_to_run_key(request, i) for i in (1, 2))
+    result_summary = result_summary_future.get_result()
     was_running = result_summary.state == task_result.State.RUNNING
     if not result_summary.can_be_canceled:
+      for f in to_runs_future:
+        f.get_result()
       return False, was_running
-    to_run.queue_number = None
+
+    to_runs = [
+      t for t in (f.get_result() for f in to_runs_future)
+      if t and t.queue_number
+    ]
+    # Do a loop for resiliency against corrupted DB but there should be only at
+    # most one TaskToRun active per TaskRequest at a time.
+    for t in to_runs:
+      t.queue_number = None
+    # This works because there is no TaskRunResult in the DB.
     result_summary.state = task_result.State.CANCELED
     result_summary.abandoned_ts = now
     result_summary.modified_ts = now
 
-    futures = ndb.put_multi_async((to_run, result_summary))
+    futures = ndb.put_multi_async(to_runs + [result_summary])
     _maybe_pubsub_notify_via_tq(result_summary, request)
     for f in futures:
       f.check_success()
@@ -998,7 +1024,12 @@ def cancel_task(request, result_key):
   # Add it to the negative cache *before* running the transaction. Either way
   # the task was already reaped or the task is correctly canceled thus not
   # reapable.
-  task_to_run.set_lookup_cache(to_run_key, False)
+  for i in (1, 2):
+    # We don't know in advance if it's try number 1 or 2, so do both. Since it's
+    # an memcache RPC, it's not too costly.
+    # TODO(maruel): Refactor to do both simultaneously to save 2ms.
+    to_run_key = task_to_run.request_to_task_to_run_key(request, i)
+    task_to_run.set_lookup_cache(to_run_key, False)
 
   try:
     ok, was_running = datastore_utils.transaction(run)
