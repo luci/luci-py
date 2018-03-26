@@ -252,64 +252,224 @@ class AppTestBase(test_case.TestCase):
       args = json.loads(protojson.encode_message(args))
     return srv.call_api(name, body=args).json
 
-  def _client_create_task(self, properties=None, **kwargs):
-    """Creates an isolated command TaskRequest via the Cloud Endpoints API."""
-    props = {
-      'cipd_input': {
-        'client_package': {
-          'package_name': 'infra/tools/cipd/${platform}',
-          'version': 'git_revision:deadbeef',
+  @staticmethod
+  def create_props(**kwargs):
+    """Returns a serialized swarming_rpcs.TaskProperties."""
+    out = {
+      u'cipd_input': {
+        u'client_package': {
+          u'package_name': u'infra/tools/cipd/${platform}',
+          u'version': u'git_revision:deadbeef',
         },
-        'packages': [{
-          'package_name': 'rm',
-          'path': 'bin',
-          'version': 'git_revision:deadbeef',
+        u'packages': [{
+          u'package_name': u'rm',
+          u'path': u'bin',
+          u'version': u'git_revision:deadbeef',
         }],
-        'server': 'https://chrome-infra-packages.appspot.com',
+        u'server': u'https://chrome-infra-packages.appspot.com',
       },
-      'dimensions': [
-        {'key': 'os', 'value': 'Amiga'},
-        {'key': 'pool', 'value': 'default'},
+      u'dimensions': [
+        {u'key': u'os', u'value': u'Amiga'},
+        {u'key': u'pool', u'value': u'default'},
       ],
-      'env': [],
-      'execution_timeout_secs': 3600,
-      'io_timeout_secs': 1200,
-      'outputs': ['foo', 'path/to/foobar']
+      u'env': [],
+      u'execution_timeout_secs': 3600,
+      u'io_timeout_secs': 1200,
+      u'outputs': [u'foo', u'path/to/foobar']
     }
-    props.update(properties or {})
+    out.update((unicode(k), v) for k, v in kwargs.iteritems())
+    return out
 
-    params = {
+  def create_new_request(self, **kwargs):
+    """Returns an initialized swarming_rpcs.TaskNewRequest."""
+    out = {
       'expiration_secs': 24*60*60,
-      'name': 'hi',
-      # Low priority user will be downgraded to 20.
-      'priority': 10,
-      'properties': props,
-      'tags': [],
+      'name': 'job1',
+      'priority': 20,
+      'tags': [u'a:tag'],
       'user': 'joe@localhost',
     }
-    params.update(kwargs)
-
+    out.update((unicode(k), v) for k, v in kwargs.iteritems())
     # Note that protorpc message constructor accepts dicts for submessages.
-    request = swarming_rpcs.NewTaskRequest(**params)
+    return swarming_rpcs.NewTaskRequest(**out)
+
+  def client_create_task(self, **kwargs):
+    """Creates a minimal task request via the Cloud Endpoints API."""
+    request = self.create_new_request(**kwargs)
     response = self.endpoint_call(
         handlers_endpoints.SwarmingTasksService, 'new', request)
     return response, response['task_id']
 
   def client_create_task_isolated(self, properties=None, **kwargs):
+    """Creates a TaskRequest using an isolated tree via the Cloud Endpoints API.
+    """
     properties = (properties or {}).copy()
     properties['inputs_ref'] = {
       'isolated': '0123456789012345678901234567890123456789',
       'isolatedserver': 'http://localhost:1',
       'namespace': 'default-gzip',
     }
-    return self._client_create_task(properties, **kwargs)
+    return self.client_create_task(
+        properties=self.create_props(**properties), **kwargs)
 
   def client_create_task_raw(self, properties=None, **kwargs):
     """Creates a raw command TaskRequest via the Cloud Endpoints API."""
     properties = (properties or {}).copy()
     properties['command'] = ['python', 'run_test.py']
-    return self._client_create_task(properties, **kwargs)
+    return self.client_create_task(
+        properties=self.create_props(**properties), **kwargs)
 
   def client_get_results(self, task_id):
     return self.endpoint_call(
         handlers_endpoints.SwarmingTaskService, 'result', {'task_id': task_id})
+
+  @staticmethod
+  def gen_props(**kwargs):
+    """Returns a serialized swarming_rpcs.TaskProperties.
+
+    To be used for expectations.
+    """
+    out = {
+      u'cipd_input': {
+        u'client_package': {
+          u'package_name': u'infra/tools/cipd/${platform}',
+          u'version': u'git_revision:deadbeef',
+        },
+        u'packages': [{
+          u'package_name': u'rm',
+          u'path': u'bin',
+          u'version': u'git_revision:deadbeef',
+        }],
+        u'server': u'https://chrome-infra-packages.appspot.com',
+      },
+      u'dimensions': [
+        {u'key': u'os', u'value': u'Amiga'},
+        {u'key': u'pool', u'value': u'default'},
+      ],
+      u'execution_timeout_secs': u'3600',
+      u'grace_period_secs': u'30',
+      u'idempotent': False,
+      u'io_timeout_secs': u'1200',
+      u'outputs': [u'foo', u'path/to/foobar']
+    }
+    out.update((unicode(k), v) for k, v in kwargs.iteritems())
+    return out
+
+  @staticmethod
+  def gen_request(**kwargs):
+    """Returns a serialized swarming_rpcs.TaskRequest.
+
+    To be used for expectations.
+    """
+    out = {
+      u'authenticated': u'user:user@example.com',
+      u'expiration_secs': u'86400',
+      u'name': u'job1',
+      u'priority': u'20',
+      u'service_account': u'none',
+      u'tags': [
+        u'a:tag',
+        u'os:Amiga',
+        u'pool:default',
+        u'priority:20',
+        u'service_account:none',
+        u'user:joe@localhost',
+      ],
+      u'user': u'joe@localhost',
+    }
+    out.update((unicode(k), v) for k, v in kwargs.iteritems())
+    return out
+
+  @staticmethod
+  def gen_perf_stats(**kwargs):
+    """Returns a serialized swarming_rpcs.PerformanceStats.
+
+    To be used for expectations.
+    """
+    out = {
+      u'bot_overhead': 0.1,
+      u'isolated_download': {
+        u'duration': 1.0,
+        u'initial_number_items': u'10',
+        u'initial_size': u'100000',
+        u'items_cold': [20],
+        u'items_hot': [30, 40],
+        u'num_items_cold': u'1',
+        u'total_bytes_items_cold': u'20',
+        u'num_items_hot': u'2',
+        u'total_bytes_items_hot': u'70',
+      },
+      u'isolated_upload': {
+        u'duration': 2.0,
+        u'items_cold': [1, 2, 40],
+        u'items_hot': [1, 2, 3, 50],
+        u'num_items_cold': u'3',
+        u'total_bytes_items_cold': u'43',
+        u'num_items_hot': u'4',
+        u'total_bytes_items_hot': u'56',
+      },
+    }
+    out.update((unicode(k), v) for k, v in kwargs.iteritems())
+    return out
+
+  def gen_result_summary(self, **kwargs):
+    """Returns a serialized swarming_rpcs.TaskResult initialized from a
+    TaskResultSummary.
+
+    To be used for expectations.
+    """
+    out = {
+      u'bot_dimensions': [
+        {u'key': u'id', u'value': [u'bot1']},
+        {u'key': u'os', u'value': [u'Amiga']},
+        {u'key': u'pool', u'value': [u'default']},
+      ],
+      u'bot_id': u'bot1',
+      u'bot_version': self.bot_version,
+      u'failure': False,
+      u'internal_failure': False,
+      u'name': u'job1',
+      u'run_id': u'5cee488008811',
+      u'server_versions': [u'v1a'],
+      u'state': u'COMPLETED',
+      u'tags': [
+        u'a:tag',
+        u'os:Amiga',
+        u'pool:default',
+        u'priority:20',
+        u'service_account:none',
+        u'user:joe@localhost',
+      ],
+      u'task_id': u'5cee488008810',
+      u'try_number': u'0',
+      u'user': u'joe@localhost',
+    }
+    out.update((unicode(k), v) for k, v in kwargs.iteritems())
+    return out
+
+  def gen_run_result(self, **kwargs):
+    """Returns a serialized swarming_rpcs.TaskResult initialized from a
+    TaskRunResult.
+
+    To be used for expectations.
+    """
+    out = {
+      u'bot_dimensions': [
+        {u'key': u'id', u'value': [u'bot1']},
+        {u'key': u'os', u'value': [u'Amiga']},
+        {u'key': u'pool', u'value': [u'default']},
+      ],
+      u'bot_id': u'bot1',
+      u'bot_version': self.bot_version,
+      u'costs_usd': [0.0],
+      u'failure': False,
+      u'internal_failure': False,
+      u'name': u'job1',
+      u'run_id': u'5cee488008811',
+      u'server_versions': [u'v1a'],
+      u'state': u'RUNNING',
+      u'task_id': u'5cee488008811',
+      u'try_number': u'1',
+    }
+    out.update((unicode(k), v) for k, v in kwargs.iteritems())
+    return out
