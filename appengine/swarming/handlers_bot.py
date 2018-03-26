@@ -952,8 +952,8 @@ class BotTaskUpdateHandler(_BotApiHandler):
 
       if state in (task_result.State.COMPLETED, task_result.State.TIMED_OUT):
         action = 'task_completed'
-      elif state == task_result.State.CANCELED:
-        action = 'task_canceled'
+      elif state == task_result.State.KILLED:
+        action = 'task_killed'
       else:
         assert state in (
             task_result.State.BOT_DIED, task_result.State.RUNNING), state
@@ -977,7 +977,7 @@ class BotTaskUpdateHandler(_BotApiHandler):
       logging.exception('Internal error: %s', e)
       self.abort_with_error(500, error=str(e))
     self.send_response(
-        {'must_stop': state == task_result.State.CANCELED, 'ok': True})
+        {'must_stop': state == task_result.State.KILLED, 'ok': True})
 
 
 class BotTaskErrorHandler(_BotApiHandler):

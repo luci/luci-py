@@ -506,6 +506,7 @@ class _OutputBuffer(object):
     This is necessary as task_runner must send keep-alive to the server to tell
     it that it is not hung, even if the subprocess doesn't output any data.
     """
+    # TODO(maruel): Use exponential backoff. https://crbug.com/825500
     if timed_out:
       # Give a |grace_period| seconds delay.
       if self._task_details.grace_period:
@@ -598,9 +599,9 @@ def run_command(remote, task_details, work_dir, cost_usd_hour,
               task_details.task_id, task_details.bot_id, params, buf.pop()):
             # Server is telling us to stop. Normally task cancellation.
             if not kill_sent:
-              logging.warning('Server induced stop; sending SIGKILL')
-              proc.kill()
-              kill_sent = True
+              logging.warning('Server induced stop; sending SIGTERM')
+            proc.terminate()
+            timed_out = monotonic_time()
 
         # Send signal on timeout if necessary. Both are failures, not
         # internal_failures.

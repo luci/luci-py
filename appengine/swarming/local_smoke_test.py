@@ -70,17 +70,6 @@ DEFAULT_ISOLATE_HELLO = """{
 }""" % {'name': HELLO_WORLD.encode('utf-8')}
 
 
-def _out(isolated_hash):
-  return {
-    u'isolated': isolated_hash,
-    u'isolatedserver': u'http://localhost:10050',
-    u'namespace': u'default-gzip',
-    u'view_url':
-      u'http://localhost:10050/browse?namespace=default-gzip&hash=' +
-      isolated_hash,
-  }
-
-
 def _script(content):
   """Deindents and encode to utf-8."""
   return textwrap.dedent(content.encode('utf-8'))
@@ -180,13 +169,19 @@ class SwarmingClient(object):
           outputs[name] = f.read()
     return summary, outputs
 
-  def task_cancel(self, task_id):
+  def task_cancel(self, task_id, args):
     """Cancels a task."""
-    return self._capture('cancel', [str(task_id)]) == ''
+    return self._capture('cancel', list(args) + [str(task_id)]) == ''
 
-  def task_query(self, task_id):
+  def task_result(self, task_id):
     """Queries a task result without waiting for it to complete."""
+    # collect --timeout 0 now works the same.
     return json.loads(self._capture('query', ['task/%s/result' % task_id]))
+
+  def task_stdout(self, task_id):
+    """Returns current task stdout without waiting for it to complete."""
+    raw = self._capture('query', ['task/%s/stdout' % task_id])
+    return json.loads(raw).get('output')
 
   def terminate(self, bot_id):
     task_id = self._capture('terminate', [bot_id]).strip()
@@ -461,7 +456,7 @@ class Test(unittest.TestCase):
           f.write('test_isolated')
         """),
     }
-    isolated_out = _out(u'f067c9cf13dcc90f2fe269499d44082150876126')
+    isolated_out = self._out(u'f067c9cf13dcc90f2fe269499d44082150876126')
     items_in = [sum(len(c) for c in content.itervalues()), 214]
     items_out = [len('test_isolated'), 125]
     expected_summary = self.gen_expected(
@@ -516,7 +511,7 @@ class Test(unittest.TestCase):
           f.write('hey2')
         """),
     }
-    isolated_out = _out(u'fc04fe5eee668c35c81db590a76c0da9cbcdae90')
+    isolated_out = self._out(u'fc04fe5eee668c35c81db590a76c0da9cbcdae90')
     items_in = [sum(len(c) for c in content.itervalues()), 150]
     items_out = [len('hey2'), len(u'bar💩'.encode('utf-8')), 191]
     expected_summary = self.gen_expected(
@@ -627,7 +622,7 @@ class Test(unittest.TestCase):
         """ % ('SIGBREAK' if sys.platform == 'win32' else 'SIGTERM')
         ),
     }
-    isolated_out = _out(u'53b4ab0562f05135e20ec91b473e5ca2282edc2b')
+    isolated_out = self._out(u'53b4ab0562f05135e20ec91b473e5ca2282edc2b')
     items_in = [sum(len(c) for c in content.itervalues()), 214]
     items_out = [len('test_isolated_hard_timeout_grace'), 119]
     expected_summary = self.gen_expected(
@@ -714,7 +709,7 @@ class Test(unittest.TestCase):
           print >> f, data['swarming']['secret_bytes'].decode('base64')
       """),
     }
-    isolated_out = _out(u'd2eca4d860e4f1728272f6a736fd1c9ac6e98c4f')
+    isolated_out = self._out(u'd2eca4d860e4f1728272f6a736fd1c9ac6e98c4f')
     items_in = [sum(len(c) for c in content.itervalues()), 214]
     items_out = [len('foobar\n'), 114]
     expected_summary = self.gen_expected(
@@ -791,7 +786,7 @@ class Test(unittest.TestCase):
         isolate_content=DEFAULT_ISOLATE_HELLO)
 
     # Second run with a cache available.
-    isolated_out = _out(u'63fc667fd217ebabdf60ca143fe25998b5ea5c77')
+    isolated_out = self._out(u'63fc667fd217ebabdf60ca143fe25998b5ea5c77')
     items_out = [3, 110]
     expected_summary = self.gen_expected(
       name=u'cache_second',
@@ -849,23 +844,14 @@ class Test(unittest.TestCase):
         'python', '-u', '-c',
         # Cheezy wait.
         ('import os,time;'
+         'print(\'hi\');'
          '[time.sleep(0.1) for _ in xrange(100000) if os.path.exists(\'%s\')];'
-        'print(\'hi\')') % signal_file,
+         'print(\'hi again\')') % signal_file,
       ]
       wait_task_id = self.client.task_trigger_raw(args)
       # Assert that the 'wait' task has started but not completed, otherwise
       # this defeats the purpose.
-      state = stats = None
-      start = time.time()
-      # 15 seconds is a long time.
-      while time.time() - start < 15.:
-        stats = self.client.task_query(wait_task_id)
-        state = stats[u'state']
-        if state == u'RUNNING':
-          break
-        self.assertEqual(u'PENDING', state, stats)
-        time.sleep(0.01)
-      self.assertEqual(u'RUNNING', state, stats)
+      self._wait_for_state(wait_task_id, u'PENDING', u'RUNNING')
 
       # This is the order of the priorities used for each task triggered. In
       # particular, below it asserts that the priority 8 tasks are run in order
@@ -880,13 +866,13 @@ class Test(unittest.TestCase):
 
       # And the wait task is still running, so that all tasks above are pending,
       # thus are given a chance to run in priority order.
-      stats = self.client.task_query(wait_task_id)
-      self.assertEqual(u'RUNNING', stats[u'state'], stats)
+      result = self.client.task_result(wait_task_id)
+      self.assertEqual(u'RUNNING', result[u'state'], result)
 
       # Ensure the tasks under test are pending.
       for task_name, priority, task_id in tasks:
-        stats = self.client.task_query(task_id)
-      self.assertEqual(u'PENDING', stats[u'state'], stats)
+        result = self.client.task_result(task_id)
+      self.assertEqual(u'PENDING', result[u'state'], result)
     finally:
       # Unblock the wait_task_id on the bot.
       os.remove(signal_file)
@@ -897,7 +883,9 @@ class Test(unittest.TestCase):
     actual_summary, actual_files = self.client.task_collect(wait_task_id)
     t = tags[:] + [u'priority:20']
     self.assertResults(
-        self.gen_expected(name=u'wait', tags=sorted(t)), actual_summary)
+        self.gen_expected(
+            name=u'wait', tags=sorted(t), outputs=['hi\nhi again\n']),
+        actual_summary)
     self.assertEqual(['summary.json'], actual_files.keys())
 
     # List of tuple(task_name, priority, task_id, results).
@@ -930,16 +918,69 @@ class Test(unittest.TestCase):
     self.assertEqual(
         0x20,  # task_result.PENDING
         actual[u'shards'][0][u'state'])
-    self.assertTrue(self.client.task_cancel(task_id))
+    self.assertTrue(self.client.task_cancel(task_id, []))
     actual, _ = self.client.task_collect(task_id, timeout=-1)
     self.assertEqual(
         0x60,  # task_result.State.CANCELED
         actual[u'shards'][0][u'state'], actual[u'shards'][0])
 
+  def test_cancel_running(self):
+    # Cancel a running task. Make sure the target process handles the signal
+    # well with a graceful termination via SIGTERM.
+    content = {
+      HELLO_WORLD + u'.py': _script(u"""
+        import signal
+        import sys
+        import threading
+        bit = threading.Event()
+        def handler(signum, _):
+          bit.set()
+          sys.stdout.write('got signal %%d\\n' %% signum)
+          sys.stdout.flush()
+        signal.signal(signal.%s, handler)
+        sys.stdout.write('hi\\n')
+        sys.stdout.flush()
+        while not bit.wait(0.01):
+          pass
+        sys.exit(23)
+        """) % ('SIGBREAK' if sys.platform == 'win32' else 'SIGTERM'),
+    }
+    task_id = self._start_isolated(
+        content, 'cancel_running', ['--', '${ISOLATED_OUTDIR}'],
+        isolate_content=DEFAULT_ISOLATE_HELLO)
+
+    # Wait for the task to start on the bot.
+    self._wait_for_state(task_id, u'PENDING', u'RUNNING')
+    # Make sure the signal handler is set by looking that 'hi' was printed,
+    # otherwise it could continue looping.
+    start = time.time()
+    out = None
+    while time.time() - start < 45.:
+      out = self.client.task_stdout(task_id)
+      if out == 'hi\n':
+        break
+    self.assertEqual(out, 'hi\n')
+
+    # Cancel it.
+    self.assertTrue(self.client.task_cancel(task_id, ['--kill-running']))
+
+    result = self._wait_for_state(task_id, u'RUNNING', u'KILLED')
+    # Make sure the exit code is what the script returned, which means the
+    # script in fact did handle the SIGTERM and returned properly.
+    self.assertEqual(u'23', result[u'exit_code'])
+
   def _run_isolated(
       self, contents, name, args, expected_summary, expected_files,
       deduped, isolate_content):
     """Runs a python script as an isolated file."""
+    task_id = self._start_isolated(contents, name, args, isolate_content)
+    actual_summary, actual_files = self.client.task_collect(task_id)
+    self.assertResults(expected_summary, actual_summary, deduped=deduped)
+    actual_files.pop('summary.json')
+    self.assertEqual(expected_files, actual_files)
+    return task_id
+
+  def _start_isolated(self, contents, name, args, isolate_content):
     # Shared code for all test_isolated_* test cases.
     root = os.path.join(self.tmpdir, name)
     # Refuse reusing the same task name twice, it makes the whole test suite
@@ -958,13 +999,8 @@ class Test(unittest.TestCase):
       with fs.open(p, 'wb') as f:
         f.write(content)
     isolated_hash = self.client.isolate(isolate_path, isolated_path)
-    task_id = self.client.task_trigger_isolated(
+    return self.client.task_trigger_isolated(
         name, isolated_hash, extra=args)
-    actual_summary, actual_files = self.client.task_collect(task_id)
-    self.assertResults(expected_summary, actual_summary, deduped=deduped)
-    actual_files.pop('summary.json')
-    self.assertEqual(expected_files, actual_files)
-    return task_id
 
   def assertResults(self, expected, result, deduped=False):
     self.assertEqual([u'shards'], result.keys())
@@ -1032,6 +1068,34 @@ class Test(unittest.TestCase):
     actual_files.pop('summary.json')
     self.assertEqual(expected_files, actual_files)
     return bot_version
+
+  def _wait_for_state(self, task_id, current, new):
+    """Waits for the task to start on the bot."""
+    state = result = None
+    start = time.time()
+    # 45 seconds is a long time.
+    # TODO(maruel): Make task_runner use exponential backoff instead of
+    # hardcoded 10s/30s, which makes these tests tremendously slower than
+    # necessary.
+    # https://crbug.com/825500
+    while time.time() - start < 45.:
+      result = self.client.task_result(task_id)
+      state = result[u'state']
+      if state == new:
+        break
+      self.assertEqual(current, state, result)
+      time.sleep(0.01)
+    self.assertEqual(new, state, result)
+    return result
+
+  def _out(self, isolated_hash):
+    return {
+      u'isolated': isolated_hash,
+      u'isolatedserver': unicode(self.servers.isolate_server.url),
+      u'namespace': u'default-gzip',
+      u'view_url': u'%s/browse?namespace=default-gzip&hash=%s' %
+          (self.servers.isolate_server.url, isolated_hash),
+    }
 
 
 def cleanup(bot, client, servers, print_all):

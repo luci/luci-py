@@ -515,6 +515,15 @@ def _bot_update_tx(
   logging inside the transaction for performance.
   """
   # 2 or 3 consecutive GETs, one PUT.
+  #
+  # Assumptions:
+  # - duration and exit_code are both set or not set. That's not always true for
+  #   TIMED_OUT/KILLED.
+  # - same for run_result.
+  # - if one of hard_timeout or io_timeout is set, duration is also set.
+  # - hard_timeout or io_timeout can still happen in the case of killing. This
+  #   still needs to result in KILLED, not TIMED_OUT.
+
   run_result_future = run_result_key.get_async()
   result_summary_future = result_summary_key.get_async()
   run_result = run_result_future.get_result()
@@ -532,9 +541,6 @@ def _bot_update_tx(
     return None, None, 'TaskRunResult is broken; %s' % (
         run_result.to_dict())
 
-  # Assumptions:
-  # - duration and exit_code are both set or not set.
-  # - same for run_result.
   if exit_code is not None:
     if run_result.exit_code is not None:
       # This happens as an HTTP request is retried when the DB write succeeded
@@ -558,12 +564,20 @@ def _bot_update_tx(
     run_result.cipd_pins = cipd_pins
 
   if run_result.state in task_result.State.STATES_RUNNING:
-    if hard_timeout or io_timeout:
-      run_result.state = task_result.State.TIMED_OUT
-      run_result.completed_ts = now
-    elif run_result.exit_code is not None:
-      run_result.state = task_result.State.COMPLETED
-      run_result.completed_ts = now
+    # Task was still registered as running. Look if it should be terminated now.
+    if run_result.killing:
+      if duration is not None:
+        # A user requested to cancel the task while it was running. Since the
+        # task is now stopped, we can tag the task result as KILLED.
+        run_result.killing = False
+        run_result.state = task_result.State.KILLED
+    else:
+      if hard_timeout or io_timeout:
+        run_result.state = task_result.State.TIMED_OUT
+        run_result.completed_ts = now
+      elif run_result.exit_code is not None:
+        run_result.state = task_result.State.COMPLETED
+        run_result.completed_ts = now
 
   run_result.signal_server_version(server_version)
   to_put = [run_result]
@@ -922,6 +936,11 @@ def bot_update_task(
   if smry.state not in task_result.State.STATES_RUNNING:
     event_mon_metrics.send_task_event(smry)
     ts_mon_metrics.on_task_completed(smry)
+
+  # Hack a bit to tell the bot what it needs to hear (see handler_bot.py). It's
+  # kind of an ugly hack but the other option is to return the whole run_result.
+  if run_result.killing:
+    return task_result.State.KILLED
   return run_result.state
 
 
@@ -973,13 +992,20 @@ def bot_kill_task(run_result_key, bot_id):
   return msg
 
 
-def cancel_task(request, result_key):
-  """Cancels a task if possible.
+def cancel_task(request, result_key, kill_running):
+  """Cancels a task if possible, setting it to either CANCELED or KILLED.
 
-  Ensures that the associated TaskToRun is canceled and updates the
-  TaskResultSummary/TaskRunResult accordingly.
+  Ensures that the associated TaskToRun is canceled (when pending) and updates
+  the TaskResultSummary/TaskRunResult accordingly. The TaskRunResult.state is
+  immediately set to KILLED for running tasks.
 
   Warning: ACL check must have been done before.
+
+  Returns:
+    tuple(bool, bool)
+    - True if the cancelation succeeded. Either the task atomically changed
+      from PENDING to CANCELED or it was RUNNING and killing bit has been set.
+    - True if the task was running while it was canceled.
   """
   if result_key.kind() == 'TaskRunResult':
     # Ignore the try number. A user may ask to cancel run result 1, but if it
@@ -989,36 +1015,41 @@ def cancel_task(request, result_key):
   now = utils.utcnow()
 
   def run():
-    """3x DB GETs, 2x DB PUTs, 1x task queue."""
-    # Need to get the current try number to know which TaskToRun to fetch.
-    result_summary_future = result_key.get_async()
-    to_runs_future = ndb.get_multi_async(
-        task_to_run.request_to_task_to_run_key(request, i) for i in (1, 2))
-    result_summary = result_summary_future.get_result()
+    """1x DB GET, 1x DB GET, 2x DB PUTs, 1x task queue."""
+    result_summary = result_key.get()
     was_running = result_summary.state == task_result.State.RUNNING
     if not result_summary.can_be_canceled:
-      for f in to_runs_future:
-        f.get_result()
       return False, was_running
 
-    to_runs = [
-      t for t in (f.get_result() for f in to_runs_future)
-      if t and t.queue_number
-    ]
-    # Do a loop for resiliency against corrupted DB but there should be only at
-    # most one TaskToRun active per TaskRequest at a time.
-    for t in to_runs:
-      t.queue_number = None
-    # This works because there is no TaskRunResult in the DB.
-    result_summary.state = task_result.State.CANCELED
+    entities = [result_summary]
+    if not was_running:
+      # PENDING.
+      result_summary.state = task_result.State.CANCELED
+      to_run = task_to_run.request_to_task_to_run_key(request, 1).get()
+      entities.append(to_run)
+      to_run.queue_number = None
+    else:
+      if not kill_running:
+        # Deny canceling a task that started.
+        return False, was_running
+      # RUNNING.
+      run_result = result_summary.run_result_key.get()
+      entities.append(run_result)
+      # Do not change state to KILLED yet. Instead, use a 2 phase commit:
+      # - set killing to True
+      # - on next bot report, tell it to kill the task
+      # - once the bot reports the task as terminated, set state to KILLED
+      run_result.killing = True
+      run_result.abandoned_ts = now
+      run_result.modified_ts = now
+      entities.append(run_result)
     result_summary.abandoned_ts = now
     result_summary.modified_ts = now
 
-    futures = ndb.put_multi_async(to_runs + [result_summary])
+    futures = ndb.put_multi_async(entities)
     _maybe_pubsub_notify_via_tq(result_summary, request)
     for f in futures:
       f.check_success()
-
     return True, was_running
 
   # Add it to the negative cache *before* running the transaction. Either way

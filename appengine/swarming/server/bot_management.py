@@ -105,7 +105,7 @@ class _BotCommon(ndb.Model):
   # - BotSettings.quarantined was set at that moment.
   quarantined = ndb.BooleanProperty(default=False)
 
-  # Affected by event_type == 'request_task', 'task_canceled', 'task_completed',
+  # Affected by event_type == 'request_task', 'task_killed', 'task_completed',
   # 'task_error'.
   task_id = ndb.StringProperty(indexed=False)
 
@@ -227,7 +227,7 @@ class BotEvent(_BotCommon):
     'bot_connected', 'bot_error', 'bot_leased', 'bot_log', 'bot_rebooting',
     'bot_shutdown', 'bot_terminate',
     'request_restart', 'request_update', 'request_sleep', 'request_task',
-    'task_completed', 'task_error', 'task_update',
+    'task_completed', 'task_error', 'task_killed', 'task_update',
   }
   # Dimensions are used for task selection. They are encoded as a list of
   # key:value. Keep in mind that the same key can be used multiple times. The
@@ -444,7 +444,7 @@ def bot_event(
       version=bot_info.version,
       **kwargs)
 
-  if event_type in ('task_canceled', 'task_completed', 'task_error'):
+  if event_type in ('task_completed', 'task_error', 'task_killed'):
     # Special case to keep the task_id in the event but not in the summary.
     bot_info.task_id = ''
 

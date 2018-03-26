@@ -558,8 +558,8 @@ class TasksApiTest(BaseTest):
     self.set_as_admin()
 
     def enqueue_task(*args, **kwargs):
-      self.assertEqual('%s,%s' % (second, first),
-                       kwargs.get('payload', ''))
+      e = {'tasks': [second, first], 'kill_running': False}
+      self.assertEqual(e, json.loads(kwargs.get('payload')))
       # check URL
       self.assertEqual('/internal/taskqueue/cancel-tasks', args[0])
       # check task queue
@@ -672,6 +672,9 @@ class TasksApiTest(BaseTest):
         (None, TaskState.EXPIRED, TaskSort.ABANDONED_TS),
         (None, TaskState.EXPIRED, TaskSort.COMPLETED_TS),
         (None, TaskState.EXPIRED, TaskSort.MODIFIED_TS),
+        (None, TaskState.KILLED, TaskSort.ABANDONED_TS),
+        (None, TaskState.KILLED, TaskSort.COMPLETED_TS),
+        (None, TaskState.KILLED, TaskSort.MODIFIED_TS),
         (None, TaskState.PENDING, TaskSort.ABANDONED_TS),
         (None, TaskState.PENDING, TaskSort.COMPLETED_TS),
         (None, TaskState.PENDING, TaskSort.MODIFIED_TS),
@@ -853,7 +856,7 @@ class TaskApiTest(BaseTest):
     self.tasks_api = test_case.Endpoints(
         handlers_endpoints.SwarmingTasksService)
 
-  def test_cancel_ok(self):
+  def test_cancel_pending(self):
     """Asserts that task cancellation goes smoothly."""
     # catch PubSub notification
     # Create and cancel a task as a non-privileged user.
@@ -862,7 +865,8 @@ class TaskApiTest(BaseTest):
         pubsub_topic='projects/abc/topics/def',
         pubsub_userdata='blah')
     expected = {u'ok': True, u'was_running': False}
-    response = self.call_api('cancel', body={'task_id': task_id})
+    response = self.call_api(
+        'cancel', body={'task_id': task_id, 'kill_running': False})
     self.assertEqual(expected, response.json)
 
     # determine that the task's state updates correctly
@@ -911,9 +915,10 @@ class TaskApiTest(BaseTest):
 
     # Attempt to cancel as non-privileged user -> HTTP 403.
     self.set_as_user()
-    self.call_api('cancel', body={'task_id': task_id}, status=403)
+    self.call_api(
+        'cancel', body={'task_id': task_id, 'kill_running': False}, status=403)
 
-  def test_task_canceled(self):
+  def test_cancel_running(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     _, task_id = self.client_create_task_raw(
         properties=dict(command=['python', 'runtest.py']))
@@ -949,16 +954,52 @@ class TaskApiTest(BaseTest):
         try_number=u'1')
     self.assertEqual(expected, self.client_get_results(task_id))
 
-    # Canceling a running task is currently not supported.
-    response = self.call_api('cancel', body={'task_id': task_id})
+    # Denied if kill_running == False.
+    response = self.call_api(
+        'cancel', body={'task_id': task_id, 'kill_running': False})
     self.assertEqual({u'ok': False, u'was_running': True}, response.json)
+
+    # Works if kill_running == True.
+    response = self.call_api(
+        'cancel', body={'task_id': task_id, 'kill_running': True})
+    self.assertEqual({u'ok': True, u'was_running': True}, response.json)
 
     self.set_as_bot()
     params = _params(output=base64.b64encode('hi'), output_chunk_start=3)
     response = self.post_json('/swarming/api/v1/bot/task_update', params)
-    self.assertEqual({u'must_stop': False, u'ok': True}, response)
+    self.assertEqual({u'must_stop': True, u'ok': True}, response)
+
+    # abandoned_ts is set but state isn't changed yet.
+    self.set_as_user()
+    expected = self.gen_result_summary(
+        abandoned_ts=fmtdate(self.now),
+        costs_usd=[0.1],
+        created_ts=fmtdate(self.now),
+        modified_ts=fmtdate(self.now),
+        started_ts=fmtdate(self.now),
+        state=u'RUNNING',
+        try_number=u'1')
+    self.assertEqual(expected, self.client_get_results(task_id))
+
+    # Bot terminates the task.
+    self.set_as_bot()
+    params = _params(
+        output=base64.b64encode(' again'), output_chunk_start=6,
+        duration=0.1, exit_code=0)
+    response = self.post_json('/swarming/api/v1/bot/task_update', params)
+    self.assertEqual({u'must_stop': True, u'ok': True}, response)
 
     self.set_as_user()
+    expected = self.gen_result_summary(
+        abandoned_ts=fmtdate(self.now),
+        costs_usd=[0.1],
+        created_ts=fmtdate(self.now),
+        duration=0.1,
+        exit_code=u'0',
+        modified_ts=fmtdate(self.now),
+        started_ts=fmtdate(self.now),
+        state=u'KILLED',
+        try_number=u'1')
     self.assertEqual(expected, self.client_get_results(task_id))
 
   def test_result_unknown(self):
@@ -1487,13 +1528,16 @@ class BotApiTest(BaseTest):
     self.set_as_bot()
     self.client_create_task_raw()
     res = self.bot_poll()
-    self.bot_complete_task(task_id=res['manifest']['task_id'])
+    response = self.bot_complete_task(task_id=res['manifest']['task_id'])
+    self.assertEqual({u'must_stop': False, u'ok': True}, response)
 
     now_1 = self.mock_now(self.now, 1)
     self.mock(random, 'getrandbits', lambda _: 0x55)
     self.client_create_task_raw(name='philbert')
     res = self.bot_poll()
-    self.bot_complete_task(exit_code=1, task_id=res['manifest']['task_id'])
+    response = self.bot_complete_task(
+        exit_code=1, task_id=res['manifest']['task_id'])
+    self.assertEqual({u'must_stop': False, u'ok': True}, response)
 
     start = utils.datetime_to_timestamp(
         self.now + datetime.timedelta(seconds=0.5)) / 1000000.
@@ -1541,7 +1585,8 @@ class BotApiTest(BaseTest):
     params = self.do_handshake()
     res = self.bot_poll()
     now_60 = self.mock_now(self.now, 60)
-    self.bot_complete_task(task_id=res['manifest']['task_id'])
+    response = self.bot_complete_task(task_id=res['manifest']['task_id'])
+    self.assertEqual({u'must_stop': False, u'ok': True}, response)
 
     params['event'] = 'bot_rebooting'
     params['message'] = 'for the best'

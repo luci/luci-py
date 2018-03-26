@@ -248,9 +248,11 @@ class CancelTasksHandler(webapp2.RequestHandler):
   """Cancels tasks given a list of their ids."""
   @decorators.require_taskqueue('cancel-tasks')
   def post(self):
-    ids = self.request.body.split(',')
-    logging.info('Cancelling tasks with ids %s', ids)
-    for task_id in ids:
+    payload = json.loads(self.request.body)
+    logging.info('Cancelling tasks with ids: %s', payload['tasks'])
+    kill_running = payload['kill_running']
+    # TODO(maruel): Parallelize.
+    for task_id in payload['tasks']:
       if not task_id:
         logging.error('Cannot cancel a blank task')
         continue
@@ -263,7 +265,8 @@ class CancelTasksHandler(webapp2.RequestHandler):
       if not request_obj:
         logging.error('Request for %s was not found.', request_key.id())
         continue
-      ok, was_running = task_scheduler.cancel_task(request_obj, result_key)
+      ok, was_running = task_scheduler.cancel_task(
+          request_obj, result_key, kill_running)
       logging.info('task %s canceled: %s was running: %s',
                    task_id, ok, was_running)
 

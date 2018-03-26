@@ -198,6 +198,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       'exit_code': None,
       'failure': False,
       'internal_failure': False,
+      'killing': None,
       'modified_ts': self.now,
       'outputs_ref': None,
       'server_versions': [u'v1a'],
@@ -974,38 +975,149 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         expected, task_scheduler.bot_kill_task(run_result.key, 'bot1'))
 
   def test_cancel_task(self):
-    request = gen_request(pubsub_topic='projects/abc/topics/def')
+    # Cancel a pending task.
     pub_sub_calls = self.mock_pub_sub()
+    request = gen_request(pubsub_topic='projects/abc/topics/def')
     task_request.init_new_request(request, True)
     result_summary = task_scheduler.schedule_request(request, None)
-    ok, was_running = task_scheduler.cancel_task(request, result_summary.key)
+    self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(0, len(pub_sub_calls)) # Nothing yet.
+
+    ok, was_running = task_scheduler.cancel_task(
+        request, result_summary.key, False)
     self.assertEqual(True, ok)
     self.assertEqual(False, was_running)
+    self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(1, len(pub_sub_calls)) # CANCELED
+
     result_summary = result_summary.key.get()
     self.assertEqual(task_result.State.CANCELED, result_summary.state)
-    self.assertEqual(2, self.execute_tasks())
-    self.assertEqual(1, len(pub_sub_calls)) # sent completion notification
     # Make sure they are added to the negative cache.
     for i in (1, 2):
       to_run_key = task_to_run.request_to_task_to_run_key(request, i)
       actual = task_to_run._lookup_cache_is_taken_async(to_run_key).get_result()
       self.assertEqual(True, actual)
+    self.assertEqual(0, self.execute_tasks())
+    self.assertEqual(1, len(pub_sub_calls)) # No other message.
 
   def test_cancel_task_running(self):
-    request = gen_request(pubsub_topic='projects/abc/topics/def')
+    # Cancel a running task.
     pub_sub_calls = self.mock_pub_sub()
-    task_request.init_new_request(request, True)
-    result_summary = task_scheduler.schedule_request(request, None)
-    self._register_bot(self.bot_dimensions)
-    reaped_request, _, run_result = task_scheduler.bot_reap_task(
-        self.bot_dimensions, 'abc', None)
-    ok, was_running = task_scheduler.cancel_task(request, result_summary.key)
+    run_result = self._quick_reap(
+        nb_task=0, pubsub_topic='projects/abc/topics/def')
+    self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(1, len(pub_sub_calls)) # RUNNING
+
+    # Denied if kill_running == False.
+    ok, was_running = task_scheduler.cancel_task(
+        run_result.request_key.get(), run_result.result_summary_key , False)
     self.assertEqual(False, ok)
     self.assertEqual(True, was_running)
-    result_summary = result_summary.key.get()
-    self.assertEqual(task_result.State.RUNNING, result_summary.state)
+    self.assertEqual(0, self.execute_tasks())
+    self.assertEqual(1, len(pub_sub_calls)) # No message.
+
+    # Works if kill_running == True.
+    ok, was_running = task_scheduler.cancel_task(
+        run_result.request_key.get(), run_result.result_summary_key , True)
+    self.assertEqual(True, ok)
+    self.assertEqual(True, was_running)
     self.assertEqual(1, self.execute_tasks())
-    self.assertEqual(1, len(pub_sub_calls)) # PENDING -> RUNNING
+    self.assertEqual(2, len(pub_sub_calls)) # CANCELED
+
+    # At this point, the task is still running and the bot is unaware.
+    run_result = run_result.key.get()
+    self.assertEqual(task_result.State.RUNNING, run_result.state)
+    self.assertEqual(True, run_result.killing)
+
+    # Repeatedly canceling works.
+    ok, was_running = task_scheduler.cancel_task(
+        run_result.request_key.get(), run_result.result_summary_key , True)
+    self.assertEqual(True, ok)
+    self.assertEqual(True, was_running)
+    self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(3, len(pub_sub_calls)) # CANCELED (again)
+
+    # Bot pulls once, gets the signal about killing, which starts the graceful
+    # termination dance.
+    self.assertEqual(
+        task_result.State.KILLED,
+        task_scheduler.bot_update_task(
+            run_result_key=run_result.key,
+            bot_id='localhost',
+            cipd_pins=None,
+            output='hey',
+            output_chunk_start=0,
+            exit_code=None,
+            duration=None,
+            hard_timeout=False,
+            io_timeout=False,
+            cost_usd=None,
+            outputs_ref=None,
+            performance_stats=None))
+
+    # At this point, it is still running, until the bot completes the task.
+    run_result = run_result.key.get()
+    self.assertEqual(task_result.State.RUNNING, run_result.state)
+    self.assertEqual(True, run_result.killing)
+
+    # Close the task.
+    self.assertEqual(
+        task_result.State.KILLED,
+        task_scheduler.bot_update_task(
+            run_result_key=run_result.key,
+            bot_id='localhost',
+            cipd_pins=None,
+            output='you',
+            output_chunk_start=3,
+            exit_code=0,
+            duration=0.1,
+            hard_timeout=False,
+            io_timeout=False,
+            cost_usd=0.1,
+            outputs_ref=None,
+            performance_stats=None))
+
+    run_result = run_result.key.get()
+    self.assertEqual(False, run_result.killing)
+    self.assertEqual(task_result.State.KILLED, run_result.state)
+    self.assertEqual(4, len(pub_sub_calls)) # KILLED
+
+  def test_cancel_task_completed(self):
+    # Cancel a completed task.
+    pub_sub_calls = self.mock_pub_sub()
+    run_result = self._quick_reap(
+        nb_task=0, pubsub_topic='projects/abc/topics/def')
+    self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(1, len(pub_sub_calls)) # RUNNING
+
+    # The task completes successfully.
+    self.assertEqual(
+        task_result.State.COMPLETED,
+        task_scheduler.bot_update_task(
+            run_result_key=run_result.key,
+            bot_id='localhost',
+            cipd_pins=None,
+            output='hey',
+            output_chunk_start=0,
+            exit_code=0,
+            duration=0.1,
+            hard_timeout=False,
+            io_timeout=False,
+            cost_usd=0.1,
+            outputs_ref=None,
+            performance_stats=None))
+    self.assertEqual(2, len(pub_sub_calls)) # COMPLETED
+
+    # Cancel request is denied.
+    ok, was_running = task_scheduler.cancel_task(
+        run_result.request_key.get(), run_result.result_summary_key, False)
+    self.assertEqual(False, ok)
+    self.assertEqual(False, was_running)
+
+    run_result = run_result.key.get()
+    self.assertEqual(None, run_result.killing)
+    self.assertEqual(task_result.State.COMPLETED, run_result.state)
+    self.assertEqual(2, len(pub_sub_calls)) # No other message.
 
   def test_cron_abort_expired_task_to_run(self):
     request = gen_request(pubsub_topic='projects/abc/topics/def')

@@ -5,6 +5,7 @@
 """This module defines Swarming Server endpoints handlers."""
 
 import datetime
+import json
 import logging
 import os
 
@@ -277,6 +278,11 @@ TaskIdWithPerf = endpoints.ResourceContainer(
     include_performance_stats=messages.BooleanField(2, default=False))
 
 
+TaskCancel = endpoints.ResourceContainer(
+    swarming_rpcs.TaskCancelRequest,
+    task_id=messages.StringField(1, required=True))
+
+
 @swarming_api.api_class(resource_name='task', path='task')
 class SwarmingTaskService(remote.Service):
   """Swarming's task-related API."""
@@ -323,7 +329,7 @@ class SwarmingTaskService(remote.Service):
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
-      TaskId, swarming_rpcs.CancelResponse,
+      TaskCancel, swarming_rpcs.CancelResponse,
       name='cancel',
       path='{task_id}/cancel')
   @auth.require(acl.can_access)
@@ -336,7 +342,8 @@ class SwarmingTaskService(remote.Service):
     request_key, result_key = _to_keys(request.task_id)
     request_obj = _get_task_request_async(
         request.task_id, request_key, _EDIT).get_result()
-    ok, was_running = task_scheduler.cancel_task(request_obj, result_key)
+    ok, was_running = task_scheduler.cancel_task(
+        request_obj, result_key, request.kill_running or False)
     return swarming_rpcs.CancelResponse(ok=ok, was_running=was_running)
 
   @gae_ts_mon.instrument_endpoint()
@@ -543,9 +550,13 @@ class SwarmingTasksService(remote.Service):
                                                request.cursor)
 
     if tasks:
-      ok = utils.enqueue_task('/internal/taskqueue/cancel-tasks',
-                              'cancel-tasks',
-                              payload=','.join(t.task_id for t in tasks))
+      payload = json.dumps(
+          {
+            'tasks': [t.task_id for t in tasks],
+            'kill_running': request.kill_running or False,
+          })
+      ok = utils.enqueue_task(
+          '/internal/taskqueue/cancel-tasks', 'cancel-tasks', payload=payload)
       if not ok:
         raise endpoints.InternalServerErrorException(
             'Could not enqueue cancel request, try again later')

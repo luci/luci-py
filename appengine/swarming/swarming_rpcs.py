@@ -15,7 +15,7 @@ class TaskState(messages.Enum):
   (
     PENDING, RUNNING, PENDING_RUNNING, COMPLETED, COMPLETED_SUCCESS,
     COMPLETED_FAILURE, EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, ALL,
-    DEDUPED) = range(12)
+    DEDUPED, KILLED) = range(13)
 
 
 class StateField(messages.Enum):
@@ -26,6 +26,7 @@ class StateField(messages.Enum):
   BOT_DIED = 0x50   # 80
   CANCELED = 0x60   # 96
   COMPLETED = 0x70  # 112
+  KILLED = 0x80     # 128
 
 
 class TaskSort(messages.Enum):
@@ -360,12 +361,17 @@ class TasksRequest(messages.Message):
   include_performance_stats = messages.BooleanField(8, default=False)
 
 
+class TaskCancelRequest(messages.Message):
+  """Request to cancel one task."""
+  kill_running = messages.BooleanField(1)
+
+
 class TasksCancelRequest(messages.Message):
-  """Request to cancel some subset of pending tasks.
-  """
+  """Request to cancel some subset of pending/running tasks."""
   tags = messages.StringField(1, repeated=True)
   cursor = messages.StringField(2)
   limit = messages.IntegerField(3, default=100)
+  kill_running = messages.BooleanField(4)
 
 
 class TasksCountRequest(messages.Message):
@@ -429,7 +435,10 @@ class TaskOutput(messages.Message):
 class TaskResult(messages.Message):
   """Representation of the TaskResultSummary or TaskRunResult ndb model."""
   # Time when the task was abandoned instead of normal completion (e.g.
-  # EXPIRED, BOT_DIED).
+  # EXPIRED, BOT_DIED, KILLED).
+  #
+  # In the case of KILLED, this records the time the user requested the task to
+  # stop.
   abandoned_ts = message_types.DateTimeField(1)
   # The same key cannot be repeated.
   bot_dimensions = messages.MessageField(StringListPair, 2, repeated=True)
@@ -440,7 +449,9 @@ class TaskResult(messages.Message):
   # List of task IDs that this task triggered, if any.
   children_task_ids = messages.StringField(5, repeated=True)
   # Time the task completed normally. Only one of abandoned_ts or completed_ts
-  # can be set.
+  # can be set except for state == KILLED.
+  #
+  # In case of KILLED, completed_ts is the time the task completed.
   completed_ts = message_types.DateTimeField(6)
   # $ saved for task with state DEDUPED.
   cost_saved_usd = messages.FloatField(7)

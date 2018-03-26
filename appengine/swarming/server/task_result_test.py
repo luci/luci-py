@@ -152,6 +152,7 @@ class TaskResultApiTest(TestCase):
       # random.getrandbits().
       'id': '1d69b9f088008811',
       'internal_failure': False,
+      'killing': None,
       'modified_ts': None,
       'outputs_ref': None,
       'server_versions': [u'v1a'],
@@ -216,6 +217,9 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(50, actual.request.priority)
     self.assertEqual(True, actual.can_be_canceled)
     actual.state = task_result.State.RUNNING
+    self.assertEqual(True, actual.can_be_canceled)
+    actual.state = task_result.State.TIMED_OUT
+    actual.duration = 0.1
     self.assertEqual(False, actual.can_be_canceled)
 
     actual.children_task_ids = [
@@ -238,7 +242,7 @@ class TaskResultApiTest(TestCase):
     expected = self._gen_result(modified_ts=self.now, started_ts=self.now)
     self.assertEqual(expected, actual.to_dict())
     self.assertEqual(50, actual.request.priority)
-    self.assertEqual(False, actual.can_be_canceled)
+    self.assertEqual(True, actual.can_be_canceled)
 
   def test_new_run_result_duration_no_exit_code(self):
     request = mkreq(_gen_request())

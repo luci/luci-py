@@ -235,13 +235,13 @@ class AppTestBase(test_case.TestCase):
         params['isolated_stats'][k][j] = base64.b64encode(
             large.pack(params['isolated_stats'][k][j]))
     params.update(kwargs)
-    response = self.post_json('/swarming/api/v1/bot/task_update', params)
-    self.assertEqual({u'must_stop': False, u'ok': True}, response)
+    return self.post_json('/swarming/api/v1/bot/task_update', params)
 
   def bot_run_task(self):
     res = self.bot_poll()
     task_id = res['manifest']['task_id']
-    self.bot_complete_task(task_id=task_id)
+    response = self.bot_complete_task(task_id=task_id)
+    self.assertEqual({u'must_stop': False, u'ok': True}, response)
     return task_id
 
   # Client
@@ -292,6 +292,11 @@ class AppTestBase(test_case.TestCase):
     out.update((unicode(k), v) for k, v in kwargs.iteritems())
     # Note that protorpc message constructor accepts dicts for submessages.
     return swarming_rpcs.NewTaskRequest(**out)
+
+  def client_cancel_task(self, task_id, kill_running):
+    return self.endpoint_call(
+        handlers_endpoints.SwarmingTaskService,
+        'cancel', {'task_id': task_id, 'kill_running': kill_running})
 
   def client_create_task(self, **kwargs):
     """Creates a minimal task request via the Cloud Endpoints API."""
