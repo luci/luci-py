@@ -18,23 +18,32 @@ indexes:
 
 - kind: BotInfo
   properties:
+  - name: composite
+  - name: dimensions_flat
+
+- kind: BotInfo
+  properties:
+  - name: composite
+  - name: dimensions_flat
+  - name: last_seen_ts
+
+# https://crbug.com/825843#c30
+# https://cloud.google.com/appengine/articles/indexselection
+- kind: BotInfo
+  properties:
+  - name: composite
+  - name: dimensions_flat
   - name: dimensions_flat
   - name: last_seen_ts
 
 - kind: BotInfo
   properties:
-  - name: dimensions_flat
-  - name: composite
-
-- kind: BotInfo
-  properties:
   - name: composite
   - name: last_seen_ts
 
 - kind: BotInfo
   properties:
   - name: dimensions_flat
-  - name: composite
   - name: last_seen_ts
 
 - kind: TaskResultSummary
