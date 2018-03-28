@@ -446,6 +446,7 @@ class AppTestBase(test_case.TestCase):
         u'user:joe@localhost',
       ],
       u'task_id': u'5cee488008810',
+      u'task_slice_index': u'0',
       u'try_number': u'0',
       u'user': u'joe@localhost',
     }
@@ -474,6 +475,7 @@ class AppTestBase(test_case.TestCase):
       u'server_versions': [u'v1a'],
       u'state': u'RUNNING',
       u'task_id': u'5cee488008811',
+      u'task_slice_index': u'0',
       u'try_number': u'1',
     }
     out.update((unicode(k), v) for k, v in kwargs.iteritems())

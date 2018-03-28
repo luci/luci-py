@@ -66,6 +66,91 @@ def _rpc_to_ndb(cls, entity, **overrides):
   return cls(**{k: v for k, v in kwargs.iteritems() if v is not None})
 
 
+def _taskproperties_from_rpc(props):
+  """Converts a swarming_rpcs.TaskProperties to a task_request.TaskProperties.
+  """
+  cipd_input = None
+  if props.cipd_input:
+    client_package = None
+    if props.cipd_input.client_package:
+      client_package = _rpc_to_ndb(
+          task_request.CipdPackage, props.cipd_input.client_package)
+    cipd_input = _rpc_to_ndb(
+        task_request.CipdInput,
+        props.cipd_input,
+        client_package=client_package,
+        packages=[
+          _rpc_to_ndb(task_request.CipdPackage, p)
+          for p in props.cipd_input.packages
+        ])
+
+  inputs_ref = None
+  if props.inputs_ref:
+    inputs_ref = _rpc_to_ndb(task_request.FilesRef, props.inputs_ref)
+
+  secret_bytes = None
+  if props.secret_bytes:
+    secret_bytes = task_request.SecretBytes(secret_bytes=props.secret_bytes)
+
+  if len(set(i.key for i in props.env)) != len(props.env):
+    raise ValueError('same environment variable key cannot be specified twice')
+  if len(set(i.key for i in props.env_prefixes)) != len(props.env_prefixes):
+    raise ValueError('same environment prefix key cannot be specified twice')
+  dims = {}
+  for i in props.dimensions:
+    dims.setdefault(i.key, []).append(i.value)
+  out = _rpc_to_ndb(
+      task_request.TaskProperties,
+      props,
+      caches=[_rpc_to_ndb(task_request.CacheEntry, c) for c in props.caches],
+      cipd_input=cipd_input,
+      # Passing command=None is supported at API level but not at NDB level.
+      command=props.command or [],
+      has_secret_bytes=secret_bytes is not None,
+      secret_bytes=None, # ignore this, it's handled out of band
+      dimensions=None, # it's named dimensions_data
+      dimensions_data=dims,
+      env={i.key: i.value for i in props.env},
+      env_prefixes={i.key: i.value for i in props.env_prefixes},
+      inputs_ref=inputs_ref)
+  return out, secret_bytes
+
+
+def _taskproperties_to_rpc(props):
+  """Converts a task_request.TaskProperties to a swarming_rpcs.TaskProperties.
+  """
+  cipd_input = None
+  if props.cipd_input:
+    client_package = None
+    if props.cipd_input.client_package:
+      client_package = _ndb_to_rpc(
+          swarming_rpcs.CipdPackage,
+          props.cipd_input.client_package)
+    cipd_input = _ndb_to_rpc(
+        swarming_rpcs.CipdInput,
+        props.cipd_input,
+        client_package=client_package,
+        packages=[
+          _ndb_to_rpc(swarming_rpcs.CipdPackage, p)
+          for p in props.cipd_input.packages
+        ])
+
+  inputs_ref = None
+  if props.inputs_ref:
+    inputs_ref = _ndb_to_rpc(swarming_rpcs.FilesRef, props.inputs_ref)
+
+  return _ndb_to_rpc(
+      swarming_rpcs.TaskProperties,
+      props,
+      caches=[_ndb_to_rpc(swarming_rpcs.CacheEntry, c) for c in props.caches],
+      cipd_input=cipd_input,
+      secret_bytes='<REDACTED>' if props.has_secret_bytes else None,
+      dimensions=_duplicate_string_pairs_from_dict(props.dimensions),
+      env=_string_pairs_from_dict(props.env),
+      env_prefixes=_string_list_pairs_from_dict(props.env_prefixes or {}),
+      inputs_ref=inputs_ref)
+
+
 ### Public API.
 
 
@@ -109,43 +194,21 @@ def bot_event_to_rpc(entity):
 def task_request_to_rpc(entity):
   """"Returns a swarming_rpcs.TaskRequest from a task_request.TaskRequest."""
   assert entity.__class__ is task_request.TaskRequest
-  props = entity.properties
-  cipd_input = None
-  if props.cipd_input:
-    client_package = None
-    if props.cipd_input.client_package:
-      client_package = _ndb_to_rpc(
-          swarming_rpcs.CipdPackage,
-          props.cipd_input.client_package)
-    cipd_input = _ndb_to_rpc(
-        swarming_rpcs.CipdInput,
-        props.cipd_input,
-        client_package=client_package,
-        packages=[
-          _ndb_to_rpc(swarming_rpcs.CipdPackage, p)
-          for p in props.cipd_input.packages
-        ])
-
-  inputs_ref = None
-  if props.inputs_ref:
-    inputs_ref = _ndb_to_rpc(swarming_rpcs.FilesRef, props.inputs_ref)
-
-  properties = _ndb_to_rpc(
-      swarming_rpcs.TaskProperties,
-      props,
-      caches=[_ndb_to_rpc(swarming_rpcs.CacheEntry, c) for c in props.caches],
-      cipd_input=cipd_input,
-      secret_bytes='<REDACTED>' if props.has_secret_bytes else None,
-      dimensions=_duplicate_string_pairs_from_dict(props.dimensions),
-      env=_string_pairs_from_dict(props.env),
-      env_prefixes=_string_list_pairs_from_dict(props.env_prefixes or {}),
-      inputs_ref=inputs_ref)
+  # Temporary. https://crbug.com/781021
+  slices = [
+      swarming_rpcs.TaskSlice(
+        properties=_taskproperties_to_rpc(entity.properties),
+        expiration_secs=entity.expiration_secs)
+  ]
 
   return _ndb_to_rpc(
       swarming_rpcs.TaskRequest,
       entity,
       authenticated=entity.authenticated.to_bytes(),
-      properties=properties)
+      # For some amount of time, the properties will be copied into the
+      # task_slices and vice-versa, to give time to the clients to update.
+      properties=slices[0].properties,
+      task_slices=slices)
 
 
 def new_task_request_from_rpc(msg, now):
@@ -156,64 +219,32 @@ def new_task_request_from_rpc(msg, now):
   None.
   """
   assert msg.__class__ is swarming_rpcs.NewTaskRequest
-  props = msg.properties
-  if not props:
-    raise ValueError('properties is required')
+  if msg.task_slices and msg.expiration_secs:
+    raise ValueError(
+        'When using task_slices, do not specify a global expiration_secs')
+  if msg.task_slices and msg.properties:
+    raise ValueError('When using task_slices, do not specify properties')
+  if msg.task_slices and len(msg.task_slices) > 1:
+    # Temporary. https://crbug.com/781021
+    raise ValueError('Only one task_slices entry is supported for now')
 
-  cipd_input = None
-  if props.cipd_input:
-    client_package = None
-    if props.cipd_input.client_package:
-      client_package = _rpc_to_ndb(
-          task_request.CipdPackage, props.cipd_input.client_package)
-    cipd_input = _rpc_to_ndb(
-        task_request.CipdInput,
-        props.cipd_input,
-        client_package=client_package,
-        packages=[
-          _rpc_to_ndb(task_request.CipdPackage, p)
-          for p in props.cipd_input.packages
-        ])
-
-  inputs_ref = None
-  if props.inputs_ref:
-    inputs_ref = _rpc_to_ndb(task_request.FilesRef, props.inputs_ref)
-
-  secret_bytes = None
-  if props.secret_bytes:
-    secret_bytes = task_request.SecretBytes(secret_bytes=props.secret_bytes)
-
-  if len(set(i.key for i in props.env)) != len(props.env):
-    raise ValueError('same environment variable key cannot be specified twice')
-  if len(set(i.key for i in props.env_prefixes)) != len(props.env_prefixes):
-    raise ValueError('same environment prefix key cannot be specified twice')
-
-  dims = {}
-  for i in props.dimensions:
-    dims.setdefault(i.key, []).append(i.value)
-  properties = _rpc_to_ndb(
-      task_request.TaskProperties,
-      props,
-      caches=[_rpc_to_ndb(task_request.CacheEntry, c) for c in props.caches],
-      cipd_input=cipd_input,
-      # Passing command=None is supported at API level but not at NDB level.
-      command=props.command or [],
-      has_secret_bytes=secret_bytes is not None,
-      secret_bytes=None, # ignore this, it's handled out of band
-      dimensions=None, # it's named dimensions_data
-      dimensions_data=dims,
-      env={i.key: i.value for i in props.env},
-      env_prefixes={i.key: i.value for i in props.env_prefixes},
-      inputs_ref=inputs_ref)
-
+  if not msg.task_slices:
+    props, secret_bytes = _taskproperties_from_rpc(msg.properties)
+    expiration_ts = now+datetime.timedelta(seconds=msg.expiration_secs)
+  else:
+    # Temporary, will be converted into a loop. https://crbug.com/781021
+    props, secret_bytes = _taskproperties_from_rpc(
+        msg.task_slices[0].properties)
+    expiration_ts = now+datetime.timedelta(
+        seconds=msg.task_slices[0].expiration_secs)
   req = _rpc_to_ndb(
       task_request.TaskRequest,
       msg,
       created_ts=now,
-      expiration_ts=now+datetime.timedelta(seconds=msg.expiration_secs),
+      expiration_ts=expiration_ts,
       # It is set in task_request.init_new_request().
       authenticated=None,
-      properties=properties,
+      properties=props,
       # This is internal field not settable via RPC.
       service_account_token=None)
 
@@ -270,4 +301,8 @@ def task_result_to_rpc(entity, send_stats):
     # This returns the right value for deduped tasks too.
     k = entity.run_result_key
     kwargs['run_id'] = task_pack.pack_run_result_key(k) if k else None
-  return _ndb_to_rpc(swarming_rpcs.TaskResult, entity, **kwargs)
+  return _ndb_to_rpc(
+      swarming_rpcs.TaskResult,
+      entity,
+      task_slice_index=0,
+      **kwargs)

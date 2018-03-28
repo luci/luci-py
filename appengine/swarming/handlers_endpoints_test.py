@@ -239,15 +239,16 @@ class TasksApiTest(BaseTest):
         pubsub_auth_token='secret that must not be shown',
         pubsub_userdata='userdata',
         service_account='service-account@example.com')
+    expected_props = self.gen_props(
+        command=[u'rm', u'-rf', u'/'],
+        execution_timeout_secs=u'30',
+        grace_period_secs=u'15')
     expected = {
       u'request': self.gen_request(
         created_ts=fmtdate(self.now),
         expiration_secs=u'30',
         priority=u'20',
-        properties=self.gen_props(
-            command=[u'rm', u'-rf', u'/'],
-            execution_timeout_secs=u'30',
-            grace_period_secs=u'15'),
+        properties=expected_props,
         pubsub_topic=u'projects/abc/topics/def',
         pubsub_userdata=u'userdata',
         tags=[
@@ -258,7 +259,13 @@ class TasksApiTest(BaseTest):
           u'service_account:service-account@example.com',
           u'user:joe@localhost'
         ],
-        service_account='service-account@example.com'),
+        service_account=u'service-account@example.com',
+        task_slices=[
+          {
+            u'expiration_secs': u'30',
+            u'properties': expected_props,
+          },
+        ]),
       u'task_id': u'5cee488008810',
     }
 
@@ -344,6 +351,13 @@ class TasksApiTest(BaseTest):
           u'project:yay',
           u'service_account:none',
           u'user:joe@localhost',
+        ],
+        task_slices=[
+          {
+            u'expiration_secs': u'86400',
+            u'properties': self.gen_props(
+                command=[u'python', u'run_test.py'], idempotent=True),
+          },
         ])
 
     # Make sure it completed.
@@ -363,6 +377,8 @@ class TasksApiTest(BaseTest):
         expiration_secs=u'30',
         name=u'job2',
         priority=u'200',
+        properties=self.gen_props(
+            command=[u'python', u'run_test.py'], idempotent=True),
         tags=[
           u'commit:pre',
           u'os:Amiga',
@@ -371,8 +387,13 @@ class TasksApiTest(BaseTest):
           u'service_account:none',
           u'user:joe@localhost',
         ],
-        properties=self.gen_props(
-            command=[u'python', u'run_test.py'], idempotent=True))
+        task_slices=[
+          {
+            u'expiration_secs': u'30',
+            u'properties': self.gen_props(
+                command=[u'python', u'run_test.py'], idempotent=True),
+          },
+        ])
     deduped_result = self.gen_result_summary(
         completed_ts=fmtdate(self.now),
         cost_saved_usd=0.1,
@@ -460,15 +481,22 @@ class TasksApiTest(BaseTest):
                 isolated='1'*40,
                 isolatedserver='http://localhost:1',
                 namespace='default-gzip')))
+    expected_props = self.gen_props(
+        inputs_ref={
+          u'isolated': u'1'*40,
+          u'isolatedserver': u'http://localhost:1',
+          u'namespace': u'default-gzip',
+        })
     expected = {
       u'request': self.gen_request(
           created_ts=fmtdate(self.now),
-          properties=self.gen_props(
-              inputs_ref={
-                u'isolated': u'1'*40,
-                u'isolatedserver': u'http://localhost:1',
-                u'namespace': u'default-gzip',
-              })),
+          properties=expected_props,
+          task_slices=[
+            {
+              u'expiration_secs': u'86400',
+              u'properties': expected_props,
+            },
+          ]),
       u'task_id': u'5cee488008810',
     }
     response = self.call_api('new', body=message_to_dict(request))
@@ -485,15 +513,22 @@ class TasksApiTest(BaseTest):
     request = self.create_new_request(
         properties=self.create_props(
             inputs_ref=swarming_rpcs.FilesRef(isolated='1'*40)))
+    expected_props = self.gen_props(
+        inputs_ref={
+          u'isolated': u'1'*40,
+          u'isolatedserver': u'https://isolateserver.appspot.com',
+          u'namespace': u'default-gzip',
+        })
     expected = {
       u'request': self.gen_request(
           created_ts=fmtdate(self.now),
-          properties=self.gen_props(
-              inputs_ref={
-                u'isolated': u'1'*40,
-                u'isolatedserver': u'https://isolateserver.appspot.com',
-                u'namespace': u'default-gzip',
-              })),
+          properties=expected_props,
+          task_slices=[
+            {
+              u'expiration_secs': u'86400',
+              u'properties': expected_props,
+            },
+          ]),
       u'task_id': u'5cee488008810',
     }
     response = self.call_api('new', body=message_to_dict(request))
@@ -510,26 +545,33 @@ class TasksApiTest(BaseTest):
     cfg.cipd.default_server = 'https://chrome-infra-packages.appspot.com'
     self.mock(config, 'settings', lambda: cfg)
 
+    expected_props = self.gen_props(
+        cipd_input={
+          u'client_package': {
+            u'package_name': u'infra/tools/cipd/${platform}',
+            u'version': u'git_revision:deadbeef',
+          },
+          u'packages': [
+            {
+              u'package_name': u'rm',
+              u'path': u'.',
+              u'version': u'latest',
+            },
+          ],
+          u'server': u'https://chrome-infra-packages.appspot.com',
+        },
+        command=[u'rm', u'-rf', u'/'],
+        env=[{u'key': u'PATH', u'value': u'/'}])
     expected = {
       u'request': self.gen_request(
           created_ts=fmtdate(self.now),
-          properties=self.gen_props(
-              cipd_input={
-                u'client_package': {
-                  u'package_name': u'infra/tools/cipd/${platform}',
-                  u'version': u'git_revision:deadbeef',
-                },
-                u'packages': [
-                  {
-                    u'package_name': u'rm',
-                    u'path': u'.',
-                    u'version': u'latest',
-                  },
-                ],
-                u'server': u'https://chrome-infra-packages.appspot.com',
-              },
-              command=[u'rm', u'-rf', u'/'],
-              env=[{u'key': u'PATH', u'value': u'/'}])),
+          properties=expected_props,
+          task_slices=[
+            {
+              u'expiration_secs': u'86400',
+              u'properties': expected_props,
+            },
+          ]),
       u'task_id': u'5cee488008810',
     }
     request = self.create_new_request(
@@ -888,6 +930,7 @@ class TaskApiTest(BaseTest):
         u'user:joe@localhost',
       ],
       u'task_id': task_id,
+      u'task_slice_index': u'0',
       u'user': u'joe@localhost',
     }
     response = self.call_api('result', body={'task_id': task_id})
@@ -1030,6 +1073,7 @@ class TaskApiTest(BaseTest):
         u'user:joe@localhost',
       ],
       u'task_id': u'5cee488008810',
+      u'task_slice_index': u'0',
       u'user': u'joe@localhost',
     }
     self.assertEqual(expected, response.json)
@@ -1148,11 +1192,12 @@ class TaskApiTest(BaseTest):
         properties={'secret_bytes': 'zekret'},
         service_account='service-account@example.com')
 
+    expected_props = self.gen_props(
+        command=[u'python', u'run_test.py'],
+        secret_bytes=u'PFJFREFDVEVEPg==') # <REDACTED> in base64
     expected = self.gen_request(
         created_ts=fmtdate(self.now),
-        properties=self.gen_props(
-            command=[u'python', u'run_test.py'],
-            secret_bytes=u'PFJFREFDVEVEPg=='), # <REDACTED> in base64
+        properties=expected_props,
         service_account=u'service-account@example.com',
         tags=[
           u'a:tag',
@@ -1161,6 +1206,12 @@ class TaskApiTest(BaseTest):
           u'priority:20',
           u'service_account:service-account@example.com',
           u'user:joe@localhost',
+        ],
+        task_slices=[
+          {
+            u'expiration_secs': u'86400',
+            u'properties': expected_props,
+          },
         ])
     response = self.call_api('request', body={'task_id': task_id})
     self.assertEqual(expected, response.json)

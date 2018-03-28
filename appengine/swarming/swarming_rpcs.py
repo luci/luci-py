@@ -263,12 +263,33 @@ class TaskProperties(messages.Message):
   secret_bytes = messages.BytesField(13)
 
 
+class TaskSlice(messages.Message):
+  """Defines a possible task execution for a task request to be run on the
+  Swarming infrastructure.
+
+  This is one of the possible fallback on a task request.
+  """
+  # The property of the task to try to run.
+  #
+  # If there is no bot that can serve this properties.dimensions when this task
+  # slice is enqueued, it is immediately denied. This can trigger if:
+  # - There is no bot with these dimensions currently known.
+  # - Bots that could run this task are either all dead or quarantined.
+  # Swarming considers a bot dead if it hasn't pinged in the last N minutes
+  # (currently 10 minutes).
+  properties = messages.MessageField(TaskProperties, 1)
+  # If this task request slice is not scheduled after waiting this long, the
+  # next one will be processed.
+  expiration_secs = messages.IntegerField(2)
+
+
 class NewTaskRequest(messages.Message):
   """Description of a new task request as described by the client.
 
   This message is used to create a new task.
   """
-  # Maximum of seconds the task may stay PENDING.
+  # Maximum of seconds the task may stay PENDING. Must be specified with
+  # properties. Cannot be used at the same time as task_slices.
   expiration_secs = messages.IntegerField(1)
   # Task name for display purpose.
   name = messages.StringField(2)
@@ -281,6 +302,13 @@ class NewTaskRequest(messages.Message):
   priority = messages.IntegerField(4)
   # Task properties, which defines what to run.
   properties = messages.MessageField(TaskProperties, 5)
+  # Slice of TaskSlice, along their scheduling parameters. Cannot be used at the
+  # same time as properties and expiration_secs.
+  #
+  # This defines all the various possible task execution for a task request to
+  # be run on the Swarming infrastructure. They are processed in order, and it
+  # is guaranteed that at most one of these will be processed.
+  task_slices = messages.MessageField(TaskSlice, 12, repeated=True)
   # Tags are 'key:value' strings that describes what the task is about. This can
   # later be leveraged to search for kinds of tasks per tag.
   tags = messages.StringField(6, repeated=True)
@@ -326,12 +354,16 @@ class TaskRequest(messages.Message):
   name = messages.StringField(2)
   parent_task_id = messages.StringField(3)
   priority = messages.IntegerField(4)
+  # For some amount of time, the properties will be copied into the
+  # task_slices and vice-versa, to give time to the clients to update.
+  # Eventually, only task_slices will be supported.
   properties = messages.MessageField(TaskProperties, 5)
   tags = messages.StringField(6, repeated=True)
   created_ts = message_types.DateTimeField(7)
   user = messages.StringField(8)
   # User name of whoever posted this task, extracted from the credentials.
   authenticated = messages.StringField(9)
+  task_slices = messages.MessageField(TaskSlice, 13, repeated=True)
   # Indicates what OAuth2 credentials the task uses when calling other services.
   service_account = messages.StringField(10)
 
@@ -505,6 +537,11 @@ class TaskResult(messages.Message):
   # the same value as deduped_from. This value can be empty if there is no
   # execution, for example the task was cancelled.
   run_id = messages.StringField(28)
+
+  # Index in the TaskRequest.task_slices (TaskSlice instance) that this result
+  # represents. The TaskSlice contains a TaskProperties, which defines what is
+  # run.
+  task_slice_index = messages.IntegerField(29)
 
 
 class TaskList(messages.Message):

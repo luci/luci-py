@@ -267,6 +267,7 @@ def gen_expected(**kwargs):
       u'service_account:none',
       u'user:joe@localhost',
     ],
+    u'task_slice_index': u'0',
     u'try_number': 1,
     u'user': u'joe@localhost',
   }
