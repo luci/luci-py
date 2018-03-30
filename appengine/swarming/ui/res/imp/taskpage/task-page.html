@@ -55,6 +55,12 @@
         it is really tall.*/
         height: 2000px;
       }
+      a.bees {
+        text-decoration: none;
+        font-size: 1.5em;
+        /* This makes sure that the link doesn't show up as blue. */
+        color: black;
+      }
 
       .right {
         margin-top: 8px;
@@ -602,6 +608,14 @@
                   <td class$="[[_internalClass(_result.internal_failure)]]">[[_result.internal_failure]]</td>
                 </tr>
                 <tr>
+                  <td>Cost (BEEs)</td>
+                  <td>
+                    <a class="bees" href="http://go/swarming-cost-units" target="_blank">
+                      [[_beesStr(_result)]]
+                    </a>
+                  </td>
+                </tr>
+                <tr>
                   <td>Cost (USD)</td>
                   <td>$[[_cost(_result)]]</td>
                 </tr>
@@ -786,6 +800,12 @@
   </template>
   <script>
   (function(){
+    // https://www.ohbees.com/collections/hobby-day-package-bees/products/package-bees
+    // costs 140. Queen bees cost $30, so cost of all the bees is $110
+    // https://honeybeesuite.com/so-what-does-the-average-honey-bee-cost/ says that
+    // there are about 3000 bees per pound.
+    // This is how many bees one dollar can buy.
+    const beePerDollar = (3.0 * 3000.0) / 110.0;
     Polymer({
       is: 'task-page',
 
@@ -1024,6 +1044,17 @@
         }
         var args = request.properties.command || [];
         return args.join(" ");
+      },
+
+      _beesStr: function(result) {
+        if (!result || !result.costs_usd || !result.costs_usd.length) {
+          return '';
+        }
+
+        let cost = result.costs_usd[0];
+        let length = Math.max(Math.round(cost * beePerDollar), 1);
+
+        return '🐝'.repeat(length);
       },
 
       _cost: function(result) {
