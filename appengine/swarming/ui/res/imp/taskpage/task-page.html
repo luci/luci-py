@@ -950,7 +950,7 @@
       },
 
       _canCancelTask: function(result) {
-        return result && result.state === "PENDING";
+        return result && (result.state === "PENDING" || result.state === "RUNNING");
       },
 
       _cancelTaskText: function(permissions, profile){
@@ -962,7 +962,11 @@
 
       _cancelTask: function() {
         var url = "/api/swarming/v1/task/" + this.task_id +"/cancel";
-        swarming.postWithToast(url, "Canceling task " + this.task_id, this._auth_headers);
+        var body = {};
+        if (this._result.state === "RUNNING") {
+          body.kill_running = true;
+        }
+        swarming.postWithToast(url, "Canceling task " + this.task_id, this._auth_headers, body);
       },
 
       _cipdRowspan: function(request, result) {
