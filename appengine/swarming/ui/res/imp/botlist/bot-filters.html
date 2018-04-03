@@ -293,7 +293,18 @@ the fleet.">
             }
             return base;
           },
-        }
+        },
+        _prettyItem: {
+          type: Object,
+          value: function() {
+            return {
+              apply: function(s) {
+                // Nothing needs prettying
+                return s;
+              }
+            };
+          }
+        },
       },
 
       _cantToggleColumn: function(col) {

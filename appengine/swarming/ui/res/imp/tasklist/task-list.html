@@ -358,6 +358,12 @@
       "started_ts": "Started Working On",
       "user": "Requesting User",
       "pending_time": "Time Spent Pending",
+      "_displayHeader": function(s) {
+        if (s.endsWith("-tag")) {
+          return s.substring(0, s.length-4) + " (tag)"
+        }
+        return s;
+      },
     };
 
     // Given a time attribute like "abandoned_ts", sortableTime returns a function
@@ -430,6 +436,19 @@
           type: Object,
           value: headerMap,
         },
+        _prettyItem: {
+          type: Object,
+          value: function() {
+            return {
+              apply: function(s) {
+                if (s.endsWith("-tag")) {
+                  return s.slice(0, -4) + " (tag)"
+                }
+                return s;
+              }
+            };
+          }
+        },
         _priorityColumns: {
           type: Array,
           value: priorityColumns
@@ -451,12 +470,12 @@
           def = "none";
         }
         var retVal = task[col];
-        if (col.startsWith("tag-")) {
-          // Trim off the first 4 letters "tag-"
-          retVal = this._tag(task, col.substr(4));
+        if (col.endsWith("-tag")) {
+          // Trim off the last 4 letters "-tag"
+          retVal = this._tag(task, col.slice(0, -4));
         }
         if (!retVal) {
-          // Handle legacy links that don't have tag-
+          // Handle legacy links that don't have -tag
           // TODO(kjlubick): remove this after old links have been updated (Mar 2019)
           retVal = this._tag(task, col);
         }
