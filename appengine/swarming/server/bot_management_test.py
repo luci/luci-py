@@ -19,10 +19,15 @@ from test_support import test_case
 from server import bot_management
 
 
-_VERSION = hashlib.sha256().hexdigest()
+_VERSION = unicode(hashlib.sha256().hexdigest())
 
 
 class BotManagementTest(test_case.TestCase):
+  def setUp(self):
+    super(BotManagementTest, self).setUp()
+    self.now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
+    self.mock_now(self.now)
+
   def test_all_apis_are_tested(self):
     actual = frozenset(i[5:] for i in dir(self) if i.startswith('test_'))
     # Contains the list of all public APIs.
@@ -32,29 +37,19 @@ class BotManagementTest(test_case.TestCase):
     missing = expected - actual
     self.assertFalse(missing)
 
-  def test_dimensions_to_flat(self):
-    self.assertEqual(
-        ['a:b', 'c:d'], bot_management.dimensions_to_flat({'a': 'b', 'c': 'd'}))
-
-  def test_bot_event(self):
-    # connected.
-    now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
-    self.mock_now(now)
-    bot_management.bot_event(
-        event_type='bot_connected', bot_id='id1',
-        external_ip='8.8.4.4', authenticated_as='bot:id1.domain',
-        dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
-        version=hashlib.sha256().hexdigest(), quarantined=False, task_id=None,
-        task_name=None)
-
-    expected = {
+  def _gen_bot_info(self, **kwargs):
+    out = {
       'authenticated_as': u'bot:id1.domain',
-      'composite': [32, 8, 2],
+      'composite': [
+        bot_management.BotInfo.NOT_MACHINE_PROVIDER,
+        bot_management.BotInfo.HEALTHY,
+        bot_management.BotInfo.IDLE,
+      ],
       'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
       'external_ip': u'8.8.4.4',
-      'first_seen_ts': now,
+      'first_seen_ts': self.now,
       'id': 'id1',
-      'last_seen_ts': now,
+      'last_seen_ts': self.now,
       'lease_id': None,
       'lease_expiration_ts': None,
       'machine_lease': None,
@@ -65,43 +60,58 @@ class BotManagementTest(test_case.TestCase):
       'task_name': None,
       'version': _VERSION,
     }
-    self.assertEqual(
-        expected, bot_management.get_info_key('id1').get().to_dict())
+    out.update(kwargs)
+    return out
 
-  def test_get_events_query(self):
-    now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
-    self.mock_now(now)
+  def _gen_bot_event(self, **kwargs):
+    out = {
+      'authenticated_as': u'bot:id1.domain',
+      'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
+      'external_ip': u'8.8.4.4',
+      'lease_id': None,
+      'lease_expiration_ts': None,
+      'machine_lease': None,
+      'machine_type': None,
+      'message': None,
+      'quarantined': False,
+      'state': {u'ram': 65},
+      'task_id': None,
+      'ts': self.now,
+      'version': _VERSION,
+      }
+    out.update(kwargs)
+    return out
+
+  def test_dimensions_to_flat(self):
+    self.assertEqual(
+        ['a:b', 'c:d'], bot_management.dimensions_to_flat({'a': 'b', 'c': 'd'}))
+
+  def test_bot_event(self):
+    # connected.
     bot_management.bot_event(
         event_type='bot_connected', bot_id='id1',
         external_ip='8.8.4.4', authenticated_as='bot:id1.domain',
         dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
         version=hashlib.sha256().hexdigest(), quarantined=False, task_id=None,
         task_name=None)
-    expected = [
-      {
-        'authenticated_as': u'bot:id1.domain',
-        'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
-        'event_type': u'bot_connected',
-        'external_ip': u'8.8.4.4',
-        'lease_id': None,
-        'lease_expiration_ts': None,
-        'machine_lease': None,
-        'machine_type': None,
-        'message': None,
-        'quarantined': False,
-        'state': {u'ram': 65},
-        'task_id': None,
-        'ts': now,
-        'version': _VERSION,
-      },
-    ]
+
+    expected = self._gen_bot_info()
+    self.assertEqual(
+        expected, bot_management.get_info_key('id1').get().to_dict())
+
+  def test_get_events_query(self):
+    bot_management.bot_event(
+        event_type='bot_connected', bot_id='id1',
+        external_ip='8.8.4.4', authenticated_as='bot:id1.domain',
+        dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
+        version=hashlib.sha256().hexdigest(), quarantined=False, task_id=None,
+        task_name=None)
+    expected = [self._gen_bot_event(event_type=u'bot_connected')]
     self.assertEqual(
         expected,
         [i.to_dict() for i in bot_management.get_events_query('id1', True)])
 
   def test_bot_event_poll_sleep(self):
-    now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
-    self.mock_now(now)
     bot_management.bot_event(
         event_type='request_sleep', bot_id='id1',
         external_ip='8.8.4.4', authenticated_as='bot:id1.domain',
@@ -110,24 +120,13 @@ class BotManagementTest(test_case.TestCase):
         task_name=None)
 
     # Assert that BotInfo was updated too.
-    expected = {
-      'authenticated_as': u'bot:id1.domain',
-      'composite': [32, 4, 2],
-      'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
-      'external_ip': u'8.8.4.4',
-      'first_seen_ts': now,
-      'id': 'id1',
-      'last_seen_ts': now,
-      'lease_id': None,
-      'lease_expiration_ts': None,
-      'machine_lease': None,
-      'machine_type': None,
-      'quarantined': True,
-      'state': {u'ram': 65},
-      'task_id': None,
-      'task_name': None,
-      'version': _VERSION,
-    }
+    expected = self._gen_bot_info(
+        composite=[
+          bot_management.BotInfo.NOT_MACHINE_PROVIDER,
+          bot_management.BotInfo.QUARANTINED,
+          bot_management.BotInfo.IDLE,
+        ],
+        quarantined=True)
     bot_info = bot_management.get_info_key('id1').get()
     self.assertEqual(expected, bot_info.to_dict())
 
@@ -135,8 +134,6 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual([], bot_management.get_events_query('id1', True).fetch())
 
   def test_bot_event_busy(self):
-    now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
-    self.mock_now(now)
     bot_management.bot_event(
         event_type='request_task', bot_id='id1',
         external_ip='8.8.4.4', authenticated_as='bot:id1.domain',
@@ -144,44 +141,19 @@ class BotManagementTest(test_case.TestCase):
         version=hashlib.sha256().hexdigest(), quarantined=False,
         task_id='12311', task_name='yo')
 
-    expected = {
-      'authenticated_as': u'bot:id1.domain',
-      'composite': [32, 8, 1],
-      'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
-      'external_ip': u'8.8.4.4',
-      'first_seen_ts': now,
-      'id': 'id1',
-      'last_seen_ts': now,
-      'lease_id': None,
-      'lease_expiration_ts': None,
-      'machine_lease': None,
-      'machine_type': None,
-      'quarantined': False,
-      'state': {u'ram': 65},
-      'task_id': u'12311',
-      'task_name': u'yo',
-      'version': _VERSION,
-    }
+    expected = self._gen_bot_info(
+        composite=[
+          bot_management.BotInfo.NOT_MACHINE_PROVIDER,
+          bot_management.BotInfo.HEALTHY,
+          bot_management.BotInfo.BUSY,
+        ],
+        task_id=u'12311',
+        task_name=u'yo')
     bot_info = bot_management.get_info_key('id1').get()
     self.assertEqual(expected, bot_info.to_dict())
 
     expected = [
-      {
-        'authenticated_as': u'bot:id1.domain',
-        'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
-        'event_type': u'request_task',
-        'external_ip': u'8.8.4.4',
-        'lease_id': None,
-        'lease_expiration_ts': None,
-        'machine_lease': None,
-        'machine_type': None,
-        'message': None,
-        'quarantined': False,
-        'state': {u'ram': 65},
-        'task_id': u'12311',
-        'ts': now,
-        'version': _VERSION,
-      },
+      self._gen_bot_event(event_type=u'request_task', task_id=u'12311'),
     ]
     self.assertEqual(
         expected,
@@ -260,7 +232,10 @@ class BotManagementTest(test_case.TestCase):
   def test_filter_availability(self):
     pass # Tested in handlers_endpoints_test
 
+
 if __name__ == '__main__':
   logging.basicConfig(
       level=logging.DEBUG if '-v' in sys.argv else logging.ERROR)
+  if '-v' in sys.argv:
+    unittest.TestCase.maxDiff = None
   unittest.main()

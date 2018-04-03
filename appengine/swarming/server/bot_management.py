@@ -155,11 +155,14 @@ class BotInfo(_BotCommon):
   This entity is a cache of the last BotEvent and is additionally updated on
   poll, which does not create a BotEvent.
   """
+  # One of:
   NOT_MACHINE_PROVIDER = 1<<5
   MACHINE_PROVIDER = 1<<4
-  NOT_QUARANTINED = 1<<3
+  # One of:
+  HEALTHY = 1<<3
   QUARANTINED = 1<<2
-  NOT_BUSY = 1<<1
+  # One of:
+  IDLE = 1<<1
   BUSY = 1<<0
 
   # Dimensions are used for task selection. They are encoded as a list of
@@ -184,8 +187,8 @@ class BotInfo(_BotCommon):
   def _calc_composite(self):
     return [
       self.MACHINE_PROVIDER if self.machine_type else self.NOT_MACHINE_PROVIDER,
-      self.QUARANTINED if self.quarantined else self.NOT_QUARANTINED,
-      self.BUSY if self.task_id else self.NOT_BUSY
+      self.QUARANTINED if self.quarantined else self.HEALTHY,
+      self.BUSY if self.task_id else self.IDLE
     ]
 
   @property
@@ -340,13 +343,13 @@ def filter_availability(q, quarantined, is_dead, now, is_busy, is_mp):
     if quarantined:
       q = q.filter(BotInfo.composite == BotInfo.QUARANTINED)
     else:
-      q = q.filter(BotInfo.composite == BotInfo.NOT_QUARANTINED)
+      q = q.filter(BotInfo.composite == BotInfo.HEALTHY)
 
   if is_busy is not None:
     if is_busy:
       q = q.filter(BotInfo.composite == BotInfo.BUSY)
     else:
-      q = q.filter(BotInfo.composite == BotInfo.NOT_BUSY)
+      q = q.filter(BotInfo.composite == BotInfo.IDLE)
 
   dt = datetime.timedelta(seconds=config.settings().bot_death_timeout_secs)
   timeout = now - dt
