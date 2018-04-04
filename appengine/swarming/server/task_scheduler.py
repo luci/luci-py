@@ -974,7 +974,7 @@ def bot_kill_task(run_result_key, bot_id):
     run_result.internal_failure = True
     run_result.abandoned_ts = now
     run_result.modified_ts = now
-    result_summary.set_from_run_result(run_result, None)
+    result_summary.set_from_run_result(run_result, request)
 
     futures = ndb.put_multi_async((run_result, result_summary))
     _maybe_pubsub_notify_via_tq(result_summary, request)

@@ -304,5 +304,4 @@ def task_result_to_rpc(entity, send_stats):
   return _ndb_to_rpc(
       swarming_rpcs.TaskResult,
       entity,
-      current_task_slice=0,
       **kwargs)

@@ -466,6 +466,10 @@ class _TaskResultCommon(ndb.Model):
   # The pinned versions of all the CIPD packages used in the task.
   cipd_pins = ndb.LocalStructuredProperty(CipdPins)
 
+  # Index in the TaskRequest.task_slices that this entity is current waiting on,
+  # running or ran.
+  current_task_slice = ndb.IntegerProperty(indexed=False, default=0)
+
   @property
   def can_be_canceled(self):
     """Returns True if the task is in a state that can be canceled."""
@@ -899,6 +903,7 @@ class TaskResultSummary(_TaskResultCommon):
     set.
     """
     assert ndb.in_transaction()
+    assert isinstance(request, task_request.TaskRequest), request
     assert isinstance(run_result, TaskRunResult), run_result
     for property_name in _TaskResultCommon._properties_fixed():
       setattr(self, property_name, getattr(run_result, property_name))
