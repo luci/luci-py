@@ -539,9 +539,10 @@ class TaskResult(messages.Message):
   run_id = messages.StringField(28)
 
   # Index in the TaskRequest.task_slices (TaskSlice instance) that this result
-  # represents. The TaskSlice contains a TaskProperties, which defines what is
-  # run.
-  task_slice_index = messages.IntegerField(29)
+  # represents. This is updated when a TaskSlice is enqueued to run.
+  #
+  # The TaskSlice contains a TaskProperties, which defines what is run.
+  current_task_slice = messages.IntegerField(29)
 
 
 class TaskList(messages.Message):

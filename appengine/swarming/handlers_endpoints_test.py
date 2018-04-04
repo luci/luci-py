@@ -915,6 +915,7 @@ class TaskApiTest(BaseTest):
     expected = {
       u'abandoned_ts': fmtdate(self.now),
       u'created_ts': fmtdate(self.now),
+      u'current_task_slice': u'0',
       u'failure': False,
       u'internal_failure': False,
       u'modified_ts': fmtdate(self.now),
@@ -930,7 +931,6 @@ class TaskApiTest(BaseTest):
         u'user:joe@localhost',
       ],
       u'task_id': task_id,
-      u'task_slice_index': u'0',
       u'user': u'joe@localhost',
     }
     response = self.call_api('result', body={'task_id': task_id})
@@ -1058,6 +1058,7 @@ class TaskApiTest(BaseTest):
     response = self.call_api('result', body={'task_id': task_id})
     expected = {
       u'created_ts': fmtdate(self.now),
+      u'current_task_slice': u'0',
       u'failure': False,
       u'internal_failure': False,
       u'modified_ts': fmtdate(self.now),
@@ -1073,7 +1074,6 @@ class TaskApiTest(BaseTest):
         u'user:joe@localhost',
       ],
       u'task_id': u'5cee488008810',
-      u'task_slice_index': u'0',
       u'user': u'joe@localhost',
     }
     self.assertEqual(expected, response.json)

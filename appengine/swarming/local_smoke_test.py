@@ -251,6 +251,7 @@ def gen_expected(**kwargs):
     u'bot_id': unicode(socket.getfqdn().split('.', 1)[0]),
     u'children_task_ids': [],
     u'cost_saved_usd': None,
+    u'current_task_slice': u'0',
     u'deduped_from': None,
     u'exit_codes': [0],
     u'failure': False,
@@ -267,7 +268,6 @@ def gen_expected(**kwargs):
       u'service_account:none',
       u'user:joe@localhost',
     ],
-    u'task_slice_index': u'0',
     u'try_number': 1,
     u'user': u'joe@localhost',
   }
