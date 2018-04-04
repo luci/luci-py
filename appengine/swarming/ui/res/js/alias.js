@@ -29,6 +29,8 @@ this.swarming.alias = this.swarming.alias || (function(){
     "sailfish": "Pixel",
     "shamu": "Nexus 6",
     "sprout": "Android One",
+    "taimen": "Pixel 2 XL",
+    "walleye": "Pixel 2",
     "zerofltetmo": "Galaxy S6",
   };
 
@@ -44,6 +46,8 @@ this.swarming.alias = this.swarming.alias || (function(){
     "1002:683d": "AMD Radeon HD 7770/8760",
     "1002:9830": "AMD Radeon HD 8400",
     "1002:9874": "AMD Carrizo",
+    "1a03":      "ASPEED",
+    "1a03:2000": "ASPEED Graphics Family",
     "102b":      "Matrox",
     "102b:0522": "Matrox MGA G200e",
     "102b:0532": "Matrox MGA G200eW",
@@ -77,9 +81,11 @@ this.swarming.alias = this.swarming.alias || (function(){
     "8086:1626": "Intel Broadwell HD Graphics 6000",
     "8086:162b": "Intel Broadwell Iris Graphics 6100",
     "8086:1912": "Intel Skylake HD Graphics 530",
+    "8086:191e": "Intel Skylake HD Graphics 515",
     "8086:1926": "Intel Skylake Iris 540/550",
     "8086:193b": "Intel Skylake Iris Pro 580",
     "8086:22b1": "Intel Braswell HD Graphics",
+    "8086:5912": "Intel Kaby Lake HD Graphics 630",
     "8086:591e": "Intel Kaby Lake HD Graphics 615",
     "8086:5926": "Intel Kaby Lake Iris Plus Graphics 640",
   }

@@ -6,9 +6,10 @@
 
 
 AMD = u'1002'
+ASPEED = u'1a03'
+INTEL = u'8086'
 MAXTROX = u'102b'
 NVIDIA = u'10de'
-INTEL = u'8086'
 
 
 _VENDOR_MAPPING = {
@@ -24,6 +25,14 @@ _VENDOR_MAPPING = {
       u'683d': u'Radeon HD 7700',
       u'9830': u'Radeon HD 8400',
       u'9874': u'Carrizo',
+    }),
+  ASPEED: (
+    u'ASPEED',
+    {
+      # https://pci-ids.ucw.cz/read/PC/1a03/2000
+      # It seems all ASPEED graphics cards use the same device id
+      # (for driver reasons?)
+      u'2000': u'ASPEED Graphics Family',
     }),
   INTEL: (
     u'Intel',
@@ -45,9 +54,11 @@ _VENDOR_MAPPING = {
       u'1626': u'Broadwell HD Graphics 6000',
       u'162b': u'Broadwell Iris Graphics 6100',
       u'1912': u'Skylake HD Graphics 530',
+      u'191e': u'Skylake HD Graphics 515',
       u'1926': u'Skylake Iris 540/550',
       u'193b': u'Skylake Iris Pro 580',
       u'22b1': u'Braswell HD Graphics',
+      u'5912': u'Kaby Lake HD Graphics 630',
       u'591e': u'Kaby Lake HD Graphics 615',
       u'5926': u'Kaby Lake Iris Plus Graphics 640',
     }),
