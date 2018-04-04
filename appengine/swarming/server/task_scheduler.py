@@ -219,7 +219,7 @@ def _handle_dead_bot(run_result_key):
   request = request_future.get_result()
   # The TaskRunResult key id is the try number.
   try_number = run_result_key.integer_id()
-  to_run_key = task_to_run.request_to_task_to_run_key(request, try_number)
+  to_run_key = task_to_run.request_to_task_to_run_key(request, try_number, 0)
 
   def run():
     """Returns tuple(task_is_retried or None, bot_id)."""
@@ -257,7 +257,7 @@ def _handle_dead_bot(run_result_key):
       #   - task hadn't got any ping at all from task_runner.run_command()
       # TODO(maruel): Allow retry for bot locked task using 'id' dimension.
       # Create a second TaskToRun.
-      to_run = task_to_run.new_task_to_run(request, 2)
+      to_run = task_to_run.new_task_to_run(request, 2, 0)
       to_put = (run_result, result_summary, to_run)
       run_result.state = task_result.State.BOT_DIED
       run_result.internal_failure = True
@@ -714,7 +714,7 @@ def schedule_request(request, secret_bytes):
   now = utils.utcnow()
   request.key = task_request.new_request_key()
   # This is the first try.
-  to_run = task_to_run.new_task_to_run(request, 1)
+  to_run = task_to_run.new_task_to_run(request, 1, 0)
   result_summary = task_result.new_result_summary(request)
   result_summary.modified_ts = now
   if secret_bytes:
@@ -1025,7 +1025,7 @@ def cancel_task(request, result_key, kill_running):
     if not was_running:
       # PENDING.
       result_summary.state = task_result.State.CANCELED
-      to_run = task_to_run.request_to_task_to_run_key(request, 1).get()
+      to_run = task_to_run.request_to_task_to_run_key(request, 1, 0).get()
       entities.append(to_run)
       to_run.queue_number = None
     else:
@@ -1059,7 +1059,7 @@ def cancel_task(request, result_key, kill_running):
     # We don't know in advance if it's try number 1 or 2, so do both. Since it's
     # an memcache RPC, it's not too costly.
     # TODO(maruel): Refactor to do both simultaneously to save 2ms.
-    to_run_key = task_to_run.request_to_task_to_run_key(request, i)
+    to_run_key = task_to_run.request_to_task_to_run_key(request, i, 0)
     task_to_run.set_lookup_cache(to_run_key, False)
 
   try:

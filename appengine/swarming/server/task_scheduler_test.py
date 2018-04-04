@@ -271,7 +271,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual('localhost', run_result.bot_id)
     self.assertEqual(1, run_result.try_number)
     to_run_key = task_to_run.request_to_task_to_run_key(
-        run_result.request_key.get(), 1)
+        run_result.request_key.get(), 1, 0)
     self.assertEqual(None, to_run_key.get().queue_number)
 
   def test_schedule_request(self):
@@ -279,7 +279,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # Essentially check _quick_schedule() and _register_bot() works.
     result_summary = self._quick_schedule(1, properties=gen_props())
     to_run_key = task_to_run.request_to_task_to_run_key(
-        result_summary.request_key.get(), 1)
+        result_summary.request_key.get(), 1, 0)
     self.assertTrue(to_run_key.get().queue_number)
     self.assertEqual(State.PENDING, result_summary.state)
 
@@ -393,7 +393,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     result_summary = self._quick_schedule(
         nb_task, properties=gen_props(idempotent=True))
     request = result_summary.request_key.get()
-    to_run_key = task_to_run.request_to_task_to_run_key(request, 1)
+    to_run_key = task_to_run.request_to_task_to_run_key(request, 1, 0)
     # TaskToRun was not stored.
     self.assertEqual(None, to_run_key.get())
     self._register_bot(0, self.bot_dimensions)
@@ -963,7 +963,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # Make sure they are added to the negative cache.
     request = result_summary.request_key.get()
     for i in (1, 2):
-      to_run_key = task_to_run.request_to_task_to_run_key(request, i)
+      to_run_key = task_to_run.request_to_task_to_run_key(request, i, 0)
       actual = task_to_run._lookup_cache_is_taken_async(to_run_key).get_result()
       self.assertEqual(True, actual)
     self.assertEqual(1, len(pub_sub_calls)) # No other message.
@@ -1304,7 +1304,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         properties=gen_props(),
         expiration_ts=self.now+(3*task_result.BOT_PING_TOLERANCE))
     to_run_key_1 = task_to_run.request_to_task_to_run_key(
-        run_result.request_key.get(), 1)
+        run_result.request_key.get(), 1, 0)
     self.assertEqual(None, to_run_key_1.get().queue_number)
 
     # See _handle_dead_bot() with special case about non-idempotent task that
@@ -1338,7 +1338,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # The old TaskToRun is not reused.
     self.assertEqual(None, to_run_key_1.get().queue_number)
     to_run_key_2 = task_to_run.request_to_task_to_run_key(
-        run_result.request_key.get(), 2)
+        run_result.request_key.get(), 2, 0)
     self.assertTrue(to_run_key_2.get().queue_number)
 
   def test_cron_handle_bot_died_same_bot_denied(self):

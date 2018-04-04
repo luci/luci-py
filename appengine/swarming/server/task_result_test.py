@@ -271,7 +271,7 @@ class TaskResultApiTest(TestCase):
     # TaskResultSummary and TaskRunResult are properly updated.
     request = mkreq(_gen_request())
     result_summary = task_result.new_result_summary(request)
-    to_run = task_to_run.new_task_to_run(request, 1)
+    to_run = task_to_run.new_task_to_run(request, 1, 0)
     result_summary.modified_ts = utils.utcnow()
     ndb.transaction(lambda: ndb.put_multi([result_summary, to_run]))
     expected = self._gen_summary(modified_ts=self.now)
