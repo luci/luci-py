@@ -34,9 +34,13 @@
     clear(): Reset the element, emptying output.  page() will not work until
         a call to load() has been made.
 
-    load(url, headers, [pageSize]): Initialize the element and make a call to
-        the server for the first batch of data. If [pageSize] is omitted, the
-        server default (or those specified in the url) will be used
+    load(url, headers, [pageSize], [reset_before]): Initialize the element
+        and make a call to the server for the first batch of data. If [pageSize]
+        is omitted, the server default (or those specified in the url) will be used.
+        if reset_before is true, the underlying array will be cleared about before
+        the request is made. This can be useful, for example, when switching between
+        two bots to make it clear the data changes. This may be undesirable when
+        filtering a list of data.
 
     page(): Must be called after a call to load().  Fetch the next batch of
         data from the server.
@@ -112,7 +116,7 @@
         this._url = "";
       },
 
-      load: function(url, headers, pageSize) {
+      load: function(url, headers, pageSize, reset_before) {
         if (!url) {
           throw "url can't be blank";
         }
@@ -123,6 +127,9 @@
         this._headers = headers;
         this._page_size = pageSize;
         this._cursor = null;
+        if (reset_before) {
+          this.set("output", []);
+        }
         this.page();
       },
 

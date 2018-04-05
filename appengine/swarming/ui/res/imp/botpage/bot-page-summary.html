@@ -241,25 +241,29 @@
       observers: ["_aggregate(tasks.*)"],
 
       _aggregate: function() {
-        if (!this.tasks || !this.tasks.length) {
-          return;
-        }
-        // TODO(kjlubick): Fix sk.now() to be less awkward to use.
-        var now = new Date(sk.now() * 1000);
-        var taskNames = [];
-        var taskAgg = {};
         var totalStats = {
-          total: this.tasks.length,
+          total: 0,
           success: 0,
           failed: 0,
           bot_died: 0,
           avg_duration: 0,
-          total_time: 0,
-          // to compute wall_time, we find the latest task (and assume tasks
-          // come to us chronologically) and find the difference between then
-          // and now.
-          wall_time: (now - this.tasks[this.tasks.length - 1].started_ts) / 1000,
+          total_time: 0
         };
+        if (!this.tasks || !this.tasks.length) {
+          this.set("_totalStats", totalStats);
+          this.set("_taskStats", []);
+          return;
+        }
+
+        // TODO(kjlubick): Fix sk.now() to be less awkward to use.
+        var now = new Date(sk.now() * 1000);
+        var taskNames = [];
+        var taskAgg = {};
+        totalStats.total = this.tasks.length;
+        // to compute wall_time, we find the latest task (and assume tasks
+        // come to us chronologically) and find the difference between then
+        // and now.
+        totalStats.wall_time = (now - this.tasks[this.tasks.length - 1].started_ts) / 1000,
         this.tasks.forEach(function(t) {
           var n = t.name.trim();
           var pieces = n.split('/');
