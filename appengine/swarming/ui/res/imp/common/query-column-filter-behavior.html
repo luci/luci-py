@@ -151,7 +151,6 @@
 
 <script>
   (function(){
-    var FILTER_SEP = ":";
     // Given a space separated list of queries, matchPartCaseInsensitive
     // returns an object of any query that matches a part of str, case
     // insensitive.  The object has an idx (index) and the part that matched.
@@ -197,8 +196,8 @@
       if (filterStr.indexOf(" ") !== -1 || filterStr.indexOf(":") === -1) {
         return false;
       }
-      var col = filterStr.split(FILTER_SEP, 1)[0];
-      var rest = filterStr.substring(col.length + FILTER_SEP.length);
+      var col = filterStr.split(":", 1)[0];
+      var rest = filterStr.substring(col.length + 1);
       if (isColumn) {
         return toMatch === col;
       }
@@ -234,10 +233,6 @@
         },
 
         // private
-        FILTER_SEP: {
-          type:String,
-          value: FILTER_SEP,
-        },
         _filters: {
           type:Array,
         },
@@ -271,7 +266,7 @@
         if (this._cantAddFilter(this._primarySelected, filterItem)) {
           return;
         }
-        var filter = this._primarySelected + this.FILTER_SEP + filterItem;
+        var filter = this._primarySelected + ":" + filterItem;
         this.push("_filters", filter);
       },
 
@@ -292,7 +287,7 @@
         if (!primarySelected || !filterItem) {
           return true;
         }
-        var filter = primarySelected + this.FILTER_SEP + filterItem;
+        var filter = primarySelected + ":" + filterItem;
         return this._filters.indexOf(filter) !== -1;
       },
 
@@ -308,9 +303,9 @@
         // Since they will be or'd together, order doesn't matter.
         var filterGroups = {};
         this._filters.forEach(function(filterString){
-          var idx = filterString.indexOf(this.FILTER_SEP);
+          var idx = filterString.indexOf(":");
           var primary = filterString.slice(0, idx);
-          var param = filterString.slice(idx + this.FILTER_SEP.length);
+          var param = filterString.slice(idx + 1);
           var arr = filterGroups[primary] || [];
           arr.push(param);
           filterGroups[primary] = arr;
@@ -342,17 +337,17 @@
 
       _manuallyAddFilter: function(){
         var filter = this._query.trim();
-        var idx = filter.indexOf(this.FILTER_SEP);
+        var idx = filter.indexOf(":");
         if (idx === -1) {
           sk.errorMessage('Invalid filter.  Should be like "foo:bar"', 5000);
           return;
         }
         var primary = filter.slice(0, idx);
-        var param = filter.slice(idx + this.FILTER_SEP.length);
+        var param = filter.slice(idx + 1);
         if (swarming.alias.DIMENSIONS_WITH_ALIASES.indexOf(primary) !== -1) {
           param = swarming.alias.apply(param, primary);
         }
-        filter = primary + this.FILTER_SEP + param;
+        filter = primary + ":" + param;
 
         if (this._filters.indexOf(filter) !== -1) {
           sk.errorMessage('Filter "'+filter+'" is already active', 5000);

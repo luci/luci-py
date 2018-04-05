@@ -324,14 +324,14 @@ the fleet.">
         var params = {};
         var dims = [];
         this._filters.forEach(function(f) {
-          var split = f.split(this.FILTER_SEP, 1)
+          var split = f.split(":", 1)
           var col = split[0];
-          var rest = f.substring(col.length + this.FILTER_SEP.length);
+          var rest = f.substring(col.length + 1);
           if (this.dimensions.indexOf(col) !== -1) {
             if (swarming.alias.DIMENSIONS_WITH_ALIASES.indexOf(col) !== -1) {
               rest = swarming.alias.unapply(rest);
             }
-            dims.push(col + this.FILTER_SEP + rest)
+            dims.push(col + ":" + rest)
           } else if (col === "status") {
             if (rest === "alive") {
               params["is_dead"] = ["FALSE"];
@@ -372,7 +372,7 @@ the fleet.">
         }
 
         query_params.dimensions.forEach(function(f) {
-          var col = f.split(this.FILTER_SEP, 1)[0];
+          var col = f.split(":", 1)[0];
           if (cols.indexOf(col) === -1) {
             cols.push(col);
           }

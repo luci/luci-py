@@ -151,7 +151,7 @@
 
       <div class="narrow-down-selector">
         <div>
-          <iron-a11y-keys target="[[_filter_input]]" keys="enter" on-keys-pressed="_manuallyAddFilter"></iron-a11y-keys>
+          <iron-a11y-keys target="[[_filter_input]]" keys="enter" on-keys-pressed="_possiblyTagFilter"></iron-a11y-keys>
           <paper-input id="filter"
             label="Search columns and filters or supply a filter and press enter"
             placeholder="gpu nvidia pool:Chrome"
@@ -388,9 +388,9 @@
         var params = {};
         var tags = [];
         this._filters.forEach(function(f) {
-          var split = f.split(this.FILTER_SEP, 1)
+          var split = f.split(":", 1)
           var col = split[0];
-          var rest = f.substring(col.length + this.FILTER_SEP.length);
+          var rest = f.substring(col.length + 1);
           if (col.endsWith("-tag")) {
             // Trim off the 4 letters "-tag"
             col = col.slice(0, -4);
@@ -406,7 +406,7 @@
             if (swarming.alias.DIMENSIONS_WITH_ALIASES.indexOf(col) !== -1) {
               rest = swarming.alias.unapply(rest);
             }
-            tags.push(col + this.FILTER_SEP + rest);
+            tags.push(col + ":" + rest);
           }
         }.bind(this));
         params["tags"] = tags;
@@ -448,17 +448,46 @@
         }
 
         var dimensions = queryParams.tags.filter(function(t){
-          var col = t.split(this.FILTER_SEP, 1)[0];
+          var col = t.split(":", 1)[0];
           return this.dimensions.indexOf(col) !== -1;
         }.bind(this));
 
         dimensions.forEach(function(f) {
-          var col = f.split(this.FILTER_SEP, 1)[0];
+          var col = f.split(":", 1)[0];
           if (cols.indexOf(col) === -1) {
             cols.push(col);
           }
         }.bind(this));
         return this._botListLink(dimensions, cols);
+      },
+
+      _possiblyTagFilter: function() {
+        var filter = this._query.trim();
+        var idx = filter.indexOf(":");
+        if (idx === -1) {
+          sk.errorMessage('Invalid filter.  Should be like "foo:bar"', 5000);
+          return;
+        }
+        var primary = filter.slice(0, idx);
+        // primary has an empty spot for "name" to deal with the top level one
+        // If a user typed in name:foo, they mean the tag, so we account for it here.
+        if (primary === "name" || (!this.primary_map[primary] && !primary.endsWith("-tag"))) {
+          // Make the tag filter for user-supplied tags, they may not have
+          // added the -tag suffix.
+          primary += "-tag";
+        }
+        var param = filter.slice(idx + 1);
+        if (swarming.alias.DIMENSIONS_WITH_ALIASES.indexOf(primary) !== -1) {
+          param = swarming.alias.apply(param, primary);
+        }
+        filter = primary + ":" + param;
+
+        if (this._filters.indexOf(filter) !== -1) {
+          sk.errorMessage('Filter "'+filter+'" is already active', 5000);
+          return;
+        }
+        this.push("_filters", filter);
+        this.set("_query", "");
       },
 
       _promptCancel: function() {
