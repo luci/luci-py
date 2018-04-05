@@ -831,7 +831,7 @@ def rebuild_task_cache(payload):
   return True
 
 
-def tidy_stale():
+def cron_tidy_stale():
   """Searches for all stale BotTaskDimensions and TaskDimensions and delete
   them.
 
@@ -851,7 +851,7 @@ def tidy_stale():
     btd = future_bots.get_result()
   finally:
     logging.info(
-        'tidy_stale() in %.3fs; TaskDimensions: found %d, deleted %d; '
+        'cron_tidy_stale() in %.3fs; TaskDimensions: found %d, deleted %d; '
         'BotTaskDimensions: found %d, deleted %d',
         (utils.utcnow() - now).total_seconds(),
         len(td), sum(1 for i in td if i), len(btd), sum(1 for i in btd if i))

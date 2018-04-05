@@ -16,6 +16,7 @@ indexes:
   - name: ts
     direction: desc
 
+# TODO(maruel): https://crbug.com/826421 Remove all last_seen_ts references.
 - kind: BotInfo
   properties:
   - name: dimensions_flat

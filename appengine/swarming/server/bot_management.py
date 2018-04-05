@@ -156,14 +156,17 @@ class BotInfo(_BotCommon):
   poll, which does not create a BotEvent.
   """
   # One of:
-  NOT_MACHINE_PROVIDER = 1<<5
-  MACHINE_PROVIDER = 1<<4
+  ALIVE = 1<<7 # 128
+  DEAD = 1<<6  # 64
   # One of:
-  HEALTHY = 1<<3
-  QUARANTINED = 1<<2
+  NOT_MACHINE_PROVIDER = 1<<5 # 32
+  MACHINE_PROVIDER = 1<<4     # 16
   # One of:
-  IDLE = 1<<1
-  BUSY = 1<<0
+  HEALTHY = 1<<3     # 8
+  QUARANTINED = 1<<2 # 4
+  # One of:
+  IDLE = 1<<1 # 2
+  BUSY = 1<<0 # 1
 
   # Dimensions are used for task selection. They are encoded as a list of
   # key:value. Keep in mind that the same key can be used multiple times. The
@@ -180,12 +183,15 @@ class BotInfo(_BotCommon):
   # Must only be set when self.task_id is set.
   task_name = ndb.StringProperty(indexed=False)
 
-  # Avoid having huge amounts of indices to query by quarantined/idle
-  composite = ndb.ComputedProperty(lambda self: self._calc_composite(),
-                                   repeated=True)
+  # Avoid having huge amounts of indices to query by quarantined/idle.
+  composite = ndb.IntegerProperty(repeated=True)
 
   def _calc_composite(self):
+    """Returns the value for BotInfo.composite, which permits quick searches."""
+    timeout = config.settings().bot_death_timeout_secs
+    is_dead = (utils.utcnow() - self.last_seen_ts).total_seconds() >= timeout
     return [
+      self.DEAD if is_dead else self.ALIVE,
       self.MACHINE_PROVIDER if self.machine_type else self.NOT_MACHINE_PROVIDER,
       self.QUARANTINED if self.quarantined else self.HEALTHY,
       self.BUSY if self.task_id else self.IDLE
@@ -197,11 +203,11 @@ class BotInfo(_BotCommon):
 
   def is_dead(self, now):
     """Returns True if the bot is dead based on timestamp now."""
+    # TODO(maruel): https://crbug.com/826421 return self.DEAD in self.composite
     timeout = config.settings().bot_death_timeout_secs
     return (now - self.last_seen_ts).total_seconds() >= timeout
 
   def to_dict(self, exclude=None):
-    exclude = ['is_busy'] + (exclude or [])
     out = super(BotInfo, self).to_dict(exclude=exclude)
     # Inject the bot id, since it's the entity key.
     out['id'] = self.id
@@ -209,6 +215,7 @@ class BotInfo(_BotCommon):
 
   def to_dict_with_now(self, now):
     out = self.to_dict()
+    # TODO(maruel): https://crbug.com/826421 Remove.
     out['is_dead'] = self.is_dead(now)
     return out
 
@@ -216,6 +223,7 @@ class BotInfo(_BotCommon):
     super(BotInfo, self)._pre_put_hook()
     if not self.task_id:
       self.task_name = None
+    self.composite = self._calc_composite()
 
 
 class BotEvent(_BotCommon):
@@ -352,11 +360,13 @@ def filter_availability(q, quarantined, is_dead, now, is_busy, is_mp):
       q = q.filter(BotInfo.composite == BotInfo.IDLE)
 
   dt = datetime.timedelta(seconds=config.settings().bot_death_timeout_secs)
-  timeout = now - dt
+  cutoff = now - dt
   if is_dead:
-    q = q.filter(BotInfo.last_seen_ts < timeout)
+    # TODO(maruel): https://crbug.com/826421 Use BotInfo.DEAD
+    q = q.filter(BotInfo.last_seen_ts <= cutoff)
   elif is_dead is not None:
-    q = q.filter(BotInfo.last_seen_ts > timeout)
+    # TODO(maruel): https://crbug.com/826421 Use BotInfo.ALIVE
+    q = q.filter(BotInfo.last_seen_ts > cutoff)
 
   if is_mp is not None:
     if is_mp:
@@ -492,3 +502,36 @@ def should_restart_bot(bot_id, state):
   if period and running_time > period:
     return True, 'Periodic reboot: running longer than %ds' % period
   return False, ''
+
+
+def cron_update_bot_info():
+  """Refreshes BotInfo.composite for dead bots."""
+  dt = datetime.timedelta(seconds=config.settings().bot_death_timeout_secs)
+  cutoff = utils.utcnow() - dt
+
+  @ndb.tasklet
+  def run(bot_key):
+    bot = yield bot_key.get_async()
+    if (bot.last_seen_ts <= cutoff and
+        (BotInfo.ALIVE in bot.composite or BotInfo.DEAD not in bot.composite)):
+      # Updating it recomputes composite.
+      yield bot.put_async()
+      raise ndb.Return(1)
+    raise ndb.Return(0)
+
+  # The assumption here is that a cron job can churn through all the entities
+  # fast enough. The number of dead bot is expected to be <10k.
+  nb = 0
+  futures = []
+  for b in BotInfo.query(BotInfo.last_seen_ts <= cutoff):
+    if BotInfo.ALIVE in b.composite or BotInfo.DEAD not in b.composite:
+      futures.append(datastore_utils.transaction_async(lambda: run(b.key)))
+      if len(futures) >= 25:
+        ndb.Future.wait_any(futures)
+        for i in xrange(len(futures) - 1, -1, -1):
+          if futures[i].done():
+            nb += futures.pop(i).get_result()
+  for f in futures:
+    nb += f.get_result()
+  logging.info('Updated %d bots', nb)
+  return nb

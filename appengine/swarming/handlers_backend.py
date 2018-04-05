@@ -31,6 +31,10 @@ import ts_mon_metrics
 
 
 class CronBotDiedHandler(webapp2.RequestHandler):
+  """Sets running tasks where the bot is not sending ping updates for several
+  minutes as BOT_DIED.
+  """
+
   @decorators.require_cronjob
   def get(self):
     ndb.get_context().set_cache_policy(lambda _: False)
@@ -48,6 +52,13 @@ class CronBotDiedHandler(webapp2.RequestHandler):
 
 
 class CronAbortExpiredShardToRunHandler(webapp2.RequestHandler):
+  """Set tasks that haven't started before their expiration_ts timestamp as
+  EXPIRED.
+
+  Most of the tasks will be expired 'inline' as bots churn through the queue,
+  but tasks where the bots are not polling will be expired by this cron job.
+  """
+
   @decorators.require_cronjob
   def get(self):
     ndb.get_context().set_cache_policy(lambda _: False)
@@ -56,11 +67,28 @@ class CronAbortExpiredShardToRunHandler(webapp2.RequestHandler):
     self.response.out.write('Success.')
 
 
-class CronTaskQueues(webapp2.RequestHandler):
+class CronTidyTaskQueues(webapp2.RequestHandler):
+  """Removes unused tasks queues, the 'dimensions sets' without active task
+  flows.
+  """
+
   @decorators.require_cronjob
   def get(self):
     ndb.get_context().set_cache_policy(lambda _: False)
-    task_queues.tidy_stale()
+    task_queues.cron_tidy_stale()
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    self.response.out.write('Success.')
+
+
+class CronUpdateBotInfoComposite(webapp2.RequestHandler):
+  """Updates BotInfo.composite if needed, e.g. the bot became dead because it
+  hasn't pinged for a while.
+  """
+
+  @decorators.require_cronjob
+  def get(self):
+    ndb.get_context().set_cache_policy(lambda _: False)
+    bot_management.cron_update_bot_info()
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 
@@ -246,6 +274,7 @@ class CronBotGroupsConfigHandler(webapp2.RequestHandler):
 
 class CancelTasksHandler(webapp2.RequestHandler):
   """Cancels tasks given a list of their ids."""
+
   @decorators.require_taskqueue('cancel-tasks')
   def post(self):
     payload = json.loads(self.request.body)
@@ -272,6 +301,8 @@ class CancelTasksHandler(webapp2.RequestHandler):
 
 
 class TaskDimensionsHandler(webapp2.RequestHandler):
+  """Refreshes the active task queues."""
+
   @decorators.require_taskqueue('rebuild-task-cache')
   def post(self):
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
@@ -324,6 +355,7 @@ class TaskGlobalMetrics(webapp2.RequestHandler):
 
 class InternalLaunchMapReduceJobWorkerHandler(webapp2.RequestHandler):
   """Called via task queue or cron to start a map reduce job."""
+
   @decorators.require_taskqueue(mapreduce_jobs.MAPREDUCE_TASK_QUEUE)
   def post(self, job_id):  # pylint: disable=R0201
     ndb.get_context().set_cache_policy(lambda _: False)
@@ -338,10 +370,10 @@ def get_routes():
   routes = [
     # Cron jobs.
     ('/internal/cron/abort_bot_died', CronBotDiedHandler),
-    ('/internal/cron/handle_bot_died', CronBotDiedHandler),
     ('/internal/cron/abort_expired_task_to_run',
         CronAbortExpiredShardToRunHandler),
-    ('/internal/cron/task_queues_tidy', CronTaskQueues),
+    ('/internal/cron/task_queues_tidy', CronTidyTaskQueues),
+    ('/internal/cron/update_bot_info', CronUpdateBotInfoComposite),
 
     ('/internal/cron/count_task_bot_distribution',
         CronCountTaskBotDistributionHandler),

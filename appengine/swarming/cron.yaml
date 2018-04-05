@@ -14,6 +14,13 @@ cron:
   schedule: every 1 minutes
   target: backend
 
+# TODO(maruel): https://crbug.com/826421 Enable once the default version is
+# enabled.
+#- description: Update BotInfo.composite for dead bots.
+#  url: /internal/cron/update_bot_info
+#  schedule: every 1 minutes
+#  target: backend
+
 - description:
     Clean up stale BotTaskDimensions and TaskDimensions so no composite indexes are needed.
   url: /internal/cron/task_queues_tidy

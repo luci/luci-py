@@ -14,6 +14,7 @@ test_env.setup_test_env()
 
 from google.appengine.ext import ndb
 
+from components import utils
 from test_support import test_case
 
 from server import bot_management
@@ -41,6 +42,7 @@ class BotManagementTest(test_case.TestCase):
     out = {
       'authenticated_as': u'bot:id1.domain',
       'composite': [
+        bot_management.BotInfo.ALIVE,
         bot_management.BotInfo.NOT_MACHINE_PROVIDER,
         bot_management.BotInfo.HEALTHY,
         bot_management.BotInfo.IDLE,
@@ -122,6 +124,7 @@ class BotManagementTest(test_case.TestCase):
     # Assert that BotInfo was updated too.
     expected = self._gen_bot_info(
         composite=[
+          bot_management.BotInfo.ALIVE,
           bot_management.BotInfo.NOT_MACHINE_PROVIDER,
           bot_management.BotInfo.QUARANTINED,
           bot_management.BotInfo.IDLE,
@@ -143,6 +146,7 @@ class BotManagementTest(test_case.TestCase):
 
     expected = self._gen_bot_info(
         composite=[
+          bot_management.BotInfo.ALIVE,
           bot_management.BotInfo.NOT_MACHINE_PROVIDER,
           bot_management.BotInfo.HEALTHY,
           bot_management.BotInfo.BUSY,
@@ -225,6 +229,60 @@ class BotManagementTest(test_case.TestCase):
     expected = ndb.Key(
         bot_management.BotRoot, 'foo', bot_management.BotSettings, 'settings')
     self.assertEqual(expected, bot_management.get_settings_key('foo'))
+
+  def test_cron_update_bot_info(self):
+    # Create two bots, one becomes dead, updating the cron job fixes composite.
+    timeout = bot_management.config.settings().bot_death_timeout_secs
+    def check(dead, alive):
+      q = bot_management.filter_availability(
+          bot_management.BotInfo.query(), quarantined=None, is_dead=True,
+          now=utils.utcnow(), is_busy=None, is_mp=None)
+      self.assertEqual(dead, [t.to_dict() for t in q])
+      q = bot_management.filter_availability(
+          bot_management.BotInfo.query(), quarantined=None, is_dead=False,
+          now=utils.utcnow(), is_busy=None, is_mp=None)
+      self.assertEqual(alive, [t.to_dict() for t in q])
+
+    bot_management.bot_event(
+        event_type='bot_connected', bot_id='id1',
+        external_ip='8.8.4.4', authenticated_as='bot:id1.domain',
+        dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
+        version=hashlib.sha256().hexdigest(), quarantined=False, task_id=None,
+        task_name=None)
+    # One second before the timeout value.
+    then = self.mock_now(self.now, timeout-1)
+    bot_management.bot_event(
+        event_type='bot_connected', bot_id='id2',
+        external_ip='8.8.4.4', authenticated_as='bot:id2.domain',
+        dimensions={'id': ['id2'], 'foo': ['bar']}, state={'ram': 65},
+        version=hashlib.sha256().hexdigest(), quarantined=False, task_id=None,
+        task_name=None)
+
+    bot1_alive = self._gen_bot_info()
+    bot1_dead = self._gen_bot_info(
+        composite=[
+          bot_management.BotInfo.DEAD,
+          bot_management.BotInfo.NOT_MACHINE_PROVIDER,
+          bot_management.BotInfo.HEALTHY,
+          bot_management.BotInfo.IDLE,
+        ])
+    bot2_alive = self._gen_bot_info(
+        authenticated_as=u'bot:id2.domain',
+        dimensions={u'foo': [u'bar'], u'id': [u'id2']},
+        first_seen_ts=then,
+        id='id2',
+        last_seen_ts=then)
+    check([], [bot1_alive, bot2_alive])
+    self.assertEqual(0, bot_management.cron_update_bot_info())
+    check([], [bot1_alive, bot2_alive])
+
+    # Just stale enough to trigger the dead logic.
+    then = self.mock_now(self.now, timeout)
+    # The cron job didn't run yet, so it still has ALIVE bit.
+    check([bot1_alive], [bot2_alive])
+    self.assertEqual(1, bot_management.cron_update_bot_info())
+    # The cron job ran, so it's now correct.
+    check([bot1_dead], [bot2_alive])
 
   def test_filter_dimensions(self):
     pass # Tested in handlers_endpoints_test

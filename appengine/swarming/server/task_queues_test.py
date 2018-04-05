@@ -293,7 +293,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     # Assert it doesn't return 0.
     self.assertEqual(3649838548, task_queues.hash_dimensions({}))
 
-  def test_tidy_stale(self):
+  def test_cron_tidy_stale(self):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     _assert_bot()
@@ -304,21 +304,21 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual([2980491642], task_queues.get_queues(u'bot1'))
 
     # No-op.
-    task_queues.tidy_stale()
+    task_queues.cron_tidy_stale()
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
     self.assertEqual([2980491642], task_queues.get_queues(u'bot1'))
 
     # One second before expiration.
     self.mock_now(now, exp.total_seconds())
-    task_queues.tidy_stale()
+    task_queues.cron_tidy_stale()
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
     self.assertEqual([2980491642], task_queues.get_queues(u'bot1'))
 
     # TaskDimension expired.
     self.mock_now(now, exp.total_seconds() + 1)
-    task_queues.tidy_stale()
+    task_queues.cron_tidy_stale()
     self.assert_count(0, task_queues.BotTaskDimensions)
     self.assert_count(0, task_queues.TaskDimensions)
     self.assertEqual([], task_queues.get_queues(u'bot1'))
