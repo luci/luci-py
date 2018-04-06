@@ -233,7 +233,7 @@ class AdbCommandsSafe(object):
   def GetUptime(self):
     """Returns the device's uptime in second."""
     # This is an high level functionality but is needed by self.Reboot().
-    out = self.PullContent('/proc/uptime')
+    out, _ = self.Shell('cat /proc/uptime')
     if out:
       return float(out.split()[0])
     return None
@@ -653,8 +653,6 @@ class AdbCommandsSafe(object):
       except adb_protocol.InvalidResponseError as e:
         # Same issue as mentioned above, but this error surfaces itself as an
         # InvalidResponseError exception when communicating over tcp.
-        if self._handle.is_local:
-          raise
         out = 'restarting adbd as root\n'
       except self._ERRORS as e:
         if not self._Reset('(): %s', e, use_serial=True):

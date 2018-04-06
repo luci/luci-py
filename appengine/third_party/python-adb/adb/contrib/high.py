@@ -876,7 +876,8 @@ class HighDevice(object):
     # pm can be very slow at times. Use a longer timeout to prevent
     # confusing a long-running command with an interrupted connection.
     out, exit_code = self.Shell('pm path', timeout_ms=30000)
-    if out != 'Error: no package specified\n':
+    if ('Error: no package specified' not in out and
+        'Argument expected after "path"' not in out):
       # Accepts an empty string too, which has been observed only on Android 4.4
       # (Kitkat) but not on later versions.
       if out not in (

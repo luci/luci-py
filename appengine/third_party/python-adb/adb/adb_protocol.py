@@ -95,7 +95,14 @@ class _AdbMessageHeader(collections.namedtuple(
   _VALID_IDS = ('AUTH', 'CLSE', 'CNXN', 'FAIL', 'OKAY', 'OPEN', 'SYNC', 'WRTE')
 
   # CNXN constants for arg0.
-  VERSION = 0x01000000
+  # If the client initializes a connection to a P+ device with the
+  # VERSION_NO_CHECKSUM version, all checksum verifications are skipped and the
+  # checksum field in the header is replaced with 0. Since adbd on the device
+  # is (hopefully) backwards compatible, use the older version regardless of
+  # device OS and continue the old checksum protocol.
+  DEFAULT_VERSION = 0x01000000
+  VERSION_NO_CHECKSUM = 0x01000001
+  SUPPORTED_VERSIONS = (DEFAULT_VERSION, VERSION_NO_CHECKSUM)
 
   # AUTH constants for arg0.
   AUTH_TOKEN = 1
@@ -158,8 +165,10 @@ class _AdbMessageHeader(collections.namedtuple(
             'Unexpected arg1 value (0x%x) on AUTH packet' % arg1, self)
       return '%s, %s' % (command_name, arg0)
     elif command_name == 'CNXN':
-      if arg0 == self.VERSION:
+      if arg0 == self.DEFAULT_VERSION:
         arg0 = 'v1'
+      elif arg0 == self.VERSION_NO_CHECKSUM:
+        arg0 = 'v2'
       arg1 = 'pktsize:%d' % arg1
     return '%s, %s, %s' % (command_name, arg0, arg1)
 
@@ -179,7 +188,11 @@ class _AdbMessage(object):
     # packet.
     try:
       usb.BulkWrite(self.header.Packed, timeout_ms)
-      usb.BulkWrite(self.data, timeout_ms)
+      # For data-less headers (eg: OKAY packets) don't send empty data. This has
+      # been shown to cause protocol faults on P+ devices. (How did this ever
+      # work...?)
+      if self.header.data_length:
+        usb.BulkWrite(self.data, timeout_ms)
     finally:
       self._log_msg(usb)
 
@@ -531,8 +544,9 @@ class AdbConnectionManager(object):
           self.port_path, nb, time.time() - start)
 
       if not reply:
+        # Initialize the connection using the older protocol version.
         msg = _AdbMessage.Make(
-            'CNXN', _AdbMessageHeader.VERSION, self.MAX_ADB_DATA,
+            'CNXN', _AdbMessageHeader.DEFAULT_VERSION, self.MAX_ADB_DATA,
             'host::%s\0' % self._host_banner)
         msg.Write(self._usb)
         reply = _AdbMessage.Read(self._usb)
@@ -574,8 +588,11 @@ class AdbConnectionManager(object):
     if reply.header.command_name != 'CNXN':
       raise usb_exceptions.DeviceAuthError(
           'Accept auth key on device, then retry.')
-    if reply.header.arg0 != _AdbMessageHeader.VERSION:
-      raise InvalidResponseError('Unknown CNXN response', reply)
+    if reply.header.arg0 not in _AdbMessageHeader.SUPPORTED_VERSIONS:
+      raise InvalidResponseError(
+          'Unsupported protocol version 0x%x in CNXN response' % (
+              reply.header.arg0),
+          reply)
     self.state = reply.data
     self.max_packet_size = reply.header.arg1
     _LOG.debug(
