@@ -358,7 +358,7 @@ def _set_executors_metrics(payload):
       status = 'running'
     elif bot_info.quarantined:
       status = 'quarantined'
-    elif bot_info.is_dead(utils.utcnow()):
+    elif bot_info.is_dead:
       status = 'dead'
     elif bot_info.state and bot_info.state.get('maintenance', False):
       status = 'maintenance'

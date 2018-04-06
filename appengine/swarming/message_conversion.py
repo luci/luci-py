@@ -168,7 +168,7 @@ def epoch_to_datetime(value):
     raise ValueError(e)
 
 
-def bot_info_to_rpc(entity, now, deleted=False):
+def bot_info_to_rpc(entity, deleted=False):
   """"Returns a swarming_rpcs.BotInfo from a bot.BotInfo."""
   return _ndb_to_rpc(
       swarming_rpcs.BotInfo,
@@ -176,7 +176,7 @@ def bot_info_to_rpc(entity, now, deleted=False):
       bot_id=entity.id,
       deleted=deleted,
       dimensions=_string_list_pairs_from_dict(entity.dimensions),
-      is_dead=entity.is_dead(now),
+      is_dead=entity.is_dead,
       machine_type=entity.machine_type,
       state=json.dumps(entity.state, sort_keys=True, separators=(',', ':')))
 

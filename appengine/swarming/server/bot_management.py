@@ -201,22 +201,16 @@ class BotInfo(_BotCommon):
   def id(self):
     return self.key.parent().string_id()
 
-  def is_dead(self, now):
-    """Returns True if the bot is dead based on timestamp now."""
-    # TODO(maruel): https://crbug.com/826421 return self.DEAD in self.composite
-    timeout = config.settings().bot_death_timeout_secs
-    return (now - self.last_seen_ts).total_seconds() >= timeout
+  @property
+  def is_dead(self):
+    # Only valid after it's stored.
+    return self.DEAD in self.composite
 
   def to_dict(self, exclude=None):
     out = super(BotInfo, self).to_dict(exclude=exclude)
     # Inject the bot id, since it's the entity key.
     out['id'] = self.id
-    return out
-
-  def to_dict_with_now(self, now):
-    out = self.to_dict()
-    # TODO(maruel): https://crbug.com/826421 Remove.
-    out['is_dead'] = self.is_dead(now)
+    out['is_dead'] = self.is_dead
     return out
 
   def _pre_put_hook(self):
@@ -345,7 +339,7 @@ def filter_dimensions(q, dimensions):
   return q
 
 
-def filter_availability(q, quarantined, is_dead, now, is_busy, is_mp):
+def filter_availability(q, quarantined, is_dead, is_busy, is_mp):
   """Filters a ndb.Query for BotInfo based on quarantined/is_dead/is_busy."""
   if quarantined is not None:
     if quarantined:
@@ -359,14 +353,10 @@ def filter_availability(q, quarantined, is_dead, now, is_busy, is_mp):
     else:
       q = q.filter(BotInfo.composite == BotInfo.IDLE)
 
-  dt = datetime.timedelta(seconds=config.settings().bot_death_timeout_secs)
-  cutoff = now - dt
   if is_dead:
-    # TODO(maruel): https://crbug.com/826421 Use BotInfo.DEAD
-    q = q.filter(BotInfo.last_seen_ts <= cutoff)
+    q = q.filter(BotInfo.composite == BotInfo.DEAD)
   elif is_dead is not None:
-    # TODO(maruel): https://crbug.com/826421 Use BotInfo.ALIVE
-    q = q.filter(BotInfo.last_seen_ts > cutoff)
+    q = q.filter(BotInfo.composite == BotInfo.ALIVE)
 
   if is_mp is not None:
     if is_mp:

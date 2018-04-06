@@ -1298,7 +1298,7 @@ class BotsApiTest(BaseTest):
       ],
       u'external_ip': u'8.8.4.4',
       u'first_seen_ts': fmtdate(then, DATETIME_NO_MICRO),
-      u'is_dead': True,
+      u'is_dead': False,
       u'last_seen_ts': fmtdate(then, DATETIME_NO_MICRO),
       u'machine_type': u'mt',
       u'quarantined': False,
@@ -1314,6 +1314,11 @@ class BotsApiTest(BaseTest):
     request = swarming_rpcs.BotsRequest()
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
+    self.assertEqual(1, bot_management.cron_update_bot_info())
+    bot3[u'is_dead'] = True
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+
     # All bots should be returned if we don't care about quarantined
     request = swarming_rpcs.BotsRequest(
         quarantined=swarming_rpcs.ThreeStateBool.NONE)
@@ -1446,11 +1451,15 @@ class BotsApiTest(BaseTest):
     expected = {
       u'count': u'3',
       u'quarantined': u'2',
-      u'dead': u'1',
+      u'dead': u'0',
       u'busy': u'1',
       u'now': unicode(self.now.strftime(DATETIME_NO_MICRO)),
     }
     request = swarming_rpcs.BotsRequest()
+    response = self.call_api('count', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+    self.assertEqual(1, bot_management.cron_update_bot_info())
+    expected[u'dead'] = u'1'
     response = self.call_api('count', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
 

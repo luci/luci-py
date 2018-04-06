@@ -16,27 +16,10 @@ indexes:
   - name: ts
     direction: desc
 
-# TODO(maruel): https://crbug.com/826421 Remove all last_seen_ts references.
-- kind: BotInfo
-  properties:
-  - name: dimensions_flat
-  - name: last_seen_ts
-
 - kind: BotInfo
   properties:
   - name: dimensions_flat
   - name: composite
-
-- kind: BotInfo
-  properties:
-  - name: composite
-  - name: last_seen_ts
-
-- kind: BotInfo
-  properties:
-  - name: dimensions_flat
-  - name: composite
-  - name: last_seen_ts
 
 - kind: TaskResultSummary
   properties:

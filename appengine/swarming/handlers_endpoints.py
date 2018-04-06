@@ -689,8 +689,7 @@ class SwarmingBotService(remote.Service):
           machine_lease=events[0].machine_lease)
       deleted = True
 
-    return message_conversion.bot_info_to_rpc(bot, utils.utcnow(),
-                                              deleted=deleted)
+    return message_conversion.bot_info_to_rpc(bot, deleted=deleted)
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
@@ -850,7 +849,7 @@ class SwarmingBotsService(remote.Service):
       q = bot_management.filter_dimensions(q, request.dimensions)
       q = bot_management.filter_availability(
           q, swarming_rpcs.to_bool(request.quarantined),
-          swarming_rpcs.to_bool(request.is_dead), now,
+          swarming_rpcs.to_bool(request.is_dead),
           swarming_rpcs.to_bool(request.is_busy),
           swarming_rpcs.to_bool(request.is_mp))
     except ValueError as e:
@@ -860,7 +859,7 @@ class SwarmingBotsService(remote.Service):
     return swarming_rpcs.BotList(
         cursor=cursor,
         death_timeout=config.settings().bot_death_timeout_secs,
-        items=[message_conversion.bot_info_to_rpc(bot, now) for bot in bots],
+        items=[message_conversion.bot_info_to_rpc(bot) for bot in bots],
         now=now)
 
   @gae_ts_mon.instrument_endpoint()
@@ -879,13 +878,12 @@ class SwarmingBotsService(remote.Service):
       raise endpoints.BadRequestException(str(e))
 
     f_count = q.count_async()
-    f_dead = (bot_management.filter_availability(q, None, True, now, None, None)
-        .count_async())
-    f_quarantined = (
-        bot_management.filter_availability(q, True, None, now, None, None)
-        .count_async())
-    f_busy = (bot_management.filter_availability(q, None, None, now, True, None)
-        .count_async())
+    f_dead = bot_management.filter_availability(
+        q, None, True, None, None).count_async()
+    f_quarantined = bot_management.filter_availability(
+        q, True, None, None, None).count_async()
+    f_busy = bot_management.filter_availability(
+        q, None, None, True, None).count_async()
     return swarming_rpcs.BotsCount(
         count=f_count.get_result(),
         quarantined=f_quarantined.get_result(),

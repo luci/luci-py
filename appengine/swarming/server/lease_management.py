@@ -928,7 +928,7 @@ def check_for_connection(machine_lease):
     if release(machine_lease):
       clear_lease_request(machine_lease.key, machine_lease.client_request_id)
     return
-  if bot_info.is_dead(utils.utcnow()):
+  if bot_info.is_dead:
     logging.warning(
         'Bot failed to connect in time:\nKey: %s\nHostname: %s',
         machine_lease.key,
@@ -1267,7 +1267,7 @@ def compute_utilization():
   now = utils.utcnow()
   q = bot_management.BotInfo.query()
   q = bot_management.filter_availability(
-      q, quarantined=None, is_dead=False, now=now, is_busy=None, is_mp=True)
+      q, quarantined=None, is_dead=False, is_busy=None, is_mp=True)
   q.map(process, batch_size=128, use_cache=False)
 
   # The number of machine types isn't very large, in the few tens, so no need to

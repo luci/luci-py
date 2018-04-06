@@ -51,6 +51,7 @@ class BotManagementTest(test_case.TestCase):
       'external_ip': u'8.8.4.4',
       'first_seen_ts': self.now,
       'id': 'id1',
+      'is_dead': False,
       'last_seen_ts': self.now,
       'lease_id': None,
       'lease_expiration_ts': None,
@@ -236,11 +237,11 @@ class BotManagementTest(test_case.TestCase):
     def check(dead, alive):
       q = bot_management.filter_availability(
           bot_management.BotInfo.query(), quarantined=None, is_dead=True,
-          now=utils.utcnow(), is_busy=None, is_mp=None)
+          is_busy=None, is_mp=None)
       self.assertEqual(dead, [t.to_dict() for t in q])
       q = bot_management.filter_availability(
           bot_management.BotInfo.query(), quarantined=None, is_dead=False,
-          now=utils.utcnow(), is_busy=None, is_mp=None)
+          is_busy=None, is_mp=None)
       self.assertEqual(alive, [t.to_dict() for t in q])
 
     bot_management.bot_event(
@@ -265,7 +266,8 @@ class BotManagementTest(test_case.TestCase):
           bot_management.BotInfo.NOT_MACHINE_PROVIDER,
           bot_management.BotInfo.HEALTHY,
           bot_management.BotInfo.IDLE,
-        ])
+        ],
+        is_dead=True)
     bot2_alive = self._gen_bot_info(
         authenticated_as=u'bot:id2.domain',
         dimensions={u'foo': [u'bar'], u'id': [u'id2']},
@@ -279,7 +281,7 @@ class BotManagementTest(test_case.TestCase):
     # Just stale enough to trigger the dead logic.
     then = self.mock_now(self.now, timeout)
     # The cron job didn't run yet, so it still has ALIVE bit.
-    check([bot1_alive], [bot2_alive])
+    check([], [bot1_alive, bot2_alive])
     self.assertEqual(1, bot_management.cron_update_bot_info())
     # The cron job ran, so it's now correct.
     check([bot1_dead], [bot2_alive])
