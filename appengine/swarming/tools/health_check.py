@@ -33,11 +33,12 @@ def retry_exception(exc_type, max_attempts, delay):
   def deco(fn):
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
-      for _ in range(max_attempts):
+      for _ in range(max_attempts - 1):
         try:
           return fn(*args, **kwargs)
         except exc_type:
           time.sleep(delay)
+      return fn(*args, **kwargs)
     return wrapper
   return deco
 
@@ -83,12 +84,12 @@ def main():
   parser.add_argument(
       '--pool',
       help='Pool to schedule a task on. If unspecified, this is autodetected.')
-  parser.add_argument('application')
+  parser.add_argument('appid')
   parser.add_argument('server_version')
   args = parser.parse_args()
 
-  url = 'https://{server_version}-dot-{application}.appspot.com'.format(
-      application=args.application,
+  url = 'https://{server_version}-dot-{appid}.appspot.com'.format(
+      appid=args.appid,
       server_version=args.server_version)
   print 'Swarming server:', url
 
@@ -97,7 +98,7 @@ def main():
     print 'Finding best pool to use'
     pool = pick_best_pool(url, args.server_version)
 
-  print 'Scheduling no-op task'
+  print 'Scheduling no-op task on pool %r' % pool
   rv = subprocess.call([
       SWARMING_TOOL, 'run',
       '-S', url,
