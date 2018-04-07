@@ -342,6 +342,11 @@ class NewTaskRequest(messages.Message):
   # Will be but into "userdata" fields of PubSub message.
   pubsub_userdata = messages.StringField(11)
 
+  # Only evaluate the task, as if we were going to schedule it, but don't
+  # actually schedule it. This will return the TaskRequest, but without
+  # a task_id.
+  evaluate_only = messages.BooleanField(13)
+
 
 class TaskRequest(messages.Message):
   """Description of a task request as registered by the server.

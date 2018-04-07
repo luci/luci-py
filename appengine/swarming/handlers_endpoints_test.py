@@ -269,12 +269,23 @@ class TasksApiTest(BaseTest):
       u'task_id': u'5cee488008810',
     }
 
+    # Do an evaluate_only call first
+    request.evaluate_only = True
+    evaluate_expect = dict(expected)
+    evaluate_expect.pop(u'task_id')
     response = self.call_api('new', body=message_to_dict(request))
+    self.assertEqual(evaluate_expect, response.json)
+
+    request.evaluate_only = False
+    response = self.call_api('new', body=message_to_dict(request))
+    # Time advanced since the evaluate_only call.
+    expected['request']['created_ts'] = fmtdate(self.now)
     self.assertEqual(expected, response.json)
 
-    # Asked for a correct grant.
+    # Asked for a correct grant(s), since both evaluate and non-evaluate modes
+    # do auth check.
     self.assertEqual(
-        [(u'service-account@example.com', datetime.timedelta(0, 30+30+15))],
+        [(u'service-account@example.com', datetime.timedelta(0, 30+30+15))] * 2,
         oauth_grant_calls)
 
   def test_new_bad_service_account(self):

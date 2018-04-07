@@ -143,7 +143,7 @@ def get_or_raise(key):
   return result
 
 
-def apply_property_defaults(properties):
+def apply_server_property_defaults(properties):
   """Fills ndb task properties with default values read from server settings."""
   cfg = config.settings()
   if not cfg:
@@ -393,7 +393,7 @@ class SwarmingTasksService(remote.Service):
     try:
       request_obj, secret_bytes = message_conversion.new_task_request_from_rpc(
           request, utils.utcnow())
-      apply_property_defaults(request_obj.properties)
+      apply_server_property_defaults(request_obj.properties)
       task_request.init_new_request(
           request_obj, acl.can_schedule_high_priority_tasks())
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
@@ -428,6 +428,12 @@ class SwarmingTasksService(remote.Service):
                 validity_duration=duration))
       except service_accounts.InternalError as exc:
         raise endpoints.InternalServerErrorException(exc.message)
+
+    # If the user only wanted to evaluate scheduling the task, but not actually
+    # schedule it, return early without a task_id.
+    if request.evaluate_only:
+      return swarming_rpcs.TaskRequestMetadata(
+          request=message_conversion.task_request_to_rpc(request_obj))
 
     try:
       result_summary = task_scheduler.schedule_request(
