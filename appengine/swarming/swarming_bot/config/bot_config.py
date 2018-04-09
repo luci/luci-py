@@ -28,11 +28,12 @@ Here's a pile of poo: 💩
 """
 
 import os
+import sys
 
 from api import os_utilities
 from api import platforms
 
-# Unused argument 'bot' - pylint: disable=W0613
+# pylint: disable=unused-argument
 
 
 def get_dimensions(bot):
@@ -303,7 +304,11 @@ def on_bot_idle(bot, since_last_action):
   - since_last_action: time in second since last action; e.g. amount of time the
                        bot has been idle.
   """
-  pass
+  # Don't try this if running inside docker.
+  if sys.platform != 'linux2' or not platforms.linux.get_inside_docker():
+    uptime = os_utilities.get_uptime()
+    if uptime > 12*60*60 * (1. + bot.get_pseudo_rand(0.2)):
+      bot.host_reboot('Periodic reboot after %ds' % uptime)
 
 
 ### Setup

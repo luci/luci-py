@@ -5,6 +5,7 @@
 
 import logging
 import os
+import struct
 import sys
 import unittest
 
@@ -17,7 +18,7 @@ import bot
 def make_bot(remote=None):
   return bot.Bot(
       remote,
-      {'dimensions': {'foo': ['bar']}},
+      {'dimensions': {'id': ['bot1'], 'pool': ['private']}},
       'https://localhost:1',
       '1234-1a2b3c4-tainted-joe',
       'base_dir',
@@ -25,6 +26,15 @@ def make_bot(remote=None):
 
 
 class TestBot(unittest.TestCase):
+  def test_get_pseudo_rand(self):
+    # This test assumes little endian.
+    # The following confirms the equivalent code in Bot.get_pseudo_rand():
+    self.assertEqual(-1., round(struct.unpack('h', '\x00\x80')[0] / 32768., 4))
+    self.assertEqual(1., round(struct.unpack('h', '\xff\x7f')[0] / 32768., 4))
+    b = make_bot()
+    self.assertEqual(-0.7782, b.get_pseudo_rand(1.))
+    self.assertEqual(-0.0778, b.get_pseudo_rand(.1))
+
   def test_post_error(self):
     # Not looking at the actual stack since the file name is call dependent and
     # the line number will change as the code is modified.
@@ -38,7 +48,8 @@ class TestBot(unittest.TestCase):
       def post_bot_event(self2, event_type, message, attributes):
         try:
           self.assertEqual('bot_error', event_type)
-          self.assertEqual({'dimensions': {'foo': ['bar']}}, attributes)
+          expected = {'dimensions': {'id': ['bot1'], 'pool': ['private']}}
+          self.assertEqual(expected, attributes)
           self.assertTrue(message.startswith(prefix), repr(message))
           calls.append(event_type)
         except Exception as e:
@@ -56,7 +67,7 @@ class TestBot(unittest.TestCase):
 
   def test_bot(self):
     obj = make_bot()
-    self.assertEqual({'foo': ['bar']}, obj.dimensions)
+    self.assertEqual({'id': ['bot1'], 'pool': ['private']}, obj.dimensions)
     self.assertEqual(
         os.path.join(obj.base_dir, 'swarming_bot.zip'), obj.swarming_bot_zip)
     self.assertEqual('1234-1a2b3c4-tainted-joe', obj.server_version)
@@ -65,7 +76,7 @@ class TestBot(unittest.TestCase):
   def test_attribute_updates(self):
     obj = make_bot()
     obj._update_bot_group_cfg('cfg_ver', {'dimensions': {'pool': ['A']}})
-    self.assertEqual({'foo': ['bar'], 'pool': ['A']}, obj.dimensions)
+    self.assertEqual({'id': ['bot1'], 'pool': ['A']}, obj.dimensions)
     self.assertEqual({'bot_group_cfg_version': 'cfg_ver'}, obj.state)
 
     # Dimension in bot_group_cfg ('A') wins over custom one ('B').

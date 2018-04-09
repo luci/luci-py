@@ -6,8 +6,10 @@
 
 import copy
 import inspect
+import hashlib
 import logging
 import os
+import struct
 import sys
 import threading
 import time
@@ -197,6 +199,18 @@ class Bot(object):
     automatically start upon boot.
     """
     return os.path.join(self.base_dir, 'swarming_bot.zip')
+
+  def get_pseudo_rand(self, width):
+    """Returns a constant pseudo-random factor for the bot within +/-width.
+
+    This is useful when we want to desynchronise a global operation, like when
+    the bot reboot on a period.
+
+    Returns:
+      float between [-width, +width] rounded to 4 decimals.
+    """
+    b = struct.unpack('h', hashlib.md5(self.id).digest()[:2])[0]
+    return round(b / 32768. * width, 4)
 
   def post_event(self, event_type, message):
     """Posts an event to the server."""
