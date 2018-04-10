@@ -502,7 +502,7 @@ def cron_update_bot_info():
   @ndb.tasklet
   def run(bot_key):
     bot = yield bot_key.get_async()
-    if (bot.last_seen_ts <= cutoff and
+    if (bot and bot.last_seen_ts <= cutoff and
         (BotInfo.ALIVE in bot.composite or BotInfo.DEAD not in bot.composite)):
       # Updating it recomputes composite.
       yield bot.put_async()
