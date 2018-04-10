@@ -393,10 +393,12 @@ class SwarmingTasksService(remote.Service):
     try:
       request_obj, secret_bytes = message_conversion.new_task_request_from_rpc(
           request, utils.utcnow())
-      apply_server_property_defaults(request_obj.properties)
+      for index in xrange(request_obj.num_task_slices):
+        apply_server_property_defaults(request_obj.task_slice(index).properties)
       task_request.init_new_request(
           request_obj, acl.can_schedule_high_priority_tasks())
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
+      logging.exception('Here\'s what was wrong in the user new task request:')
       raise endpoints.BadRequestException(e.message)
 
     # Make sure the caller is actually allowed to schedule the task before
@@ -413,10 +415,7 @@ class SwarmingTasksService(remote.Service):
         raise endpoints.BadRequestException(
             'This Swarming server doesn\'t support task service accounts '
             'because Token Server URL is not configured')
-      max_lifetime_secs = (
-          request_obj.expiration_secs +
-          request_obj.properties.execution_timeout_secs +
-          request_obj.properties.grace_period_secs)
+      max_lifetime_secs = request_obj.max_lifetime_secs
       try:
         # Note: this raises AuthorizationError if the user is not allowed to use
         # the requested account or service_accounts.InternalError if something

@@ -155,10 +155,13 @@ class CronCountTaskBotDistributionHandler(webapp2.RequestHandler):
             task_result.State.STATES_RUNNING))
     for result in q:
       # Make dimensions immutable so they can be used to index a key.
-      dimensions = tuple(sorted(
-            (k, tuple(sorted(v)))
-            for k, v in result.request.properties.dimensions.iteritems()))
-      n_tasks_by_dimensions[dimensions] += 1
+      req = result.request
+      for i in xrange(req.num_task_slices):
+        t = req.task_slice(i)
+        dimensions = tuple(sorted(
+              (k, tuple(sorted(v)))
+              for k, v in t.properties.dimensions.iteritems()))
+        n_tasks_by_dimensions[dimensions] += 1
 
     # Count how many bots have those dimensions for each set.
     n_bots_by_dimensions = {}

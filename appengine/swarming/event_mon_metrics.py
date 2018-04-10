@@ -74,7 +74,8 @@ def _task_summary_to_proto(summary, event):
   if summary.request.pubsub_topic:
     request_proto.pubsub_topic = summary.request.pubsub_topic
 
-  task_properties = summary.request.properties
+  task_properties = summary.request.task_slice(
+      summary.current_task_slice).properties
   properties_proto = request_proto.properties
 
   if task_properties.inputs_ref:

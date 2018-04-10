@@ -599,6 +599,91 @@ class TasksApiTest(BaseTest):
     response = self.call_api('new', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
 
+  def test_new_task_slices_one(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+
+    task_slices = [
+      {
+        u'properties': self.create_props(command=['python', 'run_test.py']),
+        u'expiration_secs': 180,
+      },
+    ]
+    response, _ = self.client_create_task(
+        expiration_secs=None, task_slices=task_slices)
+    expected_props = self.gen_props(command=[u'python', u'run_test.py'])
+    expected = {
+      u'request': self.gen_request(
+          created_ts=fmtdate(self.now),
+          expiration_secs=u'180',
+          properties=expected_props,
+          task_slices=[
+            {
+              u'expiration_secs': u'180',
+              u'properties': expected_props,
+            },
+          ]),
+      u'task_id': u'5cee488008810',
+    }
+    self.assertEqual(expected, response)
+
+  def test_new_task_slices_two(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+
+    task_slices = [
+      {
+        u'properties': self.create_props(command=['python', 'run_test.py']),
+        u'expiration_secs': 180,
+      },
+      {
+        u'properties': self.create_props(command=['python', 'run_test.py']),
+        u'expiration_secs': 180,
+      },
+    ]
+    # This will soon work.
+    with self.assertRaises(webtest.AppError):
+      self.client_create_task(
+          expiration_secs=None, task_slices=task_slices)
+
+  def test_new_task_slices_two_denied(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+
+    cfg = config.settings()
+    cfg.isolate.default_server = 'https://isolateserver.appspot.com'
+    cfg.isolate.default_namespace = 'default-gzip'
+    self.mock(config, 'settings', lambda: cfg)
+
+    task_slices = [
+      {
+        u'properties': self.create_props(command=['python', 'run_test.py']),
+        u'expiration_secs': 180,
+      },
+      {
+        u'properties': self.create_props(command=['python', 'run_test.py']),
+        # That's incorrect:
+        u'expiration_secs': 0,
+      },
+    ]
+    request = swarming_rpcs.NewTaskRequest(
+        expiration_secs=None,
+        name='hi',
+        priority=10,
+        tags=[],
+        task_slices=task_slices,
+        user='joe@localhost')
+    resp = self.call_api('new', body=message_to_dict(request), status=400)
+    expected = {
+      u'state': u'APPLICATION_ERROR',
+      # This will change for an error message about expiration_secs.
+      u'error_message': u'Only one task_slices entry is supported for now',
+    }
+    self.assertEqual(expected, resp.json)
+
   def test_mass_cancel(self):
     # Create two tasks.
     self.mock(random, 'getrandbits', lambda _: 0x88)

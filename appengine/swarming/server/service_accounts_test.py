@@ -164,7 +164,7 @@ class TaskAccountTokenTest(TestBase):
         'io_timeout_secs': None,
       }),
       'expiration_ts': now + datetime.timedelta(seconds=60),
-      'tags': [u'tag:1'],
+      'manual_tags': [u'tag:1'],
       'user': 'Someone',
     }
     req = task_request.TaskRequest(**args)

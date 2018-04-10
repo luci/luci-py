@@ -53,7 +53,7 @@ def _gen_request(properties=None, **kwargs):
     'priority': 50,
     'properties': task_request.TaskProperties(**props),
     'expiration_ts': now + datetime.timedelta(seconds=60),
-    'tags': [u'tag:1'],
+    'manual_tags': [u'tag:1'],
     'user': 'Jesus',
   }
   args.update(kwargs)
@@ -97,9 +97,9 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     """Stores a new initialized TaskRequest.
 
     nb_task is 1 or 0. It represents the number of GAE task queue
-    rebuild-task-cache enqueued. It is 1 when the request.properties.dimensions
-    is new (unseen before) and a GAE task queue was enqueued to process it, 0
-    otherwise.
+    rebuild-task-cache enqueued. It is 1 when the
+    request.task_slice(0).properties.dimensions is new (unseen before) and a GAE
+    task queue was enqueued to process it, 0 otherwise.
     """
     task_request.init_new_request(req, True)
     task_queues.assert_task(req)
@@ -211,11 +211,6 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     expected['try_number'] = 2
     actual = task_to_run.new_task_to_run(request, 2, 0).to_dict()
     self.assertEqual(expected, actual)
-    # now is used when task_slice_index != 0.
-    expected['task_slice_index'] = 1
-    expected['try_number'] = 1
-    actual = task_to_run.new_task_to_run(request, 1, 1).to_dict()
-    self.assertEqual(expected, actual)
 
   def test_new_task_to_run_limits(self):
     request = self.mkreq(_gen_request(), 1)
@@ -225,11 +220,10 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     task_to_run.new_task_to_run(request, 2, 0)
     with self.assertRaises(AssertionError):
       task_to_run.new_task_to_run(request, 3, 0)
-    task_to_run.new_task_to_run(request, 1, 63)
     # This is an assert instead of a ValueError because it is enforced at the
     # TaskRequest creation time.
     with self.assertRaises(AssertionError):
-      task_to_run.new_task_to_run(request, 1, 64)
+      task_to_run.new_task_to_run(request, 1, 1)
 
   def test_new_task_to_run_list(self):
     self.mock(random, 'getrandbits', lambda _: 0x12)
@@ -638,7 +632,8 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
             command=[], dimensions=request_dimensions,
             execution_timeout_secs=0, grace_period_secs=0),
         nb_task=0)
-    self.assertTrue(task.key.parent().get().properties.is_terminate)
+    self.assertTrue(
+        task.key.parent().get().task_slice(0).properties.is_terminate)
     # Bot declares exactly same dimensions so it matches.
     bot_dimensions = request_dimensions.copy()
     bot_dimensions[u'pool'] = [u'default']

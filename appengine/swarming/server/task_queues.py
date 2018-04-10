@@ -703,7 +703,8 @@ def cleanup_after_bot(bot_id):
 
 
 def assert_task(request):
-  """Makes sure the TaskRequest dimensions are listed as a known queue.
+  """Makes sure the TaskRequest dimensions, for each TaskProperties, are listed
+  as a known queue.
 
   This function must be called before storing the TaskRequest in the DB.
 
@@ -715,7 +716,12 @@ def assert_task(request):
   practice.
   """
   assert not request.key, request.key
-  _assert_task_props(request.properties, request.expiration_ts)
+  # TODO(maruel): Parallelize the following.
+  exp_ts = request.created_ts
+  for i in xrange(request.num_task_slices):
+    t = request.task_slice(i)
+    exp_ts += datetime.timedelta(seconds=t.expiration_secs)
+    _assert_task_props(t.properties, exp_ts)
 
 
 def get_queues(bot_id):

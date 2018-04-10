@@ -833,8 +833,13 @@ class TaskRequest(ndb.Model):
   expiration_ts = ndb.DateTimeProperty(
       indexed=True, validator=_validate_expiration_ts, required=True)
 
-  # Tags that specify the category of the task.
+  # Tags that specify the category of the task. This property contains both the
+  # tags specified by the user and the tags for every TaskSlice.
   tags = ndb.StringProperty(repeated=True, validator=_validate_tags)
+  # Tags that are provided by the user. This is used to regenerate the list of
+  # tags for TaskResultSummary based on the actual TaskSlice used.
+  manual_tags = ndb.StringProperty(
+      repeated=True, validator=_validate_tags, indexed=False)
 
   # Set when a task (the parent) reentrantly create swarming tasks. Must be set
   # to a valid task_id pointing to a TaskRunResult or be None.
@@ -852,9 +857,30 @@ class TaskRequest(ndb.Model):
       indexed=False, validator=_get_validate_length(1024))
 
   @property
+  def num_task_slices(self):
+    """Returns the number of TaskSlice, supports old entities."""
+    if self.properties:
+      return 1
+    raise datastore_errors.BadValueError('Missing properties')
+
+  def task_slice(self, index):
+    """Returns the TaskSlice at this index, supports old entities."""
+    if self.properties:
+      assert index == 0, index
+      t = TaskSlice(
+          properties=self.properties, expiration_secs=self.expiration_secs)
+    else:
+      raise datastore_errors.BadValueError('Missing properties')
+    t._request = self
+    return t
+
+  @property
   def secret_bytes_key(self):
-    if self.properties.has_secret_bytes:
-      return task_pack.request_key_to_secret_bytes_key(self.key)
+    if self.properties:
+      if self.properties.has_secret_bytes:
+        return task_pack.request_key_to_secret_bytes_key(self.key)
+    else:
+      raise datastore_errors.BadValueError('Missing properties')
 
   @property
   def task_id(self):
@@ -867,46 +893,54 @@ class TaskRequest(ndb.Model):
     """Reconstructs this value from expiration_ts and created_ts. Integer."""
     return int((self.expiration_ts - self.created_ts).total_seconds())
 
-  def properties_hash(self):
-    """Calculates the properties_hash for this request, if applicable.
-
-    Note: if the property has secret bytes, this function call causes a DB GET.
+  @property
+  def max_lifetime_secs(self):
+    """Calculates the maximum latency at which the task may still be running
+    user code.
     """
-    if not self.properties.idempotent:
-      return None
-    props = self.properties.to_dict()
-    k = self.secret_bytes_key
-    if k:
-      # When called from task_scheduler.schedule_task(), this function is called
-      # in the same context that stored the SecretBytes entity, so the entity is
-      # still in the in process cache.
-      #
-      # When called in the context of an idempotent TaskRunResult that is
-      # COMPLETED with success, this is much more costly since this happens
-      # inside a transaction.
-      props['secret_bytes'] = k.get().secret_bytes.encode('hex')
-    return self.HASHING_ALGO(utils.encode_to_json(props)).digest()
+    max_lifetime_secs = 0
+    offset = 0
+    for i in xrange(self.num_task_slices):
+      t = self.task_slice(i)
+      offset += t.expiration_secs
+      props = t.properties
+      mls = offset + props.execution_timeout_secs + props.grace_period_secs
+      if mls > max_lifetime_secs:
+        max_lifetime_secs = mls
+    return max_lifetime_secs
 
   def to_dict(self):
-    # to_dict() doesn't recurse correctly into ndb.LocalStructuredProperty!
+    """Supports both old and new format."""
+    # to_dict() doesn't recurse correctly into ndb.LocalStructuredProperty! It
+    # will call the default method and not the overiden one. :(
     out = super(TaskRequest, self).to_dict(
-        exclude=['pubsub_auth_token', 'properties', 'service_account_token'])
-    out['properties'] = self.properties.to_dict()
+        exclude=['manual_tags', 'properties', 'pubsub_auth_token',
+                 'service_account_token', 'task_slice'])
+    if self.properties:
+      out['properties'] = self.properties.to_dict()
     return out
 
   def _pre_put_hook(self):
-    """Adds automatic tags."""
     super(TaskRequest, self)._pre_put_hook()
-    self.properties._pre_put_hook()
-    if self.properties.is_terminate:
-      if not self.priority == 0:
-        raise datastore_errors.BadValueError(
-            'terminate request must be priority 0')
-    elif self.priority == 0:
-      raise datastore_errors.BadValueError(
-          'priority 0 can only be used for terminate request')
 
-    if len(self.tags) > 256:
+    if self.properties:
+      # Old style TaskProperties.
+      self.properties._pre_put_hook()
+      if self.properties.is_terminate:
+        if not self.priority == 0:
+          raise datastore_errors.BadValueError(
+              'terminate request must be priority 0')
+      elif self.priority == 0:
+        raise datastore_errors.BadValueError(
+            'priority 0 can only be used for terminate request')
+      _check_expiration_secs(
+          'expiration_ts',
+          int(round((self.expiration_ts - self.created_ts).total_seconds())))
+    else:
+      # TODO(maruel): crbug.com/781021
+      raise datastore_errors.BadValueError('Missing properties')
+
+    if len(self.manual_tags) > 256:
       raise datastore_errors.BadValueError(
           'up to 256 tags can be specified for a task request')
 
@@ -926,19 +960,39 @@ class TaskRequest(ndb.Model):
 
 
 def _get_automatic_tags(request):
-  """Returns tags that should automatically be added to the TaskRequest."""
-  tags = [
+  """Returns tags that should automatically be added to the TaskRequest.
+
+  This includes geneated tags from all TaskSlice.
+  """
+  tags = set((
     u'priority:%s' % request.priority,
     u'service_account:%s' % (request.service_account or u'None'),
     u'user:%s' % (request.user or u'None'),
-  ]
-  for key, values in request.properties.dimensions.iteritems():
-    for value in values:
-      tags.append(u'%s:%s' % (key, value))
+  ))
+  for i in xrange(request.num_task_slices):
+    for key, values in request.task_slice(i).properties.dimensions.iteritems():
+      for value in values:
+        tags.add(u'%s:%s' % (key, value))
   return tags
 
 
 ### Public API.
+
+
+def get_automatic_tags(request, index):
+  """Returns tags that should automatically be added to the TaskRequest for one
+  specific TaskSlice.
+  """
+  tags = set((
+    u'priority:%s' % request.priority,
+    u'service_account:%s' % (request.service_account or u'None'),
+    u'user:%s' % (request.user or u'None'),
+  ))
+  for key, values in request.task_slice(
+      index).properties.dimensions.iteritems():
+    for value in values:
+      tags.add(u'%s:%s' % (key, value))
+  return tags
 
 
 def create_termination_task(bot_id):
@@ -960,8 +1014,9 @@ def create_termination_task(bot_id):
       expiration_ts=now + datetime.timedelta(days=1),
       name=u'Terminate %s' % bot_id,
       priority=0,
+      # TODO(maruel): Use task_slice. crbug.com/781021
       properties=properties,
-      tags=[u'terminate:1'])
+      manual_tags=[u'terminate:1'])
   assert request.properties.is_terminate
   init_new_request(request, True)
   return request
@@ -1079,6 +1134,9 @@ def init_new_request(request, allow_high_priority):
 
   """
   assert request.__class__ is TaskRequest, request
+  if not request.num_task_slices:
+    raise ValueError('Either properties or task_slices must be provided')
+
   if request.parent_task_id:
     run_result_key = task_pack.unpack_run_result_key(request.parent_task_id)
     result_summary_key = task_pack.run_result_key_to_result_summary_key(
@@ -1086,7 +1144,8 @@ def init_new_request(request, allow_high_priority):
     request_key = task_pack.result_summary_key_to_request_key(
         result_summary_key)
     parent = request_key.get()
-    if not parent or parent.properties.is_terminate:
+    # Terminate request can only be requested as a single TaskProperties.
+    if not parent or parent.task_slice(0).properties.is_terminate:
       raise ValueError('parent_task_id is not a valid task')
     request.priority = min(request.priority, max(parent.priority - 1, 1))
     # Drop the previous user.
@@ -1095,28 +1154,25 @@ def init_new_request(request, allow_high_priority):
   # If the priority is below 20, make sure the user has right to do so.
   if request.priority < 20 and not allow_high_priority:
     # Special case for terminate request.
-    if not request.properties.is_terminate:
+    # Terminate request can only be requested as a single TaskProperties.
+    if not request.task_slice(0).properties.is_terminate:
       # Silently drop the priority of normal users.
       request.priority = 20
 
   request.authenticated = auth.get_current_identity()
-  if (not request.properties.is_terminate and
-      request.properties.grace_period_secs is None):
-    request.properties.grace_period_secs = 30
-  if request.properties.idempotent is None:
-    request.properties.idempotent = False
 
   # Convert None to 'none', to make it indexable. Here request.service_account
   # can be 'none', 'bot' or an <email>. When using <email>, callers of
   # 'init_new_request' are expected to generate new service account token
   # (by making an RPC to the token server) and put it into service_account_token
   # before storing it.
-  request.service_account = request.service_account or 'none'
+  request.service_account = request.service_account or u'none'
   request.service_account_token = None
 
   # This is useful to categorize the task.
-  tags = set(request.tags).union(_get_automatic_tags(request))
-  request.tags = sorted(tags)
+  assert not request.tags, 'Fix call site'
+  all_tags = set(request.manual_tags).union(_get_automatic_tags(request))
+  request.tags = sorted(all_tags)
 
 
 def validate_priority(priority):

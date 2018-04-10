@@ -281,7 +281,10 @@ class AppTestBase(test_case.TestCase):
     return out
 
   def create_new_request(self, **kwargs):
-    """Returns an initialized swarming_rpcs.TaskNewRequest."""
+    """Returns an initialized swarming_rpcs.TaskNewRequest.
+
+    Useful to use a swarming_rpcs.TaskSlice.
+    """
     out = {
       'expiration_secs': 24*60*60,
       'name': 'job1',

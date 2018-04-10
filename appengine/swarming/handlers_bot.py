@@ -665,7 +665,8 @@ class BotPollHandler(_BotBaseHandler):
       try:
         # This part is tricky since it intentionally runs a transaction after
         # another one.
-        if request.properties.is_terminate:
+        if request.task_slice(
+            run_result.current_task_slice).properties.is_terminate:
           bot_event('bot_terminate', task_id=run_result.task_id)
           self._cmd_terminate(run_result.task_id)
         else:
@@ -673,8 +674,7 @@ class BotPollHandler(_BotBaseHandler):
               'request_task', task_id=run_result.task_id,
               task_name=request.name)
           self._cmd_run(
-              request, secret_bytes, run_result.key,
-              res.bot_id, res.bot_group_cfg)
+              request, secret_bytes, run_result, res.bot_id, res.bot_group_cfg)
       except:
         logging.exception('Dang, exception after reaping')
         raise
@@ -688,10 +688,9 @@ class BotPollHandler(_BotBaseHandler):
       # https://code.google.com/p/swarming/issues/detail?id=130
       self.abort(500, 'Deadline')
 
-  def _cmd_run(
-      self, request, secret_bytes, run_result_key, bot_id, bot_group_cfg):
+  def _cmd_run(self, request, secret_bytes, run_result, bot_id, bot_group_cfg):
     logging.info('Run: %s', request.task_id)
-    props = request.properties
+    props = request.task_slice(run_result.current_task_slice).properties
     out = {
       'cmd': 'run',
       'manifest': {
@@ -733,7 +732,7 @@ class BotPollHandler(_BotBaseHandler):
             'service_account': request.service_account,
           },
         },
-        'task_id': task_pack.pack_run_result_key(run_result_key),
+        'task_id': task_pack.pack_run_result_key(run_result.key),
       },
     }
     self.send_response(utils.to_json_encodable(out))

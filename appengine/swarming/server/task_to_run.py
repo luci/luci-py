@@ -76,8 +76,9 @@ class TaskToRun(ndb.Model):
   # task is reenqueued.
   created_ts = ndb.DateTimeProperty(indexed=False)
 
-  # Moment by which the task has to be requested by a bot. Copy of TaskRequest's
-  # TaskRequest.expiration_ts to enable queries when cleaning up stale jobs.
+  # Moment by which this TaskSlice has to be requested by a bot.
+  # expiration_ts is based on TaskSlice.expiration_ts. This is used to figure
+  # out TaskSlice fallback and enable a cron job query to clean up stale tasks.
   expiration_ts = ndb.DateTimeProperty(required=True)
 
   # Everything above is immutable, everything below is mutable.
@@ -254,7 +255,7 @@ def _validate_task_async(bot_dimensions, deadline, stats, now, to_run):
 
   # Ok, it's now worth taking a real look at the entity.
   request = yield task_to_run_key_to_request_key(to_run.key).get_async()
-  props = request.properties
+  props = request.task_slice(to_run.task_slice_index).properties
 
   # The hash may have conflicts. Ensure the dimensions actually match by
   # verifying the TaskRequest.
@@ -457,11 +458,9 @@ def gen_queue_number(request, task_slice_index):
 
   It is exported so a task can be retried by task_scheduler.
   """
-  # pylint: disable=unused-argument
+  h = request.task_slice(task_slice_index).properties.dimensions
   return _gen_queue_number(
-      task_queues.hash_dimensions(request.properties.dimensions),
-      request.created_ts,
-      request.priority)
+      task_queues.hash_dimensions(h), request.created_ts, request.priority)
 
 
 def new_task_to_run(request, try_number, task_slice_index):
@@ -478,7 +477,12 @@ def new_task_to_run(request, try_number, task_slice_index):
     created = utils.utcnow()
   # TODO(maruel): expiration_ts is based on request.created_ts but it could be
   # enqueued sooner or later. crbug.com/781021
-  exp = request.created_ts + datetime.timedelta(seconds=request.expiration_secs)
+  offset = 0
+  if task_slice_index:
+    for i in xrange(task_slice_index):
+      offset += request.task_slice(i).expiration_secs
+  exp = request.created_ts + datetime.timedelta(
+      seconds=request.task_slice(task_slice_index).expiration_secs+offset)
   return TaskToRun(
       key=request_to_task_to_run_key(request, try_number, task_slice_index),
       created_ts=created,
@@ -517,7 +521,6 @@ def set_lookup_cache(task_key, is_available_to_schedule):
   # server with unneeded keys.
   cache_lifetime = 15
 
-  assert not ndb.in_transaction()
   key = _memcache_to_run_key(task_key)
   if is_available_to_schedule:
     # The item is now available, so remove it from memcache.

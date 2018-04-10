@@ -64,7 +64,7 @@ def _gen_request(properties=None):
     'priority': 50,
     'properties': task_request.TaskProperties(**props),
     'expiration_ts': now + datetime.timedelta(seconds=60),
-    'tags': [u'tag:1'],
+    'manual_tags': [u'tag:1'],
     'user': 'Jesus',
   }
   return task_request.TaskRequest(**args)

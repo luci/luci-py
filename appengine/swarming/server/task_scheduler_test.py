@@ -71,7 +71,7 @@ def gen_request(**kwargs):
     u'name': u'yay',
     u'priority': 50,
     u'expiration_ts': now + datetime.timedelta(seconds=60),
-    u'tags': [u'tag:1'],
+    u'manual_tags': [u'tag:1'],
     u'user': u'Jesus',
   }
   args.update(kwargs)
@@ -960,13 +960,13 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     result_summary = result_summary.key.get()
     self.assertEqual(State.CANCELED, result_summary.state)
-    # Make sure they are added to the negative cache.
-    request = result_summary.request_key.get()
-    for i in (1, 2):
-      to_run_key = task_to_run.request_to_task_to_run_key(request, i, 0)
-      actual = task_to_run._lookup_cache_is_taken_async(to_run_key).get_result()
-      self.assertEqual(True, actual)
     self.assertEqual(1, len(pub_sub_calls)) # No other message.
+
+    # Make sure the TaskToRun is added to the negative cache.
+    request = result_summary.request_key.get()
+    to_run_key = task_to_run.request_to_task_to_run_key(request, 1, 0)
+    actual = task_to_run._lookup_cache_is_taken_async(to_run_key).get_result()
+    self.assertEqual(True, actual)
 
   def test_cancel_task_running(self):
     # Cancel a running task.

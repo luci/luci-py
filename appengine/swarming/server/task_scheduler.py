@@ -47,8 +47,14 @@ def _secs_to_ms(value):
 def _expire_task(to_run_key, request):
   """Expires a TaskResultSummary and unschedules the TaskToRun.
 
+  This function is only meant to process PENDING tasks.
+
+  If a follow up TaskSlice is available, reenqueue a new TaskToRun instead of
+  expiring the TaskResultSummary.
+
   Returns:
-    TaskResultSummary on success.
+    TaskResultSummary on success, bool if reenqueued (due to following
+    TaskSlice).
   """
   # Look if the TaskToRun is reapable once before doing the check inside the
   # transaction. This reduces the likelihood of failing this check inside the
@@ -66,11 +72,21 @@ def _expire_task(to_run_key, request):
     result_summary_future = result_summary_key.get_async()
     to_run = to_run_future.get_result()
     if not to_run or not to_run.is_reapable:
-      result_summary_future.wait()
-      return None
+      result_summary_future.get_result()
+      return None, None
 
+    # In any case, dequeue the TaskToRun.
     to_run.queue_number = None
     result_summary = result_summary_future.get_result()
+    to_put = [to_run, result_summary]
+    new_to_run = None
+    if result_summary.current_task_slice < request.num_task_slices-1:
+      # Enqueue a new TasktoRun for the next TaskSlice.
+      new_to_run = task_to_run.new_task_to_run(
+          request, 1, result_summary.current_task_slice+1)
+      result_summary.current_task_slice += 1
+      to_put.append(new_to_run)
+
     if result_summary.try_number:
       # It's a retry that is being expired. Keep the old state. That requires an
       # additional pipelined GET but that shouldn't be the common case.
@@ -81,12 +97,12 @@ def _expire_task(to_run_key, request):
     result_summary.abandoned_ts = now
     result_summary.modified_ts = now
 
-    futures = ndb.put_multi_async((to_run, result_summary))
+    futures = ndb.put_multi_async(to_put)
     _maybe_pubsub_notify_via_tq(result_summary, request)
     for f in futures:
       f.check_success()
 
-    return result_summary
+    return result_summary, new_to_run
 
   # Add it to the negative cache *before* running the transaction. Either way
   # the task was already reaped or the task is correctly expired and not
@@ -95,14 +111,15 @@ def _expire_task(to_run_key, request):
 
   # It'll be caught by next cron job execution in case of failure.
   try:
-    res = datastore_utils.transaction(run)
+    res, r = datastore_utils.transaction(run)
   except datastore_utils.CommitError:
     res = None
+    r = None
   if res:
     logging.info(
         'Expired %s', task_pack.pack_result_summary_key(result_summary_key))
     ts_mon_metrics.on_task_completed(res)
-  return res
+  return res, r
 
 
 def _reap_task(bot_dimensions, bot_version, to_run_key, request):
@@ -127,13 +144,14 @@ def _reap_task(bot_dimensions, bot_version, to_run_key, request):
     # 3 GET, 1 PUT at the end.
     to_run_future = to_run_key.get_async()
     result_summary_future = result_summary_key.get_async()
-    if request.properties.has_secret_bytes:
-      secret_bytes_future = request.secret_bytes_key.get_async()
     to_run = to_run_future.get_result()
+    t = request.task_slice(to_run.task_slice_index)
+    if t.properties.has_secret_bytes:
+      secret_bytes_future = request.secret_bytes_key.get_async()
     result_summary = result_summary_future.get_result()
     orig_summary_state = result_summary.state
     secret_bytes = None
-    if request.properties.has_secret_bytes:
+    if t.properties.has_secret_bytes:
       secret_bytes = secret_bytes_future.get_result()
     if not to_run:
       logging.error('Missing TaskToRun?\n%s', result_summary.task_id)
@@ -217,15 +235,13 @@ def _handle_dead_bot(run_result_key):
   server_version = utils.get_app_version()
   packed = task_pack.pack_run_result_key(run_result_key)
   request = request_future.get_result()
-  # The TaskRunResult key id is the try number.
-  try_number = run_result_key.integer_id()
-  to_run_key = task_to_run.request_to_task_to_run_key(request, try_number, 0)
 
   def run():
-    """Returns tuple(task_is_retried or None, bot_id)."""
-    # Do one GET, one PUT at the end.
-    run_result, result_summary, to_run = ndb.get_multi(
-        (run_result_key, result_summary_key, to_run_key))
+    """Returns tuple(task_is_retried or None, bot_id).
+
+    1x GET, 1x GETs 2~3x PUT.
+    """
+    run_result = run_result_key.get()
     if run_result.state != task_result.State.RUNNING:
       # It was updated already or not updating last. Likely DB index was stale.
       return None, run_result.bot_id
@@ -233,10 +249,12 @@ def _handle_dead_bot(run_result_key):
       # The query index IS stale.
       return None, run_result.bot_id
 
+    current_task_slice = run_result.current_task_slice
     run_result.signal_server_version(server_version)
     old_modified = run_result.modified_ts
     run_result.modified_ts = now
 
+    result_summary = result_summary_key.get()
     orig_summary_state = result_summary.state
     if result_summary.try_number != run_result.try_number:
       # Not updating correct run_result, cancel it without touching
@@ -247,7 +265,7 @@ def _handle_dead_bot(run_result_key):
       run_result.abandoned_ts = now
       task_is_retried = None
     elif (result_summary.try_number == 1 and now < request.expiration_ts and
-          (request.properties.idempotent or
+          (request.task_slice(current_task_slice).properties.idempotent or
             run_result.started_ts == old_modified)):
       # Retry it. It fits:
       # - first try
@@ -256,8 +274,13 @@ def _handle_dead_bot(run_result_key):
       #   - idempotent
       #   - task hadn't got any ping at all from task_runner.run_command()
       # TODO(maruel): Allow retry for bot locked task using 'id' dimension.
+      # TODO(maruel): Allow increasing the current_task_slice value.
       # Create a second TaskToRun.
-      to_run = task_to_run.new_task_to_run(request, 2, 0)
+      to_run = task_to_run.new_task_to_run(request, 2, current_task_slice)
+
+      # Remove it from the negative cache.
+      task_to_run.set_lookup_cache(to_run.key, True)
+
       to_put = (run_result, result_summary, to_run)
       run_result.state = task_result.State.BOT_DIED
       run_result.internal_failure = True
@@ -285,11 +308,6 @@ def _handle_dead_bot(run_result_key):
       f.check_success()
 
     return task_is_retried
-
-  # Remove it from the negative cache *before* running the transaction. Either
-  # way the TaskToRun.queue_number was not set so there was no contention on
-  # this entity. At best the task is reenqueued for a retry.
-  task_to_run.set_lookup_cache(to_run_key, True)
 
   try:
     task_is_retried = datastore_utils.transaction(run)
@@ -640,8 +658,9 @@ def check_schedule_request_acl(request):
   # hitting this function, and so we can assume there's a pool set (this is
   # checked in TaskProperties's pre put hook).
   #
-  # It is guaranteed that at most one item can be specified in 'pool'.
-  pool = request.properties.dimensions[u'pool'][0]
+  # It is guaranteed that at most one item can be specified in 'pool' and that
+  # every TaskSlice property dimensions use the same pool and id dimensions.
+  pool = request.task_slice(0).properties.dimensions[u'pool'][0]
   pool_cfg = pools_config.get_pool_config(pool)
 
   # request.service_account can be 'bot' or 'none'. We don't care about these,
@@ -713,7 +732,7 @@ def schedule_request(request, secret_bytes):
 
   now = utils.utcnow()
   request.key = task_request.new_request_key()
-  # This is the first try.
+  # First try, first task slice.
   to_run = task_to_run.new_task_to_run(request, 1, 0)
   result_summary = task_result.new_result_summary(request)
   result_summary.modified_ts = now
@@ -734,8 +753,9 @@ def schedule_request(request, secret_bytes):
     return key
 
   deduped = False
-  if request.properties.idempotent:
-    dupe_summary = _find_dupe_task(now, request.properties_hash())
+  t = request.task_slice(0)
+  if t.properties.idempotent:
+    dupe_summary = _find_dupe_task(now, t.properties_hash())
     if dupe_summary:
       _copy_summary(
           dupe_summary, result_summary,
@@ -817,6 +837,7 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
   start = time.time()
   bot_id = bot_dimensions[u'id'][0]
   iterated = 0
+  reenqueueds = 0
   expired = 0
   failures = 0
   stale_index = 0
@@ -826,7 +847,12 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
     for request, to_run in q:
       iterated += 1
       if request.expiration_ts < utils.utcnow():
-        if _expire_task(to_run.key, request):
+        s, r = _expire_task(to_run.key, request)
+        if r:
+          # Expiring a TaskToRun for TaskSlice may reenqueue a new TaskToRun.
+          # It'll be processed accordingly but not handled here.
+          reenqueueds += 1
+        elif s:
           expired += 1
         else:
           stale_index += 1
@@ -846,9 +872,10 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
     return None, None, None
   finally:
     logging.debug(
-        'bot_reap_task(%s) in %.3fs: %d iterated, %d expired, %d stale_index, '
-        '%d failured',
-        bot_id, time.time()-start, iterated, expired, stale_index, failures)
+        'bot_reap_task(%s) in %.3fs: %d iterated, %d reenqueued, %d expired, '
+        '%d stale_index, %d failured',
+        bot_id, time.time()-start, iterated, reenqueueds, expired, stale_index,
+        failures)
 
 
 def bot_update_task(
@@ -1015,7 +1042,8 @@ def cancel_task(request, result_key, kill_running):
   now = utils.utcnow()
 
   def run():
-    """1x DB GET, 1x DB GET, 2x DB PUTs, 1x task queue."""
+    """1 DB GET, 1 memcache write, 2x DB PUTs, 1x task queue."""
+    # Need to get the current try number to know which TaskToRun to fetch.
     result_summary = result_key.get()
     was_running = result_summary.state == task_result.State.RUNNING
     if not result_summary.can_be_canceled:
@@ -1025,7 +1053,16 @@ def cancel_task(request, result_key, kill_running):
     if not was_running:
       # PENDING.
       result_summary.state = task_result.State.CANCELED
-      to_run = task_to_run.request_to_task_to_run_key(request, 1, 0).get()
+      to_run_key = task_to_run.request_to_task_to_run_key(
+          request,
+          result_summary.try_number or 1,
+          result_summary.current_task_slice or 0)
+      to_run_future = to_run_key.get_async()
+
+      # Add it to the negative cache.
+      task_to_run.set_lookup_cache(to_run_key, False)
+
+      to_run = to_run_future.get_result()
       entities.append(to_run)
       to_run.queue_number = None
     else:
@@ -1052,23 +1089,12 @@ def cancel_task(request, result_key, kill_running):
       f.check_success()
     return True, was_running
 
-  # Add it to the negative cache *before* running the transaction. Either way
-  # the task was already reaped or the task is correctly canceled thus not
-  # reapable.
-  for i in (1, 2):
-    # We don't know in advance if it's try number 1 or 2, so do both. Since it's
-    # an memcache RPC, it's not too costly.
-    # TODO(maruel): Refactor to do both simultaneously to save 2ms.
-    to_run_key = task_to_run.request_to_task_to_run_key(request, i, 0)
-    task_to_run.set_lookup_cache(to_run_key, False)
-
   try:
     ok, was_running = datastore_utils.transaction(run)
   except datastore_utils.CommitError as e:
     packed = task_pack.pack_result_summary_key(result_key)
     return 'Failed killing task %s: %s' % (packed, e)
 
-  # TODO(maruel): Add paper trail.
   return ok, was_running
 
 
@@ -1094,12 +1120,16 @@ def cron_abort_expired_task_to_run(host):
     Packed tasks ids of aborted tasks.
   """
   killed = []
+  reenqueueds = 0
   skipped = 0
   try:
     for to_run in task_to_run.yield_expired_task_to_run():
       request = to_run.request_key.get()
-      summary = _expire_task(to_run.key, request)
-      if summary:
+      summary, reenqueued = _expire_task(to_run.key, request)
+      if reenqueued:
+        # Expiring a TaskToRun for TaskSlice may reenqueue a new TaskToRun.
+        reenqueueds += 1
+      elif summary:
         # TODO(maruel): Know which try it is.
         killed.append(request)
       else:
@@ -1111,9 +1141,12 @@ def cron_abort_expired_task_to_run(host):
           'EXPIRED!\n%d tasks:\n%s',
           len(killed),
           '\n'.join(
-            '  %s/user/task/%s  %s' % (host, i.task_id, i.properties.dimensions)
+            '  %s/user/task/%s  %s' % (
+              host, i.task_id, i.task_slice(0).properties.dimensions)
             for i in killed))
-    logging.info('Killed %d task, skipped %d', len(killed), skipped)
+    logging.info(
+        'Reenqueued %d tasks, killed %d, skipped %d',
+        reenqueueds, len(killed), skipped)
   return [i.task_id for i in killed]
 
 
