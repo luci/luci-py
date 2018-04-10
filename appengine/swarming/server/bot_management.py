@@ -511,17 +511,21 @@ def cron_update_bot_info():
 
   # The assumption here is that a cron job can churn through all the entities
   # fast enough. The number of dead bot is expected to be <10k.
-  nb = 0
-  futures = []
-  for b in BotInfo.query(BotInfo.last_seen_ts <= cutoff):
-    if BotInfo.ALIVE in b.composite or BotInfo.DEAD not in b.composite:
-      futures.append(datastore_utils.transaction_async(lambda: run(b.key)))
-      if len(futures) >= 25:
-        ndb.Future.wait_any(futures)
-        for i in xrange(len(futures) - 1, -1, -1):
-          if futures[i].done():
-            nb += futures.pop(i).get_result()
-  for f in futures:
-    nb += f.get_result()
-  logging.info('Updated %d bots', nb)
-  return nb
+  dead = 0
+  seen = 0
+  try:
+    futures = []
+    for b in BotInfo.query(BotInfo.last_seen_ts <= cutoff):
+      seen += 1
+      if BotInfo.ALIVE in b.composite or BotInfo.DEAD not in b.composite:
+        futures.append(datastore_utils.transaction_async(lambda: run(b.key)))
+        if len(futures) >= 5:
+          ndb.Future.wait_any(futures)
+          for i in xrange(len(futures) - 1, -1, -1):
+            if futures[i].done():
+              dead += futures.pop(i).get_result()
+    for f in futures:
+      dead += f.get_result()
+  finally:
+    logging.info('Seen %d bots, updated %d bots', seen, dead)
+  return dead
