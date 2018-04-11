@@ -864,7 +864,7 @@ class SwarmingBotsService(remote.Service):
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
-      swarming_rpcs.BotsRequest, swarming_rpcs.BotsCount,
+      swarming_rpcs.BotsCountRequest, swarming_rpcs.BotsCount,
       http_method='GET')
   @auth.require(acl.can_view_bot)
   def count(self, request):
