@@ -510,7 +510,8 @@ def cron_update_bot_info():
     raise ndb.Return(0)
 
   # The assumption here is that a cron job can churn through all the entities
-  # fast enough. The number of dead bot is expected to be <10k.
+  # fast enough. The number of dead bot is expected to be <10k. In practice the
+  # average runtime is around 8 seconds.
   dead = 0
   seen = 0
   try:
@@ -518,7 +519,10 @@ def cron_update_bot_info():
     for b in BotInfo.query(BotInfo.last_seen_ts <= cutoff):
       seen += 1
       if BotInfo.ALIVE in b.composite or BotInfo.DEAD not in b.composite:
-        futures.append(datastore_utils.transaction_async(lambda: run(b.key)))
+        # Retry more often than the default 1. We do not want to throw too much
+        # in the logs and there should be plenty of time to do the retries.
+        f = datastore_utils.transaction_async(lambda: run(b.key), retries=3)
+        futures.append(f)
         if len(futures) >= 5:
           ndb.Future.wait_any(futures)
           for i in xrange(len(futures) - 1, -1, -1):
