@@ -61,7 +61,7 @@ def _expire_task(to_run_key, request):
   # transaction, which is an order of magnitude more costly.
   if not to_run_key.get().is_reapable:
     logging.info('Not reapable anymore')
-    return None
+    return None, None
 
   result_summary_key = task_pack.request_key_to_result_summary_key(request.key)
   now = utils.utcnow()
