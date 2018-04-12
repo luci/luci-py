@@ -682,7 +682,8 @@ def get_recursive_size(path):
 def get_python_packages():
   """Returns the list of third party python packages."""
   try:
-    return unicode(subprocess.check_output(['pip', 'freeze'])).splitlines()
+    return unicode(subprocess.check_output([
+        'pip', '--disable-pip-version-check', 'freeze'])).splitlines()
   except (subprocess.CalledProcessError, OSError):
     return None
 

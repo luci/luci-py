@@ -3,16 +3,12 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
-"""Generates the swarming_bot.zip archive for local testing.
-"""
+"""Generates the swarming_bot.zip archive for local testing."""
 
-import hashlib
+import argparse
 import json
-import logging
 import os
-import StringIO
 import sys
-import zipfile
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -36,15 +32,16 @@ def get_swarming_bot_zip():
 
 
 def main():
-  if len(sys.argv) > 1:
-    print >> sys.stderr, (
-        'This script creates a swarming_bot.zip file locally in the server '
-        'directory. This script doesn\'t accept any argument.')
-    return 1
+  parser = argparse.ArgumentParser(description=__doc__)
+  parser.add_argument(
+      '--output',
+      help='Where to drop the bot archive (default: ./swarming_bot.zip).',
+      default='swarming_bot.zip')
+  args = parser.parse_args()
 
   sys.path.insert(0, ROOT_DIR)
   content, _ = get_swarming_bot_zip()
-  with open(os.path.join(ROOT_DIR, 'swarming_bot.zip'), 'wb') as f:
+  with open(args.output, 'wb') as f:
     f.write(content)
   return 0
 
