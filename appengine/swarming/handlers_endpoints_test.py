@@ -679,8 +679,7 @@ class TasksApiTest(BaseTest):
     resp = self.call_api('new', body=message_to_dict(request), status=400)
     expected = {
       u'state': u'APPLICATION_ERROR',
-      # This will change for an error message about expiration_secs.
-      u'error_message': u'Only one task_slices entry is supported for now',
+      u'error_message': u'expiration_secs (0) must be between 1s and 7 days',
     }
     self.assertEqual(expected, resp.json)
 

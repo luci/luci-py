@@ -151,6 +151,13 @@ def _taskproperties_to_rpc(props):
       inputs_ref=inputs_ref)
 
 
+def _taskslice_from_rpc(msg):
+  """Converts a swarming_rpcs.TaskSlice to a task_request.TaskSlice."""
+  props, secret_bytes = _taskproperties_from_rpc(msg.properties)
+  out = _rpc_to_ndb(task_request.TaskSlice, msg, properties=props)
+  return out, secret_bytes
+
+
 ### Public API.
 
 
@@ -194,12 +201,14 @@ def bot_event_to_rpc(entity):
 def task_request_to_rpc(entity):
   """"Returns a swarming_rpcs.TaskRequest from a task_request.TaskRequest."""
   assert entity.__class__ is task_request.TaskRequest
-  # Temporary. https://crbug.com/781021
-  slices = [
-      swarming_rpcs.TaskSlice(
-        properties=_taskproperties_to_rpc(entity.properties),
-        expiration_secs=entity.expiration_secs)
-  ]
+  slices = []
+  for i in xrange(entity.num_task_slices):
+    t = entity.task_slice(i)
+    slices.append(
+        _ndb_to_rpc(
+            swarming_rpcs.TaskSlice,
+            t,
+            properties=_taskproperties_to_rpc(t.properties)))
 
   return _ndb_to_rpc(
       swarming_rpcs.TaskRequest,
@@ -219,33 +228,43 @@ def new_task_request_from_rpc(msg, now):
   None.
   """
   assert msg.__class__ is swarming_rpcs.NewTaskRequest
-  if msg.task_slices and msg.expiration_secs:
-    raise ValueError(
-        'When using task_slices, do not specify a global expiration_secs')
   if msg.task_slices and msg.properties:
-    raise ValueError('When using task_slices, do not specify properties')
-  if msg.task_slices and len(msg.task_slices) > 1:
-    # Temporary. https://crbug.com/781021
-    raise ValueError('Only one task_slices entry is supported for now')
+    raise ValueError('Specify one of properties or task_slices, not both')
 
-  if not msg.task_slices:
+  if msg.properties:
+    if not msg.expiration_secs:
+      raise ValueError('missing expiration_secs')
     props, secret_bytes = _taskproperties_from_rpc(msg.properties)
-    expiration_ts = now+datetime.timedelta(seconds=msg.expiration_secs)
+    slices = [
+      task_request.TaskSlice(
+          properties=props, expiration_secs=msg.expiration_secs),
+    ]
+  elif msg.task_slices:
+    if msg.expiration_secs:
+      raise ValueError(
+          'When using task_slices, do not specify a global expiration_secs')
+    secret_bytes = None
+    slices = []
+    for t in (msg.task_slices or []):
+      sl, se = _taskslice_from_rpc(t)
+      slices.append(sl)
+      if se:
+        if secret_bytes and se != secret_bytes:
+          raise ValueError(
+              'When using secret_bytes multiple times, all values must match')
+        secret_bytes = se
   else:
-    # Temporary, will be converted into a loop. https://crbug.com/781021
-    props, secret_bytes = _taskproperties_from_rpc(
-        msg.task_slices[0].properties)
-    expiration_ts = now+datetime.timedelta(
-        seconds=msg.task_slices[0].expiration_secs)
+    raise ValueError('Specify one of properties or task_slices')
+
   req = _rpc_to_ndb(
       task_request.TaskRequest,
       msg,
       created_ts=now,
-      expiration_ts=expiration_ts,
+      expiration_ts=None,
       # It is set in task_request.init_new_request().
       authenticated=None,
-      properties=props,
-      task_slices=None,
+      properties=None,
+      task_slices=slices,
       # 'tags' is now generated from manual_tags plus automatic tags.
       tags=None,
       manual_tags=msg.tags,
