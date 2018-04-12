@@ -431,6 +431,7 @@ class SwarmingTasksService(remote.Service):
     # If the user only wanted to evaluate scheduling the task, but not actually
     # schedule it, return early without a task_id.
     if request.evaluate_only:
+      request_obj._pre_put_hook()
       return swarming_rpcs.TaskRequestMetadata(
           request=message_conversion.task_request_to_rpc(request_obj))
 
