@@ -211,6 +211,8 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     expected['try_number'] = 2
     actual = task_to_run.new_task_to_run(request, 2, 0).to_dict()
     self.assertEqual(expected, actual)
+    with self.assertRaises(AssertionError):
+      task_to_run.new_task_to_run(request, 1, 1)
 
   def test_new_task_to_run_limits(self):
     request = self.mkreq(_gen_request(), 1)

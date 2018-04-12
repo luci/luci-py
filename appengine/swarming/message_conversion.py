@@ -245,6 +245,7 @@ def new_task_request_from_rpc(msg, now):
       # It is set in task_request.init_new_request().
       authenticated=None,
       properties=props,
+      task_slices=None,
       # 'tags' is now generated from manual_tags plus automatic tags.
       tags=None,
       manual_tags=msg.tags,

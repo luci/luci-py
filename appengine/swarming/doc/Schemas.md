@@ -49,16 +49,17 @@ This schema is an example of a task with two tries. This happens when the first
 try resulted in `TaskRunResult.state == BOT_DIED`. This is a relatively rare
 case.
 
-    +--------Root-------+
-    |TaskRequest        |                                        task_request.py
-    |  +--------------+ |
-    |  |TaskProperties| |
-    |  |  +--------+  | |
-    |  |  |FilesRef|  | |
-    |  |  +--------+  | |
-    |  +--------------+ |
-    |id=<based on epoch>|
-    +-------------------+
+    +--------Root------------------------------------------------------+
+    |TaskRequest                                                       |
+    |  +--------------+      +----------------+     +----------------+ |
+    |  |TaskProperties|      |TaskSlice       |     |TaskSlice       | |
+    |  |  +--------+  |      |+--------------+| ... |+--------------+| |
+    |  |  |FilesRef|  | *or* ||TaskProperties|| ... ||TaskProperties|| |
+    |  |  +--------+  |      |+--------------+|     |+--------------+| |
+    |  +--------------+      +----------------+     +----------------+ |
+    |id=<based on epoch>                                               |
+    +------------------------------------------------------------------+
+        |                                                        task_request.py
         |
         +------+
         |      |

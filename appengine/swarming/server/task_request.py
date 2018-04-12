@@ -25,16 +25,16 @@ Overview of transactions:
 
 Graph of the schema:
 
-    +--------Root-------+
-    |TaskRequest        |
-    |  +--------------+ |
-    |  |TaskProperties| |
-    |  |  +--------+  | |
-    |  |  |FilesRef|  | |
-    |  |  +--------+  | |
-    |  +--------------+ |
-    |id=<based on epoch>|
-    +-------------------+
+    +--------Root------------------------------------------------------+
+    |TaskRequest                                                       |
+    |  +--------------+      +----------------+     +----------------+ |
+    |  |TaskProperties|      |TaskSlice       |     |TaskSlice       | |
+    |  |  +--------+  |      |+--------------+| ... |+--------------+| |
+    |  |  |FilesRef|  | *or* ||TaskProperties|| ... ||TaskProperties|| |
+    |  |  +--------+  |      |+--------------+|     |+--------------+| |
+    |  +--------------+      +----------------+     +----------------+ |
+    |id=<based on epoch>                                               |
+    +------------------------------------------------------------------+
         |          |
         v          |
     +-----------+  |
@@ -780,13 +780,29 @@ class TaskRequest(ndb.Model):
 
   This model is immutable.
   """
-  # Hashing algorithm used to hash TaskProperties to create its key.
-  HASHING_ALGO = hashlib.sha256
-
   # Time this request was registered. It is set manually instead of using
   # auto_now_add=True so that expiration_ts can be set very precisely relative
   # to this property.
   created_ts = ndb.DateTimeProperty(required=True)
+
+  ## What
+
+  # Old way of specifying task properties. Only one of properties or
+  # task_slices is set.
+  properties = ndb.LocalStructuredProperty(TaskProperties, compressed=True)
+  # New way that permits fallbacks.
+  task_slices = ndb.LocalStructuredProperty(
+      TaskSlice, compressed=True, repeated=True)
+
+  # If the task request is not scheduled by this moment, it will be aborted by a
+  # cron job. It is saved instead of scheduling_expiration_secs so finding
+  # expired jobs is a simple query.
+  #
+  # When task_slices is used, this value is the same as
+  # self.task_slices[-1].expiration_ts.
+  expiration_ts = ndb.DateTimeProperty(indexed=True, required=True)
+
+  ## Why and other contexts
 
   # The name for this task request. It's only for description.
   name = ndb.StringProperty(required=True)
@@ -818,20 +834,10 @@ class TaskRequest(ndb.Model):
   # This property never shows up in UI or API responses.
   service_account_token = ndb.BlobProperty()
 
-  # The actual properties are embedded in this model.
-  properties = ndb.LocalStructuredProperty(
-      TaskProperties, compressed=True, required=True)
-
   # Priority of the task to be run. A lower number is higher priority, thus will
   # preempt requests with lower priority (higher numbers).
   priority = ndb.IntegerProperty(
       indexed=False, validator=_validate_priority, required=True)
-
-  # If the task request is not scheduled by this moment, it will be aborted by a
-  # cron job. It is saved instead of scheduling_expiration_secs so finding
-  # expired jobs is a simple query.
-  expiration_ts = ndb.DateTimeProperty(
-      indexed=True, validator=_validate_expiration_ts, required=True)
 
   # Tags that specify the category of the task. This property contains both the
   # tags specified by the user and the tags for every TaskSlice.
@@ -861,7 +867,7 @@ class TaskRequest(ndb.Model):
     """Returns the number of TaskSlice, supports old entities."""
     if self.properties:
       return 1
-    raise datastore_errors.BadValueError('Missing properties')
+    return len(self.task_slices)
 
   def task_slice(self, index):
     """Returns the TaskSlice at this index, supports old entities."""
@@ -870,7 +876,7 @@ class TaskRequest(ndb.Model):
       t = TaskSlice(
           properties=self.properties, expiration_secs=self.expiration_secs)
     else:
-      raise datastore_errors.BadValueError('Missing properties')
+      t = self.task_slices[index]
     t._request = self
     return t
 
@@ -880,7 +886,9 @@ class TaskRequest(ndb.Model):
       if self.properties.has_secret_bytes:
         return task_pack.request_key_to_secret_bytes_key(self.key)
     else:
-      raise datastore_errors.BadValueError('Missing properties')
+      for t in self.task_slices:
+        if t.properties.has_secret_bytes:
+          return task_pack.request_key_to_secret_bytes_key(self.key)
 
   @property
   def task_id(self):
@@ -918,10 +926,15 @@ class TaskRequest(ndb.Model):
                  'service_account_token', 'task_slice'])
     if self.properties:
       out['properties'] = self.properties.to_dict()
+    if self.task_slices:
+      out['task_slices'] = [t.to_dict() for t in self.task_slices]
     return out
 
   def _pre_put_hook(self):
     super(TaskRequest, self)._pre_put_hook()
+    if bool(self.properties) == bool(self.task_slices):
+      raise datastore_errors.BadValueError(
+          'exactly one of properties or task_slices must be used')
 
     if self.properties:
       # Old style TaskProperties.
@@ -937,8 +950,48 @@ class TaskRequest(ndb.Model):
           'expiration_ts',
           int(round((self.expiration_ts - self.created_ts).total_seconds())))
     else:
-      # TODO(maruel): crbug.com/781021
-      raise datastore_errors.BadValueError('Missing properties')
+      # New style TaskSlice.
+      if len(self.task_slices) > 8:
+        # The objects are large so use a low limit to start, and increase if
+        # there's user request.
+        raise datastore_errors.BadValueError(
+            'A maximum of 8 task_slices is supported')
+
+      for tslice in self.task_slices:
+        tslice._pre_put_hook()
+
+      term = sum(1 for t in self.task_slices if t.properties.is_terminate)
+      if term > 1 or (term and len(self.task_slices) > 1):
+        # Revisit this if this becomes a use case, e.g. "try to run this,
+        # otherwise terminate the bot". In any case, terminate must be last.
+        raise datastore_errors.BadValueError(
+            'terminate request must be used alone')
+
+      if term:
+        if not self.priority == 0:
+          raise datastore_errors.BadValueError(
+              'terminate request must be priority 0')
+      else:
+        if self.priority == 0:
+          raise datastore_errors.BadValueError(
+              'priority 0 can only be used for terminate request')
+
+      if len(self.task_slices) != 1:
+        # https://crbug.com/781021
+        # This will change soon.
+        raise datastore_errors.BadValueError(
+            'multiple task_slices is not yet implemented')
+
+      # They must use the exact same id or pool dimensions.
+      for key in (u'id', u'pool'):
+        v = self.task_slice(0).properties.dimensions.get(key)
+        for i in xrange(1, self.num_task_slices):
+          t = self.task_slice(i)
+          w = t.properties.dimensions.get(key)
+          if v != w:
+            raise datastore_errors.BadValueError(
+                u'each task slice must use the same %s dimensions; %s != %s' %
+                (key, v, w))
 
     if len(self.manual_tags) > 256:
       raise datastore_errors.BadValueError(
@@ -1173,6 +1226,15 @@ def init_new_request(request, allow_high_priority):
   assert not request.tags, 'Fix call site'
   all_tags = set(request.manual_tags).union(_get_automatic_tags(request))
   request.tags = sorted(all_tags)
+
+  if request.task_slices:
+    exp = 0
+    for t in request.task_slices:
+      exp += t.expiration_secs
+    # Always clobber the overall value.
+    # message_conversion.new_task_request_from_rpc() ensures both task_slices
+    # and expiration_secs cannot be used simultaneously.
+    request.expiration_ts = request.created_ts + datetime.timedelta(seconds=exp)
 
 
 def validate_priority(priority):

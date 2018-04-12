@@ -314,6 +314,23 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(None, task_to_run.TaskToRun.query().get().queue_number)
     self.assertEqual(State.EXPIRED, result_summary.key.get().state)
 
+  def test_task_slices_two_fail(self):
+    # Try to trigger two TaskSlice
+    with self.assertRaises(datastore_errors.BadValueError):
+      self._quick_schedule(
+          2,
+          task_slices=[
+            {
+              'expiration_secs': 180,
+              'properties': gen_props(),
+            },
+            {
+              'expiration_secs': 180,
+              'properties': gen_props(),
+            },
+          ])
+    self.assertEqual(2, self.execute_tasks())
+
   def test_exponential_backoff(self):
     self.mock(
         task_scheduler.random, 'random',

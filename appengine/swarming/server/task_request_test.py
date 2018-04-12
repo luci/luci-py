@@ -76,8 +76,25 @@ def _gen_properties(**properties):
   return properties
 
 
+def _gen_request_slices(**kwargs):
+  """Creates a new style TaskRequest."""
+  now = utils.utcnow()
+  args = {
+    u'created_ts': now,
+    u'manual_tags': [u'tag:1'],
+    u'name': u'Request name',
+    u'priority': 50,
+    u'user': u'Jesus',
+  }
+  args.update(kwargs)
+  # Note that ndb model constructor accepts dicts for structured properties.
+  req = task_request.TaskRequest(**args)
+  task_request.init_new_request(req, True)
+  return req
+
+
 def _gen_request(properties=None, **kwargs):
-  """Creates a TaskRequest."""
+  """Creates an old style TaskRequest."""
   now = utils.utcnow()
   properties = properties or {}
   args = {
@@ -168,6 +185,38 @@ class TaskRequestApiTest(TestCase):
     self.assertEqual(expected, task_request.get_automatic_tags(req, 0))
     with self.assertRaises(AssertionError):
       task_request.get_automatic_tags(req, 1)
+
+  def test_get_automatic_tags_slices(self):
+    # Repeated TaskSlice.
+    slices = [
+        {
+          'properties': _gen_properties(
+              dimensions={u'gpu': [u'1234:5678'], u'pool': [u'GPU']}),
+          'expiration_secs': 60,
+        },
+        {
+          'properties': _gen_properties(
+              dimensions={u'gpu': [u'none'], u'pool': [u'GPU']}),
+          'expiration_secs': 60,
+        },
+    ]
+    req = _gen_request_slices(task_slices=slices)
+    expected = set((
+        u'gpu:1234:5678',
+        u'pool:GPU',
+        u'priority:50',
+        u'service_account:none',
+        u'user:Jesus'))
+    self.assertEqual(expected, task_request.get_automatic_tags(req, 0))
+    expected = set((
+        u'gpu:none',
+        u'pool:GPU',
+        u'priority:50',
+        u'service_account:none',
+        u'user:Jesus'))
+    self.assertEqual(expected, task_request.get_automatic_tags(req, 1))
+    with self.assertRaises(IndexError):
+      task_request.get_automatic_tags(req, 2)
 
   def test_create_termination_task(self):
     request = task_request.create_termination_task(u'some-bot')
@@ -314,6 +363,7 @@ class TaskRequestApiTest(TestCase):
         u'tag:1',
         u'user:Jesus',
       ],
+      'task_slices': [],
       'user': u'Jesus',
     }
     actual = req.to_dict()
@@ -407,6 +457,7 @@ class TaskRequestApiTest(TestCase):
         u'tag:1',
         u'user:Jesus',
       ],
+      'task_slices': [],
       'user': u'Jesus',
     }
     actual = req.to_dict()
@@ -706,6 +757,38 @@ class TaskRequestApiTest(TestCase):
     with self.assertRaises(datastore_errors.BadValueError):
       req.put()
     req = _gen_request(manual_tags=['a:b']*256).put()
+
+    # Task slices
+    with self.assertRaises(ValueError):
+      # No TaskSlice
+      _gen_request_slices()
+    slices = [
+        {
+          'properties': _gen_properties(dimensions={u'pool': [u'GPU']}),
+          'expiration_secs': 60,
+        },
+    ]
+    _gen_request_slices(task_slices=slices).put()
+    req = _gen_request_slices(task_slices=slices * 2)
+    with self.assertRaises(datastore_errors.BadValueError):
+      # Will be supported soon.
+      req.put()
+    req = _gen_request_slices(task_slices=slices * 9)
+    with self.assertRaises(datastore_errors.BadValueError):
+      req.put()
+    slices = [
+        {
+          'properties': _gen_properties(dimensions={u'pool': [u'GPU']}),
+          'expiration_secs': 60,
+        },
+        {
+          'properties': _gen_properties(dimensions={u'pool': [u'other']}),
+          'expiration_secs': 60,
+        },
+    ]
+    req = _gen_request_slices(task_slices=slices)
+    with self.assertRaises(datastore_errors.BadValueError):
+      req.put()
 
   def test_validate_priority(self):
     with self.assertRaises(TypeError):
