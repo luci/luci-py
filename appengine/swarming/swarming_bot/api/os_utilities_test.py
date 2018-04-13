@@ -6,6 +6,7 @@
 import logging
 import math
 import os
+import platform
 import re
 import shutil
 import socket
@@ -49,6 +50,10 @@ class TestOsUtilities(auto_stub.TestCase):
       return
     self.assertTrue(actual.startswith(u'arm'), actual)
 
+  def test_get_cpu_type_mips(self):
+    self.mock(platform, 'machine', lambda: 'mips64')
+    self.assertEqual(os_utilities.get_cpu_type(), u'mips')
+
   def test_get_cpu_bitness(self):
     expected = (u'32', u'64')
     self.assertIn(os_utilities.get_cpu_bitness(), expected)
@@ -56,6 +61,16 @@ class TestOsUtilities(auto_stub.TestCase):
   def test_get_cpu_dimensions(self):
     values = os_utilities.get_cpu_dimensions()
     self.assertGreater(len(values), 1)
+
+  def test_get_cpu_dimensions_mips(self):
+    self.mock(platform, 'machine', lambda: 'mips64')
+    self.mock(
+        os_utilities, 'get_cpuinfo',
+        lambda: {u'name': 'Cavium Octeon II V0.1'})
+    self.mock(sys, 'maxsize', 2**31-1)
+    self.assertEqual(
+        os_utilities.get_cpu_dimensions(),
+        [u'mips', u'mips-32', u'mips-32-Cavium_Octeon_II_V0.1'])
 
   def test_parse_intel_model(self):
     examples = [

@@ -160,9 +160,12 @@ def get_cpuinfo():
     ]
     cpu_info[u'name'] = values[u'model name']
     cpu_info[u'vendor'] = values[u'vendor_id']
+  elif u'mips' in values.get('isa', ''):
+    # MIPS.
+    cpu_info[u'flags'] = values[u'isa']
+    cpu_info[u'name'] = values[u'cpu model']
   else:
     # CPU implementer == 0x41 means ARM.
-    # TODO(maruel): Add MIPS.
     cpu_info[u'flags'] = values[u'Features']
     cpu_info[u'model'] = (
       int(values[u'CPU variant'], 0), int(values[u'CPU part'], 0),

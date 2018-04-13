@@ -214,6 +214,8 @@ def get_cpu_type():
     return u'x86'
   if machine == 'aarch64':
     return u'arm64'
+  if machine == 'mips64':
+    return u'mips'
   return unicode(machine)
 
 
@@ -279,6 +281,9 @@ def get_cpu_dimensions():
     if cpu_type != u'arm':
       out.append(u'arm')
       out.append(u'arm-' + bitness)
+  elif cpu_type.startswith(u'mips'):
+    if name:
+      out.append(u'%s-%s-%s' % (cpu_type, bitness, name.replace(' ', '_')))
   # else AMD like "AMD PRO A6-8500B R5, 6 Compute Cores 2C+4G     "
 
   out.sort()
@@ -293,7 +298,7 @@ def get_cpuinfo():
   elif sys.platform == 'win32':
     info = platforms.win.get_cpuinfo()
   elif sys.platform == 'linux2':
-    info = platforms.linux.get_cpuinfo()
+     info = platforms.linux.get_cpuinfo()
   else:
     info = {}
   if platforms.is_gce():

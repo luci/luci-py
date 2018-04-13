@@ -57,6 +57,46 @@ CPU revision  : 1
 """
 
 
+MIPS64_CPU_INFO = r"""
+chrome-bot@build23-b3:/tmp/1$ cat /proc/cpuinfo
+system type             : Unsupported Board (CN6120p1.1-1000-NSP)
+machine                 : Unknown
+processor               : 0
+cpu model               : Cavium Octeon II V0.1
+BogoMIPS                : 2000.00
+wait instruction        : yes
+microsecond timers      : yes
+tlb_entries             : 128
+extra interrupt vector  : yes
+hardware watchpoint     : yes, count: 2, address/irw mask: [0x0ffc, 0x0ffb]
+isa                     : mips2 mips3 mips4 mips5 mips64r2
+ASEs implemented        :
+shadow register sets    : 1
+kscratch registers      : 3
+package                 : 0
+core                    : 0
+VCED exceptions         : not available
+VCEI exceptions         : not available
+
+processor               : 1
+cpu model               : Cavium Octeon II V0.1
+BogoMIPS                : 2000.00
+wait instruction        : yes
+microsecond timers      : yes
+tlb_entries             : 128
+extra interrupt vector  : yes
+hardware watchpoint     : yes, count: 2, address/irw mask: [0x0ffc, 0x0ffb]
+isa                     : mips2 mips3 mips4 mips5 mips64r2
+ASEs implemented        :
+shadow register sets    : 1
+kscratch registers      : 3
+package                 : 0
+core                    : 1
+VCED exceptions         : not available
+VCEI exceptions         : not available
+"""
+
+
 class TestCPUInfo(unittest.TestCase):
   def get_cpuinfo(self, text):
     tools.clear_cache(linux.get_cpuinfo)
@@ -85,6 +125,12 @@ class TestCPUInfo(unittest.TestCase):
       u'model': (1, 161, 1),
       u'vendor': u'N/A',
     }, self.get_cpuinfo(CAVIUM_CPU_INFO))
+
+  def test_get_cpuinfo_mips(self):
+    self.assertEqual({
+      u'flags': [u'mips2', u'mips3', u'mips4', u'mips5', u'mips64r2'],
+      u'name': 'Cavium Octeon II V0.1',
+    }, self.get_cpuinfo(MIPS64_CPU_INFO))
 
   def test_get_num_processors(self):
     self.assertTrue(linux.get_num_processors() != 0)
