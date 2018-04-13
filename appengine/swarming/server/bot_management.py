@@ -506,6 +506,7 @@ def cron_update_bot_info():
         (BotInfo.ALIVE in bot.composite or BotInfo.DEAD not in bot.composite)):
       # Updating it recomputes composite.
       yield bot.put_async()
+      logging.info('DEAD: %s', bot.id)
       raise ndb.Return(1)
     raise ndb.Return(0)
 
@@ -519,9 +520,12 @@ def cron_update_bot_info():
     for b in BotInfo.query(BotInfo.last_seen_ts <= cutoff):
       seen += 1
       if BotInfo.ALIVE in b.composite or BotInfo.DEAD not in b.composite:
+        # Make sure the variable is not aliased.
+        k = b.key
+        l = lambda: run(k)
         # Retry more often than the default 1. We do not want to throw too much
         # in the logs and there should be plenty of time to do the retries.
-        f = datastore_utils.transaction_async(lambda: run(b.key), retries=3)
+        f = datastore_utils.transaction_async(l, retries=3)
         futures.append(f)
         if len(futures) >= 5:
           ndb.Future.wait_any(futures)
@@ -531,5 +535,5 @@ def cron_update_bot_info():
     for f in futures:
       dead += f.get_result()
   finally:
-    logging.info('Seen %d bots, updated %d bots', seen, dead)
+    logging.debug('Seen %d bots, updated %d bots', seen, dead)
   return dead
