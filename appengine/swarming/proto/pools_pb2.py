@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='pools.proto',
   package='',
   syntax='proto3',
-  serialized_pb=_b('\n\x0bpools.proto\"=\n\x08PoolsCfg\x12\x13\n\x04pool\x18\x01 \x03(\x0b\x32\x05.Pool\x12\x1c\n\x14\x66orbid_unknown_pools\x18\x02 \x01(\x08\"\x8d\x01\n\x04Pool\x12\x0c\n\x04name\x18\x01 \x03(\t\x12\x0e\n\x06owners\x18\x02 \x03(\t\x12\x1f\n\nschedulers\x18\x03 \x01(\x0b\x32\x0b.Schedulers\x12\x1f\n\x17\x61llowed_service_account\x18\x04 \x03(\t\x12%\n\x1d\x61llowed_service_account_group\x18\x05 \x03(\t\"Y\n\nSchedulers\x12\x0c\n\x04user\x18\x01 \x03(\t\x12\r\n\x05group\x18\x02 \x03(\t\x12.\n\x12trusted_delegation\x18\x03 \x03(\x0b\x32\x12.TrustedDelegation\"p\n\x11TrustedDelegation\x12\x0f\n\x07peer_id\x18\x01 \x01(\t\x12\x32\n\x0erequire_any_of\x18\x02 \x01(\x0b\x32\x1a.TrustedDelegation.TagList\x1a\x16\n\x07TagList\x12\x0b\n\x03tag\x18\x01 \x03(\tb\x06proto3')
+  serialized_pb=_b('\n\x0bpools.proto\"\x9e\x01\n\x08PoolsCfg\x12\x13\n\x04pool\x18\x01 \x03(\x0b\x32\x05.Pool\x12\x1c\n\x14\x66orbid_unknown_pools\x18\x02 \x01(\x08\x12$\n\rtask_template\x18\x03 \x03(\x0b\x32\r.TaskTemplate\x12\x39\n\x18task_template_deployment\x18\x04 \x03(\x0b\x32\x17.TaskTemplateDeployment\"\x8f\x02\n\x04Pool\x12\x0c\n\x04name\x18\x01 \x03(\t\x12\x0e\n\x06owners\x18\x02 \x03(\t\x12\x1f\n\nschedulers\x18\x03 \x01(\x0b\x32\x0b.Schedulers\x12\x1f\n\x17\x61llowed_service_account\x18\x04 \x03(\t\x12%\n\x1d\x61llowed_service_account_group\x18\x05 \x03(\t\x12\"\n\x18task_template_deployment\x18\x06 \x01(\tH\x00\x12\x42\n\x1ftask_template_deployment_inline\x18\x07 \x01(\x0b\x32\x17.TaskTemplateDeploymentH\x00\x42\x18\n\x16task_deployment_scheme\"Y\n\nSchedulers\x12\x0c\n\x04user\x18\x01 \x03(\t\x12\r\n\x05group\x18\x02 \x03(\t\x12.\n\x12trusted_delegation\x18\x03 \x03(\x0b\x32\x12.TrustedDelegation\"p\n\x11TrustedDelegation\x12\x0f\n\x07peer_id\x18\x01 \x01(\t\x12\x32\n\x0erequire_any_of\x18\x02 \x01(\x0b\x32\x1a.TrustedDelegation.TagList\x1a\x16\n\x07TagList\x12\x0b\n\x03tag\x18\x01 \x03(\t\"\xcd\x02\n\x0cTaskTemplate\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0f\n\x07include\x18\x02 \x03(\t\x12\'\n\x05\x63\x61\x63he\x18\x03 \x03(\x0b\x32\x18.TaskTemplate.CacheEntry\x12/\n\x0c\x63ipd_package\x18\x04 \x03(\x0b\x32\x19.TaskTemplate.CipdPackage\x12\x1e\n\x03\x65nv\x18\x05 \x03(\x0b\x32\x11.TaskTemplate.Env\x1a(\n\nCacheEntry\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x1a\x39\n\x0b\x43ipdPackage\x12\x0c\n\x04path\x18\x01 \x01(\t\x12\x0b\n\x03pkg\x18\x02 \x01(\t\x12\x0f\n\x07version\x18\x03 \x01(\t\x1a?\n\x03\x45nv\x12\x0b\n\x03var\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\x12\x0e\n\x06prefix\x18\x03 \x03(\t\x12\x0c\n\x04soft\x18\x04 \x01(\x08\"y\n\x16TaskTemplateDeployment\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x1b\n\x04prod\x18\x02 \x01(\x0b\x32\r.TaskTemplate\x12\x1d\n\x06\x63\x61nary\x18\x03 \x01(\x0b\x32\r.TaskTemplate\x12\x15\n\rcanary_chance\x18\x04 \x01(\x05\x62\x06proto3')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -47,6 +47,20 @@ _POOLSCFG = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='task_template', full_name='PoolsCfg.task_template', index=2,
+      number=3, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='task_template_deployment', full_name='PoolsCfg.task_template_deployment', index=3,
+      number=4, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -59,8 +73,8 @@ _POOLSCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=15,
-  serialized_end=76,
+  serialized_start=16,
+  serialized_end=174,
 )
 
 
@@ -106,6 +120,20 @@ _POOL = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='task_template_deployment', full_name='Pool.task_template_deployment', index=5,
+      number=6, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='task_template_deployment_inline', full_name='Pool.task_template_deployment_inline', index=6,
+      number=7, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -117,9 +145,12 @@ _POOL = _descriptor.Descriptor(
   syntax='proto3',
   extension_ranges=[],
   oneofs=[
+    _descriptor.OneofDescriptor(
+      name='task_deployment_scheme', full_name='Pool.task_deployment_scheme',
+      index=0, containing_type=None, fields=[]),
   ],
-  serialized_start=79,
-  serialized_end=220,
+  serialized_start=177,
+  serialized_end=448,
 )
 
 
@@ -163,8 +194,8 @@ _SCHEDULERS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=222,
-  serialized_end=311,
+  serialized_start=450,
+  serialized_end=539,
 )
 
 
@@ -194,8 +225,8 @@ _TRUSTEDDELEGATION_TAGLIST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=403,
-  serialized_end=425,
+  serialized_start=631,
+  serialized_end=653,
 )
 
 _TRUSTEDDELEGATION = _descriptor.Descriptor(
@@ -231,19 +262,281 @@ _TRUSTEDDELEGATION = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=313,
-  serialized_end=425,
+  serialized_start=541,
+  serialized_end=653,
+)
+
+
+_TASKTEMPLATE_CACHEENTRY = _descriptor.Descriptor(
+  name='CacheEntry',
+  full_name='TaskTemplate.CacheEntry',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='name', full_name='TaskTemplate.CacheEntry.name', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='path', full_name='TaskTemplate.CacheEntry.path', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=825,
+  serialized_end=865,
+)
+
+_TASKTEMPLATE_CIPDPACKAGE = _descriptor.Descriptor(
+  name='CipdPackage',
+  full_name='TaskTemplate.CipdPackage',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='path', full_name='TaskTemplate.CipdPackage.path', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='pkg', full_name='TaskTemplate.CipdPackage.pkg', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='version', full_name='TaskTemplate.CipdPackage.version', index=2,
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=867,
+  serialized_end=924,
+)
+
+_TASKTEMPLATE_ENV = _descriptor.Descriptor(
+  name='Env',
+  full_name='TaskTemplate.Env',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='var', full_name='TaskTemplate.Env.var', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='value', full_name='TaskTemplate.Env.value', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='prefix', full_name='TaskTemplate.Env.prefix', index=2,
+      number=3, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='soft', full_name='TaskTemplate.Env.soft', index=3,
+      number=4, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=926,
+  serialized_end=989,
+)
+
+_TASKTEMPLATE = _descriptor.Descriptor(
+  name='TaskTemplate',
+  full_name='TaskTemplate',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='name', full_name='TaskTemplate.name', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='include', full_name='TaskTemplate.include', index=1,
+      number=2, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='cache', full_name='TaskTemplate.cache', index=2,
+      number=3, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='cipd_package', full_name='TaskTemplate.cipd_package', index=3,
+      number=4, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='env', full_name='TaskTemplate.env', index=4,
+      number=5, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[_TASKTEMPLATE_CACHEENTRY, _TASKTEMPLATE_CIPDPACKAGE, _TASKTEMPLATE_ENV, ],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=656,
+  serialized_end=989,
+)
+
+
+_TASKTEMPLATEDEPLOYMENT = _descriptor.Descriptor(
+  name='TaskTemplateDeployment',
+  full_name='TaskTemplateDeployment',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='name', full_name='TaskTemplateDeployment.name', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='prod', full_name='TaskTemplateDeployment.prod', index=1,
+      number=2, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='canary', full_name='TaskTemplateDeployment.canary', index=2,
+      number=3, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='canary_chance', full_name='TaskTemplateDeployment.canary_chance', index=3,
+      number=4, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=991,
+  serialized_end=1112,
 )
 
 _POOLSCFG.fields_by_name['pool'].message_type = _POOL
+_POOLSCFG.fields_by_name['task_template'].message_type = _TASKTEMPLATE
+_POOLSCFG.fields_by_name['task_template_deployment'].message_type = _TASKTEMPLATEDEPLOYMENT
 _POOL.fields_by_name['schedulers'].message_type = _SCHEDULERS
+_POOL.fields_by_name['task_template_deployment_inline'].message_type = _TASKTEMPLATEDEPLOYMENT
+_POOL.oneofs_by_name['task_deployment_scheme'].fields.append(
+  _POOL.fields_by_name['task_template_deployment'])
+_POOL.fields_by_name['task_template_deployment'].containing_oneof = _POOL.oneofs_by_name['task_deployment_scheme']
+_POOL.oneofs_by_name['task_deployment_scheme'].fields.append(
+  _POOL.fields_by_name['task_template_deployment_inline'])
+_POOL.fields_by_name['task_template_deployment_inline'].containing_oneof = _POOL.oneofs_by_name['task_deployment_scheme']
 _SCHEDULERS.fields_by_name['trusted_delegation'].message_type = _TRUSTEDDELEGATION
 _TRUSTEDDELEGATION_TAGLIST.containing_type = _TRUSTEDDELEGATION
 _TRUSTEDDELEGATION.fields_by_name['require_any_of'].message_type = _TRUSTEDDELEGATION_TAGLIST
+_TASKTEMPLATE_CACHEENTRY.containing_type = _TASKTEMPLATE
+_TASKTEMPLATE_CIPDPACKAGE.containing_type = _TASKTEMPLATE
+_TASKTEMPLATE_ENV.containing_type = _TASKTEMPLATE
+_TASKTEMPLATE.fields_by_name['cache'].message_type = _TASKTEMPLATE_CACHEENTRY
+_TASKTEMPLATE.fields_by_name['cipd_package'].message_type = _TASKTEMPLATE_CIPDPACKAGE
+_TASKTEMPLATE.fields_by_name['env'].message_type = _TASKTEMPLATE_ENV
+_TASKTEMPLATEDEPLOYMENT.fields_by_name['prod'].message_type = _TASKTEMPLATE
+_TASKTEMPLATEDEPLOYMENT.fields_by_name['canary'].message_type = _TASKTEMPLATE
 DESCRIPTOR.message_types_by_name['PoolsCfg'] = _POOLSCFG
 DESCRIPTOR.message_types_by_name['Pool'] = _POOL
 DESCRIPTOR.message_types_by_name['Schedulers'] = _SCHEDULERS
 DESCRIPTOR.message_types_by_name['TrustedDelegation'] = _TRUSTEDDELEGATION
+DESCRIPTOR.message_types_by_name['TaskTemplate'] = _TASKTEMPLATE
+DESCRIPTOR.message_types_by_name['TaskTemplateDeployment'] = _TASKTEMPLATEDEPLOYMENT
 
 PoolsCfg = _reflection.GeneratedProtocolMessageType('PoolsCfg', (_message.Message,), dict(
   DESCRIPTOR = _POOLSCFG,
@@ -280,6 +573,44 @@ TrustedDelegation = _reflection.GeneratedProtocolMessageType('TrustedDelegation'
   ))
 _sym_db.RegisterMessage(TrustedDelegation)
 _sym_db.RegisterMessage(TrustedDelegation.TagList)
+
+TaskTemplate = _reflection.GeneratedProtocolMessageType('TaskTemplate', (_message.Message,), dict(
+
+  CacheEntry = _reflection.GeneratedProtocolMessageType('CacheEntry', (_message.Message,), dict(
+    DESCRIPTOR = _TASKTEMPLATE_CACHEENTRY,
+    __module__ = 'pools_pb2'
+    # @@protoc_insertion_point(class_scope:TaskTemplate.CacheEntry)
+    ))
+  ,
+
+  CipdPackage = _reflection.GeneratedProtocolMessageType('CipdPackage', (_message.Message,), dict(
+    DESCRIPTOR = _TASKTEMPLATE_CIPDPACKAGE,
+    __module__ = 'pools_pb2'
+    # @@protoc_insertion_point(class_scope:TaskTemplate.CipdPackage)
+    ))
+  ,
+
+  Env = _reflection.GeneratedProtocolMessageType('Env', (_message.Message,), dict(
+    DESCRIPTOR = _TASKTEMPLATE_ENV,
+    __module__ = 'pools_pb2'
+    # @@protoc_insertion_point(class_scope:TaskTemplate.Env)
+    ))
+  ,
+  DESCRIPTOR = _TASKTEMPLATE,
+  __module__ = 'pools_pb2'
+  # @@protoc_insertion_point(class_scope:TaskTemplate)
+  ))
+_sym_db.RegisterMessage(TaskTemplate)
+_sym_db.RegisterMessage(TaskTemplate.CacheEntry)
+_sym_db.RegisterMessage(TaskTemplate.CipdPackage)
+_sym_db.RegisterMessage(TaskTemplate.Env)
+
+TaskTemplateDeployment = _reflection.GeneratedProtocolMessageType('TaskTemplateDeployment', (_message.Message,), dict(
+  DESCRIPTOR = _TASKTEMPLATEDEPLOYMENT,
+  __module__ = 'pools_pb2'
+  # @@protoc_insertion_point(class_scope:TaskTemplateDeployment)
+  ))
+_sym_db.RegisterMessage(TaskTemplateDeployment)
 
 
 # @@protoc_insertion_point(module_scope)

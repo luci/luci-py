@@ -165,7 +165,8 @@ class AppTestBase(test_case.TestCase):
           scheduling_groups=frozenset(),
           trusted_delegatees={},
           service_accounts=frozenset(service_accounts),
-          service_accounts_groups=())
+          service_accounts_groups=(),
+          task_template_deployment=None)
     self.mock(pools_config, 'get_pool_config', mocked_get_pool_config)
 
   # Bot

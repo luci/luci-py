@@ -1465,7 +1465,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
               for peer, tags in (trusted_delegatees or {}).iteritems()
             },
             service_accounts=frozenset(service_accounts or []),
-            service_accounts_groups=tuple(service_accounts_groups or []))
+            service_accounts_groups=tuple(service_accounts_groups or []),
+            task_template_deployment=None)
       return None
     self.mock(pools_config, 'get_pool_config', mocked_get_pool_config)
 

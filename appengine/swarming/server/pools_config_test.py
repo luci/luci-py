@@ -19,6 +19,8 @@ from test_support import test_case
 from proto import pools_pb2
 from server import pools_config
 
+from google.protobuf import text_format
+
 
 TEST_CONFIG = pools_pb2.PoolsCfg(pool=[
   pools_pb2.Pool(
@@ -86,7 +88,8 @@ class PoolsConfigTest(test_case.TestCase):
             ),
         },
         service_accounts=frozenset([u'a2@example.com', u'a1@example.com']),
-        service_accounts_groups=(u'accounts_group1', u'accounts_group2'))
+        service_accounts_groups=(u'accounts_group1', u'accounts_group2'),
+        task_template_deployment=None)
     expected2 = expected1._replace(name='another_name')
 
     self.assertEqual(expected1, pools_config.get_pool_config('pool_name'))
@@ -211,6 +214,556 @@ class PoolsConfigTest(test_case.TestCase):
     self.validator_test(cfg, [
       'pool #0 (abc): bad allowed_service_account_group #0 "!!!"',
     ])
+
+
+class TaskTemplateBaseTest(unittest.TestCase):
+  def setUp(self):
+    self.ctx = validation.Context()
+
+  PTT = pools_pb2.TaskTemplate
+  PCE = pools_pb2.TaskTemplate.CacheEntry
+  PCP = pools_pb2.TaskTemplate.CipdPackage
+  PE = pools_pb2.TaskTemplate.Env
+
+  def tt(self, **kwargs):
+    """Builds a pools_config.TaskTemplate.
+
+    Intercepts 'inclusions' from kwargs, and passes the rest to
+    `pools_pb2.TaskTemplate`. Then builds a `pools_config.TaskTemplate` the same
+    way that pools_config.py does, adds in the inclusions, then returns its
+    finalized form.
+
+    Errors during the construction of the TaskTemplate are accumulated in
+    self.ctx.
+    """
+    inclusions = kwargs.pop('inclusions', ())
+    ret = pools_config.TaskTemplate._Intermediate(self.ctx, self.PTT(**kwargs))
+    ret.inclusions.update(inclusions)
+    return ret.finalize(self.ctx)
+
+
+class TestTaskTemplates(TaskTemplateBaseTest):
+  @staticmethod
+  def parse(textpb):
+    return text_format.Merge(textpb, pools_pb2.TaskTemplate())
+
+  def test_task_template_update_cache(self):
+    tti = pools_config.TaskTemplate._Intermediate(
+        self.ctx, pools_pb2.TaskTemplate())
+    tti.update(
+        self.ctx, self.tt(cache=[self.PCE(name='hi', path='there')]), None)
+
+    self.assertEqual(
+        self.tt(cache=[self.PCE(name='hi', path='there')]),
+        tti.finalize(self.ctx))
+
+    # override existing
+    tti.update(
+        self.ctx, self.tt(cache=[self.PCE(name='hi', path='nerd')]), None)
+
+    self.assertEqual(
+        self.tt(cache=[self.PCE(name='hi', path='nerd')]),
+        tti.finalize(self.ctx))
+
+    # add new
+    tti.update(
+        self.ctx, self.tt(cache=[self.PCE(name='other', path='yep')]), None)
+
+    self.assertEqual(
+        self.tt(cache=[
+          self.PCE(name='hi', path='nerd'),
+          self.PCE(name='other', path='yep'),
+        ]),
+        tti.finalize(self.ctx))
+
+  def test_task_template_update_cipd_package(self):
+    tti = pools_config.TaskTemplate._Intermediate(
+        self.ctx, pools_pb2.TaskTemplate())
+    tti.update(self.ctx, self.tt(
+        cipd_package=[self.PCP(path='path', pkg='some/pkg', version='latest')]
+    ), None)
+
+    self.assertEqual(
+      self.tt(cipd_package=[
+          self.PCP(path='path', pkg='some/pkg', version='latest')]),
+      tti.finalize(self.ctx),
+    )
+
+    # override existing
+    tti.update(self.ctx, self.tt(cipd_package=[
+        self.PCP(path='path', pkg='some/pkg', version='oldest')]), None)
+
+    self.assertEqual(
+      self.tt(cipd_package=[
+          self.PCP(path='path', pkg='some/pkg', version='oldest')]),
+      tti.finalize(self.ctx),
+    )
+
+    # add new
+    tti.update(self.ctx, self.tt(cipd_package=[
+        self.PCP(path='other_path', pkg='some/pkg', version='1'),
+    ]), None)
+
+    self.assertEqual(
+      self.tt(cipd_package=[
+        self.PCP(path='other_path', pkg='some/pkg', version='1'),
+        self.PCP(path='path', pkg='some/pkg', version='oldest'),
+      ]),
+      tti.finalize(self.ctx),
+    )
+
+  def test_task_template_update_env(self):
+    tti = pools_config.TaskTemplate._Intermediate(
+        self.ctx, pools_pb2.TaskTemplate())
+    tti.update(self.ctx, self.tt(
+        env=[self.PE(var='VAR', value='1', soft=True)]), None)
+
+    self.assertEqual(
+        self.tt(env=[self.PE(var='VAR', value='1', soft=True)]),
+        tti.finalize(self.ctx))
+
+    # override existing
+    tti.update(self.ctx, self.tt(env=[self.PE(var='VAR', value='2')]), None)
+
+    self.assertEqual(
+        self.tt(env=[self.PE(var='VAR', value='2')]),
+        tti.finalize(self.ctx))
+
+    # add new
+    tti.update(
+        self.ctx, self.tt(env=[self.PE(var='OTHER', value='thing')]), None)
+
+    self.assertEqual(
+        self.tt(env=[
+          self.PE(var='OTHER', value='thing'),
+          self.PE(var='VAR', value='2'),
+        ]),
+        tti.finalize(self.ctx),
+    )
+
+  def test_task_template_update_env_prefix(self):
+    tti = pools_config.TaskTemplate._Intermediate(
+        self.ctx, pools_pb2.TaskTemplate())
+    tti.update(self.ctx, self.tt(env=[
+        self.PE(var='PATH', prefix=['1'], soft=True)]), None)
+
+    self.assertEqual(
+        self.tt(env=[self.PE(var='PATH', prefix=['1'], soft=True)]),
+        tti.finalize(self.ctx))
+
+    # append existing
+    tti.update(self.ctx, self.tt(env=[self.PE(var='PATH', prefix=['2'])]), None)
+
+    self.assertEqual(
+        self.tt(env=[self.PE(var='PATH', prefix=['1', '2'])]),
+        tti.finalize(self.ctx))
+
+    # existing, add new
+    tti.update(
+        self.ctx, self.tt(env=[self.PE(var='OTHER', prefix=['thing'])]), None)
+
+    self.assertEqual(
+        self.tt(env=[
+          self.PE(var='OTHER', prefix=['thing']),
+          self.PE(var='PATH', prefix=['1', '2']),
+        ]),
+        tti.finalize(self.ctx))
+
+  def test_finalize_overlapping_paths(self):
+    # adds stuff to self.ctx
+    self.tt(
+      cache=[
+        self.PCE(name='other_name', path='cache_cipd/path'),
+
+        # Cannot overlap caches
+        self.PCE(name='some_name', path='good/path'),
+        self.PCE(name='whatnow', path='good/path/b'),
+      ],
+      cipd_package=[
+        self.PCP(path='good/other', pkg='some/pkg', version='latest'),
+        self.PCP(path='cache_cipd', pkg='other/pkg', version='latest'),
+
+        # multiple cipd in same dir is OK
+        self.PCP(path='cache_cipd', pkg='other/pkg2', version='latest'),
+      ])
+
+    self.assertEqual(
+        [x.text for x in self.ctx.result().messages],
+        [
+          ('cache u\'other_name\' uses u\'cache_cipd/path\', which conflicts '
+           'with cipd[u\'other/pkg2:latest\', u\'other/pkg:latest\'] using'
+           ' u\'cache_cipd\''),
+          ('cache u\'whatnow\' uses u\'good/path/b\', which conflicts with '
+           'cache u\'some_name\' using u\'good/path\''),
+        ])
+
+  def test_finalize_empty_values(self):
+    self.tt(
+        cache=[
+          self.PCE(path='path'),
+          self.PCE(name='cool_name'),
+        ],
+        cipd_package=[
+          self.PCP(path='good/other', pkg='some/pkg'),
+          self.PCP(pkg='some/pkg', version='latest'),
+          self.PCP(path='good/other', version='latest'),
+        ],
+        env=[
+          self.PE(value='1', prefix=['path']),
+          self.PE(var='VAR', value='1', prefix=['']),
+          self.PE(var='VARR'),
+        ])
+
+    self.assertEqual(
+      [x.text for x in self.ctx.result().messages],
+      [
+        'cache[0]: empty name',
+        'cache[\'cool_name\']: empty path',
+        'cipd_package[(\'good/other\', \'some/pkg\')]: empty version',
+        'cipd_package[2]: empty pkg',
+        'env[0]: empty var',
+        'env[\'VARR\']: empty value AND prefix',
+        (
+            'u\'\': directory has conflicting owners: cache u\'cool_name\' and'
+            ' cipd[u\'some/pkg:latest\']'
+        ),
+      ])
+
+  def test_simple_pb(self):
+    tt = self.parse("""
+    cache: { name: "hi"  path: "cache/hi" }
+    cache: { name: "there"  path: "cache/there" }
+    cipd_package: { path: "bin" pkg: "foo/bar" version: "latest" }
+    env: {var: "VAR" value: "1"}
+    env: {var: "PATH" prefix: "1" prefix: "2" soft: true}
+    """)
+
+    self.assertEqual(
+        pools_config.TaskTemplate.from_pb(self.ctx, tt),
+        pools_config.TaskTemplate(
+            cache=(
+              pools_config.CacheEntry('hi', 'cache/hi'),
+              pools_config.CacheEntry('there', 'cache/there'),
+            ),
+            cipd_package=(
+              pools_config.CipdPackage('bin', 'foo/bar', 'latest'),
+            ),
+            env=(
+              pools_config.Env('PATH', '', ('1', '2'), True),
+              pools_config.Env('VAR', '1', (), False),
+            ),
+            inclusions=frozenset()))
+
+  def test_simple_include(self):
+    base = pools_config.TaskTemplate.from_pb(self.ctx, self.parse("""
+    cache: { name: "hi"  path: "cache/hi" }
+    cipd_package: { path: "bin" pkg: "foo/bar" version: "latest" }
+    env: {var: "VAR" value: "1"}
+    env: {var: "PATH" prefix: "1" prefix: "2" soft: true}
+    """))
+
+    tt = self.parse("""
+    include: "base"
+    cache: { name: "there"  path: "cache/there" }
+    cipd_package: { path: "bin" pkg: "foo/nerps" version: "yes" }
+    env: {var: "VAR" value: "2"}
+    env: {var: "PATH" prefix: "3" soft: true}
+    """)
+
+    self.assertEqual(
+        pools_config.TaskTemplate.from_pb(self.ctx, tt, {'base': base}.get),
+        pools_config.TaskTemplate(
+            cache=(
+              pools_config.CacheEntry('hi', 'cache/hi'),
+              pools_config.CacheEntry('there', 'cache/there'),
+            ),
+            cipd_package=(
+              pools_config.CipdPackage('bin', 'foo/bar', 'latest'),
+              pools_config.CipdPackage('bin', 'foo/nerps', 'yes'),
+            ),
+            env=(
+              pools_config.Env('PATH', '', ('1', '2', '3'), True),
+              pools_config.Env('VAR', '2', (), False),
+            ),
+            inclusions=frozenset({'base'}),
+          ))
+
+
+class TestPoolCfgTaskTemplate(TaskTemplateBaseTest):
+  @staticmethod
+  def parse(textpb):
+    return text_format.Merge(textpb, pools_pb2.PoolsCfg())
+
+  def test_resolve_tree_inclusion(self):
+    poolcfg = self.parse("""
+      task_template: {
+        name: "a"
+        env: {var: "VAR" value: "1"}
+      }
+      task_template: {
+        name: "b"
+        env: {var: "VAR" prefix: "pfx"}
+      }
+      task_template: {
+        name: "c"
+        include: "a"
+        include: "b"
+      }
+      task_template: {
+        name: "d"
+        include: "c"
+      }
+    """)
+
+    template_map = pools_config._resolve_task_template_inclusions(
+        self.ctx, poolcfg.task_template)
+
+    self.assertSetEqual(set('abcd'), set(template_map.keys()))
+
+    self.assertEqual(template_map['d'], self.tt(
+        env=[self.PE(var='VAR', value='1', prefix=['pfx'])],
+        inclusions='abc',
+    ))
+
+  def test_resolve_repeated_inclusion(self):
+    poolcfg = self.parse("""
+      task_template: {name: "a"}
+      task_template: {
+        name: "b"
+        include: "a"
+        include: "a"
+      }
+    """)
+
+    pools_config._resolve_task_template_inclusions(
+        self.ctx, poolcfg.task_template)
+
+    self.assertEqual(
+        [x.text for x in self.ctx.result().messages],
+        ['template[\'b\']: template u\'a\' included multiple times'])
+
+  def test_resolve_diamond_inclusion(self):
+    poolcfg = self.parse("""
+      task_template: {name: "a"}
+      task_template: {
+        name: "b"
+        include: "a"
+      }
+      task_template: {
+        name: "c"
+        include: "a"
+      }
+      task_template: {
+        name: "d"
+        include: "b" include: "c"
+      }
+    """)
+
+    pools_config._resolve_task_template_inclusions(
+        self.ctx, poolcfg.task_template)
+
+    self.assertEqual(
+        [x.text for x in self.ctx.result().messages],
+        ['template[\'d\']: template u\'a\' included (transitively) multiple '
+         'times'])
+
+  def test_inclusion_cycle(self):
+    poolcfg = self.parse("""
+      task_template: {name: "a" include: "b"}
+      task_template: {name: "b" include: "a"}
+    """)
+
+    template_map = pools_config._resolve_task_template_inclusions(
+        self.ctx, poolcfg.task_template)
+    self.assertDictEqual(template_map, {
+      'a': pools_config.TaskTemplate.CYCLE,
+      'b': pools_config.TaskTemplate.CYCLE,
+    })
+
+    tail = ', which causes an import cycle'
+    self.assertEqual(
+        [x.text for x in self.ctx.result().messages],
+        [
+            'template[\'a\']: template[\'b\']: depends on u\'a\'' + tail,
+            'template[\'a\']: depends on u\'b\'' + tail,
+        ])
+
+  def test_no_name(self):
+    poolcfg = self.parse("""
+      task_template: {}
+    """)
+
+    self.assertIsNone(pools_config._resolve_task_template_inclusions(
+        self.ctx, poolcfg.task_template))
+
+    self.assertEqual(
+        [x.text for x in self.ctx.result().messages],
+        ['one or more templates has a blank name'])
+
+  def test_dup_name(self):
+    poolcfg = self.parse("""
+      task_template: {name: "a"}
+      task_template: {name: "a"}
+    """)
+
+    self.assertIsNone(pools_config._resolve_task_template_inclusions(
+        self.ctx, poolcfg.task_template))
+
+    self.assertEqual(
+        [x.text for x in self.ctx.result().messages],
+        ['one or more templates has a duplicate name'])
+
+  def test_bad_include(self):
+    poolcfg = self.parse("""
+      task_template: {name: "a" include: "nope"}
+      task_template: {name: "b" include: "nope"}
+    """)
+
+    template_map = pools_config._resolve_task_template_inclusions(
+        self.ctx, poolcfg.task_template)
+    self.assertDictEqual(template_map, {
+      'a': None,
+      'b': None,
+    })
+
+    self.assertEqual(
+        [x.text for x in self.ctx.result().messages],
+        [
+          'template[\'a\']: unknown include: u\'nope\'',
+          'template[\'b\']: unknown include: u\'nope\'',
+        ])
+
+  def test_bad_result(self):
+    poolcfg = self.parse("""
+      task_template: {
+        name: "a"
+        env: {var: "VAR" }
+      }
+    """)
+
+    pools_config._resolve_task_template_inclusions(
+        self.ctx, poolcfg.task_template)
+
+    self.assertEqual(
+        [x.text for x in self.ctx.result().messages],
+        ['template[\'a\']: env[\'VAR\']: empty value AND prefix'])
+
+
+class TestPoolCfgTaskTemplateDeployments(TaskTemplateBaseTest):
+  @staticmethod
+  def parse(textpb):
+    return text_format.Merge(textpb, pools_pb2.PoolsCfg())
+
+  def test_resolve_deployments(self):
+    poolcfg = self.parse("""
+      task_template: {name: "prod" env: {var: "VAR" value: "prod"}}
+      task_template: {name: "canary" env: {var: "VAR" value: "canary"}}
+
+      task_template_deployment: {
+        name: "standard"
+        prod: {include: "prod"}
+        canary: {include: "canary"}
+        canary_chance: 5000
+      }
+    """)
+
+    tmap = pools_config._resolve_task_template_inclusions(
+        self.ctx, poolcfg.task_template)
+    dmap = pools_config._resolve_task_template_deployments(
+        self.ctx, tmap, poolcfg.task_template_deployment)
+
+    self.assertSetEqual({'standard'}, set(dmap.keys()))
+
+    self.assertEqual(dmap['standard'], pools_config.TaskTemplateDeployment(
+        prod=self.tt(env=[self.PE(var='VAR', value='prod'),],
+                     inclusions={'prod'}),
+        canary=self.tt(env=[self.PE(var='VAR', value='canary'),],
+                       inclusions={'canary'}),
+        canary_chance=5000))
+
+  def test_resolve_noname_deployment(self):
+    poolcfg = self.parse("""
+      task_template_deployment: {}
+    """)
+
+    self.assertIsNone(pools_config._resolve_task_template_deployments(
+        self.ctx, {}, poolcfg.task_template_deployment))
+
+    self.assertEqual(
+        [x.text for x in self.ctx.result().messages],
+        ['deployment[0]: has no name'])
+
+  def test_resolve_bad_canary(self):
+    poolcfg = self.parse("""
+      task_template_deployment: {name: "a" canary_chance: 10000}
+    """)
+
+    pools_config._resolve_task_template_deployments(
+        self.ctx, {}, poolcfg.task_template_deployment)
+
+    self.assertEqual(
+        [x.text for x in self.ctx.result().messages],
+        ['deployment[\'a\']: '+
+         'canary_chance out of range `[0,9999]`: 10000 -> %100.00'])
+
+  def test_resolve_bad_canary_2(self):
+    poolcfg = self.parse("""
+      task_template_deployment: {name: "a" canary_chance: -1}
+    """)
+
+    pools_config._resolve_task_template_deployments(
+        self.ctx, {}, poolcfg.task_template_deployment)
+
+    self.assertEqual(
+        [x.text for x in self.ctx.result().messages],
+        [('deployment[\'a\']: '
+          'canary_chance out of range `[0,9999]`: -1 -> %-0.01')])
+
+  def test_resolve_single_deployment(self):
+    poolcfg = self.parse("""
+      task_template: {name: "a" env: {var: "VAR" value: "1"} }
+      task_template_deployment: {
+        name: "std"
+        prod: {include: "a"}
+      }
+      pool {
+        task_template_deployment: "std"
+      }
+      pool {
+        task_template_deployment_inline: {
+          prod: {include: "a"}
+          canary: {
+            include: "a"
+            env: {var: "WAT" value: "yes"}
+          }
+          canary_chance: 5000
+        }
+      }
+    """)
+
+    tmap = pools_config._resolve_task_template_inclusions(
+        self.ctx, poolcfg.task_template)
+    dmap = pools_config._resolve_task_template_deployments(
+        self.ctx, tmap, poolcfg.task_template_deployment)
+
+    self.assertEqual(pools_config.TaskTemplateDeployment(
+        prod=self.tt(
+            env=[self.PE(var='VAR', value='1')],
+            inclusions='a'),
+        canary=None, canary_chance=0
+    ), pools_config._resolve_deployment(self.ctx, poolcfg.pool[0], tmap, dmap))
+
+    self.assertEqual(pools_config.TaskTemplateDeployment(
+      prod=self.tt(
+          env=[self.PE(var='VAR', value='1')],
+          inclusions='a'),
+      canary=self.tt(
+          env=(
+            self.PE(var='VAR', value='1'),
+            self.PE(var='WAT', value='yes')),
+          inclusions={'a'}),
+      canary_chance=5000,
+    ), pools_config._resolve_deployment(self.ctx, poolcfg.pool[1], tmap, dmap))
 
 
 if __name__ == '__main__':
