@@ -1324,11 +1324,6 @@ def host_reboot_and_return(message=None):
   return success
 
 
-# Compatibility code. TODO(maruel): Remove once all call sites are updated.
-restart = host_reboot
-restart_and_return = host_reboot_and_return
-
-
 def roll_log(name):
   """Rolls a log in 5Mb chunks and keep the last 10 files."""
   try:

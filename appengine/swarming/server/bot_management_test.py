@@ -164,58 +164,6 @@ class BotManagementTest(test_case.TestCase):
         expected,
         [e.to_dict() for e in bot_management.get_events_query('id1', True)])
 
-  def test_should_restart_bot_not_set(self):
-    state = {
-      'running_time': 0,
-      'started_ts': 1410989556.174,
-    }
-    self.assertEqual(
-        (False, ''), bot_management.should_restart_bot('id', state))
-
-  def test_should_restart_bot_bad_type(self):
-    state = {
-      'periodic_reboot_secs': '100',
-      'running_time': 105,
-      'started_ts': 1410989556.174,
-    }
-    self.assertEqual(
-        (False, ''), bot_management.should_restart_bot('id', state))
-
-  def test_should_restart_bot_no(self):
-    state = {
-      'periodic_reboot_secs': 100,
-      'running_time': 0,
-      'started_ts': 1410989556.174,
-    }
-    self.assertEqual(
-        (False, ''), bot_management.should_restart_bot('id', state))
-
-  def test_should_restart_bot(self):
-    state = {
-      'periodic_reboot_secs': 100,
-      'running_time': 107,  # Affected by BOT_REBOOT_PERIOD_RANDOMIZATION_MARGIN
-      'started_ts': 1410989556.174,
-    }
-    needs_reboot, message = bot_management.should_restart_bot('id', state)
-    self.assertTrue(needs_reboot)
-    self.assertTrue(message)
-
-  def test_get_bot_reboot_period(self):
-    # Mostly for code coverage.
-    self.mock(bot_management, 'BOT_REBOOT_PERIOD_RANDOMIZATION_MARGIN', 0.1)
-    state = {'periodic_reboot_secs': 1000, 'started_ts': 1234}
-    self.assertEqual(980, bot_management.get_bot_reboot_period('bot', state))
-    # Make sure the margin is respected.
-    periods = set()
-    for i in xrange(0, 1350):
-      state = {'periodic_reboot_secs': 1000, 'started_ts': i}
-      period = bot_management.get_bot_reboot_period('bot', state)
-      self.assertTrue(900 <= period < 1100)
-      periods.add(period)
-    # Make sure it's really random and covers all expected range. (This check
-    # relies on number of iterations above to be high enough).
-    self.assertEqual(200, len(periods))
-
   def test_get_info_key(self):
     self.assertEqual(
         ndb.Key(bot_management.BotRoot, 'foo', bot_management.BotInfo, 'info'),

@@ -264,27 +264,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
     }
     self.assertEqual(expected, response)
 
-  def test_poll_restart(self):
-    def mock_should_restart_bot(bot_id, state):
-      self.assertEqual('bot1', bot_id)
-      expected_state = {
-        'bot_group_cfg_version': 'default',
-        'running_time': 1234.0,
-        'sleep_streak': 0,
-        'started_ts': 1410990411.111,
-      }
-      self.assertEqual(expected_state, state)
-      return True, 'Mocked restart message'
-    self.mock(bot_management, 'should_restart_bot', mock_should_restart_bot)
-
-    params = self.do_handshake()
-    response = self.post_json('/swarming/api/v1/bot/poll', params)
-    expected = {
-      u'cmd': u'host_reboot',
-      u'message': u'Mocked restart message',
-    }
-    self.assertEqual(expected, response)
-
   def test_poll_task_raw(self):
     # Successfully poll a task.
     self.mock(random, 'getrandbits', lambda _: 0x88)

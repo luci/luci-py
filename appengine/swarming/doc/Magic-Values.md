@@ -81,9 +81,6 @@ The following environment variables may be set to alter bot behavior:
     informs the server of the time (in UTC seconds since epoch) that the bot
     will disconnect from the server. The server will not allow the bot to
     reap any tasks projected to end after the bot disconnects.
-  - `periodic_reboot_secs`: when set to a integer, instructs the server to send
-    a reboot command after this period. The actual period is fuzzed with a 10%
-    delta.
   - `quarantined`: has the same meaning as in `dimensions`. It's also
     supported as a state.
   - `bot_group_cfg_version`: version identifier of the server defined

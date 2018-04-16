@@ -518,17 +518,6 @@ class BotPollHandler(_BotBaseHandler):
     # pushed to the server, so be diligent about it.
     #
 
-    # TODO(maruel): Remove this and migrate all use cases in bot_config.py
-    # on_bot_idle().
-    # Bot may need a reboot if it is running for too long. We do not reboot
-    # quarantined bots.
-    needs_restart, restart_message = bot_management.should_restart_bot(
-        res.bot_id, res.state)
-    if needs_restart:
-      bot_event('request_restart')
-      self._cmd_host_reboot(restart_message)
-      return
-
     # If a bot advertise itself with a key state 'maintenance', do not give
     # a task to it until this key is removed.
     #
@@ -653,14 +642,6 @@ class BotPollHandler(_BotBaseHandler):
     out = {
       'cmd': 'update',
       'version': expected_version,
-    }
-    self.send_response(out)
-
-  def _cmd_host_reboot(self, message):
-    logging.info('Rebooting host: %s', message)
-    out = {
-      'cmd': 'host_reboot',
-      'message': message,
     }
     self.send_response(out)
 

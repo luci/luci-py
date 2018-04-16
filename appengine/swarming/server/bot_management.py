@@ -69,11 +69,6 @@ from server import config
 from server import task_pack
 
 
-# Margin of randomization of BOT_REBOOT_PERIOD_SECS. Per-bot period will be in
-# range [period * (1 - margin), period * (1 + margin)).
-BOT_REBOOT_PERIOD_RANDOMIZATION_MARGIN = 0.2
-
-
 ### Models.
 
 # There is one BotRoot entity per bot id. Multiple bots could run on a single
@@ -452,46 +447,6 @@ def bot_event(
     bot_info.task_id = ''
 
   datastore_utils.store_new_version(event, BotRoot, [bot_info])
-
-
-def get_bot_reboot_period(bot_id, state):
-  """Returns how long (in sec) a bot should run before being rebooted.
-
-  Uses state['periodic_reboot_secs'] as a baseline, deterministically
-  pseudo-randomizing it it on per-bot basis, to make sure that bots do not
-  reboot all at once.
-  """
-  periodic_reboot_secs = state.get('periodic_reboot_secs')
-  if not isinstance(periodic_reboot_secs, (float, int)):
-    return None
-
-  # Seed stays constant during lifetime of a swarming_bot process, but changes
-  # whenever bot is restarted. That way all bots on average restart every
-  # periodic_reboot_secs.
-  seed_bytes = hashlib.sha256(
-      '%s%s' % (bot_id, state.get('started_ts'))).digest()[:2]
-  seed = ord(seed_bytes[0]) + 256 * ord(seed_bytes[1])
-  factor = 2 * (seed - 32768) / 65536.0 * BOT_REBOOT_PERIOD_RANDOMIZATION_MARGIN
-  return int(periodic_reboot_secs * (1.0 + factor))
-
-
-def should_restart_bot(bot_id, state):
-  """Decides whether a bot needs to be restarted.
-
-  Args:
-    bot_id: ID of the bot.
-    state: dict representing current bot state.
-
-  Returns:
-    Tuple (True to restart, text message explaining the reason).
-  """
-  # Periodically reboot bots to workaround OS level leaks (especially on Win).
-  running_time = state.get('running_time', 0)
-  assert isinstance(running_time, (int, float))
-  period = get_bot_reboot_period(bot_id, state)
-  if period and running_time > period:
-    return True, 'Periodic reboot: running longer than %ds' % period
-  return False, ''
 
 
 def cron_update_bot_info():
