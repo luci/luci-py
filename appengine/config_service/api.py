@@ -468,6 +468,12 @@ class ConfigApi(remote.Service):
   @auth.public # ACL check inside
   def reimport(self, request):
     """Reimports a config set."""
+    try:
+      validation.validate_config_set(request.config_set)
+    except ValueError:
+      raise endpoints.BadRequestException(
+          'invalid config_set "%s"' % request.config_set)
+
     if not acl.can_reimport(request.config_set):
       raise endpoints.ForbiddenException(
           '%s is now allowed to reimport %r' % (
