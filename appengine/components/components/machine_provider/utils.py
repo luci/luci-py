@@ -42,7 +42,7 @@ def add_machine(dimensions, policies):
   """
   logging.info('Sending add_machine request')
   return net.json_request(
-      '%s/_ah/api/catalog/v1/add_machine' %
+      '%s/api/catalog/v1/add_machine' %
           MachineProviderConfiguration.get_instance_url(),
       method='POST',
       payload=utils.to_json_encodable({
@@ -61,7 +61,7 @@ def add_machines(requests):
   """
   logging.info('Sending batched add_machines request')
   return net.json_request(
-      '%s/_ah/api/catalog/v1/add_machines' %
+      '%s/api/catalog/v1/add_machines' %
           MachineProviderConfiguration.get_instance_url(),
       method='POST',
       payload=utils.to_json_encodable({'requests': requests}),
@@ -77,7 +77,7 @@ def delete_machine(dimensions):
   """
   logging.info('Sending delete_machine request')
   return net.json_request(
-      '%s/_ah/api/catalog/v1/delete_machine' %
+      '%s/api/catalog/v1/delete_machine' %
           MachineProviderConfiguration.get_instance_url(),
       method='POST',
       payload=utils.to_json_encodable({
@@ -96,7 +96,7 @@ def instruct_machine(request_id, swarming_server):
     swarming_server: URL of the Swarming server to connect to.
   """
   return net.json_request(
-      '%s/_ah/api/machine_provider/v1/instruct' %
+      '%s/api/machine_provider/v1/instruct' %
           MachineProviderConfiguration.get_instance_url(),
       method='POST',
       payload=utils.to_json_encodable({
@@ -116,7 +116,7 @@ def lease_machine(request):
     request: An rpc_messages.LeaseRequest instance.
   """
   return net.json_request(
-      '%s/_ah/api/machine_provider/v1/lease' %
+      '%s/api/machine_provider/v1/lease' %
           MachineProviderConfiguration.get_instance_url(),
       method='POST',
       payload=utils.to_json_encodable(request),
@@ -132,7 +132,7 @@ def lease_machines(requests):
   """
   logging.info('Sending batched lease_machines request')
   return net.json_request(
-      '%s/_ah/api/machine_provider/v1/batched_lease' %
+      '%s/api/machine_provider/v1/batched_lease' %
           MachineProviderConfiguration.get_instance_url(),
       method='POST',
       payload=utils.to_json_encodable({'requests': requests}),
@@ -148,7 +148,7 @@ def release_machine(client_request_id):
       the lease request.
   """
   return net.json_request(
-      '%s/_ah/api/machine_provider/v1/release' %
+      '%s/api/machine_provider/v1/release' %
           MachineProviderConfiguration.get_instance_url(),
       method='POST',
       payload=utils.to_json_encodable({'request_id': client_request_id}),
@@ -164,7 +164,7 @@ def retrieve_machine(hostname, backend=None):
     backend: Backend the machine belongs to.
   """
   return net.json_request(
-      '%s/_ah/api/catalog/v1/get' %
+      '%s/api/catalog/v1/get' %
           MachineProviderConfiguration.get_instance_url(),
       method='POST',
       payload=utils.to_json_encodable({
