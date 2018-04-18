@@ -164,6 +164,13 @@
       .highlighted {
         background-color: #fffc6c;
       }
+
+      /* Tell all the second td in a tr (i.e. the content) to break
+         to avoid wrapping.  This keeps the first columns nice and
+         unbroken without having to add a bunch of classes.*/
+      .task-info td:nth-child(2) {
+        word-break: break-word;
+      }
     </style>
 
     <url-param name="id"
@@ -375,6 +382,14 @@
                     </tr>
                   </template>
                 </template>
+                <tr hidden$="[[!_commitText(_request)]]">
+                  <td>Associated Commit</td>
+                  <td>
+                    <a href$="[[_commitLink(_request)]]">
+                      [[_commitText(_request)]]
+                    </a>
+                  </td>
+                </tr>
                 <template is="dom-if" if="[[_not(_request_detail)]]">
                   <tr>
                     <td>More Details</td>
@@ -1046,6 +1061,21 @@
         return args.join(" ");
       },
 
+      _commitText: function(request) {
+        var rev = this._tag(request, "source_revision");
+        if (rev) {
+          return rev.substring(0, 12);
+        }
+      },
+
+      _commitLink: function(request) {
+        var rev = this._tag(request, "source_revision");
+        var url = this._tag(request, "source_repo");
+        if (rev && url) {
+          return url.replace("%s", rev);
+        }
+      },
+
       _beesStr: function(result) {
         if (!result || !result.costs_usd || !result.costs_usd.length) {
           return '';
@@ -1181,8 +1211,8 @@
         return a !== b;
       },
 
-      _noMilo: function(result) {
-        return !(this._tag(result, "allow_milo") || this._tag(result, "luci_project"));
+      _noMilo: function(request) {
+        return !(this._tag(request, "allow_milo") || this._tag(request, "luci_project"));
       },
 
       _promptClosed: function(e) {
