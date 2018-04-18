@@ -35,29 +35,85 @@ from server import task_to_run
 # Method could be a function - pylint: disable=R0201
 
 
-def _gen_request(properties=None, **kwargs):
-  """Creates a TaskRequest."""
-  props = {
-    'command': [u'command1'],
-    'dimensions': {u'pool': [u'default']},
-    'env': {},
-    'execution_timeout_secs': 24*60*60,
-    'io_timeout_secs': None,
+def _gen_cipd(**kwargs):
+  out = {
+    u'client_package': {
+      u'package_name': u'infra/tools/cipd/${platform}',
+      u'version': u'git_revision:deadbeef',
+    },
+    u'packages': [{
+      u'package_name': u'rm',
+      u'path': u'bin',
+      u'version': u'git_revision:deadbeef',
+    }],
+    u'server': u'https://chrome-infra-packages.appspot.com',
   }
-  props.update(properties or {})
-  props['dimensions_data'] = props.pop('dimensions')
+  out.update(kwargs)
+  return out
+
+
+def _gen_properties(**kwargs):
+  """Creates a TaskProperties."""
+  out = {
+    u'cipd_input': _gen_cipd(),
+    u'command': [u'command1', u'arg1'],
+    u'dimensions': {
+      u'OS': [u'Windows-3.1.1'],
+      u'hostname': [u'localhost'],
+      u'pool': [u'default'],
+    },
+    u'env': {u'foo': u'bar', u'joe': u'2'},
+    u'env_prefixes': {u'PATH': [u'local/path']},
+    u'execution_timeout_secs': 24*60*60,
+    u'grace_period_secs': 30,
+    u'idempotent': False,
+    u'inputs_ref': {
+      u'isolatedserver': u'https://isolateserver.appspot.com',
+      u'namespace': u'default-gzip',
+    },
+    u'io_timeout_secs': None,
+    u'has_secret_bytes': u'secret_bytes' in kwargs,
+  }
+  out.update(kwargs)
+  out[u'dimensions_data'] = out.pop(u'dimensions')
+  return out
+
+
+def _gen_request_slices(**kwargs):
+  """Creates a new style TaskRequest."""
   now = utils.utcnow()
   args = {
-    'created_ts': now,
-    'name': 'Request name',
-    'priority': 50,
-    'properties': task_request.TaskProperties(**props),
-    'expiration_ts': now + datetime.timedelta(seconds=60),
-    'manual_tags': [u'tag:1'],
-    'user': 'Jesus',
+    u'created_ts': now,
+    u'manual_tags': [u'tag:1'],
+    u'name': u'Request name',
+    u'priority': 50,
+    u'user': u'Jesus',
   }
   args.update(kwargs)
-  return task_request.TaskRequest(**args)
+  # Note that ndb model constructor accepts dicts for structured properties.
+  req = task_request.TaskRequest(**args)
+  task_request.init_new_request(req, True)
+  return req
+
+
+def _gen_request(properties=None, **kwargs):
+  """Creates an old style TaskRequest."""
+  now = utils.utcnow()
+  properties = properties or {}
+  args = {
+    u'created_ts': now,
+    u'name': u'Request name',
+    u'priority': 50,
+    u'properties': _gen_properties(**properties),
+    u'expiration_ts': now + datetime.timedelta(seconds=60),
+    u'manual_tags': [u'tag:1'],
+    u'user': u'Jesus',
+  }
+  args.update(kwargs)
+  # Note that ndb model constructor accepts dicts for structured properties.
+  req = task_request.TaskRequest(**args)
+  task_request.init_new_request(req, True)
+  return req
 
 
 def _yield_next_available_task_to_dispatch(bot_dimensions, deadline):
@@ -79,8 +135,6 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     self.now = datetime.datetime(2014, 01, 02, 03, 04, 05, 06)
     self.mock_now(self.now)
     auth_testing.mock_get_current_identity(self)
-    # The default expiration_secs for _gen_request().
-    self.expiration_ts = self.now + datetime.timedelta(seconds=60)
     # Setup the backend to handle task queues for 'task-dimensions'.
     self.app = webtest.TestApp(
         handlers_backend.create_application(True),
@@ -93,7 +147,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
   def _enqueue(self, *args, **kwargs):
     return self._enqueue_orig(*args, use_dedicated_module=False, **kwargs)
 
-  def mkreq(self, req, nb_task=1):
+  def mkreq(self, nb_task, req):
     """Stores a new initialized TaskRequest.
 
     nb_task is 1 or 0. It represents the number of GAE task queue
@@ -101,16 +155,16 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     request.task_slice(0).properties.dimensions is new (unseen before) and a GAE
     task queue was enqueued to process it, 0 otherwise.
     """
-    task_request.init_new_request(req, True)
+    # It is important that the task queue to be asserted.
     task_queues.assert_task(req)
     self.assertEqual(nb_task, self.execute_tasks())
     req.key = task_request.new_request_key()
     req.put()
     return req
 
-  def _gen_new_task_to_run(self, nb_task=1, **kwargs):
+  def _gen_new_task_to_run(self, nb_task, **kwargs):
     """Returns TaskRequest, TaskToRun saved in the DB."""
-    request = self.mkreq(_gen_request(**kwargs), nb_task=nb_task)
+    request = self.mkreq(nb_task, _gen_request(**kwargs))
     to_run = task_to_run.new_task_to_run(request, 1, 0)
     to_run.put()
     return request, to_run
@@ -125,14 +179,14 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     self.assertFalse(missing)
 
   def test_task_to_run_key_to_request_key(self):
-    request = self.mkreq(_gen_request())
+    request = self.mkreq(1, _gen_request())
     task_key = task_to_run.request_to_task_to_run_key(request, 1, 0)
     actual = task_to_run.task_to_run_key_to_request_key(task_key)
     self.assertEqual(request.key, actual)
 
   def test_request_to_task_to_run_key(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
-    request = self.mkreq(_gen_request())
+    request = self.mkreq(1, _gen_request())
     # Ensures that the hash value is constant for the same input.
     self.assertEqual(
         ndb.Key('TaskRequest', 0x7e296460f77ff77e, 'TaskToRun', 1),
@@ -184,17 +238,21 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
   def test_new_task_to_run(self):
     self.mock(random, 'getrandbits', lambda _: 0x12)
     request_dimensions = {u'os': [u'Windows-3.1.1'], u'pool': [u'default']}
-    data = _gen_request(
-        properties={
-          'command': [u'command1', u'arg1'],
-          'dimensions': request_dimensions,
-          'env': {u'foo': u'bar'},
-          'execution_timeout_secs': 30,
-        },
+    data = _gen_request_slices(
+        task_slices=[
+          {
+            'properties': {
+              'command': [u'command1', u'arg1'],
+              'dimensions_data': request_dimensions,
+              'env': {u'foo': u'bar'},
+              'execution_timeout_secs': 30,
+            },
+            'expiration_secs': 31,
+          },
+        ],
         priority=20,
-        created_ts=self.now,
-        expiration_ts=self.now+datetime.timedelta(seconds=31))
-    request = self.mkreq(data)
+        created_ts=self.now)
+    request = self.mkreq(1, data)
     # request.created_ts is used.
     self.mock_now(self.now, 1)
     expected = {
@@ -211,11 +269,11 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     expected['try_number'] = 2
     actual = task_to_run.new_task_to_run(request, 2, 0).to_dict()
     self.assertEqual(expected, actual)
-    with self.assertRaises(AssertionError):
+    with self.assertRaises(IndexError):
       task_to_run.new_task_to_run(request, 1, 1)
 
   def test_new_task_to_run_limits(self):
-    request = self.mkreq(_gen_request(), 1)
+    request = self.mkreq(1, _gen_request())
     with self.assertRaises(AssertionError):
       task_to_run.new_task_to_run(request, 0, 0)
     task_to_run.new_task_to_run(request, 1, 0)
@@ -240,7 +298,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         priority=20,
         created_ts=self.now,
         expiration_ts=self.now+datetime.timedelta(seconds=31))
-    request = self.mkreq(data)
+    request = self.mkreq(1, data)
     task_to_run.new_task_to_run(request, 1, 0).put()
 
     # Create a second with higher priority.
@@ -255,7 +313,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
         priority=10,
         created_ts=self.now,
         expiration_ts=self.now+datetime.timedelta(seconds=31))
-    task_to_run.new_task_to_run(self.mkreq(data, nb_task=0), 1, 0).put()
+    task_to_run.new_task_to_run(self.mkreq(0, data), 1, 0).put()
 
     expected = [
       {
@@ -315,7 +373,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
 
   def test_yield_next_available_task_to_dispatch_none(self):
     request_dimensions = {u'os': [u'Windows-3.1.1'], u'pool': [u'default']}
-    self._gen_new_task_to_run(properties=dict(dimensions=request_dimensions))
+    self._gen_new_task_to_run(1, properties=dict(dimensions=request_dimensions))
     # Bot declares no dimensions, so it will fail to match.
     bot_dimensions = {u'id': [u'bot1'], u'pool': [u'default']}
     actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
@@ -324,7 +382,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
   def test_yield_next_available_task_to_dispatch_none_mismatch(self):
     request_dimensions = {u'os': [u'Windows-3.1.1'], u'pool': [u'default']}
     self._gen_new_task_to_run(
-        properties=dict(dimensions=request_dimensions))
+        1, properties=dict(dimensions=request_dimensions))
     # Bot declares other dimensions, so it will fail to match.
     bot_dimensions = {
       u'id': [u'bot1'],
@@ -341,7 +399,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       u'pool': [u'default'],
     }
     _request, _ = self._gen_new_task_to_run(
-        properties=dict(dimensions=request_dimensions))
+        1, properties=dict(dimensions=request_dimensions))
     # Bot declares exactly same dimensions so it matches.
     bot_dimensions = request_dimensions.copy()
     bot_dimensions[u'id'] = [u'bot1']
@@ -349,7 +407,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     expected = [
       {
         'created_ts': self.now,
-        'expiration_ts': self.expiration_ts,
+        'expiration_ts': self.now + datetime.timedelta(minutes=1),
         'queue_number': '0x613fbb330c8ede72',
         'task_slice_index': 0,
         'try_number': 1,
@@ -360,7 +418,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
   def test_yield_next_available_task_to_dispatch_subset(self):
     request_dimensions = {u'os': [u'Windows-3.1.1'], u'pool': [u'default']}
     _request, _ = self._gen_new_task_to_run(
-        properties=dict(dimensions=request_dimensions))
+        1, properties=dict(dimensions=request_dimensions))
     # Bot declares more dimensions than needed, this is fine and it matches.
     bot_dimensions = {
       u'id': [u'localhost'],
@@ -371,7 +429,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     expected = [
       {
         'created_ts': self.now,
-        'expiration_ts': self.expiration_ts,
+        'expiration_ts': self.now + datetime.timedelta(minutes=1),
         'queue_number': '0x1a3aa6630c8ede72',
         'task_slice_index': 0,
         'try_number': 1,
@@ -382,14 +440,14 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
   def test_yield_next_available_task_shard(self):
     request_dimensions = {u'os': [u'Windows-3.1.1'], u'pool': [u'default']}
     _request, _ = self._gen_new_task_to_run(
-        properties=dict(dimensions=request_dimensions))
+        1, properties=dict(dimensions=request_dimensions))
     bot_dimensions = request_dimensions.copy()
     bot_dimensions[u'id'] = [u'bot1']
     actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
     expected = [
       {
         'created_ts': self.now,
-        'expiration_ts': self.expiration_ts,
+        'expiration_ts': self.now + datetime.timedelta(minutes=1),
         'queue_number': '0x1a3aa6630c8ede72',
         'task_slice_index': 0,
         'try_number': 1,
@@ -400,7 +458,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
   def test_yield_next_available_task_to_dispatch_subset_multivalue(self):
     request_dimensions = {u'os': [u'Windows-3.1.1'], u'pool': [u'default']}
     _request, _ = self._gen_new_task_to_run(
-        properties=dict(dimensions=request_dimensions))
+        1, properties=dict(dimensions=request_dimensions))
     # Bot declares more dimensions than needed.
     bot_dimensions = {
       u'id': [u'localhost'],
@@ -411,7 +469,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     expected = [
       {
         'created_ts': self.now,
-        'expiration_ts': self.expiration_ts,
+        'expiration_ts': self.now + datetime.timedelta(minutes=1),
         'queue_number': '0x1a3aa6630c8ede72',
         'task_slice_index': 0,
         'try_number': 1,
@@ -427,13 +485,13 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       u'pool': [u'default'],
     }
     _request1, _ = self._gen_new_task_to_run(
-        properties=dict(dimensions=request_dimensions_1))
+        1, properties=dict(dimensions=request_dimensions_1))
 
     # It's normally time ordered.
     self.mock_now(self.now, 1)
     request_dimensions_2 = {u'id': [u'localhost'], u'pool': [u'default']}
     _request2, _ = self._gen_new_task_to_run(
-        properties=dict(dimensions=request_dimensions_2), nb_task=0)
+        0, properties=dict(dimensions=request_dimensions_2))
 
     bot_dimensions = {
       u'foo': [u'bar'],
@@ -445,14 +503,14 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     expected = [
       {
         'created_ts': self.now,
-        'expiration_ts': self.expiration_ts,
+        'expiration_ts': self.now + datetime.timedelta(minutes=1),
         'queue_number': '0x613fbb330c8ede72',
         'task_slice_index': 0,
         'try_number': 1,
       },
       {
         'created_ts': self.now + datetime.timedelta(seconds=1),
-        'expiration_ts': self.expiration_ts + datetime.timedelta(seconds=1),
+        'expiration_ts': self.now + datetime.timedelta(minutes=1, seconds=1),
         'queue_number': '0x5385bf748c8ede7c',
         'task_slice_index': 0,
         'try_number': 1,
@@ -472,14 +530,14 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
       u'pool': [u'default'],
     }
     _request1, _ = self._gen_new_task_to_run(
-        properties=dict(dimensions=request_dimensions_1))
+        1, properties=dict(dimensions=request_dimensions_1))
 
     # The second shard is added before the first, potentially because of a
     # desynchronized clock. It'll have higher priority.
     self.mock_now(self.now, -1)
     request_dimensions_2 = {u'id': [u'localhost'], u'pool': [u'default']}
     _request2, _ = self._gen_new_task_to_run(
-        properties=dict(dimensions=request_dimensions_2), nb_task=0)
+        0, properties=dict(dimensions=request_dimensions_2))
 
     bot_dimensions = {
       u'foo': [u'bar'],
@@ -490,16 +548,16 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     actual = _yield_next_available_task_to_dispatch(bot_dimensions, None)
     expected = [
       {
-        'created_ts': datetime.datetime(2014, 1, 2, 3, 4, 4, 6),
+        'created_ts': self.now + datetime.timedelta(seconds=-1),
         # Due to time being late on the second requester frontend.
-        'expiration_ts': self.expiration_ts - datetime.timedelta(seconds=1),
+        'expiration_ts': self.now + datetime.timedelta(minutes=1, seconds=-1),
         'queue_number': '0x5385bf748c8ede68',
         'task_slice_index': 0,
         'try_number': 1,
       },
       {
         'created_ts': self.now,
-        'expiration_ts': self.expiration_ts,
+        'expiration_ts': self.now + datetime.timedelta(minutes=1),
         'queue_number': '0x613fbb330c8ede72',
         'task_slice_index': 0,
         'try_number': 1,
@@ -512,28 +570,28 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     # Tasks added later but with higher priority are returned first.
     request_dimensions = {u'os': [u'Windows-3.1.1'], u'pool': [u'default']}
     self._gen_new_task_to_run(
-        properties=dict(dimensions=request_dimensions), priority=50)
+        1, properties=dict(dimensions=request_dimensions), priority=50)
 
     # This one is later but has higher priority.
     self.mock_now(self.now, 60)
     request = self.mkreq(
+        0,
         _gen_request(
-            properties=dict(dimensions=request_dimensions), priority=10),
-        nb_task=0)
+            properties=dict(dimensions=request_dimensions), priority=10))
     task_to_run.new_task_to_run(request, 1, 0).put()
 
     # It should return them all, in the expected order: lowest priority first.
     expected = [
       {
-        'created_ts': datetime.datetime(2014, 1, 2, 3, 5, 5, 6),
-        'expiration_ts': datetime.datetime(2014, 1, 2, 3, 6, 5, 6),
+        'created_ts': self.now + datetime.timedelta(minutes=1),
+        'expiration_ts': self.now + datetime.timedelta(minutes=2),
         'queue_number': '0x1a3aa663028ee0ca',
         'task_slice_index': 0,
         'try_number': 1,
       },
       {
         'created_ts': self.now,
-        'expiration_ts': datetime.datetime(2014, 1, 2, 3, 5, 5, 6),
+        'expiration_ts': self.now + datetime.timedelta(minutes=1),
         'queue_number': '0x1a3aa6630c8ede72',
         'task_slice_index': 0,
         'try_number': 1,
@@ -551,29 +609,29 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     # High priority tasks added later with other dimensions are returned first.
     request_dimensions_1 = {u'os': [u'Windows-3.1.1'], u'pool': [u'default']}
     _request1, _ = self._gen_new_task_to_run(
-        properties=dict(dimensions=request_dimensions_1), priority=50)
+        1, properties=dict(dimensions=request_dimensions_1), priority=50)
 
     # This one is later but has higher priority.
     self.mock_now(self.now, 60)
     request_dimensions_2 = {u'id': [u'localhost'], u'pool': [u'default']}
     request2 = self.mkreq(
+        0,
         _gen_request(
-            properties=dict(dimensions=request_dimensions_2), priority=10),
-        nb_task=0)
+            properties=dict(dimensions=request_dimensions_2), priority=10))
     task_to_run.new_task_to_run(request2, 1, 0).put()
 
     # It should return them all, in the expected order: lowest priority first.
     expected = [
       {
-        'created_ts': datetime.datetime(2014, 1, 2, 3, 5, 5, 6),
-        'expiration_ts': datetime.datetime(2014, 1, 2, 3, 6, 5, 6),
+        'created_ts': self.now + datetime.timedelta(minutes=1),
+        'expiration_ts': self.now + datetime.timedelta(minutes=2),
         'queue_number': '0x5385bf74828ee0ca',
         'task_slice_index': 0,
         'try_number': 1,
       },
       {
         'created_ts': self.now,
-        'expiration_ts': datetime.datetime(2014, 1, 2, 3, 5, 5, 6),
+        'expiration_ts': self.now + datetime.timedelta(minutes=1),
         'queue_number': '0x1a3aa6630c8ede72',
         'task_slice_index': 0,
         'try_number': 1,
@@ -618,7 +676,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     expected = [
       {
         'created_ts': self.now,
-        'expiration_ts': self.expiration_ts,
+        'expiration_ts': self.now + datetime.timedelta(minutes=1),
         'queue_number': '0x3f6b0f050c8ede72',
         'task_slice_index': 0,
         'try_number': 1,
@@ -629,11 +687,14 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
   def test_yield_next_available_task_to_run_task_terminate(self):
     request_dimensions = {u'id': [u'fake-id']}
     _request, task = self._gen_new_task_to_run(
+        0,
         priority=0,
         properties=dict(
+            cipd_input=None,
             command=[], dimensions=request_dimensions,
-            execution_timeout_secs=0, grace_period_secs=0),
-        nb_task=0)
+            env=None, env_prefixes=None,
+            inputs_ref=None,
+            execution_timeout_secs=0, grace_period_secs=0))
     self.assertTrue(
         task.key.parent().get().task_slice(0).properties.is_terminate)
     # Bot declares exactly same dimensions so it matches.
@@ -643,7 +704,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     expected = [
       {
         'created_ts': self.now,
-        'expiration_ts': self.expiration_ts,
+        'expiration_ts': self.now + datetime.timedelta(minutes=1),
         'queue_number': '0x54795e3c800ede72',
         'task_slice_index': 0,
         'try_number': 1,
@@ -653,11 +714,12 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
 
   def test_yield_expired_task_to_run(self):
     self._gen_new_task_to_run(
+        1,
         created_ts=self.now,
         expiration_ts=self.now+datetime.timedelta(seconds=60))
     bot_dimensions = {u'id': [u'bot1'], u'pool': [u'default']}
     self.assertEqual(
-        1,
+        0,
         len(_yield_next_available_task_to_dispatch(bot_dimensions, None)))
     self.assertEqual(
         0, len(list(task_to_run.yield_expired_task_to_run())))
@@ -668,14 +730,14 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     # expire them "inline" instead of waiting for a cron job.
     self.mock_now(self.now, 61)
     self.assertEqual(
-        1, len(_yield_next_available_task_to_dispatch(bot_dimensions, None)))
+        0, len(_yield_next_available_task_to_dispatch(bot_dimensions, None)))
     self.assertEqual(
         1, len(list(task_to_run.yield_expired_task_to_run())))
 
   def test_is_reapable(self):
     request_dimensions = {u'os': [u'Windows-3.1.1'], u'pool': [u'default']}
     _, to_run = self._gen_new_task_to_run(
-        properties=dict(dimensions=request_dimensions))
+        1, properties=dict(dimensions=request_dimensions))
     bot_dimensions = {
       u'id': [u'localhost'],
       u'os': [u'Windows-3.1.1'],
@@ -692,7 +754,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
   def test_set_lookup_cache(self):
     request_dimensions = {u'os': [u'Windows-3.1.1'], u'pool': [u'default']}
     _, to_run = self._gen_new_task_to_run(
-        properties=dict(dimensions=request_dimensions))
+        1, properties=dict(dimensions=request_dimensions))
     lookup = lambda k: task_to_run._lookup_cache_is_taken_async(k).get_result()
     self.assertEqual(False, lookup(to_run.key))
     task_to_run.set_lookup_cache(to_run.key, True)
