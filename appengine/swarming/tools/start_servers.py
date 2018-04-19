@@ -50,7 +50,7 @@ class LocalServers(object):
   def start(self):
     """Starts both the Swarming and Isolate servers."""
     self._swarming_server = local_app.LocalApplication(
-        APP_DIR, 9050, self._listen_all, self._root)
+        APP_DIR, 9050, self._listen_all, self._root, 'swarming-local')
     self._swarming_server.start()
 
     # We wait for the Swarming server to be started up so the isolate server

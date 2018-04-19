@@ -71,8 +71,8 @@ def find_free_ports(host, base_port, count):
 class LocalApplication(object):
   """GAE application running locally via dev_appserver.py."""
 
-  def __init__(self, app_dir, base_port, listen_all, root):
-    self._app = gae_sdk_utils.Application(app_dir)
+  def __init__(self, app_dir, base_port, listen_all, root, app_id=None):
+    self._app = gae_sdk_utils.Application(app_dir, app_id)
     self._base_port = base_port
     self._client = None
     self._log = None
