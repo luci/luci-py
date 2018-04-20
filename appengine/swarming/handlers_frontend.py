@@ -165,8 +165,9 @@ class UIHandler(auth.AuthenticatingHandler):
         # We assume the template specifies '%s' in its last path component.
         # We strip it to get a "parent" path that we can put into CSP. Note that
         # whitelisting an entire display server domain is unnecessary wide.
-        assert tmpl.startswith('https://'), tmpl
         csp['child-src'].append(tmpl[:tmpl.rfind('/')+1])
+    extra = config.settings().extra_child_src_csp_url
+    csp['child-src'].extend(extra)
     return csp
 
 

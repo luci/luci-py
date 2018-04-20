@@ -57,6 +57,10 @@ message SettingsCfg {
 
   // Sets the default gRPC proxy for the bot's Swarming server calls.
   string bot_swarming_grpc_proxy = 15;
+
+  // Any extra urls that should be added to child-src, e.g. anything that
+  // will be linked to from the display server.
+  repeated string extra_child_src_csp_url = 16;
 }
 
 

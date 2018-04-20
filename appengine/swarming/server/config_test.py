@@ -121,6 +121,23 @@ class ConfigTest(test_case.TestCase):
         'reusable_task_age_secs cannot be more than a year',
       ])
 
+    self.validator_test(
+        config._validate_settings,
+        config_pb2.SettingsCfg(
+            display_server_url_template='http://foo/bar',
+            extra_child_src_csp_url=['http://alpha/beta', 'https://']),
+      [
+        'display_server_url_template URL http://foo/bar must be https',
+        'extra_child_src_csp_url URL http://alpha/beta must be https',
+        'extra_child_src_csp_url URL https:// must be https',
+      ])
+
+    self.validator_test(
+        config._validate_settings,
+        config_pb2.SettingsCfg(
+            display_server_url_template='https://foo/',
+            extra_child_src_csp_url=['https://alpha/beta/']), [])
+
     self.validator_test(config._validate_settings, config_pb2.SettingsCfg(), [])
 
     self.validator_test(
