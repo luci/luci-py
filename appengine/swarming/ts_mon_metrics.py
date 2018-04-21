@@ -455,6 +455,8 @@ def _extract_job_fields(tags):
     spec_name = '%s:%s' % (
         tags_dict.get('master', ''),
         tags_dict.get('buildername', ''))
+    if tags_dict.get('build_is_experimental') == 'true':
+      spec_name += ':experimental'
 
   fields = {
       'project_id': tags_dict.get('project', ''),
