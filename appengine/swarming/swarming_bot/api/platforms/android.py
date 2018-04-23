@@ -187,6 +187,15 @@ def get_dimensions(devices):
   logging.info(
       'get_dimensions() (device part) took %gs' %
       round(time.time() - start, 1))
+
+  # Add gms core version
+  gms_core_versions = set()
+  for device in devices:
+    version = device.GetGMSCoreVersion()
+    if version:
+      gms_core_versions.add(version)
+  dimensions[u'device_gms_core_version'] = (sorted(gms_core_versions) or
+                                            ['unknown'])
   return dimensions
 
 
