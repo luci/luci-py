@@ -309,6 +309,9 @@ class RemoteClientGrpc(object):
     if len(command.inputs.files[0].hash) == 64:
       inferred_namespace = 'sha-256-flat'
 
+    outputs = command.expected_outputs.files[:]
+    outputs.extend(command.expected_outputs.directories)
+
     manifest = {
       'bot_id': self._session.bot_id,
       'dimensions' : {
@@ -327,7 +330,7 @@ class RemoteClientGrpc(object):
         'input' : command.inputs.files[0].hash,
         'server': self._server,
       },
-      'outputs': [o for o in command.expected_outputs.files],
+      'outputs': outputs,
       'task_id': lease.assignment,
       # These keys are only needed by raw commands. While this method
       # only supports isolated commands, the keys need to exist to avoid
