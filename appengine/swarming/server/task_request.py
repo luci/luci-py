@@ -474,6 +474,8 @@ class CipdInput(ndb.Model):
       raise datastore_errors.BadValueError('client_package is required')
     if self.client_package.path:
       raise datastore_errors.BadValueError('client_package.path must be unset')
+    # _pre_put_hook() doesn't recurse correctly into
+    # ndb.LocalStructuredProperty. Call the function manually.
     self.client_package._pre_put_hook()
 
     if not self.packages:
@@ -487,6 +489,8 @@ class CipdInput(ndb.Model):
     # same path.
     package_path_names = set()
     for p in self.packages:
+      # _pre_put_hook() doesn't recurse correctly into
+      # ndb.LocalStructuredProperty. Call the function manually.
       p._pre_put_hook()
       if not p.path:
         raise datastore_errors.BadValueError(
@@ -667,6 +671,8 @@ class TaskProperties(ndb.Model):
       raise datastore_errors.BadValueError(
           'extra_args require inputs_ref.isolated')
     if self.inputs_ref:
+      # _pre_put_hook() doesn't recurse correctly into
+      # ndb.LocalStructuredProperty. Call the function manually.
       self.inputs_ref._pre_put_hook()
     if len(self.command) > 256:
       raise datastore_errors.BadValueError(
@@ -682,6 +688,8 @@ class TaskProperties(ndb.Model):
     cache_names = set()
     cache_paths = set()
     for c in self.caches:
+      # _pre_put_hook() doesn't recurse correctly into
+      # ndb.LocalStructuredProperty. Call the function manually.
       c._pre_put_hook()
       if c.name in cache_names:
         raise datastore_errors.BadValueError(
@@ -695,6 +703,8 @@ class TaskProperties(ndb.Model):
 
     # Validate CIPD Input.
     if self.cipd_input:
+      # _pre_put_hook() doesn't recurse correctly into
+      # ndb.LocalStructuredProperty. Call the function manually.
       self.cipd_input._pre_put_hook()
       for p in self.cipd_input.packages:
         if p.path in cache_paths:
@@ -765,10 +775,16 @@ class TaskSlice(ndb.Model):
 
   def to_dict(self):
     # to_dict() doesn't recurse correctly into ndb.LocalStructuredProperty! It
-    # will call the default method and not the overiden one. :(
+    # will call the default method and not the overridden one. :(
     out = super(TaskSlice, self).to_dict(exclude=['properties'])
     out['properties'] = self.properties.to_dict()
     return out
+
+  def _pre_put_hook(self):
+    # _pre_put_hook() doesn't recurse correctly into
+    # ndb.LocalStructuredProperty. Call the function manually.
+    super(TaskSlice, self)._pre_put_hook()
+    self.properties._pre_put_hook()
 
 
 class TaskRequest(ndb.Model):
@@ -938,6 +954,8 @@ class TaskRequest(ndb.Model):
 
     if self.properties:
       # Old style TaskProperties.
+      # _pre_put_hook() doesn't recurse correctly into
+      # ndb.LocalStructuredProperty. Call the function manually.
       self.properties._pre_put_hook()
       if self.properties.is_terminate:
         if not self.priority == 0:
@@ -958,6 +976,8 @@ class TaskRequest(ndb.Model):
             'A maximum of 8 task_slices is supported')
 
       for tslice in self.task_slices:
+        # _pre_put_hook() doesn't recurse correctly into
+        # ndb.LocalStructuredProperty. Call the function manually.
         tslice._pre_put_hook()
 
       term = sum(1 for t in self.task_slices if t.properties.is_terminate)
@@ -1222,11 +1242,6 @@ def init_new_request(request, allow_high_priority):
   request.service_account = request.service_account or u'none'
   request.service_account_token = None
 
-  # This is useful to categorize the task.
-  assert not request.tags, 'Fix call site'
-  all_tags = set(request.manual_tags).union(_get_automatic_tags(request))
-  request.tags = sorted(all_tags)
-
   if request.task_slices:
     exp = 0
     for t in request.task_slices:
@@ -1235,6 +1250,11 @@ def init_new_request(request, allow_high_priority):
     # message_conversion.new_task_request_from_rpc() ensures both task_slices
     # and expiration_secs cannot be used simultaneously.
     request.expiration_ts = request.created_ts + datetime.timedelta(seconds=exp)
+
+  # This is useful to categorize the task.
+  assert not request.tags, 'Fix call site: %s' % request.tags
+  all_tags = set(request.manual_tags).union(_get_automatic_tags(request))
+  request.tags = sorted(all_tags)
 
 
 def validate_priority(priority):
