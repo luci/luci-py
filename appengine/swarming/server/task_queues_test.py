@@ -42,9 +42,9 @@ def _assert_bot(dimensions=None):
   task_queues.assert_bot_async(bot_dimensions).get_result()
 
 
-def _gen_request(properties=None):
-  """Creates a TaskRequest that expires in 24h."""
-  props = {
+def _gen_properties(**kwargs):
+  """Creates a TaskProperties."""
+  args = {
     'command': [u'command1'],
     'dimensions': {
       u'cpu': [u'x86-64'],
@@ -55,19 +55,29 @@ def _gen_request(properties=None):
     'execution_timeout_secs': 24*60*60,
     'io_timeout_secs': None,
   }
-  props.update(properties or {})
+  args.update(kwargs)
+  args[u'dimensions_data'] = args.pop(u'dimensions')
+  return task_request.TaskProperties(**args)
+
+
+def _gen_request(properties=None):
+  """Creates a TaskRequest."""
   now = utils.utcnow()
-  props[u'dimensions_data'] = props.pop(u'dimensions')
   args = {
     'created_ts': now,
+    'manual_tags': [u'tag:1'],
     'name': 'Request name',
     'priority': 50,
-    'properties': task_request.TaskProperties(**props),
-    'expiration_ts': now + datetime.timedelta(seconds=60),
-    'manual_tags': [u'tag:1'],
+    'task_slices': [
+      task_request.TaskSlice(
+          expiration_secs=60,
+          properties=properties or _gen_properties()),
+    ],
     'user': 'Jesus',
   }
-  return task_request.TaskRequest(**args)
+  req = task_request.TaskRequest(**args)
+  task_request.init_new_request(req, True)
+  return req
 
 
 class TaskQueuesApiTest(test_env_handlers.AppTestBase):
@@ -87,7 +97,6 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
 
   def _assert_task(self, tasks=1):
     request = _gen_request()
-    task_request.init_new_request(request, True)
     task_queues.assert_task(request)
     self.assertEqual(tasks, self.execute_tasks())
     return request
@@ -238,8 +247,8 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     # Assert a task that includes an 'id' dimension. No task queue is triggered
     # in this case, rebuild_task_cache() is called inlined.
     _assert_bot()
-    request = _gen_request(properties={u'dimensions': {u'id': [u'bot1']}})
-    task_request.init_new_request(request, True)
+    request = _gen_request(
+        properties=_gen_properties(dimensions={u'id': [u'bot1']}))
     task_queues.assert_task(request)
     self.assertEqual(0, self.execute_tasks())
     self.assert_count(1, bot_management.BotInfo)

@@ -47,31 +47,33 @@ from proto import config_pb2
 # pylint: disable=W0212,W0612
 
 
-def gen_props(**kwargs):
-  """Returns an initialized task_request.TaskProperties."""
-  out = {
+def _gen_properties(**kwargs):
+  """Creates a TaskProperties."""
+  args = {
     'command': [u'command1'],
     'dimensions': {u'os': [u'Windows-3.1.1'], u'pool': [u'default']},
     'env': {},
     'execution_timeout_secs': 24*60*60,
     'io_timeout_secs': None,
   }
-  out.update(kwargs)
-  out['dimensions_data'] = out.pop('dimensions')
-  return task_request.TaskProperties(**out)
+  args.update(kwargs)
+  args['dimensions_data'] = args.pop('dimensions')
+  return task_request.TaskProperties(**args)
 
 
-def gen_request(**kwargs):
+def _gen_request_slices(**kwargs):
   """Returns an initialized task_request.TaskRequest."""
   now = utils.utcnow()
   args = {
     # Don't be confused, this is not part of the API. This code is constructing
     # a DB entity, not a swarming_rpcs.NewTaskRequest.
     u'created_ts': now,
+    u'manual_tags': [u'tag:1'],
     u'name': u'yay',
     u'priority': 50,
-    u'expiration_ts': now + datetime.timedelta(seconds=60),
-    u'manual_tags': [u'tag:1'],
+    u'task_slices': [
+      task_request.TaskSlice(expiration_secs=60, properties=_gen_properties()),
+    ],
     u'user': u'Jesus',
   }
   args.update(kwargs)
@@ -80,7 +82,7 @@ def gen_request(**kwargs):
   return ret
 
 
-def get_results(request_key):
+def _get_results(request_key):
   """Fetches all task results for a specified TaskRequest ndb.Key.
 
   Returns:
@@ -223,7 +225,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     nb_task is 1 if a GAE task queue rebuild-task-cache was enqueued.
     """
     self.assertEqual(0, self.execute_tasks())
-    request = gen_request(**kwargs)
+    request = _gen_request_slices(**kwargs)
     result_summary = task_scheduler.schedule_request(request, None)
     # State will be either PENDING or COMPLETED (for deduped task)
     self.assertEqual(nb_task, self.execute_tasks())
@@ -267,7 +269,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_bot_reap_task(self):
     # Essentially check _quick_reap() works.
-    run_result = self._quick_reap(1, properties=gen_props())
+    run_result = self._quick_reap(1)
     self.assertEqual('localhost', run_result.bot_id)
     self.assertEqual(1, run_result.try_number)
     to_run_key = task_to_run.request_to_task_to_run_key(
@@ -277,14 +279,14 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_schedule_request(self):
     # It is tested indirectly in the other functions.
     # Essentially check _quick_schedule() and _register_bot() works.
-    result_summary = self._quick_schedule(1, properties=gen_props())
+    result_summary = self._quick_schedule(1)
     to_run_key = task_to_run.request_to_task_to_run_key(
         result_summary.request_key.get(), 1, 0)
     self.assertTrue(to_run_key.get().queue_number)
     self.assertEqual(State.PENDING, result_summary.state)
 
   def test_bot_reap_task_not_enough_time(self):
-    result_summary = self._quick_schedule(1, properties=gen_props())
+    result_summary = self._quick_schedule(1)
     self._register_bot(0, self.bot_dimensions)
     actual_request, _, run_result = task_scheduler.bot_reap_task(
         self.bot_dimensions, 'abc', datetime.datetime(1969, 1, 1))
@@ -293,7 +295,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertTrue(task_to_run.TaskToRun.query().get().queue_number)
 
   def test_bot_reap_task_enough_time(self):
-    result_summary = self._quick_schedule(1, properties=gen_props())
+    result_summary = self._quick_schedule(1)
     self._register_bot(0, self.bot_dimensions)
     actual_request, _, run_result = task_scheduler.bot_reap_task(
         self.bot_dimensions, 'abc', datetime.datetime(3000, 1, 1))
@@ -301,7 +303,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.failIf(task_to_run.TaskToRun.query().get().queue_number)
 
   def test_bot_reap_task_expired(self):
-    result_summary = self._quick_schedule(1, properties=gen_props())
+    result_summary = self._quick_schedule(1)
     self._register_bot(0, self.bot_dimensions)
     # Forwards clock to get past expiration.
     self.mock_now(result_summary.request_key.get().expiration_ts, 1)
@@ -320,14 +322,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       self._quick_schedule(
           2,
           task_slices=[
-            {
-              'expiration_secs': 180,
-              'properties': gen_props(),
-            },
-            {
-              'expiration_secs': 180,
-              'properties': gen_props(),
-            },
+            task_request.TaskSlice(
+                expiration_secs=180,
+                properties=_gen_properties()),
+            task_request.TaskSlice(
+                expiration_secs=180,
+                properties=_gen_properties()),
           ])
     self.assertEqual(2, self.execute_tasks())
 
@@ -381,7 +381,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def _task_ran_successfully(self, nb_task):
     """Runs an idempotent task successfully and returns the task_id."""
     run_result = self._quick_reap(
-        nb_task, properties=gen_props(idempotent=True))
+        nb_task,
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=60,
+              properties=_gen_properties(idempotent=True)),
+        ])
     self.assertEqual('localhost', run_result.bot_id)
     self.assertEqual(None, task_to_run.TaskToRun.query().get().queue_number)
     # It's important to complete the task with success.
@@ -408,7 +413,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     """Runs a task that was deduped."""
     # TODO(maruel): Test with SecretBytes.
     result_summary = self._quick_schedule(
-        nb_task, properties=gen_props(idempotent=True))
+        nb_task,
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=60,
+              properties=_gen_properties(idempotent=True)),
+        ])
     request = result_summary.request_key.get()
     to_run_key = task_to_run.request_to_task_to_run_key(request, 1, 0)
     # TaskToRun was not stored.
@@ -419,7 +429,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         self.bot_dimensions, 'abc', None)
     self.assertEqual(None, reaped_request)
 
-    result_summary_duped, run_results_duped = get_results(request.key)
+    result_summary_duped, run_results_duped = _get_results(request.key)
     # A deduped task cannot be deduped again so properties_hash is None.
     expected = self._gen_result_summary_reaped(
         completed_ts=now or self.now,
@@ -453,7 +463,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # Second task is scheduled, first task is too old to be reused.
     new_ts = self.mock_now(self.now, config.settings().reusable_task_age_secs)
     result_summary = self._quick_schedule(
-        1, properties=gen_props(idempotent=True))
+        1,
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=60,
+              properties=_gen_properties(idempotent=True)),
+        ])
     # The task was enqueued for execution.
     self.assertNotEqual(None, task_to_run.TaskToRun.query().get().queue_number)
 
@@ -469,7 +484,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # old.
     new_ts = self.mock_now(self.now, config.settings().reusable_task_age_secs)
     _result_summary = self._quick_schedule(
-        0, properties=gen_props(idempotent=True))
+        0,
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=60,
+              properties=_gen_properties(idempotent=True)),
+        ])
     # The task was enqueued for execution.
     self.assertNotEqual(None, task_to_run.TaskToRun.query().get().queue_number)
 
@@ -500,8 +520,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_task_parent_children(self):
     # Parent task creates a child task.
     parent_id = self._task_ran_successfully(1)
-    result_summary = self._quick_schedule(
-        0, properties=gen_props(), parent_task_id=parent_id)
+    result_summary = self._quick_schedule(0, parent_task_id=parent_id)
     self.assertEqual([], result_summary.children_task_ids)
     self.assertEqual(parent_id, result_summary.request_key.get().parent_task_id)
 
@@ -515,13 +534,16 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_task_parent_isolated(self):
     run_result = self._quick_reap(
         1,
-        properties=gen_props(
-          command=[],
-          inputs_ref={
-            'isolated': '1' * 40,
-            'isolatedserver': 'http://localhost:1',
-            'namespace': 'default-gzip',
-          }))
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=60,
+              properties=_gen_properties(
+                  command=[],
+                  inputs_ref=task_request.FilesRef(
+                      isolated='1' * 40,
+                      isolatedserver='http://localhost:1',
+                      namespace='default-gzip'))),
+        ])
     self.assertEqual('localhost', run_result.bot_id)
     self.assertEqual(None, task_to_run.TaskToRun.query().get().queue_number)
     # It's important to terminate the task with success.
@@ -542,8 +564,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             performance_stats=None))
 
     parent_id = run_result.task_id
-    result_summary = self._quick_schedule(
-        0, properties=gen_props(), parent_task_id=parent_id)
+    result_summary = self._quick_schedule(0, parent_task_id=parent_id)
     self.assertEqual([], result_summary.children_task_ids)
     self.assertEqual(parent_id, result_summary.request_key.get().parent_task_id)
 
@@ -558,11 +579,11 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # TODO(maruel): Split in more focused tests.
     created_ts = self.now
     self.mock_now(created_ts)
-    result_summary = self._quick_schedule(1, properties=gen_props())
+    result_summary = self._quick_schedule(1)
 
     # The TaskRequest was enqueued, the TaskResultSummary was created but no
     # TaskRunResult exist yet since the task was not scheduled on any bot.
-    result_summary, run_results = get_results(result_summary.request_key)
+    result_summary, run_results = _get_results(result_summary.request_key)
     expected = self._gen_result_summary_pending(
         created_ts=created_ts, id='1d69b9f088008910', modified_ts=created_ts)
     self.assertEqual(expected, result_summary.to_dict())
@@ -576,7 +597,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         self.bot_dimensions, 'abc', None)
     self.assertEqual(result_summary.request_key.get(), reaped_request)
     self.assertTrue(run_result)
-    result_summary, run_results = get_results(result_summary.request_key)
+    result_summary, run_results = _get_results(result_summary.request_key)
     expected = self._gen_result_summary_reaped(
         created_ts=created_ts,
         costs_usd=[0.0],
@@ -639,7 +660,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             cost_usd=0.1,
             outputs_ref=outputs_ref,
             performance_stats=performance_stats))
-    result_summary, run_results = get_results(result_summary.request_key)
+    result_summary, run_results = _get_results(result_summary.request_key)
     expected = self._gen_result_summary_reaped(
         completed_ts=done_ts,
         costs_usd=[0.1],
@@ -676,7 +697,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, [t.to_dict() for t in run_results])
 
   def test_exit_code_failure(self):
-    run_result = self._quick_reap(1, properties=gen_props())
+    run_result = self._quick_reap(1)
     self.assertEqual(
         State.COMPLETED,
         task_scheduler.bot_update_task(
@@ -692,7 +713,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
             cost_usd=0.1,
             outputs_ref=None,
             performance_stats=None))
-    result_summary, run_results = get_results(run_result.request_key)
+    result_summary, run_results = _get_results(run_result.request_key)
 
     expected = self._gen_result_summary_reaped(
         completed_ts=self.now,
@@ -723,10 +744,15 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     auth_testing.mock_is_admin(self)
     with self.assertRaises(datastore_errors.BadValueError):
       self._quick_schedule(
-          0, properties=gen_props(dimensions={u'id': [u'abc']}))
+          0,
+          task_slices=[
+            task_request.TaskSlice(
+                expiration_secs=60,
+                properties=_gen_properties(dimensions={u'id': [u'abc']})),
+          ])
 
   def test_bot_update_task(self):
-    run_result = self._quick_reap(1, properties=gen_props())
+    run_result = self._quick_reap(1)
     self.assertEqual(
         State.RUNNING,
         task_scheduler.bot_update_task(
@@ -760,7 +786,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual('hihey', run_result.key.get().get_output())
 
   def test_bot_update_task_new_overwrite(self):
-    run_result = self._quick_reap(1, properties=gen_props())
+    run_result = self._quick_reap(1)
     self.assertEqual(
         State.RUNNING,
         task_scheduler.bot_update_task(
@@ -794,7 +820,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual('hhey', run_result.key.get().get_output())
 
   def test_bot_update_exception(self):
-    run_result = self._quick_reap(1, properties=gen_props())
+    run_result = self._quick_reap(1)
     def r(*_):
       raise datastore_utils.CommitError('Sorry!')
 
@@ -817,8 +843,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_bot_update_pubsub_error(self):
     pub_sub_calls = self.mock_pub_sub()
-    run_result = self._quick_reap(
-        1, properties=gen_props(), pubsub_topic='projects/abc/topics/def')
+    run_result = self._quick_reap(1, pubsub_topic='projects/abc/topics/def')
 
     # Attempt to terminate the task with success, but make PubSub call fail.
     self.publish_successful = False
@@ -858,7 +883,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(2, len(pub_sub_calls)) # notification is sent
 
   def _bot_update_timeouts(self, hard, io):
-    run_result = self._quick_reap(1, properties=gen_props())
+    run_result = self._quick_reap(1)
     self.assertEqual(
         State.TIMED_OUT,
         task_scheduler.bot_update_task(
@@ -914,8 +939,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self._register_bot(0, self.bot_dimensions)
     # Triggers many tasks of different priorities.
     for i, p in enumerate(priorities):
-      self._quick_schedule(
-          nb_task=int(not i), properties=gen_props(), priority=p)
+      self._quick_schedule(nb_task=int(not i), priority=p)
     self.assertEqual(0, self.execute_tasks())
 
     # Make sure they are scheduled in priority order. Bot polling should hand
@@ -929,8 +953,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_bot_kill_task(self):
     pub_sub_calls = self.mock_pub_sub()
-    run_result = self._quick_reap(
-        1, properties=gen_props(), pubsub_topic='projects/abc/topics/def')
+    run_result = self._quick_reap(1, pubsub_topic='projects/abc/topics/def')
     self.assertEqual(1, len(pub_sub_calls)) # PENDING -> RUNNING
 
     self.assertEqual(
@@ -953,7 +976,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(2, len(pub_sub_calls)) # RUNNING -> BOT_DIED
 
   def test_bot_kill_task_wrong_bot(self):
-    run_result = self._quick_reap(1, properties=gen_props())
+    run_result = self._quick_reap(1)
     expected = (
       'Bot bot1 sent task kill for task 1d69b9f088008911 owned by bot '
       'localhost')
@@ -964,8 +987,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # Cancel a pending task.
     pub_sub_calls = self.mock_pub_sub()
     result_summary = self._quick_schedule(
-        1,
-        properties=gen_props(), pubsub_topic='projects/abc/topics/def')
+        1, pubsub_topic='projects/abc/topics/def')
     self.assertEqual(0, len(pub_sub_calls)) # Nothing yet.
 
     ok, was_running = task_scheduler.cancel_task(
@@ -988,8 +1010,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_cancel_task_running(self):
     # Cancel a running task.
     pub_sub_calls = self.mock_pub_sub()
-    run_result = self._quick_reap(
-        1, properties=gen_props(), pubsub_topic='projects/abc/topics/def')
+    run_result = self._quick_reap(1, pubsub_topic='projects/abc/topics/def')
     self.assertEqual(1, len(pub_sub_calls)) # RUNNING
 
     # Denied if kill_running == False.
@@ -1069,8 +1090,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_cancel_task_completed(self):
     # Cancel a completed task.
     pub_sub_calls = self.mock_pub_sub()
-    run_result = self._quick_reap(
-        1, properties=gen_props(), pubsub_topic='projects/abc/topics/def')
+    run_result = self._quick_reap(1, pubsub_topic='projects/abc/topics/def')
     self.assertEqual(1, len(pub_sub_calls)) # RUNNING
 
     # The task completes successfully.
@@ -1105,8 +1125,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_cron_abort_expired_task_to_run(self):
     pub_sub_calls = self.mock_pub_sub()
     result_summary = self._quick_schedule(
-        1,
-        properties=gen_props(), pubsub_topic='projects/abc/topics/def')
+        1, pubsub_topic='projects/abc/topics/def')
     abandoned_ts = self.mock_now(
         self.now, result_summary.request_key.get().expiration_secs+1)
     self.assertEqual(
@@ -1126,9 +1145,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     pub_sub_calls = self.mock_pub_sub()
     run_result = self._quick_reap(
         1,
-        properties=gen_props(idempotent=True),
-        expiration_ts=self.now+datetime.timedelta(seconds=600),
-        pubsub_topic='projects/abc/topics/def')
+        pubsub_topic='projects/abc/topics/def',
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=600,
+              properties=_gen_properties(idempotent=True)),
+        ])
     # Fake first try bot died.
     self.assertEqual(1, len(pub_sub_calls)) # PENDING -> RUNNING
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
@@ -1164,9 +1186,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # Test first retry, then success.
     run_result = self._quick_reap(
         1,
-        properties=gen_props(idempotent=True),
-        expiration_ts=self.now+datetime.timedelta(seconds=600),
-        pubsub_topic='projects/abc/topics/def')
+        pubsub_topic='projects/abc/topics/def',
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=600,
+              properties=_gen_properties(idempotent=True)),
+        ])
     self.assertEqual(1, len(pub_sub_calls)) # PENDING -> RUNNING
 
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
@@ -1241,9 +1266,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # Test first try, then success.
     run_result = self._quick_reap(
         1,
-        properties=gen_props(),
-        expiration_ts=self.now+datetime.timedelta(seconds=600),
-        pubsub_topic='projects/abc/topics/def')
+        pubsub_topic='projects/abc/topics/def',
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=600,
+              properties=_gen_properties()),
+        ])
     self.assertEqual(1, len(pub_sub_calls)) # PENDING -> RUNNING
 
     # Bot becomes MIA.
@@ -1318,8 +1346,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # than BOT_PING_TOLERANCE, re-enqueue it.
     run_result = self._quick_reap(
         1,
-        properties=gen_props(),
-        expiration_ts=self.now+(3*task_result.BOT_PING_TOLERANCE))
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=
+                  3*int(task_result.BOT_PING_TOLERANCE.total_seconds()),
+              properties=_gen_properties()),
+        ])
     to_run_key_1 = task_to_run.request_to_task_to_run_key(
         run_result.request_key.get(), 1, 0)
     self.assertEqual(None, to_run_key_1.get().queue_number)
@@ -1362,8 +1394,11 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # Test first retry, then success.
     run_result = self._quick_reap(
         1,
-        properties=gen_props(idempotent=True),
-        expiration_ts=self.now+datetime.timedelta(seconds=600))
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=600,
+              properties=_gen_properties(idempotent=True)),
+        ])
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(State.RUNNING, run_result.state)
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
@@ -1401,8 +1436,11 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # Test two tries internal_failure's leading to a BOT_DIED status.
     run_result = self._quick_reap(
         1,
-        properties=gen_props(idempotent=True),
-        expiration_ts=self.now+datetime.timedelta(seconds=600))
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=600,
+              properties=_gen_properties(idempotent=True)),
+        ])
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(State.RUNNING, run_result.state)
     self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
@@ -1436,8 +1474,11 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_cron_handle_bot_died_ignored_expired(self):
     run_result = self._quick_reap(
         1,
-        properties=gen_props(),
-        expiration_ts=self.now+datetime.timedelta(seconds=600))
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=600,
+              properties=_gen_properties()),
+        ])
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(State.RUNNING, run_result.state)
     self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 601)
@@ -1476,20 +1517,25 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         auth, 'get_delegation_token',
         lambda: delegation_pb2.Subtoken(tags=tags))
 
-  def check_schedule_request_acl(self, **kwargs):
-    task_scheduler.check_schedule_request_acl(gen_request(**kwargs))
+  def check_schedule_request_acl(self, properties, **kwargs):
+    task_scheduler.check_schedule_request_acl(
+        _gen_request_slices(
+            task_slices=[
+              task_request.TaskSlice(expiration_secs=60, properties=properties),
+            ],
+            **kwargs))
 
   def test_check_schedule_request_acl(self):
     self.mock_pool_config('some-other-pool')
 
     # Uses default ACL is there's no pool config.
     self.check_schedule_request_acl(
-        properties=gen_props(dimensions={u'pool': [u'some-pool']}))
+        properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
 
     # Service accounts are not allowed in this case.
     with self.assertRaises(auth.AuthorizationError) as ctx:
       self.check_schedule_request_acl(
-          properties=gen_props(dimensions={u'pool': [u'some-pool']}),
+          properties=_gen_properties(dimensions={u'pool': [u'some-pool']}),
           service_account='robot@example.com')
     self.assertTrue('Can\'t use account' in str(ctx.exception))
 
@@ -1498,21 +1544,21 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.mock(pools_config, 'forbid_unknown_pools', lambda: True)
     with self.assertRaises(auth.AuthorizationError) as ctx:
       self.check_schedule_request_acl(
-          properties=gen_props(dimensions={u'pool': [u'some-pool']}))
+          properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
     self.assertTrue('not defined in pools.cfg' in str(ctx.exception))
 
   def test_check_schedule_request_acl_forbidden(self):
     self.mock_pool_config('some-pool')
     with self.assertRaises(auth.AuthorizationError) as ctx:
       self.check_schedule_request_acl(
-          properties=gen_props(dimensions={u'pool': [u'some-pool']}))
+          properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
     self.assertTrue('not allowed to schedule tasks' in str(ctx.exception))
 
   def test_check_schedule_request_acl_allowed_explicitly(self):
     self.mock_pool_config(
         'some-pool', scheduling_users=[auth_testing.DEFAULT_MOCKED_IDENTITY])
     self.check_schedule_request_acl(
-        properties=gen_props(dimensions={u'pool': [u'some-pool']}))
+        properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
 
   def test_check_schedule_request_acl_allowed_through_the_group(self):
     self.mock_pool_config(
@@ -1521,7 +1567,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       return group == 'mocked' and ident == auth_testing.DEFAULT_MOCKED_IDENTITY
     self.mock(auth, 'is_group_member', mocked_is_group_member)
     self.check_schedule_request_acl(
-        properties=gen_props(dimensions={u'pool': [u'some-pool']}))
+        properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
 
   def test_check_schedule_request_acl_unknown_delegation(self):
     delegatee1 = auth.Identity.from_bytes('user:d1@example.com')
@@ -1530,7 +1576,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.mock_delegation(delegatee2, ['t1'])
     with self.assertRaises(auth.AuthorizationError):
       self.check_schedule_request_acl(
-          properties=gen_props(dimensions={u'pool': [u'some-pool']}))
+          properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
 
   def test_check_schedule_request_acl_delegation_ok(self):
     delegatee = auth.Identity.from_bytes('user:d1@example.com')
@@ -1538,7 +1584,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         'some-pool', trusted_delegatees={delegatee: ['t1', 'other']})
     self.mock_delegation(delegatee, ['t1', 'extra'])
     self.check_schedule_request_acl(
-        properties=gen_props(dimensions={u'pool': [u'some-pool']}))
+        properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
 
   def test_check_schedule_request_acl_delegation_missing_tag(self):
     delegatee = auth.Identity.from_bytes('user:d1@example.com')
@@ -1546,7 +1592,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.mock_delegation(delegatee, ['another'])
     with self.assertRaises(auth.AuthorizationError):
       self.check_schedule_request_acl(
-          properties=gen_props(dimensions={u'pool': [u'some-pool']}))
+          properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
 
   def test_check_schedule_request_acl_good_service_acc(self):
     self.mock_pool_config(
@@ -1554,7 +1600,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         scheduling_users=[auth_testing.DEFAULT_MOCKED_IDENTITY],
         service_accounts=['good@example.com'])
     self.check_schedule_request_acl(
-        properties=gen_props(dimensions={u'pool': [u'some-pool']}),
+        properties=_gen_properties(dimensions={u'pool': [u'some-pool']}),
         service_account='good@example.com')
 
   def test_check_schedule_request_acl_good_service_acc_through_group(self):
@@ -1567,7 +1613,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         scheduling_users=[auth_testing.DEFAULT_MOCKED_IDENTITY],
         service_accounts_groups=['accounts'])
     self.check_schedule_request_acl(
-        properties=gen_props(dimensions={u'pool': [u'some-pool']}),
+        properties=_gen_properties(dimensions={u'pool': [u'some-pool']}),
         service_account='good@example.com')
 
   def test_check_schedule_request_acl_bad_service_acc(self):
@@ -1578,7 +1624,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         service_accounts_groups=['accounts'])
     with self.assertRaises(auth.AuthorizationError) as ctx:
       self.check_schedule_request_acl(
-          properties=gen_props(dimensions={u'pool': [u'some-pool']}),
+          properties=_gen_properties(dimensions={u'pool': [u'some-pool']}),
           service_account='bad@example.com')
     self.assertTrue('is not allowed in the pool' in str(ctx.exception))
 

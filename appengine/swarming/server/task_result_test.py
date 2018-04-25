@@ -32,38 +32,50 @@ from server import task_to_run
 # pylint: disable=W0212
 
 
-def _gen_request(properties=None, **kwargs):
-  """Creates a TaskRequest."""
-  props = {
+def _gen_properties(**kwargs):
+  """Creates a TaskProperties."""
+  args = {
     'command': [u'command1'],
     'dimensions': {u'pool': [u'default']},
     'env': {},
     'execution_timeout_secs': 24*60*60,
     'io_timeout_secs': None,
   }
-  props.update(properties or {})
-  props['dimensions_data'] = props.pop('dimensions')
+  args.update(kwargs or {})
+  args['dimensions_data'] = args.pop('dimensions')
+  return task_request.TaskProperties(**args)
+
+
+def _gen_request_slice(**kwargs):
+  """Creates a TaskRequest."""
   now = utils.utcnow()
   args = {
     'created_ts': now,
+    'manual_tags': [u'tag:1'],
     'name': 'Request name',
     'priority': 50,
-    'properties': task_request.TaskProperties(**props),
-    'expiration_ts': now + datetime.timedelta(seconds=60),
-    'manual_tags': [u'tag:1'],
+    'task_slices': [
+      task_request.TaskSlice(expiration_secs=60, properties=_gen_properties()),
+    ],
     'user': 'Jesus',
   }
   args.update(kwargs)
-  return task_request.TaskRequest(**args)
+  ret = task_request.TaskRequest(**args)
+  task_request.init_new_request(ret, True)
+  ret.key = task_request.new_request_key()
+  ret.put()
+  return ret
 
 
-def mkreq(req):
-  # This function fits the old style where TaskRequest was stored first, before
-  # TaskToRun and TaskResultSummary.
-  task_request.init_new_request(req, True)
-  req.key = task_request.new_request_key()
-  req.put()
-  return req
+def _gen_request(properties=None, **kwargs):
+  """Creates a TaskRequest."""
+  return _gen_request_slice(
+      task_slices=[
+        task_request.TaskSlice(
+            expiration_secs=60,
+            properties=properties or _gen_properties()),
+      ],
+      **kwargs)
 
 
 def _safe_cmp(a, b):
@@ -209,7 +221,7 @@ class TaskResultApiTest(TestCase):
     self.assertEqual('Deduped', task_result.state_to_string(f))
 
   def test_new_result_summary(self):
-    request = mkreq(_gen_request())
+    request = _gen_request()
     actual = task_result.new_result_summary(request)
     actual.modified_ts = self.now
     # Trigger _pre_put_hook().
@@ -233,7 +245,7 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(expected, actual.key.get().children_task_ids)
 
   def test_new_run_result(self):
-    request = mkreq(_gen_request())
+    request = _gen_request()
     actual = task_result.new_run_result(
         request, 1, u'localhost', u'abc',
         {u'id': [u'localhost'], u'foo': [u'bar', u'biz']})
@@ -247,7 +259,7 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(True, actual.can_be_canceled)
 
   def test_new_run_result_duration_no_exit_code(self):
-    request = mkreq(_gen_request())
+    request = _gen_request()
     actual = task_result.new_run_result(
         request, 1, u'localhost', u'abc',
         {u'id': [u'localhost'], u'foo': [u'bar', u'biz']})
@@ -269,7 +281,7 @@ class TaskResultApiTest(TestCase):
     # Creates a TaskRequest, along its TaskResultSummary and TaskToRun. Have a
     # bot reap the task, and complete the task. Ensure the resulting
     # TaskResultSummary and TaskRunResult are properly updated.
-    request = mkreq(_gen_request())
+    request = _gen_request()
     result_summary = task_result.new_result_summary(request)
     to_run = task_to_run.new_task_to_run(request, 1, 0)
     result_summary.modified_ts = utils.utcnow()
@@ -400,7 +412,7 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(complete_ts, run_result.ended_ts)
 
   def test_yield_run_result_keys_with_dead_bot(self):
-    request = mkreq(_gen_request())
+    request = _gen_request()
     result_summary = task_result.new_result_summary(request)
     result_summary.modified_ts = utils.utcnow()
     ndb.transaction(result_summary.put)
@@ -422,7 +434,7 @@ class TaskResultApiTest(TestCase):
         list(task_result.yield_run_result_keys_with_dead_bot()))
 
   def test_set_from_run_result(self):
-    request = mkreq(_gen_request())
+    request = _gen_request()
     result_summary = task_result.new_result_summary(request)
     run_result = task_result.new_run_result(request, 1, 'localhost', 'abc', {})
     run_result.started_ts = utils.utcnow()
@@ -439,7 +451,7 @@ class TaskResultApiTest(TestCase):
     self.assertFalse(result_summary.need_update_from_run_result(run_result))
 
   def test_set_from_run_result_two_server_versions(self):
-    request = mkreq(_gen_request())
+    request = _gen_request()
     result_summary = task_result.new_result_summary(request)
     run_result = task_result.new_run_result(request, 1, 'localhost', 'abc', {})
     run_result.started_ts = utils.utcnow()
@@ -464,7 +476,7 @@ class TaskResultApiTest(TestCase):
         ['v1a', 'new-version'], result_summary.key.get().server_versions)
 
   def test_set_from_run_result_two_tries(self):
-    request = mkreq(_gen_request())
+    request = _gen_request()
     result_summary = task_result.new_result_summary(request)
     run_result_1 = task_result.new_run_result(
         request, 1, 'localhost', 'abc', {})
@@ -513,7 +525,7 @@ class TaskResultApiTest(TestCase):
     self.assertEqual(None, run_result.duration_now(utils.utcnow()))
 
   def test_run_result_timeout(self):
-    request = mkreq(_gen_request())
+    request = _gen_request()
     result_summary = task_result.new_result_summary(request)
     result_summary.modified_ts = utils.utcnow()
     ndb.transaction(result_summary.put)
@@ -548,7 +560,7 @@ class TaskResultApiTest(TestCase):
 class TestOutput(TestCase):
   def setUp(self):
     super(TestOutput, self).setUp()
-    request = mkreq(_gen_request())
+    request = _gen_request()
     result_summary = task_result.new_result_summary(request)
     result_summary.modified_ts = utils.utcnow()
     ndb.transaction(result_summary.put)

@@ -154,17 +154,17 @@ class TaskAccountTokenTest(TestBase):
     now = utils.utcnow()
     args = {
       'created_ts': now,
+      'manual_tags': [u'tag:1'],
       'name': 'Request with %s' % service_account,
       'priority': 50,
-      'properties': task_request.TaskProperties(**{
-        'command': [u'command1'],
-        'dimensions_data': {u'pool': [u'default']},
-        'env': {},
-        'execution_timeout_secs': 24*60*60,
-        'io_timeout_secs': None,
-      }),
-      'expiration_ts': now + datetime.timedelta(seconds=60),
-      'manual_tags': [u'tag:1'],
+      'task_slices': [
+        task_request.TaskSlice(
+            expiration_secs=60,
+            properties=task_request.TaskProperties(
+                command=[u'command1'],
+                dimensions_data={u'pool': [u'default']},
+                execution_timeout_secs=24*60*60)),
+      ],
       'user': 'Someone',
     }
     req = task_request.TaskRequest(**args)
