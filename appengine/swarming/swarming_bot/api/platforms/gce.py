@@ -6,6 +6,7 @@
 
 import json
 import logging
+import re
 import socket
 import threading
 import time
@@ -167,6 +168,23 @@ def get_zone():
   # Format is projects/<id>/zones/<zone>
   metadata = get_metadata()
   return unicode(metadata['instance']['zone'].rsplit('/', 1)[-1])
+
+
+@tools.cached
+def get_zones():
+  """Returns the list of zone values for the GCE VM."""
+  # Ref: https://cloud.google.com/compute/docs/regions-zones/
+  # 'continent-regionN-L' where N is a number and L a letter.
+  m = re.match(ur'([a-z]+)-([a-z]+)(\d)-([a-z])', get_zone())
+  if not m:
+    # Safety fallback in case a new form appears.
+    return [get_zone()]
+  return [
+      m.group(1),
+      m.group(1) + '-' + m.group(2),
+      m.group(1) + '-' + m.group(2) + m.group(3),
+      m.group(1) + '-' + m.group(2) + m.group(3) + '-' + m.group(4),
+  ]
 
 
 @tools.cached

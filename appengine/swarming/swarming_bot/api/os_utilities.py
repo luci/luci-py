@@ -958,7 +958,7 @@ def get_dimensions():
     image = platforms.gce.get_image()
     if image:
       dimensions[u'image'] = [image]
-    dimensions[u'zone'] = [platforms.gce.get_zone()]
+    dimensions[u'zone'] = platforms.gce.get_zones()
 
   loc = get_locale()
   if loc:
