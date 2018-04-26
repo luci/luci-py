@@ -683,6 +683,53 @@ class TasksApiTest(BaseTest):
     }
     self.assertEqual(expected, resp.json)
 
+  def test_new_denied_pool(self):
+    # Ensures that quality check is done early enough that a 400 and not an 500
+    # is returned.
+    request = self.create_new_request(
+        properties={u'dimensions': [{u'key': u'id', u'value': u'bot123'}]})
+    response = self.call_api('new', body=message_to_dict(request), status=400)
+    expected = {
+      u'error_message': u"'pool' must be used as dimensions",
+      u'state': u'APPLICATION_ERROR',
+    }
+    self.assertEqual(expected, response.json)
+
+  def test_new_denied_command(self):
+    request = self.create_new_request(
+        properties={u'dimensions': [{u'key': u'pool', u'value': u'default'}]})
+    response = self.call_api('new', body=message_to_dict(request), status=400)
+    expected = {
+      u'error_message': u'use at least one of command or inputs_ref.isolated',
+      u'state': u'APPLICATION_ERROR',
+    }
+    self.assertEqual(expected, response.json)
+
+  def test_new_denied_execution_timeout_secs(self):
+    request = self.create_new_request(
+        properties={
+          u'command': [u'echo', u'hi'],
+          u'dimensions': [{u'key': u'pool', u'value': u'default'}],
+        })
+    response = self.call_api('new', body=message_to_dict(request), status=400)
+    expected = {
+      u'error_message':
+          u'Entity has uninitialized properties: execution_timeout_secs',
+      u'state': u'APPLICATION_ERROR',
+    }
+    self.assertEqual(expected, response.json)
+
+  def test_new_ok(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    request = self.create_new_request(
+        properties={
+          u'command': [u'echo', u'hi'],
+          u'dimensions': [{u'key': u'pool', u'value': u'default'}],
+          u'execution_timeout_secs': 30,
+        })
+    response = self.call_api('new', body=message_to_dict(request), status=200)
+    self.assertEqual(u'5cee488008810', response.json[u'task_id'])
+
   def test_mass_cancel(self):
     # Create two tasks.
     self.mock(random, 'getrandbits', lambda _: 0x88)

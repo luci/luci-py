@@ -397,6 +397,10 @@ class SwarmingTasksService(remote.Service):
         apply_server_property_defaults(request_obj.task_slice(index).properties)
       task_request.init_new_request(
           request_obj, acl.can_schedule_high_priority_tasks())
+      # We need to call the ndb.Model pre-put check earlier because the
+      # following checks assume that the request itself is valid and could crash
+      # otherwise.
+      request_obj._pre_put_hook()
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       logging.exception('Here\'s what was wrong in the user new task request:')
       raise endpoints.BadRequestException(e.message)
