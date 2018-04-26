@@ -532,6 +532,15 @@ class TaskRequestApiTest(TestCase):
     with self.assertRaises(AttributeError):
       _gen_request(properties=_gen_properties(foo='bar'))
 
+    # Old TaskRequest.properties style.
+    # Hack a bit the call to force the incorrect call.
+    req = _gen_request_slices(
+        task_slices=[],
+        expiration_ts=utils.utcnow() + datetime.timedelta(hours=1),
+        properties_old=_gen_properties())
+    with self.assertRaises(datastore_errors.BadValueError):
+      req.put()
+
     # Command.
     req = _gen_request(
         properties=_gen_properties(command=[], inputs_ref=None))
