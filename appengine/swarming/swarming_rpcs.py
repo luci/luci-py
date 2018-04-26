@@ -586,6 +586,31 @@ class TaskRequestMetadata(messages.Message):
   task_result = messages.MessageField(TaskResult, 3)
 
 
+### Task queues
+
+
+class TaskQueuesRequest(messages.Message):
+  # Note that it's possible that the RPC returns a tad more or less items than
+  # requested limit.
+  limit = messages.IntegerField(1, default=200)
+  cursor = messages.StringField(2)
+
+
+class TaskQueue(messages.Message):
+  # Must be a list of 'key:value' strings to filter the returned list of bots
+  # on.
+  dimensions = messages.StringField(1, repeated=True)
+  valid_until_ts = message_types.DateTimeField(2)
+
+
+class TaskQueueList(messages.Message):
+  cursor = messages.StringField(1)
+  # Note that it's possible that the RPC returns a tad more or less items than
+  # requested limit.
+  items = messages.MessageField(TaskQueue, 2, repeated=True)
+  now = message_types.DateTimeField(3)
+
+
 ### Bots
 
 

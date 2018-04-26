@@ -1359,6 +1359,84 @@ class TaskApiTest(BaseTest):
     self.assertEqual(expected, response.json)
 
 
+class QueuesApiTest(BaseTest):
+  api_service_cls = handlers_endpoints.SwarmingQueuesService
+
+  def test_list(self):
+    # Create 3 tasks with different dimensions, so it creates different task
+    # queues and one termination task. The termination task should not be
+    # reported.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.client_create_task_raw(
+        properties={
+            u'dimensions': [
+            {u'key': u'os', u'value': u'Amiga'},
+            {u'key': u'pool', u'value': u'default'},
+          ],
+        })
+    self.mock_now(self.now, 1)
+    self.client_create_task_raw(
+        properties={
+            u'dimensions': [
+            {u'key': u'os', u'value': u'Atari'},
+            {u'key': u'pool', u'value': u'vintage'},
+          ],
+        })
+    self.mock_now(self.now, 2)
+    self.client_create_task_raw(
+        properties={
+            u'dimensions': [
+            {u'key': u'id', u'value': u'bot123'},
+            {u'key': u'pool', u'value': u'default'},
+          ],
+        })
+    # A termination task.
+    self.mock_now(self.now, 3)
+    self.set_as_bot()
+    self.bot_poll()
+    self.mock_now(self.now, 4)
+    self.set_as_privileged_user()
+    self.endpoint_call(
+        handlers_endpoints.SwarmingBotService, 'terminate', {'bot_id': 'bot1'})
+
+    # There's four task queues.
+    self.assertEqual(4, task_queues.TaskDimensions.query().count())
+
+    # Only three are returned, in two pages due to limit=2.
+    self.mock_now(self.now, 5)
+    expected = {
+      u'items': [
+        {
+          u'dimensions': [u'id:bot123', u'pool:default'],
+          u'valid_until_ts': u'2010-01-03T04:14:07',
+        },
+        {
+          u'dimensions': [u'os:Amiga', u'pool:default'],
+          u'valid_until_ts': u'2010-01-03T04:14:05',
+        },
+      ],
+      u'now': u'2010-01-02T03:04:10',
+    }
+    request = swarming_rpcs.TaskQueuesRequest(limit=2)
+    response = self.call_api('list', body=message_to_dict(request))
+    actual = response.json
+    cursor = actual.pop(u'cursor')
+    self.assertEqual(expected, actual)
+
+    expected = {
+      u'items': [
+        {
+          u'dimensions': [u'os:Atari', u'pool:vintage'],
+          u'valid_until_ts': u'2010-01-03T04:14:06',
+        },
+      ],
+      u'now': u'2010-01-02T03:04:10',
+    }
+    request = swarming_rpcs.TaskQueuesRequest(cursor=cursor, limit=2)
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+
+
 class BotsApiTest(BaseTest):
   api_service_cls = handlers_endpoints.SwarmingBotsService
 

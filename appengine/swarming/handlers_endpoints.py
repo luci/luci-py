@@ -633,6 +633,42 @@ class SwarmingTasksService(remote.Service):
     return swarming_rpcs.TasksTags(tasks_tags=ft, ts=tags.ts)
 
 
+@swarming_api.api_class(resource_name='queues', path='queues')
+class SwarmingQueuesService(remote.Service):
+  @gae_ts_mon.instrument_endpoint()
+  @auth.endpoints_method(
+      swarming_rpcs.TaskQueuesRequest, swarming_rpcs.TaskQueueList,
+      http_method='GET')
+  @auth.require(acl.can_view_all_tasks)
+  def list(self, request):
+    logging.debug('%s', request)
+    now = utils.utcnow()
+    q = task_queues.TaskDimensions.query()
+    cursor = request.cursor
+    out = []
+    count = 0
+    # As there can be a lot of terminate tasks, try to loop a few times (max 5)
+    # to get more items.
+    while len(out) < request.limit and (cursor or not count) and count < 5:
+      items, cursor = datastore_utils.fetch_page(
+          q, request.limit - len(out), cursor)
+      for i in items:
+        for s in i.sets:
+          # Ignore the tasks that are only id specific, since they are
+          # termination tasks. This happens in particular with Machine Provider
+          # managed bots, since they are recycled on a continuous basis. There
+          # may be one per bot, and it is not really useful for the user, the
+          # user may just query the list of bots.
+          if (len(s.dimensions_flat) == 1 and
+              s.dimensions_flat[0].startswith('id:')):
+            # A terminate task.
+            continue
+          out.append(swarming_rpcs.TaskQueue(
+              dimensions=s.dimensions_flat, valid_until_ts=s.valid_until_ts))
+      count += 1
+    return swarming_rpcs.TaskQueueList(cursor=cursor, items=out, now=now)
+
+
 BotId = endpoints.ResourceContainer(
     message_types.VoidMessage,
     bot_id=messages.StringField(1, required=True))
@@ -915,6 +951,7 @@ def get_routes():
     endpoints_webapp2.api_routes(SwarmingServerService) +
     endpoints_webapp2.api_routes(SwarmingTaskService) +
     endpoints_webapp2.api_routes(SwarmingTasksService) +
+    endpoints_webapp2.api_routes(SwarmingQueuesService) +
     endpoints_webapp2.api_routes(SwarmingBotService) +
     endpoints_webapp2.api_routes(SwarmingBotsService) +
     # components.config endpoints for validation and configuring of luci-config
