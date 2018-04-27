@@ -96,12 +96,12 @@ class TaskToRun(ndb.Model):
     """Returns the TaskRequest.task_slice() index this entity represents as
     pending.
     """
-    return self.key.integer_id() >> 4
+    return task_to_run_key_slice_index(self.key)
 
   @property
   def try_number(self):
     """Returns the try number, 1 or 2."""
-    return self.key.integer_id() & 15
+    return task_to_run_key_try_number(self.key)
 
   @property
   def is_reapable(self):
@@ -189,16 +189,16 @@ def _queue_number_priority(v):
   return int(_queue_number_fifo_priority(v) >> 22)
 
 
-def _memcache_to_run_key(task_key):
+def _memcache_to_run_key(to_run_key):
   """Functional equivalent of task_result.pack_result_summary_key()."""
-  request_key = task_to_run_key_to_request_key(task_key)
+  request_key = task_to_run_key_to_request_key(to_run_key)
   return '%x' % request_key.integer_id()
 
 
 @ndb.tasklet
-def _lookup_cache_is_taken_async(task_key):
+def _lookup_cache_is_taken_async(to_run_key):
   """Queries the quick lookup cache to reduce DB operations."""
-  key = _memcache_to_run_key(task_key)
+  key = _memcache_to_run_key(to_run_key)
   neg = yield ndb.get_context().memcache_get(key, namespace='task_to_run')
   raise ndb.Return(bool(neg))
 
@@ -442,25 +442,27 @@ def _yield_potential_tasks(bot_id):
 def request_to_task_to_run_key(request, try_number, task_slice_index):
   """Returns the ndb.Key for a TaskToRun from a TaskRequest."""
   assert 1 <= try_number <= 2, try_number
-  assert 0 <= task_slice_index < 64, task_slice_index
+  assert 0 <= task_slice_index < request.num_task_slices
   return ndb.Key(
       TaskToRun, try_number | (task_slice_index << 4), parent=request.key)
 
 
-def task_to_run_key_to_request_key(task_key):
+def task_to_run_key_to_request_key(to_run_key):
   """Returns the ndb.Key for a TaskToRun from a TaskRequest key."""
-  assert task_key.kind() == 'TaskToRun', task_key
-  return task_key.parent()
+  assert to_run_key.kind() == 'TaskToRun', to_run_key
+  return to_run_key.parent()
 
 
-def gen_queue_number(request, task_slice_index):
-  """Returns the value to use for TaskToRun.queue_number based on request.
-
-  It is exported so a task can be retried by task_scheduler.
+def task_to_run_key_slice_index(to_run_key):
+  """Returns the TaskRequest.task_slice() index this TaskToRun entity represents
+  as pending.
   """
-  h = request.task_slice(task_slice_index).properties.dimensions
-  return _gen_queue_number(
-      task_queues.hash_dimensions(h), request.created_ts, request.priority)
+  return to_run_key.integer_id() >> 4
+
+
+def task_to_run_key_try_number(to_run_key):
+  """Returns the try number, 1 or 2."""
+  return to_run_key.integer_id() & 15
 
 
 def new_task_to_run(request, try_number, task_slice_index):
@@ -483,10 +485,13 @@ def new_task_to_run(request, try_number, task_slice_index):
       offset += request.task_slice(i).expiration_secs
   exp = request.created_ts + datetime.timedelta(
       seconds=request.task_slice(task_slice_index).expiration_secs+offset)
+  h = request.task_slice(task_slice_index).properties.dimensions
+  qn = _gen_queue_number(
+      task_queues.hash_dimensions(h), request.created_ts, request.priority)
   return TaskToRun(
       key=request_to_task_to_run_key(request, try_number, task_slice_index),
       created_ts=created,
-      queue_number=gen_queue_number(request, task_slice_index),
+      queue_number=qn,
       expiration_ts=exp)
 
 
@@ -502,7 +507,7 @@ def match_dimensions(request_dimensions, bot_dimensions):
   return True
 
 
-def set_lookup_cache(task_key, is_available_to_schedule):
+def set_lookup_cache(to_run_key, is_available_to_schedule):
   """Updates the quick lookup cache to mark an item as available or not.
 
   This cache is a blacklist of items that are already reaped, so it is not worth
@@ -521,7 +526,7 @@ def set_lookup_cache(task_key, is_available_to_schedule):
   # server with unneeded keys.
   cache_lifetime = 15
 
-  key = _memcache_to_run_key(task_key)
+  key = _memcache_to_run_key(to_run_key)
   if is_available_to_schedule:
     # The item is now available, so remove it from memcache.
     memcache.delete(key, namespace='task_to_run')

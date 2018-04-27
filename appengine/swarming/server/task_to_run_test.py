@@ -278,7 +278,35 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     # This is an IndexError instead of a ValueError because validity is enforced
     # at the TaskRequest creation time.
     with self.assertRaises(IndexError):
-      task_to_run.new_task_to_run(request, 1, 1)
+      task_to_run.new_task_to_run(request, 1, 8)
+
+  def test_task_to_run_key_slice_index(self):
+    slices = [
+      task_request.TaskSlice(
+          expiration_secs=60,
+          properties=_gen_properties(
+              dimensions={u'pool': [u'default'], u'v': [unicode(i)]}))
+      for i in xrange(1)
+    ]
+    request = self.mkreq(len(slices), _gen_request_slices(task_slices=slices))
+    for i in xrange(len(slices)):
+      to_run = task_to_run.new_task_to_run(request, 1, i)
+      self.assertEqual(i, to_run.task_slice_index)
+      self.assertEqual(i, task_to_run.task_to_run_key_slice_index(to_run.key))
+
+  def test_task_to_run_key_try_number(self):
+    slices = [
+      task_request.TaskSlice(
+          expiration_secs=60,
+          properties=_gen_properties(
+              dimensions={u'pool': [u'default'], u'v': [unicode(i)]}))
+      for i in xrange(1)
+    ]
+    request = self.mkreq(len(slices), _gen_request_slices(task_slices=slices))
+    for i in (1, 2):
+      to_run = task_to_run.new_task_to_run(request, i, 0)
+      self.assertEqual(i, to_run.try_number)
+      self.assertEqual(i, task_to_run.task_to_run_key_try_number(to_run.key))
 
   def test_new_task_to_run_list(self):
     self.mock(random, 'getrandbits', lambda _: 0x12)
