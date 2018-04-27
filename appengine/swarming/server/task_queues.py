@@ -827,7 +827,10 @@ def rebuild_task_cache(payload):
       return obj
 
     try:
-      datastore_utils.transaction(run)
+      # Retry often. This transaction tends to fail frequently, and this is
+      # running from a task queue so it's fine if it takes more time, success is
+      # more important.
+      datastore_utils.transaction(run, retries=4)
     except datastore_utils.CommitError as e:
       # Still log an error but no need for a stack trace in the logs. It is
       # important to surface that the call failed so the task queue is retried
