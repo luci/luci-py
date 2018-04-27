@@ -27,6 +27,9 @@ ConfigApi = config.ConfigApi
 
 ### Public code.
 
+# Regular expression for dimension key.
+DIMENSION_KEY_RE = r'^[a-zA-Z\-\_\.]{1,64}$'
+
 
 def settings_info():
   """Returns information about the settings file.
@@ -72,11 +75,7 @@ def validate_flat_dimension(d):
 
 def validate_dimension_key(key):
   """Returns True if the dimension key is valid."""
-  return (
-      bool(isinstance(key, unicode) and
-      key and
-      len(key) <= 256 and
-      re.match(_DIMENSION_KEY_RE, key)))
+  return bool(isinstance(key, unicode) and re.match(DIMENSION_KEY_RE, key))
 
 
 def validate_dimension_value(value):
@@ -84,14 +83,13 @@ def validate_dimension_value(value):
   return (
       bool(isinstance(value, unicode) and
       value and
-      len(value) <= 256 and
+      len(value) <= 128 and
       value.strip() == value))
 
 
 ### Private code.
 
 
-_DIMENSION_KEY_RE = r'^[a-zA-Z\-\_\.]+$'
 _SETTINGS_CFG_FILENAME = 'settings.cfg'
 _SECONDS_IN_YEAR = 60 * 60 * 24 * 365
 

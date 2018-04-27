@@ -6,6 +6,7 @@
 import datetime
 import logging
 import random
+import string
 import sys
 import unittest
 
@@ -528,10 +529,11 @@ class TaskRequestApiTest(TestCase):
         request_1.task_slice(0).properties_hash(),
         request_2.task_slice(0).properties_hash())
 
-  def test_bad_values(self):
+  def test_request_bad_values(self):
     with self.assertRaises(AttributeError):
       _gen_request(properties=_gen_properties(foo='bar'))
 
+  def test_request_bad_values_stale_style(self):
     # Old TaskRequest.properties style.
     # Hack a bit the call to force the incorrect call.
     req = _gen_request_slices(
@@ -541,7 +543,37 @@ class TaskRequestApiTest(TestCase):
     with self.assertRaises(datastore_errors.BadValueError):
       req.put()
 
-    # Command.
+  def test_request_bad_values_task_slices(self):
+    with self.assertRaises(ValueError):
+      # No TaskSlice
+      _gen_request_slices(task_slices=[])
+    slices = [
+      task_request.TaskSlice(
+          expiration_secs=60,
+          properties=_gen_properties(dimensions={u'pool': [u'GPU']})),
+    ]
+    _gen_request_slices(task_slices=slices).put()
+    req = _gen_request_slices(task_slices=slices * 2)
+    with self.assertRaises(datastore_errors.BadValueError):
+      # Will be supported soon.
+      req.put()
+    req = _gen_request_slices(task_slices=slices * 9)
+    with self.assertRaises(datastore_errors.BadValueError):
+      req.put()
+    # Different pools.
+    slices = [
+      task_request.TaskSlice(
+          expiration_secs=60,
+          properties=_gen_properties(dimensions={u'pool': [u'GPU']})),
+      task_request.TaskSlice(
+          expiration_secs=60,
+          properties=_gen_properties(dimensions={u'pool': [u'other']})),
+    ]
+    req = _gen_request_slices(task_slices=slices)
+    with self.assertRaises(datastore_errors.BadValueError):
+      req.put()
+
+  def test_request_bad_command(self):
     req = _gen_request(
         properties=_gen_properties(command=[], inputs_ref=None))
     with self.assertRaises(datastore_errors.BadValueError):
@@ -552,16 +584,39 @@ class TaskRequestApiTest(TestCase):
       _gen_request(properties=_gen_properties(command='python'))
     _gen_request(properties=_gen_properties(command=['python'])).put()
     _gen_request(properties=_gen_properties(command=[u'python'])).put()
-    # command and inputs_ref.
+    _gen_request(properties=_gen_properties(command=[u'python']*128)).put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      _gen_request(properties=_gen_properties(command=[u'python']*129)).put()
+
+  def test_request_bad_extra_args(self):
     _gen_request(
         properties=_gen_properties(
-            command=['python'],
+            command=[],
+            extra_args=[u'python']*128,
             inputs_ref=task_request.FilesRef(
                 isolated='deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
                 isolatedserver='http://localhost:1',
                 namespace='default-gzip'))).put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      _gen_request(
+          properties=_gen_properties(
+              command=[],
+              extra_args=[u'python']*129,
+              inputs_ref=task_request.FilesRef(
+                  isolated='deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+                  isolatedserver='http://localhost:1',
+                  namespace='default-gzip'))).put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      _gen_request(
+          properties=_gen_properties(
+              command=[u'python'],
+              extra_args=[u'python'],
+              inputs_ref=task_request.FilesRef(
+                  isolated='deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+                  isolatedserver='http://localhost:1',
+                  namespace='default-gzip'))).put()
 
-    # CIPD.
+  def test_request_bad_cipd_input(self):
     def mkcipdreq(idempotent=False, **cipd_input):
       return _gen_request(
           properties=_gen_properties(
@@ -650,22 +705,21 @@ class TaskRequestApiTest(TestCase):
           ],
         server='https://chrome-infra-packages.appspot.com').put()
 
-    # Named caches.
-    mkcachereq = lambda *c: _gen_request(properties=_gen_properties(caches=c))
+  def test_request_bad_named_cache(self):
+    mkcachereq = lambda *c: _gen_request(
+        properties=_gen_properties(caches=c)).put()
     with self.assertRaises(datastore_errors.BadValueError):
       mkcachereq(task_request.CacheEntry(name='', path='git_cache'))
     with self.assertRaises(datastore_errors.BadValueError):
       mkcachereq(task_request.CacheEntry(name='git_chromium', path=''))
-    req = mkcachereq(
-        task_request.CacheEntry(name='git_chromium', path='git_cache'),
-        task_request.CacheEntry(name='git_v8', path='git_cache'))
     with self.assertRaises(datastore_errors.BadValueError):
-      req.put()
-    req = mkcachereq(
-        task_request.CacheEntry(name='git_chromium', path='git_cache'),
-        task_request.CacheEntry(name='git_chromium', path='git_cache2'))
+      mkcachereq(
+          task_request.CacheEntry(name='git_chromium', path='git_cache'),
+          task_request.CacheEntry(name='git_v8', path='git_cache'))
     with self.assertRaises(datastore_errors.BadValueError):
-      req.put()
+      mkcachereq(
+          task_request.CacheEntry(name='git_chromium', path='git_cache'),
+          task_request.CacheEntry(name='git_chromium', path='git_cache2'))
     with self.assertRaises(datastore_errors.BadValueError):
       mkcachereq(
           task_request.CacheEntry(name='git_chromium', path='/git_cache'))
@@ -689,6 +743,31 @@ class TaskRequestApiTest(TestCase):
       mkcachereq(task_request.CacheEntry(name='has space', path='git_cache'))
     with self.assertRaises(datastore_errors.BadValueError):
       mkcachereq(task_request.CacheEntry(name='CAPITAL', path='git_cache'))
+    mkcachereq()
+    mkcachereq(task_request.CacheEntry(name='git_chromium', path='git_cache'))
+    mkcachereq(
+        task_request.CacheEntry(name='git_chromium', path='git_cache'),
+        task_request.CacheEntry(name='build_chromium', path='out'))
+    mkcachereq(task_request.CacheEntry(name=u'g'*128, path=u'git_cache'))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkcachereq(task_request.CacheEntry(name=u'g'*129, path=u'git_cache'))
+    mkcachereq(task_request.CacheEntry(name=u'g', path=u'p'*256))
+    with self.assertRaises(datastore_errors.BadValueError):
+      mkcachereq(task_request.CacheEntry(name=u'g', path=u'p'*257))
+    # Too many.
+    c = [
+      task_request.CacheEntry(name=unicode(i), path=unicode(i))
+      for i in xrange(32)
+    ]
+    _gen_request(properties=_gen_properties(caches=c)).put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      c = [
+        task_request.CacheEntry(name=unicode(i), path=unicode(i))
+        for i in xrange(33)
+      ]
+      _gen_request(properties=_gen_properties(caches=c)).put()
+
+  def test_request_bad_named_cache_and_cipd_input(self):
     # A CIPD package and named caches cannot be mapped to the same path.
     req = _gen_request(
         properties=_gen_properties(
@@ -702,14 +781,19 @@ class TaskRequestApiTest(TestCase):
                 ])))
     with self.assertRaises(datastore_errors.BadValueError):
       req.put()
-    mkcachereq().put()
-    mkcachereq(
-        task_request.CacheEntry(name='git_chromium', path='git_cache')).put()
-    mkcachereq(
-        task_request.CacheEntry(name='git_chromium', path='git_cache'),
-        task_request.CacheEntry(name='build_chromium', path='out')).put()
+    req = _gen_request(
+        properties=_gen_properties(
+            caches=[
+              task_request.CacheEntry(name='git_chromium', path='git_cache1'),
+            ],
+            cipd_input=_gen_cipd_input(
+                packages=[
+                  task_request.CipdPackage(
+                      package_name='foo', path='git_cache2', version='latest'),
+                ]))).put()
 
-    # Dimensions.
+  def test_request_bad_dimensions(self):
+    # Type error.
     with self.assertRaises(TypeError):
       _gen_request(properties=_gen_properties(dimensions=[]))
     with self.assertRaises(datastore_errors.BadValueError):
@@ -723,37 +807,127 @@ class TaskRequestApiTest(TestCase):
     with self.assertRaises(datastore_errors.BadValueError):
       _gen_request(
           properties=_gen_properties(dimensions={u'id': u'b', u'a': [u'b']}))
+    # >1 value for id.
     with self.assertRaises(datastore_errors.BadValueError):
       _gen_request(
           properties=_gen_properties(dimensions={u'id': [u'a', u'b']}))
-    with self.assertRaises(datastore_errors.BadValueError):
-      _gen_request(
-          properties=_gen_properties(dimensions={u'id': u'b', u'pool': u'b'}))
+    # >1 value for pool.
     with self.assertRaises(datastore_errors.BadValueError):
       _gen_request(
           properties=_gen_properties(dimensions={u'pool': [u'b', u'b']}))
     _gen_request(
-        properties=_gen_properties(dimensions={u'id': [u'b'], u'pool': [u'b']}))
+        properties=_gen_properties(
+            dimensions={u'id': [u'b'], u'pool': [u'b']})).put()
     _gen_request(
         properties=_gen_properties(
-            dimensions={u'id': [u'b'], u'pool': [u'b'], u'a.': [u'c']}))
+            dimensions={u'id': [u'b'], u'pool': [u'b'], u'a.': [u'c']})).put()
     _gen_request(
         properties=_gen_properties(
-            dimensions={u'pool': [u'b'], u'a.': [u'b', u'c']}))
+            dimensions={u'pool': [u'b'], u'a.': [u'b', u'c']})).put()
 
-    # Environment.
+    # Max # keys.
+    d = {u'a%s' % string.ascii_letters[i]: [unicode(i)] for i in xrange(31)}
+    d[u'pool'] = [u'a']
+    _gen_request(properties=_gen_properties(dimensions=d)).put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      d = {u'a%s' % string.ascii_letters[i]: [unicode(i)] for i in xrange(32)}
+      d[u'pool'] = [u'a']
+      _gen_request(properties=_gen_properties(dimensions=d)).put()
+
+    with self.assertRaises(datastore_errors.BadValueError):
+      # Key regexp.
+      d = {u'pool': [u'default'], u'1': [u'value']}
+      _gen_request(properties=_gen_properties(dimensions=d)).put()
+    # Key length.
+    d = {u'pool': [u'default'], u'v'*64: [u'v']}
+    _gen_request(properties=_gen_properties(dimensions=d)).put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      d = {u'pool': [u'default'], u'v'*65: [u'value']}
+      _gen_request(properties=_gen_properties(dimensions=d)).put()
+
+    # Max # values.
+    d = {u'pool': [u'b'], u'a.': [unicode(i) for i in xrange(16)]}
+    _gen_request(properties=_gen_properties(dimensions=d)).put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      d = {u'pool': [u'b'], u'a.': [unicode(i) for i in xrange(17)]}
+      _gen_request(properties=_gen_properties(dimensions=d)).put()
+    # Value length.
+    d = {u'pool': [u'default'], u'v': [u'v'*128]}
+    _gen_request(properties=_gen_properties(dimensions=d)).put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      d = {u'pool': [u'default'], u'v': [u'v'*129]}
+      _gen_request(properties=_gen_properties(dimensions=d)).put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      # Value with space.
+      d = {u'pool': [u'default'], u'v': [u'v ']}
+      _gen_request(properties=_gen_properties(dimensions=d)).put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      # Duplicate value.
+      d = {u'pool': [u'default'], u'v': [u'v', u'v']}
+      _gen_request(properties=_gen_properties(dimensions=d)).put()
+
+  def test_request_bad_env(self):
+    # Type error.
     with self.assertRaises(TypeError):
       _gen_request(properties=_gen_properties(env=[]))
     with self.assertRaises(TypeError):
       _gen_request(properties=_gen_properties(env={u'a': 1}))
     _gen_request(properties=_gen_properties(env={})).put()
+    e = {u'k': u'v'}
+    _gen_request(properties=_gen_properties(env=e)).put()
+    # Key length.
+    e = {u'k'*64: u'v'}
+    _gen_request(properties=_gen_properties(env=e)).put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      e = {u'k'*65: u'v'}
+      _gen_request(properties=_gen_properties(env=e)).put()
+    # # keys.
+    e = {u'k%s' % i: u'v' for i in xrange(64)}
+    _gen_request(properties=_gen_properties(env=e)).put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      e = {u'k%s' % i: u'v' for i in xrange(65)}
+      _gen_request(properties=_gen_properties(env=e)).put()
+    # Value length.
+    e = {u'k': u'v'*1024}
+    _gen_request(properties=_gen_properties(env=e)).put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      e = {u'k': u'v'*1025}
+      _gen_request(properties=_gen_properties(env=e)).put()
 
-    # Priority.
+  def test_request_bad_env_prefixes(self):
+    # Type error.
+    with self.assertRaises(TypeError):
+      _gen_request(properties=_gen_properties(env_prefixes=[]))
+    with self.assertRaises(TypeError):
+      _gen_request(properties=_gen_properties(env_prefixes={u'a': 1}))
+    _gen_request(properties=_gen_properties(env_prefixes={})).put()
+    e = {u'k': [u'v']}
+    _gen_request(properties=_gen_properties(env_prefixes=e)).put()
+    # Key length.
+    e = {u'k'*64: [u'v']}
+    _gen_request(properties=_gen_properties(env_prefixes=e)).put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      e = {u'k'*65: [u'v']}
+      _gen_request(properties=_gen_properties(env_prefixes=e)).put()
+    # # keys.
+    e = {u'k%s' % i: [u'v'] for i in xrange(64)}
+    _gen_request(properties=_gen_properties(env_prefixes=e)).put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      e = {u'k%s' % i: [u'v'] for i in xrange(65)}
+      _gen_request(properties=_gen_properties(env_prefixes=e)).put()
+    # Value length.
+    e = {u'k': [u'v'*1024]}
+    _gen_request(properties=_gen_properties(env_prefixes=e)).put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      e = {u'k': [u'v'*1025]}
+      _gen_request(properties=_gen_properties(env_prefixes=e)).put()
+
+  def test_request_bad_priority(self):
     with self.assertRaises(datastore_errors.BadValueError):
       _gen_request(priority=task_request.MAXIMUM_PRIORITY+1)
     _gen_request(priority=task_request.MAXIMUM_PRIORITY).put()
 
-    # Execution timeout.
+  def test_request_bad_execution_timeout(self):
     with self.assertRaises(datastore_errors.BadValueError):
       _gen_request(
           properties=_gen_properties(
@@ -762,7 +936,7 @@ class TaskRequestApiTest(TestCase):
         properties=_gen_properties(
             execution_timeout_secs=task_request._THREE_DAY_SECS)).put()
 
-    # Expiration.
+  def test_request_bad_expiration(self):
     now = utils.utcnow()
     with self.assertRaises(datastore_errors.BadValueError):
       _gen_request_slices(
@@ -795,9 +969,17 @@ class TaskRequestApiTest(TestCase):
               properties=_gen_properties()),
         ]).put()
 
-    # Try with isolated/isolatedserver/namespace.
+  def test_request_bad_inputs_ref(self):
+    # Both command and inputs_ref.isolated.
+    _gen_request(
+        properties=_gen_properties(
+            command=['python'],
+            inputs_ref=task_request.FilesRef(
+                isolated='deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+                isolatedserver='http://localhost:1',
+                namespace='default-gzip'))).put()
     with self.assertRaises(datastore_errors.BadValueError):
-      # Both command and inputs_ref.isolated.
+      # Bad digest.
       _gen_request(properties=_gen_properties(
           command=['see', 'spot', 'run'],
           inputs_ref=task_request.FilesRef(
@@ -810,11 +992,13 @@ class TaskRequestApiTest(TestCase):
     with self.assertRaises(datastore_errors.BadValueError):
       req.put()
     with self.assertRaises(datastore_errors.BadValueError):
+      # Without digest nor command.
       _gen_request(properties=_gen_properties(
           command=[],
           inputs_ref=task_request.FilesRef(
               isolatedserver='https://isolateserver.appspot.com',
               namespace='default-gzip^^^')))
+    # Command and server can be skipped.
     _gen_request(properties=_gen_properties(
         command=[],
         inputs_ref=task_request.FilesRef(
@@ -822,38 +1006,29 @@ class TaskRequestApiTest(TestCase):
             isolatedserver='http://localhost:1',
             namespace='default-gzip'))).put()
 
-    # Tags
-    req = _gen_request(manual_tags=['a:b']*257)
+  def test_request_bad_pubsub(self):
+    _gen_request(pubsub_topic=u'projects/a/topics/abc').put()
     with self.assertRaises(datastore_errors.BadValueError):
-      req.put()
-    req = _gen_request(manual_tags=['a:b']*256).put()
+      _gen_request(pubsub_topic=u'a')
+    with self.assertRaises(datastore_errors.BadValueError):
+      _gen_request(pubsub_topic=u'projects/a/topics/ab').put()
+    _gen_request(pubsub_topic=u'projects/' + u'a'*1004 + u'/topics/abc').put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      _gen_request(pubsub_topic=u'projects/' + u'a'*1005 + u'/topics/abc').put()
 
-    # Task slices
-    with self.assertRaises(ValueError):
-      # No TaskSlice
-      _gen_request_slices(task_slices=[])
-    slices = [
-      task_request.TaskSlice(
-          expiration_secs=60,
-          properties=_gen_properties(dimensions={u'pool': [u'GPU']})),
-    ]
-    _gen_request_slices(task_slices=slices).put()
-    req = _gen_request_slices(task_slices=slices * 2)
+  def test_request_bad_service_account(self):
+    _gen_request(service_account=u'none').put()
+    _gen_request(service_account=u'bot').put()
+    _gen_request(service_account=u'joe@localhost').put()
     with self.assertRaises(datastore_errors.BadValueError):
-      # Will be supported soon.
-      req.put()
-    req = _gen_request_slices(task_slices=slices * 9)
+      _gen_request(service_account=u'joe').put()
+    _gen_request(service_account=u'joe@'+u'l'*124).put()
     with self.assertRaises(datastore_errors.BadValueError):
-      req.put()
-    slices = [
-      task_request.TaskSlice(
-          expiration_secs=60,
-          properties=_gen_properties(dimensions={u'pool': [u'GPU']})),
-      task_request.TaskSlice(
-          expiration_secs=60,
-          properties=_gen_properties(dimensions={u'pool': [u'other']})),
-    ]
-    req = _gen_request_slices(task_slices=slices)
+      _gen_request(service_account=u'joe@'+u'l'*125).put()
+
+  def test_request_bad_tags(self):
+    req = _gen_request(manual_tags=['a:b']*256).put()
+    req = _gen_request(manual_tags=['a:b']*257)
     with self.assertRaises(datastore_errors.BadValueError):
       req.put()
 

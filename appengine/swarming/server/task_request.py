@@ -135,7 +135,7 @@ def _validate_isolated(prop, value):
 
 
 def _validate_url(prop, value):
-  _validate_length(prop, value, 8192)
+  _validate_length(prop, value, 1024)
   if value and not validation.is_valid_secure_url(value):
     raise datastore_errors.BadValueError(
         '%s must be valid HTTPS URL, not %s' % (prop._name, value))
@@ -149,30 +149,46 @@ def _validate_namespace(prop, value):
 
 def _validate_dimensions(_prop, value):
   """Validates TaskProperties.dimensions."""
+  maxkeys = 32
+  maxvalues = 16
   if not value:
     raise datastore_errors.BadValueError(u'dimensions must be specified')
-  if len(value) > 64:
-    raise datastore_errors.BadValueError('dimensions can have up to 64 entries')
+  if len(value) > maxkeys:
+    raise datastore_errors.BadValueError(
+        u'dimensions can have up to %d keys' % maxkeys)
 
   normalized = {}
   for k, values in value.iteritems():
-    if not k or not isinstance(k, unicode):
+    # Validate the key.
+    if not config.validate_dimension_key(k):
       raise datastore_errors.BadValueError(
-          'dimensions must be a dict of strings or list of string, not %r' %
-          value)
-    if u':' in k:
-      raise datastore_errors.BadValueError('dimensions key cannot contain ":"')
-    if k.strip() != k:
-      raise datastore_errors.BadValueError('dimensions key has whitespace')
+          u'dimension key must a string that fits %r: %r is invalid' %
+          (config.DIMENSION_KEY_RE, k))
+
+    # Validate the values.
     if not values:
       raise datastore_errors.BadValueError(
-          'dimensions must be a dict of strings or list of string, not %r' %
+          u'dimensions must be a dict of strings or list of string, not %r' %
           value)
-    if (not isinstance(values, (list, tuple)) or
-        not all(isinstance(v, unicode) for v in values)):
+    if not isinstance(values, (list, tuple)):
+      # Internal bug.
       raise datastore_errors.BadValueError(
-          'dimensions must be a dict of strings or list of string, not %r' %
+          u'dimensions must be a dict of strings or list of string, not %r' %
           value)
+
+    if len(values) > maxvalues:
+      raise datastore_errors.BadValueError(
+          u'dimension key %r has too many values; maximum is %d' %
+          (k, maxvalues))
+    if len(values) != len(set(values)):
+      raise datastore_errors.BadValueError(
+          u'dimension key %r has repeated values' % k)
+    for v in values:
+      if not config.validate_dimension_value(v):
+        raise datastore_errors.BadValueError(
+            u'dimension key %r has invalid value %r' % (k, v))
+
+    # Key specific checks.
     if k == u'id' and len(values) != 1:
       raise datastore_errors.BadValueError(
           u'\'id\' cannot be specified more than once in dimensions')
@@ -181,9 +197,7 @@ def _validate_dimensions(_prop, value):
     if k == u'pool' and len(values) != 1:
       raise datastore_errors.BadValueError(
           u'\'pool\' cannot be specified more than once in dimensions')
-    if len(values) != len(set(values)):
-      raise datastore_errors.BadValueError(
-          u'dimensions values cannot be repeated')
+
     # Always store the values sorted, that simplies the code.
     normalized[k] = sorted(values)
 
@@ -192,7 +206,7 @@ def _validate_dimensions(_prop, value):
 
 def _validate_env_key(prop, key):
   """Validates TaskProperties.env."""
-  maxlen = 1024
+  maxlen = 64
   if not isinstance(key, unicode):
     raise TypeError(
         '%s must have string key, not %r' % (prop._name, key))
@@ -217,19 +231,28 @@ def _validate_env(prop, value):
     _validate_env_key(prop, k)
     if len(v) > maxlen:
       raise datastore_errors.BadValueError(
-          'key in %s is too long: %d > %d' % (prop._name, len(v), maxlen))
+          '%s: key %r has too long value: %d > %d' %
+          (prop._name, k, len(v), maxlen))
   if len(value) > 64:
     raise datastore_errors.BadValueError(
         '%s can have up to 64 keys' % prop._name)
 
 
 def _validate_env_prefixes(prop, value):
-  for k, v in value.iteritems():
-    if not isinstance(v, list):
-      raise TypeError(
-          '%s must have list value, not %r' % (prop._name, v))
+  # pylint: disable=protected-access
+  maxlen = 1024
+  for k, values in value.iteritems():
     _validate_env_key(prop, k)
-    for path in v:
+    if (not isinstance(values, list) or
+        not all(isinstance(v, unicode) for v in values)):
+      raise TypeError(
+          '%s must have list unicode value for key %r, not %r' %
+          (prop._name, k, values))
+    for path in values:
+      if len(path) > maxlen:
+        raise datastore_errors.BadValueError(
+            '%s: value for key %r is too long: %d > %d' %
+            (prop._name, k, len(path), maxlen))
       _validate_rel_path('Env Prefix', path)
 
   if len(value) > 64:
@@ -292,7 +315,7 @@ def _validate_timeout(prop, value):
 def _validate_tags(prop, value):
   """Validates TaskRequest.tags."""
   # pylint: disable=protected-access
-  _validate_length(prop, value, 1024)
+  _validate_length(prop, value, 256)
   if ':' not in value:
     raise datastore_errors.BadValueError(
         '%s must be key:value form, not %s' % (prop._name, value))
@@ -325,20 +348,20 @@ def _validate_package_version(prop, value):
 
 
 def _validate_cache_name(prop, value):
-  _validate_length(prop, value, 1024)
+  _validate_length(prop, value, 128)
   if not _CACHE_NAME_RE.match(value):
     raise datastore_errors.BadValueError(
         '%s %r does not match %s' % (prop._name, value, _CACHE_NAME_RE.pattern))
 
 
 def _validate_cache_path(prop, value):
-  _validate_length(prop, value, 1024)
+  _validate_length(prop, value, 256)
   _validate_rel_path('Cache path', value)
 
 
 def _validate_package_path(prop, value):
   """Validates a CIPD installation path."""
-  _validate_length(prop, value, 1024)
+  _validate_length(prop, value, 256)
   if not value:
     raise datastore_errors.BadValueError(
         'CIPD package path is required. Use "." to install to run dir.')
@@ -347,12 +370,15 @@ def _validate_package_path(prop, value):
 
 def _validate_output_path(prop, value):
   """Validates a path for an output file."""
-  _validate_length(prop, value, 1024)
+  _validate_length(prop, value, 512)
   _validate_rel_path('output file', value)
 
 
 def _validate_rel_path(value_name, path):
-  """Validates a relative path to be valid."""
+  """Validates a relative path to be valid.
+
+  Length have to be validated first.
+  """
   if not path:
     raise datastore_errors.BadValueError(
         'No argument provided for %s.' % value_name)
@@ -374,7 +400,7 @@ def _validate_rel_path(value_name, path):
 
 def _validate_service_account(prop, value):
   """Validates that 'service_account' field is 'bot', 'none' or email."""
-  _validate_length(prop, value, 1024)
+  _validate_length(prop, value, 128)
   if not value:
     return None
   if value in ('bot', 'none') or service_accounts.is_service_account(value):
@@ -674,15 +700,15 @@ class TaskProperties(ndb.Model):
       # _pre_put_hook() doesn't recurse correctly into
       # ndb.LocalStructuredProperty. Call the function manually.
       self.inputs_ref._pre_put_hook()
-    if len(self.command) > 256:
+    if len(self.command) > 128:
       raise datastore_errors.BadValueError(
-          'command can have up to 256 arguments')
-    if len(self.extra_args) > 256:
+          'command can have up to 128 arguments')
+    if len(self.extra_args) > 128:
       raise datastore_errors.BadValueError(
-          'extra_args can have up to 256 arguments')
+          'extra_args can have up to 128 arguments')
 
     # Validate caches.
-    if len(self.caches) > 64:
+    if len(self.caches) > 32:
       raise datastore_errors.BadValueError(
           'Up to 64 caches can be listed for a task')
     cache_names = set()
