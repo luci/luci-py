@@ -49,6 +49,10 @@ This schema is an example of a task with two tries. This happens when the first
 try resulted in `TaskRunResult.state == BOT_DIED`. This is a relatively rare
 case.
 
+**Note**: Entities marked with an asterix `*` may not be stored in certain
+situations, like for deduplicated tasks, tasks that didn't run due to internal
+failure, or tasks with no secret bytes provided (for SecretBytes).
+
     +--------Root------------------------------------------------------+
     |TaskRequest                                                       |
     |  +--------------+      +----------------+     +----------------+ |
@@ -65,17 +69,17 @@ case.
         |      |
         |      v
         |  +-----------+
-        |  |SecretBytes|                                         task_request.py
+        |  |SecretBytes|*                                        task_request.py
         |  |id=1       |
         |  +-----------+
         |
         +------+
         |      |
         |      v
-        |  +--------------+     +--------------+
-        |  |TaskToRun     | ... |TaskToRun     |                  task_to_run.py
-        |  |id=<composite>| ... |id=<composite>|
-        |  +--------------+     +--------------+
+        |  +--------------+      +--------------+
+        |  |TaskToRun     |* ... |TaskToRun     |*                task_to_run.py
+        |  |id=<composite>|  ... |id=<composite>|
+        |  +--------------+      +--------------+
         |
         v
     +-----------------+
@@ -89,29 +93,29 @@ case.
         +----------------+
         |                |
         v                v
-    +-------------+  +-------------+
-    |TaskRunResult|  |TaskRunResult|                              task_result.py
-    |  +--------+ |  |  +--------+ |
-    |  |FilesRef| |  |  |FilesRef| |
-    |  +--------+ |  |  +--------+ |
-    |id=1 <try #> |  |id=2         |
-    +-------------+  +-------------+
+    +-------------+   +-------------+
+    |TaskRunResult|*  |TaskRunResult|*                            task_result.py
+    |  +--------+ |   |  +--------+ |
+    |  |FilesRef| |   |  |FilesRef| |
+    |  +--------+ |   |  +--------+ |
+    |id=1 <try #> |   |id=2         |
+    +-------------+   +-------------+
         |
-        +--------------------+
-        |                    |
-        v                    v
-    +-----------------+  +----------------+
-    |TaskOutput       |  |PerformanceStats|                       task_result.py
-    |id=1 (not stored)|  |id=1            |
-    +-----------------+  +----------------+
+        +----------------------+
+        |                      |
+        v                      v
+    +-----------------+     +----------------+
+    |TaskOutput       |*    |PerformanceStats|*                   task_result.py
+    |id=1 (not stored)|     |id=1            |
+    +-----------------+     +----------------+
         |
         +------------ ... ----+
         |                     |
         v                     v
-    +---------------+     +---------------+
-    |TaskOutputChunk| ... |TaskOutputChunk|                       task_result.py
-    |id=1           | ... |id=N           |
-    +---------------+     +---------------+
+    +---------------+      +---------------+
+    |TaskOutputChunk|* ... |TaskOutputChunk|*                     task_result.py
+    |id=1           |  ... |id=N           |
+    +---------------+      +---------------+
 
 
 ### Task queues schema
