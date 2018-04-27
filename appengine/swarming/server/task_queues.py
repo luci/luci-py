@@ -410,6 +410,9 @@ def _rebuild_bot_cache_async(bot_dimensions, bot_root_key):
 
   The update completes with BotDimensions being updated and memcache entry for
   get_queues() updated.
+
+  Returns:
+    Number of matches.
   """
   now = utils.utcnow()
   bot_id = bot_dimensions[u'id'][0]
@@ -429,6 +432,7 @@ def _rebuild_bot_cache_async(bot_dimensions, bot_root_key):
     yield obj.put_async()
     yield ndb.get_context().memcache_set(
         bot_id, sorted(matches), namespace='task_queues')
+    raise ndb.Return(len(matches))
   finally:
     logging.debug(
         '_rebuild_bot_cache_async(%s) in %.3fs. Registered for %d queues; '
@@ -669,6 +673,9 @@ def assert_bot_async(bot_dimensions):
 
   Coupled with assert_task(), enables get_queues() to work by by knowing which
   TaskDimensions applies to this bot.
+
+  Returns:
+    Number of matches or None if hit the cache, thus nothing was updated.
   """
   assert len(bot_dimensions[u'id']) == 1, bot_dimensions
   # Check if the bot dimensions changed since last _rebuild_bot_cache_async()
@@ -679,7 +686,8 @@ def assert_bot_async(bot_dimensions):
     # Cache hit, no need to look further.
     raise ndb.Return(None)
 
-  yield _rebuild_bot_cache_async(bot_dimensions, bot_root_key)
+  matches = yield _rebuild_bot_cache_async(bot_dimensions, bot_root_key)
+  raise ndb.Return(matches)
 
 
 def cleanup_after_bot(bot_id):

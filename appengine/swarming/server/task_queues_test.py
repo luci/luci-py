@@ -39,7 +39,7 @@ def _assert_bot(dimensions=None):
   bot_management.bot_event(
       'bot_connected', u'bot1', '1.2.3.4', 'bot1', bot_dimensions, {},
       '1234', False, None, None)
-  task_queues.assert_bot_async(bot_dimensions).get_result()
+  return task_queues.assert_bot_async(bot_dimensions).get_result()
 
 
 def _gen_properties(**kwargs):
@@ -173,7 +173,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assert_count(0, task_queues.BotDimensions)
     self.assert_count(0, task_queues.BotTaskDimensions)
     self.assert_count(0, task_queues.TaskDimensions)
-    _assert_bot()
+    self.assertEqual(0, _assert_bot())
     self.assert_count(1, bot_management.BotInfo)
     self.assert_count(1, task_queues.BotDimensions)
     self.assert_count(0, task_queues.BotTaskDimensions)
@@ -184,14 +184,14 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     request = self._assert_task()
-    _assert_bot()
+    self.assertEqual(1, _assert_bot())
     valid_until_ts = request.expiration_ts + task_queues._ADVANCE
     self.assertEqual(
         valid_until_ts,
         task_queues.BotTaskDimensions.query().get().valid_until_ts)
 
     self.mock_now(now, 60)
-    _assert_bot()
+    self.assertEqual(None, _assert_bot())
     self.assertEqual(
         valid_until_ts,
         task_queues.BotTaskDimensions.query().get().valid_until_ts)
@@ -228,7 +228,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     pass
 
   def test_assert_bot_then_task(self):
-    _assert_bot()
+    self.assertEqual(0, _assert_bot())
     self._assert_task()
     self.assert_count(1, task_queues.BotDimensions)
     self.assert_count(1, task_queues.BotTaskDimensions)
@@ -237,7 +237,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
 
   def test_assert_task_then_bot(self):
     self._assert_task()
-    _assert_bot()
+    self.assertEqual(1, _assert_bot())
     self.assert_count(1, task_queues.BotDimensions)
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
@@ -246,7 +246,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
   def test_assert_bot_then_task_with_id(self):
     # Assert a task that includes an 'id' dimension. No task queue is triggered
     # in this case, rebuild_task_cache() is called inlined.
-    _assert_bot()
+    self.assertEqual(0, _assert_bot())
     request = _gen_request(
         properties=_gen_properties(dimensions={u'id': [u'bot1']}))
     task_queues.assert_task(request)
@@ -257,7 +257,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assert_count(1, task_queues.TaskDimensions)
 
   def test_cleanup_after_bot(self):
-    _assert_bot()
+    self.assertEqual(0, _assert_bot())
     self._assert_task()
     task_queues.cleanup_after_bot('bot1')
     # BotInfo is deleted separately.
@@ -273,17 +273,17 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.mock_now(now)
     request = self._assert_task()
     exp = (request.expiration_ts-request.created_ts) + task_queues._ADVANCE
-    _assert_bot()
+    self.assertEqual(1, _assert_bot())
     # One hour later, the bot changes dimensions.
     self.mock_now(now, task_queues._ADVANCE.total_seconds())
-    _assert_bot({u'gpu': u'Matrox'})
+    self.assertEqual(1, _assert_bot({u'gpu': u'Matrox'}))
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
     self.assertEqual([2980491642], task_queues.get_queues(u'bot1'))
 
     # One second before expiration.
     self.mock_now(now, exp.total_seconds())
-    _assert_bot({u'gpu': u'Matrox'})
+    self.assertEqual(None, _assert_bot({u'gpu': u'Matrox'}))
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
     self.assertEqual([2980491642], task_queues.get_queues(u'bot1'))
@@ -291,7 +291,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     # TaskDimension expired. The fact that the bot changed dimensions after an
     # hour didn't impact BotTaskDimensions expiration.
     self.mock_now(now, exp.total_seconds() + 1)
-    _assert_bot()
+    self.assertEqual(0, _assert_bot())
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
     self.assertEqual([], task_queues.get_queues(u'bot1'))
@@ -305,7 +305,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
   def test_cron_tidy_stale(self):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
-    _assert_bot()
+    self.assertEqual(0, _assert_bot())
     request = self._assert_task()
     exp = (request.expiration_ts-request.created_ts) + task_queues._ADVANCE
     self.assert_count(1, task_queues.BotTaskDimensions)
