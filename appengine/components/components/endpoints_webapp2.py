@@ -17,6 +17,7 @@ from protorpc import messages
 from protorpc import remote
 import webapp2
 
+from components import discovery_webapp2
 from components import net
 
 
@@ -163,6 +164,23 @@ def api_routes(api_class, base_path=None):
   return routes
 
 
+def api_server(api_classes):
+  """Creates webapp2 routes for the given Endpoints v1 services.
+
+  Args:
+    api_classes: A list of protorpc.remote.Service classes to create routes for.
+
+  Returns:
+    A list of webapp2.Routes.
+  """
+  # TODO(smut): Allow /api part of the path to be customized.
+  routes = []
+  for api_class in api_classes:
+    routes.extend(api_routes(api_class))
+  routes.append(directory_service_route(api_classes))
+  return routes
+
+
 class DiscoveryHandler(webapp2.RequestHandler):
   """Returns a discovery document for a service.
 
@@ -213,3 +231,39 @@ class DiscoveryHandler(webapp2.RequestHandler):
 def discovery_service_route():
   return webapp2.Route(
       '/api/discovery/v1/apis/<service>/<version>/rest', DiscoveryHandler)
+
+
+def directory_handler_factory(api_classes):
+  """Returns a directory request handler which knows about the given services.
+
+  Args:
+    api_classes: A list of protorpc.remote.Service classes the handler should
+      know about.
+
+  Returns:
+    A webapp2.RequestHandler.
+  """
+  class DirectoryHandler(webapp2.RequestHandler):
+    """Returns a directory list for known services."""
+
+    def get(self):
+      self.response.headers['Content-Type'] = 'application/json'
+      json.dump(
+          discovery_webapp2.directory(api_classes),
+          self.response, indent=2, sort_keys=True, separators=(',', ':'))
+
+  return DirectoryHandler
+
+
+def directory_service_route(api_classes):
+  """Returns a route to a handler which serves a directory list.
+
+  Args:
+    api_classes: A list of protorpc.remote.Service classes the handler should
+      know about.
+
+  Returns:
+    A webapp2.Route.
+  """
+  return webapp2.Route(
+      '/api/discovery/v1/apis', directory_handler_factory(api_classes))

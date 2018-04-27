@@ -100,6 +100,16 @@ class EndpointsWebapp2TestCase(test_case.TestCase):
       },
     })
 
+  def test_directory_routing(self):
+    app = webapp2.WSGIApplication(
+        [endpoints_webapp2.directory_service_route([EndpointsService])],
+        debug=True)
+    request = webapp2.Request.blank('/api/discovery/v1/apis')
+    request.method = 'GET'
+    response = json.loads(request.get_response(app).body)
+    self.assertEqual(len(response.get('items', [])), 1)
+    self.assertEqual(response['items'][0]['id'], 'Service:v1')
+
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None
