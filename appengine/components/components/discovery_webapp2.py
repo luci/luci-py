@@ -306,3 +306,47 @@ def generate(service):
     document['description'] = desc
   document.update(_get_methods(service))
   return document
+
+
+def directory(services):
+  """Returns a directory list for the given services.
+
+  Args:
+    services: The list of protorpc.remote.Services to describe.
+
+  Returns:
+    A dict which can be written as JSON describing the services.
+  """
+  document = {
+    'discoveryVersion': 'v1',
+    'kind': 'discovery#directoryList',
+  }
+
+  items = []
+  for service in services:
+    item = {
+      'discoveryLink': './apis/%s/%s/rest' % (
+          service.api_info.name, service.api_info.version),
+      # TODO(smut): Allow /api part of the path to be customized.
+      'discoveryRestUrl': 'https://%s/api/discovery/v1/apis/%s/%s/rest' % (
+          service.api_info.hostname, service.api_info.name,
+          service.api_info.version),
+      'id': '%s:%s' % (service.api_info.name, service.api_info.version),
+      'icons': {
+        'x16': 'https://www.google.com/images/icons/product/search-16.gif',
+        'x32': 'https://www.google.com/images/icons/product/search-32.gif',
+      },
+      'kind': 'discovery#directoryItem',
+      'name': service.api_info.name,
+      'preferred': True,
+      'version': service.api_info.version,
+    }
+    desc = _normalize_whitespace(
+        service.api_info.description or service.__doc__)
+    if desc:
+      item['description'] = desc
+    items.append(item)
+
+  if items:
+    document['items'] = items
+  return document

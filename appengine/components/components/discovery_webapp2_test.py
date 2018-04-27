@@ -283,6 +283,31 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
     }
     self.assertEqual(discovery_webapp2.generate(Service), expected)
 
+  def test_directory(self):
+    """Tests for discovery_webapp2.directory."""
+    expected = {
+      'discoveryVersion': 'v1',
+      'items': [
+        {
+          'description': 'A service to test with.',
+          'discoveryLink': './apis/service/v1/rest',
+          'discoveryRestUrl':
+              'https://None/api/discovery/v1/apis/service/v1/rest',
+          'icons': {
+            'x16': 'https://www.google.com/images/icons/product/search-16.gif',
+            'x32': 'https://www.google.com/images/icons/product/search-32.gif',
+          },
+          'id': 'service:v1',
+          'kind': 'discovery#directoryItem',
+          'name': 'service',
+          'preferred': True,
+          'version': 'v1',
+        },
+      ],
+      'kind': 'discovery#directoryList',
+    }
+    self.assertEqual(discovery_webapp2.directory([Service]), expected)
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
