@@ -794,17 +794,32 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(False, to_run.is_reapable)
 
   def test_set_lookup_cache(self):
-    request_dimensions = {u'os': [u'Windows-3.1.1'], u'pool': [u'default']}
-    _, to_run = self._gen_new_task_to_run(
-        1, properties=_gen_properties(dimensions=request_dimensions))
+    # Create two TaskToRun on the same TaskRequest and assert that affecting one
+    # negative cache entry doesn't affect the other.
+    request = self.mkreq(1, _gen_request())
+    to_run_1 = task_to_run.new_task_to_run(request, 1, 0)
+    to_run_1.put()
+    to_run_2 = task_to_run.new_task_to_run(request, 2, 0)
+    to_run_2.put()
     lookup = lambda k: task_to_run._lookup_cache_is_taken_async(k).get_result()
-    self.assertEqual(False, lookup(to_run.key))
-    task_to_run.set_lookup_cache(to_run.key, True)
-    self.assertEqual(False, lookup(to_run.key))
-    task_to_run.set_lookup_cache(to_run.key, False)
-    self.assertEqual(True, lookup(to_run.key))
-    task_to_run.set_lookup_cache(to_run.key, True)
-    self.assertEqual(False, lookup(to_run.key))
+    # By default, the negative cache is false, i.e. it is safe to reap the task.
+    self.assertEqual(False, lookup(to_run_1.key))
+    self.assertEqual(False, lookup(to_run_2.key))
+    # Mark to_run_1 as safe to reap.
+    task_to_run.set_lookup_cache(to_run_1.key, True)
+    self.assertEqual(False, lookup(to_run_1.key))
+    self.assertEqual(False, lookup(to_run_2.key))
+    # Mark to_run_1 as unreapable, i.e. a bot is about to reap it.
+    task_to_run.set_lookup_cache(to_run_1.key, False)
+    self.assertEqual(True, lookup(to_run_1.key))
+    self.assertEqual(False, lookup(to_run_2.key))
+    task_to_run.set_lookup_cache(to_run_1.key, True)
+    self.assertEqual(False, lookup(to_run_1.key))
+    self.assertEqual(False, lookup(to_run_2.key))
+    # Mark to_run_2 as unreapable, i.e. a bot is about to reap it.
+    task_to_run.set_lookup_cache(to_run_2.key, False)
+    self.assertEqual(False, lookup(to_run_1.key))
+    self.assertEqual(True, lookup(to_run_2.key))
 
 
 if __name__ == '__main__':
