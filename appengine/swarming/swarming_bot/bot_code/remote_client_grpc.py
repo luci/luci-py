@@ -253,7 +253,7 @@ class RemoteClientGrpc(object):
     self._proxy_tasks.call_unary('UpdateTaskResult', req)
 
   def get_bot_code(self, new_zip_fn, bot_version, _bot_id):
-    with open(new_zip_fn, 'w') as zf:
+    with open(new_zip_fn, 'wb') as zf:
       req = bytestream_pb2.ReadRequest()
       req.resource_name = bot_version
       try:
