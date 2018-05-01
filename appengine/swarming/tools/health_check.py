@@ -43,7 +43,7 @@ def retry_exception(exc_type, max_attempts, delay):
   return deco
 
 
-@retry_exception(ValueError, 4, 10)
+@retry_exception(ValueError, 12, 10)
 def pick_best_pool(url, server_version):
   """Pick the best pool to run the health check task on.
 
