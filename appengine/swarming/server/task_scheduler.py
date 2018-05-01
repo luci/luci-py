@@ -752,41 +752,43 @@ def schedule_request(request, secret_bytes):
     return key
 
   deduped = False
-  t = request.task_slice(0)
-  if t.properties.idempotent:
-    dupe_summary = _find_dupe_task(now, t.properties_hash())
-    if dupe_summary:
-      _copy_summary(
-          dupe_summary, result_summary,
-          ('created_ts', 'modified_ts', 'name', 'user', 'tags'))
-      # Zap irrelevant properties.
-      # It is not possible to deduped against a deduped task, so zap
-      # properties_hash.
-      # PerformanceStats is not copied over, since it's not relevant, nothing
-      # ran.
-      result_summary.properties_hash = None
-      result_summary.try_number = 0
-      result_summary.cost_saved_usd = result_summary.cost_usd
-      # Only zap after.
-      result_summary.costs_usd = []
-      result_summary.deduped_from = task_pack.pack_run_result_key(
-          dupe_summary.run_result_key)
-      # In this code path, there's not much to do as the task will not be run,
-      # previous results are returned. We still need to store the TaskRequest
-      # and TaskResultSummary.
-      #
-      # Since the task is never scheduled, TaskToRun is not stored.
-      #
-      # Since the has_secret_bytes property is already set for UI purposes, and
-      # the task itself will never be run, we skip storing the SecretBytes, as
-      # they would never be read and will just consume space in the datastore
-      # (and the task we deduplicated with will have them stored anyway, if we
-      # really want to get them again).
-      datastore_utils.insert(request, get_new_keys, extra=[result_summary])
-      logging.debug(
-          'New request %s reusing %s', result_summary.task_id,
-          dupe_summary.task_id)
-      deduped = True
+  for i in xrange(request.num_task_slices):
+    t = request.task_slice(i)
+    if t.properties.idempotent:
+      dupe_summary = _find_dupe_task(now, t.properties_hash())
+      if dupe_summary:
+        _copy_summary(
+            dupe_summary, result_summary,
+            ('created_ts', 'modified_ts', 'name', 'user', 'tags'))
+        # Zap irrelevant properties.
+        # It is not possible to dedupe against a deduped task, so zap
+        # properties_hash.
+        # PerformanceStats is not copied over, since it's not relevant, nothing
+        # ran.
+        result_summary.current_task_slice = i
+        result_summary.properties_hash = None
+        result_summary.try_number = 0
+        result_summary.cost_saved_usd = result_summary.cost_usd
+        # Only zap after.
+        result_summary.costs_usd = []
+        result_summary.deduped_from = task_pack.pack_run_result_key(
+            dupe_summary.run_result_key)
+        # In this code path, there's not much to do as the task will not be run,
+        # previous results are returned. We still need to store the TaskRequest
+        # and TaskResultSummary.
+        #
+        # Since the task is never scheduled, TaskToRun is not stored.
+        #
+        # Since the has_secret_bytes property is already set for UI purposes,
+        # and the task itself will never be run, we skip storing the
+        # SecretBytes, as they would never be read and will just consume space
+        # in the datastore (and the task we deduplicated with will have them
+        # stored anyway, if we really want to get them again).
+        datastore_utils.insert(request, get_new_keys, extra=[result_summary])
+        logging.debug(
+            'New request %s reusing %s', result_summary.task_id,
+            dupe_summary.task_id)
+        deduped = True
 
   if not deduped:
     # Storing these entities makes this task live. It is important at this point
@@ -836,7 +838,7 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
   start = time.time()
   bot_id = bot_dimensions[u'id'][0]
   iterated = 0
-  reenqueueds = 0
+  reenqueued = 0
   expired = 0
   failures = 0
   stale_index = 0
@@ -850,7 +852,7 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
         if r:
           # Expiring a TaskToRun for TaskSlice may reenqueue a new TaskToRun.
           # It'll be processed accordingly but not handled here.
-          reenqueueds += 1
+          reenqueued += 1
         elif s:
           expired += 1
         else:
@@ -873,7 +875,7 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
     logging.debug(
         'bot_reap_task(%s) in %.3fs: %d iterated, %d reenqueued, %d expired, '
         '%d stale_index, %d failured',
-        bot_id, time.time()-start, iterated, reenqueueds, expired, stale_index,
+        bot_id, time.time()-start, iterated, reenqueued, expired, stale_index,
         failures)
 
 
@@ -1116,20 +1118,19 @@ def cron_abort_expired_task_to_run(host):
     tasks or properly receive results from the bots.
 
   Returns:
-    Packed tasks ids of aborted tasks.
+    Packed tasks ids of aborted and reenqueued tasks.
   """
   killed = []
-  reenqueueds = 0
+  reenqueued = []
   skipped = 0
   try:
     for to_run in task_to_run.yield_expired_task_to_run():
       request = to_run.request_key.get()
-      summary, reenqueued = _expire_task(to_run.key, request)
-      if reenqueued:
+      summary, next_slice = _expire_task(to_run.key, request)
+      if next_slice:
         # Expiring a TaskToRun for TaskSlice may reenqueue a new TaskToRun.
-        reenqueueds += 1
+        reenqueued.append(request)
       elif summary:
-        # TODO(maruel): Know which try it is.
         killed.append(request)
       else:
         # It's not a big deal, the bot will continue running.
@@ -1145,8 +1146,9 @@ def cron_abort_expired_task_to_run(host):
             for i in killed))
     logging.info(
         'Reenqueued %d tasks, killed %d, skipped %d',
-        reenqueueds, len(killed), skipped)
-  return [i.task_id for i in killed]
+        len(reenqueued), len(killed), skipped)
+  # These are returned primarily for unit testing verification.
+  return [i.task_id for i in killed], [i.task_id for i in reenqueued]
 
 
 def cron_handle_bot_died(host):
@@ -1180,6 +1182,7 @@ def cron_handle_bot_died(host):
           '\n'.join('  %s/user/task/%s' % (host, i) for i in killed))
     logging.info(
         'Killed %d; retried %d; ignored: %d', len(killed), retried, ignored)
+  # These are returned primarily for unit testing verification.
   return killed, retried, ignored
 
 
