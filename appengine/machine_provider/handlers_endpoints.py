@@ -746,12 +746,12 @@ class MachineProviderEndpoints(remote.Service):
 
 
 def get_routes():
-  return (
-    endpoints_webapp2.api_routes(config.ConfigApi) +
-    endpoints_webapp2.api_routes(CatalogEndpoints) +
-    endpoints_webapp2.api_routes(MachineEndpoints) +
-    endpoints_webapp2.api_routes(MachineProviderEndpoints)
-  )
+  return endpoints_webapp2.api_server([
+      CatalogEndpoints,
+      MachineEndpoints,
+      MachineProviderEndpoints,
+      config.ConfigApi,
+  ])
 
 
 def create_endpoints_app():
