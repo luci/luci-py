@@ -1007,6 +1007,16 @@ class TaskRequest(ndb.Model):
         raise datastore_errors.BadValueError(
             'priority 0 can only be used for terminate request')
 
+    if len(self.task_slices) > 1:
+      # Make sure there is no duplicate task. It is likely an error from the
+      # user. Compare dictionary so it works even if idempotent is False.
+      num_unique = len(set(
+          utils.encode_to_json(t.properties.to_dict())
+          for t in self.task_slices))
+      if len(self.task_slices) != num_unique:
+        raise datastore_errors.BadValueError(
+            'cannot request duplicate task slice')
+
     if len(self.task_slices) != 1:
       # https://crbug.com/781021
       # This will change soon.

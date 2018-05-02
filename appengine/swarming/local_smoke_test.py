@@ -136,8 +136,28 @@ class SwarmingClient(object):
       logging.debug('task_id = %s', task_id)
       return task_id
 
+  def task_trigger_post(self, request):
+    """Triggers a task with the very raw RPC and returns the task id.
+
+    It does an HTTP POST at tasks/new with the provided data in 'request'.
+    """
+    out = self._capture('post', ['tasks/new'], request)
+    try:
+      data = json.loads(out)
+    except ValueError:
+      logging.info('Data could not be decoded: %r', out)
+      return None
+    task_id = data['task_id']
+    logging.debug('task_id = %s', task_id)
+    return task_id
+
   def task_collect(self, task_id, timeout=TIMEOUT_SECS):
-    """Collects the results for a task."""
+    """Collects the results for a task.
+
+    Returns:
+      - Result summary as saved by the tool
+      - output files as a dict
+    """
     tmp = os.path.join(self._tmpdir, task_id + '.json')
     tmpdir = unicode(os.path.join(self._tmpdir, task_id))
     if os.path.isdir(tmpdir):
@@ -171,20 +191,20 @@ class SwarmingClient(object):
 
   def task_cancel(self, task_id, args):
     """Cancels a task."""
-    return self._capture('cancel', list(args) + [str(task_id)]) == ''
+    return self._capture('cancel', list(args) + [str(task_id)], '') == ''
 
   def task_result(self, task_id):
     """Queries a task result without waiting for it to complete."""
     # collect --timeout 0 now works the same.
-    return json.loads(self._capture('query', ['task/%s/result' % task_id]))
+    return json.loads(self._capture('query', ['task/%s/result' % task_id], ''))
 
   def task_stdout(self, task_id):
     """Returns current task stdout without waiting for it to complete."""
-    raw = self._capture('query', ['task/%s/stdout' % task_id])
+    raw = self._capture('query', ['task/%s/stdout' % task_id], '')
     return json.loads(raw).get('output')
 
   def terminate(self, bot_id):
-    task_id = self._capture('terminate', [bot_id]).strip()
+    task_id = self._capture('terminate', [bot_id], '').strip()
     logging.info('swarming.py terminate returned %r', task_id)
     if not task_id:
       return 1
@@ -192,7 +212,8 @@ class SwarmingClient(object):
 
   def query_bot(self):
     """Returns the bot's properties."""
-    data = json.loads(self._capture('query', ['bots/list', '--limit', '10']))
+    raw = self._capture('query', ['bots/list', '--limit', '10'], '')
+    data = json.loads(raw)
     if not data.get('items'):
       return None
     assert len(data['items']) == 1
@@ -231,7 +252,7 @@ class SwarmingClient(object):
       p.communicate()
       return p.returncode
 
-  def _capture(self, command, args):
+  def _capture(self, command, args, stdin):
     name = os.path.join(self._tmpdir, u'client_%d.log' % self._index)
     self._index += 1
     cmd = [
@@ -240,8 +261,9 @@ class SwarmingClient(object):
     ] + args
     with fs.open(name, 'wb') as f:
       f.write('\nRunning: %s\n' % ' '.join(cmd))
-    p = subprocess42.Popen(cmd, stdout=subprocess42.PIPE, cwd=CLIENT_DIR)
-    return p.communicate()[0]
+    p = subprocess42.Popen(
+        cmd, stdin=subprocess42.PIPE, stdout=subprocess42.PIPE, cwd=CLIENT_DIR)
+    return p.communicate(stdin)[0]
 
 
 def gen_expected(**kwargs):
@@ -969,6 +991,46 @@ class Test(unittest.TestCase):
     # Make sure the exit code is what the script returned, which means the
     # script in fact did handle the SIGTERM and returned properly.
     self.assertEqual(u'23', result[u'exit_code'])
+
+  def test_task_slice(self):
+    request = {
+      'name': 'task_slice_fallback',
+      'priority': 40,
+      'task_slices': [
+        {
+          'expiration_secs': 120,
+          'properties': {
+            'command': ['python', '-c', 'print("first")'],
+            'dimensions': [
+              {
+                'key': 'pool',
+                'value': 'default',
+              },
+            ],
+            'grace_period_secs': 30,
+            'execution_timeout_secs': 30,
+            'io_timeout_secs': 30,
+          },
+        },
+        {
+          'expiration_secs': 120,
+          'properties': {
+            'command': ['python', '-c', 'print("second")'],
+            'dimensions': [
+              {
+                'key': 'pool',
+                'value': 'default',
+              },
+            ],
+            'grace_period_secs': 30,
+            'execution_timeout_secs': 30,
+            'io_timeout_secs': 30,
+          },
+        },
+      ],
+    }
+    task_id = self.client.task_trigger_post(json.dumps(request))
+    self.assertIsNone(task_id)
 
   def _run_isolated(
       self, contents, name, args, expected_summary, expected_files,

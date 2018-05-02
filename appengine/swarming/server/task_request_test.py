@@ -547,17 +547,24 @@ class TaskRequestApiTest(TestCase):
     with self.assertRaises(ValueError):
       # No TaskSlice
       _gen_request_slices(task_slices=[])
+    def _gen_slice(**props):
+      return task_request.TaskSlice(
+          expiration_secs=60, properties=_gen_properties(**props))
+
+    slices = [_gen_slice(dimensions={u'pool': [u'GPU']})]
+    _gen_request_slices(task_slices=slices).put()
+
+    # Limit on the maximum number of TaskSlice in a TaskRequest.
     slices = [
-      task_request.TaskSlice(
-          expiration_secs=60,
-          properties=_gen_properties(dimensions={u'pool': [u'GPU']})),
+      _gen_slice(dimensions={u'pool': [u'GPU'], u'v': [unicode(i)]})
+      for i in xrange(1)
     ]
     _gen_request_slices(task_slices=slices).put()
-    req = _gen_request_slices(task_slices=slices * 2)
-    with self.assertRaises(datastore_errors.BadValueError):
-      # Will be supported soon.
-      req.put()
-    req = _gen_request_slices(task_slices=slices * 9)
+    slices = [
+      _gen_slice(dimensions={u'pool': [u'GPU'], u'v': [unicode(i)]})
+      for i in xrange(9)
+    ]
+    req = _gen_request_slices(task_slices=slices)
     with self.assertRaises(datastore_errors.BadValueError):
       req.put()
     # Different pools.

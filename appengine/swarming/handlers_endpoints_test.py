@@ -639,7 +639,9 @@ class TasksApiTest(BaseTest):
         u'expiration_secs': 180,
       },
       {
-        u'properties': self.create_props(command=['python', 'run_test.py']),
+        u'properties': self.create_props(
+            command=['python', 'run_test.py'],
+            dimensions=[{u'key': u'pool', u'value': u'default'}]),
         u'expiration_secs': 180,
       },
     ]
