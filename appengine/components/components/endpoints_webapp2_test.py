@@ -102,7 +102,7 @@ class EndpointsWebapp2TestCase(test_case.TestCase):
 
   def test_discovery_routing(self):
     app = webapp2.WSGIApplication(
-        [endpoints_webapp2.discovery_service_route([EndpointsService])],
+        [endpoints_webapp2.discovery_service_route([EndpointsService], 'api')],
         debug=True)
     request = webapp2.Request.blank('/api/discovery/v1/apis/Service/v1/rest')
     request.method = 'GET'
@@ -111,7 +111,7 @@ class EndpointsWebapp2TestCase(test_case.TestCase):
 
   def test_directory_routing(self):
     app = webapp2.WSGIApplication(
-        [endpoints_webapp2.directory_service_route([EndpointsService])],
+        [endpoints_webapp2.directory_service_route([EndpointsService], 'api')],
         debug=True)
     request = webapp2.Request.blank('/api/discovery/v1/apis')
     request.method = 'GET'

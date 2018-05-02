@@ -267,11 +267,12 @@ def _get_methods(service):
   return document
 
 
-def generate(service):
+def generate(service, base_path):
   """Returns a discovery document for the given service.
 
   Args:
     service: The protorpc.remote.Service to describe.
+    base_path: The base path under which all service paths exist.
 
   Returns:
     A dict which can be written as JSON describing the service.
@@ -283,12 +284,11 @@ def generate(service):
         'scopes': {s: {'description': s} for s in service.api_info.scopes},
       },
     },
-    # TODO(smut): Allow /api part of the path to be customized.
-    'basePath': '/api/%s/%s' % (
+    'basePath': '%s/%s/%s' % (
+        base_path, service.api_info.name, service.api_info.version),
+    'baseUrl': 'https://%s%s/%s/%s' % (
+        service.api_info.hostname, base_path,
         service.api_info.name, service.api_info.version),
-    'baseUrl': 'https://%s/api/%s/%s' % (
-        service.api_info.hostname, service.api_info.name,
-        service.api_info.version),
     'batchPath': 'batch',
     'icons': {
       'x16': 'https://www.google.com/images/icons/product/search-16.gif',
@@ -351,7 +351,7 @@ def generate(service):
       },
     },
     'protocol': 'rest',
-    'rootUrl': 'https://%s/api/' % service.api_info.hostname,
+    'rootUrl': 'https://%s%s/' % (service.api_info.hostname, base_path),
     'servicePath': '%s/%s/' % (service.api_info.name, service.api_info.version),
     'version': service.api_info.version,
   }
@@ -362,11 +362,12 @@ def generate(service):
   return document
 
 
-def directory(services):
+def directory(services, base_path):
   """Returns a directory list for the given services.
 
   Args:
     services: The list of protorpc.remote.Services to describe.
+    base_path: The base path under which all service paths exist.
 
   Returns:
     A dict which can be written as JSON describing the services.
@@ -381,10 +382,9 @@ def directory(services):
     item = {
       'discoveryLink': './apis/%s/%s/rest' % (
           service.api_info.name, service.api_info.version),
-      # TODO(smut): Allow /api part of the path to be customized.
-      'discoveryRestUrl': 'https://%s/api/discovery/v1/apis/%s/%s/rest' % (
-          service.api_info.hostname, service.api_info.name,
-          service.api_info.version),
+      'discoveryRestUrl': 'https://%s%s/discovery/v1/apis/%s/%s/rest' % (
+          service.api_info.hostname, base_path,
+          service.api_info.name, service.api_info.version),
       'id': '%s:%s' % (service.api_info.name, service.api_info.version),
       'icons': {
         'x16': 'https://www.google.com/images/icons/product/search-16.gif',

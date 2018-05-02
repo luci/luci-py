@@ -141,10 +141,21 @@ def path_handler(api_class, api_method, service_path):
   return Handler
 
 
-def api_routes(api_class, base_path=None):
-  base_path = base_path or '/api/%s/%s' % (
-      api_class.api_info.name,
-      api_class.api_info.version)
+def api_routes(api_class, base_path='/api'):
+  """Creates webapp2 routes for the given Endpoints v1 service.
+
+  Args:
+    api_class: The protorpc.remote.Service class to create routes for.
+    base_path: The base path under which all service paths should exist.
+
+  Returns:
+    A list of webapp2.Routes.
+  """
+  # TODO(smut): Convert all callers to invoke api_server instead.
+  # Once nothing invokes this directly, make base_path required here
+  # and have the default in api_server only.
+  api_path = '%s/%s/%s' % (
+      base_path, api_class.api_info.name, api_class.api_info.version)
   routes = []
   templates = set()
   for _, m in sorted(api_class.all_remote_methods().iteritems()):
@@ -152,11 +163,11 @@ def api_routes(api_class, base_path=None):
 
     method_path = info.get_path(api_class.api_info)
     method_path = method_path.replace('{', '<').replace('}', '>')
-    template = posixpath.join(base_path, method_path)
+    template = posixpath.join(api_path, method_path)
 
     http_method = info.http_method.upper() or 'POST'
 
-    handler = path_handler(api_class, m, base_path)
+    handler = path_handler(api_class, m, api_path)
     routes.append(webapp2.Route(template, handler, methods=[http_method]))
     templates.add(template)
   for t in sorted(templates):
@@ -164,30 +175,32 @@ def api_routes(api_class, base_path=None):
   return routes
 
 
-def api_server(api_classes):
+def api_server(api_classes, base_path='/api'):
   """Creates webapp2 routes for the given Endpoints v1 services.
 
   Args:
     api_classes: A list of protorpc.remote.Service classes to create routes for.
+    base_path: The base path under which all service paths should exist. If
+      unspecified, defaults to api.
 
   Returns:
     A list of webapp2.Routes.
   """
-  # TODO(smut): Allow /api part of the path to be customized.
   routes = []
   for api_class in api_classes:
-    routes.extend(api_routes(api_class))
-  routes.append(directory_service_route(api_classes))
-  routes.append(discovery_service_route(api_classes))
+    routes.extend(api_routes(api_class, base_path=base_path))
+  routes.append(directory_service_route(api_classes, base_path))
+  routes.append(discovery_service_route(api_classes, base_path))
   return routes
 
 
-def discovery_handler_factory(api_classes):
+def discovery_handler_factory(api_classes, base_path):
   """Returns a discovery request handler which knows about the given services.
 
   Args:
     api_classes: A list of protorpc.remote.Service classes the handler should
       know about.
+    base_path: The base path under which all service paths exist.
 
   Returns:
     A webapp2.RequestHandler.
@@ -206,33 +219,35 @@ def discovery_handler_factory(api_classes):
 
       self.response.headers['Content-Type'] = 'application/json'
       json.dump(
-          discovery_webapp2.generate(service),
+          discovery_webapp2.generate(service, base_path),
           self.response, indent=2, sort_keys=True, separators=(',', ':'))
 
   return DiscoveryHandler
 
 
-def discovery_service_route(api_classes):
+def discovery_service_route(api_classes, base_path):
   """Returns a route to a handler which serves discovery documents.
 
   Args:
     api_classes: a list of protorpc.remote.Service classes the handler should
       know about.
+    base_path: The base path under which all service paths exist.
 
   Returns:
     A webapp2.Route.
   """
   return webapp2.Route(
-      '/api/discovery/v1/apis/<name>/<version>/rest',
-      discovery_handler_factory(api_classes))
+      '/%s/discovery/v1/apis/<name>/<version>/rest' % base_path,
+      discovery_handler_factory(api_classes, base_path))
 
 
-def directory_handler_factory(api_classes):
+def directory_handler_factory(api_classes, base_path):
   """Returns a directory request handler which knows about the given services.
 
   Args:
     api_classes: A list of protorpc.remote.Service classes the handler should
       know about.
+    base_path: The base path under which all service paths exist.
 
   Returns:
     A webapp2.RequestHandler.
@@ -243,21 +258,23 @@ def directory_handler_factory(api_classes):
     def get(self):
       self.response.headers['Content-Type'] = 'application/json'
       json.dump(
-          discovery_webapp2.directory(api_classes),
+          discovery_webapp2.directory(api_classes, base_path),
           self.response, indent=2, sort_keys=True, separators=(',', ':'))
 
   return DirectoryHandler
 
 
-def directory_service_route(api_classes):
+def directory_service_route(api_classes, base_path):
   """Returns a route to a handler which serves a directory list.
 
   Args:
     api_classes: A list of protorpc.remote.Service classes the handler should
       know about.
+    base_path: The base path under which all service paths exist.
 
   Returns:
     A webapp2.Route.
   """
   return webapp2.Route(
-      '/api/discovery/v1/apis', directory_handler_factory(api_classes))
+      '/%s/discovery/v1/apis' % base_path,
+      directory_handler_factory(api_classes, base_path))

@@ -433,7 +433,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
       },
       'version': 'v1',
     }
-    self.assertEqual(discovery_webapp2.generate(Service), expected)
+    self.assertEqual(discovery_webapp2.generate(Service, '/api'), expected)
 
   def test_directory(self):
     """Tests for discovery_webapp2.directory."""
@@ -458,7 +458,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
       ],
       'kind': 'discovery#directoryList',
     }
-    self.assertEqual(discovery_webapp2.directory([Service]), expected)
+    self.assertEqual(discovery_webapp2.directory([Service], '/api'), expected)
 
 
 if __name__ == '__main__':
