@@ -29,6 +29,7 @@ class Message(messages.Message):
   boolean = messages.BooleanField(1)
   integer = messages.IntegerField(2)
   string = messages.StringField(3)
+  required = messages.BooleanField(4, required=True)
 
 
 class Child(messages.Message):
@@ -48,15 +49,27 @@ class Service(remote.Service):
   @endpoints.method(message_types.VoidMessage, Message, http_method='GET')
   def get_method(self, _):
     """An HTTP GET method."""
-    return Message(value='value')
+    return Message()
 
   @endpoints.method(Message, Message)
-  def post_method(self, message):
+  def post_method(self, _):
     """An HTTP POST method.
 
     Has a multi-line description.
     """
-    return Message(value=message.Value)
+    return Message()
+
+  @endpoints.method(endpoints.ResourceContainer(
+      Message, string=messages.StringField(1)), Message)
+  def query_string_method(self, _):
+    """A method supporting query strings."""
+    return Message()
+
+  @endpoints.method(endpoints.ResourceContainer(
+      Message, path=messages.StringField(1)), Message, path='{path}/method')
+  def path_parameter_method(self, _):
+    """A method supporting path parameters."""
+    return Message()
 
 
 class DiscoveryWebapp2TestCase(test_case.TestCase):
@@ -78,11 +91,58 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
             'https://www.googleapis.com/auth/userinfo.email',
           ],
         },
+        'path_parameter_method': {
+          'description': 'A method supporting path parameters.',
+          'httpMethod': 'POST',
+          'id': 'service.path_parameter_method',
+          'parameterOrder': [
+            'path',
+          ],
+          'parameters': {
+            'path': {
+              'location': 'path',
+              'type': 'string',
+            },
+          },
+          'path': '{path}/method',
+          'request': {
+            '$ref': 'discovery_webapp2_test.Message',
+            'parameterName': 'resource',
+          },
+          'response': {
+            '$ref': 'discovery_webapp2_test.Message',
+          },
+          'scopes': [
+            'https://www.googleapis.com/auth/userinfo.email',
+          ],
+        },
         'post_method': {
           'description': 'An HTTP POST method. Has a multi-line description.',
           'httpMethod': 'POST',
           'id': 'service.post_method',
           'path': 'post_method',
+          'request': {
+            '$ref': 'discovery_webapp2_test.Message',
+            'parameterName': 'resource',
+          },
+          'response': {
+            '$ref': 'discovery_webapp2_test.Message',
+          },
+          'scopes': [
+            'https://www.googleapis.com/auth/userinfo.email',
+          ],
+        },
+        'query_string_method': {
+          'description': 'A method supporting query strings.',
+          'httpMethod': 'POST',
+          'id': 'service.query_string_method',
+          'parameters': {
+            'string': {
+              'location': 'query',
+              'type': 'string',
+            },
+          },
+          'path': 'query_string_method',
           'request': {
             '$ref': 'discovery_webapp2_test.Message',
             'parameterName': 'resource',
@@ -107,6 +167,10 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
               'format': 'int64',
               'type': 'string',
             },
+            'required': {
+              'required': True,
+              'type': 'boolean',
+            },
             'string': {
               'type': 'string',
             },
@@ -116,6 +180,38 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
       },
     }
     self.assertEqual(discovery_webapp2._get_methods(Service), expected)
+
+  def test_get_parameters(self):
+    """Tests for discovery_webapp2._get_parameters."""
+    expected = {
+      'parameterOrder': [
+        'boolean',
+        'string',
+        'required',
+      ],
+      'parameters': {
+        'boolean': {
+          'location': 'path',
+          'type': 'boolean',
+        },
+        'integer': {
+          'format': 'int64',
+          'location': 'query',
+          'type': 'string',
+        },
+        'required': {
+          'location': 'query',
+          'required': True,
+          'type': 'boolean',
+        },
+        'string': {
+          'location': 'path',
+          'type': 'string',
+        },
+      },
+    }
+    self.assertEqual(discovery_webapp2._get_parameters(
+        Message, 'path/{boolean}/with/{string}/parameters'), expected)
 
   def test_get_schemas(self):
     """Tests for discovery_webapp2._get_schemas."""
@@ -185,11 +281,58 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
             'https://www.googleapis.com/auth/userinfo.email',
           ],
         },
+        'path_parameter_method': {
+          'description': 'A method supporting path parameters.',
+          'httpMethod': 'POST',
+          'id': 'service.path_parameter_method',
+          'parameterOrder': [
+            'path',
+          ],
+          'parameters': {
+            'path': {
+              'location': 'path',
+              'type': 'string',
+            },
+          },
+          'path': '{path}/method',
+          'request': {
+            '$ref': 'discovery_webapp2_test.Message',
+            'parameterName': 'resource',
+          },
+          'response': {
+            '$ref': 'discovery_webapp2_test.Message',
+          },
+          'scopes': [
+            'https://www.googleapis.com/auth/userinfo.email',
+          ],
+        },
         'post_method': {
           'description': 'An HTTP POST method. Has a multi-line description.',
           'httpMethod': 'POST',
           'id': 'service.post_method',
           'path': 'post_method',
+          'request': {
+            '$ref': 'discovery_webapp2_test.Message',
+            'parameterName': 'resource',
+          },
+          'response': {
+            '$ref': 'discovery_webapp2_test.Message',
+          },
+          'scopes': [
+            'https://www.googleapis.com/auth/userinfo.email',
+          ],
+        },
+        'query_string_method': {
+          'description': 'A method supporting query strings.',
+          'httpMethod': 'POST',
+          'id': 'service.query_string_method',
+          'parameters': {
+            'string': {
+              'location': 'query',
+              'type': 'string',
+            },
+          },
+          'path': 'query_string_method',
           'request': {
             '$ref': 'discovery_webapp2_test.Message',
             'parameterName': 'resource',
@@ -271,6 +414,10 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
             'integer': {
               'format': 'int64',
               'type': 'string',
+            },
+            'required': {
+              'required': True,
+              'type': 'boolean',
             },
             'string': {
               'type': 'string',

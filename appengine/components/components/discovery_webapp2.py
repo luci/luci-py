@@ -4,6 +4,10 @@
 
 """Discovery document generator for an Endpoints v1 over webapp2 service."""
 
+import re
+
+import endpoints
+
 from protorpc import message_types
 from protorpc import messages
 
@@ -95,7 +99,8 @@ def _get_schemas(types):
     # Endpoints v1 and v2 discovery documents "normalize" these names by
     # removing non-alphanumeric characters and putting the rest in PascalCase.
     # However, it's possible these names only need to match the $refs below and
-    # exact formatting is irrelevant.
+    # exact formatting is irrelevant. It's also possible APIs Explorer requires
+    # these to be normalized.
     # TODO(smut): Figure out if these names need to be normalized.
     name = message_type.definition_name()
 
@@ -133,6 +138,8 @@ def _get_schemas(types):
       if isinstance(field, messages.EnumField):
         if field.default:
           field_properties['default'] = str(field.default)
+        # Endpoints v1 sorts these alphabetically while v2 does not.
+        # TODO(smut): Determine if this has any impact.
         items['enum'] = [enum.name for enum in field.type]
       elif field.default:
         field_properties['default'] = field.default
@@ -149,6 +156,38 @@ def _get_schemas(types):
       schemas[name]['properties'][field.name] = field_properties
 
   return schemas
+
+
+def _get_parameters(message, path):
+  """Returns a parameters document for the given parameters and path.
+
+  Args:
+    message: The protorpc.message.Message class describing the parameters.
+    path: The path to the method.
+
+  Returns:
+    A dict which can be written as JSON describing the path parameters.
+  """
+  PARAMETER_REGEX = r'{([a-zA-Z_][a-zA-Z0-9_]*)}'
+  # The order is the names of path parameters in the order in which they
+  # appear in the path followed by the names of required query strings.
+  order = re.findall(PARAMETER_REGEX, path)
+  parameters = _get_schemas([message]).get(message.definition_name(), {}).get(
+      'properties', {})
+  for parameter, schema in parameters.iteritems():
+    if parameter in order:
+      schema['location'] = 'path'
+    else:
+      schema['location'] = 'query'
+      if schema.get('required'):
+        order.append(parameter)
+
+  document = {}
+  if order:
+    document['parameterOrder'] = order
+  if parameters:
+    document['parameters'] = parameters
+  return document
 
 
 def _get_methods(service):
@@ -188,12 +227,24 @@ def _get_methods(service):
     request = method.remote.request_type()
     if not isinstance(request, message_types.VoidMessage):
       if info.http_method not in ('GET', 'DELETE'):
-        methods[name]['request'] = {
-          # $refs are used to look up the schema elsewhere in the discovery doc.
-          '$ref': request.__class__.definition_name(),
-          'parameterName': 'resource',
-        }
-        types.add(request.__class__)
+        rc = endpoints.ResourceContainer.get_request_message(method.remote)
+        if not isinstance(rc, endpoints.ResourceContainer):
+          methods[name]['request'] = {
+            # $refs refer to the "schemas" section of the discovery doc.
+            '$ref': request.__class__.definition_name(),
+            'parameterName': 'resource',
+          }
+          types.add(request.__class__)
+        else:
+          # If the request type is a known ResourceContainer, create a schema
+          # reference to the body only. Path parameters are handled differently.
+          methods[name]['request'] = {
+            '$ref': rc.body_message_class.definition_name(),
+            'parameterName': 'resource',
+          }
+          types.add(rc.body_message_class)
+          methods[name].update(_get_parameters(
+              rc.parameters_message_class, info.get_path(service.api_info)))
 
     response = method.remote.response_type()
     if not isinstance(response, message_types.VoidMessage):
@@ -201,8 +252,6 @@ def _get_methods(service):
         '$ref': response.__class__.definition_name(),
       }
       types.add(response.__class__)
-
-    # TODO(smut): Add parameters.
 
   document = {}
   if methods:
