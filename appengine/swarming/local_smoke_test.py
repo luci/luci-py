@@ -1030,7 +1030,18 @@ class Test(unittest.TestCase):
       ],
     }
     task_id = self.client.task_trigger_post(json.dumps(request))
-    self.assertIsNone(task_id)
+    expected_summary = self.gen_expected(
+        name=u'task_slice_fallback',
+        outputs=[u'first\n'],
+        tags=[
+          u'pool:default',
+          u'priority:40',
+          u'service_account:none',
+          u'user:None',
+        ],
+        user=u'')
+    actual_summary, _ = self.client.task_collect(task_id)
+    self.assertResults(expected_summary, actual_summary, deduped=False)
 
   def _run_isolated(
       self, contents, name, args, expected_summary, expected_files,

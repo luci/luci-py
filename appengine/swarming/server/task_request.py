@@ -1017,12 +1017,6 @@ class TaskRequest(ndb.Model):
         raise datastore_errors.BadValueError(
             'cannot request duplicate task slice')
 
-    if len(self.task_slices) != 1:
-      # https://crbug.com/781021
-      # This will change soon.
-      raise datastore_errors.BadValueError(
-          'multiple task_slices is not yet implemented')
-
     # All task slices in a single task request must use the exact same 'pool'
     # and 'id' dimension value.
     for key in (u'id', u'pool'):

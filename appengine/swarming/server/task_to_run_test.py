@@ -244,10 +244,16 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
                   dimensions=request_dimensions,
                   env={u'foo': u'bar'},
                   execution_timeout_secs=30)),
+          task_request.TaskSlice(
+              expiration_secs=30,
+              properties=_gen_properties(
+                  command=[u'command2'],
+                  dimensions=request_dimensions,
+                  execution_timeout_secs=30)),
         ],
         priority=20,
         created_ts=self.now)
-    request = self.mkreq(1, data)
+    request = self.mkreq(2, data)
     # request.created_ts is used.
     self.mock_now(self.now, 1)
     expected = {
@@ -264,19 +270,31 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     expected['try_number'] = 2
     actual = task_to_run.new_task_to_run(request, 2, 0).to_dict()
     self.assertEqual(expected, actual)
-    with self.assertRaises(IndexError):
-      task_to_run.new_task_to_run(request, 1, 1)
+    # now is used when task_slice_index != 0.
+    expected['task_slice_index'] = 1
+    expected['try_number'] = 1
+    expected['expiration_ts'] = self.now + datetime.timedelta(
+        minutes=1, seconds=1)
+    actual = task_to_run.new_task_to_run(request, 1, 1).to_dict()
+    self.assertEqual(expected, actual)
 
   def test_new_task_to_run_limits(self):
-    request = self.mkreq(1, _gen_request())
+    # Generate a TaskRequest with eight TaskSlice.
+    slices = [
+      task_request.TaskSlice(
+          expiration_secs=60,
+          properties=_gen_properties(
+              dimensions={u'pool': [u'default'], u'v': [unicode(i)]}))
+      for i in xrange(8)
+    ]
+    request = self.mkreq(8, _gen_request_slices(task_slices=slices))
     with self.assertRaises(AssertionError):
       task_to_run.new_task_to_run(request, 0, 0)
     task_to_run.new_task_to_run(request, 1, 0)
     task_to_run.new_task_to_run(request, 2, 0)
     with self.assertRaises(AssertionError):
       task_to_run.new_task_to_run(request, 3, 0)
-    # This is an IndexError instead of a ValueError because validity is enforced
-    # at the TaskRequest creation time.
+    task_to_run.new_task_to_run(request, 1, 7)
     with self.assertRaises(IndexError):
       task_to_run.new_task_to_run(request, 1, 8)
 
@@ -286,7 +304,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
           expiration_secs=60,
           properties=_gen_properties(
               dimensions={u'pool': [u'default'], u'v': [unicode(i)]}))
-      for i in xrange(1)
+      for i in xrange(8)
     ]
     request = self.mkreq(len(slices), _gen_request_slices(task_slices=slices))
     for i in xrange(len(slices)):
@@ -300,7 +318,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
           expiration_secs=60,
           properties=_gen_properties(
               dimensions={u'pool': [u'default'], u'v': [unicode(i)]}))
-      for i in xrange(1)
+      for i in xrange(8)
     ]
     request = self.mkreq(len(slices), _gen_request_slices(task_slices=slices))
     for i in (1, 2):

@@ -343,20 +343,40 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertIsNone(to_run_key.get().queue_number)
     self.assertEqual(State.EXPIRED, result_summary.key.get().state)
 
-  def test_task_slices_two_fail(self):
-    # Try to trigger two TaskSlice
-    with self.assertRaises(datastore_errors.BadValueError):
-      self._quick_schedule(
-          2,
-          task_slices=[
-            task_request.TaskSlice(
-                expiration_secs=180,
-                properties=_gen_properties()),
-            task_request.TaskSlice(
-                expiration_secs=180,
-                properties=_gen_properties()),
-          ])
-    self.assertEqual(2, self.execute_tasks())
+  def test_task_slices_fallback_to_second(self):
+    # First TaskSlice couldn't run, the second ran.
+    self._quick_schedule(
+        2,
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=180,
+              properties=_gen_properties(
+                  dimensions={
+                    u'nonexistent': [u'really'],
+                    u'pool': [u'default'],
+                  })),
+          task_request.TaskSlice(
+              expiration_secs=180,
+              properties=_gen_properties()),
+        ])
+    self.mock_now(self.now, 181)
+    self.assertEqual(1, task_to_run.TaskToRun.query().count())
+    self._register_bot(0, 1, self.bot_dimensions)
+    actual_request, _, _ = task_scheduler.bot_reap_task(
+        self.bot_dimensions, 'abc', None)
+    self.assertIsNone(actual_request)
+
+    # For now a cron job or poll to expire the first slice is necessary.
+    # Eventually it should be faster as the first dimensions should be
+    # immediately denied.
+    self.assertEqual(
+        ([], ['1d69b9f088008910']),
+        task_scheduler.cron_abort_expired_task_to_run('f.local'))
+    self.assertEqual(2, task_to_run.TaskToRun.query().count())
+
+    _request, _, run_result = task_scheduler.bot_reap_task(
+        self.bot_dimensions, 'abc', None)
+    self.assertEqual(1, run_result.current_task_slice)
 
   def test_exponential_backoff(self):
     self.mock(
@@ -558,6 +578,38 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     third_ts = self.mock_now(self.now, 20)
     self._task_deduped(
         0, third_ts, task_id, '1d69ba3ea8008b10', now=second_ts)
+
+  def test_task_idempotent_second_slice(self):
+    # A task will dedupe against a second slice, and skip the first slice.
+    # First task is idempotent.
+    task_id = self._task_ran_successfully(1, 1)
+
+    # Second task's second task slice is deduped against first task.
+    new_ts = self.mock_now(self.now, config.settings().reusable_task_age_secs-1)
+    result_summary = self._quick_schedule(
+        2,
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=180,
+              properties=_gen_properties(
+                  dimensions={
+                    u'inexistant': [u'really'],
+                    u'pool': [u'default'],
+                  })),
+          task_request.TaskSlice(
+              expiration_secs=180,
+              properties=_gen_properties(idempotent=True)),
+        ])
+    to_run_key = task_to_run.request_to_task_to_run_key(
+        result_summary.request_key.get(), 1, 0)
+    self.assertIsNone(to_run_key.get())
+    to_run_key = task_to_run.request_to_task_to_run_key(
+        result_summary.request_key.get(), 1, 1)
+    self.assertIsNone(to_run_key.get())
+    self.assertEqual(State.COMPLETED, result_summary.state)
+    self.assertEqual(task_id, result_summary.deduped_from)
+    self.assertEqual(1, result_summary.current_task_slice)
+    self.assertEqual(0, result_summary.try_number)
 
   def test_task_parent_children(self):
     # Parent task creates a child task.
