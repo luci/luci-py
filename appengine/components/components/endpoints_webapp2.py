@@ -178,59 +178,53 @@ def api_server(api_classes):
   for api_class in api_classes:
     routes.extend(api_routes(api_class))
   routes.append(directory_service_route(api_classes))
+  routes.append(discovery_service_route(api_classes))
   return routes
 
 
-class DiscoveryHandler(webapp2.RequestHandler):
-  """Returns a discovery document for a service.
+def discovery_handler_factory(api_classes):
+  """Returns a discovery request handler which knows about the given services.
 
-  Piggy-backs on real Cloud Endpoints discovery service, requires it.
+  Args:
+    api_classes: A list of protorpc.remote.Service classes the handler should
+      know about.
+
+  Returns:
+    A webapp2.RequestHandler.
   """
+  # Create a map of (name, version) => service.
+  services = {}
+  for api_class in api_classes:
+    services[(api_class.api_info.name, api_class.api_info.version)] = api_class
+  class DiscoveryHandler(webapp2.RequestHandler):
+    """Returns a discovery document for known services."""
 
-  def get_doc(self, service, version):
-    cache_key = 'discovery_doc/%s/%s/%s' % (
-      modules.get_current_version_name(), service, version)
-    cached = memcache.get(cache_key)
-    if cached:
-      return cached[0]
+    def get(self, name, version):
+      service = services.get((name, version))
+      if not service:
+        self.abort(404, 'Not Found')
 
-    logging.info('Fetching actual discovery document')
+      self.response.headers['Content-Type'] = 'application/json'
+      json.dump(
+          discovery_webapp2.generate(service),
+          self.response, indent=2, sort_keys=True, separators=(',', ':'))
 
-    doc_url = '%s://%s/_ah/api/discovery/v1/apis/%s/%s/rest' % (
-      self.request.scheme,  # Needed for local devserver.
-      self.request.host,
-      service,
-      version)
-    try:
-      doc = net.json_request(url=doc_url, deadline=45)
-      logging.info('Fetched actual discovery document')
-    except net.NotFoundError:
-      doc = None
-
-    if doc:
-      for key in ('baseUrl', 'basePath', 'rootUrl'):
-        url = urlparse.urlparse(doc.get(key))
-        if url.path.startswith('/_ah/'):
-          url = url._replace(path=url.path[len('/_ah'):])
-        doc[key] = urlparse.urlunparse(url)
-
-      if 'batchPath' in doc:
-        del doc['batchPath']
-
-    memcache.add(cache_key, (doc,))
-    return doc
-
-  def get(self, service, version):
-    doc = self.get_doc(service, version)
-    if not doc:
-      self.abort(404, 'Not found')
-    self.response.headers['Content-Type'] = 'application/json'
-    json.dump(doc, self.response, separators=(',', ':'))
+  return DiscoveryHandler
 
 
-def discovery_service_route():
+def discovery_service_route(api_classes):
+  """Returns a route to a handler which serves discovery documents.
+
+  Args:
+    api_classes: a list of protorpc.remote.Service classes the handler should
+      know about.
+
+  Returns:
+    A webapp2.Route.
+  """
   return webapp2.Route(
-      '/api/discovery/v1/apis/<service>/<version>/rest', DiscoveryHandler)
+      '/api/discovery/v1/apis/<name>/<version>/rest',
+      discovery_handler_factory(api_classes))
 
 
 def directory_handler_factory(api_classes):

@@ -100,6 +100,15 @@ class EndpointsWebapp2TestCase(test_case.TestCase):
       },
     })
 
+  def test_discovery_routing(self):
+    app = webapp2.WSGIApplication(
+        [endpoints_webapp2.discovery_service_route([EndpointsService])],
+        debug=True)
+    request = webapp2.Request.blank('/api/discovery/v1/apis/Service/v1/rest')
+    request.method = 'GET'
+    response = json.loads(request.get_response(app).body)
+    self.assertEqual(response['id'], 'Service:v1')
+
   def test_directory_routing(self):
     app = webapp2.WSGIApplication(
         [endpoints_webapp2.directory_service_route([EndpointsService])],
