@@ -276,10 +276,6 @@ def _handle_dead_bot(run_result_key):
       # TODO(maruel): Allow increasing the current_task_slice value.
       # Create a second TaskToRun.
       to_run = task_to_run.new_task_to_run(request, 2, current_task_slice)
-
-      # Remove it from the negative cache.
-      task_to_run.set_lookup_cache(to_run.key, True)
-
       to_put = (run_result, result_summary, to_run)
       run_result.state = task_result.State.BOT_DIED
       run_result.internal_failure = True

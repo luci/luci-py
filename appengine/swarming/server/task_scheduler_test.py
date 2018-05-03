@@ -1291,11 +1291,19 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
               properties=_gen_properties(idempotent=True)),
         ])
     self.assertEqual(1, len(pub_sub_calls)) # PENDING -> RUNNING
+    request = run_result.request_key.get()
+    def is_in_negative_cache(t):
+      to_run_key = task_to_run.request_to_task_to_run_key(request, t, 0)
+      return task_to_run._lookup_cache_is_taken_async(to_run_key).get_result()
+    self.assertEqual(True, is_in_negative_cache(1)) # Was just reaped.
+    self.assertEqual(False, is_in_negative_cache(2))
 
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
     self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died('f.local'))
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(2, len(pub_sub_calls)) # RUNNING -> PENDING
+    self.assertEqual(False, is_in_negative_cache(1))
+    self.assertEqual(False, is_in_negative_cache(2))
 
     # Refresh and compare:
     expected = self._gen_result_summary_reaped(
@@ -1323,6 +1331,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(3, len(pub_sub_calls)) # PENDING -> RUNNING
     self.assertEqual(2, run_result.try_number)
+    self.assertEqual(False, is_in_negative_cache(1))
+    self.assertEqual(True, is_in_negative_cache(2)) # Was just reaped.
     self.assertEqual(
         State.COMPLETED,
         task_scheduler.bot_update_task(
@@ -1539,23 +1549,38 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
               expiration_secs=600,
               properties=_gen_properties(idempotent=True)),
         ])
+    request = run_result.request_key.get()
+    def is_in_negative_cache(t):
+      to_run_key = task_to_run.request_to_task_to_run_key(request, t, 0)
+      return task_to_run._lookup_cache_is_taken_async(to_run_key).get_result()
+
     self.assertEqual(1, run_result.try_number)
+    self.assertEqual(True, is_in_negative_cache(1)) # Was just reaped.
+    self.assertEqual(False, is_in_negative_cache(2))
     self.assertEqual(State.RUNNING, run_result.state)
     self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
     self.assertEqual(([], 1, 0), task_scheduler.cron_handle_bot_died('f.local'))
+    self.assertEqual(False, is_in_negative_cache(1))
+    self.assertEqual(False, is_in_negative_cache(2))
+
+    # A second bot comes to reap the task.
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 2)
-    # It must be a different bot.
     bot_dimensions_second = self.bot_dimensions.copy()
     bot_dimensions_second[u'id'] = [u'localhost-second']
     self._register_bot(0, 1, bot_dimensions_second)
-    # No task to run because the task dimensions were already seen.
     _request, _, run_result = task_scheduler.bot_reap_task(
         bot_dimensions_second, 'abc', None)
+    self.assertTrue(run_result)
+    self.assertEqual(False, is_in_negative_cache(1))
+    # Was just tried to be reaped.
+    self.assertEqual(True, is_in_negative_cache(2))
     now_2 = self.mock_now(self.now + 2 * task_result.BOT_PING_TOLERANCE, 3)
     self.assertEqual(
         (['1d69b9f088008912'], 0, 0),
         task_scheduler.cron_handle_bot_died('f.local'))
     self.assertEqual(([], 0, 0), task_scheduler.cron_handle_bot_died('f.local'))
+    self.assertEqual(False, is_in_negative_cache(1))
+    self.assertEqual(False, is_in_negative_cache(2))
     expected = self._gen_result_summary_reaped(
         abandoned_ts=now_2,
         bot_dimensions=bot_dimensions_second,
