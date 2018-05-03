@@ -98,7 +98,8 @@ class _BotCommon(ndb.Model):
   # - dimensions['id'] is not exactly one item.
   # - invalid HTTP POST request keys.
   # - BotSettings.quarantined was set at that moment.
-  quarantined = ndb.BooleanProperty(default=False)
+  # https://crbug.com/839415
+  quarantined = ndb.BooleanProperty(default=False, indexed=False)
 
   # Affected by event_type == 'request_task', 'task_killed', 'task_completed',
   # 'task_error'.
