@@ -686,6 +686,7 @@ class BotInfo(messages.Message):
   is_dead = messages.BooleanField(6)
   last_seen_ts = message_types.DateTimeField(7)
   quarantined = messages.BooleanField(8)
+  maintenance_msg = messages.StringField(18)
   task_id = messages.StringField(9)
   task_name = messages.StringField(10)
   version = messages.StringField(11)
@@ -739,8 +740,10 @@ class BotEvent(messages.Message):
   authenticated_as = messages.StringField(7)
   # Version of swarming_bot.zip the bot is currently running.
   version = messages.StringField(8)
-  # If True, the bot is not accepting task.
+  # If True, the bot is not accepting task due to being quarantined.
   quarantined = messages.BooleanField(9)
+  # If set, the bot is rejecting tasks due to maintenance.
+  maintenance_msg = messages.StringField(11)
   # Affected by event_type == 'request_task', 'task_completed', 'task_error'.
   task_id = messages.StringField(10)
 

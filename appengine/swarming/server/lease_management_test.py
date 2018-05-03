@@ -60,6 +60,7 @@ class CheckForConnectionTest(test_case.TestCase):
         state=None,
         version=None,
         quarantined=False,
+        maintenance_msg=None,
         task_id='',
         task_name=None,
     )
@@ -87,6 +88,7 @@ class CheckForConnectionTest(test_case.TestCase):
         state=None,
         version=None,
         quarantined=False,
+        maintenance_msg=None,
         task_id='',
         task_name=None,
     )
@@ -99,6 +101,7 @@ class CheckForConnectionTest(test_case.TestCase):
         state=None,
         version=None,
         quarantined=False,
+        maintenance_msg=None,
         task_id='',
         task_name=None,
     )
@@ -118,6 +121,7 @@ class CheckForConnectionTest(test_case.TestCase):
         state=None,
         version=None,
         quarantined=False,
+        maintenance_msg=None,
         task_id='',
         task_name=None,
     )
@@ -138,6 +142,7 @@ class CheckForConnectionTest(test_case.TestCase):
         state=None,
         version=None,
         quarantined=False,
+        maintenance_msg=None,
         task_id='',
         task_name=None,
     )
@@ -187,6 +192,7 @@ class CheckForConnectionTest(test_case.TestCase):
         state=None,
         version=None,
         quarantined=False,
+        maintenance_msg=None,
         task_id='',
         task_name=None,
     )

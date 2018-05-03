@@ -38,7 +38,7 @@ def _assert_bot(dimensions=None):
   bot_dimensions.update(dimensions or {})
   bot_management.bot_event(
       'bot_connected', u'bot1', '1.2.3.4', 'bot1', bot_dimensions, {},
-      '1234', False, None, None)
+      '1234', False, None, None, None)
   return task_queues.assert_bot_async(bot_dimensions).get_result()
 
 

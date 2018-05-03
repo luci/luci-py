@@ -42,6 +42,7 @@ class BotManagementTest(test_case.TestCase):
     out = {
       'authenticated_as': u'bot:id1.domain',
       'composite': [
+        bot_management.BotInfo.NOT_IN_MAINTENANCE,
         bot_management.BotInfo.ALIVE,
         bot_management.BotInfo.NOT_MACHINE_PROVIDER,
         bot_management.BotInfo.HEALTHY,
@@ -58,6 +59,7 @@ class BotManagementTest(test_case.TestCase):
       'machine_lease': None,
       'machine_type': None,
       'quarantined': False,
+      'maintenance_msg': None,
       'state': {u'ram': 65},
       'task_id': None,
       'task_name': None,
@@ -77,6 +79,7 @@ class BotManagementTest(test_case.TestCase):
       'machine_type': None,
       'message': None,
       'quarantined': False,
+      'maintenance_msg': None,
       'state': {u'ram': 65},
       'task_id': None,
       'ts': self.now,
@@ -95,8 +98,8 @@ class BotManagementTest(test_case.TestCase):
         event_type='bot_connected', bot_id='id1',
         external_ip='8.8.4.4', authenticated_as='bot:id1.domain',
         dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
-        version=hashlib.sha256().hexdigest(), quarantined=False, task_id=None,
-        task_name=None)
+        version=hashlib.sha256().hexdigest(), quarantined=False,
+        maintenance_msg=None, task_id=None, task_name=None)
 
     expected = self._gen_bot_info()
     self.assertEqual(
@@ -107,8 +110,8 @@ class BotManagementTest(test_case.TestCase):
         event_type='bot_connected', bot_id='id1',
         external_ip='8.8.4.4', authenticated_as='bot:id1.domain',
         dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
-        version=hashlib.sha256().hexdigest(), quarantined=False, task_id=None,
-        task_name=None)
+        version=hashlib.sha256().hexdigest(), quarantined=False,
+        maintenance_msg=None, task_id=None, task_name=None)
     expected = [self._gen_bot_event(event_type=u'bot_connected')]
     self.assertEqual(
         expected,
@@ -119,12 +122,13 @@ class BotManagementTest(test_case.TestCase):
         event_type='request_sleep', bot_id='id1',
         external_ip='8.8.4.4', authenticated_as='bot:id1.domain',
         dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
-        version=hashlib.sha256().hexdigest(), quarantined=True, task_id=None,
-        task_name=None)
+        version=hashlib.sha256().hexdigest(), quarantined=True,
+        maintenance_msg=None, task_id=None, task_name=None)
 
     # Assert that BotInfo was updated too.
     expected = self._gen_bot_info(
         composite=[
+          bot_management.BotInfo.NOT_IN_MAINTENANCE,
           bot_management.BotInfo.ALIVE,
           bot_management.BotInfo.NOT_MACHINE_PROVIDER,
           bot_management.BotInfo.QUARANTINED,
@@ -143,10 +147,11 @@ class BotManagementTest(test_case.TestCase):
         external_ip='8.8.4.4', authenticated_as='bot:id1.domain',
         dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
         version=hashlib.sha256().hexdigest(), quarantined=False,
-        task_id='12311', task_name='yo')
+        maintenance_msg=None, task_id='12311', task_name='yo')
 
     expected = self._gen_bot_info(
         composite=[
+          bot_management.BotInfo.NOT_IN_MAINTENANCE,
           bot_management.BotInfo.ALIVE,
           bot_management.BotInfo.NOT_MACHINE_PROVIDER,
           bot_management.BotInfo.HEALTHY,
@@ -196,20 +201,21 @@ class BotManagementTest(test_case.TestCase):
         event_type='bot_connected', bot_id='id1',
         external_ip='8.8.4.4', authenticated_as='bot:id1.domain',
         dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
-        version=hashlib.sha256().hexdigest(), quarantined=False, task_id=None,
-        task_name=None)
+        version=hashlib.sha256().hexdigest(), quarantined=False,
+        maintenance_msg=None, task_id=None, task_name=None)
     # One second before the timeout value.
     then = self.mock_now(self.now, timeout-1)
     bot_management.bot_event(
         event_type='bot_connected', bot_id='id2',
         external_ip='8.8.4.4', authenticated_as='bot:id2.domain',
         dimensions={'id': ['id2'], 'foo': ['bar']}, state={'ram': 65},
-        version=hashlib.sha256().hexdigest(), quarantined=False, task_id=None,
-        task_name=None)
+        version=hashlib.sha256().hexdigest(), quarantined=False,
+        maintenance_msg=None, task_id=None, task_name=None)
 
     bot1_alive = self._gen_bot_info()
     bot1_dead = self._gen_bot_info(
         composite=[
+          bot_management.BotInfo.NOT_IN_MAINTENANCE,
           bot_management.BotInfo.DEAD,
           bot_management.BotInfo.NOT_MACHINE_PROVIDER,
           bot_management.BotInfo.HEALTHY,

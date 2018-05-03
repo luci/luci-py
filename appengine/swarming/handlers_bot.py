@@ -246,6 +246,8 @@ class _ProcessResult(object):
   bot_group_cfg = None
   # Bot quarantine message (or None if the bot is not in a quarantine).
   quarantined_msg = None
+  # Bot maintenance message (or None if the bot is not under maintenance).
+  maintenance_msg = None
   # DateTime indicating UTC time when bot will be reclaimed by Machine Provider,
   # or None if this is not a Machine Provider bot.
   lease_expiration_ts = None
@@ -334,7 +336,8 @@ class _BotBaseHandler(_BotApiHandler):
         state=state,
         dimensions=dimensions,
         bot_group_cfg=bot_group_cfg,
-        lease_expiration_ts=lease_expiration_ts)
+        lease_expiration_ts=lease_expiration_ts,
+        maintenance_msg=state.get('maintenance'))
 
     # The bot may decide to "self-quarantine" itself. Accept both via
     # dimensions or via state. See bot_management._BotCommon.quarantined for
@@ -424,6 +427,7 @@ class BotHandshakeHandler(_BotBaseHandler):
         authenticated_as=auth.get_peer_identity().to_bytes(),
         dimensions=res.dimensions, state=res.state,
         version=res.version, quarantined=bool(res.quarantined_msg),
+        maintenance_msg=res.maintenance_msg,
         task_id='', task_name=None, message=res.quarantined_msg)
 
     data = {
@@ -486,7 +490,8 @@ class BotPollHandler(_BotBaseHandler):
           authenticated_as=auth.get_peer_identity().to_bytes(),
           dimensions=res.dimensions, state=res.state,
           version=res.version, quarantined=quarantined,
-          task_id=task_id, task_name=task_name, message=res.quarantined_msg)
+          maintenance_msg=res.maintenance_msg, task_id=task_id,
+          task_name=task_name, message=res.quarantined_msg)
 
     # Bot version is host-specific because the host URL is embedded in
     # swarming_bot.zip
@@ -677,8 +682,8 @@ class BotEventHandler(_BotBaseHandler):
         authenticated_as=auth.get_peer_identity().to_bytes(),
         dimensions=res.dimensions, state=res.state,
         version=res.version, quarantined=bool(res.quarantined_msg),
-        task_id=None, task_name=None,
-        message=message)
+        maintenance_msg=res.maintenance_msg, task_id=None,
+        task_name=None, message=message)
 
     if event == 'bot_error':
       # Also logs this to ereporter2, so it will be listed in the server's
@@ -974,7 +979,8 @@ class BotTaskUpdateHandler(_BotApiHandler):
           external_ip=self.request.remote_addr,
           authenticated_as=auth.get_peer_identity().to_bytes(),
           dimensions=None, state=None,
-          version=None, quarantined=None, task_id=task_id, task_name=None)
+          version=None, quarantined=None, maintenance_msg=None, task_id=task_id,
+          task_name=None)
     except ValueError as e:
       ereporter2.log_request(
           request=self.request,
@@ -1022,8 +1028,8 @@ class BotTaskErrorHandler(_BotApiHandler):
         external_ip=self.request.remote_addr,
         authenticated_as=auth.get_peer_identity().to_bytes(),
         dimensions=None, state=None,
-        version=None, quarantined=None, task_id=task_id, task_name=None,
-        message=message)
+        version=None, quarantined=None, maintenance_msg=None, task_id=task_id,
+        task_name=None, message=message)
     line = (
         'Bot: https://%s/restricted/bot/%s\n'
         'Task failed: https://%s/user/task/%s\n'

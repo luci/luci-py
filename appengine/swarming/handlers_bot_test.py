@@ -823,6 +823,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'machine_lease': None,
         'message': u'for the best',
         'quarantined': False,
+        'maintenance_msg': None,
         'state': {
           u'bot_group_cfg_version': u'default',
           u'running_time': 1234.0,
@@ -851,6 +852,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         'machine_lease': None,
         'message': None,
         'quarantined': False,
+        'maintenance_msg': None,
         'state': {
           u'running_time': 1234.0,
           u'sleep_streak': 0,

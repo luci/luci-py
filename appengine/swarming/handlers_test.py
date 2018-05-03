@@ -224,12 +224,14 @@ class BackendTest(AppTestBase):
         event_type='bot_connected', bot_id='id1',
         external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
         dimensions={'foo': ['beta'], 'id': ['id1']}, state={'ram': 65},
-        version='123456789', quarantined=False, task_id=None, task_name=None)
+        version='123456789', quarantined=False, maintenance_msg=None,
+        task_id=None, task_name=None)
     bot_management.bot_event(
         event_type='bot_connected', bot_id='id2',
         external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
         dimensions={'foo': ['alpha'], 'id': ['id2']}, state={'ram': 65},
-        version='123456789', quarantined=True, task_id='987', task_name=None)
+        version='123456789', quarantined=True, maintenance_msg=None,
+        task_id='987', task_name=None)
 
     self.app.get('/internal/cron/aggregate_bots_dimensions',
         headers={'X-AppEngine-Cron': 'true'}, status=200)

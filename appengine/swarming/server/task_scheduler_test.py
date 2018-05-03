@@ -261,7 +261,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(0, self.execute_tasks())
     bot_management.bot_event(
         'bot_connected', bot_dimensions[u'id'][0], '1.2.3.4', 'joe@localhost',
-        bot_dimensions, {'state': 'real'}, '1234', False, None, None)
+        bot_dimensions, {'state': 'real'}, '1234', False, None, None, None)
     self.assertEqual(
         num_btd_updated,
         task_queues.assert_bot_async(bot_dimensions).get_result())

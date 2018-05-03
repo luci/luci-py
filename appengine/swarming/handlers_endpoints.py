@@ -721,6 +721,7 @@ class SwarmingBotService(remote.Service):
           authenticated_as=events[0].authenticated_as,
           version=events[0].version,
           quarantined=events[0].quarantined,
+          maintenance=events[0].maintenance_msg,
           task_id=events[0].task_id,
           last_seen_ts=events[0].ts,
           lease_id=events[0].lease_id,

@@ -101,6 +101,9 @@ class _BotCommon(ndb.Model):
   # https://crbug.com/839415
   quarantined = ndb.BooleanProperty(default=False, indexed=False)
 
+  # If set, the bot is rejecting tasks due to maintenance.
+  maintenance_msg = ndb.StringProperty(indexed=False)
+
   # Affected by event_type == 'request_task', 'task_killed', 'task_completed',
   # 'task_error'.
   task_id = ndb.StringProperty(indexed=False)
@@ -152,6 +155,9 @@ class BotInfo(_BotCommon):
   poll, which does not create a BotEvent.
   """
   # One of:
+  NOT_IN_MAINTENANCE = 1<<9 # 512
+  IN_MAINTENANCE = 1<<8     # 256
+  # One of:
   ALIVE = 1<<7 # 128
   DEAD = 1<<6  # 64
   # One of:
@@ -187,6 +193,7 @@ class BotInfo(_BotCommon):
     timeout = config.settings().bot_death_timeout_secs
     is_dead = (utils.utcnow() - self.last_seen_ts).total_seconds() >= timeout
     return [
+      self.IN_MAINTENANCE if self.maintenance_msg else self.NOT_IN_MAINTENANCE,
       self.DEAD if is_dead else self.ALIVE,
       self.MACHINE_PROVIDER if self.machine_type else self.NOT_MACHINE_PROVIDER,
       self.QUARANTINED if self.quarantined else self.HEALTHY,
@@ -360,12 +367,14 @@ def filter_availability(q, quarantined, is_dead, is_busy, is_mp):
     else:
       q = q.filter(BotInfo.composite == BotInfo.NOT_MACHINE_PROVIDER)
 
+  # TODO(charliea): Add filtering based on the 'maintenance' field.
+
   return q
 
 
 def bot_event(
     event_type, bot_id, external_ip, authenticated_as, dimensions, state,
-    version, quarantined, task_id, task_name, **kwargs):
+    version, quarantined, maintenance_msg, task_id, task_name, **kwargs):
   """Records when a bot has queried for work.
 
   Arguments:
@@ -380,6 +389,7 @@ def bot_event(
   - version: swarming_bot.zip version as self-reported. Used to spot if a bot
         failed to update promptly. If not provided, keep previous value.
   - quarantined: bool to determine if the bot was declared quarantined.
+  - maintenance_msg: string describing why the bot is in maintenance.
   - task_id: packed task id if relevant. Set to '' to zap the stored value.
   - task_name: task name if relevant. Zapped when task_id is zapped.
   - kwargs: optional values to add to BotEvent relevant to event_type.
@@ -402,6 +412,7 @@ def bot_event(
   bot_info.last_seen_ts = utils.utcnow()
   bot_info.external_ip = external_ip
   bot_info.authenticated_as = authenticated_as
+  bot_info.maintenance_msg = maintenance_msg
   if dimensions:
     bot_info.dimensions_flat = dimensions_to_flat(dimensions)
   if state:
@@ -438,6 +449,7 @@ def bot_event(
       authenticated_as=authenticated_as,
       dimensions_flat=bot_info.dimensions_flat,
       quarantined=bot_info.quarantined,
+      maintenance_msg=bot_info.maintenance_msg,
       state=bot_info.state,
       task_id=bot_info.task_id,
       version=bot_info.version,
