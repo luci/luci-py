@@ -441,6 +441,24 @@ def _find_dupe_task(now, h):
   return None
 
 
+def _dedupe_result_summary(dupe_summary, result_summary, task_slice_index):
+  """Copies the results from dupe_summary into result_summary."""
+  # PerformanceStats is not copied over, since it's not relevant, nothing
+  # ran.
+  _copy_summary(
+      dupe_summary, result_summary,
+      ('created_ts', 'modified_ts', 'name', 'user', 'tags'))
+  # Zap irrelevant properties.
+  result_summary.cost_saved_usd = dupe_summary.cost_usd
+  result_summary.costs_usd = []
+  result_summary.current_task_slice = task_slice_index
+  result_summary.deduped_from = task_pack.pack_run_result_key(
+      dupe_summary.run_result_key)
+  # It is not possible to dedupe against a deduped task, so zap properties_hash.
+  result_summary.properties_hash = None
+  result_summary.try_number = 0
+
+
 def _is_allowed_to_schedule(pool_cfg):
   """True if the current caller is allowed to schedule tasks in the pool."""
   caller_id = auth.get_current_identity()
@@ -747,51 +765,37 @@ def schedule_request(request, secret_bytes):
     logging.info('%s conflicted, using %s', old, result_summary.task_id)
     return key
 
-  deduped = False
+  dupe_summary = None
   for i in xrange(request.num_task_slices):
     t = request.task_slice(i)
     if t.properties.idempotent:
       dupe_summary = _find_dupe_task(now, t.properties_hash())
       if dupe_summary:
-        _copy_summary(
-            dupe_summary, result_summary,
-            ('created_ts', 'modified_ts', 'name', 'user', 'tags'))
-        # Zap irrelevant properties.
-        # It is not possible to dedupe against a deduped task, so zap
-        # properties_hash.
-        # PerformanceStats is not copied over, since it's not relevant, nothing
-        # ran.
-        result_summary.current_task_slice = i
-        result_summary.properties_hash = None
-        result_summary.try_number = 0
-        result_summary.cost_saved_usd = result_summary.cost_usd
-        # Only zap after.
-        result_summary.costs_usd = []
-        result_summary.deduped_from = task_pack.pack_run_result_key(
-            dupe_summary.run_result_key)
+        _dedupe_result_summary(dupe_summary, result_summary, i)
         # In this code path, there's not much to do as the task will not be run,
         # previous results are returned. We still need to store the TaskRequest
         # and TaskResultSummary.
         #
         # Since the task is never scheduled, TaskToRun is not stored.
-        #
+        to_run = None
         # Since the has_secret_bytes property is already set for UI purposes,
         # and the task itself will never be run, we skip storing the
         # SecretBytes, as they would never be read and will just consume space
         # in the datastore (and the task we deduplicated with will have them
         # stored anyway, if we really want to get them again).
-        datastore_utils.insert(request, get_new_keys, extra=[result_summary])
-        logging.debug(
-            'New request %s reusing %s', result_summary.task_id,
-            dupe_summary.task_id)
-        deduped = True
+        secret_bytes = None
+        break
 
-  if not deduped:
-    # Storing these entities makes this task live. It is important at this point
-    # that the HTTP handler returns as fast as possible, otherwise the task will
-    # be run but the client will not know about it.
-    datastore_utils.insert(request, get_new_keys,
-        extra=filter(bool, [to_run, result_summary, secret_bytes]))
+  # Storing these entities makes this task live. It is important at this point
+  # that the HTTP handler returns as fast as possible, otherwise the task will
+  # be run but the client will not know about it.
+  datastore_utils.insert(request, get_new_keys,
+      extra=filter(bool, [to_run, result_summary, secret_bytes]))
+  if dupe_summary:
+    logging.debug(
+        'New request %s reusing %s', result_summary.task_id,
+        dupe_summary.task_id)
+  else:
     logging.debug('New request %s', result_summary.task_id)
 
   # Get parent task details if applicable.
@@ -817,7 +821,7 @@ def schedule_request(request, secret_bytes):
     # job, which would remove this code from the critical path.
     datastore_utils.transaction(run_parent)
 
-  ts_mon_metrics.on_task_requested(result_summary, deduped)
+  ts_mon_metrics.on_task_requested(result_summary, bool(dupe_summary))
   return result_summary
 
 
