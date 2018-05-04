@@ -1468,8 +1468,8 @@ class BotsApiTest(BaseTest):
     then = datetime.datetime(2009, 1, 2, 3, 4, 5)
     self.mock_now(then)
 
-    # Add three bot events, corresponding to one dead bot, one quarantined bot,
-    # and one good bot
+    # Add four bot events, corresponding to one dead bot, one quarantined bot,
+    # one bot in maintenance, and one good bot
     bot_management.bot_event(
         event_type='bot_connected', bot_id='id3',
         external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
@@ -1488,6 +1488,12 @@ class BotsApiTest(BaseTest):
         external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
         dimensions={u'id': [u'id2'], u'pool': [u'default']}, state={'ram': 65},
         version='123456789', quarantined=True, maintenance_msg=None,
+        task_id=None, task_name=None)
+    bot_management.bot_event(
+        event_type='bot_connected', bot_id='id4',
+        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
+        dimensions={u'id': [u'id4'], u'pool': [u'default']}, state={'ram': 65},
+        version='123456789', quarantined=False, maintenance_msg='very busy',
         task_id=None, task_name=None)
     bot1 = {
       u'authenticated_as': u'bot:whitelisted-ip',
@@ -1538,8 +1544,25 @@ class BotsApiTest(BaseTest):
       u'state': u'{"ram":65}',
       u'version': u'123456789',
     }
+    bot4 = {
+      u'authenticated_as': u'bot:whitelisted-ip',
+      u'bot_id': u'id4',
+      u'deleted': False,
+      u'dimensions': [
+        {u'key': u'id', u'value': [u'id4']},
+        {u'key': u'pool', u'value': [u'default']},
+      ],
+      u'external_ip': u'8.8.4.4',
+      u'first_seen_ts': fmtdate(self.now),
+      u'is_dead': False,
+      u'last_seen_ts': fmtdate(self.now),
+      u'quarantined': False,
+      u'maintenance_msg': 'very busy',
+      u'state': u'{"ram":65}',
+      u'version': u'123456789',
+    }
     expected = {
-      u'items': [bot1, bot2, bot3],
+      u'items': [bot1, bot2, bot3, bot4],
       u'death_timeout': unicode(config.settings().bot_death_timeout_secs),
       u'now': fmtdate(self.now),
     }
@@ -1568,21 +1591,22 @@ class BotsApiTest(BaseTest):
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
     # Only bot1 corresponds to being not dead and not quarantined and
-    # this dimension
+    # not in maintenance and this dimension
     request = swarming_rpcs.BotsRequest(
       dimensions=['pool:default'],
       quarantined=swarming_rpcs.ThreeStateBool.FALSE,
+      in_maintenance=swarming_rpcs.ThreeStateBool.FALSE,
       is_dead=swarming_rpcs.ThreeStateBool.FALSE)
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
     # exclude bot2 only, which is quarantined
-    expected[u'items'] = [bot1, bot3]
+    expected[u'items'] = [bot1, bot3, bot4]
     request = swarming_rpcs.BotsRequest(
         quarantined=swarming_rpcs.ThreeStateBool.FALSE)
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
     # exclude bot3 only, which is dead
-    expected[u'items'] = [bot1, bot2]
+    expected[u'items'] = [bot1, bot2, bot4]
     request = swarming_rpcs.BotsRequest(
         is_dead=swarming_rpcs.ThreeStateBool.FALSE)
     response = self.call_api('list', body=message_to_dict(request))
@@ -1593,9 +1617,23 @@ class BotsApiTest(BaseTest):
         quarantined=swarming_rpcs.ThreeStateBool.TRUE)
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
+    # only bot4 is in maintenance
+    expected[u'items'] = [bot4]
+    request = swarming_rpcs.BotsRequest(
+        in_maintenance=swarming_rpcs.ThreeStateBool.TRUE)
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
     # quarantined:true can be paired with other dimensions and still work
+    expected[u'items'] = [bot2]
     request = swarming_rpcs.BotsRequest(
         quarantined=swarming_rpcs.ThreeStateBool.TRUE,
+        dimensions=['pool:default'])
+    response = self.call_api('list', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+    # in_maintenance:true can be paired with other dimensions and still work
+    expected[u'items'] = [bot4]
+    request = swarming_rpcs.BotsRequest(
+        in_maintenance=swarming_rpcs.ThreeStateBool.TRUE,
         dimensions=['pool:default'])
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
@@ -1615,7 +1653,8 @@ class BotsApiTest(BaseTest):
     request = swarming_rpcs.BotsRequest(
         is_busy=swarming_rpcs.ThreeStateBool.FALSE,
         is_dead=swarming_rpcs.ThreeStateBool.FALSE,
-        quarantined=swarming_rpcs.ThreeStateBool.FALSE)
+        quarantined=swarming_rpcs.ThreeStateBool.FALSE,
+        in_maintenance=swarming_rpcs.ThreeStateBool.FALSE)
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
     # only bot3 is a machine provider bot
@@ -1623,7 +1662,7 @@ class BotsApiTest(BaseTest):
     request = swarming_rpcs.BotsRequest(is_mp=swarming_rpcs.ThreeStateBool.TRUE)
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
-    expected[u'items'] = [bot1, bot2]
+    expected[u'items'] = [bot1, bot2, bot4]
     request = swarming_rpcs.BotsRequest(
         is_mp=swarming_rpcs.ThreeStateBool.FALSE)
     response = self.call_api('list', body=message_to_dict(request))
@@ -1639,6 +1678,12 @@ class BotsApiTest(BaseTest):
         quarantined=swarming_rpcs.ThreeStateBool.TRUE, dimensions=['not:exist'])
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
+    # in_maintenance:true can be paired with other non-existing dimensions and
+    # still work
+    request = swarming_rpcs.BotsRequest(
+        in_maintenance=swarming_rpcs.ThreeStateBool.TRUE,
+        dimensions=['not:exist'])
+    response = self.call_api('list', body=message_to_dict(request))
     # is_dead:true can be paired with other non-existing dimensions and
     # still work
     request = swarming_rpcs.BotsRequest(
@@ -1684,9 +1729,16 @@ class BotsApiTest(BaseTest):
         dimensions={u'id': [u'id2'], u'pool': [u'default']}, state={'ram': 65},
         version='123456789', quarantined=True, maintenance_msg=None,
         task_id=None, task_name=None)
+    bot_management.bot_event(
+        event_type='bot_connected', bot_id='id4',
+        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
+        dimensions={u'id': [u'id4'], u'pool': [u'default']}, state={'ram': 65},
+        version='123456789', quarantined=False, maintenance_msg='very busy',
+        task_id=None, task_name=None)
     expected = {
-      u'count': u'3',
+      u'count': u'4',
       u'quarantined': u'2',
+      u'maintenance': u'1',
       u'dead': u'0',
       u'busy': u'1',
       u'now': unicode(self.now.strftime(DATETIME_NO_MICRO)),
@@ -1702,6 +1754,7 @@ class BotsApiTest(BaseTest):
     expected = {
       u'count': u'1',
       u'quarantined': u'0',
+      u'maintenance': u'0',
       u'dead': u'0',
       u'busy': u'1',
       u'now': unicode(self.now.strftime(DATETIME_NO_MICRO)),
@@ -1724,11 +1777,20 @@ class BotsApiTest(BaseTest):
     response = self.call_api('count', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
 
+    expected[u'quarantined'] = u'0'
+    expected[u'dead'] = u'0'
+    expected[u'maintenance'] = u'1'
+    request = swarming_rpcs.BotsCountRequest(
+        dimensions=['pool:default', 'id:id4'])
+    response = self.call_api('count', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
+
     request = swarming_rpcs.BotsCountRequest(dimensions=['not:existing'])
     response = self.call_api('count', body=message_to_dict(request))
     expected = {
       u'count': u'0',
       u'quarantined': u'0',
+      u'maintenance': u'0',
       u'dead': u'0',
       u'busy': u'0',
       u'now': unicode(self.now.strftime(DATETIME_NO_MICRO)),

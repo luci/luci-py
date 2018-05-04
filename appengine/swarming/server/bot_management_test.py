@@ -189,12 +189,12 @@ class BotManagementTest(test_case.TestCase):
     timeout = bot_management.config.settings().bot_death_timeout_secs
     def check(dead, alive):
       q = bot_management.filter_availability(
-          bot_management.BotInfo.query(), quarantined=None, is_dead=True,
-          is_busy=None, is_mp=None)
+          bot_management.BotInfo.query(), quarantined=None, in_maintenance=None,
+          is_dead=True, is_busy=None, is_mp=None)
       self.assertEqual(dead, [t.to_dict() for t in q])
       q = bot_management.filter_availability(
-          bot_management.BotInfo.query(), quarantined=None, is_dead=False,
-          is_busy=None, is_mp=None)
+          bot_management.BotInfo.query(), quarantined=None, in_maintenance=None,
+          is_dead=False, is_busy=None, is_mp=None)
       self.assertEqual(alive, [t.to_dict() for t in q])
 
     bot_management.bot_event(

@@ -625,6 +625,7 @@ class BotsRequest(messages.Message):
   # on.
   dimensions = messages.StringField(3, repeated=True)
   quarantined = messages.EnumField(ThreeStateBool, 4, default='NONE')
+  in_maintenance = messages.EnumField(ThreeStateBool, 8, default='NONE')
   is_dead = messages.EnumField(ThreeStateBool, 5, default='NONE')
   is_busy = messages.EnumField(ThreeStateBool, 6, default='NONE')
   is_mp = messages.EnumField(ThreeStateBool, 7, default='NONE')
@@ -712,6 +713,7 @@ class BotsCount(messages.Message):
   now = message_types.DateTimeField(1)
   count = messages.IntegerField(2)
   quarantined = messages.IntegerField(3)
+  maintenance = messages.IntegerField(6)
   dead = messages.IntegerField(4)
   busy = messages.IntegerField(5)
 

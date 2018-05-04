@@ -342,13 +342,20 @@ def filter_dimensions(q, dimensions):
   return q
 
 
-def filter_availability(q, quarantined, is_dead, is_busy, is_mp):
+def filter_availability(
+    q, quarantined, in_maintenance, is_dead, is_busy, is_mp):
   """Filters a ndb.Query for BotInfo based on quarantined/is_dead/is_busy."""
   if quarantined is not None:
     if quarantined:
       q = q.filter(BotInfo.composite == BotInfo.QUARANTINED)
     else:
       q = q.filter(BotInfo.composite == BotInfo.HEALTHY)
+
+  if in_maintenance is not None:
+    if in_maintenance:
+      q = q.filter(BotInfo.composite == BotInfo.IN_MAINTENANCE)
+    else:
+      q = q.filter(BotInfo.composite == BotInfo.NOT_IN_MAINTENANCE)
 
   if is_busy is not None:
     if is_busy:

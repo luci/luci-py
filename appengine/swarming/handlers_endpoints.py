@@ -890,6 +890,7 @@ class SwarmingBotsService(remote.Service):
       q = bot_management.filter_dimensions(q, request.dimensions)
       q = bot_management.filter_availability(
           q, swarming_rpcs.to_bool(request.quarantined),
+          swarming_rpcs.to_bool(request.in_maintenance),
           swarming_rpcs.to_bool(request.is_dead),
           swarming_rpcs.to_bool(request.is_busy),
           swarming_rpcs.to_bool(request.is_mp))
@@ -920,14 +921,17 @@ class SwarmingBotsService(remote.Service):
 
     f_count = q.count_async()
     f_dead = bot_management.filter_availability(
-        q, None, True, None, None).count_async()
+        q, None, None, True, None, None).count_async()
     f_quarantined = bot_management.filter_availability(
-        q, True, None, None, None).count_async()
+        q, True, None, None, None, None).count_async()
+    f_maintenance = bot_management.filter_availability(
+        q, None, True, None, None, None).count_async()
     f_busy = bot_management.filter_availability(
-        q, None, None, True, None).count_async()
+        q, None, None, None, True, None).count_async()
     return swarming_rpcs.BotsCount(
         count=f_count.get_result(),
         quarantined=f_quarantined.get_result(),
+        maintenance=f_maintenance.get_result(),
         dead=f_dead.get_result(),
         busy=f_busy.get_result(),
         now=now)
