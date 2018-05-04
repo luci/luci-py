@@ -1841,7 +1841,7 @@ class BotApiTest(BaseTest):
         event_type='bot_connected', bot_id='id1',
         external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
         dimensions={u'id': [u'id1'], u'pool': [u'default']}, state={'ram': 65},
-        version='123456789', quarantined=False, maintenance_msg=None,
+        version='123456789', quarantined=False, maintenance_msg='very busy',
         task_id=None, task_name=None)
 
     expected = {
@@ -1856,6 +1856,7 @@ class BotApiTest(BaseTest):
       u'first_seen_ts': fmtdate(self.now),
       u'is_dead': False,
       u'last_seen_ts': fmtdate(self.now),
+      u'maintenance_msg': u'very busy',
       u'quarantined': False,
       u'state': u'{"ram":65}',
       u'version': u'123456789',
