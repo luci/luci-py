@@ -11,7 +11,7 @@ from components import endpoints_webapp2
 
 
 def get_routes():
-  return endpoints_webapp2.api_routes(config.ConfigApi)
+  return endpoints_webapp2.api_server([config.ConfigApi])
 
 
 def create_endpoints_app():
