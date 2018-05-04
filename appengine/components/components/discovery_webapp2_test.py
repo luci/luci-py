@@ -40,6 +40,7 @@ class Child(messages.Message):
 class Parent(messages.Message):
   """A parent message to test recursion with."""
   child = messages.MessageField(Child, 1)
+  datetime = message_types.DateTimeField(2)
 
 
 @endpoints.api('service', 'v1')
@@ -238,6 +239,10 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           'child': {
             '$ref': 'discovery_webapp2_test.Child',
             'description': 'A child message to test recursion with.',
+          },
+          'datetime': {
+            'format': 'date-time',
+            'type': 'string',
           },
         },
         'type': 'object',

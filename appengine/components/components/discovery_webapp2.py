@@ -118,7 +118,12 @@ def _get_schemas(types):
       items = {}
       field_properties = {}
 
-      if isinstance(field, messages.MessageField):
+      # For non-message fields, add the field information to the schema
+      # directly. For message fields, add a $ref to elsewhere in the schema
+      # and ensure the type is queued to have its schema added. DateTimeField
+      # is a message field but is treated as a non-message field.
+      if (isinstance(field, messages.MessageField)
+          and not isinstance(field, message_types.DateTimeField)):
         field_type = field.type().__class__
         desc = _normalize_whitespace(field_type.__doc__)
         if desc:
