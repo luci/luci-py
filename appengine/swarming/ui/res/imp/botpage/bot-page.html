@@ -185,6 +185,12 @@
                   <td colspan="2" class="message">[[_quarantineMessage(_bot)]]</td>
                 </tr>
               </template>
+              <template is="dom-if" if="[[_bot.maintenance_msg]]">
+                <tr class="maintenance">
+                  <td>In Maintenance</td>
+                  <td colspan="2" class="message">[[_bot.maintenance_msg]]</td>
+                </tr>
+              </template>
               <tr>
                 <td>Current Task</td>
                 <td>
