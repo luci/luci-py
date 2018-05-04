@@ -717,6 +717,24 @@ def check_schedule_request_acl(request):
         (request.service_account, pool))
 
 
+def _gen_new_keys(result_summary, to_run, secret_bytes):
+  """Creates new keys for the entities.
+
+  Warning: this assumes knowledge about the hierarchy of each entity.
+  """
+  key = task_request.new_request_key()
+  if to_run:
+    to_run.key = ndb.Key(to_run.key.kind(), to_run.key.id(), parent=key)
+  if secret_bytes:
+    secret_bytes.key = ndb.Key(
+        secret_bytes.key.kind(), secret_bytes.key.id(), parent=key)
+  old = result_summary.task_id
+  result_summary.key = ndb.Key(
+      result_summary.key.kind(), result_summary.key.id(), parent=key)
+  logging.info('%s conflicted, using %s', old, result_summary.task_id)
+  return key
+
+
 def schedule_request(request, secret_bytes):
   """Creates and stores all the entities to schedule a new task request.
 
@@ -752,18 +770,6 @@ def schedule_request(request, secret_bytes):
   if secret_bytes:
     secret_bytes.key = request.secret_bytes_key
 
-  def get_new_keys():
-    # Warning: this assumes knowledge about the hierarchy of each entity.
-    key = task_request.new_request_key()
-    to_run.key = ndb.Key(to_run.key.kind(), to_run.key.id(), parent=key)
-    if secret_bytes:
-      secret_bytes.key = ndb.Key(
-          secret_bytes.key.kind(), secret_bytes.key.id(), parent=key)
-    old = result_summary.task_id
-    result_summary.key = ndb.Key(
-        result_summary.key.kind(), result_summary.key.id(), parent=key)
-    logging.info('%s conflicted, using %s', old, result_summary.task_id)
-    return key
 
   dupe_summary = None
   for i in xrange(request.num_task_slices):
@@ -789,8 +795,9 @@ def schedule_request(request, secret_bytes):
   # Storing these entities makes this task live. It is important at this point
   # that the HTTP handler returns as fast as possible, otherwise the task will
   # be run but the client will not know about it.
-  datastore_utils.insert(request, get_new_keys,
-      extra=filter(bool, [to_run, result_summary, secret_bytes]))
+  _gen_key = lambda: _gen_new_keys(result_summary, to_run, secret_bytes)
+  extra = filter(bool, [result_summary, to_run, secret_bytes])
+  datastore_utils.insert(request, new_key_callback=_gen_key, extra=extra)
   if dupe_summary:
     logging.debug(
         'New request %s reusing %s', result_summary.task_id,
