@@ -237,7 +237,7 @@ def discovery_service_route(api_classes, base_path):
     A webapp2.Route.
   """
   return webapp2.Route(
-      '/%s/discovery/v1/apis/<name>/<version>/rest' % base_path,
+      '%s/discovery/v1/apis/<name>/<version>/rest' % base_path,
       discovery_handler_factory(api_classes, base_path))
 
 
@@ -276,5 +276,5 @@ def directory_service_route(api_classes, base_path):
     A webapp2.Route.
   """
   return webapp2.Route(
-      '/%s/discovery/v1/apis' % base_path,
+      '%s/discovery/v1/apis' % base_path,
       directory_handler_factory(api_classes, base_path))
