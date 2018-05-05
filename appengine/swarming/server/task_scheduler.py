@@ -57,10 +57,15 @@ def _has_capacity(dimensions):
   return True
 
 
-def _expire_task(to_run_key, request):
+def _expire_task(to_run_key, request, retries):
   """Expires a TaskResultSummary and unschedules the TaskToRun.
 
   This function is only meant to process PENDING tasks.
+
+  Arguments:
+    to_run_key: the TaskToRun to expire
+    request: the corresponding TaskRequest instance
+    retries: number of retries in the transaction
 
   If a follow up TaskSlice is available, reenqueue a new TaskToRun instead of
   expiring the TaskResultSummary.
@@ -132,7 +137,7 @@ def _expire_task(to_run_key, request):
 
   # It'll be caught by next cron job execution in case of failure.
   try:
-    res, r = datastore_utils.transaction(run)
+    res, r = datastore_utils.transaction(run, retries=retries)
   except datastore_utils.CommitError:
     res = None
     r = None
@@ -896,7 +901,8 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
     for request, to_run in q:
       iterated += 1
       if request.expiration_ts < utils.utcnow():
-        s, r = _expire_task(to_run.key, request)
+        # Use a low number of retries, as at worst the cron job will catch it.
+        s, r = _expire_task(to_run.key, request, retries=1)
         if r:
           # Expiring a TaskToRun for TaskSlice may reenqueue a new TaskToRun.
           # It'll be processed accordingly but not handled here.
@@ -1174,7 +1180,7 @@ def cron_abort_expired_task_to_run(host):
   try:
     for to_run in task_to_run.yield_expired_task_to_run():
       request = to_run.request_key.get()
-      summary, next_slice = _expire_task(to_run.key, request)
+      summary, next_slice = _expire_task(to_run.key, request, retries=4)
       if next_slice:
         # Expiring a TaskToRun for TaskSlice may reenqueue a new TaskToRun.
         reenqueued.append(request)
