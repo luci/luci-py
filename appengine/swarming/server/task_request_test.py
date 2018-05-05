@@ -945,6 +945,14 @@ class TaskRequestApiTest(TestCase):
 
   def test_request_bad_expiration(self):
     now = utils.utcnow()
+    with self.assertRaises(ValueError):
+      _gen_request_slices(
+          created_ts=now,
+          task_slices=[
+            task_request.TaskSlice(
+                expiration_secs=None,
+                properties=_gen_properties()),
+          ])
     with self.assertRaises(datastore_errors.BadValueError):
       _gen_request_slices(
           created_ts=now,

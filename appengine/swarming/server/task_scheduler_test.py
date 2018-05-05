@@ -397,7 +397,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertIsNone(to_run_key.get().queue_number)
     self.assertEqual(State.EXPIRED, result_summary.key.get().state)
 
-  def test_task_slices_fallback_to_second(self):
+  def test_schedule_request_slice_fallback_to_second_after_expiration(self):
     # First TaskSlice couldn't run, the second ran.
     self._quick_schedule(
         2,
@@ -431,6 +431,54 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     _request, _, run_result = task_scheduler.bot_reap_task(
         self.bot_dimensions, 'abc', None)
     self.assertEqual(1, run_result.current_task_slice)
+
+  def test_schedule_request_slice_no_capacity(self):
+    self.mock(task_scheduler, '_has_capacity', lambda _: False)
+    result_summary = self._quick_schedule(
+        2,
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=180,
+              properties=_gen_properties(
+                  dimensions={
+                    u'nonexistent': [u'really'],
+                    u'pool': [u'default'],
+                  })),
+          task_request.TaskSlice(
+              expiration_secs=180,
+              properties=_gen_properties()),
+        ])
+    # The task is immediately denied, without waiting.
+    self.assertEqual(State.NO_RESOURCE, result_summary.state)
+    self.assertEqual(self.now, result_summary.abandoned_ts)
+    self.assertIsNone(result_summary.try_number)
+    self.assertEqual(0, result_summary.current_task_slice)
+
+  def test_schedule_request_slice_no_capacity_fallback_second(self):
+    items = []
+    def _has_capacity(dimensions):
+      items.append(dimensions)
+      return len(items) > 1
+    self.mock(task_scheduler, '_has_capacity', _has_capacity)
+    result_summary = self._quick_schedule(
+        2,
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=180,
+              properties=_gen_properties(
+                  dimensions={
+                    u'nonexistent': [u'really'],
+                    u'pool': [u'default'],
+                  })),
+          task_request.TaskSlice(
+              expiration_secs=180,
+              properties=_gen_properties()),
+        ])
+    # The task fell back to the second slice, still pending.
+    self.assertEqual(State.PENDING, result_summary.state)
+    self.assertIsNone(result_summary.abandoned_ts)
+    self.assertIsNone(result_summary.try_number)
+    self.assertEqual(1, result_summary.current_task_slice)
 
   def test_exponential_backoff(self):
     self.mock(
@@ -1330,6 +1378,50 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(3, len(pub_sub_calls)) # PENDING -> BOT_DIED
+
+  def test_cron_abort_expired_fallback(self):
+    result_summary = self._quick_schedule(
+        4,
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=600,
+              properties=_gen_properties(
+                  io_timeout_secs=60,
+                  dimensions={u'pool': [u'some-pool']})),
+          task_request.TaskSlice(
+              expiration_secs=600,
+              properties=_gen_properties(
+                  io_timeout_secs=61,
+                  dimensions={u'pool': [u'some-pool']})),
+          task_request.TaskSlice(
+              expiration_secs=600,
+              properties=_gen_properties(
+                  io_timeout_secs=62,
+                  dimensions={u'pool': [u'some-pool']})),
+          task_request.TaskSlice(
+              expiration_secs=600,
+              properties=_gen_properties(
+                  io_timeout_secs=63,
+                  dimensions={u'pool': [u'some-pool']})),
+        ])
+    self.assertEqual(State.PENDING, result_summary.state)
+    self.assertEqual(0, result_summary.current_task_slice)
+
+    # Expire the first task. But _has_capacity returns False 2 times, so 1+2 =
+    # 3, meaning it falls back to the fourth slice.
+    self.mock_now(self.now, 601)
+    items = []
+    def _has_capacity(dimensions):
+      items.append(dimensions)
+      return len(items) > 2
+    self.mock(task_scheduler, '_has_capacity', _has_capacity)
+    self.assertEqual(
+        ([], ['1d69b9f088008910']),
+        task_scheduler.cron_abort_expired_task_to_run('f.local'))
+    result_summary = result_summary.key.get()
+    self.assertEqual(State.PENDING, result_summary.state)
+    # Skipped #1 and #2.
+    self.assertEqual(3, result_summary.current_task_slice)
 
   def test_cron_handle_bot_died(self):
     pub_sub_calls = self.mock_pub_sub()

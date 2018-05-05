@@ -15,18 +15,19 @@ class TaskState(messages.Enum):
   (
     PENDING, RUNNING, PENDING_RUNNING, COMPLETED, COMPLETED_SUCCESS,
     COMPLETED_FAILURE, EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, ALL,
-    DEDUPED, KILLED) = range(13)
+    DEDUPED, KILLED, NO_RESOURCE) = range(14)
 
 
 class StateField(messages.Enum):
-  RUNNING = 0x10    # 16
-  PENDING = 0x20    # 32
-  EXPIRED = 0x30    # 48
-  TIMED_OUT = 0x40  # 64
-  BOT_DIED = 0x50   # 80
-  CANCELED = 0x60   # 96
-  COMPLETED = 0x70  # 112
-  KILLED = 0x80     # 128
+  RUNNING = 0x10      # 16
+  PENDING = 0x20      # 32
+  EXPIRED = 0x30      # 48
+  TIMED_OUT = 0x40    # 64
+  BOT_DIED = 0x50     # 80
+  CANCELED = 0x60     # 96
+  COMPLETED = 0x70    # 112
+  KILLED = 0x80       # 128
+  NO_RESOURCE = 0x100 # 256
 
 
 class TaskSort(messages.Enum):

@@ -1262,6 +1262,8 @@ def init_new_request(request, allow_high_priority):
   if request.task_slices:
     exp = 0
     for t in request.task_slices:
+      if not t.expiration_secs:
+        raise ValueError('missing expiration_secs')
       exp += t.expiration_secs
     # Always clobber the overall value.
     # message_conversion.new_task_request_from_rpc() ensures both task_slices

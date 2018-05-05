@@ -94,24 +94,26 @@ class State(object):
 
   It's in fact an enum. Values should be in decreasing order of importance.
   """
-  RUNNING = 0x10    # 16
-  PENDING = 0x20    # 32
-  EXPIRED = 0x30    # 48
-  TIMED_OUT = 0x40  # 64
-  BOT_DIED = 0x50   # 80
-  CANCELED = 0x60   # 96
-  COMPLETED = 0x70  # 112
-  KILLED = 0x80     # 128
+  RUNNING = 0x10      # 16
+  PENDING = 0x20      # 32
+  EXPIRED = 0x30      # 48
+  TIMED_OUT = 0x40    # 64
+  BOT_DIED = 0x50     # 80
+  CANCELED = 0x60     # 96
+  COMPLETED = 0x70    # 112
+  KILLED = 0x80       # 128
+  NO_RESOURCE = 0x100 # 256
 
   STATES = (
       RUNNING, PENDING, EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, COMPLETED,
-      KILLED)
+      KILLED, NO_RESOURCE)
   STATES_RUNNING = (RUNNING, PENDING)
   STATES_NOT_RUNNING = (
-      EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, COMPLETED, KILLED)
-  STATES_EXCEPTIONAL = (EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, KILLED)
+      EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, COMPLETED, KILLED, NO_RESOURCE)
+  STATES_EXCEPTIONAL = (
+      EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, KILLED, NO_RESOURCE)
   STATES_DONE = (TIMED_OUT, COMPLETED, KILLED)
-  STATES_ABANDONED = (EXPIRED, BOT_DIED, CANCELED)
+  STATES_ABANDONED = (EXPIRED, BOT_DIED, CANCELED, NO_RESOURCE)
 
   _NAMES = {
     RUNNING: 'Running',
@@ -122,6 +124,7 @@ class State(object):
     CANCELED: 'User canceled',
     COMPLETED: 'Completed',
     KILLED: 'Killed',
+    NO_RESOURCE: 'No resource available',
   }
 
   @classmethod
@@ -1182,6 +1185,9 @@ def _filter_query(cls, query, start, end, sort, state):
 
   if state == 'killed':
     return query.filter(cls.state == State.KILLED)
+
+  if state == 'no_resource':
+    return query.filter(cls.state == State.NO_RESOURCE)
 
   raise ValueError('Invalid state')
 

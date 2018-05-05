@@ -44,6 +44,19 @@ def _secs_to_ms(value):
   return int(round(value * 1000.))
 
 
+def _has_capacity(dimensions):
+  """Returns True if there's a reasonable chance for this run to be triggered.
+
+  Looks at the bots and caches the information.
+
+  Currently a scaffolding to be implemented later.
+  """
+  # pylint: disable=unused-argument
+  # It will be coded with super fast single memcache get request in the hot
+  # path. I promise.
+  return True
+
+
 def _expire_task(to_run_key, request):
   """Expires a TaskResultSummary and unschedules the TaskToRun.
 
@@ -79,22 +92,30 @@ def _expire_task(to_run_key, request):
     to_run.queue_number = None
     result_summary = result_summary_future.get_result()
     to_put = [to_run, result_summary]
+    # Check if there's a TaskSlice fallback that could be reenqueued.
     new_to_run = None
-    if result_summary.current_task_slice < request.num_task_slices-1:
-      # Enqueue a new TasktoRun for the next TaskSlice.
-      new_to_run = task_to_run.new_task_to_run(
-          request, 1, result_summary.current_task_slice+1)
-      result_summary.current_task_slice += 1
-      to_put.append(new_to_run)
+    index = result_summary.current_task_slice+1
+    while index < request.num_task_slices:
+      dimensions = request.task_slice(index).properties.dimensions
+      if _has_capacity(dimensions):
+        # Enqueue a new TasktoRun for this next TaskSlice, it has capacity!
+        new_to_run = task_to_run.new_task_to_run(request, 1, index)
+        result_summary.current_task_slice = index
+        to_put.append(new_to_run)
+        break
+      index += 1
 
-    if result_summary.try_number:
-      # It's a retry that is being expired. Keep the old state. That requires an
-      # additional pipelined GET but that shouldn't be the common case.
-      run_result = result_summary.run_result_key.get()
-      result_summary.set_from_run_result(run_result, request)
-    else:
-      result_summary.state = task_result.State.EXPIRED
-    result_summary.abandoned_ts = now
+    if not new_to_run:
+      # There's no fallback, giving up.
+      if result_summary.try_number:
+        # It's a retry that is being expired, i.e. the first try had BOT_DIED.
+        # Keep the old state. That requires an additional pipelined GET but that
+        # shouldn't be the common case.
+        run_result = result_summary.run_result_key.get()
+        result_summary.set_from_run_result(run_result, request)
+      else:
+        result_summary.state = task_result.State.EXPIRED
+      result_summary.abandoned_ts = now
     result_summary.modified_ts = now
 
     futures = ndb.put_multi_async(to_put)
@@ -272,9 +293,8 @@ def _handle_dead_bot(run_result_key):
       # - One of:
       #   - idempotent
       #   - task hadn't got any ping at all from task_runner.run_command()
-      # TODO(maruel): Allow retry for bot locked task using 'id' dimension.
       # TODO(maruel): Allow increasing the current_task_slice value.
-      # Create a second TaskToRun.
+      # Create a second TaskToRun with the same TaskSlice.
       to_run = task_to_run.new_task_to_run(request, 2, current_task_slice)
       to_put = (run_result, result_summary, to_run)
       run_result.state = task_result.State.BOT_DIED
@@ -763,13 +783,11 @@ def schedule_request(request, secret_bytes):
 
   now = utils.utcnow()
   request.key = task_request.new_request_key()
-  # First try, first task slice.
-  to_run = task_to_run.new_task_to_run(request, 1, 0)
   result_summary = task_result.new_result_summary(request)
   result_summary.modified_ts = now
+  to_run = None
   if secret_bytes:
     secret_bytes.key = request.secret_bytes_key
-
 
   dupe_summary = None
   for i in xrange(request.num_task_slices):
@@ -781,9 +799,7 @@ def schedule_request(request, secret_bytes):
         # In this code path, there's not much to do as the task will not be run,
         # previous results are returned. We still need to store the TaskRequest
         # and TaskResultSummary.
-        #
         # Since the task is never scheduled, TaskToRun is not stored.
-        to_run = None
         # Since the has_secret_bytes property is already set for UI purposes,
         # and the task itself will never be run, we skip storing the
         # SecretBytes, as they would never be read and will just consume space
@@ -791,6 +807,27 @@ def schedule_request(request, secret_bytes):
         # stored anyway, if we really want to get them again).
         secret_bytes = None
         break
+
+  if not dupe_summary:
+    # The task has to run. Make sure there's capacity.
+    index = 0
+    while index < request.num_task_slices:
+      # This needs to be extremely fast.
+      to_run = task_to_run.new_task_to_run(request, 1, index)
+      if _has_capacity(request.task_slice(index).properties.dimensions):
+        # It's pending at this index now.
+        result_summary.current_task_slice = index
+        break
+      index += 1
+
+    if index == request.num_task_slices:
+      # Skip to_run since it's not enqueued.
+      to_run = None
+      # Same rationale as deduped task.
+      secret_bytes = None
+      # Instantaneously denied.
+      result_summary.abandoned_ts = result_summary.created_ts
+      result_summary.state = task_result.State.NO_RESOURCE
 
   # Storing these entities makes this task live. It is important at this point
   # that the HTTP handler returns as fast as possible, otherwise the task will
@@ -802,6 +839,10 @@ def schedule_request(request, secret_bytes):
     logging.debug(
         'New request %s reusing %s', result_summary.task_id,
         dupe_summary.task_id)
+  elif result_summary.state == task_result.State.NO_RESOURCE:
+    logging.warning(
+        'New request %s denied with NO_RESOURCE', result_summary.task_id)
+    logging.debug('New request %s', result_summary.task_id)
   else:
     logging.debug('New request %s', result_summary.task_id)
 
