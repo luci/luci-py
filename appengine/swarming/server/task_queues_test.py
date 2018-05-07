@@ -29,17 +29,19 @@ from server import task_request
 
 
 def _assert_bot(dimensions=None):
+  bot_id = u'bot1'
   bot_dimensions = {
     u'cpu': [u'x86-64', u'x64'],
-    u'id': [u'bot1'],
+    u'id': [bot_id],
     u'os': [u'Ubuntu-16.04', u'Ubuntu'],
     u'pool': [u'default'],
   }
   bot_dimensions.update(dimensions or {})
   bot_management.bot_event(
-      'bot_connected', u'bot1', '1.2.3.4', 'bot1', bot_dimensions, {},
+      'bot_connected', bot_id, '1.2.3.4', 'bot1', bot_dimensions, {},
       '1234', False, None, None, None)
-  return task_queues.assert_bot_async(bot_dimensions).get_result()
+  bot_root_key = bot_management.get_root_key(bot_id)
+  return task_queues.assert_bot_async(bot_root_key, bot_dimensions).get_result()
 
 
 def _gen_properties(**kwargs):
@@ -233,7 +235,8 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assert_count(1, task_queues.BotDimensions)
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
-    self.assertEqual([2980491642], task_queues.get_queues(u'bot1'))
+    bot_root_key = bot_management.get_root_key(u'bot1')
+    self.assertEqual([2980491642], task_queues.get_queues(bot_root_key))
 
   def test_assert_task_then_bot(self):
     self._assert_task()
@@ -241,7 +244,8 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assert_count(1, task_queues.BotDimensions)
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
-    self.assertEqual([2980491642], task_queues.get_queues(u'bot1'))
+    bot_root_key = bot_management.get_root_key(u'bot1')
+    self.assertEqual([2980491642], task_queues.get_queues(bot_root_key))
 
   def test_assert_bot_then_task_with_id(self):
     # Assert a task that includes an 'id' dimension. No task queue is triggered
@@ -259,7 +263,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
   def test_cleanup_after_bot(self):
     self.assertEqual(0, _assert_bot())
     self._assert_task()
-    task_queues.cleanup_after_bot('bot1')
+    task_queues.cleanup_after_bot(bot_management.get_root_key('bot1'))
     # BotInfo is deleted separately.
     self.assert_count(1, bot_management.BotInfo)
     self.assert_count(0, task_queues.BotDimensions)
@@ -279,14 +283,15 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(1, _assert_bot({u'gpu': u'Matrox'}))
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
-    self.assertEqual([2980491642], task_queues.get_queues(u'bot1'))
+    bot_root_key = bot_management.get_root_key(u'bot1')
+    self.assertEqual([2980491642], task_queues.get_queues(bot_root_key))
 
     # One second before expiration.
     self.mock_now(now, exp.total_seconds())
     self.assertEqual(None, _assert_bot({u'gpu': u'Matrox'}))
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
-    self.assertEqual([2980491642], task_queues.get_queues(u'bot1'))
+    self.assertEqual([2980491642], task_queues.get_queues(bot_root_key))
 
     # TaskDimension expired. The fact that the bot changed dimensions after an
     # hour didn't impact BotTaskDimensions expiration.
@@ -294,7 +299,7 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(0, _assert_bot())
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
-    self.assertEqual([], task_queues.get_queues(u'bot1'))
+    self.assertEqual([], task_queues.get_queues(bot_root_key))
 
   def test_hash_dimensions(self):
     with self.assertRaises(AttributeError):
@@ -310,27 +315,28 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
     exp = (request.expiration_ts-request.created_ts) + task_queues._ADVANCE
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
-    self.assertEqual([2980491642], task_queues.get_queues(u'bot1'))
+    bot_root_key = bot_management.get_root_key(u'bot1')
+    self.assertEqual([2980491642], task_queues.get_queues(bot_root_key))
 
     # No-op.
     task_queues.cron_tidy_stale()
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
-    self.assertEqual([2980491642], task_queues.get_queues(u'bot1'))
+    self.assertEqual([2980491642], task_queues.get_queues(bot_root_key))
 
     # One second before expiration.
     self.mock_now(now, exp.total_seconds())
     task_queues.cron_tidy_stale()
     self.assert_count(1, task_queues.BotTaskDimensions)
     self.assert_count(1, task_queues.TaskDimensions)
-    self.assertEqual([2980491642], task_queues.get_queues(u'bot1'))
+    self.assertEqual([2980491642], task_queues.get_queues(bot_root_key))
 
     # TaskDimension expired.
     self.mock_now(now, exp.total_seconds() + 1)
     task_queues.cron_tidy_stale()
     self.assert_count(0, task_queues.BotTaskDimensions)
     self.assert_count(0, task_queues.TaskDimensions)
-    self.assertEqual([], task_queues.get_queues(u'bot1'))
+    self.assertEqual([], task_queues.get_queues(bot_root_key))
 
 
 if __name__ == '__main__':

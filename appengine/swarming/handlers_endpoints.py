@@ -750,14 +750,15 @@ class SwarmingBotService(remote.Service):
     still alive.
     """
     logging.debug('%s', request)
-    bot_key = bot_management.get_info_key(request.bot_id)
-    bot_info = get_or_raise(bot_key)  # raises 404 if there is no such bot
+    bot_info_key = bot_management.get_info_key(request.bot_id)
+    bot_info = get_or_raise(bot_info_key)  # raises 404 if there is no such bot
     if bot_info.machine_lease:
       ml = lease_management.MachineLease.get_by_id(bot_info.machine_lease)
       if lease_management.release(ml):
         lease_management.cleanup_bot(ml)
-    task_queues.cleanup_after_bot(request.bot_id)
-    bot_key.delete()
+    # BotRoot is parent to BotInfo.
+    task_queues.cleanup_after_bot(bot_info_key.parent())
+    bot_info_key.delete()
     return swarming_rpcs.DeletedResponse(deleted=True)
 
   @gae_ts_mon.instrument_endpoint()

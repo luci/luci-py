@@ -39,6 +39,7 @@ from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
 from components import utils
+from server import bot_management
 from server import task_pack
 from server import task_queues
 from server import task_request
@@ -371,7 +372,8 @@ def _yield_potential_tasks(bot_id):
     - First page of every query returned
     - All queries exhausted
   """
-  potential_dimensions_hashes = task_queues.get_queues(bot_id)
+  bot_root_key = bot_management.get_root_key(bot_id)
+  potential_dimensions_hashes = task_queues.get_queues(bot_root_key)
   # Note that the default ndb.EVENTUAL_CONSISTENCY is used so stale items may be
   # returned. It's handled specifically by consumers of this function.
   start = time.time()

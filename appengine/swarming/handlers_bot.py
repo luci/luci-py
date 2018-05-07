@@ -392,7 +392,8 @@ class _BotBaseHandler(_BotApiHandler):
       return result
 
     # TODO(maruel): Parallelise.
-    task_queues.assert_bot_async(dimensions).get_result()
+    bot_root_key = bot_management.get_root_key(bot_id)
+    task_queues.assert_bot_async(bot_root_key, dimensions).get_result()
     return result
 
 

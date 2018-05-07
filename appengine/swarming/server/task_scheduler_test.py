@@ -259,12 +259,14 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       bot_dimensions: bot dimensions to assert.
     """
     self.assertEqual(0, self.execute_tasks())
+    bot_id = bot_dimensions[u'id'][0]
     bot_management.bot_event(
-        'bot_connected', bot_dimensions[u'id'][0], '1.2.3.4', 'joe@localhost',
+        'bot_connected', bot_id, '1.2.3.4', 'joe@localhost',
         bot_dimensions, {'state': 'real'}, '1234', False, None, None, None)
+    bot_root_key = bot_management.get_root_key(bot_id)
     self.assertEqual(
         num_btd_updated,
-        task_queues.assert_bot_async(bot_dimensions).get_result())
+        task_queues.assert_bot_async(bot_root_key, bot_dimensions).get_result())
     self.assertEqual(num_task, self.execute_tasks())
     self.assertEqual(0, self.execute_tasks())
 

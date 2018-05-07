@@ -62,7 +62,6 @@ from google.appengine.ext import ndb
 
 from components import datastore_utils
 from components import utils
-from server import bot_management
 from server import task_pack
 
 
@@ -668,19 +667,21 @@ def hash_dimensions(dimensions):
 
 
 @ndb.tasklet
-def assert_bot_async(bot_dimensions):
+def assert_bot_async(bot_root_key, bot_dimensions):
   """Prepares BotTaskDimensions entities as needed.
 
   Coupled with assert_task(), enables get_queues() to work by by knowing which
   TaskDimensions applies to this bot.
 
+  Arguments:
+    bot_root_key: ndb.Key to bot_management.BotRoot
+    bot_dimensions: dictionary of the bot dimensions
+
   Returns:
     Number of matches or None if hit the cache, thus nothing was updated.
   """
-  assert len(bot_dimensions[u'id']) == 1, bot_dimensions
   # Check if the bot dimensions changed since last _rebuild_bot_cache_async()
   # call.
-  bot_root_key = bot_management.get_root_key(bot_dimensions[u'id'][0])
   obj = yield ndb.Key(BotDimensions, 1, parent=bot_root_key).get_async()
   if obj and obj.dimensions_flat == _flatten_bot_dimensions(bot_dimensions):
     # Cache hit, no need to look further.
@@ -690,8 +691,11 @@ def assert_bot_async(bot_dimensions):
   raise ndb.Return(matches)
 
 
-def cleanup_after_bot(bot_id):
+def cleanup_after_bot(bot_root_key):
   """Removes all BotDimensions and BotTaskDimensions for this bot.
+
+  Arguments:
+    bot_root_key: ndb.Key to bot_management.BotRoot
 
   Do not clean up TaskDimensions. There could be pending tasks and there's a
   possibility that a bot with the same ID could come up afterward (low chance in
@@ -700,8 +704,6 @@ def cleanup_after_bot(bot_id):
   as assert_bot_async() would fail to create the corresponding
   BotTaskDimensions.
   """
-  bot_root_key = bot_management.get_root_key(bot_id)
-
   q = BotTaskDimensions.query(ancestor=bot_root_key).iter(keys_only=True)
   futures = ndb.delete_multi_async(q)
   futures.append(ndb.Key(BotDimensions, 1, parent=bot_root_key).delete_async())
@@ -732,11 +734,13 @@ def assert_task(request):
     _assert_task_props(t.properties, exp_ts)
 
 
-def get_queues(bot_id):
-  """Queries all the known task queues in parallel and yields the task in order
-  of priority.
+def get_queues(bot_root_key):
+  """Returns the known task queues as integers.
+
+  Arguments:
+    bot_root_key: ndb.Key to bot_management.BotRoot
   """
-  assert isinstance(bot_id, unicode), repr(bot_id)
+  bot_id = bot_root_key.string_id()
   data = memcache.get(bot_id, namespace='task_queues')
   if data is not None:
     logging.debug(
@@ -748,7 +752,6 @@ def get_queues(bot_id):
   # actually been triggered in the past. Since this is under a root entity, this
   # should be fast.
   now = utils.utcnow()
-  bot_root_key = bot_management.get_root_key(bot_id)
   data = sorted(
       obj.key.integer_id() for obj in
       BotTaskDimensions.query(ancestor=bot_root_key)
