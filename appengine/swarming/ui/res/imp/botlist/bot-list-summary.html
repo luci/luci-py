@@ -106,6 +106,12 @@
         </td>
         <td class="left">[[fleet.quarantined]]</td>
       </tr>
+      <tr>
+        <td class="right">
+          <a href$="[[_makeURL('maintenance','',columns.*,sort,verbose)]]">Maintenance</a>:
+        </td>
+        <td class="left">[[fleet.maintenance]]</td>
+      </tr>
     </table>
 
     <div class="header buffer">Selected</div>
@@ -151,6 +157,12 @@
           <a href$="[[_makeURL('quarantined','true',columns.*,sort,verbose,count_params.*)]]">Quarantined</a>:
         </td>
         <td class="left">[[_count_query.quarantined]]</td>
+      </tr>
+      <tr>
+        <td class="right">
+          <a href$="[[_makeURL('maintenance','true',columns.*,sort,verbose,count_params.*)]]">Maintenance</a>:
+        </td>
+        <td class="left">[[_count_query.maintenance]]</td>
       </tr>
     </table>
 
@@ -214,7 +226,7 @@
           return "";
         }
         if (filter === "alive" || filter === "dead" ||
-            filter === "quarantined") {
+            filter === "quarantined" || filter === "maintenance") {
           return "status:" + filter;
         } else {
           return "task:" + filter;

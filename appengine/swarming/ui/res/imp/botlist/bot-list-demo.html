@@ -57,6 +57,7 @@
       "now": "2016-08-01T17:21:07.239940",
       "dead": "22",
       "quarantined": "15",
+      "maintenance": "1",
       "kind": "swarming#botsItem",
       "etag": "\"nhThK35uIVdvx1_Mr5DChu_DyBs/aO8fy5IdESDx-fy3If19oDKu0f0\""
     };
@@ -80,6 +81,7 @@
       busy: 0,
       dead: 5,
       quarantined: 0,
+      maintenance: 0,
     }
     server.respondWith("GET", /^\/api\/swarming\/v1\/bots\/count\?is_dead=TRUE.*/, JSON.stringify(count));
 
@@ -88,6 +90,7 @@
       busy: 581,
       dead: 10,
       quarantined: 0,
+      maintenance: 0,
     }
     server.respondWith("GET", /^\/api\/swarming\/v1\/bots\/count\?[^i].*/, JSON.stringify(count));
 

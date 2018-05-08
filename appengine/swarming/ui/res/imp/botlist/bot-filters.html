@@ -229,6 +229,8 @@ the fleet.">
       status: function(bot, status) {
         if (status === "quarantined") {
           return bot.quarantined;
+        } else if (status === "maintenance") {
+          return !!bot.maintenance_msg;
         } else if (status === "dead") {
           return bot.is_dead;
         } else {
@@ -336,8 +338,11 @@ the fleet.">
             if (rest === "alive") {
               params["is_dead"] = ["FALSE"];
               params["quarantined"] = ["FALSE"];
+              params["in_maintenance"] = ["FALSE"];
             } else if (rest === "quarantined") {
               params["quarantined"] = ["TRUE"];
+            } else if (rest === "maintenance") {
+              params["in_maintenance"] = ["TRUE"];
             } else if (rest === "dead") {
               params["is_dead"] = ["TRUE"];
             }
