@@ -113,6 +113,7 @@ class EndpointsWebapp2TestCase(test_case.TestCase):
         '/api/Service/v1/post_403',
         '/api/discovery/v1/apis',
         '/api/discovery/v1/apis/<name>/<version>/rest',
+        '/api/static/proxy.html',
     ])
 
   def test_discovery_routing(self):
@@ -133,6 +134,14 @@ class EndpointsWebapp2TestCase(test_case.TestCase):
     response = json.loads(request.get_response(app).body)
     self.assertEqual(len(response.get('items', [])), 1)
     self.assertEqual(response['items'][0]['id'], 'Service:v1')
+
+  def test_proxy_routing(self):
+    app = webapp2.WSGIApplication(
+        [adapter.explorer_proxy_route('/api')], debug=True)
+    request = webapp2.Request.blank('/api/static/proxy.html')
+    request.method = 'GET'
+    response = request.get_response(app).body
+    self.assertIn('/api', response)
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
