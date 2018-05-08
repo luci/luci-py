@@ -490,6 +490,7 @@ def cron_update_bot_info():
   # average runtime is around 8 seconds.
   dead = 0
   seen = 0
+  failed = 0
   try:
     futures = []
     for b in BotInfo.query(BotInfo.last_seen_ts <= cutoff):
@@ -500,15 +501,24 @@ def cron_update_bot_info():
         l = lambda: run(k)
         # Retry more often than the default 1. We do not want to throw too much
         # in the logs and there should be plenty of time to do the retries.
-        f = datastore_utils.transaction_async(l, retries=3)
+        f = datastore_utils.transaction_async(l, retries=5)
         futures.append(f)
         if len(futures) >= 5:
           ndb.Future.wait_any(futures)
           for i in xrange(len(futures) - 1, -1, -1):
             if futures[i].done():
-              dead += futures.pop(i).get_result()
+              try:
+                dead += futures.pop(i).get_result()
+              except datastore_utils.CommitError:
+                logging.warning('Failed to commit a Tx')
+                failed += 1
     for f in futures:
-      dead += f.get_result()
+      try:
+        dead += f.get_result()
+      except datastore_utils.CommitError:
+        logging.warning('Failed to commit a Tx')
+        failed += 1
   finally:
-    logging.debug('Seen %d bots, updated %d bots', seen, dead)
+    logging.debug(
+        'Seen %d bots, updated %d bots, failed %d tx', seen, dead, failed)
   return dead
