@@ -687,8 +687,12 @@ def get_recursive_size(path):
 def get_python_packages():
   """Returns the list of third party python packages."""
   try:
-    return unicode(subprocess.check_output([
-        'pip', '--disable-pip-version-check', 'freeze'])).splitlines()
+    # --disable-pip-version-check is only supported in v6.0 and we still have
+    # bots running very old versions. Use the environment variable instead.
+    env = os.environ.copy()
+    env['PIP_DISABLE_PIP_VERSION_CHECK'] = '1'
+    cmd = ['pip', 'freeze']
+    return unicode(subprocess.check_output(cmd, env=env)).splitlines()
   except (subprocess.CalledProcessError, OSError):
     return None
 

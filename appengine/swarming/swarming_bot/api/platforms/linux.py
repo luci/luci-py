@@ -63,8 +63,8 @@ def get_num_processors():
       ctypes.sizeof(cpu_set_t),
       ctypes.pointer(cpu_set))
   if err != 0:
-    logging.error('sched_getaffinity() failed to get CPU affinity mask')
-    # Fallback onto multiprocessing.
+    # This is not a big deal, fallback onto multiprocessing. This happens on
+    # MIPS.
     return multiprocessing.cpu_count()
   return len(cpu_set.get_cpus())
 
