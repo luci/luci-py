@@ -44,7 +44,7 @@ def main():
   res = plugin.CodeGeneratorResponse()
   files_to_generate = set(req.file_to_generate)
   for input in req.proto_file:
-    if input.name not in files_to_generate:
+    if input.name not in files_to_generate or not input.service:
       continue
     res.file.add(
         name=input.name.replace('.proto', '_prpc_pb2.py'),
