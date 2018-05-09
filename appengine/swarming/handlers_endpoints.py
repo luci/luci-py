@@ -368,6 +368,31 @@ class SwarmingTaskService(remote.Service):
     return swarming_rpcs.TaskOutput(output=output)
 
 
+TasksRequest = endpoints.ResourceContainer(
+    message_types.VoidMessage,
+    limit=messages.IntegerField(1, default=200),
+    cursor=messages.StringField(2),
+    # These should be DateTimeField but endpoints + protorpc have trouble
+    # encoding this message in a GET request, this is due to DateTimeField's
+    # special encoding in protorpc-1.0/protorpc/message_types.py that is
+    # bypassed when using endpoints-1.0/endpoints/protojson.py to add GET query
+    # parameter support.
+    end=messages.FloatField(3),
+    start=messages.FloatField(4),
+    state=messages.EnumField(swarming_rpcs.TaskState, 5, default='ALL'),
+    tags=messages.StringField(6, repeated=True),
+    sort=messages.EnumField(swarming_rpcs.TaskSort, 7, default='CREATED_TS'),
+    include_performance_stats=messages.BooleanField(8, default=False))
+
+
+TasksCountRequest = endpoints.ResourceContainer(
+    message_types.VoidMessage,
+    end=messages.FloatField(3),
+    start=messages.FloatField(4),
+    state=messages.EnumField(swarming_rpcs.TaskState, 5, default='ALL'),
+    tags=messages.StringField(6, repeated=True))
+
+
 @swarming_api.api_class(resource_name='tasks', path='tasks')
 class SwarmingTasksService(remote.Service):
   """Swarming's tasks-related API."""
@@ -457,7 +482,7 @@ class SwarmingTasksService(remote.Service):
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
-      swarming_rpcs.TasksRequest, swarming_rpcs.TaskList,
+      TasksRequest, swarming_rpcs.TaskList,
       http_method='GET')
   @auth.require(acl.can_view_all_tasks)
   def list(self, request):
@@ -495,7 +520,7 @@ class SwarmingTasksService(remote.Service):
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
-      swarming_rpcs.TasksRequest, swarming_rpcs.TaskRequests,
+      TasksRequest, swarming_rpcs.TaskRequests,
       http_method='GET')
   @auth.require(acl.can_view_all_tasks)
   def requests(self, request):
@@ -580,7 +605,7 @@ class SwarmingTasksService(remote.Service):
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
-      swarming_rpcs.TasksCountRequest, swarming_rpcs.TasksCount,
+      TasksCountRequest, swarming_rpcs.TasksCount,
       http_method='GET')
   @auth.require(acl.can_view_all_tasks)
   def count(self, request):
@@ -633,11 +658,19 @@ class SwarmingTasksService(remote.Service):
     return swarming_rpcs.TasksTags(tasks_tags=ft, ts=tags.ts)
 
 
+TaskQueuesRequest = endpoints.ResourceContainer(
+    message_types.VoidMessage,
+    # Note that it's possible that the RPC returns a tad more or less items than
+    # requested limit.
+    limit=messages.IntegerField(1, default=200),
+    cursor=messages.StringField(2))
+
+
 @swarming_api.api_class(resource_name='queues', path='queues')
 class SwarmingQueuesService(remote.Service):
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
-      swarming_rpcs.TaskQueuesRequest, swarming_rpcs.TaskQueueList,
+      TaskQueuesRequest, swarming_rpcs.TaskQueueList,
       http_method='GET')
   @auth.require(acl.can_view_all_tasks)
   def list(self, request):
@@ -870,13 +903,34 @@ class SwarmingBotService(remote.Service):
         now=now)
 
 
+BotsRequest = endpoints.ResourceContainer(
+    message_types.VoidMessage,
+    limit=messages.IntegerField(1, default=200),
+    cursor=messages.StringField(2),
+    # Must be a list of 'key:value' strings to filter the returned list of bots
+    # on.
+    dimensions=messages.StringField(3, repeated=True),
+    quarantined=messages.EnumField(
+        swarming_rpcs.ThreeStateBool, 4, default='NONE'),
+    in_maintenance=messages.EnumField(
+        swarming_rpcs.ThreeStateBool, 8, default='NONE'),
+    is_dead=messages.EnumField(swarming_rpcs.ThreeStateBool, 5, default='NONE'),
+    is_busy=messages.EnumField(swarming_rpcs.ThreeStateBool, 6, default='NONE'),
+    is_mp=messages.EnumField(swarming_rpcs.ThreeStateBool, 7, default='NONE'))
+
+
+BotsCountRequest = endpoints.ResourceContainer(
+    message_types.VoidMessage,
+    dimensions=messages.StringField(1, repeated=True))
+
+
 @swarming_api.api_class(resource_name='bots', path='bots')
 class SwarmingBotsService(remote.Service):
   """Bots-related API."""
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
-      swarming_rpcs.BotsRequest, swarming_rpcs.BotList,
+      BotsRequest, swarming_rpcs.BotList,
       http_method='GET')
   @auth.require(acl.can_view_bot)
   def list(self, request):
@@ -907,7 +961,7 @@ class SwarmingBotsService(remote.Service):
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
-      swarming_rpcs.BotsCountRequest, swarming_rpcs.BotsCount,
+      BotsCountRequest, swarming_rpcs.BotsCount,
       http_method='GET')
   @auth.require(acl.can_view_bot)
   def count(self, request):

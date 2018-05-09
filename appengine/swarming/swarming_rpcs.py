@@ -377,28 +377,6 @@ class TaskRequest(messages.Message):
   pubsub_userdata = messages.StringField(12)
 
 
-class TasksRequest(messages.Message):
-  """Request to get some subset of available tasks.
-
-  This message can be used both to fetch the requests or the results.
-  """
-  limit = messages.IntegerField(1, default=200)
-  cursor = messages.StringField(2)
-  # These should be DateTimeField but endpoints + protorpc have trouble encoding
-  # this message in a GET request, this is due to DateTimeField's special
-  # encoding in protorpc-1.0/protorpc/message_types.py that is bypassed when
-  # using endpoints-1.0/endpoints/protojson.py to add GET query parameter
-  # support.
-  end = messages.FloatField(3)
-  start = messages.FloatField(4)
-  state = messages.EnumField(TaskState, 5, default='ALL')
-  tags = messages.StringField(6, repeated=True)
-  sort = messages.EnumField(TaskSort, 7, default='CREATED_TS')
-  # Only applicable when fetching results. This incurs more DB operations and
-  # more data is returned so this is a bit slower.
-  include_performance_stats = messages.BooleanField(8, default=False)
-
-
 class TaskCancelRequest(messages.Message):
   """Request to cancel one task."""
   kill_running = messages.BooleanField(1)
@@ -410,19 +388,6 @@ class TasksCancelRequest(messages.Message):
   cursor = messages.StringField(2)
   limit = messages.IntegerField(3, default=100)
   kill_running = messages.BooleanField(4)
-
-
-class TasksCountRequest(messages.Message):
-  """Request to count some subset of tasks."""
-  # These should be DateTimeField but endpoints + protorpc have trouble encoding
-  # this message in a GET request, this is due to DateTimeField's special
-  # encoding in protorpc-1.0/protorpc/message_types.py that is bypassed when
-  # using endpoints-1.0/endpoints/protojson.py to add GET query parameter
-  # support.
-  end = messages.FloatField(3)
-  start = messages.FloatField(4)
-  state = messages.EnumField(TaskState, 5, default='ALL')
-  tags = messages.StringField(6, repeated=True)
 
 
 ### Task-Related Responses
@@ -590,13 +555,6 @@ class TaskRequestMetadata(messages.Message):
 ### Task queues
 
 
-class TaskQueuesRequest(messages.Message):
-  # Note that it's possible that the RPC returns a tad more or less items than
-  # requested limit.
-  limit = messages.IntegerField(1, default=200)
-  cursor = messages.StringField(2)
-
-
 class TaskQueue(messages.Message):
   # Must be a list of 'key:value' strings to filter the returned list of bots
   # on.
@@ -616,27 +574,6 @@ class TaskQueueList(messages.Message):
 
 
 ### Bot-Related Requests
-
-
-class BotsRequest(messages.Message):
-  """Information needed to request bot data."""
-  limit = messages.IntegerField(1, default=200)
-  cursor = messages.StringField(2)
-  # Must be a list of 'key:value' strings to filter the returned list of bots
-  # on.
-  dimensions = messages.StringField(3, repeated=True)
-  quarantined = messages.EnumField(ThreeStateBool, 4, default='NONE')
-  in_maintenance = messages.EnumField(ThreeStateBool, 8, default='NONE')
-  is_dead = messages.EnumField(ThreeStateBool, 5, default='NONE')
-  is_busy = messages.EnumField(ThreeStateBool, 6, default='NONE')
-  is_mp = messages.EnumField(ThreeStateBool, 7, default='NONE')
-
-
-class BotsCountRequest(messages.Message):
-  """Information needed to request bot counts."""
-  # Must be a list of 'key:value' strings to filter the returned list of bots
-  # on.
-  dimensions = messages.StringField(1, repeated=True)
 
 
 class BotEventsRequest(messages.Message):
