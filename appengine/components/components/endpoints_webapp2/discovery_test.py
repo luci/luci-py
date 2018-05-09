@@ -73,13 +73,51 @@ class Service(remote.Service):
     return Message()
 
 
+SplitService = endpoints.api(
+    'split', 'v1', description='A split service to test with.')
+
+
+@SplitService.api_class(resource_name='sa', path='a')
+class ServiceA(remote.Service):
+  """Part A of a split service to test with."""
+
+  @endpoints.method(message_types.VoidMessage, Message, http_method='GET')
+  def get_method(self, _):
+    """An HTTP GET method."""
+    return Message()
+
+
+@SplitService.api_class(resource_name='sb', path='b')
+class ServiceB(remote.Service):
+  """Part B of a split service to test with."""
+
+  @endpoints.method(Message, Message)
+  def post_method(self, _):
+    """An HTTP POST method.
+
+    Has a multi-line description.
+    """
+    return Message()
+
+
+@endpoints.api('service', 'v1')
+class ServiceExtension(remote.Service):
+  """A service to test with."""
+
+  @endpoints.method(message_types.VoidMessage, Message, http_method='GET')
+  def get_method2(self, _):
+    """Another HTTP GET method."""
+    return Message()
+
+
 class DiscoveryWebapp2TestCase(test_case.TestCase):
   """Tests for discovery.py"""
 
   def test_get_methods(self):
     """Tests discovery._get_methods."""
-    expected = {
-      'methods': {
+    expected = (
+      # methods
+      {
         'get_method': {
           'description': 'An HTTP GET method.',
           'httpMethod': 'GET',
@@ -156,7 +194,11 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           ],
         },
       },
-      'schemas': {
+      # resources
+      {
+      },
+      # schemas
+      {
         'discovery_test.Message': {
           'description': 'A message to test with.',
           'id': 'discovery_test.Message',
@@ -179,7 +221,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           'type': 'object',
         },
       },
-    }
+    )
     self.assertEqual(discovery._get_methods(Service), expected)
 
   def test_get_parameters(self):
@@ -252,6 +294,8 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
 
   def test_generate(self):
     """Tests for discovery.generate."""
+    with self.assertRaises(AssertionError):
+      discovery.generate([], '/api')
     expected = {
       'auth': {
         'oauth2': {
@@ -433,7 +477,151 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
       },
       'version': 'v1',
     }
-    self.assertEqual(discovery.generate(Service, '/api'), expected)
+    self.assertEqual(discovery.generate([Service], '/api'), expected)
+    expected = {
+      'auth': {
+        'oauth2': {
+          'scopes': {
+            'https://www.googleapis.com/auth/userinfo.email': {
+              'description': 'https://www.googleapis.com/auth/userinfo.email',
+            },
+          },
+        },
+      },
+      'basePath': '/api/split/v1',
+      'baseUrl': 'https://None/api/split/v1',
+      'batchPath': 'batch',
+      'description': 'A split service to test with.',
+      'discoveryVersion': 'v1',
+      'icons': {
+        'x16': 'https://www.google.com/images/icons/product/search-16.gif',
+        'x32': 'https://www.google.com/images/icons/product/search-32.gif',
+      },
+      'id': 'split:v1',
+      'kind': 'discovery#restDescription',
+      'name': 'split',
+      'parameters': {
+        'alt': {
+          'default': 'json',
+          'description': 'Data format for the response.',
+          'enum': ['json'],
+          'enumDescriptions': [
+            'Responses with Content-Type of application/json',
+          ],
+          'location': 'query',
+          'type': 'string',
+        },
+        'fields': {
+          'description': (
+              'Selector specifying which fields to include in a partial'
+              ' response.'),
+          'location': 'query',
+          'type': 'string',
+        },
+        'key': {
+          'description': (
+              'API key. Your API key identifies your project and provides you'
+              ' with API access, quota, and reports. Required unless you'
+              ' provide an OAuth 2.0 token.'),
+          'location': 'query',
+          'type': 'string',
+        },
+        'oauth_token': {
+          'description': 'OAuth 2.0 token for the current user.',
+          'location': 'query',
+          'type': 'string',
+        },
+        'prettyPrint': {
+          'default': 'true',
+          'description': 'Returns response with indentations and line breaks.',
+          'location': 'query',
+          'type': 'boolean',
+        },
+        'quotaUser': {
+          'description': (
+              'Available to use for quota purposes for server-side'
+              ' applications. Can be any arbitrary string assigned to a user,'
+              ' but should not exceed 40 characters. Overrides userIp if both'
+              ' are provided.'),
+          'location': 'query',
+          'type': 'string',
+        },
+        'userIp': {
+          'description': (
+              'IP address of the site where the request originates. Use this if'
+              ' you want to enforce per-user limits.'),
+          'location': 'query',
+          'type': 'string',
+        },
+      },
+      'protocol': 'rest',
+      'resources': {
+        'sa': {
+          'methods': {
+            'get_method': {
+              'description': 'An HTTP GET method.',
+              'httpMethod': 'GET',
+              'id': 'split.sa.get_method',
+              'path': 'a/get_method',
+              'response': {
+                '$ref': 'discovery_test.Message',
+              },
+              'scopes': [
+                'https://www.googleapis.com/auth/userinfo.email',
+              ],
+            },
+          },
+        },
+        'sb': {
+          'methods': {
+            'post_method': {
+              'description':
+                  'An HTTP POST method. Has a multi-line description.',
+              'httpMethod': 'POST',
+              'id': 'split.sb.post_method',
+              'path': 'b/post_method',
+              'request': {
+                '$ref': 'discovery_test.Message',
+                'parameterName': 'resource',
+              },
+              'response': {
+                '$ref': 'discovery_test.Message',
+              },
+              'scopes': [
+                'https://www.googleapis.com/auth/userinfo.email',
+              ],
+            },
+          },
+        },
+      },
+      'rootUrl': 'https://None/api/',
+      'servicePath': 'split/v1/',
+      'schemas': {
+        'discovery_test.Message': {
+          'description': 'A message to test with.',
+          'id': 'discovery_test.Message',
+          'properties': {
+            'boolean': {
+              'type': 'boolean',
+            },
+            'integer': {
+              'format': 'int64',
+              'type': 'string',
+            },
+            'required': {
+              'required': True,
+              'type': 'boolean',
+            },
+            'string': {
+              'type': 'string',
+            },
+          },
+          'type': 'object',
+        },
+      },
+      'version': 'v1',
+    }
+    self.assertEqual(discovery.generate([ServiceA, ServiceB], '/api'), expected)
 
   def test_directory(self):
     """Tests for discovery.directory."""
@@ -455,10 +643,26 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           'preferred': True,
           'version': 'v1',
         },
+        {
+          'description': 'A split service to test with.',
+          'discoveryLink': './apis/split/v1/rest',
+          'discoveryRestUrl':
+              'https://None/api/discovery/v1/apis/split/v1/rest',
+          'icons': {
+            'x16': 'https://www.google.com/images/icons/product/search-16.gif',
+            'x32': 'https://www.google.com/images/icons/product/search-32.gif',
+          },
+          'id': 'split:v1',
+          'kind': 'discovery#directoryItem',
+          'name': 'split',
+          'preferred': True,
+          'version': 'v1',
+        },
       ],
       'kind': 'discovery#directoryList',
     }
-    self.assertEqual(discovery.directory([Service], '/api'), expected)
+    self.assertEqual(
+        discovery.directory([Service, ServiceA, ServiceB], '/api'), expected)
 
 
 if __name__ == '__main__':

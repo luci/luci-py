@@ -196,15 +196,17 @@ def _get_parameters(message, path):
 
 
 def _get_methods(service):
-  """Returns a methods and schemas document for the given service.
+  """Returns methods, resources, and schemas documents for the given service.
 
   Args:
     service: The protorpc.remote.Service to describe.
 
   Returns:
-    A dict which can be written as JSON describing the methods and types.
+    A tuple of three dicts which can be written as JSON describing the methods,
+    resources, and types.
   """
   methods = {}
+  resources = {}
   types = set()
 
   for _, method in service.all_remote_methods().iteritems():
@@ -212,13 +214,20 @@ def _get_methods(service):
     info = getattr(method, 'method_info', None)
     if info is None:
       continue
-    # info.method_id returns <service name>.<method>. Extract <method>.
-    name = info.method_id(service.api_info).split('.')[-1]
+    # info.method_id returns <service name>.<method name> or
+    # <service name>.<resource name>.<method name> for resource methods.
+    method_id = info.method_id(service.api_info)
+    parts = method_id.split('.')
+    assert len(parts) in (2, 3), method_id
+    name = parts[-1]
+    resource = None
+    if len(parts) == 3:
+      resource = parts[1]
 
-    methods[name] = {
+    document = {
       'httpMethod': info.http_method,
-      # <service name>.<method>.
-      'id': info.method_id(service.api_info),
+      # <service name>.<method name>.
+      'id': method_id,
       'path': info.get_path(service.api_info),
       'scopes': [
         'https://www.googleapis.com/auth/userinfo.email',
@@ -227,14 +236,14 @@ def _get_methods(service):
 
     desc = _normalize_whitespace(method.remote.method.__doc__)
     if desc:
-      methods[name]['description'] = desc
+      document['description'] = desc
 
     request = method.remote.request_type()
     if not isinstance(request, message_types.VoidMessage):
       if info.http_method not in ('GET', 'DELETE'):
         rc = endpoints.ResourceContainer.get_request_message(method.remote)
         if not isinstance(rc, endpoints.ResourceContainer):
-          methods[name]['request'] = {
+          document['request'] = {
             # $refs refer to the "schemas" section of the discovery doc.
             '$ref': request.__class__.definition_name(),
             'parameterName': 'resource',
@@ -243,60 +252,65 @@ def _get_methods(service):
         else:
           # If the request type is a known ResourceContainer, create a schema
           # reference to the body only. Path parameters are handled differently.
-          methods[name]['request'] = {
+          document['request'] = {
             '$ref': rc.body_message_class.definition_name(),
             'parameterName': 'resource',
           }
           types.add(rc.body_message_class)
-          methods[name].update(_get_parameters(
+          document.update(_get_parameters(
               rc.parameters_message_class, info.get_path(service.api_info)))
 
     response = method.remote.response_type()
     if not isinstance(response, message_types.VoidMessage):
-      methods[name]['response'] = {
+      document['response'] = {
         '$ref': response.__class__.definition_name(),
       }
       types.add(response.__class__)
 
-  document = {}
-  if methods:
-    document['methods'] = methods
-  schemas = _get_schemas(types)
-  if schemas:
-    document['schemas'] = schemas
-  return document
+    if resource:
+      if resource not in resources:
+        resources[resource] = {
+          'methods': {},
+        }
+      resources[resource]['methods'][name] = document
+    else:
+      methods[name] = document
+
+  return methods, resources, _get_schemas(types)
 
 
-def generate(service, base_path):
+def generate(classes, base_path):
   """Returns a discovery document for the given service.
 
   Args:
-    service: The protorpc.remote.Service to describe.
+    classes: The non-empty list of protorpc.remote.Service classes to describe.
+      All classes must be part of the same service.
     base_path: The base path under which all service paths exist.
 
   Returns:
     A dict which can be written as JSON describing the service.
   """
+  assert classes, classes
   document = {
     'discoveryVersion': 'v1',
     'auth': {
       'oauth2': {
-        'scopes': {s: {'description': s} for s in service.api_info.scopes},
+        'scopes': {s: {'description': s} for s in classes[0].api_info.scopes},
       },
     },
     'basePath': '%s/%s/%s' % (
-        base_path, service.api_info.name, service.api_info.version),
+        base_path, classes[0].api_info.name, classes[0].api_info.version),
     'baseUrl': 'https://%s%s/%s/%s' % (
-        service.api_info.hostname, base_path,
-        service.api_info.name, service.api_info.version),
+        classes[0].api_info.hostname, base_path,
+        classes[0].api_info.name, classes[0].api_info.version),
     'batchPath': 'batch',
     'icons': {
       'x16': 'https://www.google.com/images/icons/product/search-16.gif',
       'x32': 'https://www.google.com/images/icons/product/search-32.gif',
     },
-    'id': '%s:%s' % (service.api_info.name, service.api_info.version),
+    'id': '%s:%s' % (classes[0].api_info.name, classes[0].api_info.version),
     'kind': 'discovery#restDescription',
-    'name': service.api_info.name,
+    'name': classes[0].api_info.name,
     'parameters': {
       'alt': {
         'default': 'json',
@@ -351,22 +365,37 @@ def generate(service, base_path):
       },
     },
     'protocol': 'rest',
-    'rootUrl': 'https://%s%s/' % (service.api_info.hostname, base_path),
-    'servicePath': '%s/%s/' % (service.api_info.name, service.api_info.version),
-    'version': service.api_info.version,
+    'rootUrl': 'https://%s%s/' % (classes[0].api_info.hostname, base_path),
+    'servicePath': '%s/%s/' % (
+        classes[0].api_info.name, classes[0].api_info.version),
+    'version': classes[0].api_info.version,
   }
-  desc = _normalize_whitespace(service.api_info.description or service.__doc__)
+  desc = _normalize_whitespace(
+      classes[0].api_info.description or classes[0].__doc__)
   if desc:
     document['description'] = desc
-  document.update(_get_methods(service))
+  methods = {}
+  resources = {}
+  schemas = {}
+  for service in classes:
+    m, r, s = _get_methods(service)
+    methods.update(m)
+    resources.update(r)
+    schemas.update(s)
+  if methods:
+    document['methods'] = methods
+  if resources:
+    document['resources'] = resources
+  if schemas:
+    document['schemas'] = schemas
   return document
 
 
-def directory(services, base_path):
+def directory(classes, base_path):
   """Returns a directory list for the given services.
 
   Args:
-    services: The list of protorpc.remote.Services to describe.
+    classes: The list of protorpc.remote.Service classes to describe.
     base_path: The base path under which all service paths exist.
 
   Returns:
@@ -377,8 +406,8 @@ def directory(services, base_path):
     'kind': 'discovery#directoryList',
   }
 
-  items = []
-  for service in services:
+  items = {}
+  for service in classes:
     item = {
       'discoveryLink': './apis/%s/%s/rest' % (
           service.api_info.name, service.api_info.version),
@@ -399,8 +428,8 @@ def directory(services, base_path):
         service.api_info.description or service.__doc__)
     if desc:
       item['description'] = desc
-    items.append(item)
+    items[item['id']] = item
 
   if items:
-    document['items'] = items
+    document['items'] = sorted(items.values(), key=lambda i: i['id'])
   return document

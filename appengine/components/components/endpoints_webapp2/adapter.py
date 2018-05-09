@@ -2,6 +2,7 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+import collections
 import endpoints
 import httplib
 import json
@@ -212,21 +213,22 @@ def discovery_handler_factory(api_classes, base_path):
   Returns:
     A webapp2.RequestHandler.
   """
-  # Create a map of (name, version) => service.
-  services = {}
+  # Create a map of (name, version) => [services...].
+  service_map = collections.defaultdict(list)
   for api_class in api_classes:
-    services[(api_class.api_info.name, api_class.api_info.version)] = api_class
+    service_map[(api_class.api_info.name, api_class.api_info.version)].append(
+        api_class)
   class DiscoveryHandler(webapp2.RequestHandler):
     """Returns a discovery document for known services."""
 
     def get(self, name, version):
-      service = services.get((name, version))
-      if not service:
+      services = service_map.get((name, version))
+      if not services:
         self.abort(404, 'Not Found')
 
       self.response.headers['Content-Type'] = 'application/json'
       json.dump(
-          discovery.generate(service, base_path),
+          discovery.generate(services, base_path),
           self.response, indent=2, sort_keys=True, separators=(',', ':'))
 
   return DiscoveryHandler
