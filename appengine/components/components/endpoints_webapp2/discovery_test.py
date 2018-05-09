@@ -61,15 +61,15 @@ class Service(remote.Service):
     return Message()
 
   @endpoints.method(endpoints.ResourceContainer(
-      Message, string=messages.StringField(1)), Message)
+      Message, string=messages.StringField(1)), Message, http_method='GET')
   def query_string_method(self, _):
-    """A method supporting query strings."""
+    """An HTTP GET method supporting query strings."""
     return Message()
 
   @endpoints.method(endpoints.ResourceContainer(
       Message, path=messages.StringField(1)), Message, path='{path}/method')
   def path_parameter_method(self, _):
-    """A method supporting path parameters."""
+    """An HTTP POST method supporting path parameters."""
     return Message()
 
 
@@ -131,7 +131,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           ],
         },
         'path_parameter_method': {
-          'description': 'A method supporting path parameters.',
+          'description': 'An HTTP POST method supporting path parameters.',
           'httpMethod': 'POST',
           'id': 'service.path_parameter_method',
           'parameterOrder': [
@@ -172,8 +172,8 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           ],
         },
         'query_string_method': {
-          'description': 'A method supporting query strings.',
-          'httpMethod': 'POST',
+          'description': 'An HTTP GET method supporting query strings.',
+          'httpMethod': 'GET',
           'id': 'service.query_string_method',
           'parameters': {
             'string': {
@@ -331,7 +331,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           ],
         },
         'path_parameter_method': {
-          'description': 'A method supporting path parameters.',
+          'description': 'An HTTP POST method supporting path parameters.',
           'httpMethod': 'POST',
           'id': 'service.path_parameter_method',
           'parameterOrder': [
@@ -372,8 +372,8 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           ],
         },
         'query_string_method': {
-          'description': 'A method supporting query strings.',
-          'httpMethod': 'POST',
+          'description': 'An HTTP GET method supporting query strings.',
+          'httpMethod': 'GET',
           'id': 'service.query_string_method',
           'parameters': {
             'string': {
