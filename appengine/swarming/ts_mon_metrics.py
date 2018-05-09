@@ -24,6 +24,7 @@ from server import task_result
 #   current monitoring pipeline is not adapted for this.
 # - id is unique for each bot.
 # - temp_band is android specific.
+# Keep in sync with ../swarming_bot/bot_code/bot_main.py
 _IGNORED_DIMENSIONS = (
     'android_devices', 'caches', 'id', 'server_version', 'temp_band')
 # Real timeout is 60s, keep it slightly under to bail out early.

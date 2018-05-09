@@ -122,7 +122,8 @@ DEFAULT_SETTINGS = {
 }
 
 # Keep in sync with ../../ts_mon_metrics.py
-_IGNORED_DIMENSIONS = ('android_devices', 'caches', 'id', 'temp_band')
+_IGNORED_DIMENSIONS = (
+    'android_devices', 'caches', 'id', 'server_version', 'temp_band')
 
 
 ### Monitoring
