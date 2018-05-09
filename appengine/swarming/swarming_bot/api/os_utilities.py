@@ -1042,7 +1042,7 @@ def get_state():
     },
     u'cpu_name': get_cpuinfo().get(u'name'),
     u'cost_usd_hour': get_cost_hour(),
-    u'cwd': os.getcwd(),
+    u'cwd': file_path.get_native_path_case(os.getcwd().decode('utf-8')),
     u'disks': get_disks_info(),
     # Only including a subset of the environment variable, as state is not
     # designed to sustain large load at the moment.
