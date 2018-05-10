@@ -216,7 +216,7 @@ class BrowseHandler(auth.AuthenticatingHandler):
 
   def get_content_security_policy(self):
     csp = super(BrowseHandler, self).get_content_security_policy()
-    csp.setdefault('child-src', []).append("'self'")
+    csp.setdefault('frame-src', []).append("'self'")
     return csp
 
 

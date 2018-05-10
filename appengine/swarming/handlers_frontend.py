@@ -160,14 +160,21 @@ class UIHandler(auth.AuthenticatingHandler):
     tmpl = config.settings().display_server_url_template
     if tmpl:
       if tmpl.startswith('/'):
-        csp['child-src'].append("'self'")
+        csp['frame-src'].append("'self'")
       else:
         # We assume the template specifies '%s' in its last path component.
         # We strip it to get a "parent" path that we can put into CSP. Note that
         # whitelisting an entire display server domain is unnecessary wide.
-        csp['child-src'].append(tmpl[:tmpl.rfind('/')+1])
+        csp['frame-src'].append(tmpl[:tmpl.rfind('/')+1])
     extra = config.settings().extra_child_src_csp_url
-    csp['child-src'].extend(extra)
+    # Note that frame-src was once child-src, which was deprecated and support
+    # was dropped by some browsers. See
+    # https://bugs.chromium.org/p/chromium/issues/detail?id=839909
+    csp['frame-src'].extend(extra)
+
+    # required by Polymer to make HTML Imports work on Firefox. Remove when
+    # HTML Imports is no longer required.
+    csp['script-src'].append('data:')
     return csp
 
 

@@ -341,7 +341,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
         "https://www.gstatic.com", # Google charts styling
       ],
 
-      'child-src': [
+      'frame-src': [
         'https://accounts.google.com',  # Google OAuth2 library opens iframes
       ],
 
