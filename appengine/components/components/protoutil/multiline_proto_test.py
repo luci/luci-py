@@ -23,8 +23,8 @@ import test_proto_pb2
 class MultilineProtoTest(unittest.TestCase):
 
   def test_pass_through(self):
-    content = """lucky_number: 42
-    poem: "Churp churp churp."
+    content = """num: 42
+    str: "Churp churp churp."
     """
     self.assertEqual(
         content, multiline_proto.parse_multiline(content))
@@ -36,19 +36,19 @@ class MultilineProtoTest(unittest.TestCase):
               All mimsy were the borogoves,
               And the mome raths outgrabe."""
     content = textwrap.dedent("""
-      poem: <<EOP
+      str: <<EOP
       %s
       EOP
-      lucky_number: 42
+      num: 42
     """) % poem
-    stuff = test_proto_pb2.Stuff()
+    msg = test_proto_pb2.Msg()
     parsed_content = multiline_proto.parse_multiline(content)
-    protobuf.text_format.Merge(parsed_content, stuff)
-    self.assertEqual(textwrap.dedent(poem), stuff.poem)
+    protobuf.text_format.Merge(parsed_content, msg)
+    self.assertEqual(textwrap.dedent(poem), msg.str)
 
   def test_missing_terminator(self):
     content = """
-      poem: <<EONEVER
+      str: <<EONEVER
         blah
         yoda
       """
@@ -63,15 +63,15 @@ class MultilineProtoTest(unittest.TestCase):
                And the mome raths outgrabe.\
                \U0001F4A9"""
     content = textwrap.dedent(u"""
-      poem: <<EOP
+      str: <<EOP
       %s
       EOP
-      lucky_number: 42
+      num: 42
     """) % poem
-    stuff = test_proto_pb2.Stuff()
+    msg = test_proto_pb2.Msg()
     parsed_content = multiline_proto.parse_multiline(content)
-    protobuf.text_format.Merge(parsed_content, stuff)
-    self.assertEqual(textwrap.dedent(poem), stuff.poem)
+    protobuf.text_format.Merge(parsed_content, msg)
+    self.assertEqual(textwrap.dedent(poem), msg.str)
 
   def test_go_compatibility(self):
     # pylint: disable=line-too-long

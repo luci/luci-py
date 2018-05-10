@@ -2,11 +2,15 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-syntax = "proto2";
+syntax = "proto3";
 
 package multiline_proto;
 
-message Stuff {
-  optional int32 lucky_number = 1;
-  optional string poem = 2;
+message Msg {
+  int32 num = 1;
+  repeated int32 nums = 2;
+  string str = 3;
+  repeated string strs = 4;
+  Msg msg = 5;
+  repeated Msg msgs = 6;
 }
