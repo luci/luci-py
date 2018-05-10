@@ -77,6 +77,7 @@ class FrontendTest(AppTestBase):
       '/auth',
       '/ereporter2/api/v1/on_error',
       '/api/discovery/v1/apis',
+      '/api/static/proxy.html',
       '/api/swarming/v1/server/permissions',
       '/swarming/api/v1/client/list',
       '/swarming/api/v1/bot/server_ping',
