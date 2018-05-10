@@ -48,14 +48,14 @@ class MembershipTest(test_case.EndpointsTestCase):
     self.add_group('testgroup', ['user:mithras@hotmail.com'])
 
     # baphomet is not a member
-    request = endpoints_api.MembershipRequest(
+    request = endpoints_api.MembershipRequest.combined_message_class(
         group='testgroup',
         identity='user:baphomet@aol.com')
     response = self.call_api('membership', msg_dict(request), 200)
     self.assertEqual({u'is_member': False}, response.json)
 
     # mithras is a member
-    request = endpoints_api.MembershipRequest(
+    request = endpoints_api.MembershipRequest.combined_message_class(
         group='testgroup',
         identity='user:mithras@hotmail.com')
     response = self.call_api('membership', msg_dict(request), 200)
@@ -63,28 +63,30 @@ class MembershipTest(test_case.EndpointsTestCase):
 
   def test_is_member_false_for_spurious_group(self):
     """Assert that is_member returns false for nonexistent group names."""
-    request = endpoints_api.MembershipRequest(
+    request = endpoints_api.MembershipRequest.combined_message_class(
         group='wolves', identity='user:amaterasu@the.sun')
     response = self.call_api('membership', msg_dict(request), 200)
     self.assertEqual({u'is_member': False}, response.json)
 
   def test_is_member_adds_prefix(self):
     self.add_group('golden_egg', ['user:praj@pa.ti'])
-    request = endpoints_api.MembershipRequest(
+    request = endpoints_api.MembershipRequest.combined_message_class(
         group='golden_egg', identity='praj@pa.ti')
     response = self.call_api('membership', msg_dict(request), 200)
     self.assertEqual({u'is_member': True}, response.json)
 
   def test_is_member_fails_with_degenerate_request(self):
     requests = [
-        endpoints_api.MembershipRequest(group='testgroup'),
-        endpoints_api.MembershipRequest(identity='loki@ragna.rok')]
+        endpoints_api.MembershipRequest.combined_message_class(
+            group='testgroup'),
+        endpoints_api.MembershipRequest.combined_message_class(
+            identity='loki@ragna.rok')]
     for request in requests:
       with self.assertRaises(ValidationError):
         _ = self.call_api('membership', msg_dict(request), 200)
 
   def test_is_member_fails_with_invalid_identity(self):
-    request = endpoints_api.MembershipRequest(
+    request = endpoints_api.MembershipRequest.combined_message_class(
         group='testgroup', identity='invalid:identity')
     with self.call_should_fail('400'):
       _ = self.call_api('membership', msg_dict(request), 200)

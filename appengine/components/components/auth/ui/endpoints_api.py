@@ -5,6 +5,7 @@
 """Endpoints version of is_member API."""
 
 import endpoints
+from protorpc import message_types
 from protorpc import messages
 from protorpc import remote
 
@@ -17,9 +18,10 @@ from .. import model
 ### ProtoRPC Messages
 
 
-class MembershipRequest(messages.Message):
-  group = messages.StringField(1, required=True)
-  identity = messages.StringField(2, required=True)
+MembershipRequest = endpoints.ResourceContainer(
+  message_types.VoidMessage,
+  group=messages.StringField(1, required=True),
+  identity=messages.StringField(2, required=True))
 
 
 class MembershipResponse(messages.Message):
