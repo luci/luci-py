@@ -66,6 +66,11 @@ class ServicerContext(object):
     """
     self._active = False
 
+  @property
+  def code(self):
+    """Returns current gRPC status code."""
+    return self._code
+
   def set_code(self, code):
     """Accepts the status code of the RPC.
 
@@ -78,6 +83,11 @@ class ServicerContext(object):
     """
     assert code in codes.ALL_CODES, '%r is not StatusCode.*' % (code,)
     self._code = code
+
+  @property
+  def details(self):
+    """Returns details set by set_details."""
+    return self._details
 
   def set_details(self, details):
     """Accepts the service-side details of the RPC.
