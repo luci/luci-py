@@ -2,6 +2,36 @@
 # Use of this source code is governed under the Apache License, Version 2.0
 # that can be found in the LICENSE file.
 
+"""Allow multiline strings in text protobuf format.
+
+Usage:
+
+  text_proto = protoutil.parse_multiline(multiline_text_proto)
+  protobuf.text_format.Merge(text_proto, msg)
+
+`parse_multiline` looks for bash-style heredocs and replaces them with
+single-line text-proto-escaped strings.
+
+Example:
+  this: <<EOF
+    would
+      turn \ninto
+      a "single"
+    line
+  EOF
+
+Turns into the following:
+  this: "would\nturn \\ninto\n  a \"single\"\nline"
+
+The format must be compatible with
+https://github.com/luci/luci-go/blob/master/common/proto/multiline.go
+
+In particular, the inner lines will be treated with `textwrap.dedent`;
+any common leading whitespace that occurs on every line will be removed.
+Although both tabs and spaces count as whitespace, they are not equivalent (i.e.
+only exactly-matching whitespace prefixes count).
+"""
+
 import re
 import textwrap
 
@@ -11,15 +41,16 @@ _SPACE_RE = re.compile('^(\s*)')
 _END_RE_FMT = r'^\s*%s\s*$'
 
 
-class ParseError(Exception):
+class MultilineParseError(Exception):
   pass
 
 
-def parse(content):
+def parse_multiline(content):
   """Parses a multiline text proto and turns it into a single-line one.
 
   Raises an exception is if there's an open heredoc without a
   matching close marker.
+
   Args:
     content (str): multiline text proto.
   Returns:
@@ -56,7 +87,7 @@ def parse(content):
     multiline_parts.append(line)
 
   if terminator:
-    raise ParseError(
+    raise MultilineParseError(
         'Unterminated multiline sequence; terminator = %r' % terminator)
 
   return '\n'.join(lines)
@@ -81,4 +112,3 @@ def _escape_char(c):
 
 def _escape_line(s):
   return str(''.join(_escape_char(c) for c in s))
-

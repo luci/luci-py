@@ -18,7 +18,7 @@ utils.fix_protobuf_package()
 from google import protobuf
 
 from components import auth
-from components import multiline_proto
+from components import protoutil
 from components import utils
 from components.datastore_utils import config
 
@@ -98,8 +98,8 @@ def _convert_config(content, dest_type):
   msg = dest_type()
   try:
     protobuf.text_format.Merge(
-        multiline_proto.parse(content.decode('utf-8')), msg)
-  except (multiline_proto.ParseError, protobuf.text_format.ParseError,
+        protoutil.parse_multiline(content.decode('utf-8')), msg)
+  except (protoutil.MultilineParseError, protobuf.text_format.ParseError,
           UnicodeDecodeError) as ex:
     raise ConfigFormatError(ex.message)
   return msg

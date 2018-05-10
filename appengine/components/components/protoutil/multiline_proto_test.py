@@ -26,7 +26,8 @@ class MultilineProtoTest(unittest.TestCase):
     content = """lucky_number: 42
     poem: "Churp churp churp."
     """
-    self.assertEqual(content, multiline_proto.parse(content))
+    self.assertEqual(
+        content, multiline_proto.parse_multiline(content))
 
   def test_multiline(self):
     poem = """\
@@ -41,7 +42,7 @@ class MultilineProtoTest(unittest.TestCase):
       lucky_number: 42
     """) % poem
     stuff = test_proto_pb2.Stuff()
-    parsed_content = multiline_proto.parse(content)
+    parsed_content = multiline_proto.parse_multiline(content)
     protobuf.text_format.Merge(parsed_content, stuff)
     self.assertEqual(textwrap.dedent(poem), stuff.poem)
 
@@ -51,8 +52,8 @@ class MultilineProtoTest(unittest.TestCase):
         blah
         yoda
       """
-    with self.assertRaises(multiline_proto.ParseError):
-      multiline_proto.parse(content)
+    with self.assertRaises(multiline_proto.MultilineParseError):
+      multiline_proto.parse_multiline(content)
 
   def test_escapes_and_unprintable(self):
     poem = u"""\
@@ -68,7 +69,7 @@ class MultilineProtoTest(unittest.TestCase):
       lucky_number: 42
     """) % poem
     stuff = test_proto_pb2.Stuff()
-    parsed_content = multiline_proto.parse(content)
+    parsed_content = multiline_proto.parse_multiline(content)
     protobuf.text_format.Merge(parsed_content, stuff)
     self.assertEqual(textwrap.dedent(poem), stuff.poem)
 
@@ -142,7 +143,7 @@ class MultilineProtoTest(unittest.TestCase):
              'DERP'])),
     ]
     for test in tests:
-      parsed = multiline_proto.parse(test[2])
+      parsed = multiline_proto.parse_multiline(test[2])
       self.assertEqual(
           parsed, test[1], 'Test "%s" failed. Expected:\n%s\n\nActual:\n%s' % (
               test[0], test[1], parsed))
