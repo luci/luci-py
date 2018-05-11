@@ -708,13 +708,26 @@ BotId = endpoints.ResourceContainer(
 
 
 BotEventsRequest = endpoints.ResourceContainer(
-    swarming_rpcs.BotEventsRequest,
-    bot_id=messages.StringField(1, required=True))
+    message_types.VoidMessage,
+    bot_id=messages.StringField(1, required=True),
+    limit=messages.IntegerField(2, default=200),
+    cursor=messages.StringField(3),
+    # end, start are seconds since epoch.
+    end=messages.FloatField(4),
+    start=messages.FloatField(5))
 
 
 BotTasksRequest = endpoints.ResourceContainer(
-    swarming_rpcs.BotTasksRequest,
-    bot_id=messages.StringField(1, required=True))
+    message_types.VoidMessage,
+    bot_id=messages.StringField(1, required=True),
+    limit=messages.IntegerField(2, default=200),
+    cursor=messages.StringField(3),
+    # end, start are seconds since epoch.
+    end=messages.FloatField(4),
+    start=messages.FloatField(5),
+    state=messages.EnumField(swarming_rpcs.TaskState, 6, default='ALL'),
+    sort=messages.EnumField(swarming_rpcs.TaskSort, 7, default='CREATED_TS'),
+    include_performance_stats=messages.BooleanField(8, default=False))
 
 
 @swarming_api.api_class(resource_name='bot', path='bot')

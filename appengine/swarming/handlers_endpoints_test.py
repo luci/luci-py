@@ -1956,10 +1956,9 @@ class BotApiTest(BaseTest):
         now_1 + datetime.timedelta(seconds=0.5)) / 1000000.
 
     self.set_as_privileged_user()
-    request = swarming_rpcs.BotTasksRequest(
-        end=end, start=start, include_performance_stats=True)
+    request = handlers_endpoints.BotTasksRequest.combined_message_class(
+        bot_id='bot1', end=end, start=start, include_performance_stats=True)
     body = message_to_dict(request)
-    body['bot_id'] = 'bot1'
     response = self.call_api('tasks', body=body)
     expected = {
       u'items': [
@@ -2008,8 +2007,8 @@ class BotApiTest(BaseTest):
     end = utils.datetime_to_timestamp(now_60) / 1000000.
     self.set_as_privileged_user()
     body = message_to_dict(
-        swarming_rpcs.BotEventsRequest(start=start, end=end+1))
-    body['bot_id'] = 'bot1'
+        handlers_endpoints.BotEventsRequest.combined_message_class(
+            bot_id='bot1', start=start, end=end+1))
     response = self.call_api('events', body=body)
     dimensions = [
       {u'key': u'id', u'value': [u'bot1']},
@@ -2088,8 +2087,9 @@ class BotApiTest(BaseTest):
     self.assertEqual(expected, response.json)
 
     # Now test with a subset.
-    body = message_to_dict(swarming_rpcs.BotEventsRequest(start=end, end=end+1))
-    body['bot_id'] = 'bot1'
+    body = message_to_dict(
+        handlers_endpoints.BotEventsRequest.combined_message_class(
+            bot_id='bot1', start=end, end=end+1))
     response = self.call_api('events', body=body)
     expected['items'] = expected['items'][:-3]
     self.assertEqual(expected, response.json)

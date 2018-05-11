@@ -573,45 +573,6 @@ class TaskQueueList(messages.Message):
 ### Bots
 
 
-### Bot-Related Requests
-
-
-class BotEventsRequest(messages.Message):
-  """Request to get events for a bot."""
-  limit = messages.IntegerField(1, default=200)
-  cursor = messages.StringField(2)
-  # These should be DateTimeField but endpoints + protorpc have trouble encoding
-  # this message in a GET request, this is due to DateTimeField's special
-  # encoding in protorpc-1.0/protorpc/message_types.py that is bypassed when
-  # using endpoints-1.0/endpoints/protojson.py to add GET query parameter
-  # support.
-  end = messages.FloatField(3)
-  start = messages.FloatField(4)
-
-
-class BotTasksRequest(messages.Message):
-  """Request to get data about a bot's tasks."""
-  limit = messages.IntegerField(1, default=200)
-  cursor = messages.StringField(2)
-  # These should be DateTimeField but endpoints + protorpc have trouble encoding
-  # this message in a GET request, this is due to DateTimeField's special
-  # encoding in protorpc-1.0/protorpc/message_types.py that is bypassed when
-  # using endpoints-1.0/endpoints/protojson.py to add GET query parameter
-  # support.
-  end = messages.FloatField(3)
-  start = messages.FloatField(4)
-  state = messages.EnumField(TaskState, 5, default='ALL')
-  # It is currently not possible to query by tag on a specific bot, this
-  # information is not saved in TaskRunResult to reduce the entity size. It is
-  # fixable if a need ever come up, but normally a bot doesn't run enough task
-  # per day to have to bother with this, just enumerate all the tasks run on the
-  # bot and filter on client side.
-  sort = messages.EnumField(TaskSort, 7, default='CREATED_TS')
-  # Only applicable when fetching results. This incurs more DB operations and
-  # more data is returned so this is a bit slower.
-  include_performance_stats = messages.BooleanField(8, default=False)
-
-
 ### Bot-Related Responses
 
 
