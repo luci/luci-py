@@ -16,6 +16,9 @@ import logging
 import time
 import urllib
 
+# TODO(maruel): This needs to be fixed by adding proper vpython incantation when
+# running pylint.
+# pylint: disable=import-error
 import Crypto.Hash.SHA256 as SHA256
 import Crypto.PublicKey.RSA as RSA
 import Crypto.Signature.PKCS1_v1_5 as PKCS1_v1_5
