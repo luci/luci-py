@@ -18,6 +18,7 @@ import test_env_handlers
 import webtest
 
 from google.appengine.api import datastore_errors
+from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
 import handlers_backend
@@ -228,6 +229,11 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
   def test_rebuild_task_cache(self):
     # Tested indirectly by self._assert_task()
     pass
+
+  def test_dimensions_to_flat(self):
+    self.assertEqual(
+        ['a:bee', 'a:c', 'cee:zee'],
+        task_queues.dimensions_to_flat({'a': ['c', 'bee'], 'cee': ['zee']}))
 
   def test_assert_bot_then_task(self):
     self.assertEqual(0, _assert_bot())

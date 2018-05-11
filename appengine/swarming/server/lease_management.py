@@ -945,6 +945,7 @@ def check_for_connection(machine_lease):
 def cleanup_bot(machine_lease):
   """Cleans up entities after a bot is removed."""
   bot_root_key = bot_management.get_root_key(machine_lease.hostname)
+  # The bot is being removed, remove it from the task queues.
   task_queues.cleanup_after_bot(bot_root_key)
   bot_management.get_info_key(machine_lease.hostname).delete()
   clear_lease_request(machine_lease.key, machine_lease.client_request_id)
