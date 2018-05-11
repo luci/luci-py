@@ -161,10 +161,10 @@ class ConfigApi(remote.Service):
     """
     meta = ServiceDynamicMetadata(version=METADATA_FORMAT_VERSION)
     http_headers = dict(self.request_state.headers)
-    assert 'host' in http_headers, http_headers
+    assert 'host' in http_headers or 'Host' in http_headers, http_headers
     meta.validation = meta.Validator(
         url='https://{hostname}/_ah/api/{name}/{version}/{path}validate'.format(
-            hostname=http_headers['host'],
+            hostname=http_headers.get('host') or http_headers['Host'],
             name=self.api_info.name,
             version=self.api_info.version,
             path=self.api_info.path or '',
