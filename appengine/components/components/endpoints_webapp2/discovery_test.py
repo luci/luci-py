@@ -295,7 +295,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
   def test_generate(self):
     """Tests for discovery.generate."""
     with self.assertRaises(AssertionError):
-      discovery.generate([], '/api')
+      discovery.generate([], 'localhost:8080', '/api')
     expected = {
       'auth': {
         'oauth2': {
@@ -307,7 +307,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
         },
       },
       'basePath': '/api/service/v1',
-      'baseUrl': 'https://None/api/service/v1',
+      'baseUrl': 'http://localhost:8080/api/service/v1',
       'batchPath': 'batch',
       'description': 'A service to test with.',
       'discoveryVersion': 'v1',
@@ -450,7 +450,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
         },
       },
       'protocol': 'rest',
-      'rootUrl': 'https://None/api/',
+      'rootUrl': 'http://localhost:8080/api/',
       'servicePath': 'service/v1/',
       'schemas': {
         'discovery_test.Message': {
@@ -477,7 +477,8 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
       },
       'version': 'v1',
     }
-    self.assertEqual(discovery.generate([Service], '/api'), expected)
+    self.assertEqual(
+        discovery.generate([Service], 'localhost:8080', '/api'), expected)
     expected = {
       'auth': {
         'oauth2': {
@@ -489,7 +490,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
         },
       },
       'basePath': '/api/split/v1',
-      'baseUrl': 'https://None/api/split/v1',
+      'baseUrl': 'http://localhost:8080/api/split/v1',
       'batchPath': 'batch',
       'description': 'A split service to test with.',
       'discoveryVersion': 'v1',
@@ -594,7 +595,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           },
         },
       },
-      'rootUrl': 'https://None/api/',
+      'rootUrl': 'http://localhost:8080/api/',
       'servicePath': 'split/v1/',
       'schemas': {
         'discovery_test.Message': {
@@ -621,7 +622,9 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
       },
       'version': 'v1',
     }
-    self.assertEqual(discovery.generate([ServiceA, ServiceB], '/api'), expected)
+    self.assertEqual(
+        discovery.generate([ServiceA, ServiceB], 'localhost:8080', '/api'),
+        expected)
 
   def test_directory(self):
     """Tests for discovery.directory."""
@@ -632,7 +635,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           'description': 'A service to test with.',
           'discoveryLink': './apis/service/v1/rest',
           'discoveryRestUrl':
-              'https://None/api/discovery/v1/apis/service/v1/rest',
+              'http://localhost:8080/api/discovery/v1/apis/service/v1/rest',
           'icons': {
             'x16': 'https://www.google.com/images/icons/product/search-16.gif',
             'x32': 'https://www.google.com/images/icons/product/search-32.gif',
@@ -647,7 +650,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           'description': 'A split service to test with.',
           'discoveryLink': './apis/split/v1/rest',
           'discoveryRestUrl':
-              'https://None/api/discovery/v1/apis/split/v1/rest',
+              'http://localhost:8080/api/discovery/v1/apis/split/v1/rest',
           'icons': {
             'x16': 'https://www.google.com/images/icons/product/search-16.gif',
             'x32': 'https://www.google.com/images/icons/product/search-32.gif',
@@ -662,7 +665,8 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
       'kind': 'discovery#directoryList',
     }
     self.assertEqual(
-        discovery.directory([Service, ServiceA, ServiceB], '/api'), expected)
+        discovery.directory(
+            [Service, ServiceA, ServiceB], 'localhost:8080', '/api'), expected)
 
 
 if __name__ == '__main__':

@@ -11,6 +11,8 @@ import endpoints
 from protorpc import message_types
 from protorpc import messages
 
+from components import utils
+
 
 def _normalize_whitespace(s):
   """Replaces consecutive whitespace characters with a single space.
@@ -279,18 +281,20 @@ def _get_methods(service):
   return methods, resources, _get_schemas(types)
 
 
-def generate(classes, base_path):
+def generate(classes, host, base_path):
   """Returns a discovery document for the given service.
 
   Args:
     classes: The non-empty list of protorpc.remote.Service classes to describe.
       All classes must be part of the same service.
+    host: The host this request was received by.
     base_path: The base path under which all service paths exist.
 
   Returns:
     A dict which can be written as JSON describing the service.
   """
   assert classes, classes
+  scheme = 'http:' if utils.is_local_dev_server() else 'https:'
   document = {
     'discoveryVersion': 'v1',
     'auth': {
@@ -300,8 +304,8 @@ def generate(classes, base_path):
     },
     'basePath': '%s/%s/%s' % (
         base_path, classes[0].api_info.name, classes[0].api_info.version),
-    'baseUrl': 'https://%s%s/%s/%s' % (
-        classes[0].api_info.hostname, base_path,
+    'baseUrl': '%s//%s%s/%s/%s' % (
+        scheme, host, base_path,
         classes[0].api_info.name, classes[0].api_info.version),
     'batchPath': 'batch',
     'icons': {
@@ -365,7 +369,7 @@ def generate(classes, base_path):
       },
     },
     'protocol': 'rest',
-    'rootUrl': 'https://%s%s/' % (classes[0].api_info.hostname, base_path),
+    'rootUrl': '%s//%s%s/' % (scheme, host, base_path),
     'servicePath': '%s/%s/' % (
         classes[0].api_info.name, classes[0].api_info.version),
     'version': classes[0].api_info.version,
@@ -391,16 +395,18 @@ def generate(classes, base_path):
   return document
 
 
-def directory(classes, base_path):
+def directory(classes, host, base_path):
   """Returns a directory list for the given services.
 
   Args:
     classes: The list of protorpc.remote.Service classes to describe.
+    host: The host this request was received by.
     base_path: The base path under which all service paths exist.
 
   Returns:
     A dict which can be written as JSON describing the services.
   """
+  scheme = 'http:' if utils.is_local_dev_server() else 'https:'
   document = {
     'discoveryVersion': 'v1',
     'kind': 'discovery#directoryList',
@@ -411,8 +417,8 @@ def directory(classes, base_path):
     item = {
       'discoveryLink': './apis/%s/%s/rest' % (
           service.api_info.name, service.api_info.version),
-      'discoveryRestUrl': 'https://%s%s/discovery/v1/apis/%s/%s/rest' % (
-          service.api_info.hostname, base_path,
+      'discoveryRestUrl': '%s//%s%s/discovery/v1/apis/%s/%s/rest' % (
+          scheme, host, base_path,
           service.api_info.name, service.api_info.version),
       'id': '%s:%s' % (service.api_info.name, service.api_info.version),
       'icons': {

@@ -222,13 +222,14 @@ def discovery_handler_factory(api_classes, base_path):
     """Returns a discovery document for known services."""
 
     def get(self, name, version):
+      host = dict(self.request.headers)['Host']
       services = service_map.get((name, version))
       if not services:
         self.abort(404, 'Not Found')
 
       self.response.headers['Content-Type'] = 'application/json'
       json.dump(
-          discovery.generate(services, base_path),
+          discovery.generate(services, host, base_path),
           self.response, indent=2, sort_keys=True, separators=(',', ':'))
 
   return DiscoveryHandler
@@ -265,9 +266,10 @@ def directory_handler_factory(api_classes, base_path):
     """Returns a directory list for known services."""
 
     def get(self):
+      host = dict(self.request.headers)['Host']
       self.response.headers['Content-Type'] = 'application/json'
       json.dump(
-          discovery.directory(api_classes, base_path),
+          discovery.directory(api_classes, host, base_path),
           self.response, indent=2, sort_keys=True, separators=(',', ':'))
 
   return DirectoryHandler
