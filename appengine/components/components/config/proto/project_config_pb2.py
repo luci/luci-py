@@ -17,9 +17,9 @@ _sym_db = _symbol_database.Default()
 
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='components/config/proto/project_config.proto',
-  package='config_service',
-  syntax='proto2',
-  serialized_pb=_b('\n,components/config/proto/project_config.proto\x12\x0e\x63onfig_service\"*\n\nProjectCfg\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06\x61\x63\x63\x65ss\x18\x02 \x03(\t\"^\n\x07RefsCfg\x12)\n\x04refs\x18\x01 \x03(\x0b\x32\x1b.config_service.RefsCfg.Ref\x1a(\n\x03Ref\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x63onfig_path\x18\x03 \x01(\t')
+  package='config',
+  syntax='proto3',
+  serialized_pb=_b('\n,components/config/proto/project_config.proto\x12\x06\x63onfig\"*\n\nProjectCfg\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06\x61\x63\x63\x65ss\x18\x02 \x03(\t\"V\n\x07RefsCfg\x12!\n\x04refs\x18\x01 \x03(\x0b\x32\x13.config.RefsCfg.Ref\x1a(\n\x03Ref\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x63onfig_path\x18\x03 \x01(\tb\x06proto3')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -28,20 +28,20 @@ _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 _PROJECTCFG = _descriptor.Descriptor(
   name='ProjectCfg',
-  full_name='config_service.ProjectCfg',
+  full_name='config.ProjectCfg',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='name', full_name='config_service.ProjectCfg.name', index=0,
+      name='name', full_name='config.ProjectCfg.name', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='access', full_name='config_service.ProjectCfg.access', index=1,
+      name='access', full_name='config.ProjectCfg.access', index=1,
       number=2, type=9, cpp_type=9, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -55,31 +55,31 @@ _PROJECTCFG = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
+  syntax='proto3',
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=64,
-  serialized_end=106,
+  serialized_start=56,
+  serialized_end=98,
 )
 
 
 _REFSCFG_REF = _descriptor.Descriptor(
   name='Ref',
-  full_name='config_service.RefsCfg.Ref',
+  full_name='config.RefsCfg.Ref',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='name', full_name='config_service.RefsCfg.Ref.name', index=0,
+      name='name', full_name='config.RefsCfg.Ref.name', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='config_path', full_name='config_service.RefsCfg.Ref.config_path', index=1,
+      name='config_path', full_name='config.RefsCfg.Ref.config_path', index=1,
       number=3, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -93,23 +93,23 @@ _REFSCFG_REF = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
+  syntax='proto3',
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=162,
-  serialized_end=202,
+  serialized_start=146,
+  serialized_end=186,
 )
 
 _REFSCFG = _descriptor.Descriptor(
   name='RefsCfg',
-  full_name='config_service.RefsCfg',
+  full_name='config.RefsCfg',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='refs', full_name='config_service.RefsCfg.refs', index=0,
+      name='refs', full_name='config.RefsCfg.refs', index=0,
       number=1, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -123,12 +123,12 @@ _REFSCFG = _descriptor.Descriptor(
   ],
   options=None,
   is_extendable=False,
-  syntax='proto2',
+  syntax='proto3',
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=108,
-  serialized_end=202,
+  serialized_start=100,
+  serialized_end=186,
 )
 
 _REFSCFG_REF.containing_type = _REFSCFG
@@ -139,7 +139,7 @@ DESCRIPTOR.message_types_by_name['RefsCfg'] = _REFSCFG
 ProjectCfg = _reflection.GeneratedProtocolMessageType('ProjectCfg', (_message.Message,), dict(
   DESCRIPTOR = _PROJECTCFG,
   __module__ = 'components.config.proto.project_config_pb2'
-  # @@protoc_insertion_point(class_scope:config_service.ProjectCfg)
+  # @@protoc_insertion_point(class_scope:config.ProjectCfg)
   ))
 _sym_db.RegisterMessage(ProjectCfg)
 
@@ -148,12 +148,12 @@ RefsCfg = _reflection.GeneratedProtocolMessageType('RefsCfg', (_message.Message,
   Ref = _reflection.GeneratedProtocolMessageType('Ref', (_message.Message,), dict(
     DESCRIPTOR = _REFSCFG_REF,
     __module__ = 'components.config.proto.project_config_pb2'
-    # @@protoc_insertion_point(class_scope:config_service.RefsCfg.Ref)
+    # @@protoc_insertion_point(class_scope:config.RefsCfg.Ref)
     ))
   ,
   DESCRIPTOR = _REFSCFG,
   __module__ = 'components.config.proto.project_config_pb2'
-  # @@protoc_insertion_point(class_scope:config_service.RefsCfg)
+  # @@protoc_insertion_point(class_scope:config.RefsCfg)
   ))
 _sym_db.RegisterMessage(RefsCfg)
 _sym_db.RegisterMessage(RefsCfg.Ref)
