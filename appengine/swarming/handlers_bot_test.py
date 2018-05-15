@@ -627,8 +627,14 @@ class BotApiTest(test_env_handlers.AppTestBase):
   def test_poll_enough_time(self):
     # Successfully poll a task.
     self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.set_as_bot()
+    self.bot_poll()
+
+    self.set_as_user()
     _, task_id = self.client_create_task_isolated()
     self.assertEqual('0', task_id[-1])
+
+    self.set_as_bot()
     params = self.do_handshake()
     bot_info = bot_management.get_info_key('bot1').get()
     bot_info.lease_expiration_ts = datetime.datetime(3000, 1, 1)
@@ -930,9 +936,14 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
   def test_task_update_db_failure(self):
     # The error is caught in task_scheduler.bot_update_task().
+    self.set_as_bot()
+    self.bot_poll()
+
+    self.set_as_user()
     self.client_create_task_raw(
         properties=dict(command=['python', 'runtest.py']))
 
+    self.set_as_bot()
     params = self.do_handshake()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     task_id = response['manifest']['task_id']
@@ -954,9 +965,14 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual({u'error': u'Failed to update, please retry'}, response)
 
   def test_task_update_failure(self):
+    self.set_as_bot()
+    self.bot_poll()
+
+    self.set_as_user()
     self.client_create_task_raw(
         properties=dict(command=['python', 'runtest.py']))
 
+    self.set_as_bot()
     params = self.do_handshake()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     task_id = response['manifest']['task_id']
@@ -1179,7 +1195,11 @@ class BotApiTest(test_env_handlers.AppTestBase):
       return 'blah@example.com', service_accounts.AccessToken('blah', 126240504)
     self.mock(service_accounts, 'get_task_account_token', mocked)
 
+    self.set_as_bot()
+    resp = self.bot_poll()
+
     # Create a task.
+    self.set_as_user()
     _, task_summary_id = self.client_create_task_raw()
     self.assertEqual('0', task_summary_id[-1])
     # Convert TaskResultSummary reference to TaskRunResult.

@@ -321,6 +321,9 @@ class TasksApiTest(BaseTest):
     """Asserts that new returns task result for deduped."""
     # Run a task to completion.
     self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.set_as_bot()
+    self.bot_poll()
+    self.set_as_user()
     self.client_create_task_raw(
         tags=['project:yay', 'commit:post'],
         properties=dict(idempotent=True))
@@ -748,6 +751,9 @@ class TasksApiTest(BaseTest):
   def test_mass_cancel(self):
     # Create two tasks.
     self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.set_as_bot()
+    self.do_handshake()
+    self.set_as_user()
     first, second, _, _, now_120 = self._gen_three_pending_tasks()
 
     expected = {
@@ -954,8 +960,11 @@ class TasksApiTest(BaseTest):
     self.assertEqual(expected, self.call_api('tags', body={}).json)
 
   def _gen_two_tasks(self):
-    # first request
     self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.set_as_bot()
+    self.bot_poll()
+    self.set_as_user()
+    # first request
     _, first_id = self.client_create_task_raw(
         name='first',
         tags=['project:yay', 'commit:post'],
@@ -1064,6 +1073,9 @@ class TaskApiTest(BaseTest):
     # catch PubSub notification
     # Create and cancel a task as a non-privileged user.
     self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.set_as_bot()
+    self.bot_poll()
+    self.set_as_user()
     _, task_id = self.client_create_task_raw(
         pubsub_topic='projects/abc/topics/def',
         pubsub_userdata='blah')
@@ -1124,6 +1136,9 @@ class TaskApiTest(BaseTest):
 
   def test_cancel_running(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.set_as_bot()
+    self.bot_poll()
+    self.set_as_user()
     _, task_id = self.client_create_task_raw(
         properties=dict(command=['python', 'runtest.py']))
 
@@ -1213,8 +1228,11 @@ class TaskApiTest(BaseTest):
   def test_result_ok(self):
     """Asserts that result produces a result entity."""
     self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.set_as_bot()
+    self.bot_poll()
 
     # pending task
+    self.set_as_user()
     _, task_id = self.client_create_task_raw()
     response = self.call_api('result', body={'task_id': task_id})
     expected = {
@@ -1245,7 +1263,7 @@ class TaskApiTest(BaseTest):
 
     # run as bot
     self.set_as_bot()
-    self.bot_poll('bot1')
+    self.bot_poll()
 
     self.set_as_user()
     response = self.call_api('result', body={'task_id': run_id})
@@ -1257,6 +1275,9 @@ class TaskApiTest(BaseTest):
 
   def test_result_completed_task(self):
     """Tests that completed tasks are correctly reported."""
+    self.set_as_bot()
+    self.bot_poll()
+    self.set_as_user()
     self.client_create_task_raw()
     self.set_as_bot()
     task_id = self.bot_run_task()
@@ -1289,6 +1310,9 @@ class TaskApiTest(BaseTest):
 
   def test_stdout_ok(self):
     """Asserts that stdout reports a task's output."""
+    self.set_as_bot()
+    self.bot_poll()
+    self.set_as_user()
     self.client_create_task_raw()
 
     # task_id determined by bot run
@@ -1319,6 +1343,9 @@ class TaskApiTest(BaseTest):
 
   def test_task_deduped(self):
     """Asserts that task deduplication works as expected."""
+    self.set_as_bot()
+    self.bot_poll()
+    self.set_as_user()
     _, task_id_1 = self.client_create_task_raw(properties=dict(idempotent=True))
 
     self.set_as_bot()
@@ -1937,7 +1964,10 @@ class BotApiTest(BaseTest):
     self.mock(random, 'getrandbits', lambda _: 0x88)
 
     self.set_as_bot()
+    self.bot_poll()
+    self.set_as_user()
     self.client_create_task_raw()
+    self.set_as_bot()
     res = self.bot_poll()
     response = self.bot_complete_task(task_id=res['manifest']['task_id'])
     self.assertEqual({u'must_stop': False, u'ok': True}, response)
@@ -1991,9 +2021,9 @@ class BotApiTest(BaseTest):
     self.mock(random, 'getrandbits', lambda _: 0x88)
 
     self.set_as_bot()
-    self.client_create_task_raw()
     params = self.do_handshake()
-    res = self.bot_poll()
+    self.client_create_task_raw()
+    res = self.bot_poll(params=params)
     now_60 = self.mock_now(self.now, 60)
     response = self.bot_complete_task(task_id=res['manifest']['task_id'])
     self.assertEqual({u'must_stop': False, u'ok': True}, response)
@@ -2071,16 +2101,6 @@ class BotApiTest(BaseTest):
           u'ts': fmtdate(self.now),
           u'version': u'123',
         },
-        {
-          u'authenticated_as': u'bot:whitelisted-ip',
-          u'dimensions': dimensions,
-          u'event_type': u'bot_connected',
-          u'external_ip': unicode(self.source_ip),
-          u'quarantined': False,
-          u'state': state_no_cfg_ver,
-          u'ts': fmtdate(self.now),
-          u'version': u'123',
-        },
       ],
         u'now': fmtdate(now_60),
     }
@@ -2091,7 +2111,7 @@ class BotApiTest(BaseTest):
         handlers_endpoints.BotEventsRequest.combined_message_class(
             bot_id='bot1', start=end, end=end+1))
     response = self.call_api('events', body=body)
-    expected['items'] = expected['items'][:-3]
+    expected['items'] = expected['items'][:-2]
     self.assertEqual(expected, response.json)
 
   def test_terminate_admin(self):

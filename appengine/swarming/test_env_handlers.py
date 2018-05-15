@@ -200,9 +200,10 @@ class AppTestBase(test_case.TestCase):
       params['bot_config'] = response['bot_config']
     return params
 
-  def bot_poll(self, bot='bot1'):
+  def bot_poll(self, bot='bot1', params=None):
     """Simulates a bot that polls for task."""
-    params = self.do_handshake(bot)
+    if not params:
+      params = self.do_handshake(bot)
     return self.post_json('/swarming/api/v1/bot/poll', params)
 
   def bot_complete_task(self, **kwargs):

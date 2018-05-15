@@ -11,6 +11,7 @@ Swarming client to ensure the system works end to end.
 """
 
 import base64
+import contextlib
 import json
 import logging
 import os
@@ -855,27 +856,10 @@ class Test(unittest.TestCase):
     # created with priorities that are out of order. Then it unblocks the bot
     # and asserts the tasks are run in the expected order, based on priority and
     # created_ts.
-    signal_file = os.path.join(self.tmpdir, 'test_priority')
-    fs.open(signal_file, 'wb').close()
-
     # List of tuple(task_name, priority, task_id).
     tasks = []
     tags = [u'pool:default', u'service_account:none', u'user:joe@localhost']
-    try:
-      args = [
-        '-T', 'wait', '--priority', '20', '--',
-        'python', '-u', '-c',
-        # Cheezy wait.
-        ('import os,time;'
-         'print(\'hi\');'
-         '[time.sleep(0.1) for _ in xrange(100000) if os.path.exists(\'%s\')];'
-         'print(\'hi again\')') % signal_file,
-      ]
-      wait_task_id = self.client.task_trigger_raw(args)
-      # Assert that the 'wait' task has started but not completed, otherwise
-      # this defeats the purpose.
-      self._wait_for_state(wait_task_id, u'PENDING', u'RUNNING')
-
+    with self._make_wait_task('test_priority'):
       # This is the order of the priorities used for each task triggered. In
       # particular, below it asserts that the priority 8 tasks are run in order
       # of created_ts.
@@ -886,31 +870,13 @@ class Test(unittest.TestCase):
           'python', '-u', '-c', 'print(\'%d\')' % priority,
         ]
         tasks.append((task_name, priority, self.client.task_trigger_raw(args)))
-
-      # And the wait task is still running, so that all tasks above are pending,
-      # thus are given a chance to run in priority order.
-      result = self.client.task_result(wait_task_id)
-      self.assertEqual(u'RUNNING', result[u'state'], result)
-
       # Ensure the tasks under test are pending.
       for task_name, priority, task_id in tasks:
         result = self.client.task_result(task_id)
       self.assertEqual(u'PENDING', result[u'state'], result)
-    finally:
-      # Unblock the wait_task_id on the bot.
-      os.remove(signal_file)
 
-    # Ensure the initial wait task is completed. This will cause all the pending
-    # tasks to be run. Now, will they be run in the expected order? That is the
-    # question!
-    actual_summary, actual_files = self.client.task_collect(wait_task_id)
-    t = tags[:] + [u'priority:20']
-    self.assertResults(
-        self.gen_expected(
-            name=u'wait', tags=sorted(t), outputs=['hi\nhi again\n']),
-        actual_summary)
-    self.assertEqual(['summary.json'], actual_files.keys())
-
+    # The wait task is done. This will cause all the pending tasks to be run.
+    # Now, will they be run in the expected order? That is the question!
     # List of tuple(task_name, priority, task_id, results).
     results = []
     # Collect every tasks.
@@ -931,17 +897,20 @@ class Test(unittest.TestCase):
     self.assertEqual(expected, [r[0] for r in results])
 
   def test_cancel_pending(self):
-    # Cancel a pending task.
+    # Cancel a pending task. Triggering a task for an unknown dimension will
+    # result in state NO_RESOURCE, so instead a dummy task is created to make
+    # sure the bot cannot reap the second one.
     args = [
-      '-T', 'cancel_pending', '--dimension', 'unknown_key', 'unknown_value',
+      '-T', 'cancel_pending',
       '--', 'python', '-u', '-c', 'print(\'hi\')'
     ]
-    task_id = self.client.task_trigger_raw(args)
-    actual, _ = self.client.task_collect(task_id, timeout=-1)
-    self.assertEqual(
-        0x20,  # task_result.PENDING
-        actual[u'shards'][0][u'state'])
-    self.assertTrue(self.client.task_cancel(task_id, []))
+    with self._make_wait_task('test_cancel_pending'):
+      task_id = self.client.task_trigger_raw(args)
+      actual, _ = self.client.task_collect(task_id, timeout=-1)
+      self.assertEqual(
+          0x20,  # task_result.PENDING
+          actual[u'shards'][0][u'state'])
+      self.assertTrue(self.client.task_cancel(task_id, []))
     actual, _ = self.client.task_collect(task_id, timeout=-1)
     self.assertEqual(
         0x60,  # task_result.State.CANCELED
@@ -994,7 +963,7 @@ class Test(unittest.TestCase):
 
   def test_task_slice(self):
     request = {
-      'name': 'task_slice_fallback',
+      'name': 'task_slice',
       'priority': 40,
       'task_slices': [
         {
@@ -1031,7 +1000,7 @@ class Test(unittest.TestCase):
     }
     task_id = self.client.task_trigger_post(json.dumps(request))
     expected_summary = self.gen_expected(
-        name=u'task_slice_fallback',
+        name=u'task_slice',
         outputs=[u'first\n'],
         tags=[
           u'pool:default',
@@ -1042,6 +1011,73 @@ class Test(unittest.TestCase):
         user=u'')
     actual_summary, _ = self.client.task_collect(task_id)
     self.assertResults(expected_summary, actual_summary, deduped=False)
+
+  def test_no_resource(self):
+    request = {
+      'name': 'no_resource',
+      'priority': 40,
+      'task_slices': [
+        {
+          # Really long expiration that would cause the smoke test to abort
+          # under normal conditions.
+          'expiration_secs': 1200,
+          'properties': {
+            'command': ['python', '-c', 'print("hello")'],
+            'dimensions': [
+              {
+                'key': 'pool',
+                'value': 'inexistant',
+              },
+            ],
+            'grace_period_secs': 30,
+            'execution_timeout_secs': 30,
+            'io_timeout_secs': 30,
+          },
+        },
+      ],
+    }
+    task_id = self.client.task_trigger_post(json.dumps(request))
+    actual_summary, _ = self.client.task_collect(task_id)
+    summary = actual_summary[u'shards'][0]
+    self.assertIsNone(summary)
+
+  @contextlib.contextmanager
+  def _make_wait_task(self, name):
+    """Creates a dummy task that keeps the bot busy, while other things are
+    being done.
+    """
+    signal_file = os.path.join(self.tmpdir, name)
+    fs.open(signal_file, 'wb').close()
+    args = [
+      '-T', 'wait', '--priority', '20', '--',
+      'python', '-u', '-c',
+      # Cheezy wait.
+      ('import os,time;'
+        'print(\'hi\');'
+        '[time.sleep(0.1) for _ in xrange(100000) if os.path.exists(\'%s\')];'
+        'print(\'hi again\')') % signal_file,
+    ]
+    wait_task_id = self.client.task_trigger_raw(args)
+    # Assert that the 'wait' task has started but not completed, otherwise
+    # this defeats the purpose.
+    self._wait_for_state(wait_task_id, u'PENDING', u'RUNNING')
+    yield
+    # Double check.
+    result = self.client.task_result(wait_task_id)
+    self.assertEqual(u'RUNNING', result[u'state'], result)
+    # Unblock the wait_task_id on the bot.
+    os.remove(signal_file)
+    # Ensure the initial wait task is completed.
+    actual_summary, actual_files = self.client.task_collect(wait_task_id)
+    tags = [
+      u'pool:default', u'priority:20', u'service_account:none',
+      u'user:joe@localhost',
+    ]
+    self.assertResults(
+        self.gen_expected(
+            name=u'wait', tags=tags, outputs=['hi\nhi again\n']),
+        actual_summary)
+    self.assertEqual(['summary.json'], actual_files.keys())
 
   def _run_isolated(
       self, contents, name, args, expected_summary, expected_files,
