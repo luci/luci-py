@@ -441,6 +441,10 @@ def bot_event(
   if kwargs.get('machine_lease') is not None:
     bot_info.machine_lease = kwargs['machine_lease']
 
+  if quarantined:
+    # Make sure it is not in the queue since it can't reap anything.
+    task_queues.cleanup_after_bot(info_key.parent())
+
   if event_type in ('request_sleep', 'task_update'):
     # Handle this specifically. It's not much of an even worth saving a BotEvent
     # for but it's worth updating BotInfo. The only reason BotInfo is GET is to
@@ -467,6 +471,33 @@ def bot_event(
     bot_info.task_id = ''
 
   datastore_utils.store_new_version(event, BotRoot, [bot_info])
+
+
+def has_capacity(dimensions):
+  """Returns True if there's a reasonable chance for this task request
+  dimensions set to be serviced by a bot alive.
+
+  First look at the task queues, then look into the datastore to figure this
+  out.
+  """
+  # Look at the fast path.
+  cap = task_queues.probably_has_capacity(dimensions)
+  if cap is not None:
+    return cap
+
+  # Do a query. That's slower and it's eventually consistent.
+  q = BotInfo.query()
+  flat = task_queues.dimensions_to_flat(dimensions)
+  for f in flat:
+    q = q.filter(BotInfo.dimensions_flat == f)
+  if q.get():
+    logging.warning('FOUND CAPACITY VIA BotInfo: %s', flat)
+    task_queues.set_has_capacity(dimensions)
+    return True
+
+  logging.error('HAS NO CAPACITY: %s', flat)
+  # TODO(maruel): https://crbug.com/839173
+  return True
 
 
 def cron_update_bot_info():
@@ -498,10 +529,11 @@ def cron_update_bot_info():
       if BotInfo.ALIVE in b.composite or BotInfo.DEAD not in b.composite:
         # Make sure the variable is not aliased.
         k = b.key
-        l = lambda: run(k)
+        # Unregister the bot from task queues since it can't reap anything.
+        task_queues.cleanup_after_bot(k.parent())
         # Retry more often than the default 1. We do not want to throw too much
         # in the logs and there should be plenty of time to do the retries.
-        f = datastore_utils.transaction_async(l, retries=5)
+        f = datastore_utils.transaction_async(lambda: run(k), retries=5)
         futures.append(f)
         if len(futures) >= 5:
           ndb.Future.wait_any(futures)

@@ -217,6 +217,28 @@ class BotManagementTest(test_case.TestCase):
         bot_management.BotRoot, 'foo', bot_management.BotSettings, 'settings')
     self.assertEqual(expected, bot_management.get_settings_key('foo'))
 
+  def test_has_capacity(self):
+    # The bot can service this dimensions.
+    d = {u'pool': [u'default'], u'os': [u'Ubuntu-16.04']}
+    # By default, nothing has capacity.
+    # TODO(maruel): https://crbug.com/839173
+    self.assertEqual(True, bot_management.has_capacity(d))
+
+    # A bot comes online. There's some capacity now.
+    _bot_event(
+        event_type='bot_connected',
+        dimensions={'id': ['id1'], 'pool': ['default'], 'os': ['Ubuntu',
+          'Ubuntu-16.04']})
+    self.assertEqual(1, bot_management.BotInfo.query().count())
+    self.assertEqual(True, bot_management.has_capacity(d))
+
+    # Disable the memcache code path to confirm the DB based behavior.
+    self.mock(task_queues, 'probably_has_capacity', lambda *_: None)
+    self.assertEqual(True, bot_management.has_capacity(d))
+    # TODO(maruel): https://crbug.com/839173
+    d = {u'pool': [u'inexistant']}
+    self.assertEqual(True, bot_management.has_capacity(d))
+
   def test_cron_update_bot_info(self):
     # Create two bots, one becomes dead, updating the cron job fixes composite.
     timeout = bot_management.config.settings().bot_death_timeout_secs

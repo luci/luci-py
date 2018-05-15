@@ -435,7 +435,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(1, run_result.current_task_slice)
 
   def test_schedule_request_slice_no_capacity(self):
-    self.mock(task_scheduler, '_has_capacity', lambda _: False)
+    self.mock(bot_management, 'has_capacity', lambda _: False)
     result_summary = self._quick_schedule(
         2,
         task_slices=[
@@ -458,10 +458,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
 
   def test_schedule_request_slice_no_capacity_fallback_second(self):
     items = []
-    def _has_capacity(dimensions):
+    def has_capacity(dimensions):
       items.append(dimensions)
       return len(items) > 1
-    self.mock(task_scheduler, '_has_capacity', _has_capacity)
+    self.mock(bot_management, 'has_capacity', has_capacity)
     result_summary = self._quick_schedule(
         2,
         task_slices=[
@@ -1409,14 +1409,14 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(State.PENDING, result_summary.state)
     self.assertEqual(0, result_summary.current_task_slice)
 
-    # Expire the first task. But _has_capacity returns False 2 times, so 1+2 =
+    # Expire the first task. But has_capacity returns False 2 times, so 1+2 =
     # 3, meaning it falls back to the fourth slice.
     self.mock_now(self.now, 601)
     items = []
-    def _has_capacity(dimensions):
+    def has_capacity(dimensions):
       items.append(dimensions)
       return len(items) > 2
-    self.mock(task_scheduler, '_has_capacity', _has_capacity)
+    self.mock(bot_management, 'has_capacity', has_capacity)
     self.assertEqual(
         ([], ['1d69b9f088008910']),
         task_scheduler.cron_abort_expired_task_to_run('f.local'))

@@ -751,6 +751,9 @@ def get_queues(bot_root_key):
     logging.debug(
         'get_queues(%s): can run from %d queues (memcache)\n%s',
         bot_id, len(data), data)
+    # Refresh all the keys.
+    memcache.set_multi(
+        {str(d): True for d in data}, time=61, namespace='task_queues_tasks')
     return data
 
   # Retrieve all the dimensions_hash that this bot could run that have
@@ -765,7 +768,35 @@ def get_queues(bot_root_key):
   logging.info(
       'get_queues(%s): Query in %.3fs: can run from %d queues\n%s',
       bot_id, (utils.utcnow()-now).total_seconds(), len(data), data)
+  memcache.set_multi(
+      {str(d): True for d in data}, time=61, namespace='task_queues_tasks')
   return data
+
+
+def probably_has_capacity(dimensions):
+  """Returns True if there is likely a live bot to serve this request.
+
+  There's a risk of collision, that is it could return True even if there is no
+  capacity. The risk is of 2^30 different dimensions sets.
+
+  It is only looking at the task queues, not at the actual bots.
+
+  Returns:
+    True or False if the capacity is cached, None otherwise.
+  """
+  dimensions_hash = str(hash_dimensions(dimensions))
+  # Sadly, the fact that the key is not there doesn't mean that this task queue
+  # is dead. For example:
+  # - memcache could have been cleared manually or could be malfunctioning.
+  # - in the case where a single bot can service the dimensions, the bot may not
+  #   have been polling for N+1 seconds.
+  return memcache.get(dimensions_hash, namespace='task_queues_tasks')
+
+
+def set_has_capacity(dimensions):
+  """Registers the fact that this task request dimensions set has capacity."""
+  dimensions_hash = str(hash_dimensions(dimensions))
+  memcache.set(dimensions_hash, True, time=61, namespace='task_queues_tasks')
 
 
 def rebuild_task_cache(payload):

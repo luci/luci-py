@@ -949,6 +949,11 @@ class BotTaskUpdateHandler(_BotApiHandler):
             task_request.CipdPackage(**args) for args in cipd_pins['packages']]
       )
 
+    # Tell the task queues management engine that the bot is still alive, and
+    # it shall refresh the task queues.
+    bot_root_key = bot_management.get_root_key(bot_id)
+    task_queues.get_queues(bot_root_key)
+
     try:
       state = task_scheduler.bot_update_task(
           run_result_key=run_result_key,

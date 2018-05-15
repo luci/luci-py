@@ -23,6 +23,7 @@ from components import utils
 import event_mon_metrics
 import ts_mon_metrics
 
+from server import bot_management
 from server import config
 from server import pools_config
 from server import service_accounts
@@ -42,19 +43,6 @@ _PROBABILITY_OF_QUICK_COMEBACK = 0.05
 def _secs_to_ms(value):
   """Converts a seconds value in float to the number of ms as an integer."""
   return int(round(value * 1000.))
-
-
-def _has_capacity(dimensions):
-  """Returns True if there's a reasonable chance for this run to be triggered.
-
-  Looks at the bots and caches the information.
-
-  Currently a scaffolding to be implemented later.
-  """
-  # pylint: disable=unused-argument
-  # It will be coded with super fast single memcache get request in the hot
-  # path. I promise.
-  return True
 
 
 def _expire_task(to_run_key, request, retries):
@@ -102,7 +90,7 @@ def _expire_task(to_run_key, request, retries):
     index = result_summary.current_task_slice+1
     while index < request.num_task_slices:
       dimensions = request.task_slice(index).properties.dimensions
-      if _has_capacity(dimensions):
+      if bot_management.has_capacity(dimensions):
         # Enqueue a new TasktoRun for this next TaskSlice, it has capacity!
         new_to_run = task_to_run.new_task_to_run(request, 1, index)
         result_summary.current_task_slice = index
@@ -819,7 +807,8 @@ def schedule_request(request, secret_bytes):
     while index < request.num_task_slices:
       # This needs to be extremely fast.
       to_run = task_to_run.new_task_to_run(request, 1, index)
-      if _has_capacity(request.task_slice(index).properties.dimensions):
+      if bot_management.has_capacity(
+          request.task_slice(index).properties.dimensions):
         # It's pending at this index now.
         result_summary.current_task_slice = index
         break
