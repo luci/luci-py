@@ -61,6 +61,7 @@ import datetime
 import hashlib
 import logging
 
+from google.appengine import runtime
 from google.appengine.ext import ndb
 
 from components import datastore_utils
@@ -68,6 +69,11 @@ from components import utils
 from server import config
 from server import task_pack
 from server import task_queues
+
+
+# BotEvent entities that should be deleted after a while. Eventually trim older
+# than 2 years old but let's start more softly with a tad over 3 years.
+_OLD_BOT_EVENTS_CUT_OFF = datetime.timedelta(days=366*3)
 
 
 ### Models.
@@ -554,3 +560,30 @@ def cron_update_bot_info():
     logging.debug(
         'Seen %d bots, updated %d bots, failed %d tx', seen, dead, failed)
   return dead
+
+
+def cron_delete_old_bot_events():
+  """Deletes very old BotEvent entites."""
+  count = 0
+  start = utils.utcnow()
+  try:
+    # End before the cron job allowed time of 10 minutes.
+    time_to_stop = start + datetime.timedelta(seconds=int(9.5*60))
+
+    # Order is by key, so it is naturally ordered by bot, which means the
+    # operations will mainly operate on one root entity at a time.
+    q = BotEvent.query(default_options=ndb.QueryOptions(keys_only=True)).filter(
+        BotEvent.ts <= start - _OLD_BOT_EVENTS_CUT_OFF)
+    more = True
+    cursor = None
+    while more:
+      keys, cursor, more = q.fetch_page(10, start_cursor=cursor)
+      ndb.delete_multi(keys)
+      count += len(keys)
+      if utils.utcnow() >= time_to_stop:
+        break
+    return count
+  except runtime.DeadlineExceededError:
+    pass
+  finally:
+    logging.info('Deleted %d entities', count)

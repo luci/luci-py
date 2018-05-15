@@ -291,6 +291,16 @@ class BotManagementTest(test_case.TestCase):
     # The cron job ran, so it's now correct.
     check([bot1_dead], [bot2_alive])
 
+  def test_cron_delete_old_bot_events(self):
+    # Create a bot event 3 years ago right at the cron job old BotEvent cut off,
+    # and another one one second later (that will be kept).
+    _bot_event(event_type='bot_connected')
+    now = self.now
+    self.mock_now(now, 1)
+    _bot_event(event_type='bot_connected')
+    self.mock_now(now + bot_management._OLD_BOT_EVENTS_CUT_OFF, 0)
+    self.assertEqual(1, bot_management.cron_delete_old_bot_events())
+
   def test_filter_dimensions(self):
     pass # Tested in handlers_endpoints_test
 

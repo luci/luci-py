@@ -30,6 +30,12 @@ cron:
   schedule: every 1 minutes synchronized
   target: backend
 
+# https://crbug.com/826343
+#- description: Delete old BotEvents
+#  url: /internal/cron/delete_old_bot_events
+#  schedule: every 10 minutes
+#  target: backend
+
 
 ### MP
 

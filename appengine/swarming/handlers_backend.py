@@ -93,6 +93,17 @@ class CronUpdateBotInfoComposite(webapp2.RequestHandler):
     self.response.out.write('Success.')
 
 
+class CronDeleteOldBotEvents(webapp2.RequestHandler):
+  """Deletes old BotEvent entities."""
+
+  @decorators.require_cronjob
+  def get(self):
+    ndb.get_context().set_cache_policy(lambda _: False)
+    bot_management.cron_delete_old_bot_events()
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    self.response.out.write('Success.')
+
+
 class CronMachineProviderBotsUtilizationHandler(webapp2.RequestHandler):
   """Determines Machine Provider bot utilization."""
 
@@ -377,6 +388,7 @@ def get_routes():
         CronAbortExpiredShardToRunHandler),
     ('/internal/cron/task_queues_tidy', CronTidyTaskQueues),
     ('/internal/cron/update_bot_info', CronUpdateBotInfoComposite),
+    ('/internal/cron/delete_old_bot_events', CronDeleteOldBotEvents),
 
     ('/internal/cron/count_task_bot_distribution',
         CronCountTaskBotDistributionHandler),
