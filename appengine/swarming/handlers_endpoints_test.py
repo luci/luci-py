@@ -1935,6 +1935,37 @@ class BotApiTest(BaseTest):
     self.set_as_admin()
     self.call_api('get', body={'bot_id': 'not_a_bot'}, status=404)
 
+  def test_get_deleted_bot(self):
+    bot_management.bot_event(
+        event_type='bot_connected', bot_id='id1',
+        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
+        dimensions={u'id': [u'id1'], u'pool': [u'default']}, state={'foo':0},
+        version='123456789', quarantined=False, maintenance_msg=None,
+        task_id=None, task_name=None)
+    # Delete the bot.
+    self.set_as_admin()
+    response = self.call_api('delete', body={'bot_id': 'id1'})
+    self.assertEqual({u'deleted': True}, response.json)
+
+    # Get it. Should still return a ghost version.
+    expected = {
+      u'authenticated_as': u'bot:whitelisted-ip',
+      u'bot_id': u'id1',
+      u'deleted': True,
+      u'dimensions': [
+        {u'key': u'id', u'value': [u'id1']},
+        {u'key': u'pool', u'value': [u'default']},
+      ],
+      u'external_ip': u'8.8.4.4',
+      u'is_dead': False,
+      u'last_seen_ts': u'2010-01-02T03:04:05',
+      u'quarantined': False,
+      u'state': u'{"foo":0}',
+      u'version': u'123456789',
+    }
+    resp = self.call_api('get', body={'bot_id': 'id1'})
+    self.assertEqual(expected, resp.json)
+
   def test_delete_ok(self):
     """Assert that delete finds and deletes a bot."""
     self.set_as_admin()

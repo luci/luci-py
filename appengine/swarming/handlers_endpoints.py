@@ -760,7 +760,7 @@ class SwarmingBotService(remote.Service):
         raise endpoints.NotFoundException('%s not found.' % bot_id)
       bot = bot_management.BotInfo(
           key=bot_management.get_info_key(bot_id),
-          dimensions_flat=bot_management.dimensions_to_flat(
+          dimensions_flat=task_queues.dimensions_to_flat(
               events[0].dimensions),
           state=events[0].state,
           external_ip=events[0].external_ip,
