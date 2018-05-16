@@ -66,6 +66,7 @@ FILES = (
     'client/isolate_storage.py',
     'client/isolated_format.py',
     'client/isolateserver.py',
+    'client/local_caching.py',
     'client/named_cache.py',
     'client/proto/__init__.py',
     'client/proto/bytestream_pb2.py',

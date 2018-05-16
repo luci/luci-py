@@ -30,6 +30,7 @@ from utils import subprocess42
 from libs import luci_context
 import bot_auth
 import fake_swarming
+import local_caching
 import named_cache
 import remote_client
 import task_runner
@@ -663,7 +664,9 @@ class TestTaskRunner(TestTaskRunnerBase):
 
   def test_run_command_caches(self):
     # Put a file into a named cache.
-    cache_manager = named_cache.CacheManager(os.path.join(self.root_dir, u'c'))
+    root_dir = os.path.join(self.root_dir, u'c')
+    policies = local_caching.CachePolicies(0, 0, 0, 0)
+    cache_manager = named_cache.CacheManager(root_dir, policies)
     install_dir = os.path.join(self.root_dir, u'install')
 
     with cache_manager.open():
