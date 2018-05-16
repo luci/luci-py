@@ -363,11 +363,25 @@ server replies:
 and what the bot declares as its digest. In general it is because the default
 server version changed.
 
-The bot duplicates itself as swarming_bot.1.zip and swarming_bot.2.zip with
-alterning versions. This aleviates issues with partial download or broken bot
+The bot duplicates itself as `swarming_bot.1.zip` and `swarming_bot.2.zip` with
+alternating versions. This aleviates issues with partial download or broken bot
 code. It requests the new bot code via its digest. The way the bot restarts
 itself is slightly OS specfic, it exec() itself on POSIX systems but calls a
 subprocess on Windows.
+
+
+##### LKGBC
+
+The current bot code is either `swarming_bot.1.zip` or `swarming_bot.2.zip`.
+The _Last Known Good Bot Code_ is `swarming_bot.zip`.
+
+The LKGBC is updated in one of these situations:
+
+*   The LKGBC doesn't exist on disk (it wasn't deleted by a task, aka `rm -rf
+    /`).
+*   The LKGBC doesn't match the current bot and one of the following is true:
+    *   The bot ran a successful task.
+    *   LKGBC code is older than a week.
 
 
 ##### run

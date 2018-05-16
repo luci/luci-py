@@ -981,6 +981,48 @@ class TestBotMain(TestBotBase):
 
     self.assertEqual(0, bot_main.main([]))
 
+  def test_update_lkgbc(self):
+    # Create LKGBC with a timestamp from 1h ago.
+    lkgbc = os.path.join(self.bot.base_dir, 'swarming_bot.zip')
+    with open(lkgbc, 'wb') as f:
+      f.write('a')
+    past = time.time() - 60*60
+    os.utime(lkgbc, (past, past))
+
+    cur = os.path.join(self.bot.base_dir, 'swarming_bot.1.zip')
+    with open(cur, 'wb') as f:
+      f.write('ab')
+    self.mock(bot_main, 'THIS_FILE', cur)
+
+    self.assertEqual(True, bot_main._update_lkgbc(self.bot))
+    with open(lkgbc, 'rb') as f:
+      self.assertEqual('ab', f.read())
+
+  def test_maybe_update_lkgbc(self):
+    # Create LKGBC with a timestamp from 1h ago.
+    lkgbc = os.path.join(self.bot.base_dir, 'swarming_bot.zip')
+    with open(lkgbc, 'wb') as f:
+      f.write('a')
+    past = time.time() - 60*60
+    os.utime(lkgbc, (past, past))
+
+    cur = os.path.join(self.bot.base_dir, 'swarming_bot.1.zip')
+    with open(cur, 'wb') as f:
+      f.write('ab')
+    self.mock(bot_main, 'THIS_FILE', cur)
+
+    # No update even if they mismatch, LKGBC is not old enough.
+    self.assertEqual(False, bot_main._maybe_update_lkgbc(self.bot))
+    with open(lkgbc, 'rb') as f:
+      self.assertEqual('a', f.read())
+
+    # Fast forward a little more than 7 days.
+    now = time.time()
+    self.mock(time, 'time', lambda: now + 7*24*60*60+10)
+    self.assertEqual(True, bot_main._maybe_update_lkgbc(self.bot))
+    with open(lkgbc, 'rb') as f:
+      self.assertEqual('ab', f.read())
+
 
 class TestBotNotMocked(TestBotBase):
   def test_bot_restart(self):
