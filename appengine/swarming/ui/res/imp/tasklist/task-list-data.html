@@ -190,12 +190,13 @@
               // don't add a -tag version if it's already been seen.
               return;
             }
-            var v = t.tagMap[k];
             k = k + "-tag";
             if (!map[k]) {
               map[k] = {};
             }
-            map[k][v] = true;
+            for (var v of t.tagMap[k] || []) {
+              map[k][v] = true;
+            }
           });
         });
 
@@ -257,7 +258,11 @@
             var split = tag.split(":", 1)
             var key = split[0];
             var rest = tag.substring(key.length + 1);
-            tagMap[key] = rest;
+            if (!tagMap[key]) {
+              tagMap[key] = [rest];
+            } else {
+              tagMap[key].push(rest);
+            }
           });
           t.tagMap = tagMap;
 
