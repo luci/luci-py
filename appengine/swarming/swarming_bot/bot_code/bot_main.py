@@ -1154,7 +1154,13 @@ def _poll_server(botobj, quit_bit, last_action):
     _call_hook_safe(
         True, botobj, 'on_bot_idle', max(0, time.time() - last_action))
     _maybe_update_lkgbc(botobj)
-    quit_bit.wait(value)
+    try:
+      # Sometimes throw with "[Errno 4] Interrupted function call", especially
+      # on Windows upon system shutdown.
+      quit_bit.wait(value)
+    except IOError:
+      # Act as it if were set as this likely mean a system shutdown.
+      quit_bit.set()
     return False
 
   if cmd == 'terminate':
