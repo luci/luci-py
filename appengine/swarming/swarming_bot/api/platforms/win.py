@@ -70,10 +70,11 @@ def _get_disk_info(mount_point):
 
 
 @tools.cached
-def _get_wmi_wbem():
-  """Returns a WMI client ready to do queries."""
+def _get_win32com():
+  """Returns an uninitialized WMI client."""
   try:
-    import win32com.client  # pylint: disable=F0401
+    from win32com import client  # pylint: disable=F0401
+    return client
   except ImportError:
     # win32com is included in pywin32, which is an optional package that is
     # installed by Swarming devs. If you find yourself needing it to run without
@@ -81,7 +82,14 @@ def _get_wmi_wbem():
     # implementation that doesn't use pywin32.
     return None
 
-  wmi_service = win32com.client.Dispatch('WbemScripting.SWbemLocator')
+
+@tools.cached
+def _get_wmi_wbem():
+  """Returns a WMI client connected to localhost ready to do queries."""
+  client = _get_win32com()
+  if not client:
+    return None
+  wmi_service = client.Dispatch('WbemScripting.SWbemLocator')
   return wmi_service.ConnectServer('.', 'root\\cimv2')
 
 
@@ -283,33 +291,38 @@ def get_gpu():
   if not wbem:
     return None, None
 
+  client = _get_win32com()
   dimensions = set()
   state = set()
   # https://msdn.microsoft.com/library/aa394512.aspx
-  for device in wbem.ExecQuery('SELECT * FROM Win32_VideoController'):
-    # The string looks like:
-    #  PCI\VEN_15AD&DEV_0405&SUBSYS_040515AD&REV_00\3&2B8E0B4B&0&78
-    pnp_string = device.PNPDeviceID
-    ven_id = u'UNKNOWN'
-    dev_id = u'UNKNOWN'
-    match = re.search(r'VEN_([0-9A-F]{4})', pnp_string)
-    if match:
-      ven_id = match.group(1).lower()
-    match = re.search(r'DEV_([0-9A-F]{4})', pnp_string)
-    if match:
-      dev_id = match.group(1).lower()
+  try:
+    for device in wbem.ExecQuery('SELECT * FROM Win32_VideoController'):
+      # The string looks like:
+      #  PCI\VEN_15AD&DEV_0405&SUBSYS_040515AD&REV_00\3&2B8E0B4B&0&78
+      pnp_string = device.PNPDeviceID
+      ven_id = u'UNKNOWN'
+      dev_id = u'UNKNOWN'
+      match = re.search(r'VEN_([0-9A-F]{4})', pnp_string)
+      if match:
+        ven_id = match.group(1).lower()
+      match = re.search(r'DEV_([0-9A-F]{4})', pnp_string)
+      if match:
+        dev_id = match.group(1).lower()
 
-    dev_name = device.VideoProcessor or u''
-    version = device.DriverVersion or u''
-    ven_name, dev_name = gpu.ids_to_names(ven_id, u'', dev_id, dev_name)
+      dev_name = device.VideoProcessor or u''
+      version = device.DriverVersion or u''
+      ven_name, dev_name = gpu.ids_to_names(ven_id, u'', dev_id, dev_name)
 
-    dimensions.add(unicode(ven_id))
-    dimensions.add(u'%s:%s' % (ven_id, dev_id))
-    if version:
-      dimensions.add(u'%s:%s-%s' % (ven_id, dev_id, version))
-      state.add(u'%s %s %s' % (ven_name, dev_name, version))
-    else:
-      state.add(u'%s %s' % (ven_name, dev_name))
+      dimensions.add(unicode(ven_id))
+      dimensions.add(u'%s:%s' % (ven_id, dev_id))
+      if version:
+        dimensions.add(u'%s:%s-%s' % (ven_id, dev_id, version))
+        state.add(u'%s %s %s' % (ven_name, dev_name, version))
+      else:
+        state.add(u'%s %s' % (ven_name, dev_name))
+  except client.com_error as e:
+    # This generally happens when this is called as the host is shutting down.
+    logging.error('get_gpu(): %s', e)
   return sorted(dimensions), sorted(state)
 
 
