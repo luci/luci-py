@@ -496,8 +496,9 @@ def has_capacity(dimensions):
   flat = task_queues.dimensions_to_flat(dimensions)
   for f in flat:
     q = q.filter(BotInfo.dimensions_flat == f)
-  if q.get():
-    logging.warning('FOUND CAPACITY VIA BotInfo: %s', flat)
+  if q.count(limit=1):
+    logging.info('Found capacity via BotInfo: %s', flat)
+    # Add it to the quick cache to improve performance.
     task_queues.set_has_capacity(dimensions)
     return True
 

@@ -923,9 +923,9 @@ def check_for_connection(machine_lease):
         machine_lease.key,
         machine_lease.hostname,
     )
+    task = task_request.create_termination_task(machine_lease.hostname)
     task_scheduler.schedule_request(
-        task_request.create_termination_task(machine_lease.hostname), None,
-    )
+        task, secret_bytes=None, check_capacity=False)
     if release(machine_lease):
       clear_lease_request(machine_lease.key, machine_lease.client_request_id)
     return
@@ -935,9 +935,9 @@ def check_for_connection(machine_lease):
         machine_lease.key,
         machine_lease.hostname,
     )
+    task = task_request.create_termination_task(machine_lease.hostname)
     task_scheduler.schedule_request(
-        task_request.create_termination_task(machine_lease.hostname), None,
-    )
+        task, secret_bytes=None, check_capacity=False)
     if release(machine_lease):
       cleanup_bot(machine_lease)
 
@@ -1055,9 +1055,9 @@ def handle_early_release(machine_lease):
         machine_lease.key,
         machine_lease.hostname,
     )
+    task = task_request.create_termination_task(machine_lease.hostname)
     task_result_summary = task_scheduler.schedule_request(
-        task_request.create_termination_task(machine_lease.hostname), None,
-    )
+        task, secret_bytes=None, check_capacity=True)
     associate_termination_task(
         machine_lease.key, machine_lease.hostname, task_result_summary.task_id)
 

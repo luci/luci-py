@@ -239,7 +239,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     """
     self.assertEqual(0, self.execute_tasks())
     request = _gen_request_slices(**kwargs)
-    result_summary = task_scheduler.schedule_request(request, None)
+    result_summary = task_scheduler.schedule_request(request, None, True)
     # State will be either PENDING or COMPLETED (for deduped task)
     self.assertEqual(num_task, self.execute_tasks())
     self.assertEqual(0, self.execute_tasks())
@@ -361,6 +361,21 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual('1d69b9f088002b10', result_summary_2.task_id)
     self.assertEqual(State.COMPLETED, result_summary_2.state)
     self.assertEqual(task_id_1, result_summary_2.deduped_from)
+
+  def test_schedule_request_no_capacity(self):
+    # No capacity, denied.
+    request = _gen_request_slices()
+    result_summary = task_scheduler.schedule_request(request, None, True)
+    # TODO(maruel): https://crbug.com/839173
+    self.assertEqual(State.PENDING, result_summary.state)
+    self.assertEqual(1, self.execute_tasks())
+
+  def test_schedule_request_no_check_capacity(self):
+    # No capacity, but check disabled, allowed.
+    request = _gen_request_slices()
+    result_summary = task_scheduler.schedule_request(request, None, False)
+    self.assertEqual(State.PENDING, result_summary.state)
+    self.assertEqual(1, self.execute_tasks())
 
   def test_bot_reap_task_not_enough_time(self):
     self._register_bot(0, self.bot_dimensions)
