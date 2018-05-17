@@ -1,7 +1,7 @@
 cron:
 
 
-### tasks
+### Tasks
 
 - description:
     Catch TaskRunResult's where the bot died and failed sending updates.
@@ -11,11 +11,6 @@ cron:
 
 - description: Catch TaskToRun's that are expired.
   url: /internal/cron/abort_expired_task_to_run
-  schedule: every 1 minutes
-  target: backend
-
-- description: Update BotInfo.composite for dead bots.
-  url: /internal/cron/update_bot_info
   schedule: every 1 minutes
   target: backend
 
@@ -30,9 +25,17 @@ cron:
   schedule: every 1 minutes synchronized
   target: backend
 
+
+### Bots
+
+- description: Update BotInfo.composite for dead bots.
+  url: /internal/cron/update_bot_info
+  schedule: every 1 minutes
+  target: backend
+
 - description: Delete old BotEvents
   url: /internal/cron/delete_old_bot_events
-  schedule: every 10 minutes
+  schedule: every 5 minutes synchronized
   target: backend
 
 
