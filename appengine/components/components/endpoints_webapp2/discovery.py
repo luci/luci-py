@@ -255,9 +255,9 @@ def _get_methods(service):
       document['description'] = desc
 
     request = method.remote.request_type()
-    if not isinstance(request, message_types.VoidMessage):
-      rc = endpoints.ResourceContainer.get_request_message(method.remote)
-      if not isinstance(rc, endpoints.ResourceContainer):
+    rc = endpoints.ResourceContainer.get_request_message(method.remote)
+    if not isinstance(rc, endpoints.ResourceContainer):
+      if not isinstance(request, message_types.VoidMessage):
         if info.http_method not in ('GET', 'DELETE'):
           document['request'] = {
             # $refs refer to the "schemas" section of the discovery doc.
@@ -265,17 +265,19 @@ def _get_methods(service):
             'parameterName': 'resource',
           }
           types.add(request.__class__)
-      else:
-        # If the request type is a known ResourceContainer, create a schema
-        # reference to the body only. Path parameters are handled differently.
+    else:
+      # If the request type is a known ResourceContainer, create a schema
+      # reference to the body if necessary. Path parameters are handled
+      # differently.
+      if rc.body_message_class != message_types.VoidMessage:
         if info.http_method not in ('GET', 'DELETE'):
           document['request'] = {
             '$ref': rc.body_message_class.definition_name(),
             'parameterName': 'resource',
           }
           types.add(rc.body_message_class)
-        document.update(_get_parameters(
-            rc.parameters_message_class, info.get_path(service.api_info)))
+      document.update(_get_parameters(
+          rc.parameters_message_class, info.get_path(service.api_info)))
 
     response = method.remote.response_type()
     if not isinstance(response, message_types.VoidMessage):

@@ -86,9 +86,9 @@ SplitService = endpoints.api(
 class ServiceA(remote.Service):
   """Part A of a split service to test with."""
 
-  @endpoints.method(message_types.VoidMessage, Message, http_method='GET')
-  def get_method(self, _):
-    """An HTTP GET method."""
+  @endpoints.method(message_types.VoidMessage, Message)
+  def post_method(self, _):
+    """An HTTP POST method."""
     return Message()
 
 
@@ -96,22 +96,9 @@ class ServiceA(remote.Service):
 class ServiceB(remote.Service):
   """Part B of a split service to test with."""
 
-  @endpoints.method(Message, Message)
+  @endpoints.method(endpoints.ResourceContainer(), Message)
   def post_method(self, _):
-    """An HTTP POST method.
-
-    Has a multi-line description.
-    """
-    return Message()
-
-
-@endpoints.api('service', 'v1')
-class ServiceExtension(remote.Service):
-  """A service to test with."""
-
-  @endpoints.method(message_types.VoidMessage, Message, http_method='GET')
-  def get_method2(self, _):
-    """Another HTTP GET method."""
+    """An HTTP POST method."""
     return Message()
 
 
@@ -578,11 +565,11 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
       'resources': {
         'sa': {
           'methods': {
-            'get_method': {
-              'description': 'An HTTP GET method.',
-              'httpMethod': 'GET',
-              'id': 'split.sa.get_method',
-              'path': 'a/get_method',
+            'post_method': {
+              'description': 'An HTTP POST method.',
+              'httpMethod': 'POST',
+              'id': 'split.sa.post_method',
+              'path': 'a/post_method',
               'response': {
                 '$ref': 'discovery_test.Message',
               },
@@ -596,14 +583,10 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           'methods': {
             'post_method': {
               'description':
-                  'An HTTP POST method. Has a multi-line description.',
+                  'An HTTP POST method.',
               'httpMethod': 'POST',
               'id': 'split.sb.post_method',
               'path': 'b/post_method',
-              'request': {
-                '$ref': 'discovery_test.Message',
-                'parameterName': 'resource',
-              },
               'response': {
                 '$ref': 'discovery_test.Message',
               },
