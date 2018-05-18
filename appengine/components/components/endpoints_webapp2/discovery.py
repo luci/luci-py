@@ -254,11 +254,12 @@ def _get_methods(service):
       else:
         # If the request type is a known ResourceContainer, create a schema
         # reference to the body only. Path parameters are handled differently.
-        document['request'] = {
-          '$ref': rc.body_message_class.definition_name(),
-          'parameterName': 'resource',
-        }
-        types.add(rc.body_message_class)
+        if info.http_method not in ('GET', 'DELETE'):
+          document['request'] = {
+            '$ref': rc.body_message_class.definition_name(),
+            'parameterName': 'resource',
+          }
+          types.add(rc.body_message_class)
         document.update(_get_parameters(
             rc.parameters_message_class, info.get_path(service.api_info)))
 

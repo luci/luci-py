@@ -60,8 +60,10 @@ class Service(remote.Service):
     """
     return Message()
 
-  @endpoints.method(endpoints.ResourceContainer(
-      Message, string=messages.StringField(1)), Message, http_method='GET')
+  @endpoints.method(
+      endpoints.ResourceContainer(
+          message_types.VoidMessage, string=messages.StringField(1)),
+      Message, http_method='GET')
   def query_string_method(self, _):
     """An HTTP GET method supporting query strings."""
     return Message()
@@ -182,10 +184,6 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
             },
           },
           'path': 'query_string_method',
-          'request': {
-            '$ref': 'discovery_test.Message',
-            'parameterName': 'resource',
-          },
           'response': {
             '$ref': 'discovery_test.Message',
           },
@@ -382,10 +380,6 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
             },
           },
           'path': 'query_string_method',
-          'request': {
-            '$ref': 'discovery_test.Message',
-            'parameterName': 'resource',
-          },
           'response': {
             '$ref': 'discovery_test.Message',
           },
