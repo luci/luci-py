@@ -142,6 +142,7 @@ def get_dimensions(devices):
   # TODO(bpastene) Make sure all the devices use the same board and OS.
   dimension_properties = {
     u'device_os': ['build.id'],
+    u'device_os_flavor': ['product.brand'],
     u'device_type': ['build.product', 'product.board', 'product.device'],
   }
   for dim in dimension_properties:
@@ -171,6 +172,18 @@ def get_dimensions(devices):
       del dimensions[dim]
     else:
       dimensions[dim] = sorted(dimensions[dim])
+
+  # Tweaks the 'product.brand' prop to be a little more readable.
+  if dimensions.get(u'device_os_flavor'):
+    def _fix_flavor(flavor):
+      flavor = flavor.lower()
+      # Non-aosp stock android is reported as 'google'. Other OEMs that ship
+      # their own images are free to report what they want. (eg: Nvidia Shield
+      # is reported as 'NVIDIA'.
+      return 'aosp' if flavor == 'android' else flavor
+
+    dimensions[u'device_os_flavor'] = list(
+        map(_fix_flavor, dimensions[u'device_os_flavor']))
 
   nb_android = len(dimensions[u'android'])
   dimensions[u'android_devices'] = map(
