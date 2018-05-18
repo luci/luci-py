@@ -159,6 +159,11 @@ def _get_schemas(types):
       if field.required:
         field_properties['required'] = True
 
+      # For repeated fields, most of the field information gets added to items.
+      # For non-repeated fields, the field information is added directly to the
+      # field properties. However, for parameters, even repeated fields have
+      # their field information added directly to the field properties. See
+      # _get_parameters below.
       if field.repeated:
         field_properties['items'] = items
         field_properties['type'] = 'array'
@@ -187,6 +192,10 @@ def _get_parameters(message, path):
   parameters = _get_schemas([message]).get(message.definition_name(), {}).get(
       'properties', {})
   for parameter, schema in parameters.iteritems():
+    # As above, repeated fields for parameters do not have items.
+    if schema['type'] == 'array':
+      schema.update(schema.pop('items'))
+      schema['repeated'] = True
     if parameter in order:
       schema['location'] = 'path'
     else:

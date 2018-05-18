@@ -29,7 +29,8 @@ class Message(messages.Message):
   boolean = messages.BooleanField(1)
   integer = messages.IntegerField(2, default=2)
   string = messages.StringField(3)
-  required = messages.BooleanField(4, required=True)
+  repeated = messages.BooleanField(4, repeated=True)
+  required = messages.BooleanField(5, required=True)
 
 
 class Child(messages.Message):
@@ -62,14 +63,16 @@ class Service(remote.Service):
 
   @endpoints.method(
       endpoints.ResourceContainer(
-          message_types.VoidMessage, string=messages.StringField(1)),
+          message_types.VoidMessage,
+          string=messages.StringField(1, repeated=True)),
       Message, http_method='GET')
   def query_string_method(self, _):
     """An HTTP GET method supporting query strings."""
     return Message()
 
-  @endpoints.method(endpoints.ResourceContainer(
-      Message, path=messages.StringField(1)), Message, path='{path}/method')
+  @endpoints.method(
+      endpoints.ResourceContainer(Message, path=messages.StringField(1)),
+      Message, path='{path}/method')
   def path_parameter_method(self, _):
     """An HTTP POST method supporting path parameters."""
     return Message()
@@ -180,6 +183,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           'parameters': {
             'string': {
               'location': 'query',
+              'repeated': True,
               'type': 'string',
             },
           },
@@ -208,6 +212,12 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
               'default': '2',
               'format': 'int64',
               'type': 'string',
+            },
+            'repeated': {
+              'items': {
+                'type': 'boolean',
+              },
+              'type': 'array',
             },
             'required': {
               'required': True,
@@ -241,6 +251,11 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           'format': 'int64',
           'location': 'query',
           'type': 'string',
+        },
+        'repeated': {
+          'location': 'query',
+          'repeated': True,
+          'type': 'boolean',
         },
         'required': {
           'location': 'query',
@@ -378,6 +393,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           'parameters': {
             'string': {
               'location': 'query',
+              'repeated': True,
               'type': 'string',
             },
           },
@@ -460,6 +476,12 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
               'default': '2',
               'format': 'int64',
               'type': 'string',
+            },
+            'repeated': {
+              'items': {
+                'type': 'boolean',
+              },
+              'type': 'array',
             },
             'required': {
               'required': True,
@@ -606,6 +628,12 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
               'default': '2',
               'format': 'int64',
               'type': 'string',
+            },
+            'repeated': {
+              'items': {
+                'type': 'boolean',
+              },
+              'type': 'array',
             },
             'required': {
               'required': True,
