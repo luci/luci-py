@@ -119,6 +119,7 @@ def _get_schemas(types):
     for field in message_type.all_fields():
       items = {}
       field_properties = {}
+      schema_type = None
 
       # For non-message fields, add the field information to the schema
       # directly. For message fields, add a $ref to elsewhere in the schema
@@ -143,13 +144,17 @@ def _get_schemas(types):
           items['format'] = schema_format
 
       if isinstance(field, messages.EnumField):
-        if field.default:
-          field_properties['default'] = str(field.default)
         # Endpoints v1 sorts these alphabetically while v2 does not.
         # TODO(smut): Determine if this has any impact.
         items['enum'] = [enum.name for enum in field.type]
-      elif field.default:
+
+      if field.default:
         field_properties['default'] = field.default
+        # Defaults for types that aren't strings in the code but are strings
+        # in the schema must be converted here. For example, EnumField
+        # would otherwise have a default that isn't even valid JSON.
+        if schema_type == 'string':
+          field_properties['default'] = str(field.default)
 
       if field.required:
         field_properties['required'] = True
