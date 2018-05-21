@@ -736,7 +736,7 @@
               <div class="tabs">
                 <paper-tabs selected="{{_show_raw}}" no-bar>
                   <paper-tab disabled$="[[_noMilo(_request)]]">
-                    <a id="milolink" href$="[[_getDisplayServerLink(_server_details.display_server_url_template,task_id)]]" target="_blank" rel="noopener">
+                    <a id="milolink" href$="[[_getDisplayServerLink(_server_details.display_server_url_template,task_id,_request)]]" target="_blank" rel="noopener">
                       Milo Output
                     </a>
                   </paper-tab>
@@ -765,9 +765,9 @@
 
             <template is="dom-if" if="[[_supportsMilo(_request,_show_raw)]]">
               <div class="milo tabbed" hidden$="[[_isSummaryLink(task_id)]]">
-                Milo results are only generated for task summaires, that is, tasks whose ids end in 0.  Tasks ending in 1 or 2 represent possible retries of tasks.  See <a href="//goo.gl/LE4rwV">the docs</a> for more.
+                Milo results are only generated for task summaries, that is, tasks whose ids end in 0.  Tasks ending in 1 or 2 represent possible retries of tasks.  See <a href="//goo.gl/LE4rwV">the docs</a> for more.
               </div>
-              <iframe id="miloFrame" class="milo tabbed" src$="[[_getDisplayServerLink(_server_details.display_server_url_template,task_id)]]"></iframe>
+              <iframe id="miloFrame" class="milo tabbed" src$="[[_getDisplayServerLink(_server_details.display_server_url_template,task_id,_request)]]"></iframe>
             </template>
             <template is="dom-if" if="[[_show_raw]]">
               <div class$="code stdout tabbed break-all [[_classStdout(_wide_logs)]]">[[_rawOutput(_stdout,_result)]]</div>
@@ -1162,11 +1162,17 @@
         return "";
       },
 
-      _getDisplayServerLink: function(template,id) {
-        if (!template) {
+      _getDisplayServerLink: function(milo_template, id, request) {
+        var logs = this._tag(request, "log_location");
+        var miloHost = this._tag(request, "milo_host");
+        if (logs && miloHost) {
+          logs = logs.replace("logdog://", "");
+          return miloHost.replace("%s", logs);
+        }
+        if (!milo_template) {
           return undefined;
         }
-        return template.replace("%s", id);
+        return milo_template.replace("%s", id);
       },
 
       _hasActualCIPDPackages: function(result) {
@@ -1376,8 +1382,8 @@ time.sleep(${leaseDuration})`];
         this.$.data.reload();
         var miloFrame = this.$$("iframe")
         if (miloFrame) {
-          var templ = this._server_details.display_server_url_template;
-          miloFrame.src = this._getDisplayServerLink(templ, this.task_id);
+          var milo_templ = this._server_details.display_server_url_template;
+          miloFrame.src = this._getDisplayServerLink(milo_templ, this.task_id, this._request);
         }
       },
 
