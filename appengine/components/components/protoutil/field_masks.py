@@ -33,7 +33,67 @@ from google.protobuf import descriptor
 
 # TODO(nodir): add message trimming
 
-# TODO(nodir): add field path set parsing
+
+def parse_field_tree(field_mask, desc):
+  """Parses a field mask to a tree of fields.
+
+  Each node represents a field and in turn is represented by a dict where each
+  dict key is a child key and dict value is a child node. For example, parses
+  ['a', 'b.c'] to {'a': {}, 'b': {'c': {}}}.
+
+  Removes trailing stars, e.g. parses ['a.*'] to {'a': {}}.
+  Removes redundant paths, e.g. parses ['a', 'a.b'] as {'a': {}}.
+
+  Args:
+    field_mask: a google.protobuf.field_mask_pb2.FieldMask instance.
+    desc: a google.protobuf.descriptor.Descriptor for the target message.
+
+  Raises:
+    ValueError if a field path is invalid.
+  """
+  parsed_paths = []
+  for p in field_mask.paths:
+    try:
+      parsed_paths.append(_parse_path(p, desc))
+    except ValueError as ex:
+      raise ValueError('invalid path "%s": %s' % (p, ex))
+
+  parsed_paths = _normalize_paths(parsed_paths)
+
+  root = {}
+  for p in parsed_paths:
+    node = root
+    for seg in p:
+      node = node.setdefault(seg, {})
+  return root
+
+
+def _normalize_paths(paths):
+  """Normalizes field paths. Returns a new set of paths.
+
+  paths must be parsed, see _parse_path.
+
+  Removes trailing stars, e.g. convertes ('a', _STAR_SEG) to ('a',).
+
+  Removes paths that have a segment prefix already present in paths,
+  e.g. removes ('a', 'b') from [('a', 'b'), ('a',)].
+  """
+  paths = _remove_trailing_stars(paths)
+  return {
+      p for p in paths
+      if not any(p[:i] in paths for i in xrange(len(p)))
+  }
+
+
+def _remove_trailing_stars(paths):
+  ret = set()
+  for p in paths:
+    assert isinstance(p, tuple), p
+    if p[-1] == _STAR_SEG:
+      p = p[:-1]
+    ret.add(p)
+  return ret
+
 
 # Used in a parsed path to represent a star literal.
 # See _parse_path.
