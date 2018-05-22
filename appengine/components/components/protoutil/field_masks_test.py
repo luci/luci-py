@@ -45,7 +45,7 @@ class ParsePathTests(unittest.TestCase):
 
   def test_str_repeated_trailing_star(self):
     actual = self.parse('strs.*')
-    expected = ('strs', field_masks._STAR_SEG)
+    expected = ('strs', field_masks.STAR)
     self.assertEqual(actual, expected)
 
   def test_str_repeated_index(self):
@@ -94,7 +94,7 @@ class ParsePathTests(unittest.TestCase):
 
   def test_map_str_key_star(self):
     actual = self.parse('map_str_num.*')
-    expected = ('map_str_num', field_masks._STAR_SEG)
+    expected = ('map_str_num', field_masks.STAR)
     self.assertEqual(actual, expected)
 
   def test_map_str_key_int(self):
@@ -117,7 +117,7 @@ class ParsePathTests(unittest.TestCase):
 
   def test_map_bool_key_star(self):
     actual = self.parse('map_bool_str.*')
-    expected = ('map_bool_str', field_masks._STAR_SEG)
+    expected = ('map_bool_str', field_masks.STAR)
     self.assertEqual(actual, expected)
 
   def test_msg_str(self):
@@ -127,7 +127,7 @@ class ParsePathTests(unittest.TestCase):
 
   def test_msg_star(self):
     actual = self.parse('msg.*')
-    expected = ('msg', field_masks._STAR_SEG)
+    expected = ('msg', field_masks.STAR)
     self.assertEqual(actual, expected)
 
   def test_msg_star_str(self):
@@ -144,7 +144,7 @@ class ParsePathTests(unittest.TestCase):
 
   def test_msg_msgs_str(self):
     actual = self.parse('msgs.*.str')
-    expected = ('msgs', field_masks._STAR_SEG, 'str')
+    expected = ('msgs', field_masks.STAR, 'str')
     self.assertEqual(actual, expected)
 
   def test_msg_map_num_str(self):
@@ -159,12 +159,12 @@ class ParsePathTests(unittest.TestCase):
 
   def test_map_str_map_num_star(self):
     actual = self.parse('map_str_msg.*')
-    expected = ('map_str_msg', field_masks._STAR_SEG)
+    expected = ('map_str_msg', field_masks.STAR)
     self.assertEqual(actual, expected)
 
   def test_map_str_map_num_star_str(self):
     actual = self.parse('map_str_msg.*.str')
-    expected = ('map_str_msg', field_masks._STAR_SEG, 'str')
+    expected = ('map_str_msg', field_masks.STAR, 'str')
     self.assertEqual(actual, expected)
 
   def test_trailing_period(self):

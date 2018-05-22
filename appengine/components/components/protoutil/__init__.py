@@ -4,6 +4,9 @@
 
 """Utility functions for Protocol Buffers."""
 
-from .field_masks import parse_field_tree
+# Pylint doesn't like relative wildcard imports.
+# pylint: disable=W0401,W0403
+
+from .field_masks import *
 from .multiline_proto import parse_multiline, MultilineParseError
 from .protoutil import merge_dict

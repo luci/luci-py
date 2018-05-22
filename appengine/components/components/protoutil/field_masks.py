@@ -33,6 +33,11 @@ from google.protobuf import descriptor
 
 # TODO(nodir): add message trimming
 
+__all__ = [
+    'parse_field_tree',
+    'STAR',
+]
+
 
 def parse_field_tree(field_mask, desc):
   """Parses a field mask to a tree of fields.
@@ -40,6 +45,8 @@ def parse_field_tree(field_mask, desc):
   Each node represents a field and in turn is represented by a dict where each
   dict key is a child key and dict value is a child node. For example, parses
   ['a', 'b.c'] to {'a': {}, 'b': {'c': {}}}.
+
+  Parses stars as field_masks.STAR.
 
   Removes trailing stars, e.g. parses ['a.*'] to {'a': {}}.
   Removes redundant paths, e.g. parses ['a', 'a.b'] as {'a': {}}.
@@ -73,7 +80,7 @@ def _normalize_paths(paths):
 
   paths must be parsed, see _parse_path.
 
-  Removes trailing stars, e.g. convertes ('a', _STAR_SEG) to ('a',).
+  Removes trailing stars, e.g. convertes ('a', STAR) to ('a',).
 
   Removes paths that have a segment prefix already present in paths,
   e.g. removes ('a', 'b') from [('a', 'b'), ('a',)].
@@ -89,7 +96,7 @@ def _remove_trailing_stars(paths):
   ret = set()
   for p in paths:
     assert isinstance(p, tuple), p
-    if p[-1] == _STAR_SEG:
+    if p[-1] == STAR:
       p = p[:-1]
     ret.add(p)
   return ret
@@ -97,7 +104,7 @@ def _remove_trailing_stars(paths):
 
 # Used in a parsed path to represent a star literal.
 # See _parse_path.
-_STAR_SEG = object()
+STAR = object()
 
 # Token types.
 _STAR, _PERIOD, _LITERAL, _STRING, _INTEGER, _UNKNOWN, _EOF = xrange(7)
@@ -136,7 +143,7 @@ def _parse_path(path, desc):
     desc: a google.protobuf.descriptor.Descriptor of the target message.
 
   Returns:
-    A tuple of segments. A star is returned as _STAR_SEG object.
+    A tuple of segments. A star is returned as STAR object.
 
   Raises:
     ValueError if path is invalid.
@@ -179,7 +186,7 @@ def _parse_path(path, desc):
         raise ValueError('unexpected token "%s", expected a star' % tok)
       read()  # Swallow star.
       ctx.expect_star = False
-      return _STAR_SEG, False
+      return STAR, False
 
     if ctx.desc is None:
       raise ValueError(
@@ -192,7 +199,7 @@ def _parse_path(path, desc):
             'unsupported key type of field "%s"' % ctx.field_path)
       if tok_type == _STAR:
         read()  # Swallow star.
-        seg = _STAR_SEG
+        seg = STAR
       elif key_type == descriptor.FieldDescriptor.TYPE_BOOL:
         seg = read_bool()
       elif key_type in _INTEGER_FIELD_TYPES:
@@ -207,8 +214,8 @@ def _parse_path(path, desc):
     if tok_type == _STAR:
       # Include all fields.
       read()  # Swallow star.
-       # A _STAR_SEG field cannot be followed by subfields.
-      return _STAR_SEG, True
+       # A STAR field cannot be followed by subfields.
+      return STAR, True
 
     if tok_type != _LITERAL:
       raise ValueError(
