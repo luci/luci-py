@@ -1025,21 +1025,8 @@ def get_state():
     nb_files_in_temp = len(os.listdir(tmpdir))
   except OSError:
     nb_files_in_temp = 'N/A'
-  isolated_cached_info = get_isolated_cache_info()
-  named_caches_dir = os.path.abspath(u'c')
   state = {
     u'audio': get_audio(),
-    u'caches': {
-      u'cipd': get_cipd_cache_info(),
-      u'isolated': {
-        u'items': len(isolated_cached_info),
-        u'size': sum(i[0] for i in isolated_cached_info.itervalues()),
-      },
-      u'named': {
-        k: get_recursive_size(os.path.join(named_caches_dir, v[0]))
-        for k, v in get_named_caches_info().iteritems()
-      },
-    },
     u'cpu_name': get_cpuinfo().get(u'name'),
     u'cost_usd_hour': get_cost_hour(),
     u'cwd': file_path.get_native_path_case(os.getcwd().decode('utf-8')),
