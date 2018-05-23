@@ -26,6 +26,15 @@ Supports advanced field mask semantics:
 - Refer to all fields of a message using * literal: publisher.*.
 - Prohibit addressing a single element in repeated fields: authors.0.name
 
+FieldMask.paths string grammar:
+  path = segment {'.' segment}
+  segment = literal | '*' | quoted_string;
+  literal = string | integer | bool
+  string = (letter | '_') {letter | '_' | digit}
+  integer = ['-'] digit {digit};
+  bool = 'true' | 'false';
+  quoted_string = '`' { utf8-no-backtick | '``' } '`'
+
 TODO(nodir): replace spec above with a link to a spec when it is available.
 """
 
@@ -34,19 +43,25 @@ from google.protobuf import descriptor
 # TODO(nodir): add message trimming
 
 __all__ = [
-    'parse_field_tree',
+    'parse_segment_tree',
     'STAR',
 ]
 
 
-def parse_field_tree(field_mask, desc):
-  """Parses a field mask to a tree of fields.
+# Used in a parsed path to represent a star segment.
+# See parse_segment_tree.
+STAR = object()
 
-  Each node represents a field and in turn is represented by a dict where each
+
+def parse_segment_tree(field_mask, desc):
+  """Parses a field mask to a tree of segments.
+
+  Each node represents a segment and in turn is represented by a dict where each
   dict key is a child key and dict value is a child node. For example, parses
   ['a', 'b.c'] to {'a': {}, 'b': {'c': {}}}.
 
-  Parses stars as field_masks.STAR.
+  Parses '*' segments as field_masks.STAR.
+  Parses integer and boolean map keys as int and bool.
 
   Removes trailing stars, e.g. parses ['a.*'] to {'a': {}}.
   Removes redundant paths, e.g. parses ['a', 'a.b'] as {'a': {}}.
@@ -101,10 +116,6 @@ def _remove_trailing_stars(paths):
     ret.add(p)
   return ret
 
-
-# Used in a parsed path to represent a star literal.
-# See _parse_path.
-STAR = object()
 
 # Token types.
 _STAR, _PERIOD, _LITERAL, _STRING, _INTEGER, _UNKNOWN, _EOF = xrange(7)

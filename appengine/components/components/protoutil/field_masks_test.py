@@ -208,9 +208,9 @@ class NormalizePathsTests(unittest.TestCase):
     self.assertEqual(actual, expected)
 
 
-class ParseFieldTreeTests(unittest.TestCase):
+class ParseSegmentTreeTests(unittest.TestCase):
   def parse(self, paths):
-    return field_masks.parse_field_tree(
+    return field_masks.parse_segment_tree(
         field_mask_pb2.FieldMask(paths=paths),
         test_proto_pb2.Msg.DESCRIPTOR)
 
