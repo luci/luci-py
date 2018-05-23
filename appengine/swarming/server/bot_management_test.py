@@ -127,6 +127,8 @@ class BotManagementTest(test_case.TestCase):
     super(BotManagementTest, self).setUp()
     self.now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(self.now)
+    # https://crbug.com/839173
+    self.mock(bot_management, '_FAKE_CAPACITY', False)
 
   def test_all_apis_are_tested(self):
     actual = frozenset(i[5:] for i in dir(self) if i.startswith('test_'))
@@ -221,8 +223,7 @@ class BotManagementTest(test_case.TestCase):
     # The bot can service this dimensions.
     d = {u'pool': [u'default'], u'os': [u'Ubuntu-16.04']}
     # By default, nothing has capacity.
-    # TODO(maruel): https://crbug.com/839173
-    self.assertEqual(True, bot_management.has_capacity(d))
+    self.assertEqual(False, bot_management.has_capacity(d))
 
     # A bot comes online. There's some capacity now.
     _bot_event(
@@ -235,9 +236,8 @@ class BotManagementTest(test_case.TestCase):
     # Disable the memcache code path to confirm the DB based behavior.
     self.mock(task_queues, 'probably_has_capacity', lambda *_: None)
     self.assertEqual(True, bot_management.has_capacity(d))
-    # TODO(maruel): https://crbug.com/839173
     d = {u'pool': [u'inexistant']}
-    self.assertEqual(True, bot_management.has_capacity(d))
+    self.assertEqual(False, bot_management.has_capacity(d))
 
   def test_cron_update_bot_info(self):
     # Create two bots, one becomes dead, updating the cron job fixes composite.

@@ -133,6 +133,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       u'os': [u'Windows', u'Windows-3.1.1'],
       u'pool': [u'default'],
     }
+    # https://crbug.com/839173
+    self.mock(bot_management, '_FAKE_CAPACITY', False)
 
   def _enqueue(self, *args, **kwargs):
     return self._enqueue_orig(*args, use_dedicated_module=False, **kwargs)
@@ -363,11 +365,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(task_id_1, result_summary_2.deduped_from)
 
   def test_schedule_request_no_capacity(self):
-    # No capacity, denied.
+    # No capacity, denied. That's the default.
     request = _gen_request_slices()
     result_summary = task_scheduler.schedule_request(request, None, True)
-    # TODO(maruel): https://crbug.com/839173
-    self.assertEqual(State.PENDING, result_summary.state)
+    self.assertEqual(State.NO_RESOURCE, result_summary.state)
     self.assertEqual(1, self.execute_tasks())
 
   def test_schedule_request_no_check_capacity(self):
@@ -411,8 +412,9 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertIsNone(to_run_key.get().queue_number)
     self.assertEqual(State.EXPIRED, result_summary.key.get().state)
 
-  def test_schedule_request_slice_fallback_to_second_after_expiration(self):
-    # First TaskSlice couldn't run, the second ran.
+  def test_schedule_request_slice_fallback_to_second_immediate(self):
+    # First TaskSlice couldn't run so it was immediately skipped, the second ran
+    # instead.
     self._register_bot(0, self.bot_dimensions)
     self._quick_schedule(
         2,
@@ -428,26 +430,32 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
               expiration_secs=180,
               properties=_gen_properties()),
         ])
-    self.mock_now(self.now, 181)
-    self.assertEqual(1, task_to_run.TaskToRun.query().count())
-    actual_request, _, _ = task_scheduler.bot_reap_task(
-        self.bot_dimensions, 'abc', None)
-    self.assertIsNone(actual_request)
-
-    # For now a cron job or poll to expire the first slice is necessary.
-    # Eventually it should be faster as the first dimensions should be
-    # immediately denied.
-    self.assertEqual(
-        ([], ['1d69b9f088008910']),
-        task_scheduler.cron_abort_expired_task_to_run('f.local'))
-    self.assertEqual(2, task_to_run.TaskToRun.query().count())
-
-    _request, _, run_result = task_scheduler.bot_reap_task(
+    request, _, run_result = task_scheduler.bot_reap_task(
         self.bot_dimensions, 'abc', None)
     self.assertEqual(1, run_result.current_task_slice)
 
+  def test_schedule_request_slice_fallback_to_second_after_expiration(self):
+    # First TaskSlice couldn't run so it was eventually expired, the second ran
+    # instead.
+    self._register_bot(0, self.bot_dimensions)
+    self._quick_schedule(
+        2,
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=180,
+              properties=_gen_properties(io_timeout_secs=61)),
+          task_request.TaskSlice(
+              expiration_secs=180,
+              properties=_gen_properties()),
+        ])
+    self.mock_now(self.now, 181)
+    # The first was immediately expired, and the second immediately reaped.
+    request, _, run_result = task_scheduler.bot_reap_task(
+        self.bot_dimensions, 'abc', None)
+    # BUG(maruel): Should have taken the second.
+    self.assertEqual(0, run_result.current_task_slice)
+
   def test_schedule_request_slice_no_capacity(self):
-    self.mock(bot_management, 'has_capacity', lambda _: False)
     result_summary = self._quick_schedule(
         2,
         task_slices=[
@@ -469,11 +477,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(0, result_summary.current_task_slice)
 
   def test_schedule_request_slice_no_capacity_fallback_second(self):
-    items = []
-    def has_capacity(dimensions):
-      items.append(dimensions)
-      return len(items) > 1
-    self.mock(bot_management, 'has_capacity', has_capacity)
+    self._register_bot(0, self.bot_dimensions)
     result_summary = self._quick_schedule(
         2,
         task_slices=[
@@ -1397,6 +1401,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(3, len(pub_sub_calls)) # PENDING -> BOT_DIED
 
   def test_cron_abort_expired_fallback(self):
+    # 1 and 4 have capacity.
+    self.bot_dimensions[u'item'] = [u'1', u'4']
     self._register_bot(0, self.bot_dimensions)
     result_summary = self._quick_schedule(
         4,
@@ -1404,41 +1410,33 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
           task_request.TaskSlice(
               expiration_secs=600,
               properties=_gen_properties(
-                  io_timeout_secs=60,
-                  dimensions={u'pool': [u'some-pool']})),
+                  dimensions={u'pool': [u'default'], u'item': [u'1']})),
           task_request.TaskSlice(
               expiration_secs=600,
               properties=_gen_properties(
-                  io_timeout_secs=61,
-                  dimensions={u'pool': [u'some-pool']})),
+                  dimensions={u'pool': [u'default'], u'item': [u'2']})),
           task_request.TaskSlice(
               expiration_secs=600,
               properties=_gen_properties(
-                  io_timeout_secs=62,
-                  dimensions={u'pool': [u'some-pool']})),
+                  dimensions={u'pool': [u'default'], u'item': [u'3']})),
           task_request.TaskSlice(
               expiration_secs=600,
               properties=_gen_properties(
-                  io_timeout_secs=63,
-                  dimensions={u'pool': [u'some-pool']})),
+                  dimensions={u'pool': [u'default'], u'item': [u'4']})),
         ])
     self.assertEqual(State.PENDING, result_summary.state)
     self.assertEqual(0, result_summary.current_task_slice)
 
-    # Expire the first task. But has_capacity returns False 2 times, so 1+2 =
-    # 3, meaning it falls back to the fourth slice.
+    # Expire the first slice.
     self.mock_now(self.now, 601)
-    items = []
-    def has_capacity(dimensions):
-      items.append(dimensions)
-      return len(items) > 2
-    self.mock(bot_management, 'has_capacity', has_capacity)
+
+    # cron job 'expires' the task slices but not the whole task.
     self.assertEqual(
         ([], ['1d69b9f088008910']),
         task_scheduler.cron_abort_expired_task_to_run('f.local'))
     result_summary = result_summary.key.get()
     self.assertEqual(State.PENDING, result_summary.state)
-    # Skipped #1 and #2.
+    # Skipped the second and third TaskSlice.
     self.assertEqual(3, result_summary.current_task_slice)
 
   def test_cron_handle_bot_died(self):

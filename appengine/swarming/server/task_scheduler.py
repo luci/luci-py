@@ -903,6 +903,8 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
         bot_dimensions, deadline)
     for request, to_run in q:
       iterated += 1
+      # BUG(maruel): Needs to check the task slice expiration, not the whole
+      # request expiration.
       if request.expiration_ts < utils.utcnow():
         # Use a low number of retries, as at worst the cron job will catch it.
         s, r = _expire_task(to_run.key, request, retries=1)
