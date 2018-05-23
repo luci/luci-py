@@ -486,6 +486,7 @@ def has_capacity(dimensions):
   First look at the task queues, then look into the datastore to figure this
   out.
   """
+  assert not ndb.in_transaction()
   # Look at the fast path.
   cap = task_queues.probably_has_capacity(dimensions)
   if cap is not None:

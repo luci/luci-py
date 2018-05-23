@@ -72,6 +72,15 @@ def _expire_task(to_run_key, request, retries):
   result_summary_key = task_pack.request_key_to_result_summary_key(request.key)
   now = utils.utcnow()
 
+  # Do a quick check for capacity for the remaining TaskSlice (if any) before
+  # the transaction runs, as has_capacity() cannot be called while the
+  # transaction runs.
+  index = task_to_run.task_to_run_key_slice_index(to_run_key)
+  capacity = [
+    bot_management.has_capacity(request.task_slice(i).properties.dimensions)
+    for i in xrange(index+1, request.num_task_slices)
+  ]
+
   def run():
     # 2 concurrent GET, one PUT. Optionally with an additional serialized GET.
     to_run_future = to_run_key.get_async()
@@ -87,16 +96,17 @@ def _expire_task(to_run_key, request, retries):
     to_put = [to_run, result_summary]
     # Check if there's a TaskSlice fallback that could be reenqueued.
     new_to_run = None
-    index = result_summary.current_task_slice+1
-    while index < request.num_task_slices:
-      dimensions = request.task_slice(index).properties.dimensions
-      if bot_management.has_capacity(dimensions):
+    offset = result_summary.current_task_slice+1
+    rest = request.num_task_slices - offset
+    for index in xrange(rest):
+      # Use the lookup created just before the transaction. There's a small race
+      # condition in here but we're willing to accept it.
+      if capacity[index]:
         # Enqueue a new TasktoRun for this next TaskSlice, it has capacity!
-        new_to_run = task_to_run.new_task_to_run(request, 1, index)
-        result_summary.current_task_slice = index
+        new_to_run = task_to_run.new_task_to_run(request, 1, index+offset)
+        result_summary.current_task_slice = index+offset
         to_put.append(new_to_run)
         break
-      index += 1
 
     if not new_to_run:
       # There's no fallback, giving up.

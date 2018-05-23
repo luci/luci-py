@@ -478,6 +478,7 @@ def _yield_BotTaskDimensions_keys(dimensions_hash, dimensions_flat):
   """Yields all the BotTaskDimensions ndb.Key for the bots that correspond to
   these task request dimensions.
   """
+  assert not ndb.in_transaction()
   q = BotDimensions.query()
   for d in dimensions_flat:
     q = q.filter(BotDimensions.dimensions_flat == d)
