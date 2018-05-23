@@ -127,9 +127,14 @@ class FrontendTest(AppTestBase):
                  'returned %s' % (method, path, response))
       self.assertIn(response.status_int, (302, 403, 405), msg=message)
       if response.status_int == 302:
-        # See user_service_stub.py, _DEFAULT_LOGIN_URL.
-        login_url = 'https://www.google.com/accounts/Login?continue='
-        self.assertTrue(response.headers['Location'].startswith(login_url))
+        # There's two reasons, either login or redirect to api-explorer.
+        options = (
+          # See user_service_stub.py, _DEFAULT_LOGIN_URL.
+          'https://www.google.com/accounts/Login?continue=',
+          'https://apis-explorer.appspot.com/apis-explorer',
+        )
+        self.assertTrue(
+            response.headers['Location'].startswith(options), route)
 
     self.set_as_anonymous()
     # Try to execute 'get' and 'post' and verify they fail with 403 or 405.
