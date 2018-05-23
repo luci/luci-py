@@ -94,6 +94,10 @@ _MIN_TIMEOUT_SECS = 1 if utils.is_local_dev_server() else 30
 _BEGINING_OF_THE_WORLD = datetime.datetime(2010, 1, 1, 0, 0, 0, 0)
 
 
+# 1 is for ':'.
+_TAG_LENGTH = config.DIMENSION_KEY_LENGTH + config.DIMENSION_VALUE_LENGTH + 1
+
+
 # Used for isolated files.
 _HASH_CHARS = frozenset('0123456789abcdef')
 
@@ -315,7 +319,7 @@ def _validate_timeout(prop, value):
 def _validate_tags(prop, value):
   """Validates TaskRequest.tags."""
   # pylint: disable=protected-access
-  _validate_length(prop, value, 256)
+  _validate_length(prop, value, _TAG_LENGTH)
   if ':' not in value:
     raise datastore_errors.BadValueError(
         '%s must be key:value form, not %s' % (prop._name, value))

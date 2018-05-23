@@ -27,8 +27,13 @@ ConfigApi = config.ConfigApi
 
 ### Public code.
 
+
+# Maximum acceptable length for dimensions.
+DIMENSION_KEY_LENGTH = 64
+DIMENSION_VALUE_LENGTH = 256
+
 # Regular expression for dimension key.
-DIMENSION_KEY_RE = r'^[a-zA-Z\-\_\.]{1,64}$'
+DIMENSION_KEY_RE = r'^[a-zA-Z\-\_\.]+$'
 
 
 def settings_info():
@@ -75,7 +80,11 @@ def validate_flat_dimension(d):
 
 def validate_dimension_key(key):
   """Returns True if the dimension key is valid."""
-  return bool(isinstance(key, unicode) and re.match(DIMENSION_KEY_RE, key))
+  return (
+      isinstance(key, unicode) and
+      key and
+      len(key) <= DIMENSION_KEY_LENGTH and
+      bool(re.match(DIMENSION_KEY_RE, key)))
 
 
 def validate_dimension_value(value):
@@ -83,7 +92,7 @@ def validate_dimension_value(value):
   return (
       bool(isinstance(value, unicode) and
       value and
-      len(value) <= 128 and
+      len(value) <= DIMENSION_VALUE_LENGTH and
       value.strip() == value))
 
 

@@ -20,6 +20,7 @@ from components import auth_testing
 from components import utils
 from test_support import test_case
 
+from server import config
 from server import task_pack
 from server import task_request
 
@@ -832,6 +833,7 @@ class TaskRequestApiTest(TestCase):
         properties=_gen_properties(
             dimensions={u'pool': [u'b'], u'a.': [u'b', u'c']})).put()
 
+  def test_request_bad_dimensions_key(self):
     # Max # keys.
     d = {u'a%s' % string.ascii_letters[i]: [unicode(i)] for i in xrange(31)}
     d[u'pool'] = [u'a']
@@ -846,12 +848,19 @@ class TaskRequestApiTest(TestCase):
       d = {u'pool': [u'default'], u'1': [u'value']}
       _gen_request(properties=_gen_properties(dimensions=d)).put()
     # Key length.
-    d = {u'pool': [u'default'], u'v'*64: [u'v']}
+    d = {
+      u'pool': [u'default'],
+      u'v'*config.DIMENSION_KEY_LENGTH: [u'v'],
+    }
     _gen_request(properties=_gen_properties(dimensions=d)).put()
     with self.assertRaises(datastore_errors.BadValueError):
-      d = {u'pool': [u'default'], u'v'*65: [u'value']}
+      d = {
+        u'pool': [u'default'],
+        u'v'*(config.DIMENSION_KEY_LENGTH+1): [u'value'],
+      }
       _gen_request(properties=_gen_properties(dimensions=d)).put()
 
+  def test_request_bad_dimensions_value(self):
     # Max # values.
     d = {u'pool': [u'b'], u'a.': [unicode(i) for i in xrange(16)]}
     _gen_request(properties=_gen_properties(dimensions=d)).put()
@@ -859,10 +868,16 @@ class TaskRequestApiTest(TestCase):
       d = {u'pool': [u'b'], u'a.': [unicode(i) for i in xrange(17)]}
       _gen_request(properties=_gen_properties(dimensions=d)).put()
     # Value length.
-    d = {u'pool': [u'default'], u'v': [u'v'*128]}
+    d = {
+      u'pool': [u'default'],
+      u'v': [u'v'*config.DIMENSION_VALUE_LENGTH],
+    }
     _gen_request(properties=_gen_properties(dimensions=d)).put()
     with self.assertRaises(datastore_errors.BadValueError):
-      d = {u'pool': [u'default'], u'v': [u'v'*129]}
+      d = {
+        u'pool': [u'default'],
+        u'v': [u'v'*(config.DIMENSION_VALUE_LENGTH+1)],
+      }
       _gen_request(properties=_gen_properties(dimensions=d)).put()
     with self.assertRaises(datastore_errors.BadValueError):
       # Value with space.
@@ -1042,10 +1057,20 @@ class TaskRequestApiTest(TestCase):
       _gen_request(service_account=u'joe@'+u'l'*125).put()
 
   def test_request_bad_tags(self):
-    req = _gen_request(manual_tags=['a:b']*256).put()
-    req = _gen_request(manual_tags=['a:b']*257)
     with self.assertRaises(datastore_errors.BadValueError):
-      req.put()
+      _gen_request(manual_tags=['a']).put()
+
+  def test_request_bad_tags_too_many(self):
+    _gen_request(manual_tags=['a:b']*256).put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      _gen_request(manual_tags=['a:b']*257).put()
+
+  def test_request_bad_tags_too_long(self):
+    # Minus 2 for the 'a:' prefix.
+    l = task_request._TAG_LENGTH - 2
+    _gen_request(manual_tags=['a:' + 'b'*l]).put()
+    with self.assertRaises(datastore_errors.BadValueError):
+      _gen_request(manual_tags=['a:' + 'a'*(l+1)]).put()
 
   def test_validate_priority(self):
     with self.assertRaises(TypeError):

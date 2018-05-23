@@ -35,6 +35,45 @@ class ConfigTest(test_case.TestCase):
       for m in messages
     ])
 
+  def test_validate_flat_dimension(self):
+    self.assertTrue(config.validate_flat_dimension(u'a:b'))
+    # Broken flat dimensions.
+    self.assertFalse(config.validate_flat_dimension('a:b'))
+    self.assertFalse(config.validate_flat_dimension(u'a:'))
+    self.assertFalse(config.validate_flat_dimension(u':b'))
+    self.assertFalse(config.validate_flat_dimension(u'ab'))
+
+  def test_validate_flat_dimension_key(self):
+    l = config.DIMENSION_KEY_LENGTH
+    self.assertTrue(config.validate_flat_dimension(u'a'*l + u':b'))
+    self.assertFalse(config.validate_flat_dimension(u'a'*(l+1) + u':b'))
+
+  def test_validate_flat_dimension_value(self):
+    l = config.DIMENSION_VALUE_LENGTH
+    self.assertTrue(config.validate_flat_dimension(u'a:' + u'b'*l))
+    self.assertFalse(config.validate_flat_dimension(u'a:' + u'b'*(l+1)))
+
+  def test_validate_dimension_key(self):
+    self.assertTrue(config.validate_dimension_key(u'b'))
+    self.assertTrue(config.validate_dimension_key(u'-'))
+    self.assertFalse(config.validate_dimension_key(u''))
+    self.assertFalse(config.validate_dimension_key(u'+'))
+
+  def test_validate_dimension_key_length(self):
+    l = config.DIMENSION_KEY_LENGTH
+    self.assertTrue(config.validate_dimension_key(u'b'*l))
+    self.assertFalse(config.validate_dimension_key(u'b'*(l+1)))
+
+  def test_validate_dimension_value(self):
+    self.assertTrue(config.validate_dimension_value(u'b'))
+    self.assertFalse(config.validate_dimension_value(u''))
+    self.assertFalse(config.validate_dimension_value(u' a'))
+
+  def test_validate_dimension_value_length(self):
+    l = config.DIMENSION_VALUE_LENGTH
+    self.assertTrue(config.validate_dimension_value(u'b'*l))
+    self.assertFalse(config.validate_dimension_value(u'b'*(l+1)))
+
   def test_validate_isolate_settings(self):
     self.validator_test(
         config._validate_isolate_settings,
