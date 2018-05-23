@@ -1228,6 +1228,9 @@ def init_new_request(request, allow_high_priority):
     raise ValueError('Either properties or task_slices must be provided')
 
   if request.parent_task_id:
+    # Note that if the child task is _likely_ blocking the parent task, unless
+    # the parent task did a fire-and-forget. Make sure to setup the priority and
+    # pool allocation accordingly.
     run_result_key = task_pack.unpack_run_result_key(request.parent_task_id)
     result_summary_key = task_pack.run_result_key_to_result_summary_key(
         run_result_key)
@@ -1237,7 +1240,6 @@ def init_new_request(request, allow_high_priority):
     # Terminate request can only be requested as a single TaskProperties.
     if not parent or parent.task_slice(0).properties.is_terminate:
       raise ValueError('parent_task_id is not a valid task')
-    request.priority = min(request.priority, max(parent.priority - 1, 1))
     # Drop the previous user.
     request.user = parent.user
 
