@@ -245,6 +245,197 @@ class ParseSegmentTreeTests(unittest.TestCase):
     self.assertEqual(actual, expected)
 
 
+class IncludeFieldTests(unittest.TestCase):
+  def test_all(self):
+    tree = {}
+    path = ('a', )
+    self.assertEqual(
+        field_masks.include_field(tree, path),
+        field_masks.INCLUDE_ENTIRELY)
+
+  def testinclude_recursively(self):
+    tree = {'a': {}}
+    path = ('a', )
+    self.assertEqual(
+        field_masks.include_field(tree, path),
+        field_masks.INCLUDE_ENTIRELY)
+
+  def testinclude_recursively_second_level(self):
+    tree = {'a': {'b': {}}}
+    path = ('a', 'b')
+    self.assertEqual(
+        field_masks.include_field(tree, path),
+        field_masks.INCLUDE_ENTIRELY)
+
+  def testinclude_recursively_star(self):
+    tree = {'a': {field_masks.STAR: {'b': {}}}}
+    path = ('a', 'x', 'b')
+    self.assertEqual(
+        field_masks.include_field(tree, path),
+        field_masks.INCLUDE_ENTIRELY)
+
+  def testinclude_partially(self):
+    tree = {'a': {'b': {}}}
+    path = ('a', )
+    self.assertEqual(
+        field_masks.include_field(tree, path),
+        field_masks.INCLUDE_PARTIALLY)
+
+  def testinclude_partially_second_level(self):
+    tree = {'a': {'b': {'c': {}}}}
+    path = ('a', 'b')
+    self.assertEqual(
+        field_masks.include_field(tree, path),
+        field_masks.INCLUDE_PARTIALLY)
+
+  def testinclude_partially_star(self):
+    tree = {'a': {field_masks.STAR: {'b': {}}}}
+    path = ('a', 'x')
+    self.assertEqual(
+        field_masks.include_field(tree, path),
+        field_masks.INCLUDE_PARTIALLY)
+
+  def testexclude(self):
+    tree = {'a': {}}
+    path = ('b',)
+    self.assertEqual(
+        field_masks.include_field(tree, path),
+        field_masks.EXCLUDE)
+
+  def testexclude_second_level(self):
+    tree = {'a': {'b': {}}}
+    path = ('a', 'c')
+    self.assertEqual(
+        field_masks.include_field(tree, path),
+        field_masks.EXCLUDE)
+
+
+class TrimTests(unittest.TestCase):
+
+  def trim(self, msg, *mask_paths):
+    field_tree = field_masks.parse_segment_tree(
+        field_mask_pb2.FieldMask(paths=mask_paths), msg.DESCRIPTOR)
+    field_masks.trim_message(msg, field_tree)
+
+  def test_scalar_trim(self):
+    msg = test_proto_pb2.Msg(num=1)
+    self.trim(msg, 'str')
+    self.assertEqual(msg, test_proto_pb2.Msg())
+
+  def test_scalar_leave(self):
+    msg = test_proto_pb2.Msg(num=1)
+    self.trim(msg, 'num')
+    self.assertEqual(msg, test_proto_pb2.Msg(num=1))
+
+  def test_scalar_repeated_trim(self):
+    msg = test_proto_pb2.Msg(nums=[1, 2])
+    self.trim(msg, 'str')
+    self.assertEqual(msg, test_proto_pb2.Msg())
+
+  def test_scalar_repeated_leave(self):
+    msg = test_proto_pb2.Msg(nums=[1, 2])
+    self.trim(msg, 'nums')
+    self.assertEqual(msg, test_proto_pb2.Msg(nums=[1, 2]))
+
+  def test_submessage_trim(self):
+    msg = test_proto_pb2.Msg(msg=test_proto_pb2.Msg(num=1))
+    self.trim(msg, 'str')
+    self.assertEqual(msg, test_proto_pb2.Msg())
+
+  def test_submessage_leave_entirely(self):
+    msg = test_proto_pb2.Msg(msg=test_proto_pb2.Msg(num=1))
+    self.trim(msg, 'msg')
+    self.assertEqual(msg, test_proto_pb2.Msg(msg=test_proto_pb2.Msg(num=1)))
+
+  def test_submessage_leave_partially(self):
+    msg = test_proto_pb2.Msg(msg=test_proto_pb2.Msg(num=1, str='x'))
+    self.trim(msg, 'msg.num')
+    self.assertEqual(msg, test_proto_pb2.Msg(msg=test_proto_pb2.Msg(num=1)))
+
+  def test_submessage_repeated_trim(self):
+    msg = test_proto_pb2.Msg(
+        msgs=[test_proto_pb2.Msg(num=1), test_proto_pb2.Msg(num=2)])
+    self.trim(msg, 'str')
+    self.assertEqual(msg, test_proto_pb2.Msg())
+
+  def test_submessage_repeated_leave_entirely(self):
+    msg = test_proto_pb2.Msg(
+        msgs=[test_proto_pb2.Msg(num=1), test_proto_pb2.Msg(num=2)])
+    expected = test_proto_pb2.Msg(
+        msgs=[test_proto_pb2.Msg(num=1), test_proto_pb2.Msg(num=2)])
+    self.trim(msg, 'msgs')
+    self.assertEqual(msg, expected)
+
+  def test_submessage_repeated_leave_entirely_trailing_star(self):
+    msg = test_proto_pb2.Msg(
+        msgs=[test_proto_pb2.Msg(num=1), test_proto_pb2.Msg(num=2)])
+    expected = test_proto_pb2.Msg(
+        msgs=[test_proto_pb2.Msg(num=1), test_proto_pb2.Msg(num=2)])
+    self.trim(msg, 'msgs.*')
+    self.assertEqual(msg, expected)
+
+  def test_submessage_repeated_leave_partially(self):
+    msg = test_proto_pb2.Msg(msgs=[
+        test_proto_pb2.Msg(num=1, str='x'),
+        test_proto_pb2.Msg(num=2, str='y'),
+    ])
+    expected = test_proto_pb2.Msg(msgs=[
+        test_proto_pb2.Msg(num=1),
+        test_proto_pb2.Msg(num=2),
+    ])
+    self.trim(msg, 'msgs.*.num')
+    self.assertEqual(msg, expected)
+
+  def test_map_str_num_trim(self):
+    msg = test_proto_pb2.Msg(map_str_num={'1': 1, '2': 2})
+    self.trim(msg, 'str')
+    self.assertEqual(msg, test_proto_pb2.Msg())
+
+  def test_map_str_num_leave_key(self):
+    msg = test_proto_pb2.Msg(map_str_num={'a': 1, 'b': 2})
+    self.trim(msg, 'map_str_num.a')
+    self.assertEqual(msg, test_proto_pb2.Msg(map_str_num={'a': 1}))
+
+  def test_map_str_num_leave_key_with_int_key(self):
+    msg = test_proto_pb2.Msg(map_str_num={'1': 1, '2': 2})
+    self.trim(msg, 'map_str_num.`1`')
+    self.assertEqual(msg, test_proto_pb2.Msg(map_str_num={'1': 1}))
+
+  def test_map_str_num_leave_key_with_int_key_invalid(self):
+    msg = test_proto_pb2.Msg(map_str_num={'1': 1, '2': 2})
+    with self.assertRaisesRegexp(ValueError, 'expected a string'):
+      self.trim(msg, 'map_str_num.1')
+
+  def test_map_str_msg_trim(self):
+    msg = test_proto_pb2.Msg(map_str_msg={'a': test_proto_pb2.Msg()})
+    self.trim(msg, 'str')
+    self.assertEqual(msg, test_proto_pb2.Msg())
+
+  def test_map_str_msg_leave_key_entirely(self):
+    msg = test_proto_pb2.Msg(
+        map_str_msg={
+            'a': test_proto_pb2.Msg(num=1),
+            'b': test_proto_pb2.Msg(num=2),
+        },
+        num=1)
+    self.trim(msg, 'map_str_msg.a')
+    self.assertEqual(
+        msg,
+        test_proto_pb2.Msg(map_str_msg={'a': test_proto_pb2.Msg(num=1)}))
+
+  def test_map_str_msg_leave_key_partially(self):
+    msg = test_proto_pb2.Msg(
+        map_str_msg={
+            'a': test_proto_pb2.Msg(num=1, str='a'),
+            'b': test_proto_pb2.Msg(num=2, str='b'),
+        },
+        num=1)
+    self.trim(msg, 'map_str_msg.a.num')
+    self.assertEqual(
+        msg,
+        test_proto_pb2.Msg(map_str_msg={'a': test_proto_pb2.Msg(num=1)}))
+
+
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None

@@ -38,19 +38,151 @@ FieldMask.paths string grammar:
 TODO(nodir): replace spec above with a link to a spec when it is available.
 """
 
+import contextlib
+
+from google import protobuf
 from google.protobuf import descriptor
 
-# TODO(nodir): add message trimming
-
 __all__ = [
-    'parse_segment_tree',
+    'EXCLUDE',
+    'INCLUDE_ENTIRELY',
+    'INCLUDE_PARTIALLY',
     'STAR',
+    'include_field',
+    'parse_segment_tree',
+    'trim_message',
 ]
 
 
 # Used in a parsed path to represent a star segment.
 # See parse_segment_tree.
 STAR = object()
+
+
+def trim_message(message, field_tree):
+  """Clears msg fields that are not in the field_mask.
+
+  If field_mask is empty, this is a noop.
+
+  Uses include_field to decide if a field should be cleared, see
+  include_field's doc.
+
+  Args:
+    message: a google.protobuf.message.Message instance.
+    field_tree: a field tree parsed using parse_segment_tree.
+      The desciptor used in parse_segment_tree must match message.DESCRIPTOR.
+
+  Raises:
+    ValueError if a field mask path is invalid.
+  """
+  # Path to the current field value.
+  seg_stack = []
+
+  @contextlib.contextmanager
+  def with_seg(seg):
+    """Returns a context manager that adds/removes a segment.
+
+    The context manager adds/removes the segment to the stack of segments on
+    enter/exit. Yields a boolean indicating whether the segment must be
+    included. See include_field() docstring for possible values.
+    See parse_segment_tree for possible values of seg.
+    """
+    seg_stack.append(seg)
+    try:
+      yield include_field(field_tree, tuple(seg_stack))
+    finally:
+      seg_stack.pop()
+
+  def trim_msg(msg):
+    for f, v in msg.ListFields():
+      with with_seg(f.name) as incl:
+        if incl == INCLUDE_ENTIRELY:
+          continue
+
+        if incl == EXCLUDE:
+          msg.ClearField(f.name)
+          continue
+
+        assert incl == INCLUDE_PARTIALLY
+
+        if not f.message_type:
+          # The field is scalar, but the field mask does not specify to include
+          # it entirely. Skip it because scalars do not have subfields.
+          # Note that parse_segment_tree would fail on such a mask because
+          # a scalar field cannot be followed by other fields.
+          msg.ClearField(f.name)
+          continue
+
+        # Trim the field value.
+        if f.message_type.GetOptions().map_entry:
+          for mk, mv in v.items():
+            with with_seg(mk) as incl:
+              if incl == INCLUDE_ENTIRELY:
+                pass
+              elif incl == EXCLUDE:
+                v.pop(mk)
+              elif isinstance(mv, protobuf.message.Message):
+                trim_msg(mv)
+              else:
+                # The field is scalar, see the comment above.
+                v.pop(mk)
+        elif f.label == descriptor.FieldDescriptor.LABEL_REPEATED:
+          with with_seg(STAR):
+            for rv in v:
+              trim_msg(rv)
+        else:
+          trim_msg(v)
+
+  trim_msg(message)
+
+
+EXCLUDE = 0
+INCLUDE_PARTIALLY = 1
+INCLUDE_ENTIRELY = 2
+
+
+def include_field(field_tree, path):
+  """Tells if a field value at the given path must be included in the response.
+
+  Args:
+    field_tree: a dict of fields, see parse_segment_tree.
+    path: a tuple of path segments.
+
+  Returns:
+    EXCLUDE if the field value must be excluded.
+    INCLUDE_PARTIALLY if some subfields of the field value must be included.
+    INCLUDE_ENTIRELY if the field value must be included entirely.
+  """
+  assert isinstance(path, tuple), path
+  assert path
+
+  def include(node, i):
+    """Tells if field path[i] must be included according to the node."""
+    if not node:
+      # node is a leaf.
+      return INCLUDE_ENTIRELY
+
+    if i == len(path):
+      # n is an intermediate node and we've exhausted path.
+      # Some of the value's subfields are included, so include this value
+      # partially.
+      return INCLUDE_PARTIALLY
+
+    # Find children that match current segment.
+    seg = path[i]
+    children = [node.get(seg)]
+    if seg != STAR:
+      # node might have a star child
+      # e.g. node = {'a': {'b': {}}, STAR: {'c': {}}}
+      # If seg is 'x', we should check the star child.
+      children.append(node.get(STAR))
+    children = [c for c in children if c is not None]
+    if not children:
+      # Nothing matched.
+      return EXCLUDE
+    return max(include(c, i + 1) for c in children)
+
+  return include(field_tree, 0)
 
 
 def parse_segment_tree(field_mask, desc):
