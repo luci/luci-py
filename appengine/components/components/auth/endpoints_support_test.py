@@ -11,6 +11,7 @@ from test_support import test_env
 test_env.setup_test_env()
 
 import endpoints
+from protorpc import message_types
 from protorpc import messages
 from protorpc import remote
 
@@ -147,10 +148,11 @@ class EndpointsAuthTest(test_case.TestCase):
 class TestingServiceApi(remote.Service):
   """Used as an example Endpoints service below."""
 
-  class Requests(messages.Message):
-    param1 = messages.StringField(1)
-    param2 = messages.StringField(2)
-    raise_error = messages.BooleanField(3)
+  Requests = endpoints.ResourceContainer(
+      message_types.VoidMessage,
+      param1=messages.StringField(1),
+      param2=messages.StringField(2),
+      raise_error=messages.BooleanField(3))
 
   class Response(messages.Message):
     param1 = messages.StringField(1)
