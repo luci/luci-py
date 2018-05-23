@@ -113,6 +113,7 @@ class EndpointsWebapp2TestCase(test_case.TestCase):
         '/api/Service/v1/post_403',
         '/api/discovery/v1/apis',
         '/api/discovery/v1/apis/<name>/<version>/rest',
+        '/api/explorer',
         '/api/static/proxy.html',
     ])
 
@@ -142,6 +143,14 @@ class EndpointsWebapp2TestCase(test_case.TestCase):
     request.method = 'GET'
     response = request.get_response(app).body
     self.assertIn('/api', response)
+
+  def test_redirect_routing(self):
+    app = webapp2.WSGIApplication(
+        [adapter.explorer_redirect_route('/api')], debug=True)
+    request = webapp2.Request.blank('/api/explorer')
+    request.method = 'GET'
+    response = request.get_response(app)
+    self.assertEqual(response.status, '302 Moved Temporarily')
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

@@ -21,6 +21,7 @@ import webapp2
 
 from components import net
 from components import template
+from components import utils
 
 import discovery
 
@@ -196,9 +197,12 @@ def api_server(api_classes, base_path='/api'):
   routes = []
   for api_class in api_classes:
     routes.extend(api_routes(api_class, base_path=base_path))
-  routes.append(directory_service_route(api_classes, base_path))
-  routes.append(discovery_service_route(api_classes, base_path))
-  routes.append(explorer_proxy_route(base_path))
+  routes.extend([
+      directory_service_route(api_classes, base_path),
+      discovery_service_route(api_classes, base_path),
+      explorer_proxy_route(base_path),
+      explorer_redirect_route(base_path),
+  ])
   return routes
 
 
@@ -222,7 +226,7 @@ def discovery_handler_factory(api_classes, base_path):
     """Returns a discovery document for known services."""
 
     def get(self, name, version):
-      host = dict(self.request.headers)['Host']
+      host = self.request.headers['Host']
       services = service_map.get((name, version))
       if not services:
         self.abort(404, 'Not Found')
@@ -266,7 +270,7 @@ def directory_handler_factory(api_classes, base_path):
     """Returns a directory list for known services."""
 
     def get(self):
-      host = dict(self.request.headers)['Host']
+      host = self.request.headers['Host']
       self.response.headers['Content-Type'] = 'application/json'
       json.dump(
           discovery.directory(api_classes, host, base_path),
@@ -311,3 +315,23 @@ def explorer_proxy_route(base_path):
       'adapter': os.path.join(THIS_DIR, 'templates'),
   })
   return webapp2.Route('%s/static/proxy.html' % base_path, ProxyHandler)
+
+
+def explorer_redirect_route(base_path):
+  """Returns a route to a handler which redirects to the API explorer.
+
+  Args:
+    base_path: The base path under which all service paths exist.
+
+  Returns:
+    A webapp2.Route.
+  """
+  class RedirectHandler(webapp2.RequestHandler):
+    """Returns a handler redirecting to the API explorer."""
+
+    def get(self):
+      host = self.request.headers['Host']
+      self.redirect('https://apis-explorer.appspot.com/apis-explorer'
+                    '/?base=https://%s%s' % (host, base_path))
+
+  return webapp2.Route('%s/explorer' % base_path, RedirectHandler)
