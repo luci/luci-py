@@ -105,6 +105,12 @@ class ServiceB(remote.Service):
 class DiscoveryWebapp2TestCase(test_case.TestCase):
   """Tests for discovery.py"""
 
+  def test_normalize_name(self):
+    """Tests discovery._normalize_name."""
+    self.assertEqual(
+        discovery._normalize_name('some_package.subpackage.a__method'),
+        'SomePackageSubpackageAMethod')
+
   def test_get_methods(self):
     """Tests discovery._get_methods."""
     expected = (
@@ -116,7 +122,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           'id': 'service.get_method',
           'path': 'get_method',
           'response': {
-            '$ref': 'discovery_test.Message',
+            '$ref': 'DiscoveryTestMessage',
           },
           'scopes': [
             'https://www.googleapis.com/auth/userinfo.email',
@@ -137,11 +143,11 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           },
           'path': '{path}/method',
           'request': {
-            '$ref': 'discovery_test.Message',
+            '$ref': 'DiscoveryTestMessage',
             'parameterName': 'resource',
           },
           'response': {
-            '$ref': 'discovery_test.Message',
+            '$ref': 'DiscoveryTestMessage',
           },
           'scopes': [
             'https://www.googleapis.com/auth/userinfo.email',
@@ -153,11 +159,11 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           'id': 'service.post_method',
           'path': 'post_method',
           'request': {
-            '$ref': 'discovery_test.Message',
+            '$ref': 'DiscoveryTestMessage',
             'parameterName': 'resource',
           },
           'response': {
-            '$ref': 'discovery_test.Message',
+            '$ref': 'DiscoveryTestMessage',
           },
           'scopes': [
             'https://www.googleapis.com/auth/userinfo.email',
@@ -176,7 +182,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           },
           'path': 'query_string_method',
           'response': {
-            '$ref': 'discovery_test.Message',
+            '$ref': 'DiscoveryTestMessage',
           },
           'scopes': [
             'https://www.googleapis.com/auth/userinfo.email',
@@ -188,9 +194,9 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
       },
       # schemas
       {
-        'discovery_test.Message': {
+        'DiscoveryTestMessage': {
           'description': 'A message to test with.',
-          'id': 'discovery_test.Message',
+          'id': 'DiscoveryTestMessage',
           'properties': {
             'boolean': {
               'type': 'boolean',
@@ -261,9 +267,9 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
   def test_get_schemas(self):
     """Tests for discovery._get_schemas."""
     expected = {
-      'discovery_test.Child': {
+      'DiscoveryTestChild': {
         'description': 'A child message to test recursion with.',
-        'id': 'discovery_test.Child',
+        'id': 'DiscoveryTestChild',
         'properties': {
           'enum': {
             'default': 'UNKNOWN',
@@ -276,12 +282,12 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
         },
         'type': 'object',
       },
-      'discovery_test.Parent': {
+      'DiscoveryTestParent': {
         'description': 'A parent message to test recursion with.',
-        'id': 'discovery_test.Parent',
+        'id': 'DiscoveryTestParent',
         'properties': {
           'child': {
-            '$ref': 'discovery_test.Child',
+            '$ref': 'DiscoveryTestChild',
             'description': 'A child message to test recursion with.',
           },
           'datetime': {
@@ -326,7 +332,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           'id': 'service.get_method',
           'path': 'get_method',
           'response': {
-            '$ref': 'discovery_test.Message',
+            '$ref': 'DiscoveryTestMessage',
           },
           'scopes': [
             'https://www.googleapis.com/auth/userinfo.email',
@@ -347,11 +353,11 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           },
           'path': '{path}/method',
           'request': {
-            '$ref': 'discovery_test.Message',
+            '$ref': 'DiscoveryTestMessage',
             'parameterName': 'resource',
           },
           'response': {
-            '$ref': 'discovery_test.Message',
+            '$ref': 'DiscoveryTestMessage',
           },
           'scopes': [
             'https://www.googleapis.com/auth/userinfo.email',
@@ -363,11 +369,11 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           'id': 'service.post_method',
           'path': 'post_method',
           'request': {
-            '$ref': 'discovery_test.Message',
+            '$ref': 'DiscoveryTestMessage',
             'parameterName': 'resource',
           },
           'response': {
-            '$ref': 'discovery_test.Message',
+            '$ref': 'DiscoveryTestMessage',
           },
           'scopes': [
             'https://www.googleapis.com/auth/userinfo.email',
@@ -386,7 +392,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           },
           'path': 'query_string_method',
           'response': {
-            '$ref': 'discovery_test.Message',
+            '$ref': 'DiscoveryTestMessage',
           },
           'scopes': [
             'https://www.googleapis.com/auth/userinfo.email',
@@ -451,9 +457,9 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
       'protocol': 'rest',
       'rootUrl': 'http://localhost:8080/api/',
       'schemas': {
-        'discovery_test.Message': {
+        'DiscoveryTestMessage': {
           'description': 'A message to test with.',
-          'id': 'discovery_test.Message',
+          'id': 'DiscoveryTestMessage',
           'properties': {
             'boolean': {
               'type': 'boolean',
@@ -572,7 +578,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
               'id': 'split.sa.post_method',
               'path': 'a/post_method',
               'response': {
-                '$ref': 'discovery_test.Message',
+                '$ref': 'DiscoveryTestMessage',
               },
               'scopes': [
                 'https://www.googleapis.com/auth/userinfo.email',
@@ -589,7 +595,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
               'id': 'split.sb.post_method',
               'path': 'b/post_method',
               'response': {
-                '$ref': 'discovery_test.Message',
+                '$ref': 'DiscoveryTestMessage',
               },
               'scopes': [
                 'https://www.googleapis.com/auth/userinfo.email',
@@ -600,9 +606,9 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
       },
       'rootUrl': 'http://localhost:8080/api/',
       'schemas': {
-        'discovery_test.Message': {
+        'DiscoveryTestMessage': {
           'description': 'A message to test with.',
-          'id': 'discovery_test.Message',
+          'id': 'DiscoveryTestMessage',
           'properties': {
             'boolean': {
               'type': 'boolean',

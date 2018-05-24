@@ -14,6 +14,21 @@ from protorpc import messages
 from components import utils
 
 
+def _normalize_name(n):
+  """Splits words by . and _ and PascalCases the rest.
+
+  Args:
+    n: The string to normalize.
+
+  Returns:
+    A normalized version of the given string.
+  """
+  words = []
+  for word in n.replace('_', '.').split('.'):
+    words.append('%s%s' % (word[:1].upper(), word[1:]))
+  return ''.join(words)
+
+
 def _normalize_whitespace(s):
   """Replaces consecutive whitespace characters with a single space.
 
@@ -98,13 +113,7 @@ def _get_schemas(types):
   # this invariant by initializing seen to types and adding to seen every time
   # the loop adds to types.
   for message_type in types:
-    # Endpoints v1 and v2 discovery documents "normalize" these names by
-    # removing non-alphanumeric characters and putting the rest in PascalCase.
-    # However, it's possible these names only need to match the $refs below and
-    # exact formatting is irrelevant. It's also possible APIs Explorer requires
-    # these to be normalized.
-    # TODO(smut): Figure out if these names need to be normalized.
-    name = message_type.definition_name()
+    name = _normalize_name(message_type.definition_name())
 
     schemas[name] = {
       'id': name,
@@ -136,7 +145,7 @@ def _get_schemas(types):
           types.append(field_type)
           # Maintain loop invariant.
           seen.add(field_type)
-        items['$ref'] = field_type.definition_name()
+        items['$ref'] = _normalize_name(field_type.definition_name())
       else:
         schema_type, schema_format = _get_type_format(field)
         items['type'] = schema_type
@@ -189,8 +198,8 @@ def _get_parameters(message, path):
   # The order is the names of path parameters in the order in which they
   # appear in the path followed by the names of required query strings.
   order = re.findall(PARAMETER_REGEX, path)
-  parameters = _get_schemas([message]).get(message.definition_name(), {}).get(
-      'properties', {})
+  parameters = _get_schemas([message]).get(
+      _normalize_name(message.definition_name()), {}).get('properties', {})
   for parameter, schema in parameters.iteritems():
     # As above, repeated fields for parameters do not have items.
     if schema['type'] == 'array':
@@ -261,7 +270,7 @@ def _get_methods(service):
         if info.http_method not in ('GET', 'DELETE'):
           document['request'] = {
             # $refs refer to the "schemas" section of the discovery doc.
-            '$ref': request.__class__.definition_name(),
+            '$ref': _normalize_name(request.__class__.definition_name()),
             'parameterName': 'resource',
           }
           types.add(request.__class__)
@@ -272,7 +281,7 @@ def _get_methods(service):
       if rc.body_message_class != message_types.VoidMessage:
         if info.http_method not in ('GET', 'DELETE'):
           document['request'] = {
-            '$ref': rc.body_message_class.definition_name(),
+            '$ref': _normalize_name(rc.body_message_class.definition_name()),
             'parameterName': 'resource',
           }
           types.add(rc.body_message_class)
@@ -282,7 +291,7 @@ def _get_methods(service):
     response = method.remote.response_type()
     if not isinstance(response, message_types.VoidMessage):
       document['response'] = {
-        '$ref': response.__class__.definition_name(),
+        '$ref': _normalize_name(response.__class__.definition_name()),
       }
       types.add(response.__class__)
 
