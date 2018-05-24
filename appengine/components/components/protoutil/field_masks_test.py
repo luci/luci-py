@@ -253,56 +253,56 @@ class IncludeFieldTests(unittest.TestCase):
         field_masks.include_field(tree, path),
         field_masks.INCLUDE_ENTIRELY)
 
-  def testinclude_recursively(self):
+  def test_include_recursively(self):
     tree = {'a': {}}
     path = ('a', )
     self.assertEqual(
         field_masks.include_field(tree, path),
         field_masks.INCLUDE_ENTIRELY)
 
-  def testinclude_recursively_second_level(self):
+  def test_include_recursively_second_level(self):
     tree = {'a': {'b': {}}}
     path = ('a', 'b')
     self.assertEqual(
         field_masks.include_field(tree, path),
         field_masks.INCLUDE_ENTIRELY)
 
-  def testinclude_recursively_star(self):
+  def test_include_recursively_star(self):
     tree = {'a': {field_masks.STAR: {'b': {}}}}
     path = ('a', 'x', 'b')
     self.assertEqual(
         field_masks.include_field(tree, path),
         field_masks.INCLUDE_ENTIRELY)
 
-  def testinclude_partially(self):
+  def test_include_partially(self):
     tree = {'a': {'b': {}}}
     path = ('a', )
     self.assertEqual(
         field_masks.include_field(tree, path),
         field_masks.INCLUDE_PARTIALLY)
 
-  def testinclude_partially_second_level(self):
+  def test_include_partially_second_level(self):
     tree = {'a': {'b': {'c': {}}}}
     path = ('a', 'b')
     self.assertEqual(
         field_masks.include_field(tree, path),
         field_masks.INCLUDE_PARTIALLY)
 
-  def testinclude_partially_star(self):
+  def test_include_partially_star(self):
     tree = {'a': {field_masks.STAR: {'b': {}}}}
     path = ('a', 'x')
     self.assertEqual(
         field_masks.include_field(tree, path),
         field_masks.INCLUDE_PARTIALLY)
 
-  def testexclude(self):
+  def test_exclude(self):
     tree = {'a': {}}
     path = ('b',)
     self.assertEqual(
         field_masks.include_field(tree, path),
         field_masks.EXCLUDE)
 
-  def testexclude_second_level(self):
+  def test_exclude_second_level(self):
     tree = {'a': {'b': {}}}
     path = ('a', 'c')
     self.assertEqual(
