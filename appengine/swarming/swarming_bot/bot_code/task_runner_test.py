@@ -6,6 +6,7 @@
 
 import base64
 import datetime
+import fnmatch
 import json
 import logging
 import os
@@ -86,14 +87,14 @@ class FakeAuthSystem(object):
 class TestTaskRunnerBase(net_utils.TestCase):
   def setUp(self):
     super(TestTaskRunnerBase, self).setUp()
-    self.root_dir = tempfile.mkdtemp(prefix='task_runner')
-    logging.info('Temp: %s', self.root_dir)
-    self.work_dir = os.path.join(self.root_dir, 'w')
+    self.root_dir = unicode(tempfile.mkdtemp(prefix=u'task_runner'))
+    self.work_dir = os.path.join(self.root_dir, u'w')
+    # Create the logs directory so run_isolated.py can put its log there.
+    self.logs_dir = os.path.join(self.root_dir, u'logs')
     os.chdir(self.root_dir)
     os.mkdir(self.work_dir)
-    # Create the logs directory so run_isolated.py can put its log there.
-    self._logs = os.path.join(self.root_dir, 'logs')
-    os.mkdir(self._logs)
+    os.mkdir(self.logs_dir)
+    logging.info('Temp: %s', self.root_dir)
     def _get_run_isolated():
       return [sys.executable, os.path.join(CLIENT_DIR, 'run_isolated.py')]
     self.mock(task_runner, 'get_run_isolated', _get_run_isolated)
@@ -111,9 +112,9 @@ class TestTaskRunnerBase(net_utils.TestCase):
   def tearDown(self):
     os.chdir(test_env_bot_code.BOT_DIR)
     try:
-      logging.debug(self._logs)
-      for i in os.listdir(self._logs):
-        with open(os.path.join(self._logs, i), 'rb') as f:
+      logging.debug(self.logs_dir)
+      for i in os.listdir(self.logs_dir):
+        with open(os.path.join(self.logs_dir, i), 'rb') as f:
           logging.debug('%s:\n%s', i, ''.join('  ' + line for line in f))
       file_path.rmtree(self.root_dir)
     except OSError:
@@ -661,19 +662,46 @@ class TestTaskRunner(TestTaskRunnerBase):
     }
     self.assertEqual(expected, self._run_command(task_details))
 
+  def _expect_files(self, expected):
+    expected = expected[:]
+    for root, dirs, filenames in os.walk(self.root_dir):
+      if 'logs' in dirs:
+        dirs.remove('logs')
+      for filename in filenames:
+        p = os.path.relpath(os.path.join(root, filename), self.root_dir)
+        for i, e in enumerate(expected):
+          if fnmatch.fnmatch(p, e):
+            expected.pop(i)
+            break
+        else:
+          self.fail((p, expected))
+    if expected:
+      self.fail(expected)
+
   def test_run_command_caches(self):
-    # Put a file into a named cache.
-    root_dir = os.path.join(self.root_dir, u'c')
+    # This test puts a file into a named cache, remove it, runs a test that
+    # updates the named cache, remaps it and asserts the content was updated.
+    #
+    # Directories:
+    #   <root_dir>/
+    #   <root_dir>/c - <cache_dir> named cache root
+    #   <root_dir>/dest - <dest_dir> used for manual cache update
+    #   <root_dir>/w - <self.work_dir> used by the task.
+    cache_dir = os.path.join(self.root_dir, u'c')
+    dest_dir = os.path.join(self.root_dir, u'dest')
     policies = local_caching.CachePolicies(0, 0, 0, 0)
-    cache_manager = local_caching.CacheManager(root_dir, policies)
-    install_dir = os.path.join(self.root_dir, u'install')
 
-    with cache_manager.open():
-      cache_manager.install(install_dir, 'foo')
-      with open(os.path.join(install_dir, 'bar'), 'wb') as f:
+    # Inject file 'bar' in the named cache 'foo'.
+    with local_caching.NamedCache(cache_dir, policies) as cache:
+      cache.install(dest_dir, 'foo')
+      with open(os.path.join(dest_dir, 'bar'), 'wb') as f:
         f.write('thecache')
-      cache_manager.uninstall(install_dir, 'foo')
+      cache.uninstall(dest_dir, 'foo')
+      self.assertFalse(os.path.exists(dest_dir))
 
+    self._expect_files([u'c/*/bar', u'c/state.json'])
+
+    # Maps the cache 'foo' as 'cache_foo'. This runs inside self.work_dir.
     # This runs the command for real.
     self.requests(cost_usd=1, exit_code=0)
     script = (
@@ -684,11 +712,9 @@ class TestTaskRunner(TestTaskRunnerBase):
       'with open("../../result", "wb") as f:\n'
       '  f.write(cached)\n'
       'with open("cache_foo/bar", "wb") as f:\n'
-      '  f.write("updated_cache")\n'
-    )
+      '  f.write("updated_cache")\n')
     task_details = self.get_task_details(
-        script,
-        caches=[{'name': 'foo', 'path': 'cache_foo'}])
+        script, caches=[{'name': 'foo', 'path': 'cache_foo'}])
     expected = {
       u'exit_code': 0,
       u'hard_timeout': False,
@@ -697,15 +723,29 @@ class TestTaskRunner(TestTaskRunnerBase):
       u'version': task_runner.OUT_VERSION,
     }
     self.assertEqual(expected, self._run_command(task_details))
+    self._expect_files(
+        [
+          u'c/*/bar', u'c/state.json', u'result', u'w/run_isolated_args.json',
+        ])
 
+    # Ensure the 'result' file written my the task contained foo/bar.
     with open(os.path.join(self.root_dir, 'result'), 'rb') as f:
       self.assertEqual('thecache', f.read())
+    os.remove(os.path.join(self.root_dir, 'result'))
 
-    with cache_manager.open():
-      cache_manager.install(install_dir, 'foo')
-      with open(os.path.join(install_dir, 'bar'), 'rb') as f:
+    print open(os.path.join(cache_dir, 'state.json')).read()
+
+    with local_caching.NamedCache(cache_dir, policies) as cache:
+      self.assertFalse(os.path.exists(dest_dir))
+      self._expect_files(
+          [u'c/*/bar', u'c/state.json', u'w/run_isolated_args.json'])
+      cache.install(dest_dir, 'foo')
+      self._expect_files(
+          [u'dest/bar', u'c/state.json', u'w/run_isolated_args.json'])
+      with open(os.path.join(dest_dir, 'bar'), 'rb') as f:
         self.assertEqual('updated_cache', f.read())
-      cache_manager.uninstall(install_dir, 'foo')
+      cache.uninstall(dest_dir, 'foo')
+      self.assertFalse(os.path.exists(dest_dir))
 
   def test_start_task_runner_fail_on_startup(self):
     def _get_run_isolated():
