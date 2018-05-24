@@ -4,15 +4,12 @@
 
 """Cloud endpoints for the GCE Backend API."""
 
-import endpoints
+import webapp2
 
 from components import config
 from components import endpoints_webapp2
 
 
-def get_routes():
-  return endpoints_webapp2.api_server([config.ConfigApi])
-
-
 def create_endpoints_app():
-  return endpoints.api_server([config.ConfigApi])
+  return webapp2.WSGIApplication(
+      endpoints_webapp2.api_server([config.ConfigApi], base_path='/_ah/api'))

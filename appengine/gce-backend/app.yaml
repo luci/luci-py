@@ -10,11 +10,8 @@ automatic_scaling:
   min_idle_instances: 1
 
 handlers:
-- url: /_ah/spi/.*
+- url: /_ah/api/.*
   script: main.endpoints_app
-  secure: always
-- url: /api/.*
-  script: main.frontend_app
   secure: always
 - url: /internal/cron/.*
   login: admin
