@@ -120,7 +120,7 @@ message MachineProviderSettings {
 // All groups default to 'administrators'.
 //
 // See
-// https://github.com/luci/luci-py/blob/master/appengine/swarming/doc/Access-Groups.md
+// https://chromium.googlesource.com/infra/luci/luci-py.git/+/master/appengine/swarming/doc/Access-Groups.md
 // for more detail.
 
 message AuthSettings {

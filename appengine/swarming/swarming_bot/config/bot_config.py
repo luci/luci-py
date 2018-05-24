@@ -51,7 +51,8 @@ def get_dimensions(bot):
   dimensions override the ones provided by the bot. See bot.Bot.dimensions for
   more information.
 
-  See https://github.com/luci/luci-py/tree/master/appengine/swarming/doc/Magic-Values.md.
+  See
+  https://chromium.googlesource.com/infra/luci/luci-py.git/+/master/appengine/swarming/doc/Magic-Values.md
 
   Arguments:
   - bot: bot.Bot instance or None. See ../api/bot.py.
@@ -135,7 +136,8 @@ def get_state(bot):
   'dimensions' for that), but it can use it for maintenance and bookkeeping
   tasks.
 
-  See https://github.com/luci/luci-py/tree/master/appengine/swarming/doc/Magic-Values.md.
+  See
+  https://chromium.googlesource.com/infra/luci/luci-py.git/+/master/appengine/swarming/doc/Magic-Values.md
 
   Arguments:
   - bot: bot.Bot instance or None. See ../api/bot.py.
@@ -255,7 +257,7 @@ def on_before_task(bot, bot_file, runner_cmd, runner_env):
   - bot_file: Path to file to write information about the state of the bot.
               This file can be used to pass certain info about the bot
               to tasks, such as which connected android devices to run on. See
-              https://github.com/luci/luci-py/tree/master/appengine/swarming/doc/Magic-Values.md#run_isolated
+              https://chromium.googlesource.com/infra/luci/luci-py.git/+/master/appengine/swarming/doc/Magic-Values.md#run_isolated
   - runner_cmd: Command to be executed to launch task runner. This variable can
                 be mutated to override the task runner, modify its arguments
                 and/or add a wrapper script around it. USE WITH CAUTION.
@@ -333,7 +335,8 @@ def setup_bot(bot):
     f.write(
 """This directory contains a Swarming bot.
 
-Swarming source code is hosted at https://github.com/luci/luci-py.
+Swarming source code is hosted at
+https://chromium.googlesource.com/infra/luci/luci-py.git.
 
 The bot was generated from the server %s. To get the bot's attributes, run:
 

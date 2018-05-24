@@ -18,7 +18,7 @@ A complete CI toolkit:
 *   git based configuration data propagation.
 *   Automatic Google Compute Engine VM recycling.
 *   Windows, OSX and Linux (Ubuntu), used with Android, iOS, ChromeOS.
-*   Written in python 2.7 along [Go](https://github.com/luci/luci-go) tools.
+*   Written in python 2.7 along [Go](https://go.chromium.org/luci) tools.
 *   Used by the Chromium infrastructure and other teams.
 
 
