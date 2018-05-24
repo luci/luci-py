@@ -324,18 +324,19 @@ def _parse_path(path, desc):
     if tok_type == _EOF:
       raise ValueError('unexpected end')
 
-    if ctx.expect_star:
+    is_map_key = ctx.desc and ctx.desc.GetOptions().map_entry
+    if ctx.repeated and not is_map_key:
       if tok_type != _STAR:
         raise ValueError('unexpected token "%s", expected a star' % tok)
       read()  # Swallow star.
-      ctx.expect_star = False
+      ctx.repeated = False
       return STAR, False
 
     if ctx.desc is None:
       raise ValueError(
           'scalar field "%s" cannot have subfields' % ctx.field_path)
 
-    if ctx.desc.GetOptions().map_entry:
+    if is_map_key:
       key_type = ctx.desc.fields_by_name['key'].type
       if key_type not in _SUPPORTED_MAP_KEY_TYPES:
         raise ValueError(
@@ -402,7 +403,7 @@ class _ParseContext(object):
   def __init__(self, desc):
     self.i = 0
     self.desc = desc
-    self.expect_star = False
+    self.repeated = False
     self._field_path = []  # full path of the current field
 
   def advance_to_field(self, field):
@@ -412,9 +413,7 @@ class _ParseContext(object):
       field: a google.protobuf.descriptor.FieldDescriptor to move to.
     """
     self.desc = field.message_type
-    self.expect_star = (
-        field.label == descriptor.FieldDescriptor.LABEL_REPEATED
-        and not (self.desc and self.desc.GetOptions().map_entry))
+    self.repeated = field.label == descriptor.FieldDescriptor.LABEL_REPEATED
     self._field_path.append(field.name)
 
   @property
