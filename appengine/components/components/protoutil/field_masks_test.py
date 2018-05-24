@@ -141,11 +141,13 @@ class ParsePathTests(unittest.TestCase):
       self.parse('msg.*.str')
 
   def test_msg_unexpected_field(self):
-    with self.assertRaisesRegexp(ValueError, r'field "msg.x" does not exist'):
+    err_pattern = r'field "x" does not exist in message protoutil.Msg'
+    with self.assertRaisesRegexp(ValueError, err_pattern):
       self.parse('msg.x')
 
   def test_msg_unexpected_subfield(self):
-    with self.assertRaisesRegexp(ValueError, r'"msg.msg.x" does not exist'):
+    err_pattern = r'field "x" does not exist in message protoutil.Msg'
+    with self.assertRaisesRegexp(ValueError, err_pattern):
       self.parse('msg.msg.x')
 
   def test_msg_msgs_str(self):

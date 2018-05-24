@@ -384,9 +384,9 @@ def _parse_path(path, desc, repeated=False):
 
     field = ctx.desc.fields_by_name.get(field_name)
     if field is None:
-      prefix = ctx.field_path
-      full_name = '%s.%s' % (prefix, field_name) if prefix else field_name
-      raise ValueError('field "%s" does not exist' % full_name)
+      raise ValueError(
+          'field "%s" does not exist in message %s' % (
+              field_name, ctx.desc.full_name))
     ctx.advance_to_field(field)
     return field_name, False
 
