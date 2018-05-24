@@ -47,179 +47,198 @@ __all__ = [
     'EXCLUDE',
     'INCLUDE_ENTIRELY',
     'INCLUDE_PARTIALLY',
+    'Mask',
     'STAR',
-    'include_field',
-    'parse_segment_tree',
-    'trim_message',
 ]
 
 
 # Used in a parsed path to represent a star segment.
-# See parse_segment_tree.
+# See Mask docstring.
 STAR = object()
-
-
-def trim_message(message, field_tree):
-  """Clears msg fields that are not in the field_mask.
-
-  If field_mask is empty, this is a noop.
-
-  Uses include_field to decide if a field should be cleared, see
-  include_field's doc.
-
-  Args:
-    message: a google.protobuf.message.Message instance.
-    field_tree: a field tree parsed using parse_segment_tree.
-      The desciptor used in parse_segment_tree must match message.DESCRIPTOR.
-
-  Raises:
-    ValueError if a field mask path is invalid.
-  """
-  # Path to the current field value.
-  seg_stack = []
-
-  @contextlib.contextmanager
-  def with_seg(seg):
-    """Returns a context manager that adds/removes a segment.
-
-    The context manager adds/removes the segment to the stack of segments on
-    enter/exit. Yields a boolean indicating whether the segment must be
-    included. See include_field() docstring for possible values.
-    See parse_segment_tree for possible values of seg.
-    """
-    seg_stack.append(seg)
-    try:
-      yield include_field(field_tree, tuple(seg_stack))
-    finally:
-      seg_stack.pop()
-
-  def trim_msg(msg):
-    for f, v in msg.ListFields():
-      with with_seg(f.name) as incl:
-        if incl == INCLUDE_ENTIRELY:
-          continue
-
-        if incl == EXCLUDE:
-          msg.ClearField(f.name)
-          continue
-
-        assert incl == INCLUDE_PARTIALLY
-
-        if not f.message_type:
-          # The field is scalar, but the field mask does not specify to include
-          # it entirely. Skip it because scalars do not have subfields.
-          # Note that parse_segment_tree would fail on such a mask because
-          # a scalar field cannot be followed by other fields.
-          msg.ClearField(f.name)
-          continue
-
-        # Trim the field value.
-        if f.message_type.GetOptions().map_entry:
-          for mk, mv in v.items():
-            with with_seg(mk) as incl:
-              if incl == INCLUDE_ENTIRELY:
-                pass
-              elif incl == EXCLUDE:
-                v.pop(mk)
-              elif isinstance(mv, protobuf.message.Message):
-                trim_msg(mv)
-              else:
-                # The field is scalar, see the comment above.
-                v.pop(mk)
-        elif f.label == descriptor.FieldDescriptor.LABEL_REPEATED:
-          with with_seg(STAR):
-            for rv in v:
-              trim_msg(rv)
-        else:
-          trim_msg(v)
-
-  trim_msg(message)
-
 
 EXCLUDE = 0
 INCLUDE_PARTIALLY = 1
 INCLUDE_ENTIRELY = 2
 
 
-def include_field(field_tree, path):
-  """Tells if a field value at the given path must be included in the response.
+class Mask(object):
+  """A tree representation of a field mask. Serves as a tree node too.
 
-  Args:
-    field_tree: a dict of fields, see parse_segment_tree.
-    path: a tuple of path segments.
+  Each node represents a segment of a paths string, e.g. 'bar' in 'foo.bar.qux'.
+  A Field mask with paths ['a', 'b.c'] is parsed as
+    <root>
+      a
+      b
+        c
 
-  Returns:
-    EXCLUDE if the field value must be excluded.
-    INCLUDE_PARTIALLY if some subfields of the field value must be included.
-    INCLUDE_ENTIRELY if the field value must be included entirely.
+  Attrs:
+    desc: a descriptor of the message of the field this node represents.
+      If the field type is not a message, then desc is None and the node
+      must be a leaf.
+    repeated: True means that the segment represents a repeated field, and not
+      one of the elements. Children of the node are the field elements.
+    children: a dict that maps a segment to its node, e.g. children of the root
+      of the example above has keys 'a' and 'b', and values are Mask objects. A
+      segment can be of type str, int, bool or it can be the value of
+      field_masks.STAR for '*' segments.
   """
-  assert isinstance(path, tuple), path
-  assert path
 
-  def include(node, i):
-    """Tells if field path[i] must be included according to the node."""
-    if not node:
-      # node is a leaf.
+  def __init__(self, desc=None, repeated=False, children=None):
+    """Initializes the mask.
+
+    The arguments initialize attributes of the same names, see Mask docstring.
+    """
+    self.desc = desc
+    self.repeated = repeated
+    self.children = children or {}
+
+  def trim(self, message):
+    """Clears message fields that are not in the mask.
+
+    The message must be a google.protobuf.message.Message.
+    Uses self.include to decide what to trim, see its docstring.
+    If self is a leaf, this is a noop.
+    """
+    for f, v in message.ListFields():
+      incl = self.include((f.name,))
+      if incl == INCLUDE_ENTIRELY:
+        continue
+
+      if incl == EXCLUDE:
+        message.ClearField(f.name)
+        continue
+
+      assert incl == INCLUDE_PARTIALLY
+      # Child for this field must exist because INCLUDE_PARTIALLY.
+      child = self.children[f.name]
+
+      if not f.message_type:
+        # The field is scalar, but the field mask does not specify to
+        # include it entirely. Skip it because scalars do not have
+        # subfields. Note that from_field_mask would fail on such a mask
+        # because a scalar field cannot be followed by other fields.
+        message.ClearField(f.name)
+        continue
+
+      # Trim the field value.
+      if f.message_type.GetOptions().map_entry:
+        for mk, mv in v.items():
+          incl = self.include((f.name, mk))
+          if incl == INCLUDE_ENTIRELY:
+            pass
+          elif incl == EXCLUDE:
+            v.pop(mk)
+          elif isinstance(mv, protobuf.message.Message):
+            assert incl == INCLUDE_PARTIALLY
+            # Child for mk must exist because INCLUDE_PARTIALLY.
+            child.children[mk].trim(mv)
+          else:
+            # The field is scalar, see the comment above.
+            v.pop(mk)
+      elif f.label == descriptor.FieldDescriptor.LABEL_REPEATED:
+        star_child = child.children[STAR]
+        for rv in v:
+          star_child.trim(rv)
+      else:
+        child.trim(v)
+
+  def include(self, path, start_at=0):
+    """Tells if a field value at the given path must be included.
+
+    Args:
+      path: a path string or a tuple of segments.
+      start_at: the index of the segment to start interpreting path from.
+
+    Returns:
+      EXCLUDE if the field value must be excluded.
+      INCLUDE_PARTIALLY if some subfields of the field value must be included.
+      INCLUDE_ENTIRELY if the field value must be included entirely.
+
+    Raises:
+      ValueError: path is a string and it is invalid according to
+        self.desc and self.repeated.
+    """
+    assert path
+    if not isinstance(path, tuple):
+      path = _parse_path(path, self.desc, self.repeated)
+
+    if not self.children:
       return INCLUDE_ENTIRELY
 
-    if i == len(path):
-      # n is an intermediate node and we've exhausted path.
+    if start_at == len(path):
+      # This node is intermediate and we've exhausted the path.
       # Some of the value's subfields are included, so include this value
       # partially.
       return INCLUDE_PARTIALLY
 
     # Find children that match current segment.
-    seg = path[i]
-    children = [node.get(seg)]
+    seg = path[start_at]
+    children = [self.children.get(seg)]
     if seg != STAR:
-      # node might have a star child
-      # e.g. node = {'a': {'b': {}}, STAR: {'c': {}}}
+      # self might have a star child
+      # e.g. self is {'a': {'b': {}}, STAR: {'c': {}}}
       # If seg is 'x', we should check the star child.
-      children.append(node.get(STAR))
+      children.append(self.children.get(STAR))
     children = [c for c in children if c is not None]
     if not children:
       # Nothing matched.
       return EXCLUDE
-    return max(include(c, i + 1) for c in children)
+    return max(c.include(path, start_at + 1) for c in children)
 
-  return include(field_tree, 0)
+  @classmethod
+  def from_field_mask(cls, field_mask, desc):
+    """Parses a field mask to a Mask.
 
+    Removes trailing stars, e.g. parses ['a.*'] as ['a'].
+    Removes redundant paths, e.g. parses ['a', 'a.b'] as ['a'].
 
-def parse_segment_tree(field_mask, desc):
-  """Parses a field mask to a tree of segments.
+    Args:
+      field_mask: a google.protobuf.field_mask_pb2.FieldMask instance.
+      desc: a google.protobuf.descriptor.Descriptor for the target message.
 
-  Each node represents a segment and in turn is represented by a dict where each
-  dict key is a child key and dict value is a child node. For example, parses
-  ['a', 'b.c'] to {'a': {}, 'b': {'c': {}}}.
+    Raises:
+      ValueError if a field path is invalid.
+    """
+    parsed_paths = []
+    for p in field_mask.paths:
+      try:
+        parsed_paths.append(_parse_path(p, desc))
+      except ValueError as ex:
+        raise ValueError('invalid path "%s": %s' % (p, ex))
 
-  Parses '*' segments as field_masks.STAR.
-  Parses integer and boolean map keys as int and bool.
+    parsed_paths = _normalize_paths(parsed_paths)
 
-  Removes trailing stars, e.g. parses ['a.*'] to {'a': {}}.
-  Removes redundant paths, e.g. parses ['a', 'a.b'] as {'a': {}}.
+    root = cls(desc)
+    for p in parsed_paths:
+      node = root
+      for seg in p:
+        if seg not in node.children:
+          if node.desc.GetOptions().map_entry:
+            child = cls(node.desc.fields_by_name['value'].message_type)
+          elif node.repeated:
+            child = cls(node.desc)
+          else:
+            field = node.desc.fields_by_name[seg]
+            repeated = field.label == descriptor.FieldDescriptor.LABEL_REPEATED
+            child = cls(field.message_type, repeated=repeated)
+          node.children[seg] = child
+        node = node.children[seg]
+    return root
 
-  Args:
-    field_mask: a google.protobuf.field_mask_pb2.FieldMask instance.
-    desc: a google.protobuf.descriptor.Descriptor for the target message.
+  def __eq__(self, other):
+    """Returns True if other is equivalent to self."""
+    return (
+        self.desc == other.desc and
+        self.repeated == other.repeated and
+        self.children == other.children)
 
-  Raises:
-    ValueError if a field path is invalid.
-  """
-  parsed_paths = []
-  for p in field_mask.paths:
-    try:
-      parsed_paths.append(_parse_path(p, desc))
-    except ValueError as ex:
-      raise ValueError('invalid path "%s": %s' % (p, ex))
+  def __ne__(self, other):
+    """Returns False if other is equivalent to self."""
+    return not (self == other)
 
-  parsed_paths = _normalize_paths(parsed_paths)
-
-  root = {}
-  for p in parsed_paths:
-    node = root
-    for seg in p:
-      node = node.setdefault(seg, {})
-  return root
+  def __repr__(self):
+    """Returns a string representation of the Mask."""
+    return 'Mask(%r, %r, %r)' % (self.desc, self.repeated, self.children)
 
 
 def _normalize_paths(paths):
@@ -269,21 +288,17 @@ _SUPPORTED_MAP_KEY_TYPES = _INTEGER_FIELD_TYPES | {
 }
 
 
-def _parse_path(path, desc):
+def _parse_path(path, desc, repeated=False):
   """Parses a field path to a tuple of segments.
 
-  Grammar:
-    path = segment {'.' segment}
-    segment = literal | '*' | quoted_string;
-    literal = string | integer | bool
-    string = (letter | '_') {letter | '_' | digit}
-    integer = ['-'] digit {digit};
-    bool = 'true' | 'false';
-    quoted_string = '`' { utf8-no-backtick | '``' } '`'
+  See grammar in the module docstring.
 
   Args:
     path: a field path.
     desc: a google.protobuf.descriptor.Descriptor of the target message.
+    repeated: True means that desc is a repeated field. For example,
+      the target field is a repeated message field and path starts with an
+      index.
 
   Returns:
     A tuple of segments. A star is returned as STAR object.
@@ -292,7 +307,7 @@ def _parse_path(path, desc):
     ValueError if path is invalid.
   """
   tokens = list(_tokenize(path))
-  ctx = _ParseContext(desc)
+  ctx = _ParseContext(desc, repeated)
   peek = lambda: tokens[ctx.i]
 
   def read():
@@ -400,10 +415,10 @@ def _parse_path(path, desc):
 class _ParseContext(object):
   """Context of parsing in _parse_path."""
 
-  def __init__(self, desc):
+  def __init__(self, desc, repeated):
     self.i = 0
     self.desc = desc
-    self.repeated = False
+    self.repeated = repeated
     self._field_path = []  # full path of the current field
 
   def advance_to_field(self, field):

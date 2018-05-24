@@ -19,9 +19,15 @@ import field_masks
 import test_proto_pb2
 
 
+# Shortcuts.
+TEST_DESC = test_proto_pb2.Msg.DESCRIPTOR
+STAR = field_masks.STAR
+Mask = field_masks.Mask
+
+
 class ParsePathTests(unittest.TestCase):
-  def parse(self, path):
-    return field_masks._parse_path(path, test_proto_pb2.Msg.DESCRIPTOR)
+  def parse(self, path, repeated=False):
+    return field_masks._parse_path(path, TEST_DESC, repeated=repeated)
 
   def test_str(self):
     actual = self.parse('str')
@@ -45,7 +51,7 @@ class ParsePathTests(unittest.TestCase):
 
   def test_str_repeated_trailing_star(self):
     actual = self.parse('strs.*')
-    expected = ('strs', field_masks.STAR)
+    expected = ('strs', STAR)
     self.assertEqual(actual, expected)
 
   def test_str_repeated_index(self):
@@ -94,7 +100,7 @@ class ParsePathTests(unittest.TestCase):
 
   def test_map_str_key_star(self):
     actual = self.parse('map_str_num.*')
-    expected = ('map_str_num', field_masks.STAR)
+    expected = ('map_str_num', STAR)
     self.assertEqual(actual, expected)
 
   def test_map_str_key_int(self):
@@ -117,7 +123,7 @@ class ParsePathTests(unittest.TestCase):
 
   def test_map_bool_key_star(self):
     actual = self.parse('map_bool_str.*')
-    expected = ('map_bool_str', field_masks.STAR)
+    expected = ('map_bool_str', STAR)
     self.assertEqual(actual, expected)
 
   def test_msg_str(self):
@@ -127,7 +133,7 @@ class ParsePathTests(unittest.TestCase):
 
   def test_msg_star(self):
     actual = self.parse('msg.*')
-    expected = ('msg', field_masks.STAR)
+    expected = ('msg', STAR)
     self.assertEqual(actual, expected)
 
   def test_msg_star_str(self):
@@ -144,7 +150,7 @@ class ParsePathTests(unittest.TestCase):
 
   def test_msg_msgs_str(self):
     actual = self.parse('msgs.*.str')
-    expected = ('msgs', field_masks.STAR, 'str')
+    expected = ('msgs', STAR, 'str')
     self.assertEqual(actual, expected)
 
   def test_msg_map_num_str(self):
@@ -159,12 +165,12 @@ class ParsePathTests(unittest.TestCase):
 
   def test_map_str_map_num_star(self):
     actual = self.parse('map_str_msg.*')
-    expected = ('map_str_msg', field_masks.STAR)
+    expected = ('map_str_msg', STAR)
     self.assertEqual(actual, expected)
 
   def test_map_str_map_num_star_str(self):
     actual = self.parse('map_str_msg.*.str')
-    expected = ('map_str_msg', field_masks.STAR, 'str')
+    expected = ('map_str_msg', STAR, 'str')
     self.assertEqual(actual, expected)
 
   def test_trailing_period(self):
@@ -174,6 +180,15 @@ class ParsePathTests(unittest.TestCase):
   def test_trailing_period_period(self):
     with self.assertRaisesRegexp(ValueError, r'cannot start with a period'):
       self.parse('str..')
+
+  def test_repeated_valid(self):
+    actual = self.parse('*.str', repeated=True)
+    expected = (STAR, 'str')
+    self.assertEqual(actual, expected)
+
+  def test_repeated_invalid(self):
+    with self.assertRaisesRegexp(ValueError, r'expected a star'):
+      self.parse('1.str', repeated=True)
 
 
 class NormalizePathsTests(unittest.TestCase):
@@ -208,114 +223,104 @@ class NormalizePathsTests(unittest.TestCase):
     self.assertEqual(actual, expected)
 
 
-class ParseSegmentTreeTests(unittest.TestCase):
+class FromFieldMaskTests(unittest.TestCase):
   def parse(self, paths):
-    return field_masks.parse_segment_tree(
-        field_mask_pb2.FieldMask(paths=paths),
-        test_proto_pb2.Msg.DESCRIPTOR)
+    fm = field_mask_pb2.FieldMask(paths=paths)
+    return Mask.from_field_mask(fm, TEST_DESC)
 
   def test_empty(self):
     actual = self.parse([])
-    expected = {}
+    expected = Mask(TEST_DESC)
     self.assertEqual(actual, expected)
 
   def test_str(self):
     actual = self.parse(['str'])
-    expected = {'str': {}}
+    expected = Mask(TEST_DESC, children={
+        'str': Mask(),
+    })
     self.assertEqual(actual, expected)
 
   def test_str_num(self):
     actual = self.parse(['str', 'num'])
-    expected = {'str': {}, 'num': {}}
+    expected = Mask(TEST_DESC, children={
+        'str': Mask(),
+        'num': Mask(),
+    })
     self.assertEqual(actual, expected)
 
   def test_str_msg_num(self):
     actual = self.parse(['str', 'msg.num'])
-    expected = {'str': {}, 'msg': {'num': {}}}
+    expected = Mask(TEST_DESC, children={
+        'str': Mask(),
+        'msg': Mask(TEST_DESC, children={
+            'num': Mask(),
+        }),
+    })
     self.assertEqual(actual, expected)
 
   def test_redunant(self):
     actual = self.parse(['msg', 'msg.num'])
-    expected = {'msg': {}}
+    expected = Mask(TEST_DESC, children={
+        'msg': Mask(TEST_DESC),
+    })
     self.assertEqual(actual, expected)
 
   def test_redunant_star(self):
     actual = self.parse(['msg.*', 'msg.msg.num'])
-    expected = {'msg': {}}
+    expected = Mask(TEST_DESC, children={
+        'msg': Mask(TEST_DESC),
+    })
     self.assertEqual(actual, expected)
 
 
-class IncludeFieldTests(unittest.TestCase):
+class IncludeTests(unittest.TestCase):
+  def mask(self, *paths):
+    return Mask.from_field_mask(
+        field_mask_pb2.FieldMask(paths=list(paths)), TEST_DESC)
+
   def test_all(self):
-    tree = {}
-    path = ('a', )
-    self.assertEqual(
-        field_masks.include_field(tree, path),
-        field_masks.INCLUDE_ENTIRELY)
+    actual = self.mask().include('str')
+    self.assertEqual(actual, field_masks.INCLUDE_ENTIRELY)
 
   def test_include_recursively(self):
-    tree = {'a': {}}
-    path = ('a', )
-    self.assertEqual(
-        field_masks.include_field(tree, path),
-        field_masks.INCLUDE_ENTIRELY)
+    actual = self.mask('str').include('str')
+    self.assertEqual(actual, field_masks.INCLUDE_ENTIRELY)
 
   def test_include_recursively_second_level(self):
-    tree = {'a': {'b': {}}}
-    path = ('a', 'b')
-    self.assertEqual(
-        field_masks.include_field(tree, path),
-        field_masks.INCLUDE_ENTIRELY)
+    actual = self.mask('msg.str').include('msg.str')
+    self.assertEqual(actual, field_masks.INCLUDE_ENTIRELY)
 
   def test_include_recursively_star(self):
-    tree = {'a': {field_masks.STAR: {'b': {}}}}
-    path = ('a', 'x', 'b')
-    self.assertEqual(
-        field_masks.include_field(tree, path),
-        field_masks.INCLUDE_ENTIRELY)
+    actual = self.mask('map_str_msg.*.str').include('map_str_msg.x.str')
+    self.assertEqual(actual, field_masks.INCLUDE_ENTIRELY)
 
   def test_include_partially(self):
-    tree = {'a': {'b': {}}}
-    path = ('a', )
-    self.assertEqual(
-        field_masks.include_field(tree, path),
-        field_masks.INCLUDE_PARTIALLY)
+    actual = self.mask('msg.str').include('msg')
+    self.assertEqual(actual, field_masks.INCLUDE_PARTIALLY)
 
   def test_include_partially_second_level(self):
-    tree = {'a': {'b': {'c': {}}}}
-    path = ('a', 'b')
-    self.assertEqual(
-        field_masks.include_field(tree, path),
-        field_masks.INCLUDE_PARTIALLY)
+    actual = self.mask('msg.msg.str').include('msg.msg')
+    self.assertEqual(actual, field_masks.INCLUDE_PARTIALLY)
 
   def test_include_partially_star(self):
-    tree = {'a': {field_masks.STAR: {'b': {}}}}
-    path = ('a', 'x')
-    self.assertEqual(
-        field_masks.include_field(tree, path),
-        field_masks.INCLUDE_PARTIALLY)
+    actual = self.mask('map_str_msg.*.str').include('map_str_msg.x')
+    self.assertEqual(actual, field_masks.INCLUDE_PARTIALLY)
 
   def test_exclude(self):
-    tree = {'a': {}}
-    path = ('b',)
-    self.assertEqual(
-        field_masks.include_field(tree, path),
-        field_masks.EXCLUDE)
+    actual = self.mask('str').include('num')
+    self.assertEqual(actual, field_masks.EXCLUDE)
 
   def test_exclude_second_level(self):
-    tree = {'a': {'b': {}}}
-    path = ('a', 'c')
-    self.assertEqual(
-        field_masks.include_field(tree, path),
-        field_masks.EXCLUDE)
+    actual = self.mask('msg.str').include('msg.num')
+    self.assertEqual(actual, field_masks.EXCLUDE)
 
 
 class TrimTests(unittest.TestCase):
 
   def trim(self, msg, *mask_paths):
-    field_tree = field_masks.parse_segment_tree(
+    mask = Mask.from_field_mask(
         field_mask_pb2.FieldMask(paths=mask_paths), msg.DESCRIPTOR)
-    field_masks.trim_message(msg, field_tree)
+    mask.trim(msg)
 
   def test_scalar_trim(self):
     msg = test_proto_pb2.Msg(num=1)
