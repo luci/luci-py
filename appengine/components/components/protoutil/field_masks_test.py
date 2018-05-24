@@ -281,39 +281,39 @@ class IncludeTests(unittest.TestCase):
         field_mask_pb2.FieldMask(paths=list(paths)), TEST_DESC)
 
   def test_all(self):
-    actual = self.mask().include('str')
+    actual = self.mask().includes('str')
     self.assertEqual(actual, field_masks.INCLUDE_ENTIRELY)
 
   def test_include_recursively(self):
-    actual = self.mask('str').include('str')
+    actual = self.mask('str').includes('str')
     self.assertEqual(actual, field_masks.INCLUDE_ENTIRELY)
 
   def test_include_recursively_second_level(self):
-    actual = self.mask('msg.str').include('msg.str')
+    actual = self.mask('msg.str').includes('msg.str')
     self.assertEqual(actual, field_masks.INCLUDE_ENTIRELY)
 
   def test_include_recursively_star(self):
-    actual = self.mask('map_str_msg.*.str').include('map_str_msg.x.str')
+    actual = self.mask('map_str_msg.*.str').includes('map_str_msg.x.str')
     self.assertEqual(actual, field_masks.INCLUDE_ENTIRELY)
 
   def test_include_partially(self):
-    actual = self.mask('msg.str').include('msg')
+    actual = self.mask('msg.str').includes('msg')
     self.assertEqual(actual, field_masks.INCLUDE_PARTIALLY)
 
   def test_include_partially_second_level(self):
-    actual = self.mask('msg.msg.str').include('msg.msg')
+    actual = self.mask('msg.msg.str').includes('msg.msg')
     self.assertEqual(actual, field_masks.INCLUDE_PARTIALLY)
 
   def test_include_partially_star(self):
-    actual = self.mask('map_str_msg.*.str').include('map_str_msg.x')
+    actual = self.mask('map_str_msg.*.str').includes('map_str_msg.x')
     self.assertEqual(actual, field_masks.INCLUDE_PARTIALLY)
 
   def test_exclude(self):
-    actual = self.mask('str').include('num')
+    actual = self.mask('str').includes('num')
     self.assertEqual(actual, field_masks.EXCLUDE)
 
   def test_exclude_second_level(self):
-    actual = self.mask('msg.str').include('msg.num')
+    actual = self.mask('msg.str').includes('msg.num')
     self.assertEqual(actual, field_masks.EXCLUDE)
 
 

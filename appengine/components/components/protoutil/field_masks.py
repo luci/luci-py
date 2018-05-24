@@ -96,11 +96,11 @@ class Mask(object):
     """Clears message fields that are not in the mask.
 
     The message must be a google.protobuf.message.Message.
-    Uses self.include to decide what to trim, see its docstring.
+    Uses self.includes to decide what to trim, see its docstring.
     If self is a leaf, this is a noop.
     """
     for f, v in message.ListFields():
-      incl = self.include((f.name,))
+      incl = self.includes((f.name,))
       if incl == INCLUDE_ENTIRELY:
         continue
 
@@ -123,7 +123,7 @@ class Mask(object):
       # Trim the field value.
       if f.message_type.GetOptions().map_entry:
         for mk, mv in v.items():
-          incl = self.include((f.name, mk))
+          incl = self.includes((f.name, mk))
           if incl == INCLUDE_ENTIRELY:
             pass
           elif incl == EXCLUDE:
@@ -142,7 +142,7 @@ class Mask(object):
       else:
         child.trim(v)
 
-  def include(self, path, start_at=0):
+  def includes(self, path, start_at=0):
     """Tells if a field value at the given path must be included.
 
     Args:
@@ -167,7 +167,7 @@ class Mask(object):
 
     if start_at == len(path):
       # This node is intermediate and we've exhausted the path.
-      # Some of the value's subfields are included, so include this value
+      # Some of the value's subfields are included, so includes this value
       # partially.
       return INCLUDE_PARTIALLY
 
@@ -183,7 +183,7 @@ class Mask(object):
     if not children:
       # Nothing matched.
       return EXCLUDE
-    return max(c.include(path, start_at + 1) for c in children)
+    return max(c.includes(path, start_at + 1) for c in children)
 
   @classmethod
   def from_field_mask(cls, field_mask, desc):
