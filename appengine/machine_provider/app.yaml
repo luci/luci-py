@@ -8,7 +8,7 @@ api_version: 1
 instance_class: F4
 
 handlers:
-- url: /_ah/spi/.*
+- url: /_ah/api/.*
   script: main.endpoints_app
   secure: always
 - url: /internal/cron/.*

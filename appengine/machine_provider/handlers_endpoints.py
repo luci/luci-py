@@ -9,6 +9,7 @@ import json
 import logging
 
 import endpoints
+import webapp2
 
 from google.appengine import runtime
 from google.appengine.api import app_identity
@@ -755,9 +756,9 @@ def get_routes():
 
 
 def create_endpoints_app():
-  return endpoints.api_server([
+  return webapp2.WSGIApplication(endpoints_webapp2.api_server([
       CatalogEndpoints,
       MachineEndpoints,
       MachineProviderEndpoints,
       config.ConfigApi,
-  ])
+  ], base_path='/_ah/api'))

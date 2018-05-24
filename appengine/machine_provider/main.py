@@ -28,8 +28,7 @@ def main():
     handlers_frontend.create_frontend_app(),
     handlers_queues.create_queues_app(),
   )
-  for app in apps[1:]:
-    # Not callable on endpoints app
+  for app in apps:
     gae_ts_mon.initialize(app=app, is_enabled_fn=is_enabled_callback)
   return apps
 
