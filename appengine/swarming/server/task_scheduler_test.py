@@ -452,8 +452,42 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # The first was immediately expired, and the second immediately reaped.
     request, _, run_result = task_scheduler.bot_reap_task(
         self.bot_dimensions, 'abc', None)
-    # BUG(maruel): Should have taken the second.
-    self.assertEqual(0, run_result.current_task_slice)
+    self.assertEqual(1, run_result.current_task_slice)
+
+  def test_schedule_request_slice_fallback_to_second_after_expiration(self):
+    # The first TaskSlice couldn't run so it was eventually expired and the
+    # second couldn't be run by the bot that was polling.
+    self._register_bot(0, self.bot_dimensions)
+    second_bot = self.bot_dimensions.copy()
+    second_bot[u'id'] = [u'second']
+    second_bot[u'os'] = [u'Atari']
+    self._register_bot(0, second_bot)
+    self._quick_schedule(
+        2,
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=180,
+              properties=_gen_properties(io_timeout_secs=61)),
+          task_request.TaskSlice(
+              expiration_secs=180,
+              properties=_gen_properties(
+                  dimensions={u'pool': [u'default'], u'os': [u'Atari']})),
+        ])
+    # The second bot can't reap the task.
+    _, _, run_result = task_scheduler.bot_reap_task(second_bot, 'second', None)
+    self.assertIsNone(run_result)
+
+    self.mock_now(self.now, 181)
+    # The first was immediately expired, and the second TaskSlice cannot be
+    # reaped by this bot.
+    _, _, run_result = task_scheduler.bot_reap_task(
+        self.bot_dimensions, 'abc', None)
+    self.assertIsNone(run_result)
+    # The second bot is able to reap it immediately. This is because when the
+    # first bot tried to reap the task, it expired the first TaskToRun and
+    # created a new one, which the second bot *can* reap.
+    _, _, run_result = task_scheduler.bot_reap_task(second_bot, 'second', None)
+    self.assertEqual(1, run_result.current_task_slice)
 
   def test_schedule_request_slice_no_capacity(self):
     result_summary = self._quick_schedule(

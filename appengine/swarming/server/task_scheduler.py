@@ -45,6 +45,59 @@ def _secs_to_ms(value):
   return int(round(value * 1000.))
 
 
+def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity):
+  """Expires a to_run_key and look for a TaskSlice fallback.
+
+  Called as a ndb transaction by _expire_task().
+
+  2 concurrent GET, one PUT. Optionally with an additional serialized GET.
+  """
+  to_run_future = to_run_key.get_async()
+  result_summary_future = result_summary_key.get_async()
+  to_run = to_run_future.get_result()
+  if not to_run or not to_run.is_reapable:
+    result_summary_future.get_result()
+    return None, None
+
+  # In any case, dequeue the TaskToRun.
+  to_run.queue_number = None
+  result_summary = result_summary_future.get_result()
+  to_put = [to_run, result_summary]
+  # Check if there's a TaskSlice fallback that could be reenqueued.
+  new_to_run = None
+  offset = result_summary.current_task_slice+1
+  rest = request.num_task_slices - offset
+  for index in xrange(rest):
+    # Use the lookup created just before the transaction. There's a small race
+    # condition in here but we're willing to accept it.
+    if capacity[index]:
+      # Enqueue a new TasktoRun for this next TaskSlice, it has capacity!
+      new_to_run = task_to_run.new_task_to_run(request, 1, index+offset)
+      result_summary.current_task_slice = index+offset
+      to_put.append(new_to_run)
+      break
+
+  if not new_to_run:
+    # There's no fallback, giving up.
+    if result_summary.try_number:
+      # It's a retry that is being expired, i.e. the first try had BOT_DIED.
+      # Keep the old state. That requires an additional pipelined GET but that
+      # shouldn't be the common case.
+      run_result = result_summary.run_result_key.get()
+      result_summary.set_from_run_result(run_result, request)
+    else:
+      result_summary.state = task_result.State.EXPIRED
+    result_summary.abandoned_ts = now
+  result_summary.modified_ts = now
+
+  futures = ndb.put_multi_async(to_put)
+  _maybe_pubsub_notify_via_tq(result_summary, request)
+  for f in futures:
+    f.check_success()
+
+  return result_summary, new_to_run
+
+
 def _expire_task(to_run_key, request, retries):
   """Expires a TaskResultSummary and unschedules the TaskToRun.
 
@@ -59,8 +112,9 @@ def _expire_task(to_run_key, request, retries):
   expiring the TaskResultSummary.
 
   Returns:
-    TaskResultSummary on success, bool if reenqueued (due to following
-    TaskSlice).
+    tuple of
+    - TaskResultSummary on success
+    - TaskToRun if a new TaskSlice was reenqueued
   """
   # Look if the TaskToRun is reapable once before doing the check inside the
   # transaction. This reduces the likelihood of failing this check inside the
@@ -81,69 +135,24 @@ def _expire_task(to_run_key, request, retries):
     for i in xrange(index+1, request.num_task_slices)
   ]
 
-  def run():
-    # 2 concurrent GET, one PUT. Optionally with an additional serialized GET.
-    to_run_future = to_run_key.get_async()
-    result_summary_future = result_summary_key.get_async()
-    to_run = to_run_future.get_result()
-    if not to_run or not to_run.is_reapable:
-      result_summary_future.get_result()
-      return None, None
-
-    # In any case, dequeue the TaskToRun.
-    to_run.queue_number = None
-    result_summary = result_summary_future.get_result()
-    to_put = [to_run, result_summary]
-    # Check if there's a TaskSlice fallback that could be reenqueued.
-    new_to_run = None
-    offset = result_summary.current_task_slice+1
-    rest = request.num_task_slices - offset
-    for index in xrange(rest):
-      # Use the lookup created just before the transaction. There's a small race
-      # condition in here but we're willing to accept it.
-      if capacity[index]:
-        # Enqueue a new TasktoRun for this next TaskSlice, it has capacity!
-        new_to_run = task_to_run.new_task_to_run(request, 1, index+offset)
-        result_summary.current_task_slice = index+offset
-        to_put.append(new_to_run)
-        break
-
-    if not new_to_run:
-      # There's no fallback, giving up.
-      if result_summary.try_number:
-        # It's a retry that is being expired, i.e. the first try had BOT_DIED.
-        # Keep the old state. That requires an additional pipelined GET but that
-        # shouldn't be the common case.
-        run_result = result_summary.run_result_key.get()
-        result_summary.set_from_run_result(run_result, request)
-      else:
-        result_summary.state = task_result.State.EXPIRED
-      result_summary.abandoned_ts = now
-    result_summary.modified_ts = now
-
-    futures = ndb.put_multi_async(to_put)
-    _maybe_pubsub_notify_via_tq(result_summary, request)
-    for f in futures:
-      f.check_success()
-
-    return result_summary, new_to_run
-
   # Add it to the negative cache *before* running the transaction. Either way
   # the task was already reaped or the task is correctly expired and not
   # reapable.
   task_to_run.set_lookup_cache(to_run_key, False)
 
   # It'll be caught by next cron job execution in case of failure.
+  run = lambda: _expire_task_tx(
+      now, request, to_run_key, result_summary_key, capacity)
   try:
-    res, r = datastore_utils.transaction(run, retries=retries)
+    summary, new_to_run = datastore_utils.transaction(run, retries=retries)
   except datastore_utils.CommitError:
-    res = None
-    r = None
-  if res:
+    summary = None
+    new_to_run = None
+  if summary:
     logging.info(
         'Expired %s', task_pack.pack_result_summary_key(result_summary_key))
-    ts_mon_metrics.on_task_completed(res)
-  return res, r
+    ts_mon_metrics.on_task_completed(summary)
+  return summary, new_to_run
 
 
 def _reap_task(bot_dimensions, bot_version, to_run_key, request):
@@ -903,20 +912,31 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
         bot_dimensions, deadline)
     for request, to_run in q:
       iterated += 1
-      # BUG(maruel): Needs to check the task slice expiration, not the whole
-      # request expiration.
-      if request.expiration_ts < utils.utcnow():
+      slice_index = task_to_run.task_to_run_key_slice_index(to_run.key)
+      t = request.task_slice(slice_index)
+      limit = to_run.created_ts + datetime.timedelta(seconds=t.expiration_secs)
+      if limit < utils.utcnow():
         # Use a low number of retries, as at worst the cron job will catch it.
-        s, r = _expire_task(to_run.key, request, retries=1)
-        if r:
-          # Expiring a TaskToRun for TaskSlice may reenqueue a new TaskToRun.
-          # It'll be processed accordingly but not handled here.
-          reenqueued += 1
-        elif s:
-          expired += 1
-        else:
-          stale_index += 1
-        continue
+        summary, new_to_run = _expire_task(to_run.key, request, retries=1)
+        if not new_to_run:
+          if summary:
+            expired += 1
+          else:
+            stale_index += 1
+          continue
+        # Expiring a TaskToRun for TaskSlice may reenqueue a new TaskToRun.
+        # Check it out right away, just in case.
+        reenqueued += 1
+        # We need to do an adhoc validation to check the new TaskToRun, so see
+        # if we can harvest it too. This is slightly duplicating work in
+        # yield_next_available_task_to_dispatch().
+        slice_index = task_to_run.task_to_run_key_slice_index(new_to_run.key)
+        t = request.task_slice(slice_index)
+        if not task_to_run.match_dimensions(
+            t.properties.dimensions, bot_dimensions):
+          continue
+        to_run = new_to_run
+
       run_result, secret_bytes = _reap_task(
           bot_dimensions, bot_version, to_run.key, request)
       if not run_result:
@@ -1185,8 +1205,8 @@ def cron_abort_expired_task_to_run(host):
   try:
     for to_run in task_to_run.yield_expired_task_to_run():
       request = to_run.request_key.get()
-      summary, next_slice = _expire_task(to_run.key, request, retries=4)
-      if next_slice:
+      summary, new_to_run = _expire_task(to_run.key, request, retries=4)
+      if new_to_run:
         # Expiring a TaskToRun for TaskSlice may reenqueue a new TaskToRun.
         reenqueued.append(request)
       elif summary:
