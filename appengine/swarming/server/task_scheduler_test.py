@@ -72,7 +72,10 @@ def _gen_request_slices(**kwargs):
     u'name': u'yay',
     u'priority': 50,
     u'task_slices': [
-      task_request.TaskSlice(expiration_secs=60, properties=_gen_properties()),
+      task_request.TaskSlice(
+        expiration_secs=60,
+        properties=_gen_properties(),
+        wait_for_capacity=False),
     ],
     u'user': u'Jesus',
   }
@@ -241,7 +244,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     """
     self.assertEqual(0, self.execute_tasks())
     request = _gen_request_slices(**kwargs)
-    result_summary = task_scheduler.schedule_request(request, None, True)
+    result_summary = task_scheduler.schedule_request(request, None)
     # State will be either PENDING or COMPLETED (for deduped task)
     self.assertEqual(num_task, self.execute_tasks())
     self.assertEqual(0, self.execute_tasks())
@@ -358,7 +361,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         task_slices=[
           task_request.TaskSlice(
               expiration_secs=60,
-              properties=_gen_properties(idempotent=True)),
+              properties=_gen_properties(idempotent=True),
+              wait_for_capacity=False),
         ])
     self.assertEqual('1d69b9f088002b10', result_summary_2.task_id)
     self.assertEqual(State.COMPLETED, result_summary_2.state)
@@ -367,14 +371,20 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_schedule_request_no_capacity(self):
     # No capacity, denied. That's the default.
     request = _gen_request_slices()
-    result_summary = task_scheduler.schedule_request(request, None, True)
+    result_summary = task_scheduler.schedule_request(request, None)
     self.assertEqual(State.NO_RESOURCE, result_summary.state)
     self.assertEqual(1, self.execute_tasks())
 
   def test_schedule_request_no_check_capacity(self):
     # No capacity, but check disabled, allowed.
-    request = _gen_request_slices()
-    result_summary = task_scheduler.schedule_request(request, None, False)
+    request = _gen_request_slices(
+            task_slices=[
+              task_request.TaskSlice(
+                  expiration_secs=60,
+                  properties=_gen_properties(),
+                  wait_for_capacity=True),
+            ])
+    result_summary = task_scheduler.schedule_request(request, None)
     self.assertEqual(State.PENDING, result_summary.state)
     self.assertEqual(1, self.execute_tasks())
 
@@ -425,10 +435,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
                   dimensions={
                     u'nonexistent': [u'really'],
                     u'pool': [u'default'],
-                  })),
+                  }),
+              wait_for_capacity=False),
           task_request.TaskSlice(
               expiration_secs=180,
-              properties=_gen_properties()),
+              properties=_gen_properties(),
+              wait_for_capacity=False),
         ])
     request, _, run_result = task_scheduler.bot_reap_task(
         self.bot_dimensions, 'abc', None)
@@ -499,16 +511,39 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
                   dimensions={
                     u'nonexistent': [u'really'],
                     u'pool': [u'default'],
-                  })),
+                  }),
+              wait_for_capacity=False),
           task_request.TaskSlice(
               expiration_secs=180,
-              properties=_gen_properties()),
+              properties=_gen_properties(),
+              wait_for_capacity=False),
         ])
     # The task is immediately denied, without waiting.
     self.assertEqual(State.NO_RESOURCE, result_summary.state)
     self.assertEqual(self.now, result_summary.abandoned_ts)
     self.assertIsNone(result_summary.try_number)
     self.assertEqual(0, result_summary.current_task_slice)
+
+  def test_schedule_request_slice_wait_for_capacity(self):
+    result_summary = self._quick_schedule(
+        2,
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=180,
+              properties=_gen_properties(
+                  dimensions={
+                    u'nonexistent': [u'really'],
+                    u'pool': [u'default'],
+                  }),
+              wait_for_capacity=False),
+          task_request.TaskSlice(
+              expiration_secs=180,
+              properties=_gen_properties(),
+              wait_for_capacity=True),
+        ])
+        # Pending on the second slice, even if there's no capacity.
+    self.assertEqual(State.PENDING, result_summary.state)
+    self.assertEqual(1, result_summary.current_task_slice)
 
   def test_schedule_request_slice_no_capacity_fallback_second(self):
     self._register_bot(0, self.bot_dimensions)
@@ -521,10 +556,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
                   dimensions={
                     u'nonexistent': [u'really'],
                     u'pool': [u'default'],
-                  })),
+                  }),
+              wait_for_capacity=False),
           task_request.TaskSlice(
               expiration_secs=180,
-              properties=_gen_properties()),
+              properties=_gen_properties(),
+              wait_for_capacity=False),
         ])
     # The task fell back to the second slice, still pending.
     self.assertEqual(State.PENDING, result_summary.state)
@@ -596,7 +633,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         task_slices=[
           task_request.TaskSlice(
               expiration_secs=60,
-              properties=_gen_properties(idempotent=True)),
+              properties=_gen_properties(idempotent=True),
+              wait_for_capacity=False),
         ])
     self.assertEqual('localhost', run_result.bot_id)
     to_run_key = _run_result_to_to_run_key(run_result)
@@ -630,7 +668,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         task_slices=[
           task_request.TaskSlice(
               expiration_secs=60,
-              properties=_gen_properties(idempotent=True)),
+              properties=_gen_properties(idempotent=True),
+              wait_for_capacity=False),
         ])
     request = result_summary.request_key.get()
     to_run_key = task_to_run.request_to_task_to_run_key(request, 1, 0)
@@ -679,7 +718,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         task_slices=[
           task_request.TaskSlice(
               expiration_secs=60,
-              properties=_gen_properties(idempotent=True)),
+              properties=_gen_properties(idempotent=True),
+              wait_for_capacity=False),
         ])
     # The task was enqueued for execution.
     to_run_key = task_to_run.request_to_task_to_run_key(
@@ -702,7 +742,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         task_slices=[
           task_request.TaskSlice(
               expiration_secs=60,
-              properties=_gen_properties(idempotent=True)),
+              properties=_gen_properties(idempotent=True),
+              wait_for_capacity=False),
         ])
     # The task was enqueued for execution.
     to_run_key = task_to_run.request_to_task_to_run_key(
@@ -749,10 +790,12 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
                   dimensions={
                     u'inexistant': [u'really'],
                     u'pool': [u'default'],
-                  })),
+                  }),
+              wait_for_capacity=False),
           task_request.TaskSlice(
               expiration_secs=180,
-              properties=_gen_properties(idempotent=True)),
+              properties=_gen_properties(idempotent=True),
+              wait_for_capacity=False),
         ])
     to_run_key = task_to_run.request_to_task_to_run_key(
         result_summary.request_key.get(), 1, 0)
@@ -791,7 +834,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
                   inputs_ref=task_request.FilesRef(
                       isolated='1' * 40,
                       isolatedserver='http://localhost:1',
-                      namespace='default-gzip'))),
+                      namespace='default-gzip')),
+              wait_for_capacity=False),
         ])
     self.assertEqual('localhost', run_result.bot_id)
     to_run_key = _run_result_to_to_run_key(run_result)
@@ -999,7 +1043,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
           task_slices=[
             task_request.TaskSlice(
                 expiration_secs=60,
-                properties=_gen_properties(dimensions={u'id': [u'abc']})),
+                properties=_gen_properties(dimensions={u'id': [u'abc']}),
+                wait_for_capacity=False),
           ])
 
   def test_bot_update_task(self):
@@ -1403,7 +1448,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         task_slices=[
           task_request.TaskSlice(
               expiration_secs=600,
-              properties=_gen_properties(idempotent=True)),
+              properties=_gen_properties(idempotent=True),
+              wait_for_capacity=False),
         ])
     # Fake first try bot died.
     self.assertEqual(1, len(pub_sub_calls)) # PENDING -> RUNNING
@@ -1473,6 +1519,37 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     # Skipped the second and third TaskSlice.
     self.assertEqual(3, result_summary.current_task_slice)
 
+  def test_cron_abort_expired_fallback_wait_for_capacity(self):
+    # 1 has capacity.
+    self.bot_dimensions[u'item'] = [u'1']
+    self._register_bot(0, self.bot_dimensions)
+    result_summary = self._quick_schedule(
+        2,
+        task_slices=[
+          task_request.TaskSlice(
+              expiration_secs=600,
+              properties=_gen_properties(
+                  dimensions={u'pool': [u'default'], u'item': [u'1']}),
+              wait_for_capacity=False),
+          task_request.TaskSlice(
+              expiration_secs=600,
+              properties=_gen_properties(
+                  dimensions={u'pool': [u'default'], u'item': [u'2']}),
+              wait_for_capacity=True),
+        ])
+    self.assertEqual(State.PENDING, result_summary.state)
+    self.assertEqual(0, result_summary.current_task_slice)
+
+    # Expire the first slice.
+    self.mock_now(self.now, 601)
+    self.assertEqual(
+        ([], ['1d69b9f088008910']),
+        task_scheduler.cron_abort_expired_task_to_run('f.local'))
+    result_summary = result_summary.key.get()
+    self.assertEqual(State.PENDING, result_summary.state)
+    # Wait for the second TaskSlice even if there is no capacity.
+    self.assertEqual(1, result_summary.current_task_slice)
+
   def test_cron_handle_bot_died(self):
     pub_sub_calls = self.mock_pub_sub()
 
@@ -1484,7 +1561,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         task_slices=[
           task_request.TaskSlice(
               expiration_secs=600,
-              properties=_gen_properties(idempotent=True)),
+              properties=_gen_properties(idempotent=True),
+              wait_for_capacity=False),
         ])
     self.assertEqual(1, len(pub_sub_calls)) # PENDING -> RUNNING
     request = run_result.request_key.get()
@@ -1574,7 +1652,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         task_slices=[
           task_request.TaskSlice(
               expiration_secs=600,
-              properties=_gen_properties()),
+              properties=_gen_properties(),
+              wait_for_capacity=False),
         ])
     self.assertEqual(1, len(pub_sub_calls)) # PENDING -> RUNNING
 
@@ -1654,7 +1733,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
           task_request.TaskSlice(
               expiration_secs=
                   3*int(task_result.BOT_PING_TOLERANCE.total_seconds()),
-              properties=_gen_properties()),
+              properties=_gen_properties(),
+              wait_for_capacity=False),
         ])
     to_run_key_1 = task_to_run.request_to_task_to_run_key(
         run_result.request_key.get(), 1, 0)
@@ -1701,7 +1781,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         task_slices=[
           task_request.TaskSlice(
               expiration_secs=600,
-              properties=_gen_properties(idempotent=True)),
+              properties=_gen_properties(idempotent=True),
+              wait_for_capacity=False),
         ])
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(State.RUNNING, run_result.state)
@@ -1743,7 +1824,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         task_slices=[
           task_request.TaskSlice(
               expiration_secs=600,
-              properties=_gen_properties(idempotent=True)),
+              properties=_gen_properties(idempotent=True),
+              wait_for_capacity=False),
         ])
     request = run_result.request_key.get()
     def is_in_negative_cache(t):
@@ -1797,7 +1879,8 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         task_slices=[
           task_request.TaskSlice(
               expiration_secs=600,
-              properties=_gen_properties()),
+              properties=_gen_properties(),
+              wait_for_capacity=False),
         ])
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(State.RUNNING, run_result.state)
@@ -1841,7 +1924,10 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     task_scheduler.check_schedule_request_acl(
         _gen_request_slices(
             task_slices=[
-              task_request.TaskSlice(expiration_secs=60, properties=properties),
+              task_request.TaskSlice(
+                  expiration_secs=60,
+                  properties=properties,
+                  wait_for_capacity=False),
             ],
             **kwargs))
 

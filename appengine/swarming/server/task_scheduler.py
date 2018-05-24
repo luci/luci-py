@@ -130,9 +130,12 @@ def _expire_task(to_run_key, request, retries):
   # the transaction runs, as has_capacity() cannot be called while the
   # transaction runs.
   index = task_to_run.task_to_run_key_slice_index(to_run_key)
+  slices = [
+    request.task_slice(i) for i in xrange(index+1, request.num_task_slices)
+  ]
   capacity = [
-    bot_management.has_capacity(request.task_slice(i).properties.dimensions)
-    for i in xrange(index+1, request.num_task_slices)
+    t.wait_for_capacity or bot_management.has_capacity(t.properties.dimensions)
+    for t in slices
   ]
 
   # Add it to the negative cache *before* running the transaction. Either way
@@ -767,7 +770,7 @@ def _gen_new_keys(result_summary, to_run, secret_bytes):
   return key
 
 
-def schedule_request(request, secret_bytes, check_capacity):
+def schedule_request(request, secret_bytes):
   """Creates and stores all the entities to schedule a new task request.
 
   Assumes ACL check has already happened (see 'check_schedule_request_acl').
@@ -782,9 +785,6 @@ def schedule_request(request, secret_bytes, check_capacity):
   - secret_bytes: SecretBytes entity to be saved in the DB. It's key will be set
              and the entity will be stored by this function. None is allowed if
              there are no SecretBytes for this task.
-  - check_capacity: if True, check if there's capacity available for this
-                    request. This only works well for single TaskSlice task
-                    request.
 
   Returns:
     TaskResultSummary. TaskToRun is not returned.
@@ -830,8 +830,9 @@ def schedule_request(request, secret_bytes, check_capacity):
       # This needs to be extremely fast.
       to_run = task_to_run.new_task_to_run(request, 1, index)
       #  Make sure there's capacity if desired.
-      if not check_capacity or bot_management.has_capacity(
-          request.task_slice(index).properties.dimensions):
+      t = request.task_slice(index)
+      if (t.wait_for_capacity or
+          bot_management.has_capacity(t.properties.dimensions)):
         # It's pending at this index now.
         result_summary.current_task_slice = index
         break

@@ -282,6 +282,12 @@ class TaskSlice(messages.Message):
   # If this task request slice is not scheduled after waiting this long, the
   # next one will be processed.
   expiration_secs = messages.IntegerField(2)
+  # When a task is scheduled and there are currently no bots available to run
+  # the task, the TaskSlice can either be PENDING, or be denied immediately.
+  # When denied, the next TaskSlice is enqueued, and if there's no following
+  # TaskSlice, the task state is set to NO_RESOURCE. This should normally be
+  # set to False to avoid unnecessary waiting.
+  wait_for_capacity = messages.BooleanField(3)
 
 
 class NewTaskRequest(messages.Message):

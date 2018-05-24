@@ -774,11 +774,12 @@ class TaskSlice(ndb.Model):
   expiration_secs = ndb.IntegerProperty(
       validator=_validate_expiration_secs, required=True)
 
-  # If there is no bot that can serve this properties.dimensions when this task
-  # slice is enqueued, it is immediately denied. Old-style tasks have it set to
-  # False. It could become an option stored in the DB later if there's user
-  # needs.
-  deny_if_no_bot = True
+  # When a task is scheduled and there are currently no bots available to run
+  # the task, the TaskSlice can either be PENDING, or be denied immediately.
+  # When denied, the next TaskSlice is enqueued, and if there's no following
+  # TaskSlice, the task state is set to NO_RESOURCE. This should normally be
+  # set to False to avoid unnecessary waiting.
+  wait_for_capacity = ndb.BooleanProperty(default=False)
 
   # Set at instantiation, needed to calculate properties_hash.
   _request = None
@@ -815,6 +816,8 @@ class TaskSlice(ndb.Model):
     # ndb.LocalStructuredProperty. Call the function manually.
     super(TaskSlice, self)._pre_put_hook()
     self.properties._pre_put_hook()
+    if self.wait_for_capacity is None:
+      raise datastore_errors.BadValueError('wait_for_capacity is required')
 
 
 class TaskRequest(ndb.Model):
@@ -1088,7 +1091,7 @@ def get_automatic_tags(request, index):
   return tags
 
 
-def create_termination_task(bot_id):
+def create_termination_task(bot_id, wait_for_capacity):
   """Returns a task to terminate the given bot.
 
   ACL check must have been done before.
@@ -1108,7 +1111,10 @@ def create_termination_task(bot_id):
       name=u'Terminate %s' % bot_id,
       priority=0,
       task_slices=[
-        TaskSlice(expiration_secs=24*60*60, properties=properties),
+        TaskSlice(
+            expiration_secs=24*60*60,
+            properties=properties,
+            wait_for_capacity=wait_for_capacity),
       ],
       manual_tags=[u'terminate:1'])
   assert request.task_slice(0).properties.is_terminate

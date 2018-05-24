@@ -264,6 +264,7 @@ class TasksApiTest(BaseTest):
           {
             u'expiration_secs': u'30',
             u'properties': expected_props,
+            u'wait_for_capacity': False,
           },
         ]),
       u'task_id': u'5cee488008810',
@@ -371,6 +372,7 @@ class TasksApiTest(BaseTest):
             u'expiration_secs': u'86400',
             u'properties': self.gen_props(
                 command=[u'python', u'run_test.py'], idempotent=True),
+            u'wait_for_capacity': False,
           },
         ])
 
@@ -406,6 +408,7 @@ class TasksApiTest(BaseTest):
             u'expiration_secs': u'30',
             u'properties': self.gen_props(
                 command=[u'python', u'run_test.py'], idempotent=True),
+            u'wait_for_capacity': False,
           },
         ])
     deduped_result = self.gen_result_summary(
@@ -502,6 +505,7 @@ class TasksApiTest(BaseTest):
             {
               u'expiration_secs': u'86400',
               u'properties': expected_props,
+              u'wait_for_capacity': False,
             },
           ]),
       u'task_id': u'5cee488008810',
@@ -534,6 +538,7 @@ class TasksApiTest(BaseTest):
             {
               u'expiration_secs': u'86400',
               u'properties': expected_props,
+              u'wait_for_capacity': False,
             },
           ]),
       u'task_id': u'5cee488008810',
@@ -577,6 +582,7 @@ class TasksApiTest(BaseTest):
             {
               u'expiration_secs': u'86400',
               u'properties': expected_props,
+              u'wait_for_capacity': False,
             },
           ]),
       u'task_id': u'5cee488008810',
@@ -602,8 +608,9 @@ class TasksApiTest(BaseTest):
 
     task_slices = [
       {
-        u'properties': self.create_props(command=['python', 'run_test.py']),
         u'expiration_secs': 180,
+        u'properties': self.create_props(command=['python', 'run_test.py']),
+        u'wait_for_capacity': False,
       },
     ]
     response, _ = self.client_create_task(
@@ -618,6 +625,7 @@ class TasksApiTest(BaseTest):
             {
               u'expiration_secs': u'180',
               u'properties': expected_props,
+              u'wait_for_capacity': False,
             },
           ]),
       u'task_id': u'5cee488008810',
@@ -631,14 +639,16 @@ class TasksApiTest(BaseTest):
 
     task_slices = [
       {
-        u'properties': self.create_props(command=['python', 'run_test.py']),
         u'expiration_secs': 180,
+        u'properties': self.create_props(command=['python', 'run_test.py']),
+        u'wait_for_capacity': False,
       },
       {
+        u'expiration_secs': 180,
         u'properties': self.create_props(
             command=['python', 'run_test.py'],
             dimensions=[{u'key': u'pool', u'value': u'default'}]),
-        u'expiration_secs': 180,
+        u'wait_for_capacity': False,
       },
     ]
     response, _ = self.client_create_task(
@@ -656,10 +666,12 @@ class TasksApiTest(BaseTest):
             {
               u'expiration_secs': u'180',
               u'properties': expected_props_1,
+              u'wait_for_capacity': False,
             },
             {
               u'expiration_secs': u'180',
               u'properties': expected_props_2,
+              u'wait_for_capacity': False,
             },
           ]),
       u'task_id': u'5cee488008810',
@@ -678,13 +690,15 @@ class TasksApiTest(BaseTest):
 
     task_slices = [
       {
-        u'properties': self.create_props(command=['python', 'run_test.py']),
         u'expiration_secs': 180,
+        u'properties': self.create_props(command=['python', 'run_test.py']),
+        u'wait_for_capacity': False,
       },
       {
-        u'properties': self.create_props(command=['python', 'run_test.py']),
         # That's incorrect:
         u'expiration_secs': 0,
+        u'properties': self.create_props(command=['python', 'run_test.py']),
+        u'wait_for_capacity': False,
       },
     ]
     request = swarming_rpcs.NewTaskRequest(
@@ -1399,6 +1413,7 @@ class TaskApiTest(BaseTest):
           {
             u'expiration_secs': u'86400',
             u'properties': expected_props,
+            u'wait_for_capacity': False,
           },
         ])
     response = self.call_api('request', body={'task_id': task_id})

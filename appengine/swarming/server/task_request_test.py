@@ -207,7 +207,8 @@ class TaskRequestApiTest(TestCase):
       task_request.get_automatic_tags(req, 2)
 
   def test_create_termination_task(self):
-    request = task_request.create_termination_task(u'some-bot')
+    request = task_request.create_termination_task(u'some-bot',
+        wait_for_capacity=True)
     self.assertTrue(request.task_slice(0).properties.is_terminate)
 
   def test_new_request_key(self):
@@ -353,6 +354,7 @@ class TaskRequestApiTest(TestCase):
         {
           'expiration_secs': 30,
           'properties': expected_properties,
+          'wait_for_capacity': False,
         },
       ],
       'user': u'Jesus',
@@ -450,6 +452,7 @@ class TaskRequestApiTest(TestCase):
         {
           'expiration_secs': 30,
           'properties': expected_properties,
+          'wait_for_capacity': False,
         },
       ],
       'user': u'Jesus',
