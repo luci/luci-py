@@ -44,7 +44,7 @@ class Parent(messages.Message):
   datetime = message_types.DateTimeField(2)
 
 
-@endpoints.api('service', 'v1')
+@endpoints.api('service', 'v1', title='Titled Service')
 class Service(remote.Service):
   """A service to test with."""
 
@@ -450,7 +450,6 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
       },
       'protocol': 'rest',
       'rootUrl': 'http://localhost:8080/api/',
-      'servicePath': 'service/v1/',
       'schemas': {
         'discovery_test.Message': {
           'description': 'A message to test with.',
@@ -481,6 +480,8 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           'type': 'object',
         },
       },
+      'servicePath': 'service/v1/',
+      'title': 'Titled Service',
       'version': 'v1',
     }
     self.assertEqual(
@@ -598,7 +599,6 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
         },
       },
       'rootUrl': 'http://localhost:8080/api/',
-      'servicePath': 'split/v1/',
       'schemas': {
         'discovery_test.Message': {
           'description': 'A message to test with.',
@@ -629,6 +629,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           'type': 'object',
         },
       },
+      'servicePath': 'split/v1/',
       'version': 'v1',
     }
     self.assertEqual(

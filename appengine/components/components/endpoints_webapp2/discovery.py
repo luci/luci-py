@@ -391,6 +391,8 @@ def generate(classes, host, base_path):
         classes[0].api_info.name, classes[0].api_info.version),
     'version': classes[0].api_info.version,
   }
+  if classes[0].api_info.title:
+    document['title'] = classes[0].api_info.title
   desc = _normalize_whitespace(
       classes[0].api_info.description or classes[0].__doc__)
   if desc:
