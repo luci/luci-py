@@ -163,7 +163,7 @@ def validate_template_config(config, context):
       valid = False
     else:
       base_names.add(template.base_name)
-  if len(base_names) > 10:
+  if len(base_names) > 20:
     context.error('Too many instance templates.')
     valid = False
   metrics.config_valid.set(valid, fields={'config': TEMPLATES_CFG_FILENAME})

@@ -117,38 +117,9 @@ class UpdateConfigTest(test_case.TestCase):
     template_config = config_pb2.InstanceTemplateConfig(
       templates=[
             config_pb2.InstanceTemplateConfig.InstanceTemplate(
-                base_name='base-name-1',
-            ),
-            config_pb2.InstanceTemplateConfig.InstanceTemplate(
-                base_name='base-name-2',
-            ),
-            config_pb2.InstanceTemplateConfig.InstanceTemplate(
-                base_name='base-name-3',
-            ),
-            config_pb2.InstanceTemplateConfig.InstanceTemplate(
-                base_name='base-name-4',
-            ),
-            config_pb2.InstanceTemplateConfig.InstanceTemplate(
-                base_name='base-name-5',
-            ),
-            config_pb2.InstanceTemplateConfig.InstanceTemplate(
-                base_name='base-name-6',
-            ),
-            config_pb2.InstanceTemplateConfig.InstanceTemplate(
-                base_name='base-name-7',
-            ),
-            config_pb2.InstanceTemplateConfig.InstanceTemplate(
-                base_name='base-name-8',
-            ),
-            config_pb2.InstanceTemplateConfig.InstanceTemplate(
-                base_name='base-name-9',
-            ),
-            config_pb2.InstanceTemplateConfig.InstanceTemplate(
-                base_name='base-name-10',
-            ),
-            config_pb2.InstanceTemplateConfig.InstanceTemplate(
-                base_name='base-name-11',
-            ),
+                base_name='base-name-%d',
+            )
+            for d in xrange(21)
       ],
     )
     self.install_mock(template_config=template_config)
