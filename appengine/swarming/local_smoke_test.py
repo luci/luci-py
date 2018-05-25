@@ -6,8 +6,8 @@
 
 """Integration test for the Swarming server, Swarming bot and Swarming client.
 
-It starts both a Swarming server and a Swarming bot and triggers tasks with the
-Swarming client to ensure the system works end to end.
+It starts a Swarming server, Isolate server and a Swarming bot, then triggers
+tasks with the Swarming client to ensure the system works end to end.
 """
 
 import base64
