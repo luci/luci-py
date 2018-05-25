@@ -154,8 +154,9 @@ def _get_schemas(types):
 
       if isinstance(field, messages.EnumField):
         # Endpoints v1 sorts these alphabetically while v2 does not.
-        # TODO(smut): Determine if this has any impact.
-        items['enum'] = [enum.name for enum in field.type]
+        items['enum'] = sorted([enum.name for enum in field.type])
+        # Endpoints v1 includes empty descriptions for each enum.
+        items['enumDescriptions'] = ['' for _ in field.type]
 
       if field.default:
         field_properties['default'] = field.default

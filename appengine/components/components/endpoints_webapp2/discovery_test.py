@@ -274,8 +274,12 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           'enum': {
             'default': 'UNKNOWN',
             'enum': [
-              'UNKNOWN',
               'KNOWN',
+              'UNKNOWN',
+            ],
+            'enumDescriptions': [
+              '',
+              '',
             ],
             'type': 'string',
           },
