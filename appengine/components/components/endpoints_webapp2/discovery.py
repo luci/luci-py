@@ -117,7 +117,6 @@ def _get_schemas(types):
 
     schemas[name] = {
       'id': name,
-      'properties': {},
       'type': 'object',
     }
 
@@ -125,6 +124,7 @@ def _get_schemas(types):
     if desc:
       schemas[name]['description'] = desc
 
+    properties = {}
     for field in message_type.all_fields():
       items = {}
       field_properties = {}
@@ -180,7 +180,10 @@ def _get_schemas(types):
       else:
         field_properties.update(items)
 
-      schemas[name]['properties'][field.name] = field_properties
+      properties[field.name] = field_properties
+
+    if properties:
+      schemas[name]['properties'] = properties
 
   return schemas
 
