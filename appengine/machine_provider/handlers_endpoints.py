@@ -746,15 +746,6 @@ class MachineProviderEndpoints(remote.Service):
     machine.put()
 
 
-def get_routes():
-  return endpoints_webapp2.api_server([
-      CatalogEndpoints,
-      MachineEndpoints,
-      MachineProviderEndpoints,
-      config.ConfigApi,
-  ])
-
-
 def create_endpoints_app():
   return webapp2.WSGIApplication(endpoints_webapp2.api_server([
       CatalogEndpoints,

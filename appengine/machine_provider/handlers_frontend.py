@@ -100,5 +100,4 @@ def create_frontend_app():
   routes = []
   if not utils.should_disable_ui_routes():
     routes.extend(get_routes())
-  routes.extend(handlers_endpoints.get_routes())
   return webapp2.WSGIApplication(routes)
