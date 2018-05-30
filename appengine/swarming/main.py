@@ -13,10 +13,12 @@ import os
 import sys
 
 import endpoints
+import webapp2
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
 
+from components import endpoints_webapp2
 from components import ereporter2
 from components import utils
 
@@ -59,12 +61,17 @@ def create_application():
   gae_ts_mon.initialize(main.APP, is_enabled_fn=is_enabled_callback)
 
   # TODO(maruel): Remove this once there is no known client anymore.
-  api = endpoints.api_server([
-    handlers_endpoints.swarming_api,
+  api = webapp2.WSGIApplication(endpoints_webapp2.api_server([
+    handlers_endpoints.SwarmingServerService,
+    handlers_endpoints.SwarmingTaskService,
+    handlers_endpoints.SwarmingTasksService,
+    handlers_endpoints.SwarmingQueuesService,
+    handlers_endpoints.SwarmingBotService,
+    handlers_endpoints.SwarmingBotsService,
     # components.config endpoints for validation and configuring of luci-config
     # service URL.
     config.ConfigApi,
-  ])
+  ], base_path='/_ah/api'))
 
   event_mon_metrics.initialize()
   ts_mon_metrics.initialize()

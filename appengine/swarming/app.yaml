@@ -12,7 +12,7 @@ automatic_scaling:
 default_expiration: "10m"
 
 handlers:
-- url: /_ah/spi/.*
+- url: /_ah/api/.*
   script: main.endpoints_app
   secure: always
 
