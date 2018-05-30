@@ -13,6 +13,7 @@ import os
 import sys
 
 import endpoints
+import webapp2
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
@@ -22,6 +23,7 @@ utils.fix_protobuf_package()
 
 from components import auth
 from components import ereporter2
+from components import endpoints_webapp2
 
 import gae_ts_mon
 
@@ -41,12 +43,12 @@ def create_application():
 
   gae_ts_mon.initialize(frontend, is_enabled_fn=is_enabled_callback)
   # App that serves new endpoints API.
-  api = endpoints.api_server([
+  api = webapp2.WSGIApplication(endpoints_webapp2.api_server([
       handlers_endpoints_v1.IsolateService,
       # components.config endpoints for validation and configuring of
       # luci-config service URL.
       config.ConfigApi,
-  ])
+  ], base_path='/_ah/api'))
   return frontend, api
 
 

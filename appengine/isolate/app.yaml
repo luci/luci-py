@@ -12,7 +12,7 @@ automatic_scaling:
   max_pending_latency: 250ms
 
 handlers:
-- url: /_ah/spi/.*
+- url: /_ah/api/.*
   script: main_frontend.endpoints_app
   secure: always
 
