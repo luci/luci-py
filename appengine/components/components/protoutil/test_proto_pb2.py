@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   name='test_proto.proto',
   package='protoutil',
   syntax='proto3',
-  serialized_pb=_b('\n\x10test_proto.proto\x12\tprotoutil\"\xa1\x04\n\x03Msg\x12\x0b\n\x03num\x18\x01 \x01(\x05\x12\x0c\n\x04nums\x18\x02 \x03(\x05\x12\x0b\n\x03str\x18\x03 \x01(\t\x12\x0c\n\x04strs\x18\x04 \x03(\t\x12\x1b\n\x03msg\x18\x05 \x01(\x0b\x32\x0e.protoutil.Msg\x12\x1c\n\x04msgs\x18\x06 \x03(\x0b\x32\x0e.protoutil.Msg\x12\x32\n\x0bmap_str_num\x18\x07 \x03(\x0b\x32\x1d.protoutil.Msg.MapStrNumEntry\x12\x32\n\x0bmap_num_str\x18\x08 \x03(\x0b\x32\x1d.protoutil.Msg.MapNumStrEntry\x12\x34\n\x0cmap_bool_str\x18\t \x03(\x0b\x32\x1e.protoutil.Msg.MapBoolStrEntry\x12\x32\n\x0bmap_str_msg\x18\n \x03(\x0b\x32\x1d.protoutil.Msg.MapStrMsgEntry\x1a\x30\n\x0eMapStrNumEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x05:\x02\x38\x01\x1a\x30\n\x0eMapNumStrEntry\x12\x0b\n\x03key\x18\x01 \x01(\x05\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x31\n\x0fMapBoolStrEntry\x12\x0b\n\x03key\x18\x01 \x01(\x08\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a@\n\x0eMapStrMsgEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1d\n\x05value\x18\x02 \x01(\x0b\x32\x0e.protoutil.Msg:\x02\x38\x01\x62\x06proto3')
+  serialized_pb=_b('\n\x10test_proto.proto\x12\tprotoutil\"\xce\x04\n\x03Msg\x12\x0b\n\x03num\x18\x01 \x01(\x05\x12\x0c\n\x04nums\x18\x02 \x03(\x05\x12\x0b\n\x03str\x18\x03 \x01(\t\x12\x0c\n\x04strs\x18\x04 \x03(\t\x12\x1b\n\x03msg\x18\x05 \x01(\x0b\x32\x0e.protoutil.Msg\x12\x1c\n\x04msgs\x18\x06 \x03(\x0b\x32\x0e.protoutil.Msg\x12\x32\n\x0bmap_str_num\x18\x07 \x03(\x0b\x32\x1d.protoutil.Msg.MapStrNumEntry\x12\x32\n\x0bmap_num_str\x18\x08 \x03(\x0b\x32\x1d.protoutil.Msg.MapNumStrEntry\x12\x34\n\x0cmap_bool_str\x18\t \x03(\x0b\x32\x1e.protoutil.Msg.MapBoolStrEntry\x12\x32\n\x0bmap_str_msg\x18\n \x03(\x0b\x32\x1d.protoutil.Msg.MapStrMsgEntry\x12+\n\x10json_name_option\x18\x0b \x01(\tR\x11\x61nother_json_name\x1a\x30\n\x0eMapStrNumEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x05:\x02\x38\x01\x1a\x30\n\x0eMapNumStrEntry\x12\x0b\n\x03key\x18\x01 \x01(\x05\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x31\n\x0fMapBoolStrEntry\x12\x0b\n\x03key\x18\x01 \x01(\x08\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a@\n\x0eMapStrMsgEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x1d\n\x05value\x18\x02 \x01(\x0b\x32\x0e.protoutil.Msg:\x02\x38\x01\x62\x06proto3')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -59,8 +59,8 @@ _MSG_MAPSTRNUMENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=362,
-  serialized_end=410,
+  serialized_start=407,
+  serialized_end=455,
 )
 
 _MSG_MAPNUMSTRENTRY = _descriptor.Descriptor(
@@ -96,8 +96,8 @@ _MSG_MAPNUMSTRENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=412,
-  serialized_end=460,
+  serialized_start=457,
+  serialized_end=505,
 )
 
 _MSG_MAPBOOLSTRENTRY = _descriptor.Descriptor(
@@ -133,8 +133,8 @@ _MSG_MAPBOOLSTRENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=462,
-  serialized_end=511,
+  serialized_start=507,
+  serialized_end=556,
 )
 
 _MSG_MAPSTRMSGENTRY = _descriptor.Descriptor(
@@ -170,8 +170,8 @@ _MSG_MAPSTRMSGENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=513,
-  serialized_end=577,
+  serialized_start=558,
+  serialized_end=622,
 )
 
 _MSG = _descriptor.Descriptor(
@@ -251,6 +251,13 @@ _MSG = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='json_name_option', full_name='protoutil.Msg.json_name_option', index=10,
+      number=11, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None, json_name='another_json_name'),
   ],
   extensions=[
   ],
@@ -264,7 +271,7 @@ _MSG = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=32,
-  serialized_end=577,
+  serialized_end=622,
 )
 
 _MSG_MAPSTRNUMENTRY.containing_type = _MSG

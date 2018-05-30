@@ -26,8 +26,8 @@ Mask = field_masks.Mask
 
 
 class ParsePathTests(unittest.TestCase):
-  def parse(self, path, repeated=False):
-    return field_masks._parse_path(path, TEST_DESC, repeated=repeated)
+  def parse(self, path, **kwargs):
+    return field_masks._parse_path(path, TEST_DESC, **kwargs)
 
   def test_str(self):
     actual = self.parse('str')
@@ -192,6 +192,16 @@ class ParsePathTests(unittest.TestCase):
     with self.assertRaisesRegexp(ValueError, r'expected a star'):
       self.parse('1.str', repeated=True)
 
+  def test_json_name(self):
+    actual = self.parse('mapStrNum.aB', json_names=True)
+    expected = ('map_str_num', 'aB')
+    self.assertEqual(actual, expected)
+
+  def test_json_name_option(self):
+    actual = self.parse('another_json_name', json_names=True)
+    expected = ('json_name_option',)
+    self.assertEqual(actual, expected)
+
 
 class NormalizePathsTests(unittest.TestCase):
 
@@ -226,9 +236,9 @@ class NormalizePathsTests(unittest.TestCase):
 
 
 class FromFieldMaskTests(unittest.TestCase):
-  def parse(self, paths):
+  def parse(self, paths, **kwargs):
     fm = field_mask_pb2.FieldMask(paths=paths)
-    return Mask.from_field_mask(fm, TEST_DESC)
+    return Mask.from_field_mask(fm, TEST_DESC, **kwargs)
 
   def test_empty(self):
     actual = self.parse([])
@@ -271,6 +281,17 @@ class FromFieldMaskTests(unittest.TestCase):
     actual = self.parse(['msg.*', 'msg.msg.num'])
     expected = Mask(TEST_DESC, children={
         'msg': Mask(TEST_DESC),
+    })
+    self.assertEqual(actual, expected)
+
+  def test_json_names(self):
+    actual = self.parse(['mapStrNum.aB', 'str'], json_names=True)
+    map_str_num_desc = TEST_DESC.fields_by_name['map_str_num'].message_type
+    expected = Mask(TEST_DESC, children={
+        'str': Mask(),
+        'map_str_num': Mask(map_str_num_desc, repeated=True, children={
+            'aB': Mask(),
+        }),
     })
     self.assertEqual(actual, expected)
 

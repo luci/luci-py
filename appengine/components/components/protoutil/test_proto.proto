@@ -20,4 +20,6 @@ message Msg {
   map<int32, string> map_num_str = 8;
   map<bool, string> map_bool_str = 9;
   map<string, Msg> map_str_msg = 10;
+
+  string json_name_option = 11 [json_name="another_json_name"];
 }
