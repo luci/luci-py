@@ -148,7 +148,7 @@ class ConfigApi(remote.Service):
     for m in ctx.result().messages:
       res.messages.append(ValidationMessage(
           severity=common.Severity.lookup_by_number(m.severity),
-          text=m.text,
+          text=unicode(m.text, errors='replace'),
       ))
     return res
 

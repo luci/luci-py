@@ -81,11 +81,7 @@ class Context(object):
         if foo % 2 == 1:
           ctx.error('must be an even number')  # 'foo: must be an even number'
     """
-    args = tuple(
-        a.encode('ascii', 'ignore') if isinstance(a, unicode) else a
-        for a in args
-    )
-    new_prefix = '%s%s' % (self.prefixes[-1], str(prefix) % args)
+    new_prefix = '%s%s' % (self.prefixes[-1], prefix % args)
     self.prefixes.append(new_prefix)
     try:
       yield
@@ -97,14 +93,15 @@ class Context(object):
 
     Args:
       severity (int): severity level. Use standard logging levels.
-      text (str): message text for humans.
+      text (basestring): message text for humans.
       *args: format args for text, like in logging.info.
     """
     assert isinstance(severity, int), severity
+    assert isinstance(text, basestring), text
     assert severity >= 0, severity
     msg = Message(
         severity=severity,
-        text='%s%s' % (self.prefixes[-1], (str(text) % args)),
+        text='%s%s' % (self.prefixes[-1], text % args),
     )
     self.messages.append(msg)
     if self.on_message:

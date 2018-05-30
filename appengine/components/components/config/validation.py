@@ -229,7 +229,7 @@ class Rule(object):
     try:
       cfg = common._convert_config(content, self.dest_type)
     except common.ConfigFormatError as ex:
-      ctx.error(str(ex))
+      ctx.error('%s', ex)
       return
     ctx.config_set = config_set
     ctx.path = path

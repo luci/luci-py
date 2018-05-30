@@ -90,7 +90,7 @@ class ValidationTestCase(test_case.TestCase):
       try:
         yaml.safe_load(cfg)
       except Exception as ex:
-        ctx.error(ex)
+        ctx.error('%s', ex)
     rule(validate_yaml)
 
     self.rule_set.validate('projects/foo', 'bar.cfg', '}{')

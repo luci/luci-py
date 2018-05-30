@@ -27,7 +27,7 @@ class ValidationContextTestCase(test_case.TestCase):
     with ctx.prefix('prefix %d ', 3):
       ctx.warning('warning %s', 2)
 
-    with ctx.prefix('non-ascii %s', u'\xf0\x9f\x90\xb1'):
+    with ctx.prefix('unicode %s', u'\xf0\x9f\x90\xb1 '):
       ctx.error('no cat')
 
     self.assertEqual(
@@ -39,7 +39,7 @@ class ValidationContextTestCase(test_case.TestCase):
           validation_context.Message(
               severity=logging.WARNING, text='prefix 3 warning 2'),
           validation_context.Message(
-              severity=logging.ERROR, text='non-ascii no cat'),
+              severity=logging.ERROR, text=u'unicode \xf0\x9f\x90\xb1 no cat'),
         ],
       ),
     )
@@ -49,7 +49,7 @@ class ValidationContextTestCase(test_case.TestCase):
       pass
     ctx = validation_context.Context.raise_on_error(exc_type=Error)
     with self.assertRaises(Error):
-      ctx.error(1)
+      ctx.error('1')
 
   def test_logging(self):
     logger = mock.Mock()
