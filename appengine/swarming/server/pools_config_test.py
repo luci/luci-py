@@ -418,11 +418,11 @@ class TestTaskTemplates(TaskTemplateBaseTest):
       [x.text for x in self.ctx.result().messages],
       [
         'cache[0]: empty name',
-        'cache[\'cool_name\']: empty path',
-        'cipd_package[(\'good/other\', \'some/pkg\')]: empty version',
+        'cache[u\'cool_name\']: empty path',
+        'cipd_package[(u\'good/other\', u\'some/pkg\')]: empty version',
         'cipd_package[2]: empty pkg',
         'env[0]: empty var',
-        'env[\'VARR\']: empty value AND prefix',
+        'env[u\'VARR\']: empty value AND prefix',
         (
             'u\'\': directory has conflicting owners: cache u\'cool_name\' and'
             ' cipd[u\'some/pkg:latest\']'
@@ -540,7 +540,7 @@ class TestPoolCfgTaskTemplate(TaskTemplateBaseTest):
 
     self.assertEqual(
         [x.text for x in self.ctx.result().messages],
-        ['template[\'b\']: template u\'a\' included multiple times'])
+        ['template[u\'b\']: template u\'a\' included multiple times'])
 
   def test_resolve_diamond_inclusion(self):
     poolcfg = self.parse("""
@@ -564,7 +564,7 @@ class TestPoolCfgTaskTemplate(TaskTemplateBaseTest):
 
     self.assertEqual(
         [x.text for x in self.ctx.result().messages],
-        ['template[\'d\']: template u\'a\' included (transitively) multiple '
+        ['template[u\'d\']: template u\'a\' included (transitively) multiple '
          'times'])
 
   def test_inclusion_cycle(self):
@@ -584,8 +584,8 @@ class TestPoolCfgTaskTemplate(TaskTemplateBaseTest):
     self.assertEqual(
         [x.text for x in self.ctx.result().messages],
         [
-            'template[\'a\']: template[\'b\']: depends on u\'a\'' + tail,
-            'template[\'a\']: depends on u\'b\'' + tail,
+            'template[u\'a\']: template[u\'b\']: depends on u\'a\'' + tail,
+            'template[u\'a\']: depends on u\'b\'' + tail,
         ])
 
   def test_no_name(self):
@@ -629,8 +629,8 @@ class TestPoolCfgTaskTemplate(TaskTemplateBaseTest):
     self.assertEqual(
         [x.text for x in self.ctx.result().messages],
         [
-          'template[\'a\']: unknown include: u\'nope\'',
-          'template[\'b\']: unknown include: u\'nope\'',
+          'template[u\'a\']: unknown include: u\'nope\'',
+          'template[u\'b\']: unknown include: u\'nope\'',
         ])
 
   def test_bad_result(self):
@@ -646,7 +646,7 @@ class TestPoolCfgTaskTemplate(TaskTemplateBaseTest):
 
     self.assertEqual(
         [x.text for x in self.ctx.result().messages],
-        ['template[\'a\']: env[\'VAR\']: empty value AND prefix'])
+        ['template[u\'a\']: env[u\'VAR\']: empty value AND prefix'])
 
 
 class TestPoolCfgTaskTemplateDeployments(TaskTemplateBaseTest):
@@ -703,7 +703,7 @@ class TestPoolCfgTaskTemplateDeployments(TaskTemplateBaseTest):
 
     self.assertEqual(
         [x.text for x in self.ctx.result().messages],
-        ['deployment[\'a\']: '+
+        ['deployment[u\'a\']: '+
          'canary_chance out of range `[0,9999]`: 10000 -> %100.00'])
 
   def test_resolve_bad_canary_2(self):
@@ -716,7 +716,7 @@ class TestPoolCfgTaskTemplateDeployments(TaskTemplateBaseTest):
 
     self.assertEqual(
         [x.text for x in self.ctx.result().messages],
-        [('deployment[\'a\']: '
+        [('deployment[u\'a\']: '
           'canary_chance out of range `[0,9999]`: -1 -> %-0.01')])
 
   def test_resolve_single_deployment(self):
