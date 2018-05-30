@@ -3,3 +3,4 @@
 # that can be found in the LICENSE file.
 
 from .server import *  # pylint: disable=wildcard-import
+from .encoding import Encoding

@@ -21,6 +21,8 @@ class ServicerContext(object):
     self._details = None
     self._invocation_metadata = []
     self._peer = None
+    self._request_encoding = None
+    self._response_encoding = None
 
   def invocation_metadata(self):
     """Accesses the metadata from the sent by the client.
@@ -101,3 +103,13 @@ class ServicerContext(object):
     """
     assert isinstance(details, basestring), '%r is not string' % (details,)
     self._details = details
+
+  @property
+  def request_encoding(self):
+    """Returns prpc.Encoding of the request."""
+    return self._request_encoding
+
+  @property
+  def response_encoding(self):
+    """Returns prpc.Encoding of the response."""
+    return self._response_encoding

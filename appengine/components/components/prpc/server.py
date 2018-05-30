@@ -154,7 +154,7 @@ class Server(object):
           response: a webapp2.Response.
         """
         context = ServicerContext()
-        content, accept = self._handle(context, service, method)
+        content = self._handle(context, service, method)
         origin = self.request.headers.get('Origin')
         if origin:
           self.response.headers['Access-Control-Allow-Origin'] = origin
@@ -166,7 +166,7 @@ class Server(object):
             'X-Prpc-Grpc-Code')
         if content is not None:
           self.response.headers['Content-Type'] = encoding.Encoding.header(
-              accept)
+              context._response_encoding)
           self.response.out.write(content)
         elif context._details is not None:
           # webapp2 will automatically encode strings as utf-8.
@@ -180,6 +180,8 @@ class Server(object):
       def _handle(self, context, service, method):
         """Generates the response content and sets the context appropriately.
 
+        Sets context._request_encoding and context._response_encoding.
+
         Args:
           context: a context.ServicerContext.
           service: the service being targeted by this pRPC call.
@@ -188,26 +190,26 @@ class Server(object):
         Returns:
           content: the binary or textual content of the RPC response. Note
             that this may be None in the event that an error occurs.
-          accept: an encoding.Encoding enum value for the encoding of the
-            response.
         """
         try:
           parsed_headers = headers.parse_headers(self.request.headers)
+          context._request_encoding = parsed_headers.content_type
+          context._response_encoding = parsed_headers.accept
         except ValueError as e:
           logging.exception('Error processing headers')
           context.set_code(StatusCode.INVALID_ARGUMENT)
           context.set_details(e.message)
-          return None, None
+          return None
 
         if service not in server._services:
           context.set_code(StatusCode.UNIMPLEMENTED)
           context.set_details('Service %s does not exist' % service)
-          return None, None
+          return None
         rpc_handler = server._services[service].methods.get(method)
         if rpc_handler is None:
           context.set_code(StatusCode.UNIMPLEMENTED)
           context.set_details('Method %s does not exist' % method)
-          return None, None
+          return None
         request_message, response_message, handler = rpc_handler
 
         request = request_message()
@@ -218,7 +220,7 @@ class Server(object):
           logging.warning('Failed to decode request: %s' % e)
           context.set_code(StatusCode.INVALID_ARGUMENT)
           context.set_details('Error parsing request')
-          return None, None
+          return None
 
         context._timeout = parsed_headers.timeout
         context._invocation_metadata = parsed_headers.invocation_metadata
@@ -242,20 +244,20 @@ class Server(object):
           logging.exception('Service implementation threw an exception')
           context.set_code(StatusCode.INTERNAL)
           context.set_details('Service implementation threw an exception')
-          return None, None
+          return None
 
         if response is None:
           if context._code == StatusCode.OK:
             context.set_code(StatusCode.INTERNAL)
             context.set_details(
                 'Service implementation didn\'t return a response')
-          return None, None
+          return None
 
         if not isinstance(response, response_message):
           logging.error('Service implementation response has incorrect type')
           context.set_code(StatusCode.INTERNAL)
           context.set_details('Service implementation returned invalid value')
-          return None, None
+          return None
 
         try:
           encoder = encoding.get_encoder(parsed_headers.accept)
@@ -264,9 +266,9 @@ class Server(object):
           logging.exception('Failed to encode response')
           context.set_code(StatusCode.INTERNAL)
           context.set_details('Error serializing response')
-          return None, None
+          return None
 
-        return content, parsed_headers.accept
+        return content
 
       def options(self, _service, _method):
         """Sends an empty response with headers for CORS for all requests."""
