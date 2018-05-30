@@ -981,6 +981,15 @@ def get_dimensions():
 
     dimensions[u'kvm'] = [unicode(int(platforms.linux.get_kvm()))]
 
+    comp = platforms.linux.get_device_tree_compatible()
+    if comp:
+      dimensions[u'device_tree_compatible'] = comp
+    # Just check CPU #0. In practice different CPU core could have different CPU
+    # governor.
+    gov = platforms.linux.get_cpu_scaling_governor(0)
+    if gov:
+      dimensions[u'cpu_governor'] = gov
+
   if sys.platform == 'darwin':
     model = platforms.osx.get_hardware_model_string()
     if model:

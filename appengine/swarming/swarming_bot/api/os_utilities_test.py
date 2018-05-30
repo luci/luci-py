@@ -137,6 +137,10 @@ class TestOsUtilities(auto_stub.TestCase):
     actual.discard(u'ssd')
     # There are cases where this dimension is not set.
     actual.discard(u'machine_type')
+    # Only set on ARM Linux machines.
+    actual.discard(u'device_tree_compatible')
+    # Only set on bare metal Linux machines.
+    actual.discard(u'cpu_governor')
 
     expected = {u'cores', u'cpu', u'gpu', u'id', u'os', u'pool', u'python'}
     if platforms.is_gce():

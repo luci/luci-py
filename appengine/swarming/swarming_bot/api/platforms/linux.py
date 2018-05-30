@@ -297,6 +297,29 @@ def get_inside_docker():
   return u'stock'
 
 
+@tools.cached
+def get_device_tree_compatible():
+  """Returns the devicetree/compatible data, if available.
+
+  This is generally used on ARM based hardware.
+  """
+  try:
+    with open('/sys/firmware/devicetree/base/compatible', 'rb') as f:
+      return unicode(f.read().strip()).split(u',')
+  except IOError:
+    return None
+
+
+def get_cpu_scaling_governor(cpu_num):
+  """Returns the current CPU scaling governor, if available."""
+  p = '/sys/devices/system/cpu/cpufreq/policy%d/scaling_governor' % cpu_num
+  try:
+    with open(p, 'rb') as f:
+      return [unicode(f.read().strip())]
+  except IOError:
+    return None
+
+
 ## Mutating code.
 
 
