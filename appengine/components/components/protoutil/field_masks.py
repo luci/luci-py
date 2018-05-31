@@ -204,7 +204,7 @@ class Mask(object):
     return self._submask(_parse_path(path, self.desc, repeated=self.repeated))
 
   def _submask(self, path, start_at=0):
-    """Implements get()."""
+    """Implements submask()."""
     if start_at == len(path):
       return self
     child = self.children.get(path[start_at])
