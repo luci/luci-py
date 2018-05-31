@@ -17,24 +17,23 @@ from google.protobuf import descriptor_pb2
 
 
 SERVICE_FORMAT = '''
-%(service_name)sServiceDescription = {
+%sServiceDescription = {
   'descriptor': descriptor_pb2.ServiceDescriptorProto(),
-  'package': %(package_name)r,
-  'file': %(file)r,
+  'package': %r,
 }
-%(service_name)sServiceDescription['descriptor'].ParseFromString(%(descriptor_hex)r.decode(\'hex\'))
+%sServiceDescription['descriptor'].ParseFromString(%r.decode(\'hex\'))
 '''
 
 
 def generate_code(input):
   fragments = [HEADER_FORMAT % input.name]
   for service in input.service:
-    fragments.append(SERVICE_FORMAT % {
-        'service_name': service.name,
-        'package_name': str(input.package),
-        'descriptor_hex': service.SerializeToString().encode('hex'),
-        'file': input.name,
-    })
+    fragments.append(SERVICE_FORMAT % (
+        service.name,
+        str(input.package),
+        service.name,
+        service.SerializeToString().encode('hex'),
+    ))
   return ('\n'.join(fragments)).strip() + '\n'
 
 
