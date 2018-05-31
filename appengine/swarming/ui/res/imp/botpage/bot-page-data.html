@@ -30,10 +30,10 @@
 
   Methods:
     parseEvents(json): Given the json returned by the server on a request to
-        api/swarming/v1/bot/[botid]/events, return an array of event Objects.
+        _ah/api/swarming/v1/bot/[botid]/events, return an array of event Objects.
 
     parseTasks(json):  Given the json returned by the server on a request to
-        api/swarming/v1/bot/[botid]/events, return an array of task Objects.
+        _ah/api/swarming/v1/bot/[botid]/events, return an array of task Objects.
 
     request(): Force a fetch of the data. This happens automatically when
         auth_headers is set or bot_id is changed.
@@ -121,7 +121,7 @@
 
         lastRequest = this.async(function(){
           lastRequest = undefined;
-          var baseUrl = "/api/swarming/v1/bot/"+this.bot_id;
+          var baseUrl = "/_ah/api/swarming/v1/bot/"+this.bot_id;
           var p = this._getJsonAsync("_bot", baseUrl + "/get",
             "_busy1", this.auth_headers);
           p.then(function(){

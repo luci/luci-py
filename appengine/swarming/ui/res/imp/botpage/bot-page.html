@@ -502,7 +502,7 @@
       },
 
       _deleteBot: function() {
-        swarming.postWithToast("/api/swarming/v1/bot/"+this.bot_id+"/delete",
+        swarming.postWithToast("/_ah/api/swarming/v1/bot/"+this.bot_id+"/delete",
           "Deleting "+this.bot_id, this._auth_headers);
       },
 
@@ -589,7 +589,7 @@
         if (!this._auth_headers) {
           return;
         }
-        var baseUrl = "/api/swarming/v1/bot/"+this.bot_id;
+        var baseUrl = "/_ah/api/swarming/v1/bot/"+this.bot_id;
         this.$.page_tasks.load(baseUrl + "/tasks", this._auth_headers, 30, true);
         this.$.page_events.load(baseUrl + "/events", this._auth_headers, 50, true);
       },
@@ -602,7 +602,7 @@
       },
 
       _shutdownBot: function() {
-        swarming.postWithToast("/api/swarming/v1/bot/"+this.bot_id+"/terminate",
+        swarming.postWithToast("/_ah/api/swarming/v1/bot/"+this.bot_id+"/terminate",
           "Shutting down "+this.bot_id, this._auth_headers);
       },
 

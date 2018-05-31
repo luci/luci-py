@@ -999,7 +999,7 @@
       },
 
       _cancelTask: function() {
-        var url = "/api/swarming/v1/task/" + this.task_id +"/cancel";
+        var url = "/_ah/api/swarming/v1/task/" + this.task_id +"/cancel";
         var body = {};
         if (this._result.state === "RUNNING") {
           body.kill_running = true;
@@ -1326,7 +1326,7 @@ time.sleep(${leaseDuration})`];
         newTask.properties.idempotent = false;
 
         console.log("New task has dimensions", newTask.properties.dimensions);
-        swarming.postWithToast("/api/swarming/v1/tasks/new", "Requesting new task",
+        swarming.postWithToast("/_ah/api/swarming/v1/tasks/new", "Requesting new task",
           this._auth_headers, newTask)
         .then(function(response) {
             response = JSON.parse(response);
@@ -1442,7 +1442,7 @@ time.sleep(${leaseDuration})`];
         dims.forEach(function(d){
           botCountParams.dimensions.push(`${d.key}:${d.value}`);
         });
-        this._getJsonAsync("_bots_count", "/api/swarming/v1/bots/count", "_busyBotCount", this._auth_headers, botCountParams);
+        this._getJsonAsync("_bots_count", "/_ah/api/swarming/v1/bots/count", "_busyBotCount", this._auth_headers, botCountParams);
 
         var start = new Date();
         start.setSeconds(0);
@@ -1457,10 +1457,10 @@ time.sleep(${leaseDuration})`];
           tags: botCountParams.dimensions,
         };
 
-        this._getJsonAsync("_other_running", "/api/swarming/v1/tasks/count", "_busyRunningCount", this._auth_headers, taskCountParams);
+        this._getJsonAsync("_other_running", "/_ah/api/swarming/v1/tasks/count", "_busyRunningCount", this._auth_headers, taskCountParams);
         // change running to pending
         taskCountParams.state = ["PENDING"];
-        this._getJsonAsync("_other_pending", "/api/swarming/v1/tasks/count", "_busyPendingCount", this._auth_headers, taskCountParams);
+        this._getJsonAsync("_other_pending", "/_ah/api/swarming/v1/tasks/count", "_busyPendingCount", this._auth_headers, taskCountParams);
       }
     });
   })();

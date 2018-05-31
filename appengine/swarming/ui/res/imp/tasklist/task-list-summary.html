@@ -192,7 +192,7 @@
         }
 
         var queryObj = JSON.parse(JSON.stringify(this.count_params));
-        this._getJsonAsync("_selected_exact","/api/swarming/v1/tasks/count","_busy3",
+        this._getJsonAsync("_selected_exact","/_ah/api/swarming/v1/tasks/count","_busy3",
           this.auth_headers, queryObj);
 
         for (var j = 0; j < SELECTED_TASKS_SUMMARY.length; j++) {
@@ -200,7 +200,7 @@
             this.push("_selected_counts", {});
           }
           queryObj.state = [SELECTED_TASKS_SUMMARY[j].name];
-          this._getJsonAsyncArr(j, "_selected_counts","/api/swarming/v1/tasks/count","_busyArr1",
+          this._getJsonAsyncArr(j, "_selected_counts","/_ah/api/swarming/v1/tasks/count","_busyArr1",
           this.auth_headers, queryObj);
         }
       },

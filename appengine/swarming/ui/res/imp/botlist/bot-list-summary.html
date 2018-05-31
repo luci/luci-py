@@ -261,7 +261,7 @@
         if (!this.auth_headers || !this.count_params) {
           return;
         }
-        this._getJsonAsync("_count_query","/api/swarming/v1/bots/count","busy",
+        this._getJsonAsync("_count_query","/_ah/api/swarming/v1/bots/count","busy",
           this.auth_headers, this.count_params);
       }
     });

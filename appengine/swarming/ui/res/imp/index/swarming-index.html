@@ -188,7 +188,7 @@
         }
         this.set("_busy1", true);
 
-        sk.request("POST", "/api/swarming/v1/server/token", undefined, auth_headers).then(JSON.parse).then(function(t) {
+        sk.request("POST", "/_ah/api/swarming/v1/server/token", undefined, auth_headers).then(JSON.parse).then(function(t) {
           this.set("_bootstrap_token", t.bootstrap_token);
           this.set("_busy1", false);
         }.bind(this)).catch(function(reason) {

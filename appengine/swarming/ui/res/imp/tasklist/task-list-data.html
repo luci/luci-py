@@ -28,7 +28,7 @@
           "is_dead": "TRUE",       // optional
         }
         For a full list of dimensions in the fleet, see the API call:
-        https://[swarming_url]/api/swarming/v1/bots/dimensions
+        https://[swarming_url]/_ah/api/swarming/v1/bots/dimensions
     // outputs
     dimensions: Array<String>, of all valid dimensions.
     tasks: Array<Object>, all tasks returned by the server.
@@ -121,9 +121,9 @@
       },
 
       signIn: function(){
-        this._getJsonAsync("_tags", "/api/swarming/v1/tasks/tags",
+        this._getJsonAsync("_tags", "/_ah/api/swarming/v1/tasks/tags",
           "_busy2", this.auth_headers);
-        this._getJsonAsync("_dimensions","/api/swarming/v1/bots/dimensions",
+        this._getJsonAsync("_dimensions","/_ah/api/swarming/v1/bots/dimensions",
           "_busy1", this.auth_headers);
       },
 

@@ -146,7 +146,7 @@
         this.set("_busyArr", []);
         this.set("_results", []);
         var baseTaskId = taskId.substring(0, taskId.length - 1);
-        var baseUrl = "/api/swarming/v1/task/";
+        var baseUrl = "/_ah/api/swarming/v1/task/";
 
         for (var i = 0; i < numTries -1; i++) {
           var id = baseTaskId + (i + 1);

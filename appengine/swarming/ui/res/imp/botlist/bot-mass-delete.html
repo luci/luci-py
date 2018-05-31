@@ -139,7 +139,7 @@
         this.started_deleting = true;
 
         // get list of bots that match
-        var toDeleteURL = "/api/swarming/v1/bots/list" + this._args();
+        var toDeleteURL = "/_ah/api/swarming/v1/bots/list" + this._args();
         sk.request("GET", toDeleteURL, null, this.auth_headers)
           .then(JSON.parse).then(function(json){
             this._to_delete = json.items;
@@ -166,7 +166,7 @@
           console.log("Skipping empty id in slot ",this._deleted_count);
         }
 
-        sk.request("POST", `/api/swarming/v1/bot/${id}/delete`,
+        sk.request("POST", `/_ah/api/swarming/v1/bot/${id}/delete`,
                    "", this.auth_headers)
           .then(function(){
             this._deleted_count += 1;
@@ -184,7 +184,7 @@
         this.finished_deleting = false;
         this._ready_to_delete = false;
 
-        var countUrl = "/api/swarming/v1/bots/count" + this._args();
+        var countUrl = "/_ah/api/swarming/v1/bots/count" + this._args();
         sk.request("GET", countUrl, null, this.auth_headers)
           .then(JSON.parse).then(function(json){
             this._ready_to_delete = true;
