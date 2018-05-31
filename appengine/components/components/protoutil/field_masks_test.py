@@ -464,6 +464,22 @@ class TrimTests(unittest.TestCase):
         test_proto_pb2.Msg(map_str_msg={'a': test_proto_pb2.Msg(num=1)}))
 
 
+class SubmaskTests(unittest.TestCase):
+  def mask(self, *paths):
+    return Mask.from_field_mask(
+        field_mask_pb2.FieldMask(paths=list(paths)), TEST_DESC)
+
+  def test_one_level(self):
+    actual = self.mask('msg.str', 'str').submask('msg')
+    expected = self.mask('str')
+    self.assertEqual(actual, expected)
+
+  def test_two_levels(self):
+    actual = self.mask('msg.msg.str', 'str').submask('msg.msg')
+    expected = self.mask('str')
+    self.assertEqual(actual, expected)
+
+
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None

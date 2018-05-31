@@ -98,7 +98,7 @@ class Mask(object):
     If self is a leaf, this is a noop.
     """
     for f, v in message.ListFields():
-      incl = self.includes((f.name,))
+      incl = self._includes((f.name,))
       if incl == INCLUDE_ENTIRELY:
         continue
 
@@ -121,7 +121,7 @@ class Mask(object):
       # Trim the field value.
       if f.message_type.GetOptions().map_entry:
         for mk, mv in v.items():
-          incl = self.includes((f.name, mk))
+          incl = self._includes((f.name, mk))
           if incl == INCLUDE_ENTIRELY:
             pass
           elif incl == EXCLUDE:
@@ -140,13 +140,11 @@ class Mask(object):
       else:
         child.trim(v)
 
-  def includes(self, path, start_at=0):
+  def includes(self, path):
     """Tells if a field value at the given path must be included.
 
     Args:
-      path: a path string or a tuple of segments.
-        Must use canonical field names, i.e. not json names.
-      start_at: the index of the segment to start interpreting path from.
+      path: a path string. Must use canonical field names, i.e. not json names.
 
     Returns:
       EXCLUDE if the field value must be excluded.
@@ -158,8 +156,10 @@ class Mask(object):
         self.desc and self.repeated.
     """
     assert path
-    if not isinstance(path, tuple):
-      path = _parse_path(path, self.desc, repeated=self.repeated)
+    return self._includes(_parse_path(path, self.desc, repeated=self.repeated))
+
+  def _includes(self, path, start_at=0):
+    """Implements includes()."""
 
     if not self.children:
       return INCLUDE_ENTIRELY
@@ -182,7 +182,33 @@ class Mask(object):
     if not children:
       # Nothing matched.
       return EXCLUDE
-    return max(c.includes(path, start_at + 1) for c in children)
+    return max(c._includes(path, start_at + 1) for c in children)
+
+  def submask(self, path):
+    """Returns a sub-mask given a path from self to it.
+
+    For example, for a mask ["a.b.c"], mask.get('a.b') will return a mask with
+    c.
+
+    Args:
+      path: a path string. Must use canonical field names, i.e. not json names.
+
+    Returns:
+      A Mask or None.
+
+    Raises:
+      ValueError: path is a string and it is invalid according to
+        self.desc and self.repeated.
+    """
+    assert path
+    return self._submask(_parse_path(path, self.desc, repeated=self.repeated))
+
+  def _submask(self, path, start_at=0):
+    """Implements get()."""
+    if start_at == len(path):
+      return self
+    child = self.children.get(path[start_at])
+    return child and child._submask(path, start_at + 1)
 
   @classmethod
   def from_field_mask(cls, field_mask, desc, json_names=False):
