@@ -20,6 +20,7 @@ import webapp2
 from google.protobuf import symbol_database
 
 # Helpers are in separate modules so this one exposes only the public interface.
+from components.prpc import discovery
 from components.prpc import encoding
 from components.prpc import headers
 from components.prpc.codes import StatusCode
@@ -72,6 +73,8 @@ class Server(object):
   def __init__(self):
     self._services = {}
     self._interceptors = ()
+    self._discovery_service = discovery.Discovery()
+    self.add_service(self._discovery_service)
 
   def add_interceptor(self, interceptor):
     """Adds an interceptor to the interceptor chain.
@@ -130,6 +133,8 @@ class Server(object):
       raise ValueError(
           'Tried to double-register handlers for service %s' % desc.name)
     self._services[full_name] = _Service(servicer, methods)
+
+    self._discovery_service.add_service(servicer.DESCRIPTION)
 
   def get_routes(self):
     """Returns a list of webapp2.Route for all the routes the API handles."""

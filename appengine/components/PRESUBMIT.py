@@ -68,6 +68,7 @@ def CommonChecks(input_api, output_api):
     join('components', 'datastore_utils'),
     join('components', 'ereporter2'),
     join('components', 'prpc'),
+    join('components', 'prpc', 'discovery'),
     join('tests'),
   ]
   tests = []
