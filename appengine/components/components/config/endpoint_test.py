@@ -23,7 +23,7 @@ class EndpointTestCase(test_case.EndpointsTestCase):
 
   def test_metadata(self):
     rule_set = validation.RuleSet()
-    self.mock(endpoint, 'get_default_rule_set', lambda: rule_set)
+    self.mock(validation, 'DEFAULT_RULE_SET', rule_set)
     validation.rule('projects/foo', 'bar.cfg', rule_set=rule_set)
     validation.rule('services/foo', 'foo.cfg', rule_set=rule_set)
 
@@ -62,6 +62,28 @@ class EndpointTestCase(test_case.EndpointsTestCase):
     )
     common.ConfigSettings.clear_cache()
     self.assertTrue(endpoint.is_trusted_requester())
+
+  def test_bad_message_text_characters(self):
+    rule_set = validation.RuleSet()
+    self.mock(validation, 'DEFAULT_RULE_SET', rule_set)
+
+    @validation.rule('projects/foo', 'bar.cfg', rule_set=rule_set)
+    def validate(cfg, ctx):  # pylint: disable=unused-argument, unused-variable
+      ctx.error('a\x80b')
+
+    self.mock(auth, 'is_admin', lambda: True)
+
+    req = {
+      'config_set': 'projects/foo',
+      'path': 'bar.cfg',
+      'content': '',
+    }
+    resp = self.call_api('validate', req).json_body
+    self.assertEqual(resp, {
+      'messages': [
+        {'severity': 'ERROR', 'text': u'a\ufffdb'},
+      ],
+    })
 
 
 if __name__ == '__main__':
