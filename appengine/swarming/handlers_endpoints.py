@@ -217,7 +217,12 @@ class SwarmingServerService(remote.Service):
       message_types.VoidMessage, swarming_rpcs.BootstrapToken)
   @auth.require(acl.can_create_bot)
   def token(self, _request):
-    """Returns a token to bootstrap a new bot."""
+    """Returns a token to bootstrap a new bot.
+
+    This may seem strange to be a POST and not a GET, but it's very
+    important to make sure GET requests are idempotent and safe
+    to be pre-fetched; generating a token is neither of those things.
+    """
     return swarming_rpcs.BootstrapToken(
         bootstrap_token = bot_code.generate_bootstrap_token(),
       )

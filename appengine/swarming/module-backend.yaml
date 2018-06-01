@@ -38,6 +38,7 @@ libraries:
 - name: yaml
   version: "3.10"
 
+# Keep this list in sync with app.yaml
 skip_files:
 # Test and tools.
 - support/
@@ -59,3 +60,4 @@ skip_files:
 - ^[A-Z]+\.[a-z]+$
 - ui/node_modules/
 - ui/res/imp/bower_components/
+- ui2/node_modules/.+

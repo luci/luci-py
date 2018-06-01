@@ -30,6 +30,7 @@ def CommonChecks(input_api, output_api):
   excluded = [
     r'.+-build\.(js|html)$',
     r'.+/build/.+(js|html)$',
+    r'.+/dist/.+(js|html|css)$',
     r'/test',
     r'.+_pb2\.py$',
     r'.+_pb2_grpc\.py$',

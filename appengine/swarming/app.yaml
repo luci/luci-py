@@ -63,6 +63,16 @@ handlers:
     Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
     X-Frame-Options: deny
 
+- url: /newres/(.+)
+  static_files: ui2/dist/\1
+  upload: ui2/dist/(.+)
+  secure: always
+  expiration: "1h"
+  application_readable: true
+  http_headers:
+    Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+    X-Frame-Options: deny
+
 - url: .*
   script: main.app
   secure: always
@@ -96,6 +106,7 @@ libraries:
 - name: yaml
   version: "3.10"
 
+# Keep this list in sync with module-backend.yaml
 skip_files:
 # Test and tools.
 - support/
@@ -117,3 +128,4 @@ skip_files:
 - ^[A-Z]+\.[a-z]+$
 - ui/node_modules/
 - ui/res/imp/bower_components/
+- ui2/node_modules/.+

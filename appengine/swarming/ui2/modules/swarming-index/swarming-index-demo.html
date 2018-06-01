@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<title>swarming-index demo</title>
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=egde,chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://apis.google.com/js/platform.js" async defer></script>
+<script type="text/javascript" charset="utf-8">
+  // This bit of script loads the custom elements v1 polyfill, but only if required.
+  if (!window.customElements) {
+    var newScript = document.createElement('script');
+    newScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/custom-elements/1.0.8/custom-elements.min.js';
+    document.write(newScript.outerHTML);
+  }
+</script>
+<!-- Comment out the scripts below if using real OAuth flow-->
+<!--   <script src="https://apis.google.com/js/platform.js?onload=init" async defer></script>
+  <script>
+    function init(){
+      gapi.load('auth2', () => {
+        document.dispatchEvent(new CustomEvent('oauth-lib-loaded'));
+      })
+    }
+  </script> -->
+<swarming-index client_id="foo" testing_offline=true></swarming-index>
+<!-- <swarming-index client_id="20770472288-t5smpbpjptka4nd888fv0ctd23ftba2o.apps.googleusercontent.com"></swarming-index> -->
+

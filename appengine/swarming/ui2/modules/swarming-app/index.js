@@ -1,0 +1,9 @@
+// Copyright 2018 The LUCI Authors. All rights reserved.
+// Use of this source code is governed under the Apache License, Version 2.0
+// that can be found in the LICENSE file.
+
+import 'elements-sk/icon-sk'
+
+import '../oauth-login'
+import './swarming-app.js'
+import './swarming-app.scss'

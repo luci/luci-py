@@ -11,7 +11,10 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def bootstrap():
-  template.bootstrap({'swarming': os.path.join(ROOT_DIR, 'templates')})
+  template.bootstrap({
+    'swarming': os.path.join(ROOT_DIR, 'templates'),
+    'wcui': os.path.join(ROOT_DIR, 'ui2', 'dist')
+    })
 
 
 def reset():
