@@ -98,7 +98,7 @@ def add_cors_headers(headers):
 
 
 class CorsHandler(webapp2.RequestHandler):
-  def options(self):
+  def options(self, *_args, **_kwargs):
     add_cors_headers(self.response.headers)
 
 
