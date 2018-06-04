@@ -47,7 +47,7 @@ only on Windows and the command there is different:
       },
     }],
 
-    ['OS=="android"', {
+    ['OS=="windows"', {
       'variables': {
         'command': [
           'setup_env.py',
