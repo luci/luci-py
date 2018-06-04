@@ -157,12 +157,20 @@
         content: " | ";
       }
 
+      .slice-tabs {
+        max-width: 400px;
+      }
+
       .chart {
         margin-left: 5px;
       }
 
       .highlighted {
         background-color: #fffc6c;
+      }
+
+      table.inactive {
+        background-color: #ddd;
       }
 
       /* Tell all the second td in a tr (i.e. the content) to break
@@ -255,7 +263,16 @@
               </task-disambiguation>
             </template>
 
-            <table class="task-info" hidden$="[[_not(_task_exists)]]">
+            <template is="dom-if" if="[[_hasMultipleSlices(_request.task_slices)]]">
+              <paper-tabs class="slice-tabs" selected="{{_currentSliceIdx}}" no-bar>
+                <template is="dom-repeat" items="[[_request.task_slices]]" indexAs="index">
+                  <paper-tab>Task Slice [[_add(index,1)]]</paper-tab>
+                </template>
+              </paper-tabs>
+            </template>
+
+            <table class$="task-info [[_activeSliceClass(_result.current_task_slice, _currentSliceIdx)]]"
+                hidden$="[[_not(_task_exists)]]">
               <tbody>
                 <tr>
                   <td>Name</td>
@@ -263,7 +280,12 @@
                 </tr>
                 <tr>
                   <td>State</td>
-                  <td class$="[[_stateClass(_result)]]">[[state(_result)]]</td>
+                  <template is="dom-if" if="[[_isActiveSlice(_result.current_task_slice, _currentSliceIdx)]]">
+                    <td class$="[[_stateClass(_result)]]">[[state(_result)]]</td>
+                  </template>
+                  <template is="dom-if" if="[[!_isActiveSlice(_result.current_task_slice, _currentSliceIdx)]]">
+                    <td>THIS SLICE DID NOT RUN. Select another slice above.</td>
+                  </template>
                 </tr>
 
                 <tr>
@@ -279,7 +301,7 @@
                     <span class$="[[_it(_bots_count.count)]]">[[_bots_count.count]]</span>
                     <a
                         title="The list of bots that matches the list of dimensions"
-                        href$="[[_botListLink(_request.properties.dimensions)]]">bots</a>
+                        href$="[[_botListLink(_currentSlice.properties.dimensions)]]">bots</a>
                     could possibly run this task
                     (<span class$="[[_it(_bots_count.busy)]]">[[_bots_count.busy]]</span>
                     busy,
@@ -300,11 +322,11 @@
                     <span class$="[[_it(_other_pending.count)]]">[[_other_pending.count]]</span>
                     <a
                       title="The list of pending tasks that matches the list of dimensions"
-                      href$='[[_taskListLink(_request.properties.dimensions,"","state:PENDING")]]'>similar pending tasks</a>,
+                      href$='[[_taskListLink(_currentSlice.properties.dimensions,"","state:PENDING")]]'>similar pending tasks</a>,
                     <span class$="[[_it(_other_running.count)]]">[[_other_running.count]]</span>
                     <a
                       title="The list of running tasks that matches the list of dimensions"
-                      href$='[[_taskListLink(_request.properties.dimensions,"","state:RUNNING")]]'>similar running tasks</a>
+                      href$='[[_taskListLink(_currentSlice.properties.dimensions,"","state:RUNNING")]]'>similar running tasks</a>
                   </td>
                 </tr>
 
@@ -336,10 +358,10 @@
                     <td>[[_request.service_account]]</td>
                   </tr>
                 </template>
-                <template is="dom-if" if="[[_request.properties.secret_bytes]]">
+                <template is="dom-if" if="[[_currentSlice.properties.secret_bytes]]">
                   <tr>
                     <td>Secret Bytes</td>
-                    <td>[[_request.properties.secret_bytes]]</td>
+                    <td>[[_currentSlice.properties.secret_bytes]]</td>
                   </tr>
                 </template>
                 <template is="dom-if" if="[[_request.parent_task_id]]">
@@ -351,17 +373,17 @@
                   </tr>
                 </template>
                 <tr>
-                  <td rowspan$="[[_rowspan(_request.properties.dimensions)]]">
+                  <td rowspan$="[[_rowspan(_currentSlice.properties.dimensions)]]">
                     Dimensions <br/>
                     <a
                         title="The list of bots that matches the list of dimensions"
-                        href$="[[_botListLink(_request.properties.dimensions)]]">Bots</a>
+                        href$="[[_botListLink(_currentSlice.properties.dimensions)]]">Bots</a>
                      <a
                         title="The list of tasks that matches the list of dimensions"
-                        href$="[[_taskListLink(_request.properties.dimensions)]]">Tasks</a>
+                        href$="[[_taskListLink(_currentSlice.properties.dimensions)]]">Tasks</a>
                   </td>
                 </tr>
-                <template is="dom-repeat" items="{{_request.properties.dimensions}}" as="dimension">
+                <template is="dom-repeat" items="[[_currentSlice.properties.dimensions]]" as="dimension">
                   <tr>
                     <td><b>[[dimension.key]]:</b> [[_aliasRequest(dimension)]]</td>
                   </tr>
@@ -369,16 +391,16 @@
                 <tr>
                   <td>Isolated Inputs</td>
                   <td>
-                    <a href$="[[_isolateLink(_request.properties.inputs_ref)]]">
-                      [[_request.properties.inputs_ref.isolated]]
+                    <a href$="[[_isolateLink(_currentSlice.properties.inputs_ref)]]">
+                      [[_currentSlice.properties.inputs_ref.isolated]]
                     </a>
                   </td>
                 </tr>
-                <template is="dom-if" if="[[_request.properties.outputs.length]]">
+                <template is="dom-if" if="[[_currentSlice.properties.outputs.length]]">
                   <tr>
-                    <td rowspan$="[[_rowspan(_request.properties.outputs)]]">Expected outputs</td>
+                    <td rowspan$="[[_rowspan(_currentSlice.properties.outputs)]]">Expected outputs</td>
                   </tr>
-                  <template is="dom-repeat" items="{{_request.properties.outputs}}" as="output">
+                  <template is="dom-repeat" items="[[_currentSlice.properties.outputs]]" as="output">
                     <tr>
                       <td>[[output]]</td>
                     </tr>
@@ -416,32 +438,32 @@
               <tbody id="more_details" hidden$="[[!_request_detail]]">
                 <tr>
                   <td>Extra Args</td>
-                  <td class="code break-all">[[_extraArgs(_request)]]</td>
+                  <td class="code break-all">[[_extraArgs(_currentSlice.properties)]]</td>
                 </tr>
                 <tr>
                   <td>Command</td>
-                  <td class="code break-all">[[_command(_request)]]</td>
+                  <td class="code break-all">[[_command(_currentSlice.properties)]]</td>
                 </tr>
                 <tr>
-                  <td rowspan$="[[_rowspan(_request.properties.env)]]">Environment Vars</td>
+                  <td rowspan$="[[_rowspan(_currentSlice.properties.env)]]">Environment Vars</td>
                 </tr>
-                <template is="dom-repeat" items="{{_request.properties.env}}" as="env">
+                <template is="dom-repeat" items="[[_currentSlice.properties.env]]" as="env">
                   <tr>
                     <td class="break-all">[[env.key]]=[[env.value]]</td>
                   </tr>
                 </template>
                 <tr>
                   <td
-                    rowspan$="[[_rowspan(_request.properties.env_prefixes)]]">Environment Prefixes</td>
+                    rowspan$="[[_rowspan(_currentSlice.properties.env_prefixes)]]">Environment Prefixes</td>
                 </tr>
-                <template is="dom-repeat" items="{{_request.properties.env_prefixes}}" as="env">
+                <template is="dom-repeat" items="[[_currentSlice.properties.env_prefixes]]" as="env">
                   <tr>
                     <td class="break-all">[[env.key]]=[[[env.value]]]</td>
                   </tr>
                 </template>
                 <tr>
                   <td>Idempotent</td>
-                  <td>[[_request.properties.idempotent]]</td>
+                  <td>[[_currentSlice.properties.idempotent]]</td>
                 </tr>
                 <tr>
                   <td rowspan$="[[_rowspan(_request.tags)]]">Tags</td>
@@ -454,28 +476,28 @@
 
                 <tr>
                   <td>Execution timeout</td>
-                  <td>[[_humanDuration(_request.properties.execution_timeout_secs)]]</td>
+                  <td>[[_humanDuration(_currentSlice.properties.execution_timeout_secs)]]</td>
                 </tr>
                 <tr>
                   <td>I/O timeout</td>
-                  <td>[[_humanDuration(_request.properties.io_timeout_secs)]]</td>
+                  <td>[[_humanDuration(_currentSlice.properties.io_timeout_secs)]]</td>
                 </tr>
                 <tr>
                   <td>Grace period</td>
-                  <td>[[_humanDuration(_request.properties.grace_period_secs)]]</td>
+                  <td>[[_humanDuration(_currentSlice.properties.grace_period_secs)]]</td>
                 </tr>
 
                 <tr>
                   <td>CIPD server</td>
                   <td>
-                    <a href$="[[_request.properties.cipd_input.server]]">
-                      [[_request.properties.cipd_input.server]]
+                    <a href$="[[_currentSlice.properties.cipd_input.server]]">
+                      [[_currentSlice.properties.cipd_input.server]]
                     </a>
                   </td>
                 </tr>
                 <tr>
                   <td>CIPD version</td>
-                  <td class="break-all">[[_request.properties.cipd_input.client_package.version]]</td>
+                  <td class="break-all">[[_currentSlice.properties.cipd_input.client_package.version]]</td>
                 </tr>
                 <template is="dom-if" if="[[_wasPickedUp(_result)]]">
                   <tr>
@@ -484,10 +506,10 @@
                   </tr>
                 </template>
 
-                <tr hidden$="[[_not(_request.properties.cipd_input)]]">
-                  <td rowspan$="[[_cipdRowspan(_request,_result)]]">CIPD packages</td>
+                <tr hidden$="[[_not(_currentSlice.properties.cipd_input)]]">
+                  <td rowspan$="[[_cipdRowspan(_currentSlice.properties,_result)]]">CIPD packages</td>
                 </tr>
-                <template is="dom-repeat" items="[[_cipdPackages(_request,_result)]]" as="cipd">
+                <template is="dom-repeat" items="[[_cipdPackages(_currentSlice.properties,_result)]]" as="cipd">
                   <tr>
                     <td>[[cipd.path]]/</td>
                   </tr>
@@ -503,10 +525,10 @@
                   </tr>
                 </template>
 
-                <tr hidden$="[[_empty(_request.properties.caches)]]">
-                  <td rowspan$="[[_rowspan(_request.properties.caches)]]">Named caches</td>
+                <tr hidden$="[[_empty(_currentSlice.properties.caches)]]">
+                  <td rowspan$="[[_rowspan(_currentSlice.properties.caches)]]">Named caches</td>
                 </tr>
-                <template is="dom-repeat" items="[[_request.properties.caches]]" as="cache">
+                <template is="dom-repeat" items="[[_currentSlice.properties.caches]]" as="cache">
                   <tr>
                     <td><span>[[cache.name]]</span>:<span>[[cache.path]]</span></td>
                   </tr>
@@ -533,7 +555,7 @@
                     <template is="dom-if" if="[[_wasNotPickedUp(_result)]]">
                       <tr>
                         <td>Expires</td>
-                        <td>[[_expires(_request)]]</td>
+                        <td>[[_expires(_request, _currentSlice)]]</td>
                       </tr>
                     </template>
                     <template is="dom-if" if="[[_result.human_completed_ts]]">
@@ -596,13 +618,13 @@
                 </tr>
                 <template is="dom-repeat" items="[[_result.bot_dimensions]]" as="dimension">
                   <tr>
-                    <td bgcolor$="[[_highlight(_request.properties.dimensions, dimension.key)]]">
+                    <td bgcolor$="[[_highlight(_currentSlice.properties.dimensions, dimension.key)]]">
                       <b>[[dimension.key]]:</b>
                       <template
                         is="dom-repeat"
-                        items="[[_aliasResult(_request.properties.dimensions, dimension)]]"
+                        items="[[_aliasResult(_currentSlice.properties.dimensions, dimension)]]"
                         as="value">
-                        <span class$="[[value.class]] dim">[[value.name]]</span>
+                        <span class$="break-all [[value.class]] dim">[[value.name]]</span>
                       </template>
                     </td>
                   </tr>
@@ -717,7 +739,7 @@
               <div class="title">Reproducing the task locally</div>
               <div class="reproduce">
                 <div>Download inputs files into directory <i>foo</i>:</div>
-                <div class="code">  python isolateserver.py download -I [[_request.properties.inputs_ref.isolatedserver]] --namespace [[_request.properties.inputs_ref.namespace]] -s [[_request.properties.inputs_ref.isolated]] --target foo</div>
+                <div class="code">  python isolateserver.py download -I [[_currentSlice.properties.inputs_ref.isolatedserver]] --namespace [[_currentSlice.properties.inputs_ref.namespace]] -s [[_currentSlice.properties.inputs_ref.isolated]] --target foo</div>
                 <br>
                 <div>Run this task locally:</div>
                 <div class="code">  python swarming.py reproduce -S [[_host_url]] [[task_id]]</div>
@@ -874,7 +896,14 @@
           type: Boolean,
           value: false,
         },
-
+        _currentSlice: {
+          type: Object,
+          computed: "_getCurrSlice(_request,_currentSliceIdx)",
+        },
+        _currentSliceIdx: {
+          type: Number,
+          value: 0,
+        },
         _dialog_prompt: {
           type: String,
           value: "",
@@ -906,13 +935,14 @@
         },
         _request: {
           type: Object,
-          observer: "_requestUpdated"
+          observer: "_requestUpdated",
         },
         _request_detail: {
           type: Boolean,
         },
         _result: {
           type: Object,
+          observer: "_resultUpdated",
         },
         _retry_dimensions: {
           type: Array,
@@ -929,7 +959,23 @@
       },
 
       observers: [
-        "_similarLoad(_request,_result,_auth_headers)"],
+        "_similarLoad(_currentSlice,_result,_auth_headers)"],
+
+      _activeSliceClass: function(activeSliceIdx, currentSliceIdx) {
+        if (this._isActiveSlice(activeSliceIdx, currentSliceIdx)) {
+          return "active";
+        }
+        return "inactive";
+      },
+
+      _isActiveSlice: function(activeSliceIdx, currentSliceIdx) {
+        // Intentionally use == here to allow for string -> int comparison.
+        return activeSliceIdx == currentSliceIdx;
+      },
+
+      _add: function(n, m) {
+        return n + m;
+      },
 
       _aliasRequest: function(request) {
         var values = request.value;
@@ -945,7 +991,7 @@
       },
 
       _aliasResult: function(requested_dims, bot_dim) {
-        // requested_dims is the entire _request.properties.dimensions array, but we
+        // requested_dims is the entire _currentSlice.properties.dimensions array, but we
         // are only passed in one key at a time from _result.bot_dimensions as the
         // bot_dim variable. Therefore we need to loop through the key-value pairs
         // of requested_dims to determine whether the current bot dimension was
@@ -1007,14 +1053,14 @@
         swarming.postWithToast(url, "Canceling task " + this.task_id, this._auth_headers, body);
       },
 
-      _cipdRowspan: function(request, result) {
-        if (!request || !request.properties || !request.properties.cipd_input) {
+      _cipdRowspan: function(properties, result) {
+        if (!properties || !properties.cipd_input) {
           return 0;
         }
         // We always need to at least double the number of packages because we
         // show the path and then the requested.  If the actual package info
         // is available, we triple the number of packages to account for that.
-        var rowSpan = (request.properties.cipd_input.packages || []).length;
+        var rowSpan = (properties.cipd_input.packages || []).length;
         if (this._hasActualCIPDPackages(result)) {
           rowSpan *= 3;
         } else {
@@ -1024,11 +1070,11 @@
         return rowSpan + 1;
       },
 
-      _cipdPackages: function(request, result) {
-        if (!request || !request.properties || !request.properties.cipd_input) {
+      _cipdPackages: function(properties, result) {
+        if (!properties || !properties.cipd_input) {
           return [];
         }
-        var packages = request.properties.cipd_input.packages || [];
+        var packages = properties.cipd_input.packages || [];
         var actual = (result && result.cipd_pins && result.cipd_pins.packages) || [];
         packages.forEach(function(p, i) {
           p.requested = p.package_name + ":" + p.version;
@@ -1056,11 +1102,11 @@
         return "";
       },
 
-      _command: function(request) {
-        if (!request || !request.properties) {
+      _command: function(properties) {
+        if (!properties) {
           return "";
         }
-        var args = request.properties.command || [];
+        var args = properties.command || [];
         return args.join(" ");
       },
 
@@ -1138,21 +1184,20 @@
         return a === b;
       },
 
-      _expires: function(request) {
-        var delta = parseInt(request.expiration_secs);
+      _expires: function(request, currentSlice) {
+        var delta = parseInt(currentSlice.expiration_secs);
         if (delta) {
           return sk.human.localeTime(new Date(request.created_ts.getTime() + delta * 1000));
         }
         // Fall back to something
-        return request.expiration_secs + " seconds from created time";
+        return currentSlice.expiration_secs + " seconds from created time";
       },
 
-      _extraArgs: function(request) {
-        if (!request || !request.properties) {
+      _extraArgs: function(properties) {
+        if (!properties) {
           return "";
         }
-        var args = request.properties.extra_args || [];
-        return args.join(" ");
+        return (properties.extra_args || []).join(" ");
       },
 
       _failureClass: function(failure) {
@@ -1160,6 +1205,13 @@
           return "failed_task";
         }
         return "";
+      },
+
+      _getCurrSlice: function(request, sliceIdx) {
+        if (!request || !request.task_slices) {
+          return {};
+        }
+        return request.task_slices[sliceIdx || 0];
       },
 
       _getDisplayServerLink: function(milo_template, id, request) {
@@ -1177,6 +1229,10 @@
 
       _hasActualCIPDPackages: function(result) {
         return result && result.cipd_pins && result.cipd_pins.packages;
+      },
+
+      _hasMultipleSlices: function(task_slices) {
+        return task_slices && task_slices.length > 1;
       },
 
       _highlight: function(request, key) {
@@ -1236,7 +1292,7 @@
       },
 
       _promptDebug: function() {
-        this.$.debug_task_prompt.setDimensions(this._request.properties.dimensions);
+        this.$.debug_task_prompt.setDimensions(this._currentSlice.properties.dimensions);
         this.$.debug_task.open();
       },
 
@@ -1253,7 +1309,7 @@
           name: `leased to ${this._profile.email} for debugging`,
           parent_task_id: this._request.parent_task_id,
           priority: 20,
-          properties: this._request.properties,
+          properties: this._currentSlice.properties,
           service_account: this._request.service_account,
           tags: ["debug_task:1"],
           user: this._profile.email,
@@ -1288,7 +1344,7 @@ time.sleep(${leaseDuration})`];
       },
 
       _promptRetry: function() {
-        this.$.retry_task_prompt.setDimensions(this._request.properties.dimensions);
+        this.$.retry_task_prompt.setDimensions(this._currentSlice.properties.dimensions);
         this.$.retry_task.open();
       },
 
@@ -1305,7 +1361,7 @@ time.sleep(${leaseDuration})`];
           name: this._request.name +" (retry)",
           parent_task_id: this._request.parent_task_id,
           priority: this._request.priority,
-          properties: this._request.properties,
+          properties: this._currentSlice.properties,
           service_account: this._request.service_account,
           tags: this._request.tags,
           user: this._profile.email,
@@ -1345,7 +1401,7 @@ time.sleep(${leaseDuration})`];
       },
 
       _getFirstRequestDimension: function(key) {
-        var dimensions = this._request.properties.dimensions.filter(function (d) {
+        var dimensions = this._currentSlice.properties.dimensions.filter(function (d) {
           return d.key === key;
         });
         if (!dimensions.length) {
@@ -1393,6 +1449,10 @@ time.sleep(${leaseDuration})`];
         }
       },
 
+      _resultUpdated: function(result) {
+        this.set("_currentSliceIdx", result.current_task_slice || 0);
+      },
+
       _softRefresh: function() {
         if (this._result && this._result.state !== "RUNNING" &&
             this._result.state !==  "PENDING") {
@@ -1414,11 +1474,11 @@ time.sleep(${leaseDuration})`];
         this.set("_request_detail", !this._request_detail);
       },
 
-      _tag: function(result, col) {
-        if (!result || !result.tagMap) {
+      _tag: function(request, col) {
+        if (!request || !request.tagMap) {
           return undefined;
         }
-        return result.tagMap[col];
+        return request.tagMap[col];
       },
 
       _wasPickedUp: function(result) {
@@ -1430,15 +1490,15 @@ time.sleep(${leaseDuration})`];
       },
 
       _similarLoad: function() {
-        if (!this._request || !this._result || !this._auth_headers) {
+        if (!this._currentSlice || !this._result || !this._auth_headers) {
           return;
         }
-        var result = this._result;
+        var currentSlice = this._currentSlice;
         var request = this._request;
         var botCountParams = {
           dimensions: []
         };
-        var dims = (request.properties && request.properties.dimensions) || [];
+        var dims = (currentSlice.properties && currentSlice.properties.dimensions) || [];
         dims.forEach(function(d){
           botCountParams.dimensions.push(`${d.key}:${d.value}`);
         });

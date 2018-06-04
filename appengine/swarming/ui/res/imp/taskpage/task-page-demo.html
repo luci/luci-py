@@ -59,26 +59,21 @@
 
 
     server.respondWith("GET", /^\/_ah\/api\/swarming\/v1\/task\/abcdef\d+\/request.*/, genResponse(requests));
-    server.respondWith("GET", /^\/api\/swarming\/v1\/task\/abcdef\d+\/request.*/, genResponse(requests));
 
     server.respondWith("GET", /^\/_ah\/api\/swarming\/v1\/task\/abcdef\d+\/result.*/, genResponse(results));
-    server.respondWith("GET", /^\/api\/swarming\/v1\/task\/abcdef\d+\/result.*/, genResponse(results));
 
     server.respondWith("GET", /^\/_ah\/api\/swarming\/v1\/task\/abcdef\d+\/stdout.*/, genResponse(stdouts));
-    server.respondWith("GET", /^\/api\/swarming\/v1\/task\/abcdef\d+\/stdout.*/, genResponse(stdouts));
 
     var permissions = {
       cancel_task: true,
     };
     server.respondWith("GET",  /^\/_ah\/api\/swarming\/v1\/server\/permissions/, JSON.stringify(permissions));
-    server.respondWith("GET", /^\/api\/swarming\/v1\/server\/permissions/, JSON.stringify(permissions));
 
     var details = {
       server_version: "1234-deadbeef",
       display_server_url_template: "/res/imp/taskpage/milo-sample.html?id=%s&foo=bar",
     };
     server.respondWith("GET", /^\/_ah\/api\/swarming\/v1\/server\/details/, JSON.stringify(details));
-    server.respondWith("GET", /^\/api\/swarming\/v1\/server\/details/, JSON.stringify(details));
 
     var cancel = function(request) {
       console.log("Cancelling", request);
@@ -91,13 +86,12 @@
     }
 
     server.respondWith("POST", /^\/_ah\/api\/swarming\/v1\/task\/.+\/cancel/, cancel);
-    server.respondWith("POST", /^\/api\/swarming\/v1\/task\/.+\/cancel/, cancel);
 
     var countDetails = {
       count: 780,
     }
 
-    server.respondWith("GET", /^\/api\/swarming\/v1\/tasks\/count/, function(request){
+    server.respondWith("GET", /^\/_ah\/api\/swarming\/v1\/tasks\/count/, function(request){
       countDetails.count++;
       request.respond(200, {}, JSON.stringify(countDetails));
     });
@@ -109,7 +103,6 @@
     }
 
     server.respondWith("POST", /^\/_ah\/api\/swarming\/v1\/tasks\/new/, newTask);
-    server.respondWith("POST", /^\/api\/swarming\/v1\/tasks\/new/, newTask);
 
     var count = {
       count: 905,
@@ -118,7 +111,7 @@
       quarantined: 0,
       maintenance: 1,
     }
-    server.respondWith("GET", /^\/api\/swarming\/v1\/bots\/count.*/, JSON.stringify(count));
+    server.respondWith("GET", /^\/_ah\/api\/swarming\/v1\/bots\/count.*/, JSON.stringify(count));
     </script>
 
     <link rel="import" href="task-page.html">
