@@ -203,7 +203,7 @@ class Server(object):
           context._request_encoding = parsed_headers.content_type
           context._response_encoding = parsed_headers.accept
         except ValueError as e:
-          logging.exception('Error processing headers')
+          logging.warning('Error parsing headers: %s', e)
           context.set_code(StatusCode.INVALID_ARGUMENT)
           context.set_details(e.message)
           return None
