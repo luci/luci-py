@@ -60,8 +60,7 @@ def create_application():
   from mapreduce import main
   gae_ts_mon.initialize(main.APP, is_enabled_fn=is_enabled_callback)
 
-  # TODO(maruel): Remove this once there is no known client anymore.
-  api = webapp2.WSGIApplication(endpoints_webapp2.api_server([
+  api = endpoints_webapp2.api_server([
     handlers_endpoints.SwarmingServerService,
     handlers_endpoints.SwarmingTaskService,
     handlers_endpoints.SwarmingTasksService,
@@ -71,7 +70,7 @@ def create_application():
     # components.config endpoints for validation and configuring of luci-config
     # service URL.
     config.ConfigApi,
-  ], base_path='/_ah/api'))
+  ])
 
   event_mon_metrics.initialize()
   ts_mon_metrics.initialize()

@@ -1031,7 +1031,7 @@ class SwarmingBotsService(remote.Service):
 
 
 def get_routes():
-  return endpoints_webapp2.api_server([
+  return endpoints_webapp2.api_routes([
     SwarmingServerService,
     SwarmingTaskService,
     SwarmingTasksService,
@@ -1040,4 +1040,4 @@ def get_routes():
     SwarmingBotsService,
     # components.config endpoints for validation and configuring of luci-config
     # service URL.
-    config.ConfigApi])
+    config.ConfigApi], base_path='/api')

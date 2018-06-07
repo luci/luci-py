@@ -551,7 +551,7 @@ class IsolateService(remote.Service):
 
 
 def get_routes():
-  return endpoints_webapp2.api_server([
+  return endpoints_webapp2.api_routes([
       config.ConfigApi,
       IsolateService,
-  ])
+  ], base_path='/api')

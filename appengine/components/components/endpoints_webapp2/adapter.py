@@ -149,54 +149,41 @@ def path_handler(api_class, api_method, service_path):
   return Handler
 
 
-def api_routes(api_class, base_path='/api'):
-  """Creates webapp2 routes for the given Endpoints v1 service.
-
-  Args:
-    api_class: The protorpc.remote.Service class to create routes for.
-    base_path: The base path under which all service paths should exist.
-
-  Returns:
-    A list of webapp2.Routes.
-  """
-  # TODO(smut): Convert all callers to invoke api_server instead.
-  # Once nothing invokes this directly, make base_path required here
-  # and have the default in api_server only.
-  api_path = '%s/%s/%s' % (
-      base_path, api_class.api_info.name, api_class.api_info.version)
-  routes = []
-  templates = set()
-  for _, m in sorted(api_class.all_remote_methods().iteritems()):
-    info = m.method_info
-
-    method_path = info.get_path(api_class.api_info)
-    method_path = method_path.replace('{', '<').replace('}', '>')
-    tmpl = posixpath.join(api_path, method_path)
-
-    http_method = info.http_method.upper() or 'POST'
-
-    handler = path_handler(api_class, m, api_path)
-    routes.append(webapp2.Route(tmpl, handler, methods=[http_method]))
-    templates.add(tmpl)
-  for t in sorted(templates):
-    routes.append(webapp2.Route(t, CorsHandler, methods=['OPTIONS']))
-  return routes
-
-
-def api_server(api_classes, base_path='/api'):
+def api_routes(api_classes, base_path='/_ah/api'):
   """Creates webapp2 routes for the given Endpoints v1 services.
 
   Args:
     api_classes: A list of protorpc.remote.Service classes to create routes for.
     base_path: The base path under which all service paths should exist. If
-      unspecified, defaults to api.
+      unspecified, defaults to /_ah/api.
 
   Returns:
     A list of webapp2.Routes.
   """
   routes = []
+
+  # Add routes for each class.
   for api_class in api_classes:
-    routes.extend(api_routes(api_class, base_path=base_path))
+    api_base_path = '%s/%s/%s' % (
+        base_path, api_class.api_info.name, api_class.api_info.version)
+    templates = set()
+
+    # Add routes for each method of each class.
+    for _, method in sorted(api_class.all_remote_methods().iteritems()):
+      info = method.method_info
+      method_path = info.get_path(api_class.api_info)
+      method_path = method_path.replace('{', '<').replace('}', '>')
+      t = posixpath.join(api_base_path, method_path)
+      http_method = info.http_method.upper() or 'POST'
+      handler = path_handler(api_class, method, api_base_path)
+      routes.append(webapp2.Route(t, handler, methods=[http_method]))
+      templates.add(t)
+
+    # Add routes for HTTP OPTIONS (to add CORS headers) for each method.
+    for t in sorted(templates):
+      routes.append(webapp2.Route(t, CorsHandler, methods=['OPTIONS']))
+
+  # Add generic routes.
   routes.extend([
       directory_service_route(api_classes, base_path),
       discovery_service_route(api_classes, base_path),
@@ -204,6 +191,23 @@ def api_server(api_classes, base_path='/api'):
       explorer_redirect_route(base_path),
   ])
   return routes
+
+
+def api_server(api_classes, base_path='/_ah/api'):
+  """Creates a webapp2 application for the given Endpoints v1 services.
+
+  A shortcut for webapp2.WSGIApplication(api_routes(...)), which exists to
+  match endpoints.api_server's behavior of returning a webapp2.WSGIApplication.
+
+  Args:
+    api_classes: A list of protorpc.remote.Service classes to create routes for.
+    base_path: The base path under which all service paths should exist. If
+      unspecified, defaults to /_ah/api.
+
+  Returns:
+    A webapp2.WSGIApplication.
+  """
+  return webapp2.WSGIApplication(api_routes(api_classes, base_path))
 
 
 def discovery_handler_factory(api_classes, base_path):

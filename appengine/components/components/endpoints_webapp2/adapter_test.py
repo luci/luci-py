@@ -88,8 +88,8 @@ class EndpointsWebapp2TestCase(test_case.TestCase):
 
   def test_handle_403(self):
     app = webapp2.WSGIApplication(
-        adapter.api_routes(EndpointsService), debug=True)
-    request = webapp2.Request.blank('/api/Service/v1/post_403')
+        adapter.api_routes([EndpointsService], '/_ah/api'), debug=True)
+    request = webapp2.Request.blank('/_ah/api/Service/v1/post_403')
     request.method = 'POST'
     response = request.get_response(app)
     self.assertEqual(response.status_int, 403)
@@ -99,22 +99,25 @@ class EndpointsWebapp2TestCase(test_case.TestCase):
       },
     })
 
-  def test_api_server_routes(self):
+  def test_api_routes(self):
     routes = sorted([
-        r.template for r in adapter.api_server([EndpointsService])])
+        r.template for r in adapter.api_routes([EndpointsService])])
     self.assertEqual(routes, [
-        '/api/Service/v1/get',
-        '/api/Service/v1/get',
-        '/api/Service/v1/get_container',
-        '/api/Service/v1/get_container',
-        '/api/Service/v1/post',
-        '/api/Service/v1/post',
-        '/api/Service/v1/post_403',
-        '/api/Service/v1/post_403',
-        '/api/discovery/v1/apis',
-        '/api/discovery/v1/apis/<name>/<version>/rest',
-        '/api/explorer',
-        '/api/static/proxy.html',
+        # Each route appears twice below because each route has two
+        # different handlers, one for HTTP OPTIONS and the other for
+        # user-defined methods.
+        '/_ah/api/Service/v1/get',
+        '/_ah/api/Service/v1/get',
+        '/_ah/api/Service/v1/get_container',
+        '/_ah/api/Service/v1/get_container',
+        '/_ah/api/Service/v1/post',
+        '/_ah/api/Service/v1/post',
+        '/_ah/api/Service/v1/post_403',
+        '/_ah/api/Service/v1/post_403',
+        '/_ah/api/discovery/v1/apis',
+        '/_ah/api/discovery/v1/apis/<name>/<version>/rest',
+        '/_ah/api/explorer',
+        '/_ah/api/static/proxy.html',
     ])
 
   def test_discovery_routing(self):

@@ -11,5 +11,4 @@ from components import endpoints_webapp2
 
 
 def create_endpoints_app():
-  return webapp2.WSGIApplication(
-      endpoints_webapp2.api_server([config.ConfigApi], base_path='/_ah/api'))
+  return endpoints_webapp2.api_server([config.ConfigApi])

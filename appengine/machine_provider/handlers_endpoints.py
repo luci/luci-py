@@ -747,9 +747,9 @@ class MachineProviderEndpoints(remote.Service):
 
 
 def create_endpoints_app():
-  return webapp2.WSGIApplication(endpoints_webapp2.api_server([
+  return endpoints_webapp2.api_server([
       CatalogEndpoints,
       MachineEndpoints,
       MachineProviderEndpoints,
       config.ConfigApi,
-  ], base_path='/_ah/api'))
+  ])
