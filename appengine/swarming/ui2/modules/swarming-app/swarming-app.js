@@ -40,6 +40,7 @@ window.customElements.define('swarming-app', class extends HTMLElement {
     upgradeProperty(this, 'testing_offline');
     this._addHTML();
     this._render();
+    this._busyTaskCount = 0;
   }
 
   static get observedAttributes() {
@@ -94,6 +95,19 @@ window.customElements.define('swarming-app', class extends HTMLElement {
 
   attributeChangedCallback(attrName, oldVal, newVal) {
     this._render();
+  }
+
+  addBusyTasks(count) {
+    this._busyTaskCount += count;
+    // TODO(kjlubick): activate the spinner
+  }
+
+  finishedTask() {
+    this._busyTaskCount--;
+    if (this._busyTaskCount <= 0) {
+      this._busyTaskCount = 0;
+      this.dispatchEvent(new CustomEvent('busy-end', {bubbles: true}));
+    }
   }
 
 });

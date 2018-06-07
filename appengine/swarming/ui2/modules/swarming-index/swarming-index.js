@@ -41,15 +41,15 @@ const bootstrapTemplate = (ele) => html`
   <ol>
     <li>
       <strong> TL;DR; </strong>
-<pre class="command">python -c "import urllib; exec urllib.urlopen('${ele._host_url}/bootstrap?tok=${ele._bootstrap_token}').read()"</pre>
+<pre class=command>python -c "import urllib; exec urllib.urlopen('${ele._host_url}/bootstrap?tok=${ele._bootstrap_token}').read()"</pre>
     </li>
     <li>
       Escaped version to pass as a ssh argument:
-<pre class="command">'python -c "import urllib; exec urllib.urlopen('"'${ele._host_url}/bootstrap?tok=${ele._bootstrap_token}'"').read()"'</pre>
+<pre class=command>'python -c "import urllib; exec urllib.urlopen('"'${ele._host_url}/bootstrap?tok=${ele._bootstrap_token}'"').read()"'</pre>
     </li>
     <li>
       Manually:
-<pre class="command">mkdir bot; cd bot
+<pre class=command>mkdir bot; cd bot
 rm -f swarming_bot.zip; curl -sSLOJ ${ele._host_url}/bot_code?tok=${ele._bootstrap_token}
 python swarming_bot.zip</pre>
     </li>
@@ -72,7 +72,7 @@ const template = (ele) => html`
   <main>
 
     <h2>Service Status</h2>
-    <div>Server Version: ${ele._server_details.server_version}</div>
+    <div>Server Version: <span class=server_version>${ele._server_details.server_version}</span></div>
     <div>Bot Version: ${ele._server_details.bot_version} </div>
     <ul>
       <li>
@@ -125,8 +125,8 @@ window.customElements.define('swarming-index', class extends HTMLElement {
     this._bootstrap_token = '...';
     let idx = location.hostname.indexOf('.appspot.com');
     this._project_id = location.hostname.substring(0, idx) || 'not_found';
-
     this._host_url = location.origin;
+    this._auth_header = '';
   }
 
   static get observedAttributes() {
@@ -146,8 +146,29 @@ window.customElements.define('swarming-index', class extends HTMLElement {
     }
   }
 
+  _fetchToken() {
+    let post_extra = {
+      headers: {'authorization': this._auth_header},
+      method: 'POST',
+    };
+    let app = this.firstElementChild;
+    app.addBusyTasks(1);
+    fetch('/_ah/api/swarming/v1/server/token', post_extra)
+      .then(jsonOrThrow)
+      .then((json) => {
+        this._bootstrap_token = json.bootstrap_token;
+        this._render();
+        app.finishedTask();
+      })
+      .catch((e) => {
+        console.error(e);
+        errorMessage(`Error loading token: ${e.body}`, 5000);
+        app.finishedTask();
+      });
+  }
+
   update() {
-    if (!this.auth_header) {
+    if (!this._auth_header) {
       return;
     }
     this._server_details = {
@@ -155,40 +176,36 @@ window.customElements.define('swarming-index', class extends HTMLElement {
       bot_version: '<loading>',
     };
     let extra = {
-      headers: {'authorization': this.auth_header}
+      headers: {'authorization': this._auth_header}
     };
-
+    let app = this.firstElementChild;
+    app.addBusyTasks(2);
     fetch('/_ah/api/swarming/v1/server/details', extra)
       .then(jsonOrThrow)
       .then((json) => {
         this._server_details = json;
         this._render();
+        app.finishedTask();
       })
       .catch((e) => {
         console.error(e);
         errorMessage(`Error loading details: ${e.body}`, 5000);
+        app.finishedTask();
       });
     fetch('/_ah/api/swarming/v1/server/permissions', extra)
       .then(jsonOrThrow)
       .then((json) => {
         this._permissions = json;
+        if (this._permissions.get_bootstrap_token) {
+          this._fetchToken();
+        }
         this._render();
+        app.finishedTask();
       })
       .catch((e) => {
         console.error(e);
         errorMessage(`Error loading permissions: ${e.body}`, 5000);
-      });
-
-    extra.method = 'POST';
-    fetch('/_ah/api/swarming/v1/server/token', extra)
-      .then(jsonOrThrow)
-      .then((json) => {
-        this._bootstrap_token = json.bootstrap_token;
-        this._render();
-      })
-      .catch((e) => {
-        console.error(e);
-        errorMessage(`Error loading token: ${e.body}`, 5000);
+        app.finishedTask();
       });
 
   }
@@ -198,13 +215,11 @@ window.customElements.define('swarming-index', class extends HTMLElement {
     upgradeProperty(this, 'testing_offline');
 
     this.addEventListener('log-in', (e) => {
-      this.auth_header = e.detail.auth_header;
+      this._auth_header = e.detail.auth_header;
       this.update();
     });
 
     this._render();
-    // make a fetch ASAP, but not immediately (demo mock up may not be set up yet)
-    window.setTimeout(() => this.update());
   }
 
   _render() {
