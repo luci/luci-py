@@ -30,7 +30,7 @@ handlers:
 - url: /src
   static_dir: ui/src
 
-- url: /_ah/spi/.*
+- url: /_ah/api/.*
   script: apps.endpoints
 
 - url: /.*
