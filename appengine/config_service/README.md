@@ -14,6 +14,7 @@
     `<appid>` below with your project id.
 *   Visit Google Cloud Console, IAM & Admin, click Add Member and add someone
     else so you can safely be hit by a bus.
+*   Follow the instructions in [ui/README.md](ui/README.md) to build the UI.
 *   Upload the code with: `./tools/gae upl -x -A <appid>`
 *   Ensure that the import location has been properly configured for access by
     the service account of the config service.
