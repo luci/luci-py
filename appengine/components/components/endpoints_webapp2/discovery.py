@@ -15,7 +15,7 @@ from components import utils
 
 
 def _normalize_name(n):
-  """Splits words by . and _ and PascalCases the rest.
+  """Splits words by non-alphanumeric characters and PascalCases the rest.
 
   Args:
     n: The string to normalize.
@@ -24,7 +24,7 @@ def _normalize_name(n):
     A normalized version of the given string.
   """
   words = []
-  for word in n.replace('_', '.').split('.'):
+  for word in re.split(r'[^0-9a-zA-Z]', n):
     words.append('%s%s' % (word[:1].upper(), word[1:]))
   return ''.join(words)
 
