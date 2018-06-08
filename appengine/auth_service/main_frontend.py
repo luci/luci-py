@@ -18,10 +18,9 @@ sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
 from components import utils
 utils.fix_protobuf_package()
 
-import endpoints
-
 from components import auth
 from components import config
+from components import endpoints_webapp2
 from components import ereporter2
 
 import handlers_frontend
@@ -35,10 +34,8 @@ def create_applications():
   frontend = monitoring.wrap_webapp2_app(
       handlers_frontend.create_application(False))
 
-  # App that serves endpoints APIs. Note: monitoring.wrap_webapp2_app doesn't
-  # support Endpoints server. This is fine, we don't host any important APIs
-  # there.
-  api = endpoints.api_server([auth.AuthService, config.ConfigApi])
+  api = monitoring.wrap_webapp2_app(
+      endpoints_webapp2.api_server([auth.AuthService, config.ConfigApi]))
 
   return frontend, api
 

@@ -13,7 +13,7 @@ automatic_scaling:
   max_concurrent_requests: 4
 
 handlers:
-- url: /_ah/spi/.*
+- url: /_ah/api/.*
   script: main_frontend.endpoints_app
   secure: always
 
