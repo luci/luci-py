@@ -3,3 +3,13 @@
 // that can be found in the LICENSE file.
 
 import './index.js'
+
+(function(){
+
+let btn = document.getElementById('test-button');
+btn.addEventListener('click', () => {
+  let swapp = document.getElementsByTagName('swarming-app');
+  swapp[0].addBusyTasks(1);
+});
+
+})();

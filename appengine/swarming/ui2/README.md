@@ -50,7 +50,7 @@ whitelist `localhost:8080` for that client_id.
 
 Any file matching `modules/**/*_test.js` will automatically be added to the test suite.
 When developing tests, it is easiest to put the tests in "automatically rebuild and run"
-mode, which can be done with `make dev_test`.
+mode, which can be done with `make continuous_test`.
 
 To run all tests exactly once on Firefox and Chrome (assuming those browsers are present):
 

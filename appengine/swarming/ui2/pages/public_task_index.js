@@ -2,9 +2,4 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import 'elements-sk/icon-sk'
-import 'elements-sk/spinner-sk'
-
-import '../oauth-login'
-import './swarming-app.js'
-import './swarming-app.scss'
+import '../modules/swarming-app'

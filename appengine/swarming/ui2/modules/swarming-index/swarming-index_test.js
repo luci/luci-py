@@ -2,7 +2,9 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import './index.js'
+import 'modules/swarming-index'
+
+(function(){
 
 const fetchMock = require('fetch-mock');
 
@@ -33,6 +35,7 @@ afterEach(function() {
   fetchMock.restore();
 });
 
+// A reusable HTML element in which we create our element under test.
 let container = document.createElement('div');
 document.body.appendChild(container);
 
@@ -40,13 +43,13 @@ afterEach(function() {
   container.innerHTML = '';
 });
 
-// calls the test callback with one element 'ele', a created
-// <swarming-index>.
+// calls the test callback with one element 'ele', a created <swarming-index>.
 // We can't put the describes inside the whenDefined callback because
 // that doesn't work on Firefox (and possibly other places).
 function createElement(test) {
   return window.customElements.whenDefined('swarming-index').then(() => {
     container.innerHTML = `<swarming-index client_id=for_test testing_offline=true></swarming-index>`;
+    expect(container.firstElementChild).toBeTruthy();
     test(container.firstElementChild);
   });
 }
@@ -63,6 +66,8 @@ function userLogsIn(ele, callback) {
 }
 
 function becomeAdmin() {
+  // overwrite the default fetchMock behaviors for this run to return
+  // what an admin would see.
   fetchMock.get('/_ah/api/swarming/v1/server/permissions', {
     get_bootstrap_token: true
   }, { overwriteRoutes: true });
@@ -257,5 +262,7 @@ describe('swarming-index', function() {
         });
       });
     });
-  });
+  }); // end describe('api calls')
 });
+
+})();

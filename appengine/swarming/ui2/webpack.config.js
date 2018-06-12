@@ -13,5 +13,6 @@ module.exports = (env, argv) => {
     test: /.js$/,
     use: 'html-template-minifier-webpack',
   });
+
   return config;
 }

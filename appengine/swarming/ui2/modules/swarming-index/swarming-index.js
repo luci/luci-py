@@ -58,7 +58,7 @@ python swarming_bot.zip</pre>
 `;
 
 const template = (ele) => html`
-<swarming-app id="swapp"
+<swarming-app id=swapp
               client_id="${ele.client_id}"
               testing_offline="${ele.testing_offline}">
   <header>
@@ -115,6 +115,7 @@ const template = (ele) => html`
 </swarming-app>`;
 
 window.customElements.define('swarming-index', class extends HTMLElement {
+
   constructor() {
     super();
     this._server_details = {
@@ -196,6 +197,8 @@ window.customElements.define('swarming-index', class extends HTMLElement {
       .then(jsonOrThrow)
       .then((json) => {
         this._permissions = json;
+        // Avoid unnecessary 403s, only get a bootstrap_token if we have
+        // permission to do so.
         if (this._permissions.get_bootstrap_token) {
           this._fetchToken();
         }

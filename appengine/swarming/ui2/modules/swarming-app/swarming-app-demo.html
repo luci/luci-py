@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <title>swarming-app demo</title>
 <meta charset="utf-8" />
-<meta http-equiv="X-UA-Compatible" content="IE=egde,chrome=1">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script type="text/javascript" charset="utf-8">
   // This bit of script loads the custom elements v1 polyfill, but only if required.
   if (!window.customElements) {
-    var newScript = document.createElement('script');
-    newScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/custom-elements/1.0.8/custom-elements.min.js';
-    document.write(newScript.outerHTML);
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/custom-elements/1.1.1/custom-elements.min.js';
+    document.write(s.outerHTML);
   }
 </script>
 <swarming-app client_id="foo" testing_offline=true>
@@ -30,6 +30,8 @@
     consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse
     cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non
     proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+
+    <p><button id=test-button>Press button to activate spinner</button></p>
 
   </main>
   <footer><error-sk></error-sk></footer>

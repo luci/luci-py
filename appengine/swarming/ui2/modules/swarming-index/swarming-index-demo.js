@@ -12,24 +12,24 @@ function requireLogin(logged_in, delay=500) {
   return function(url, opts){
     if (opts && opts.headers && opts.headers.authorization) {
       return new Promise((resolve) => {
-                  setTimeout(resolve, delay);
-                }).then(() => {
-                  return {
-                    status: 200,
-                    body: JSON.stringify(logged_in),
-                    headers: {'Content-Type':'application/json'},
-                  };
-                });
+        setTimeout(resolve, delay);
+      }).then(() => {
+        return {
+          status: 200,
+          body: JSON.stringify(logged_in),
+          headers: {'Content-Type':'application/json'},
+        };
+      });
     } else {
       return new Promise((resolve) => {
-                  setTimeout(resolve, delay);
-                }).then(() => {
-                  return {
-                    status: 403,
-                    body: 'Try logging in',
-                    headers: {'Content-Type':'text/plain'},
-                  };
-                });
+        setTimeout(resolve, delay);
+      }).then(() => {
+        return {
+          status: 403,
+          body: 'Try logging in',
+          headers: {'Content-Type':'text/plain'},
+        };
+      });
     }
   };
 }

@@ -37,6 +37,16 @@ swarming-app > {
     margin: auto 5px; /* Center things vertically */
   }
 
+  header .spinner-spacer {
+    min-width:40px;
+  }
+
+  header spinner-sk {
+    width: 24px;
+    height: 24px;
+    margin: 0;
+  }
+
   main {
     padding: 0 5px;
   }

@@ -12,6 +12,11 @@ if (typeof webpackConfig === 'function') {
 webpackConfig.entry = null;
 webpackConfig.mode = 'development';
 
+// Allows tests to import modules locally
+webpackConfig.resolve = {
+    modules: ['./node_modules', './'],
+}
+
 module.exports = function(config) {
   config.set({
 
@@ -27,7 +32,7 @@ module.exports = function(config) {
     // list of files / patterns to load in the browser
     files: [
         'node_modules/@webcomponents/custom-elements/custom-elements.min.js',
-        { pattern: 'modules/**/*_test.js', watched: false },
+        '_all_tests.js',
     ],
 
 
@@ -35,13 +40,35 @@ module.exports = function(config) {
     exclude: [
     ],
 
+    plugins: [
+        'karma-concat-preprocessor',
+        'karma-webpack',
+        'karma-jasmine',
+        'karma-firefox-launcher',
+        'karma-chrome-launcher',
+    ],
 
     // preprocess matching files before serving them to the browser
     // available preprocessors: https://npmjs.org/browse/keyword/karma-preprocessor
     preprocessors: {
-        'modules/**/*_test.js': [ 'webpack' ]
+        'modules/**/*.js': ['concat'],
+        '_all_tests.js': [ 'webpack' ]
     },
 
+    concat: {
+        // By default, concat puts everything in a function(){}, but
+        // that doesn't work with imports.
+        header: '',
+        footer: '',
+        outputs: [
+            {
+                file: '_all_tests.js',
+                inputs: [
+                    'modules/**/*_test.js',
+                ],
+            },
+        ],
+    },
 
     // test results reporter to use
     // possible values: 'dots', 'progress'
@@ -63,7 +90,7 @@ module.exports = function(config) {
 
 
     // enable / disable watching file and executing tests whenever any file changes
-    autoWatch: true,
+    autoWatch: false,
 
 
     // start these browsers
