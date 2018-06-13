@@ -10,6 +10,13 @@ Swarming is purely a task scheduler service.
 [Documentation](doc)
 
 
+## Chrome Operations release
+
+Visit https://goto.google.com/swarming-releases for the Chrome Operations
+release process.
+
+
+
 ## Setting up
 
 *   Visit http://console.cloud.google.com and create a project. Replace
