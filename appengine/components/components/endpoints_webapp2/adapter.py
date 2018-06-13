@@ -139,7 +139,7 @@ def path_handler(api_class, api_method, service_path):
           else:
             response_body = PROTOCOL.encode_message(res)
 
-      if self.response.status_code != 204:
+      if self.response.status_int != 204:
         self.response.content_type = 'application/json; charset=utf-8'
         self.response.out.write(response_body)
       else:
