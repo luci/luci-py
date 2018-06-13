@@ -91,7 +91,7 @@ def _gen_request_slices(**kwargs):
   }
   args.update(kwargs)
   req = task_request.TaskRequest(**args)
-  task_request.init_new_request(req, True)
+  task_request.init_new_request(req, True, task_request.TEMPLATE_AUTO)
   return req
 
 

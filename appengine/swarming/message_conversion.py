@@ -221,8 +221,8 @@ def task_request_to_rpc(entity):
 
 
 def new_task_request_from_rpc(msg, now):
-  """"Returns a (task_request.TaskRequest, task_request.SecretBytes) from
-  a swarming_rpcs.NewTaskRequest.
+  """"Returns a (task_request.TaskRequest, task_request.SecretBytes,
+  task_request.TemplateApplyEnum) from a swarming_rpcs.NewTaskRequest.
 
   If secret_bytes were not included in the rpc, the SecretBytes entity will be
   None.
@@ -256,6 +256,14 @@ def new_task_request_from_rpc(msg, now):
   else:
     raise ValueError('Specify one of properties or task_slices')
 
+  pttf = swarming_rpcs.PoolTaskTemplateField
+  template_apply = {
+    pttf.AUTO: task_request.TEMPLATE_AUTO,
+    pttf.CANARY_NEVER: task_request.TEMPLATE_CANARY_NEVER,
+    pttf.CANARY_PREFER: task_request.TEMPLATE_CANARY_PREFER,
+    pttf.SKIP: task_request.TEMPLATE_SKIP,
+  }[msg.pool_task_template]
+
   req = _rpc_to_ndb(
       task_request.TaskRequest,
       msg,
@@ -269,9 +277,10 @@ def new_task_request_from_rpc(msg, now):
       tags=None,
       manual_tags=msg.tags,
       # This is internal field not settable via RPC.
-      service_account_token=None)
+      service_account_token=None,
+      pool_task_template=None) # handled out of band
 
-  return req, secret_bytes
+  return req, secret_bytes, template_apply
 
 
 def task_result_to_rpc(entity, send_stats):

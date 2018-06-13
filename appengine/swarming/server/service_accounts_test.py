@@ -168,7 +168,7 @@ class TaskAccountTokenTest(TestBase):
       'user': 'Someone',
     }
     req = task_request.TaskRequest(**args)
-    task_request.init_new_request(req, True)
+    task_request.init_new_request(req, True, task_request.TEMPLATE_AUTO)
     req.key = task_request.new_request_key()
     req.service_account = service_account
     req.service_account_token = service_account_token

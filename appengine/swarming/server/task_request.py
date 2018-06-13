@@ -65,13 +65,27 @@ from components import utils
 from components.config import validation
 
 from server import config
+from server import directory_occlusion
+from server import pools_config
 from server import service_accounts
 from server import task_pack
+
 import cipd
 
 
 # Maximum acceptable priority value, which is effectively the lowest priority.
 MAXIMUM_PRIORITY = 255
+
+
+# Enum singletons controlling the application of the pool task templates in
+# init_new_request. This is the counterpart of
+# swarming_rpcs.PoolTaskTemplateField
+class TemplateApplyEnum(str):
+  pass
+TEMPLATE_AUTO = TemplateApplyEnum('TEMPLATE_AUTO')
+TEMPLATE_CANARY_PREFER = TemplateApplyEnum('TEMPLATE_CANARY_PREFER')
+TEMPLATE_CANARY_NEVER = TemplateApplyEnum('TEMPLATE_CANARY_NEVER')
+TEMPLATE_SKIP = TemplateApplyEnum('TEMPLATE_SKIP')
 
 
 # Three days in seconds. Add 10s to account for small jitter.
@@ -637,6 +651,12 @@ class TaskProperties(ndb.Model):
   has_secret_bytes = ndb.BooleanProperty(default=False, indexed=False)
 
   @property
+  def pool(self):
+    """Returns the pool that this TaskProperties has in dimensions, or None if
+    no pool dimension exists."""
+    return self.dimensions.get('pool', [None])[0]
+
+  @property
   def dimensions(self):
     """Returns dimensions as a dict(unicode, list(unicode)), even for older
     entities.
@@ -932,6 +952,12 @@ class TaskRequest(ndb.Model):
     return t
 
   @property
+  def pool(self):
+    # all task_slices must have the same pool, and we must have at least one
+    # task slice, so just return the 0th's pool.
+    return self.task_slice(0).properties.pool
+
+  @property
   def secret_bytes_key(self):
     if self.properties_old:
       if self.properties_old.has_secret_bytes:
@@ -1118,7 +1144,7 @@ def create_termination_task(bot_id, wait_for_capacity):
       ],
       manual_tags=[u'terminate:1'])
   assert request.task_slice(0).properties.is_terminate
-  init_new_request(request, True)
+  init_new_request(request, True, TEMPLATE_SKIP)
   return request
 
 
@@ -1221,7 +1247,125 @@ def validate_request_key(request_key):
             root_entity_shard_id))
 
 
-def init_new_request(request, allow_high_priority):
+def _select_task_template(pool, template_apply):
+  """Selects the task template to apply from the given pool config.
+
+  Args:
+    pool (str) - The name of the pool to select a task template from.
+    template_apply (swarming_rpcs.PoolTaskTemplate) - The PoolTaskTemplate
+      enum controlling application of the deployment.
+
+  Returns:
+    (TaskTemplate, extra_tags) if there's a template to apply or else
+    (None, extra_tags).
+  """
+  if not pool:
+    # It shouldn't actually be possible, but here for consistency so that tasks
+    # always get a swarming.pool.template tag with SOME value.
+    return None, ('swarming.pool.template:no_pool',)
+
+  assert isinstance(template_apply, TemplateApplyEnum)
+
+  pool_cfg = pools_config.get_pool_config(pool)
+  if not pool_cfg:
+    return None, ('swarming.pool.template:no_config',)
+
+  tags = ('swarming.pool.version:%s' % (pool_cfg.rev,),)
+
+  if template_apply == TEMPLATE_SKIP:
+    tags += ('swarming.pool.template:skip',)
+    return None, tags
+
+  deployment = pool_cfg.task_template_deployment
+  if not deployment:
+    tags += ('swarming.pool.template:none',)
+    return None, tags
+
+  canary = deployment.canary and (
+    (template_apply == TEMPLATE_CANARY_PREFER)
+    or (template_apply == TEMPLATE_AUTO and
+        random.randint(1, 9999) < deployment.canary_chance)
+  )
+  to_apply = deployment.canary if canary else deployment.prod
+
+  tags += ('swarming.pool.template:%s' % ('canary' if canary else 'prod'),)
+  return to_apply, tags
+
+
+def _apply_task_template(task_template, props):
+  """Applies this template to the indicated properties.
+
+  Modifies `props` in-place.
+
+  Args:
+    task_template (pools_config.TaskTemplate|None) - The template to apply. If
+      None, then this function returns without modifying props.
+    props (TaskProperties) - The task properties to modify.
+  """
+  if task_template is None:
+    return
+
+  assert isinstance(task_template, pools_config.TaskTemplate)
+  assert isinstance(props, TaskProperties)
+
+  for envvar in task_template.env:
+    var_name = envvar.var
+
+    if not envvar.soft:
+      if var_name in (props.env or {}):
+        raise ValueError(
+            'request.env[%r] conflicts with pool\'s template' % var_name)
+      if var_name in (props.env_prefixes or {}):
+        raise ValueError(
+            'request.env_prefixes[%r] conflicts with pool\'s template'
+            % var_name)
+
+    if envvar.value:
+      props.env = props.env or {}
+      props.env[var_name] = props.env.get(var_name, '') or envvar.value
+
+    if envvar.prefix:
+      props.env_prefixes = props.env_prefixes or {}
+      props.env_prefixes[var_name] = (
+          list(envvar.prefix) + props.env_prefixes.get(var_name, []))
+
+  reserved_cache_names = set()
+  occlude_checker = directory_occlusion.Checker()
+  # Add all task template paths.
+  for cache in task_template.cache:
+    reserved_cache_names.add(cache.name)
+    occlude_checker.add(cache.path, 'task template cache %r' % cache.name, '')
+  for cp in task_template.cipd_package:
+    occlude_checker.add(
+        cp.path, 'task template cipd', '%s:%s' % (cp.pkg, cp.version))
+
+  # Add all task paths, avoiding spurious initializations in the underlying
+  # TaskProperties (repeated fields auto-initialize to [] when looped over).
+  for cache in (props.caches or ()):
+    if cache.name in reserved_cache_names:
+      raise ValueError(
+          'request.cache[%r] conflicts with pool\'s template' % cache.name)
+    occlude_checker.add(cache.path, 'task cache %r' % cache.name, '')
+  for cp in (props.cipd_input.packages or () if props.cipd_input else ()):
+    occlude_checker.add(
+        cp.path, 'task cipd', '%s:%s' % (cp.package_name, cp.version))
+
+  ctx = validation.Context()
+  if occlude_checker.conflicts(ctx):
+    raise ValueError('\n'.join(m.text for m in ctx.result().messages))
+
+  for cache in task_template.cache:
+    props.caches.append(CacheEntry(name=cache.name, path=cache.path))
+
+  if task_template.cipd_package:
+    # Only initialize TaskProperties.cipd_input if we have something to add
+    props.cipd_input = props.cipd_input or CipdInput()
+    for cp in task_template.cipd_package:
+      props.cipd_input.packages.append(CipdPackage(
+          package_name=cp.pkg, path=cp.path, version=cp.version))
+
+
+def init_new_request(request, allow_high_priority, template_apply):
   """Initializes a new TaskRequest but doesn't store it.
 
   ACL check must have been done before, except for high priority task.
@@ -1232,6 +1376,7 @@ def init_new_request(request, allow_high_priority):
   - priority: defaults to parent.priority - 1
   - user: overridden by parent.user
 
+  template_apply must be one of the TEMPLATE_* singleton values above.
   """
   assert request.__class__ is TaskRequest, request
   if not request.num_task_slices:
@@ -1271,20 +1416,24 @@ def init_new_request(request, allow_high_priority):
   request.service_account = request.service_account or u'none'
   request.service_account_token = None
 
+  task_template, extra_tags = _select_task_template(
+      request.pool, template_apply)
+
   if request.task_slices:
     exp = 0
     for t in request.task_slices:
       if not t.expiration_secs:
         raise ValueError('missing expiration_secs')
       exp += t.expiration_secs
+      _apply_task_template(task_template, t.properties)
     # Always clobber the overall value.
     # message_conversion.new_task_request_from_rpc() ensures both task_slices
     # and expiration_secs cannot be used simultaneously.
     request.expiration_ts = request.created_ts + datetime.timedelta(seconds=exp)
 
   # This is useful to categorize the task.
-  assert not request.tags, 'Fix call site: %s' % request.tags
   all_tags = set(request.manual_tags).union(_get_automatic_tags(request))
+  all_tags.update(extra_tags)
   request.tags = sorted(all_tags)
 
 

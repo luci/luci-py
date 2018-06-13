@@ -274,6 +274,8 @@ class BackendTest(AppTestBase):
             task_result.TagValues(tag='pool', values=['default']),
             task_result.TagValues(tag='priority', values=['20']),
             task_result.TagValues(tag='service_account', values=['none']),
+            task_result.TagValues(
+                tag='swarming.pool.template', values=['no_config']),
             task_result.TagValues(tag='user', values=['joe@localhost']),
             task_result.TagValues(tag='zeta', values=['theta']),
         ],

@@ -257,6 +257,8 @@ class TasksApiTest(BaseTest):
           u'pool:default',
           u'priority:20',
           u'service_account:service-account@example.com',
+          u'swarming.pool.template:none',
+          u'swarming.pool.version:pools_cfg_rev',
           u'user:joe@localhost'
         ],
         service_account=u'service-account@example.com',
@@ -267,17 +269,15 @@ class TasksApiTest(BaseTest):
             u'wait_for_capacity': False,
           },
         ]),
-      u'task_id': u'5cee488008810',
     }
 
     # Do an evaluate_only call first
     request.evaluate_only = True
-    evaluate_expect = dict(expected)
-    evaluate_expect.pop(u'task_id')
     response = self.call_api('new', body=message_to_dict(request))
-    self.assertEqual(evaluate_expect, response.json)
+    self.assertEqual(expected, response.json)
 
     request.evaluate_only = False
+    expected[u'task_id'] = u'5cee488008810'
     response = self.call_api('new', body=message_to_dict(request))
     # Time advanced since the evaluate_only call.
     expected['request']['created_ts'] = fmtdate(self.now)
@@ -288,6 +288,58 @@ class TasksApiTest(BaseTest):
     self.assertEqual(
         [(u'service-account@example.com', datetime.timedelta(0, 30+30+15))] * 2,
         oauth_grant_calls)
+
+  def test_new_ok_template(self):
+    """Asserts that new generates appropriate metadata for a templated task."""
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.mock(random, 'randint', lambda *_: 10000) # always pick prod
+
+    request = self.create_new_request(
+        properties=self.create_props(
+            command=['rm', '-rf', '/'],
+            execution_timeout_secs=30,
+            grace_period_secs=15,
+            dimensions=[
+              {u'key': u'os', u'value': u'Amiga'},
+              {u'key': u'pool', u'value': u'template'},
+            ]),
+        tags=[u'a:tag'])
+    expected_props = self.gen_props(
+        command=[u'rm', u'-rf', u'/'],
+        execution_timeout_secs=u'30',
+        grace_period_secs=u'15',
+        env=[{u'key': u'VAR', u'value': u'prod'}],
+        dimensions=[
+          {u'key': u'os', u'value': u'Amiga'},
+          {u'key': u'pool', u'value': u'template'},
+        ])
+    expected = {
+      u'request': self.gen_request(
+        created_ts=fmtdate(self.now),
+        priority=u'20',
+        properties=expected_props,
+        tags=[
+          u'a:tag',
+          u'os:Amiga',
+          u'pool:template',
+          u'priority:20',
+          u'service_account:none',
+          u'swarming.pool.template:prod',
+          u'swarming.pool.version:pools_cfg_rev',
+          u'user:joe@localhost',
+        ],
+        task_slices=[
+          {
+            u'expiration_secs': u'86400',
+            u'properties': expected_props,
+            u'wait_for_capacity': False,
+          },
+        ]),
+      u'task_id': u'5cee488008810',
+    }
+
+    response = self.call_api('new', body=message_to_dict(request))
+    self.assertEqual(expected, response.json)
 
   def test_new_bad_service_account(self):
     oauth_grant_calls = self.mock_task_service_accounts()
@@ -350,6 +402,8 @@ class TasksApiTest(BaseTest):
           u'priority:20',
           u'project:yay',
           u'service_account:none',
+          u'swarming.pool.template:none',
+          u'swarming.pool.version:pools_cfg_rev',
           u'user:joe@localhost',
         ],
         try_number=u'1')
@@ -365,6 +419,8 @@ class TasksApiTest(BaseTest):
           u'priority:20',
           u'project:yay',
           u'service_account:none',
+          u'swarming.pool.template:none',
+          u'swarming.pool.version:pools_cfg_rev',
           u'user:joe@localhost',
         ],
         task_slices=[
@@ -401,6 +457,8 @@ class TasksApiTest(BaseTest):
           u'pool:default',
           u'priority:200',
           u'service_account:none',
+          u'swarming.pool.template:none',
+          u'swarming.pool.version:pools_cfg_rev',
           u'user:joe@localhost',
         ],
         task_slices=[
@@ -428,6 +486,8 @@ class TasksApiTest(BaseTest):
           u'pool:default',
           u'priority:200',
           u'service_account:none',
+          u'swarming.pool.template:none',
+          u'swarming.pool.version:pools_cfg_rev',
           u'user:joe@localhost',
         ])
 
@@ -1015,7 +1075,9 @@ class TasksApiTest(BaseTest):
         started_ts=fmtdate(self.now),
         tags=[
           u'commit:post', u'os:Amiga', u'pool:default', u'priority:20',
-          u'project:yay', u'service_account:none', u'user:joe@localhost',
+          u'project:yay', u'service_account:none',
+          u'swarming.pool.template:none',
+          u'swarming.pool.version:pools_cfg_rev', u'user:joe@localhost',
         ],
         try_number=u'1')
     deduped = self.gen_result_summary(
@@ -1031,7 +1093,9 @@ class TasksApiTest(BaseTest):
         started_ts=fmtdate(self.now),
         tags=[
           u'commit:pre', u'os:Amiga', u'pool:default', u'priority:20',
-          u'project:yay', u'service_account:none', u'user:jack@localhost',
+          u'project:yay', u'service_account:none',
+          u'swarming.pool.template:none',
+          u'swarming.pool.version:pools_cfg_rev', u'user:jack@localhost',
         ],
         task_id=u'5cfcee8006610',
         user=u'jack@localhost')
@@ -1115,6 +1179,7 @@ class TaskApiTest(BaseTest):
         u'pool:default',
         u'priority:20',
         u'service_account:none',
+        u'swarming.pool.template:no_config',
         u'user:joe@localhost',
       ],
       u'task_id': task_id,
@@ -1264,6 +1329,7 @@ class TaskApiTest(BaseTest):
         u'pool:default',
         u'priority:20',
         u'service_account:none',
+        u'swarming.pool.template:no_config',
         u'user:joe@localhost',
       ],
       u'task_id': u'5cee488008810',
@@ -1407,6 +1473,8 @@ class TaskApiTest(BaseTest):
           u'pool:default',
           u'priority:20',
           u'service_account:service-account@example.com',
+          u'swarming.pool.template:none',
+          u'swarming.pool.version:pools_cfg_rev',
           u'user:joe@localhost',
         ],
         task_slices=[

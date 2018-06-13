@@ -35,6 +35,18 @@ class TaskSort(messages.Enum):
   CREATED_TS, MODIFIED_TS, COMPLETED_TS, ABANDONED_TS = range(4)
 
 
+class PoolTaskTemplateField(messages.Enum):
+  """Flag to control the application of the pool's TaskTemplate in a new
+  TaskRequest.
+
+  The non-endpoints counterpart is in task_request.
+  """
+  AUTO = 0
+  CANARY_PREFER = 1
+  CANARY_NEVER = 2
+  SKIP = 3
+
+
 ### Pretend Associative Array
 
 
@@ -353,6 +365,14 @@ class NewTaskRequest(messages.Message):
   # actually schedule it. This will return the TaskRequest, but without
   # a task_id.
   evaluate_only = messages.BooleanField(13)
+
+  # Controls the application of the pool's TaskTemplate to the creation of this
+  # task. By default this will automatically select the pool's preference for
+  # template, but you can also instruct swarming to prefer/prevent the
+  # application of canary templates, as well as skipping the template
+  # altogether.
+  pool_task_template = messages.EnumField(
+      PoolTaskTemplateField, 14, default='AUTO')
 
 
 class TaskRequest(messages.Message):

@@ -9,6 +9,7 @@ used primarily by task_scheduler.check_schedule_request_acl.
 """
 
 import collections
+import random
 
 from components import auth
 from components import config
@@ -61,8 +62,11 @@ _TaskTemplateDeployment = collections.namedtuple('_TaskTemplateDeployment', [
   # The TaskTemplate for canary builds (optional).
   'canary',
   # The chance (int [0, 9999]) of the time that the canary template should
-  # be selected. Required if canary is not None. If we parse a 0 from the
-  # pools.cfg, then both this and 'canary' are set to None.
+  # be selected. Must be 0 if no canary is specified.
+  #
+  # NOTE: some tests set this to >9999 in order to force canary selection
+  # without mocking randomint; in the live server TaskTemplateDeployment.from_pb
+  # prevents this from occuring.
   'canary_chance',
 ])
 
@@ -309,6 +313,8 @@ Env = collections.namedtuple('Env', ['var', 'value', 'prefix', 'soft'])
 
 def get_pool_config(pool_name):
   """Returns PoolConfig for the given pool or None if not defined."""
+  if pool_name is None:
+    raise ValueError('get_pool_config called with None')
   return _fetch_pools_config().pools.get(pool_name)
 
 

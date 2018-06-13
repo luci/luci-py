@@ -21,6 +21,7 @@ from components import utils
 from test_support import test_case
 
 from server import config
+from server import pools_config
 from server import task_pack
 from server import task_request
 
@@ -74,6 +75,7 @@ def _gen_properties(**kwargs):
 
 def _gen_request_slices(**kwargs):
   """Creates a TaskRequest."""
+  template_apply = kwargs.pop('_template_apply', task_request.TEMPLATE_AUTO)
   now = utils.utcnow()
   args = {
     u'created_ts': now,
@@ -88,7 +90,7 @@ def _gen_request_slices(**kwargs):
   args.update(kwargs)
   # Note that ndb model constructor accepts dicts for structured properties.
   req = task_request.TaskRequest(**args)
-  task_request.init_new_request(req, True)
+  task_request.init_new_request(req, True, template_apply)
   return req
 
 
@@ -108,6 +110,53 @@ def _gen_secret(req, secret_bytes):
   sb = task_request.SecretBytes(secret_bytes=secret_bytes)
   sb.key = req.secret_bytes_key
   return sb
+
+
+def _gen_task_template(cache=None, cipd_package=None, env=None):
+  """Builds an unverified pools_config.TaskTemplate for use with
+  _set_pool_config_with_templates.
+
+  Args:
+    cache (None|dict{name: path}) - cache entries to set.
+    cipd_package (None|dict{(path, pkg): version}) - cipd packages to set.
+    env (None|dict{var: value|(value, prefix)|(value, prefix, soft)}) -
+        envvars to set. The key is always the envvar to set, and the value may
+        be:
+          * the envvar value as a string (prefix=() and soft=False)
+          * A (value, prefix) tuple (soft=False)
+          * A (value, prefix, soft) tuple
+
+  Returns constructed pools_config.TaskTemplate.
+  """
+  def env_value(var, combo_value):
+    prefix, soft = (), False
+    if isinstance(combo_value, tuple):
+      assert len(combo_value) in (2, 3), (
+          'unexpected tuple length: %r' % combo_value)
+      if len(combo_value) == 2:
+        value, prefix = combo_value
+      else:
+        value, prefix, soft = combo_value
+    else:
+      value = unicode(combo_value)
+
+    return pools_config.Env(var, value, tuple(map(unicode, prefix)), soft)
+
+  return pools_config.TaskTemplate(
+    cache=sorted(
+      pools_config.CacheEntry(unicode(name), unicode(path))
+      for name, path in (cache or {}).iteritems()
+    ),
+    cipd_package=sorted(
+      pools_config.CipdPackage(unicode(path), unicode(pkg), unicode(version))
+      for (path, pkg), version in (cipd_package or {}).iteritems()
+    ),
+    env=sorted(
+      env_value(unicode(var), value)
+      for var, value in (env or {}).iteritems()
+    ),
+    inclusions=(),
+  )
 
 
 class Prop(object):
@@ -151,8 +200,129 @@ class TaskRequestPrivateTest(TestCase):
       task_request._validate_isolated(
           Prop(), '0123456789abcdef'*9)
 
+  def test_apply_template_simple(self):
+    tt = _gen_task_template(
+      cache={'cache': 'c'},
+      cipd_package={('cipd', 'some/pkg'): 'latest'},
+      env={'ENV': ('1', ['a'])},
+    )
+    p = task_request.TaskProperties()
+    task_request._apply_task_template(tt, p)
+    self.assertEqual(p, task_request.TaskProperties(
+      env={u'ENV': u'1'},
+      env_prefixes={u'ENV': [u'a']},
+      caches=[task_request.CacheEntry(name=u'cache', path=u'c')],
+      cipd_input=task_request.CipdInput(
+          packages=[task_request.CipdPackage(
+              package_name=u'some/pkg', path=u'cipd', version=u'latest')])
+    ))
+
+  def test_apply_template_env_set_error(self):
+    tt = _gen_task_template(env={'ENV': ('1', ['a'])})
+    p = task_request.TaskProperties(env={u'ENV': u'10'})
+    with self.assertRaises(ValueError) as ex:
+      task_request._apply_task_template(tt, p)
+    self.assertEqual(
+        ex.exception.message,
+        "request.env[u'ENV'] conflicts with pool's template")
+
+  def test_apply_template_env_prefix_set_error(self):
+    tt = _gen_task_template(env={'ENV': ('1', ['a'])})
+    p = task_request.TaskProperties(env_prefixes={u'ENV': [u'b']})
+    with self.assertRaises(ValueError) as ex:
+      task_request._apply_task_template(tt, p)
+    self.assertEqual(
+        ex.exception.message,
+        "request.env_prefixes[u'ENV'] conflicts with pool's template")
+
+  def test_apply_template_env_override_soft(self):
+    tt = _gen_task_template(env={'ENV': ('1', ['a'], True)})
+    p = task_request.TaskProperties(env={u'ENV': u'2'})
+    task_request._apply_task_template(tt, p)
+    self.assertEqual(p, task_request.TaskProperties(
+        env={u'ENV': u'2'},
+        env_prefixes={u'ENV': [u'a']},
+    ))
+
+  def test_apply_template_env_prefixes_append_soft(self):
+    tt = _gen_task_template(env={'ENV': ('1', ['a'], True)})
+    p = task_request.TaskProperties(env_prefixes={u'ENV': [u'b']})
+    task_request._apply_task_template(tt, p)
+    self.assertEqual(p, task_request.TaskProperties(
+      env={u'ENV': u'1'},
+      env_prefixes={u'ENV': [u'a', u'b']},
+    ))
+
+  def test_apply_template_conflicting_cache(self):
+    tt = _gen_task_template(cache={'c': 'C'})
+    p = task_request.TaskProperties(
+      caches=[task_request.CacheEntry(name='c', path='B')])
+    with self.assertRaises(ValueError) as ex:
+      task_request._apply_task_template(tt, p)
+    self.assertEqual(
+        ex.exception.message,
+        "request.cache['c'] conflicts with pool's template")
+
+  def test_apply_template_conflicting_cache_path(self):
+    tt = _gen_task_template(cache={'c': 'C'})
+    p = task_request.TaskProperties(
+      caches=[task_request.CacheEntry(name='other', path='C')])
+    with self.assertRaises(ValueError) as ex:
+      task_request._apply_task_template(tt, p)
+    self.assertEqual(
+        ex.exception.message,
+        "u'C': directory has conflicting owners: task cache 'other' "
+        "and task template cache u'c'")
+
+  def test_apply_template_conflicting_cache_cipd_path(self):
+    tt = _gen_task_template(cache={'c': 'C'})
+    p = task_request.TaskProperties(
+        cipd_input=task_request.CipdInput(
+            packages=[
+              task_request.CipdPackage(
+                path='C', package_name='pkg', version='latest')]))
+    with self.assertRaises(ValueError) as ex:
+      task_request._apply_task_template(tt, p)
+    self.assertEqual(
+        ex.exception.message,
+        "u'C': directory has conflicting owners: task cipd['pkg:latest'] "
+        "and task template cache u'c'")
+
+  def test_apply_template_conflicting_cipd_package(self):
+    tt = _gen_task_template(cipd_package={('C', 'pkg'): 'latest'})
+    p = task_request.TaskProperties(
+        cipd_input=task_request.CipdInput(
+            packages=[
+              task_request.CipdPackage(
+                path='C', package_name='other', version='latest')]))
+    with self.assertRaises(ValueError) as ex:
+      task_request._apply_task_template(tt, p)
+    self.assertEqual(
+        ex.exception.message,
+        "u'C': directory has conflicting owners: task cipd['other:latest'] "
+        "and task template cipd[u'pkg:latest']")
+
+  def test_apply_template_conflicting_cipd_cache_path(self):
+    tt = _gen_task_template(cipd_package={('C', 'pkg'): 'latest'})
+    p = task_request.TaskProperties(
+      caches=[task_request.CacheEntry(name='other', path='C')])
+    with self.assertRaises(ValueError) as ex:
+      task_request._apply_task_template(tt, p)
+    self.assertEqual(
+        ex.exception.message,
+        "u'C': directory has conflicting owners: task cache 'other' "
+        "and task template cipd[u'pkg:latest']")
+
 
 class TaskRequestApiTest(TestCase):
+  def setUp(self):
+    super(TaskRequestApiTest, self).setUp()
+    # pool_configs is a mapping of pool name -> pools_config.PoolConfig. Tests
+    # can modify this to have pools_config.get_pool_config return the
+    # appropriate data.
+    self._pool_configs = {}
+    self.mock(pools_config, 'get_pool_config', self._pool_configs.get)
+
   def test_all_apis_are_tested(self):
     # Ensures there's a test for each public API.
     module = task_request
@@ -347,6 +517,7 @@ class TaskRequestApiTest(TestCase):
         u'pool:default',
         u'priority:50',
         u'service_account:none',
+        u'swarming.pool.template:no_config',
         u'tag:1',
         u'user:Jesus',
       ],
@@ -445,6 +616,7 @@ class TaskRequestApiTest(TestCase):
         u'pool:default',
         u'priority:50',
         u'service_account:none',
+        u'swarming.pool.template:no_config',
         u'tag:1',
         u'user:Jesus',
       ],
@@ -501,6 +673,116 @@ class TaskRequestApiTest(TestCase):
     as_dict = request.to_dict()
     self.assertEqual('bot', as_dict['service_account'])
     self.assertIn(u'service_account:bot', as_dict['tags'])
+
+  def _set_pool_config_with_templates(
+      self, prod=None, canary=None, canary_chance=None, pool_name=u'default'):
+    """Builds a new pools_config.PoolConfig populated with the given
+    pools_config.TaskTemplate objects and assigns it into the mocked
+    `pools_confi.get_pool_config()` method.
+
+    If prod is None, this omits the TaskTemplateDeployment entirely.
+
+    canary_chance may be supplied as >9999 (normally illegal) in order to force
+    the selection of canary."""
+    deployment = None
+    if prod is not None:
+      deployment = pools_config.TaskTemplateDeployment(
+            prod=prod, canary=canary, canary_chance=canary_chance)
+
+    self._pool_configs[pool_name] = pools_config.PoolConfig(
+        name=pool_name,
+        rev=u'testVersion1',
+        scheduling_users=(),
+        scheduling_groups=(),
+        trusted_delegatees={},
+        service_accounts=(),
+        service_accounts_groups=(),
+        task_template_deployment=deployment)
+
+  def test_init_new_request_skip_template(self):
+    self._set_pool_config_with_templates(_gen_task_template(env={'hi': 'prod'}))
+
+    request = _gen_request(_template_apply=task_request.TEMPLATE_SKIP)
+    as_dict = request.to_dict()
+    self.assertIn(u'swarming.pool.version:testVersion1', as_dict['tags'])
+    self.assertIn(u'swarming.pool.template:skip', as_dict['tags'])
+
+  def test_init_new_request_missing_template(self):
+    self._set_pool_config_with_templates()
+
+    request = _gen_request()
+    as_dict = request.to_dict()
+    self.assertIn(u'swarming.pool.version:testVersion1', as_dict['tags'])
+    self.assertIn(u'swarming.pool.template:none', as_dict['tags'])
+
+  def test_init_new_request_prod_template(self):
+    self._set_pool_config_with_templates(
+      _gen_task_template(env={'hi': 'prod'}),
+      canary=None,
+      canary_chance=0,  # always prefer prod serverside
+    )
+
+    request = _gen_request()
+    as_dict = request.to_dict()
+    self.assertIn(u'swarming.pool.version:testVersion1', as_dict['tags'])
+    self.assertIn(u'swarming.pool.template:prod', as_dict['tags'])
+    self.assertEqual(as_dict['task_slices'][0]['properties']['env']['hi'],
+                     'prod')
+
+  def test_init_new_request_canary_template(self):
+    self._set_pool_config_with_templates(
+      _gen_task_template(env={'hi': 'prod'}),
+      _gen_task_template(env={'hi': 'canary'}),
+      canary_chance=10000,  # always prefer canary serverside
+    )
+
+    request = _gen_request()
+    as_dict = request.to_dict()
+    self.assertIn(u'swarming.pool.version:testVersion1', as_dict['tags'])
+    self.assertIn(u'swarming.pool.template:canary', as_dict['tags'])
+    self.assertEqual(as_dict['task_slices'][0]['properties']['env']['hi'],
+                     'canary')
+
+  def test_init_new_request_canary_never_template(self):
+    self._set_pool_config_with_templates(
+      _gen_task_template(env={'hi': 'prod'}),
+      _gen_task_template(env={'hi': 'canary'}),
+      canary_chance=10000,  # always prefer canary serverside
+    )
+
+    request = _gen_request(_template_apply=task_request.TEMPLATE_CANARY_NEVER)
+    as_dict = request.to_dict()
+    self.assertIn(u'swarming.pool.version:testVersion1', as_dict['tags'])
+    self.assertIn(u'swarming.pool.template:prod', as_dict['tags'])
+    self.assertEqual(as_dict['task_slices'][0]['properties']['env']['hi'],
+                     'prod')
+
+  def test_init_new_request_canary_prefer_template(self):
+    self._set_pool_config_with_templates(
+      _gen_task_template(env={'hi': 'prod'}),
+      _gen_task_template(env={'hi': 'canary'}),
+      canary_chance=0,  # always prefer prod serverside
+    )
+
+    request = _gen_request(_template_apply=task_request.TEMPLATE_CANARY_PREFER)
+    as_dict = request.to_dict()
+    self.assertIn(u'swarming.pool.version:testVersion1', as_dict['tags'])
+    self.assertIn(u'swarming.pool.template:canary', as_dict['tags'])
+    self.assertEqual(as_dict['task_slices'][0]['properties']['env']['hi'],
+                     'canary')
+
+  def test_init_new_request_canary_prefer_prod_template(self):
+    self._set_pool_config_with_templates(
+      _gen_task_template(env={'hi': 'prod'}),
+      # No canary defined, even though caller would prefer it, if available.
+    )
+
+    request = _gen_request(_template_apply=task_request.TEMPLATE_CANARY_PREFER)
+    as_dict = request.to_dict()
+    self.assertIn(u'swarming.pool.version:testVersion1', as_dict['tags'])
+    self.assertIn(u'swarming.pool.template:prod', as_dict['tags'])
+    self.assertEqual(as_dict['task_slices'][0]['properties']['env']['hi'],
+                     'prod')
 
   def test_duped(self):
     # Two TestRequest with the same properties.

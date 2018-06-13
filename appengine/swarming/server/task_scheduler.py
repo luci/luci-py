@@ -705,10 +705,7 @@ def check_schedule_request_acl(request):
   # 'acl.can_edit_bot', see 'terminate' RPC handler. Such tasks do not end up
   # hitting this function, and so we can assume there's a pool set (this is
   # checked in TaskProperties's pre put hook).
-  #
-  # It is guaranteed that at most one item can be specified in 'pool' and that
-  # every TaskSlice property dimensions use the same pool and id dimensions.
-  pool = request.task_slice(0).properties.dimensions[u'pool'][0]
+  pool = request.pool
   pool_cfg = pools_config.get_pool_config(pool)
 
   # request.service_account can be 'bot' or 'none'. We don't care about these,

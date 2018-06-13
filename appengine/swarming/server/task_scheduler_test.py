@@ -81,7 +81,7 @@ def _gen_request_slices(**kwargs):
   }
   args.update(kwargs)
   ret = task_request.TaskRequest(**args)
-  task_request.init_new_request(ret, True)
+  task_request.init_new_request(ret, True, task_request.TEMPLATE_AUTO)
   return ret
 
 
@@ -188,6 +188,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
         u'pool:default',
         u'priority:50',
         u'service_account:none',
+        u'swarming.pool.template:no_config',
         u'tag:1',
         u'user:Jesus',
       ],

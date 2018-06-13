@@ -150,6 +150,35 @@ class AppTestBase(test_case.TestCase):
     """Mocks ACLs of 'default' pool to allow usage of given service accounts."""
     assert isinstance(service_accounts, (list, tuple)), service_accounts
     def mocked_get_pool_config(pool):
+      if pool == 'template':
+        return pools_config.PoolConfig(
+            name='template',
+            rev='pools_cfg_rev',
+            scheduling_users=frozenset([
+              # See setUp above. We just duplicate the first ACL layer here
+              auth.Identity(auth.IDENTITY_USER, 'super-admin@example.com'),
+              auth.Identity(auth.IDENTITY_USER, 'admin@example.com'),
+              auth.Identity(auth.IDENTITY_USER, 'priv@example.com'),
+              auth.Identity(auth.IDENTITY_USER, 'user@example.com'),
+            ]),
+            scheduling_groups=frozenset(),
+            trusted_delegatees={},
+            service_accounts=frozenset(service_accounts),
+            service_accounts_groups=(),
+            task_template_deployment=pools_config.TaskTemplateDeployment(
+                prod=pools_config.TaskTemplate(
+                  cache=(),
+                  cipd_package=(),
+                  env=(pools_config.Env('VAR', 'prod', (), False),),
+                  inclusions=()),
+                canary=pools_config.TaskTemplate(
+                  cache=(),
+                  cipd_package=(),
+                  env=(pools_config.Env('VAR', 'canary', (), False),),
+                  inclusions=()),
+                canary_chance=0.5,
+            ))
+
       if pool != 'default':
         return None
       return pools_config.PoolConfig(
@@ -383,6 +412,8 @@ class AppTestBase(test_case.TestCase):
         u'pool:default',
         u'priority:20',
         u'service_account:none',
+        u'swarming.pool.template:none',
+        u'swarming.pool.version:pools_cfg_rev',
         u'user:joe@localhost',
       ],
       u'user': u'joe@localhost',
@@ -449,6 +480,7 @@ class AppTestBase(test_case.TestCase):
         u'pool:default',
         u'priority:20',
         u'service_account:none',
+        u'swarming.pool.template:no_config',
         u'user:joe@localhost',
       ],
       u'task_id': u'5cee488008810',

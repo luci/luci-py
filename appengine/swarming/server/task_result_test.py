@@ -61,7 +61,7 @@ def _gen_request_slice(**kwargs):
   }
   args.update(kwargs)
   ret = task_request.TaskRequest(**args)
-  task_request.init_new_request(ret, True)
+  task_request.init_new_request(ret, True, task_request.TEMPLATE_AUTO)
   ret.key = task_request.new_request_key()
   ret.put()
   return ret
@@ -138,6 +138,7 @@ class TaskResultApiTest(TestCase):
         u'pool:default',
         u'priority:50',
         u'service_account:none',
+        u'swarming.pool.template:no_config',
         u'tag:1',
         u'user:Jesus',
       ],

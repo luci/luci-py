@@ -421,12 +421,14 @@ class SwarmingTasksService(remote.Service):
       request.properties.secret_bytes = sb
 
     try:
-      request_obj, secret_bytes = message_conversion.new_task_request_from_rpc(
-          request, utils.utcnow())
+      request_obj, secret_bytes, template_apply = (
+          message_conversion.new_task_request_from_rpc(
+              request, utils.utcnow()))
       for index in xrange(request_obj.num_task_slices):
         apply_server_property_defaults(request_obj.task_slice(index).properties)
       task_request.init_new_request(
-          request_obj, acl.can_schedule_high_priority_tasks())
+          request_obj, acl.can_schedule_high_priority_tasks(),
+          template_apply)
       # We need to call the ndb.Model pre-put check earlier because the
       # following checks assume that the request itself is valid and could crash
       # otherwise.
