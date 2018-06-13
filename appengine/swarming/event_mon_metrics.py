@@ -35,7 +35,6 @@ TAGS = {
     'project': ['project'],
     'purpose': ['purpose'],
     'slavename': ['slavename'],
-    'spec_name': ['spec_name'],
     'stepname': ['stepname'],
 }
 
