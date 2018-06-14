@@ -669,20 +669,6 @@ def get_named_caches_info():
     return {}
 
 
-def get_recursive_size(path):
-  """Returns the total data size for the specified path."""
-  try:
-    total = 0
-    for root, _, files in fs.walk(path):
-      for f in files:
-        total += fs.lstat(os.path.join(root, f)).st_size
-    return total
-  except (IOError, OSError, UnicodeEncodeError) as exc:
-    logging.warning('Exception while getting the size of %s:\n%s', path, exc)
-    # Returns a negative number to make it clear that something is wrong.
-    return -1
-
-
 @tools.cached
 def get_python_packages():
   """Returns the list of third party python packages."""
@@ -1062,6 +1048,9 @@ def get_state():
     u'uptime': int(round(get_uptime())),
     u'user': getpass.getuser().decode('utf-8'),
   }
+  cache = get_named_caches_info()
+  if cache:
+    state[u'named_caches'] = cache
   if sys.platform in ('cygwin', 'win32'):
     state[u'cygwin'] = [sys.platform == 'cygwin']
   if sys.platform == 'darwin':

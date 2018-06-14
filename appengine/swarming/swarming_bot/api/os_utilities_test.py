@@ -31,15 +31,6 @@ import os_utilities
 
 
 class TestOsUtilities(auto_stub.TestCase):
-  def test_get_recursive_size(self):
-    tmp = unicode(tempfile.mkdtemp(prefix='swarming_os_utils_test'))
-    try:
-      with open(os.path.join(tmp, '1'), 'wb') as f:
-        f.write('1234')
-      self.assertEqual(os_utilities.get_recursive_size(tmp), 4)
-    finally:
-      shutil.rmtree(tmp)
-
   def test_get_os_name(self):
     expected = (u'Debian', u'Linux', u'Mac', u'Raspbian', u'Ubuntu', u'Windows')
     self.assertIn(os_utilities.get_os_name(), expected)
