@@ -106,6 +106,49 @@ describe('swarming-index', function() {
       });
     });
 
+    describe('when logged in as unauthorized user', function() {
+
+      function notAuthorized() {
+        // overwrite the default fetchMock behaviors to have everything return 403.
+        fetchMock.get('/_ah/api/swarming/v1/server/details', 403,
+                      { overwriteRoutes: true });
+        fetchMock.get('/_ah/api/swarming/v1/server/permissions', 403,
+                      { overwriteRoutes: true });
+      }
+
+      beforeEach(notAuthorized);
+
+      it('tells the user to try a different account', function(done){
+        createElement((ele) => {
+          userLogsIn(ele, () => {
+            let serverVersion = ele.querySelector('swarming-app>main .server_version');
+            expect(serverVersion).toBeTruthy();
+            expect(serverVersion.innerText).toContain('different account');
+            done();
+          });
+        });
+      });
+      it('does not displays the bootstrapping section', function(done){
+        createElement((ele) => {
+          userLogsIn(ele, () => {
+            let sectionHeaders = ele.querySelectorAll('swarming-app>main h2');
+            expect(sectionHeaders).toBeTruthy();
+            expect(sectionHeaders.length).toBe(2);
+            done();
+          });
+        });
+      });
+      it('does not display the bootstrap token', function(done){
+        createElement((ele) => {
+          userLogsIn(ele, () => {
+            let commandBox = ele.querySelector('swarming-app>main .command');
+            expect(commandBox).toBeNull();
+            done();
+          });
+        });
+      });
+    });
+
     describe('when logged in as user (no bootstrap_token)', function() {
       it('displays the server version', function(done){
         createElement((ele) => {

@@ -189,8 +189,16 @@ window.customElements.define('swarming-index', class extends HTMLElement {
         app.finishedTask();
       })
       .catch((e) => {
-        console.error(e);
-        errorMessage(`Error loading details: ${e.body}`, 5000);
+        if (e.status === 403) {
+          this._server_details = {
+            server_version: 'User unauthorized - try logging in with a different account',
+            bot_version: '',
+          };
+          this._render();
+        } else {
+          console.error(e);
+          errorMessage(`Unexpected error loading details: ${e.body}`, 5000);
+        }
         app.finishedTask();
       });
     fetch('/_ah/api/swarming/v1/server/permissions', extra)
@@ -206,8 +214,10 @@ window.customElements.define('swarming-index', class extends HTMLElement {
         app.finishedTask();
       })
       .catch((e) => {
-        console.error(e);
-        errorMessage(`Error loading permissions: ${e.body}`, 5000);
+        if (e.status !== 403) {
+          console.error(e);
+          errorMessage(`Unexpected error loading permissions: ${e.body}`, 5000);
+        }
         app.finishedTask();
       });
 
