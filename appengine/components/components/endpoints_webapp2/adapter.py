@@ -149,13 +149,14 @@ def path_handler(api_class, api_method, service_path):
   return Handler
 
 
-def api_routes(api_classes, base_path='/_ah/api'):
+def api_routes(api_classes, base_path='/_ah/api', regex='[^/]+'):
   """Creates webapp2 routes for the given Endpoints v1 services.
 
   Args:
     api_classes: A list of protorpc.remote.Service classes to create routes for.
     base_path: The base path under which all service paths should exist. If
       unspecified, defaults to /_ah/api.
+    regex: Regular expression to allow in path parameters.
 
   Returns:
     A list of webapp2.Routes.
@@ -172,7 +173,7 @@ def api_routes(api_classes, base_path='/_ah/api'):
     for _, method in sorted(api_class.all_remote_methods().iteritems()):
       info = method.method_info
       method_path = info.get_path(api_class.api_info)
-      method_path = method_path.replace('{', '<').replace('}', '>')
+      method_path = method_path.replace('{', '<').replace('}', ':%s>' % regex)
       t = posixpath.join(api_base_path, method_path)
       http_method = info.http_method.upper() or 'POST'
       handler = path_handler(api_class, method, api_base_path)
@@ -193,7 +194,7 @@ def api_routes(api_classes, base_path='/_ah/api'):
   return routes
 
 
-def api_server(api_classes, base_path='/_ah/api'):
+def api_server(api_classes, base_path='/_ah/api', regex='[^/]+'):
   """Creates a webapp2 application for the given Endpoints v1 services.
 
   A shortcut for webapp2.WSGIApplication(api_routes(...)), which exists to
@@ -203,11 +204,12 @@ def api_server(api_classes, base_path='/_ah/api'):
     api_classes: A list of protorpc.remote.Service classes to create routes for.
     base_path: The base path under which all service paths should exist. If
       unspecified, defaults to /_ah/api.
+    regex: Regular expression to allow in path parameters.
 
   Returns:
     A webapp2.WSGIApplication.
   """
-  return webapp2.WSGIApplication(api_routes(api_classes, base_path))
+  return webapp2.WSGIApplication(api_routes(api_classes, base_path, regex))
 
 
 def discovery_handler_factory(api_classes, base_path):
