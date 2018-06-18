@@ -277,17 +277,18 @@ class Server(object):
 
         return content
 
-      def options(self, _service, _method):
+      # pylint: disable=unused-argument
+      def options(self, service, method):
         """Sends an empty response with headers for CORS for all requests."""
         origin = self.request.headers.get('Origin')
         if origin:
           self.response.headers['Access-Control-Allow-Origin'] = origin
           self.response.headers['Vary'] = 'Origin'
           self.response.headers['Access-Control-Allow-Credentials'] = 'true'
-          self.response.headers['Access-Control-Allow-Headers'] = [
-              'Origin', 'Content-Type', 'Accept', 'Authorization']
-          self.response.headers['Access-Control-Allow-Methods'] = [
-              'OPTIONS', 'POST']
+          self.response.headers['Access-Control-Allow-Headers'] = \
+              'Origin, Content-Type, Accept, Authorization'
+          self.response.headers['Access-Control-Allow-Methods'] = \
+              'OPTIONS, POST'
           self.response.headers['Access-Control-Max-Age'] = '600'
 
     return Handler
