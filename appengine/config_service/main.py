@@ -8,12 +8,12 @@ import sys
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
 
-import endpoints
 import webapp2
 
-from components import utils
+from components import endpoints_webapp2
 from components import ereporter2
 from components import template
+from components import utils
 from google.appengine.api import app_identity
 
 import admin
@@ -39,7 +39,9 @@ def create_html_app():  # pragma: no cover
 
 def create_endpoints_app():  # pragma: no cover
   """Returns WSGI app that serves cloud endpoints requests."""
-  return endpoints.api_server([api.ConfigApi, admin.AdminApi])
+  # The default regex doesn't allow / but config_sets and paths have / in them.
+  return endpoints_webapp2.api_server(
+      [api.ConfigApi, admin.AdminApi], regex='.+')
 
 
 def create_backend_app():  # pragma: no cover
