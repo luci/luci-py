@@ -171,7 +171,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
   def get_check_final(
       self, exit_code=0, output_re=r'^hi\n$', outputs_ref=None,
-      headers=None):
+      headers=None, isolated_stats=True):
     def check_final(kwargs):
       # Ignore these values.
       kwargs['data'].pop('bot_overhead', None)
@@ -200,6 +200,13 @@ class TestTaskRunner(TestTaskRunnerBase):
       }
       if outputs_ref:
         expected['data']['outputs_ref'] = outputs_ref
+      if isolated_stats:
+        expected['data']['isolated_stats'] = {
+          'download': {
+            'initial_number_items': 0,
+            'initial_size': 0,
+          },
+        }
       self.assertEqual(expected, kwargs, kwargs)
     return check_final
 
@@ -428,7 +435,8 @@ class TestTaskRunner(TestTaskRunnerBase):
           u'isolated': u'123',
           u'isolatedserver': u'http://localhost:1',
           u'namespace': u'default-gzip',
-        })
+        },
+        isolated_stats=False)
     task_details = self.get_task_details(isolated={
       'input': '123',
       'server': 'localhost:1',
@@ -890,6 +898,12 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
               'hard_timeout': hard_timeout,
               'id': 'localhost',
               'io_timeout': io_timeout,
+              'isolated_stats': {
+                'download': {
+                  'initial_number_items': 0,
+                  'initial_size': 0,
+                },
+              },
               'output_chunk_start': 0,
               'task_id': 23,
             },

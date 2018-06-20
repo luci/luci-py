@@ -355,6 +355,7 @@ def _copy_summary(src, dst, skip_list):
 
   It doesn't copy the key nor any member in skip_list.
   """
+  # pylint: disable=unidiomatic-typecheck
   assert type(src) == type(dst), '%s!=%s' % (src.__class__, dst.__class__)
   # Access to a protected member _XX of a client class - pylint: disable=W0212
   kwargs = {
