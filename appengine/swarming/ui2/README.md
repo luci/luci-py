@@ -55,3 +55,14 @@ mode, which can be done with `make continuous_test`.
 To run all tests exactly once on Firefox and Chrome (assuming those browsers are present):
 
     make test
+
+## Generating the docs
+
+We use [JSDoc](http://usejsdoc.org/) to document the modules. While the documentation is readable
+inline, it can be easier to browse in a web browser.
+
+To generate the HTML docs, run
+
+    make docs
+
+which will open docs/index.html after build.

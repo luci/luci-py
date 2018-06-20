@@ -247,14 +247,7 @@
           "_busy1", this.auth_headers);
         this._getJsonAsync("server_details", "/_ah/api/swarming/v1/server/details",
           "_busy2", this.auth_headers).catch(function(r){
-            if (r.status === 403) {
-              this.server_details = {
-                server_version: "User unauthorized - try different account",
-                bot_version: "",
-              }
-            } else {
-              sk.errorMessage("Unexpected HTTP response: "+ (r.status || " ") + " " + r.response);
-            }
+            sk.errorMessage("Http response: "+ (r.status || " ") + " " + r.response);
           });
       },
 

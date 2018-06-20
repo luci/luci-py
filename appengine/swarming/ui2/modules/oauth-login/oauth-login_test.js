@@ -3,17 +3,17 @@
 // that can be found in the LICENSE file.
 
 import 'modules/oauth-login'
-(function(){
-
-// A reusable HTML element in which we create our element under test.
-let container = document.createElement('div');
-document.body.appendChild(container);
-
-afterEach(function() {
-  container.innerHTML = '';
-});
 
 describe('oauth-login', function() {
+  // A reusable HTML element in which we create our element under test.
+  let container = document.createElement('div');
+  document.body.appendChild(container);
+
+  afterEach(function() {
+    container.innerHTML = '';
+  });
+
+//===============TESTS START====================================
 
   describe('testing-offline true', function() {
 
@@ -146,5 +146,3 @@ describe('oauth-login', function() {
   }); // end describe('testing-offline false')
 
 });
-
-})();

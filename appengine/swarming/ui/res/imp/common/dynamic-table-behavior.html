@@ -133,18 +133,18 @@
         }
       },
 
-      _column: function(col, key) {
+      _column: function(col, item) {
         var f = this._columnMap[col];
         if (!f) {
-          f = function(key) {
-            var c = this._attribute(key, col, "none");
+          f = function(item) {
+            var c = this._attribute(item, col, "none");
             if (this._verbose) {
               return c.join(" | ");
             }
             return c[0];
           }
         }
-        return f.bind(this)(key);
+        return f.bind(this)(item);
       },
 
       _compare: function(a, b) {

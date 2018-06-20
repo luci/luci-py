@@ -6,7 +6,9 @@
   "author": "",
   "license": "Apache 2.0",
   "dependencies": {
-    "@webcomponents/custom-elements": "^1.1.1"
+    "@webcomponents/custom-elements": "^1.1.1",
+    "common-sk": "^2.0.4",
+    "elements-sk": "^2.1.0"
   },
   "devDependencies": {
     "babel-core": "^6.26.3",
@@ -15,9 +17,7 @@
     "babel-preset-env": "^1.7.0",
     "babel-preset-minify": "^0.4.3",
     "clean-webpack-plugin": "^0.1.19",
-    "common-sk": "^2.0.2",
     "css-loader": "^0.28.11",
-    "elements-sk": "^1.0.0",
     "extract-text-webpack-plugin": "^v4.0.0-beta.0",
     "fetch-mock": "^6.0.0",
     "file-loader": "^1.1.11",
@@ -25,7 +25,7 @@
     "html-template-minifier-webpack": "^1.0.0",
     "html-webpack-plugin": "^3.2.0",
     "jasmine-core": "^3.1.0",
-    "jsdoc": "^3.5.5",
+    "jsdoc": "~3.5.5",
     "karma": "^2.0.2",
     "karma-chrome-launcher": "^2.2.0",
     "karma-concat-preprocessor": "^0.1.4",

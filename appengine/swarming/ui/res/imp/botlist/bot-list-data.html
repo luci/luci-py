@@ -68,9 +68,9 @@
       }
       var zones = [];
       var avg = 0;
-      for (k in temps) {
+      for (var k in temps) {
         zones.push(k +": "+temps[k]);
-        avg += temps[k];
+        avg += (+temps[k]);
       }
       avg = avg / zones.length
       if (avg) {
@@ -191,13 +191,13 @@
           var devices = [];
           var d = (bot && bot.state && bot.state.devices) || {};
           // state.devices is like {Serial:Object}, so we need to keep the serial
-          for (key in d) {
+          for (var key in d) {
             var o = d[key];
             o.serial = key;
             o.okay = (o.state === AVAILABLE);
             // It is easier to assume all devices on a bot are of the same type
             // than to pick through the (incomplete) device state and find it.
-            // Bots that are quarentined because they have no devices
+            // Bots that are quarantined because they have no devices
             // still have devices in their state (the last known device attached)
             // but don't have the device_type dimension. In that case, we punt
             // on device type.

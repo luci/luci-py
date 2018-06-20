@@ -2,9 +2,9 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-/** @module swarming-ui/modules/oauth-login */
-
-/** oauth-login is a small widget that handles an OAuth 2.0 flow with Google.
+/** @module swarming-ui/modules/oauth-login
+ * @description <h2><code>oauth-login</code></h2>
+ * oauth-login is a small widget that handles an OAuth 2.0 flow with Google.
  *
  * <p>
  *  This widget either a sign in button or displays the info of the

@@ -2,5 +2,4 @@
 // Use of this source code is governed under the Apache License, Version 2.0
 // that can be found in the LICENSE file.
 
-import './swarming-app.js'
-import './swarming-app.scss'
+module.exports = require('common-sk/jsdoc.common.js')

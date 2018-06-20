@@ -3,35 +3,35 @@
 // that can be found in the LICENSE file.
 
 import 'modules/swarming-app'
-(function(){
-
-// A reusable HTML element in which we create our element under test.
-let container = document.createElement('div');
-document.body.appendChild(container);
-
-afterEach(function() {
-  container.innerHTML = '';
-});
-
-// calls the test callback with one element 'ele', a created <swarming-app>.
-// We can't put the describes inside the whenDefined callback because
-// that doesn't work on Firefox (and possibly other places).
-function createElement(test) {
-  return window.customElements.whenDefined('swarming-app').then(() => {
-    container.innerHTML = `
-        <swarming-app testing_offline=true>
-          <header>
-            <aside class=hideable>Menu option</aside>
-          </header>
-          <main></main>
-          <footer></footer>
-        </swarming-app>`;
-    expect(container.firstElementChild).toBeTruthy();
-    test(container.firstElementChild);
-  });
-}
 
 describe('swarming-app', function() {
+  // A reusable HTML element in which we create our element under test.
+  let container = document.createElement('div');
+  document.body.appendChild(container);
+
+  afterEach(function() {
+    container.innerHTML = '';
+  });
+
+  // calls the test callback with one element 'ele', a created <swarming-app>.
+  // We can't put the describes inside the whenDefined callback because
+  // that doesn't work on Firefox (and possibly other places).
+  function createElement(test) {
+    return window.customElements.whenDefined('swarming-app').then(() => {
+      container.innerHTML = `
+          <swarming-app testing_offline=true>
+            <header>
+              <aside class=hideable>Menu option</aside>
+            </header>
+            <main></main>
+            <footer></footer>
+          </swarming-app>`;
+      expect(container.firstElementChild).toBeTruthy();
+      test(container.firstElementChild);
+    });
+  }
+
+//===============TESTS START====================================
 
   describe('html injection to provided content', function() {
 
@@ -134,5 +134,3 @@ describe('swarming-app', function() {
     });
   }); // end describe('spinner and busy property')
 });
-
-})();

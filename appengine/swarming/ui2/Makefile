@@ -31,5 +31,10 @@ continuous_test:
 		make test
 	done
 
+.PHONY: docs
+docs: package-lock.json
+	npx jsdoc -c jsdoc.config.js -d docs
+	xdg-open docs/index.html
+
 package-lock.json: package.json
 	npm install
