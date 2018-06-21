@@ -12,22 +12,92 @@ from protorpc import messages
 
 
 class TaskState(messages.Enum):
-  (
-    PENDING, RUNNING, PENDING_RUNNING, COMPLETED, COMPLETED_SUCCESS,
-    COMPLETED_FAILURE, EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, ALL,
-    DEDUPED, KILLED, NO_RESOURCE) = range(14)
+  """Used to query for tasks.
+
+  For example, this enum enables querying for all tasks with state COMPLETED but
+  non-zero exit code via COMPLETED_FAILURE.
+  """
+  # Query for all tasks currently PENDING.
+  PENDING = 0
+  # Query for all tasks currently RUNNING. This includes tasks currently in the
+  # overhead phase; mapping input files or archiving outputs back to the
+  # server.
+  RUNNING = 1
+  # Query for all tasks currently PENDING or RUNNING. This is the query for the
+  # 'active' tasks.
+  PENDING_RUNNING = 2
+  # Query for all tasks that completed normally as COMPLETED, independent of the
+  # process exit code.
+  COMPLETED = 3
+  # Query for all tasks that completed normally as COMPLETED and that had exit
+  # code 0.
+  COMPLETED_SUCCESS = 4
+  # Query for all tasks that completed normally as COMPLETED and that had exit
+  # code not 0.
+  COMPLETED_FAILURE = 5
+  # Query for all tasks that are EXPIRED.
+  EXPIRED = 6
+  # Query for all tasks that are TIMED_OUT.
+  TIMED_OUT = 7
+  # Query for all tasks that are BOT_DIED.
+  BOT_DIED = 8
+  # Query for all tasks that are CANCELED.
+  CANCELED = 9
+  # Query for all tasks, independent of the task state.
+  ALL = 10
+  # Query for all tasks that are COMPLETED but that actually didn't run due to
+  # TaskProperties.idempotent being True *and* that a previous task with the
+  # exact same TaskProperties had successfully run before.
+  DEDUPED = 11
+  # Query for all tasks that are KILLED.
+  KILLED = 12
+  # Query for all tasks that are NO_RESOURCE.
+  NO_RESOURCE = 13
 
 
 class StateField(messages.Enum):
-  RUNNING = 0x10      # 16
-  PENDING = 0x20      # 32
-  EXPIRED = 0x30      # 48
-  TIMED_OUT = 0x40    # 64
-  BOT_DIED = 0x50     # 80
-  CANCELED = 0x60     # 96
-  COMPLETED = 0x70    # 112
-  KILLED = 0x80       # 128
-  NO_RESOURCE = 0x100 # 256
+  """Represents the current task state.
+
+  Some states are still mutable: PENDING and RUNNING. The others are final and
+  will not change afterward.
+  """
+  # The task is currently running. This is in fact 3 phases: the initial
+  # overhead to fetch input files, the actual task running, and the tear down
+  # overhead to archive output files to the server.
+  RUNNING = 0x10
+  # The task is currently pending. This means that no bot reaped the task. It
+  # will stay in this state until either a task reaps it or the expiration
+  # elapsed. The task pending expiration is specified as
+  # TaskSlice.expiration_secs, one per task slice.
+  PENDING = 0x20
+  # The task is not pending anymore, and never ran due to lack of capacity. This
+  # means that other higher priority tasks ran instead and that not enough bots
+  # were available to run this task for TaskSlice.expiration_secs seconds.
+  EXPIRED = 0x30
+  # The task ran for longer than the allowed time in
+  # TaskProperties.execution_timeout_secs or TaskProperties.io_timeout_secs.
+  # This means the bot forcefully killed the task process as described in the
+  # graceful termination dance in the documentation.
+  TIMED_OUT = 0x40
+  # The task ran but the bot had an internal failure, unrelated to the task
+  # itself. It can be due to the server being unavailable to get task update,
+  # the host on which the bot is running crashing or rebooting, etc.
+  BOT_DIED = 0x50
+  # The task never ran, and was manually cancelled via the 'cancel' API before
+  # it was reaped.
+  CANCELED = 0x60
+  # The task ran and completed normally. The task process exit code may be 0 or
+  # another value.
+  COMPLETED = 0x70
+  # The task ran but was manually killed via the 'cancel' API. This means the
+  # bot forcefully killed the task process as described in the graceful
+  # termination dance in the documentation.
+  KILLED = 0x80
+  # The task was never set to PENDING and was immediately refused, as the server
+  # determined that there is no bot capacity to run this task. Set
+  # TaskSlice.wait_for_capacity to True to force the server to keep the task
+  # slice pending even in this case.
+  NO_RESOURCE = 0x100
 
 
 class TaskSort(messages.Enum):
