@@ -347,12 +347,10 @@ class TasksApiTest(BaseTest):
         properties=self.create_props(command=['rm', '-rf', '/']),
         service_account='bad email')
     response = self.call_api('new', body=message_to_dict(request), status=400)
-    # Note: Cloud Endpoints proxy transform this response to
-    # {"error": {"message": "..."}}.
     self.assertEqual({
-        u'error_message': u'\'service_account\' must be an email, "bot" or '
-            '"none" string, got u\'bad email\'',
-        u'state': u'APPLICATION_ERROR',
+        u'error': {
+            u'message': u'\'service_account\' must be an email, "bot" or '
+                '"none" string, got u\'bad email\''},
     }, response.json)
     self.assertFalse(oauth_grant_calls)
 
@@ -363,11 +361,8 @@ class TasksApiTest(BaseTest):
         properties=self.create_props(command=['rm', '-rf', '/']),
         service_account='service-account@example.com')
     response = self.call_api('new', body=message_to_dict(request), status=403)
-    # Note: Cloud Endpoints proxy transform this response to
-    # {"error": {"message": "..."}}.
     self.assertEqual({
-        u'error_message': u'forbidden account',
-        u'state': u'APPLICATION_ERROR',
+        u'error': {u'message': u'forbidden account'},
     }, response.json)
 
   def test_new_ok_deduped(self):
@@ -770,8 +765,9 @@ class TasksApiTest(BaseTest):
         user='joe@localhost')
     resp = self.call_api('new', body=message_to_dict(request), status=400)
     expected = {
-      u'state': u'APPLICATION_ERROR',
-      u'error_message': u'expiration_secs (0) must be between 1s and 7 days',
+      u'error': {
+        u'message': u'expiration_secs (0) must be between 1s and 7 days',
+      },
     }
     self.assertEqual(expected, resp.json)
 
@@ -782,8 +778,7 @@ class TasksApiTest(BaseTest):
         properties={u'dimensions': [{u'key': u'id', u'value': u'bot123'}]})
     response = self.call_api('new', body=message_to_dict(request), status=400)
     expected = {
-      u'error_message': u"'pool' must be used as dimensions",
-      u'state': u'APPLICATION_ERROR',
+      u'error': {u'message': u"'pool' must be used as dimensions"},
     }
     self.assertEqual(expected, response.json)
 
@@ -792,8 +787,9 @@ class TasksApiTest(BaseTest):
         properties={u'dimensions': [{u'key': u'pool', u'value': u'default'}]})
     response = self.call_api('new', body=message_to_dict(request), status=400)
     expected = {
-      u'error_message': u'use at least one of command or inputs_ref.isolated',
-      u'state': u'APPLICATION_ERROR',
+      u'error': {
+          u'message': u'use at least one of command or inputs_ref.isolated',
+      },
     }
     self.assertEqual(expected, response.json)
 
@@ -805,9 +801,10 @@ class TasksApiTest(BaseTest):
         })
     response = self.call_api('new', body=message_to_dict(request), status=400)
     expected = {
-      u'error_message':
-          u'Entity has uninitialized properties: execution_timeout_secs',
-      u'state': u'APPLICATION_ERROR',
+      u'error': {
+          u'message':
+              u'Entity has uninitialized properties: execution_timeout_secs',
+          },
     }
     self.assertEqual(expected, response.json)
 

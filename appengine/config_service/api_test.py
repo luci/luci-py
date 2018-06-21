@@ -28,6 +28,7 @@ import validation
 
 class ApiTest(test_case.EndpointsTestCase):
   api_service_cls = api.ConfigApi
+  api_service_regex = '.+'
 
   def setUp(self):
     super(ApiTest, self).setUp()

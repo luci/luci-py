@@ -10,13 +10,13 @@ import logging
 import time
 import urllib
 
-import endpoints
 import webtest
 
 from google.appengine.datastore import datastore_stub_util
 from google.appengine.ext import ndb
 from google.appengine.ext import testbed
 
+from components import endpoints_webapp2
 from components import utils
 from depot_tools import auto_stub
 
@@ -167,22 +167,54 @@ class TestCase(auto_stub.TestCase):
 
 class Endpoints(object):
   """Handles endpoints API calls."""
-  def __init__(self, api_service_cls, source_ip='127.0.0.1'):
+  def __init__(self, api_service_cls, regex=None, source_ip='127.0.0.1'):
     super(Endpoints, self).__init__()
     self._api_service_cls = api_service_cls
+    kwargs = {}
+    if regex:
+      kwargs['regex'] = regex
     self._api_app = webtest.TestApp(
-        endpoints.api_server([self._api_service_cls], restricted=False),
+        endpoints_webapp2.api_server([self._api_service_cls], **kwargs),
         extra_environ={'REMOTE_ADDR': source_ip})
 
-  def call_api(self, method, body=None, status=200):
+  def call_api(self, method, body=None, status=(200, 204)):
     """Calls endpoints API method identified by its name."""
+    # Because body is a dict and not a ResourceContainer, there's no way to tell
+    # which parameters belong in the URL and which belong in the body when the
+    # HTTP method supports both. However there's no harm in supplying parameters
+    # in both the URL and the body since ResourceContainers don't allow the same
+    # parameter name to be used in both places. Supplying parameters in both
+    # places produces no ambiguity and extraneous parameters are safely ignored.
     assert hasattr(self._api_service_cls, method), method
-    res = '/_ah/spi/%s.%s' % (self._api_service_cls.__name__, method)
+    info = getattr(self._api_service_cls, method).method_info
+    path = info.get_path(self._api_service_cls.api_info)
+
+    # Identify which arguments are path parameters and which are query strings.
+    body = body or {}
+    query_strings = []
+    for key, value in sorted(body.iteritems()):
+      if '{%s}' % key in path:
+        path = path.replace('{%s}' % key, value)
+      else:
+        # We cannot tell if the parameter is a repeated field from a dict.
+        # Allow all query strings to be multi-valued.
+        if not isinstance(value, list):
+          value = [value]
+        for val in value:
+          query_strings.append('%s=%s' % (key, val))
+    if query_strings:
+      path = '%s?%s' % (path, '&'.join(query_strings))
+
+    path = '/_ah/api/%s/%s/%s' % (self._api_service_cls.api_info.name,
+                                  self._api_service_cls.api_info.version,
+                                  path)
     try:
-      return self._api_app.post_json(res, body or {}, status=status)
+      if info.http_method in ('GET', 'DELETE'):
+        return self._api_app.get(path, status=status)
+      return self._api_app.post_json(path, body, status=status)
     except Exception as e:
       # Useful for diagnosing issues in test cases.
-      logging.info('%s failed: %s', res, e)
+      logging.info('%s failed: %s', path, e)
       raise
 
 
@@ -203,6 +235,9 @@ class EndpointsTestCase(TestCase):
   """
   # Should be set in subclasses to a subclass of remote.Service.
   api_service_cls = None
+  # Should be set in subclasses to a regular expression to match against path
+  # parameters. See components.endpoints_webapp2.adapter.api_server.
+  api_service_regex = None
 
   # See call_should_fail.
   expected_fail_status = None
@@ -211,9 +246,10 @@ class EndpointsTestCase(TestCase):
 
   def setUp(self):
     super(EndpointsTestCase, self).setUp()
-    self._endpoints = Endpoints(self.api_service_cls)
+    self._endpoints = Endpoints(
+        self.api_service_cls, regex=self.api_service_regex)
 
-  def call_api(self, method, body=None, status=200):
+  def call_api(self, method, body=None, status=(200, 204)):
     if self.expected_fail_status:
       status = self.expected_fail_status
     return self._endpoints.call_api(method, body, status)
