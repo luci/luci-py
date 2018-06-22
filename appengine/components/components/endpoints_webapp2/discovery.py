@@ -234,8 +234,10 @@ def _get_methods(service):
     A tuple of three dicts which can be written as JSON describing the methods,
     resources, and types.
   """
-  methods = {}
-  resources = {}
+  document = {
+    'methods': {},
+    'resources': {},
+  }
   types = set()
 
   for _, method in service.all_remote_methods().iteritems():
@@ -243,19 +245,16 @@ def _get_methods(service):
     info = getattr(method, 'method_info', None)
     if info is None:
       continue
-    # info.method_id returns <service name>.<method name> or
-    # <service name>.<resource name>.<method name> for resource methods.
+    # info.method_id returns <service name>.[<resource name>.]*<method name>.
+    # There may be 0 or more resource names.
     method_id = info.method_id(service.api_info)
     parts = method_id.split('.')
-    assert len(parts) in (2, 3), method_id
+    assert len(parts) > 1, method_id
     name = parts[-1]
-    resource = None
-    if len(parts) == 3:
-      resource = parts[1]
+    resource_parts = parts[1:-1]
 
-    document = {
+    item = {
       'httpMethod': info.http_method,
-      # <service name>.<method name>.
       'id': method_id,
       'path': info.get_path(service.api_info),
       'scopes': [
@@ -265,14 +264,14 @@ def _get_methods(service):
 
     desc = _normalize_whitespace(method.remote.method.__doc__)
     if desc:
-      document['description'] = desc
+      item['description'] = desc
 
     request = method.remote.request_type()
     rc = endpoints.ResourceContainer.get_request_message(method.remote)
     if not isinstance(rc, endpoints.ResourceContainer):
       if not isinstance(request, message_types.VoidMessage):
         if info.http_method not in ('GET', 'DELETE'):
-          document['request'] = {
+          item['request'] = {
             # $refs refer to the "schemas" section of the discovery doc.
             '$ref': _normalize_name(request.__class__.definition_name()),
             'parameterName': 'resource',
@@ -284,31 +283,27 @@ def _get_methods(service):
       # differently.
       if rc.body_message_class != message_types.VoidMessage:
         if info.http_method not in ('GET', 'DELETE'):
-          document['request'] = {
+          item['request'] = {
             '$ref': _normalize_name(rc.body_message_class.definition_name()),
             'parameterName': 'resource',
           }
           types.add(rc.body_message_class)
-      document.update(_get_parameters(
+      item.update(_get_parameters(
           rc.parameters_message_class, info.get_path(service.api_info)))
 
     response = method.remote.response_type()
     if not isinstance(response, message_types.VoidMessage):
-      document['response'] = {
+      item['response'] = {
         '$ref': _normalize_name(response.__class__.definition_name()),
       }
       types.add(response.__class__)
 
-    if resource:
-      if resource not in resources:
-        resources[resource] = {
-          'methods': {},
-        }
-      resources[resource]['methods'][name] = document
-    else:
-      methods[name] = document
+    pointer = document
+    for part in resource_parts:
+      pointer = pointer.setdefault('resources', {}).setdefault(part, {})
+    pointer.setdefault('methods', {})[name] = item
 
-  return methods, resources, _get_schemas(types)
+  return document['methods'], document['resources'], _get_schemas(types)
 
 
 def generate(classes, host, base_path):

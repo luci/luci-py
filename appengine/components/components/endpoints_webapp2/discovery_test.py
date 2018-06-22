@@ -77,6 +77,21 @@ class Service(remote.Service):
     """An HTTP POST method supporting path parameters."""
     return Message()
 
+  @endpoints.method(Message, Message, name='resource.a')
+  def resource_method_a(self, _):
+    """A method belonging to a resource."""
+    return Message()
+
+  @endpoints.method(Message, Message, name='resource.subresource.b')
+  def resource_method_b(self, _):
+    """A method belonging to a sub-resource."""
+    return Message()
+
+  @endpoints.method(Message, Message, name='resource.subresource.c')
+  def resource_method_c(self, _):
+    """A method belonging to a sub-resource."""
+    return Message()
+
 
 SplitService = endpoints.api(
     'split', 'v1', description='A split service to test with.')
@@ -191,6 +206,64 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
       },
       # resources
       {
+        'resource': {
+          'methods': {
+            'a': {
+              'description': 'A method belonging to a resource.',
+              'httpMethod': 'POST',
+              'id': 'service.resource.a',
+              'path': 'resource_method_a',
+              'request': {
+                '$ref': 'DiscoveryTestMessage',
+                'parameterName': 'resource',
+              },
+              'response': {
+                '$ref': 'DiscoveryTestMessage',
+              },
+              'scopes': [
+                'https://www.googleapis.com/auth/userinfo.email',
+              ],
+            },
+          },
+          'resources': {
+            'subresource': {
+              'methods': {
+                'b': {
+                  'description': 'A method belonging to a sub-resource.',
+                  'httpMethod': 'POST',
+                  'id': 'service.resource.subresource.b',
+                  'path': 'resource_method_b',
+                  'request': {
+                    '$ref': 'DiscoveryTestMessage',
+                    'parameterName': 'resource',
+                  },
+                  'response': {
+                    '$ref': 'DiscoveryTestMessage',
+                  },
+                  'scopes': [
+                    'https://www.googleapis.com/auth/userinfo.email',
+                  ],
+                    },
+                'c': {
+                  'description': 'A method belonging to a sub-resource.',
+                  'httpMethod': 'POST',
+                  'id': 'service.resource.subresource.c',
+                  'path': 'resource_method_c',
+                  'request': {
+                    '$ref': 'DiscoveryTestMessage',
+                    'parameterName': 'resource',
+                  },
+                  'response': {
+                    '$ref': 'DiscoveryTestMessage',
+                  },
+                  'scopes': [
+                    'https://www.googleapis.com/auth/userinfo.email',
+                  ],
+                },
+              },
+            },
+          },
+        },
       },
       # schemas
       {
@@ -460,6 +533,66 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
         },
       },
       'protocol': 'rest',
+      'resources': {
+        'resource': {
+          'methods': {
+            'a': {
+              'description': 'A method belonging to a resource.',
+              'httpMethod': 'POST',
+              'id': 'service.resource.a',
+              'path': 'resource_method_a',
+              'request': {
+                '$ref': 'DiscoveryTestMessage',
+                'parameterName': 'resource',
+              },
+              'response': {
+                '$ref': 'DiscoveryTestMessage',
+              },
+              'scopes': [
+                'https://www.googleapis.com/auth/userinfo.email',
+              ],
+            },
+          },
+          'resources': {
+            'subresource': {
+              'methods': {
+                'b': {
+                  'description': 'A method belonging to a sub-resource.',
+                  'httpMethod': 'POST',
+                  'id': 'service.resource.subresource.b',
+                  'path': 'resource_method_b',
+                  'request': {
+                    '$ref': 'DiscoveryTestMessage',
+                    'parameterName': 'resource',
+                  },
+                  'response': {
+                    '$ref': 'DiscoveryTestMessage',
+                  },
+                  'scopes': [
+                    'https://www.googleapis.com/auth/userinfo.email',
+                  ],
+                },
+                'c': {
+                  'description': 'A method belonging to a sub-resource.',
+                  'httpMethod': 'POST',
+                  'id': 'service.resource.subresource.c',
+                  'path': 'resource_method_c',
+                  'request': {
+                    '$ref': 'DiscoveryTestMessage',
+                    'parameterName': 'resource',
+                  },
+                  'response': {
+                    '$ref': 'DiscoveryTestMessage',
+                  },
+                  'scopes': [
+                    'https://www.googleapis.com/auth/userinfo.email',
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
       'rootUrl': 'http://localhost:8080/api/',
       'schemas': {
         'DiscoveryTestMessage': {
