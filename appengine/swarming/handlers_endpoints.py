@@ -384,7 +384,7 @@ TasksRequest = endpoints.ResourceContainer(
     # parameter support.
     end=messages.FloatField(3),
     start=messages.FloatField(4),
-    state=messages.EnumField(swarming_rpcs.TaskState, 5, default='ALL'),
+    state=messages.EnumField(swarming_rpcs.TaskStateQuery, 5, default='ALL'),
     tags=messages.StringField(6, repeated=True),
     sort=messages.EnumField(swarming_rpcs.TaskSort, 7, default='CREATED_TS'),
     include_performance_stats=messages.BooleanField(8, default=False))
@@ -394,7 +394,7 @@ TasksCountRequest = endpoints.ResourceContainer(
     message_types.VoidMessage,
     end=messages.FloatField(3),
     start=messages.FloatField(4),
-    state=messages.EnumField(swarming_rpcs.TaskState, 5, default='ALL'),
+    state=messages.EnumField(swarming_rpcs.TaskStateQuery, 5, default='ALL'),
     tags=messages.StringField(6, repeated=True))
 
 
@@ -732,7 +732,7 @@ BotTasksRequest = endpoints.ResourceContainer(
     # end, start are seconds since epoch.
     end=messages.FloatField(4),
     start=messages.FloatField(5),
-    state=messages.EnumField(swarming_rpcs.TaskState, 6, default='ALL'),
+    state=messages.EnumField(swarming_rpcs.TaskStateQuery, 6, default='ALL'),
     sort=messages.EnumField(swarming_rpcs.TaskSort, 7, default='CREATED_TS'),
     include_performance_stats=messages.BooleanField(8, default=False))
 

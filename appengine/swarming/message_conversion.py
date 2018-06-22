@@ -319,7 +319,7 @@ def task_result_to_rpc(entity, send_stats):
     'cipd_pins': cipd_pins,
     'outputs_ref': outputs_ref,
     'performance_stats': performance_stats,
-    'state': swarming_rpcs.StateField(entity.state),
+    'state': swarming_rpcs.TaskState(entity.state),
   }
   if entity.__class__ is task_result.TaskRunResult:
     kwargs['costs_usd'] = []

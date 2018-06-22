@@ -11,55 +11,74 @@ from protorpc import messages
 ### Enums
 
 
-class TaskState(messages.Enum):
-  """Used to query for tasks.
+class TaskStateQuery(messages.Enum):
+  """Use one of the values in this enum to query for tasks in one of the
+  specified state.
 
-  For example, this enum enables querying for all tasks with state COMPLETED but
-  non-zero exit code via COMPLETED_FAILURE.
+  Use 'ALL' to not use any filtering based on task state.
+
+  As an example, this enum enables querying for all tasks with state COMPLETED
+  but non-zero exit code via COMPLETED_FAILURE.
+
+  Do not confuse TaskStateQuery and TaskState. TaskStateQuery is to query tasks
+  via the API. TaskState is the current task state.
   """
-  # Query for all tasks currently PENDING.
+  # Query for all tasks currently TaskState.PENDING.
   PENDING = 0
-  # Query for all tasks currently RUNNING. This includes tasks currently in the
-  # overhead phase; mapping input files or archiving outputs back to the
-  # server.
+  # Query for all tasks currently TaskState.RUNNING. This includes tasks
+  # currently in the overhead phase; mapping input files or archiving outputs
+  # back to the server.
   RUNNING = 1
-  # Query for all tasks currently PENDING or RUNNING. This is the query for the
-  # 'active' tasks.
+  # Query for all tasks currently TaskState.PENDING or TaskState.RUNNING. This
+  # is the query for the 'active' tasks.
   PENDING_RUNNING = 2
-  # Query for all tasks that completed normally as COMPLETED, independent of the
-  # process exit code.
+  # Query for all tasks that completed normally as TaskState.COMPLETED,
+  # independent of the process exit code.
   COMPLETED = 3
-  # Query for all tasks that completed normally as COMPLETED and that had exit
-  # code 0.
+  # Query for all tasks that completed normally as TaskState.COMPLETED and that
+  # had exit code 0.
   COMPLETED_SUCCESS = 4
-  # Query for all tasks that completed normally as COMPLETED and that had exit
-  # code not 0.
+  # Query for all tasks that completed normally as TaskState.COMPLETED and that
+  # had exit code not 0.
   COMPLETED_FAILURE = 5
-  # Query for all tasks that are EXPIRED.
+  # Query for all tasks that are TaskState.EXPIRED.
   EXPIRED = 6
-  # Query for all tasks that are TIMED_OUT.
+  # Query for all tasks that are TaskState.TIMED_OUT.
   TIMED_OUT = 7
-  # Query for all tasks that are BOT_DIED.
+  # Query for all tasks that are TaskState.BOT_DIED.
   BOT_DIED = 8
-  # Query for all tasks that are CANCELED.
+  # Query for all tasks that are TaskState.CANCELED.
   CANCELED = 9
   # Query for all tasks, independent of the task state.
+  #
+  # In hindsight, this constant should have been the value 0. Sorry, the
+  # original author was young and foolish.
   ALL = 10
-  # Query for all tasks that are COMPLETED but that actually didn't run due to
-  # TaskProperties.idempotent being True *and* that a previous task with the
-  # exact same TaskProperties had successfully run before.
+  # Query for all tasks that are TaskState.COMPLETED but that actually didn't
+  # run due to TaskProperties.idempotent being True *and* that a previous task
+  # with the exact same TaskProperties had successfully run before, aka
+  # COMPLETED_SUCCESS.
   DEDUPED = 11
-  # Query for all tasks that are KILLED.
+  # Query for all tasks that are TaskState.KILLED.
   KILLED = 12
-  # Query for all tasks that are NO_RESOURCE.
+  # Query for all tasks that are TaskState.NO_RESOURCE.
   NO_RESOURCE = 13
 
 
-class StateField(messages.Enum):
+class TaskState(messages.Enum):
   """Represents the current task state.
 
   Some states are still mutable: PENDING and RUNNING. The others are final and
   will not change afterward.
+
+  A task is guaranteed to be in exactly one state at any point of time.
+
+  Do not confuse TaskStateQuery and TaskState. TaskStateQuery is to query tasks
+  via the API. TaskState is the current task state.
+
+  As you read the following constants, astute readers may wonder why these
+  constants look like a bitmask. This is because of historical reasons and this
+  is effectively an enum, not a bitmask.
   """
   # The task is currently running. This is in fact 3 phases: the initial
   # overhead to fetch input files, the actual task running, and the tear down
@@ -94,9 +113,14 @@ class StateField(messages.Enum):
   # termination dance in the documentation.
   KILLED = 0x80
   # The task was never set to PENDING and was immediately refused, as the server
-  # determined that there is no bot capacity to run this task. Set
-  # TaskSlice.wait_for_capacity to True to force the server to keep the task
-  # slice pending even in this case.
+  # determined that there is no bot capacity to run this task. This happens
+  # because no bot exposes a superset of the requested task dimensions.
+  #
+  # Set TaskSlice.wait_for_capacity to True to force the server to keep the task
+  # slice pending even in this case. Generally speaking, the task will
+  # eventually switch to EXPIRED, as there's no bot to run it. That said, there
+  # are situations where it is known that in some not-too-distant future a wild
+  # bot will appear that will be able to run this task.
   NO_RESOURCE = 0x100
 
 
@@ -576,7 +600,7 @@ class TaskResult(messages.Message):
   # Time the task started being run by a bot.
   started_ts = message_types.DateTimeField(18)
   # Current state of the task (e.g. PENDING, RUNNING, COMPLETED, EXPIRED, etc).
-  state = messages.EnumField(StateField, 19)
+  state = messages.EnumField(TaskState, 19)
   # Summary task ID (ending with '0') when creating a new task.
   task_id = messages.StringField(20)
   # Can be 0, 1 or 2. It is 0 for a deduped task, since nothing ran. It is

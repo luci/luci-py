@@ -508,7 +508,7 @@ class TasksApiTest(BaseTest):
       u'now': fmtdate(now_30),
     }
     request = handlers_endpoints.TasksRequest.combined_message_class(
-        state=swarming_rpcs.TaskState.DEDUPED)
+        state=swarming_rpcs.TaskStateQuery.DEDUPED)
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
 
@@ -519,7 +519,8 @@ class TasksApiTest(BaseTest):
 
     # Deduped task have no performance data associated.
     request = handlers_endpoints.TasksRequest.combined_message_class(
-        state=swarming_rpcs.TaskState.DEDUPED, include_performance_stats=True)
+        state=swarming_rpcs.TaskStateQuery.DEDUPED,
+        include_performance_stats=True)
     response = self.call_api('list', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
 
@@ -527,7 +528,7 @@ class TasksApiTest(BaseTest):
     start = utils.datetime_to_timestamp(self.now) / 1000000. - 1
     end = utils.datetime_to_timestamp(now_30) / 1000000. + 1
     request = handlers_endpoints.TasksRequest.combined_message_class(
-        start=start, end=end, state=swarming_rpcs.TaskState.DEDUPED)
+        start=start, end=end, state=swarming_rpcs.TaskStateQuery.DEDUPED)
     response = self.call_api('count', body=message_to_dict(request))
     self.assertEqual({u'now': fmtdate(now_30), u'count': u'1'}, response.json)
 
@@ -894,7 +895,7 @@ class TasksApiTest(BaseTest):
     # Both state and tag.
     request = handlers_endpoints.TasksRequest.combined_message_class(
         end=end, start=start, tags=['commit:pre'],
-        state=swarming_rpcs.TaskState.COMPLETED_SUCCESS)
+        state=swarming_rpcs.TaskStateQuery.COMPLETED_SUCCESS)
     self.assertEqual(
         {u'now': fmtdate(now_120), u'items': [second]},
         self.call_api('list', body=message_to_dict(request)).json)
@@ -903,13 +904,13 @@ class TasksApiTest(BaseTest):
     request = handlers_endpoints.TasksRequest.combined_message_class(
         end=end, start=start, tags=['commit:pre'],
         sort=swarming_rpcs.TaskSort.MODIFIED_TS,
-        state=swarming_rpcs.TaskState.COMPLETED_SUCCESS)
+        state=swarming_rpcs.TaskStateQuery.COMPLETED_SUCCESS)
     self.call_api('list', body=message_to_dict(request), status=400)
 
   def test_count_indexes(self):
     # Asserts that no combination crashes.
     _, _, now_120, start, end = self._gen_two_tasks()
-    for state in swarming_rpcs.TaskState:
+    for state in swarming_rpcs.TaskStateQuery:
       for tags in ([], ['a:1'], ['a:1', 'b:2']):
         request = handlers_endpoints.TasksCountRequest.combined_message_class(
             start=start, end=end, state=state, tags=tags)
@@ -922,57 +923,57 @@ class TasksApiTest(BaseTest):
 
   def test_list_indexes(self):
     # Asserts that no combination crashes unexpectedly.
-    TaskState = swarming_rpcs.TaskState
+    TaskStateQuery = swarming_rpcs.TaskStateQuery
     TaskSort = swarming_rpcs.TaskSort
     # List of all unsupported combinations. These can be added either with a new
     # index or by massaging the way entities are stored.
     blacklisted = [
-        # (<Using start, end or tags>, TaskState, TaskSort)
-        (None, TaskState.BOT_DIED, TaskSort.ABANDONED_TS),
-        (None, TaskState.BOT_DIED, TaskSort.COMPLETED_TS),
-        (None, TaskState.BOT_DIED, TaskSort.MODIFIED_TS),
-        (None, TaskState.CANCELED, TaskSort.ABANDONED_TS),
-        (None, TaskState.CANCELED, TaskSort.COMPLETED_TS),
-        (None, TaskState.CANCELED, TaskSort.MODIFIED_TS),
-        (None, TaskState.COMPLETED, TaskSort.ABANDONED_TS),
-        (None, TaskState.COMPLETED, TaskSort.COMPLETED_TS),
-        (None, TaskState.COMPLETED, TaskSort.MODIFIED_TS),
-        (None, TaskState.COMPLETED_FAILURE, TaskSort.ABANDONED_TS),
-        (None, TaskState.COMPLETED_FAILURE, TaskSort.COMPLETED_TS),
-        (None, TaskState.COMPLETED_FAILURE, TaskSort.MODIFIED_TS),
-        (None, TaskState.COMPLETED_SUCCESS, TaskSort.ABANDONED_TS),
-        (None, TaskState.COMPLETED_SUCCESS, TaskSort.COMPLETED_TS),
-        (None, TaskState.COMPLETED_SUCCESS, TaskSort.MODIFIED_TS),
-        (None, TaskState.DEDUPED, TaskSort.ABANDONED_TS),
-        (None, TaskState.DEDUPED, TaskSort.COMPLETED_TS),
-        (None, TaskState.DEDUPED, TaskSort.MODIFIED_TS),
-        (None, TaskState.EXPIRED, TaskSort.ABANDONED_TS),
-        (None, TaskState.EXPIRED, TaskSort.COMPLETED_TS),
-        (None, TaskState.EXPIRED, TaskSort.MODIFIED_TS),
-        (None, TaskState.KILLED, TaskSort.ABANDONED_TS),
-        (None, TaskState.KILLED, TaskSort.COMPLETED_TS),
-        (None, TaskState.KILLED, TaskSort.MODIFIED_TS),
-        (None, TaskState.NO_RESOURCE, TaskSort.ABANDONED_TS),
-        (None, TaskState.NO_RESOURCE, TaskSort.COMPLETED_TS),
-        (None, TaskState.NO_RESOURCE, TaskSort.MODIFIED_TS),
-        (None, TaskState.PENDING, TaskSort.ABANDONED_TS),
-        (None, TaskState.PENDING, TaskSort.COMPLETED_TS),
-        (None, TaskState.PENDING, TaskSort.MODIFIED_TS),
-        (None, TaskState.PENDING_RUNNING, TaskSort.ABANDONED_TS),
-        (None, TaskState.PENDING_RUNNING, TaskSort.COMPLETED_TS),
-        (None, TaskState.PENDING_RUNNING, TaskSort.MODIFIED_TS),
-        (None, TaskState.RUNNING, TaskSort.ABANDONED_TS),
-        (None, TaskState.RUNNING, TaskSort.COMPLETED_TS),
-        (None, TaskState.RUNNING, TaskSort.MODIFIED_TS),
-        (None, TaskState.TIMED_OUT, TaskSort.ABANDONED_TS),
-        (None, TaskState.TIMED_OUT, TaskSort.COMPLETED_TS),
-        (None, TaskState.TIMED_OUT, TaskSort.MODIFIED_TS),
-        (True, TaskState.ALL, TaskSort.ABANDONED_TS),
-        (True, TaskState.ALL, TaskSort.COMPLETED_TS),
-        (True, TaskState.ALL, TaskSort.MODIFIED_TS),
+        # (<Using start, end or tags>, TaskStateQuery, TaskSort)
+        (None, TaskStateQuery.BOT_DIED, TaskSort.ABANDONED_TS),
+        (None, TaskStateQuery.BOT_DIED, TaskSort.COMPLETED_TS),
+        (None, TaskStateQuery.BOT_DIED, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.CANCELED, TaskSort.ABANDONED_TS),
+        (None, TaskStateQuery.CANCELED, TaskSort.COMPLETED_TS),
+        (None, TaskStateQuery.CANCELED, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.COMPLETED, TaskSort.ABANDONED_TS),
+        (None, TaskStateQuery.COMPLETED, TaskSort.COMPLETED_TS),
+        (None, TaskStateQuery.COMPLETED, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.COMPLETED_FAILURE, TaskSort.ABANDONED_TS),
+        (None, TaskStateQuery.COMPLETED_FAILURE, TaskSort.COMPLETED_TS),
+        (None, TaskStateQuery.COMPLETED_FAILURE, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.COMPLETED_SUCCESS, TaskSort.ABANDONED_TS),
+        (None, TaskStateQuery.COMPLETED_SUCCESS, TaskSort.COMPLETED_TS),
+        (None, TaskStateQuery.COMPLETED_SUCCESS, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.DEDUPED, TaskSort.ABANDONED_TS),
+        (None, TaskStateQuery.DEDUPED, TaskSort.COMPLETED_TS),
+        (None, TaskStateQuery.DEDUPED, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.EXPIRED, TaskSort.ABANDONED_TS),
+        (None, TaskStateQuery.EXPIRED, TaskSort.COMPLETED_TS),
+        (None, TaskStateQuery.EXPIRED, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.KILLED, TaskSort.ABANDONED_TS),
+        (None, TaskStateQuery.KILLED, TaskSort.COMPLETED_TS),
+        (None, TaskStateQuery.KILLED, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.NO_RESOURCE, TaskSort.ABANDONED_TS),
+        (None, TaskStateQuery.NO_RESOURCE, TaskSort.COMPLETED_TS),
+        (None, TaskStateQuery.NO_RESOURCE, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.PENDING, TaskSort.ABANDONED_TS),
+        (None, TaskStateQuery.PENDING, TaskSort.COMPLETED_TS),
+        (None, TaskStateQuery.PENDING, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.PENDING_RUNNING, TaskSort.ABANDONED_TS),
+        (None, TaskStateQuery.PENDING_RUNNING, TaskSort.COMPLETED_TS),
+        (None, TaskStateQuery.PENDING_RUNNING, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.RUNNING, TaskSort.ABANDONED_TS),
+        (None, TaskStateQuery.RUNNING, TaskSort.COMPLETED_TS),
+        (None, TaskStateQuery.RUNNING, TaskSort.MODIFIED_TS),
+        (None, TaskStateQuery.TIMED_OUT, TaskSort.ABANDONED_TS),
+        (None, TaskStateQuery.TIMED_OUT, TaskSort.COMPLETED_TS),
+        (None, TaskStateQuery.TIMED_OUT, TaskSort.MODIFIED_TS),
+        (True, TaskStateQuery.ALL, TaskSort.ABANDONED_TS),
+        (True, TaskStateQuery.ALL, TaskSort.COMPLETED_TS),
+        (True, TaskStateQuery.ALL, TaskSort.MODIFIED_TS),
     ]
     _, _, now_120, start, end = self._gen_two_tasks()
-    for state in TaskState:
+    for state in TaskStateQuery:
       for tags in ([], ['a:1'], ['a:1', 'b:2']):
         for start in (None, start):
           for end in (None, end):

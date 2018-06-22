@@ -90,9 +90,13 @@ BOT_PING_TOLERANCE = datetime.timedelta(seconds=2*60)
 
 
 class State(object):
-  """States in which a task can be.
+  """Represents the current task state.
 
-  It's in fact an enum. Values should be in decreasing order of importance.
+  For documentation, see the comments in the swarming_rpcs.TaskState enum, which
+  is using the same values:
+  https://cs.chromium.org/chromium/infra/luci/appengine/swarming/swarming_rpcs.py?q=TaskState\(
+
+  It's in fact an enum.
   """
   RUNNING = 0x10      # 16
   PENDING = 0x20      # 32
@@ -107,12 +111,14 @@ class State(object):
   STATES = (
       RUNNING, PENDING, EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, COMPLETED,
       KILLED, NO_RESOURCE)
+  # State will mutate again. Anything else means not queued, not running.
   STATES_RUNNING = (RUNNING, PENDING)
-  STATES_NOT_RUNNING = (
-      EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, COMPLETED, KILLED, NO_RESOURCE)
+  # Abnormal termination.
   STATES_EXCEPTIONAL = (
       EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, KILLED, NO_RESOURCE)
+  # Task ran and is done running.
   STATES_DONE = (TIMED_OUT, COMPLETED, KILLED)
+  # Task didn't run (except for BOT_DIED, which may or may not have run).
   STATES_ABANDONED = (EXPIRED, BOT_DIED, CANCELED, NO_RESOURCE)
 
   _NAMES = {

@@ -377,7 +377,7 @@ def _maybe_pubsub_notify_now(result_summary, request):
   assert isinstance(
       result_summary, task_result.TaskResultSummary), result_summary
   assert isinstance(request, task_request.TaskRequest), request
-  if (result_summary.state in task_result.State.STATES_NOT_RUNNING and
+  if (result_summary.state not in task_result.State.STATES_RUNNING and
       request.pubsub_topic):
     task_id = task_pack.pack_result_summary_key(result_summary.key)
     try:

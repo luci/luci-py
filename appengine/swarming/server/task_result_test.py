@@ -200,9 +200,6 @@ class TaskResultApiTest(TestCase):
       task_result.State.STATES_ABANDONED)
     self.assertEqual(set(items), set(task_result.State.STATES))
     self.assertEqual(len(items), len(set(items)))
-    self.assertEqual(
-        task_result.State.STATES_RUNNING + task_result.State.STATES_NOT_RUNNING,
-        task_result.State.STATES)
 
   def test_state_to_string(self):
     # Same code as State.to_string() except that it works for
