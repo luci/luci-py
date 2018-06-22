@@ -455,16 +455,12 @@ class IsolateService(remote.Service):
       BadRequestException if any digest is not a valid hexadecimal number.
     """
     # Kick off all queries in parallel. Build mapping Future -> digest.
-    futures = {}
-    for digest in entries.items:
-      # check for error conditions
-      key = entry_key_or_error(entries.namespace.namespace, digest.digest)
-      futures[key.get_async(use_cache=False)] = digest
+    def fetch(digest):
+      key = entry_key_or_error(
+          entries.namespace.namespace, digest.digest)
+      return key.get_async(use_cache=False)
 
-    # Pick first one that finishes and yield it, rinse, repeat.
-    while futures:
-      future = ndb.Future.wait_any(futures)
-      yield futures.pop(future), future.get_result()
+    return utils.async_apply(entries.items, fetch, unordered=True)
 
   @classmethod
   def partition_collection(cls, entries):

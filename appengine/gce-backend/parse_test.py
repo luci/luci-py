@@ -555,10 +555,8 @@ class EnsureInstanceGroupManagerExistsTest(test_case.TestCase):
     expected_key = parse.get_instance_group_manager_key(
         template_cfg, manager_cfg)
 
-    future = parse.ensure_instance_group_manager_exists(
-        template_cfg, manager_cfg)
-    future.wait()
-    key = future.get_result()
+    key = parse.ensure_instance_group_manager_exists(
+        template_cfg, manager_cfg).get_result()
     entity = key.get()
 
     self.assertEqual(key, expected_key)
@@ -584,10 +582,8 @@ class EnsureInstanceGroupManagerExistsTest(test_case.TestCase):
         minimum_size=1,
     ).put()
 
-    future = parse.ensure_instance_group_manager_exists(
-        template_cfg, manager_cfg)
-    future.wait()
-    key = future.get_result()
+    key = parse.ensure_instance_group_manager_exists(
+        template_cfg, manager_cfg).get_result()
     entity = key.get()
 
     self.assertEqual(key, expected_key)
@@ -613,10 +609,8 @@ class EnsureInstanceGroupManagerExistsTest(test_case.TestCase):
         minimum_size=1,
     ).put()
 
-    future = parse.ensure_instance_group_manager_exists(
-        template_cfg, manager_cfg)
-    future.wait()
-    key = future.get_result()
+    key = parse.ensure_instance_group_manager_exists(
+        template_cfg, manager_cfg).get_result()
     entity = key.get()
 
     self.assertEqual(key, expected_key)

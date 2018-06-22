@@ -744,6 +744,60 @@ def import_jinja2():
   sys.path.append(os.path.join(THIS_DIR, 'third_party'))
 
 
+# NDB Futures
+
+
+def async_apply(iterable, async_fn, unordered=False, concurrent_jobs=50):
+  """Applies async_fn to each item and yields (item, result) tuples.
+
+  Args:
+    iterable: an iterable of items for which to call async_fn
+    async_fn: (item) => ndb.Future. It is called for each item in iterable.
+    unordered: False to return results in the same order as iterable.
+      Otherwise, yield results as soon as futures finish.
+    concurrent_jobs: maximum number of futures running concurrently.
+  """
+  if unordered:
+    return _async_apply_unordered(iterable, async_fn, concurrent_jobs)
+  return _async_apply_ordered(iterable, async_fn, concurrent_jobs)
+
+
+def _async_apply_ordered(iterable, async_fn, concurrent_jobs):
+  results = _async_apply_unordered(
+      enumerate(iterable),
+      lambda (i, item): async_fn(item),
+      concurrent_jobs)
+  for (_, item), result in sorted(results, key=lambda i: i[0][0]):
+    yield item, result
+
+
+def _async_apply_unordered(iterable, async_fn, concurrent_jobs):
+  # maps a future to the original item(s). Items is a list because async_fn
+  # is allowed to return the same future for different items.
+  futs = {}
+  iterator = iter(iterable)
+
+  def launch():
+    running_futs = sum(1 for f in futs if not f.done())
+    while running_futs < concurrent_jobs:
+      try:
+        item = next(iterator)
+      except StopIteration:
+        break
+      future = async_fn(item)
+      if not future.done():
+        running_futs += 1
+      futs.setdefault(future, []).append(item)
+
+  launch()
+  while futs:
+    future = ndb.Future.wait_any(futs)
+    res = future.get_result()
+    launch()  # launch more before yielding
+    for item in futs.pop(future):
+      yield item, res
+
+
 def sync_of(async_fn):
   """Returns a synchronous version of an asynchronous function."""
   is_static_method = isinstance(async_fn, staticmethod)

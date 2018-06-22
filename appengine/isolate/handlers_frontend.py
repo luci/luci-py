@@ -79,6 +79,7 @@ class RestrictedConfigHandler(auth.AuthenticatingHandler):
   @staticmethod
   def cast_to_type(param_name, value):
     def to_bool(value):
+      # pylint: disable=unidiomatic-typecheck
       if type(value) is bool:
         return value
       return {'True': True, 'False': False}.get(value, False)

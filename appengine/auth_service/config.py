@@ -69,8 +69,7 @@ def get_remote_url():
 
 def get_revisions():
   """Returns a mapping {config file name => Revision instance or None}."""
-  futures = {p: _get_config_revision_async(p) for p in _CONFIG_SCHEMAS}
-  return {p: f.get_result() for p, f in futures.iteritems()}
+  return dict(utils.async_apply(_CONFIG_SCHEMAS, _get_config_revision_async))
 
 
 def _get_config_revision_async(path):
@@ -119,9 +118,11 @@ def refetch_config(force=False):
   # Figure out what needs to be updated.
   dirty = {}
   dirty_in_authdb = {}
+
+  cur_revs = dict(utils.async_apply(configs, _get_config_revision_async))
   for path, (new_rev, conf) in sorted(configs.iteritems()):
     assert path in _CONFIG_SCHEMAS, path
-    cur_rev = _get_config_revision_async(path).get_result()
+    cur_rev = cur_revs[path]
     if cur_rev != new_rev or force:
       if _CONFIG_SCHEMAS[path]['use_authdb_transaction']:
         dirty_in_authdb[path] = (new_rev, conf)
@@ -531,16 +532,14 @@ def _fetch_configs(paths):
     CannotLoadConfigError if some config is missing or invalid.
   """
   paths = sorted(paths)
-  futures = [
-    config.get_self_config_async(
-        p, dest_type=_CONFIG_SCHEMAS[p]['proto_class'], store_last_good=False)
-    for p in paths
-  ]
   configs_url = _get_configs_url()
-  ndb.Future.wait_all(futures)
   out = {}
-  for path, future in zip(paths, futures):
-    rev, conf = future.get_result()
+  configs = utils.async_apply(
+      paths,
+      lambda p: config.get_self_config_async(
+          p, dest_type=_CONFIG_SCHEMAS[p]['proto_class'], store_last_good=False)
+  )
+  for path, (rev, conf) in configs:
     if conf is None:
       default = _CONFIG_SCHEMAS[path].get('default')
       if default is None:

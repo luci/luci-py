@@ -292,15 +292,15 @@ def import_external_groups():
 
   # Fetch files specified in the config in parallel.
   entries = list(config.tarball) + list(config.plainlist)
-  futures = [fetch_file_async(e.url, e.oauth_scopes) for e in entries]
+  files = utils.async_apply(
+      entries, lambda e: fetch_file_async(e.url, e.oauth_scopes))
 
   # {system name -> group name -> list of identities}
   bundles = {}
-  for e, future in zip(entries, futures):
+  for e, contents in files:
     # Unpack tarball into {system name -> group name -> list of identities}.
     if isinstance(e, config_pb2.GroupImporterConfig.TarballEntry):
-      fetched = load_tarball(
-          future.get_result(), e.systems, e.groups, e.domain)
+      fetched = load_tarball(contents, e.systems, e.groups, e.domain)
       assert not (
           set(fetched) & set(bundles)), (fetched.keys(), bundles.keys())
       bundles.update(fetched)
@@ -308,7 +308,7 @@ def import_external_groups():
 
     # Add plainlist group to 'external/*' bundle.
     if isinstance(e, config_pb2.GroupImporterConfig.PlainlistEntry):
-      group = load_group_file(future.get_result(), e.domain)
+      group = load_group_file(contents, e.domain)
       name = 'external/%s' % e.group
       if 'external' not in bundles:
         bundles['external'] = {}
