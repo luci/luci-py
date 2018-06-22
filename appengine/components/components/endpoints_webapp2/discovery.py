@@ -410,6 +410,8 @@ def generate(classes, host, base_path):
       classes[0].api_info.description or classes[0].__doc__)
   if desc:
     document['description'] = desc
+  if classes[0].api_info.documentation:
+    document['documentationLink'] = classes[0].api_info.documentation
   methods = {}
   resources = {}
   schemas = {}
@@ -466,6 +468,8 @@ def directory(classes, host, base_path):
         service.api_info.description or service.__doc__)
     if desc:
       item['description'] = desc
+    if service.api_info.documentation:
+      item['documentationLink'] = service.api_info.documentation
     items[item['id']] = item
 
   if items:

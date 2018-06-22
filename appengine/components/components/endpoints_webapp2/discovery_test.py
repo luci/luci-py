@@ -44,7 +44,7 @@ class Parent(messages.Message):
   datetime = message_types.DateTimeField(2)
 
 
-@endpoints.api('service', 'v1', title='Titled Service')
+@endpoints.api('service', 'v1', title='Titled Service', documentation='link')
 class Service(remote.Service):
   """A service to test with."""
 
@@ -323,6 +323,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
       'batchPath': 'batch',
       'description': 'A service to test with.',
       'discoveryVersion': 'v1',
+      'documentationLink': 'link',
       'icons': {
         'x16': 'https://www.google.com/images/icons/product/search-16.gif',
         'x32': 'https://www.google.com/images/icons/product/search-32.gif',
@@ -656,6 +657,7 @@ class DiscoveryWebapp2TestCase(test_case.TestCase):
           'discoveryLink': './apis/service/v1/rest',
           'discoveryRestUrl':
               'http://localhost:8080/api/discovery/v1/apis/service/v1/rest',
+          'documentationLink': 'link',
           'icons': {
             'x16': 'https://www.google.com/images/icons/product/search-16.gif',
             'x32': 'https://www.google.com/images/icons/product/search-32.gif',
