@@ -214,7 +214,8 @@ def main():
 
   # Always make the current working directory the directory containing this
   # file. It simplifies assumptions.
-  os.chdir(os.path.dirname(THIS_FILE))
+  base_dir = os.path.dirname(THIS_FILE)
+  os.chdir(base_dir)
   # Always create the logs dir first thing, before printing anything out.
   if not os.path.isdir('logs'):
     os.mkdir('logs')
@@ -232,10 +233,11 @@ def main():
     # Self-replicate itself right away as swarming_bot.1.zip and restart the bot
     # process as this copy. This enables LKGBC logic.
     print >> sys.stderr, 'Self replicating pid:%d.' % os.getpid()
-    if os.path.isfile('swarming_bot.1.zip'):
-      os.remove('swarming_bot.1.zip')
-    shutil.copyfile('swarming_bot.zip', 'swarming_bot.1.zip')
-    cmd = ['swarming_bot.1.zip'] + sys.argv[1:]
+    new_zip = os.path.join(base_dir, 'swarming_bot.1.zip')
+    if os.path.isfile(new_zip):
+      os.remove(new_zip)
+    shutil.copyfile(THIS_FILE, new_zip)
+    cmd = [new_zip] + sys.argv[1:]
     print >> sys.stderr, 'cmd: %s' % cmd
     return common.exec_python(cmd)
 
