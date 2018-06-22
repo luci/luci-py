@@ -141,7 +141,7 @@
             if (this._verbose) {
               return c.join(" | ");
             }
-            return c[0];
+            return swarming.longest(c);
           }
         }
         return f.bind(this)(item);
