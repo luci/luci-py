@@ -168,7 +168,7 @@ class Server(object):
           self.response.headers['Vary'] = 'Origin'
           self.response.headers['Access-Control-Allow-Credentials'] = 'true'
         self.response.status = _PRPC_TO_HTTP_STATUS[context._code]
-        self.response.headers['X-Prpc-Grpc-Code'] = str(context._code[0])
+        self.response.headers['X-Prpc-Grpc-Code'] = str(context._code.value)
         self.response.headers['Access-Control-Expose-Headers'] = (
             'X-Prpc-Grpc-Code')
         if content is not None:
