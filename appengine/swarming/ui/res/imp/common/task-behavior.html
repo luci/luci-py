@@ -47,6 +47,10 @@
           type: String,
           value: "EXPIRED",
         },
+        NO_RESOURCE: {
+          type: String,
+          value: "NO_RESOURCE",
+        },
         PENDING: {
           type: String,
           value: "PENDING",
@@ -62,7 +66,7 @@
       },
 
       stateClass: function(state) {
-        if (state === this.CANCELED || state === this.TIMED_OUT || state === this.EXPIRED) {
+        if (state === this.CANCELED || state === this.TIMED_OUT || state === this.EXPIRED || state === this.NO_RESOURCE) {
           return "exception";
         }
         if (state === this.BOT_DIED) {

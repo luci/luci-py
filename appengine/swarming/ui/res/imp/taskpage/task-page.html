@@ -552,7 +552,7 @@
                         <td title$="[[_result.started_ts]]">[[_result.human_started_ts]]</td>
                       </tr>
                     </template>
-                    <template is="dom-if" if="[[_wasNotPickedUp(_result)]]">
+                    <template is="dom-if" if="[[_canExpire(_result)]]">
                       <tr>
                         <td>Expires</td>
                         <td>[[_expires(_request, _currentSlice)]]</td>
@@ -676,7 +676,7 @@
                 </tr>
               </table>
             </template>
-            <template is="dom-if" if="[[_wasNotPickedUp(_result)]]">
+            <template is="dom-if" if="[[_canExpire(_result)]]">
               This space left blank until a bot is assigned to the task.
             </template>
 
@@ -1482,11 +1482,12 @@ time.sleep(${leaseDuration})`];
       },
 
       _wasPickedUp: function(result) {
-        return result && result.state !== this.PENDING && result.state !== this.CANCELED && result.state != this.EXPIRED;
+        return result && result.state !== this.PENDING && result.state !== this.NO_RESOURCE &&
+              result.state !== this.CANCELED && result.state !== this.EXPIRED;
       },
 
-      _wasNotPickedUp: function(result) {
-        return result && !this._wasPickedUp(result);
+      _canExpire: function(result) {
+        return result && !this._wasPickedUp(result) && result.state !== this.NO_RESOURCE;
       },
 
       _similarLoad: function() {
