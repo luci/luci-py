@@ -268,6 +268,9 @@ def load_and_run(
           local_auth_context = auth_system.start()
         except bot_auth.AuthSystemError as e:
           raise InternalError('Failed to init auth: %s' % e)
+      else:
+        logging.warning(
+            'Disabling auth subsystem, --auth-params-file wasn\'t provided')
 
       # Override LUCI_CONTEXT['local_auth']. If the task is not using auth,
       # do NOT inherit existing local_auth (if its there). Kick it out by

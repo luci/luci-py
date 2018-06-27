@@ -187,9 +187,9 @@ class RemoteClientNative(object):
   def authentication_headers_expiration(self):
     """Returns int unix timestamp of when current cached auth headers expire.
 
-    Returns 0 if unknown or not using auth.
+    Returns 0 if unknown or None if not using auth at all.
     """
-    return int(self._exp_ts or 0)
+    return int(self._exp_ts) if not self._disabled else None
 
   def _get_headers_or_throw(self):
     if self._disabled:
