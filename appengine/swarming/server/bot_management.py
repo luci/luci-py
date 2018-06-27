@@ -479,10 +479,6 @@ def bot_event(
   datastore_utils.store_new_version(event, BotRoot, [bot_info])
 
 
-# TODO(maruel): https://crbug.com/839173
-_FAKE_CAPACITY = True
-
-
 def has_capacity(dimensions):
   """Returns True if there's a reasonable chance for this task request
   dimensions set to be serviced by a bot alive.
@@ -508,8 +504,7 @@ def has_capacity(dimensions):
     return True
 
   logging.error('HAS NO CAPACITY: %s', flat)
-  # TODO(maruel): https://crbug.com/839173
-  return _FAKE_CAPACITY
+  return False
 
 
 def cron_update_bot_info():

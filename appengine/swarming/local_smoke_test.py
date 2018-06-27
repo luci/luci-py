@@ -1012,6 +1012,67 @@ class Test(unittest.TestCase):
     actual_summary, _ = self.client.task_collect(task_id)
     self.assertResults(expected_summary, actual_summary, deduped=False)
 
+  def test_task_slice_fallback(self):
+    # The first one shall be skipped.
+    request = {
+      'name': 'task_slice_fallback',
+      'priority': 40,
+      'task_slices': [
+        {
+          # Really long expiration that would cause the smoke test to abort
+          # under normal condition.
+          'expiration_secs': 1200,
+          'properties': {
+            'command': ['python', '-c', 'print("first")'],
+            'dimensions': [
+              {
+                'key': 'pool',
+                'value': 'default',
+              },
+              {
+                'key': 'invalidkey',
+                'value': 'invalidvalue',
+              },
+            ],
+            'grace_period_secs': 30,
+            'execution_timeout_secs': 30,
+            'io_timeout_secs': 30,
+          },
+        },
+        {
+          'expiration_secs': 120,
+          'properties': {
+            'command': ['python', '-c', 'print("second")'],
+            'dimensions': [
+              {
+                'key': 'pool',
+                'value': 'default',
+              },
+            ],
+            'grace_period_secs': 30,
+            'execution_timeout_secs': 30,
+            'io_timeout_secs': 30,
+          },
+        },
+      ],
+    }
+    task_id = self.client.task_trigger_post(json.dumps(request))
+    expected_summary = self.gen_expected(
+        name=u'task_slice_fallback',
+        current_task_slice=u'1',
+        outputs=[u'second\n'],
+        tags=[
+          # Bug!
+          u'invalidkey:invalidvalue',
+          u'pool:default',
+          u'priority:40',
+          u'service_account:none',
+          u'user:None',
+        ],
+        user=u'')
+    actual_summary, _ = self.client.task_collect(task_id)
+    self.assertResults(expected_summary, actual_summary, deduped=False)
+
   def test_no_resource(self):
     request = {
       'name': 'no_resource',
@@ -1039,7 +1100,11 @@ class Test(unittest.TestCase):
     task_id = self.client.task_trigger_post(json.dumps(request))
     actual_summary, _ = self.client.task_collect(task_id)
     summary = actual_summary[u'shards'][0]
-    self.assertIsNone(summary)
+    # Immediately cancelled.
+    self.assertEqual(
+        0x100,  # task_result.State.NO_RESOURCE
+        summary[u'state'])
+    self.assertTrue(summary[u'abandoned_ts'])
 
   @contextlib.contextmanager
   def _make_wait_task(self, name):

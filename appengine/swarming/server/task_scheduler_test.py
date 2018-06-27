@@ -136,8 +136,6 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
       u'os': [u'Windows', u'Windows-3.1.1'],
       u'pool': [u'default'],
     }
-    # https://crbug.com/839173
-    self.mock(bot_management, '_FAKE_CAPACITY', False)
 
   def _enqueue(self, *args, **kwargs):
     return self._enqueue_orig(*args, use_dedicated_module=False, **kwargs)

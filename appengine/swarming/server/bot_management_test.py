@@ -127,8 +127,6 @@ class BotManagementTest(test_case.TestCase):
     super(BotManagementTest, self).setUp()
     self.now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(self.now)
-    # https://crbug.com/839173
-    self.mock(bot_management, '_FAKE_CAPACITY', False)
 
   def test_all_apis_are_tested(self):
     actual = frozenset(i[5:] for i in dir(self) if i.startswith('test_'))
