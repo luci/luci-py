@@ -1112,6 +1112,9 @@ def cancel_task(request, result_key, kill_running):
     - True if the cancelation succeeded. Either the task atomically changed
       from PENDING to CANCELED or it was RUNNING and killing bit has been set.
     - True if the task was running while it was canceled.
+
+  Raises:
+    datastore_utils.CommitError if the transaction failed.
   """
   if result_key.kind() == 'TaskRunResult':
     # Ignore the try number. A user may ask to cancel run result 1, but if it
@@ -1168,14 +1171,7 @@ def cancel_task(request, result_key, kill_running):
       f.check_success()
     return True, was_running
 
-  try:
-    ok, was_running = datastore_utils.transaction(run)
-  except datastore_utils.CommitError as e:
-    packed = task_pack.pack_result_summary_key(result_key)
-    return 'Failed killing task %s: %s' % (packed, e)
-
-  return ok, was_running
-
+  return datastore_utils.transaction(run)
 
 
 ### Cron job.
