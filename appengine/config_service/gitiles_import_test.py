@@ -435,7 +435,7 @@ class GitilesImportTestCase(test_case.TestCase):
     projects.get_project.return_value = service_config_pb2.Project(
         id='chromium',
         config_location=service_config_pb2.ConfigSetLocation(
-            url='https://localhost/chromium/src/',
+            url='https://localhost/chromium/src/+/refs/heads/master',
             storage_type=service_config_pb2.ConfigSetLocation.GITILES,
         ),
     )
@@ -443,7 +443,8 @@ class GitilesImportTestCase(test_case.TestCase):
     gitiles_import.import_project('chromium')
 
     gitiles_import._import_config_set.assert_called_once_with(
-        'projects/chromium', 'https://localhost/chromium/src/+/refs/heads/luci')
+        'projects/chromium',
+        'https://localhost/chromium/src/+/refs/heads/master')
 
   def test_import_project_not_found(self):
     self.mock(projects, 'get_project', mock.Mock(return_value=None))

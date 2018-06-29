@@ -43,8 +43,6 @@ GITILES_LOCATION_TYPE = service_config_pb2.ConfigSetLocation.GITILES
 DEFAULT_GITILES_IMPORT_CONFIG = service_config_pb2.ImportCfg.Gitiles(
     fetch_log_deadline=15,
     fetch_archive_deadline=15,
-    project_config_default_ref='refs/heads/luci',
-    project_config_default_path='/',
     ref_config_default_path='luci',
 )
 
@@ -335,14 +333,6 @@ def import_project(project_id):
 
     txn()
     return
-
-  # Adjust location
-  cfg = get_gitiles_config()
-  if not loc.treeish or loc.treeish == 'HEAD':
-    loc = loc._replace(treeish=cfg.project_config_default_ref)
-  loc = loc._replace(
-      path=loc.path.strip('/') or cfg.project_config_default_path,
-  )
 
   # Update project repo info.
   repo_url = str(loc._replace(treeish=None, path=None))

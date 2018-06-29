@@ -93,17 +93,22 @@ def validate_config_set_location(loc, ctx, allow_relative_url=False):
   if not loc:
     ctx.error('not specified')
     return
-  if allow_relative_url and is_url_relative(loc.url):
-    if loc.storage_type != service_config_pb2.ConfigSetLocation.UNSET:
+  if is_url_relative(loc.url):
+    if not allow_relative_url:
+      ctx.error('url is relative')
+    elif loc.storage_type != service_config_pb2.ConfigSetLocation.UNSET:
       ctx.error('storage_type must not be set if relative url is used')
   elif loc.storage_type == service_config_pb2.ConfigSetLocation.UNSET:
     ctx.error('storage_type is not set')
   else:
     assert loc.storage_type == service_config_pb2.ConfigSetLocation.GITILES
     try:
-      gitiles.Location.parse(loc.url)
+      parsed_loc = gitiles.Location.parse(loc.url)
     except ValueError as ex:
       ctx.error('%s', ex.message)
+    else:
+      if parsed_loc.treeish == 'HEAD':
+        ctx.error('ref/commit is not specified')
 
 
 @validation.self_rule(

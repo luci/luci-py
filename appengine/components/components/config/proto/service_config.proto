@@ -122,8 +122,10 @@ message ImportCfg {
     int32 fetch_log_deadline = 1;
     // Request timeout in seconds when requesting directory archive.
     int32 fetch_archive_deadline = 2;
+    // DEPRECATED, ignored. TODO(nodir): remove.
     // Default ref for project configs.
     string project_config_default_ref = 3;
+    // DEPRECATED, ignored. TODO(nodir): remove.
     // Default directory for project configs.
     string project_config_default_path = 4;
     // Default directory for ref configs.
