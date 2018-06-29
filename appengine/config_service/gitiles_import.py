@@ -323,19 +323,18 @@ def import_project(project_id):
   try:
     loc = gitiles.Location.parse_resolve(project.config_location.url)
   except gitiles.TreeishResolutionError:
-    if storage.ConfigSet.get_by_id(config_set):
-      # The config set existed once, but now location points to
-      # a nonexistent ref. It is likely to be misconfigured.
-      raise
-    msg = ('treeish was not resolved in URL "%s" => '
-           'configs for %s do not exist') % (
-              project.config_location.url, config_set)
-    storage.ImportAttempt(
-        key=storage.last_import_attempt_key(config_set),
-        success=False,
-        message=msg,
-    ).put()
-    raise NotFoundError(msg)
+
+    @ndb.transactional
+    def txn():
+      key = ndb.Key(storage.ConfigSet, config_set)
+      if key.get():
+        logging.warning(
+            'treeish was not resolved in URL "%s" => delete project',
+            project.config_location.url)
+        key.delete()
+
+    txn()
+    return
 
   # Adjust location
   cfg = get_gitiles_config()

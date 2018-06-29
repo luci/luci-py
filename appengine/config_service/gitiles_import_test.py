@@ -468,9 +468,11 @@ class GitilesImportTestCase(test_case.TestCase):
         gitiles.Location, 'parse_resolve',
         mock.Mock(side_effect=gitiles.TreeishResolutionError()))
 
-    err_pattern = 'treeish was not resolved'
-    with self.assertRaisesRegexp(gitiles_import.NotFoundError, err_pattern):
-      gitiles_import.import_project('chromium')
+    storage.ConfigSet(
+        id='projects/chromium', location='https://example.com').put()
+
+    gitiles_import.import_project('chromium')
+    self.assertIsNone(storage.ConfigSet.get_by_id('projects/chromium'))
 
   def test_import_ref(self):
     self.mock(gitiles_import, '_import_config_set', mock.Mock())
