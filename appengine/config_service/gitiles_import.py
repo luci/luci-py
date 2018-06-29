@@ -363,7 +363,10 @@ def import_ref(project_id, ref_name):
     raise NotFoundError('project %s not found' % project_id)
   if project.config_location.storage_type != GITILES_LOCATION_TYPE:
     raise Error('project %s is not a Gitiles project' % project_id)
-  loc = gitiles.Location.parse_resolve(project.config_location.url)
+
+  # We don't call parse_resolve here because we are replacing treeish and
+  # path below anyway.
+  loc = gitiles.Location.parse(project.config_location.url)
 
   ref = None
   for r in projects.get_refs([project_id])[project_id] or ():
