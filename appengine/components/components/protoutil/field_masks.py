@@ -211,7 +211,8 @@ class Mask(object):
     return child and child._submask(path, start_at + 1)
 
   @classmethod
-  def from_field_mask(cls, field_mask, desc, json_names=False):
+  def from_field_mask(
+      cls, field_mask, desc, json_names=False, update_mask=False):
     """Parses a field mask to a Mask.
 
     Removes trailing stars, e.g. parses ['a.*'] as ['a'].
@@ -223,6 +224,9 @@ class Mask(object):
       json_names: True if field_mask uses json field names for field names,
         e.g. "fooBar" instead of "foo_bar".
         Field names will be parsed in the canonical form.
+      update_mask: if True, the field_mask is treated as an update mask.
+        In an update mask, a repeated field is allowed only as the last
+        field in a paths string.
 
     Raises:
       ValueError if a field path is invalid.
@@ -237,9 +241,15 @@ class Mask(object):
     parsed_paths = _normalize_paths(parsed_paths)
 
     root = cls(desc)
-    for p in parsed_paths:
+    for i, p in enumerate(parsed_paths):
       node = root
+      node_name = ''
       for seg in p:
+        if node.repeated and update_mask:
+          raise ValueError(
+              ('update mask allows a repeated field only at the last '
+               'position; field "%s" in "%s" is not last')
+              % (node_name, field_mask.paths[i]))
         if seg not in node.children:
           if node.desc.GetOptions().map_entry:
             child = cls(node.desc.fields_by_name['value'].message_type)
@@ -251,6 +261,7 @@ class Mask(object):
             child = cls(field.message_type, repeated=repeated)
           node.children[seg] = child
         node = node.children[seg]
+        node_name = seg
     return root
 
   def __eq__(self, other):

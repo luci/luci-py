@@ -295,6 +295,18 @@ class FromFieldMaskTests(unittest.TestCase):
     })
     self.assertEqual(actual, expected)
 
+  def test_update_mask(self):
+    actual = self.parse(['msgs'], update_mask=True)
+    expected = Mask(TEST_DESC, children={
+        'msgs': Mask(TEST_DESC, repeated=True),
+    })
+    self.assertEqual(actual, expected)
+
+  def test_update_mask_with_intermediate_repeated_field(self):
+    err_pattern = r'field "msgs" in "msgs\.\*\.str" is not last'
+    with self.assertRaisesRegexp(ValueError, err_pattern):
+      self.parse(['msgs.*.str'], update_mask=True)
+
 
 class IncludeTests(unittest.TestCase):
   def mask(self, *paths):
