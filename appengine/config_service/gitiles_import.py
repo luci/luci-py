@@ -312,12 +312,30 @@ def import_project(project_id):
   if not config.validation.is_valid_project_id(project_id):
     raise ValueError('Invalid project id: %s' % project_id)
 
+  config_set = 'projects/%s' % project_id
+
   project = projects.get_project(project_id)
   if project is None:
     raise NotFoundError('project %s not found' % project_id)
   if project.config_location.storage_type != GITILES_LOCATION_TYPE:
     raise Error('project %s is not a Gitiles project' % project_id)
-  loc = gitiles.Location.parse_resolve(project.config_location.url)
+
+  try:
+    loc = gitiles.Location.parse_resolve(project.config_location.url)
+  except gitiles.TreeishResolutionError:
+    if storage.ConfigSet.get_by_id(config_set):
+      # The config set existed once, but now location points to
+      # a nonexistent ref. It is likely to be misconfigured.
+      raise
+    msg = ('treeish was not resolved in URL "%s" => '
+           'configs for %s do not exist') % (
+              project.config_location.url, config_set)
+    storage.ImportAttempt(
+        key=storage.last_import_attempt_key(config_set),
+        success=False,
+        message=msg,
+    ).put()
+    raise NotFoundError(msg)
 
   # Adjust location
   cfg = get_gitiles_config()
@@ -332,7 +350,7 @@ def import_project(project_id):
   projects.update_import_info(
       project_id, projects.RepositoryType.GITILES, repo_url)
 
-  _import_config_set('projects/%s' % project_id, loc)
+  _import_config_set(config_set, loc)
 
 
 def import_ref(project_id, ref_name):

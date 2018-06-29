@@ -4,7 +4,10 @@
 # that can be found in the LICENSE file.
 
 import datetime
+import logging
 import os
+import sys
+import unittest
 
 from test_env import future
 import test_env
@@ -451,6 +454,24 @@ class GitilesImportTestCase(test_case.TestCase):
     with self.assertRaises(ValueError):
       gitiles_import.import_project(')))')
 
+  def test_import_project_ref_not_resolved(self):
+    self.mock(projects, 'get_project', mock.Mock())
+    projects.get_project.return_value = service_config_pb2.Project(
+        id='chromium',
+        config_location=service_config_pb2.ConfigSetLocation(
+            url='https://localhost/chromium/src/',
+            storage_type=service_config_pb2.ConfigSetLocation.GITILES,
+        ),
+    )
+
+    self.mock(
+        gitiles.Location, 'parse_resolve',
+        mock.Mock(side_effect=gitiles.TreeishResolutionError()))
+
+    err_pattern = 'treeish was not resolved'
+    with self.assertRaisesRegexp(gitiles_import.NotFoundError, err_pattern):
+      gitiles_import.import_project('chromium')
+
   def test_import_ref(self):
     self.mock(gitiles_import, '_import_config_set', mock.Mock())
     self.mock(projects, 'get_project', mock.Mock())
@@ -498,4 +519,9 @@ class GitilesImportTestCase(test_case.TestCase):
 
 
 if __name__ == '__main__':
+  if '-v' in sys.argv:
+    unittest.TestCase.maxDiff = None
+  logging.basicConfig(
+      level=logging.DEBUG if '-v' in sys.argv else logging.CRITICAL,
+      format='%(levelname)-7s %(filename)s:%(lineno)3d %(message)s')
   test_env.main()

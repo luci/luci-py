@@ -17,6 +17,10 @@ from google.appengine.ext import ndb
 from components import gerrit
 
 
+class TreeishResolutionError(Exception):
+  """Failed to resolve a treeish. See Location.parse."""
+
+
 Contribution = collections.namedtuple(
     'Contribution', ['name', 'email', 'time'])
 Commit = collections.namedtuple(
@@ -76,6 +80,10 @@ class Location(LocationTuple):
       gitiles.Location.
         treeish: if not present in the |url|, defaults to 'HEAD'.
         path: always starts with '/'. If not present in |url|, it is just '/'.
+
+    Raises:
+      TreeishResolutionError: failed to find a valid treeish in the url
+        present in treeishes.
     """
     parsed = urlparse.urlparse(url)
     path_match = RGX_URL_PATH.match(parsed.path)
@@ -105,7 +113,7 @@ class Location(LocationTuple):
       while treeish and tuple(treeish) not in treeishes:
         treeish.pop()
       if not treeish:
-        raise ValueError(
+        raise TreeishResolutionError(
             'treeish in %r could not be resolved' % '/'.join(treeish_and_path))
 
     path = treeish_and_path[len(treeish):]
@@ -130,6 +138,9 @@ class Location(LocationTuple):
     Does not support refs that start with "refs/heads/master/".
 
     May send a get_refs() request.
+
+    Raises:
+      TreeishResolutionError if url contains an invalid ref.
     """
     loc = cls.parse(url)
     if loc.path and loc.path != '/' and loc.treeish != 'refs/heads/master':

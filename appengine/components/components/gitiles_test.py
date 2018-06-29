@@ -355,7 +355,7 @@ class GitilesTestCase(test_case.TestCase):
     self.assertEqual(loc.treeish, 'refs/heads/c/d')
     self.assertEqual(loc.path, '/e')
 
-    with self.assertRaises(ValueError):
+    with self.assertRaises(gitiles.TreeishResolutionError):
       gitiles.Location.parse_resolve('http://h/p/+/a/c/b')
 
   def test_parse_resolve_master(self):
