@@ -503,7 +503,7 @@ def has_capacity(dimensions):
     task_queues.set_has_capacity(dimensions)
     return True
 
-  logging.error('HAS NO CAPACITY: %s', flat)
+  logging.warning('HAS NO CAPACITY: %s', flat)
   return False
 
 
