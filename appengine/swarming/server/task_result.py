@@ -83,10 +83,16 @@ from server import task_request
 import cipd
 
 # Amount of time after which a bot is considered dead. In short, if a bot has
-# not ping in the last 2 minutes while running a task, it is considered dead.
+# not sent an update in the last N minutes while running a task, it is
+# considered dead.
 #
 # task_runner.MAX_PACKET_INTERVAL is 30 seconds.
-BOT_PING_TOLERANCE = datetime.timedelta(seconds=2*60)
+#
+# https://crbug.com/863175 "Temporarily" increase from 2 minutes to 6 minutes,
+# as some task workload is so overwhelming on the host that the bot process
+# doesn't get CPU time for several minutes. This should be decreased once the
+# bot processes run at higher priority.
+BOT_PING_TOLERANCE = datetime.timedelta(seconds=6*60)
 
 
 class State(object):
