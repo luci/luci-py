@@ -999,8 +999,17 @@ class BotTaskUpdateHandler(_BotApiHandler):
     except Exception as e:
       logging.exception('Internal error: %s', e)
       self.abort_with_error(500, error=str(e))
-    self.send_response(
-        {'must_stop': state == task_result.State.KILLED, 'ok': True})
+    # - BOT_DIED will occur when the following conditions are true:
+    #   - The bot polled correctly, but then stopped updating for at least
+    #     task_result.BOT_PING_TOLERANCE. (It can occur if the host went to
+    #     sleep, or the OS was overwhelmed).
+    #   - /internal/cron/abort_bot_died runs, detects the bot is MIA, kills the
+    #     task.
+    #   - Bot wakes up, starts sending updates again.
+    # - KILLED is when the client uses the kill API to forcibly stop a running
+    #   task.
+    must_stop = state in (task_result.State.BOT_DIED, task_result.State.KILLED)
+    self.send_response({'must_stop': must_stop, 'ok': True})
 
 
 class BotTaskErrorHandler(_BotApiHandler):
