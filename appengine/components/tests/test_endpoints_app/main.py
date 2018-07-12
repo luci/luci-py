@@ -11,6 +11,7 @@ from protorpc import messages
 from protorpc import remote
 
 from components import auth
+from components import endpoints_webapp2
 
 
 package = 'testing_api'
@@ -44,4 +45,4 @@ class TestingServiceApi(remote.Service):
     pass
 
 
-app = endpoints.api_server([TestingServiceApi])
+app = endpoints_webapp2.api_server([TestingServiceApi])
