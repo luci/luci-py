@@ -75,8 +75,6 @@ def CommonChecks(input_api, output_api):
   ]
 
   blacklist = [
-    # TODO(crbug/848146): Re-enable.
-    r'^local_smoke_test\.py$',
     # Never run the remote_smoke_test automatically. Should instead be run after
     # uploading a server instance.
     r'^remote_smoke_test\.py$'

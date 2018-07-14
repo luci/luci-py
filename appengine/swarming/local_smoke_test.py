@@ -289,6 +289,7 @@ def gen_expected(**kwargs):
       u'pool:default',
       u'priority:100',
       u'service_account:none',
+      u'swarming.pool.template:no_config',
       u'user:joe@localhost',
     ],
     u'try_number': 1,
@@ -383,6 +384,7 @@ class Test(unittest.TestCase):
           u'pool:default',
           u'priority:100',
           u'service_account:none',
+          u'swarming.pool.template:no_config',
           u'user:joe@localhost',
         ]))
     self.assertOneTask(args, summary, {})
@@ -858,7 +860,8 @@ class Test(unittest.TestCase):
     # created_ts.
     # List of tuple(task_name, priority, task_id).
     tasks = []
-    tags = [u'pool:default', u'service_account:none', u'user:joe@localhost']
+    tags = [u'pool:default', u'service_account:none',
+            u'swarming.pool.template:no_config', u'user:joe@localhost']
     with self._make_wait_task('test_priority'):
       # This is the order of the priorities used for each task triggered. In
       # particular, below it asserts that the priority 8 tasks are run in order
@@ -1006,6 +1009,7 @@ class Test(unittest.TestCase):
           u'pool:default',
           u'priority:40',
           u'service_account:none',
+          u'swarming.pool.template:no_config',
           u'user:None',
         ],
         user=u'')
@@ -1067,6 +1071,7 @@ class Test(unittest.TestCase):
           u'pool:default',
           u'priority:40',
           u'service_account:none',
+          u'swarming.pool.template:no_config',
           u'user:None',
         ],
         user=u'')
@@ -1136,7 +1141,7 @@ class Test(unittest.TestCase):
     actual_summary, actual_files = self.client.task_collect(wait_task_id)
     tags = [
       u'pool:default', u'priority:20', u'service_account:none',
-      u'user:joe@localhost',
+      u'swarming.pool.template:no_config', u'user:joe@localhost',
     ]
     self.assertResults(
         self.gen_expected(
@@ -1201,6 +1206,10 @@ class Test(unittest.TestCase):
       if perf_stats:
         # Ignore bot_overhead, everything else should be empty.
         perf_stats.pop(u'bot_overhead', None)
+        self.assertEqual(perf_stats.get(u'isolated_download', {}).pop(
+            u'initial_number_items'), u'0')
+        self.assertEqual(perf_stats.get(u'isolated_download', {}).pop(
+            u'initial_size'), u'0')
         self.assertFalse(perf_stats.pop(u'isolated_download', None))
         self.assertFalse(perf_stats.pop(u'isolated_upload', None))
         self.assertFalse(perf_stats)
