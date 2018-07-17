@@ -186,17 +186,10 @@ Things you don't have to care about anymore:
 ## Performance expectations
 
 The current design has the following runtime parameters:
-   - Less or equal 16384 dimensions product per bot. *This is an implementation
-     detail but currently enforced*. This is equivalent to a bot with:
-     - 15 different dimensions of one item each
-     - 7 dimensions, each with 4 different values, e.g. `os: [Windows-Vista-SP2,
-       Windows-Vista-SP2-en, Windows-en](Windows,)`, with 6 other dimensions.
-     - String length *do not matter*, only the number of value.
-   - Effective pending task queue of ~1000 items. Above that, it'll become less
-     efficient. It should always aims for <10000 tasks pending. That is,
-     excluding tasks **running**. Ensure the Task expiration timestamp is set
-     accordingly. *This is an implementation detail*.
-   - 20000 bots live. That's simply the maximum we loaded tested against. In practice, it should be fine to have more.
+   - Number of task queues (different kind of task request dimensions) in the
+     1000s range.
+   - Task creation rate below 20tps (task per second).
+   - ~20000 bots live.
 
 
 ## Detailed Design
