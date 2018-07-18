@@ -85,8 +85,9 @@ class _ParsingContext(object):
     # Accumulate all characters even if they aren't allowed by the grammar.
     # In the worst case there will be extra keys in the fields dict which will
     # be ignored when the mask is applied because they don't match any legal
-    # field name. It won't cause incorrect masks to be applied. The exceptions
-    # are / and * which have special meaning. See add_field below.
+    # field name. It won't cause incorrect masks to be applied. The exception is
+    # / which has special meaning. See add_field below. Note that * has special
+    # meaning while applying the mask but not while parsing. See _apply below.
     self.accumulator.append(char)
 
   def add_field(self, i):
@@ -95,7 +96,6 @@ class _ParsingContext(object):
     Args:
       i: The index the parser is at.
     """
-    # TODO(smut): Handle * special case.
     if not self.accumulator:
       raise ParsingError(i, 'expected name')
 
@@ -139,7 +139,10 @@ def _parse(fields):
     fields: A fields partial response string.
 
   Returns:
-    A dict which can be used to mask a JSON response.
+    A dict which can be used to mask another dict.
+
+  Raises:
+    ParsingError: If fields wasn't a valid partial response string.
   """
   stack = [_ParsingContext()]
 
@@ -203,3 +206,73 @@ def _parse(fields):
     stack[-1].add_field(i)
 
   return stack[0].fields
+
+
+def _apply(response, partial):
+  """Applies the given partial response dict to the given response.
+
+  Args:
+    response: A dict to be updated in place.
+    partial: A partial response dict as returned by _parse. May be modified,
+      but will not have its masking behavior changed.
+
+  Returns:
+    The masked response.
+  """
+  for key, value in response.items():
+    pointer = None
+    if key in partial:
+      if partial[key]:
+        # If the subfield dict is non-empty, include all of *'s subfields.
+        _merge(partial.get('*', {}), partial[key])
+      pointer = partial[key]
+    elif '*' in partial:
+      pointer = partial['*']
+
+    if pointer is None:
+      response.pop(key)
+
+    elif pointer:
+      if isinstance(value, dict) and value:
+        _apply(value, pointer)
+        if not value:
+          # No subfields were kept, remove this field.
+          response.pop(key)
+
+      elif isinstance(value, list) and value:
+        new_values = []
+        for v in value:
+          # In a dict constructed from a protorpc.message.Message list elements
+          # always have the same type. Here we allow list elements to have mixed
+          # types and only recursively apply the mask to dicts.
+          if isinstance(v, dict):
+            _apply(v, pointer)
+            if v:
+              # Subfields were kept, include this element.
+              new_values.append(v)
+          else:
+            # Non-dict, include this element.
+            new_values.append(v)
+        response[key] = new_values
+        if not new_values:
+          # No elements were kept, remove this field.
+          response.pop(key)
+
+  return response
+
+
+def mask(response, fields):
+  """Applies the given fields partial response string to the given response.
+
+  Args:
+    response: A dict encoded using protorpc.protojson.ProtoJson.encode_message
+      to be updated in place.
+    fields: A fields partial response string.
+
+  Returns:
+    The masked response.
+
+  Raises:
+    ParsingError: If fields wasn't a valid partial response string.
+  """
+  return _apply(response, _parse(fields))
