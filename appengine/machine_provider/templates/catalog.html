@@ -20,7 +20,9 @@
     <td>{{macros.render_message(machine.dimensions)}}</td>
     <td>
     {{machine.state}}
-    {% if machine.lease_expiration_ts %}
+    {% if machine.leased_indefinitely %}
+      indefinitely
+    {% elif machine.lease_expiration_ts %}
       until {{machine.lease_expiration_ts}}
       {% if machine.lease_expiration_ts <= now %}
         (expired)

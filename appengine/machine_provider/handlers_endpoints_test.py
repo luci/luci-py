@@ -1434,6 +1434,28 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
         rpc_messages.LeaseRequestError.MUTUAL_EXCLUSION_ERROR,
     )
 
+  def test_lease_duration_and_indefinite(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
+    lease_request = rpc_to_json(rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=1,
+        indefinite=True,
+        request_id='abc',
+    ))
+
+    lease_response = jsonish_dict_to_rpc(
+        self.call_api('lease', lease_request).json,
+        rpc_messages.LeaseResponse,
+    )
+    self.assertEqual(
+        lease_response.error,
+        rpc_messages.LeaseRequestError.MUTUAL_EXCLUSION_ERROR,
+    )
+
   def test_lease_timestamp(self):
     def is_group_member(group):
       return group == 'machine-provider-users'
@@ -1492,6 +1514,66 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
     self.assertEqual(
         lease_response.error,
         rpc_messages.LeaseRequestError.LEASE_TOO_LONG,
+    )
+
+  def test_lease_timestamp_and_indefinite(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
+    lease_request = rpc_to_json(rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        indefinite=True,
+        lease_expiration_ts=int(utils.time_time()) + 3600,
+        request_id='abc',
+    ))
+
+    lease_response = jsonish_dict_to_rpc(
+        self.call_api('lease', lease_request).json,
+        rpc_messages.LeaseResponse,
+    )
+    self.assertEqual(
+        lease_response.error,
+        rpc_messages.LeaseRequestError.MUTUAL_EXCLUSION_ERROR,
+    )
+
+  def test_lease_indefinite(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
+    lease_request = rpc_to_json(rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        indefinite=True,
+        request_id='abc',
+    ))
+
+    lease_response = jsonish_dict_to_rpc(
+        self.call_api('lease', lease_request).json,
+        rpc_messages.LeaseResponse,
+    )
+    self.assertFalse(lease_response.error)
+
+  def test_lease_length_unspecified(self):
+    def is_group_member(group):
+      return group == 'machine-provider-users'
+    self.mock(acl.auth, 'is_group_member', is_group_member)
+    lease_request = rpc_to_json(rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        request_id='abc',
+    ))
+
+    lease_response = jsonish_dict_to_rpc(
+        self.call_api('lease', lease_request).json,
+        rpc_messages.LeaseResponse,
+    )
+    self.assertEqual(
+        lease_response.error,
+        rpc_messages.LeaseRequestError.LEASE_LENGTH_UNSPECIFIED,
     )
 
   def test_duplicate(self):

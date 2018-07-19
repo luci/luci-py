@@ -110,7 +110,9 @@ class CatalogEndpoints(remote.Service):
         policies=entry.policies,
         state=entry.state,
     )
-    if entry.lease_expiration_ts:
+    if entry.leased_indefinitely:
+      response.leased_indefinitely = True
+    elif entry.lease_expiration_ts:
       # datetime_to_timestamp returns microseconds, convert to seconds.
       response.lease_expiration_ts = utils.datetime_to_timestamp(
           entry.lease_expiration_ts) / 1000 / 1000
@@ -458,7 +460,7 @@ class MachineProviderEndpoints(remote.Service):
 
     metrics.lease_requests_received.increment()
     if request.duration:
-      if request.lease_expiration_ts:
+      if request.lease_expiration_ts or request.indefinite:
         return rpc_messages.LeaseResponse(
             client_request_id=request.request_id,
             error=rpc_messages.LeaseRequestError.MUTUAL_EXCLUSION_ERROR,
@@ -474,6 +476,11 @@ class MachineProviderEndpoints(remote.Service):
             error=rpc_messages.LeaseRequestError.LEASE_TOO_LONG,
         )
     elif request.lease_expiration_ts:
+      if request.indefinite:
+        return rpc_messages.LeaseResponse(
+            client_request_id=request.request_id,
+            error=rpc_messages.LeaseRequestError.MUTUAL_EXCLUSION_ERROR,
+        )
       if request.lease_expiration_ts <= now:
         return rpc_messages.LeaseResponse(
             client_request_id=request.request_id,
@@ -484,7 +491,7 @@ class MachineProviderEndpoints(remote.Service):
             client_request_id=request.request_id,
             error=rpc_messages.LeaseRequestError.LEASE_TOO_LONG,
         )
-    else:
+    elif not request.indefinite:
       return rpc_messages.LeaseResponse(
           client_request_id=request.request_id,
           error=rpc_messages.LeaseRequestError.LEASE_LENGTH_UNSPECIFIED,

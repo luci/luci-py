@@ -138,6 +138,9 @@ class CatalogMachineEntry(CatalogEntry):
   lease_id = ndb.StringProperty()
   # DateTime indicating lease expiration time.
   lease_expiration_ts = ndb.DateTimeProperty()
+  # Indicates whether this machine is leased indefinitely.
+  # Supersedes lease_expiration_ts.
+  leased_indefinitely = ndb.BooleanProperty()
   # rpc_messages.Policies governing this machine.
   policies = msgprop.MessageProperty(rpc_messages.Policies)
   # Determines sorted order relative to other CatalogMachineEntries.

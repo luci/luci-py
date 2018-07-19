@@ -103,21 +103,31 @@ def lease_machine(machine_key, lease):
 
   logging.info('Leasing CatalogMachineEntry:\n%s', machine)
   lease.leased_ts = utils.utcnow()
+  indefinite = False
   if lease.request.lease_expiration_ts:
     lease_expiration_ts = datetime.datetime.utcfromtimestamp(
         lease.request.lease_expiration_ts)
-  else:
+  elif lease.request.duration:
     lease_expiration_ts = lease.leased_ts + datetime.timedelta(
         seconds=lease.request.duration,
     )
+  else:
+    # Indefinite lease. Set dummy expiration date. This prevents having to
+    # create a compound index which allows querying by lease_expiration_ts
+    # and indefinite == False. To make the lease truly indefinite, when
+    # processing a lease expiration, ensure it isn't indefinite.
+    lease_expiration_ts = lease.leased_ts + datetime.timedelta(days=10000)
+    indefinite = True
   lease.machine_id = machine.key.id()
   lease.response.hostname = machine.dimensions.hostname
   # datetime_to_timestamp returns microseconds, which are too fine grain.
   lease.response.lease_expiration_ts = utils.datetime_to_timestamp(
       lease_expiration_ts) / 1000 / 1000
+  lease.response.leased_indefinitely = indefinite
   lease.response.state = rpc_messages.LeaseRequestState.FULFILLED
   machine.lease_id = lease.key.id()
   machine.lease_expiration_ts = lease_expiration_ts
+  machine.leased_indefinitely = indefinite
   machine.state = models.CatalogMachineEntryStates.LEASED
   ndb.put_multi([lease, machine])
   params = {
@@ -168,6 +178,14 @@ def reclaim_machine(machine_key, reclamation_ts):
     return
 
   logging.info('Attempting to reclaim CatalogMachineEntry:\n%s', machine)
+
+  if machine.leased_indefinitely:
+    # Extend the lease so we don't have to process this reclamation again for
+    # awhile. This avoids creating a compound datastore index.
+    logging.warning('CatalogMachineEntry leased indefinitely:\n%s', machine)
+    machine.lease_expiration_ts += datetime.timedelta(days=10000)
+    machine.put()
+    return False
 
   if machine.lease_expiration_ts is None:
     # This can reasonably happen if e.g. the lease was voluntarily given up.
@@ -258,6 +276,7 @@ def release_lease(lease_key):
   lease.response.lease_expiration_ts = utils.datetime_to_timestamp(
       now) / 1000 / 1000
   machine.lease_expiration_ts = now
+  machine.leased_indefinitely = False
   ndb.put_multi([lease, machine])
 
 
