@@ -294,6 +294,7 @@ class LeaseReleaseProcessor(webapp2.RequestHandler):
 def create_cron_app():
   return webapp2.WSGIApplication([
       ('/internal/cron/process-lease-requests', LeaseRequestProcessor),
-      ('/internal/cron/process-machine-reclamations', MachineReclamationProcessor),
+      ('/internal/cron/process-machine-reclamations',
+       MachineReclamationProcessor),
       ('/internal/cron/process-lease-releases', LeaseReleaseProcessor),
   ])

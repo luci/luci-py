@@ -419,7 +419,7 @@ class MachineProviderEndpoints(remote.Service):
         ))
       else:
         try:
-          responses.append(self._lease(request, user, request_hash))
+          responses.append(self._lease(request, request_hash))
         except (
             datastore_errors.Timeout,
             runtime.apiproxy_errors.CancelledError,
@@ -449,9 +449,9 @@ class MachineProviderEndpoints(remote.Service):
         request_hash,
         request,
     )
-    return self._lease(request, user, request_hash)
+    return self._lease(request, request_hash)
 
-  def _lease(self, request, user, request_hash):
+  def _lease(self, request, request_hash):
     """Handles an incoming LeaseRequest."""
     # Arbitrary limit. Increase if necessary.
     MAX_LEASE_DURATION = 60 * 60 * 24 * 2

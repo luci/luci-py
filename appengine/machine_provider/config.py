@@ -20,7 +20,7 @@ ConfigApi = config.ConfigApi
 
 
 @validation.self_rule(SETTINGS_CFG_FILENAME, config_pb2.SettingsCfg)
-def validate_settings(cfg, ctx):
+def validate_settings(_cfg, _ctx):
   """Validates settings.cfg file against proto message schema."""
   pass
 

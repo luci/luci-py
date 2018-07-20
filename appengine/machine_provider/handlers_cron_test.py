@@ -899,7 +899,7 @@ class LeaseReleaseProcessorTest(test_case.TestCase):
         duration=1,
         request_id='fake-id',
     )
-    key = models.LeaseRequest(
+    models.LeaseRequest(
         deduplication_checksum=
             models.LeaseRequest.compute_deduplication_checksum(request),
         key=models.LeaseRequest.generate_key(

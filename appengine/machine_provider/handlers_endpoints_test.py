@@ -592,7 +592,7 @@ class MachineTest(test_case.EndpointsTestCase):
         backend=rpc_messages.Backend.DUMMY,
         hostname='fake-host',
     )
-    machine_key = models.CatalogMachineEntry(
+    models.CatalogMachineEntry(
         key=models.CatalogMachineEntry.generate_key(dimensions),
         dimensions=dimensions,
         instruction=models.Instruction(
@@ -616,7 +616,7 @@ class MachineTest(test_case.EndpointsTestCase):
     ).put()
 
     with self.assertRaises(webtest.app.AppError):
-      response = jsonish_dict_to_rpc(
+      jsonish_dict_to_rpc(
           self.call_api('poll', request).json,
           rpc_messages.PollResponse,
       )
@@ -631,7 +631,7 @@ class MachineTest(test_case.EndpointsTestCase):
         backend=rpc_messages.Backend.DUMMY,
         hostname='fake-host',
     )
-    machine_key = models.CatalogMachineEntry(
+    models.CatalogMachineEntry(
         key=models.CatalogMachineEntry.generate_key(dimensions),
         dimensions=dimensions,
         instruction=models.Instruction(
@@ -655,7 +655,7 @@ class MachineTest(test_case.EndpointsTestCase):
     ).put()
 
     with self.assertRaises(webtest.app.AppError):
-      response = jsonish_dict_to_rpc(
+      jsonish_dict_to_rpc(
           self.call_api('poll', request).json,
           rpc_messages.PollResponse,
       )
@@ -678,7 +678,7 @@ class MachineTest(test_case.EndpointsTestCase):
     ).put()
 
     with self.assertRaises(webtest.app.AppError):
-      response = jsonish_dict_to_rpc(
+      jsonish_dict_to_rpc(
           self.call_api('poll', request).json,
           rpc_messages.PollResponse,
       )
@@ -694,7 +694,7 @@ class MachineTest(test_case.EndpointsTestCase):
         backend=rpc_messages.Backend.DUMMY,
         hostname='fake-host',
     )
-    machine_key = models.CatalogMachineEntry(
+    models.CatalogMachineEntry(
         key=models.CatalogMachineEntry.generate_key(dimensions),
         dimensions=dimensions,
         instruction=models.Instruction(
@@ -715,7 +715,7 @@ class MachineTest(test_case.EndpointsTestCase):
     ).put()
 
     with self.assertRaises(webtest.app.AppError):
-      response = jsonish_dict_to_rpc(
+      jsonish_dict_to_rpc(
           self.call_api('poll', request).json,
           rpc_messages.PollResponse,
       )
@@ -1022,7 +1022,7 @@ class MachineTest(test_case.EndpointsTestCase):
         backend=rpc_messages.Backend.DUMMY,
         hostname='fake-host',
     )
-    machine_key = models.CatalogMachineEntry(
+    models.CatalogMachineEntry(
         key=models.CatalogMachineEntry.generate_key(dimensions),
         dimensions=dimensions,
         instruction=models.Instruction(
@@ -1047,7 +1047,7 @@ class MachineTest(test_case.EndpointsTestCase):
         backend=rpc_messages.Backend.DUMMY,
         hostname='fake-host',
     )
-    machine_key = models.CatalogMachineEntry(
+    models.CatalogMachineEntry(
         key=models.CatalogMachineEntry.generate_key(dimensions),
         dimensions=dimensions,
         lease_id='fake-id',
@@ -1194,7 +1194,7 @@ class MachineProviderBatchedReleaseTest(test_case.EndpointsTestCase):
     ts = utils.utcnow()
     self.mock(utils, 'utcnow', lambda *args, **kwargs: ts)
 
-    def _release(*args, **kwargs):
+    def _release(*_args, **_kwargs):
       raise runtime.apiproxy_errors.CancelledError
     self.mock(handlers_endpoints.MachineProviderEndpoints, '_release', _release)
 
@@ -1295,7 +1295,7 @@ class MachineProviderBatchedLeaseTest(test_case.EndpointsTestCase):
     ts = utils.utcnow()
     self.mock(utils, 'utcnow', lambda *args, **kwargs: ts)
 
-    def _lease(*args, **kwargs):
+    def _lease(*_args, **_kwargs):
       raise runtime.apiproxy_errors.CancelledError
     self.mock(handlers_endpoints.MachineProviderEndpoints, '_lease', _lease)
 
@@ -1673,7 +1673,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
     request = rpc_to_json(request)
 
     with self.assertRaises(webtest.app.AppError):
-      response = jsonish_dict_to_rpc(
+      jsonish_dict_to_rpc(
           self.call_api('instruct', request).json,
           rpc_messages.MachineInstructionResponse,
       )
@@ -1806,7 +1806,7 @@ class MachineProviderInstructTest(test_case.EndpointsTestCase):
     request = rpc_to_json(request)
 
     with self.assertRaises(webtest.app.AppError):
-      response = jsonish_dict_to_rpc(
+      jsonish_dict_to_rpc(
           self.call_api('instruct', request).json,
           rpc_messages.MachineInstructionResponse,
       )
