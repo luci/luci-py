@@ -74,6 +74,8 @@ FILES = (
     'infra_libs/__init__.py',
     'infra_libs/_command_line_linux.py',
     'infra_libs/_command_line_stub.py',
+    'infra_libs/bigquery/__init__.py',
+    'infra_libs/bigquery/helper.py',
     'infra_libs/httplib2_utils.py',
     'infra_libs/ts_mon/__init__.py',
     'infra_libs/ts_mon/common/__init__.py',

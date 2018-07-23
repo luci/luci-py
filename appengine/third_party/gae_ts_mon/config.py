@@ -25,8 +25,8 @@ from google.appengine.api.app_identity import app_identity
 from google.appengine.api import runtime
 from google.appengine.ext import ndb
 
-import handlers
-import shared
+from infra_libs.ts_mon import handlers
+from infra_libs.ts_mon import shared
 from infra_libs.ts_mon.common import http_metrics
 from infra_libs.ts_mon.common import interface
 from infra_libs.ts_mon.common import metric_store

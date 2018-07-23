@@ -1,5 +1,4 @@
-third_party/
-------------
+# third_party/
 
 Third party packages used by AppEngine instances.
 

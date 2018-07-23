@@ -1,8 +1,7 @@
 Name: gae_ts_mon
 Short Name: gae_ts_mon
 URL: https://chromium.googlesource.com/infra/infra/+/master/appengine_module/gae_ts_mon/
-Version: 1.1.15
-Revision: 0b44aba87c1c6538439df6d24a409870810747ab
+Revision: 0c2b00962aec244573836a0fbb2e465e3426daa1
 License: Chromium License
 
 Description:
@@ -13,6 +12,5 @@ to roll infra_libs in infra.git first, to make sure they are at
 compatible at the version you need.
 
 Local Modifications:
-- Removed all test/ directories.
-- Copied LICENSE from the root of infra.git.
-- Updated symlinks to point to the correct places within luci-py.
+- Removed all of the following directories: protobuf/, test/, third_party/ .
+- Copied the content of the symlinks.

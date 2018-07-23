@@ -9,7 +9,7 @@ import webapp2
 
 from google.appengine.ext import ndb
 
-import shared
+from infra_libs.ts_mon import shared
 from infra_libs.ts_mon.common import interface
 
 

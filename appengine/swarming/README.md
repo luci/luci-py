@@ -87,3 +87,4 @@ You can run a swarming+isolate local setup with:
 Then run a bot with:
 
     ./tools/start_bot.py http://localhost:9050
+
