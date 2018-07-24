@@ -287,7 +287,7 @@ def gen_expected(**kwargs):
     u'state': 0x70,  # task_result.State.COMPLETED.
     u'tags': [
       u'pool:default',
-      u'priority:100',
+      u'priority:200',
       u'service_account:none',
       u'swarming.pool.template:no_config',
       u'user:joe@localhost',
@@ -382,7 +382,7 @@ class Test(unittest.TestCase):
           u'os:' + self.dimensions['os'][0],
           u'os:' + self.dimensions['os'][1],
           u'pool:default',
-          u'priority:100',
+          u'priority:200',
           u'service_account:none',
           u'swarming.pool.template:no_config',
           u'user:joe@localhost',
