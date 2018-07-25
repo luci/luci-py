@@ -145,6 +145,7 @@ class LocalApplication(object):
       cmd.extend(('--host', '0.0.0.0'))
       cmd.extend(('--admin_host', '0.0.0.0'))
       cmd.extend(('--api_host', '0.0.0.0'))
+      cmd.extend(('--enable_host_checking', 'false'))
     else:
       # The default is 'localhost' EXCEPT if environment variable
       # 'DEVSHELL_CLIENT_PORT' is set, then the default is '0.0.0.0'. Take no

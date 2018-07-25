@@ -97,7 +97,11 @@ class LocalServers(object):
 def main():
   fix_encoding.fix_encoding()
   parser = argparse.ArgumentParser(description=sys.modules[__name__].__doc__)
-  parser.add_argument('-a', '--all', action='store_true')
+  parser.add_argument(
+      '-a', '--all', action='store_true', help='allow non local connection')
+  parser.add_argument(
+      '-l', '--leak', action='store_true',
+      help='leak logs instead of deleting on shutdown')
   args = parser.parse_args()
   root = tempfile.mkdtemp(prefix='start_servers')
   try:
@@ -105,6 +109,7 @@ def main():
     dump_log = True
     try:
       servers.start()
+      print('Logs:     %s' % root)
       print('Swarming: %s' % servers.swarming_server.url)
       print('Isolate : %s' % servers.isolate_server.url)
       servers.wait()
@@ -116,7 +121,8 @@ def main():
       if dump_log:
         servers.dump_log()
   finally:
-    shutil.rmtree(root)
+    if not args.leak:
+      shutil.rmtree(root)
   return exit_code
 
 
