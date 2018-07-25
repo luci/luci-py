@@ -806,16 +806,18 @@ class SwarmingBotService(remote.Service):
     logging.debug('%s', request)
     bot_info_key = bot_management.get_info_key(request.bot_id)
     bot_info = get_or_raise(bot_info_key)  # raises 404 if there is no such bot
-    cleaned = False
     if bot_info.machine_lease:
       ml = lease_management.MachineLease.get_by_id(bot_info.machine_lease)
       if lease_management.release(ml):
+        # This calls both task_queues.cleanup_after_bot and bot_info_key.delete.
         lease_management.cleanup_bot(ml)
-        cleaned = True
-    if not cleaned:
-      # BotRoot is parent to BotInfo. It is important to note that the bot is
-      # not there anymore, so it is not a member of any task queue.
-      task_queues.cleanup_after_bot(bot_info_key.parent())
+        return swarming_rpcs.DeletedResponse(deleted=True)
+      # MP bot failed to be released. Don't delete or clean up after it.
+      return swarming_rpcs.DeletedResponse(deleted=False)
+    # Non-MP bot. Attempt to delete it normally.
+    # BotRoot is parent to BotInfo. It is important to note that the bot is
+    # not there anymore, so it is not a member of any task queue.
+    task_queues.cleanup_after_bot(bot_info_key.parent())
     bot_info_key.delete()
     return swarming_rpcs.DeletedResponse(deleted=True)
 

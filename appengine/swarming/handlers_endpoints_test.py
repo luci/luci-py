@@ -34,6 +34,7 @@ from server import bot_code
 from server import bot_management
 from server import config
 from server import large
+from server import lease_management
 from server import task_pack
 from server import task_queues
 from server import task_request
@@ -2063,6 +2064,47 @@ class BotApiTest(BaseTest):
         dimensions={u'id': [u'id1'], u'pool': [u'default']}, state=state,
         version='123456789', quarantined=False, maintenance_msg=None,
         task_id=None, task_name=None)
+
+    # delete the bot
+    response = self.call_api('delete', body={'bot_id': 'id1'})
+    self.assertEqual({u'deleted': True}, response.json)
+
+    # is it gone?
+    self.call_api('delete', body={'bot_id': 'id1'}, status=404)
+
+  def test_delete_mp_release_failed(self):
+    """Assert that if an MP bot fails to be released, the bot isn't deleted."""
+    self.set_as_admin()
+    self.mock(acl, '_is_admin', lambda *_args, **_kwargs: True)
+    self.mock(lease_management, 'release', lambda *_args, **_kwargs: False)
+    key = lease_management.MachineLease(id='lease-id', hostname='id1').put()
+    bot_management.bot_event(
+        event_type='bot_connected', bot_id='id1',
+        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
+        dimensions={u'id': [u'id1'], u'pool': [u'default']}, state={},
+        version='123456789', quarantined=False, maintenance_msg=None,
+        task_id=None, task_name=None, machine_lease=key.id())
+
+    # delete the bot
+    response = self.call_api('delete', body={'bot_id': 'id1'})
+    self.assertEqual({u'deleted': False}, response.json)
+
+    # is it still there?
+    response = self.call_api('get', body={'bot_id': 'id1'})
+    self.assertFalse(response.json[u'deleted'])
+
+  def test_delete_mp_ok(self):
+    """Assert that delete finds and deletes an MP bot."""
+    self.set_as_admin()
+    self.mock(acl, '_is_admin', lambda *_args, **_kwargs: True)
+    self.mock(lease_management, 'release', lambda *_args, **_kwargs: True)
+    key = lease_management.MachineLease(id='lease-id', hostname='id1').put()
+    bot_management.bot_event(
+        event_type='bot_connected', bot_id='id1',
+        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
+        dimensions={u'id': [u'id1'], u'pool': [u'default']}, state={},
+        version='123456789', quarantined=False, maintenance_msg=None,
+        task_id=None, task_name=None, machine_lease=key.id())
 
     # delete the bot
     response = self.call_api('delete', body={'bot_id': 'id1'})
