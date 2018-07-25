@@ -779,6 +779,7 @@ class SwarmingBotService(remote.Service):
           last_seen_ts=events[0].ts,
           lease_id=events[0].lease_id,
           lease_expiration_ts=events[0].lease_expiration_ts,
+          leased_indefinitely=events[0].leased_indefinitely,
           machine_type=events[0].machine_type,
           machine_lease=events[0].machine_lease)
       deleted = True

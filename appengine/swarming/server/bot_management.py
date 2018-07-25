@@ -62,6 +62,7 @@ import hashlib
 import logging
 
 from google.appengine import runtime
+from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
 from components import datastore_utils
@@ -119,7 +120,12 @@ class _BotCommon(ndb.Model):
   lease_id = ndb.StringProperty(indexed=False)
 
   # UTC seconds from epoch when bot will be reclaimed by Machine Provider.
+  # Only one of lease_expiration_ts and leased_indefinitely must be specified.
   lease_expiration_ts = ndb.DateTimeProperty(indexed=False)
+
+  # Whether or not the bot is leased indefinitely from Machine Provider.
+  # Only one of lease_expiration_ts and leased_indefinitely must be specified.
+  leased_indefinitely = ndb.BooleanProperty(indexed=False)
 
   # ID of the MachineType, for bots acquired from Machine Provider.
   machine_type = ndb.StringProperty(indexed=False)
@@ -151,6 +157,9 @@ class _BotCommon(ndb.Model):
   def _pre_put_hook(self):
     super(_BotCommon, self)._pre_put_hook()
     self.dimensions_flat.sort()
+    if self.lease_expiration_ts and self.leased_indefinitely:
+      raise datastore_errors.BadValueError(
+        'lease_expiration_ts and leased_indefinitely both set:\n%s' % self)
 
 
 class BotInfo(_BotCommon):
@@ -408,7 +417,11 @@ def bot_event(
   - kwargs: optional values to add to BotEvent relevant to event_type.
   - lease_id (in kwargs): ID assigned by Machine Provider for this bot.
   - lease_expiration_ts (in kwargs): UTC seconds from epoch when Machine
-        Provider lease expires.
+        Provider lease expires. Only one of lease_expiration_ts and
+        leased_indefinitely must be specified.
+  - leased_indefinitely (in kwargs): Whether or not the Machine Provider
+        lease is indefinite. Only one of lease_expiration_ts and
+        leased_indefinitely must be specified.
   - machine_type (in kwargs): ID of the lease_management.MachineType this
         Machine Provider bot was leased for.
   - machine_lease (in kwargs): ID of the lease_management.MachineType
@@ -441,7 +454,11 @@ def bot_event(
   if kwargs.get('lease_id') is not None:
     bot_info.lease_id = kwargs['lease_id']
   if kwargs.get('lease_expiration_ts') is not None:
+    assert not kwargs.get('leased_indefinitely'), bot_id
     bot_info.lease_expiration_ts = kwargs['lease_expiration_ts']
+  if kwargs.get('leased_indefinitely') is not None:
+    assert not kwargs.get('lease_expiration_ts'), bot_id
+    bot_info.leased_indefinitely = kwargs['leased_indefinitely']
   if kwargs.get('machine_type') is not None:
     bot_info.machine_type = kwargs['machine_type']
   if kwargs.get('machine_lease') is not None:

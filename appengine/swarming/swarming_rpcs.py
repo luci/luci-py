@@ -717,6 +717,7 @@ class BotInfo(messages.Message):
   deleted = messages.BooleanField(15)
   machine_type = messages.StringField(16)
   machine_lease = messages.StringField(17)
+  leased_indefinitely = messages.BooleanField(19)
 
 
 class BotList(messages.Message):

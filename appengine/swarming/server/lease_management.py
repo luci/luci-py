@@ -13,7 +13,7 @@ Swarming integration with Machine Provider
 handlers_backend.py contains a cron job which looks at each MachineType and
 ensures there are at least as many MachineLeases in the datastore which refer
 to that MachineType as the target_size in MachineType specifies by numbering
-them 0 through target_size - 1 If there are MachineType entities numbered
+them 0 through target_size - 1. If there are MachineType entities numbered
 target_size or greater which refer to that MachineType, those MachineLeases
 are marked as drained.
 
@@ -26,9 +26,6 @@ server/bot_management.py) corresponding to the machine provided for the lease.
 Include the lease ID and lease_expiration_ts as fields in the BotInfo. If it
 is expired, clear the associated lease. If there is no associated lease and
 the MachineLease is drained, delete the MachineLease entity.
-
-TODO(smut): If there is an associated request and the MachineLease is drained,
-release the lease immediately (as long as the bot is not mid-task).
 """
 
 import base64
@@ -39,6 +36,7 @@ import logging
 import math
 
 from google.appengine.api import app_identity
+from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 from google.appengine.ext.ndb import msgprop
 from protorpc.remote import protojson
@@ -82,17 +80,26 @@ class MachineLease(ndb.Model):
   # Whether or not this MachineLease should issue lease requests.
   drained = ndb.BooleanProperty(indexed=True)
   # Number of seconds ahead of lease_expiration_ts to release leases.
+  # Not specified for indefinite leases.
   early_release_secs = ndb.IntegerProperty(indexed=False)
   # Hostname of the machine currently allocated for this request.
   hostname = ndb.StringProperty()
   # DateTime indicating when the instruction to join the server was sent.
   instruction_ts = ndb.DateTimeProperty()
-  # Duration to lease for.
+  # Duration to lease for, as specified in the config.
+  # Only one of lease_duration_secs and lease_indefinitely must be specified.
   lease_duration_secs = ndb.IntegerProperty(indexed=False)
-  # DateTime indicating lease expiration time.
+  # DateTime indicating lease expiration time, as specified by Machine Provider.
+  # Only one of lease_expiration_ts and leased_indefinitely must be specified.
   lease_expiration_ts = ndb.DateTimeProperty()
   # Lease ID assigned by Machine Provider.
   lease_id = ndb.StringProperty(indexed=False)
+  # Lease indefinitely, as specified in the config.
+  # Only one of lease_duration_secs and lease_indefinitely must be specified.
+  lease_indefinitely = ndb.BooleanProperty()
+  # Leased indefinitely, as specified by Machine Provider.
+  # Only one of lease_expiration_ts and leased_indefinitely must be specified.
+  leased_indefinitely = ndb.BooleanProperty()
   # ndb.Key for the MachineType this MachineLease is created for.
   machine_type = ndb.KeyProperty()
   # machine_provider.Dimensions describing the machine.
@@ -104,6 +111,15 @@ class MachineLease(ndb.Model):
   request_id_base = ndb.StringProperty(indexed=False)
   # Task ID for the termination task scheduled for this machine.
   termination_task = ndb.StringProperty(indexed=False)
+
+  def _pre_put_hook(self):
+    super(MachineLease, self)._pre_put_hook()
+    if self.lease_duration_secs and self.lease_indefinitely:
+      raise datastore_errors.BadValueError(
+        'lease_duration_secs and lease_indefinitely both set:\n%s' % self)
+    if self.lease_expiration_ts and self.leased_indefinitely:
+      raise datastore_errors.BadValueError(
+        'lease_expiration_ts and leased_indefinitely both set:\n%s' % self)
 
 
 class MachineType(ndb.Model):
@@ -120,12 +136,22 @@ class MachineType(ndb.Model):
   # Whether or not to attempt to lease machines of this type.
   enabled = ndb.BooleanProperty(default=True)
   # Duration to lease each machine for.
+  # Only one of lease_duration_secs and lease_indefinitely must be specified.
   lease_duration_secs = ndb.IntegerProperty(indexed=False)
+  # Lease indefinitely.
+  # Only one of lease_duration_secs and lease_indefinitely must be specified.
+  lease_indefinitely = ndb.BooleanProperty(indexed=False)
   # machine_provider.Dimensions describing the machine.
   mp_dimensions = msgprop.MessageProperty(
       machine_provider.Dimensions, indexed=False)
   # Target number of machines of this type to have leased at once.
   target_size = ndb.IntegerProperty(indexed=False, required=True)
+
+  def _pre_put_hook(self):
+    super(MachineType, self)._pre_put_hook()
+    if self.lease_duration_secs and self.lease_indefinitely:
+      raise datastore_errors.BadValueError(
+        'lease_duration_secs and lease_indefinitely both set:\n%s' % self)
 
 
 class MachineTypeUtilization(ndb.Model):
@@ -158,6 +184,7 @@ def create_machine_lease(machine_lease_key, machine_type):
   yield MachineLease(
       key=machine_lease_key,
       lease_duration_secs=machine_type.lease_duration_secs,
+      lease_indefinitely=machine_type.lease_indefinitely,
       early_release_secs=machine_type.early_release_secs,
       machine_type=machine_type.key,
       mp_dimensions=machine_type.mp_dimensions,
@@ -180,7 +207,8 @@ def update_machine_lease(machine_lease_key, machine_type):
     logging.error('MachineLease not found:\nKey: %s', machine_lease_key)
     return
 
-  if machine_lease.lease_expiration_ts:
+  # See ensure_entity_exists below for why we only update leased machines.
+  if machine_lease.lease_expiration_ts or machine_lease.leased_indefinitely:
     put = False
 
     if machine_lease.early_release_secs != machine_type.early_release_secs:
@@ -189,6 +217,10 @@ def update_machine_lease(machine_lease_key, machine_type):
 
     if machine_lease.lease_duration_secs != machine_type.lease_duration_secs:
       machine_lease.lease_duration_secs = machine_type.lease_duration_secs
+      put = True
+
+    if machine_lease.lease_indefinitely != machine_type.lease_indefinitely:
+      machine_lease.lease_indefinitely = machine_type.lease_indefinitely
       put = True
 
     if machine_lease.mp_dimensions != machine_type.mp_dimensions:
@@ -217,14 +249,17 @@ def ensure_entity_exists(machine_type, n):
 
   # If there is a MachineLease, we may need to update it if the MachineType's
   # lease properties have changed. It's only safe to update it if the current
-  # lease is fulfilled (indicated by the presence of lease_expiration_ts) so
-  # the changes only go into effect for the next lease request.
-  if machine_lease.lease_expiration_ts and (
-      machine_lease.early_release_secs != machine_type.early_release_secs
-      or machine_lease.lease_duration_secs != machine_type.lease_duration_secs
-      or machine_lease.mp_dimensions != machine_type.mp_dimensions
-  ):
-    yield update_machine_lease(machine_lease_key, machine_type)
+  # lease is fulfilled (indicated by the presence of lease_expiration_ts or
+  # leased_indefinitely) so the changes only go into effect for the next lease
+  # request. This is because leasing parameters are immutable in Machine
+  # Provider.
+  if machine_lease.lease_expiration_ts or machine_lease.leased_indefinitely:
+    if (machine_lease.early_release_secs != machine_type.early_release_secs
+        or machine_lease.lease_duration_secs != machine_type.lease_duration_secs
+        or machine_lease.lease_indefinitely != machine_type.lease_indefinitely
+        or machine_lease.mp_dimensions != machine_type.mp_dimensions
+    ):
+      yield update_machine_lease(machine_lease_key, machine_type)
 
 
 def machine_type_pb2_to_entity(pb2):
@@ -242,6 +277,7 @@ def machine_type_pb2_to_entity(pb2):
       early_release_secs=pb2.early_release_secs,
       enabled=True,
       lease_duration_secs=pb2.lease_duration_secs,
+      lease_indefinitely=pb2.lease_indefinitely,
       mp_dimensions=protojson.decode_message(
           machine_provider.Dimensions,
           json.dumps(dict(pair.split(':', 1) for pair in pb2.mp_dimensions)),
@@ -511,19 +547,22 @@ def schedule_lease_management():
     # If there's no connection_ts, we're waiting on a bot so schedule the
     # management job to check on it. If there is a connection_ts, then don't
     # schedule the management job until it's time to release the machine.
-    if (not machine_lease.connection_ts
-        or machine_lease.drained
-        or machine_lease.lease_expiration_ts <= now + datetime.timedelta(
-            seconds=machine_lease.early_release_secs)):
-      if not utils.enqueue_task(
-          '/internal/taskqueue/machine-provider-manage',
-          'machine-provider-manage',
-          params={
-              'key': machine_lease.key.urlsafe(),
-          },
-      ):
-        logging.warning(
-            'Failed to enqueue task for MachineLease: %s', machine_lease.key)
+    if machine_lease.connection_ts:
+      if not machine_lease.drained:
+        if machine_lease.lease_expiration_ts > now + datetime.timedelta(
+            seconds=machine_lease.early_release_secs):
+          continue
+        if machine_lease.leased_indefinitely:
+          continue
+    if not utils.enqueue_task(
+        '/internal/taskqueue/machine-provider-manage',
+        'machine-provider-manage',
+        params={
+            'key': machine_lease.key.urlsafe(),
+        },
+    ):
+      logging.warning(
+          'Failed to enqueue task for MachineLease: %s', machine_lease.key)
 
 
 @ndb.transactional
@@ -559,6 +598,7 @@ def clear_lease_request(key, request_id):
   machine_lease.instruction_ts = None
   machine_lease.lease_expiration_ts = None
   machine_lease.lease_id = None
+  machine_lease.leased_indefinitely = None
   machine_lease.termination_task = None
   machine_lease.put()
 
@@ -630,7 +670,8 @@ def associate_termination_task(key, hostname, task_id):
 
 @ndb.transactional
 def log_lease_fulfillment(
-    key, request_id, hostname, lease_expiration_ts, lease_id):
+    key, request_id, hostname, lease_expiration_ts, leased_indefinitely,
+    lease_id):
   """Logs lease fulfillment.
 
   Args:
@@ -638,6 +679,8 @@ def log_lease_fulfillment(
     request_id: ID of the request being fulfilled.
     hostname: Hostname of the machine fulfilling the request.
     lease_expiration_ts: UTC seconds since epoch when the lease expires.
+    leased_indefinitely: Whether this lease is indefinite or not. Supersedes
+      lease_expiration_ts.
     lease_id: ID of the lease assigned by Machine Provider.
   """
   machine_lease = key.get()
@@ -654,14 +697,19 @@ def log_lease_fulfillment(
     )
     return
 
-  if (hostname == machine_lease.hostname
-      and lease_expiration_ts == machine_lease.lease_expiration_ts
-      and lease_id == machine_lease.lease_id):
-    return
+  # If we've already logged this lease fulfillment, there's nothing to do.
+  if hostname == machine_lease.hostname and lease_id == machine_lease.lease_id:
+    if lease_expiration_ts == machine_lease.lease_expiration_ts:
+      return
+    if leased_indefinitely and machine_lease.indefinite:
+      return
 
   machine_lease.hostname = hostname
-  machine_lease.lease_expiration_ts = datetime.datetime.utcfromtimestamp(
-      lease_expiration_ts)
+  if leased_indefinitely:
+    machine_lease.leased_indefinitely = True
+  else:
+    machine_lease.lease_expiration_ts = datetime.datetime.utcfromtimestamp(
+        lease_expiration_ts)
   machine_lease.lease_id = lease_id
   machine_lease.put()
 
@@ -744,7 +792,7 @@ def ensure_bot_info_exists(machine_lease):
   if not (
       bot_info
       and bot_info.lease_id
-      and bot_info.lease_expiration_ts
+      and (bot_info.lease_expiration_ts or bot_info.leased_indefinitely)
       and bot_info.machine_type
   ):
     logging.info(
@@ -767,6 +815,7 @@ def ensure_bot_info_exists(machine_lease):
         task_name=None,
         lease_id=machine_lease.lease_id,
         lease_expiration_ts=machine_lease.lease_expiration_ts,
+        leased_indefinitely=machine_lease.leased_indefinitely,
         machine_type=machine_lease.machine_type.id(),
         machine_lease=machine_lease.key.id(),
     )
@@ -776,7 +825,7 @@ def ensure_bot_info_exists(machine_lease):
     if not (
         bot_info
         and bot_info.lease_id
-        and bot_info.lease_expiration_ts
+        and (bot_info.lease_expiration_ts or bot_info.leased_indefinitely)
         and bot_info.machine_type
         and bot_info.machine_lease
     ):
@@ -1164,18 +1213,22 @@ def handle_lease_request_response(machine_lease, response):
       )
       clear_lease_request(machine_lease.key, machine_lease.client_request_id)
     else:
+      expires = response['lease_expiration_ts']
+      if response['leased_indefinitely']:
+        expires = 'never'
       logging.info(
           'Request fulfilled: %s\nRequest ID: %s\nHostname: %s\nExpires: %s',
           machine_lease.key,
           machine_lease.client_request_id,
           response['hostname'],
-          response['lease_expiration_ts'],
+          expires,
       )
       log_lease_fulfillment(
           machine_lease.key,
           machine_lease.client_request_id,
           response['hostname'],
           int(response['lease_expiration_ts']),
+          response['leased_indefinitely'],
           response['request_hash'],
       )
   elif state == machine_provider.LeaseRequestState.DENIED:
@@ -1205,6 +1258,7 @@ def manage_pending_lease_request(machine_lease):
           dimensions=machine_lease.mp_dimensions,
           # TODO(smut): Vary duration so machines don't expire all at once.
           duration=machine_lease.lease_duration_secs,
+          indefinite=machine_lease.lease_indefinitely,
           request_id=machine_lease.client_request_id,
       ),
   )
@@ -1227,7 +1281,7 @@ def manage_lease(key):
     return
 
   # Manage a leased machine.
-  if machine_lease.lease_expiration_ts:
+  if machine_lease.lease_expiration_ts or machine_lease.leased_indefinitely:
     manage_leased_machine(machine_lease)
     return
 

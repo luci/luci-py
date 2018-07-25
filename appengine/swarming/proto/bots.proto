@@ -112,11 +112,18 @@ message MachineType {
   // Human-readable description for this type of machine.
   string description = 2;
 
-  // Number of seconds ahead of lease_expiration_ts to release leases.
+  // Number of seconds ahead of lease_duration_ts to release leases.
+  //
+  // If omitted, defaults to zero. Must not be specified for indefinite leases.
   int32 early_release_secs = 3;
 
-  // Duration to lease each machine for.
-  int32 lease_duration_secs = 4;
+  oneof lease_duration {
+    // Duration to lease each machine for.
+    int32 lease_duration_secs = 4;
+
+    // Lease indefinitely.
+    bool lease_indefinitely = 8;
+  }
 
   // Machine Provider dimensions describing this machine.
   //

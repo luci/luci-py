@@ -414,6 +414,34 @@ class EnsureBotInfoExistsTest(test_case.TestCase):
     self.assertEqual(bot_info.lease_id, machine_lease.lease_id)
     self.assertEqual(
         bot_info.lease_expiration_ts, machine_lease.lease_expiration_ts)
+    self.assertTrue(bot_info.lease_expiration_ts)
+    self.assertEqual(
+        bot_info.leased_indefinitely, machine_lease.leased_indefinitely)
+    self.assertFalse(bot_info.leased_indefinitely)
+    self.assertEqual(bot_info.machine_type, machine_lease.machine_type.id())
+    self.assertEqual(bot_info.machine_lease, machine_lease.key.id())
+
+  def test_creates_indefinite(self):
+    key = lease_management.MachineLease(
+        id='machine-type-1',
+        hostname='hostname',
+        lease_id='lease-id',
+        leased_indefinitely=True,
+        machine_type=ndb.Key(lease_management.MachineType, 'machine-type'),
+    ).put()
+
+    lease_management.ensure_bot_info_exists(key.get())
+
+    machine_lease = key.get()
+    bot_info = bot_management.get_info_key(machine_lease.bot_id).get()
+    self.assertEqual(machine_lease.bot_id, machine_lease.hostname)
+    self.assertEqual(bot_info.lease_id, machine_lease.lease_id)
+    self.assertEqual(
+        bot_info.lease_expiration_ts, machine_lease.lease_expiration_ts)
+    self.assertFalse(bot_info.lease_expiration_ts)
+    self.assertEqual(
+        bot_info.leased_indefinitely, machine_lease.leased_indefinitely)
+    self.assertTrue(bot_info.leased_indefinitely)
     self.assertEqual(bot_info.machine_type, machine_lease.machine_type.id())
     self.assertEqual(bot_info.machine_lease, machine_lease.key.id())
 

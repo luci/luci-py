@@ -417,7 +417,7 @@ class BotGroupsConfigTest(test_case.TestCase):
       'bot_group #1: machine_type #0: reusing name "abc"'
     ])
 
-  def test_machine_type_lease_duration_secs_unspecified(self):
+  def test_machine_type_lease_duration_secs_and_indefinitely_unspecified(self):
     cfg = bots_pb2.BotsCfg(
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
@@ -426,7 +426,8 @@ class BotGroupsConfigTest(test_case.TestCase):
         ]),
     ])
     self.validator_test(cfg, [
-      'bot_group #0: machine_type #0: lease_duration_secs is required'
+      'bot_group #0: machine_type #0: lease_duration_secs or lease_indefinitely'
+      ' must be specified'
     ])
 
   def test_machine_type_lease_duration_secs_zero(self):
@@ -438,7 +439,21 @@ class BotGroupsConfigTest(test_case.TestCase):
         ]),
     ])
     self.validator_test(cfg, [
-      'bot_group #0: machine_type #0: lease_duration_secs is required'
+      'bot_group #0: machine_type #0: lease_duration_secs or lease_indefinitely'
+      ' must be specified'
+    ])
+
+  def test_machine_type_lease_indefinitely_false(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_indefinitely=False,
+                               mp_dimensions=['key:value'], target_size=1),
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0: lease_duration_secs or lease_indefinitely'
+      ' must be specified'
     ])
 
   def test_machine_type_lease_duration_secs_negative(self):

@@ -796,8 +796,8 @@ def _validate_machine_type(ctx, machine_type, known_machine_type_names):
     ctx.error('reusing name "%s"', machine_type.name)
     return
   known_machine_type_names.add(machine_type.name)
-  if not machine_type.lease_duration_secs:
-    ctx.error('lease_duration_secs is required')
+  if not (machine_type.lease_duration_secs or machine_type.lease_indefinitely):
+    ctx.error('lease_duration_secs or lease_indefinitely must be specified')
     return
   if machine_type.lease_duration_secs < 0:
     ctx.error('lease_duration_secs must be positive')

@@ -248,9 +248,14 @@ class _ProcessResult(object):
   quarantined_msg = None
   # Bot maintenance message (or None if the bot is not under maintenance).
   maintenance_msg = None
-  # DateTime indicating UTC time when bot will be reclaimed by Machine Provider,
-  # or None if this is not a Machine Provider bot.
+  # DateTime indicating UTC time when bot will be reclaimed by Machine Provider.
+  # If lease_expiration_ts and leased_indefinitely are both None then this is
+  # not a Machine Provider bot.
   lease_expiration_ts = None
+  # Indicates the bot is leased indefinitely from Machine Provider.
+  # If lease_expiration_ts and leased_indefinitely are both None then this is
+  # not a Machine Provider bot.
+  leased_indefinitely = None
 
   def __init__(self, **kwargs):
     for k, v in kwargs.iteritems():
@@ -294,6 +299,7 @@ class _BotBaseHandler(_BotApiHandler):
         bot_id = dimensions['id'][0]
 
     lease_expiration_ts = None
+    leased_indefinitely = None
     machine_type = None
     if bot_id:
       logging.debug('Fetching bot info and settings')
@@ -302,6 +308,7 @@ class _BotBaseHandler(_BotApiHandler):
           bot_management.get_settings_key(bot_id)])
       if bot_info:
         lease_expiration_ts = bot_info.lease_expiration_ts
+        leased_indefinitely = bot_info.leased_indefinitely
         machine_type = bot_info.machine_type
 
     # Make sure bot self-reported ID matches the authentication token. Raises
@@ -337,6 +344,7 @@ class _BotBaseHandler(_BotApiHandler):
         dimensions=dimensions,
         bot_group_cfg=bot_group_cfg,
         lease_expiration_ts=lease_expiration_ts,
+        leased_indefinitely=leased_indefinitely,
         maintenance_msg=state.get('maintenance'))
 
     # The bot may decide to "self-quarantine" itself. Accept both via
