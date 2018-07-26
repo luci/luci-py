@@ -1214,7 +1214,7 @@ def handle_lease_request_response(machine_lease, response):
       clear_lease_request(machine_lease.key, machine_lease.client_request_id)
     else:
       expires = response['lease_expiration_ts']
-      if response['leased_indefinitely']:
+      if response.get('leased_indefinitely'):
         expires = 'never'
       logging.info(
           'Request fulfilled: %s\nRequest ID: %s\nHostname: %s\nExpires: %s',
@@ -1228,7 +1228,7 @@ def handle_lease_request_response(machine_lease, response):
           machine_lease.client_request_id,
           response['hostname'],
           int(response['lease_expiration_ts']),
-          response['leased_indefinitely'],
+          response.get('leased_indefinitely'),
           response['request_hash'],
       )
   elif state == machine_provider.LeaseRequestState.DENIED:
