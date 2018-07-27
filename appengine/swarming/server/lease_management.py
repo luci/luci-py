@@ -1121,7 +1121,8 @@ def manage_leased_machine(machine_lease):
   """
   assert machine_lease.client_request_id, machine_lease.key
   assert machine_lease.hostname, machine_lease.key
-  assert machine_lease.lease_expiration_ts, machine_lease.key
+  assert (machine_lease.lease_expiration_ts
+          or machine_lease.leased_indefinitely), machine_lease.key
 
   # Handle a newly leased machine.
   if not machine_lease.bot_id:
