@@ -1080,6 +1080,95 @@ class GetTargetSize(test_case.TestCase):
         lease_management.get_target_size(config.schedule, 'mt', 1, 3), 2)
 
 
+class ScheduleLeaseManagementTest(test_case.TestCase):
+  """Tests for lease_management.schedule_lease_management."""
+
+  def test_none(self):
+    def enqueue_task(*_args, **_kwargs):
+      self.fail('enqueue_task called')
+    self.mock(utils, 'enqueue_task', enqueue_task)
+
+    lease_management.schedule_lease_management()
+
+  def test_manageable(self):
+    def enqueue_task(*_args, **kwargs):
+      self.assertTrue(kwargs.get('params', {}).get('key'))
+    self.mock(utils, 'enqueue_task', enqueue_task)
+
+    lease_management.MachineLease().put()
+    lease_management.schedule_lease_management()
+
+  def test_pending_connection(self):
+    def enqueue_task(*_args, **kwargs):
+      self.assertTrue(kwargs.get('params', {}).get('key'))
+    self.mock(utils, 'enqueue_task', enqueue_task)
+
+    key = lease_management.MachineLease(
+        client_request_id='request-id',
+    ).put()
+    lease_management.log_lease_fulfillment(
+        key, 'request-id', 'hostname', 0, True, 'lease-id')
+    lease_management.schedule_lease_management()
+
+  def test_leased(self):
+    def enqueue_task(*_args, **_kwargs):
+      self.fail('enqueue_task called')
+    self.mock(utils, 'enqueue_task', enqueue_task)
+
+    key = lease_management.MachineLease(
+        client_request_id='request-id',
+    ).put()
+    lease_expiration_ts = utils.datetime_to_timestamp(
+        utils.utcnow()) / 1000 / 1000 + 3600
+    lease_management.log_lease_fulfillment(
+        key, 'request-id', 'hostname', lease_expiration_ts, False, 'lease-id')
+    lease_management.associate_connection_ts(key, utils.utcnow())
+    lease_management.schedule_lease_management()
+
+  def test_expired(self):
+    def enqueue_task(*_args, **kwargs):
+      self.assertTrue(kwargs.get('params', {}).get('key'))
+    self.mock(utils, 'enqueue_task', enqueue_task)
+
+    key = lease_management.MachineLease(
+        client_request_id='request-id',
+        early_release_secs=3600,
+    ).put()
+    lease_expiration_ts = utils.datetime_to_timestamp(
+        utils.utcnow()) / 1000 / 1000
+    lease_management.log_lease_fulfillment(
+        key, 'request-id', 'hostname', lease_expiration_ts, False, 'lease-id')
+    lease_management.associate_connection_ts(key, utils.utcnow())
+    lease_management.schedule_lease_management()
+
+  def test_leased_indefinitely(self):
+    def enqueue_task(*_args, **_kwargs):
+      self.fail('enqueue_task called')
+    self.mock(utils, 'enqueue_task', enqueue_task)
+
+    key = lease_management.MachineLease(
+        client_request_id='request-id',
+    ).put()
+    lease_management.log_lease_fulfillment(
+        key, 'request-id', 'hostname', 0, True, 'lease-id')
+    lease_management.associate_connection_ts(key, utils.utcnow())
+    lease_management.schedule_lease_management()
+
+  def test_drained(self):
+    def enqueue_task(*_args, **kwargs):
+      self.assertTrue(kwargs.get('params', {}).get('key'))
+    self.mock(utils, 'enqueue_task', enqueue_task)
+
+    key = lease_management.MachineLease(
+        client_request_id='request-id',
+    ).put()
+    lease_management.log_lease_fulfillment(
+        key, 'request-id', 'hostname', 0, True, 'lease-id')
+    lease_management.associate_connection_ts(key, utils.utcnow())
+    lease_management.drain_entity(key)
+    lease_management.schedule_lease_management()
+
+
 if __name__ == '__main__':
   logging.basicConfig(
       level=logging.DEBUG if '-v' in sys.argv else logging.ERROR)

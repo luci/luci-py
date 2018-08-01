@@ -549,10 +549,12 @@ def schedule_lease_management():
     # schedule the management job until it's time to release the machine.
     if machine_lease.connection_ts:
       if not machine_lease.drained:
-        if machine_lease.lease_expiration_ts > now + datetime.timedelta(
-            seconds=machine_lease.early_release_secs):
-          continue
+        # lease_expiration_ts is None if leased_indefinitely, check it first.
         if machine_lease.leased_indefinitely:
+          continue
+        assert machine_lease.lease_expiration_ts, machine_lease
+        if machine_lease.lease_expiration_ts > now + datetime.timedelta(
+            seconds=machine_lease.early_release_secs or 0):
           continue
     if not utils.enqueue_task(
         '/internal/taskqueue/machine-provider-manage',
