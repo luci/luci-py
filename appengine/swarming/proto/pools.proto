@@ -47,6 +47,11 @@ message PoolsCfg {
   // When pools specify a task_template_deployment, it draws from this
   // namespace.
   repeated TaskTemplateDeployment task_template_deployment = 4;
+
+  // Defines about how to monitor bots in a pool. The pool above refer to one of
+  // the BotMonitoring message by name, which permits reusing BotMonitoring
+  // definitions.
+  repeated BotMonitoring bot_monitoring = 5;
 }
 
 
@@ -97,6 +102,9 @@ message Pool {
     // not be specified.
     TaskTemplateDeployment task_template_deployment_inline = 7;
   }
+
+  // Refer to one bot_monitoring at the file level by name.
+  string bot_monitoring = 8;
 }
 
 
@@ -309,4 +317,35 @@ message TaskTemplateDeployment {
   //   * 7500  "75% chance of picking canary"
   //   * 9999  "99.99% chance of picking canary"
   int32 canary_chance = 4;
+}
+
+
+// Defines about how to monitor bots.
+message BotMonitoring {
+  // Name is used by Pool to describe how to monitor bots in this pool.
+  string name = 1;
+  // Dimension keys to be used to bucket the bots.
+  //
+  // The algorithm for a key with multiple values is:
+  //   def simplify(values):
+  //     values = sorted(values)
+  //     return '|'.join(
+  //         v for i, v in enumerate(values)
+  //         if not any(v.startswith(value) for v in values[i+1:]))
+  //
+  // For example, if 'os' is specified and a bot has the values
+  // ['Linux', 'Ubuntu', 'Ubuntu-16.04'], the bucket value used for this bot
+  // will be 'Linux|Ubuntu-16.04'.
+  //
+  // Then whole algorithm then works for each key:
+  //   def bucket(keys, bot_dimensions):
+  //     return ';'.join(
+  //         '%s:%s' % (key, simplify(bot_dimensions.get(values, []))
+  //         for key in keys)
+  //
+  // so the end result may look like: 'os:Linux|Ubuntu-16.04;pool:Testers'.
+  //
+  // More precisely, when this is used, the other bot dimensions are ignored.
+  // 'pool' is always implicit.
+  repeated string dimension_keys = 2;
 }
