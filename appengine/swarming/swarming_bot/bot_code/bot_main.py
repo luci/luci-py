@@ -1176,11 +1176,15 @@ def _poll_server(botobj, quit_bit, last_action):
 
   if cmd == 'run':
     # Value is the manifest
-    if _run_manifest(botobj, value, start):
+    success = _run_manifest(botobj, value, start)
+    # Unconditionally clean up cache after each task. This is done *after* the
+    # task is terminated, so that:
+    # - there's no task overhead
+    # - if there's an exception while cleaning, it's not logged in the task
+    _clean_cache(botobj)
+    if success:
       # Completed a task successfully so update swarming_bot.zip if necessary.
       _update_lkgbc(botobj)
-    # Clean up cache after a task
-    _clean_cache(botobj)
     # TODO(maruel): Handle the case where quit_bit.is_set() happens here. This
     # is concerning as this means a signal (often SIGTERM) was received while
     # running the task. Make sure the host is properly restarting.

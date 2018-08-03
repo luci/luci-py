@@ -129,8 +129,6 @@ def get_isolated_args(work_dir, task_details, isolated_result,
       [
         # Switch to 'task' logical account, if it is set.
         '--switch-to-account', 'task',
-        # Cleanup has been run at bot startup in bot_main.py.
-        '--no-clean',
         # https://github.com/luci/luci-py/issues/270
         #'--use-symlinks',
         '--json', isolated_result,
