@@ -48,9 +48,9 @@ message PoolsCfg {
   // namespace.
   repeated TaskTemplateDeployment task_template_deployment = 4;
 
-  // Defines about how to monitor bots in a pool. The pool above refer to one of
-  // the BotMonitoring message by name, which permits reusing BotMonitoring
-  // definitions.
+  // Defines about how to monitor bots in a pool. Each pool above may refer to
+  // one of the BotMonitoring message by name, which permits reusing
+  // BotMonitoring definitions.
   repeated BotMonitoring bot_monitoring = 5;
 }
 
@@ -347,5 +347,5 @@ message BotMonitoring {
   //
   // More precisely, when this is used, the other bot dimensions are ignored.
   // 'pool' is always implicit.
-  repeated string dimension_keys = 2;
+  repeated string dimension_key = 2;
 }
