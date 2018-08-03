@@ -2072,6 +2072,28 @@ class BotApiTest(BaseTest):
     # is it gone?
     self.call_api('delete', body={'bot_id': 'id1'}, status=404)
 
+  def test_delete_mp_already_released(self):
+    """Assert that if an MP bot was already released, the bot is deleted."""
+    self.set_as_admin()
+    def release(*_args, **_kwargs):
+      self.fail('release called')
+    self.mock(acl, '_is_admin', lambda *_args, **_kwargs: True)
+    self.mock(lease_management, 'release', release)
+    key = lease_management.MachineLease(id='lease-id', hostname='id2').put()
+    bot_management.bot_event(
+        event_type='bot_connected', bot_id='id1',
+        external_ip='8.8.4.4', authenticated_as='bot:whitelisted-ip',
+        dimensions={u'id': [u'id1'], u'pool': [u'default']}, state={},
+        version='123456789', quarantined=False, maintenance_msg=None,
+        task_id=None, task_name=None, machine_lease=key.id())
+
+    # delete the bot
+    response = self.call_api('delete', body={'bot_id': 'id1'})
+    self.assertEqual({u'deleted': True}, response.json)
+
+    # is it gone?
+    self.call_api('delete', body={'bot_id': 'id1'}, status=404)
+
   def test_delete_mp_release_failed(self):
     """Assert that if an MP bot fails to be released, the bot isn't deleted."""
     self.set_as_admin()

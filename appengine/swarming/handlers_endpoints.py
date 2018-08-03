@@ -808,12 +808,19 @@ class SwarmingBotService(remote.Service):
     bot_info = get_or_raise(bot_info_key)  # raises 404 if there is no such bot
     if bot_info.machine_lease:
       ml = lease_management.MachineLease.get_by_id(bot_info.machine_lease)
-      if lease_management.release(ml):
-        # This calls both task_queues.cleanup_after_bot and bot_info_key.delete.
-        lease_management.cleanup_bot(ml)
-        return swarming_rpcs.DeletedResponse(deleted=True)
-      # MP bot failed to be released. Don't delete or clean up after it.
-      return swarming_rpcs.DeletedResponse(deleted=False)
+      # MachineLease entities persist, ensure it's still referring to this bot.
+      if ml.hostname == bot_info.id:
+        if lease_management.release(ml):
+          # This calls task_queues.cleanup_after_bot and bot_info_key.delete.
+          lease_management.cleanup_bot(ml)
+          return swarming_rpcs.DeletedResponse(deleted=True)
+        # MP bot failed to be released. Don't delete or clean up after it.
+        return swarming_rpcs.DeletedResponse(deleted=False)
+      else:
+        # MachineLease moved on to the next bot.
+        # Not an error. See server/lease_management.py.
+        logging.info(
+            'MachineLease doesn\'t refer to this BotInfo, skipping release')
     # Non-MP bot. Attempt to delete it normally.
     # BotRoot is parent to BotInfo. It is important to note that the bot is
     # not there anymore, so it is not a member of any task queue.
