@@ -219,7 +219,7 @@
           if (task.state === "COMPLETED") {
             if (task.failure) {
               task.state = "FAILURE";
-            } else {
+            } else if (task.state !== "RUNNING") {
               task.state = "SUCCESS";
             }
           }

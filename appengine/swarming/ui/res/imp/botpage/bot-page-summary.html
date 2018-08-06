@@ -295,7 +295,7 @@
           } else if (t.internal_failure) {
             totalStats.bot_died++;
             taskAgg[n].bot_died++;
-          } else {
+          } else if (t.state !== "RUNNING") {
             totalStats.success++;
             taskAgg[n].success++;
           }
