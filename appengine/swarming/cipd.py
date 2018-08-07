@@ -6,12 +6,12 @@
 
 import re
 
-# Regular expressions below are copied from
-# https://chromium.googlesource.com/infra/luci/luci-go/+/eb562da3/cipd/client/cipd/common/common.go
+# Regular expressions and other validation rules below are copied from
+# https://chromium.googlesource.com/infra/luci/luci-go/+/61fc2ffc/cipd/common/common.go
 
 PACKAGE_NAME_RE = re.compile(r'^([a-z0-9_\-\.]+/)*[a-z0-9_\-\.]+$')
 PACKAGE_NAME_TEMPLATE_RE = re.compile(r'^[a-z0-9_\-\.,\${}/=]+$')
-INSTANCE_ID_RE = re.compile(r'^[0-9a-f]{40}$')
+INSTANCE_ID_RE = re.compile(r'^([0-9a-f]{40})|([a-zA-Z0-9_\-]{44,})$')
 TAG_KEY_RE = re.compile(r'^[a-z0-9_\-]+$')
 REF_RE = re.compile(r'^[a-z0-9_./\-]{1,256}$')
 TAG_MAX_LEN = 400
@@ -51,7 +51,12 @@ def is_valid_tag(tag):
 
 
 def is_valid_instance_id(version):
-  """Returns True if |version| is an insance_id."""
+  """Returns True if |version| is an instance_id.
+
+  I.e. it is either a 40-char long hex strings (for legacy SHA1 ids), or
+  a sufficiently long urlsafe base64-encoded unpadded string (for newer ids, in
+  particular SHA256 ones).
+  """
   return bool(INSTANCE_ID_RE.match(version))
 
 
