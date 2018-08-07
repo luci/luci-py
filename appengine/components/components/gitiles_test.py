@@ -358,15 +358,20 @@ class GitilesTestCase(test_case.TestCase):
     with self.assertRaises(gitiles.TreeishResolutionError):
       gitiles.Location.parse_resolve('http://h/p/+/a/c/b')
 
-  def test_parse_resolve_master(self):
-    self.mock(gitiles, 'get_refs', mock.Mock(side_effect=Exception))
-    loc = gitiles.Location.parse_resolve('http://h/p/+/master/a/b')
-    self.assertEqual(loc.treeish, 'refs/heads/master')
-    self.assertEqual(loc.path, '/a/b')
+  def test_parse_resolve_head(self):
+    self.mock(gitiles, 'get_refs', mock.Mock())
+    gitiles.get_refs.return_value = {
+      'refs/heads/a/b': {},
+    }
+    loc = gitiles.Location.parse_resolve('http://h/p/+/refs/heads/a/b/c')
+    self.assertEqual(loc.treeish, 'refs/heads/a/b')
+    self.assertEqual(loc.path, '/c')
+    gitiles.get_refs.assert_called_with('h', 'p', 'refs/heads/a/')
 
-    loc = gitiles.Location.parse_resolve('http://h/p/+/refs/heads/master/a/b')
-    self.assertEqual(loc.treeish, 'refs/heads/master')
-    self.assertEqual(loc.path, '/a/b')
+    gitiles.get_refs.return_value = {}
+    with self.assertRaises(gitiles.TreeishResolutionError):
+      gitiles.Location.parse_resolve('http://h/p/+/refs/heads/x/y')
+    gitiles.get_refs.assert_called_with('h', 'p', 'refs/heads/x/')
 
   def test_location_neq(self):
     loc1 = gitiles.Location(

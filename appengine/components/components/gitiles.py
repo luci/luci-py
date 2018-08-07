@@ -113,8 +113,7 @@ class Location(LocationTuple):
       while treeish and tuple(treeish) not in treeishes:
         treeish.pop()
       if not treeish:
-        raise TreeishResolutionError(
-            'treeish in %r could not be resolved' % '/'.join(treeish_and_path))
+        raise TreeishResolutionError('could not resolve treeish in %s' % url)
 
     path = treeish_and_path[len(treeish):]
 
@@ -143,18 +142,24 @@ class Location(LocationTuple):
       TreeishResolutionError if url contains an invalid ref.
     """
     loc = cls.parse(url)
-    if loc.path and loc.path != '/' and loc.treeish != 'refs/heads/master':
-      # If true ref name contains slash, a prefix of path might be suffix of
+    if loc.path and loc.path != '/':
+      # If true ref name contains slash, a prefix of path might be a suffix of
       # ref. Try to resolve it.
-      refs = get_refs(loc.hostname, loc.project)
-      if refs:
-        treeishes = set(refs.keys())
-        for ref in refs.iterkeys():
-          for prefix in ('refs/tags/', 'refs/heads/'):
-            if ref.startswith(prefix):
-              treeishes.add(ref[len(prefix):])
-              break
-        loc = cls.parse(url, treeishes=treeishes)
+      ref_prefix = None
+      if loc.treeish.startswith('refs/'):
+        ref_prefix = loc.treeish + '/'
+      refs = get_refs(loc.hostname, loc.project, ref_prefix)
+      if not refs:
+        raise TreeishResolutionError('could not resolve treeish in %s' % url)
+
+      treeishes = set(refs.keys())
+      # Add branches and tags without a prefix.
+      for ref in refs:
+        for prefix in ('refs/tags/', 'refs/heads/'):
+          if ref.startswith(prefix):
+            treeishes.add(ref[len(prefix):])
+            break
+      loc = cls.parse(url, treeishes=treeishes)
     return loc
 
   def __str__(self):
@@ -393,18 +398,35 @@ def get_archive(*args, **kwargs):
 
 
 @ndb.tasklet
-def get_refs_async(hostname, project, **fetch_kwargs):
+def get_refs_async(hostname, project, ref_prefix=None, **fetch_kwargs):
   """Gets refs from the server.
 
   Returns:
     Dict (ref_name -> last_commit_sha), or None if repository was not found.
   """
+  ref_prefix = ref_prefix or 'refs/'
+  assert ref_prefix.startswith('refs/')
+  assert ref_prefix.endswith('/')
   _validate_args(hostname, project)
-  res = yield gerrit.fetch_json_async(
-      hostname, '%s/+refs' % urllib.quote(project), **fetch_kwargs)
+
+  path = '%s/+refs' % urllib.quote(project)
+
+  prepend_prefix = False
+  if len(ref_prefix) > len('refs/'):
+    path += ref_prefix[4:-1] # exclude "refs" prefix and "/" suffix.
+    prepend_prefix = True
+  res = yield gerrit.fetch_json_async(hostname, path, **fetch_kwargs)
   if res is None:
     raise ndb.Return(None)
-  raise ndb.Return({k: v['value'] for k, v in res.iteritems()})
+
+  ret = {}
+  for k, v in res.iteritems():
+    # if ref_prefix was specified and there is a ref matching exactly the
+    # prefix, gitiles returns full ref, not ''.
+    if prepend_prefix and k != ref_prefix[:-1]:  # -1 to exclude "/" suffix
+      k = ref_prefix + k
+    ret[k] = v['value']
+  raise ndb.Return(ret)
 
 
 def get_refs(*args, **kwargs):
