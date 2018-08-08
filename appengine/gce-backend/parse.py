@@ -127,6 +127,8 @@ def compute_template_checksum(template_cfg):
       'network_url': template_cfg.network_url,
       'project': template_cfg.project,
       'service-accounts': [],
+      'snapshot_labels': sorted(template_cfg.snapshot_labels),
+      'snapshot_name': template_cfg.snapshot_name,
       'tags': sorted(template_cfg.tags),
   }
   if template_cfg.service_accounts:
@@ -378,6 +380,8 @@ def ensure_entities_exist(template_cfg, manager_cfgs, max_concurrent=50):
         network_url=template_cfg.network_url,
         project=template_cfg.project,
         service_accounts=_load_service_accounts(template_cfg.service_accounts),
+        snapshot_labels=list(template_cfg.snapshot_labels),
+        snapshot_name=template_cfg.snapshot_name,
         tags=list(template_cfg.tags),
     )
   if ensure_instance_group_managers_active(

@@ -56,6 +56,11 @@ message InstanceTemplateConfig {
     optional bool auto_assign_external_ip = 12;
     // Minimum CPU platform.
     optional string min_cpu_platform = 13;
+    // Name of a snapshot to create a disk from for each VM.
+    optional string snapshot_name = 16;
+    // Labels identifying a snapshot to create a disk from for each VM.
+    // Each string should be formatted as "key:value".
+    repeated string snapshot_labels = 17;
   }
 
   repeated InstanceTemplate templates = 1;

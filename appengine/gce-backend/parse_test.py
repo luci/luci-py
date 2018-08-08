@@ -642,28 +642,31 @@ class EnsureEntityExists(test_case.TestCase):
                 ],
             ),
         ],
+        snapshot_labels=[
+            'key:value',
+        ],
         tags=[
           'tag',
-        ]
+        ],
     )
     manager_cfgs = [
         config_pb2.InstanceGroupManagerConfig.InstanceGroupManager(
             maximum_size=2,
             minimum_size=1,
             template_base_name='base-name',
-            zone='us-central-1a',
+            zone='us-central1-a',
         ),
         config_pb2.InstanceGroupManagerConfig.InstanceGroupManager(
             maximum_size=3,
             minimum_size=2,
             template_base_name='base-name',
-            zone='us-central-1b',
+            zone='us-central1-b',
         ),
         config_pb2.InstanceGroupManagerConfig.InstanceGroupManager(
             maximum_size=4,
             minimum_size=3,
             template_base_name='base-name',
-            zone='us-central-1c',
+            zone='us-central1-c',
         ),
     ]
     expected_instance_template_key = parse.get_instance_template_key(
@@ -711,6 +714,8 @@ class EnsureEntityExists(test_case.TestCase):
     self.assertEqual(instance_template_revision.metadata, expected_metadata)
     self.assertItemsEqual(
         instance_template_revision.service_accounts, expected_service_accounts)
+    self.assertItemsEqual(instance_template_revision.snapshot_labels,
+                          template_cfg.snapshot_labels)
     self.assertItemsEqual(instance_template_revision.tags, template_cfg.tags)
     self.assertItemsEqual(
         instance_template_revision.active, expected_active_keys)

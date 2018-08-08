@@ -116,6 +116,12 @@ class InstanceTemplateRevision(ndb.Model):
   project = ndb.StringProperty(indexed=False)
   # List of service accounts available to instances created from this template.
   service_accounts = ndb.LocalStructuredProperty(ServiceAccount, repeated=True)
+  # List of labels describing a snapshot to create a disk from for instances
+  # created from this template.
+  snapshot_labels = ndb.StringProperty(indexed=False, repeated=True)
+  # Name of a snapshot to create a disk from for instances created from this
+  # template.
+  snapshot_name = ndb.StringProperty(indexed=False)
   # Initial list of tags to apply when creating instances from this template.
   tags = ndb.StringProperty(indexed=False, repeated=True)
   # URL of the instance template created from this entity.

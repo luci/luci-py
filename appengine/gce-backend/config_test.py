@@ -291,6 +291,95 @@ class UpdateConfigTest(test_case.TestCase):
         config_pb2.SettingsCfg(mp_server='url'),
         ['mp_server must start with "https://" or "http://localhost"'])
 
+  def test_validate_metadata(self):
+    self.validator_test(config.validate_template_config,
+        config_pb2.InstanceTemplateConfig(), [])
+    self.validator_test(
+        config.validate_template_config,
+        config_pb2.InstanceTemplateConfig(templates=[
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                base_name='name',
+            ),
+        ]),
+        [])
+    self.validator_test(
+        config.validate_template_config,
+        config_pb2.InstanceTemplateConfig(templates=[
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                base_name='name',
+            ),
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                base_name='name',
+            ),
+        ]),
+        ['base_name name is not globally unique.'])
+    self.validator_test(
+        config.validate_template_config,
+        config_pb2.InstanceTemplateConfig(templates=[
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                metadata=['key'],
+            ),
+        ]),
+        ['metadata key is not in key:value form.'])
+    self.validator_test(
+        config.validate_template_config,
+        config_pb2.InstanceTemplateConfig(templates=[
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                metadata=[':'],
+            ),
+        ]),
+        ['metadata : has empty key.'])
+    self.validator_test(
+        config.validate_template_config,
+        config_pb2.InstanceTemplateConfig(templates=[
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                metadata_from_file=['key'],
+            ),
+        ]),
+        ['metadata_from_file key is not in key:value form.'])
+    self.validator_test(
+        config.validate_template_config,
+        config_pb2.InstanceTemplateConfig(templates=[
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                metadata_from_file=['key:'],
+            ),
+        ]),
+        ['metadata_from_file key: has empty value.'])
+    self.validator_test(
+        config.validate_template_config,
+        config_pb2.InstanceTemplateConfig(templates=[
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                metadata_from_file=[':value'],
+            ),
+        ]),
+        ['metadata_from_file :value has empty key.'])
+    self.validator_test(
+        config.validate_template_config,
+        config_pb2.InstanceTemplateConfig(templates=[
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                snapshot_labels=['key'],
+            ),
+        ]),
+        ['snapshot_label key is not in key:value form.'])
+    self.validator_test(
+        config.validate_template_config,
+        config_pb2.InstanceTemplateConfig(templates=[
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                snapshot_labels=[':'],
+            ),
+        ]),
+        ['snapshot_label : has empty key.'])
+    self.validator_test(
+        config.validate_template_config,
+        config_pb2.InstanceTemplateConfig(templates=[
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                metadata=['key:value', 'key:value:with:colons', 'key:'],
+                metadata_from_file=['key:value', 'key:value:with:colons'],
+                snapshot_labels=['key:value', 'key:value:with:colons', 'key:'],
+            ),
+        ]),
+        [])
+
   def test_metadata_from_file(self):
     key = "startup-script"
     content = "./cmd.sh"

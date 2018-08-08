@@ -56,11 +56,8 @@ class Configuration(datastore_utils.config.GlobalConfig):
     def _desugar_template(proto_cfg):
       for template in proto_cfg.templates:
         for value in template.metadata_from_file:
-          # Assumes value is on the form key:path
+          # Validated below. See validate_template_config.
           part = value.split(':', 1)
-          if len(part) < 2:
-            logging.error('Invalid metadata_from_file value: %s', value)
-            return proto_cfg
           _, content = config.get_self_config(part[1], None,
                   store_last_good=True)
           template.metadata.append('%s:%s' % (part[0], content))
@@ -163,6 +160,35 @@ def validate_template_config(config, context):
       valid = False
     else:
       base_names.add(template.base_name)
+    for metadata in template.metadata:
+      parts = metadata.split(':', 1)
+      if len(parts) != 2:
+        context.error('metadata %s is not in key:value form.', metadata)
+        valid = False
+      elif not parts[0]:
+        context.error('metadata %s has empty key.', metadata)
+        valid = False
+    for metadata in template.metadata_from_file:
+      parts = metadata.split(':', 1)
+      if len(parts) != 2:
+        context.error(
+            'metadata_from_file %s is not in key:value form.', metadata)
+        valid = False
+      else:
+        if not parts[0]:
+          context.error('metadata_from_file %s has empty key.', metadata)
+          valid = False
+        if not parts[1]:
+          context.error('metadata_from_file %s has empty value.', metadata)
+          valid = False
+    for label in template.snapshot_labels:
+      parts = label.split(':', 1)
+      if len(parts) != 2:
+        context.error('snapshot_label %s is not in key:value form.', label)
+        valid = False
+      elif not parts[0]:
+        context.error('snapshot_label %s has empty key.', label)
+        valid = False
   if len(base_names) > 20:
     context.error('Too many instance templates.')
     valid = False
