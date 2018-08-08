@@ -153,4 +153,3 @@ def add_entry(action, number, where):
 def generate_stats():
   """Returns the number of minutes processed."""
   return STATS_HANDLER.process_next_chunk(stats_framework.TOO_RECENT)
-

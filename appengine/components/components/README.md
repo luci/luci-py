@@ -15,6 +15,8 @@ repository.
   - [datastore_utils/](datastore_utils) is utility code to enhance NDB.
   - [ereporter2/](ereporter2) is a standalone components that sends alerts based
     on reading the server's log.
+  - [stats_framework/](stats_framework) contains structure to help generating
+    in-server statistics DB.
   - [static/](static) contains third party javascript libraries.
   - [third_party/](third_party) contains third party python libraries used by
     components, that are needed on *all* servers.

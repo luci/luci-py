@@ -15,7 +15,10 @@ from components import stats_framework
 from components import utils
 
 
-class RequestLog(object):
+## Private code.
+
+
+class _RequestLog(object):
   """Simple mock of logservice.RequestLog."""
   def __init__(self):
     self.status = 200
@@ -23,6 +26,9 @@ class RequestLog(object):
     self.end_time = None
     self.app_logs = []
     self.finished = True
+
+
+## Public code.
 
 
 def configure(test):
@@ -38,7 +44,7 @@ def configure(test):
             message=stats_framework.PREFIX + message))
 
   def _do_request(req, *args, **kwargs):
-    entry = RequestLog()
+    entry = _RequestLog()
     _request_logs.append(entry)
     response = None
     try:
@@ -50,7 +56,7 @@ def configure(test):
       entry.end_time = utils.time_time()
 
   def _yield_logs(_start_time, _end_time):
-    """Returns fake RequestLog entities.
+    """Returns fake _RequestLog entities.
 
     Ignore start_time and end_time, it's assumed the caller will filter them
     again.
@@ -74,8 +80,3 @@ def reset_timestamp(handler, timestamp):
   timestamp = datetime.datetime(*timestamp.timetuple()[:5], second=0)
   # pylint: disable=W0212
   handler._set_last_processed_time(timestamp)
-
-
-class MockMixIn:
-  def configure(self):
-    configure(self)

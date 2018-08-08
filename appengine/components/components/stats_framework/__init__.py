@@ -130,10 +130,9 @@ class StatisticsFramework(object):
         # (currently 10 minutes), it was unable to even process a single minute
         # worth of statistics.
         return None
-      else:
-        logging.warning(msg)
-        # At least something was processed, so it's fine.
-        return count
+      logging.warning(msg)
+      # At least something was processed, so it's fine.
+      return count
 
   def day_key(self, day):
     """Returns the complete entity key for a specific day stats.

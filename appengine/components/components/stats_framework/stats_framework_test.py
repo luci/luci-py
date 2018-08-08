@@ -9,6 +9,8 @@ import sys
 import time
 import unittest
 
+# pylint: disable=no-self-argument,relative-import,ungrouped-imports
+# pylint: disable=wrong-import-position
 from test_support import test_env
 test_env.setup_test_env()
 
@@ -21,8 +23,6 @@ from components import stats_framework
 from components import utils
 from test_support import stats_framework_mock
 from test_support import test_case
-
-# pylint: disable=W0212
 
 
 class InnerSnapshot(ndb.Model):
@@ -67,7 +67,7 @@ def strip_seconds(timestamp):
   return datetime.datetime(*timestamp.timetuple()[:5], second=0)
 
 
-class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
+class StatsFrameworkTest(test_case.TestCase):
   def test_empty(self):
     handler = stats_framework.StatisticsFramework(
         'test_framework', Snapshot, self.fail)
@@ -314,14 +314,13 @@ def generate_snapshot(start_time, end_time):
   return values
 
 
-class StatsFrameworkLogTest(test_case.TestCase, stats_framework_mock.MockMixIn):
+class StatsFrameworkLogTest(test_case.TestCase):
   def setUp(self):
     super(StatsFrameworkLogTest, self).setUp()
     stats_framework_mock.configure(self)
     self.h = stats_framework.StatisticsFramework(
         'test_framework', Snapshot, generate_snapshot)
 
-    # pylint: disable=E0213
     class GenerateHandler(webapp2.RequestHandler):
       def get(self2):
         stats_framework.add_entry('Hello')

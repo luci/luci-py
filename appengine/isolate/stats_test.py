@@ -57,7 +57,7 @@ def to_str(now, delta):
   return unicode(now.strftime(stats.utils.DATETIME_FORMAT))
 
 
-class StatsTest(test_case.TestCase, stats_framework_mock.MockMixIn):
+class StatsTest(test_case.TestCase):
   def setUp(self):
     super(StatsTest, self).setUp()
     fake_routes = [

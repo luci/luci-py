@@ -24,7 +24,7 @@ import stats
 import template
 from components import auth
 from components import stats_framework
-from components import stats_framework_gviz
+from components.stats_framework import stats_gviz
 from components import utils
 from gviz import gviz_api
 
@@ -320,7 +320,7 @@ class StatsHandler(webapp2.RequestHandler):
     duration = utils.get_request_as_int(self.request, 'duration', 120, 1, 1000)
 
     description = _GVIZ_DESCRIPTION.copy()
-    description.update(stats_framework_gviz.get_description_key(resolution))
+    description.update(stats_gviz.get_description_key(resolution))
     table = stats_framework.get_stats(
         stats.STATS_HANDLER, resolution, None, duration, True)
     params = {
@@ -338,10 +338,9 @@ class StatsGvizHandlerBase(webapp2.RequestHandler):
 
   def get(self):
     description = _GVIZ_DESCRIPTION.copy()
-    description.update(
-        stats_framework_gviz.get_description_key(self.RESOLUTION))
+    description.update(stats_gviz.get_description_key(self.RESOLUTION))
     try:
-      stats_framework_gviz.get_json(
+      stats_gviz.get_json(
           self.request,
           self.response,
           stats.STATS_HANDLER,
