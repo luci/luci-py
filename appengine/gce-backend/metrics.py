@@ -38,7 +38,8 @@ GLOBAL_METRICS = {
     'instances': gae_ts_mon.GaugeMetric(
         'machine_provider/gce_backend/instances',
         'Current count of the number of instances.',
-        [gae_ts_mon.StringField('instance_template')]
+        [gae_ts_mon.StringField('instance_template'),
+         gae_ts_mon.BooleanField('drained')]
     ),
 }
 
@@ -59,29 +60,40 @@ instance_deletion_time = gae_ts_mon.CumulativeDistributionMetric(
 
 
 def compute_global_metrics(): # pragma: no cover
-  for name, counts in config.count_instances().iteritems():
-    logging.info('%s min: %s', name, counts[0])
+  for name, (minimum, maximum) in config.count_instances().iteritems():
+    logging.info('%s min: %s', name, minimum)
     GLOBAL_METRICS['config_min_instances'].set(
-        counts[0],
+        minimum,
         fields={
             'instance_template': name,
         },
         target_fields=GLOBAL_TARGET_FIELDS,
     )
-    logging.info('%s max: %s', name, counts[1])
+    logging.info('%s max: %s', name, maximum)
     GLOBAL_METRICS['config_max_instances'].set(
-        counts[1],
+        maximum,
         fields={
             'instance_template': name,
         },
         target_fields=GLOBAL_TARGET_FIELDS,
     )
 
-  for name, count in instance_group_managers.count_instances().iteritems():
-    logging.info('%s: %s', name, count)
+  counts = instance_group_managers.count_instances()
+  for name, (active, drained) in counts.iteritems():
+    logging.info('%s active: %s', name, active)
     GLOBAL_METRICS['instances'].set(
-        count,
+        active,
         fields={
+            'drained': False,
+            'instance_template': name,
+        },
+        target_fields=GLOBAL_TARGET_FIELDS,
+    )
+    logging.info('%s drained: %s', name, drained)
+    GLOBAL_METRICS['instances'].set(
+        drained,
+        fields={
+            'drained': True,
             'instance_template': name,
         },
         target_fields=GLOBAL_TARGET_FIELDS,

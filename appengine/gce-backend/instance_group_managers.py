@@ -403,12 +403,15 @@ def count_instances():
   """Counts the number of instances owned by each instance template.
 
   Returns:
-    A dict mapping instance template name to count of instances.
+    A dict mapping instance template name to a two element list with counts of
+    [active, drained] instances.
   """
   # Aggregate the number of instances owned by each instance group manager
   # created for each instance template.
-  totals = collections.defaultdict(int)
-  for instance_group_manager in models.InstanceGroupManager.query():
-    instance_template_name = instance_group_manager.key.parent().parent().id()
-    totals[instance_template_name] += len(instance_group_manager.instances)
+  totals = collections.defaultdict(lambda: [0, 0])
+  drained = set(get_drained_instance_group_managers())
+  for igm in models.InstanceGroupManager.query():
+    # Get the name of the instance template these instances belong to.
+    name = igm.key.parent().parent().id()
+    totals[name][int(igm.key in drained)] += len(igm.instances)
   return totals

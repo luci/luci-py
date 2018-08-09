@@ -34,7 +34,7 @@ class CountInstancesTest(test_case.TestCase):
             'zone',
         ),
     ).put()
-    expected = {'base-name': 0}
+    expected = {'base-name': [0, 0]}
 
     actual = instance_group_managers.count_instances()
     self.assertEqual(actual, expected)
@@ -51,12 +51,36 @@ class CountInstancesTest(test_case.TestCase):
             ndb.Key(models.Instance, 'fake-key-2'),
         ],
     ).put()
-    expected = {'base-name': 2}
+    expected = {'base-name': [2, 0]}
 
     actual = instance_group_managers.count_instances()
     self.assertEqual(actual, expected)
 
-  def test_several_instance_group_manager(self):
+  def test_one_instance_group_manager_drained(self):
+    key = models.InstanceGroupManager(
+        key=instance_group_managers.get_instance_group_manager_key(
+            'base-name',
+            'revision',
+            'zone',
+        ),
+        instances=[
+            ndb.Key(models.Instance, 'fake-key-1'),
+            ndb.Key(models.Instance, 'fake-key-2'),
+        ],
+    ).put()
+    def get_drained_instance_group_managers(*_args, **_kwargs):
+      return [key]
+    self.mock(
+        instance_group_managers,
+        'get_drained_instance_group_managers',
+        get_drained_instance_group_managers,
+    )
+    expected = {'base-name': [0, 2]}
+
+    actual = instance_group_managers.count_instances()
+    self.assertEqual(actual, expected)
+
+  def test_several_instance_group_managers(self):
     models.InstanceGroupManager(
         key=instance_group_managers.get_instance_group_manager_key(
             'base-name-1',
@@ -68,7 +92,7 @@ class CountInstancesTest(test_case.TestCase):
             ndb.Key(models.Instance, 'fake-key-2'),
         ],
     ).put()
-    models.InstanceGroupManager(
+    key = models.InstanceGroupManager(
         key=instance_group_managers.get_instance_group_manager_key(
             'base-name-1',
             'revision',
@@ -95,7 +119,15 @@ class CountInstancesTest(test_case.TestCase):
             'zone',
         ),
     ).put()
-    expected = {'base-name-1': 3, 'base-name-2': 1, 'base-name-3': 0}
+    def get_drained_instance_group_managers(*_args, **_kwargs):
+      return [key]
+    self.mock(
+        instance_group_managers,
+        'get_drained_instance_group_managers',
+        get_drained_instance_group_managers,
+    )
+    expected = {
+        'base-name-1': [2, 1], 'base-name-2': [1, 0], 'base-name-3': [0, 0]}
 
     actual = instance_group_managers.count_instances()
     self.assertEqual(actual, expected)
