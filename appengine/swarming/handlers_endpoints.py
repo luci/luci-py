@@ -390,6 +390,11 @@ TasksRequest = endpoints.ResourceContainer(
     include_performance_stats=messages.BooleanField(8, default=False))
 
 
+TaskStatesRequest = endpoints.ResourceContainer(
+    message_types.VoidMessage,
+    task_id=messages.StringField(1, repeated=True))
+
+
 TasksCountRequest = endpoints.ResourceContainer(
     message_types.VoidMessage,
     end=messages.FloatField(3),
@@ -493,10 +498,10 @@ class SwarmingTasksService(remote.Service):
       http_method='GET')
   @auth.require(acl.can_view_all_tasks)
   def list(self, request):
-    """Returns tasks results based on the filters.
+    """Returns full task results based on the filters.
 
     This endpoint is significantly slower than 'count'. Use 'count' when
-    possible.
+    possible. If you just want the state of tasks, use 'get_states'.
     """
     # TODO(maruel): Rename 'list' to 'results'.
     # TODO(maruel): Rename 'TaskList' to 'TaskResults'.
@@ -524,6 +529,40 @@ class SwarmingTasksService(remote.Service):
           for i in items
         ],
         now=now)
+
+  @gae_ts_mon.instrument_endpoint()
+  @auth.endpoints_method(
+      TaskStatesRequest, swarming_rpcs.TaskStates,
+      http_method='GET')
+  # TODO(martiniss): users should be able to view their state. This requires
+  # looking up each TaskRequest.
+  @auth.require(acl.can_view_all_tasks)
+  def get_states(self, request):
+    """Returns task state for a specific set of tasks.
+    """
+    logging.debug('%s', request)
+    result_keys = [_to_keys(task_id)[1] for task_id in request.task_id]
+
+    # Hot path. Fetch everything we can from memcache.
+    entities = ndb.get_multi(
+        result_keys, use_cache=True, use_memcache=True, use_datastore=False)
+    states = [t.state if t else task_result.State.PENDING for t in entities]
+    # Now fetch both the ones in non-stable state or not in memcache.
+    missing_keys = [
+      result_keys[i] for i, state in enumerate(states)
+      if state in task_result.State.STATES_RUNNING
+    ]
+    if missing_keys:
+      more = ndb.get_multi(
+          missing_keys, use_cache=False, use_memcache=False, use_datastore=True)
+      # This relies on missing_keys being in the same order as states (for
+      # common elements).
+      for i, s in enumerate(states):
+        if s in task_result.State.STATES_RUNNING:
+          states[i] = more.pop(0).state
+
+    return swarming_rpcs.TaskStates(
+        states=[swarming_rpcs.TaskState(state) for state in states])
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(

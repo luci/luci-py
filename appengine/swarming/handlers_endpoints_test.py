@@ -908,6 +908,39 @@ class TasksApiTest(BaseTest):
         state=swarming_rpcs.TaskStateQuery.COMPLETED_SUCCESS)
     self.call_api('list', body=message_to_dict(request), status=400)
 
+  def test_get_state_ok(self):
+    """Asserts that get_states requests return correct state."""
+    # Create two tasks, one COMPLETED, one PENDING
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.set_as_bot()
+    self.bot_poll()
+    self.set_as_user()
+    # first request
+    _, first_id = self.client_create_task_raw(
+        name='first',
+        tags=['project:yay', 'commit:post'],
+        properties=dict(idempotent=True))
+    self.set_as_bot()
+    self.bot_run_task()
+
+    # second request
+    self.set_as_user()
+    self.mock(random, 'getrandbits', lambda _: 0x66)
+    self.mock_now(self.now, 60)
+    _, second_id = self.client_create_task_raw(
+        name='second',
+        user='jack@localhost',
+        tags=['project:yay', 'commit:pre'])
+
+    self.set_as_privileged_user()
+
+    # Basic request.
+    request = handlers_endpoints.TaskStatesRequest.combined_message_class(
+        task_id=[first_id, second_id])
+    expected = {u'states': ['COMPLETED', 'PENDING']}
+    actual = self.call_api('get_states', body=message_to_dict(request)).json
+    self.assertEqual(expected, actual)
+
   def test_count_indexes(self):
     # Asserts that no combination crashes.
     _, _, now_120, start, end = self._gen_two_tasks()

@@ -636,6 +636,11 @@ class TaskResult(messages.Message):
   current_task_slice = messages.IntegerField(29)
 
 
+class TaskStates(messages.Message):
+  """Only holds states. Used in the 'get_states' RPC."""
+  states = messages.EnumField(TaskState, 1, repeated=True)
+
+
 class TaskList(messages.Message):
   """Wraps a list of TaskResult."""
   # TODO(maruel): Rename to TaskResults.
