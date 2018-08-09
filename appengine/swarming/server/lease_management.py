@@ -1140,14 +1140,15 @@ def manage_leased_machine(machine_lease):
     check_for_connection(machine_lease)
 
   # Handle an expired lease.
-  if machine_lease.lease_expiration_ts <= utils.utcnow():
-    logging.info(
-        'MachineLease expired:\nKey: %s\nHostname: %s',
-        machine_lease.key,
-        machine_lease.hostname,
-    )
-    cleanup_bot(machine_lease)
-    return
+  if not machine_lease.leased_indefinitely:
+    if machine_lease.lease_expiration_ts <= utils.utcnow():
+      logging.info(
+          'MachineLease expired:\nKey: %s\nHostname: %s',
+          machine_lease.key,
+          machine_lease.hostname,
+      )
+      cleanup_bot(machine_lease)
+      return
 
   # Handle an active lease with a termination task scheduled.
   # TODO(smut): Check if the bot got terminated by some other termination task.

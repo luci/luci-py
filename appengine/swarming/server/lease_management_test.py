@@ -1080,6 +1080,71 @@ class GetTargetSize(test_case.TestCase):
         lease_management.get_target_size(config.schedule, 'mt', 1, 3), 2)
 
 
+class ManageLeasedMachineTest(test_case.TestCase):
+  """Tests for lease_management.manage_leased_machine."""
+
+  def test_creates_bot_id_and_sends_connection_instruction(self):
+    def send_connection_instruction(machine_lease):
+      self.assertTrue(machine_lease)
+    self.mock(lease_management, 'send_connection_instruction',
+              send_connection_instruction)
+    key = lease_management.MachineLease(
+        id='machine-lease',
+        client_request_id='request-id',
+        hostname='hostname',
+        lease_id='lease-id',
+        leased_indefinitely=True,
+        machine_type=lease_management.MachineType(
+            id='machine-type',
+            target_size=1,
+        ).put(),
+    ).put()
+    lease_management.manage_leased_machine(key.get())
+    self.assertTrue(key.get().bot_id)
+    self.assertEquals(key.get().bot_id, key.get().hostname)
+
+  def test_checks_for_connection(self):
+    def check_for_connection(machine_lease):
+      self.assertTrue(machine_lease)
+    def cleanup_bot(*_args, **_kwargs):
+      self.fail('cleanup_bot called')
+    self.mock(lease_management, 'check_for_connection', check_for_connection)
+    self.mock(lease_management, 'cleanup_bot', cleanup_bot)
+    key = lease_management.MachineLease(
+        id='machine-lease',
+        bot_id='hostname',
+        client_request_id='request-id',
+        hostname='hostname',
+        instruction_ts=utils.utcnow(),
+        lease_id='lease-id',
+        leased_indefinitely=True,
+        machine_type=lease_management.MachineType(
+            id='machine-type',
+            target_size=1,
+        ).put(),
+    ).put()
+    lease_management.manage_leased_machine(key.get())
+    self.assertTrue(key.get().client_request_id)
+
+  def test_cleans_up_bot(self):
+    key = lease_management.MachineLease(
+        id='machine-lease',
+        bot_id='hostname',
+        client_request_id='request-id',
+        connection_ts=utils.utcnow(),
+        hostname='hostname',
+        instruction_ts=utils.utcnow(),
+        lease_expiration_ts=utils.utcnow(),
+        lease_id='lease-id',
+        machine_type=lease_management.MachineType(
+            id='machine-type',
+            target_size=1,
+        ).put(),
+    ).put()
+    lease_management.manage_leased_machine(key.get())
+    self.assertFalse(key.get().client_request_id)
+
+
 class ScheduleLeaseManagementTest(test_case.TestCase):
   """Tests for lease_management.schedule_lease_management."""
 
