@@ -145,19 +145,49 @@ def lease_machine(machine_key, lease):
   return True
 
 
+@ndb.transactional
+def deny_lease(lease_key, cutoff_ts):
+  """Denies the given lease request if it's had no activity since the cutoff.
+
+  Args:
+    lease_key: ndb.Key for a models.LeaseRequest instance.
+    cutoff_ts: datetime.datetime instance indicating the cutoff time.
+  """
+  lease = lease_key.get()
+  if lease.response.state != rpc_messages.LeaseRequestState.UNTRIAGED:
+    logging.warning('LeaseRequest no longer untriaged:\n%s', lease)
+    return
+  if lease.last_modified_ts >= cutoff_ts:
+    logging.warning('LeaseRequest modified after cutoff:\n%s', lease)
+    return
+  logging.info('Denying lease request with no activity:\n%s', lease)
+  lease.response.state = rpc_messages.LeaseRequestState.DENIED
+  lease.put()
+
+
 class LeaseRequestProcessor(webapp2.RequestHandler):
   """Worker for processing lease requests."""
 
   @decorators.require_cronjob
   def get(self):
+    # The cutoff should be small enough to provide a quick answer to whether or
+    # not a lease request can be fulfilled, but not so small that the request
+    # gets denied while machines which could have fulfilled the request were
+    # still being provisioned by one of the backend services. Adjust if needed.
+    now = utils.utcnow()
+    cutoff = now - datetime.timedelta(hours=4)
+
     for lease in models.LeaseRequest.query_untriaged():
       filters = get_dimension_filters(lease.request)
       for machine_key in models.CatalogMachineEntry.query_available(*filters):
         if lease_machine(machine_key, lease):
           metrics.lease_requests_fulfilled.increment()
           metrics.lease_requests_fulfilled_time.add(
-              (utils.utcnow() - lease.created_ts).total_seconds())
+              (now - lease.created_ts).total_seconds())
           break
+      else:
+        if lease.last_modified_ts < cutoff:
+          deny_lease(lease.key, cutoff)
 
 
 @ndb.transactional(xg=True)

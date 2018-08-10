@@ -449,6 +449,40 @@ class LeaseRequestProcessorTest(test_case.TestCase):
     )
     self.assertTrue(key.get().response.leased_indefinitely)
 
+  def test_one_request_inactive(self):
+    now = utils.utcnow()
+    def utcnow():
+      return now + datetime.timedelta(days=10)
+    self.mock(handlers_cron.utils, 'utcnow', utcnow)
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        indefinite=True,
+        request_id='fake-id',
+    )
+    key = models.LeaseRequest(
+        deduplication_checksum=
+          models.LeaseRequest.compute_deduplication_checksum(request),
+        key=models.LeaseRequest.generate_key(
+            auth_testing.DEFAULT_MOCKED_IDENTITY.to_bytes(),
+            request,
+        ),
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=request,
+        response=rpc_messages.LeaseResponse(
+            client_request_id='fake-id',
+            state=rpc_messages.LeaseRequestState.UNTRIAGED,
+        ),
+    ).put()
+
+    self.app.get(
+        '/internal/cron/process-lease-requests',
+        headers={'X-AppEngine-Cron': 'true'},
+    )
+    self.assertEqual(
+        key.get().response.state, rpc_messages.LeaseRequestState.DENIED)
+
 
 class MachineReclamationProcessorTest(test_case.TestCase):
   """Tests for handlers_cron.MachineReclamationProcessor."""
