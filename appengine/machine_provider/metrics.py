@@ -4,7 +4,32 @@
 
 """Metrics to track with ts_mon and event_mon."""
 
+import logging
+
+from components.machine_provider import rpc_messages
+
 import gae_ts_mon
+import models
+
+
+# Overrides to create app-global metrics.
+GLOBAL_TARGET_FIELDS = {
+  # Name of the module reporting the metric.
+  'job_name': '',
+  # Version of the app reporting the metric.
+  'hostname': '',
+  # ID of the instance reporting the metric.
+  'task_num': 0,
+}
+
+
+GLOBAL_METRICS = {
+    'lease_requests_untriaged': gae_ts_mon.GaugeMetric(
+        'machine_provider/lease_requests/untriaged',
+        'Number of untriaged lease requests.',
+        None,
+    ),
+}
 
 
 lease_requests_deduped = gae_ts_mon.CounterMetric(
@@ -48,3 +73,18 @@ pubsub_messages_sent = gae_ts_mon.CounterMetric(
     'Number of Pub/Sub messages sent.',
     [gae_ts_mon.StringField('target')],
 )
+
+
+def compute_global_metrics(): # pragma: no cover
+  count = models.LeaseRequest.query(
+      models.LeaseRequest.response.state==
+          rpc_messages.LeaseRequestState.UNTRIAGED).count()
+  logging.info('Untriaged lease requests: %d', count)
+  GLOBAL_METRICS['lease_requests_untriaged'].set(
+      count, target_fields=GLOBAL_TARGET_FIELDS)
+
+
+def initialize(): # pragma: no cover
+  gae_ts_mon.register_global_metrics(GLOBAL_METRICS.values())
+  gae_ts_mon.register_global_metrics_callback(
+      'callback', compute_global_metrics)
