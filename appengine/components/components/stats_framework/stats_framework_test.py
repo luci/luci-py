@@ -20,9 +20,13 @@ import webapp2
 import webtest
 
 from components import stats_framework
+from components.stats_framework import stats_logs
 from components import utils
-from test_support import stats_framework_mock
+from test_support import stats_framework_logs_mock
 from test_support import test_case
+
+
+# TODO(maruel): Split stats_logs specific test into a separate unit test.
 
 
 class InnerSnapshot(ndb.Model):
@@ -301,13 +305,12 @@ class StatsFrameworkTest(test_case.TestCase):
 
   def test_yield_empty(self):
     self.testbed.init_modules_stub()
-    self.assertEqual(
-        0, len(list(stats_framework.yield_entries(None, None))))
+    self.assertEqual(0, len(list(stats_logs.yield_entries(None, None))))
 
 
 def generate_snapshot(start_time, end_time):
   values = Snapshot()
-  for entry in stats_framework.yield_entries(start_time, end_time):
+  for entry in stats_logs.yield_entries(start_time, end_time):
     values.requests += 1
     for l in entry.entries:
       values.inner.c += l
@@ -317,13 +320,13 @@ def generate_snapshot(start_time, end_time):
 class StatsFrameworkLogTest(test_case.TestCase):
   def setUp(self):
     super(StatsFrameworkLogTest, self).setUp()
-    stats_framework_mock.configure(self)
+    stats_framework_logs_mock.configure(self)
     self.h = stats_framework.StatisticsFramework(
         'test_framework', Snapshot, generate_snapshot)
 
     class GenerateHandler(webapp2.RequestHandler):
       def get(self2):
-        stats_framework.add_entry('Hello')
+        stats_logs.add_entry('Hello')
         self2.response.write('Yay')
 
     class JsonHandler(webapp2.RequestHandler):
@@ -348,38 +351,33 @@ class StatsFrameworkLogTest(test_case.TestCase):
     self.mock_now(self.now, 0)
 
   def test_yield_entries(self):
-    stats_framework_mock.reset_timestamp(self.h, self.now)
+    stats_framework_logs_mock.reset_timestamp(self.h, self.now)
 
-    self.assertEqual(
-        0, len(list(stats_framework.yield_entries(None, None))))
-    self.assertEqual(
-        0, len(list(stats_framework.yield_entries(1, time.time()))))
+    self.assertEqual(0, len(list(stats_logs.yield_entries(None, None))))
+    self.assertEqual(0, len(list(stats_logs.yield_entries(1, time.time()))))
 
     self.assertEqual('Yay', self.app.get('/generate').body)
 
+    self.assertEqual(1, len(list(stats_logs.yield_entries(None, None))))
+    self.assertEqual(1, len(list(stats_logs.yield_entries(1, time.time()))))
     self.assertEqual(
-        1, len(list(stats_framework.yield_entries(None, None))))
-    self.assertEqual(
-        1, len(list(stats_framework.yield_entries(1, time.time()))))
-    self.assertEqual(
-        0, len(list(stats_framework.yield_entries(
-          None, utils.time_time()))))
+        0, len(list(stats_logs.yield_entries(None, utils.time_time()))))
 
   def test_json_empty_days(self):
-    stats_framework_mock.reset_timestamp(self.h, self.now)
+    stats_framework_logs_mock.reset_timestamp(self.h, self.now)
     self.assertEqual([], self.app.get('/json?resolution=days&duration=9').json)
 
   def test_json_empty_hours(self):
-    stats_framework_mock.reset_timestamp(self.h, self.now)
+    stats_framework_logs_mock.reset_timestamp(self.h, self.now)
     self.assertEqual([], self.app.get('/json?resolution=hours&duration=9').json)
 
   def test_json_empty_minutes(self):
-    stats_framework_mock.reset_timestamp(self.h, self.now)
+    stats_framework_logs_mock.reset_timestamp(self.h, self.now)
     self.assertEqual(
         [], self.app.get('/json?resolution=minutes&duration=9').json)
 
   def test_json_empty_processed_days(self):
-    stats_framework_mock.reset_timestamp(self.h, self.now)
+    stats_framework_logs_mock.reset_timestamp(self.h, self.now)
     self.h.process_next_chunk(0)
     expected = [
       {
@@ -394,7 +392,7 @@ class StatsFrameworkLogTest(test_case.TestCase):
         expected, self.app.get('/json?resolution=days&duration=9').json)
 
   def test_json_empty_processed_hours(self):
-    stats_framework_mock.reset_timestamp(self.h, self.now)
+    stats_framework_logs_mock.reset_timestamp(self.h, self.now)
     self.h.process_next_chunk(0)
     expected = [
       {
@@ -416,7 +414,7 @@ class StatsFrameworkLogTest(test_case.TestCase):
         expected, self.app.get('/json?resolution=hours&duration=9').json)
 
   def test_json_empty_processed_minutes(self):
-    stats_framework_mock.reset_timestamp(self.h, self.now)
+    stats_framework_logs_mock.reset_timestamp(self.h, self.now)
     self.h.process_next_chunk(0)
     expected = [
       {
@@ -494,7 +492,7 @@ class StatsFrameworkLogTest(test_case.TestCase):
         expected, self.app.get('/json?resolution=minutes&duration=11').json)
 
   def test_json_empty_processed_minutes_limited(self):
-    stats_framework_mock.reset_timestamp(self.h, self.now)
+    stats_framework_logs_mock.reset_timestamp(self.h, self.now)
     self.h.process_next_chunk(0)
     expected = [
       {
@@ -523,7 +521,7 @@ class StatsFrameworkLogTest(test_case.TestCase):
         expected, self.app.get('/json?resolution=minutes&duration=3').json)
 
   def test_json_two_days(self):
-    stats_framework_mock.reset_timestamp(self.h, self.now)
+    stats_framework_logs_mock.reset_timestamp(self.h, self.now)
     self.assertEqual('Yay', self.app.get('/generate').body)
     self.assertEqual('Yay', self.app.get('/generate').body)
     self.h.process_next_chunk(0)
@@ -540,7 +538,7 @@ class StatsFrameworkLogTest(test_case.TestCase):
         expected, self.app.get('/json?resolution=days&duration=9').json)
 
   def test_json_two_hours(self):
-    stats_framework_mock.reset_timestamp(self.h, self.now)
+    stats_framework_logs_mock.reset_timestamp(self.h, self.now)
     self.assertEqual('Yay', self.app.get('/generate').body)
     self.assertEqual('Yay', self.app.get('/generate').body)
     self.h.process_next_chunk(0)
@@ -557,7 +555,7 @@ class StatsFrameworkLogTest(test_case.TestCase):
         expected, self.app.get('/json?resolution=hours&duration=1').json)
 
   def test_json_two_minutes(self):
-    stats_framework_mock.reset_timestamp(self.h, self.now)
+    stats_framework_logs_mock.reset_timestamp(self.h, self.now)
     self.assertEqual('Yay', self.app.get('/generate').body)
     self.assertEqual('Yay', self.app.get('/generate').body)
     self.h.process_next_chunk(0)

@@ -14,6 +14,7 @@ import logging
 from google.appengine.ext import ndb
 
 from components import stats_framework
+from components.stats_framework import stats_logs
 from components import utils
 
 
@@ -114,7 +115,7 @@ def _extract_snapshot_from_logs(start_time, end_time):
   values = _Snapshot()
   total_lines = 0
   parse_errors = 0
-  for entry in stats_framework.yield_entries(start_time, end_time):
+  for entry in stats_logs.yield_entries(start_time, end_time):
     values.requests += 1
     if entry.request.status >= 400:
       values.failures += 1
@@ -146,8 +147,7 @@ def add_entry(action, number, where):
   The format is simple enough that it doesn't require a regexp for faster
   processing.
   """
-  stats_framework.add_entry(
-      '%s; %d; %s' % (_ACTION_NAMES[action], number, where))
+  stats_logs.add_entry('%s; %d; %s' % (_ACTION_NAMES[action], number, where))
 
 
 def generate_stats():

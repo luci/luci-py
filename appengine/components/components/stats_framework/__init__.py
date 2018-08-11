@@ -12,7 +12,6 @@ measurements saved and presentations must be supplied by the user.
 """
 
 import calendar
-import collections
 import datetime
 import logging
 
@@ -24,10 +23,6 @@ from google.appengine.runtime import DeadlineExceededError
 from components import utils
 
 
-# Logs prefix.
-PREFIX = 'Stats: '
-
-
 # Supported resolutions. In theory, 'weeks' and 'months' could be added one day
 # if desired.
 RESOLUTIONS = ('days', 'hours', 'minutes')
@@ -37,10 +32,6 @@ RESOLUTIONS = ('days', 'hours', 'minutes')
 # eventual log consistency doesn't have to be managed explicitly. On the dev
 # server, there's no eventual inconsistency so process up to the last minute.
 TOO_RECENT = 5 if not utils.is_local_dev_server() else 1
-
-
-# One handled HTTP request and the associated statistics if any.
-StatsEntry = collections.namedtuple('StatsEntry', ('request', 'entries'))
 
 
 class StatisticsFramework(object):
@@ -524,24 +515,6 @@ def _lowest_missing_bit(bitmap):
   return 64
 
 
-def _yield_logs(start_time, end_time):
-  """Yields logservice.RequestLogs for the requested time interval.
-
-  Meant to be mocked in tests.
-  """
-  # If module_versions is not specified, it will default to the current version
-  # on current module, which is not what we want.
-  # TODO(maruel): Keep request.offset and use it to resume the query by using it
-  # instead of using start_time/end_time.
-  module_versions = utils.get_module_version_list(None, True)
-  for request in logservice.fetch(
-      start_time=start_time - 1 if start_time else start_time,
-      end_time=end_time + 1 if end_time else end_time,
-      include_app_logs=True,
-      module_versions=module_versions):
-    yield request
-
-
 def _get_snapshot_as_dict_future(keys):
   """Gets post-processed entities referenced by keys.
 
@@ -591,14 +564,6 @@ def _get_minutes_keys(handler, now, num_minutes):
 
 
 ### Public API.
-
-
-def add_entry(message):
-  """Adds an entry for the current request.
-
-  Meant to be mocked in tests.
-  """
-  logging.debug(PREFIX + message)
 
 
 def accumulate(lhs, rhs, skip):
@@ -655,30 +620,6 @@ def accumulate(lhs, rhs, skip):
           # This happens when a structure changes and the old entity is being
           # summed to.
           logging.error('Couldn\'t set %s to %s', key, value)
-
-
-def yield_entries(start_time, end_time):
-  """Yields StatsEntry in this time interval.
-
-  Look at requests that *ended* between [start_time, end_time[. Ignore the start
-  time of the request. This is because the parameters start_time and end_time of
-  logserver.fetch() filters on the completion time of the request.
-  """
-  offset = len(PREFIX)
-  for request in _yield_logs(start_time, end_time):
-    if not request.finished or not request.end_time:
-      continue
-    if start_time and request.end_time < start_time:
-      continue
-    if end_time and request.end_time >= end_time:
-      continue
-
-    # Gathers all the entries added via add_entry().
-    entries = [
-      l.message[offset:] for l in request.app_logs
-      if l.level <= logservice.LOG_LEVEL_INFO and l.message.startswith(PREFIX)
-    ]
-    yield StatsEntry(request, entries)
 
 
 def get_stats(handler, resolution, now, num_items, as_dict):

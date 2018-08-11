@@ -11,7 +11,7 @@ import datetime
 
 import webtest
 
-from components import stats_framework
+from components.stats_framework import stats_logs
 from components import utils
 
 
@@ -39,9 +39,9 @@ def configure(test):
 
   def _add_entry(message):
     _request_logs[-1].app_logs.append(
-        stats_framework.logservice.AppLog(
-            level=stats_framework.logservice.LOG_LEVEL_DEBUG,
-            message=stats_framework.PREFIX + message))
+        stats_logs.logservice.AppLog(
+            level=stats_logs.logservice.LOG_LEVEL_DEBUG,
+            message=stats_logs.PREFIX + message))
 
   def _do_request(req, *args, **kwargs):
     entry = _RequestLog()
@@ -64,8 +64,8 @@ def configure(test):
     for request in _request_logs:
       yield request
 
-  test.mock(stats_framework, 'add_entry', _add_entry)
-  test.mock(stats_framework, '_yield_logs', _yield_logs)
+  test.mock(stats_logs, 'add_entry', _add_entry)
+  test.mock(stats_logs, '_yield_logs', _yield_logs)
   _old_request = test.mock(webtest.TestApp, 'do_request', _do_request)
 
 
