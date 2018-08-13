@@ -21,6 +21,11 @@ indexes:
   - name: dimensions_flat
   - name: composite
 
+- kind: NamedCache
+  ancestor: yes
+  properties:
+  - name: ts
+
 - kind: TaskResultSummary
   properties:
   - name: failure

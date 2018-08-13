@@ -20,6 +20,17 @@ queue:
   rate: 500/s
 
 
+## Named caches
+
+- name: named-cache-task
+  rate: 10/s
+  # Cron will reschedule, so don't retry on failure.
+  # Need both limits, since AE semantics is "AND", not "OR".
+  retry_parameters:
+    task_retry_limit: 0
+    task_age_limit: 1s
+
+
 ## MP
 
 - name: machine-provider-manage
