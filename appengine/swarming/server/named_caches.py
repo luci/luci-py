@@ -19,10 +19,10 @@ state on each bot.
     +----------+     +----------+
 
 
-The cached size for each named cache is the P(95) for the caches found on the
-fleet. It is updated every 24 hours, so that if a large cache is not re-observed
-for 24h, it will be lowered. When an higher size is observed that is more than
-10% of the previous one, the value is immediately updated.
+The cached size for each named cache is the 95th percentile for the caches found
+on the fleet. It is updated every 24 hours, so that if a large cache is not
+re-observed for 24h, it will be lowered. When an higher size is observed that is
+more than 10% of the previous one, the value is immediately updated.
 
 Caches for named cache that haven't been updated for 8 days are deleted.
 
@@ -132,7 +132,7 @@ def task_update_pool(pool):
   logging.info('Found %d caches in pool %r', len(found), pool)
   # TODO(maruel): Parallelise.
   for name, sizes in sorted(found.iteritems()):
-    # Adhoc calculation to take the ~P(95).
+    # Adhoc calculation to take the ~95th percentile.
     sizes.sort()
     size = sizes[int(float(len(sizes)) * 0.95)]
     if _update_named_cache(pool, name, size):
@@ -150,11 +150,11 @@ def task_update_pool(pool):
 
 
 def cron_update_named_caches():
-  """Update NamedCache very old BotEvent entites."""
+  """Trigger one task queue per pool to update NamedCache entites."""
   for pool in pools_config.known():
     if not utils.enqueue_task(
         '/internal/taskqueue/update_named_cache',
         'named-cache-task',
         params={'pool': pool},
     ):
-      logging.error('Failed to enqueue named cache task for pool %s', pool)
+      logging.error('Failed to enqueue task for pool %s', pool)
