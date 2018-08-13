@@ -310,6 +310,7 @@ class BackendTest(AppTestBase):
       ('pubsub', '/internal/taskqueue/pubsub/', 'abcabcabc'),
       ('rebuild-task-cache', '/internal/taskqueue/rebuild-task-cache', ''),
       ('tsmon', '/internal/taskqueue/tsmon/', 'executors'),
+      ('named-cache-task', '/internal/taskqueue/update_named_cache', ''),
     ]
     self.assertEqual(len(task_queues), len(task_queue_urls))
     for i, url in enumerate(task_queue_urls):

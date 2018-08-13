@@ -104,6 +104,7 @@ class PoolsConfigTest(test_case.TestCase):
 
     self.assertEqual(expected1, pools_config.get_pool_config('pool_name'))
     self.assertEqual(expected2, pools_config.get_pool_config('another_name'))
+    self.assertEqual(['another_name', 'pool_name'], pools_config.known())
 
   def test_empty_config_is_valid(self):
     self.validator_test(pools_pb2.PoolsCfg(), [])
