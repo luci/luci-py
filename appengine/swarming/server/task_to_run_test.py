@@ -127,7 +127,7 @@ class TaskToRunApiTest(test_env_handlers.AppTestBase):
     self.now = datetime.datetime(2014, 01, 02, 03, 04, 05, 06)
     self.mock_now(self.now)
     auth_testing.mock_get_current_identity(self)
-    # Setup the backend to handle task queues for 'task-dimensions'.
+    # Setup the backend to handle task queues.
     self.app = webtest.TestApp(
         handlers_backend.create_application(True),
         extra_environ={

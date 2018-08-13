@@ -86,7 +86,7 @@ def _gen_request(properties=None):
 class TaskQueuesApiTest(test_env_handlers.AppTestBase):
   def setUp(self):
     super(TaskQueuesApiTest, self).setUp()
-    # Setup the backend to handle task queues for 'task-dimensions'.
+    # Setup the backend to handle task queues.
     self.app = webtest.TestApp(
         handlers_backend.create_application(True),
         extra_environ={

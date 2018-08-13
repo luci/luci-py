@@ -117,7 +117,7 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.mock_now(self.now)
     auth_testing.mock_get_current_identity(self)
     event_mon_metrics.initialize()
-    # Setup the backend to handle task queues for 'task-dimensions'.
+    # Setup the backend to handle task queues.
     self.app = webtest.TestApp(
         handlers_backend.create_application(True),
         extra_environ={

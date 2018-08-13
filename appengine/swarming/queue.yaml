@@ -15,10 +15,6 @@ queue:
 - name: rebuild-task-cache
   rate: 500/s
 
-# TODO(maruel): Remove around 2017-06-10
-- name: task-dimensions
-  rate: 500/s
-
 
 ## Named caches
 
