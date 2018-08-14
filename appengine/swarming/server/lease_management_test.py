@@ -1233,6 +1233,18 @@ class ScheduleLeaseManagementTest(test_case.TestCase):
     lease_management.drain_entity(key)
     lease_management.schedule_lease_management()
 
+  def test_broken(self):
+    def enqueue_task(*_args, **kwargs):
+      self.assertTrue(kwargs.get('params', {}).get('key'))
+    self.mock(utils, 'enqueue_task', enqueue_task)
+
+    lease_management.MachineLease(
+        client_request_id='request-id',
+        connection_ts=utils.utcnow(),
+        drained=False,
+    ).put()
+    lease_management.schedule_lease_management()
+
 
 if __name__ == '__main__':
   logging.basicConfig(
