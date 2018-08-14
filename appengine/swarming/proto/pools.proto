@@ -18,17 +18,7 @@ message PoolsCfg {
   // List of all defined pools.
   repeated Pool pool = 1;
 
-  // If 'true' and callers try to add a task that use a pool not defined in
-  // 'pools' above, Swarming will reject the call with "Permission Denied"
-  // error.
-  //
-  // If 'false', Swarming will allow the task if caller has 'can_create_task'
-  // permission. This is used for backward compatibility with simple Swarming
-  // deployments that don't do pool isolation.
-  //
-  // Note that tasks in undefined pools aren't allowed to use service accounts,
-  // since Swarming doesn't know what accounts are allowed in such unconfigured
-  // pools.
+  // Currently ignored. To be removed.
   bool forbid_unknown_pools = 2;
 
   // This is the "shared namespace" of task templates.

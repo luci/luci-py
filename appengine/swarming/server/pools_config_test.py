@@ -51,7 +51,6 @@ TEST_CONFIG = pools_pb2.PoolsCfg(
         bot_monitoring='bots',
       ),
     ],
-    forbid_unknown_pools=True,
     bot_monitoring=[
       pools_pb2.BotMonitoring(name='bots', dimension_key=['os', 'bool']),
     ],
@@ -78,7 +77,6 @@ class PoolsConfigTest(test_case.TestCase):
 
   def test_get_pool_config(self):
     self.mock_config(TEST_CONFIG)
-    self.assertTrue(pools_config.forbid_unknown_pools())
     self.assertEqual(None, pools_config.get_pool_config('unknown'))
 
     expected1 = pools_config.PoolConfig(

@@ -253,6 +253,7 @@ class BackendTest(AppTestBase):
     self.assertEqual(expected, actual)
 
   def testCronTagsAggregateTask(self):
+    self.mock_default_pool_acl([])
     self.set_as_admin()
     now = datetime.datetime(2011, 1, 2, 3, 4, 5)
     self.mock_now(now)
@@ -275,7 +276,9 @@ class BackendTest(AppTestBase):
             task_result.TagValues(tag='priority', values=['20']),
             task_result.TagValues(tag='service_account', values=['none']),
             task_result.TagValues(
-                tag='swarming.pool.template', values=['no_config']),
+                tag='swarming.pool.template', values=['none']),
+            task_result.TagValues(
+                tag='swarming.pool.version', values=['pools_cfg_rev']),
             task_result.TagValues(tag='user', values=['joe@localhost']),
             task_result.TagValues(tag='zeta', values=['theta']),
         ],
@@ -283,6 +286,7 @@ class BackendTest(AppTestBase):
     self.assertEqual(expected, actual)
 
   def testCronCountTaskBotDistributionHandler(self):
+    self.mock_default_pool_acl([])
     self.set_as_admin()
     now = datetime.datetime(2011, 1, 2, 3, 4, 5)
     self.mock_now(now)

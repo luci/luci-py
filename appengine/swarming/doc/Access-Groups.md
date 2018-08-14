@@ -86,7 +86,3 @@ Pool ACLs are defined in `pools.cfg` config file (see
 [proto/pools.proto](../proto/pools.proto)). If this file is missing or empty,
 pool ACLs are completely disabled for the service, meaning only the
 server-global ACLs are consulted.
-
-Additionally if `forbid_unknown_pools` is false (this is default!), the pool
-authorization ACL is skipped for pools not specified in `pools.cfg`. See the
-proto doc for more details.

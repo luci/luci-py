@@ -30,9 +30,9 @@ import handlers_endpoints
 import handlers_frontend
 import template
 import ts_mon_metrics
-from server import config
 from server import acl
-
+from server import config
+from server import pools_config
 
 # pylint: disable=redefined-outer-name
 def create_application():
@@ -44,6 +44,7 @@ def create_application():
   # groups configuration. Useful when running smoke test.
   if utils.is_local_dev_server():
     acl.bootstrap_dev_server_acls()
+    pools_config.bootstrap_dev_server_acls()
 
   def is_enabled_callback():
     return config.settings().enable_ts_monitoring

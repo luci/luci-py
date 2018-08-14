@@ -289,7 +289,8 @@ def gen_expected(**kwargs):
       u'pool:default',
       u'priority:200',
       u'service_account:none',
-      u'swarming.pool.template:no_config',
+      u'swarming.pool.template:none',
+      u'swarming.pool.version:pools_cfg_rev',
       u'user:joe@localhost',
     ],
     u'try_number': 1,
@@ -384,7 +385,8 @@ class Test(unittest.TestCase):
           u'pool:default',
           u'priority:200',
           u'service_account:none',
-          u'swarming.pool.template:no_config',
+          u'swarming.pool.template:none',
+          u'swarming.pool.version:pools_cfg_rev',
           u'user:joe@localhost',
         ]))
     self.assertOneTask(args, summary, {})
@@ -860,8 +862,13 @@ class Test(unittest.TestCase):
     # created_ts.
     # List of tuple(task_name, priority, task_id).
     tasks = []
-    tags = [u'pool:default', u'service_account:none',
-            u'swarming.pool.template:no_config', u'user:joe@localhost']
+    tags = [
+      u'pool:default',
+      u'service_account:none',
+      u'swarming.pool.template:none',
+      u'swarming.pool.version:pools_cfg_rev',
+      u'user:joe@localhost',
+    ]
     with self._make_wait_task('test_priority'):
       # This is the order of the priorities used for each task triggered. In
       # particular, below it asserts that the priority 8 tasks are run in order
@@ -1009,7 +1016,8 @@ class Test(unittest.TestCase):
           u'pool:default',
           u'priority:40',
           u'service_account:none',
-          u'swarming.pool.template:no_config',
+          u'swarming.pool.template:none',
+          u'swarming.pool.version:pools_cfg_rev',
           u'user:None',
         ],
         user=u'')
@@ -1071,7 +1079,8 @@ class Test(unittest.TestCase):
           u'pool:default',
           u'priority:40',
           u'service_account:none',
-          u'swarming.pool.template:no_config',
+          u'swarming.pool.template:none',
+          u'swarming.pool.version:pools_cfg_rev',
           u'user:None',
         ],
         user=u'')
@@ -1092,7 +1101,11 @@ class Test(unittest.TestCase):
             'dimensions': [
               {
                 'key': 'pool',
-                'value': 'inexistant',
+                'value': 'default',
+              },
+              {
+                'key': 'bad_key',
+                'value': 'bad_value',
               },
             ],
             'grace_period_secs': 30,
@@ -1140,8 +1153,12 @@ class Test(unittest.TestCase):
     # Ensure the initial wait task is completed.
     actual_summary, actual_files = self.client.task_collect(wait_task_id)
     tags = [
-      u'pool:default', u'priority:20', u'service_account:none',
-      u'swarming.pool.template:no_config', u'user:joe@localhost',
+      u'pool:default',
+      u'priority:20',
+      u'service_account:none',
+      u'swarming.pool.template:none',
+      u'swarming.pool.version:pools_cfg_rev',
+      u'user:joe@localhost',
     ]
     self.assertResults(
         self.gen_expected(

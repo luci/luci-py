@@ -1934,31 +1934,36 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
   def test_check_schedule_request_acl(self):
     self.mock_pool_config('some-other-pool')
 
-    # Uses default ACL is there's no pool config.
-    self.check_schedule_request_acl(
-        properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
+    # There's no "default ACL" anymore if there's no pool config.
+    with self.assertRaises(auth.AuthorizationError) as ctx:
+      self.check_schedule_request_acl(
+          properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
+    self.assertIn(
+        'Can\'t submit tasks to pool "some-pool" not defined in pools.cfg',
+        str(ctx.exception))
 
-    # Service accounts are not allowed in this case.
+    # Service accounts are not allowed if not configured.
     with self.assertRaises(auth.AuthorizationError) as ctx:
       self.check_schedule_request_acl(
           properties=_gen_properties(dimensions={u'pool': [u'some-pool']}),
           service_account='robot@example.com')
-    self.assertTrue('Can\'t use account' in str(ctx.exception))
+    self.assertIn(
+        'Can\'t submit tasks to pool "some-pool" not defined in pools.cfg',
+        str(ctx.exception))
 
   def test_check_schedule_request_acl_unknown_forbidden(self):
     self.mock_pool_config('some-other-pool')
-    self.mock(pools_config, 'forbid_unknown_pools', lambda: True)
     with self.assertRaises(auth.AuthorizationError) as ctx:
       self.check_schedule_request_acl(
           properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
-    self.assertTrue('not defined in pools.cfg' in str(ctx.exception))
+    self.assertTrue('not defined in pools.cfg', str(ctx.exception))
 
   def test_check_schedule_request_acl_forbidden(self):
     self.mock_pool_config('some-pool')
     with self.assertRaises(auth.AuthorizationError) as ctx:
       self.check_schedule_request_acl(
           properties=_gen_properties(dimensions={u'pool': [u'some-pool']}))
-    self.assertTrue('not allowed to schedule tasks' in str(ctx.exception))
+    self.assertIn('not allowed to schedule tasks', str(ctx.exception))
 
   def test_check_schedule_request_acl_allowed_explicitly(self):
     self.mock_pool_config(

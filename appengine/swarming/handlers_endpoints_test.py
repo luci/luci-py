@@ -1177,6 +1177,7 @@ class TaskApiTest(BaseTest):
     super(TaskApiTest, self).setUp()
     self.tasks_api = test_case.Endpoints(
         handlers_endpoints.SwarmingTasksService)
+    self.mock_default_pool_acl([])
 
   def test_cancel_pending(self):
     """Asserts that task cancellation goes smoothly."""
@@ -1211,7 +1212,8 @@ class TaskApiTest(BaseTest):
         u'pool:default',
         u'priority:20',
         u'service_account:none',
-        u'swarming.pool.template:no_config',
+        u'swarming.pool.template:none',
+        u'swarming.pool.version:pools_cfg_rev',
         u'user:joe@localhost',
       ],
       u'task_id': task_id,
@@ -1281,6 +1283,16 @@ class TaskApiTest(BaseTest):
         modified_ts=fmtdate(self.now),
         started_ts=fmtdate(self.now),
         state=u'RUNNING',
+        tags=[
+          u'a:tag',
+          u'os:Amiga',
+          u'pool:default',
+          u'priority:20',
+          u'service_account:none',
+          u'swarming.pool.template:none',
+          u'swarming.pool.version:pools_cfg_rev',
+          u'user:joe@localhost',
+        ],
         try_number=u'1')
     self.assertEqual(expected, self.client_get_results(task_id))
 
@@ -1308,6 +1320,16 @@ class TaskApiTest(BaseTest):
         modified_ts=fmtdate(self.now),
         started_ts=fmtdate(self.now),
         state=u'RUNNING',
+        tags=[
+          u'a:tag',
+          u'os:Amiga',
+          u'pool:default',
+          u'priority:20',
+          u'service_account:none',
+          u'swarming.pool.template:none',
+          u'swarming.pool.version:pools_cfg_rev',
+          u'user:joe@localhost',
+        ],
         try_number=u'1')
     self.assertEqual(expected, self.client_get_results(task_id))
 
@@ -1329,6 +1351,16 @@ class TaskApiTest(BaseTest):
         modified_ts=fmtdate(self.now),
         started_ts=fmtdate(self.now),
         state=u'KILLED',
+        tags=[
+          u'a:tag',
+          u'os:Amiga',
+          u'pool:default',
+          u'priority:20',
+          u'service_account:none',
+          u'swarming.pool.template:none',
+          u'swarming.pool.version:pools_cfg_rev',
+          u'user:joe@localhost',
+        ],
         try_number=u'1')
     self.assertEqual(expected, self.client_get_results(task_id))
 
@@ -1361,7 +1393,8 @@ class TaskApiTest(BaseTest):
         u'pool:default',
         u'priority:20',
         u'service_account:none',
-        u'swarming.pool.template:no_config',
+        u'swarming.pool.template:none',
+        u'swarming.pool.version:pools_cfg_rev',
         u'user:joe@localhost',
       ],
       u'task_id': u'5cee488008810',
@@ -1528,6 +1561,8 @@ class QueuesApiTest(BaseTest):
     # queues and one termination task. The termination task should not be
     # reported.
     self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.mock_default_pool_acl([])
+    self.set_as_user()
     self.client_create_task_raw(
         properties={
             u'dimensions': [
@@ -1540,7 +1575,7 @@ class QueuesApiTest(BaseTest):
         properties={
             u'dimensions': [
             {u'key': u'os', u'value': u'Atari'},
-            {u'key': u'pool', u'value': u'vintage'},
+            {u'key': u'pool', u'value': u'template'},
           ],
         })
     self.mock_now(self.now, 2)
@@ -1588,7 +1623,7 @@ class QueuesApiTest(BaseTest):
     expected = {
       u'items': [
         {
-          u'dimensions': [u'os:Atari', u'pool:vintage'],
+          u'dimensions': [u'os:Atari', u'pool:template'],
           u'valid_until_ts': u'2010-01-03T04:14:06',
         },
       ],
@@ -1985,6 +2020,10 @@ class BotsApiTest(BaseTest):
 class BotApiTest(BaseTest):
   api_service_cls = handlers_endpoints.SwarmingBotService
 
+  def setUp(self):
+    super(BotApiTest, self).setUp()
+    self.mock_default_pool_acl([])
+
   def test_get_ok(self):
     """Asserts that get shows the tasks a specific bot has executed."""
     self.set_as_privileged_user()
@@ -2183,7 +2222,9 @@ class BotApiTest(BaseTest):
 
     now_1 = self.mock_now(self.now, 1)
     self.mock(random, 'getrandbits', lambda _: 0x55)
+    self.set_as_user()
     self.client_create_task_raw(name='philbert')
+    self.set_as_bot()
     res = self.bot_poll()
     response = self.bot_complete_task(
         exit_code=1, task_id=res['manifest']['task_id'])
@@ -2231,7 +2272,9 @@ class BotApiTest(BaseTest):
 
     self.set_as_bot()
     params = self.do_handshake()
+    self.set_as_user()
     self.client_create_task_raw()
+    self.set_as_bot()
     res = self.bot_poll(params=params)
     now_60 = self.mock_now(self.now, 60)
     response = self.bot_complete_task(task_id=res['manifest']['task_id'])

@@ -62,6 +62,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         utils, 'enqueue_task', self._enqueue_task)
     self.now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(self.now)
+    self.mock_default_pool_acl([])
 
   @ndb.non_transactional
   def _enqueue_task(self, url, queue_name, **kwargs):
@@ -270,11 +271,13 @@ class BotApiTest(test_env_handlers.AppTestBase):
     # A bot polls, gets a task, updates it, completes it.
     params = self.do_handshake()
     # Enqueue a task.
+    self.set_as_user()
     _, task_id = self.client_create_task_raw(
         properties={u'relative_cwd': u'de/ep'})
     self.assertEqual('0', task_id[-1])
     # Convert TaskResultSummary reference to TaskRunResult.
     task_id = task_id[:-1] + '1'
+    self.set_as_bot()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     expected = {
       u'cmd': u'run',
@@ -329,10 +332,12 @@ class BotApiTest(test_env_handlers.AppTestBase):
   def test_poll_task_with_bot_service_account(self):
     params = self.do_handshake()
 
+    self.set_as_user()
     _, task_id = self.client_create_task_raw(service_account='bot')
     self.assertEqual('0', task_id[-1])
     task_id = task_id[:-1] + '1'
 
+    self.set_as_bot()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     expected = {
       u'cmd': u'run',
@@ -381,6 +386,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
   def test_poll_task_with_caches(self):
     params = self.do_handshake()
 
+    self.set_as_user()
     _, task_id = self.client_create_task_raw({
       'caches': [{
         'name': 'git_infra',
@@ -390,6 +396,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual('0', task_id[-1])
     task_id = task_id[:-1] + '1'
 
+    self.set_as_bot()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     expected = {
       u'cmd': u'run',
@@ -486,10 +493,12 @@ class BotApiTest(test_env_handlers.AppTestBase):
     # A bot polls, gets a task, updates it, completes it.
     params = self.do_handshake()
     # Enqueue a task.
+    self.set_as_user()
     _, task_id = self.client_create_task_isolated()
     self.assertEqual('0', task_id[-1])
     # Convert TaskResultSummary reference to TaskRunResult.
     task_id = task_id[:-1] + '1'
+    self.set_as_bot()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     expected = {
       u'cmd': u'run',
@@ -613,8 +622,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
   def test_poll_not_enough_time(self):
     # Make sure there's a task that we don't get.
+    self.set_as_user()
     _, task_id = self.client_create_task_raw()
     self.assertEqual('0', task_id[-1])
+    self.set_as_bot()
     params = self.do_handshake()
     bot_info = bot_management.get_info_key('bot1').get()
     bot_info.lease_expiration_ts = datetime.datetime(1969, 1, 1)
@@ -880,6 +891,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     # Runs a task up to completion.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     params = self.do_handshake()
+    self.set_as_user()
     self.client_create_task_raw(
         properties=dict(command=['python', 'runtest.py']))
 
@@ -902,6 +914,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       self.assertEqual(expected, self.client_get_results(task_id))
 
     # 1. Initial task update with no data.
+    self.set_as_bot()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     task_id = response['manifest']['task_id']
     params = _params()
@@ -1008,7 +1021,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
   def test_task_failure(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     params = self.do_handshake()
+    self.set_as_user()
     self.client_create_task_raw()
+    self.set_as_bot()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     task_id = response['manifest']['task_id']
 
@@ -1043,7 +1058,9 @@ class BotApiTest(test_env_handlers.AppTestBase):
         ereporter2, 'log_request',
         lambda *args, **kwargs: errors.append((args, kwargs)))
     params = self.do_handshake()
+    self.set_as_user()
     self.client_create_task_raw()
+    self.set_as_bot()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     task_id = response['manifest']['task_id']
 
@@ -1081,8 +1098,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
     # Task was canceled while running, resulting in KILLED.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     params = self.do_handshake()
+    self.set_as_user()
     self.client_create_task_raw()
 
+    self.set_as_bot()
     params = self.do_handshake()
     response = self.post_json('/swarming/api/v1/bot/poll', params)
     self.assertEqual(u'run', response.get(u'cmd'))

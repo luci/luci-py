@@ -519,6 +519,7 @@ def _is_allowed_to_schedule(pool_cfg):
   # Using delegation?
   delegation_token = auth.get_delegation_token()
   if not delegation_token:
+    logging.info('No delegation token')
     return False
 
   # Log relevant info about the delegation to simplify debugging.
@@ -715,23 +716,10 @@ def check_schedule_request_acl(request):
       request.service_account)
 
   if not pool_cfg:
-    logging.info('Pool "%s" is not in pools.cfg', pool)
-    # Deployments that use pools.cfg may forbid unknown pools completely.
-    # This is a safeguard against anyone executing tasks in a new not fully
-    # configured pool.
-    if pools_config.forbid_unknown_pools():
-      raise auth.AuthorizationError(
-          'Can\'t submit tasks to pool "%s" not defined in pools.cfg' % pool)
-    # To be backward compatible with Swarming deployments that do not care about
-    # pools isolation pools without pools.cfg entry are relatively wide open
-    # (anyone with 'can_create_task' permission can use them). As a downside,
-    # they are not allowed to use service accounts, since Swarming doesn't know
-    # what accounts are allowed in such unknown pools.
-    if has_service_account:
-      raise auth.AuthorizationError(
-          'Can\'t use account "%s" in the pool "%s" not defined in pools.cfg' %
-          (request.service_account, pool))
-    return
+    logging.warning('Pool "%s" is not in pools.cfg', pool)
+    # Unknown pools are forbidden.
+    raise auth.AuthorizationError(
+        'Can\'t submit tasks to pool "%s" not defined in pools.cfg' % pool)
 
   logging.info(
       'Looking at the pool "%s" in pools.cfg, rev "%s"', pool, pool_cfg.rev)
