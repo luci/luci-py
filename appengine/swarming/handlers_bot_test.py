@@ -396,13 +396,10 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'manifest': {
         u'bot_id': u'bot1',
         u'bot_authenticated_as': u'bot:whitelisted-ip',
-        u'caches': [
-          {
-            u'hint': -1,
-            u'name': u'git_infra',
-            u'path': u'git_cache',
-          },
-        ],
+        u'caches': [{
+          u'name': u'git_infra',
+          u'path': u'git_cache',
+        }],
         u'cipd_input': {
           u'client_package': {
             u'package_name': u'infra/tools/cipd/${platform}',

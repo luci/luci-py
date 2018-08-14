@@ -23,7 +23,6 @@ from server import bot_auth
 from server import bot_code
 from server import bot_management
 from server import config
-from server import named_caches
 from server import service_accounts
 from server import task_pack
 from server import task_queues
@@ -586,21 +585,12 @@ class BotPollHandler(_BotBaseHandler):
   def _cmd_run(self, request, secret_bytes, run_result, bot_id, bot_group_cfg):
     logging.info('Run: %s', request.task_id)
     props = request.task_slice(run_result.current_task_slice).properties
-
-    caches = [c.to_dict() for c in props.caches]
-    names = [c.name for c in props.caches]
-    pool = props.dimensions['pool'][0]
-    # Warning: this is doing a DB GET on the cold path, which will increase the
-    # reap failure.
-    for i, hint in enumerate(named_caches.get_hints(pool, names)):
-      caches[i]['hint'] = hint
-
     out = {
       'cmd': 'run',
       'manifest': {
         'bot_id': bot_id,
         'bot_authenticated_as': auth.get_peer_identity().to_bytes(),
-        'caches': caches,
+        'caches': [c.to_dict() for c in props.caches],
         'cipd_input': {
           'client_package': props.cipd_input.client_package.to_dict(),
           'packages': [p.to_dict() for p in props.cipd_input.packages],

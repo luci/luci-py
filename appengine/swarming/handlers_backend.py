@@ -23,7 +23,6 @@ from server import bot_groups_config
 from server import bot_management
 from server import config
 from server import lease_management
-from server import named_caches
 from server import task_pack
 from server import task_queues
 from server import task_result
@@ -150,14 +149,6 @@ class CronMachineProviderManagementHandler(webapp2.RequestHandler):
       return
 
     lease_management.schedule_lease_management()
-
-
-class CronNamedCachesUpdate(webapp2.RequestHandler):
-  """Updates named caches hints."""
-
-  @decorators.require_cronjob
-  def get(self):
-    named_caches.cron_update_named_caches()
 
 
 class CronCountTaskBotDistributionHandler(webapp2.RequestHandler):
@@ -359,15 +350,6 @@ class TaskMachineProviderManagementHandler(webapp2.RequestHandler):
     lease_management.manage_lease(key)
 
 
-class TaskNamedCachesPool(webapp2.RequestHandler):
-  """Update named caches cache for a pool."""
-
-  @decorators.require_taskqueue('named-cache-task')
-  def post(self):
-    params = json.loads(self.request.body)
-    named_caches.task_update_pool(params['pool'])
-
-
 class TaskGlobalMetrics(webapp2.RequestHandler):
   """Compute global metrics for timeseries monitoring."""
 
@@ -425,7 +407,6 @@ def get_routes():
         CronMachineProviderConfigHandler),
     ('/internal/cron/machine_provider_manage',
         CronMachineProviderManagementHandler),
-    ('/internal/cron/named_caches_update', CronNamedCachesUpdate),
 
     # Task queues.
     ('/internal/taskqueue/cancel-tasks', CancelTasksHandler),
@@ -433,7 +414,6 @@ def get_routes():
     (r'/internal/taskqueue/pubsub/<task_id:[0-9a-f]+>', TaskSendPubSubMessage),
     ('/internal/taskqueue/machine-provider-manage',
         TaskMachineProviderManagementHandler),
-    (r'/internal/taskqueue/update_named_cache', TaskNamedCachesPool),
     (r'/internal/taskqueue/tsmon/<kind:[0-9A-Za-z_]+>', TaskGlobalMetrics),
 
     # Mapreduce related urls.
