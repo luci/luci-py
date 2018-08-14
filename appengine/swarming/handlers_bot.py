@@ -23,6 +23,7 @@ from server import bot_auth
 from server import bot_code
 from server import bot_management
 from server import config
+from server import named_caches
 from server import service_accounts
 from server import task_pack
 from server import task_queues
@@ -262,6 +263,10 @@ class _ProcessResult(object):
       # Typo catching assert, ensure _ProcessResult class has the attribute.
       assert hasattr(self, k), k
       setattr(self, k, v)
+
+  @property
+  def os(self):
+    return (self.dimensions or {}).get('os') or []
 
 
 class _BotBaseHandler(_BotApiHandler):
@@ -568,7 +573,8 @@ class BotPollHandler(_BotBaseHandler):
               'request_task', task_id=run_result.task_id,
               task_name=request.name)
           self._cmd_run(
-              request, secret_bytes, run_result, res.bot_id, res.bot_group_cfg)
+              request, secret_bytes, run_result, res.bot_id, res.os,
+              res.bot_group_cfg)
       except:
         logging.exception('Dang, exception after reaping')
         raise
@@ -582,15 +588,25 @@ class BotPollHandler(_BotBaseHandler):
       # https://code.google.com/p/swarming/issues/detail?id=130
       self.abort(500, 'Deadline')
 
-  def _cmd_run(self, request, secret_bytes, run_result, bot_id, bot_group_cfg):
+  def _cmd_run(
+      self, request, secret_bytes, run_result, bot_id, oses, bot_group_cfg):
     logging.info('Run: %s', request.task_id)
     props = request.task_slice(run_result.current_task_slice).properties
+
+    caches = [c.to_dict() for c in props.caches]
+    names = [c.name for c in props.caches]
+    pool = props.dimensions['pool'][0]
+    # Warning: this is doing a DB GET on the cold path, which will increase the
+    # reap failure.
+    for i, hint in enumerate(named_caches.get_hints(pool, oses, names)):
+      caches[i]['hint'] = hint
+
     out = {
       'cmd': 'run',
       'manifest': {
         'bot_id': bot_id,
         'bot_authenticated_as': auth.get_peer_identity().to_bytes(),
-        'caches': [c.to_dict() for c in props.caches],
+        'caches': caches,
         'cipd_input': {
           'client_package': props.cipd_input.client_package.to_dict(),
           'packages': [p.to_dict() for p in props.cipd_input.packages],

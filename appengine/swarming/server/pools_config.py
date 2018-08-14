@@ -332,6 +332,11 @@ def forbid_unknown_pools():
   return _fetch_pools_config().forbid_unknown_pools
 
 
+def known():
+  """Returns the list of all pool names."""
+  return sorted(_fetch_pools_config().pools)
+
+
 ### Private stuff.
 
 
