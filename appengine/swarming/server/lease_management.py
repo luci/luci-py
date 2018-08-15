@@ -552,10 +552,9 @@ def schedule_lease_management():
         # lease_expiration_ts is None if leased_indefinitely, check it first.
         if machine_lease.leased_indefinitely:
           continue
-        exp = now + datetime.timedelta(
-            seconds=machine_lease.early_release_secs or 0)
-        if (machine_lease.lease_expiration_ts and
-            machine_lease.lease_expiration_ts > exp):
+        assert machine_lease.lease_expiration_ts, machine_lease
+        if machine_lease.lease_expiration_ts > now + datetime.timedelta(
+            seconds=machine_lease.early_release_secs or 0):
           continue
     if not utils.enqueue_task(
         '/internal/taskqueue/machine-provider-manage',
