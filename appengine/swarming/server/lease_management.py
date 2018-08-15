@@ -922,6 +922,13 @@ def associate_connection_ts(key, connection_ts):
   if machine_lease.connection_ts:
     return
 
+  if not machine_lease.bot_id:
+    # Can happen if two task queue tasks to manage the same lease are in flight
+    # at once, and one releases the lease on a bot which didn't connect in time
+    # while the bot connects right after, and the other sees the new connection.
+    logging.warning('MachineLease already released:\n%s', machine_lease)
+    return
+
   machine_lease.connection_ts = connection_ts
   machine_lease.put()
 
@@ -947,6 +954,9 @@ def check_for_connection(machine_lease):
     # look at events from before the connection instruction was sent.
     if event.ts < machine_lease.instruction_ts:
       break
+    # TODO(smut): Create bot_released event, then abandon if we see it.
+    # This will avoid the situation where we process the connection of a bot
+    # which connects just after it was released for taking too long to connect.
     if event.event_type == 'bot_connected':
       logging.info(
           'Bot connected:\nKey: %s\nHostname: %s\nTime: %s',
@@ -1001,6 +1011,7 @@ def cleanup_bot(machine_lease):
   task_queues.cleanup_after_bot(bot_root_key)
   bot_management.get_info_key(machine_lease.hostname).delete()
   clear_lease_request(machine_lease.key, machine_lease.client_request_id)
+  logging.info('MachineLease cleared:\nKey: %s', machine_lease.key)
 
 
 def last_shutdown_ts(hostname):
@@ -1044,7 +1055,7 @@ def release(machine_lease):
       )
       return False
   logging.info(
-      'MachineLease released:\nKey%s\nHostname: %s',
+      'MachineLease released:\nKey: %s\nHostname: %s',
       machine_lease.key,
       machine_lease.hostname,
   )

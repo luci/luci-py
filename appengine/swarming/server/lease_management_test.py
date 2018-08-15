@@ -1187,6 +1187,7 @@ class ScheduleLeaseManagementTest(test_case.TestCase):
         utils.utcnow()) / 1000 / 1000 + 3600
     lease_management.log_lease_fulfillment(
         key, 'request-id', 'hostname', lease_expiration_ts, False, 'lease-id')
+    lease_management.associate_bot_id(key, 'hostname')
     lease_management.associate_connection_ts(key, utils.utcnow())
     lease_management.schedule_lease_management()
 
@@ -1216,6 +1217,7 @@ class ScheduleLeaseManagementTest(test_case.TestCase):
     ).put()
     lease_management.log_lease_fulfillment(
         key, 'request-id', 'hostname', 0, True, 'lease-id')
+    lease_management.associate_bot_id(key, 'hostname')
     lease_management.associate_connection_ts(key, utils.utcnow())
     lease_management.schedule_lease_management()
 
