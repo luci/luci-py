@@ -30,6 +30,7 @@ The caches will only be precalculated for the pools defined in pools.cfg.
 """
 
 import datetime
+import json
 import logging
 
 from google.appengine.ext import ndb
@@ -168,7 +169,9 @@ def task_update_pool(pool):
     if bot.last_seen_ts < exp:
       # Dead bot.
       continue
-    os = _reduce_oses(bot.dimensions.get('os'))
+    # Some bots do not have 'os' correctly specified. They fall into the
+    # 'unknown' OS bucket.
+    os = _reduce_oses(bot.dimensions.get('os') or [])
     state = bot.state
     if not state or not isinstance(state, dict):
       continue
@@ -216,9 +219,10 @@ def cron_update_named_caches():
     if not utils.enqueue_task(
         '/internal/taskqueue/update_named_cache',
         'named-cache-task',
-        params={'pool': pool},
+        payload=json.dumps({'pool': pool}),
     ):
       logging.error('Failed to enqueue task for pool %s', pool)
     else:
+      logging.debug('Enqueued task for pool %s', pool)
       total += 1
   return total

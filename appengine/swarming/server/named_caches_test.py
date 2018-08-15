@@ -5,6 +5,7 @@
 
 import datetime
 import hashlib
+import json
 import logging
 import sys
 import unittest
@@ -58,8 +59,9 @@ class NamedCachesTest(test_case.TestCase):
     self.mock(pools_config, 'known', lambda: ['first', 'second'])
 
   @ndb.non_transactional
-  def _enqueue_task(self, url, queue_name, params):
+  def _enqueue_task(self, url, queue_name, payload):
     if queue_name == 'named-cache-task':
+      params = json.loads(payload)
       self.assertEqual(True, named_caches.task_update_pool(params['pool']))
       return True
     self.fail(url)

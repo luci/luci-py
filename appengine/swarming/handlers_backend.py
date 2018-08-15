@@ -365,6 +365,7 @@ class TaskNamedCachesPool(webapp2.RequestHandler):
   @decorators.require_taskqueue('named-cache-task')
   def post(self):
     params = json.loads(self.request.body)
+    logging.info('Handling pool: %s', params['pool'])
     named_caches.task_update_pool(params['pool'])
 
 
