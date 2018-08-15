@@ -39,6 +39,14 @@ cron:
   target: backend
 
 
+### Named caches
+
+- description: Update named caches cache
+  url: /internal/cron/named_caches_update
+  schedule: every 10 minutes synchronized
+  target: backend
+
+
 ### MP
 
 - description: Compute Machine Provider bot utilization.
