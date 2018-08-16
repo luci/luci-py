@@ -39,6 +39,40 @@ def rpc_to_json(rpc_message):
   return json.loads(protojson.encode_message(rpc_message))
 
 
+class AssociateBotIdTest(test_case.TestCase):
+  """Tests for lease_management.associate_bot_id."""
+
+  def test_hostname_unset(self):
+    key = lease_management.MachineLease().put()
+    lease_management.associate_bot_id(key, 'id')
+    self.assertFalse(key.get().bot_id)
+    self.assertFalse(key.get().hostname)
+
+  def test_hostname_mismatch(self):
+    key = lease_management.MachineLease(hostname='id1').put()
+    lease_management.associate_bot_id(key, 'id2')
+    self.assertFalse(key.get().bot_id)
+    self.assertEqual(key.get().hostname, 'id1')
+
+  def test_bot_id_mismatch(self):
+    key = lease_management.MachineLease(bot_id='id1', hostname='id1').put()
+    lease_management.associate_bot_id(key, 'id2')
+    self.assertEqual(key.get().bot_id, 'id1')
+    self.assertEqual(key.get().hostname, 'id1')
+
+  def test_hostname_set(self):
+    key = lease_management.MachineLease(hostname='id1').put()
+    lease_management.associate_bot_id(key, 'id1')
+    self.assertEqual(key.get().bot_id, 'id1')
+    self.assertEqual(key.get().hostname, 'id1')
+
+  def test_bot_id_match(self):
+    key = lease_management.MachineLease(bot_id='id1', hostname='id1').put()
+    lease_management.associate_bot_id(key, 'id1')
+    self.assertEqual(key.get().bot_id, 'id1')
+    self.assertEqual(key.get().hostname, 'id1')
+
+
 class CheckForConnectionTest(test_case.TestCase):
   """Tests for lease_management.check_for_connection."""
 
@@ -1234,6 +1268,89 @@ class ScheduleLeaseManagementTest(test_case.TestCase):
     lease_management.associate_connection_ts(key, utils.utcnow())
     lease_management.drain_entity(key)
     lease_management.schedule_lease_management()
+
+
+class SendConnectionInstructionTest(test_case.TestCase):
+  """Tests for lease_management.send_connection_instruction."""
+
+  def test_empty(self):
+    def instruct_machine(*_args, **_kwargs):
+      return {}
+    self.mock(machine_provider, 'instruct_machine', instruct_machine)
+
+    key = lease_management.MachineLease(
+        bot_id='bot-id',
+        client_request_id='request-id',
+        hostname='bot-id',
+    ).put()
+
+    lease_management.send_connection_instruction(key.get())
+    self.assertFalse(key.get().instruction_ts)
+
+  def test_ok(self):
+    def instruct_machine(*_args, **_kwargs):
+      return {'client_request_id': 'request-id'}
+    self.mock(machine_provider, 'instruct_machine', instruct_machine)
+
+    key = lease_management.MachineLease(
+        bot_id='bot-id',
+        client_request_id='request-id',
+        hostname='bot-id',
+    ).put()
+
+    lease_management.send_connection_instruction(key.get())
+    self.assertTrue(key.get().instruction_ts)
+
+  def test_reclaimed(self):
+    def instruct_machine(*_args, **_kwargs):
+      return {'client_request_id': 'request-id', 'error': 'ALREADY_RECLAIMED'}
+    self.mock(machine_provider, 'instruct_machine', instruct_machine)
+
+    key = lease_management.MachineLease(
+        bot_id='bot-id',
+        client_request_id='request-id',
+        hostname='bot-id',
+    ).put()
+
+    lease_management.send_connection_instruction(key.get())
+    self.assertFalse(key.get().bot_id)
+    self.assertFalse(key.get().client_request_id)
+    self.assertFalse(key.get().hostname)
+    self.assertFalse(key.get().instruction_ts)
+
+  def test_error(self):
+    def instruct_machine(*_args, **_kwargs):
+      return {'client_request_id': 'request-id', 'error': 'error'}
+    self.mock(machine_provider, 'instruct_machine', instruct_machine)
+
+    key = lease_management.MachineLease(
+        bot_id='bot-id',
+        client_request_id='request-id',
+        hostname='bot-id',
+    ).put()
+
+    lease_management.send_connection_instruction(key.get())
+    self.assertTrue(key.get().bot_id)
+    self.assertTrue(key.get().client_request_id)
+    self.assertTrue(key.get().hostname)
+    self.assertFalse(key.get().instruction_ts)
+
+  def test_race(self):
+    key = lease_management.MachineLease(
+        bot_id='bot-id',
+        client_request_id='request-id',
+        hostname='bot-id',
+    ).put()
+
+    def instruct_machine(*_args, **_kwargs):
+      # Mimic race condition by clearing the MachineLease.
+      # In reality this would happen concurrently elsewhere.
+      lease_management.clear_lease_request(key, key.get().client_request_id)
+      return {'client_request_id': 'request-id'}
+    self.mock(machine_provider, 'instruct_machine', instruct_machine)
+
+    lease_management.send_connection_instruction(key.get())
+    self.assertFalse(key.get().instruction_ts)
 
 
 if __name__ == '__main__':
