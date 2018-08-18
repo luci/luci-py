@@ -23,6 +23,9 @@ cron:
 - url: /internal/cron/fetch-instances
   schedule: every 1 minutes
 
+- url: /internal/cron/fetch-snapshots
+  schedule: every 1 minutes
+
 - url: /internal/cron/import-config
   schedule: every 1 minutes synchronized
 

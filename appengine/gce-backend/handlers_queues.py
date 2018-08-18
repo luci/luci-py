@@ -17,6 +17,7 @@ import cleanup
 import instance_group_managers
 import instance_templates
 import instances
+import snapshots
 
 
 class CatalogedInstanceRemovalHandler(webapp2.RequestHandler):
@@ -214,6 +215,21 @@ class InstanceTemplateDeletionHandler(webapp2.RequestHandler):
     instance_templates.delete(key)
 
 
+class SnapshotFetchHandler(webapp2.RequestHandler):
+  """Worker for fetching snapshots for the given InstanceTemplateRevision."""
+
+  @decorators.require_taskqueue('fetch-snapshots')
+  def post(self):
+    """Fetches snapshots referenced by the given InstanceTemplateRevision.
+
+    Params:
+      key: URL-safe key for a models.InstanceTemplateRevision.
+    """
+    key = ndb.Key(urlsafe=self.request.get('key'))
+    assert key.kind() == 'InstanceTemplateRevision', key
+    snapshots.derive_snapshot(key)
+
+
 def create_queues_app():
   return webapp2.WSGIApplication([
       ('/internal/queues/catalog-instance', InstanceCatalogHandler),
@@ -234,6 +250,7 @@ def create_queues_app():
       ('/internal/queues/delete-instance-template',
        InstanceTemplateDeletionHandler),
       ('/internal/queues/fetch-instances', InstanceFetchHandler),
+      ('/internal/queues/fetch-snapshots', SnapshotFetchHandler),
       ('/internal/queues/remove-cataloged-instance',
        CatalogedInstanceRemovalHandler),
       ('/internal/queues/resize-instance-group', InstanceGroupResizeHandler),

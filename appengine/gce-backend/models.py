@@ -122,6 +122,8 @@ class InstanceTemplateRevision(ndb.Model):
   # Name of a snapshot to create a disk from for instances created from this
   # template.
   snapshot_name = ndb.StringProperty(indexed=False)
+  # Snapshot URL derived from snapshot labels and name.
+  snapshot_url = ndb.StringProperty(indexed=False)
   # Initial list of tags to apply when creating instances from this template.
   tags = ndb.StringProperty(indexed=False, repeated=True)
   # URL of the instance template created from this entity.

@@ -531,6 +531,36 @@ class Project(object):
     )
     return response.get('error', {}).get('errors', [])
 
+  def get_snapshots(
+      self, name=None, labels=None, max_results=None, page_token=None):
+    """Returns the snapshots matching the specified name and labels.
+
+    Args:
+      name: Name of a snapshot. If unspecified, matches all names.
+      labels: Dict of labels. If unspecified, matches all labels.
+      max_results: If specified, maximum number of snapshots to return.
+      page_token: If specified, token to use to return a specific page of
+        snapshots.
+
+    Returns:
+      A compute#snapshotList dict.
+    """
+    labels = labels or {}
+    params = {}
+    filters = []
+    if name:
+      filters.append('(name = %s)' % name)
+    for key, value in sorted(labels.iteritems()):
+      filters.append('(labels.%s = %s)' % (key, value))
+    if filters:
+      # e.g. (name = snapshot-name) AND (label.version = latest)
+      params['filter'] = ' AND '.join(filters)
+    if max_results:
+      params['maxResults'] = max_results
+    if page_token:
+      params['pageToken'] = page_token
+    return self.call_api('/global/snapshots', params=params)
+
 
 class ZoneOperation(object):
   """Asynchronous GCE operation returned by some Project methods.

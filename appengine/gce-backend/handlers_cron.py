@@ -17,6 +17,7 @@ import instance_group_managers
 import instance_templates
 import instances
 import parse
+import snapshots
 
 
 class CatalogedInstanceRemovalHandler(webapp2.RequestHandler):
@@ -142,6 +143,14 @@ class InstanceTemplateDeletionHandler(webapp2.RequestHandler):
     instance_templates.schedule_deletion()
 
 
+class SnapshotFetchHandler(webapp2.RequestHandler):
+  """Worker for fetching snapshots."""
+
+  @decorators.require_cronjob
+  def get(self):
+    snapshots.schedule_fetch()
+
+
 def create_cron_app():
   return webapp2.WSGIApplication([
       ('/internal/cron/catalog-instances', InstanceCatalogHandler),
@@ -158,6 +167,7 @@ def create_cron_app():
        InstanceTemplateDeletionHandler),
       ('/internal/cron/delete-instances', InstanceDeletionHandler),
       ('/internal/cron/fetch-instances', InstanceFetchHandler),
+      ('/internal/cron/fetch-snapshots', SnapshotFetchHandler),
       ('/internal/cron/import-config', ConfigImportHandler),
       ('/internal/cron/process-config', ConfigProcessHandler),
       ('/internal/cron/remove-cataloged-instances',
