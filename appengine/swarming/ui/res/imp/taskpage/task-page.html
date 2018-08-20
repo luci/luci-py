@@ -339,6 +339,10 @@
                   <td>[[_request.priority]]</td>
                 </tr>
                 <tr>
+                  <td>Wait for Capacity</td>
+                  <td>[[_currentSlice.wait_for_capacity]]</td>
+                </tr>
+                <tr>
                   <td>User</td>
                   <td>[[_request.user]]</td>
                 </tr>
@@ -546,12 +550,10 @@
                         <td title$="[[_result.started_ts]]">[[_result.human_started_ts]]</td>
                       </tr>
                     </template>
-                    <template is="dom-if" if="[[_canExpire(_result)]]">
-                      <tr>
-                        <td>Expires</td>
-                        <td>[[_expires(_request, _currentSlice)]]</td>
-                      </tr>
-                    </template>
+                    <tr>
+                      <td>Expires</td>
+                      <td>[[_expires(_request, _currentSlice)]]</td>
+                    </tr>
                     <template is="dom-if" if="[[_result.human_completed_ts]]">
                       <tr>
                         <td>Completed</td>
