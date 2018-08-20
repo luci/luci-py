@@ -477,6 +477,35 @@ class UpdateCatalogedEntryTest(test_case.TestCase):
     self.failUnless(key.get().cataloged)
     self.assertEqual(
         key.get().lease_expiration_ts, datetime.datetime.utcfromtimestamp(now))
+    self.failIf(key.get().leased_indefinitely)
+    self.failUnless(key.get().leased)
+    self.failIf(key.get().pending_deletion)
+
+  def test_updated_leased_indefinitely(self):
+    """Ensures an instance can be updated with leased_indefinitely."""
+    def retrieve_machine(*args, **kwargs):
+      return {
+          'leased_indefinitely': True,
+      }
+    self.mock(catalog.machine_provider, 'retrieve_machine', retrieve_machine)
+
+    key = instances.get_instance_key(
+        'base-name',
+        'revision',
+        'zone',
+        'instance-name',
+    )
+    key = models.Instance(
+        key=key,
+        cataloged=True,
+        instance_group_manager=instances.get_instance_group_manager_key(key),
+    ).put()
+
+    self.failIf(key.get().leased)
+    catalog.update_cataloged_instance(key)
+    self.failUnless(key.get().cataloged)
+    self.failUnless(key.get().leased_indefinitely)
+    self.failIf(key.get().lease_expiration_ts)
     self.failUnless(key.get().leased)
     self.failIf(key.get().pending_deletion)
 

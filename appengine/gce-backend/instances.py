@@ -94,6 +94,26 @@ def add_lease_expiration_ts(key, lease_expiration_ts):
   instance.put()
 
 
+@ndb.transactional
+def set_leased_indefinitely(key):
+  """Sets the instance as leased indefinitely.
+
+  Args:
+    key: ndb.Key for a models.Instance entity.
+  """
+  instance = key.get()
+  if not instance:
+    logging.warning('Instance does not exist: %s', key)
+    return
+
+  if instance.leased_indefinitely:
+    return
+
+  logging.info('Setting instance as leased indefinitely')
+  instance.leased_indefinitely = True
+  instance.put()
+
+
 def fetch(key):
   """Gets instances created by the given instance group manager.
 

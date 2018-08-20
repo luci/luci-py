@@ -814,5 +814,65 @@ class SetDeletionTime(test_case.TestCase):
     self.assertEqual(key.get().deletion_ts, now)
 
 
+class SetLeasedIndefinitelyTest(test_case.TestCase):
+  """Tests for instances.set_leased_indefinitely."""
+
+  def test_entity_not_found(self):
+    """Ensures nothing happens when the entity doesn't exist."""
+    key = ndb.Key(models.Instance, 'fake-instance')
+
+    instances.set_leased_indefinitely(key)
+
+    self.failIf(key.get())
+
+  def test_leased_indefinitely_set(self):
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+    ).put()
+
+    instances.set_leased_indefinitely(key)
+
+    self.failUnless(key.get().leased_indefinitely)
+    self.failUnless(key.get().leased)
+
+  def test_leased_indefinitely_matches(self):
+    now = utils.utcnow()
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+        leased_indefinitely=True,
+    ).put()
+
+    instances.set_leased_indefinitely(key)
+
+    self.failUnless(key.get().leased_indefinitely)
+    self.failUnless(key.get().leased)
+
+  def test_leased_indefinitely_updated(self):
+    key = models.Instance(
+        key=instances.get_instance_key(
+            'base-name',
+            'revision',
+            'zone',
+            'instance-name',
+        ),
+        leased_indefinitely=False,
+    ).put()
+
+    instances.set_leased_indefinitely(key)
+
+    self.failUnless(key.get().leased_indefinitely)
+    self.failUnless(key.get().leased)
+
+
 if __name__ == '__main__':
   unittest.main()

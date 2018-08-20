@@ -46,8 +46,11 @@ class Instance(ndb.Model):
   last_updated = ndb.DateTimeProperty(auto_now=True, indexed=True)
   # Whether or not this instance has been leased out by Machine Provider.
   leased = ndb.ComputedProperty(
-      lambda self: bool(self.lease_expiration_ts), indexed=True)
-  # DateTime indicating when the lease on this machine expires.
+      lambda self: bool(self.leased_indefinitely or self.lease_expiration_ts),
+      indexed=True)
+  # Indicates whether this instance is leased indefinitely.
+  leased_indefinitely = ndb.BooleanProperty()
+  # DateTime indicating when the lease on this instance expires.
   lease_expiration_ts = ndb.DateTimeProperty(indexed=False)
   # Whether or not this instance is pending deletion.
   pending_deletion = ndb.BooleanProperty(indexed=True)

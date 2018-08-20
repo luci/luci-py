@@ -238,6 +238,9 @@ def update_cataloged_instance(key):
           int(response['lease_expiration_ts']))
       if instance.lease_expiration_ts != lease_expiration_ts:
         instances.add_lease_expiration_ts(key, lease_expiration_ts)
+    elif response.get('leased_indefinitely'):
+      if not instance.leased_indefinitely:
+        instances.set_leased_indefinitely(key)
   except net.NotFoundError:
     logging.info('Instance not found in catalog: %s', key)
     instances.mark_for_deletion(key)
