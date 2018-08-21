@@ -167,6 +167,16 @@
         background-color: #ddd;
       }
 
+      .pending {
+        color: "#E69F00";
+      }
+      .overhead {
+        color: "#D55E00";
+      }
+      .running {
+        color: "#0072B2";
+      }
+
       /* Tell all the second td in a tr (i.e. the content) to break
          to avoid wrapping.  This keeps the first columns nice and
          unbroken without having to add a bunch of classes.*/
@@ -572,21 +582,15 @@
                     </tr>
                     <tr>
                       <td>Pending Time</td>
-                      <td>
-                        <font color="#E69F00">[[_result.human_pending]]</font>
-                      </td>
+                      <td class="pending">[[_result.human_pending]]</td>
                     </tr>
                     <tr>
                       <td>Total Overhead</td>
-                      <td>
-                        <font color="#D55E00">[[_humanDuration(_result.performance_stats.bot_overhead)]]</font>
-                      </td>
+                      <td class="overhead">[[_humanDuration(_result.performance_stats.bot_overhead)]]</td>
                     </tr>
                     <tr>
                       <td>Running Time</td>
-                      <td>
-                        <font color="#0072B2">[[_result.human_duration]]</font>
-                      </td>
+                      <td class="running" title="An asterisk indicates the task is still running and thus the time is dynamic.">[[_result.human_duration]]</td>
                     </tr>
                   </tbody>
                 </table>

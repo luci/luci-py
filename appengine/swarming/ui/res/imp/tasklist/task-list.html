@@ -238,7 +238,7 @@
                     is="dom-repeat"
                     items="[[_plainColumns]]"
                     as="c">
-                  <td hidden$="[[_hide(c)]]">
+                  <td hidden$="[[_hide(c)]]" title$="[[_tooltip(c)]]">
                     [[_column(c, task)]]
                   </td>
                 </template>
@@ -365,6 +365,11 @@
         return s;
       },
     };
+
+    var tooltipMap = {
+      "duration": "An asterisk indicates the task is still running and thus the time is dynamic.",
+      "costs_usd": "An asterisk indicates the task is still running and thus the cost is dynamic.",
+    }
 
     // Given a time attribute like "abandoned_ts", sortableTime returns a function
     // that compares the tasks based on the attribute.  This is used for sorting.
@@ -604,6 +609,10 @@
 
       _taskClass: function(task) {
         return this.stateClass(this._column("state", task));
+      },
+
+      _tooltip: function(col) {
+        return tooltipMap[col];
       }
     });
   })();
