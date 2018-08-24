@@ -30,7 +30,7 @@ class CatalogTest(test_case.TestCase):
 
   def test_not_found(self):
     """Ensures nothing happens when the instance doesn't exist."""
-    def add_machine(*args, **kwargs):
+    def add_machine(*_args, **_kwargs):
       self.fail('add_machine called')
     self.mock(catalog.machine_provider, 'add_machine', add_machine)
 
@@ -39,7 +39,7 @@ class CatalogTest(test_case.TestCase):
 
   def test_already_cataloged(self):
     """Ensures nothing happens when the instance is already cataloged."""
-    def add_machine(*args, **kwargs):
+    def add_machine(*_args, **_kwargs):
       self.fail('add_machine called')
     self.mock(catalog.machine_provider, 'add_machine', add_machine)
 
@@ -60,7 +60,7 @@ class CatalogTest(test_case.TestCase):
 
   def test_pending_deletion(self):
     """Ensures nothing happens when the instance is pending deletion."""
-    def add_machine(*args, **kwargs):
+    def add_machine(*_args, **_kwargs):
       self.fail('add_machine called')
     self.mock(catalog.machine_provider, 'add_machine', add_machine)
 
@@ -81,7 +81,7 @@ class CatalogTest(test_case.TestCase):
 
   def test_instance_group_manager_not_found(self):
     """Ensures nothing happens when the instance group manager doesn't exist."""
-    def add_machine(*args, **kwargs):
+    def add_machine(*_args, **_kwargs):
       self.fail('add_machine called')
     self.mock(catalog.machine_provider, 'add_machine', add_machine)
 
@@ -101,7 +101,7 @@ class CatalogTest(test_case.TestCase):
 
   def test_instance_template_revision_not_found(self):
     """Ensures nothing happens when instance template revision doesn't exist."""
-    def add_machine(*args, **kwargs):
+    def add_machine(*_args, **_kwargs):
       self.fail('add_machine called')
     self.mock(catalog.machine_provider, 'add_machine', add_machine)
 
@@ -124,7 +124,7 @@ class CatalogTest(test_case.TestCase):
 
   def test_service_account_not_found(self):
     """Ensures nothing happens when a service account doesn't exist."""
-    def add_machine(*args, **kwargs):
+    def add_machine(*_args, **_kwargs):
       self.fail('add_machine called')
     self.mock(catalog.machine_provider, 'add_machine', add_machine)
 
@@ -150,9 +150,9 @@ class CatalogTest(test_case.TestCase):
 
   def test_cataloged(self):
     """Ensures an instance can be cataloged."""
-    def add_machine(*args, **kwargs):
+    def add_machine(*_args, **_kwargs):
       return {}
-    def send_machine_event(*args, **kwargs):
+    def send_machine_event(*_args, **_kwargs):
       pass
     self.mock(catalog.machine_provider, 'add_machine', add_machine)
     self.mock(catalog.metrics, 'send_machine_event', send_machine_event)
@@ -182,9 +182,9 @@ class CatalogTest(test_case.TestCase):
 
   def test_cataloging_error(self):
     """Ensures an instance isn't marked cataloged on error."""
-    def add_machine(*args, **kwargs):
+    def add_machine(*_args, **_kwargs):
       return {'error': 'error'}
-    def send_machine_event(*args, **kwargs):
+    def send_machine_event(*_args, **_kwargs):
       pass
     self.mock(catalog.machine_provider, 'add_machine', add_machine)
     self.mock(catalog.metrics, 'send_machine_event', send_machine_event)
@@ -214,9 +214,9 @@ class CatalogTest(test_case.TestCase):
 
   def test_cataloging_error_hostname_reuse(self):
     """Ensures an instance is marked cataloged on HOSTNAME_REUSE."""
-    def add_machine(*args, **kwargs):
+    def add_machine(*_args, **_kwargs):
       return {'error': 'HOSTNAME_REUSE'}
-    def send_machine_event(*args, **kwargs):
+    def send_machine_event(*_args, **_kwargs):
       pass
     self.mock(catalog.machine_provider, 'add_machine', add_machine)
     self.mock(catalog.metrics, 'send_machine_event', send_machine_event)
@@ -311,7 +311,7 @@ class RemoveTest(test_case.TestCase):
 
   def test_not_found(self):
     """Ensures nothing happens when the instance doesn't exist."""
-    def delete_machine(*args, **kwargs):
+    def delete_machine(*_args, **_kwargs):
       self.fail('delete_machine called')
     self.mock(catalog.machine_provider, 'delete_machine', delete_machine)
 
@@ -320,9 +320,9 @@ class RemoveTest(test_case.TestCase):
 
   def test_not_cataloged(self):
     """Ensures an instance is set for deletion when not cataloged."""
-    def delete_machine(*args, **kwargs):
+    def delete_machine(*_args, **_kwargs):
       return {'error': 'ENTRY_NOT_FOUND'}
-    def send_machine_event(*args, **kwargs):
+    def send_machine_event(*_args, **_kwargs):
       pass
     self.mock(catalog.machine_provider, 'delete_machine', delete_machine)
     self.mock(catalog.metrics, 'send_machine_event', send_machine_event)
@@ -345,9 +345,9 @@ class RemoveTest(test_case.TestCase):
 
   def test_removed(self):
     """Ensures an instance can be removed."""
-    def delete_machine(*args, **kwargs):
+    def delete_machine(*_args, **_kwargs):
       return {}
-    def send_machine_event(*args, **kwargs):
+    def send_machine_event(*_args, **_kwargs):
       pass
     self.mock(catalog.machine_provider, 'delete_machine', delete_machine)
     self.mock(catalog.metrics, 'send_machine_event', send_machine_event)
@@ -370,7 +370,7 @@ class RemoveTest(test_case.TestCase):
 
   def test_removal_error(self):
     """Ensures an instance isn't set for deletion on error."""
-    def delete_machine(*args, **kwargs):
+    def delete_machine(*_args, **_kwargs):
       return {'error': 'error'}
     self.mock(catalog.machine_provider, 'delete_machine', delete_machine)
 
@@ -421,7 +421,7 @@ class UpdateCatalogedEntryTest(test_case.TestCase):
 
   def test_not_found(self):
     """Ensures nothing happens when the instance doesn't exist."""
-    def retrieve_machine(*args, **kwargs):
+    def retrieve_machine(*_args, **_kwargs):
       self.fail('retrieve_machine called')
     self.mock(catalog.machine_provider, 'retrieve_machine', retrieve_machine)
 
@@ -430,7 +430,7 @@ class UpdateCatalogedEntryTest(test_case.TestCase):
 
   def test_not_cataloged(self):
     """Ensures nothing happens when the instance is not cataloged."""
-    def retrieve_machine(*args, **kwargs):
+    def retrieve_machine(*_args, **_kwargs):
       self.fail('retrieve_machine called')
     self.mock(catalog.machine_provider, 'retrieve_machine', retrieve_machine)
 
@@ -454,7 +454,7 @@ class UpdateCatalogedEntryTest(test_case.TestCase):
   def test_updated_lease_expiration_ts(self):
     """Ensures an instance can be updated with a lease_expiration_ts."""
     now = int(utils.time_time())
-    def retrieve_machine(*args, **kwargs):
+    def retrieve_machine(*_args, **_kwargs):
       return {
           'lease_expiration_ts': str(now),
       }
@@ -483,7 +483,7 @@ class UpdateCatalogedEntryTest(test_case.TestCase):
 
   def test_updated_leased_indefinitely(self):
     """Ensures an instance can be updated with leased_indefinitely."""
-    def retrieve_machine(*args, **kwargs):
+    def retrieve_machine(*_args, **_kwargs):
       return {
           'leased_indefinitely': True,
       }
@@ -511,9 +511,9 @@ class UpdateCatalogedEntryTest(test_case.TestCase):
 
   def test_retrieval_error(self):
     """Ensures an instance is set for deletion when not found."""
-    def retrieve_machine(*args, **kwargs):
+    def retrieve_machine(*_args, **_kwargs):
       raise net.NotFoundError('404', 404, '404')
-    def send_machine_event(*args, **kwargs):
+    def send_machine_event(*_args, **_kwargs):
       pass
     self.mock(catalog.machine_provider, 'retrieve_machine', retrieve_machine)
     self.mock(catalog.metrics, 'send_machine_event', send_machine_event)

@@ -59,7 +59,7 @@ class UpdateConfigTest(test_case.TestCase):
       metadata_file: What to return when metadata_file is requested. Defaults
         to an empty string.
     """
-    def get_self_config(path, _,  **kwargs):
+    def get_self_config(path, *_args, **_kwargs):
       self.assertIn(path, ('templates.cfg', 'managers.cfg', 'settings.cfg',
           'metadata_file'))
       if path == 'templates.cfg':
@@ -117,7 +117,7 @@ class UpdateConfigTest(test_case.TestCase):
     template_config = config_pb2.InstanceTemplateConfig(
       templates=[
             config_pb2.InstanceTemplateConfig.InstanceTemplate(
-                base_name='base-name-%d',
+                base_name='base-name-%d' % d,
             )
             for d in xrange(21)
       ],

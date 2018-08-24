@@ -148,13 +148,13 @@ def update_template_configs():
 
 
 @validation.self_rule(TEMPLATES_CFG_FILENAME, config_pb2.InstanceTemplateConfig)
-def validate_template_config(config, context):
+def validate_template_config(cfg, context):
   """Validates an InstanceTemplateConfig instance."""
   # We don't do any GCE-specific validation here. Just require globally
   # unique base name because base name is used as the key in the datastore.
   base_names = set()
   valid = True
-  for template in config.templates:
+  for template in cfg.templates:
     if template.base_name in base_names:
       context.error('base_name %s is not globally unique.', template.base_name)
       valid = False
@@ -197,13 +197,13 @@ def validate_template_config(config, context):
 
 @validation.self_rule(
     MANAGERS_CFG_FILENAME, config_pb2.InstanceGroupManagerConfig)
-def validate_manager_config(config, context):
+def validate_manager_config(cfg, context):
   """Validates an InstanceGroupManagerConfig instance."""
   # We don't do any GCE-specific validation here. Just require per-template
   # unique zone because template+zone is used as a key in the datastore.
   zones = collections.defaultdict(set)
   valid = True
-  for manager in config.managers:
+  for manager in cfg.managers:
     if manager.zone in zones[manager.template_base_name]:
       context.error(
           'zone %s is not unique in template %s.',
@@ -232,9 +232,9 @@ def validate_manager_config(config, context):
 
 
 @validation.self_rule(SETTINGS_CFG_FILENAME, config_pb2.SettingsCfg)
-def validate_settings_config(config, context):
-  if config.HasField('mp_server'):
-    if not validation.is_valid_secure_url(config.mp_server):
+def validate_settings_config(cfg, context):
+  if cfg.HasField('mp_server'):
+    if not validation.is_valid_secure_url(cfg.mp_server):
       context.error(
           'mp_server must start with "https://" or "http://localhost"')
 

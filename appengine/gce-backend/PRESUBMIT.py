@@ -9,13 +9,21 @@ details on the presubmit API built into git cl.
 """
 
 def CommonChecks(input_api, output_api):
+  output = input_api.canned_checks.RunPylint(
+      input_api,
+      output_api,
+      black_list=[r'.*_pb2\.py$'],
+      # TODO(smut): Fix cyclic import (config.py <-> metrics.py).
+      disabled_warnings=['cyclic-import'],
+  )
   tests = input_api.canned_checks.GetUnitTestsInDirectory(
       input_api,
       output_api,
       input_api.PresubmitLocalPath(),
       whitelist=[r'.+_test\.py$'],
   )
-  return input_api.RunTests(tests, parallel=True)
+  output.extend(input_api.RunTests(tests, parallel=True))
+  return output
 
 
 # pylint: disable=unused-argument

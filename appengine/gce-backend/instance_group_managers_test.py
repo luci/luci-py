@@ -202,7 +202,7 @@ class CreateTest(test_case.TestCase):
 
   def test_creates(self):
     """Ensures an instance group manager is created."""
-    def create_instance_group_manager(*args, **kwargs):
+    def create_instance_group_manager(*_args, **_kwargs):
       return {'targetLink': 'url'}
     self.mock(
         instance_group_managers.gce.Project,
@@ -231,9 +231,9 @@ class CreateTest(test_case.TestCase):
 
   def test_updates_when_already_created(self):
     """Ensures an instance group manager is updated when already created."""
-    def create_instance_group_manager(*args, **kwargs):
+    def create_instance_group_manager(*_args, **_kwargs):
       raise net.Error('', 409, '')
-    def get_instance_group_manager(*args, **kwargs):
+    def get_instance_group_manager(*_args, **_kwargs):
       return {'selfLink': 'url'}
     self.mock(
         instance_group_managers.gce.Project,
@@ -267,7 +267,7 @@ class CreateTest(test_case.TestCase):
 
   def test_doesnt_update_when_creation_fails(self):
     """Ensures an instance group manager is not updated when creation fails."""
-    def create_instance_group_manager(*args, **kwargs):
+    def create_instance_group_manager(*_args, **_kwargs):
       raise net.Error('', 400, '')
     self.mock(
         instance_group_managers.gce.Project,
@@ -306,7 +306,7 @@ class DeleteTest(test_case.TestCase):
 
   def test_deletes(self):
     """Ensures an instance group manager is deleted."""
-    def json_request(url, *args, **kwargs):
+    def json_request(url, *_args, **_kwargs):
       return {'targetLink': url}
     self.mock(instance_group_managers.net, 'json_request', json_request)
 
@@ -324,7 +324,7 @@ class DeleteTest(test_case.TestCase):
 
   def test_target_link_mismatch(self):
     """Ensures nothing happens when targetLink doesn't match."""
-    def json_request(*args, **kwargs):
+    def json_request(*_args, **_kwargs):
       return {'targetLink': 'mismatch'}
     self.mock(instance_group_managers.net, 'json_request', json_request)
 
@@ -355,7 +355,7 @@ class DeleteTest(test_case.TestCase):
 
   def test_url_not_found(self):
     """Ensures URL is updated when the instance group manager is not found."""
-    def json_request(url, *args, **kwargs):
+    def json_request(*_args, **_kwargs):
       raise net.Error('', 404, '')
     self.mock(instance_group_managers.net, 'json_request', json_request)
 
@@ -373,7 +373,7 @@ class DeleteTest(test_case.TestCase):
 
   def test_deletion_fails(self):
     """Ensures nothing happens when instance group manager deletion fails."""
-    def json_request(url, *args, **kwargs):
+    def json_request(*_args, **_kwargs):
       raise net.Error('', 400, '')
     self.mock(instance_group_managers.net, 'json_request', json_request)
 
@@ -568,10 +568,10 @@ class ResizeTest(test_case.TestCase):
   """Tests for instance_group_managers.resize."""
 
   def test_entity_doesnt_exist(self):
-    def get_instance_group_manager(*args, **kwargs):
+    def get_instance_group_manager(*_args, **_kwargs):
       self.fail('get_instance_group_manager called')
 
-    def resize_managed_instance_group(*args, **kwargs):
+    def resize_managed_instance_group(*_args, **_kwargs):
       self.fail('resize_managed_instance_group called')
 
     self.mock(
@@ -590,10 +590,10 @@ class ResizeTest(test_case.TestCase):
     self.failIf(key.get())
 
   def test_no_url(self):
-    def get_instance_group_manager(*args, **kwargs):
+    def get_instance_group_manager(*_args, **_kwargs):
       self.fail('get_instance_group_manager called')
 
-    def resize_managed_instance_group(*args, **kwargs):
+    def resize_managed_instance_group(*_args, **_kwargs):
       self.fail('resize_managed_instance_group called')
 
     self.mock(
@@ -625,10 +625,10 @@ class ResizeTest(test_case.TestCase):
     instance_group_managers.resize(key)
 
   def test_parent_doesnt_exist(self):
-    def get_instance_group_manager(*args, **kwargs):
+    def get_instance_group_manager(*_args, **_kwargs):
       self.fail('get_instance_group_manager called')
 
-    def resize_managed_instance_group(*args, **kwargs):
+    def resize_managed_instance_group(*_args, **_kwargs):
       self.fail('resize_managed_instance_group called')
 
     self.mock(
@@ -657,10 +657,10 @@ class ResizeTest(test_case.TestCase):
     instance_group_managers.resize(key)
 
   def test_no_project(self):
-    def get_instance_group_manager(*args, **kwargs):
+    def get_instance_group_manager(*_args, **_kwargs):
       self.fail('get_instance_group_manager called')
 
-    def resize_managed_instance_group(*args, **kwargs):
+    def resize_managed_instance_group(*_args, **_kwargs):
       self.fail('resize_managed_instance_group called')
 
     self.mock(
@@ -692,12 +692,12 @@ class ResizeTest(test_case.TestCase):
     instance_group_managers.resize(key)
 
   def test_resize_no_actions(self):
-    def get_instance_group_manager(*args, **kwargs):
+    def get_instance_group_manager(*_args, **_kwargs):
       return {
           'name': 'name',
       }
 
-    def resize_managed_instance_group(*args, **kwargs):
+    def resize_managed_instance_group(*_args, **_kwargs):
       self.fail('resize_managed_instance_group called')
 
     self.mock(
@@ -730,7 +730,7 @@ class ResizeTest(test_case.TestCase):
     instance_group_managers.resize(key)
 
   def test_resize_none_created(self):
-    def get_instance_group_manager(*args, **kwargs):
+    def get_instance_group_manager(*_args, **_kwargs):
       return {
           'currentActions': {
               'none': 0,
@@ -774,7 +774,7 @@ class ResizeTest(test_case.TestCase):
     instance_group_managers.resize(key)
 
   def test_resize_some_created(self):
-    def get_instance_group_manager(*args, **kwargs):
+    def get_instance_group_manager(*_args, **_kwargs):
       return {
           'currentActions': {
               'none': 3,
@@ -818,7 +818,7 @@ class ResizeTest(test_case.TestCase):
     instance_group_managers.resize(key)
 
   def test_resize_all_created(self):
-    def get_instance_group_manager(*args, **kwargs):
+    def get_instance_group_manager(*_args, **_kwargs):
       return {
           'currentActions': {
               'none': 10,
@@ -827,7 +827,7 @@ class ResizeTest(test_case.TestCase):
           'targetSize': 10,
       }
 
-    def resize_managed_instance_group(_, name, zone, size):
+    def resize_managed_instance_group(*_args, **_kwargs):
       self.failIf(True)
 
     self.mock(
@@ -860,16 +860,16 @@ class ResizeTest(test_case.TestCase):
     instance_group_managers.resize(key)
 
   def test_resize_excess_created(self):
-    def get_instance_group_manager(*args, **kwargs):
+    def get_instance_group_manager(*_args, **_kwargs):
       return {
           'currentActions': {
               'none': 2,
           },
           'name': 'name',
-	  'targetSize': 2,
+          'targetSize': 2,
       }
 
-    def resize_managed_instance_group(_, name, zone, size):
+    def resize_managed_instance_group(*_args, **_kwargs):
       self.failIf(True)
 
     self.mock(
@@ -902,7 +902,7 @@ class ResizeTest(test_case.TestCase):
     instance_group_managers.resize(key)
 
   def test_resize_other_revisions_created(self):
-    def get_instance_group_manager(*args, **kwargs):
+    def get_instance_group_manager(*_args, **_kwargs):
       return {
           'currentActions': {
               'none': 0,
@@ -962,7 +962,7 @@ class ScheduleCreationTest(test_case.TestCase):
   """Tests for instance_group_managers.schedule_creation."""
 
   def setUp(self, *args, **kwargs):
-    def enqueue_task(taskqueue, key):
+    def enqueue_task(_taskqueue, key):
       entity = key.get()
       entity.url = key.urlsafe()
       entity.put()

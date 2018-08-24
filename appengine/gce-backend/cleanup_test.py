@@ -67,7 +67,7 @@ class CheckDeletedInstanceTest(test_case.TestCase):
 
   def test_exists(self):
     """Ensures nothing happens when the instance still exists."""
-    def json_request(*args, **kwargs):
+    def json_request(*_args, **_kwargs):
       return {}
     self.mock(cleanup.net, 'json_request', json_request)
 
@@ -88,9 +88,9 @@ class CheckDeletedInstanceTest(test_case.TestCase):
 
   def test_deleted(self):
     """Ensures the entity is marked deleted when the instance doesn't exists."""
-    def json_request(*args, **kwargs):
+    def json_request(*_args, **_kwargs):
       raise net.NotFoundError('404', 404, '404')
-    def send_machine_event(*args, **kwargs):
+    def send_machine_event(*_args, **_kwargs):
       pass
     self.mock(cleanup.net, 'json_request', json_request)
     self.mock(cleanup.metrics, 'send_machine_event', send_machine_event)
@@ -140,7 +140,7 @@ class CleanupDeletedInstanceTest(test_case.TestCase):
 
   def test_deletes(self):
     """Ensures the entity is deleted."""
-    def send_machine_event(*args, **kwargs):
+    def send_machine_event(*_args, **_kwargs):
       pass
     self.mock(cleanup.metrics, 'send_machine_event', send_machine_event)
 
@@ -164,7 +164,7 @@ class CleanupDrainedInstanceTest(test_case.TestCase):
 
   def test_entity_not_found(self):
     """Ensures nothing happens when the entity is not found."""
-    def json_request(*args, **kwargs):
+    def json_request(*_args, **_kwargs):
       self.fail('json_request called')
     self.mock(cleanup.net, 'json_request', json_request)
 
@@ -176,7 +176,7 @@ class CleanupDrainedInstanceTest(test_case.TestCase):
 
   def test_url_unspecified(self):
     """Ensures nothing happens when the entity has no URL."""
-    def json_request(*args, **kwargs):
+    def json_request(*_args, **_kwargs):
       self.fail('json_request called')
     self.mock(cleanup.net, 'json_request', json_request)
 
@@ -206,7 +206,7 @@ class CleanupDrainedInstanceTest(test_case.TestCase):
 
   def test_parent_unspecified(self):
     """Ensures nothing happens when the parent doesn't exist."""
-    def json_request(*args, **kwargs):
+    def json_request(*_args, **_kwargs):
       self.fail('json_request called')
     self.mock(cleanup.net, 'json_request', json_request)
 
@@ -234,7 +234,7 @@ class CleanupDrainedInstanceTest(test_case.TestCase):
 
   def test_grandparent_unspecified(self):
     """Ensures nothing happens when the grandparent doesn't exist."""
-    def json_request(*args, **kwargs):
+    def json_request(*_args, **_kwargs):
       self.fail('json_request called')
     self.mock(cleanup.net, 'json_request', json_request)
 
@@ -286,7 +286,7 @@ class CleanupDrainedInstanceTest(test_case.TestCase):
 
   def test_not_drained(self):
     """Ensures nothing happens when the parent is not drained."""
-    def json_request(*args, **kwargs):
+    def json_request(*_args, **_kwargs):
       self.fail('json_request called')
     self.mock(cleanup.net, 'json_request', json_request)
 
@@ -317,9 +317,9 @@ class CleanupDrainedInstanceTest(test_case.TestCase):
 
   def test_drained(self):
     """Ensures the entity is marked deleted when the parent is drained."""
-    def json_request(*args, **kwargs):
+    def json_request(*_args, **_kwargs):
       raise net.NotFoundError('404', 404, '404')
-    def send_machine_event(*args, **kwargs):
+    def send_machine_event(*_args, **_kwargs):
       pass
     self.mock(cleanup.net, 'json_request', json_request)
     self.mock(cleanup.metrics, 'send_machine_event', send_machine_event)
@@ -354,9 +354,9 @@ class CleanupDrainedInstanceTest(test_case.TestCase):
 
   def test_implicitly_drained(self):
     """Ensures the entity is marked deleted when the grandparent is drained."""
-    def json_request(*args, **kwargs):
+    def json_request(*_args, **_kwargs):
       raise net.NotFoundError('404', 404, '404')
-    def send_machine_event(*args, **kwargs):
+    def send_machine_event(*_args, **_kwargs):
       pass
     self.mock(cleanup.net, 'json_request', json_request)
     self.mock(cleanup.metrics, 'send_machine_event', send_machine_event)
@@ -394,10 +394,10 @@ class CleanupInstanceGroupManagersTest(test_case.TestCase):
   """Tests for cleanup.cleanup_instance_group_managers."""
 
   def test_no_entities(self):
-    def get_drained_instance_group_managers(*args, **kwargs):
+    def get_drained_instance_group_managers(*_args, **_kwargs):
       return []
     @ndb.tasklet
-    def delete_instance_group_manager(*args, **kwargs):
+    def delete_instance_group_manager(*_args, **_kwargs):
       self.fail('delete_instance_group_manager called')
     self.mock(
         cleanup.instance_group_managers,
@@ -411,7 +411,7 @@ class CleanupInstanceGroupManagersTest(test_case.TestCase):
     self.failIf(models.InstanceGroupManager.query().count())
 
   def test_deletes(self):
-    def get_drained_instance_group_managers(*args, **kwargs):
+    def get_drained_instance_group_managers(*_args, **_kwargs):
       return [
           ndb.Key(models.InstanceGroupManager, 'fake-key-1'),
           ndb.Key(models.InstanceGroupManager, 'fake-key-3'),
@@ -451,10 +451,10 @@ class CleanupInstanceTemplateRevisionsTest(test_case.TestCase):
   """Tests for cleanup.cleanup_instance_template_revisions."""
 
   def test_no_entities(self):
-    def get_drained_instance_template_revisions(*args, **kwargs):
+    def get_drained_instance_template_revisions(*_args, **_kwargs):
       return []
     @ndb.tasklet
-    def delete_instance_template_revision(*args, **kwargs):
+    def delete_instance_template_revision(*_args, **_kwargs):
       self.fail('delete_instance_template_revision called')
     self.mock(
         cleanup.instance_templates,
@@ -471,7 +471,7 @@ class CleanupInstanceTemplateRevisionsTest(test_case.TestCase):
     self.failIf(models.InstanceTemplateRevision.query().count())
 
   def test_deletes(self):
-    def get_drained_instance_template_revisions(*args, **kwargs):
+    def get_drained_instance_template_revisions(*_args, **_kwargs):
       return [
           ndb.Key(models.InstanceTemplateRevision, 'fake-key-1'),
           ndb.Key(models.InstanceTemplateRevision, 'fake-key-3'),
@@ -516,7 +516,7 @@ class CleanupInstanceTemplatesTest(test_case.TestCase):
 
   def test_no_entities(self):
     @ndb.tasklet
-    def delete_instance_template(*args, **kwargs):
+    def delete_instance_template(*_args, **_kwargs):
       self.fail('delete_instance_template called')
     self.mock(
         cleanup,
@@ -942,7 +942,7 @@ class ExistsTest(test_case.TestCase):
 
   def test_exists(self):
     """Ensures an existing entity can be detected."""
-    def json_request(*args, **kwargs):
+    def json_request(*_args, **_kwargs):
       return {}
     self.mock(cleanup.net, 'json_request', json_request)
 
@@ -950,7 +950,7 @@ class ExistsTest(test_case.TestCase):
 
   def test_not_found(self):
     """Ensures a non-existant entity can be detected."""
-    def json_request(*args, **kwargs):
+    def json_request(*_args, **_kwargs):
       raise net.NotFoundError('404', 404, '404')
     self.mock(cleanup.net, 'json_request', json_request)
 
@@ -958,7 +958,7 @@ class ExistsTest(test_case.TestCase):
 
   def test_error(self):
     """Ensures errors are surfaced."""
-    def json_request(*args, **kwargs):
+    def json_request(*_args, **_kwargs):
       raise net.AuthError('403', 403, '403')
     self.mock(cleanup.net, 'json_request', json_request)
 

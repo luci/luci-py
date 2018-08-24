@@ -61,7 +61,7 @@ class CreateTest(test_case.TestCase):
 
   def test_creates(self):
     """Ensures an instance template is created."""
-    def create_instance_template(*args, **kwargs):
+    def create_instance_template(*_args, **_kwargs):
       return {'targetLink': 'url'}
     self.mock(
         instance_templates.gce.Project,
@@ -96,9 +96,9 @@ class CreateTest(test_case.TestCase):
 
   def test_updates_when_already_created(self):
     """Ensures an instance template is updated when already created."""
-    def create_instance_template(*args, **kwargs):
+    def create_instance_template(*_args, **_kwargs):
       raise net.Error('', 409, '')
-    def get_instance_template(*args, **kwargs):
+    def get_instance_template(*_args, **_kwargs):
       return {'selfLink': 'url'}
     self.mock(
         instance_templates.gce.Project,
@@ -126,7 +126,7 @@ class CreateTest(test_case.TestCase):
 
   def test_doesnt_update_when_creation_fails(self):
     """Ensures an instance template is not updated when creation fails."""
-    def create_instance_template(*args, **kwargs):
+    def create_instance_template(*_args, **_kwargs):
       raise net.Error('', 403, '')
     self.mock(
         instance_templates.gce.Project,
@@ -159,7 +159,7 @@ class DeleteTest(test_case.TestCase):
 
   def test_deletes(self):
     """Ensures an instance template is deleted."""
-    def json_request(url, *args, **kwargs):
+    def json_request(url, *_args, **_kwargs):
       return {'targetLink': url}
     self.mock(instance_templates.net, 'json_request', json_request)
 
@@ -177,7 +177,7 @@ class DeleteTest(test_case.TestCase):
 
   def test_url_mismatch(self):
     """Ensures nothing happens when the targetLink doesn't match."""
-    def json_request(*args, **kwargs):
+    def json_request(*_args, **_kwargs):
       return {'targetLink': 'mismatch'}
     self.mock(instance_templates.net, 'json_request', json_request)
 
@@ -208,7 +208,7 @@ class DeleteTest(test_case.TestCase):
 
   def test_url_not_found(self):
     """Ensures URL is updated when the instance template is not found."""
-    def json_request(url, *args, **kwargs):
+    def json_request(*_args, **_kwargs):
       raise net.Error('', 404, '')
     self.mock(instance_templates.net, 'json_request', json_request)
 
@@ -226,7 +226,7 @@ class DeleteTest(test_case.TestCase):
 
   def test_deletion_fails(self):
     """Ensures nothing happens when instance template deletion fails."""
-    def json_request(url, *args, **kwargs):
+    def json_request(*_args, **_kwargs):
       raise net.Error('', 400, '')
     self.mock(instance_templates.net, 'json_request', json_request)
 
@@ -363,7 +363,7 @@ class ScheduleCreationTest(test_case.TestCase):
   """Tests for instance_templates.schedule_creation."""
 
   def setUp(self, *args, **kwargs):
-    def enqueue_task(taskqueue, key):
+    def enqueue_task(_taskqueue, key):
       entity = key.get()
       entity.url = key.urlsafe()
       entity.put()
