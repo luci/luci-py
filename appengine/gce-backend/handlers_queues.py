@@ -14,6 +14,7 @@ from components import decorators
 
 import catalog
 import cleanup
+import disks
 import instance_group_managers
 import instance_templates
 import instances
@@ -78,6 +79,21 @@ class DeletedInstanceCleanupHandler(webapp2.RequestHandler):
     key = ndb.Key(urlsafe=self.request.get('key'))
     assert key.kind() == 'Instance', key
     cleanup.cleanup_deleted_instance(key)
+
+
+class DiskCreationHandler(webapp2.RequestHandler):
+  """Worker for creating a disk for the given Instance."""
+
+  @decorators.require_taskqueue('create-disk')
+  def post(self):
+    """Creates a disk required by the given Instance.
+
+    Params:
+      key: URL-safe key for a models.Instance.
+    """
+    key = ndb.Key(urlsafe=self.request.get('key'))
+    assert key.kind() == 'Instance', key
+    disks.create(key)
 
 
 class DrainedInstanceCleanupHandler(webapp2.RequestHandler):
@@ -239,6 +255,7 @@ def create_queues_app():
        DeletedInstanceCleanupHandler),
       ('/internal/queues/cleanup-drained-instance',
        DrainedInstanceCleanupHandler),
+      ('/internal/queues/create-disk', DiskCreationHandler),
       ('/internal/queues/create-instance-group-manager',
        InstanceGroupManagerCreationHandler),
       ('/internal/queues/create-instance-template',

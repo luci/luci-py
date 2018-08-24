@@ -561,6 +561,23 @@ class Project(object):
       params['pageToken'] = page_token
     return self.call_api('/global/snapshots', params=params)
 
+  def create_disk(self, name, snapshot, zone):
+    """Creates a disk from the given snapshot.
+
+    Args:
+      name: Name of the disk to create.
+      snapshot: Snapshot to use when creating the disk.
+      zone: Zone to create the disk in. e.g. us-central1-f
+    """
+    return self.call_api(
+        '/zones/%s/disks' % zone,
+        method='POST',
+        payload={
+            'name': name,
+            'sourceSnapshot': snapshot,
+        },
+    )
+
 
 class ZoneOperation(object):
   """Asynchronous GCE operation returned by some Project methods.

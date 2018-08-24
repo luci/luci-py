@@ -13,6 +13,7 @@ from components import decorators
 import catalog
 import cleanup
 import config
+import disks
 import instance_group_managers
 import instance_templates
 import instances
@@ -56,6 +57,14 @@ class ConfigProcessHandler(webapp2.RequestHandler):
         max_concurrent=10,
         max_concurrent_igm=10,
     )
+
+
+class DiskCreationHandler(webapp2.RequestHandler):
+  """Worker for creating disks."""
+
+  @decorators.require_cronjob
+  def get(self):
+    disks.schedule_creation()
 
 
 class EntityCleanupHandler(webapp2.RequestHandler):
@@ -155,6 +164,7 @@ def create_cron_app():
   return webapp2.WSGIApplication([
       ('/internal/cron/catalog-instances', InstanceCatalogHandler),
       ('/internal/cron/cleanup-entities', EntityCleanupHandler),
+      ('/internal/cron/create-disks', DiskCreationHandler),
       ('/internal/cron/create-instance-group-managers',
        InstanceGroupManagerCreationHandler),
       ('/internal/cron/create-instance-templates',

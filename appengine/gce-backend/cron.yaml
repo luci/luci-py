@@ -5,6 +5,9 @@ cron:
 - url: /internal/cron/cleanup-entities
   schedule: every 1 minutes
 
+- url: /internal/cron/create-disks
+  schedule: every 1 minutes
+
 - url: /internal/cron/create-instance-group-managers
   schedule: every 1 minutes
 

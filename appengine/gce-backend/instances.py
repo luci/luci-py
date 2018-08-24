@@ -48,6 +48,18 @@ def get_instance_group_manager_key(key):
       *key.id().split()[:-1])
 
 
+def get_name(key):
+  """Returns the name of the given Instance.
+
+  Args:
+    key: ndb.Key for a models.Instance.
+
+  Returns:
+    A string.
+  """
+  return key.id().split()[-1]
+
+
 @ndb.transactional
 def mark_for_deletion(key):
   """Marks the given instance for deletion.
