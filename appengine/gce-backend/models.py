@@ -37,6 +37,8 @@ class Instance(ndb.Model):
   deleted = ndb.BooleanProperty(indexed=True)
   # Time that the deletion request for this instance was first initiated.
   deletion_ts = ndb.DateTimeProperty(indexed=False)
+  # The disk attached to this instance.
+  disk = ndb.StringProperty(indexed=False)
   # Name of this instance.
   hostname = ndb.ComputedProperty(
       lambda self: self.key.id().split()[-1], indexed=True)

@@ -6,12 +6,35 @@
 
 import logging
 
+from google.appengine.ext import ndb
+
 from components import gce
 from components import net
 
 import instances
 import models
 import utilities
+
+
+@ndb.transactional
+def set_attached(key, disk):
+  """Sets the disk as attached to the given Instance.
+
+  Args:
+    key: ndb.Key for a models.Instance entity.
+    disk: Name of the disk.
+  """
+  instance = key.get()
+  if not instance:
+    logging.warning('Instance does not exist: %s', key)
+    return
+
+  if instance.disk == disk:
+    return
+
+  logging.info('Updating disk (%s -> %s)', instance.disk, disk)
+  instance.disk = disk
+  instance.put()
 
 
 def create(key):
@@ -23,6 +46,9 @@ def create(key):
   instance = key.get()
   if not instance:
     logging.warning('Instance does not exist: %s', key)
+    return
+
+  if instance.disk:
     return
 
   igm_key = instances.get_instance_group_manager_key(key)
@@ -55,7 +81,24 @@ def create(key):
       # 409 means the disk already exists.
       raise
 
-  # TODO(smut): Attach the disk.
+  # Attach the disk to the instance.
+  # Returns 200 if the operation has started, an operation already exists, or
+  # the disk has already been attached. Returns 404 if the disk doesn't exist
+  # and 400 if the disk is still being created.
+  try:
+    api.attach_disk(name, disk, igm_key.id())
+  except net.Error as e:
+    if e.status_code in (400, 404):
+      # 400 or 404 means this was called too soon after creating the disk.
+      return
+    raise
+
+  # Check if the disk is attached.
+  result = api.get_instance(igm_key.id(), name, fields=['disks/deviceName'])
+  for d in result.get('disks', []):
+    if d.get('deviceName') == disk:
+      set_attached(key, disk)
+      return
 
 
 def _schedule_creation(keys):
@@ -69,7 +112,7 @@ def _schedule_creation(keys):
     if igm:
       for key in igm.instances:
         instance = key.get()
-        if instance:
+        if instance and not instance.disk:
           utilities.enqueue_task('create-disk', key)
 
 

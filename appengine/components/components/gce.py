@@ -578,6 +578,25 @@ class Project(object):
         },
     )
 
+  def attach_disk(self, instance, disk, zone):
+    """Attaches a disk to an instance.
+
+    Args:
+      instance: Name of the instance to attach the disk to.
+      disk: Name of the disk to attach.
+      zone: Zone the disk and instance already exist in. e.g. us-central1-f
+    """
+    return self.call_api(
+        '/zones/%s/instances/%s/attachDisk' % (zone, instance),
+        method='POST',
+        payload={
+            'autoDelete': True,
+            'deviceName': disk,
+            'source': 'projects/%s/zones/%s/disks/%s' % (
+                self.project_id, zone, disk),
+        },
+    )
+
 
 class ZoneOperation(object):
   """Asynchronous GCE operation returned by some Project methods.
