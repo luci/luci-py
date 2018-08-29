@@ -140,10 +140,13 @@ def get_dimensions(devices):
   # Each key in the following dict is a dimension and its value is the list of
   # all possible device properties that can define that dimension.
   # TODO(bpastene) Make sure all the devices use the same board and OS.
+  # product.device should be read (and listed) first, that is, before
+  # build.product because the latter is deprecated.
+  # https://android.googlesource.com/platform/build/+/master/tools/buildinfo.sh
   dimension_properties = {
     u'device_os': ['build.id'],
     u'device_os_flavor': ['product.brand'],
-    u'device_type': ['build.product', 'product.board', 'product.device'],
+    u'device_type': ['product.device', 'build.product', 'product.board'],
   }
   for dim in dimension_properties:
     dimensions[dim] = set()
@@ -155,9 +158,16 @@ def get_dimensions(devices):
       for dim, props in dimension_properties.iteritems():
         for prop in props:
           real_prop = u'ro.' + prop
-          if real_prop in properties and properties[real_prop].strip():
-            dimensions[dim].add(properties[real_prop].strip())
-            break
+          if real_prop in properties:
+            p = properties[real_prop].strip()
+            if p and p not in dimensions[dim]:
+              dimensions[dim].add(p)
+              # In the past, we would break here to have only one device_type.
+              # This can be re-introduced if needed, but for some devices
+              # (e.g. 2017 NVidia Shield, aka darcy) there are different values
+              # for product.device and build.product (e.g. darcy and foster
+              # [the device_type of the 2015 Shield]). Rather than knowing
+              # which of the three keys is "correct", just report all of them.
       # Only advertize devices that can be used.
       dimensions[u'android'].append(device.serial)
 
