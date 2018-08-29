@@ -405,7 +405,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'bot_authenticated_as': u'bot:whitelisted-ip',
         u'caches': [
           {
-            u'hint': -1,
+            u'hint': '-1',
             u'name': u'git_infra',
             u'path': u'git_cache',
           },

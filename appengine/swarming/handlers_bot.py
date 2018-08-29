@@ -599,7 +599,7 @@ class BotPollHandler(_BotBaseHandler):
     # Warning: this is doing a DB GET on the cold path, which will increase the
     # reap failure.
     for i, hint in enumerate(named_caches.get_hints(pool, oses, names)):
-      caches[i]['hint'] = hint
+      caches[i]['hint'] = str(hint)
 
     out = {
       'cmd': 'run',

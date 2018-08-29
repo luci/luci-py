@@ -722,7 +722,7 @@ class TestTaskRunner(TestTaskRunnerBase):
       'with open("cache_foo/bar", "wb") as f:\n'
       '  f.write("updated_cache")\n')
     task_details = self.get_task_details(
-        script, caches=[{'name': 'foo', 'path': 'cache_foo'}])
+        script, caches=[{'name': 'foo', 'path': 'cache_foo', 'hint': '100'}])
     expected = {
       u'exit_code': 0,
       u'hard_timeout': False,
