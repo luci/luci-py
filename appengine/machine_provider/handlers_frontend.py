@@ -14,6 +14,7 @@ from components import datastore_utils
 from components import template
 from components import utils
 
+import acl
 import handlers_endpoints
 import models
 
@@ -24,7 +25,8 @@ THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 class CatalogHandler(auth.AuthenticatingHandler):
   """Catalog handler."""
 
-  @auth.require(auth.is_admin)
+  @auth.autologin
+  @auth.require(acl.can_view_catalog)
   def get(self, machine_id=None):
     params = {
         'machines': [],
@@ -49,6 +51,8 @@ class CatalogHandler(auth.AuthenticatingHandler):
 class LeaseRequestHandler(auth.AuthenticatingHandler):
   """Lease request handler."""
 
+  # TODO(smut): Update list of lease request viewers.
+  @auth.autologin
   @auth.require(auth.is_admin)
   def get(self, lease_id=None):
     params = {
@@ -76,11 +80,7 @@ class RootHandler(auth.AuthenticatingHandler):
 
   @auth.public
   def get(self):
-    params = {
-        'is_admin': auth.is_admin(),
-    }
-
-    self.response.write(template.render('templates/root.html', params=params))
+    self.response.write(template.render('templates/root.html'))
 
 
 def get_routes():
