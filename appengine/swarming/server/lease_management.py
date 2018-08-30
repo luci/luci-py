@@ -26,6 +26,10 @@ server/bot_management.py) corresponding to the machine provided for the lease.
 Include the lease ID and lease_expiration_ts as fields in the BotInfo. If it
 is expired, clear the associated lease. If there is no associated lease and
 the MachineLease is drained, delete the MachineLease entity.
+
+Each self-management job performs only one idempotent operation then returns,
+meaning each iteration makes incremental progress over the last iteration and
+the self-management jobs must be called continuously via cron.
 """
 
 import base64
@@ -1167,6 +1171,7 @@ def manage_leased_machine(machine_lease):
   # Handle a newly leased machine.
   if not machine_lease.bot_id:
     ensure_bot_info_exists(machine_lease)
+    return
 
   # Once BotInfo is created, send the instruction to join the server.
   if not machine_lease.instruction_ts:
@@ -1176,6 +1181,7 @@ def manage_leased_machine(machine_lease):
   # Once the instruction is sent, check for connection.
   if not machine_lease.connection_ts:
     check_for_connection(machine_lease)
+    return
 
   # Handle an expired lease.
   if not machine_lease.leased_indefinitely:
