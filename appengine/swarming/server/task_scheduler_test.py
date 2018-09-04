@@ -421,6 +421,31 @@ class TaskSchedulerApiTest(test_env_handlers.AppTestBase):
     self.assertIsNone(to_run_key.get().queue_number)
     self.assertEqual(State.EXPIRED, result_summary.key.get().state)
 
+  def test_bot_reap_task_6_expired(self):
+    # A lot of tasks are expired, eventually stop expiring them.
+    self._register_bot(0, self.bot_dimensions)
+    result_summaries = []
+    for i in xrange(6):
+      self.mock_now(self.now, i)
+      result_summaries.append(self._quick_schedule(int(not bool(i))))
+    # Forwards clock to get past expiration.
+    self.mock_now(result_summaries[-1].request_key.get().expiration_ts, 1)
+
+    # Fail to reap a task.
+    actual_request, _, run_result = task_scheduler.bot_reap_task(
+        self.bot_dimensions, 'abc', None)
+    self.assertIsNone(actual_request)
+    self.assertIsNone(run_result)
+    # They all got expired ...
+    for result_summary in result_summaries[:-1]:
+      result_summary = result_summary.key.get()
+      self.assertEqual(State.EXPIRED, result_summary.state)
+    # ... except the the very last one because of the limit of 5 task expired
+    # per poll.
+    result_summary = result_summaries[-1]
+    result_summary = result_summary.key.get()
+    self.assertEqual(State.PENDING, result_summary.state)
+
   def test_schedule_request_slice_fallback_to_second_immediate(self):
     # First TaskSlice couldn't run so it was immediately skipped, the second ran
     # instead.

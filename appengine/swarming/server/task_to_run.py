@@ -530,6 +530,9 @@ def set_lookup_cache(to_run_key, is_available_to_schedule):
   Another reason for this negative cache is that the DB index takes some seconds
   to be updated, which means it can return stale items (e.g. already reaped).
 
+  It can be viewed as a lock, except that the 'lock' is never released, it is
+  impliclity released after 15 seconds.
+
   Returns:
     True if the key was updated, False if was trying to reap and the entry was
     already set.

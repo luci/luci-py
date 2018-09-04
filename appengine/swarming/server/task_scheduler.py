@@ -98,7 +98,7 @@ def _expire_task_tx(now, request, to_run_key, result_summary_key, capacity):
   return result_summary, new_to_run
 
 
-def _expire_task(to_run_key, request, retries):
+def _expire_task(to_run_key, request, inline):
   """Expires a TaskResultSummary and unschedules the TaskToRun.
 
   This function is only meant to process PENDING tasks.
@@ -106,7 +106,8 @@ def _expire_task(to_run_key, request, retries):
   Arguments:
     to_run_key: the TaskToRun to expire
     request: the corresponding TaskRequest instance
-    retries: number of retries in the transaction
+    inline: True if this is done as part of a bot polling for a task to run,
+            in this case it should abort as quickly as possible
 
   If a follow up TaskSlice is available, reenqueue a new TaskToRun instead of
   expiring the TaskResultSummary.
@@ -116,6 +117,13 @@ def _expire_task(to_run_key, request, retries):
     - TaskResultSummary on success
     - TaskToRun if a new TaskSlice was reenqueued
   """
+  # Add it to the negative cache *before* running the transaction. Either way
+  # the task was already reaped or the task is correctly expired and not
+  # reapable.
+  if not task_to_run.set_lookup_cache(to_run_key, False) and inline:
+    logging.info('Not expiring inline task with negative cache set')
+    return None, None
+
   # Look if the TaskToRun is reapable once before doing the check inside the
   # transaction. This reduces the likelihood of failing this check inside the
   # transaction, which is an order of magnitude more costly.
@@ -138,10 +146,8 @@ def _expire_task(to_run_key, request, retries):
     for t in slices
   ]
 
-  # Add it to the negative cache *before* running the transaction. Either way
-  # the task was already reaped or the task is correctly expired and not
-  # reapable.
-  task_to_run.set_lookup_cache(to_run_key, False)
+  # When running inline, do not retry too much.
+  retries = 1 if inline else 4
 
   # It'll be caught by next cron job execution in case of failure.
   run = lambda: _expire_task_tx(
@@ -903,8 +909,16 @@ def bot_reap_task(bot_dimensions, bot_version, deadline):
       t = request.task_slice(slice_index)
       limit = to_run.created_ts + datetime.timedelta(seconds=t.expiration_secs)
       if limit < utils.utcnow():
-        # Use a low number of retries, as at worst the cron job will catch it.
-        summary, new_to_run = _expire_task(to_run.key, request, retries=1)
+        if expired >= 5:
+          # Do not try to expire too many tasks in one poll request, as this
+          # kills the polling performance in case of degenerate queue: this
+          # happens in the situation where a large backlog >10000 of tasks are
+          # expiring simultaneously.
+          logging.info('Too many inline expiration; skipping')
+          failures += 1
+          continue
+
+        summary, new_to_run = _expire_task(to_run.key, request, inline=True)
         if not new_to_run:
           if summary:
             expired += 1
@@ -1188,7 +1202,7 @@ def cron_abort_expired_task_to_run(host):
   try:
     for to_run in task_to_run.yield_expired_task_to_run():
       request = to_run.request_key.get()
-      summary, new_to_run = _expire_task(to_run.key, request, retries=4)
+      summary, new_to_run = _expire_task(to_run.key, request, inline=False)
       if new_to_run:
         # Expiring a TaskToRun for TaskSlice may reenqueue a new TaskToRun.
         reenqueued.append(request)
