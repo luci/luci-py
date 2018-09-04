@@ -279,6 +279,29 @@ class TasksApiTest(BaseTest):
 
     request.evaluate_only = False
     expected[u'task_id'] = u'5cee488008810'
+    expected[u'task_result'] = {
+      u'abandoned_ts': u'2010-01-02T03:04:05',
+      u'created_ts': u'2010-01-02T03:04:05',
+      u'current_task_slice': u'0',
+      u'failure': False,
+      u'internal_failure': False,
+      u'modified_ts': u'2010-01-02T03:04:05',
+      u'name': u'job1',
+      u'server_versions': [u'v1a'],
+      u'state': u'NO_RESOURCE',
+      u'tags': [
+        u'a:tag',
+        u'os:Amiga',
+        u'pool:default',
+        u'priority:20',
+        u'service_account:service-account@example.com',
+        u'swarming.pool.template:none',
+        u'swarming.pool.version:pools_cfg_rev',
+        u'user:joe@localhost',
+      ],
+      u'task_id': u'5cee488008810',
+      u'user': u'joe@localhost',
+    }
     response = self.call_api('new', body=message_to_dict(request))
     # Time advanced since the evaluate_only call.
     expected['request']['created_ts'] = fmtdate(self.now)
@@ -337,6 +360,29 @@ class TasksApiTest(BaseTest):
           },
         ]),
       u'task_id': u'5cee488008810',
+      u'task_result': {
+        u'abandoned_ts': u'2010-01-02T03:04:05',
+        u'created_ts': u'2010-01-02T03:04:05',
+        u'current_task_slice': u'0',
+        u'failure': False,
+        u'internal_failure': False,
+        u'modified_ts': u'2010-01-02T03:04:05',
+        u'name': u'job1',
+        u'server_versions': [u'v1a'],
+        u'state': u'NO_RESOURCE',
+        u'tags': [
+          u'a:tag',
+          u'os:Amiga',
+          u'pool:template',
+          u'priority:20',
+          u'service_account:none',
+          u'swarming.pool.template:prod',
+          u'swarming.pool.version:pools_cfg_rev',
+          u'user:joe@localhost',
+        ],
+        u'task_id': u'5cee488008810',
+        u'user': u'joe@localhost',
+      },
     }
 
     response = self.call_api('new', body=message_to_dict(request))
@@ -566,6 +612,29 @@ class TasksApiTest(BaseTest):
             },
           ]),
       u'task_id': u'5cee488008810',
+      u'task_result': {
+        u'abandoned_ts': u'2010-01-02T03:04:05',
+        u'created_ts': u'2010-01-02T03:04:05',
+        u'current_task_slice': u'0',
+        u'failure': False,
+        u'internal_failure': False,
+        u'modified_ts': u'2010-01-02T03:04:05',
+        u'name': u'job1',
+        u'server_versions': [u'v1a'],
+        u'state': u'NO_RESOURCE',
+        u'tags': [
+          u'a:tag',
+          u'os:Amiga',
+          u'pool:default',
+          u'priority:20',
+          u'service_account:none',
+          u'swarming.pool.template:none',
+          u'swarming.pool.version:pools_cfg_rev',
+          u'user:joe@localhost',
+        ],
+        u'task_id': u'5cee488008810',
+        u'user': u'joe@localhost',
+      },
     }
     response = self.call_api('new', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
@@ -599,6 +668,29 @@ class TasksApiTest(BaseTest):
             },
           ]),
       u'task_id': u'5cee488008810',
+      u'task_result': {
+        u'abandoned_ts': u'2010-01-02T03:04:05',
+        u'created_ts': u'2010-01-02T03:04:05',
+        u'current_task_slice': u'0',
+        u'failure': False,
+        u'internal_failure': False,
+        u'modified_ts': u'2010-01-02T03:04:05',
+        u'name': u'job1',
+        u'server_versions': [u'v1a'],
+        u'state': u'NO_RESOURCE',
+        u'tags': [
+          u'a:tag',
+          u'os:Amiga',
+          u'pool:default',
+          u'priority:20',
+          u'service_account:none',
+          u'swarming.pool.template:none',
+          u'swarming.pool.version:pools_cfg_rev',
+          u'user:joe@localhost',
+        ],
+        u'task_id': u'5cee488008810',
+        u'user': u'joe@localhost',
+      },
     }
     response = self.call_api('new', body=message_to_dict(request))
     self.assertEqual(expected, response.json)
@@ -643,6 +735,29 @@ class TasksApiTest(BaseTest):
             },
           ]),
       u'task_id': u'5cee488008810',
+      u'task_result': {
+        u'abandoned_ts': u'2010-01-02T03:04:05',
+        u'created_ts': u'2010-01-02T03:04:05',
+        u'current_task_slice': u'0',
+        u'failure': False,
+        u'internal_failure': False,
+        u'modified_ts': u'2010-01-02T03:04:05',
+        u'name': u'job1',
+        u'server_versions': [u'v1a'],
+        u'state': u'NO_RESOURCE',
+        u'tags': [
+          u'a:tag',
+          u'os:Amiga',
+          u'pool:default',
+          u'priority:20',
+          u'service_account:none',
+          u'swarming.pool.template:none',
+          u'swarming.pool.version:pools_cfg_rev',
+          u'user:joe@localhost',
+        ],
+        u'task_id': u'5cee488008810',
+        u'user': u'joe@localhost',
+      },
     }
     request = self.create_new_request(
         properties=self.create_props(
@@ -686,6 +801,29 @@ class TasksApiTest(BaseTest):
             },
           ]),
       u'task_id': u'5cee488008810',
+      u'task_result': {
+        u'abandoned_ts': u'2010-01-02T03:04:05',
+        u'created_ts': u'2010-01-02T03:04:05',
+        u'current_task_slice': u'0',
+        u'failure': False,
+        u'internal_failure': False,
+        u'modified_ts': u'2010-01-02T03:04:05',
+        u'name': u'job1',
+        u'server_versions': [u'v1a'],
+        u'state': u'NO_RESOURCE',
+        u'tags': [
+          u'a:tag',
+          u'os:Amiga',
+          u'pool:default',
+          u'priority:20',
+          u'service_account:none',
+          u'swarming.pool.template:none',
+          u'swarming.pool.version:pools_cfg_rev',
+          u'user:joe@localhost',
+        ],
+        u'task_id': u'5cee488008810',
+        u'user': u'joe@localhost',
+      },
     }
     self.assertEqual(expected, response)
 
@@ -732,6 +870,29 @@ class TasksApiTest(BaseTest):
             },
           ]),
       u'task_id': u'5cee488008810',
+      u'task_result': {
+        u'abandoned_ts': u'2010-01-02T03:04:05',
+        u'created_ts': u'2010-01-02T03:04:05',
+        u'current_task_slice': u'0',
+        u'failure': False,
+        u'internal_failure': False,
+        u'modified_ts': u'2010-01-02T03:04:05',
+        u'name': u'job1',
+        u'server_versions': [u'v1a'],
+        u'state': u'NO_RESOURCE',
+        u'tags': [
+          u'a:tag',
+          u'os:Amiga',
+          u'pool:default',
+          u'priority:20',
+          u'service_account:none',
+          u'swarming.pool.template:none',
+          u'swarming.pool.version:pools_cfg_rev',
+          u'user:joe@localhost',
+        ],
+        u'task_id': u'5cee488008810',
+        u'user': u'joe@localhost',
+      },
     }
     self.assertEqual(expected, response)
 

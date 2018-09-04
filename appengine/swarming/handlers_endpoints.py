@@ -482,15 +482,16 @@ class SwarmingTasksService(remote.Service):
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
 
-    previous_result = None
-    if result_summary.deduped_from:
-      previous_result = message_conversion.task_result_to_rpc(
+    returned_result = None
+    if result_summary.state != task_result.State.PENDING:
+      # It likely is COMPLETED (because of deduping) or NO_RESOURCE.
+      returned_result = message_conversion.task_result_to_rpc(
           result_summary, False)
 
     return swarming_rpcs.TaskRequestMetadata(
         request=message_conversion.task_request_to_rpc(request_obj),
         task_id=task_pack.pack_result_summary_key(result_summary.key),
-        task_result=previous_result)
+        task_result=returned_result)
 
   @gae_ts_mon.instrument_endpoint()
   @auth.endpoints_method(
