@@ -3,7 +3,8 @@ runtime: python27
 api_version: 1
 threadsafe: true
 
-instance_class: F4
+# Many cron jobs uses a lot of memory. It's not worth micro optimizing.
+instance_class: F4_1G
 
 handlers:
 - url: /(internal|restricted)/mapreduce(/.*)?
