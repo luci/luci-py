@@ -1178,6 +1178,63 @@ class ManageLeasedMachineTest(test_case.TestCase):
     lease_management.manage_leased_machine(key.get())
     self.assertFalse(key.get().client_request_id)
 
+  def test_releases(self):
+    key = lease_management.MachineLease(
+        id='machine-lease',
+        bot_id='hostname',
+        client_request_id='request-id',
+        connection_ts=utils.utcnow(),
+        early_release_secs=86400,
+        hostname='hostname',
+        instruction_ts=utils.utcnow(),
+        lease_expiration_ts=utils.utcnow() + datetime.timedelta(days=1),
+        lease_id='lease-id',
+        machine_type=lease_management.MachineType(
+            id='machine-type',
+            target_size=1,
+        ).put(),
+    ).put()
+    lease_management.manage_leased_machine(key.get())
+    self.assertTrue(key.get().termination_task)
+
+  def test_releases_drained_bot(self):
+    key = lease_management.MachineLease(
+        id='machine-lease',
+        bot_id='hostname',
+        client_request_id='request-id',
+        connection_ts=utils.utcnow(),
+        drained=True,
+        hostname='hostname',
+        instruction_ts=utils.utcnow(),
+        lease_expiration_ts=utils.utcnow() + datetime.timedelta(days=1),
+        lease_id='lease-id',
+        machine_type=lease_management.MachineType(
+            id='machine-type',
+            target_size=1,
+        ).put(),
+    ).put()
+    lease_management.manage_leased_machine(key.get())
+    self.assertTrue(key.get().termination_task)
+
+  def test_releases_drained_indefinite_bot(self):
+    key = lease_management.MachineLease(
+        id='machine-lease',
+        bot_id='hostname',
+        client_request_id='request-id',
+        connection_ts=utils.utcnow(),
+        drained=True,
+        hostname='hostname',
+        instruction_ts=utils.utcnow(),
+        leased_indefinitely=True,
+        lease_id='lease-id',
+        machine_type=lease_management.MachineType(
+            id='machine-type',
+            target_size=1,
+        ).put(),
+    ).put()
+    lease_management.manage_leased_machine(key.get())
+    self.assertTrue(key.get().termination_task)
+
 
 class ScheduleLeaseManagementTest(test_case.TestCase):
   """Tests for lease_management.schedule_lease_management."""

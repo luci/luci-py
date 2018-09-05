@@ -1137,26 +1137,33 @@ def handle_termination_task(machine_lease):
 def handle_early_release(machine_lease):
   """Handles the early release of a leased machine.
 
+  Early release can be due to configured early release time, or being drained.
+
   Args:
     machine_lease: MachineLease instance.
   """
   assert not machine_lease.termination_task, machine_lease.termination_task
 
-  early_expiration_ts = machine_lease.lease_expiration_ts - datetime.timedelta(
-      seconds=machine_lease.early_release_secs)
+  # Machines leased indefinitely can only be released if they are drained.
+  # All other machines can be released if they are drained or their early
+  # release time has arrived.
+  if not machine_lease.drained:
+    early_release_ts = machine_lease.lease_expiration_ts - datetime.timedelta(
+        seconds=machine_lease.early_release_secs)
+    if early_release_ts > utils.utcnow():
+      return
 
-  if machine_lease.drained or early_expiration_ts <= utils.utcnow():
-    logging.info(
-        'MachineLease ready to be released:\nKey: %s\nHostname: %s',
-        machine_lease.key,
-        machine_lease.hostname,
-    )
-    task = task_request.create_termination_task(
-        machine_lease.hostname, wait_for_capacity=True)
-    task_result_summary = task_scheduler.schedule_request(
-        task, secret_bytes=None)
-    associate_termination_task(
-        machine_lease.key, machine_lease.hostname, task_result_summary.task_id)
+  logging.info(
+      'MachineLease ready to be released:\nKey: %s\nHostname: %s',
+      machine_lease.key,
+      machine_lease.hostname,
+  )
+  task = task_request.create_termination_task(
+      machine_lease.hostname, wait_for_capacity=True)
+  task_result_summary = task_scheduler.schedule_request(
+      task, secret_bytes=None)
+  associate_termination_task(
+      machine_lease.key, machine_lease.hostname, task_result_summary.task_id)
 
 
 def manage_leased_machine(machine_lease):
