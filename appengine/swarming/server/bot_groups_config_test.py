@@ -430,11 +430,25 @@ class BotGroupsConfigTest(test_case.TestCase):
       ' must be specified'
     ])
 
-  def test_machine_type_lease_duration_secs_zero(self):
+  def test_machine_type_early_release_secs_and_lease_indefinitely(self):
     cfg = bots_pb2.BotsCfg(
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
-          bots_pb2.MachineType(name='abc', lease_duration_secs=0,
+          bots_pb2.MachineType(name='abc',
+                               early_release_secs=1, lease_indefinitely=True,
+                               mp_dimensions=['key:value'], target_size=1),
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0: early_release_secs cannot be specified'
+      ' with lease_indefinitely'
+    ])
+
+  def test_machine_type_lease_indefinitely_false(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_indefinitely=False,
                                mp_dimensions=['key:value'], target_size=1),
         ]),
     ])
@@ -443,11 +457,11 @@ class BotGroupsConfigTest(test_case.TestCase):
       ' must be specified'
     ])
 
-  def test_machine_type_lease_indefinitely_false(self):
+  def test_machine_type_lease_duration_secs_zero(self):
     cfg = bots_pb2.BotsCfg(
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
-          bots_pb2.MachineType(name='abc', lease_indefinitely=False,
+          bots_pb2.MachineType(name='abc', lease_duration_secs=0,
                                mp_dimensions=['key:value'], target_size=1),
         ]),
     ])
@@ -466,6 +480,19 @@ class BotGroupsConfigTest(test_case.TestCase):
     ])
     self.validator_test(cfg, [
       'bot_group #0: machine_type #0: lease_duration_secs must be positive'
+    ])
+
+  def test_machine_type_early_release_secs_negative(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               early_release_secs=-1,
+                               mp_dimensions=['key:value'], target_size=1),
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0: early_release_secs must be positive'
     ])
 
   def test_machine_type_mp_dimensions_unspecified(self):

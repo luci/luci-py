@@ -121,6 +121,9 @@ class MachineLease(ndb.Model):
     if self.lease_duration_secs and self.lease_indefinitely:
       raise datastore_errors.BadValueError(
         'lease_duration_secs and lease_indefinitely both set:\n%s' % self)
+    if self.early_release_secs and self.lease_indefinitely:
+      raise datastore_errors.BadValueError(
+        'early_release_secs and lease_indefinitely both set:\n%s' % self)
     if self.lease_expiration_ts and self.leased_indefinitely:
       raise datastore_errors.BadValueError(
         'lease_expiration_ts and leased_indefinitely both set:\n%s' % self)
