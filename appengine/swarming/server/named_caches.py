@@ -19,10 +19,11 @@ state on each bot.
     +----------+     +----------+
 
 
-The cached size for each named cache is the 95th percentile for the caches found
-on the fleet. It is updated every 24 hours, so that if a large cache is not
-re-observed for 24h, it will be lowered. When an higher size is observed that is
-more than 10% of the previous one, the value is immediately updated.
+The cached size hint for each named cache is the 95th percentile for the caches
+found on the fleet. It is updated every 24 hours, so that if a large cache is
+not re-observed for 24h, it will be lowered. When an higher size hint is
+observed that is more than 10% of the previous one, the value is immediately
+updated.
 
 Caches for named cache that haven't been updated for 8 days are deleted.
 
@@ -56,9 +57,9 @@ class NamedCache(ndb.Model):
   memcache, even if the hint is not exactly right.
   """
   ts = ndb.DateTimeProperty()
-  os = ndb.StringProperty(indexed=False)
+  os = ndb.StringProperty()
   name = ndb.StringProperty()
-  max_size = ndb.IntegerProperty(indexed=False)
+  hint = ndb.IntegerProperty(indexed=False, default=0)
 
 
 ### Private APIs.
@@ -72,14 +73,14 @@ def _named_cache_key(pool, os, name):
   return ndb.Key(NamedCacheRoot, pool, NamedCache, os + ':' + name)
 
 
-def _update_named_cache(pool, os, name, size):
+def _update_named_cache(pool, os, name, hint):
   """Opportunistically update a named cache if the hint was off by 10% or more.
 
   Arguments:
   - pool: pool name
   - os: reduced 'os' value
   - name: named cache name
-  - size: observed size on the fleet
+  - hint: observed size hint to use on the fleet
 
   It will be updated when:
   - The NamedCache is older than 24 hours, where the new size is used and the
@@ -89,13 +90,13 @@ def _update_named_cache(pool, os, name, size):
   assert isinstance(pool, basestring), repr(pool)
   assert isinstance(os, basestring), repr(os)
   assert isinstance(name, basestring), repr(name)
-  assert isinstance(size, (int, long)), repr(size)
+  assert isinstance(hint, (int, long)), repr(hint)
   key = _named_cache_key(pool, os, name)
   now = utils.utcnow().replace(microsecond=0)
   e = key.get()
   exp = now - datetime.timedelta(hours=24)
-  if not e or e.max_size <= size*0.9 or e.ts < exp:
-    e = NamedCache(key=key, ts=now, os=os, name=name, max_size=size)
+  if not e or e.hint <= hint*0.9 or e.ts < exp:
+    e = NamedCache(key=key, ts=now, os=os, name=name, hint=hint)
     e.put()
     return True
   return False
@@ -135,7 +136,7 @@ def get_hints(pool, oses, names):
   os = _reduce_oses(oses)
   keys = [_named_cache_key(pool, os, name) for name in names]
   entities = ndb.get_multi(keys)
-  hints = [e.max_size if e else -1 for e in entities]
+  hints = [e.hint if e else -1 for e in entities]
   ancestor = ndb.Key(NamedCacheRoot, pool)
   for i, hint in enumerate(hints):
     if hint > -1:
@@ -147,7 +148,7 @@ def get_hints(pool, oses, names):
       # TODO(maruel): We could define default hints in the pool.
       continue
     # Found something! Take the largest value.
-    hints[i] = max(e.max_size for e in other_oses)
+    hints[i] = max(e.hint for e in other_oses)
 
   return hints
 
@@ -201,9 +202,9 @@ def task_update_pool(pool):
     for name, sizes in sorted(d.iteritems()):
       # Adhoc calculation to take the ~95th percentile.
       sizes.sort()
-      size = sizes[int(float(len(sizes)) * 0.95)]
-      if _update_named_cache(pool, os, name, size):
-        logging.debug('Pool %r  OS %r  Cache %r  hint=%d', pool, os, name, size)
+      hint = sizes[int(float(len(sizes)) * 0.95)]
+      if _update_named_cache(pool, os, name, hint):
+        logging.debug('Pool %r  OS %r  Cache %r  hint=%d', pool, os, name, hint)
 
   # Delete the old ones.
   exp = utils.utcnow().replace(microsecond=0) - datetime.timedelta(days=8)
