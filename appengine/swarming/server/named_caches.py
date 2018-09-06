@@ -164,32 +164,37 @@ def task_update_pool(pool):
   """
   q = bot_management.BotInfo.query()
   found = {}
+  bots = 0
   exp = utils.utcnow().replace(microsecond=0) - datetime.timedelta(hours=4)
   for bot in bot_management.filter_dimensions(q, [u'pool:'+pool]):
     if bot.last_seen_ts < exp:
-      # Dead bot.
+      # Very dead bot; it hasn't pinged for 4 hours.
       continue
+    bots += 1
     # Some bots do not have 'os' correctly specified. They fall into the
     # 'unknown' OS bucket.
     os = _reduce_oses(bot.dimensions.get('os') or [])
     state = bot.state
     if not state or not isinstance(state, dict):
+      logging.debug('%s has no state', bot.id)
       continue
     # TODO(maruel): Use structured data instead of adhoc json.
-    c = state.get('named_cache')
+    c = state.get('named_caches')
     if not isinstance(c, dict):
       continue
     d = found.setdefault(os, {})
     for key, value in sorted(c.iteritems()):
       if not value or not isinstance(value, list) or len(value) != 2:
+        logging.error('%s has bad cache (A)', bot.id)
         continue
       if not value[0] or not isinstance(value[0], list) or len(value[0]) != 2:
+        logging.error('%s has bad cache (B)', bot.id)
         continue
       s = value[0][1]
       d.setdefault(key, []).append(s)
   logging.info(
-      'Found %d caches in %d distinct OSes in pool %r',
-      sum(len(f) for f in found.itervalues()), len(found), pool)
+      'Found %d bots, %d caches in %d distinct OSes in pool %r',
+      bots, sum(len(f) for f in found.itervalues()), len(found), pool)
 
   # TODO(maruel): Parallelise.
   for os, d in sorted(found.iteritems()):

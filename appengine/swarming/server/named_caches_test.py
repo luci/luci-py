@@ -30,9 +30,9 @@ def _bot_event(bot_id, pool, caches, oses):
     u'os': oses or [u'Linux', u'Ubuntu', u'Ubuntu-16.04'],
     u'pool': [pool],
   }
-  # Format is named_cache: {name: [['shortname', size], timestamp]}.
+  # Format is named_caches: {name: [['shortname', size], timestamp]}.
   state = {
-    'named_cache': {
+    'named_caches': {
       name: [['a', size], 10] for name, size in caches.iteritems()
     }
   }
