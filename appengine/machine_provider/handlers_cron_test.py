@@ -33,6 +33,7 @@ class CanFulfillTest(test_case.TestCase):
     request = rpc_messages.LeaseRequest(
         dimensions=rpc_messages.Dimensions(
             disk_gb=100,
+            disk_type=rpc_messages.DiskTypes.SSD,
             num_cpus=2,
             os_family=rpc_messages.OSFamily.LINUX,
         ),
@@ -40,6 +41,7 @@ class CanFulfillTest(test_case.TestCase):
     entry = models.CatalogMachineEntry(
         dimensions=rpc_messages.Dimensions(
             disk_gb=100,
+            disk_type=rpc_messages.DiskTypes.SSD,
             num_cpus=2,
             os_family=rpc_messages.OSFamily.LINUX,
         ),
@@ -58,6 +60,7 @@ class CanFulfillTest(test_case.TestCase):
     entry = models.CatalogMachineEntry(
         dimensions=rpc_messages.Dimensions(
             disk_gb=100,
+            disk_type=rpc_messages.DiskTypes.HDD,
             hostname='fake-host',
             memory_gb=8.0,
             num_cpus=2,

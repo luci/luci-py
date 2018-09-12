@@ -60,8 +60,12 @@ def extract_dimensions(instance, instance_template_revision):
 
   if instance_template_revision.disk_size_gb:
     dimensions['disk_gb'] = instance_template_revision.disk_size_gb
+
+  # GCE defaults to an HDD type.
+  dimensions['disk_type'] = 'HDD'
   if instance_template_revision.disk_type:
-    dimensions['disk_type'] = instance_template_revision.disk_type
+    if gce.DISK_TYPES[instance_template_revision.disk_type]['ssd']:
+      dimensions['disk_type'] = 'SSD'
 
   if instance_template_revision.machine_type:
     dimensions['memory_gb'] = gce.machine_type_to_memory(

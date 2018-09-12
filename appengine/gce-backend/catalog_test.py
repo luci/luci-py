@@ -263,6 +263,7 @@ class ExtractDimensionsTest(test_case.TestCase):
     )
     expected_dimensions = {
         'backend': 'GCE',
+        'disk_type': 'HDD',
         'hostname': 'instance-name',
         'project': 'project',
     }
@@ -287,12 +288,14 @@ class ExtractDimensionsTest(test_case.TestCase):
             os_family=machine_provider.OSFamily.LINUX,
         ),
         disk_size_gb=300,
+        disk_type='pd-ssd',
         machine_type='n1-standard-8',
         project='project',
     )
     expected_dimensions = {
         'backend': 'GCE',
         'disk_gb': 300,
+        'disk_type': 'SSD',
         'hostname': 'instance-name',
         'memory_gb': 30,
         'num_cpus': 8,

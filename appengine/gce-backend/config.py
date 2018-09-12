@@ -17,6 +17,7 @@ import metrics
 
 from components import config
 from components import datastore_utils
+from components import gce
 from components import machine_provider
 from components import utils
 from components.config import validation
@@ -160,6 +161,9 @@ def validate_template_config(cfg, context):
       valid = False
     else:
       base_names.add(template.base_name)
+    if template.disk_type and template.disk_type not in gce.DISK_TYPES:
+      context.error('disk_type %s is invalid.', template.disk_type)
+      valid = False
     for metadata in template.metadata:
       parts = metadata.split(':', 1)
       if len(parts) != 2:

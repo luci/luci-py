@@ -27,6 +27,12 @@ class LinuxFlavor(messages.Enum):
   DEBIAN = 2
 
 
+class DiskTypes(messages.Enum):
+  """Lists valid disk types."""
+  HDD = 1
+  SSD = 2
+
+
 class Dimensions(messages.Message):
   """Represents the dimensions of a machine."""
   # The operating system family of this machine.
@@ -49,3 +55,5 @@ class Dimensions(messages.Message):
   os_version = messages.StringField(8)
   # The project this machine was created in.
   project = messages.StringField(9)
+  # The type of disk this machine has.
+  disk_type = messages.EnumField(DiskTypes, 10)

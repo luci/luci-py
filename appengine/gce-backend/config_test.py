@@ -113,6 +113,23 @@ class UpdateConfigTest(test_case.TestCase):
     self.failIf(config.Configuration.cached().manager_config)
     self.failIf(config.Configuration.cached().revision)
 
+  def test_invalid_disk_type(self):
+    """Ensures invalid disk types reject the entire config."""
+    template_config = config_pb2.InstanceTemplateConfig(
+        templates=[
+            config_pb2.InstanceTemplateConfig.InstanceTemplate(
+                base_name='base-name',
+                disk_type='invalid-disk-type',
+            ),
+        ],
+    )
+    self.install_mock(template_config=template_config)
+
+    config.update_template_configs()
+    self.failIf(config.Configuration.cached().template_config)
+    self.failIf(config.Configuration.cached().manager_config)
+    self.failIf(config.Configuration.cached().revision)
+
   def test_too_many_instance_templates(self):
     template_config = config_pb2.InstanceTemplateConfig(
       templates=[

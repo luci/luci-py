@@ -14,6 +14,13 @@ AUTH_SCOPES = [
 ]
 
 
+DISK_TYPES = {
+    'local-ssd': {'ssd': True},
+    'pd-ssd': {'ssd': True},
+    'pd-standard': {'ssd': False},
+}
+
+
 MACHINE_TYPES = {
     'f1-micro':       {'cpus': 1,  'memory': 0.6},
     'g1-small':       {'cpus': 1,  'memory': 1.7},
