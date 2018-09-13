@@ -454,7 +454,7 @@ class MachineProviderEndpoints(remote.Service):
   def _lease(self, request, request_hash):
     """Handles an incoming LeaseRequest."""
     # Arbitrary limit. Increase if necessary.
-    MAX_LEASE_DURATION = 60 * 60 * 24 * 2
+    MAX_LEASE_DURATION = 60 * 60 * 24 * 7
     now = utils.time_time()
     max_lease_expiration_ts = now + MAX_LEASE_DURATION
 
