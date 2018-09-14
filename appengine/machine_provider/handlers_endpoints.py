@@ -453,10 +453,10 @@ class MachineProviderEndpoints(remote.Service):
 
   def _lease(self, request, request_hash):
     """Handles an incoming LeaseRequest."""
-    # Arbitrary limit. Increase if necessary.
-    MAX_LEASE_DURATION = 60 * 60 * 24 * 7
+    # Arbitrary limit of 3 weeks. Increase if necessary.
+    MAX_LEASE_DURATION_SECS = 60 * 60 * 24 * 21
     now = utils.time_time()
-    max_lease_expiration_ts = now + MAX_LEASE_DURATION
+    max_lease_expiration_ts = now + MAX_LEASE_DURATION_SECS
 
     metrics.lease_requests_received.increment()
     if request.duration:
@@ -470,7 +470,7 @@ class MachineProviderEndpoints(remote.Service):
             client_request_id=request.request_id,
             error=rpc_messages.LeaseRequestError.NONPOSITIVE_DEADLINE,
         )
-      if request.duration > MAX_LEASE_DURATION:
+      if request.duration > MAX_LEASE_DURATION_SECS:
         return rpc_messages.LeaseResponse(
             client_request_id=request.request_id,
             error=rpc_messages.LeaseRequestError.LEASE_TOO_LONG,
