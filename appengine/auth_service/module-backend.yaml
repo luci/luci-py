@@ -5,6 +5,8 @@ runtime: python27
 api_version: 1
 threadsafe: true
 
+instance_class: F4_1G
+
 handlers:
 - url: /internal/cron/ts_mon/.*
   script: main_backend.ts_mon_app
