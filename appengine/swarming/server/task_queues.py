@@ -88,7 +88,7 @@ class BotDimensions(ndb.Model):
   Parent is BotRoot.
   Key id is 1.
 
-  This is redundant from BotEvents but it is leveraged to quickly assert if
+  This is redundant from BotEvent but it is leveraged to quickly assert if
   _rebuild_bot_cache_async() must be called or not.
   """
   # 'key:value' strings. This is stored to enable the removal of stale entities

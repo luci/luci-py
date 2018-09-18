@@ -72,9 +72,8 @@ from server import task_pack
 from server import task_queues
 
 
-# BotEvent entities that should be deleted after a while. Eventually trim older
-# than 2 years old but let's start more softly with a tad over 3 years.
-_OLD_BOT_EVENTS_CUT_OFF = datetime.timedelta(days=366*3)
+# BotEvent entities are deleted after a while.
+_OLD_BOT_EVENTS_CUT_OFF = datetime.timedelta(days=366*2)
 
 
 ### Models.
@@ -426,6 +425,9 @@ def bot_event(
         Machine Provider bot was leased for.
   - machine_lease (in kwargs): ID of the lease_management.MachineType
         corresponding to this bot.
+
+  Returns:
+    ndb.Key to BotEvent entity if one was added.
   """
   if not bot_id:
     return
@@ -494,6 +496,7 @@ def bot_event(
     bot_info.task_id = ''
 
   datastore_utils.store_new_version(event, BotRoot, [bot_info])
+  return event.key
 
 
 def has_capacity(dimensions):
@@ -582,21 +585,20 @@ def cron_update_bot_info():
 
 def cron_delete_old_bot_events():
   """Deletes very old BotEvent entites."""
-  count = 0
   start = utils.utcnow()
+  # Run for 4.5 minutes and schedule the cron job every 5 minutes. Running for
+  # 9.5 minutes (out of 10 allowed for a cron job) results in 'Exceeded soft
+  # private memory limit of 512 MB with 512 MB' even if this loop should be
+  # fairly light on memory usage.
+  time_to_stop = start + datetime.timedelta(seconds=int(4.5*60))
+  more = True
+  cursor = None
+  count = 0
   try:
-    # Run for 4.5 minutes and schedule the cron job every 5 minutes. Running for
-    # 9.5 minutes (out of 10 allowed for a cron job) results in 'Exceeded soft
-    # private memory limit of 512 MB with 512 MB' even if this loop should be
-    # fairly light on memory usage.
-    time_to_stop = start + datetime.timedelta(seconds=int(4.5*60))
-
     # Order is by key, so it is naturally ordered by bot, which means the
     # operations will mainly operate on one root entity at a time.
     q = BotEvent.query(default_options=ndb.QueryOptions(keys_only=True)).filter(
         BotEvent.ts <= start - _OLD_BOT_EVENTS_CUT_OFF)
-    more = True
-    cursor = None
     while more:
       keys, cursor, more = q.fetch_page(10, start_cursor=cursor)
       ndb.delete_multi(keys)
@@ -607,4 +609,4 @@ def cron_delete_old_bot_events():
   except runtime.DeadlineExceededError:
     pass
   finally:
-    logging.info('Deleted %d entities', count)
+    logging.info('Deleted %d BotEvent entities', count)
