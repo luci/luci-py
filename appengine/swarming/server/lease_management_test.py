@@ -842,6 +842,90 @@ class EnsureEntitiesExistTest(test_case.TestCase):
     self.assertEqual(key.get().lease_duration_secs, 1)
     self.assertEqual(key.get().mp_dimensions.disk_gb, 100)
 
+  def test_machine_lease_exists_mismatched_updated_to_indefinite(self):
+    def fetch_machine_types():
+      return {
+          'machine-type': bots_pb2.MachineType(
+              lease_indefinitely=True,
+              mp_dimensions=['disk_gb:100'],
+              name='machine-type',
+              target_size=1,
+          ),
+      }
+    self.mock(
+        lease_management.bot_groups_config,
+        'fetch_machine_types',
+        fetch_machine_types,
+    )
+
+    key = lease_management.MachineType(
+        id='machine-type',
+        lease_indefinitely=True,
+        mp_dimensions=machine_provider.Dimensions(
+            disk_gb=100,
+        ),
+        target_size=1,
+    ).put()
+    key = lease_management.MachineLease(
+        id='%s-0' % key.id(),
+        early_release_secs=1,
+        lease_duration_secs=2,
+        lease_expiration_ts=utils.utcnow(),
+        machine_type=key,
+        mp_dimensions=machine_provider.Dimensions(
+            disk_gb=100,
+        ),
+    ).put()
+
+    lease_management.ensure_entities_exist()
+
+    self.assertEqual(lease_management.MachineLease.query().count(), 1)
+    self.assertFalse(key.get().early_release_secs)
+    self.assertFalse(key.get().lease_duration_secs)
+    self.assertTrue(key.get().lease_indefinitely)
+    self.assertFalse(key.get().drained)
+
+  def test_machine_lease_exists_mismatched_updated_to_finite(self):
+    def fetch_machine_types():
+      return {
+          'machine-type': bots_pb2.MachineType(
+              lease_duration_secs=1,
+              mp_dimensions=['disk_gb:100'],
+              name='machine-type',
+              target_size=1,
+          ),
+      }
+    self.mock(
+        lease_management.bot_groups_config,
+        'fetch_machine_types',
+        fetch_machine_types,
+    )
+
+    key = lease_management.MachineType(
+        id='machine-type',
+        lease_duration_secs=1,
+        mp_dimensions=machine_provider.Dimensions(
+            disk_gb=100,
+        ),
+        target_size=1,
+    ).put()
+    key = lease_management.MachineLease(
+        id='%s-0' % key.id(),
+        lease_indefinitely=True,
+        leased_indefinitely=True,
+        machine_type=key,
+        mp_dimensions=machine_provider.Dimensions(
+            disk_gb=100,
+        ),
+    ).put()
+
+    lease_management.ensure_entities_exist()
+
+    self.assertEqual(lease_management.MachineLease.query().count(), 1)
+    self.assertEqual(key.get().lease_duration_secs, 1)
+    self.assertFalse(key.get().lease_indefinitely)
+    self.assertTrue(key.get().drained)
+
   def test_daily_schedule_resize(self):
     def fetch_machine_types():
       return {

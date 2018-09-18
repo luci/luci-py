@@ -214,28 +214,43 @@ def update_machine_lease(machine_lease_key, machine_type):
     logging.error('MachineLease not found:\nKey: %s', machine_lease_key)
     return
 
+  # When updating an indefinitely leased machine, drain it, otherwise the
+  # new lease parameters, which only take effect on the next lease, will
+  # not take effect until the machine is manually deleted.
+  put = False
+  drain = False
+
   # See ensure_entity_exists below for why we only update leased machines.
-  if machine_lease.lease_expiration_ts or machine_lease.leased_indefinitely:
-    put = False
+  if not machine_lease.lease_expiration_ts:
+    if not machine_lease.leased_indefinitely:
+      return
+    drain = True
 
-    if machine_lease.early_release_secs != machine_type.early_release_secs:
-      machine_lease.early_release_secs = machine_type.early_release_secs
-      put = True
+  if machine_lease.early_release_secs != machine_type.early_release_secs:
+    machine_lease.early_release_secs = machine_type.early_release_secs
+    put = True
 
-    if machine_lease.lease_duration_secs != machine_type.lease_duration_secs:
-      machine_lease.lease_duration_secs = machine_type.lease_duration_secs
-      put = True
+  if machine_lease.lease_duration_secs != machine_type.lease_duration_secs:
+    machine_lease.lease_duration_secs = machine_type.lease_duration_secs
+    put = True
 
-    if machine_lease.lease_indefinitely != machine_type.lease_indefinitely:
-      machine_lease.lease_indefinitely = machine_type.lease_indefinitely
-      put = True
+  if machine_lease.lease_indefinitely != machine_type.lease_indefinitely:
+    machine_lease.lease_indefinitely = machine_type.lease_indefinitely
+    put = True
 
-    if machine_lease.mp_dimensions != machine_type.mp_dimensions:
-      machine_lease.mp_dimensions = machine_type.mp_dimensions
-      put = True
+  if machine_lease.mp_dimensions != machine_type.mp_dimensions:
+    machine_lease.mp_dimensions = machine_type.mp_dimensions
+    put = True
 
-    if put:
-      yield machine_lease.put_async()
+  if not put:
+    return
+
+  if drain:
+    logging.info('Draining MachineLease:\nKey: %s\nHostname: %s',
+                 machine_lease_key, machine_lease.hostname)
+    machine_lease.drained = True
+
+  yield machine_lease.put_async()
 
 
 @ndb.tasklet
