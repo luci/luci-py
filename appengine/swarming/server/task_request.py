@@ -51,10 +51,12 @@ separate entity to clearly declare the boundary for task request deduplication.
 
 import datetime
 import hashlib
+import logging
 import posixpath
 import random
 import re
 
+from google.appengine import runtime
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
@@ -121,6 +123,10 @@ _CACHE_NAME_RE = re.compile(ur'^[a-z0-9_]{1,4096}$')
 
 # Early verification of environment variable key name.
 _ENV_KEY_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
+
+
+# TaskRequest entity groups are deleted after a while.
+_OLD_TASK_REQUEST_CUT_OFF = datetime.timedelta(days=366*4)
 
 
 ### Properties validators must come before the models.
@@ -1443,3 +1449,37 @@ def validate_priority(priority):
     raise datastore_errors.BadValueError(
         'priority (%d) must be between 0 and %d (inclusive)' %
         (priority, MAXIMUM_PRIORITY))
+
+
+def cron_delete_old_task_requests():
+  """Deletes very old TaskRequest entities and their children entities."""
+  start = utils.utcnow()
+  # Run for 4.5 minutes and schedule the cron job every 5 minutes. Running for
+  # 9.5 minutes (out of 10 allowed for a cron job) results in 'Exceeded soft
+  # private memory limit of 512 MB with 512 MB' even if this loop should be
+  # fairly light on memory usage.
+  time_to_stop = start + datetime.timedelta(seconds=int(4.5*60))
+  count = 0
+  total = 0
+  end_key = convert_to_request_key(
+      start - _OLD_TASK_REQUEST_CUT_OFF, suffix=0xffff)
+  try:
+    # Order is by key, so it is naturally ordered by TaskRequest creation time.
+    opt = ndb.QueryOptions(keys_only=True)
+    q = TaskRequest.query(default_options=opt).order(TaskRequest.key).filter(
+        TaskRequest.key < end_key)
+    for request_key in q:
+      # Delete the whole group. An ancestor query will retrieve the entity
+      # itself too, so no need to explicitly delete it.
+      keys = ndb.Query(ancestor=request_key).fetch(keys_only=True)
+      ndb.delete_multi(keys)
+      total += len(keys)
+      count += 1
+      if utils.utcnow() >= time_to_stop:
+        break
+    return count
+  except runtime.DeadlineExceededError:
+    pass
+  finally:
+    logging.info(
+        'Deleted %d TaskRequest entities; %d entities in total', count, total)

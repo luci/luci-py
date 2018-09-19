@@ -70,6 +70,7 @@ import logging
 import random
 import re
 
+from google.appengine import runtime
 from google.appengine.api import datastore_errors
 from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
@@ -93,6 +94,10 @@ import cipd
 # doesn't get CPU time for several minutes. This should be decreased once the
 # bot processes run at higher priority.
 BOT_PING_TOLERANCE = datetime.timedelta(seconds=6*60)
+
+
+# TaskOutputChunk entities are be deleted after a while.
+_OLD_TASK_OUTPUT_CHUNKS_CUT_OFF = datetime.timedelta(days=366*2)
 
 
 class State(object):
@@ -1118,6 +1123,12 @@ def _output_append(output_key, number_chunks, output, output_chunk_start):
   return entities, number_chunks
 
 
+def _outputchunk_key_to_request(output_chunk_key):
+  """Returns the ndb.Key for the TaskRequest."""
+  summary_key = output_chunk_key.parent().parent().parent()
+  return task_pack.result_summary_key_to_request_key(summary_key)
+
+
 def _sort_property(sort):
   """Returns a datastore_query.PropertyOrder based on 'sort'."""
   if sort not in ('created_ts', 'modified_ts', 'completed_ts', 'abandoned_ts'):
@@ -1303,3 +1314,38 @@ def get_result_summaries_query(start, end, sort, state, tags):
       tags_filter = ndb.AND(tags_filter, TaskResultSummary.tags == tag)
     query = query.filter(tags_filter)
   return _filter_query(TaskResultSummary, query, start, end, sort, state)
+
+
+def cron_delete_old_task_output_chunks():
+  """Deletes very old TaskOutputChunk entities."""
+  start = utils.utcnow()
+  # Run for 4.5 minutes and schedule the cron job every 5 minutes. Running for
+  # 9.5 minutes (out of 10 allowed for a cron job) results in 'Exceeded soft
+  # private memory limit of 512 MB with 512 MB' even if this loop should be
+  # fairly light on memory usage.
+  time_to_stop = start + datetime.timedelta(seconds=int(4.5*60))
+  more = True
+  cursor = None
+  count = 0
+  end_ts = start - _OLD_TASK_OUTPUT_CHUNKS_CUT_OFF
+  end = task_request.convert_to_request_key(end_ts, suffix=0xffff).integer_id()
+  try:
+    # Order is by key, so it is naturally ordered by TaskRequest creation time.
+    opt = ndb.QueryOptions(keys_only=True)
+    q = TaskOutputChunk.query(default_options=opt).order(TaskOutputChunk.key)
+    while more:
+      keys, cursor, more = q.fetch_page(10, start_cursor=cursor)
+      keys = [
+        k for k in keys if _outputchunk_key_to_request(k).integer_id() > end
+      ]
+      if not keys:
+        break
+      ndb.delete_multi(keys)
+      count += len(keys)
+      if utils.utcnow() >= time_to_stop:
+        break
+    return count
+  except runtime.DeadlineExceededError:
+    pass
+  finally:
+    logging.info('Deleted %d TaskOutputChunk entities', count)

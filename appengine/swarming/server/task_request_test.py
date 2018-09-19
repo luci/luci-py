@@ -1399,6 +1399,31 @@ class TaskRequestApiTest(TestCase):
     with self.assertRaises(datastore_errors.BadValueError):
       task_request.SecretBytes(secret_bytes='a'*(20*1024+1)).put()
 
+  def test_cron_delete_old_task_requests(self):
+    # Create a TaskRequest 4 years ago right at the cron job cut off,
+    # and another one one second later (that will be kept).
+    class Foo(ndb.Model):
+      pass
+    now = utils.utcnow()
+    self.mock_now(now, 0)
+    request_1 = _gen_request_slices()
+    request_1.key = task_request.new_request_key()
+    request_1.put()
+    foo_1 = Foo(parent=request_1.key, id=1)
+    foo_1.put()
+    self.mock_now(now, 1)
+    request_2 = _gen_request_slices()
+    request_2.key = task_request.new_request_key()
+    request_2.put()
+    foo_2 = Foo(parent=request_2.key, id=2)
+    foo_2.put()
+    self.mock_now(now + task_request._OLD_TASK_REQUEST_CUT_OFF, 0)
+    self.assertEqual(1, task_request.cron_delete_old_task_requests())
+    # Make sure the right one still exists.
+    actual = task_request.TaskRequest.query().fetch(keys_only=True)
+    self.assertEqual([request_1.key], actual)
+    self.assertEqual([foo_1.key], Foo.query().fetch(keys_only=True))
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
