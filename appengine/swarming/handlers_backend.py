@@ -330,8 +330,10 @@ class TaskDimensionsHandler(webapp2.RequestHandler):
   def post(self):
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     if not task_queues.rebuild_task_cache(self.request.body):
-      # The task needs to be retried.
-      self.response.set_status(500)
+      # The task needs to be retried. Reply that the service is unavailable
+      # (503) instead of an internal server error (500) to help differentiating
+      # in the logs, even if it is not technically correct.
+      self.response.set_status(503)
     else:
       self.response.out.write('Success.')
 

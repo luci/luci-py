@@ -875,7 +875,7 @@ def rebuild_task_cache(payload):
       # Still log an error but no need for a stack trace in the logs. It is
       # important to surface that the call failed so the task queue is retried
       # later.
-      logging.error('Failed updating TaskDimensions: %s', e)
+      logging.warning('Failed updating TaskDimensions: %s; reenqueuing', e)
       return False
   finally:
     # Any of the _refresh_BotTaskDimensions() calls above could throw. Still log
