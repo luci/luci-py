@@ -63,8 +63,10 @@ release process.
         here](../components/components/config/#linking-to-the-config-service).
 *   If you are not using a config service, see [Configuring using FS
     mode](https://chromium.googlesource.com/infra/luci/luci-py/+/master/appengine/components/components/config/README.md#fs-mode).
-    You'll need to add an entry to settings.cfg like `ui_client_id:
-    "<client_id>"`
+    *   You'll need to add an entry to settings.cfg like `ui_client_id:
+        "<client_id>"`
+    *   You also need to update chrome-infra-auth/oauth.cfg to add `client_ids:
+        "<client_id>"`
 *   If you plan to use an [auth_service](../auth_service),
     *   Make sure it is setup already.
     *   [Follow instructions
