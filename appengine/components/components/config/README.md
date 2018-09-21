@@ -40,8 +40,7 @@ To link a LUCI app to a config service:
     *  `service_hostname` is the config service hostname, e.g.
        `luci-config.appspot.com`.
     *  `trusted_service_account` is the service account of the config service,
-        e.g. `user:<appid>@appspot.gserviceaccount.com` or
-        `service:luci-config`.
+        e.g. `user:luci-config@appspot.gserviceaccount.com`.
 *   Tell the configure service that your app may fetch your configs by
     adding your app to `services.cfg` of the config service.
 
