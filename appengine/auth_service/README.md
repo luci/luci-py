@@ -45,7 +45,8 @@ installations. For one-off experimentation, this is not strictly necessary.
 
 *   Make sure your app is fully working.
 *   Visit https://\<authid\>.appspot.com where \<authid\> is the auth_service
-    instance to link with.
+    instance to link with, e.g. chrome-infra-auth.
+*   Click on the Services tab.
 *   Type your \<appid\> in GAE application id and click Generate linking URL,
     where \<appid\> is the service being linked to the auth_service.
 *   Click the link in the UI.

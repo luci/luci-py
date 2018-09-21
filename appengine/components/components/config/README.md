@@ -32,15 +32,16 @@ To link a LUCI app to a config service:
 
 *   Make sure you are in the `administrators` group of the app.
 *   Open the exported Config Cloud Endpoints service in the app with API
-    Explorer (replace `<host>` with the app hostname):
+    Explorer (replace `<host>` with the app hostname, i.e. foo.appspot.com):
     `https://apis-explorer.appspot.com/apis-explorer/?base=https://<host>/_ah/api#p/config/v1/config.settings`
 
     In the request body:
 
-    *  `service_hostname` is the config service hostname (e.g.
-       `luci-config.appspot.com`).
-    *  `trusted_service_account` is the service account of the config service
-        (e.g. `user:<appid>@appspot.gserviceaccount.com` or `service:<appid>`).
+    *  `service_hostname` is the config service hostname, e.g.
+       `luci-config.appspot.com`.
+    *  `trusted_service_account` is the service account of the config service,
+        e.g. `user:<appid>@appspot.gserviceaccount.com` or
+        `service:luci-config`.
 *   Tell the configure service that your app may fetch your configs by
     adding your app to `services.cfg` of the config service.
 
