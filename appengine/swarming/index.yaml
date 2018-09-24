@@ -11,6 +11,11 @@ indexes:
 # your application using appcfg.py.
 
 - kind: BotEvent
+  properties:
+  - name: dimensions_flat
+  - name: ts
+
+- kind: BotEvent
   ancestor: yes
   properties:
   - name: ts

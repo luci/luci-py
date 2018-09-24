@@ -132,6 +132,11 @@ class _BotCommon(ndb.Model):
   # ID of the MachineLease, for bots acquired from Machine Provider.
   machine_lease = ndb.StringProperty(indexed=False)
 
+  # Dimensions are used for task selection. They are encoded as a list of
+  # key:value. Keep in mind that the same key can be used multiple times. The
+  # list must be sorted. It is indexed to enable searching for bots.
+  dimensions_flat = ndb.StringProperty(repeated=True)
+
   @property
   def dimensions(self):
     """Returns a dict representation of self.dimensions_flat."""
@@ -184,12 +189,6 @@ class BotInfo(_BotCommon):
   # One of:
   IDLE = 1<<1 # 2
   BUSY = 1<<0 # 1
-
-  # Dimensions are used for task selection. They are encoded as a list of
-  # key:value. Keep in mind that the same key can be used multiple times. The
-  # list must be sorted.
-  # It IS indexed to enable searching for bots.
-  dimensions_flat = ndb.StringProperty(repeated=True)
 
   # First time this bot was seen.
   first_seen_ts = ndb.DateTimeProperty(auto_now_add=True, indexed=False)
@@ -252,11 +251,6 @@ class BotEvent(_BotCommon):
     'request_restart', 'request_update', 'request_sleep', 'request_task',
     'task_completed', 'task_error', 'task_killed', 'task_update',
   }
-  # Dimensions are used for task selection. They are encoded as a list of
-  # key:value. Keep in mind that the same key can be used multiple times. The
-  # list must be sorted.
-  # It is NOT indexed because this is not needed for events.
-  dimensions_flat = ndb.StringProperty(repeated=True, indexed=False)
 
   # Common properties for all events (which includes everything in _BotCommon).
   ts = ndb.DateTimeProperty(auto_now_add=True)
