@@ -736,16 +736,21 @@
               <div class="reproduce">
                 <div hidden$="[[_hasNoIsolated(_currentSlice.properties)]]">Download inputs files into directory <i>foo</i>:</div>
                 <div class="code bottom_space" hidden$="[[_hasNoIsolated(_currentSlice.properties)]]">
-                python isolateserver.py download -I [[_currentSlice.properties.inputs_ref.isolatedserver]] --namespace [[_currentSlice.properties.inputs_ref.namespace]] -s [[_currentSlice.properties.inputs_ref.isolated]] --target foo</div>
+                  # (if needed) git clone https://chromium.googlesource.com/infra/luci/client-py<br>
+                  python ./client-py/isolateserver.py download -I [[_currentSlice.properties.inputs_ref.isolatedserver]] --namespace [[_currentSlice.properties.inputs_ref.namespace]]
+                  -s [[_currentSlice.properties.inputs_ref.isolated]] --target foo</div>
 
                 <div>Run this task locally:</div>
-                <div class="code bottom_space">  python swarming.py reproduce -S [[_host_url]] [[task_id]]</div>
+                <div class="code bottom_space">
+                  # (if needed) git clone https://chromium.googlesource.com/infra/luci/client-py<br>
+                  python ./client-py/swarming.py reproduce -S [[_host_url]] [[task_id]]
+                </div></div>
 
                 <div>Download output results into directory <i>foo</i>:</div>
-                <div class="code bottom_space">  python swarming.py collect -S [[_host_url]] --task-output-dir=foo [[task_id]]</div>
+                <div class="code bottom_space">
+                  # (if needed) git clone https://chromium.googlesource.com/infra/luci/client-py<br>
+                  python ./client-py/swarming.py collect -S [[_host_url]] --task-output-dir=foo [[task_id]]</div>
 
-                <div>Looking for <i>swarming.py</i>?</div>
-                <div class="code bottom_space">  git clone https://chromium.googlesource.com/infra/luci/luci-py</div>
               </div>
             </div>
           </div>
