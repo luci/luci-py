@@ -1451,7 +1451,11 @@ time.sleep(${leaseDuration})`];
             this._result.state !==  "PENDING") {
           return;
         }
+        // Maintain the current slice index for soft-refreshes.
+        // See crbug.com/887616
+        var currindex = this._currentSliceIdx;
         this._refresh();
+        this._currentSliceIdx = currindex;
       },
 
       _rowspan: function(dims) {
