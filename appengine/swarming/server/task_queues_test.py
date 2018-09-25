@@ -270,9 +270,17 @@ class TaskQueuesApiTest(test_env_handlers.AppTestBase):
   def test_set_has_capacity(self):
     d = {u'pool': [u'default'], u'os': [u'Ubuntu-16.04']}
     # By default, nothing has capacity. None means no data.
+    now = utils.utcnow()
+    self.mock_now(now, 0)
     self.assertEqual(None, task_queues.probably_has_capacity(d))
-    task_queues.set_has_capacity(d)
+    # Keep the value for 2 seconds, exclusive.
+    task_queues.set_has_capacity(d, 2)
     self.assertEqual(True, task_queues.probably_has_capacity(d))
+    self.mock_now(now, 1)
+    self.assertEqual(True, task_queues.probably_has_capacity(d))
+    # The value expired.
+    self.mock_now(now, 2)
+    self.assertEqual(None, task_queues.probably_has_capacity(d))
 
   def test_assert_bot_then_task(self):
     self.assertEqual(0, _assert_bot())

@@ -511,10 +511,32 @@ def has_capacity(dimensions):
   flat = task_queues.dimensions_to_flat(dimensions)
   for f in flat:
     q = q.filter(BotInfo.dimensions_flat == f)
+
+  # Add it to the 'quick cache' to improve performance. This cache is kept for
+  # the same duration as how long bots are considered still alive without a
+  # ping. There are two uses case:
+  # - there's a single bot in the fleet for these dimensions and it takes a
+  #   long time rebooting. This is the case with Android with slow
+  #   initialization and some baremetal bots (thanks SCSI firmware!).
+  # - Machine Provider recycle the fleet simultaneously, which causes
+  #   instantaneous downtime. https://crbug.com/888603
+  seconds = config.settings().bot_death_timeout_secs
+
   if q.count(limit=1):
     logging.info('Found capacity via BotInfo: %s', flat)
-    # Add it to the quick cache to improve performance.
-    task_queues.set_has_capacity(dimensions)
+    task_queues.set_has_capacity(dimensions, seconds)
+    return True
+
+  # Search a bit harder. In this case, we're looking for BotEvent which would be
+  # a bot that used to exist recently.
+  cutoff = utils.utcnow() - datetime.timedelta(seconds=seconds)
+  q = BotEvent.query(BotEvent.ts > cutoff)
+  flat = task_queues.dimensions_to_flat(dimensions)
+  for f in flat:
+    q = q.filter(BotEvent.dimensions_flat == f)
+  if q.count(limit=1):
+    logging.info('Found capacity via BotEvent: %s', flat)
+    task_queues.set_has_capacity(dimensions, seconds)
     return True
 
   logging.warning('HAS NO CAPACITY: %s', flat)

@@ -794,10 +794,15 @@ def probably_has_capacity(dimensions):
   return memcache.get(dimensions_hash, namespace='task_queues_tasks')
 
 
-def set_has_capacity(dimensions):
-  """Registers the fact that this task request dimensions set has capacity."""
+def set_has_capacity(dimensions, seconds):
+  """Registers the fact that this task request dimensions set has capacity.
+
+  Arguments:
+    seconds: the amount of time this 'fact' should be kept.
+  """
   dimensions_hash = str(hash_dimensions(dimensions))
-  memcache.set(dimensions_hash, True, time=61, namespace='task_queues_tasks')
+  memcache.set(
+      dimensions_hash, True, time=seconds, namespace='task_queues_tasks')
 
 
 def rebuild_task_cache(payload):

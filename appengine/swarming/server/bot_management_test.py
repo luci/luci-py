@@ -19,6 +19,7 @@ from components import utils
 from test_support import test_case
 
 from server import bot_management
+from server import config
 from server import task_queues
 
 
@@ -125,6 +126,8 @@ def _gen_bot_event(**kwargs):
 
 
 class BotManagementTest(test_case.TestCase):
+  APP_DIR = test_env.APP_DIR
+
   def setUp(self):
     super(BotManagementTest, self).setUp()
     self.now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
@@ -237,6 +240,26 @@ class BotManagementTest(test_case.TestCase):
     self.mock(task_queues, 'probably_has_capacity', lambda *_: None)
     self.assertEqual(True, bot_management.has_capacity(d))
     d = {u'pool': [u'inexistant']}
+
+  def test_has_capacity_BotEvent(self):
+    # Disable the memcache code path to confirm the DB based behavior.
+    self.mock(task_queues, 'probably_has_capacity', lambda *_: None)
+
+    d = {u'pool': [u'default'], u'os': [u'Ubuntu-16.04']}
+    botid = 'id1'
+    _bot_event(
+        event_type='bot_connected',
+        dimensions={'id': [botid], 'pool': ['default'], 'os': ['Ubuntu',
+          'Ubuntu-16.04']})
+    self.assertEqual(True, bot_management.has_capacity(d))
+
+    # Delete the BotInfo, so the bot disapeared.
+    bot_management.get_info_key(botid).delete()
+    # The capacity is still found due to a recent BotEvent with this dimension.
+    self.assertEqual(True, bot_management.has_capacity(d))
+    self.mock_now(self.now, config.settings().bot_death_timeout_secs-1)
+    self.assertEqual(True, bot_management.has_capacity(d))
+    self.mock_now(self.now, config.settings().bot_death_timeout_secs)
     self.assertEqual(False, bot_management.has_capacity(d))
 
   def test_cron_update_bot_info(self):
