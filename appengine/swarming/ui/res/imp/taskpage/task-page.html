@@ -361,6 +361,10 @@
                   <td>[[_currentSlice.wait_for_capacity]]</td>
                 </tr>
                 <tr>
+                  <td>Slice Expires</td>
+                  <td>[[_expires(_request, _currentSliceIdx)]]</td>
+                </tr>
+                <tr>
                   <td>User</td>
                   <td>[[_request.user]]</td>
                 </tr>
@@ -570,7 +574,7 @@
                     </template>
                     <tr>
                       <td>Expires</td>
-                      <td>[[_expires(_request, _currentSlice)]]</td>
+                      <td>[[_expires(_request, -1)]]</td>
                     </tr>
                     <template is="dom-if" if="[[_result.human_completed_ts]]">
                       <tr>
@@ -1174,12 +1178,19 @@
       },
 
       _expires: function(request, currentSlice) {
-        var delta = parseInt(currentSlice.expiration_secs);
+        var delta = 0;
+        if (currentSlice < 0) {
+          // magic number for "show all"
+          currentSlice = request.task_slices && (request.task_slices.length - 1);
+        }
+        for (var i = 0; i <= currentSlice; i++) {
+          delta += parseInt(request.task_slices[i].expiration_secs);
+        }
         if (delta) {
           return sk.human.localeTime(new Date(request.created_ts.getTime() + delta * 1000));
         }
         // Fall back to something
-        return currentSlice.expiration_secs + " seconds from created time";
+        return request.expiration_secs + " seconds from created time";
       },
 
       _extraArgs: function(properties) {
