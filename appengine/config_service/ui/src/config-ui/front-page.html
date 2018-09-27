@@ -30,7 +30,7 @@
 
       .loading { text-align: center; }
 
-      .config-card { 
+      .config-card {
         padding-bottom: 1%;
         animation: fadein 1.5s;
       }
@@ -71,14 +71,15 @@
         on-response="_onGotConfigSets"
         headers="[[auth_headers]]">
     </iron-ajax>
-    
+
     <div class="search-bar">
       <paper-search-bar
           id = "searchBar"
           query="{{query}}"
-          hide-filter-button="true"></paper-search-bar>
+          hide-filter-button="true"
+          on-paper-search-search="_setURL"></paper-search-bar>
     </div>
-    
+
     <div class="config-list">
       <template is="dom-if" if="[[isLoading]]">
         <div class="center loading">
@@ -94,7 +95,7 @@
             <template is="dom-repeat" items="[[searchResults]]" as="config">
               <div class="center config-card">
                 <config-set-card
-                  name="[[config.config_set]]" 
+                  name="[[config.config_set]]"
                   last-import-attempt="[[_getLastImportAttempt(config.last_import_attempt)]]"
                   revision="[[_getRevision(config.revision)]]"
                   link="[[_getURL(config)]]"
@@ -176,6 +177,10 @@
 
       _getLastImportAttempt: function(lastImportAttempt) {
         return lastImportAttempt || null;
+      },
+
+      _setURL: function() {
+        window.location.href = "/#/q/" + this.query;
       },
 
       _getURL: function(config) {

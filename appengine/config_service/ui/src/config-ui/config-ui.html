@@ -26,7 +26,7 @@
           height: 60px;
         }
 
-        .logo { 
+        .logo {
           height: 50px;
         }
 
@@ -108,10 +108,16 @@
                     pattern="/"
                     active="{{frontPageActive}}"></app-route>
 
+        <app-route  route="{{route}}"
+                    pattern="/q/:query"
+                    data="{{queryData}}"
+                    active="{{frontPageActive}}"></app-route>
+
         <template is="dom-if" if="[[frontPageActive]]">
           <front-page auth_headers="[[auth_headers]]"
                       initialized="[[initialized]]"
-                      signed_in="[[signed_in]]"></front-page>
+                      signed_in="[[signed_in]]"
+                      query="[[queryData.query]]"></front-page>
         </template>
 
         <template is="dom-if" if="[[serviceActive]]" restamp="true">
@@ -149,7 +155,7 @@
           value: null
         }
       },
-      
+
       ready: function() {
         this.async(function() {
           // If the path is blank, redirect to /

@@ -20,6 +20,16 @@ import storage
 import services
 
 
+OPENSEARCH_XML = '''<?xml version="1.0" encoding="UTF-8"?>
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
+  <ShortName>luci-config</ShortName>
+  <Description>
+    A configuration service for LUCI
+  </Description>
+  <Url type="text/html" template="https://%s/#/q/{searchTerms}" />
+</OpenSearchDescription>'''
+
+
 class CronGitilesImport(webapp2.RequestHandler):
   """Imports configs from Gitiles."""
   @decorators.require_cronjob
@@ -67,6 +77,14 @@ class SchemasHandler(webapp2.RequestHandler):
     self.response.set_status(httplib.NOT_FOUND)
 
 
+class OpensearchHandler(webapp2.RequestHandler):
+  """Returns opensearch.xml with the correct headers."""
+
+  def get(self):
+    self.response.content_type = 'application/opensearchdescription+xml'
+    self.response.write(OPENSEARCH_XML % self.request.host)
+
+
 class TaskGitilesImportConfigSet(webapp2.RequestHandler):
   """Imports a config set from gitiles."""
 
@@ -80,6 +98,7 @@ class TaskGitilesImportConfigSet(webapp2.RequestHandler):
 def get_frontend_routes():  # pragma: no cover
   return [
     webapp2.Route(r'/', MainPageHandler),
+    webapp2.Route(r'/opensearch.xml', OpensearchHandler),
     webapp2.Route(r'/schemas/<name:.+>', SchemasHandler),
     webapp2.Route(r'/_ah/bounce', notifications.BounceHandler),
   ]

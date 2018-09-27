@@ -1,5 +1,5 @@
 {
-  "name": "Config UI",
+  "name": "luci-config-ui",
   "description": "This is a UI for the configuration service",
   "main": "index.html",
   "dependencies": {
