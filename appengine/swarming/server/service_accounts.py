@@ -32,10 +32,27 @@ AccessToken = collections.namedtuple('AccessToken', [
 ])
 
 
-class InternalError(Exception):
-  """Raised if something unexpectedly misbehaves.
+class PermissionError(Exception):
+  """The service account is not allowed to be used by the caller."""
 
-  This generally should not happen. It's fine to return HTTP 500 if it does.
+
+class MisconfigurationError(Exception):
+  """Something is not correctly configured.
+
+  The difference from PermissionError is that generally the account is allowed
+  to be used, but some misconfiguration (e.g. IAM permissions) preclude the
+  token server or Swarming from using it.
+
+  Can be transformed into HTTP 400 error and returned to the caller.
+  """
+
+
+class InternalError(Exception):
+  """Something unexpectedly misbehaves.
+
+  This generally should not happen. It's fine to return HTTP 500 if it does. The
+  content of the exception is scabbed of private information that should not be
+  visible to the caller.
   """
 
 
@@ -79,7 +96,8 @@ def get_oauth_token_grant(service_account, validity_duration):
     Base64-encoded string with the grant body.
 
   Raises:
-    auth.AuthorizationError if the token server forbids the usage.
+    PermissionError if the token server forbids the usage.
+    MisconfigurationError if the service account is misconfigured.
     InternalError if the RPC fails unexpectedly.
   """
   assert has_token_server()
@@ -179,7 +197,9 @@ def get_task_account_token(task_id, bot_id, scopes):
     (<service account email> or 'bot' or 'none', AccessToken or None).
 
   Raises:
-    auth.AccessTokenError if the token can't be generated.
+    PermissionError if the token server forbids the usage.
+    MisconfigurationError if the service account is misconfigured.
+    InternalError if the RPC fails unexpectedly.
   """
   # Grab corresponding TaskRequest.
   try:
@@ -189,11 +209,11 @@ def get_task_account_token(task_id, bot_id, scopes):
         result_summary_key)
   except ValueError as exc:
     logging.error('Unexpectedly bad task_id: %s', exc)
-    raise auth.AccessTokenError('Bad task_id: %s' % task_id)
+    raise MisconfigurationError('Bad task_id: %s' % task_id)
 
   task_request = task_request_key.get()
   if not task_request:
-    raise auth.AccessTokenError('No such task request: %s' % task_id)
+    raise MisconfigurationError('No such task request: %s' % task_id)
 
   # 'none' or 'bot' cases are handled by the bot locally, no token for them.
   if task_request.service_account in ('none', 'bot'):
@@ -201,12 +221,12 @@ def get_task_account_token(task_id, bot_id, scopes):
 
   # The only possible case is a service account email. Double check this.
   if not is_service_account(task_request.service_account):
-    raise auth.AccessTokenError(
-        'Not a service account email: %s', task_request.service_account)
+    raise MisconfigurationError(
+        'Not a service account email: %s' % task_request.service_account)
 
   # Should have a token prepared by 'get_oauth_token_grant' already.
   if not task_request.service_account_token:
-    raise auth.AccessTokenError(
+    raise MisconfigurationError(
         'The task request %s has no associated service account token' % task_id)
 
   # Additional information for Token Server's logs.
@@ -218,16 +238,8 @@ def get_task_account_token(task_id, bot_id, scopes):
 
   # Use this token to grab the real OAuth token. Note that the bot caches the
   # resulting OAuth token internally, so we don't bother to cache it here.
-  try:
-    access_token, expiry = _mint_oauth_token_via_grant(
-        task_request.service_account_token, scopes, audit_tags)
-  except auth.AuthorizationError as exc:
-    # This token is no longer usable (most likely expired or ACLs has changed),
-    # or requested scopes are not allowed.
-    raise auth.AccessTokenError('Can\'t generate OAuth token - %s' % exc)
-  except InternalError as exc:
-    # Callers expect AccessTokenError.
-    raise auth.AccessTokenError(str(exc), transient=True)
+  access_token, expiry = _mint_oauth_token_via_grant(
+      task_request.service_account_token, scopes, audit_tags)
 
   # Log and return the token.
   token = AccessToken(
@@ -257,7 +269,9 @@ def get_system_account_token(system_service_account, scopes):
     (<service account email> or 'bot' or 'none', AccessToken or None).
 
   Raises:
-    auth.AccessTokenError if the token can't be generated.
+    PermissionError if the usage of the account is forbidden.
+    MisconfigurationError if the service account is misconfigured.
+    InternalError if the RPC fails unexpectedly.
   """
   if not system_service_account:
     return 'none', None  # no auth is configured
@@ -266,10 +280,16 @@ def get_system_account_token(system_service_account, scopes):
     return 'bot', None  # the bot should use tokens provided by local hooks
 
   # Attempt to mint a token (or grab an existing one from cache).
-  blob, expiry = auth.get_access_token(
-      scopes=scopes,
-      act_as=system_service_account,
-      min_lifetime_sec=MIN_TOKEN_LIFETIME_SEC)
+  try:
+    blob, expiry = auth.get_access_token(
+        scopes=scopes,
+        act_as=system_service_account,
+        min_lifetime_sec=MIN_TOKEN_LIFETIME_SEC)
+  except auth.AccessTokenError as exc:
+    if exc.transient:
+      raise InternalError(exc.message)
+    raise MisconfigurationError(exc.message)
+
   assert isinstance(blob, basestring)
   assert isinstance(expiry, (int, long, float))
   token = AccessToken(blob, int(expiry))
@@ -305,7 +325,8 @@ def _mint_oauth_token_grant(service_account, end_user, validity_duration):
     (new token, datetime when it expires).
 
   Raises:
-    auth.AuthorizationError if the token server forbids the usage.
+    PermissionError if the token server forbids the usage.
+    MisconfigurationError if the service account is misconfigured.
     InternalError if the RPC fails unexpectedly.
   """
   resp = _call_token_server(
@@ -336,6 +357,11 @@ def _mint_oauth_token_via_grant(grant_token, oauth_scopes, audit_tags):
 
   Returns:
     (new token, datetime when it expires).
+
+  Raises:
+    PermissionError if the token server forbids the usage.
+    MisconfigurationError if the service account is misconfigured.
+    InternalError if the RPC fails unexpectedly.
   """
   resp = _call_token_server(
     'MintOAuthTokenViaGrant', {
@@ -366,7 +392,8 @@ def _call_token_server(method, request):
     Dict with response fields.
 
   Raises:
-    auth.AuthorizationError on HTTP 403 reply.
+    PermissionError on HTTP 403 reply.
+    MisconfigurationError if the service account is misconfigured.
     InternalError if the RPC fails unexpectedly.
   """
   # Double check token server URL looks sane ('https://....'). This is checked
@@ -375,7 +402,8 @@ def _call_token_server(method, request):
   try:
     utils.validate_root_service_url(ts_url)
   except ValueError as exc:
-    raise InternalError('Invalid token server URL %s: %s' % (ts_url, exc))
+    raise MisconfigurationError(
+        'Invalid token server URL %s: %s' % (ts_url, exc))
 
   # See TokenMinter in
   # https://chromium.googlesource.com/infra/luci/luci-go/+/master/tokenserver/api/minter/v1/token_minter.proto
@@ -392,7 +420,14 @@ def _call_token_server(method, request):
         'Error calling %s (HTTP %s: %s):\n%s',
         method, exc.status_code, exc.message, exc.response)
     if exc.status_code == 403:
-      raise auth.AuthorizationError(exc.response)
+      raise PermissionError(
+          'HTTP 403 from the token server:\n%s' % exc.response)
+    if exc.status_code == 400:
+      raise MisconfigurationError(
+          'HTTP 400 from the token server:\n%s' % exc.response)
+    # Don't put the response body into the error message, it may contain
+    # internal details (that are public to Swarming server, but may not be
+    # public to whoever is calling the Swarming server now).
     raise InternalError('Failed to call MintOAuthTokenGrant, see server logs')
 
 

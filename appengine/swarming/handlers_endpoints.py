@@ -458,14 +458,15 @@ class SwarmingTasksService(remote.Service):
             'because Token Server URL is not configured')
       max_lifetime_secs = request_obj.max_lifetime_secs
       try:
-        # Note: this raises AuthorizationError if the user is not allowed to use
-        # the requested account or service_accounts.InternalError if something
-        # unexpected happens.
         duration = datetime.timedelta(seconds=max_lifetime_secs)
         request_obj.service_account_token = (
             service_accounts.get_oauth_token_grant(
                 service_account=request_obj.service_account,
                 validity_duration=duration))
+      except service_accounts.PermissionError as exc:
+        raise auth.AuthorizationError(exc.message)
+      except service_accounts.MisconfigurationError as exc:
+        raise endpoints.BadRequestException(exc.message)
       except service_accounts.InternalError as exc:
         raise endpoints.InternalServerErrorException(exc.message)
 

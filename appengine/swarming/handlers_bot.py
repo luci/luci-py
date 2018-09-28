@@ -751,12 +751,17 @@ class BotOAuthTokenHandler(_BotApiHandler):
     * "none" if the bot is not configured to use service accounts at all.
     * "bot" if the bot should use tokens produced by bot_config.py hook.
 
-  Response body is a JSON dict:
+  The response body on success is a JSON dict:
     {
       "service_account": <str email> or "none" or "bot",
       "access_token": <str with actual token (if account is configured)>,
       "expiry": <int with unix timestamp in seconds (if account is configured)>
     }
+
+  May also return:
+    HTTP 403 - if the caller is not allowed to use the service account.
+    HTTP 400 - on a bad request or if the service account is misconfigured.
+    HTTP 500 - on retriable transient errors.
   """
   ACCEPTED_KEYS = {
     u'account_id',  # 'system' or 'task'
@@ -839,15 +844,12 @@ class BotOAuthTokenHandler(_BotApiHandler):
             bot_group_cfg.system_service_account, scopes)
       else:
         raise AssertionError('Impossible, there is a check above')
-    except auth.AccessTokenError as exc:
-      # Note: no need to log this, it is already logged at the source. Also
-      # we cautiously do not return any error details to the bot, just in case
-      # they may contain something we don't want to disclose.
-      if exc.transient:
-        self.abort_with_error(
-            500, error='Transient error when generating the token')
-      self.abort_with_error(
-          403, error='Fatal error when generating the token, see server logs')
+    except service_accounts.PermissionError as exc:
+      self.abort_with_error(403, error=exc.message)
+    except service_accounts.MisconfigurationError as exc:
+      self.abort_with_error(400, error=exc.message)
+    except service_accounts.InternalError as exc:
+      self.abort_with_error(500, error=exc.message)
 
     # Note: the token info is already logged by service_accounts.get_*_token.
     if token:

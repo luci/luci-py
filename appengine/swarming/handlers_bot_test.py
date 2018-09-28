@@ -1269,7 +1269,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
     # Emulate fatal error.
     def mocked(*_args, **_kwargs):
-      raise auth.AccessTokenError('Fatal error')
+      raise service_accounts.PermissionError('Fatal error')
     self.mock(service_accounts, 'get_task_account_token', mocked)
 
     response = self.app.post_json(
@@ -1282,13 +1282,11 @@ class BotApiTest(test_env_handlers.AppTestBase):
         },
         expect_errors=True)
     self.assertEqual(403, response.status_code)
-    self.assertEqual(
-        {u'error': u'Fatal error when generating the token, see server logs'},
-        response.json)
+    self.assertEqual({u'error': u'Fatal error'}, response.json)
 
     # Emulate transient error.
     def mocked(*_args, **_kwargs):
-      raise auth.AccessTokenError('Transient error', transient=True)
+      raise service_accounts.InternalError('Transient error')
     self.mock(service_accounts, 'get_task_account_token', mocked)
 
     response = self.app.post_json(
@@ -1301,9 +1299,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         },
         expect_errors=True)
     self.assertEqual(500, response.status_code)
-    self.assertEqual(
-        {u'error': u'Transient error when generating the token'},
-        response.json)
+    self.assertEqual({u'error': u'Transient error'}, response.json)
 
   def test_oauth_token_system_account(self):
     self.set_as_bot()

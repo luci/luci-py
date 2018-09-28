@@ -142,10 +142,10 @@ class OAuthTokenGrantTest(TestBase):
         expected_payload=None,
       response=net.Error('bad', 403, 'Token server error message'))
 
-    with self.assertRaises(auth.AuthorizationError) as err:
+    with self.assertRaises(service_accounts.PermissionError) as err:
       service_accounts.get_oauth_token_grant(
           'service-account@example.com', datetime.timedelta(seconds=3600))
-    self.assertEqual('Token server error message', str(err.exception))
+    self.assertIn('Token server error message', str(err.exception))
 
 
 class TaskAccountTokenTest(TestBase):
@@ -220,12 +220,12 @@ class TaskAccountTokenTest(TestBase):
               task_id, 'bot-id', ['scope1', 'scope2']))
 
   def test_malformed_task_id(self):
-    with self.assertRaises(auth.AccessTokenError):
+    with self.assertRaises(service_accounts.MisconfigurationError):
       service_accounts.get_task_account_token(
           'bad-task-id', 'bot-id', ['scope1', 'scope2'])
 
   def test_missing_task_id(self):
-    with self.assertRaises(auth.AccessTokenError):
+    with self.assertRaises(service_accounts.MisconfigurationError):
       service_accounts.get_task_account_token(
           '382b353612985111', 'bot-id', ['scope1', 'scope2'])
 
