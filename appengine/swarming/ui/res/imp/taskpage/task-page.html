@@ -540,7 +540,11 @@
                   </tr>
                   <tr hidden$="[[!_hasActualCIPDPackages(_result)]]">
                     <td class="break-all">
-                      <span class="cipd-header">Actual: </span>[[cipd.actual]]
+                      <span class="cipd-header">Actual: </span>
+                      <a href$="[[_cipdLink(cipd.actual, _currentSlice.properties.cipd_input.server)]]"
+                         target="_blank" rel="noopener">
+                        [[cipd.actual]]
+                      </a>
                     </td>
                   </tr>
                 </template>
@@ -1057,6 +1061,20 @@
           body.kill_running = true;
         }
         swarming.postWithToast(url, "Canceling task " + this.task_id, this._auth_headers, body);
+      },
+
+      _cipdLink: function(actualStr, server) {
+        // actualStr looks like infra/python/cpython/windows-amd64:1ba7...
+        if (!actualStr || !server) {
+          return undefined;
+        }
+        var splits = actualStr.split(":");
+        if (splits.length !== 2) {
+          return undefined;
+        }
+        var pkg = splits[0];
+        var version = splits[1];
+        return server + "/p/" + pkg + "/+/" + version;
       },
 
       _cipdRowspan: function(properties, result) {
