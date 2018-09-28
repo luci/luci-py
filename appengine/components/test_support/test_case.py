@@ -149,9 +149,10 @@ class TestCase(auto_stub.TestCase):
           self.assertEqual('POST', task['method'])
           logging.info('Task: %s', task['url'])
 
-          # Not 100% sure why the Content-Length hack is needed:
+          # Not 100% sure why the Content-Length hack is needed, nor why the
+          # stub returns unicode values that break webtest's assertions.
           body = base64.b64decode(task['body'])
-          headers = dict(task['headers'])
+          headers = {k: str(v) for k, v in task['headers']}
           headers['Content-Length'] = str(len(body))
           try:
             self.app.post(task['url'], body, headers=headers, **kwargs)
