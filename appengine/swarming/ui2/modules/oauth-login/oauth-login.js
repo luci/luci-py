@@ -30,7 +30,7 @@
  *
  */
 
-import { html, render } from 'lit-html/lib/lit-extended'
+import { html, render } from 'lit-html'
 import { upgradeProperty } from 'elements-sk/upgradeProperty'
 import { errorMessage } from 'common-sk/modules/errorMessage'
 
@@ -41,12 +41,12 @@ const template = (ele) => {
   <img class=center id=avatar src="${ele._profile.imageURL}" width=30 height=30>
   <span class=center>${ele._profile.email}</span>
   <span class=center>|</span>
-  <a class=center on-click=${()=>ele._logOut()} href="#">Sign out</a>
+  <a class=center @click=${()=>ele._logOut()} href="#">Sign out</a>
 </div>`;
   } else {
     return html`
 <div>
-  <a on-click=${()=>ele._logIn()} href="#">Sign in</a>
+  <a @click=${()=>ele._logIn()} href="#">Sign in</a>
 </div>`;
   }
 };
@@ -96,11 +96,9 @@ window.customElements.define('oauth-login', class extends HTMLElement {
   set client_id(val) { return this.setAttribute('client_id', val);}
 
   /** @prop {bool} testing_offline Mirrors the attribute 'testing_offline'. */
-  get testing_offline() { return this.getAttribute('testing_offline');}
+  get testing_offline() { return this.hasAttribute('testing_offline');}
   set testing_offline(val) {
-    // If testing_offline gets passed through multiple layers, it ends up the
-    // string 'false'
-    if (val && val !== 'false') {
+    if (val) {
       this.setAttribute('testing_offline', true);
     } else {
       this.removeAttribute('testing_offline');

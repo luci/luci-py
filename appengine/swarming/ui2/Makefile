@@ -5,7 +5,6 @@ default: package-lock.json
 
 release: package-lock.json
 	npx webpack --mode=production
-	cp node_modules/@webcomponents/custom-elements/custom-elements.min.js dist/custom-elements.min.js
 
 serve: package-lock.json
 	npx webpack-dev-server --mode=development --watch-poll

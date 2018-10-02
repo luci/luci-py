@@ -4,6 +4,7 @@
 
 const commonBuilder = require('pulito');
 const path = require('path');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 module.exports = (env, argv) => {
   let config = commonBuilder(env, argv, __dirname);
@@ -13,6 +14,11 @@ module.exports = (env, argv) => {
     test: /.js$/,
     use: 'html-template-minifier-webpack',
   });
+  config.plugins.push(
+    new CopyWebpackPlugin([
+        { from: 'node_modules/@webcomponents/custom-elements/custom-elements.min.js' },
+    ])
+  );
 
   return config;
 }

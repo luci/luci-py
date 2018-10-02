@@ -4,7 +4,31 @@
 
 import 'modules/swarming-app'
 
+if (!mockAppGETs) {
+  var mockAppGETs = require('modules/test_util').mockAppGETs;
+}
+
 describe('swarming-app', function() {
+  const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
+
+  beforeEach(function(){
+    // These are the default responses to the expected API calls (aka 'matched')
+    // They can be overridden for specific tests, if needed.
+    mockAppGETs(fetchMock, {
+      can_like_dogs: true,
+      can_like_cats: true
+    });
+
+    // Everything else
+    fetchMock.catch(404);
+  });
+
+  afterEach(function() {
+    // Completely remove the mocking which allows each test
+    // to be able to mess with the mocked routes w/o impacting other tests.
+    fetchMock.reset();
+  });
+
   // A reusable HTML element in which we create our element under test.
   let container = document.createElement('div');
   document.body.appendChild(container);
@@ -31,6 +55,22 @@ describe('swarming-app', function() {
     });
   }
 
+  function userLogsIn(ele, callback) {
+    // The swarming-app emits the 'busy-end' event when all pending
+    // fetches (and renders) have resolved.
+    let ran = false;
+    ele.addEventListener('busy-end', (e) => {
+      if (!ran) {
+        callback();
+      }
+      ran = true; // prevent multiple runs if the test makes the
+                  // app go busy (e.g. if it calls fetch).
+    });
+    let login = ele.querySelector('oauth-login');
+    login._logIn();
+    fetchMock.flush();
+  }
+
 //===============TESTS START====================================
 
   describe('html injection to provided content', function() {
@@ -45,6 +85,8 @@ describe('swarming-app', function() {
         expect(login).toBeTruthy();
         let spinner = ele.querySelector('header spinner-sk');
         expect(spinner).toBeTruthy();
+        let serverVersion = ele.querySelector('header .server-version');
+        expect(serverVersion).toBeTruthy();
         done();
       });
     });
@@ -132,5 +174,102 @@ describe('swarming-app', function() {
         }, 10);
       });
     });
+  }); // end describe('spinner and busy property')
+
+  describe('behavior with logged-in user', function() {
+
+    describe('html content', function() {
+      it('adds a server version indicator to the header', function(done){
+        createElement((ele) => {
+          ele.addEventListener('server-details-loaded', (e) => {
+            e.stopPropagation();
+            let serverVersion = ele.querySelector('header .server-version');
+            expect(serverVersion).toBeTruthy();
+            expect(serverVersion.textContent).toContain('1234-abcdefg');
+            done();
+          });
+          let serverVersion = ele.querySelector('header .server-version');
+          expect(serverVersion).toBeTruthy();
+          expect(serverVersion.textContent).toContain('must log in');
+          userLogsIn(ele, () => {});
+        });
+      });
+    });
+
+    describe('api calls', function(){
+      function expectNoUnmatchedCalls() {
+        let calls = fetchMock.calls(UNMATCHED, 'GET');
+        expect(calls.length).toBe(0, 'no unmatched (unexpected) GETs');
+        calls = fetchMock.calls(UNMATCHED, 'POST');
+        expect(calls.length).toBe(0, 'no unmatched (unexpected) POSTs');
+      }
+
+      it('makes no API calls when not logged in', function(done) {
+        createElement((ele) => {
+          fetchMock.flush().then(() => {
+            // MATCHED calls are calls that we expect and specified in the
+            // beforeEach at the top of this file.
+            let calls = fetchMock.calls(MATCHED, 'GET');
+            expect(calls.length).toBe(0);
+
+            expectNoUnmatchedCalls();
+            done();
+          });
+        });
+      });
+
+      it('makes authenticated calls when a user logs in', function(done) {
+        createElement((ele) => {
+          userLogsIn(ele, () => {
+            let calls = fetchMock.calls(MATCHED, 'GET');
+            expect(calls.length).toBe(2);
+            // calls is an array of 2-length arrays with the first element
+            // being the string of the url and the second element being
+            // the options that were passed in
+            let gets = calls.map((c) => c[0]);
+            expect(gets).toContain('/_ah/api/swarming/v1/server/details');
+            expect(gets).toContain('/_ah/api/swarming/v1/server/permissions');
+
+            // check authorization headers are set
+            calls.forEach((c) => {
+              expect(c[1].headers).toBeDefined();
+              expect(c[1].headers.authorization).toContain('Bearer ');
+            })
+
+            expectNoUnmatchedCalls();
+            done();
+          });
+        });
+      });
+    });
+
+    describe('events', function(){
+      it('emits a permissions-loaded event', function(done) {
+        createElement((ele) => {
+          ele.addEventListener('permissions-loaded', (e) => {
+            e.stopPropagation();
+            expect(ele.permissions).toBeTruthy();
+            expect(ele.permissions.can_like_dogs).toBeTruthy();
+            done();
+          });
+          expect(ele.permissions).toEqual({});
+          userLogsIn(ele, () => {});
+        });
+      });
+
+      it('emits a server-details-loaded event', function(done) {
+        createElement((ele) => {
+          ele.addEventListener('server-details-loaded', (e) => {
+            e.stopPropagation();
+            expect(ele.server_details).toBeTruthy();
+            expect(ele.server_details.server_version).toBe('1234-abcdefg');
+            done();
+          });
+          expect(ele.server_details.server_version).toContain('must log in');
+          userLogsIn(ele, () => {});
+        });
+      });
+    });
+
   }); // end describe('spinner and busy property')
 });

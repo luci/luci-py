@@ -4,22 +4,20 @@
 
 import 'modules/swarming-index'
 
-describe('swarming-index', function() {
+if (!mockAppGETs) {
+  // ES6 Modules don't support conditional imports (yet), and if we did this
+  // the normal way, mockAppGETs would get declared multiple times (because
+  // of the concatenate hack we have to do with Karma and Webpack).
+  var mockAppGETs = require('modules/test_util').mockAppGETs;
+}
 
-  const fetchMock = require('fetch-mock');
+describe('swarming-index', function() {
+  const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
 
   beforeEach(function(){
-    fetchMock.sandbox();
-
-    // These are the default responses to the expected API calls (aka 'matched').
+    // These are the default responses to the expected API calls (aka 'matched')
     // They can be overridden for specific tests, if needed.
-    fetchMock.get('/_ah/api/swarming/v1/server/details', {
-      server_version: '1234-abcdefg',
-      bot_version: 'abcdoeraymeyouandme',
-    });
-
-
-    fetchMock.get('/_ah/api/swarming/v1/server/permissions', {
+    mockAppGETs(fetchMock, {
       get_bootstrap_token: false
     });
 
@@ -32,7 +30,7 @@ describe('swarming-index', function() {
   afterEach(function() {
     // Completely remove the mocking which allows each test
     // to be able to mess with the mocked routes w/o impacting other tests.
-    fetchMock.restore();
+    fetchMock.reset();
   });
 
   // A reusable HTML element in which we create our element under test.
@@ -48,7 +46,9 @@ describe('swarming-index', function() {
   // that doesn't work on Firefox (and possibly other places).
   function createElement(test) {
     return window.customElements.whenDefined('swarming-index').then(() => {
-      container.innerHTML = `<swarming-index client_id=for_test testing_offline=true></swarming-index>`;
+      container.innerHTML =
+          `<swarming-index client_id=for_test testing_offline=true>
+          </swarming-index>`;
       expect(container.firstElementChild).toBeTruthy();
       test(container.firstElementChild);
     });
@@ -57,8 +57,13 @@ describe('swarming-index', function() {
   function userLogsIn(ele, callback) {
     // The swarming-app emits the 'busy-end' event when all pending
     // fetches (and renders) have resolved.
+    let ran = false;
     ele.addEventListener('busy-end', (e) => {
-      callback();
+      if (!ran) {
+        callback();
+      }
+      ran = true; // prevent multiple runs if the test makes the
+                  // app go busy (e.g. if it calls fetch).
     });
     let login = ele.querySelector('oauth-login');
     login._logIn();
@@ -112,7 +117,7 @@ describe('swarming-index', function() {
         // overwrite the default fetchMock behaviors to have everything return 403.
         fetchMock.get('/_ah/api/swarming/v1/server/details', 403,
                       { overwriteRoutes: true });
-        fetchMock.get('/_ah/api/swarming/v1/server/permissions', 403,
+        fetchMock.get('/_ah/api/swarming/v1/server/permissions', {},
                       { overwriteRoutes: true });
       }
 
@@ -220,21 +225,20 @@ describe('swarming-index', function() {
 
   describe('api calls', function() {
     function expectNoUnmatchedCalls() {
-      let calls = fetchMock.calls(false, 'GET');
-      expect(calls.length).toBe(0, 'no unmatched GETs');
-      calls = fetchMock.calls(false, 'POST');
-      expect(calls.length).toBe(0, 'no unmatched POSTs');
+      let calls = fetchMock.calls(UNMATCHED, 'GET');
+      expect(calls.length).toBe(0, 'no unmatched (unexpected) GETs');
+      calls = fetchMock.calls(UNMATCHED, 'POST');
+      expect(calls.length).toBe(0, 'no unmatched (unexpected) POSTs');
     }
 
     it('makes no API calls when not logged in', function(done) {
       createElement((ele) => {
         fetchMock.flush().then(() => {
-          // true in the first argument means 'matched calls',
-          // that is calls that we expect and specified in the
+          // MATCHED calls are calls that we expect and specified in the
           // beforeEach at the top of this file.
-          let calls = fetchMock.calls(true, 'GET');
+          let calls = fetchMock.calls(MATCHED, 'GET');
           expect(calls.length).toBe(0);
-          calls = fetchMock.calls(true, 'POST');
+          calls = fetchMock.calls(MATCHED, 'POST');
           expect(calls.length).toBe(0);
 
           expectNoUnmatchedCalls();
@@ -243,25 +247,11 @@ describe('swarming-index', function() {
       });
     });
 
-    it('makes authenticated API calls when a user logs in', function(done) {
+    it('does not request a token when a normal user logs in', function(done) {
       createElement((ele) => {
         userLogsIn(ele, () => {
-          let calls = fetchMock.calls(true, 'GET');
-          expect(calls.length).toBe(2);
-          // calls is an array of 2-length arrays with the first element
-          // being the string of the url and the second element being
-          // the options that were passed in
-          let gets = calls.map((c) => c[0]);
-          expect(gets).toContain('/_ah/api/swarming/v1/server/details');
-          expect(gets).toContain('/_ah/api/swarming/v1/server/permissions');
-
-          // check authorization headers are set
-          calls.forEach((c) => {
-            expect(c[1].headers).toBeDefined();
-            expect(c[1].headers.authorization).toContain('Bearer ');
-          })
-
-          calls = fetchMock.calls(true, 'POST');
+          // swarming-app makes some GETs and swarming-app_test.js tests that.
+          let calls = fetchMock.calls(MATCHED, 'POST');
           expect(calls.length).toBe(0);
 
           expectNoUnmatchedCalls();
@@ -270,26 +260,13 @@ describe('swarming-index', function() {
       });
     });
 
-    it('makes more authenticated API calls when an admin logs in', function(done) {
+    it('fetches a token when an admin logs in', function(done) {
       becomeAdmin();
       createElement((ele) => {
         userLogsIn(ele, () => {
-          let calls = fetchMock.calls(true, 'GET');
-          expect(calls.length).toBe(2);
-          // calls is an array of 2-length arrays with the first element
-          // being the string of the url and the second element being
-          // the options that were passed in
-          let gets = calls.map((c) => c[0]);
-          expect(gets).toContain('/_ah/api/swarming/v1/server/details');
-          expect(gets).toContain('/_ah/api/swarming/v1/server/permissions');
+           // swarming-app makes the GETs and swarming-app_test.js tests that.
 
-          // check authorization headers are set
-          calls.forEach((c) => {
-            expect(c[1].headers).toBeDefined();
-            expect(c[1].headers.authorization).toContain('Bearer ');
-          })
-
-          calls = fetchMock.calls(true, 'POST');
+          let calls = fetchMock.calls(MATCHED, 'POST');
           let posts = calls.map((c) => c[0]);
           expect(calls.length).toBe(1);
           expect(posts).toContain('/_ah/api/swarming/v1/server/token');

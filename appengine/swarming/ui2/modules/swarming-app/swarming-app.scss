@@ -33,7 +33,11 @@ swarming-app > {
     font-size: 20px;
   }
 
-  header > * {
+  header .right {
+    display: flex;
+  }
+
+  header > *, header .right > * {
     margin: auto 5px; /* Center things vertically */
   }
 
