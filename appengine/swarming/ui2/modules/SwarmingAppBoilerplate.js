@@ -125,14 +125,12 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
 
   /** Re-renders the app, starting with the top level template. */
   render() {
-    //console.time('render');
     render(this._template(this), this);
     if (!this._app) {
       this._app = this.firstElementChild;
       // render again in case anything was using attributes on this._app.
       render(this._template(this), this);
     }
-    //console.timeEnd('render');
   }
 
   attributeChangedCallback(attrName, oldVal, newVal) {
