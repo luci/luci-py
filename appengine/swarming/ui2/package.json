@@ -7,7 +7,7 @@
   "license": "Apache 2.0",
   "dependencies": {
     "@webcomponents/custom-elements": "~1.1.1",
-    "common-sk": "~2.0.6",
+    "common-sk": "~3.1.0",
     "elements-sk": "~2.4.2",
     "javascript-natural-sort": "~0.7.1",
     "lit-html": "~0.11.4"

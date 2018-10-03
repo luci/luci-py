@@ -32,7 +32,7 @@
 
 import { html, render } from 'lit-html'
 import { upgradeProperty } from 'elements-sk/upgradeProperty'
-import { errorMessage } from 'common-sk/modules/errorMessage'
+import { errorMessage } from 'elements-sk/errorMessage'
 
 const template = (ele) => {
   if (ele.auth_header) {

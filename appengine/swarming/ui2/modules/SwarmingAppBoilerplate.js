@@ -4,7 +4,7 @@
 
 /** @module swarming-ui/SwarmingAppBoilerplate */
 
-import { errorMessage } from 'common-sk/modules/errorMessage'
+import { errorMessage } from 'elements-sk/errorMessage'
 import { html, render } from 'lit-html'
 import { upgradeProperty } from 'elements-sk/upgradeProperty'
 

@@ -1,0 +1,116 @@
+bot-list {
+  main a[href] {
+    color: #1F78B4;
+  }
+
+  .bot-table {
+    border-collapse: collapse;
+    margin-left: 5px;
+
+    td,th {
+      border: 1px solid #DDD;
+      padding: 5px;
+    }
+
+    th {
+      position: relative;
+    }
+  }
+
+  .flex {
+    flex: 1; /* expand to all available space */
+  }
+
+  /* These things can be inside a key/value/filter selector,
+     and are similar in style*/
+  .item, .information_only {
+    border-bottom: 1px solid #EEE;
+    max-width: 250px;
+    min-height: 1.0em;
+    min-width: 100px;
+    padding: 0.1em 0.2em;
+    line-height: 1.5em;
+  }
+
+  .item {
+    display: flex;
+    checkbox-sk {
+      margin: 2px auto;
+    }
+  }
+
+  .header {
+    display: flex;
+    flex-direction: row;
+
+    .filter_box {
+      margin-bottom: 5px;
+      flex-grow: 1;
+    }
+
+    .summary {
+      padding: 5px;
+      border-left: 1px solid black;
+
+      .title {
+        font-size: 1.2em;
+        font-weight: 700;
+      }
+
+      tr > :first-child {
+        text-align: right;
+      }
+      tr > * {
+        min-width: 2.0em;
+      }
+    }
+  }
+
+  .selector {
+    border: 1px solid black;
+    margin: 0 5px;
+    max-height: 200px;
+    min-height: 130px;
+    min-width: 255px;
+    overflow-y: auto;
+    display: inline-block;
+    vertical-align: top;
+  }
+
+  .search {
+    display: inline-block;
+    min-width: calc(100% - 40px);
+    margin: 5px;
+  }
+
+  .options {
+    /* If the screen is small enough that these wrap, it may be
+    worth considering having a media query to spread these out flat.*/
+    display: inline-block;
+
+    .verbose > * {
+      display: inline-block
+    }
+
+    input, a {
+      display: block;
+    }
+  }
+
+  .old_version {
+    background-color: #ffffdd;
+  }
+  .quarantined, .bad-device {
+    background-color: #ffdddd;
+  }
+  .maintenance {
+    background-color: #cee9f9;
+  }
+  .dead {
+    background-color: #cccccc;
+  }
+  .alt {
+    background-color: #f8f8f8;
+  }
+
+}

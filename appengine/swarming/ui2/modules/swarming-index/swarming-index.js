@@ -18,9 +18,9 @@
 import { html, render } from 'lit-html'
 import { upgradeProperty } from 'elements-sk/upgradeProperty'
 import { jsonOrThrow } from 'common-sk/modules/jsonOrThrow'
-import { errorMessage } from 'common-sk/modules/errorMessage'
+import { errorMessage } from 'elements-sk/errorMessage'
 
-import 'common-sk/modules/error-toast-sk'
+import 'elements-sk/error-toast-sk'
 
 import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
 
