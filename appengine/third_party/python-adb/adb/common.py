@@ -395,7 +395,7 @@ class UsbHandle(Handle):
           if device_matcher is None or device_matcher(handle):
             yield handle
         except (usb1.USBErrorOther, usb1.USBErrorNoDevice) as e:
-          logging.exception(
+          logging.error(
               'Failed to open USB device, is user in group plugdev? %s', e)
           continue
     except usb1.USBError as e:
