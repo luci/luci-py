@@ -846,12 +846,20 @@ class HighDevice(object):
     _LOG.info('%s: %s', cmd, out)
     return False
 
-  def UninstallAPK(self, package):
+  def UninstallAPK(self, package, user=None):
     """Uninstalls the package."""
-    cmd = 'pm uninstall %s' % pipes.quote(package)
+    cmd = 'pm uninstall'
+    if user is not None:
+      cmd += ' --user %s' % user
+    cmd += ' %s' % pipes.quote(package)
     out, exit_code = self.Shell(cmd)
+    # pm can exit with 0 even if it fails to uninstall, and who knows if the
+    # output can be reliably parsed. So only return success if the package
+    # is missing afterwards.
     if not exit_code:
-      return True
+      _, exit_code = self.Shell('pm path %s' % pipes.quote(package))
+      if exit_code:  # Should be non-zero. (Hopefully)
+        return True
     _LOG.info('%s: %s', cmd, out)
     return False
 

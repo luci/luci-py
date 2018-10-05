@@ -20,7 +20,7 @@ import logging
 import socket
 import subprocess
 import time
-
+import uuid
 
 from adb import adb_commands
 from adb import adb_protocol
@@ -148,6 +148,7 @@ class AdbCommandsSafe(object):
 
     # State.
     self._adb_cmd = None
+    self._needs_su = False
     self._serial = None
     self._failure = None
     self._handle = handle
@@ -337,7 +338,17 @@ class AdbCommandsSafe(object):
     if self._adb_cmd:
       for _ in self._Loop():
         try:
-          self._adb_cmd.Push(cStringIO.StringIO(content), dest, mtime)
+          if dest.startswith('/data/local/tmp') or not self._needs_su:
+            self._adb_cmd.Push(cStringIO.StringIO(content), dest, mtime)
+          else:
+            # If we need to use "su" to access root privileges, first push the
+            # file to a world-writable dir, then use "su" to move the file
+            # over.
+            tmp_dest = '/data/local/tmp/%s' % uuid.uuid4()
+            self._adb_cmd.Push(cStringIO.StringIO(content), tmp_dest, mtime)
+            _, exit_code = self.Shell('mv %s %s' % (tmp_dest, dest))
+            if exit_code:
+              return False
           return True
         except usb_exceptions.AdbCommandFailureException:
           break
@@ -462,6 +473,8 @@ class AdbCommandsSafe(object):
       - stdout is as unicode if it ran, None if an USB error occurred.
       - exit_code is set if ran.
     """
+    if self._needs_su:
+      cmd = 'su root ' + cmd
     if self._adb_cmd:
       for _ in self._Loop():
         try:
@@ -557,6 +570,9 @@ class AdbCommandsSafe(object):
     reenumerate the device until the device is back, then reinitialize the
     communication, all synchronously.
     """
+    # Don't bother restarting adbd if we can already attain root status.
+    if self.IsRoot():
+      return True
     if self._adb_cmd and self._Root():
       # There's no need to loop initially too fast. Restarting the adbd always
       # take 'some' amount of time. In practice, this can take a good 1 second.
@@ -568,6 +584,9 @@ class AdbCommandsSafe(object):
         if not self._Reconnect(True):
           continue
         if self.IsRoot():
+          return True
+        elif self.IsSuRoot():
+          self._needs_su = True
           return True
       _LOG.error('%s.Root(): Failed to id after %d tries', self.port_path, i+1)
     return False
@@ -585,6 +604,7 @@ class AdbCommandsSafe(object):
         if not self._Reconnect(True):
           continue
         if self.IsRoot() is False:
+          self._needs_su = False
           return True
       _LOG.error(
           '%s.Unroot(): Failed to id after %d tries', self.port_path, i+1)
@@ -603,6 +623,18 @@ class AdbCommandsSafe(object):
     go to the new restarted adbd process.
     """
     out, exit_code = self.Shell('id')
+    if exit_code != 0 or not out:
+      return None
+    return out.startswith('uid=0(root)')
+
+  def IsSuRoot(self):
+    """Returns True if the user can "su" as root.
+
+    Like IsRoot(), but explicitly runs 'su root' to try to attain root status.
+    Some devices explicitly need this, even if adbd has successfully been
+    restarted as root.
+    """
+    out, exit_code = self.Shell('su root id')
     if exit_code != 0 or not out:
       return None
     return out.startswith('uid=0(root)')
