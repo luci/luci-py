@@ -21,13 +21,13 @@
       }
 
       span {
-        color: var(--paper-grey-600); 
+        color: var(--paper-grey-600);
         word-wrap: break-word;
         font-size: 90%;
       }
-      
-      .config-title { 
-        @apply --paper-font-headline; 
+
+      .config-title {
+        @apply --paper-font-headline;
         word-wrap: break-word;
         font-size: 120%;
       }
@@ -43,7 +43,7 @@
       .paper-red { color: var(--paper-red-600); }
 
       .paper-grey { color: var(--paper-grey-600); }
-      
+
     </style>
 
     <paper-card elevation="2"
@@ -117,7 +117,7 @@
       },
 
       _openConfigPage: function() {
-        window.location.href = window.location.href + this.name;
+        window.location.href = "/#/" + this.name;
       },
     });
   </script>
