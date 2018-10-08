@@ -20,16 +20,16 @@ For tools in luci-py/client, the following environment variables have effect:
 ## run_isolated
 
 `run_isolated.py/.zip` understands the following. These values should be set in
-the `command` section of the .isolate file.
+either the `command` section of the .isolate file, or the values for the
+environment variables passed in the command line with the `--env` option.
 
-*   `${ISOLATED_OUTDIR}`: If found on command line argument, replaced by the
-    temporary directory that is uploaded back to the server after the task
-    execution. This causes `run_isolated` to print a `[run_isolated_out_hack]`
-    statement after the task.
-*   `${SWARMING_BOT_FILE}`: If found on command line argument, replaced by a
-    file written to by the swarming bot's on_before_task() hook in the swarming
-    server's custom bot_config.py. This is used by a swarming bot to communicate
-    state of the bot to tasks.
+*   `${ISOLATED_OUTDIR}`: If found on command line argument or environment
+    variable, it will be replaced by the temporary directory that is uploaded
+    back to the server after the task execution.
+*   `${SWARMING_BOT_FILE}`: If found on command line argument or environment
+    variable, it will replaced by a file written to by the swarming bot's
+    on_before_task() hook in the swarming server's custom bot_config.py. This is
+    used by a swarming bot to communicate state of the bot to tasks.
 
 
 ## Swarming
