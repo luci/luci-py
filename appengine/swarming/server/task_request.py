@@ -1056,17 +1056,18 @@ class TaskRequest(ndb.Model):
         raise datastore_errors.BadValueError(
             'cannot request duplicate task slice')
 
-    # All task slices in a single task request must use the exact same 'pool'
-    # and 'id' dimension value.
-    for key in (u'id', u'pool'):
-      v = self.task_slice(0).properties.dimensions.get(key)
-      for i in xrange(1, self.num_task_slices):
-        t = self.task_slice(i)
-        w = t.properties.dimensions.get(key)
-        if v != w:
-          raise datastore_errors.BadValueError(
-              u'each task slice must use the same %s dimensions; %s != %s' %
-              (key, v, w))
+    # All task slices in a single TaskRequest must use the exact same 'pool'.
+    # It is fine to use different 'id' values; one bot is targetting in the
+    # first TaskSlice, a second bot is targetted as a fallback on the second
+    # TaskSlice.
+    v = self.task_slice(0).properties.dimensions.get(u'pool')
+    for i in xrange(1, self.num_task_slices):
+      t = self.task_slice(i)
+      w = t.properties.dimensions.get(u'pool')
+      if v != w:
+        raise datastore_errors.BadValueError(
+            u'each task slice must use the same pool dimensions; %s != %s' %
+            (v, w))
 
     if len(self.manual_tags) > 256:
       raise datastore_errors.BadValueError(

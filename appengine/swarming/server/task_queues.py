@@ -432,7 +432,9 @@ def _rebuild_bot_cache_async(bot_dimensions, bot_root_key):
 
 
 def _get_task_dims_key(dimensions_hash, dimensions):
-  # Both 'id' and 'pool' are guaranteed to have at most 1 item.
+  """Returns the ndb.Key for the task dimensions."""
+  # Both 'id' and 'pool' are guaranteed to have at most 1 item for a single
+  # TaskProperty.
   if u'id' in dimensions:
     return ndb.Key(
         TaskDimensionsRoot, u'id:%s' % dimensions[u'id'][0],
