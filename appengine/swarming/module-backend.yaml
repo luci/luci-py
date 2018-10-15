@@ -7,13 +7,15 @@ threadsafe: true
 instance_class: F4_1G
 
 handlers:
+# Backend for mapreduce jobs.
 - url: /(internal|restricted)/mapreduce(/.*)?
-  script: main.mapreduce_app
+  script: main_backend.mapreduce_app
   secure: always
   login: admin
 
+# Cron jobs, task queues.
 - url: /internal/.+
-  script: main.backend_app
+  script: main_backend.app
   secure: always
   login: admin
 

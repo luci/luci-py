@@ -12,15 +12,21 @@ automatic_scaling:
 default_expiration: "10m"
 
 handlers:
+# Cloud Endpoints APIs.
 - url: /_ah/api/.*
-  script: main.endpoints_app
+  script: main_frontend.endpoints_app
   secure: always
 
+# Old API URLs.
+- url: /api/.*
+  script: main_frontend.app
+  secure: always
+
+# Sadly we have to put mapreduce in both the frontend and backend.
 - url: /(internal|restricted)/mapreduce(/.*)?
   script: main.mapreduce_app
   secure: always
   login: admin
-
 - url: /mapreduce/pipeline/images
   static_dir: third_party/mapreduce/lib/pipeline/ui/images
   secure: always
@@ -29,6 +35,7 @@ handlers:
     Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
     X-Frame-Options: deny
 
+# Static content.
 - url: /([^/]+)\.(css|ico|txt)
   static_files: static/\1.\2
   upload: static/(.+)\.(css|ico|txt)
@@ -38,21 +45,11 @@ handlers:
     Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
     X-Frame-Options: deny
 
-- url: /api/.*
-  script: main.app
-  secure: always
-
+# Frontend.
 - url: /(user|restricted)(|/.*)
-  script: main.app
+  script: main_frontend.app
   secure: always
   login: required
-
-# TODO(vadimsh): Get rid of this route after confirming it's not used on
-# default module. Old task queue tasks may potentially target 'default' module.
-- url: /internal/.+
-  script: main.backend_app
-  secure: always
-  login: admin
 
 - url: /res/(.+)
   static_files: ui/build/\1
@@ -73,8 +70,9 @@ handlers:
     Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
     X-Frame-Options: deny
 
+# Warning: this includes the bot API at /swarming/api/...
 - url: .*
-  script: main.app
+  script: main_frontend.app
   secure: always
 
 builtins:
