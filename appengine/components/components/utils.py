@@ -50,6 +50,9 @@ EPOCH = datetime.datetime.utcfromtimestamp(0)
 _task_queue_module = 'backend'
 
 
+## GAE environment
+
+
 def should_disable_ui_routes():
     return os.environ.get('LUCI_DISABLE_UI_ROUTES', '0') == '1'
 
@@ -89,34 +92,7 @@ def is_unit_test():
       for p in sys.meta_path)
 
 
-def get_module_version_list(module_list, tainted):
-  """Returns a list of pairs (module name, version name) to fetch logs for.
-
-  Arguments:
-    module_list: list of modules to list, defaults to all modules.
-    tainted: if False, excludes versions with '-tainted' in their name.
-  """
-  result = []
-  if not module_list:
-    # If the function it called too often, it'll raise a OverQuotaError. So
-    # cache it for 10 minutes.
-    module_list = gae_memcache.get('modules_list')
-    if not module_list:
-      module_list = modules.get_modules()
-      gae_memcache.set('modules_list', module_list, time=10*60)
-
-  for module in module_list:
-    # If the function it called too often, it'll raise a OverQuotaError.
-    # Versions is a bit more tricky since we'll loose data, since versions are
-    # changed much more often than modules. So cache it for 1 minute.
-    key = 'modules_list-' + module
-    version_list = gae_memcache.get(key)
-    if not version_list:
-      version_list = modules.get_versions(module)
-      gae_memcache.set(key, version_list, time=60)
-    result.extend(
-        (module, v) for v in version_list if tainted or '-tainted' not in v)
-  return result
+## Handler
 
 
 def get_request_as_int(request, key, default, min_value, max_value):
@@ -127,6 +103,56 @@ def get_request_as_int(request, key, default, min_value, max_value):
   except ValueError:
     return default
   return min(max_value, max(min_value, value))
+
+
+## Time
+
+
+def utcnow():
+  """Returns datetime.utcnow(), used for testing.
+
+  Use this function so it can be mocked everywhere.
+  """
+  return datetime.datetime.utcnow()
+
+
+def time_time():
+  """Returns the equivalent of time.time() as mocked if applicable."""
+  return (utcnow() - EPOCH).total_seconds()
+
+
+def milliseconds_since_epoch(now):
+  """Returns the number of milliseconds since unix epoch as an int."""
+  now = now or utcnow()
+  return int(round((now - EPOCH).total_seconds() * 1000.))
+
+
+def datetime_to_rfc2822(dt):
+  """datetime -> string value for Last-Modified header as defined by RFC2822."""
+  if not isinstance(dt, datetime.datetime):
+    raise TypeError(
+        'Expecting datetime object, got %s instead' % type(dt).__name__)
+  assert dt.tzinfo is None, 'Expecting UTC timestamp: %s' % dt
+  return email_utils.formatdate(datetime_to_timestamp(dt) / 1000000.0)
+
+
+def datetime_to_timestamp(value):
+  """Converts UTC datetime to integer timestamp in microseconds since epoch."""
+  if not isinstance(value, datetime.datetime):
+    raise ValueError(
+        'Expecting datetime object, got %s instead' % type(value).__name__)
+  if value.tzinfo is not None:
+    raise ValueError('Only UTC datetime is supported')
+  dt = value - EPOCH
+  return dt.microseconds + 1000 * 1000 * (dt.seconds + 24 * 3600 * dt.days)
+
+
+def timestamp_to_datetime(value):
+  """Converts integer timestamp in microseconds since epoch to UTC datetime."""
+  if not isinstance(value, (int, long, float)):
+    raise ValueError(
+        'Expecting a number, got %s instead' % type(value).__name__)
+  return EPOCH + datetime.timedelta(microseconds=value)
 
 
 def parse_datetime(text):
@@ -211,84 +237,7 @@ def constant_time_equals(a, b):
   return result == 0
 
 
-def to_units(number):
-  """Convert a string to numbers."""
-  UNITS = ('', 'k', 'm', 'g', 't', 'p', 'e', 'z', 'y')
-  unit = 0
-  while number >= 1024.:
-    unit += 1
-    number = number / 1024.
-    if unit == len(UNITS) - 1:
-      break
-  if unit:
-    return '%.2f%s' % (number, UNITS[unit])
-  return '%d' % number
-
-
-def validate_root_service_url(url):
-  """Raises ValueError if the URL doesn't look like https://<host>."""
-  schemes = ('https', 'http') if is_local_dev_server() else ('https',)
-  parsed = urlparse.urlparse(url)
-  if parsed.scheme not in schemes:
-    raise ValueError('unsupported protocol %r' % str(parsed.scheme))
-  if not parsed.netloc:
-    raise ValueError('missing hostname')
-  stripped = urlparse.urlunparse((parsed[0], parsed[1], '', '', '', ''))
-  if stripped != url:
-    raise ValueError('expecting root host URL, e.g. %r)' % str(stripped))
-
-
-### Time
-
-
-def utcnow():
-  """Returns datetime.utcnow(), used for testing.
-
-  Use this function so it can be mocked everywhere.
-  """
-  return datetime.datetime.utcnow()
-
-
-def time_time():
-  """Returns the equivalent of time.time() as mocked if applicable."""
-  return (utcnow() - EPOCH).total_seconds()
-
-
-def milliseconds_since_epoch(now):
-  """Returns the number of milliseconds since unix epoch as an int."""
-  now = now or utcnow()
-  return int(round((now - EPOCH).total_seconds() * 1000.))
-
-
-def datetime_to_rfc2822(dt):
-  """datetime -> string value for Last-Modified header as defined by RFC2822."""
-  if not isinstance(dt, datetime.datetime):
-    raise TypeError(
-        'Expecting datetime object, got %s instead' % type(dt).__name__)
-  assert dt.tzinfo is None, 'Expecting UTC timestamp: %s' % dt
-  return email_utils.formatdate(datetime_to_timestamp(dt) / 1000000.0)
-
-
-def datetime_to_timestamp(value):
-  """Converts UTC datetime to integer timestamp in microseconds since epoch."""
-  if not isinstance(value, datetime.datetime):
-    raise ValueError(
-        'Expecting datetime object, got %s instead' % type(value).__name__)
-  if value.tzinfo is not None:
-    raise ValueError('Only UTC datetime is supported')
-  dt = value - EPOCH
-  return dt.microseconds + 1000 * 1000 * (dt.seconds + 24 * 3600 * dt.days)
-
-
-def timestamp_to_datetime(value):
-  """Converts integer timestamp in microseconds since epoch to UTC datetime."""
-  if not isinstance(value, (int, long, float)):
-    raise ValueError(
-        'Expecting a number, got %s instead' % type(value).__name__)
-  return EPOCH + datetime.timedelta(microseconds=value)
-
-
-### Cache
+## Cache
 
 
 class _Cache(object):
@@ -471,6 +420,9 @@ def memcache(*args, **kwargs):
   return decorator
 
 
+## GAE identity
+
+
 @cache
 def get_app_version():
   """Returns currently running version (not necessary a default one)."""
@@ -534,7 +486,37 @@ def get_service_account_name():
   return app_identity.get_service_account_name()
 
 
-### Task queue
+def get_module_version_list(module_list, tainted):
+  """Returns a list of pairs (module name, version name) to fetch logs for.
+
+  Arguments:
+    module_list: list of modules to list, defaults to all modules.
+    tainted: if False, excludes versions with '-tainted' in their name.
+  """
+  result = []
+  if not module_list:
+    # If the function it called too often, it'll raise a OverQuotaError. So
+    # cache it for 10 minutes.
+    module_list = gae_memcache.get('modules_list')
+    if not module_list:
+      module_list = modules.get_modules()
+      gae_memcache.set('modules_list', module_list, time=10*60)
+
+  for module in module_list:
+    # If the function it called too often, it'll raise a OverQuotaError.
+    # Versions is a bit more tricky since we'll loose data, since versions are
+    # changed much more often than modules. So cache it for 1 minute.
+    key = 'modules_list-' + module
+    version_list = gae_memcache.get(key)
+    if not version_list:
+      version_list = modules.get_versions(module)
+      gae_memcache.set(key, version_list, time=60)
+    result.extend(
+        (module, v) for v in version_list if tainted or '-tainted' not in v)
+  return result
+
+
+## Task queue
 
 
 @cache
@@ -699,6 +681,33 @@ def encode_to_json(data):
 
 
 ## General
+
+
+def to_units(number):
+  """Convert a string to numbers."""
+  UNITS = ('', 'k', 'm', 'g', 't', 'p', 'e', 'z', 'y')
+  unit = 0
+  while number >= 1024.:
+    unit += 1
+    number = number / 1024.
+    if unit == len(UNITS) - 1:
+      break
+  if unit:
+    return '%.2f%s' % (number, UNITS[unit])
+  return '%d' % number
+
+
+def validate_root_service_url(url):
+  """Raises ValueError if the URL doesn't look like https://<host>."""
+  schemes = ('https', 'http') if is_local_dev_server() else ('https',)
+  parsed = urlparse.urlparse(url)
+  if parsed.scheme not in schemes:
+    raise ValueError('unsupported protocol %r' % str(parsed.scheme))
+  if not parsed.netloc:
+    raise ValueError('missing hostname')
+  stripped = urlparse.urlunparse((parsed[0], parsed[1], '', '', '', ''))
+  if stripped != url:
+    raise ValueError('expecting root host URL, e.g. %r)' % str(stripped))
 
 
 def get_token_fingerprint(blob):
