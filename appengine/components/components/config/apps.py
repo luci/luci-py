@@ -16,9 +16,11 @@ from . import handlers
 
 
 def create_backend_application():
-  return webapp2.WSGIApplication(
+  app = webapp2.WSGIApplication(
       handlers.get_backend_routes(),
       debug=utils.is_local_dev_server())
+  utils.report_memory(app)
+  return app
 
 
 backend = create_backend_application()

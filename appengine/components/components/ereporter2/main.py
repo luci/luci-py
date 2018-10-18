@@ -21,7 +21,9 @@ def create_wsgi_application():
   routes = []
   routes.extend(handlers.get_frontend_routes())
   routes.extend(handlers.get_backend_routes())
-  return webapp2.WSGIApplication(routes, debug=utils.is_local_dev_server())
+  app = webapp2.WSGIApplication(routes, debug=utils.is_local_dev_server())
+  utils.report_memory(app)
+  return app
 
 
 APP = create_wsgi_application()

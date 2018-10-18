@@ -70,6 +70,8 @@ def create_application():
 
   event_mon_metrics.initialize()
   ts_mon_metrics.initialize()
+  utils.report_memory(frontend_app)
+  utils.report_memory(api)
   return frontend_app, api, main.APP
 
 

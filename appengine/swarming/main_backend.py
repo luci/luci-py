@@ -51,6 +51,7 @@ def create_application():
 
   event_mon_metrics.initialize()
   ts_mon_metrics.initialize()
+  utils.report_memory(backend_app)
   return backend_app, main.APP
 
 
