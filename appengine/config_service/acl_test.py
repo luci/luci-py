@@ -39,6 +39,7 @@ class AclTestCase(test_case.TestCase):
 
     acl_cfg = service_config_pb2.AclCfg(
         project_access_group='project-admins',
+        service_access_group='service-admins',
     )
     self.mock(projects, '_filter_existing', lambda pids: pids)
     self.mock(storage, 'get_self_config_async', lambda *_: future(acl_cfg))
@@ -58,6 +59,12 @@ class AclTestCase(test_case.TestCase):
     ])
     auth.is_group_member.side_effect = lambda g, *_: g == 'swarming-app'
 
+    self.assertTrue(can_read_config_set('services/swarming'))
+
+  def test_service_access_group(self):
+    self.assertFalse(can_read_config_set('services/swarming'))
+
+    auth.is_group_member.side_effect = lambda name, *_: name == 'service-admins'
     self.assertTrue(can_read_config_set('services/swarming'))
 
   def test_has_service_access_no_access(self):

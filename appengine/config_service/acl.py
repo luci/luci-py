@@ -91,7 +91,8 @@ def has_services_access(service_ids):
     assert isinstance(sid, basestring)
     assert sid
 
-  if is_admin():
+  super_group = get_acl_cfg().service_access_group
+  if is_admin() or super_group and auth.is_group_member(super_group):
     return {sid: True for sid in service_ids}
 
   service_id_set = set(service_ids)
