@@ -57,3 +57,7 @@ class Dimensions(messages.Message):
   project = messages.StringField(9)
   # The type of disk this machine has.
   disk_type = messages.EnumField(DiskTypes, 10)
+  # The name of the snapshot used by this machine.
+  snapshot = messages.StringField(11)
+  # The labels describing the snapshot used by this machine.
+  snapshot_labels = messages.StringField(12, repeated=True)

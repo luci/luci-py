@@ -77,6 +77,13 @@ def extract_dimensions(instance, instance_template_revision):
 
   dimensions['project'] = instance_template_revision.project
 
+  if instance_template_revision.snapshot_name:
+    dimensions['snapshot'] = instance_template_revision.snapshot_name
+
+  if instance_template_revision.snapshot_labels:
+    dimensions['snapshot_labels'] = (
+        instance_template_revision.snapshot_labels[:])
+
   return dimensions
 
 

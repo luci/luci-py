@@ -36,6 +36,7 @@ class CanFulfillTest(test_case.TestCase):
             disk_type=rpc_messages.DiskTypes.SSD,
             num_cpus=2,
             os_family=rpc_messages.OSFamily.LINUX,
+            snapshot='snapshot',
         ),
     )
     entry = models.CatalogMachineEntry(
@@ -44,6 +45,7 @@ class CanFulfillTest(test_case.TestCase):
             disk_type=rpc_messages.DiskTypes.SSD,
             num_cpus=2,
             os_family=rpc_messages.OSFamily.LINUX,
+            snapshot='snapshot',
         ),
     )
 
@@ -65,6 +67,7 @@ class CanFulfillTest(test_case.TestCase):
             memory_gb=8.0,
             num_cpus=2,
             os_family=rpc_messages.OSFamily.LINUX,
+            snapshot_labels=['label1', 'label2'],
         ),
     )
 
@@ -85,6 +88,25 @@ class CanFulfillTest(test_case.TestCase):
             memory_gb=8.0,
             num_cpus=2,
             os_family=rpc_messages.OSFamily.LINUX,
+        ),
+    )
+
+    self.assertFalse(handlers_cron.can_fulfill(entry, request))
+
+  def test_mismatch_repeated(self):
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            snapshot_labels=['label1', 'label2'],
+        ),
+    )
+    entry = models.CatalogMachineEntry(
+        dimensions=rpc_messages.Dimensions(
+            disk_gb=100,
+            hostname='fake-host',
+            memory_gb=8.0,
+            num_cpus=2,
+            os_family=rpc_messages.OSFamily.LINUX,
+            snapshot_labels=['label1'],
         ),
     )
 
@@ -144,7 +166,7 @@ class LeaseMachineTest(test_case.TestCase):
     machine_key = models.CatalogMachineEntry(
         id='machine-id',
         dimensions=rpc_messages.Dimensions(
-            os_family=rpc_messages.OSFamily.OSX,
+            snapshot_labels=['label1'],
         ),
         policies=rpc_messages.Policies(
             machine_service_account='service-account',
@@ -329,6 +351,7 @@ class LeaseRequestProcessorTest(test_case.TestCase):
     request = rpc_messages.LeaseRequest(
         dimensions=rpc_messages.Dimensions(
             os_family=rpc_messages.OSFamily.LINUX,
+            snapshot_labels=['label1', 'label2'],
         ),
         duration=1,
         request_id='fake-id',
@@ -351,6 +374,7 @@ class LeaseRequestProcessorTest(test_case.TestCase):
         backend=rpc_messages.Backend.DUMMY,
         hostname='fake-host',
         os_family=rpc_messages.OSFamily.LINUX,
+        snapshot_labels=['label1', 'label2', 'label3', 'label4'],
     )
     models.CatalogMachineEntry(
         key=models.CatalogMachineEntry.generate_key(dimensions),

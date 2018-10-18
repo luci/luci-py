@@ -10,6 +10,7 @@ import time
 
 from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
+from protorpc import messages
 from protorpc.remote import protojson
 import webapp2
 
@@ -50,10 +51,16 @@ def can_fulfill(entry, request):
   for dimension in rpc_messages.Dimensions.all_fields():
     entry_value = entry.dimensions.get_assigned_value(dimension.name)
     request_value = request.dimensions.get_assigned_value(dimension.name)
-    if request_value is not None and entry_value != request_value:
-      # There is a mismatched dimension, and the requested dimension was
-      # not None, which means the entry does not fulfill the request.
-      return False
+    if request_value is not None:
+      if isinstance(request_value, messages.FieldList):
+        if request_value:
+          # For a non-empty list, ensure every specified value matches.
+          if set(entry_value) < set(request_value):
+            return False
+      elif entry_value != request_value:
+        # There is a mismatched dimension, and the requested dimension was
+        # not None, which means the entry does not fulfill the request.
+        return False
   return True
 
 
@@ -71,8 +78,15 @@ def get_dimension_filters(request):
   for dimension in rpc_messages.Dimensions.all_fields():
     entry_value = getattr(models.CatalogEntry.dimensions, dimension.name)
     request_value = request.dimensions.get_assigned_value(dimension.name)
+    # Ignore unspecified values.
     if request_value is not None:
-      filters.append(entry_value == request_value)
+      if isinstance(request_value, messages.FieldList):
+       if request_value:
+        # Match all specified list values.
+        filters.append(ndb.AND(*[(entry_value == rv) for rv in request_value]))
+      else:
+        # Match specified value exactly.
+        filters.append(entry_value == request_value)
   return filters
 
 
