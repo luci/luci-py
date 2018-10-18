@@ -60,7 +60,6 @@ class AccessTokenError(Exception):
 # Do not log AccessTokenError exception raised from a tasklet.
 ndb.add_flow_exception(AccessTokenError)
 
-
 @ndb.tasklet
 def get_access_token_async(
     scopes, service_account_key=None, act_as=None, min_lifetime_sec=5*60):
@@ -72,11 +71,11 @@ def get_access_token_async(
   account.
 
   If 'act_as' is specified, will return an access token for this account with
-  given scopes, generating it through a call to signJwt IAM API, using
+  given scopes, generating it through a call to IAM:generateAccessToken, using
   IAM-scoped access token of a primary service account (an appspot one, or the
   one specified via 'service_account_key'). In this case the primary service
-  account should have 'serviceAccountActor' role in the service account it acts
-  as.
+  account should have 'serviceAccountTokenCreator' role in the service account
+  it acts as.
 
   See https://cloud.google.com/iam/docs/service-accounts.
 
@@ -102,7 +101,9 @@ def get_access_token_async(
   # efficiency of the cache (we need to constantly update it to keep tokens
   # fresh).
   if min_lifetime_sec <= 0 or min_lifetime_sec > 30 * 60:
-    raise ValueError('"min_lifetime_sec" should be in range (0; 1800]')
+    raise ValueError(
+        '"min_lifetime_sec" should be in range (0; 1800], actual: %d'
+        % min_lifetime_sec)
 
   # Accept a single string to mimic app_identity.get_access_token behavior.
   if isinstance(scopes, basestring):
@@ -120,14 +121,24 @@ def get_access_token_async(
         scopes=scopes,
         key_id=None)
     # We need IAM-scoped token only on cache miss, so generate it lazily.
-    # _RemoteSigner will call this function if it really needs a token.
-    iam_token_factory = lambda: get_access_token_async(
-        ['https://www.googleapis.com/auth/iam'], service_account_key)
-    t = yield _get_jwt_based_token_async(
-        scopes, cache_key, min_lifetime_sec,
-        _RemoteSigner(act_as, iam_token_factory))
-    raise ndb.Return(t)
+    iam_token_factory = (
+      lambda: get_access_token_async(
+        scopes=['https://www.googleapis.com/auth/iam'],
+        service_account_key=service_account_key,
+        act_as=None,
+        min_lifetime_sec=5*60))
+    token = yield _get_or_mint_token_async(
+        cache_key,
+        min_lifetime_sec,
+        lambda: _mint_oauth_token_async(
+            iam_token_factory,
+            act_as,
+            scopes,
+            min_lifetime_sec)
+    )
+    raise ndb.Return(token)
 
+  # Generate a token directly from the service account key.
   if service_account_key:
     # Empty private_key_id probably means that the app is not configured yet.
     if not service_account_key.private_key_id:
@@ -137,10 +148,14 @@ def get_access_token_async(
         email=service_account_key.client_email,
         scopes=scopes,
         key_id=service_account_key.private_key_id)
-    t = yield _get_jwt_based_token_async(
-        scopes, cache_key, min_lifetime_sec,
-        _LocalSigner(service_account_key))
-    raise ndb.Return(t)
+    token = yield _get_or_mint_token_async(
+        cache_key,
+        min_lifetime_sec,
+        lambda: _mint_jwt_based_token_async(
+            scopes,
+            _LocalSigner(service_account_key))
+    )
+    raise ndb.Return(token)
 
   # TODO(vadimsh): Use app_identity.make_get_access_token_call to make it async.
   raise ndb.Return(app_identity.get_access_token(scopes))
@@ -174,28 +189,25 @@ def _memcache_key(method, email, scopes, key_id=None):
   })
   return hashlib.sha256(blob).hexdigest()
 
-
 @ndb.tasklet
-def _get_jwt_based_token_async(scopes, cache_key, min_lifetime_sec, signer):
-  """Returns token for @*.iam.gserviceaccount.com service account."""
+def _get_or_mint_token_async(cache_key, min_lifetime_secs, minter):
+  """Gets an accress token from the cache or triggers mint flow."""
   # Randomize refresh time to avoid thundering herd effect when token expires.
   # Also add 5 sec extra to make sure callers will get the token that lives for
   # at least min_lifetime_sec even taking into account possible delays in
   # propagating the token up the stack. We can't give any strict guarantees
   # here though (need to be able to stop time to do that).
-  min_allowed_exp = (
-      utils.time_time() +
-      random.randint(min_lifetime_sec + 5, min_lifetime_sec + 305))
   token_info = yield _memcache_get(cache_key, namespace=_MEMCACHE_NS)
-  if not token_info or token_info['exp_ts'] < min_allowed_exp:
-    logging.info(
-        'Refreshing the access token for %s with scopes %s',
-        signer.email, scopes)
-    token_info = yield _mint_jwt_based_token_async(scopes, signer)
-    yield _memcache_set(
-        cache_key, token_info, token_info['exp_ts'], namespace=_MEMCACHE_NS)
-  raise ndb.Return((token_info['access_token'], token_info['exp_ts']))
 
+  min_allowed_exp = (
+    utils.time_time() +
+    random.randint(min_lifetime_secs + 5, min_lifetime_secs + 305))
+
+  if not token_info or token_info['exp_ts'] < min_allowed_exp:
+    token_info = yield minter()
+    yield _memcache_set(cache_key, token_info,
+                        token_info['exp_ts'], namespace=_MEMCACHE_NS)
+  raise ndb.Return(token_info['access_token'], token_info['exp_ts'])
 
 @ndb.tasklet
 def _mint_jwt_based_token_async(scopes, signer):
@@ -211,6 +223,10 @@ def _mint_jwt_based_token_async(scopes, signer):
   # perfectly in sync with global time. If client machine's time is in the
   # future according to Google server clock, the access token request will be
   # denied. It doesn't complain about slightly late clock though.
+  logging.info(
+    'Refreshing the access token for %s with scopes %s',
+    signer.email, scopes)
+
   now = int(utils.time_time()) - 5
   jwt = yield signer.sign_claimset_async({
     'aud': 'https://www.googleapis.com/oauth2/v4/token',
@@ -239,6 +255,44 @@ def _mint_jwt_based_token_async(scopes, signer):
   raise ndb.Return({
     'access_token': str(token['access_token']),
     'exp_ts': int(utils.time_time() + token['expires_in']),
+  })
+
+@ndb.tasklet
+def _mint_oauth_token_async(token_factory, email, scopes,
+    min_lifetime_secs=0, delegates=None):
+  """Creates a new access token using IAM credentials API."""
+  # Query IAM credentials generateAccessToken API to obtain an OAuth token for
+  # a given service account. Maximum lifetime is 1 hour. And can be obtained
+  # through a chain of delegates.
+  logging.info(
+      'Refreshing the access token for %s with scopes %s',
+      email, scopes
+  )
+
+  request_body = {'scopes': scopes}
+  if delegates:
+    request_body['delegates'] = delegates
+  if min_lifetime_secs > 0:
+    # Api accepts number of seconds with trailing 's'
+    request_body['lifetime'] = '%ds' % min_lifetime_secs
+
+  http_auth = yield token_factory()
+  response = yield _call_async(
+      url='https://iamcredentials.googleapis.com/v1/projects/-/'
+          'serviceAccounts/%s:generateAccessToken' % urllib.quote_plus(email),
+      method='POST',
+      headers={
+        'Accept': 'application/json',
+        'Authorization': 'Bearer %s' % http_auth,
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      payload=utils.encode_to_json(request_body),
+  )
+  expired_at = int(utils.datetime_to_timestamp(
+      utils.parse_rfc3339_datetime(response['expireTime'])) / 1e6)
+  raise ndb.Return({
+    'access_token': response['accessToken'],
+    'exp_ts': expired_at,
   })
 
 
@@ -411,34 +465,3 @@ class _LocalSigner(object):
     return PKCS1_v1_5.new(pkey).sign(SHA256.new(blob))
 
 
-class _RemoteSigner(object):
-  """Knows how to sign JWTs via signJwt RPC."""
-
-  def __init__(self, email, iam_token_factory):
-    self._email = email
-    self._iam_token_factory = iam_token_factory
-
-  @property
-  def email(self):
-    return self._email
-
-  @ndb.tasklet
-  def sign_claimset_async(self, claimset):
-    # https://cloud.google.com/iam/reference/rest/v1/projects.serviceAccounts/signJwt
-    iam_token, _ = yield self._iam_token_factory()
-    response = yield _call_async(
-        url='https://iam.googleapis.com/v1/projects/-/serviceAccounts/'
-            '%s:signJwt' % self._email,
-        payload=utils.encode_to_json({
-          'payload': utils.encode_to_json(claimset),  # yep, JSON in JSON
-        }),
-        method='POST',
-        headers={
-          'Accept': 'application/json',
-          'Authorization': 'Bearer %s' % iam_token,
-          'Content-Type': 'application/json; charset=utf-8',
-        })
-    # 'signedJwt' is base64-encoded string, convert it from unicode to str.
-    jwt = response['signedJwt'].encode('ascii')
-    _log_jwt(self.email, 'remote', jwt)
-    raise ndb.Return(jwt)
