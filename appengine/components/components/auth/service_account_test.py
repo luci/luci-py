@@ -117,6 +117,11 @@ class GetAccessTokenTest(test_case.TestCase):
   def test_get_jwt_based_token_memcache(self):
     now = datetime.datetime(2015, 1, 2, 3)
 
+
+    def randint_mock(start, end):
+      return (start + end) / 2
+    self.mock(service_account, '_randint', randint_mock)
+
     # Fake memcache, dev server's one doesn't know about mocked time.
     memcache = {}
 

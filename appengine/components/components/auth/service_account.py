@@ -201,7 +201,7 @@ def _get_or_mint_token_async(cache_key, min_lifetime_secs, minter):
 
   min_allowed_exp = (
     utils.time_time() +
-    random.randint(min_lifetime_secs + 5, min_lifetime_secs + 305))
+    _randint(min_lifetime_secs + 5, min_lifetime_secs + 305))
 
   if not token_info or token_info['exp_ts'] < min_allowed_exp:
     token_info = yield minter()
@@ -351,6 +351,10 @@ def _call_async(url, payload, method, headers):
   raise AccessTokenError(
       'Failed to call %s after multiple attempts' % url, transient=True)
 
+
+def _randint(*args, **kwargs):
+  """To be mocked in tests."""
+  return random.randint(*args, **kwargs)
 
 def _urlfetch(**kwargs):
   """To be mocked in tests."""
