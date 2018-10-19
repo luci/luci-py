@@ -202,7 +202,7 @@ class GetAccessTokenTest(test_case.TestCase):
     signer = FakeSigner()
     token = service_account._mint_jwt_based_token_async(
         ['scope1', 'scope2'], signer).get_result()
-    self.assertEqual({'access_token': 'token', 'exp_ts': 1420171200.0}, token)
+    self.assertEqual({'access_token':'token', 'exp_ts':1420171200.0}, token)
 
     self.assertEqual([{
       'aud': 'https://www.googleapis.com/oauth2/v4/token',
@@ -434,16 +434,15 @@ class GetAccessTokenTest(test_case.TestCase):
     def get_access_token_async_mock(
         scopes, service_account_key=None,
         act_as=None, min_lifetime_sec=5*60):
-      if act_as:
-        result = yield orig_get_access_token_async(
-            scopes,
-            service_account_key,
-            act_as,
-            min_lifetime_sec
-        )
-        raise ndb.Return(result)
       if service_account_key:
         raise ndb.Return("FAKETOKENFAKETOKEN")
+      result = yield orig_get_access_token_async(
+          scopes,
+          service_account_key,
+          act_as,
+          min_lifetime_sec
+      )
+      raise ndb.Return(result)
 
     # Wrap get_access_token to mock out local signing
     self.mock(service_account,
