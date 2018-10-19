@@ -19,17 +19,24 @@ from proto import bots_pb2
 from server import bot_groups_config
 
 
+VALID_MP_DIMENSIONS = [
+  'disk_type:HDD',
+  'num_cpus:1',
+  'project:p'
+]
+
+
 MACHINE_TYPE_1 = bots_pb2.MachineType(
   name='mt1',
   lease_duration_secs=1,
-  mp_dimensions=['k:v'],
+  mp_dimensions=VALID_MP_DIMENSIONS,
   target_size=1,
 )
 
 MACHINE_TYPE_2 = bots_pb2.MachineType(
   name='mt2',
   lease_duration_secs=1,
-  mp_dimensions=['k:v'],
+  mp_dimensions=VALID_MP_DIMENSIONS,
   target_size=1,
 )
 
@@ -370,7 +377,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1),
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1),
         ]),
     ])
     self.validator_test(cfg, [])
@@ -380,7 +388,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1),
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1),
         ]),
     ])
     self.validator_test(cfg, [
@@ -392,9 +401,11 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1),
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1),
           bots_pb2.MachineType(name='abc', lease_duration_secs=456,
-                               mp_dimensions=['key:value'], target_size=2),
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=2),
         ]),
     ])
     self.validator_test(cfg, [
@@ -406,11 +417,13 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1),
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1),
         ]),
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=456,
-                               mp_dimensions=['key:value'], target_size=2),
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=2),
         ]),
     ])
     self.validator_test(cfg, [
@@ -422,7 +435,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc',
-                               mp_dimensions=['key:value'], target_size=1),
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1),
         ]),
     ])
     self.validator_test(cfg, [
@@ -436,7 +450,8 @@ class BotGroupsConfigTest(test_case.TestCase):
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc',
                                early_release_secs=1, lease_indefinitely=True,
-                               mp_dimensions=['key:value'], target_size=1),
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1),
         ]),
     ])
     self.validator_test(cfg, [
@@ -449,7 +464,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_indefinitely=False,
-                               mp_dimensions=['key:value'], target_size=1),
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1),
         ]),
     ])
     self.validator_test(cfg, [
@@ -462,7 +478,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=0,
-                               mp_dimensions=['key:value'], target_size=1),
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1),
         ]),
     ])
     self.validator_test(cfg, [
@@ -475,7 +492,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=-123,
-                               mp_dimensions=['key:value'], target_size=1),
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1),
         ]),
     ])
     self.validator_test(cfg, [
@@ -488,23 +506,12 @@ class BotGroupsConfigTest(test_case.TestCase):
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
                                early_release_secs=-1,
-                               mp_dimensions=['key:value'], target_size=1),
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1),
         ]),
     ])
     self.validator_test(cfg, [
       'bot_group #0: machine_type #0: early_release_secs must be positive'
-    ])
-
-  def test_machine_type_mp_dimensions_unspecified(self):
-    cfg = bots_pb2.BotsCfg(
-      bot_group=[
-        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
-          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=[], target_size=1),
-        ]),
-    ])
-    self.validator_test(cfg, [
-      'bot_group #0: machine_type #0: at least one dimension is required'
     ])
 
   def test_machine_type_mp_dimensions_wrong_format(self):
@@ -520,12 +527,57 @@ class BotGroupsConfigTest(test_case.TestCase):
       ' bad dimension "key", not a key:value pair'
     ])
 
+  def test_machine_type_mp_dimensions_disk_type_unspecified(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=[
+                                   'num_cpus:1',
+                                   'project:p',
+                               ], target_size=1),
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0: missing required mp_dimensions: disk_type'
+    ])
+
+  def test_machine_type_mp_dimensions_num_cpus_unspecified(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=[
+                                   'disk_type:HDD',
+                                   'project:p',
+                               ], target_size=1),
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0: missing required mp_dimensions: num_cpus'
+    ])
+
+  def test_machine_type_mp_dimensions_project_unspecified(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=[
+                                   'disk_type:HDD',
+                                   'num_cpus:1',
+                               ], target_size=1),
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0: missing required mp_dimensions: project'
+    ])
+
   def test_machine_type_target_size_unspecified(self):
     cfg = bots_pb2.BotsCfg(
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value']),
+                               mp_dimensions=VALID_MP_DIMENSIONS),
         ]),
     ])
     self.validator_test(cfg, [])
@@ -535,7 +587,11 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=0),
+                               mp_dimensions=[
+                                   'disk_type:d',
+                                   'num_cpus:1',
+                                   'project:p'
+                               ], target_size=0),
         ]),
     ])
     self.validator_test(cfg, [])
@@ -545,7 +601,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=-1),
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=-1),
         ]),
     ])
     self.validator_test(cfg, [
@@ -557,7 +614,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='1:30',
@@ -574,7 +632,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='1:30',
@@ -591,7 +650,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='1:30',
@@ -610,7 +670,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='1:30',
@@ -627,7 +688,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='1:30',
@@ -647,7 +709,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='1:00',
@@ -665,7 +728,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    end='1:00',
@@ -683,7 +747,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='now',
@@ -702,7 +767,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='1:00:20',
@@ -721,7 +787,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='-1:00',
@@ -740,7 +807,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='1:-01',
@@ -759,7 +827,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='1:00',
@@ -778,7 +847,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='1:00',
@@ -797,7 +867,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='24:00',
@@ -816,7 +887,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='1:60',
@@ -835,7 +907,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='1:00',
@@ -854,7 +927,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='1:00',
@@ -873,7 +947,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='1:00',
@@ -892,7 +967,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='1:30',
@@ -911,7 +987,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='1:30',
@@ -930,7 +1007,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='1:30',
@@ -953,7 +1031,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='1:30',
@@ -974,7 +1053,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='1:30',
@@ -993,7 +1073,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  daily=[bots_pb2.DailySchedule(
                                    start='1:30',
@@ -1009,7 +1090,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  load_based=[bots_pb2.LoadBased(
                                    maximum_size=1,
@@ -1028,7 +1110,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  load_based=[bots_pb2.LoadBased(
                                    maximum_size=3,
@@ -1044,7 +1127,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  load_based=[bots_pb2.LoadBased(
                                    maximum_size=3,
@@ -1062,7 +1146,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  load_based=[bots_pb2.LoadBased(
                                    maximum_size=3,
@@ -1080,7 +1165,8 @@ class BotGroupsConfigTest(test_case.TestCase):
       bot_group=[
         bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
           bots_pb2.MachineType(name='abc', lease_duration_secs=123,
-                               mp_dimensions=['key:value'], target_size=1,
+                               mp_dimensions=VALID_MP_DIMENSIONS,
+                               target_size=1,
                                schedule=bots_pb2.Schedule(
                                  load_based=[bots_pb2.LoadBased(
                                    maximum_size=4,

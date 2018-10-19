@@ -807,14 +807,17 @@ def _validate_machine_type(ctx, machine_type, known_machine_type_names):
     return
   if machine_type.early_release_secs < 0:
     ctx.error('early_release_secs must be positive')
-  if not machine_type.mp_dimensions:
-    ctx.error('at least one dimension is required')
     return
+  required = {'disk_type', 'num_cpus', 'project'}
   for j, dim in enumerate(machine_type.mp_dimensions):
     with ctx.prefix('mp_dimensions #%d: ', j):
       if ':' not in dim:
         ctx.error('bad dimension "%s", not a key:value pair', dim)
-        continue
+        return
+      required.discard(dim.split(':', 1)[0])
+  if required:
+    ctx.error('missing required mp_dimensions: %s', ', '.join(sorted(required)))
+    return
   if machine_type.target_size < 0:
     ctx.error('target_size must be positive')
     return
