@@ -130,22 +130,6 @@ class UpdateConfigTest(test_case.TestCase):
     self.failIf(config.Configuration.cached().manager_config)
     self.failIf(config.Configuration.cached().revision)
 
-  def test_too_many_instance_templates(self):
-    template_config = config_pb2.InstanceTemplateConfig(
-      templates=[
-            config_pb2.InstanceTemplateConfig.InstanceTemplate(
-                base_name='base-name-%d' % d,
-            )
-            for d in xrange(51)
-      ],
-    )
-    self.install_mock(template_config=template_config)
-
-    config.update_template_configs()
-    self.failIf(config.Configuration.cached().template_config)
-    self.failIf(config.Configuration.cached().manager_config)
-    self.failIf(config.Configuration.cached().revision)
-
   def test_repeated_zone_different_base_name(self):
     """Ensures repeated zones in different base names are valid."""
     manager_config = config_pb2.InstanceGroupManagerConfig(
