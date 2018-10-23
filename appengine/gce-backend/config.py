@@ -193,7 +193,8 @@ def validate_template_config(cfg, context):
       elif not parts[0]:
         context.error('snapshot_label %s has empty key.', label)
         valid = False
-  if len(base_names) > 20:
+  # Arbitrary. Increase if needed.
+  if len(base_names) > 50:
     context.error('Too many instance templates.')
     valid = False
   metrics.config_valid.set(valid, fields={'config': TEMPLATES_CFG_FILENAME})

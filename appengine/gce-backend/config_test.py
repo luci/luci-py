@@ -136,7 +136,7 @@ class UpdateConfigTest(test_case.TestCase):
             config_pb2.InstanceTemplateConfig.InstanceTemplate(
                 base_name='base-name-%d' % d,
             )
-            for d in xrange(21)
+            for d in xrange(51)
       ],
     )
     self.install_mock(template_config=template_config)
