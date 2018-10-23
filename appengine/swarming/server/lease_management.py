@@ -293,6 +293,13 @@ def machine_type_pb2_to_entity(pb2):
   Returns:
     A MachineType entity.
   """
+  # Put dimensions into k: [v0, v1, v2, ...] form. protojson.decode_message
+  # can handle non-repeated dimensions in a list. At this point, it's verified
+  # that only dimensions allowed to be repeated are. See bot_groups_config.py.
+  dims = {}
+  for dim in pb2.mp_dimensions:
+    k, v = dim.split(':', 1)
+    dims.setdefault(k, []).append(v)
   return MachineType(
       id=pb2.name,
       description=pb2.description,
@@ -302,7 +309,7 @@ def machine_type_pb2_to_entity(pb2):
       lease_indefinitely=pb2.lease_indefinitely,
       mp_dimensions=protojson.decode_message(
           machine_provider.Dimensions,
-          json.dumps(dict(pair.split(':', 1) for pair in pb2.mp_dimensions)),
+          json.dumps(dims),
       ),
       target_size=pb2.target_size,
   )

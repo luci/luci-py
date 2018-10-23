@@ -504,7 +504,11 @@ class EnsureEntitiesExistTest(test_case.TestCase):
           'machine-type': bots_pb2.MachineType(
               early_release_secs=0,
               lease_duration_secs=1,
-              mp_dimensions=['disk_gb:100'],
+              mp_dimensions=[
+                  'disk_gb:100',
+                  'snapshot_labels:label1',
+                  'snapshot_labels:label2',
+              ],
               name='machine-type',
               target_size=1,
           ),
@@ -524,6 +528,9 @@ class EnsureEntitiesExistTest(test_case.TestCase):
 
     self.assertEqual(key.get().early_release_secs, 0)
     self.assertEqual(key.get().lease_duration_secs, 1)
+    self.assertEqual(key.get().mp_dimensions.disk_gb, 100)
+    self.assertEqual(key.get().mp_dimensions.snapshot_labels[0], 'label1')
+    self.assertEqual(key.get().mp_dimensions.snapshot_labels[1], 'label2')
     self.assertEqual(key.get().target_size, 1)
     self.assertEqual(lease_management.MachineLease.query().count(), 1)
 

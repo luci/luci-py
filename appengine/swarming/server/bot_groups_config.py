@@ -15,6 +15,7 @@ from google.appengine.ext import ndb
 
 from components import auth
 from components import config
+from components import machine_provider
 from components import utils
 from components.config import validation
 
@@ -809,12 +810,23 @@ def _validate_machine_type(ctx, machine_type, known_machine_type_names):
     ctx.error('early_release_secs must be positive')
     return
   required = {'disk_type', 'num_cpus', 'project'}
+  seen = set()
   for j, dim in enumerate(machine_type.mp_dimensions):
     with ctx.prefix('mp_dimensions #%d: ', j):
       if ':' not in dim:
         ctx.error('bad dimension "%s", not a key:value pair', dim)
         return
-      required.discard(dim.split(':', 1)[0])
+      key = dim.split(':', 1)[0]
+      try:
+        field = machine_provider.Dimensions.field_by_name(key)
+      except KeyError:
+        ctx.error('unknown dimension "%s"', key)
+        return
+      if key in seen and not field.repeated:
+        ctx.error('duplicate value for non-repeated dimension "%s"', key)
+        return
+      seen.add(key)
+      required.discard(key)
   if required:
     ctx.error('missing required mp_dimensions: %s', ', '.join(sorted(required)))
     return

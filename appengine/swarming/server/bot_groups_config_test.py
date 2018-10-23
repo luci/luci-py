@@ -22,7 +22,9 @@ from server import bot_groups_config
 VALID_MP_DIMENSIONS = [
   'disk_type:HDD',
   'num_cpus:1',
-  'project:p'
+  'project:p',
+  'snapshot_labels:label1',
+  'snapshot_labels:label2',
 ]
 
 
@@ -525,6 +527,34 @@ class BotGroupsConfigTest(test_case.TestCase):
     self.validator_test(cfg, [
       'bot_group #0: machine_type #0: mp_dimensions #0:'
       ' bad dimension "key", not a key:value pair'
+    ])
+
+  def test_machine_type_mp_dimensions_unknown(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=['key:value'], target_size=1),
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0: mp_dimensions #0: unknown dimension "key"'
+    ])
+
+  def test_machine_type_mp_dimensions_duplicate(self):
+    cfg = bots_pb2.BotsCfg(
+      bot_group=[
+        bots_pb2.BotGroup(auth=DEFAULT_AUTH_CFG, machine_type=[
+          bots_pb2.MachineType(name='abc', lease_duration_secs=123,
+                               mp_dimensions=[
+                                   'os_family:LINUX',
+                                   'os_family:WINDOWS',
+                               ], target_size=1),
+        ]),
+    ])
+    self.validator_test(cfg, [
+      'bot_group #0: machine_type #0: mp_dimensions #1:'
+      ' duplicate value for non-repeated dimension "os_family"'
     ])
 
   def test_machine_type_mp_dimensions_disk_type_unspecified(self):
