@@ -31,6 +31,7 @@
 
 import { errorMessage } from 'elements-sk/errorMessage'
 import { html, render } from 'lit-html'
+import { ifDefined } from 'lit-html/directives/if-defined';
 import { jsonOrThrow } from 'common-sk/modules/jsonOrThrow'
 import { upgradeProperty } from 'elements-sk/upgradeProperty'
 
@@ -56,11 +57,11 @@ spinner_template.innerHTML =`
 
 function versionLink(details) {
   if (!details || !details.server_version) {
-    return '#';
+    return undefined;
   }
   var split = details.server_version.split('-');
   if (split.length !== 2) {
-    return '#';
+    return undefined;
   }
   return `https://chromium.googlesource.com/infra/luci/luci-py/+/${split[1]}`;
 }
@@ -68,7 +69,7 @@ function versionLink(details) {
 const dynamic_content_template = (ele) => html`
 <div class=server-version>
   Server:
-  <a href=${versionLink(ele._server_details)}>
+  <a href=${ifDefined(versionLink(ele._server_details))}>
     ${ele._server_details.server_version}
   </a>
 </div>

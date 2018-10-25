@@ -11,14 +11,14 @@ import { colHeaderMap, column, listQueryParams, processBots, processDimensions,
          processPrimaryMap } from 'modules/bot-list/bot-list-helpers'
 
 describe('bot-list', function() {
-  // Do these have to be here?
-  const mockAppGETs = require('modules/test_util').mockAppGETs;
-  const toContainRegexMatcher = require('modules/test_util').toContainRegexMatcher;
-  // This doesn't yet support import from
+  // Things that get imported multiple times go here, using require. Otherwise,
+  // the concatenation trick we do doesn't play well with webpack, which tries
+  // to include it multiple times.
+  const { mockAppGETs, customMatchers}  = require('modules/test_util');
   const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
 
   beforeEach(function() {
-    jasmine.addMatchers(toContainRegexMatcher);
+    jasmine.addMatchers(customMatchers);
     // Clear out any query params we might have to not mess with our current state.
     history.pushState(null, '', window.location.origin + window.location.pathname + '?');
   });
@@ -86,7 +86,7 @@ describe('bot-list', function() {
         callback();
       }
     });
-    let login = ele.querySelector('oauth-login');
+    let login = $$('oauth-login', ele);
     login._logIn();
     fetchMock.flush();
   }
@@ -116,16 +116,16 @@ describe('bot-list', function() {
     describe('when not logged in', function() {
       it('tells the user they should log in', function(done) {
         createElement((ele) => {
-          let loginMessage = ele.querySelector('swarming-app>main .message');
+          let loginMessage = $$('swarming-app>main .message', ele);
           expect(loginMessage).toBeTruthy();
           expect(loginMessage.hidden).toBeFalsy('Message should not be hidden');
-          expect(loginMessage.innerText).toContain('must sign in');
+          expect(loginMessage.textContent).toContain('must sign in');
           done();
         })
       })
       it('does not display filters or bots', function(done) {
         createElement((ele) => {
-          let botTable = ele.querySelector('.bot-table');
+          let botTable = $$('.bot-table', ele);
           expect(botTable).toBeTruthy();
           expect(botTable.hidden).toBeTruthy('.bot-table should be hidden');
           done();
@@ -151,20 +151,20 @@ describe('bot-list', function() {
 
       it('tells the user they should change accounts', function(done) {
         loggedInBotlist((ele) => {
-          let loginMessage = ele.querySelector('swarming-app>main .message');
+          let loginMessage = $$('swarming-app>main .message', ele);
           expect(loginMessage).toBeTruthy();
           expect(loginMessage.hidden).toBeFalsy('Message should not be hidden');
-          expect(loginMessage.innerText).toContain('different account');
+          expect(loginMessage.textContent).toContain('different account');
           done();
         });
       });
       it('does not display filters or bots', function(done) {
         loggedInBotlist((ele) => {
-          let botTable = ele.querySelector('.bot-table');
+          let botTable = $$('.bot-table', ele);
           expect(botTable).toBeTruthy();
           expect(botTable.hidden).toBeTruthy('.bot-table should be hidden');
 
-          let filters = ele.querySelector('.filters');
+          let filters = $$('.filters', ele);
           expect(filters).toBeFalsy('.filters should not be shown');
           done();
         });
@@ -176,7 +176,7 @@ describe('bot-list', function() {
       describe('default landing page', function() {
         it('displays whatever bots show up', function(done) {
           loggedInBotlist((ele) => {
-            let botRows = ele.querySelectorAll('.bot-table .bot-row');
+            let botRows = $('.bot-table .bot-row', ele);
             expect(botRows).toBeTruthy();
             expect(botRows.length).toBe(10, '(num botRows)');
             done();
@@ -191,20 +191,20 @@ describe('bot-list', function() {
             ele._verbose = false;
             ele.render();
 
-            let colHeaders = ele.querySelectorAll('.bot-table thead th');
+            let colHeaders = $('.bot-table thead th', ele);
             expect(colHeaders).toBeTruthy();
             expect(colHeaders.length).toBe(4, '(num colHeaders)');
+            expect(colHeaders[0].innerHTML).toContain('<more-vert-icon-sk');
+            expect(colHeaders[0]).toMatchTextContent('Bot Id');
+            expect(colHeaders[1]).toMatchTextContent('Current Task');
+            expect(colHeaders[2]).toMatchTextContent('OS');
+            expect(colHeaders[3]).toMatchTextContent('Status');
 
-            expect(colHeaders[0].innerText.trim()).toBe('Bot Id');
-            expect(colHeaders[1].innerText.trim()).toBe('Current Task');
-            expect(colHeaders[2].innerText.trim()).toBe('OS');
-            expect(colHeaders[3].innerText.trim()).toBe('Status');
-
-            let rows = ele.querySelectorAll('.bot-table .bot-row');
+            let rows = $('.bot-table .bot-row', ele);
             expect(rows).toBeTruthy();
             expect(rows.length).toBe(10, '10 rows');
 
-            let cols = ele.querySelectorAll('.bot-table .bot-row td');
+            let cols = $('.bot-table .bot-row td', ele);
             expect(cols).toBeTruthy();
             expect(cols.length).toBe(4 * 10, '4 columns * 10 rows');
             // little helper for readability
@@ -214,37 +214,37 @@ describe('bot-list', function() {
             expect(rows[0]).not.toHaveClass('dead');
             expect(rows[0]).not.toHaveClass('quarantined');
             expect(rows[0]).not.toHaveClass('old_version');
-            expect(cell(0, 0).innerText).toBe('somebot10-a9');
+            expect(cell(0, 0)).toMatchTextContent('somebot10-a9');
             expect(cell(0, 0).innerHTML).toContain('<a ', 'has a link');
             expect(cell(0, 0).innerHTML).toContain('href="/bot?id=somebot10-a9"', 'link is correct');
-            expect(cell(0, 1).innerText).toBe('idle');
+            expect(cell(0, 1)).toMatchTextContent('idle');
             expect(cell(0, 1).innerHTML).not.toContain('<a ', 'no link');
-            expect(cell(0, 2).innerText).toBe('Ubuntu-17.04');
-            expect(cell(0, 3).innerText).toContain('Alive');
+            expect(cell(0, 2)).toMatchTextContent('Ubuntu-17.04');
+            expect(cell(0, 3).textContent).toContain('Alive');
 
             expect(rows[1]).toHaveClass('quarantined');
-            expect(cell(1, 0).innerText).toBe('somebot11-a9');
-            expect(cell(1, 1).innerText).toBe('idle');
-            expect(cell(1, 2).innerText).toBe('Android');
-            expect(cell(1, 3).innerText).toContain('Quarantined');
-            expect(cell(1, 3).innerText).toContain('[too_hot,low_battery]');
+            expect(cell(1, 0)).toMatchTextContent('somebot11-a9');
+            expect(cell(1, 1)).toMatchTextContent('idle');
+            expect(cell(1, 2)).toMatchTextContent('Android');
+            expect(cell(1, 3).textContent).toContain('Quarantined');
+            expect(cell(1, 3).textContent).toContain('[available, too_hot, low_battery]');
 
             expect(rows[2]).toHaveClass('dead');
             expect(rows[2]).toHaveClass('old_version');
-            expect(cell(2, 0).innerText).toBe('somebot12-a9');
-            expect(cell(2, 1).innerText).toBe('3e17182091d7ae11');
+            expect(cell(2, 0)).toMatchTextContent('somebot12-a9');
+            expect(cell(2, 1)).toMatchTextContent('3e17182091d7ae11');
             expect(cell(2, 1).innerHTML).toContain('<a ', 'has a link');
             expect(cell(2, 1).innerHTML).toContain('href="/task?id=3e17182091d7ae10"',
                                       'link is pointing to the cannonical (0 ending) page');
             expect(cell(2, 1).innerHTML).toContain('title="Perf-Win10-Clang-Golo',
                                       'Mouseover with task name');
-            expect(cell(2, 2).innerText).toBe('Windows-10-16299.431');
-            expect(cell(2, 3).innerText).toContain('Dead');
-            expect(cell(2, 3).innerText).toContain('Last seen 1w ago');
+            expect(cell(2, 2)).toMatchTextContent('Windows-10-16299.431');
+            expect(cell(2, 3).textContent).toContain('Dead');
+            expect(cell(2, 3).textContent).toContain('Last seen 1w ago');
 
             expect(rows[3]).toHaveClass('maintenance');
-            expect(cell(3, 3).innerText).toContain('Maintenance');
-            expect(cell(3, 3).innerText).toContain('Need to re-format the hard drive.');
+            expect(cell(3, 3).textContent).toContain('Maintenance');
+            expect(cell(3, 3).textContent).toContain('Need to re-format the hard drive.');
 
             expect(rows[4]).toHaveClass('old_version');
             done();
@@ -257,7 +257,7 @@ describe('bot-list', function() {
             ele._dir = 'asc';
             ele.render();
 
-            let sortToggles = ele.querySelectorAll('.bot-table thead sort-toggle');
+            let sortToggles = $('.bot-table thead sort-toggle', ele);
             expect(sortToggles).toBeTruthy();
             expect(sortToggles.length).toBe(4, '(num sort-toggles)');
 
@@ -286,45 +286,55 @@ describe('bot-list', function() {
 
         it('displays counts', function(done) {
           loggedInBotlist((ele) => {
-            let summaryTables = ele.querySelectorAll('.summary table');
+            let summaryTables = $('.summary table', ele);
             expect(summaryTables).toBeTruthy();
             expect(summaryTables.length).toBe(2, '(num summaryTables');
             let [fleetTable, queryTable] = summaryTables;
             // spot check some values
-            let tds = fleetTable.querySelectorAll('tr:first-child td');
+            let tds = $('tr:first-child td', fleetTable);
             expect(tds).toBeTruthy();
             expect(tds.length).toBe(2);
-            expect(tds[0].textContent).toEqual('All:');
-            // TODO(kjlubick): Check link on tds[0]
-            expect(tds[1].textContent).toEqual('11434');
+            expect(tds[0]).toMatchTextContent('All:');
+            expect(tds[0].innerHTML).not.toContain('href');
+            expect(tds[1]).toMatchTextContent('11434');
 
-            tds = fleetTable.querySelectorAll('tr:nth-child(4) td');
+            tds = $('tr:nth-child(4) td', fleetTable);
             expect(tds).toBeTruthy();
             expect(tds.length).toBe(2);
-            expect(tds[0].textContent).toEqual('Idle:');
-            // TODO(kjlubick): Check link on tds[0]
-            expect(tds[1].textContent).toEqual('211');
+            expect(tds[0]).toMatchTextContent('Idle:');
+            expect(tds[0].innerHTML).toContain(encodeURIComponent('task:idle'));
+            expect(tds[1]).toMatchTextContent('211');
 
-            tds = queryTable.querySelectorAll('tr:nth-child(2) td');
+            tds = $('tr:first-child td', queryTable);
             expect(tds).toBeTruthy();
             expect(tds.length).toBe(2);
-            expect(tds[0].textContent).toEqual('Alive:');
-            // TODO(kjlubick): Check link on tds[0]
-            expect(tds[1].textContent).toEqual('429');
+            expect(tds[0]).toMatchTextContent('Displayed:');
+            expect(tds[0].innerHTML).not.toContain('href');
+            expect(tds[1]).toMatchTextContent('10');
 
-            tds = queryTable.querySelectorAll('tr:nth-child(7) td');
+            tds = $('tr:nth-child(3) td', queryTable);
             expect(tds).toBeTruthy();
             expect(tds.length).toBe(2);
-            expect(tds[0].textContent).toEqual('Maintenance:');
-            // TODO(kjlubick): Check link on tds[0]
-            expect(tds[1].textContent).toEqual('0');
+            expect(tds[0]).toMatchTextContent('Alive:');
+            expect(tds[0].innerHTML).toContain(encodeURIComponent('status:alive'));
+            expect(tds[1]).toMatchTextContent('429');
 
+            tds = $('tr:nth-child(8) td', queryTable);
+            expect(tds).toBeTruthy();
+            expect(tds.length).toBe(2);
+            expect(tds[0]).toMatchTextContent('Maintenance:');
+            expect(tds[0].innerHTML).toContain(encodeURIComponent('status:maintenance'));
+            expect(tds[1]).toMatchTextContent('0');
+
+            // by default fleet table should be hidden
+            expect(fleetTable.parentElement).toHaveAttribute('hidden', 'fleet table of counts');
+            expect(queryTable).not.toHaveAttribute('hidden', 'query table of counts');
 
             done();
           });
         });
 
-        // disabled because it's causing flakes on Chrome
+        // disabled because it is causing flakes on Chrome
         // pushState doesn't appear to be synchronous on Chrome and thus
         // we have strange behavior.
         // https://bugs.chromium.org/p/chromium/issues/detail?id=510026
@@ -411,12 +421,13 @@ describe('bot-list', function() {
       });
     });
 
-    it('toggles columns by clicking on the boxes in the "key selector"', function(done) {
+    it('toggles columns by clicking on the boxes in the "column selector"', function(done) {
       loggedInBotlist((ele) => {
         ele._cols = ['id', 'task', 'os', 'status'];
+        ele._showColSelector = true;
         ele.render();
 
-        let keySelector = ele.querySelector('.selector.keys');
+        let keySelector = $$('.col_selector', ele);
         expect(keySelector).toBeTruthy();
 
         // click on first non checked checkbox.
@@ -424,11 +435,11 @@ describe('bot-list', function() {
         let checkbox = null;
         for (let i = 0; i < keySelector.children.length; i++) {
           let child = keySelector.children[i];
-          checkbox = child.querySelector('checkbox-sk');
-          keyToClick = child.querySelector('.key');
-          expect(keyToClick).toBeTruthy();
-          if (!checkbox.checked) {
-            keyToClick = keyToClick.textContent;
+          checkbox = $$('checkbox-sk', child);
+          keyToClick = $$('.key', child);
+          if (checkbox && !checkbox.checked) {
+            expect(keyToClick).toBeTruthy();
+            keyToClick = keyToClick.textContent.trim();
             break;
           }
         }
@@ -448,8 +459,9 @@ describe('bot-list', function() {
         checkbox = null;
         for (let i = 0; i < keySelector.children.length; i++) {
           let child = keySelector.children[i];
-          checkbox = child.querySelector('checkbox-sk');
-          if (child.querySelector('.key').textContent === keyToClick) {
+          checkbox = $$('checkbox-sk', child);
+          let key = $$('.key', child);
+          if (key && key.textContent.trim() === keyToClick) {
             break;
           }
         }
@@ -465,6 +477,34 @@ describe('bot-list', function() {
         expect(colHeaders.length).toBe(4, '(num colHeaders)');
         expectedHeader = colHeaderMap[keyToClick] || keyToClick;
         expect(colHeaders.map((c) => c.textContent.trim())).not.toContain(expectedHeader);
+        done();
+      });
+    });
+
+    it('toggles fleet data visibility', function(done) {
+      loggedInBotlist((ele) => {
+        ele._showFleetCounts = false;
+        ele.render();
+
+        let showMore = $$('.fleet_header.shower expand-more-icon-sk', ele);
+        expect(showMore).toBeTruthy();
+        let counts = $$('#fleet_counts').parentElement;
+        expect(counts).toHaveAttribute('hidden');
+
+        showMore.click();
+        showMore = $$('.fleet_header.shower expand-more-icon-sk', ele);
+        let showLess = $$('.fleet_header.hider expand-less-icon-sk', ele);
+        expect(showLess).toBeTruthy();
+        expect(showMore).toBeFalsy();
+        expect(counts).not.toHaveAttribute('hidden');
+
+        showLess.click();
+        showMore = $$('.fleet_header.shower expand-more-icon-sk', ele);
+        showLess = $$('.fleet_header.hider expand-less-icon-sk', ele);
+        expect(showLess).toBeFalsy();
+        expect(showMore).toBeTruthy();
+        expect(counts).toHaveAttribute('hidden');
+
         done();
       });
     });
@@ -526,35 +566,37 @@ describe('bot-list', function() {
         let expectedOrder = ['id', 'task', 'android_devices', 'os', 'status', 'xcode_version'];
         expect(ele._cols).toEqual(expectedOrder);
 
-        let expectedHeaders = ['Bot Id', 'Current Task', 'Android Devices', 'OS', 'Status', 'XCode Version'];
+        let expectedHeaders = ['Bot Id', 'Current Task', 'Android Devices', 'OS',
+                               'Status', 'XCode Version'];
         let colHeaders = $('.bot-table thead th');
         expect(colHeaders.map((c) => c.textContent.trim())).toEqual(expectedHeaders);
         done();
       });
     });
 
-    function getSelectorRow(ele, type, value) {
-      let sel = ele.querySelector('.selector.'+type);
-      expect(sel).toBeTruthy();
+    function getChildItemWithText(ele, value) {
+      expect(ele).toBeTruthy();
 
-      for (let i = 0; i < sel.children.length; i++) {
-        let child = sel.children[i];
+      for (let i = 0; i < ele.children.length; i++) {
+        let child = ele.children[i];
         let text = child.firstElementChild;
-        expect(text).toBeTruthy(`all ${type} rows should have some text`);
-        if (text.textContent.trim() === value) {
+        if (text && text.textContent.trim() === value) {
           return child;
         }
       }
-      fail(`Could not find ${type} selector row with value ${value}`);
+      // uncomment below when debugging
+      // fail(`Could not find child of ${ele} with text value ${value}`);
+      return null;
     }
 
     it('does not toggle forced columns (like "id")', function(done) {
       loggedInBotlist((ele) => {
         ele._cols = ['id', 'task', 'os', 'status'];
+        ele._showColSelector = true;
         ele.render();
 
-        let row = getSelectorRow(ele, 'keys', 'id');
-        let checkbox = row.querySelector('checkbox-sk');
+        let row = getChildItemWithText($$('.col_selector'), 'id', ele);
+        let checkbox = $$('checkbox-sk', row);
         expect(checkbox.checked).toBeTruthy();
         checkbox.click(); // click is synchronous, it returns after
                           // the clickHandler is run.
@@ -576,7 +618,7 @@ describe('bot-list', function() {
       loggedInBotlist((ele) => {
         ele._cols = ['id', 'task', 'os', 'status'];
         ele.render();
-        let row = getSelectorRow(ele, 'keys', 'cpu');
+        let row = getChildItemWithText($$('.selector.keys'), 'cpu', ele);
         expect(row).toBeTruthy();
         row.click();
         expect(row.hasAttribute('selected')).toBeTruthy();
@@ -591,7 +633,7 @@ describe('bot-list', function() {
         expect(values).toContain('x86-64');
 
         let oldRow = row;
-        row = getSelectorRow(ele, 'keys', 'device_os');
+        row = getChildItemWithText($$('.selector.keys'), 'device_os', ele);
         expect(row).toBeTruthy();
         row.click();
         expect(row.hasAttribute('selected')).toBeTruthy('new row only one selected');
@@ -610,42 +652,44 @@ describe('bot-list', function() {
       });
     });
 
-    it('orders keys alphabetically with selected cols on top', function(done) {
+    it('orders columns alphabetically with selected cols on top', function(done) {
       loggedInBotlist((ele) => {
         ele._cols = ['id', 'os', 'task', 'status'];
-        ele.render();
+        ele._showColSelector = true;
+        ele._refilterPossibleColumns(); // also calls render
 
-        let keySelector = $$('.selector.keys');
+        let keySelector = $$('.col_selector');
         expect(keySelector).toBeTruthy();
         let keys = childrenAsArray(keySelector).map((c) => c.textContent.trim());
 
-        expect(keys.slice(0, 6)).toEqual(['id', 'task', 'os', 'status',
+        // Skip the first child, which is the input box
+        expect(keys.slice(1, 7)).toEqual(['id', 'task', 'os', 'status',
                                           'android_devices', 'battery_health']);
 
         done();
       });
     });
 
-    it('adds a filter when the arrow is clicked', function(done) {
+    it('adds a filter when the addIcon is clicked', function(done) {
       loggedInBotlist((ele) => {
         ele._cols = ['id', 'task', 'os', 'status'];
         ele._primaryKey = 'os';  // set 'os' selected
         ele._filters = [];  // no filters
         ele.render();
 
-        let valueRow = getSelectorRow(ele, 'values', 'Android');
-        let arrow = valueRow.querySelector('arrow-forward-icon-sk');
-        expect(arrow).toBeTruthy('there should be an arrow');
-        arrow.click();
+        let valueRow = getChildItemWithText($$('.selector.values'), 'Android', ele);
+        let addIcon = $$('add-circle-icon-sk', valueRow);
+        expect(addIcon).toBeTruthy('there should be an icon for adding');
+        addIcon.click();
 
         expect(ele._filters.length).toBe(1, 'a filter should be added');
         expect(ele._filters[0]).toEqual('os:Android');
 
-        let filterSelector = ele.querySelector('.selector.filters');
-        expect(filterSelector).toBeTruthy('there should be a filter selector');
-        expect(filterSelector.children.length).toBe(1);
-        expect(arrow.hasAttribute('hidden'))
-              .toBeTruthy('arrow should go away after being clicked');
+        let chipContainer = $$('.chip_container', ele);
+        expect(chipContainer).toBeTruthy('there should be a filter chip container');
+        expect(chipContainer.children.length).toBe(1);
+        expect(addIcon.hasAttribute('hidden'))
+              .toBeTruthy('addIcon should go away after being clicked');
         done();
       });
     });
@@ -657,17 +701,44 @@ describe('bot-list', function() {
         ele._filters = ['device_type:bullhead', 'os:Android'];
         ele.render();
 
-        let filterRow = getSelectorRow(ele, 'filters', 'os:Android');
-        let icon = filterRow.querySelector('remove-circle-outline-icon-sk');
+        let filterChip = getChildItemWithText($$('.chip_container'), 'os:Android', ele);
+        let icon = $$('cancel-icon-sk', filterChip);
         expect(icon).toBeTruthy('there should be a icon to remove it');
         icon.click();
 
         expect(ele._filters.length).toBe(1, 'a filter should be removed');
         expect(ele._filters[0]).toEqual('device_type:bullhead', 'os:Android should be removed');
 
-        let filterSelector = ele.querySelector('.selector.filters');
-        expect(filterSelector).toBeTruthy('there should be a filter selector');
-        expect(filterSelector.children.length).toBe(1);
+        let chipContainer = $$('.chip_container', ele);
+        expect(chipContainer).toBeTruthy('there should be a filter chip container');
+        expect(chipContainer.children.length).toBe(1);
+        done();
+      });
+    });
+
+    it('shows and hides the column selector', function(done) {
+      loggedInBotlist((ele) => {
+        ele._showColSelector = false;
+        ele.render();
+
+        let cs = $$('.col_selector', ele);
+        expect(cs).toBeFalsy();
+
+        let toClick = $$('.col_options', ele);
+        expect(toClick).toBeTruthy('Thing to click to show col selector');
+        toClick.click();
+
+        cs = $$('.col_selector', ele);
+        expect(cs).toBeTruthy();
+
+        // click anywhere else to hide the column selector
+        toClick = $$('.header', ele);
+        expect(toClick).toBeTruthy('Thing to click to hide col selector');
+        toClick.click();
+
+        cs = $$('.col_selector', ele);
+        expect(cs).toBeFalsy();
+
         done();
       });
     });
@@ -687,7 +758,7 @@ describe('bot-list', function() {
           return '[]'; // pretend no bots match
         }, { overwriteRoutes: true });
 
-        ele._addFilter('os', 'Linux');
+        ele._addFilter('os:Linux');
         // The true on flush waits for res.json() to resolve too, which
         // is when we know the element has updated the _bots.
         fetchMock.flush(true).then(() => {
@@ -696,7 +767,88 @@ describe('bot-list', function() {
 
           done();
         });
+      });
+    });
 
+    it('allows filters to be added from the search box', function(done) {
+      loggedInBotlist((ele) => {
+        ele._filters = [];
+        ele.render();
+
+        let filterInput = $$('#filter_search', ele);
+        filterInput.value = 'invalid filter';
+        ele._filterSearch({key: 'Enter'});
+        expect(ele._filters).toEqual([]);
+        // Leave the input to let the user correct their mistake.
+        expect(filterInput.value).toEqual('invalid filter');
+
+        // Spy on the list call to make sure a request is made with the
+        let calledTimes = 0;
+        fetchMock.get('glob:/_ah/api/swarming/v1/bots/list?*', (url, _) => {
+          expect(url).toContain(encodeURIComponent('valid:filter:gpu:can:have:many:colons'));
+          calledTimes++;
+          return '[]'; // pretend no bots match
+        }, {overwriteRoutes: true});
+
+        filterInput.value = 'valid:filter:gpu:can:have:many:colons';
+        ele._filterSearch({key: 'Enter'});
+        expect(ele._filters).toEqual(['valid:filter:gpu:can:have:many:colons']);
+        // Empty the input for next time.
+        expect(filterInput.value).toEqual('');
+        filterInput.value = 'valid:filter:gpu:can:have:many:colons';
+        ele._filterSearch({key: 'Enter'});
+        // No duplicates
+        expect(ele._filters).toEqual(['valid:filter:gpu:can:have:many:colons']);
+
+        fetchMock.flush(true).then(() => {
+          expect(calledTimes).toEqual(1, 'Only request bots once');
+
+          done();
+        });
+      });
+    });
+
+    it('searches filters by typing in the text box', function(done) {
+      loggedInBotlist((ele) => {
+        ele._filters = [];
+        ele.render();
+
+        let filterInput = $$('#filter_search', ele);
+        filterInput.value = 'dev';
+        ele._refilterPrimaryKeys();
+
+        // Auto selects the first one
+        expect(ele._primaryKey).toEqual('android_devices');
+
+        let row = getChildItemWithText($$('.selector.keys'), 'cpu', ele);
+        expect(row).toBeFalsy('cpu should be hiding');
+        row = getChildItemWithText($$('.selector.keys'), 'device_type', ele);
+        expect(row).toBeTruthy('device_type should be there');
+
+        done();
+      });
+    });
+
+    it('searches columns by typing in the text box', function(done) {
+      loggedInBotlist((ele) => {
+        ele._cols = ['id', 'task', 'os', 'status'];
+        ele._showColSelector = true;
+        ele.render();
+
+        let columnInput = $$('#column_search', ele);
+        columnInput.value = 'batt';
+        ele._refilterPossibleColumns();
+
+        let colSelector = $$('.col_selector', ele);
+        expect(colSelector).toBeTruthy();
+        expect(colSelector.children.length).toEqual(6);
+
+        let row = getChildItemWithText(colSelector, 'gpu');
+        expect(row).toBeFalsy('gpu should be hiding');
+        row = getChildItemWithText(colSelector, 'battery_status');
+        expect(row).toBeTruthy('battery_status should be there');
+
+        done();
       });
     });
 
@@ -760,7 +912,7 @@ describe('bot-list', function() {
     it('makes requests on adding new filters and removing them.', function(done) {
       loggedInBotlist((ele) => {
         fetchMock.resetHistory();
-        ele._addFilter('alpha','beta');
+        ele._addFilter('alpha:beta');
 
         let calls = fetchMock.calls(MATCHED, 'GET');
         expect(calls.length).toBe(2, '1 for the bots, 1 for the count');
@@ -816,6 +968,14 @@ describe('bot-list', function() {
       expect(temp).toBeTruthy();
       expect(temp.average).toBe('34.8', 'rounds to one decimal place');
       expect(temp.zones).toBe('thermal_zone0: 34.5 | thermal_zone1: 35', 'joins with |');
+    });
+
+    it('turns the dates into DateObjects', function() {
+      // Make a copy of the object because _processBots will modify it in place.
+      let bots = processBots([deepCopy(LINUX_BOT)]);
+      let ts = bots[0].first_seen_ts
+      expect(ts).toBeTruthy();
+      expect(ts instanceof Date).toBeTruthy('Should be a date object');
     });
 
     it('turns the device map into a list', function() {
@@ -875,7 +1035,7 @@ describe('bot-list', function() {
       // Note this list doesn't include the blacklisted keys.
       let expectedKeys = ['android_devices', 'cores', 'cpu', 'device', 'device_os',
           'device_type', 'gpu', 'hidpi', 'machine_type', 'os', 'pool',
-          'xcode_version', 'zone', 'id', 'disk_space', 'task', 'status', 'is_mp_bot'];
+          'xcode_version', 'zone', 'id', 'task', 'status', 'is_mp_bot'];
       let actualKeys = Object.keys(pMap);
       actualKeys.sort();
       expectedKeys.sort();
@@ -897,7 +1057,7 @@ describe('bot-list', function() {
       expect(pMap['status']).toContain('alive');
       expect(pMap['is_mp_bot']).toBeTruthy();
       expect(pMap['is_mp_bot']).toContain('false');
-      expect(pMap['id']).toEqual([]);
+      expect(pMap['id']).toEqual(null);
     });
 
     it('correctly makes query params from filters', function() {
@@ -937,6 +1097,10 @@ describe('bot-list', function() {
         let qp = listQueryParams(testcase.filters, testcase.limit);
         expect(qp).toEqual(testcase.output);
       }
+
+      let testcase = expectations[0];
+      let qp = listQueryParams(testcase.filters, testcase.limit, 'mock_cursor12345');
+      expect(qp).toEqual('cursor=mock_cursor12345&'+testcase.output);
 
     });
   }); // end describe('data parsing')

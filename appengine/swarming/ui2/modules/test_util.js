@@ -11,7 +11,7 @@
  * </p>
  */
 
-export const toContainRegexMatcher = {
+export const customMatchers = {
   // see https://jasmine.github.io/tutorials/custom_matcher
   // for docs on the factory that returns a matcher.
   'toContainRegex': function(util, customEqualityTesters) {
@@ -43,7 +43,51 @@ export const toContainRegexMatcher = {
       },
     };
   },
+
+  'toHaveAttribute': function(util, customEqualityTesters) {
+    return {
+      'compare': function(actual, attribute) {
+        if (!isElement(actual)) {
+          throw `${actual} is not a DOM element`;
+        }
+        return {
+          pass: actual.hasAttribute(attribute),
+        };
+      },
+    };
+  },
+
+  // Trims off whitespace before comparing
+  'toMatchTextContent': function(util, customEqualityTesters) {
+    return {
+      'compare': function(actual, text) {
+        if (!isElement(actual)) {
+          throw `${actual} is not a DOM element`;
+        }
+        text = text.trim();
+        let actualText = actual.textContent.trim();
+        if (actualText === text) {
+          return {
+            // craft the message for the negated version
+            message: `Expected ${actualText} to not equal ${text} `+
+                     `(ignoring whitespace)`,
+            pass: true,
+          };
+        }
+        return {
+          message: `Expected ${actualText} to equal ${text} `+
+                   `(ignoring whitespace)`,
+          pass: false,
+        };
+      },
+    };
+  },
 };
+
+function isElement(ele) {
+  //https://stackoverflow.com/a/36894871
+  return ele instanceof Element || ele instanceof HTMLDocument;
+}
 
 export function mockAppGETs(fetchMock, permissions) {
   fetchMock.get('/_ah/api/swarming/v1/server/details', {
@@ -59,6 +103,7 @@ export function mockAuthdAppGETs(fetchMock, permissions) {
   fetchMock.get('/_ah/api/swarming/v1/server/details', requireLogin({
     server_version: '1234-abcdefg',
     bot_version: 'abcdoeraymeyouandme',
+    machine_provider_template: 'https://example.com/leases/%s',
   }));
 
 
@@ -66,13 +111,25 @@ export function mockAuthdAppGETs(fetchMock, permissions) {
                 requireLogin(permissions));
 }
 
-// TODO(kjlubick): put delay back to 500 or so
 export function requireLogin(logged_in, delay=100) {
-  return function(url, opts){
+  const original_items = logged_in.items && logged_in.items.slice();
+  return function(url, opts) {
     if (opts && opts.headers && opts.headers.authorization) {
       return new Promise((resolve) => {
         setTimeout(resolve, delay);
       }).then(() => {
+        if (logged_in.items instanceof Array) {
+          // pretend there are two pages
+          if (!logged_in.cursor) {
+            // first page
+            logged_in.cursor = 'fake_cursor12345';
+            logged_in.items = original_items.slice(0, original_items.length/2);
+          } else {
+            // second page
+            logged_in.cursor = undefined;
+            logged_in.items = original_items.slice(original_items.length/2);
+          }
+        }
         return {
           status: 200,
           body: JSON.stringify(logged_in),

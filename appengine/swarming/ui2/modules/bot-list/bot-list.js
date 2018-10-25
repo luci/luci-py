@@ -16,27 +16,35 @@
  *    Instead, dummy data will be used. Ideal for local testing.
  */
 
+import { $, $$ } from 'common-sk/modules/dom'
+import { errorMessage } from 'elements-sk/errorMessage'
 import { html, render } from 'lit-html'
+import { ifDefined } from 'lit-html/directives/if-defined';
 import { jsonOrThrow } from 'common-sk/modules/jsonOrThrow'
 import naturalSort from 'javascript-natural-sort/naturalSort'
+import * as query from 'common-sk/modules/query'
 import { stateReflector } from 'common-sk/modules/stateReflector'
 
 import 'elements-sk/checkbox-sk'
 import 'elements-sk/error-toast-sk'
-import 'elements-sk/icon/arrow-forward-icon-sk'
-import 'elements-sk/icon/remove-circle-outline-icon-sk'
+import 'elements-sk/icon/add-circle-icon-sk'
+import 'elements-sk/icon/cancel-icon-sk'
+import 'elements-sk/icon/expand-less-icon-sk'
+import 'elements-sk/icon/expand-more-icon-sk'
+import 'elements-sk/icon/more-vert-icon-sk'
 import 'elements-sk/icon/search-icon-sk'
 import 'elements-sk/select-sk'
 import 'elements-sk/styles/buttons'
 import '../sort-toggle'
 import '../swarming-app'
 
-import { stableSort } from '../util'
+import { stableSort, taskListLink } from '../util'
 import { aggregateTemps, attribute, botLink, column, colHeaderMap,
-         devices, extraKeys, filterBots, fromDimension, fromState, initCounts,
+         devices, extraKeys, filterBots, filterPossibleColumns, filterPossibleKeys,
+         filterPossibleValues, fromDimension, fromState, initCounts,
          listQueryParams, longestOrAll, makeFilter, processBots, processCounts,
-         processDimensions, processPrimaryMap, sortColumns, sortKeys,
-         specialSortMap, taskLink } from './bot-list-helpers'
+         processDimensions, processPrimaryMap, sortColumns, sortPossibleColumns,
+         specialFilters, specialSortMap, taskLink } from './bot-list-helpers'
 import SwarmingAppBoilerplate from '../SwarmingAppBoilerplate'
 
 const colHead = (col, ele) => html`
@@ -56,11 +64,6 @@ const botRow = (bot, ele) => html`
 const primaryOption = (key, ele) => html`
 <div class=item ?selected=${ele._primaryKey === key}>
   <span class=key>${key}</span>
-  <span class=flex></span>
-  <checkbox-sk ?checked=${ele._cols.indexOf(key) >= 0}
-               ?disabled=${ele._forcedColumns.indexOf(key) >= 0}
-               @click=${(e) => ele._toggleCol(e, key)}>
-  </checkbox-sk>
 </div>`;
 
 const secondaryOptions = (ele) => {
@@ -70,30 +73,30 @@ const secondaryOptions = (ele) => {
   let values = ele._primaryMap[ele._primaryKey];
   if (!values) {
     return html`
-<div class="information_only">
-  Only dimensions can be used for filtering. <i>${ele._primaryKey}</i> is a part
-  of the bot's state and is informational only.
+<div class=information_only>
+  Hmm... no preloaded values. Maybe try typing your filter like ${ele._primaryKey}:foo-bar in the
+  above box and hitting enter.
 </div>`;
   }
+  values = filterPossibleValues(values, ele._primaryKey, ele._filterQuery);
+  values.sort(naturalSort);
   return values.map((value) =>
     html`
 <div class=item>
   <span class=value>${value}</span>
   <span class=flex></span>
-  <arrow-forward-icon-sk ?hidden=${ele._filters.indexOf(makeFilter(ele._primaryKey, value)) >= 0}
-                         @click=${() => ele._addFilter(ele._primaryKey, value)}>
-  </arrow-forward-icon-sk>
+  <add-circle-icon-sk ?hidden=${ele._filters.indexOf(makeFilter(ele._primaryKey, value)) >= 0}
+                      @click=${() => ele._addFilter(makeFilter(ele._primaryKey, value))}>
+  </add-circle-icon-sk>
 </div>`);
 }
 
 
-const filterOption = (filter, ele) => html`
-<div class=item>
-  <span class=filter>${filter}</span>
-  <span class=flex></span>
-  <remove-circle-outline-icon-sk @click=${() => ele._removeFilter(filter)}>
-  </remove-circle-outline-icon-sk>
-</div>`
+const filterChip = (filter, ele) => html`
+<span class=chip>
+  <span>${filter}</span>
+  <cancel-icon-sk @click=${() => ele._removeFilter(filter)}></cancel-icon-sk>
+</span>`;
 
 // can't use <select> and <option> because <option> strips out non-text
 // (e.g. checkboxes)
@@ -101,67 +104,83 @@ const filters = (ele) => html`
 <!-- primary key selector-->
 <select-sk class="selector keys"
            @selection-changed=${(e) => ele._primayKeyChanged(e)}>
-  ${ele._primaryArr.map((key) => primaryOption(key, ele))}
+  ${ele._filteredPrimaryArr.map((key) => primaryOption(key, ele))}
 </select-sk>
 <!-- secondary value selector-->
 <select-sk class="selector values" disabled>
   ${secondaryOptions(ele)}
-</select-sk>
-<!-- filters selector-->
-<select-sk class="selector filters" disabled>
-  ${ele._filters.map((filter) => filterOption(filter, ele))}
 </select-sk>`;
 
 const options = (ele) => html`
 <div class=options>
   <div class=verbose>
     <checkbox-sk ?checked=${ele._verbose}
-                 @click=${(e) => ele._toggleVerbose(e)}>
+                 @click=${ele._toggleVerbose}>
     </checkbox-sk>
     <span>Verbose Entries</span>
   </div>
-  <!-- TODO(kjlubick): have something like sk-input -->
-  <input placeholder='limit'></input>
-  <a href="https://example.com">View Matching Tasks</a>
-  <!-- TODO(kjlubick): Only make this button appear for admins -->
-  <button @click=${(e) => alert('not implemented yet')}>
+  <a href=${ele._matchingTasksLink()}>View Matching Tasks</a>
+  <button
+      ?disabled=${!ele.permissions.delete_bot}
+      @click=${(e) => alert('use the dialog on the old botlist UI for now.')}>
     DELETE ALL DEAD BOTS
   </button>
 </div>`;
 
-const summaryFleetRow = (count) => html`
+const summaryFleetRow = (ele, count) => html`
 <tr>
-  <td><a href="/TODO">${count.label}</a>:</td>
+  <td><a href=${ifDefined(ele._makeSummaryURL(count, false))}>${count.label}</a>:</td>
   <td>${count.value}</td>
 </tr>`;
 
-const summaryQueryRow = (count) => html`
+const summaryQueryRow = (ele, count) => html`
 <tr>
-  <td><a href="/TODO">${count.label}</a>:</td>
+  <td><a href=${ifDefined(ele._makeSummaryURL(count, true))}>${count.label}</a>:</td>
   <td>${count.value}</td>
 </tr>`;
+
+// TODO(kjlubick): This could maybe be a generic helper function.
+const fleetCountsToggleSwitch = (ele) => {
+  if (ele._showFleetCounts) {
+    return html`<expand-less-icon-sk @click=${ele._toggleFleetsCount}></expand-less-icon-sk>`;
+  } else {
+    return html`<expand-more-icon-sk @click=${ele._toggleFleetsCount}></expand-more-icon-sk>`;
+  }
+};
 
 const summary = (ele) => html`
-<div class=title>Fleet</div>
-<!-- TODO(kjlubick) Linkify these-->
-<!-- TODO(kjlubick) Perhaps make fleet values hidden by default?
-     It would save some vertical space.-->
-<table>
-  ${ele._fleetCounts.map((count) => summaryFleetRow(count))}
-</table>
-<div class=title>Selected</div>
-<table>
-  ${ele._queryCounts.map((count) => summaryQueryRow(count))}
-</table>`;
+<div class=summary ?hidden=${!ele._showFleetCounts}>
+  <div class="fleet_header hider title">
+    <span>Fleet</span>
+    ${fleetCountsToggleSwitch(ele)}
+  </div>
+  <table id=fleet_counts>
+    ${ele._fleetCounts.map((count) => summaryFleetRow(ele, count))}
+  </table>
+</div>
+
+<div class=summary>
+  <div class="fleet_header shower title" ?hidden=${ele._showFleetCounts}>
+    <span>Fleet</span>
+    ${fleetCountsToggleSwitch(ele)}
+  </div>
+
+  <div class=title>Selected</div>
+  <table id=query_counts>
+    ${summaryQueryRow(ele, {label: 'Displayed', value: ele._bots.length})}
+    ${ele._queryCounts.map((count) => summaryQueryRow(ele, count))}
+  </table>
+</div>`;
 
 const header = (ele) => html`
 <div class=header>
   <div class=filter_box ?hidden=${!ele.loggedInAndAuthorized}>
-    <!-- TODO(kjlubick): have something like sk-input -->
     <search-icon-sk></search-icon-sk>
-    <input class=search
-           placeholder='Search colums and filters or supply a filter
-                        and press enter'>
+    <input id=filter_search class=search type=text
+           placeholder='Search filters or supply a filter
+                        and press enter'
+           @input=${e => ele._refilterPrimaryKeys(e)}
+           @keyup=${e => ele._filterSearch(e)}>
     </input>
     <!-- The following div has display:block and divides the above and
          below inline-block groups-->
@@ -171,10 +190,54 @@ const header = (ele) => html`
     ${options(ele)}
   </div>
 
-  <div class=summary>
     ${summary(ele)}
   </div>
+</div>
+<div class=chip_container>
+  ${ele._filters.map((filter) => filterChip(filter, ele))}
 </div>`;
+
+const columnOption = (key, ele) => html`
+<div class=item>
+  <span class=key>${key}</span>
+  <span class=flex></span>
+  <checkbox-sk ?checked=${ele._cols.indexOf(key) >= 0}
+               ?disabled=${ele._forcedColumns.indexOf(key) >= 0}
+               @click=${(e) => ele._toggleCol(e, key)}>
+  </checkbox-sk>
+</div>`;
+
+const col_selector = (ele) => {
+  if (!ele._showColSelector) {
+    return '';
+  }
+  return html`
+<!-- Stop clicks from traveling outside the popup.-->
+<div class=col_selector @click=${e => e.stopPropagation()}>
+  <input id=column_search class=search type=text
+         placeholder='Search columns to show'
+         @input=${e => ele._refilterPossibleColumns(e)}
+         <!-- Looking at the change event, but that had the behavior of firing
+              any time the user clicked away, with seemingly no differentiation.
+              Instead, we watch keyup and wait for the 'Enter' key. -->
+         @keyup=${e => ele._columnSearch(e)}>
+  </input>
+  ${ele._filteredPossibleColumns.map((key) => columnOption(key, ele))}
+</div>`;
+}
+
+const col_options = (ele) => html`
+<!-- Put the click action here to make it bigger, especially for mobile.-->
+<th class=col_options @click=${ele._toggleColSelector}>
+  <span class=show_widget>
+    <more-vert-icon-sk></more-vert-icon-sk>
+  </span>
+  <span>Bot Id</span>
+  <sort-toggle @click=${e => (e.stopPropagation() && e.preventDefault())}
+               key=id .currentKey=${ele._sort} .direction=${ele._dir}>
+  </sort-toggle>
+  ${col_selector(ele)}
+</th>`;
 
 const template = (ele) => html`
 <swarming-app id=swapp
@@ -185,21 +248,39 @@ const template = (ele) => html`
       <aside class=hideable>
         <a href=/>Home</a>
         <a href=/botlist>Bot List</a>
+        <a href=/oldui/botlist>Old Bot List</a>
         <a href=/tasklist>Task List</a>
       </aside>
   </header>
-  <main>
+  <!-- Allow clicking anywhere to dismiss the column selector-->
+  <main @click=${e => ele._showColSelector && ele._toggleColSelector(e)}>
     <h2 class=message ?hidden=${ele.loggedInAndAuthorized}>${ele._message}</h2>
 
     ${ele.loggedInAndAuthorized ? header(ele): ''}
 
     <table class=bot-table ?hidden=${!ele.loggedInAndAuthorized}>
-      <thead><tr>${ele._cols.map((col) => colHead(col,ele))}</tr></thead>
+      <thead>
+        <tr>
+          ${col_options(ele)}
+          ${ele._cols.slice(1).map((col) => colHead(col,ele))}
+        </tr>
+      </thead>
       <tbody>${ele._sortBots().map((bot) => botRow(bot,ele))}</tbody>
     </table>
   </main>
   <footer><error-toast-sk></error-toast-sk></footer>
 </swarming-app>`;
+
+// How many items to load on the first load of bots
+// This is a relatively low number to make the initial page load
+// seem snappier. After this, we can go up (see BATCH LOAD) to
+// reduce the number of queries, since the user can expect to wait
+// a bit more when their interaction (e.g. adding a filter) causes
+// more data to be fetched.
+const INITIAL_LOAD = 100;
+// How many items to load on subsequent fetches.
+// This number was picked from experience and experimentation.
+const BATCH_LOAD = 200;
 
 window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
 
@@ -213,11 +294,15 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     this._cols = [];
     this._dir = '';
     this._filters = [];
-    this._limit = 0; // _limit 0 is a sentinel value for _fetch()
+    this._limit = 0; // _limit being 0 is a sentinel value for _fetch()
                      // We won't actually make a request if _limit is 0.
+                     // So, we keep limit 0 until our params have been read in
+                     // from the URL to avoid making a request until we are
+                     // ready.
     this._sort = '';
     this._primaryKey = '';
     this._verbose = false;
+    this._showFleetCounts = false;
 
     this._fleetCounts = initCounts();
     this._queryCounts = initCounts();
@@ -230,9 +315,9 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
           'd': this._dir,
           'f': this._filters,
           'k': this._primaryKey,
-          'l': this._limit,
           's': this._sort,
           'v': this._verbose,
+          'e': this._showFleetCounts, // 'e' because 'f', 'l', are taken
         }
     }, /*setState*/(newState) => {
       // default values if not specified.
@@ -243,25 +328,46 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
       this._dir = newState.d || 'asc';
       this._filters = newState.f; // default to []
       this._primaryKey = newState.k; // default to ''
-      this._limit = newState.l || 100; // TODO(kjlubick): add limit UI element
       this._sort = newState.s || 'id';
-      this._verbose = newState.v;
+      this._verbose = newState.v;         // default to false
+      this._showFleetCounts = newState.e; // default to false
+      this._limit = INITIAL_LOAD;
       this._fetch();
       this.render();
     });
 
-    /** _primaryArr: Array<String>, the display order of the primary keys.
-        This is dimensions, then bot properties, then elements
-        from bot.state. */
+    /** _primaryArr: Array<String>, the display order of the primaryKeys, that is,
+        anything that can be searched/filtered by. This should not be changed
+        after it is set initially - it is the ground truth of primary keys.
+     */
     this._primaryArr = [];
+    /** _filteredPrimaryArr: Array<String>, the current, filtered display order
+        of the primaryKeys. This can be mutated when filtering/sorting.
+     */
+    this._filteredPrimaryArr = [];
+    /** _possibleColumns: Array<String>, Any valid columns that can be sorted by.
+        This is a superset of _primaryArr, with some extra things that are useful,
+        but can't be filtered by (the API only supports filtering by dimensions
+        and a few special items). This should not be changed after it is set
+        initially - it is the ground truth of columns.
+     */
+    this._possibleColumns = [];
+    /** _filteredPossibleColumns: Array<String>, the current, filtered display
+        order of columns that the user can select using the col_selector.
+     */
+    this._filteredPossibleColumns = [];
     /** _primaryMap: Object, a mapping of primary keys to secondary items.
         The primary keys are things that can be columns or sorted by.  The
         primary values (aka the secondary items) are things that can be filtered
         on. Primary consists of dimensions and state.  Secondary contains the
         values primary things can be.*/
     this._primaryMap = {};
-    this._dimensions = [];
     this._message = 'You must sign in to see anything useful.';
+    this._showColSelector = false;
+    this._columnQuery = ''; // tracks what's typed into the input to search columns
+    this._filterQuery = ''; // tracks what's typed into the input to search filters
+    // Allows us to abort fetches that are tied to filters when filters change.
+    this._fetchController = null;
   }
 
   connectedCallback() {
@@ -275,19 +381,20 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     this.addEventListener('sort-change', (e) => {
       this._sort = e.detail.key;
       this._dir = e.detail.direction;
+      this._stateChanged();
       this.render();
     });
   }
 
-  _addFilter(key, value) {
-    let filter = makeFilter(key, value);
+  _addFilter(filter) {
     if (this._filters.indexOf(filter) >= 0) {
       return;
     }
     this._filters.push(filter);
+    this._stateChanged();
     // pre-filter what we have
     this._bots = filterBots(this._filters, this._bots);
-    // go fetch for all the bots that match
+    // go fetch for all the bots that match the new filters.
     this._fetch();
     // render what we have now.  When _fetch() resolves it will
     // re-render.
@@ -311,24 +418,68 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     return classes;
   }
 
+  _columnSearch(e) {
+    if (e.key !== 'Enter') {
+      return;
+    }
+    let input = $$('#column_search', this);
+    let newCol = input.value.trim();
+    if (this._possibleColumns.indexOf(newCol) === -1) {
+      errorMessage(`Column "${newCol}" is not valid.`, 5000);
+      return;
+    }
+    input.value = '';
+    this._columnQuery = '';
+    if (this._cols.indexOf(newCol) !== -1) {
+      this.render();
+      errorMessage(`Column "${newCol}" already displayed.`, 5000);
+      return;
+    }
+    this._cols.push(newCol);
+    this._stateChanged();
+    this.render();
+  }
+
   _fetch() {
     // limit of 0 is a sentinel value. See constructor for more details.
     if (!this.loggedInAndAuthorized || !this._limit) {
       return;
     }
+    if (this._fetchController) {
+      // Kill any outstanding requests that use the filters
+      this._fetchController.abort();
+    }
+    // Make a fresh abort controller for each set of fetches. AFAIK, they
+    // cannot be re-used once aborted.
+    this._fetchController = new AbortController();
     let extra = {
-      headers: {'authorization': this.auth_header}
+      headers: {'authorization': this.auth_header},
+      signal: this._fetchController.signal,
     };
     // Fetch the bots
     this.app.addBusyTasks(1);
-    // TODO(kjlubick): support paging
     let queryParams = listQueryParams(this._filters, this._limit);
-    fetch('/_ah/api/swarming/v1/bots/list?' + queryParams, extra)
+    fetch(`/_ah/api/swarming/v1/bots/list?${queryParams}`, extra)
       .then(jsonOrThrow)
       .then((json) => {
-        this._bots = processBots(json.items);
-        this.render();
-        this.app.finishedTask();
+        this._bots = [];
+        const maybeLoadMore = (json) => {
+          this._bots = this._bots.concat(processBots(json.items));
+          this.render();
+          // Special case: Don't load all the bots when filters is empty to avoid
+          // loading many many bots unintentionally.
+          if (this._filters.length && json.cursor) {
+            this._limit = BATCH_LOAD;
+            queryParams = listQueryParams(this._filters, BATCH_LOAD, json.cursor);
+            fetch(`/_ah/api/swarming/v1/bots/list?${queryParams}`, extra)
+              .then(jsonOrThrow)
+              .then(maybeLoadMore)
+              .catch((e) => this.fetchError(e, 'bots/list (paging)'));
+          } else {
+            this.app.finishedTask();
+          }
+        }
+        maybeLoadMore(json);
       })
       .catch((e) => this.fetchError(e, 'bots/list'));
 
@@ -360,18 +511,27 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
         .catch((e) => this.fetchError(e, 'bots/count (fleet)'));
     }
 
-    // Fetch _dimensions so we can fill out the filters.
+    // fetch dimensions so we can fill out the filters.
     // We only need to do this once, because we don't expect it to
     // change (much) after the page has been loaded.
-    if (!this._dimensions.length) {
+    if (!this._possibleColumns.length) {
       this.app.addBusyTasks(1);
+      extra = {
+        headers: {'authorization': this.auth_header},
+        // No signal here because we shouldn't need to abort it.
+        // This request does not depend on the filters.
+      };
       // Only need to fetch this once.
       fetch('/_ah/api/swarming/v1/bots/dimensions', extra)
       .then(jsonOrThrow)
       .then((json) => {
-        this._dimensions = processDimensions(json.bots_dimensions);
+        let dimensions = processDimensions(json.bots_dimensions);
         this._primaryMap = processPrimaryMap(json.bots_dimensions);
-        this._primaryArr = this._dimensions.concat(extraKeys);
+        this._possibleColumns = dimensions.concat(extraKeys);
+        this._filteredPossibleColumns = this._possibleColumns.slice();
+        this._primaryArr = Object.keys(this._primaryMap);
+        this._primaryArr.sort();
+        this._filteredPrimaryArr = this._primaryArr.slice();
         this.render();
         this.app.finishedTask();
       })
@@ -379,8 +539,101 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     }
   }
 
+  _filterSearch(e) {
+    if (e.key !== 'Enter') {
+      return;
+    }
+    let input = $$('#filter_search', this);
+    let newFilter = input.value.trim();
+    if (newFilter.indexOf(':') === -1) {
+      errorMessage('Invalid filter.  Should be like "foo:bar"', 5000);
+      return;
+    }
+    input.value = '';
+    this._filterQuery = '';
+    this._primaryKey = '';
+    if (this._filters.indexOf(newFilter) !== -1) {
+      this._refilterPrimaryKeys();
+      errorMessage(`Filter "${newFilter}" is already active`, 5000);
+      return;
+    }
+    this._addFilter(newFilter);
+    this._refilterPrimaryKeys();
+  }
+
+  _makeSummaryURL(newFilter, preserveOthers) {
+    if (!newFilter || newFilter.label === 'Displayed' || newFilter.label === 'All') {
+      // no link
+      return undefined;
+    }
+    let label = newFilter.label.toLowerCase();
+    let filterStr = 'status:'+label;
+    if (label === 'busy' || label === 'idle') {
+      filterStr = 'task:'+label;
+    }
+    if (preserveOthers) {
+      filterStr = encodeURIComponent(filterStr);
+      if (window.location.href.indexOf(filterStr) === -1) {
+        return window.location.href + '&f=' + filterStr;
+      }
+      // The filter is already on the list.
+      return undefined;
+    }
+
+    let params = {
+      s: [this._sort],
+      c: this._cols,
+      v: [this._verbose],
+      f: [filterStr],
+    };
+
+    return window.location.href.split('?')[0] + '?' + query.fromParamSet(params);
+  }
+
+  _matchingTasksLink() {
+    let cols = ['name', 'state', 'created_ts'];
+    let dimensionFilters = this._filters.filter((f) => {
+      // Strip out non-dimensions like "is_mp_bot"
+      return !specialFilters[f.split(':')[0]];
+    });
+    // Add any dimensions as columns, so they are shown by default
+    for (let f of dimensionFilters) {
+      let col = f.split(':', 1)[0];
+      if (cols.indexOf(col) === -1) {
+        cols.push(col);
+      }
+    }
+    return taskListLink(dimensionFilters, cols);
+  }
+
   _primayKeyChanged(e) {
-    this._primaryKey = this._primaryArr[e.detail.selection];
+    this._primaryKey = this._filteredPrimaryArr[e.detail.selection];
+    this._stateChanged();
+    this.render();
+  }
+
+  _refilterPossibleColumns(e) {
+    let input = $$('#column_search', this);
+    // If the column selector box is hidden, input will be null
+    this._columnQuery = (input && input.value) || '';
+    this._filteredPossibleColumns = filterPossibleColumns(this._possibleColumns, this._columnQuery);
+    sortPossibleColumns(this._filteredPossibleColumns, this._cols);
+    this.render();
+  }
+
+  _refilterPrimaryKeys(e) {
+    this._filterQuery = $$('#filter_search', this).value;
+
+    this._filteredPrimaryArr = filterPossibleKeys(this._primaryArr, this._primaryMap, this._filterQuery);
+    // Update the selected to be the current one (if it is still with being
+    // shown) or the first match.  This saves the user from having to click
+    // the first result before seeing results.
+    if (this._filterQuery && this._filteredPrimaryArr.length > 0 &&
+        this._filteredPrimaryArr.indexOf(this._primaryKey) === -1) {
+      this._primaryKey = this._filteredPrimaryArr[0];
+      this._stateChanged();
+    }
+
     this.render();
   }
 
@@ -390,16 +643,25 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
       return;
     }
     this._filters.splice(idx, 1);
+    this._stateChanged();
     this._fetch();
     this.render();
   }
 
   render() {
     // Incorporate any data changes before rendering.
-    sortKeys(this._primaryArr, this._cols);
     sortColumns(this._cols);
-    this._stateChanged();
     super.render();
+    if (this._primaryKey) {
+      let selectedKey = $$('.keys.selector .item[selected]', this);
+      // Especially on a page reload, the selected key won't be viewable.
+      // This scrolls the little box into view if it's not and, since it
+      // runs every render, keeps it in view.
+      selectedKey && selectedKey.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    }
   }
 
   /* sort the internal set of bots based on the sort-toggle and direction
@@ -420,12 +682,12 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
       }
       // Default to a natural compare of the columns.
       let aCol = column(sortOn, botA, this);
-      if (aCol === 'none'){
+      if (aCol === 'none') {
         // put "none" at the bottom of the sort order
         aCol = 'ZZZ';
       }
       let bCol = column(sortOn, botB, this);
-      if (bCol === 'none'){
+      if (bCol === 'none') {
         // put "none" at the bottom of the sort order
         bCol = 'ZZZ';
       }
@@ -450,6 +712,24 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     } else {
       this._cols.push(col);
     }
+    this._stateChanged();
+    this.render();
+  }
+
+  _toggleColSelector(e) {
+    e.preventDefault();
+    // Prevent double click event from happening with the
+    // click listener on <main>.
+    e.stopPropagation();
+    this._showColSelector = !this._showColSelector;
+    this._refilterPossibleColumns(); // also renders
+  }
+
+  _toggleFleetsCount(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    this._showFleetCounts = !this._showFleetCounts;
+    this._stateChanged();
     this.render();
   }
 
@@ -457,6 +737,7 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     // This prevents a double event from happening.
     e.preventDefault();
     this._verbose = !this._verbose;
+    this._stateChanged();
     this.render();
   }
 

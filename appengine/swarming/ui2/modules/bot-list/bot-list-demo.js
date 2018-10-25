@@ -12,7 +12,8 @@ import { requireLogin, mockAuthdAppGETs } from '../test_util'
 // correctly for it, and we get strange errors about 'this' not being defined.
 const fetchMock = require('fetch-mock');
 
-// uncomment to stress test with 2560 items
+// uncomment to stress test with 5120 items
+// data_s10.items.push(...data_s10.items);
 // data_s10.items.push(...data_s10.items);
 // data_s10.items.push(...data_s10.items);
 // data_s10.items.push(...data_s10.items);
@@ -23,11 +24,11 @@ const fetchMock = require('fetch-mock');
 // data_s10.items.push(...data_s10.items);
 
 mockAuthdAppGETs(fetchMock, {
-  delete_bots: false
+  delete_bot: false,
 });
 
 fetchMock.get('glob:/_ah/api/swarming/v1/bots/list?*',
-              requireLogin(data_s10));
+              requireLogin(data_s10, 500));
 
 fetchMock.get('/_ah/api/swarming/v1/bots/dimensions',
               requireLogin(fleetDimensions));

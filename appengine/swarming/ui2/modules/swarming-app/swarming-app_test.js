@@ -4,11 +4,11 @@
 
 import 'modules/swarming-app'
 
-if (!mockAppGETs) {
-  var mockAppGETs = require('modules/test_util').mockAppGETs;
-}
-
 describe('swarming-app', function() {
+  // Things that get imported multiple times go here, using require. Otherwise,
+  // the concatenation trick we do doesn't play well with webpack, which tries
+  // to include it multiple times.
+  const { mockAppGETs } = require('modules/test_util');
   const { fetchMock, MATCHED, UNMATCHED } = require('fetch-mock');
 
   beforeEach(function(){

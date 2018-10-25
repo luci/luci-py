@@ -8,11 +8,12 @@
 // If a function doesn't refer to 'this', it should go here, otherwise
 // it should go inside the element declaration.
 
-import { diffDate } from 'common-sk/modules/human'
+import * as human from 'common-sk/modules/human'
 // query.fromObject is more readable than just 'fromObject'
 import * as query from 'common-sk/modules/query'
 import { html } from 'lit-html'
 import naturalSort from 'javascript-natural-sort/naturalSort'
+import { sanitizeAndHumanizeTime } from '../util'
 
 /** aggregateTemps looks through the temperature data and computes an
  *  average temp. Beyond that, it prepares the temperature data for
@@ -88,27 +89,64 @@ export function devices(bot) {
   return bot.state.devices || [];
 }
 
-/** fromDimensions returns the array of dimension values that match the given
- *  key or null if this bot doesn't have that dimension.
- * @param {Object} bot - The bot from which to extract data.
- * @param {string} dim - The 'key' of the dimension to look for.
+/** filterPossibleColumns shows only those columns that match the given query.
+ *  This means, if there is a part of the query in the column (ignoring case).
  */
-export function fromDimension(bot, dim) {
-  if (!bot || !bot.dimensions || !dim) {
-    return null;
+export function filterPossibleColumns(allCols, query) {
+  if (!query) {
+    return allCols;
   }
-  for (let i = 0; i < bot.dimensions.length; i++) {
-    if (bot.dimensions[i].key === dim) {
-      return bot.dimensions[i].value;
+  return allCols.filter((c) => {
+    return matchPartCaseInsensitive(c, query);
+  });
+}
+
+/** filterPossibleKeys shows only those keys that match the given query.
+ *  This means, if there is a part of the key in the column (ignoring case),
+ *  or if any value associated to the key (via keyMap) matches.
+ */
+export function filterPossibleKeys(allKeys, keyMap, query) {
+  if (!query) {
+    return allKeys;
+  }
+  // Allow partially typed filters to still match parts.
+  query = query.replace(':', ' ').trim();
+  return allKeys.filter((k) => {
+    if (matchPartCaseInsensitive(k, query)) {
+      return true;
     }
+    let values = keyMap[k] || [];
+    for (let value of values) {
+      if (matchPartCaseInsensitive(value, query)) {
+        return true;
+      }
+    }
+    return false;
+  });
+}
+
+/** filterPossibleValues shows some values associated with the given query.
+ * If the user has typed in a query, show all secondary elements if
+ * their primary element matches.  If it doesn't match the primary
+ * element, only show those secondary elements that do.
+ */
+export function filterPossibleValues(allValues, currentKey, query) {
+  query = query.replace(':', ' ').trim();
+  if (!query || matchPartCaseInsensitive(currentKey, query)) {
+    return allValues;
   }
-  return null;
+  return allValues.filter((v) => {
+    if (matchPartCaseInsensitive(v, query)) {
+      return true;
+    }
+    return false;
+  });
 }
 
 // A list of special rules for filters. In practice, this is anything
 // that is not a dimension, since the API only supports filtering by
 // dimensions and these values.
-const specialFilters = {
+export const specialFilters = {
   id: function(bot, id) {
     return bot.bot_id === id;
   },
@@ -139,7 +177,7 @@ const specialFilters = {
     // Task must be 'busy'.
     return !!bot.task_id;
   }
-}
+};
 
 /** Filters the bots like they would be filtered from the server
  * filters: Array<String>: like ['alpha:beta']
@@ -173,6 +211,23 @@ export function filterBots(filters, bots) {
   });
 }
 
+/** fromDimensions returns the array of dimension values that match the given
+ *  key or null if this bot doesn't have that dimension.
+ * @param {Object} bot - The bot from which to extract data.
+ * @param {string} dim - The 'key' of the dimension to look for.
+ */
+export function fromDimension(bot, dim) {
+  if (!bot || !bot.dimensions || !dim) {
+    return null;
+  }
+  for (let i = 0; i < bot.dimensions.length; i++) {
+    if (bot.dimensions[i].key === dim) {
+      return bot.dimensions[i].value;
+    }
+  }
+  return null;
+}
+
 /** fromState returns the array of values that match the given key
  *  from a bot's state or null if this bot doesn't have it..
  * @param {Object} bot - The bot from which to extract data.
@@ -203,8 +258,9 @@ export function initCounts() {
  *  passed in args.
  *  @param {Array<string>} filters - a list of colon-separated key-values.
  *  @param {Number} limit - the limit of results to return.
+ *  @param {String} cursor - An optional cursor for server pagination.
  */
-export function listQueryParams(filters, limit) {
+export function listQueryParams(filters, limit, cursor) {
   let params = {};
   let dims = [];
   filters.forEach((f) => {
@@ -238,6 +294,9 @@ export function listQueryParams(filters, limit) {
   });
   params['dimensions'] = dims;
   params['limit'] = limit;
+  if (cursor) {
+    params['cursor'] = cursor;
+  }
   return query.fromObject(params);
 }
 
@@ -265,6 +324,30 @@ export function makeFilter(key, value) {
   return `${key}:${value}`;
 }
 
+/** matchPartCaseInsensitive returns true or false if str matches any
+ *of a space separated list of queries,
+ */
+export function matchPartCaseInsensitive(str, queries) {
+  if (!queries) {
+    return true;
+  }
+  if (!str) {
+    return false
+  }
+  queries = queries.trim().toLocaleLowerCase();
+  str = str.toLocaleLowerCase();
+  let xq = queries.split(' ');
+  for (let query of xq) {
+    let idx = str.indexOf(query);
+    if (idx !== -1) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const BOT_TIMES = ['first_seen_ts', 'last_seen_ts', 'lease_expiration_ts'];
+
 /** processBots processes the array of bots from the server and returns it.
  *  The primary goal is to get the data ready for display.
  */
@@ -272,7 +355,7 @@ export function processBots(arr) {
   if (!arr) {
     return [];
   }
-  arr.forEach((bot) => {
+  for (let bot of arr) {
     bot.state = (bot.state && JSON.parse(bot.state)) || {};
     // get the disks in an easier to deal with format, sorted by size.
     let disks = bot.state.disks || {};
@@ -324,8 +407,11 @@ export function processBots(arr) {
       return 0;
     });
     bot.state.devices = devices;
-  });
-  // TODO(kjlubick): do more here and write some tests for it.
+
+    for (let time of BOT_TIMES) {
+      sanitizeAndHumanizeTime(bot, time);
+    };
+  };
 
   return arr;
 }
@@ -399,10 +485,9 @@ export function processPrimaryMap(dimensions) {
   pMap['device_os'] && pMap['device_os'].push('none');
   pMap['device_type'] && pMap['device_type'].push('none');
 
-  pMap['id'] = [];
+  pMap['id'] = null;
 
   // Create custom filter/sorting options
-  pMap['disk_space'] = [];
   pMap['task'] = ['busy', 'idle'];
   pMap['status'] = ['alive', 'dead', 'quarantined', 'maintenance'];
   pMap['is_mp_bot'] = ['true', 'false'];
@@ -443,11 +528,11 @@ export function sortColumns(cols) {
   cols.sort(compareColumns);
 }
 
-/** sortKeys sorts the keys that show up in the left filter box. It puts the
+/** sortPossibleColumns sorts the columns in the column selector. It puts the
  *  selected ones on top in the order they are displayed and the rest below
  *  in alphabetical order.
  */
-export function sortKeys(keys, selectedCols) {
+export function sortPossibleColumns(keys, selectedCols) {
   let selected = {};
   for (let c of selectedCols) {
     selected[c] = true;
@@ -488,16 +573,23 @@ export function taskLink(taskId, disableCanonicalID) {
   return `/task?id=${taskId}`;
 }
 
+function timeDiffApprox(date) {
+  if (!date) {
+    return 'eons';
+  }
+  return human.diffDate(date.getTime());
+}
+
 const blacklistDimensions = ['quarantined', 'error', 'id'];
 
 /** extraKeys is a list of things we want to be able to sort by or display
- *  that aren't dimensions.
+ *  that are not dimensions.
 .*/
 export const extraKeys = ['disk_space', 'uptime', 'running_time', 'task',
 'status', 'version', 'external_ip', 'internal_ip', 'mp_lease_id',
 'mp_lease_expires', 'last_seen', 'first_seen', 'battery_level',
 'battery_voltage', 'battery_temperature', 'battery_status', 'battery_health',
-'bot_temperature', 'device_temperature', 'is_mp_bot'];
+'bot_temperature', 'device_temperature', 'serial_number'];
 
 /** colHeaderMap maps keys to their human readable name.*/
 export const colHeaderMap = {
@@ -527,10 +619,30 @@ export const colHeaderMap = {
   'os': 'OS',
   'pool': 'Pool',
   'running_time': 'Swarming Uptime',
+  'serial_number': 'Device Serial Number',
   'status': 'Status',
   'uptime': 'Bot Uptime',
   'xcode_version': 'XCode Version',
 };
+
+// Taken from http://developer.android.com/reference/android/os/BatteryManager.html
+const BATTERY_HEALTH_ALIASES = {
+  1: 'Unknown',
+  2: 'Good',
+  3: 'Overheated',
+  4: 'Dead',
+  5: 'Over Voltage',
+  6: 'Unspecified Failure',
+  7: 'Too Cold',
+}
+
+const BATTERY_STATUS_ALIASES = {
+  1: 'Unknown',
+  2: 'Charging',
+  3: 'Discharging',
+  4: 'Not Charging',
+  5: 'Full',
+}
 
 /** specialSortMap maps keys to their special sort rules, encapsulated in a
  *  function. The function takes in the current sort direction (1 for ascending)
@@ -540,14 +652,135 @@ export const specialSortMap = {
   id: (dir, botA, botB) => dir * naturalSort(botA.bot_id, botB.bot_id),
 };
 
-// TODO(kjlubick): running_time and many others should be implemented here.
+function deviceHelper(callback) {
+  return (bot, ele) => {
+    let devices = bot.state.devices;
+    if (!devices || !devices.length) {
+      return 'N/A - no devices';
+    }
+    return devices.map(callback).join(' | ');
+  };
+}
+
 const colMap = {
+  android_devices: (bot, ele) => {
+    let devs = attribute(bot, 'android_devices', '0');
+    if (ele._verbose) {
+      return devs.join(' | ') + ' devices available';
+    }
+    // max() works on strings as long as they can be coerced to Number.
+    return Math.max(...devs) + ' devices available';
+  },
+  battery_health: deviceHelper((device) => {
+    let h = (device.battery && device.battery.health) || 'UNKNOWN';
+    let alias = BATTERY_HEALTH_ALIASES[h] || '';
+    return `${alias} (${h})`;
+  }),
+  battery_level: deviceHelper((device) => {
+    return (device.battery && device.battery.level) || 'UNKNOWN';
+  }),
+  battery_status: deviceHelper((device) => {
+    let h = (device.battery && device.battery.status) || 'UNKNOWN';
+    let alias = BATTERY_STATUS_ALIASES[h] || '';
+    return `${alias} (${h})`;
+  }),
+  battery_temperature: deviceHelper((device) => {
+    // Battery temps are in tenths of degrees C - convert to more human range.
+    return (device.battery && device.battery.temperature / 10) || 'UNKNOWN';
+  }),
+  battery_voltage: deviceHelper((device) => {
+    return (device.battery && device.battery.voltage) || 'UNKNOWN';
+  }),
+  bot_temperature: (bot, ele) => {
+    if (ele._verbose) {
+      return bot.state.temp.zones || 'UNKNOWN';
+    }
+    return bot.state.temp.average || 'UNKNOWN';
+  },
+  device_temperature: (bot, ele) => {
+    let devices = bot.state.devices;
+    if (!devices || !devices.length) {
+      return 'N/A - no devices';
+    }
+    return devices.map((device) => {
+      if (ele._verbose) {
+        return device.temp.zones || UNKNOWN;
+      }
+      return device.temp.average || UNKNOWN;
+    }).join(' | ');
+  },
+  disk_space: (bot, ele) => {
+    let aliased = [];
+    for (let disk of bot.disks) {
+      let alias = human.bytes(disk.mb, human.MB);
+      aliased.push(`${disk.id} ${alias} (${disk.mb})`);
+    }
+    if (ele._verbose) {
+      return aliased.join(' | ');
+    }
+    return aliased[0];
+  },
+  external_ip: (bot, ele) => {
+    return bot.external_ip || 'none';
+  },
+  first_seen: (bot, ele) => {
+    return human.localeTime(bot.first_seen_ts);
+  },
   id: (bot, ele) => html`<a target=_blank
                             rel=noopener
                             href=${botLink(bot.bot_id)}>${bot.bot_id}</a>`,
+  internal_ip: (bot, ele) => {
+    return attribute(bot, 'ip', 'none')[0];
+  },
+  last_seen: (bot, ele) => {
+    if (ele._verbose) {
+      return human.localeTime(bot.last_seen_ts);
+    }
+    return timeDiffApprox(bot.last_seen_ts) + ' ago';
+  },
+  mp_lease_id: (bot, ele) => {
+    if (!bot.lease_id) {
+      return 'none';
+    }
+    let id = bot.lease_id;
+    if (!ele._verbose) {
+      id = id.substring(0, 10);
+    }
+    if (ele.server_details && ele.server_details.machine_provider_template) {
+      // Might not be loaded yet.
+      let mp_url = ele.server_details.machine_provider_template
+                      .replace('%s', bot.lease_id);
+      return html`<a target=_blank
+                     rel=noopener
+                     href=${mp_url}>${id}</a>`;
+    }
+    return id;
+  },
+  mp_lease_expires: (bot, ele) => {
+    if (!bot.lease_expiration_ts) {
+      return 'N/A';
+    }
+    if (ele._verbose) {
+      return human.localeTime(bot.lease_expiration_ts);
+    }
+    if (bot.lease_expiration_ts < new Date()) {
+      return timeDiffApprox(bot.lease_expiration_ts) + ' ago';
+    }
+    return 'in ' + timeDiffApprox(bot.lease_expiration_ts);
+  },
+  running_time:  (bot, ele) => {
+    let r = fromState(bot, 'running_time');
+    if (!r) {
+      return 'UNKNOWN';
+    }
+    return strDuration(r);
+  },
+  serial_number: deviceHelper((device) => {
+    return device.serial || 'UNKNOWN';
+  }),
   status: (bot, ele) => {
     if (bot.is_dead) {
-      return `Dead. Last seen ${diffDate(bot.last_seen_ts)} ago`;
+      return `Dead. Last seen ${human.diffDate(bot.last_seen_ts)} ago`;
     }
     if (bot.quarantined) {
       let msg = fromState(bot, 'quarantined');
@@ -564,17 +797,15 @@ const colMap = {
       if (msg === 'UNKNOWN') {
         msg = fromDimension(bot, 'quarantined') || 'UNKNOWN';
       }
-      let errs = [];
+      let deviceStates = [];
       // Show all the errors that are active on devices to make it more
       // clear if this is a transient error (e.g. device is too hot)
       // or if it is requires human interaction (e.g. device is unauthorized)
       devices(bot).forEach(function(d) {
-        if (d.state !== 'available') {
-          errs.push(d.state);
-        }
+          deviceStates.push(d.state);
       });
-      if (errs.length) {
-        msg += ` [${errs.join(',')}]`;
+      if (deviceStates.length) {
+        msg += ` devices: [${deviceStates.join(', ')}]`;
       }
       return `Quarantined: ${msg}`;
     }
@@ -592,4 +823,18 @@ const colMap = {
                    title=${bot.task_name}
                    href=${taskLink(bot.task_id)}>${bot.task_id}</a>`;
   },
+  uptime: (bot, ele) => {
+    let u = fromState(bot, 'uptime');
+    if (!u) {
+      return 'UNKNOWN';
+    }
+    return strDuration(u);
+  },
+  version: (bot, ele) => {
+    let v = bot.version || 'UNKNOWN';
+    if (ele._verbose) {
+      return v;
+    }
+    return v.substring(0, 10);
+  }
 };

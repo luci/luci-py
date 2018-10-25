@@ -115,7 +115,11 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
                       'with a different account';
       this._notAuthorized = true;
       this.render();
-    } else {
+    } else if (e.name !== 'AbortError') {
+      // We can ignore AbortError since they fire anytime a filter is added
+      // or removed (even for fetch promises that have already been resolved).
+      // Chrome and Firefox report a DOMException in this case:
+      // https://developer.mozilla.org/en-US/docs/Web/API/DOMException
       console.error(e);
       errorMessage(`Unexpected error loading ${loadingWhat}: ${e.message}`,
                    5000);
@@ -125,11 +129,11 @@ export default class SwarmingAppBoilerplate extends HTMLElement {
 
   /** Re-renders the app, starting with the top level template. */
   render() {
-    render(this._template(this), this);
+    render(this._template(this), this, {eventContext: this});
     if (!this._app) {
       this._app = this.firstElementChild;
       // render again in case anything was using attributes on this._app.
-      render(this._template(this), this);
+      render(this._template(this), this, {eventContext: this});
     }
   }
 
