@@ -14,6 +14,7 @@ import * as query from 'common-sk/modules/query'
 import { html } from 'lit-html'
 import naturalSort from 'javascript-natural-sort/naturalSort'
 import { sanitizeAndHumanizeTime } from '../util'
+import { applyAlias } from '../alias'
 
 /** aggregateTemps looks through the temperature data and computes an
  *  average temp. Beyond that, it prepares the temperature data for
@@ -43,7 +44,7 @@ export function aggregateTemps(temps) {
 
 /** attribute looks first in dimension and then in state for the
  * specified attribute. This will always return an array. If there is
- * no matching attribute, ['unknown'] will be returned. The typical
+ * no matching attribute, ['UNKNOWN'] will be returned. The typical
  * caller of this is column(), so the return value is generally a string.
  *
  * @param {Object} bot - The bot from which to extract data.
@@ -78,7 +79,9 @@ export function column(col, bot, ele) {
   if (c) {
     return c(bot, ele);
   }
-  return longestOrAll(attribute(bot, col, 'none'), ele._verbose);
+  let values = attribute(bot, col, 'none');
+  values = values.map((v) => applyAlias(v, col));
+  return longestOrAll(values, ele._verbose);
 }
 
 /** devices returns a potentially empty list of devices (e.g. Android devices)
@@ -117,6 +120,7 @@ export function filterPossibleKeys(allKeys, keyMap, query) {
     }
     let values = keyMap[k] || [];
     for (let value of values) {
+      value = applyAlias(value, k);
       if (matchPartCaseInsensitive(value, query)) {
         return true;
       }
@@ -130,12 +134,13 @@ export function filterPossibleKeys(allKeys, keyMap, query) {
  * their primary element matches.  If it doesn't match the primary
  * element, only show those secondary elements that do.
  */
-export function filterPossibleValues(allValues, currentKey, query) {
+export function filterPossibleValues(allValues, selectedKey, query) {
   query = query.replace(':', ' ').trim();
-  if (!query || matchPartCaseInsensitive(currentKey, query)) {
+  if (!query || matchPartCaseInsensitive(selectedKey, query)) {
     return allValues;
   }
   return allValues.filter((v) => {
+    v = applyAlias(v, selectedKey);
     if (matchPartCaseInsensitive(v, query)) {
       return true;
     }
@@ -390,7 +395,7 @@ export function processBots(arr) {
       // still have devices in their state (the last known device attached)
       // but don't have the device_type dimension. In that case, we punt
       // on device type.
-      let types = fromDimension(bot, 'device_type') || ['unknown'];
+      let types = fromDimension(bot, 'device_type') || ['UNKNOWN'];
       o.device_type = types[0];
       o.temp = aggregateTemps(o.temp);
       devices.push(o);
@@ -603,8 +608,8 @@ export const colHeaderMap = {
   'battery_temperature': 'Battery Temp (°C)',
   'battery_voltage': 'Battery Voltage (mV)',
   'bot_temperature': 'Bot Temp (°C)',
-  'cores': 'Cores',
-  'cpu': 'CPU',
+  'cores': 'CPU Core Count',
+  'cpu': 'CPU type',
   'device': 'Non-android Device',
   'device_os': 'Device OS',
   'device_temperature': 'Device Temp (°C)',
@@ -612,7 +617,7 @@ export const colHeaderMap = {
   'disk_space': 'Free Space (MB)',
   'external_ip': 'External IP',
   'first_seen': 'First Seen',
-  'gpu': 'GPU',
+  'gpu': 'GPU type',
   'internal_ip': 'Internal or Local IP',
   'last_seen': 'Last Seen',
   'mp_lease_expires': 'Machine Provider Lease Expires',
@@ -623,6 +628,7 @@ export const colHeaderMap = {
   'status': 'Status',
   'uptime': 'Bot Uptime',
   'xcode_version': 'XCode Version',
+  'version': 'Client Code Version',
 };
 
 // Taken from http://developer.android.com/reference/android/os/BatteryManager.html
@@ -773,7 +779,7 @@ const colMap = {
     if (!r) {
       return 'UNKNOWN';
     }
-    return strDuration(r);
+    return human.strDuration(r);
   },
   serial_number: deviceHelper((device) => {
     return device.serial || 'UNKNOWN';
@@ -828,7 +834,7 @@ const colMap = {
     if (!u) {
       return 'UNKNOWN';
     }
-    return strDuration(u);
+    return human.strDuration(u);
   },
   version: (bot, ele) => {
     let v = bot.version || 'UNKNOWN';

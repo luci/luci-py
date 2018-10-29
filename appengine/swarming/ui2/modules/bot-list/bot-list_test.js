@@ -852,6 +852,81 @@ describe('bot-list', function() {
       });
     });
 
+    it('makes certain columns more readable', function(done) {
+      loggedInBotlist((ele) => {
+        ele._cols = ['id', 'mp_lease_expires', 'mp_lease_id', 'uptime'];
+        ele._sort = 'mp_lease_expires';
+        ele._dir = 'desc';
+        ele.render();
+
+        let rows = $('.bot-table .bot-row', ele);
+        expect(rows).toBeTruthy();
+        expect(rows.length).toBe(10, '10 rows');
+
+        let cols = $('.bot-table .bot-row td', ele);
+        expect(cols).toBeTruthy();
+        expect(cols.length).toBe(4 * 10, '4 columns * 10 rows');
+        // little helper for readability
+        let cell = (r, c) => cols[4*r+c];
+
+        // Check the content of the first few rows (after sorting)
+        expect(cell(0, 0)).toMatchTextContent('somebot18-a9');
+        expect(cell(0, 1)).toMatchTextContent('in 71w');
+        expect(cell(0, 2).innerHTML).toContain('<a ', 'has an mp link');
+        expect(cell(0, 2).innerHTML).toContain('href="https://example.com/leases/22596363b3de40b06f981fb85d82312e8c0ed511"', 'link is correct');
+        expect(cell(0, 3)).toMatchTextContent('7h  1m 48s');
+
+        expect(cell(1, 0)).toMatchTextContent('somebot10-a9');
+        expect(cell(1, 1)).toMatchTextContent('N/A');
+        expect(cell(1, 2).innerHTML).not.toContain('<a ', 'no mp link');
+        expect(cell(1, 3)).toMatchTextContent('5h 53m 32s');
+        done();
+      });
+    });
+
+    it('applies aliases to certain columns', function(done) {
+      loggedInBotlist((ele) => {
+        ele._cols = ['id', 'device_type', 'gpu'];
+        ele._sort = 'device_type';
+        ele._dir = 'asc';
+        ele.render();
+
+        let rows = $('.bot-table .bot-row', ele);
+        expect(rows).toBeTruthy();
+        expect(rows.length).toBe(10, '10 rows');
+
+        let cols = $('.bot-table .bot-row td', ele);
+        expect(cols).toBeTruthy();
+        expect(cols.length).toBe(3 * 10, '3 columns * 10 rows');
+        // little helper for readability
+        let cell = (r, c) => cols[3*r+c];
+
+        // Check the content of the first few rows (after sorting)
+        expect(cell(0, 0)).toMatchTextContent('somebot11-a9');
+        expect(cell(0, 1)).toMatchTextContent('Nexus 5X (bullhead)');
+        expect(cell(0, 2)).toMatchTextContent('none');
+
+        expect(cell(1, 0)).toMatchTextContent('somebot10-a9');
+        expect(cell(1, 1)).toMatchTextContent('none');
+        expect(cell(1, 2)).toMatchTextContent('NVIDIA Quadro P400 (10de:1cb3-384.59)');
+        done();
+      });
+    });
+
+    it('applies aliases in the filter slots', function(done) {
+      loggedInBotlist((ele) => {
+        ele._primaryKey = 'gpu';
+        ele.render();
+
+        let values = $$('.values.selector', ele);
+        expect(values).toBeTruthy();
+        // spot check
+        expect(values.children[0]).toMatchTextContent('NVIDIA (10de)');
+        expect(values.children[8]).toMatchTextContent('Matrox MGA G200e (102b:0522)');
+        done();
+      });
+    });
+
   }); // end describe('dynamic behavior')
 
   describe('api calls', function() {

@@ -38,7 +38,8 @@ import 'elements-sk/styles/buttons'
 import '../sort-toggle'
 import '../swarming-app'
 
-import { stableSort, taskListLink } from '../util'
+import { taskListLink } from '../util'
+import { applyAlias } from '../alias'
 import { aggregateTemps, attribute, botLink, column, colHeaderMap,
          devices, extraKeys, filterBots, filterPossibleColumns, filterPossibleKeys,
          filterPossibleValues, fromDimension, fromState, initCounts,
@@ -83,7 +84,7 @@ const secondaryOptions = (ele) => {
   return values.map((value) =>
     html`
 <div class=item>
-  <span class=value>${value}</span>
+  <span class=value>${applyAlias(value, ele._primaryKey)}</span>
   <span class=flex></span>
   <add-circle-icon-sk ?hidden=${ele._filters.indexOf(makeFilter(ele._primaryKey, value)) >= 0}
                       @click=${() => ele._addFilter(makeFilter(ele._primaryKey, value))}>
@@ -262,6 +263,9 @@ const template = (ele) => html`
       <thead>
         <tr>
           ${col_options(ele)}
+          <!-- Slice off the first column (which is always 'id') so we can
+               have a custom first box (including the widget to select columns.
+            -->
           ${ele._cols.slice(1).map((col) => colHead(col,ele))}
         </tr>
       </thead>
@@ -412,7 +416,7 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     if (bot.maintenance_msg) {
       classes += 'maintenance ';
     }
-    if (bot.version !== this.server_details.server_version) {
+    if (bot.version !== this.server_details.bot_version) {
       classes += 'old_version';
     }
     return classes;
@@ -667,7 +671,9 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
   /* sort the internal set of bots based on the sort-toggle and direction
    * and returns it (for use in templating) */
   _sortBots() {
-    stableSort(this._bots, (botA, botB) => {
+    // All major supported browsers are now stable (or stable-ish)
+    // https://stackoverflow.com/a/3027715
+    this._bots.sort((botA, botB) => {
       let sortOn = this._sort;
       if (!sortOn) {
         return 0;
@@ -712,6 +718,7 @@ window.customElements.define('bot-list', class extends SwarmingAppBoilerplate {
     } else {
       this._cols.push(col);
     }
+    this._refilterPossibleColumns();
     this._stateChanged();
     this.render();
   }

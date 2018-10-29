@@ -93,6 +93,7 @@ export function mockAppGETs(fetchMock, permissions) {
   fetchMock.get('/_ah/api/swarming/v1/server/details', {
     server_version: '1234-abcdefg',
     bot_version: 'abcdoeraymeyouandme',
+    machine_provider_template: 'https://example.com/leases/%s',
   });
 
 
