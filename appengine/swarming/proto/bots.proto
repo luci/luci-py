@@ -4,6 +4,7 @@
 
 syntax = "proto3";
 
+package swarming;
 
 // Schema for bots.cfg service config file in luci-config.
 //

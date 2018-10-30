@@ -17,9 +17,9 @@ _sym_db = _symbol_database.Default()
 
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='config.proto',
-  package='',
+  package='swarming',
   syntax='proto3',
-  serialized_pb=_b('\n\x0c\x63onfig.proto\"\xf5\x03\n\x0bSettingsCfg\x12\x18\n\x10google_analytics\x18\x01 \x01(\t\x12\x1e\n\x16reusable_task_age_secs\x18\x02 \x01(\x05\x12\x1e\n\x16\x62ot_death_timeout_secs\x18\x03 \x01(\x05\x12\x1c\n\x14\x65nable_ts_monitoring\x18\x04 \x01(\x08\x12!\n\x07isolate\x18\x05 \x01(\x0b\x32\x10.IsolateSettings\x12\x1b\n\x04\x63ipd\x18\x06 \x01(\x0b\x32\r.CipdSettings\x12$\n\x02mp\x18\x07 \x01(\x0b\x32\x18.MachineProviderSettings\x12,\n$force_bots_to_sleep_and_not_run_task\x18\x08 \x01(\x08\x12\x14\n\x0cui_client_id\x18\t \x01(\t\x12#\n\x1b\x64isplay_server_url_template\x18\x0b \x01(\t\x12\x1a\n\x12max_bot_sleep_time\x18\x0c \x01(\x05\x12\x1b\n\x04\x61uth\x18\r \x01(\x0b\x32\r.AuthSettings\x12\x1e\n\x16\x62ot_isolate_grpc_proxy\x18\x0e \x01(\t\x12\x1f\n\x17\x62ot_swarming_grpc_proxy\x18\x0f \x01(\t\x12\x1f\n\x17\x65xtra_child_src_csp_url\x18\x10 \x03(\tJ\x04\x08\n\x10\x0b\"D\n\x0fIsolateSettings\x12\x16\n\x0e\x64\x65\x66\x61ult_server\x18\x01 \x01(\t\x12\x19\n\x11\x64\x65\x66\x61ult_namespace\x18\x02 \x01(\t\"4\n\x0b\x43ipdPackage\x12\x14\n\x0cpackage_name\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t\"T\n\x0c\x43ipdSettings\x12\x16\n\x0e\x64\x65\x66\x61ult_server\x18\x01 \x01(\t\x12,\n\x16\x64\x65\x66\x61ult_client_package\x18\x02 \x01(\x0b\x32\x0c.CipdPackage\":\n\x17MachineProviderSettings\x12\x0f\n\x07\x65nabled\x18\x01 \x01(\x08\x12\x0e\n\x06server\x18\x02 \x01(\t\"\xb1\x01\n\x0c\x41uthSettings\x12\x14\n\x0c\x61\x64mins_group\x18\x01 \x01(\t\x12\x1b\n\x13\x62ot_bootstrap_group\x18\x02 \x01(\t\x12\x1e\n\x16privileged_users_group\x18\x03 \x01(\t\x12\x13\n\x0busers_group\x18\x04 \x01(\t\x12\x1b\n\x13view_all_bots_group\x18\x05 \x01(\t\x12\x1c\n\x14view_all_tasks_group\x18\x06 \x01(\tb\x06proto3')
+  serialized_pb=_b('\n\x0c\x63onfig.proto\x12\x08swarming\"\x99\x04\n\x0bSettingsCfg\x12\x18\n\x10google_analytics\x18\x01 \x01(\t\x12\x1e\n\x16reusable_task_age_secs\x18\x02 \x01(\x05\x12\x1e\n\x16\x62ot_death_timeout_secs\x18\x03 \x01(\x05\x12\x1c\n\x14\x65nable_ts_monitoring\x18\x04 \x01(\x08\x12*\n\x07isolate\x18\x05 \x01(\x0b\x32\x19.swarming.IsolateSettings\x12$\n\x04\x63ipd\x18\x06 \x01(\x0b\x32\x16.swarming.CipdSettings\x12-\n\x02mp\x18\x07 \x01(\x0b\x32!.swarming.MachineProviderSettings\x12,\n$force_bots_to_sleep_and_not_run_task\x18\x08 \x01(\x08\x12\x14\n\x0cui_client_id\x18\t \x01(\t\x12#\n\x1b\x64isplay_server_url_template\x18\x0b \x01(\t\x12\x1a\n\x12max_bot_sleep_time\x18\x0c \x01(\x05\x12$\n\x04\x61uth\x18\r \x01(\x0b\x32\x16.swarming.AuthSettings\x12\x1e\n\x16\x62ot_isolate_grpc_proxy\x18\x0e \x01(\t\x12\x1f\n\x17\x62ot_swarming_grpc_proxy\x18\x0f \x01(\t\x12\x1f\n\x17\x65xtra_child_src_csp_url\x18\x10 \x03(\tJ\x04\x08\n\x10\x0b\"D\n\x0fIsolateSettings\x12\x16\n\x0e\x64\x65\x66\x61ult_server\x18\x01 \x01(\t\x12\x19\n\x11\x64\x65\x66\x61ult_namespace\x18\x02 \x01(\t\"4\n\x0b\x43ipdPackage\x12\x14\n\x0cpackage_name\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\t\"]\n\x0c\x43ipdSettings\x12\x16\n\x0e\x64\x65\x66\x61ult_server\x18\x01 \x01(\t\x12\x35\n\x16\x64\x65\x66\x61ult_client_package\x18\x02 \x01(\x0b\x32\x15.swarming.CipdPackage\":\n\x17MachineProviderSettings\x12\x0f\n\x07\x65nabled\x18\x01 \x01(\x08\x12\x0e\n\x06server\x18\x02 \x01(\t\"\xb1\x01\n\x0c\x41uthSettings\x12\x14\n\x0c\x61\x64mins_group\x18\x01 \x01(\t\x12\x1b\n\x13\x62ot_bootstrap_group\x18\x02 \x01(\t\x12\x1e\n\x16privileged_users_group\x18\x03 \x01(\t\x12\x13\n\x0busers_group\x18\x04 \x01(\t\x12\x1b\n\x13view_all_bots_group\x18\x05 \x01(\t\x12\x1c\n\x14view_all_tasks_group\x18\x06 \x01(\tb\x06proto3')
 )
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -28,111 +28,111 @@ _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 _SETTINGSCFG = _descriptor.Descriptor(
   name='SettingsCfg',
-  full_name='SettingsCfg',
+  full_name='swarming.SettingsCfg',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='google_analytics', full_name='SettingsCfg.google_analytics', index=0,
+      name='google_analytics', full_name='swarming.SettingsCfg.google_analytics', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='reusable_task_age_secs', full_name='SettingsCfg.reusable_task_age_secs', index=1,
+      name='reusable_task_age_secs', full_name='swarming.SettingsCfg.reusable_task_age_secs', index=1,
       number=2, type=5, cpp_type=1, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='bot_death_timeout_secs', full_name='SettingsCfg.bot_death_timeout_secs', index=2,
+      name='bot_death_timeout_secs', full_name='swarming.SettingsCfg.bot_death_timeout_secs', index=2,
       number=3, type=5, cpp_type=1, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='enable_ts_monitoring', full_name='SettingsCfg.enable_ts_monitoring', index=3,
+      name='enable_ts_monitoring', full_name='swarming.SettingsCfg.enable_ts_monitoring', index=3,
       number=4, type=8, cpp_type=7, label=1,
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='isolate', full_name='SettingsCfg.isolate', index=4,
+      name='isolate', full_name='swarming.SettingsCfg.isolate', index=4,
       number=5, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='cipd', full_name='SettingsCfg.cipd', index=5,
+      name='cipd', full_name='swarming.SettingsCfg.cipd', index=5,
       number=6, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='mp', full_name='SettingsCfg.mp', index=6,
+      name='mp', full_name='swarming.SettingsCfg.mp', index=6,
       number=7, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='force_bots_to_sleep_and_not_run_task', full_name='SettingsCfg.force_bots_to_sleep_and_not_run_task', index=7,
+      name='force_bots_to_sleep_and_not_run_task', full_name='swarming.SettingsCfg.force_bots_to_sleep_and_not_run_task', index=7,
       number=8, type=8, cpp_type=7, label=1,
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='ui_client_id', full_name='SettingsCfg.ui_client_id', index=8,
+      name='ui_client_id', full_name='swarming.SettingsCfg.ui_client_id', index=8,
       number=9, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='display_server_url_template', full_name='SettingsCfg.display_server_url_template', index=9,
+      name='display_server_url_template', full_name='swarming.SettingsCfg.display_server_url_template', index=9,
       number=11, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='max_bot_sleep_time', full_name='SettingsCfg.max_bot_sleep_time', index=10,
+      name='max_bot_sleep_time', full_name='swarming.SettingsCfg.max_bot_sleep_time', index=10,
       number=12, type=5, cpp_type=1, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='auth', full_name='SettingsCfg.auth', index=11,
+      name='auth', full_name='swarming.SettingsCfg.auth', index=11,
       number=13, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='bot_isolate_grpc_proxy', full_name='SettingsCfg.bot_isolate_grpc_proxy', index=12,
+      name='bot_isolate_grpc_proxy', full_name='swarming.SettingsCfg.bot_isolate_grpc_proxy', index=12,
       number=14, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='bot_swarming_grpc_proxy', full_name='SettingsCfg.bot_swarming_grpc_proxy', index=13,
+      name='bot_swarming_grpc_proxy', full_name='swarming.SettingsCfg.bot_swarming_grpc_proxy', index=13,
       number=15, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='extra_child_src_csp_url', full_name='SettingsCfg.extra_child_src_csp_url', index=14,
+      name='extra_child_src_csp_url', full_name='swarming.SettingsCfg.extra_child_src_csp_url', index=14,
       number=16, type=9, cpp_type=9, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -150,27 +150,27 @@ _SETTINGSCFG = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=17,
-  serialized_end=518,
+  serialized_start=27,
+  serialized_end=564,
 )
 
 
 _ISOLATESETTINGS = _descriptor.Descriptor(
   name='IsolateSettings',
-  full_name='IsolateSettings',
+  full_name='swarming.IsolateSettings',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='default_server', full_name='IsolateSettings.default_server', index=0,
+      name='default_server', full_name='swarming.IsolateSettings.default_server', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='default_namespace', full_name='IsolateSettings.default_namespace', index=1,
+      name='default_namespace', full_name='swarming.IsolateSettings.default_namespace', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -188,27 +188,27 @@ _ISOLATESETTINGS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=520,
-  serialized_end=588,
+  serialized_start=566,
+  serialized_end=634,
 )
 
 
 _CIPDPACKAGE = _descriptor.Descriptor(
   name='CipdPackage',
-  full_name='CipdPackage',
+  full_name='swarming.CipdPackage',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='package_name', full_name='CipdPackage.package_name', index=0,
+      name='package_name', full_name='swarming.CipdPackage.package_name', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='version', full_name='CipdPackage.version', index=1,
+      name='version', full_name='swarming.CipdPackage.version', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -226,27 +226,27 @@ _CIPDPACKAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=590,
-  serialized_end=642,
+  serialized_start=636,
+  serialized_end=688,
 )
 
 
 _CIPDSETTINGS = _descriptor.Descriptor(
   name='CipdSettings',
-  full_name='CipdSettings',
+  full_name='swarming.CipdSettings',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='default_server', full_name='CipdSettings.default_server', index=0,
+      name='default_server', full_name='swarming.CipdSettings.default_server', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='default_client_package', full_name='CipdSettings.default_client_package', index=1,
+      name='default_client_package', full_name='swarming.CipdSettings.default_client_package', index=1,
       number=2, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
@@ -264,27 +264,27 @@ _CIPDSETTINGS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=644,
-  serialized_end=728,
+  serialized_start=690,
+  serialized_end=783,
 )
 
 
 _MACHINEPROVIDERSETTINGS = _descriptor.Descriptor(
   name='MachineProviderSettings',
-  full_name='MachineProviderSettings',
+  full_name='swarming.MachineProviderSettings',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='enabled', full_name='MachineProviderSettings.enabled', index=0,
+      name='enabled', full_name='swarming.MachineProviderSettings.enabled', index=0,
       number=1, type=8, cpp_type=7, label=1,
       has_default_value=False, default_value=False,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='server', full_name='MachineProviderSettings.server', index=1,
+      name='server', full_name='swarming.MachineProviderSettings.server', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -302,55 +302,55 @@ _MACHINEPROVIDERSETTINGS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=730,
-  serialized_end=788,
+  serialized_start=785,
+  serialized_end=843,
 )
 
 
 _AUTHSETTINGS = _descriptor.Descriptor(
   name='AuthSettings',
-  full_name='AuthSettings',
+  full_name='swarming.AuthSettings',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='admins_group', full_name='AuthSettings.admins_group', index=0,
+      name='admins_group', full_name='swarming.AuthSettings.admins_group', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='bot_bootstrap_group', full_name='AuthSettings.bot_bootstrap_group', index=1,
+      name='bot_bootstrap_group', full_name='swarming.AuthSettings.bot_bootstrap_group', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='privileged_users_group', full_name='AuthSettings.privileged_users_group', index=2,
+      name='privileged_users_group', full_name='swarming.AuthSettings.privileged_users_group', index=2,
       number=3, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='users_group', full_name='AuthSettings.users_group', index=3,
+      name='users_group', full_name='swarming.AuthSettings.users_group', index=3,
       number=4, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='view_all_bots_group', full_name='AuthSettings.view_all_bots_group', index=4,
+      name='view_all_bots_group', full_name='swarming.AuthSettings.view_all_bots_group', index=4,
       number=5, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='view_all_tasks_group', full_name='AuthSettings.view_all_tasks_group', index=5,
+      name='view_all_tasks_group', full_name='swarming.AuthSettings.view_all_tasks_group', index=5,
       number=6, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
@@ -368,8 +368,8 @@ _AUTHSETTINGS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=791,
-  serialized_end=968,
+  serialized_start=846,
+  serialized_end=1023,
 )
 
 _SETTINGSCFG.fields_by_name['isolate'].message_type = _ISOLATESETTINGS
@@ -387,42 +387,42 @@ DESCRIPTOR.message_types_by_name['AuthSettings'] = _AUTHSETTINGS
 SettingsCfg = _reflection.GeneratedProtocolMessageType('SettingsCfg', (_message.Message,), dict(
   DESCRIPTOR = _SETTINGSCFG,
   __module__ = 'config_pb2'
-  # @@protoc_insertion_point(class_scope:SettingsCfg)
+  # @@protoc_insertion_point(class_scope:swarming.SettingsCfg)
   ))
 _sym_db.RegisterMessage(SettingsCfg)
 
 IsolateSettings = _reflection.GeneratedProtocolMessageType('IsolateSettings', (_message.Message,), dict(
   DESCRIPTOR = _ISOLATESETTINGS,
   __module__ = 'config_pb2'
-  # @@protoc_insertion_point(class_scope:IsolateSettings)
+  # @@protoc_insertion_point(class_scope:swarming.IsolateSettings)
   ))
 _sym_db.RegisterMessage(IsolateSettings)
 
 CipdPackage = _reflection.GeneratedProtocolMessageType('CipdPackage', (_message.Message,), dict(
   DESCRIPTOR = _CIPDPACKAGE,
   __module__ = 'config_pb2'
-  # @@protoc_insertion_point(class_scope:CipdPackage)
+  # @@protoc_insertion_point(class_scope:swarming.CipdPackage)
   ))
 _sym_db.RegisterMessage(CipdPackage)
 
 CipdSettings = _reflection.GeneratedProtocolMessageType('CipdSettings', (_message.Message,), dict(
   DESCRIPTOR = _CIPDSETTINGS,
   __module__ = 'config_pb2'
-  # @@protoc_insertion_point(class_scope:CipdSettings)
+  # @@protoc_insertion_point(class_scope:swarming.CipdSettings)
   ))
 _sym_db.RegisterMessage(CipdSettings)
 
 MachineProviderSettings = _reflection.GeneratedProtocolMessageType('MachineProviderSettings', (_message.Message,), dict(
   DESCRIPTOR = _MACHINEPROVIDERSETTINGS,
   __module__ = 'config_pb2'
-  # @@protoc_insertion_point(class_scope:MachineProviderSettings)
+  # @@protoc_insertion_point(class_scope:swarming.MachineProviderSettings)
   ))
 _sym_db.RegisterMessage(MachineProviderSettings)
 
 AuthSettings = _reflection.GeneratedProtocolMessageType('AuthSettings', (_message.Message,), dict(
   DESCRIPTOR = _AUTHSETTINGS,
   __module__ = 'config_pb2'
-  # @@protoc_insertion_point(class_scope:AuthSettings)
+  # @@protoc_insertion_point(class_scope:swarming.AuthSettings)
   ))
 _sym_db.RegisterMessage(AuthSettings)
 
