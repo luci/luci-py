@@ -303,7 +303,16 @@ class AdbCommandsSafe(object):
       # TODO(maruel): Distinction between file is not present and I/O error.
       for _ in self._Loop():
         try:
-          return self._adb_cmd.Pull(remotefile, None)
+          if not self._needs_su:
+            return self._adb_cmd.Pull(remotefile, None)
+          else:
+            # If we need su to be root, we likely can't use adb's filesync. So
+            # cat the file instead as a normal shell command and return the
+            # output.
+            out, exit_code = self.Shell('cat %s' % remotefile)
+            if exit_code:
+              return None
+            return out
         except usb_exceptions.AdbCommandFailureException:
           break
         except self._ERRORS as e:
