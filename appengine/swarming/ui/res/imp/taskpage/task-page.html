@@ -380,8 +380,8 @@
                 </template>
                 <template is="dom-if" if="[[_currentSlice.properties.secret_bytes]]">
                   <tr>
-                    <td>Secret Bytes</td>
-                    <td>[[_currentSlice.properties.secret_bytes]]</td>
+                    <td>Has Secret Bytes</td>
+                    <td title="The secret bytes on present on the machine, but not in the UI/API">true</td>
                   </tr>
                 </template>
                 <template is="dom-if" if="[[_request.parent_task_id]]">
