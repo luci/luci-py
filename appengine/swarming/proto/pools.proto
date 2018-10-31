@@ -96,6 +96,12 @@ message Pool {
 
   // Refer to one bot_monitoring at the file level by name.
   string bot_monitoring = 8;
+
+  // If specified, this is the description of the external schedulers to be used
+  // for tasks and bots for this pool that match the dimension set of a scheduler.
+  // If there are multiple items in this list, then the first one that matches
+  // the dimension set of a given task or bot will be used for that task or bot.
+  repeated ExternalSchedulerConfig external_schedulers = 9;
 }
 
 
@@ -339,4 +345,20 @@ message BotMonitoring {
   // More precisely, when this is used, the other bot dimensions are ignored.
   // 'pool' is always implicit.
   repeated string dimension_key = 2;
+}
+
+// Describes an external scheduler used by a particular swarming pool and
+// dimension set, via the external scheduler API.
+message ExternalSchedulerConfig {
+  // Service address of external scheduler.
+  string address = 1;
+
+  // Scheduler id within the external scheduler service to use. This value
+  // is opaque to swarming.
+  string id = 2;
+
+  // Dimensions is a list of dimension strings in "key:value" format (e.g.
+  // ["os:foo", "featureX:bar"]). A task or bot will use this external scheduler
+  // if and only if the task or bot contains all of these dimensions.
+  repeated string dimensions = 3;
 }
