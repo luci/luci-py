@@ -80,6 +80,8 @@ class TaskState(messages.Enum):
   constants look like a bitmask. This is because of historical reasons and this
   is effectively an enum, not a bitmask.
   """
+  # Invalid state, do not use.
+  INVALID = 0x00
   # The task is currently running. This is in fact 3 phases: the initial
   # overhead to fetch input files, the actual task running, and the tear down
   # overhead to archive output files to the server.

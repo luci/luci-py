@@ -1,0 +1,96 @@
+// Copyright 2018 The LUCI Authors. All rights reserved.
+// Use of this source code is governed under the Apache License, Version 2.0
+// that can be found in the LICENSE file.
+
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+package swarming;
+
+// TaskState represents the different allowed states for a Task.
+//
+// This is taken from swarming_rpcs.py:TaskState
+enum TaskState {
+  // Invalid state, do not use.
+  INVALID = 0;
+  // The task is currently running. This is in fact 3 phases: the initial
+  // overhead to fetch input files, the actual task running, and the tear down
+  // overhead to archive output files to the server.
+  RUNNING = 0x10;
+  // The task is currently pending. This means that no bot reaped the task. It
+  // will stay in this state until either a task reaps it or the expiration
+  // elapsed. The task pending expiration is specified as
+  // TaskSlice.expiration_secs, one per task slice.
+  PENDING = 0x20;
+  // The task is not pending anymore, and never ran due to lack of capacity. This
+  // means that other higher priority tasks ran instead and that not enough bots
+  // were available to run this task for TaskSlice.expiration_secs seconds.
+  EXPIRED = 0x30;
+  // The task ran for longer than the allowed time in
+  // TaskProperties.execution_timeout_secs or TaskProperties.io_timeout_secs.
+  // This means the bot forcefully killed the task process as described in the
+  // graceful termination dance in the documentation.
+  TIMED_OUT = 0x40;
+  // The task ran but the bot had an internal failure, unrelated to the task
+  // itself. It can be due to the server being unavailable to get task update,
+  // the host on which the bot is running crashing or rebooting, etc.
+  BOT_DIED = 0x50;
+  // The task never ran, and was manually cancelled via the 'cancel' API before
+  // it was reaped.
+  CANCELED = 0x60;
+  // The task ran and completed normally. The task process exit code may be 0 or
+  // another value.
+  COMPLETED = 0x70;
+  // The task ran but was manually killed via the 'cancel' API. This means the
+  // bot forcefully killed the task process as described in the graceful
+  // termination dance in the documentation.
+  KILLED = 0x80;
+  // The task was never set to PENDING and was immediately refused, as the server
+  // determined that there is no bot capacity to run this task. This happens
+  // because no bot exposes a superset of the requested task dimensions.
+  //
+  // Set TaskSlice.wait_for_capacity to True to force the server to keep the task
+  // slice pending even in this case. Generally speaking, the task will
+  // eventually switch to EXPIRED, as there's no bot to run it. That said, there
+  // are situations where it is known that in some not-too-distant future a wild
+  // bot will appear that will be able to run this task.
+  NO_RESOURCE = 0x100;
+}
+
+// TaskSpec describes a task request and its state, for the purposes of the
+// external scheduler API.
+//
+// It intentionally elides aspects of a task request that are irrelevant
+// to scheduling decisions, to keep this proto small for performance reasons.
+//
+// This message format is in its early stages, and may be subject to frequent
+// or even breaking changes as the external scheduler API is rolled out.
+message TaskSpec {
+  // ID is the swarming task request it.
+  string id = 1;
+
+  // Tags is the list of tags applied to this task request.
+  repeated string tags = 2;
+
+  // Slices is the set of task slices for this spec. A TaskSpec must contain
+  // at least 1 slice.
+  repeated SliceSpec slices = 3;
+
+  // State is the current state of this task.
+  TaskState state = 4;
+
+  // BotID is the id of the bot that this task is running on. It is only
+  // valid if state=RUNNING.
+  string bot_id = 5;
+
+  // EnqueuedTime is the time at which a task was enqueued. It is only valid
+  // if state=PENDING.
+  google.protobuf.Timestamp enqueued_time = 6;
+}
+
+// SliceSpec describes a task request slice, for the purposes of TaskSpec.
+message SliceSpec {
+  // Dimensions is set dimension strings for this slice.
+  repeated string dimensions = 1;
+}
