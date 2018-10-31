@@ -110,7 +110,7 @@ def report_memory(app):
   """Wraps an app so handlers log when memory usage increased by at least 0.5MB
   after the handler completed.
   """
-  if is_local_dev_server():
+  if is_unit_test():
     # Otherwise this fails with:
     # AssertionError: No api proxy found for service "system"
     return
