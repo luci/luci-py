@@ -2427,6 +2427,12 @@ class BotApiTest(BaseTest):
             base64.b64decode(actual['items'][0]['performance_stats'][k][j]))
     self.assertEqual(expected, actual)
 
+    request = handlers_endpoints.BotTasksRequest.combined_message_class(
+        bot_id='bot1', include_performance_stats=True,
+        sort=swarming_rpcs.TaskSort.COMPLETED_TS)
+    body = message_to_dict(request)
+    response = self.call_api('tasks', body=body)
+
   def test_events(self):
     # Run one task, push an event manually.
     self.mock(random, 'getrandbits', lambda _: 0x88)

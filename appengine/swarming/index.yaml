@@ -39,6 +39,12 @@ indexes:
 - kind: TaskRunResult
   properties:
   - name: bot_id
+  - name: completed_ts
+    direction: desc
+
+- kind: TaskRunResult
+  properties:
+  - name: bot_id
   - name: started_ts
 
 - kind: TaskRunResult
